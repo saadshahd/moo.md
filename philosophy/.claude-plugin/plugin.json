@@ -1,0 +1,13 @@
+{
+  "name": "philosophy",
+  "version": "0.0.1",
+  "description": "clarify before you build. learn from failure. iterate with confidence.",
+  "author": {
+    "name": "Saad saahd",
+    "url": "https://saadshahd.github.io"
+  },
+  "homepage": "https://github.com/saadsaahd/moo.md",
+  "repository": "https://github.com/saadsaahd/moo.md",
+  "license": "MIT",
+  "keywords": ["intent", "inversion", "confidence", "functional", "iterate"]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "moo.md",
+  "description": "thoughtful plugins for Claude Code",
+  "owner": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  },
+  "plugins": [
+    {
+      "name": "philosophy",
+      "source": "./philosophy",
+      "description": "clarify before you build. learn from failure. iterate with confidence.",
+      "category": "productivity"
+    }
+  ]
+}
