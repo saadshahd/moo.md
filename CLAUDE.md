@@ -56,7 +56,7 @@ description: What it does. One line.
 
 - Skills: `skills/<skill-name>/SKILL.md` (kebab-case)
 - Commands: `commands/<verb>.md` (e.g., `plan.md`, `debug.md`)
-- Agents: `agents/<role>.md` (e.g., `codebase-explorer.md`)
+- Agents: `agents/<role>.md` (e.g., `explorer.md`)
 
 ### Reference Files
 
