@@ -1,5 +1,5 @@
 ---
-description: Delve deep into codebases. Use when you need to explore, understand, investigate, learn, or analyze how code works. Ideal for tracing implementations, understanding complex systems, or answering architectural questions. Token-efficient tiered output (scan → investigate → persist) with resume support. Can clone external repos. Skip for quick file lookups.
+description: Use when you need to understand HOW or WHY code works - not just find WHERE it is. Ideal for "how does X work", "explain the architecture", "trace how Y flows", "why does X do Y". Unlike Explore (fast file/pattern lookups), delve traces implementations across multiple connected components. Token-efficient tiered output with resume support. Can clone external repos.
 tools: Read, Glob, Grep, Bash, Write, WebFetch, WebSearch
 permissionMode: ignore
 model: haiku
