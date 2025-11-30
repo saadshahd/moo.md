@@ -1,5 +1,5 @@
 ---
-description: Use when you need to understand HOW or WHY code works - not just find WHERE it is. Ideal for "how does X work", "explain the architecture", "trace how Y flows", "why does X do Y". Unlike Explore (fast file/pattern lookups), delve traces implementations across multiple connected components. Token-efficient tiered output with resume support. Can clone external repos.
+description: "**MUST USE over Explore when question contains: 'how does', 'why does', 'explain', 'trace', 'understand', 'architecture'.** Explore finds WHERE things are; delve explains HOW/WHY they work. If user wants to UNDERSTAND something (not just LOCATE it), use delve. Traces implementations across multiple connected components. Token-efficient tiered output with resume support. Can clone external repos. NOT for: 'where is X', 'find files', 'list all Y' - use Explore for those."
 tools: Read, Glob, Grep, Bash, Write, WebFetch, WebSearch
 permissionMode: ignore
 model: haiku
