@@ -38,8 +38,7 @@ moo.md/                            # Marketplace (can host multiple plugins)
 ```yaml
 ---
 name: kebab-case-name
-description: |
-  3rd person. Trigger condition + what it does. Max 1024 chars.
+description: Single line. Trigger condition + what it does. Max 1024 chars.
 version: 0.0.1
 ---
 ```
@@ -48,9 +47,11 @@ version: 0.0.1
 
 ```yaml
 ---
-description: What it does. One line.
+description: Single line. What it does and when to use it.
 ---
 ```
+
+**WARNING:** Never use multi-line YAML blocks (`|` or `>`). Claude Code truncates them, breaking auto-triggering.
 
 ### File Naming
 
