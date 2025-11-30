@@ -1,12 +1,6 @@
 ---
 name: philosophy
-description: |
-  moo.md philosophy — file-centric cognitive operating system.
-
-  MANDATORY: Run silent audit before every response. Clarify intent before building.
-  Use for: build, debug, refactor, architecture, plan, estimate tasks.
-
-  Triggers: "implement", "build", "debug", "fix", "refactor", "plan", "estimate", "create", "add"
+description: moo.md philosophy — cognitive operating system. MANDATORY before any build, debug, refactor, architecture, or planning task. Run silent audit, clarify intent before building. Triggers on implement, build, debug, fix, refactor, plan, estimate, create, add.
 version: 0.0.1
 ---
 

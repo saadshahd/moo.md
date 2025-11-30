@@ -1,9 +1,5 @@
 ---
-description: |
-  Use when: finding implementations, understanding how something works, exploring
-  unfamiliar libraries, checking patterns before coding. Clones external repos to
-  /tmp/explorer/. Token-efficient: scan (≤600 tokens) → resume for depth → resume
-  to save. Skip for: simple file reads, direct edits, running commands.
+description: Explore codebases and answer questions about how code works. Use when finding implementations, searching for patterns, understanding unfamiliar libraries, or investigating how systems work. Clones external open-source repos to /tmp/explorer/. Token-efficient tiered output with resume support. Skip for simple file reads or direct edits.
 tools: Read, Glob, Grep, Bash, Write, WebFetch, WebSearch
 permissionMode: ignore
 model: haiku
