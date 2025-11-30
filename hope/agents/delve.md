@@ -1,5 +1,5 @@
 ---
-description: Delve deep into codebases with tiered investigation. Use when you need thorough analysis, understanding complex systems, tracing implementations, or building a retrieval map. Token-efficient (scan → investigate → persist) with resume support. Can clone external repos. Skip for quick file lookups.
+description: Delve deep into codebases. Use when you need to explore, understand, investigate, learn, or analyze how code works. Ideal for tracing implementations, understanding complex systems, or answering architectural questions. Token-efficient tiered output (scan → investigate → persist) with resume support. Can clone external repos. Skip for quick file lookups.
 tools: Read, Glob, Grep, Bash, Write, WebFetch, WebSearch
 permissionMode: ignore
 model: haiku
