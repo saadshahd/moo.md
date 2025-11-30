@@ -1,6 +1,6 @@
 ---
-name: philosophy
-description: moo.md philosophy — cognitive operating system. MANDATORY before any build, debug, refactor, architecture, or planning task. Run silent audit, clarify intent before building. Triggers on implement, build, debug, fix, refactor, plan, estimate, create, add.
+name: hope
+description: moo.md hope — cognitive operating system. MANDATORY before any build, debug, refactor, architecture, or planning task. Run silent audit, clarify intent before building. Triggers on implement, build, debug, fix, refactor, plan, estimate, create, add.
 version: 0.0.1
 ---
 

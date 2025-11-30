@@ -7,8 +7,8 @@
   },
   "plugins": [
     {
-      "name": "philosophy",
-      "source": "./philosophy",
+      "name": "hope",
+      "source": "./hope",
       "description": "clarify before you build. learn from failure. iterate with confidence.",
       "category": "productivity"
     }

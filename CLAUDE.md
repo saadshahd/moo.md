@@ -9,7 +9,7 @@ moo.md — thoughtful plugins for Claude Code.
 ```
 moo.md/                            # Marketplace (can host multiple plugins)
 ├── .claude-plugin/marketplace.json
-├── philosophy/                    # First plugin
+├── hope/                    # First plugin
 │   ├── .claude-plugin/plugin.json
 │   ├── skills/<skill-name>/
 │   │   ├── SKILL.md
@@ -26,7 +26,7 @@ moo.md/                            # Marketplace (can host multiple plugins)
 ```bash
 # From parent directory:
 /plugin marketplace add ./moo.md
-/plugin install philosophy@moo.md
+/plugin install hope@moo.md
 ```
 
 ## Conventions

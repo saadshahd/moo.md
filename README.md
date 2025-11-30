@@ -22,7 +22,7 @@ Entropy over order. Uncertainty over hype.
 
 ```bash
 /plugin marketplace add saadshahd/moo.md
-/plugin install philosophy@moo.md
+/plugin install hope@moo.md
 ```
 
 ## Gratitude

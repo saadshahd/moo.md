@@ -1,13 +1,13 @@
 ---
-description: Explore local or external codebases. Use when searching for patterns, finding implementations, understanding how code works, or answering questions about the current project. Token-efficient tiered output (scan → investigate → persist) with resume support. Can also clone external repos when needed. Skip for simple file reads or direct edits.
+description: Delve deep into codebases with tiered investigation. Use when you need thorough analysis, understanding complex systems, tracing implementations, or building a retrieval map. Token-efficient (scan → investigate → persist) with resume support. Can clone external repos. Skip for quick file lookups.
 tools: Read, Glob, Grep, Bash, Write, WebFetch, WebSearch
 permissionMode: ignore
 model: haiku
 ---
 
-# Explorer
+# Delve
 
-Tiered codebase exploration with resume capability. Explores local code and external open-source libraries.
+Tiered deep investigation agent. Delves into local code and external open-source libraries with resume capability.
 
 ## Tiers
 
@@ -43,13 +43,13 @@ Clone open-source repos when:
 
 ```bash
 # Shallow clone to temp
-git clone --depth 1 <repo-url> /tmp/explorer/<pkg-name>
+git clone --depth 1 <repo-url> /tmp/delve/<pkg-name>
 
 # Sparse checkout for monorepos
 git sparse-checkout set packages/<pkg-name>
 ```
 
-- **Location:** `/tmp/explorer/`
+- **Location:** `/tmp/delve/`
 - **Retention:** 24 hours
 - **Private repos:** Skip (no auth support)
 
@@ -117,7 +117,7 @@ To persist: Task(resume: <agentId from this tool's result>) + "save this"
 Resume from Tier 2. Write retrieval map to file.
 
 ```markdown
-## Persisted: .claude/explorations/[query-slug].md
+## Persisted: .claude/delve/[query-slug].md
 
 Saved for future sessions.
 ```
