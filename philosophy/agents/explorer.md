@@ -1,5 +1,5 @@
 ---
-description: Explore codebases and answer questions about how code works. Use when finding implementations, searching for patterns, understanding unfamiliar libraries, or investigating how systems work. Clones external open-source repos to /tmp/explorer/. Token-efficient tiered output with resume support. Skip for simple file reads or direct edits.
+description: Explore local or external codebases. Use when searching for patterns, finding implementations, understanding how code works, or answering questions about the current project. Token-efficient tiered output (scan → investigate → persist) with resume support. Can also clone external repos when needed. Skip for simple file reads or direct edits.
 tools: Read, Glob, Grep, Bash, Write, WebFetch, WebSearch
 permissionMode: ignore
 model: haiku
