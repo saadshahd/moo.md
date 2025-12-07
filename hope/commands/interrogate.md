@@ -9,6 +9,7 @@ Enter question-generator mode. Surface questions that matter.
 ## Phase 1: Context Mapping
 
 Understand the topic:
+
 - What domain does this belong to?
 - What's the stated goal?
 - Who cares about this and why?
@@ -16,9 +17,10 @@ Understand the topic:
 
 ## Phase 2: Question Generation
 
-Generate 15-20 questions across 5 categories:
+Generate 15-20 questions across 5 categories, use ask tool:
 
 ### 1. Root Cause (5 Whys)
+
 - Why does this problem exist?
 - Why hasn't it been solved already?
 - Why now vs later?
@@ -26,6 +28,7 @@ Generate 15-20 questions across 5 categories:
 - Why does this matter?
 
 ### 2. Constraints & Boundaries
+
 - What can't change here?
 - What would make this impossible?
 - What's the budget (time/money/energy)?
@@ -33,6 +36,7 @@ Generate 15-20 questions across 5 categories:
 - What regulations apply?
 
 ### 3. Hidden Assumptions
+
 - What are we taking for granted?
 - What "everyone knows" might be wrong?
 - What worked before that might not work now?
@@ -40,6 +44,7 @@ Generate 15-20 questions across 5 categories:
 - What would a beginner ask?
 
 ### 4. Success & Failure
+
 - What does success look like in detail?
 - How would we measure it?
 - What would make this fail immediately?
@@ -47,6 +52,7 @@ Generate 15-20 questions across 5 categories:
 - Who defines success here?
 
 ### 5. Alternative Framings
+
 - What if the opposite were true?
 - What would [different expert] ask about this?
 - What's the meta-problem here?
@@ -56,6 +62,7 @@ Generate 15-20 questions across 5 categories:
 ## Phase 3: Prioritization
 
 Rank questions by:
+
 - **Critical**: Answer changes everything
 - **Important**: Significantly affects approach
 - **Useful**: Clarifies details

@@ -1,0 +1,13 @@
+{
+  "name": "product",
+  "version": "0.0.1",
+  "description": "PRD generation, competitive analysis, research synthesis, and goal systems for product work.",
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  },
+  "homepage": "https://github.com/saadsaahd/moo.md",
+  "repository": "https://github.com/saadsaahd/moo.md",
+  "license": "MIT",
+  "keywords": ["prd", "competitive", "research", "metrics", "product"]
+}

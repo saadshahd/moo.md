@@ -11,6 +11,7 @@ Start a task the moo.md way. **Will not proceed until ≥85% confident in intent
 Before anything else, identify what's unclear.
 
 **Ask yourself (silently):**
+
 - What problem does this solve today?
 - Who's the user and what's their journey?
 - What's the simplest version that works?
@@ -18,7 +19,8 @@ Before anything else, identify what's unclear.
 - What constraints exist (tech, perf, compat)?
 - What's been tried before?
 
-**If confidence < 85%**, ask the user 3-5 targeted questions:
+**If confidence < 85%**, ask the user 3-5 targeted questions using the ask tool:
+
 - Open-ended (no yes/no)
 - Designed to surface blind spots
 - Cover: purpose, success criteria, constraints, edge cases
@@ -40,6 +42,7 @@ Once intent is clear:
 ## Phase 3: Library Search (Build tasks)
 
 Search production libraries:
+
 - npm / PyPI / crates.io
 - Find ≥2 options OR justify why none exist
 - Evaluate: downloads, maintenance, security
@@ -47,10 +50,12 @@ Search production libraries:
 ## Phase 4: Assess Confidence
 
 State confidence as range:
+
 - Apply novelty decay (first time = max 70%)
 - Cite specific evidence
 
 **Confidence gates:**
+
 - < 70% → More research needed, don't recommend yet
 - 70-85% → Can proceed with monitoring
 - ≥ 85% → Ship with confidence
