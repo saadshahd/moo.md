@@ -4,21 +4,15 @@
 
 moo.md — thoughtful plugins for Claude Code.
 
-## Plugin Structure
+## Structure
 
 ```
-moo.md/                            # Marketplace (can host multiple plugins)
-├── .claude-plugin/marketplace.json
-├── hope/                    # First plugin
-│   ├── .claude-plugin/plugin.json
-│   ├── skills/<skill-name>/
-│   │   ├── SKILL.md
-│   │   └── references/
-│   ├── commands/<command>.md
-│   ├── agents/<agent>.md
-│   ├── hooks/hooks.json
-│   └── scripts/
-└── <future-plugin>/               # Add more plugins here
+moo.md/
+├── hope/                    # Plugin source
+│   ├── skills/              # SKILL.md files
+│   ├── commands/            # Command prompts
+│   ├── agents/, hooks/
+└── scripts/install.sh       # Multi-tool installer
 ```
 
 ## Local Testing
