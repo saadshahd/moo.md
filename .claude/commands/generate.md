@@ -1,8 +1,8 @@
 ---
-description: Meta-prompt generator. Creates vanilla command/skill/agent files optimized for Claude Code + Opus 4.5.
+description: Meta-prompt generator. Creates vanilla command/skill/agent files optimized for Claude Code
 ---
 
-# /moo:generate
+# /generate
 
 Generate production-ready `.md` files for Claude Code.
 
@@ -24,11 +24,11 @@ Extract from task description:
 
 ### Phase 2: Confidence Check
 
-| Confidence | Action                                |
-| ---------- | ------------------------------------- |
+| Confidence | Action                                 |
+| ---------- | -------------------------------------- |
 | < 70%      | Ask ONE clarifying question, then STOP |
 | 70-85%     | Generate with `## Assumptions` section |
-| ≥ 85%      | Generate directly                     |
+| ≥ 85%      | Generate directly                      |
 
 **Ask when unclear:**
 
@@ -38,11 +38,11 @@ Extract from task description:
 
 ### Phase 3: Determine Output Type
 
-| Signal                                                    | Type        |
-| --------------------------------------------------------- | ----------- |
-| "when I run", "command for", explicit invocation          | **Command** |
-| "always apply", "principles for", "when working on"       | **Skill**   |
-| "search for", "find", "analyze", "evaluate", delegatable  | **Agent**   |
+| Signal                                                   | Type        |
+| -------------------------------------------------------- | ----------- |
+| "when I run", "command for", explicit invocation         | **Command** |
+| "always apply", "principles for", "when working on"      | **Skill**   |
+| "search for", "find", "analyze", "evaluate", delegatable | **Agent**   |
 
 If ambiguous → default to **Command** (most common).
 
@@ -81,12 +81,13 @@ description: [What it does and when to use it. Single line. Max 1024 chars.]
 ## Quality Footer
 
 [For non-trivial commands, include:]
-
 ```
+
 Confidence: X-Y% (evidence: [specific])
 Alternative: [approach] (confidence: X-Y%, tradeoff: [what changes])
 Reversible: Type [2A/2B/1] (rollback: [time/effort])
 Complexity: X story points
+
 ```
 
 ## Examples
@@ -99,7 +100,10 @@ Complexity: X story points
 ```markdown
 ---
 name: [kebab-case-name]
-description: [Trigger condition + what it does. Single line. Max 1024 chars. Example: "When refactoring component architecture, apply journey-centric organization and illegal states elimination."]
+description:
+  [
+    Trigger condition + what it does. Single line. Max 1024 chars. Example: "When refactoring component architecture, apply journey-centric organization and illegal states elimination.",
+  ]
 version: 0.0.1
 ---
 
@@ -136,7 +140,8 @@ version: 0.0.1
 
 ```markdown
 ---
-description: [What it searches/analyzes and when to delegate to it. Single line.]
+description:
+  [What it searches/analyzes and when to delegate to it. Single line.]
 ---
 
 # [Agent Name]
@@ -171,7 +176,7 @@ Use when unclear:
 [Optional: Sample delegation scenarios.]
 ```
 
-## Opus 4.5 Optimizations
+## Optimizations
 
 **Apply these to all generated content:**
 
