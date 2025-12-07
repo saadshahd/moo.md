@@ -10,7 +10,19 @@
       "name": "hope",
       "source": "./hope",
       "description": "clarify before you build. learn from failure. iterate with confidence.",
-      "category": "productivity"
+      "category": "thinking"
+    },
+    {
+      "name": "product",
+      "source": "./product",
+      "description": "PRD generation, competitive analysis, research synthesis, and goal systems for product work.",
+      "category": "product"
+    },
+    {
+      "name": "wordsmith",
+      "source": "./wordsmith",
+      "description": "cVoice extraction, precision editing, narrative structure, and copy evaluation for writing work.",
+      "category": "writing"
     }
   ]
 }

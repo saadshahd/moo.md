@@ -2,20 +2,21 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'moo.md active. Clarify intent → /plan → proceed. Learnings: ~/.claude/learnings/'"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh"
           }
         ]
       }
     ],
-    "PreCompact": [
+    "SessionEnd": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/pre_compact.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/extract-learnings.sh"
           }
         ]
       }

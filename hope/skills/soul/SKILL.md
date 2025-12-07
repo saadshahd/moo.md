@@ -4,6 +4,13 @@ description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks
 version: 0.0.1
 ---
 
+<EXTREMELY-IMPORTANT>
+This skill applies to EVERY task. No exceptions.
+Run Silent Audit before responding.
+Use confidence gates.
+Clarify intent before building.
+</EXTREMELY-IMPORTANT>
+
 # moo.md
 
 Cognitive operating system for structured thinking.
@@ -25,6 +32,19 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 ```
 
 **Forbidden without percentage**: "probably", "likely", "maybe", "might", "could"
+
+---
+
+## Common Rationalizations (All Wrong)
+
+If you catch yourself thinking:
+- "This is just a simple question" → WRONG. Run Silent Audit.
+- "I already know the answer" → WRONG. State confidence percentage.
+- "This doesn't need a library search" → WRONG. Search anyway.
+- "The user wants me to just do it" → WRONG. Clarify intent first.
+- "This is too small for workflows" → WRONG. Workflow B for any fix.
+
+**Every rationalization = skipped step = compounding failure.**
 
 ---
 
@@ -301,20 +321,8 @@ Every library you don't write = 1000 bugs you don't have.
 | `failures.jsonl`    | `{ts, context, failure, root_cause, prevention}`      |
 | `discoveries.jsonl` | `{ts, context, discovery, confidence, applies_to}`    |
 | `constraints.jsonl` | `{ts, context, constraint, source, permanent}`        |
-| `predictions.jsonl` | `{ts, prediction, confidence, story_points, outcome}` |
 
----
-
-## Pre-Compact Protocol
-
-Before compaction:
-
-1. Extract failures → `failures.jsonl`
-2. Extract discoveries → `discoveries.jsonl`
-3. Update constraints → `constraints.jsonl`
-4. Verify predictions → update outcomes
-5. Audit contradictions → Ask if conflict found
-6. Propose amendments → Ask before modifying guidance
+Use `/hope:learn` to extract learnings from session or transcript.
 
 ---
 

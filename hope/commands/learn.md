@@ -6,43 +6,46 @@ description: Extract learnings from this session into ~/.claude/learnings/
 
 Extract session learnings into compound knowledge.
 
-## Steps
+## Input
 
-1. **Ensure directory exists**
+$ARGUMENTS
+
+If a transcript path is provided above, read it using the Read tool. Otherwise, analyze the current session context.
+
+## Extraction Process
+
+1. **Read source**: If path provided, use Read tool on that file. Otherwise use current session.
+
+2. **Ensure directory exists**:
    ```bash
    mkdir -p ~/.claude/learnings
    ```
 
-2. **Extract Failures** → `failures.jsonl`
-   ```json
-   {"ts":"ISO","context":"area","failure":"what","root_cause":"why","prevention":"how to avoid"}
-   ```
+3. **Extract and write each category** (use current timestamp in ISO format):
 
-3. **Extract Discoveries** → `discoveries.jsonl`
-   ```json
-   {"ts":"ISO","context":"area","discovery":"learning","confidence":[0.X,0.Y],"applies_to":["areas"]}
-   ```
+### Failures → `~/.claude/learnings/failures.jsonl`
+Bugs, errors, wrong assumptions, things that didn't work.
+```json
+{"ts":"ISO","context":"area","failure":"what","root_cause":"why","prevention":"how"}
+```
 
-4. **Extract Constraints** → `constraints.jsonl`
-   ```json
-   {"ts":"ISO","context":"area","constraint":"boundary","source":"how found","permanent":bool}
-   ```
+### Discoveries → `~/.claude/learnings/discoveries.jsonl`
+Insights, patterns, techniques that worked well.
+```json
+{"ts":"ISO","context":"area","discovery":"insight","confidence":0.X,"applies_to":["areas"]}
+```
 
-5. **Update Predictions** → `predictions.jsonl`
-   - Mark outcomes: "confirmed" / "refuted" / "partial"
+### Constraints → `~/.claude/learnings/constraints.jsonl`
+Limits, blockers, requirements discovered.
+```json
+{"ts":"ISO","context":"area","constraint":"limit","source":"how found","permanent":bool}
+```
 
-6. **Audit Contradictions**
-   - Do new learnings conflict with existing ones?
-   - If yes: surface via Ask tool
+4. **Be selective**: Only significant learnings. Skip routine actions.
 
-7. **Report Summary**
+5. **Use empty arrays** if no items in a category.
+
+6. **Report summary**:
    - Failures logged: N
    - Discoveries logged: N
-   - Predictions verified: N
-   - Contradictions found: N
-
----
-
-## Focus Area (optional)
-
-$ARGUMENTS
+   - Constraints logged: N
