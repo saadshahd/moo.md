@@ -77,6 +77,31 @@ Reversible: Type [2A/2B/1]
 Complexity: X story points
 ```
 
+## Phase 5b: Project-Level Planning (≥8 story points only)
+
+For high-complexity tasks, add project-level controls:
+
+```
+### Kill Criteria
+Conditions that stop the project:
+1. [Specific measurable condition]
+2. [Specific measurable condition]
+3. [Specific measurable condition]
+
+### Pivot Triggers
+Signals requiring direction change:
+1. [Observable signal]
+2. [Observable signal]
+3. [Observable signal]
+
+### 48-Hour De-risking Test
+Riskiest assumption: [Identify #1 risk]
+Test: [Specific experiment to run]
+Success criteria: [Measurable outcome]
+Failure criteria: [Measurable outcome]
+Pivot if fails: [Alternative direction]
+```
+
 ## Phase 6: Wait
 
 **Do not implement until user says "proceed".**
