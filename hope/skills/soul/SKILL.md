@@ -24,6 +24,7 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 ```
 □ Inversion applied? (failure modes identified)
 □ Library searched? (production solution exists?)
+□ Learnings recalled? (past failures/discoveries for this domain?)
 □ Confidence stated? (X-Y% with evidence)
 □ Alternative provided? (different approach)
 □ Reversibility checked? (Type 2A/2B/1)
@@ -322,7 +323,11 @@ Every library you don't write = 1000 bugs you don't have.
 | `discoveries.jsonl` | `{ts, context, discovery, confidence, applies_to}`    |
 | `constraints.jsonl` | `{ts, context, constraint, source, permanent}`        |
 
-Use `/hope:learn` to extract learnings from session or transcript.
+**Commands:**
+- `/hope:learn` - Extract learnings from session or transcript
+- `/hope:recall` - Surface relevant learnings for current context
+
+**When to recall:** Before starting substantial work in a domain, run `/hope:recall [domain]` to surface past insights and avoid repeating mistakes.
 
 ---
 

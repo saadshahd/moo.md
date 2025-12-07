@@ -14,14 +14,40 @@ If a transcript path is provided above, read it using the Read tool. Otherwise, 
 
 ## Extraction Process
 
-1. **Read source**: If path provided, use Read tool on that file. Otherwise use current session.
+1. **Read source**:
+   - If no path provided, analyze current session context
+   - If path provided, first check file size:
+     ```bash
+     wc -l < "$PATH"
+     ```
+   - **Large files (> 500 lines)**: Read in chunks using Read tool with offset/limit:
+     - Calculate: `offset = line_count - 300`
+     - Read last 300 lines: `Read(path, offset: X, limit: 300)`
+     - Focus on user messages and assistant responses
+     - Skip verbose tool output unless it contains errors
+   - **Small files (<= 500 lines)**: Read entire file with Read tool
 
 2. **Ensure directory exists**:
    ```bash
    mkdir -p ~/.claude/learnings
    ```
 
-3. **Extract and write each category** (use current timestamp in ISO format):
+3. **Read existing learnings for deduplication**:
+   ```bash
+   cat ~/.claude/learnings/failures.jsonl 2>/dev/null
+   cat ~/.claude/learnings/discoveries.jsonl 2>/dev/null
+   cat ~/.claude/learnings/constraints.jsonl 2>/dev/null
+   ```
+
+4. **Deduplication rules** (apply before writing each learning):
+   - **Exact match**: Skip if (context + key field) matches existing entry
+     - Failures: context + failure + root_cause
+     - Discoveries: context + discovery
+     - Constraints: context + constraint
+   - **Semantic match**: Skip if existing entry covers same insight, even if worded differently
+   - **When in doubt, skip**: Fewer quality entries > many duplicates
+
+5. **Extract and write each category** (use current timestamp in ISO format):
 
 ### Failures → `~/.claude/learnings/failures.jsonl`
 Bugs, errors, wrong assumptions, things that didn't work.
@@ -41,11 +67,11 @@ Limits, blockers, requirements discovered.
 {"ts":"ISO","context":"area","constraint":"limit","source":"how found","permanent":bool}
 ```
 
-4. **Be selective**: Only significant learnings. Skip routine actions.
+6. **Be selective**: Only significant learnings. Skip routine actions.
 
-5. **Use empty arrays** if no items in a category.
+7. **Use empty arrays** if no items in a category.
 
-6. **Report summary**:
-   - Failures logged: N
-   - Discoveries logged: N
-   - Constraints logged: N
+8. **Report summary**:
+   - Failures: N new (M duplicates skipped)
+   - Discoveries: N new (M duplicates skipped)
+   - Constraints: N new (M duplicates skipped)
