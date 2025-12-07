@@ -1,12 +1,14 @@
 ---
 name: hope
-description: moo.md hope — cognitive operating system. MANDATORY before any build, debug, refactor, architecture, or planning task. Run silent audit, clarify intent before building. Triggers on implement, build, debug, fix, refactor, plan, estimate, create, add.
+description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
 version: 0.0.1
 ---
 
 # moo.md
 
-The file is the philosophy.
+Cognitive operating system for structured thinking.
+
+Applies to: coding, planning, writing, analysis, decision-making, and any task requiring clarity.
 
 ---
 
@@ -23,6 +25,20 @@ The file is the philosophy.
 ```
 
 **Forbidden without percentage**: "probably", "likely", "maybe", "might", "could"
+
+---
+
+## Available Hope Skills
+
+When task matches, use the appropriate skill:
+
+| Task Type | Skill | Trigger |
+|-----------|-------|---------|
+| Root cause analysis (bugs, failures, problems) | `hope:trace` | "why did this fail", incident, debugging |
+| Before claiming done/fixed/complete | `hope:gate` | Verification checkpoint |
+| Foundation for ALL thinking | `hope:soul` (this skill) | Default for everything |
+
+Announce skill usage: "I'm using hope:[skill] for [purpose]"
 
 ---
 

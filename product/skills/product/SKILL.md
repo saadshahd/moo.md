@@ -1,0 +1,48 @@
+---
+name: product
+description: Use when doing competitive analysis, writing PRDs, defining metrics/OKRs, synthesizing user research, analyzing cohort retention, evaluating PRD quality, or prioritizing technical debt. Auto-activates on product management, strategy, roadmap, or requirements tasks.
+---
+
+# Product Skill
+
+Router skill for product management workflows. Detects task type and routes to appropriate workflow.
+
+## When This Skill Activates
+
+You're working on:
+
+- Competitive analysis or market positioning
+- Product requirements documentation
+- Goal setting and metrics definition
+- User research synthesis
+- Cohort and retention analysis
+- PRD quality evaluation
+- Technical debt prioritization
+
+## Workflow Selection
+
+Announce which workflow you're using:
+
+| Task Type                                   | Workflow             | Reference                |
+| ------------------------------------------- | -------------------- | ------------------------ |
+| Competitive analysis, market gaps, win/loss | Competitive Analysis | `references/compete.md`  |
+| Feature specs, requirements, MVP scoping    | PRD Generation       | `references/prd.md`      |
+| Goals, OKRs, KPIs, tracking systems         | Metrics & Goals      | `references/metrics.md`  |
+| User interviews, qualitative data, insights | Research Synthesis   | `references/research.md` |
+| Retention, LTV, churn, cohort data          | Cohort Analysis      | `references/cohort.md`   |
+| PRD review, completeness check, scoring     | PRD Evaluation       | `references/prd-eval.md` |
+| Tech debt triage, remediation planning      | Debt Prioritization  | `references/debt.md`     |
+
+## Usage
+
+1. Detect which workflow applies based on user's task
+2. Announce: "I'm using the product skill for [workflow]"
+3. Load the appropriate reference file
+4. Execute the workflow exactly as written
+
+## Rules
+
+- Use ask tool to gather input before proceeding
+- Ground recommendations in evidence
+- Use story points, never time estimates
+- Challenge assumptions and cut scope by default

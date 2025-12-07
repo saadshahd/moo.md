@@ -1,0 +1,13 @@
+{
+  "name": "wordsmith",
+  "version": "0.0.1",
+  "description": "Voice extraction, precision editing, narrative structure, and copy evaluation for writing work.",
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  },
+  "homepage": "https://github.com/saadsaahd/moo.md",
+  "repository": "https://github.com/saadsaahd/moo.md",
+  "license": "MIT",
+  "keywords": ["voice", "editing", "narrative", "copy", "writing"]
+}
