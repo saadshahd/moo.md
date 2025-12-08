@@ -22,14 +22,6 @@ Three plugins.
 - [product](product.md) — Product management workflows.
 - [wordsmith](wordsmith.md) — Writing workflows.
 
-## Philosophy
-
-Under stress, you forget to think clearly.
-
-Pause before building. Name the unknowns. Search for prior art. Surface what could fail.
-
-When you forget, Claude remembers.
-
 ---
 
 **Source:** [github.com/saadshahd/moo.md](https://github.com/saadshahd/moo.md)

@@ -2,14 +2,6 @@
 
 You have ten AI tools. No system. Every session starts from zero.
 
-## The Problem
-
-Under pressure, you forget the basics.
-
-Clarify intent before building. Check for prior art. Name what could fail. State your confidence.
-
-Simple disciplines—gone the moment pressure hits.
-
 ## Install
 
 ```bash
@@ -41,6 +33,7 @@ The soul skill activated. It runs a silent audit:
 ```
 □ Inversion applied? (failure modes identified)
 □ Library searched? (production solution exists?)
+□ Learnings recalled? (past failures/discoveries?)
 □ Confidence stated? (X-Y% with evidence)
 □ Intent clarified? (≥85% confident I understand)
 ```
