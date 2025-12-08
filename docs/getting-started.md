@@ -4,14 +4,11 @@ You have ten AI tools. No system. Every session starts from zero.
 
 ## Install
 
-```bash
-# Terminal: clone the repo
-git clone git@github.com:saadshahd/moo.md.git
-```
+Requires SSH key with repo access.
 
 ```bash
-# Claude Code: add marketplace and install
-/plugin marketplace add ./moo.md
+# Claude Code
+/plugin marketplace add git@github.com:saadshahd/moo.md.git
 /plugin install hope@moo.md
 ```
 

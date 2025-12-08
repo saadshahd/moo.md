@@ -20,26 +20,19 @@ Entropy over order. Uncertainty over hype.
 
 ## Install
 
-```bash
-# Terminal: clone the repo
-git clone git@github.com:saadshahd/moo.md.git
-```
+Requires SSH key with repo access.
 
 ```bash
-# Claude Code: add marketplace and install
-/plugin marketplace add ./moo.md
+# Claude Code
+/plugin marketplace add git@github.com:saadshahd/moo.md.git
 /plugin install hope@moo.md
 ```
 
 ## Update
 
 ```bash
-# Terminal: pull latest
-cd moo.md && git pull
-```
-
-```bash
-# Claude Code: reinstall
+# Claude Code
+/plugin marketplace update moo.md
 /plugin uninstall hope@moo.md
 /plugin install hope@moo.md
 ```
@@ -50,6 +43,12 @@ cd moo.md && git pull
 - [hope](docs/hope.md) — Core plugin
 - [product](docs/product.md) — Product workflows
 - [wordsmith](docs/wordsmith.md) — Writing workflows
+
+## Issues
+
+Something broken? Onboarding unclear? Feature request?
+
+→ [Open an issue](https://github.com/saadshahd/moo.md/issues)
 
 ## Gratitude
 
