@@ -31,9 +31,25 @@ git clone git@github.com:saadshahd/moo.md.git
 /plugin install hope@moo.md
 ```
 
+## Update
+
+```bash
+# Terminal: pull latest
+cd moo.md && git pull
+```
+
+```bash
+# Claude Code: reinstall
+/plugin uninstall hope@moo.md
+/plugin install hope@moo.md
+```
+
 ## Documentation
 
-→ [docs/](docs/index.md)
+- [Getting Started](docs/getting-started.md) — Install and first command
+- [hope](docs/hope.md) — Core plugin
+- [product](docs/product.md) — Product workflows
+- [wordsmith](docs/wordsmith.md) — Writing workflows
 
 ## Gratitude
 
