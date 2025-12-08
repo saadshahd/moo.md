@@ -5,7 +5,13 @@ You have ten AI tools. No system. Every session starts from zero.
 ## Install
 
 ```bash
-/plugin marketplace add saadshahd/moo.md
+# Terminal: clone the repo
+git clone git@github.com:saadshahd/moo.md.git
+```
+
+```bash
+# Claude Code: add marketplace and install
+/plugin marketplace add ./moo.md
 /plugin install hope@moo.md
 ```
 

@@ -6,7 +6,7 @@ Thoughtful plugins for Claude Code.
 
 Under stress, I forget to think clearly.
 
-Pause before building. Name the unknowns. Search for prior art. Surface what could fail. Simple disciplines—gone the moment pressure hits.
+Pause before building. Name the unknowns. Search for prior art. Surface what could fail. Simple disciplines — gone the moment pressure hits.
 
 So I wrote them down.
 
@@ -21,9 +21,19 @@ Entropy over order. Uncertainty over hype.
 ## Install
 
 ```bash
-/plugin marketplace add saadshahd/moo.md
+# Terminal: clone the repo
+git clone git@github.com:saadshahd/moo.md.git
+```
+
+```bash
+# Claude Code: add marketplace and install
+/plugin marketplace add ./moo.md
 /plugin install hope@moo.md
 ```
+
+## Documentation
+
+→ [docs/](docs/index.md)
 
 ## Gratitude
 
