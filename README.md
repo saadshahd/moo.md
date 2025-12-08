@@ -27,5 +27,6 @@ Entropy over order. Uncertainty over hype.
 
 ## Gratitude
 
-**[Superpowers](https://github.com/obra/superpowers)** — prior art
 **[Nate B. Jones](https://www.natebjones.com/)** — grounded thinking, advanced prompting
+
+**[Superpowers](https://github.com/obra/superpowers)** — prior art
