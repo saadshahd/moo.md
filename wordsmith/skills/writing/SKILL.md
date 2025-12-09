@@ -1,6 +1,7 @@
 ---
 name: writing
-description: Use when editing prose, extracting voice profiles, structuring narratives, writing microcopy, or evaluating content quality. Auto-activates on writing, editing, copy, content, voice, tone, or narrative tasks.
+description: MANDATORY when user provides draft text, asks to edit prose, review writing, or improve copy. Auto-activates on "edit this", "improve this", "review my writing", "fix my prose", draft text in quotes, any content refinement, voice extraction, narrative structure, or microcopy tasks.
+version: 0.0.2
 ---
 
 # Writing Skill
