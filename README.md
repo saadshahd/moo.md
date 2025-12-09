@@ -46,21 +46,10 @@ delve into how authentication works in this repo
 
 ## Documentation
 
-**Getting Started:**
 - [5-Minute Start](docs/getting-started.md) — Install and see value immediately
+- [Learnings System](docs/learnings-system.md) — How your thinking compounds
 
-**Daily Use (Journeys):**
-- [Understand Code](docs/journeys/understand-code.md) — delve into any codebase
-- [Build a Feature](docs/journeys/build-feature.md) — plan with clarity
-- [Debug a Problem](docs/journeys/debug-problem.md) — root cause, not workaround
-- [Write a PRD](docs/journeys/write-prd.md) — requirements that survive engineering
-- [Analyze Competitors](docs/journeys/analyze-competitors.md) — gaps and roadmap
-- [Edit Writing](docs/journeys/edit-writing.md) — tighten your prose
-
-**Core Concepts:**
-- [Learnings System](docs/learnings-system.md) — how your thinking compounds
-
-**Power User Reference:**
+**Plugin Reference:**
 - [hope](docs/hope.md) — cognitive operating system
 - [product](docs/product.md) — PRDs, competitive analysis, metrics
 - [wordsmith](docs/wordsmith.md) — editing, voice extraction, narrative

@@ -42,6 +42,16 @@ Auto-triggers on:
 | `/product:metrics` | Transform vague goals into SMART goals with tracking systems. |
 | `/product:debt` | Tech debt prioritization. Business impact, effort estimates, remediation roadmap. |
 
+## When to Use
+
+| Situation | Command |
+|-----------|---------|
+| Starting a new feature | `/product:prd` |
+| Validating an existing PRD | `/product:prd-eval` |
+| Too many features, unclear priority | `/product:prd` (to force cuts) |
+
+---
+
 ## PRD Workflow
 
 The `/product:prd` command follows four phases:

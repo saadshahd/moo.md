@@ -47,6 +47,20 @@ Three skills that auto-activate:
 | `/hope:interrogate` | Generate penetrating questions to deepen understanding. |
 | `/hope:calibrate` | Review confidence calibration from prediction history. |
 
+## When to Use
+
+### Plan vs Just Code
+
+| Situation | Approach |
+|-----------|----------|
+| < 3 story points, clear path | Just code |
+| Unfamiliar territory | Plan first |
+| Multiple valid approaches | Plan first |
+| Will touch > 3 files | Plan first |
+| Has failure modes | Plan first |
+
+---
+
 ## Core Concepts
 
 ### Confidence Gates

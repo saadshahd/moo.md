@@ -64,12 +64,11 @@ Your thinking compounds.
 
 ## Next Steps
 
-**Daily Use** — Pick a journey:
-- [Understand Code](journeys/understand-code.md) — delve into any codebase
-- [Build a Feature](journeys/build-feature.md) — plan with clarity
-- [Debug a Problem](journeys/debug-problem.md) — root cause, not workaround
+**Learn more:**
+- [Learnings System](learnings-system.md) — How your thinking compounds
 
-**More Plugins:**
+**Plugin Reference:**
+- [hope](hope.md) — cognitive operating system
 - [product](product.md) — PRDs, competitive analysis, metrics
 - [wordsmith](wordsmith.md) — editing, voice extraction, narrative
 
