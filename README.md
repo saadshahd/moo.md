@@ -57,10 +57,7 @@ delve into how authentication works in this repo
 ## Update
 
 ```bash
-# Claude Code
 /plugin marketplace update moo.md
-/plugin uninstall hope@moo.md
-/plugin install hope@moo.md
 ```
 
 ## Issues
