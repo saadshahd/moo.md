@@ -12,6 +12,7 @@ if [ "$MSG_COUNT" -lt 3 ]; then
   cat << 'EOF'
 {
   "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
     "additionalContext": "REMEMBER: Apply hope:soul skill - run Silent Audit before responding. Also run hope:recall to surface relevant past learnings."
   }
 }
