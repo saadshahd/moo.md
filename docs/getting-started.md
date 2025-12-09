@@ -1,18 +1,15 @@
-# Getting Started
+# 5-Minute Start
 
-You have ten AI tools. No system. Every session starts from zero.
+Install hope. Run one command. See value.
 
 ## Install
 
 Requires SSH key with repo access.
 
 ```bash
-# Claude Code
 /plugin marketplace add git@github.com:saadshahd/moo.md.git
 /plugin install hope@moo.md
 ```
-
-That's it. The soul skill activates on every session.
 
 ## Your First Command
 
@@ -27,36 +24,55 @@ What happens:
 3. **Library search** — Prior art before custom code
 4. **Confidence stated** — Percentage, not "probably"
 
-The system does what you forget.
+The system does what you forget under pressure.
 
 ## What Just Happened
 
-The soul skill activated. It runs a silent audit:
+The soul skill activated. Every response runs through a silent audit:
 
 ```
-□ Inversion applied? (failure modes identified)
-□ Library searched? (production solution exists?)
-□ Learnings recalled? (past failures/discoveries?)
-□ Confidence stated? (X-Y% with evidence)
-□ Intent clarified? (≥85% confident I understand)
+□ Failure modes identified?
+□ Library searched?
+□ Past learnings recalled?
+□ Confidence stated with evidence?
+□ Intent ≥85% clear?
 ```
 
-Every response passes through these gates.
+You don't see this checklist. You see better answers.
+
+## Three Keywords to Remember
+
+| Say this | Get this |
+|----------|----------|
+| "delve into how X works" | Deep code investigation |
+| "plan building X" | Structured plan with intent clarification |
+| "recall what I learned about X" | Surface insights from past sessions |
+
+Try one now:
+
+```
+delve into how authentication works in this repo
+```
 
 ## The Payoff
 
 Learnings persist.
 
-When sessions end, the system captures failures and discoveries to `~/.claude/learnings/`. Next time, it surfaces what you learned.
+When sessions end, the system captures failures and discoveries to `~/.claude/learnings/`. Next session, it surfaces what you learned.
 
 Your thinking compounds.
 
 ## Next Steps
 
-- Read [hope.md](hope.md) for skills and commands
-- Add [product](product.md) for PRD, competitive analysis, research workflows
-- Add [wordsmith](wordsmith.md) for editing, voice extraction, narrative structure
+**Daily Use** — Pick a journey:
+- [Understand Code](journeys/understand-code.md) — delve into any codebase
+- [Build a Feature](journeys/build-feature.md) — plan with clarity
+- [Debug a Problem](journeys/debug-problem.md) — root cause, not workaround
+
+**More Plugins:**
+- [product](product.md) — PRDs, competitive analysis, metrics
+- [wordsmith](wordsmith.md) — editing, voice extraction, narrative
 
 ---
 
-Install hope. Run `/hope:plan`. Let the system remember what you forget.
+Install hope. Say "plan building X". Let the system remember what you forget.

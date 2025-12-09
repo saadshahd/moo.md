@@ -1,20 +1,35 @@
-# hope
+# hope — Power User Reference
 
 Cognitive operating system for structured thinking.
 
-Applies to: coding, planning, writing, analysis, decision-making—any task requiring clarity.
+---
+
+| Say this | Get this |
+|----------|----------|
+| "delve into how X works" | Deep code investigation |
+| "plan building X" | Intent clarification + structured plan |
+| "recall what I learned about X" | Surface past learnings |
+| "/hope:debug 'problem'" | Root cause analysis |
+| "/hope:postmortem 'incident'" | Structured incident review |
+
+---
 
 ## Skills
 
-Three skills.
+Three skills that auto-activate:
 
-| Skill | Purpose | Auto-triggers on |
-|-------|---------|------------------|
+| Skill | Purpose | Triggers on |
+|-------|---------|-------------|
 | `hope:soul` | Foundation for all thinking. Silent audit, confidence gates, workflows. | Every session (mandatory) |
 | `hope:gate` | Verification before claiming done. Checklists by workflow type. | "done", "fixed", "complete" |
 | `hope:trace` | Root cause analysis. Five Whys, prevention hierarchy. | Bugs, failures, incidents |
+| `hope:recall` | Surface relevant learnings from past sessions. | Session start, domain work |
 
-→ Full docs: [`hope/skills/soul/SKILL.md`](../hope/skills/soul/SKILL.md)
+## Agents
+
+| Agent | Purpose | Trigger keywords |
+|-------|---------|------------------|
+| `hope:delve` | Deep code investigation with tiered output | "how does", "why does", "explain", "trace", "understand" |
 
 ## Commands
 
@@ -25,12 +40,12 @@ Three skills.
 | `/hope:postmortem` | Structured post-incident review. Timeline, Five Whys, prevention measures. |
 | `/hope:learn` | Extract learnings from session into `~/.claude/learnings/`. |
 | `/hope:recall` | Surface relevant learnings from past sessions. |
+| `/hope:compact` | Merge duplicate learnings, prune stale entries. |
 | `/hope:mirror` | Detect blind spots in a decision. Hidden assumptions, missing perspectives. |
 | `/hope:future` | Regret minimization. Project to age 80, evaluate what you'll regret not doing. |
 | `/hope:reframe` | Alternative framings for stuck problems. Transform constraints into advantages. |
 | `/hope:interrogate` | Generate penetrating questions to deepen understanding. |
-
-→ Full docs: [`hope/commands/`](../hope/commands/)
+| `/hope:calibrate` | Review confidence calibration from prediction history. |
 
 ## Core Concepts
 
@@ -44,11 +59,9 @@ No vague words. Percentages only.
 | **70-85%** | Ship with monitoring and fallback. |
 | **≥ 85%** | Ship immediately. |
 
-Forbidden: "probably", "likely", "maybe", "might", "could"
+**Forbidden:** "probably", "likely", "maybe", "might", "could"
 
 ### Workflows
-
-Three workflows.
 
 | Task | Workflow | Gate |
 |------|----------|------|
@@ -78,7 +91,7 @@ Complexity: X story points
 
 ### Learnings System
 
-Three types:
+Three types of learnings stored in `~/.claude/learnings/`:
 
 | File | What it stores |
 |------|---------------|
@@ -86,9 +99,7 @@ Three types:
 | `discoveries.jsonl` | Insights with confidence and applicability |
 | `constraints.jsonl` | Boundaries (permanent or temporary) |
 
-Location: `~/.claude/learnings/`
-
-`/hope:learn` to extract. `/hope:recall` to surface.
+See [Learnings System](learnings-system.md) for full documentation.
 
 ---
 
