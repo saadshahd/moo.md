@@ -53,6 +53,7 @@ delve into how authentication works in this repo
 - [hope](docs/hope.md) — cognitive operating system
 - [product](docs/product.md) — PRDs, competitive analysis, metrics
 - [wordsmith](docs/wordsmith.md) — editing, voice extraction, narrative
+- [founder](docs/founder.md) — idea validation, pitch decks, financials
 
 ## Update
 
