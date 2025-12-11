@@ -29,6 +29,12 @@
       "source": "./founder",
       "description": "Complete workflows for startup validation, fundraising, and financial modeling with Marp slides and spreadsheet outputs.",
       "category": "founder"
+    },
+    {
+      "name": "career",
+      "source": "./career",
+      "description": "Interview prep, skill assessment, STAR narratives, stakeholder navigation, and focus capacity analysis for career development.",
+      "category": "career"
     }
   ]
 }
