@@ -23,6 +23,12 @@
       "source": "./wordsmith",
       "description": "cVoice extraction, precision editing, narrative structure, and copy evaluation for writing work.",
       "category": "writing"
+    },
+    {
+      "name": "founder",
+      "source": "./founder",
+      "description": "Complete workflows for startup validation, fundraising, and financial modeling with Marp slides and spreadsheet outputs.",
+      "category": "founder"
     }
   ]
 }

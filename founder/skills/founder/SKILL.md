@@ -1,0 +1,63 @@
+---
+name: founder
+description: Use when validating ideas, sizing markets, building pitch decks, preparing for investors, modeling financials, planning launches, or creating board reports. Auto-activates on fundraising, pitch, investor, TAM/SAM/SOM, unit economics, runway, or board deck tasks.
+---
+
+# Founder Skill
+
+Router skill for startup workflows. Detects task type and routes to appropriate workflow that produces usable artifacts.
+
+## When This Skill Activates
+
+You're working on:
+
+- Validating a product idea or value proposition
+- Calculating market size (TAM/SAM/SOM)
+- Analyzing competitive landscape or threats
+- Building or evaluating a pitch deck
+- Preparing for investor meetings
+- Modeling unit economics, projections, or cash flow
+- Planning a product launch
+- Creating board reports or updates
+
+## Workflow Selection
+
+Announce which workflow you're using before starting:
+
+| Task Type                         | Workflow            | Reference                     | Output Artifact               |
+| --------------------------------- | ------------------- | ----------------------------- | ----------------------------- |
+| Idea validation, stress testing   | Validate Idea       | `references/validate.md`      | JSON scores + GO/ITERATE/KILL |
+| TAM/SAM/SOM, market opportunity   | Size Market         | `references/market-size.md`   | Tables + Marp slide           |
+| Competition, threats, positioning | Analyze Competition | `references/compete.md`       | Threat matrix + heat map      |
+| Pitch deck creation or eval       | Build Pitch Deck    | `references/pitch.md`         | Marp deck (10-12 slides)      |
+| Investor Q&A, meeting prep        | Prep for Investors  | `references/investor-prep.md` | Q&A document                  |
+| Unit economics, projections, cash | Model Financials    | `references/financials.md`    | Spreadsheet-ready tables      |
+| Launch planning, 90-day roadmap   | Plan Launch         | `references/launch.md`        | Phased execution plan         |
+| Board deck, metrics summary       | Report to Board     | `references/board.md`         | Marp deck + summary           |
+
+## Usage
+
+1. Detect which workflow applies based on user's task
+2. Announce: "I'm using the founder skill for [workflow]"
+3. Load the appropriate reference file
+4. Execute the workflow exactly as written
+5. Produce the specified artifact
+
+## Artifact Tooling
+
+After generating markdown artifacts, users can convert them:
+
+| Artifact      | Tool        | Command                                        |
+| ------------- | ----------- | ---------------------------------------------- |
+| Slides (Marp) | Marp CLI    | `npx @marp-team/marp-cli slides.md --pptx`     |
+| Documents     | md-to-pdf   | `npx md-to-pdf document.md`                    |
+| Spreadsheets  | Copy tables | Paste markdown tables into Google Sheets/Excel |
+
+## Rules
+
+- Always ask clarifying questions before generating artifacts
+- Produce complete, usable outputs (not partial drafts)
+- Use Marp format for all slide decks
+- Use markdown tables for spreadsheet data (easy paste)
+- Be brutally honest in evaluations (2% YC acceptance rate mindset)
+- Include confidence levels and key assumptions
