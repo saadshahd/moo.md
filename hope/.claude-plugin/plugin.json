@@ -2,12 +2,9 @@
   "name": "hope",
   "version": "0.1.1",
   "description": "clarify before you build. learn from failure. iterate with confidence.",
+  "keywords": ["intent", "inversion", "confidence", "functional", "iterate"],
   "author": {
-    "name": "Saad saahd",
+    "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"
-  },
-  "homepage": "https://github.com/saadsaahd/moo.md",
-  "repository": "https://github.com/saadsaahd/moo.md",
-  "license": "MIT",
-  "keywords": ["intent", "inversion", "confidence", "functional", "iterate"]
+  }
 }

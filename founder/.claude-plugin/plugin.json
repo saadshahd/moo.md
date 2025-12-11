@@ -1,0 +1,10 @@
+{
+  "name": "founder",
+  "version": "0.0.1",
+  "description": "Complete workflows for startup validation, fundraising, and financial modeling",
+  "keywords": ["startup validation", "fundraising", "financial modeling"],
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
+}
