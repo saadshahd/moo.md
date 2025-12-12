@@ -108,4 +108,4 @@ Track all changes in `CHANGELOG.md` at repo root.
 
 **IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.
 
-See `docs/philosophy.md` for versioning strategy.
+See `PHILOSOPHY.md` for core principles.

@@ -10,7 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- Marketplace philosophy document (`docs/philosophy.md`)
+- PHILOSOPHY.md with core principles
 - CHANGELOG.md with version history
 - Career plugin to README plugin list
 - Changelog section to CLAUDE.md with commit guidelines
