@@ -54,6 +54,7 @@ delve into how authentication works in this repo
 - [product](docs/product.md) — PRDs, competitive analysis, metrics
 - [wordsmith](docs/wordsmith.md) — editing, voice extraction, narrative
 - [founder](docs/founder.md) — idea validation, pitch decks, financials
+- [career](docs/career.md) — interview prep, skill gaps, stakeholder navigation
 
 ## Update
 

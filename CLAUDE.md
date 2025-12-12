@@ -8,11 +8,23 @@ moo.md — thoughtful plugins for Claude Code.
 
 ```
 moo.md/
-├── hope/                    # Plugin source
-│   ├── skills/              # SKILL.md files
-│   ├── commands/            # Command prompts
-│   ├── agents/, hooks/
+├── hope/                    # Cognitive operating system
+├── product/                 # PRDs, competitive analysis, metrics
+├── wordsmith/               # Editing, voice, narrative
+├── founder/                 # Startup validation, financials
+├── career/                  # Interview prep, skill gaps
+├── prompts/                 # Standalone prompt library
+├── docs/                    # Documentation
 └── scripts/install.sh       # Multi-tool installer
+```
+
+Each plugin follows:
+```
+<plugin>/
+├── .claude-plugin/plugin.json
+├── skills/<name>/SKILL.md
+├── skills/<name>/references/
+└── commands/<verb>.md
 ```
 
 ## Local Testing
@@ -79,3 +91,21 @@ description: Single line. What it does and when to use it.
 - Nested reference chains (A → B → C)
 - Time estimates instead of story points
 - Windows paths or magic numbers in scripts
+
+## Changelog
+
+Track all changes in `CHANGELOG.md` at repo root.
+
+**When committing:**
+- Add entry under `[Unreleased]` section
+- Use categories: Added, Changed, Fixed, Removed
+- Reference plugin name in entry (e.g., "feat(hope): ...")
+
+**When releasing:**
+- Move unreleased items to new version section
+- Update version in affected plugin.json files
+- Tag the release
+
+**IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.
+
+See `docs/philosophy.md` for versioning strategy.
