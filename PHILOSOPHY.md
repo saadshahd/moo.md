@@ -1,31 +1,49 @@
 # PHILOSOPHY.md
 
-Every skill is a proven mental model or thinking framework.
+Internal guide. Ensures all skills align with core principles.
 
 ---
 
-## Why
+## Core Belief
 
-Under pressure, humans forget to think clearly. We fall back on instinct, skip steps, and make predictable errors.
+There's always a deeper problem underneath the visible one.
 
-Mental models are compression. They encode decades of hard-won insight into repeatable patterns.
-
-moo.md externalizes these models so Claude applies them when you forget.
+Until you find it, every action risks being wasted effort.
 
 ---
 
-## What Makes a Skill
+## What moo.md Does
 
-Each skill must be grounded in:
+Externalizes mental models so they apply automatically—surfacing what matters when pressure makes you forget.
 
-- A named framework (inversion, confidence calibration, Five Whys, etc.)
-- Evidence it works (research, practice, or widespread adoption)
-- Clear trigger conditions (when to use it)
+---
 
-No invented methodology. No "best practices" without provenance.
+## Principles
+
+1. **Depth over surface** — Trace symptoms to root causes. Five Whys, not quick fixes.
+
+2. **Signal over noise** — Filter what matters from what screams loudest.
+
+3. **Proven over invented** — Named frameworks with evidence (Inversion, Confidence Calibration, Reversibility, Regret Minimization). No made-up methodology.
+
+4. **Clarity before action** — Understand intent before building. ≥85% confident or ask.
+
+5. **Automatic over remembered** — If humans forget under pressure, encode it so they don't have to remember.
+
+---
+
+## Skill Requirements
+
+Every skill must have:
+
+- [ ] Named framework (not invented)
+- [ ] Evidence it works (research, practice, or adoption)
+- [ ] Clear trigger condition (when to use)
+- [ ] Provenance documented
 
 ---
 
 ## Structure
 
-**hope** = core thinking models. Domain plugins = specialized applications.
+**hope** = core thinking models
+**Domain plugins** = specialized applications of the same principles
