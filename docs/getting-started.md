@@ -71,6 +71,8 @@ Your thinking compounds.
 - [hope](hope.md) — cognitive operating system
 - [product](product.md) — PRDs, competitive analysis, metrics
 - [wordsmith](wordsmith.md) — editing, voice extraction, narrative
+- [founder](founder.md) — idea validation, pitch decks, financials
+- [career](career.md) — career development, growth planning
 
 ---
 
