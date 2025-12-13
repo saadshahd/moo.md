@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **2 thinking tools** (fills genuine gaps from Farnam Street audit):
+  - `incentives.md` - Munger's "show me the incentive" for predicting/explaining behavior
+  - `bottlenecks.md` - Goldratt's Theory of Constraints for finding binding limits
+
+### Changed
+- hope plugin version 0.4.2 → 0.4.3
+- Thinking tools count 28 → 30
+- Systems category now includes Incentives and Bottlenecks
+
 ---
 
 ## [0.4.2] - 2025-12-13
