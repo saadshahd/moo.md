@@ -37,6 +37,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - hope plugin version 0.3.0 → 0.4.0 (strategic frameworks + 4 tools)
 - wordsmith plugin version 0.0.3 → 0.0.4 (Open Loop framework)
+- product plugin version 0.0.2 → 0.0.3 (JTBD, Systems Archetypes references)
+- career plugin version 0.0.2 → 0.0.3 (10/10/10, Feynman references)
+- founder plugin version 0.0.2 → 0.0.3 (Regret Minimization reference)
 - Thinking tools count 30 → 34
 - Frameworks now separate from tactical tools (strategic vs tactical)
 
