@@ -46,6 +46,14 @@ From `hope/skills/soul/references/tools/`:
 | [Hard Choice](../../hope/skills/soul/references/tools/hard-choice.md)               | GO/KILL verdicts with no clear winner        |
 | [Zwicky Box](../../hope/skills/soul/references/tools/zwicky-box.md)                 | Generate creative business model variations  |
 | [First Principles](../../hope/skills/soul/references/tools/first-principles.md)     | Challenge "that's how it's done" assumptions |
+| [Pre-Mortem](../../hope/skills/soul/references/tools/pre-mortem.md)                 | Anticipate launch/funding failures           |
+| [Circle of Competence](../../hope/skills/soul/references/tools/circle-of-competence.md) | Know when to hire vs build yourself      |
+
+From this skill's `references/`:
+
+| Tool                                              | When to Use                             |
+| ------------------------------------------------- | --------------------------------------- |
+| [Regret Minimization](references/regret-minimization.md) | Major founder decisions (quit job, pivot, shut down) |
 
 ## Usage
 

@@ -11,6 +11,37 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.0] - 2025-12-13
+
+### Added
+- **5 Strategic Frameworks** (meta-level thinking frameworks):
+  - `hope/skills/soul/references/handshake.md` - Align/Build/Commit for driving action
+  - `hope/skills/soul/references/scope.md` - SCOPE pre-analysis right-sizing
+  - `hope/skills/soul/references/leverage-points.md` - Donella Meadows' 12 intervention points
+  - `hope/skills/soul/references/spot.md` - SPOT pattern recognition → action
+  - `wordsmith/skills/writing/references/open-loop.md` - Zeigarnik retention framework
+- **4 new thinking tools**:
+  - `hope/skills/soul/references/tools/bayesian-thinking.md`
+  - `hope/skills/soul/references/tools/lindy-effect.md`
+  - `hope/skills/soul/references/tools/map-territory.md`
+  - `hope/skills/soul/references/tools/opportunity-cost.md`
+- **2 product references**:
+  - `product/skills/product/references/jobs-to-be-done.md`
+  - `product/skills/product/references/systems-archetypes.md`
+- **1 career reference**:
+  - `career/skills/career/references/10-10-10.md`
+- Strategic Frameworks section in hope SKILL.md
+- Open Loop reference in wordsmith SKILL.md
+- Content audit in `docs/audit/`
+
+### Changed
+- hope plugin version 0.3.0 → 0.4.0 (strategic frameworks + 4 tools)
+- wordsmith plugin version 0.0.3 → 0.0.4 (Open Loop framework)
+- Thinking tools count 30 → 34
+- Frameworks now separate from tactical tools (strategic vs tactical)
+
+---
+
 ## [0.3.0] - 2025-12
 
 ### Added

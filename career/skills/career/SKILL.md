@@ -48,6 +48,14 @@ From `hope/skills/soul/references/tools/`:
 | [SBI](../../hope/skills/soul/references/tools/sbi.md)                                 | Give or receive feedback without judgment |
 | [Conflict Resolution](../../hope/skills/soul/references/tools/conflict-resolution.md) | Navigate stakeholder disagreements        |
 | [Ladder of Inference](../../hope/skills/soul/references/tools/ladder-inference.md)    | Check assumptions in political situations |
+| [Circle of Competence](../../hope/skills/soul/references/tools/circle-of-competence.md) | Know your strengths and limits           |
+
+From this skill's `references/`:
+
+| Tool                                      | When to Use                             |
+| ----------------------------------------- | --------------------------------------- |
+| [10/10/10 Rule](references/10-10-10.md)   | Daily career decisions with time clarity |
+| [Feynman Technique](references/feynman-technique.md) | Deep learning, interview prep, verify understanding |
 
 ## Usage
 

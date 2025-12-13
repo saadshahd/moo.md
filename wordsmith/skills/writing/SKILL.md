@@ -30,6 +30,12 @@ Announce which workflow you're using:
 | Write UI copy, tone variations               | Microcopy Tones     | `references/copy.md`      |
 | Evaluate blog/content quality, score         | Content Evaluation  | `references/eval.md`      |
 
+## Strategic Framework
+
+| Framework | Purpose | When to Use |
+|-----------|---------|-------------|
+| [Open Loop](references/open-loop.md) | Make messages memorable via Zeigarnik effect | Copy, presentations, emails that need to stick |
+
 ## Related Thinking Tools
 
 From `hope/skills/soul/references/tools/`:

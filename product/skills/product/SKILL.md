@@ -34,6 +34,23 @@ Announce which workflow you're using:
 | PRD review, completeness check, scoring     | PRD Evaluation       | `references/prd-eval.md` |
 | Tech debt triage, remediation planning      | Debt Prioritization  | `references/debt.md`     |
 
+## Related Thinking Tools
+
+From `hope/skills/soul/references/tools/`:
+
+| Tool                                                                                  | When to Use                               |
+| ------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [Second-Order Thinking](../../hope/skills/soul/references/tools/second-order.md)      | Predict consequences of product decisions |
+| [Pre-Mortem](../../hope/skills/soul/references/tools/pre-mortem.md)                   | Anticipate launch failures                |
+| [Pareto](../../hope/skills/soul/references/tools/pareto.md)                           | Focus on 20% of features that deliver 80% value |
+
+From this skill's `references/`:
+
+| Tool                                              | When to Use                             |
+| ------------------------------------------------- | --------------------------------------- |
+| [Jobs To Be Done](references/jobs-to-be-done.md)  | Understand what customers hire products for |
+| [Systems Archetypes](references/systems-archetypes.md) | Recognize "limits to growth", "shifting burden" patterns |
+
 ## Usage
 
 1. Detect which workflow applies based on user's task
