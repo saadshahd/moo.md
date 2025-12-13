@@ -4,13 +4,13 @@ Product management workflows for Claude Code.
 
 ---
 
-| Say this | Get this |
-|----------|----------|
-| "write a PRD for X" | Interrogative requirements gathering |
-| "analyze competitors for X" | Feature matrix + gap analysis |
-| "prioritize tech debt" | Business impact + remediation roadmap |
-| "synthesize this research" | Emotional signals + emergent themes |
-| "define metrics for X" | SMART goals + tracking system |
+| Say this                    | Get this                              |
+| --------------------------- | ------------------------------------- |
+| "write a PRD for X"         | Interrogative requirements gathering  |
+| "analyze competitors for X" | Feature matrix + gap analysis         |
+| "prioritize tech debt"      | Business impact + remediation roadmap |
+| "synthesize this research"  | Emotional signals + emergent themes   |
+| "define metrics for X"      | SMART goals + tracking system         |
 
 ---
 
@@ -23,6 +23,7 @@ Product management workflows for Claude Code.
 ## When It Activates
 
 Auto-triggers on:
+
 - Competitive analysis, market positioning
 - PRD writing, requirements gathering
 - Goal setting, metrics, OKRs
@@ -32,22 +33,22 @@ Auto-triggers on:
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `/product:prd` | Build PRD through interrogative requirements. Challenges assumptions, cuts scope to MVP. |
-| `/product:prd-eval` | Score PRD on 5 dimensions (0-5 each). Returns ACCEPT/REVISE/REJECT with fixes. |
-| `/product:compete` | Competitive analysis. Feature matrix, gap prioritization, win/loss patterns, roadmap. |
-| `/product:research` | Qualitative research synthesis. Emotional signals, tensions, emergent questions. |
-| `/product:cohort` | Cohort analysis. Retention, LTV, churn patterns, strategic recommendations. |
-| `/product:metrics` | Transform vague goals into SMART goals with tracking systems. |
-| `/product:debt` | Tech debt prioritization. Business impact, effort estimates, remediation roadmap. |
+| Command             | Purpose                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `/product:prd`      | Build PRD through interrogative requirements. Challenges assumptions, cuts scope to MVP. |
+| `/product:prd-eval` | Score PRD on 5 dimensions (0-5 each). Returns ACCEPT/REVISE/REJECT with fixes.           |
+| `/product:compete`  | Competitive analysis. Feature matrix, gap prioritization, win/loss patterns, roadmap.    |
+| `/product:research` | Qualitative research synthesis. Emotional signals, tensions, emergent questions.         |
+| `/product:cohort`   | Cohort analysis. Retention, LTV, churn patterns, strategic recommendations.              |
+| `/product:metrics`  | Transform vague goals into SMART goals with tracking systems.                            |
+| `/product:debt`     | Tech debt prioritization. Business impact, effort estimates, remediation roadmap.        |
 
 ## When to Use
 
-| Situation | Command |
-|-----------|---------|
-| Starting a new feature | `/product:prd` |
-| Validating an existing PRD | `/product:prd-eval` |
+| Situation                           | Command                        |
+| ----------------------------------- | ------------------------------ |
+| Starting a new feature              | `/product:prd`                 |
+| Validating an existing PRD          | `/product:prd-eval`            |
 | Too many features, unclear priority | `/product:prd` (to force cuts) |
 
 ---
@@ -80,6 +81,7 @@ The `/product:compete` command produces:
 5. **Roadmap Recommendations** — Prioritized by impact score
 
 **Priority formula:**
+
 ```
 Priority = (Market Pressure × Deal Impact × Strategic Fit) / Build Effort
 ```
@@ -88,13 +90,13 @@ Priority = (Market Pressure × Deal Impact × Strategic Fit) / Build Effort
 
 The `/product:prd-eval` command scores on 5 dimensions (0-5 each):
 
-| Dimension | What it measures |
-|-----------|------------------|
-| Clarity | Unambiguous language, clear success criteria |
-| MVP Focus | Scope cuts, feature justification |
-| Feasibility | Technical realism, constraint awareness |
-| Completeness | All sections present, no gaps |
-| Risk Management | Risks identified with mitigations |
+| Dimension       | What it measures                             |
+| --------------- | -------------------------------------------- |
+| Clarity         | Unambiguous language, clear success criteria |
+| MVP Focus       | Scope cuts, feature justification            |
+| Feasibility     | Technical realism, constraint awareness      |
+| Completeness    | All sections present, no gaps                |
+| Risk Management | Risks identified with mitigations            |
 
 **Verdict:** ACCEPT (≥20), REVISE (15-19), REJECT (<15)
 
@@ -111,12 +113,12 @@ The `/product:research` command iteratively extracts:
 
 The `/product:cohort` command analyzes:
 
-| Output | What it shows |
-|--------|---------------|
+| Output           | What it shows                      |
+| ---------------- | ---------------------------------- |
 | Retention matrix | Week-over-week retention by cohort |
-| LTV by cohort | Lifetime value trends |
-| Churn patterns | When and why users leave |
-| Recommendations | Strategic actions based on data |
+| LTV by cohort    | Lifetime value trends              |
+| Churn patterns   | When and why users leave           |
+| Recommendations  | Strategic actions based on data    |
 
 ## Tech Debt Prioritization
 

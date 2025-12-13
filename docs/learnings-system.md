@@ -33,13 +33,14 @@ Your thinking compounds. Every session builds on past sessions.
 
 ## Three Types of Learnings
 
-| File | What it stores | Example |
-|------|---------------|---------|
-| `failures.jsonl` | Bugs, errors, wrong assumptions | "Race condition in async handler caused timeout" |
-| `discoveries.jsonl` | Patterns, techniques that worked | "Use env var flag to prevent hook recursion" |
-| `constraints.jsonl` | Limits, blockers, requirements | "Private repos can't use /plugin marketplace add user/repo" |
+| File                | What it stores                   | Example                                                     |
+| ------------------- | -------------------------------- | ----------------------------------------------------------- |
+| `failures.jsonl`    | Bugs, errors, wrong assumptions  | "Race condition in async handler caused timeout"            |
+| `discoveries.jsonl` | Patterns, techniques that worked | "Use env var flag to prevent hook recursion"                |
+| `constraints.jsonl` | Limits, blockers, requirements   | "Private repos can't use /plugin marketplace add user/repo" |
 
 Each entry includes:
+
 - **timestamp** — When it was learned
 - **context** — What area it applies to
 - **confidence** — How certain (0.0 to 1.0)
@@ -47,12 +48,12 @@ Each entry includes:
 
 ## Keywords
 
-| Say this | Get this |
-|----------|----------|
-| "recall what I learned about X" | Surface relevant past learnings |
-| `/hope:recall hooks` | Recall learnings about hooks specifically |
-| `/hope:learn` | Extract learnings from current session |
-| `/hope:compact` | Merge duplicates, prune stale entries |
+| Say this                        | Get this                                  |
+| ------------------------------- | ----------------------------------------- |
+| "recall what I learned about X" | Surface relevant past learnings           |
+| `/hope:recall hooks`            | Recall learnings about hooks specifically |
+| `/hope:learn`                   | Extract learnings from current session    |
+| `/hope:compact`                 | Merge duplicates, prune stale entries     |
 
 ## Recall: Surface Past Learnings
 
@@ -99,6 +100,7 @@ To extract from a saved transcript:
 ```
 
 The system:
+
 1. Analyzes the session for significant insights
 2. Deduplicates against existing learnings
 3. Appends new entries to the appropriate files
@@ -112,6 +114,7 @@ Over time, learnings accumulate. Some become redundant or outdated.
 ```
 
 The system:
+
 1. Creates a backup (never loses data)
 2. Merges duplicate insights (boosts confidence)
 3. Prunes outdated or superseded entries
@@ -149,18 +152,39 @@ You don't see this. But the system checks: "Have I learned anything relevant to 
 All files use JSONL (JSON Lines) format — one JSON object per line.
 
 **failures.jsonl:**
+
 ```json
-{"ts":"2024-12-09T14:00:00Z","context":"hooks","failure":"Infinite recursion when hook spawns Claude","root_cause":"No guard against re-triggering","prevention":"Use HOPE_EXTRACTING=1 env var"}
+{
+  "ts": "2024-12-09T14:00:00Z",
+  "context": "hooks",
+  "failure": "Infinite recursion when hook spawns Claude",
+  "root_cause": "No guard against re-triggering",
+  "prevention": "Use HOPE_EXTRACTING=1 env var"
+}
 ```
 
 **discoveries.jsonl:**
+
 ```json
-{"ts":"2024-12-09T14:00:00Z","context":"hooks","discovery":"Gate SessionEnd hooks by counting user messages (>=3) to skip trivial sessions","confidence":0.85,"applies_to":["hooks","learnings-extraction"]}
+{
+  "ts": "2024-12-09T14:00:00Z",
+  "context": "hooks",
+  "discovery": "Gate SessionEnd hooks by counting user messages (>=3) to skip trivial sessions",
+  "confidence": 0.85,
+  "applies_to": ["hooks", "learnings-extraction"]
+}
 ```
 
 **constraints.jsonl:**
+
 ```json
-{"ts":"2024-12-09T14:00:00Z","context":"claude-code","constraint":"Private repos cannot use /plugin marketplace add user/repo","source":"Testing during plugin development","permanent":true}
+{
+  "ts": "2024-12-09T14:00:00Z",
+  "context": "claude-code",
+  "constraint": "Private repos cannot use /plugin marketplace add user/repo",
+  "source": "Testing during plugin development",
+  "permanent": true
+}
 ```
 
 ## Integration with Workflows
@@ -168,23 +192,26 @@ All files use JSONL (JSON Lines) format — one JSON object per line.
 The learnings system integrates with hope's workflows:
 
 **Before building (Workflow A):**
+
 - Recall surfaces past failures in this domain
 - You avoid repeating mistakes
 
 **Before debugging (Workflow B):**
+
 - Recall shows similar bugs and their root causes
 - Faster diagnosis
 
 **Before planning:**
+
 - Recall surfaces constraints that might affect the plan
 - More realistic scope
 
 ---
 
-| Say this | Get this |
-|----------|----------|
-| "recall X" | Surface relevant learnings |
-| `/hope:learn` | Extract from current session |
-| `/hope:compact` | Deduplicate and prune |
+| Say this        | Get this                     |
+| --------------- | ---------------------------- |
+| "recall X"      | Surface relevant learnings   |
+| `/hope:learn`   | Extract from current session |
+| `/hope:compact` | Deduplicate and prune        |
 
 Your thinking compounds. Every session makes the next one better.
