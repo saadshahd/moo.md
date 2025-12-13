@@ -1,14 +1,14 @@
 ---
 name: hope
 description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
-version: 0.4.1
+version: 0.4.2
 ---
 
 <EXTREMELY-IMPORTANT>
 This skill applies to EVERY task. No exceptions.
 Run Silent Audit before responding.
 Use confidence gates.
-Clarify intent before building.
+Clarify intent using /hope:intent before building.
 </EXTREMELY-IMPORTANT>
 
 # moo.md
@@ -40,42 +40,52 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 
 Higher-level frameworks for complex situations. Use before diving into tactical tools.
 
-| Framework | Purpose | When to Use |
-|-----------|---------|-------------|
-| [Handshake](references/handshake.md) | Drive action from communication | Meetings, negotiations, getting buy-in |
-| [SCOPE](references/scope.md) | Right-size analysis before starting | Research, investigation, any analysis work |
-| [Leverage Points](references/leverage-points.md) | Find where to intervene in systems | Complex system change, choosing interventions |
-| [SPOT](references/spot.md) | Surface and act on recurring patterns | Retrospectives, debugging recurring issues |
+| Framework                                        | Purpose                               | When to Use                                   |
+| ------------------------------------------------ | ------------------------------------- | --------------------------------------------- |
+| [Handshake](references/handshake.md)             | Drive action from communication       | Meetings, negotiations, getting buy-in        |
+| [SCOPE](references/scope.md)                     | Right-size analysis before starting   | Research, investigation, any analysis work    |
+| [Leverage Points](references/leverage-points.md) | Find where to intervene in systems    | Complex system change, choosing interventions |
+| [SPOT](references/spot.md)                       | Surface and act on recurring patterns | Retrospectives, debugging recurring issues    |
 
 ---
 
-## Thinking Tools
+## Default Tools
 
-All tools in `references/tools/`. Select based on task:
+For most situations, use these first:
 
-| Category | Tools | When to Use |
-|----------|-------|-------------|
-| Root Cause | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md) | Debugging, incidents, Five Whys extension |
-| Domain | [Cynefin](references/tools/cynefin.md) | Choosing approach before diving in |
-| Decision | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md) | Multi-option choices, fast decisions |
-| Prioritization | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Pareto](references/tools/pareto.md), [Opportunity Cost](references/tools/opportunity-cost.md) | Backlog grooming, debt triage, tradeoffs |
-| Systems | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md) | Architecture, metrics, consequences |
-| Creative | [Six Hats](references/tools/six-hats.md), [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md) | Brainstorming, reframing, innovation |
-| Communication | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md) | Writing, feedback, negotiation |
-| Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md), [MECE](references/tools/mece.md) | Decomposition, exhaustive breakdown |
-| Razors | [Occam's](references/tools/occams-razor.md), [Hanlon's](references/tools/hanlons-razor.md) | Simplify explanations, reduce conflict |
-| Fallacies | [Sunk Cost](references/tools/sunk-cost.md) | Cut losses, stop bad investments |
-| Risk | [Pre-Mortem](references/tools/pre-mortem.md) | Anticipate failure before starting |
-| Boundaries | [Circle of Competence](references/tools/circle-of-competence.md), [Chesterton's Fence](references/tools/chestertons-fence.md) | Know limits, understand before changing |
-| Probability | [Bayesian Thinking](references/tools/bayesian-thinking.md) | Update beliefs with evidence, calibrate confidence |
-| Abstraction | [Map vs Territory](references/tools/map-territory.md), [Lindy Effect](references/tools/lindy-effect.md) | Models ≠ reality, prefer time-tested |
-| Biases | [Munger's 25](references/tools/munger-biases.md) | Pre-decision bias check, high-stakes decisions |
+| Situation              | Default                                                | When to Use                            |
+| ---------------------- | ------------------------------------------------------ | -------------------------------------- |
+| Prioritizing work      | [Impact-Effort](references/tools/impact-effort.md)     | Backlog grooming, what to do next      |
+| Breaking down problems | [Issue Trees](references/tools/issue-trees.md)         | Complex problems, exhaustive analysis  |
+| Finding root cause     | [Ishikawa](references/tools/ishikawa.md)               | Debugging, incidents, postmortems      |
+| Making decisions       | [Decision Matrix](references/tools/decision-matrix.md) | Multi-option choices with tradeoffs    |
+| Understanding systems  | [Feedback Loops](references/tools/feedback-loops.md)   | Architecture, metrics, consequences    |
+| Communicating clearly  | [Minto Pyramid](references/tools/minto-pyramid.md)     | Writing, presentations, exec summaries |
+
+## All Tools (when default doesn't fit)
+
+| Category          | Tools                                                                                                                                                                                                 | When to Use                                        |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Root Cause        | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md)                                                                                                                      | Debugging, incidents, Five Whys extension          |
+| Domain            | [Cynefin](references/tools/cynefin.md)                                                                                                                                                                | Choosing approach before diving in                 |
+| Decision          | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md) | Multi-option choices, fast decisions               |
+| Prioritization    | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Opportunity Cost](references/tools/opportunity-cost.md)                                            | Backlog grooming, debt triage, tradeoffs           |
+| Systems           | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md)                                  | Architecture, metrics, consequences                |
+| Creative          | [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md)                            | Brainstorming, reframing, innovation               |
+| Communication     | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md)                                                    | Writing, feedback, negotiation                     |
+| Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md)                                              | Decomposition, exhaustive breakdown                |
+| Risk              | [Pre-Mortem](references/tools/pre-mortem.md)                                                                                                                                                          | Anticipate failure before starting                 |
+| Boundaries        | [Circle of Competence](references/tools/circle-of-competence.md), [Chesterton's Fence](references/tools/chestertons-fence.md)                                                                         | Know limits, understand before changing            |
+| Probability       | [Bayesian Thinking](references/tools/bayesian-thinking.md)                                                                                                                                            | Update beliefs with evidence, calibrate confidence |
+| Abstraction       | [Map vs Territory](references/tools/map-territory.md)                                                                                                                                                 | Models ≠ reality, question assumptions             |
+| Biases            | [Munger's 25](references/tools/munger-biases.md)                                                                                                                                                      | Pre-decision bias check, high-stakes decisions     |
 
 ---
 
 ## Common Rationalizations (All Wrong)
 
 If you catch yourself thinking:
+
 - "This is just a simple question" → WRONG. Run Silent Audit.
 - "I already know the answer" → WRONG. State confidence percentage.
 - "This doesn't need a library search" → WRONG. Search anyway.
@@ -90,11 +100,11 @@ If you catch yourself thinking:
 
 When task matches, use the appropriate skill:
 
-| Task Type | Skill | Trigger |
-|-----------|-------|---------|
-| Root cause analysis (bugs, failures, problems) | `hope:trace` | "why did this fail", incident, debugging |
-| Before claiming done/fixed/complete | `hope:gate` | Verification checkpoint |
-| Foundation for ALL thinking | `hope:soul` (this skill) | Default for everything |
+| Task Type                                      | Skill                    | Trigger                                  |
+| ---------------------------------------------- | ------------------------ | ---------------------------------------- |
+| Root cause analysis (bugs, failures, problems) | `hope:trace`             | "why did this fail", incident, debugging |
+| Before claiming done/fixed/complete            | `hope:gate`              | Verification checkpoint                  |
+| Foundation for ALL thinking                    | `hope:soul` (this skill) | Default for everything                   |
 
 Announce skill usage: "I'm using hope:[skill] for [purpose]"
 
@@ -354,13 +364,14 @@ Every library you don't write = 1000 bugs you don't have.
 
 `~/.claude/learnings/`:
 
-| File                | Schema                                                |
-| ------------------- | ----------------------------------------------------- |
-| `failures.jsonl`    | `{ts, context, failure, root_cause, prevention}`      |
-| `discoveries.jsonl` | `{ts, context, discovery, confidence, applies_to}`    |
-| `constraints.jsonl` | `{ts, context, constraint, source, permanent}`        |
+| File                | Schema                                             |
+| ------------------- | -------------------------------------------------- |
+| `failures.jsonl`    | `{ts, context, failure, root_cause, prevention}`   |
+| `discoveries.jsonl` | `{ts, context, discovery, confidence, applies_to}` |
+| `constraints.jsonl` | `{ts, context, constraint, source, permanent}`     |
 
 **Commands:**
+
 - `/hope:learn` - Extract learnings from session or transcript
 - `/hope:recall` - Surface relevant learnings for current context
 

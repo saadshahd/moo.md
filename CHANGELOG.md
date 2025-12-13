@@ -11,6 +11,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.2] - 2025-12-13
+
+### Removed
+- **7 redundant thinking tools** (bloat reduction per Anthropic guidelines):
+  - `hanlons-razor.md` - Too niche (5% use cases)
+  - `occams-razor.md` - First Principles is more actionable
+  - `mece.md` - Principle is embedded in Issue Trees
+  - `pareto.md` - Covered by Impact-Effort matrix
+  - `sunk-cost.md` - Single-concept, merged note into Opportunity Cost
+  - `lindy-effect.md` - Bayesian heuristic, not standalone tool
+  - `six-hats.md` - 70% overlap with Productive Thinking
+
+### Added
+- **Default Tools section** in hope SKILL.md - 6 go-to tools for common situations
+  - Follows Anthropic's "default with escape hatch" pattern
+  - Reduces decision paralysis from 27+ tool options
+
+### Changed
+- hope plugin version 0.4.1 → 0.4.2
+- Thinking tools count 35 → 28
+- Tools table now has "Default Tools" + "All Tools" structure
+
+---
+
 ## [0.4.1] - 2025-12-13
 
 ### Added
