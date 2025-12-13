@@ -5,6 +5,7 @@ Analyze focus capacity using the λ/Δ/θ model and calculate meeting costs.
 ## Two Modes
 
 This workflow has two modes:
+
 1. **Parameter Estimation:** Discover your personal λ, Δ, θ values
 2. **Meeting Cost Analysis:** Calculate true cost of a specific meeting
 
@@ -12,11 +13,11 @@ This workflow has two modes:
 
 ### The Model (Can Duruk's Framework)
 
-| Parameter | Definition | Typical Range |
-|-----------|------------|---------------|
-| **λ (lambda)** | Interruptions per hour (meetings, DMs, email checks, "got a sec?", self-interruptions) | 0.5 - 4 |
-| **Δ (delta)** | Minutes to fully resume deep work after interruption | 5 - 25 |
-| **θ (theta)** | Minimum uninterrupted minutes needed for meaningful progress | 30 - 90 |
+| Parameter      | Definition                                                                             | Typical Range |
+| -------------- | -------------------------------------------------------------------------------------- | ------------- |
+| **λ (lambda)** | Interruptions per hour (meetings, DMs, email checks, "got a sec?", self-interruptions) | 0.5 - 4       |
+| **Δ (delta)**  | Minutes to fully resume deep work after interruption                                   | 5 - 25        |
+| **θ (theta)**  | Minimum uninterrupted minutes needed for meaningful progress                           | 30 - 90       |
 
 ### Interview Questions
 

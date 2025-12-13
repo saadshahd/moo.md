@@ -15,6 +15,7 @@ Use ask tool to gather:
 ### Phase 1: Discovery
 
 Search for recent job postings from:
+
 - Official careers site
 - LinkedIn Jobs
 - Indeed
@@ -24,6 +25,7 @@ Search for recent job postings from:
 **Gather only recent postings (<90 days).** Mark older ones as ARCHIVE.
 
 For each posting, record:
+
 - Job title
 - Location (remote/hybrid/onsite)
 - Posting date + source
@@ -35,16 +37,19 @@ For each posting, record:
 From the postings, identify:
 
 **Growth Cues:**
+
 - "First hire," "founding member," "new team"
 - Expansion into new markets/products
 - Leadership roles being created
 
 **Stability Cues:**
+
 - Roles focused on renewals, compliance, customer success
 - Backfill positions
 - Process/operations roles
 
 **Red Flags:**
+
 - Jobs open >90 days without changes
 - Same role reposted multiple times
 - Contradictory requirements
@@ -52,6 +57,7 @@ From the postings, identify:
 - High volume of similar roles (churn indicator)
 
 **Organizational Focus:**
+
 - Which functions are hiring most? (Sales, Product, Engineering, etc.)
 - What does the hiring pattern reveal about priorities?
 
@@ -67,12 +73,14 @@ Which roles are freshest (most likely to be filled soon) vs. stale?
 What's the realistic entry point?
 
 **3. Culture & Work Style**
+
 - Remote vs onsite signals
 - Growth language vs stability language
 - Startup energy vs enterprise caution
 
 **4. Watch Outs**
 Weak spots to investigate further:
+
 - Teams not hiring (why?)
 - Red flags identified
 - Questions to ask in interviews
@@ -81,9 +89,9 @@ Weak spots to investigate further:
 
 Document claims with receipts:
 
-| Claim | Supporting Snippet | Job + Date + Source | Confidence |
-|-------|-------------------|---------------------|------------|
-| [Claim] | "[Quote]" | [Title] - [Date] - [Source] | 0-100% |
+| Claim   | Supporting Snippet | Job + Date + Source         | Confidence |
+| ------- | ------------------ | --------------------------- | ---------- |
+| [Claim] | "[Quote]"          | [Title] - [Date] - [Source] | 0-100%     |
 
 Mark any >90 day old sources as ARCHIVE.
 

@@ -17,6 +17,7 @@ Use ask tool to gather:
 ### Step 1: Situation Distillation
 
 Summarize into:
+
 - **Core issue** (2-3 sentences)
 - **Key tension points** (3-5 bullets)
 - **Decision urgency level** (Critical / High / Medium / Low)
@@ -24,10 +25,12 @@ Summarize into:
 ### Step 2: Landscape Mapping
 
 **Facts Everyone Agrees On:**
+
 - List 3-5 undisputed facts
 - Note their implications
 
 **Points of Disagreement:**
+
 - Issue 1: [What] → Sides: [Who believes what]
 - Issue 2: [What] → Sides: [Who believes what]
 - Continue as needed
@@ -57,6 +60,7 @@ Repeat for all significant stakeholders.
 Develop exactly 3 paths forward:
 
 **Option 1: [The Collaborative Path]**
+
 - **Specific Actions:** 5 concrete steps
 - **Timeline:** When to do what
 - **Pros:** 3 main benefits
@@ -73,6 +77,7 @@ Develop exactly 3 paths forward:
 ### Step 5: Recommendation
 
 Select the recommended option and justify:
+
 - Why this option over the others
 - What makes it most likely to succeed given the constraints
 - What needs to go right

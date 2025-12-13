@@ -5,6 +5,7 @@ Evidence-based evaluation of AI collaboration skills with scoring rubrics and im
 ## Input Required
 
 Use ask tool to gather:
+
 - 25-35 minutes of focused time from user
 - Honest, specific responses (not aspirational)
 
@@ -12,13 +13,13 @@ Use ask tool to gather:
 
 Evaluate across 5 weighted competencies:
 
-| Competency | Weight | What It Measures |
-|------------|--------|------------------|
-| Prompt Mastery | 40% | Constructing effective, structured prompts |
-| Technical Understanding | 15% | Knowledge of AI systems and limitations |
-| Practical Application | 20% | Systematic integration into real workflows |
-| Critical Evaluation | 15% | Validation and verification practices |
-| Workflow Design | 10% | Creating repeatable, documented processes |
+| Competency              | Weight | What It Measures                           |
+| ----------------------- | ------ | ------------------------------------------ |
+| Prompt Mastery          | 40%    | Constructing effective, structured prompts |
+| Technical Understanding | 15%    | Knowledge of AI systems and limitations    |
+| Practical Application   | 20%    | Systematic integration into real workflows |
+| Critical Evaluation     | 15%    | Validation and verification practices      |
+| Workflow Design         | 10%    | Creating repeatable, documented processes  |
 
 Plus: Learning Velocity (informs roadmap, not scored)
 
@@ -27,11 +28,13 @@ Plus: Learning Velocity (informs roadmap, not scored)
 ### Test 1: Specificity Challenge
 
 Present this generic prompt:
+
 > "Help me write a proposal for a potential client."
 
 Ask user to transform it into their actual working version.
 
 **Evaluate against checklist:**
+
 - Client characteristics (industry, size, decision-making style)
 - Proposal type (service agreement, partnership, project bid)
 - Desired outcome (meeting, signature, pilot, next steps)
@@ -44,6 +47,7 @@ Ask user to transform it into their actual working version.
 Present scenario: AI output is 70% right, needs improvement via prompting only.
 
 Ask:
+
 1. Number of revision attempts typically used
 2. What first iteration focuses on (exact follow-up prompt)
 3. What second iteration focuses on
@@ -53,6 +57,7 @@ Ask:
 ### Test 3: Workflow Test
 
 Ask user to describe one specific, regular AI task:
+
 1. **Preparation:** What happens before first prompt?
 2. **Initial Prompt:** Detail level, structure, frameworks used
 3. **Iteration:** How they refine output to usable result
@@ -105,6 +110,7 @@ Ask these questions:
 ## Part 6: Advanced Techniques (Optional)
 
 Ask about:
+
 - Custom instructions / system prompts
 - API usage / programmatic access
 - Multi-tool workflows
@@ -117,13 +123,13 @@ Ask about:
 
 Score each competency 1-10:
 
-| Level | Characteristics |
-|-------|-----------------|
-| 1-2 | Basic or inconsistent use |
-| 3-4 | Regular use with some structure |
-| 5-6 | Systematic approach with consistent practices |
-| 7-8 | Advanced integration with documented processes |
-| 9-10 | Expert-level with teaching/building capabilities |
+| Level | Characteristics                                  |
+| ----- | ------------------------------------------------ |
+| 1-2   | Basic or inconsistent use                        |
+| 3-4   | Regular use with some structure                  |
+| 5-6   | Systematic approach with consistent practices    |
+| 7-8   | Advanced integration with documented processes   |
+| 9-10  | Expert-level with teaching/building capabilities |
 
 ## Output Format
 

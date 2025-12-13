@@ -14,6 +14,7 @@ Use ask tool to gather:
 ### Step 1: Situation Intake
 
 Ask user to describe the mess however makes sense:
+
 - A Slack thread they're staring at
 - A vague ask from their manager
 - An idea they had that won't crystallize
@@ -24,15 +25,15 @@ Ask user to describe the mess however makes sense:
 
 Map the situation to one of these core professional skills:
 
-| Skill | Indicators | Artifact Type |
-|-------|------------|---------------|
-| **Judgment** | Multiple valid paths, unclear which is right | Decision doc |
-| **Orchestration** | Many moving parts, dependencies unclear | Spec / Project brief |
-| **Coordination** | Multiple stakeholders, alignment needed | Stakeholder map / RACI |
-| **Taste** | Quality unclear, standards undefined | Rubric / Evaluation criteria |
-| **Updating** | New information, need to change course | Status update / Pivot memo |
-| **Synthesis** | Too much information, need clarity | Executive summary / Brief |
-| **Framing** | Problem definition unclear | Problem statement |
+| Skill             | Indicators                                   | Artifact Type                |
+| ----------------- | -------------------------------------------- | ---------------------------- |
+| **Judgment**      | Multiple valid paths, unclear which is right | Decision doc                 |
+| **Orchestration** | Many moving parts, dependencies unclear      | Spec / Project brief         |
+| **Coordination**  | Multiple stakeholders, alignment needed      | Stakeholder map / RACI       |
+| **Taste**         | Quality unclear, standards undefined         | Rubric / Evaluation criteria |
+| **Updating**      | New information, need to change course       | Status update / Pivot memo   |
+| **Synthesis**     | Too much information, need clarity           | Executive summary / Brief    |
+| **Framing**       | Problem definition unclear                   | Problem statement            |
 
 Explain which skill the situation demands and why.
 
@@ -111,6 +112,7 @@ Based on this performance, try:
 ## Example Transformation
 
 **Messy Input:**
+
 > "My manager asked me to 'figure out what we should do about the support queue' but didn't give any constraints. I've got data showing tickets are up 40% but I don't know if they want a quick fix or a long-term solution or both."
 
 **Drill Output:**

@@ -42,11 +42,11 @@ You don't see this checklist. You see better answers.
 
 ## Three Keywords to Remember
 
-| Say this | Get this |
-|----------|----------|
-| "delve into how X works" | Deep code investigation |
-| "plan building X" | Structured plan with intent clarification |
-| "recall what I learned about X" | Surface insights from past sessions |
+| Say this                        | Get this                                  |
+| ------------------------------- | ----------------------------------------- |
+| "delve into how X works"        | Deep code investigation                   |
+| "plan building X"               | Structured plan with intent clarification |
+| "recall what I learned about X" | Surface insights from past sessions       |
 
 Try one now:
 
@@ -65,9 +65,11 @@ Your thinking compounds.
 ## Next Steps
 
 **Learn more:**
+
 - [Learnings System](learnings-system.md) — How your thinking compounds
 
 **Plugin Reference:**
+
 - [hope](hope.md) — cognitive operating system
 - [product](product.md) — PRDs, competitive analysis, metrics
 - [wordsmith](wordsmith.md) — editing, voice extraction, narrative

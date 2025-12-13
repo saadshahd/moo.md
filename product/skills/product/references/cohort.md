@@ -5,6 +5,7 @@ Analyze customer cohort data for retention, expansion, and lifetime value insigh
 ## Phase 1: Data Collection
 
 Ask for:
+
 - Cohort data (customers by acquisition month, revenue per period)
 - Data format (CSV, table, or describe)
 - Customer vs revenue retention preference
@@ -21,7 +22,8 @@ Feb 2024    100%     97%      94%      90%      --
 ```
 
 **Color key:**
-- >100% = expansion (dark green)
+
+- > 100% = expansion (dark green)
 - 90-100% = healthy (light green)
 - 75-90% = concerning (yellow)
 - 50-75% = poor (orange)
@@ -32,15 +34,18 @@ Feb 2024    100%     97%      94%      90%      --
 Calculate for each cohort:
 
 **Retention rates:**
+
 - Month 1, 3, 6, 12 customer retention
 - Month 1, 3, 6, 12 revenue retention
 
 **Aggregate metrics:**
+
 - GRR (Gross Revenue Retention): Revenue retained excluding expansion
 - NRR (Net Revenue Retention): Revenue retained including expansion
 - Average retention curve across all cohorts
 
 **Benchmarks:**
+
 - Good SaaS: 85-90% GRR, >110% NRR
 - Excellent: >90% GRR, >120% NRR
 
@@ -60,6 +65,7 @@ Benchmark: >3:1 healthy, >5:1 excellent
 ```
 
 **Blended company metrics:**
+
 - Overall LTV (weighted average)
 - Overall payback period
 - LTV trend by cohort vintage
@@ -69,19 +75,23 @@ Benchmark: >3:1 healthy, >5:1 excellent
 Generate actionable findings:
 
 **Churn patterns:**
+
 - Peak churn period: Month [X] - proactive outreach at [X-1]
 - Plateau point: Month [X] - customers past this are long-term
 
 **Expansion patterns:**
+
 - Average expansion timing: Month [X]
 - Expansion rate by segment
 
 **Cohort comparison:**
+
 - Best performing: [Cohort] - [Why]
 - Worst performing: [Cohort] - [Why]
 - Trend: Newer cohorts [improving/declining]
 
 **Segment differences:**
+
 - [Segment A] vs [Segment B]: [X]% point difference
 
 ## Output Summary

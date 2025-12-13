@@ -20,6 +20,8 @@ Score each factor 1-5.
 
 ## Priority Tiers
 
+**Tools:** [Eisenhower](../../../../hope/skills/soul/references/tools/eisenhower.md) for urgent/important triage, [Impact-Effort](../../../../hope/skills/soul/references/tools/impact-effort.md) for ROI-based prioritization.
+
 ### Priority 1: Critical Path Blockers
 
 Issues that will prevent upcoming features or pose immediate risk.

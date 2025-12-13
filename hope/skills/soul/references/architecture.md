@@ -7,7 +7,7 @@ Users reason in journeys, not components.
 ```
 ✗ Layer-First
 /components/Button
-/services/Auth  
+/services/Auth
 /utils/Validation
 
 ✓ Journey-First
@@ -50,15 +50,13 @@ type User =
 Errors as values, not exceptions.
 
 ```typescript
-type Result<T, E = Error> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
+type Result<T, E = Error> = { ok: true; value: T } | { ok: false; error: E };
 
 // Pipeline composition
 const pipeline = pipe(
-  fetchData,           // Result<Data, FetchError>
-  flatMap(validate),   // Result<Valid, ValidationError>
-  flatMap(save)        // Result<Saved, SaveError>
+  fetchData, // Result<Data, FetchError>
+  flatMap(validate), // Result<Valid, ValidationError>
+  flatMap(save) // Result<Saved, SaveError>
 );
 ```
 
@@ -97,11 +95,11 @@ Load = (Components × Complexity) − Journey Coherence
 
 ## Anti-Patterns
 
-| Pattern | Problem | Fix |
-|---------|---------|-----|
-| `*Manager`, `*Helper` | Vague responsibility | Domain names |
-| `try/catch` for control | Hidden flow | Result types |
-| `interface_v2` | Cognitive split | Atomic migration |
-| Nested ternary | Unreadable | Discriminated union |
-| Boolean parameters | Unclear intent | Options object |
-| > 2 callback levels | Cognitive overload | Pipeline/flatMap |
+| Pattern                 | Problem              | Fix                 |
+| ----------------------- | -------------------- | ------------------- |
+| `*Manager`, `*Helper`   | Vague responsibility | Domain names        |
+| `try/catch` for control | Hidden flow          | Result types        |
+| `interface_v2`          | Cognitive split      | Atomic migration    |
+| Nested ternary          | Unreadable           | Discriminated union |
+| Boolean parameters      | Unclear intent       | Options object      |
+| > 2 callback levels     | Cognitive overload   | Pipeline/flatMap    |

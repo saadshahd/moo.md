@@ -22,17 +22,18 @@ Create exactly 3 unconventional perspectives, ordered from most practical to mos
 
 For each perspective, provide:
 
-| Component | Description |
-|-----------|-------------|
-| **Reframe Title** | 5-10 words capturing the shift |
-| **Core Insight** | 1 sentence explaining the thinking shift |
-| **Vivid Story** | 100-150 word thought experiment illustrating this perspective |
-| **Memorable Metaphor** | 1 sentence comparing the challenge to something unexpected |
-| **Action Tagline** | Under 12 words—what to do differently |
+| Component              | Description                                                   |
+| ---------------------- | ------------------------------------------------------------- |
+| **Reframe Title**      | 5-10 words capturing the shift                                |
+| **Core Insight**       | 1 sentence explaining the thinking shift                      |
+| **Vivid Story**        | 100-150 word thought experiment illustrating this perspective |
+| **Memorable Metaphor** | 1 sentence comparing the challenge to something unexpected    |
+| **Action Tagline**     | Under 12 words—what to do differently                         |
 
 ### Step 3: Implementation Bridge
 
 For the most practical perspective only, add:
+
 - **First concrete step** to take tomorrow
 - **Key metric** to track progress
 - **Potential obstacle** and how to overcome it
@@ -42,21 +43,27 @@ For the most practical perspective only, add:
 Use these lenses to generate genuinely different viewpoints:
 
 ### Inversion
+
 What if the opposite were true? What if the constraint were an advantage?
 
 ### Time Shift
+
 How would you approach this if you had 10x more time? 10x less? How will this look in 5 years?
 
 ### Role Swap
+
 How would a competitor see this? A customer? A complete outsider? Someone from a different industry?
 
 ### Assumption Burial
+
 What are you assuming that might not be true? What if you eliminated the biggest assumption?
 
 ### Scale Shift
+
 What if this were 100x bigger? 100x smaller? What changes?
 
 ### Constraint Removal
+
 What would you do if [biggest constraint] didn't exist? Now, what partial version of that is possible?
 
 ## Output Format
@@ -128,6 +135,7 @@ What would you do if [biggest constraint] didn't exist? Now, what partial versio
 ## Example
 
 **Input:**
+
 - Challenge: "I want to get promoted but my manager doesn't seem to notice my work"
 - Current approach: "Working harder and documenting my wins in 1:1s"
 - Constraints: "Remote team, manager has 15 direct reports"
@@ -135,9 +143,11 @@ What would you do if [biggest constraint] didn't exist? Now, what partial versio
 **Output Perspectives:**
 
 1. **Most Practical:** "Promote Your Manager First"
-   - Core insight: Make your manager look good to *their* boss, and they'll need you visible.
+
+   - Core insight: Make your manager look good to _their_ boss, and they'll need you visible.
 
 2. **Moderately Radical:** "Skip the Middle—Build Your Reputation Outside"
+
    - Core insight: Cross-functional visibility creates pull; your manager will notice when others request you.
 
 3. **Most Radical:** "The Promotion Is Already Happening Elsewhere"

@@ -1,6 +1,7 @@
 ---
 name: career
 description: Use when preparing for interviews, assessing skills, analyzing job opportunities, navigating stakeholder politics, or developing professional capabilities. Auto-activates on interview prep, career assessment, job search, skill gaps, feedback interpretation, leadership development, or professional growth tasks.
+version: 0.0.2
 ---
 
 # Career Skill
@@ -25,18 +26,28 @@ You're working on:
 
 Announce which workflow you're using:
 
-| Task Type | Workflow | Reference |
-|-----------|----------|-----------|
-| AI fluency evaluation, skill assessment | AI Fluency Assessment | `references/assess.md` |
-| Interview practice, scenario simulation | Interview Simulator | `references/simulate.md` |
-| Behavioral stories, achievement narratives | STAR-C Narrative | `references/star.md` |
-| Weakness patterns, skill gap analysis | Gap Analysis | `references/gap.md` |
-| Practice drills, situation-to-skill | Practice Drill | `references/drill.md` |
-| Executive updates, leadership emails | Communication Eval | `references/eval-comm.md` |
+| Task Type                                  | Workflow              | Reference                   |
+| ------------------------------------------ | --------------------- | --------------------------- |
+| AI fluency evaluation, skill assessment    | AI Fluency Assessment | `references/assess.md`      |
+| Interview practice, scenario simulation    | Interview Simulator   | `references/simulate.md`    |
+| Behavioral stories, achievement narratives | STAR-C Narrative      | `references/star.md`        |
+| Weakness patterns, skill gap analysis      | Gap Analysis          | `references/gap.md`         |
+| Practice drills, situation-to-skill        | Practice Drill        | `references/drill.md`       |
+| Executive updates, leadership emails       | Communication Eval    | `references/eval-comm.md`   |
 | Political situations, stakeholder dynamics | Stakeholder Navigator | `references/stakeholder.md` |
-| Mental ruts, alternative viewpoints | Perspective Shift | `references/reframe.md` |
-| Meeting costs, deep work capacity | Focus Capacity | `references/focus.md` |
-| Job posting OSINT, company intelligence | Job Intel | `references/osint.md` |
+| Mental ruts, alternative viewpoints        | Perspective Shift     | `references/reframe.md`     |
+| Meeting costs, deep work capacity          | Focus Capacity        | `references/focus.md`       |
+| Job posting OSINT, company intelligence    | Job Intel             | `references/osint.md`       |
+
+## Related Thinking Tools
+
+From `hope/skills/soul/references/tools/`:
+
+| Tool                                                                                  | When to Use                               |
+| ------------------------------------------------------------------------------------- | ----------------------------------------- |
+| [SBI](../../hope/skills/soul/references/tools/sbi.md)                                 | Give or receive feedback without judgment |
+| [Conflict Resolution](../../hope/skills/soul/references/tools/conflict-resolution.md) | Navigate stakeholder disagreements        |
+| [Ladder of Inference](../../hope/skills/soul/references/tools/ladder-inference.md)    | Check assumptions in political situations |
 
 ## Usage
 

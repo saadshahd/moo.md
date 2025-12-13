@@ -15,30 +15,35 @@ Use ask tool to gather:
 Each story must follow this structure:
 
 ### S - Situation Analysis
+
 - Start with the hardest constraint faced
 - Quantify the limitation (timeline, budget, resources, data availability)
 - Explain why this constraint mattered strategically
 - Set context for the stakes involved
 
 ### T - Task Definition
+
 - Define success criteria with measurable outcomes
 - Explain how success would be evaluated
 - Identify who needed to be satisfied and why
 - Clarify what failure would cost
 
 ### A - Action Documentation
+
 - Focus on **decision points**, not just activities
 - Explain reasoning at each choice point
 - Highlight moments where approach A was chosen over B
 - Include verification steps taken
 
 ### R - Result Quantification
+
 - Provide specific metrics showing impact
 - Compare to baseline or alternative approaches
 - Include both intended and unintended consequences
 - Measure efficiency gains and quality maintenance
 
 ### C - Constraint Reflection
+
 - What would be done differently with more resources
 - How the limitation shaped the approach
 - What was learned about working within constraints
@@ -48,16 +53,17 @@ Each story must follow this structure:
 
 Tag each sentence in the narrative:
 
-| Tag | Meaning |
-|-----|---------|
-| `[FACT]` | Directly verifiable claim |
+| Tag           | Meaning                             |
+| ------------- | ----------------------------------- |
+| `[FACT]`      | Directly verifiable claim           |
 | `[INFERENCE]` | Reasonable conclusion from evidence |
-| `[OPINION]` | Your judgment or interpretation |
-| `[TK-VERIFY]` | Items to confirm before interview |
+| `[OPINION]`   | Your judgment or interpretation     |
+| `[TK-VERIFY]` | Items to confirm before interview   |
 
 ## AI Integration Disclosure (When Relevant)
 
 If AI tools were used, include:
+
 - Specific tools for specific tasks
 - Validation/verification process
 - What AI got wrong and how it was caught
@@ -72,6 +78,7 @@ Ask user to paste their bullet points or descriptions.
 ### Step 2: Identify Story Candidates
 
 For each bullet, assess:
+
 - Is there a clear constraint to anchor the story?
 - Are there decision points (not just activities)?
 - Can results be quantified?
@@ -121,6 +128,7 @@ For each viable story:
 ## Example Transformation
 
 **Input bullet:**
+
 > "Led migration of customer data from legacy system under tight deadline"
 
 **Output STAR-C:**
@@ -163,6 +171,7 @@ For each viable story:
 ## Output Format
 
 Deliver stories grouped by:
+
 1. Target competencies they demonstrate
 2. Evidence strength (prioritize 4-5/5)
 3. TK-VERIFY items across all stories

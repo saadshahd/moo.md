@@ -1,7 +1,7 @@
 ---
 name: hope
 description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
-version: 0.1.2
+version: 0.2.0
 ---
 
 <EXTREMELY-IMPORTANT>
@@ -33,6 +33,23 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 ```
 
 **Forbidden without percentage**: "probably", "likely", "maybe", "might", "could"
+
+---
+
+## Thinking Tools
+
+All tools in `references/tools/`. Select based on task:
+
+| Category | Tools | When to Use |
+|----------|-------|-------------|
+| Root Cause | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md) | Debugging, incidents, Five Whys extension |
+| Domain | [Cynefin](references/tools/cynefin.md) | Choosing approach before diving in |
+| Decision | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md) | Multi-option choices, fast decisions |
+| Prioritization | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md) | Backlog grooming, debt triage |
+| Systems | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md) | Architecture, metrics, consequences |
+| Creative | [Six Hats](references/tools/six-hats.md), [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md) | Brainstorming, reframing, innovation |
+| Communication | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md) | Writing, feedback, negotiation |
+| Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md) | Decomposition, understanding, mapping |
 
 ---
 

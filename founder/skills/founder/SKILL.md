@@ -1,6 +1,7 @@
 ---
 name: founder
 description: Use when validating ideas, sizing markets, building pitch decks, preparing for investors, modeling financials, planning launches, or creating board reports. Auto-activates on fundraising, pitch, investor, TAM/SAM/SOM, unit economics, runway, or board deck tasks.
+version: 0.0.2
 ---
 
 # Founder Skill
@@ -34,6 +35,17 @@ Announce which workflow you're using before starting:
 | Unit economics, projections, cash | Model Financials    | `references/financials.md`    | Spreadsheet-ready tables      |
 | Launch planning, 90-day roadmap   | Plan Launch         | `references/launch.md`        | Phased execution plan         |
 | Board deck, metrics summary       | Report to Board     | `references/board.md`         | Marp deck + summary           |
+
+## Related Thinking Tools
+
+From `hope/skills/soul/references/tools/`:
+
+| Tool                                                                                | When to Use                                  |
+| ----------------------------------------------------------------------------------- | -------------------------------------------- |
+| [Abstraction Ladder](../../hope/skills/soul/references/tools/abstraction-ladder.md) | Reframe pivot decisions                      |
+| [Hard Choice](../../hope/skills/soul/references/tools/hard-choice.md)               | GO/KILL verdicts with no clear winner        |
+| [Zwicky Box](../../hope/skills/soul/references/tools/zwicky-box.md)                 | Generate creative business model variations  |
+| [First Principles](../../hope/skills/soul/references/tools/first-principles.md)     | Challenge "that's how it's done" assumptions |
 
 ## Usage
 

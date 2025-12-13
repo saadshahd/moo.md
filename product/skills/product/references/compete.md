@@ -5,6 +5,7 @@ Analyze competitive landscape and generate strategic recommendations.
 ## Input Required
 
 Ask for:
+
 - Competitor data (feature lists, pricing, reviews, analyst reports)
 - Your product context (name, capabilities, target market, position)
 - Win/loss data if available
@@ -25,13 +26,14 @@ Note emerging threats (new entrants, adjacent players).
 
 ## Phase 2: Feature Comparison Matrix
 
-| Category | Your Product | Comp A | Comp B | Comp C | Market Expectation |
-|----------|--------------|--------|--------|--------|-------------------|
+| Category | Your Product | Comp A   | Comp B   | Comp C   | Market Expectation  |
+| -------- | ------------ | -------- | -------- | -------- | ------------------- |
 | [Area]   | [Status]     | [Status] | [Status] | [Status] | [Must/Nice-to-Have] |
 
 **Status:** ✅ Full | 🟡 Partial | ❌ Missing | 🚧 Beta
 
 For each gap where you're behind:
+
 - What specifically is missing?
 - Who cares about this gap?
 - Are we losing deals because of it?
@@ -78,6 +80,7 @@ For each gap, in priority order:
 ## Phase 5: Roadmap Recommendations
 
 **Immediate (Next Quarter):**
+
 ```
 ### [Feature/Improvement]
 - Rationale: [Why this moves the needle]
@@ -91,14 +94,16 @@ For each gap, in priority order:
 ## Phase 6: Priority Scoring
 
 Calculate for top 5 gaps:
+
 ```
 Priority = (Market Pressure × Deal Impact × Strategic Fit) / Build Effort
 ```
 
 | Gap | Market | Deal | Fit | Effort | Score | Rank |
-|-----|--------|------|-----|--------|-------|------|
+| --- | ------ | ---- | --- | ------ | ----- | ---- |
 
 **Top 3 to pursue:**
+
 1. [Feature] - Score: [X] - Rationale: [Why]
 2. [Feature] - Score: [X] - Rationale: [Why]
 3. [Feature] - Score: [X] - Rationale: [Why]

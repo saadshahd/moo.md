@@ -11,29 +11,35 @@ Ask the user to paste or describe their project overview—goals, users, feature
 Work through these areas. Challenge assumptions. Push for scope cuts.
 
 ### Vision & Validation
+
 - What problem are we solving? How do you know it's worth solving?
 - Have you validated with real users, or are these assumptions?
 - What's the smallest thing that solves the core problem?
 
 ### Users & Use Cases
+
 - Who are the primary users? How well do you understand their pain?
 - What's the single most critical use case for MVP?
 - Which use cases add complexity without solving the core problem?
 
 ### Features & Scope
+
 - List essential features. Now challenge: can we ship without each one?
 - Which are truly Must-Have vs. Nice-to-Have?
 - If you could only keep TWO features, which would they be?
 
 ### Technical Requirements
+
 - What technical constraints exist?
 - Are any choices over-engineering the MVP?
 
 ### Success Metrics
+
 - How will you measure MVP success?
 - What KPIs indicate we solved the core problem?
 
 ### Risks & Assumptions
+
 - What are the top 3 risks?
 - Is any feature based on unvalidated assumptions?
 - Where is scope creep hiding?
@@ -41,6 +47,7 @@ Work through these areas. Challenge assumptions. Push for scope cuts.
 ## Phase 3: Summarize & Challenge
 
 Summarize what you've learned. Highlight:
+
 - Potential bloat in the MVP
 - Unvalidated assumptions
 - Features that could be cut

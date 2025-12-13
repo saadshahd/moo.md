@@ -5,6 +5,7 @@ Cut the fluff, keep the voice. Edit prose for clarity without losing the author'
 ## Input Required
 
 Ask for:
+
 - Passage to edit
 - Any constraints (word count target, tone to preserve)
 
@@ -17,14 +18,14 @@ Ask for:
 
 ## Common Cuts
 
-| Pattern | Example | Fix |
-|---------|---------|-----|
-| Weak qualifiers | "very unique" | "unique" |
-| Redundancy | "past history" | "history" |
-| Filler phrases | "in order to" | "to" |
-| Passive voice (when weak) | "was done by" | "[actor] did" |
-| Hedge words | "I think that maybe" | Direct statement |
-| Nominalizations | "make a decision" | "decide" |
+| Pattern                   | Example              | Fix              |
+| ------------------------- | -------------------- | ---------------- |
+| Weak qualifiers           | "very unique"        | "unique"         |
+| Redundancy                | "past history"       | "history"        |
+| Filler phrases            | "in order to"        | "to"             |
+| Passive voice (when weak) | "was done by"        | "[actor] did"    |
+| Hedge words               | "I think that maybe" | Direct statement |
+| Nominalizations           | "make a decision"    | "decide"         |
 
 ## Output Format
 
@@ -33,6 +34,7 @@ Provide three sections:
 ### 1. Marked-Up Version
 
 Show changes inline:
+
 - ~~Strikethrough~~ for deletions
 - **Bold** for additions or restructured text
 - [Note: explanation] for non-obvious changes

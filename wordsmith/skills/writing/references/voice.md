@@ -5,6 +5,7 @@ Analyze writing samples to extract a reusable voice profile.
 ## Input Required
 
 Ask for:
+
 - 300-500 words of the author's writing
 - Context: What type of content is this? (blog, docs, marketing, personal)
 
@@ -13,26 +14,31 @@ Ask for:
 Build a style profile covering:
 
 ### Tone
+
 - Formal vs casual spectrum (1-10)
 - Serious vs playful
 - Authoritative vs conversational
 
 ### Cadence
+
 - Average sentence length
 - Paragraph rhythm
 - Use of fragments or run-ons
 
 ### Vocabulary
+
 - Jargon level (technical terms, industry speak)
 - Favorite words/phrases
 - Words they avoid
 
 ### Syntax
+
 - Active vs passive voice preference
 - Question usage
 - List and structure patterns
 
 ### Rhetorical Moves
+
 - How they open pieces
 - Transition patterns
 - How they close/call to action

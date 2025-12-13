@@ -5,6 +5,7 @@ Evaluate a Product Requirements Document for completeness and actionability.
 ## Input
 
 Ask for:
+
 - PRD to evaluate (paste or file path)
 - Context (team size, timeline, system criticality)
 
@@ -56,16 +57,17 @@ Are blockers identified with owners?
 
 Check presence and quality:
 
-| Element | Present? | Quality |
-|---------|----------|---------|
-| Acceptance criteria | [Y/N] | [Assessment] |
-| Success metrics | [Y/N] | [Assessment] |
-| Non-goals | [Y/N] | [Assessment] |
-| Dependencies | [Y/N] | [Assessment] |
+| Element             | Present? | Quality      |
+| ------------------- | -------- | ------------ |
+| Acceptance criteria | [Y/N]    | [Assessment] |
+| Success metrics     | [Y/N]    | [Assessment] |
+| Non-goals           | [Y/N]    | [Assessment] |
+| Dependencies        | [Y/N]    | [Assessment] |
 
 ## Anti-Patterns
 
 Flag these:
+
 - "Should be performant" - Not testable
 - "Improve UX" - Not measurable
 - No edge case handling specified

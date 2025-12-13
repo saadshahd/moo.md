@@ -5,6 +5,7 @@ Craft a 3-act story structure that lands with your audience.
 ## Input Required
 
 Ask for:
+
 - **Concept or thesis:** One-line idea
 - **Target audience:** Who needs to hear this (e.g., CFOs, Gen-Z gamers, technical PMs)
 - **Desired emotional outcome:** What should they feel (e.g., urgency, hope, confidence)
@@ -12,6 +13,7 @@ Ask for:
 ## Internal Reasoning
 
 Before generating, reason through:
+
 1. What does this audience care about?
 2. What tension will resonate with them?
 3. What resolution delivers the emotional outcome?
@@ -19,16 +21,19 @@ Before generating, reason through:
 ## Three-Act Structure
 
 ### Act I: Setup
+
 - Establish the world/context
 - Introduce the protagonist (could be reader, company, idea)
 - Plant the seed of conflict
 
 ### Act II: Confrontation
+
 - Escalate the tension
 - Show stakes and obstacles
 - Build to the turning point
 
 ### Act III: Resolution
+
 - Deliver the payoff
 - Transform the protagonist
 - Call to action
@@ -64,6 +69,7 @@ Return JSON:
 ## Quality Checks
 
 Before returning:
+
 - [ ] 3 acts present
 - [ ] 2 key beats per act
 - [ ] Opening hook <=25 words

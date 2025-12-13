@@ -1,6 +1,7 @@
 ---
 name: product
 description: Use when doing competitive analysis, writing PRDs, defining metrics/OKRs, synthesizing user research, analyzing cohort retention, evaluating PRD quality, or prioritizing technical debt. Auto-activates on product management, strategy, roadmap, or requirements tasks.
+version: 0.0.2
 ---
 
 # Product Skill

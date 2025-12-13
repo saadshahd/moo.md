@@ -5,6 +5,7 @@ Turn aspirations into actionable goal systems.
 ## Input Required
 
 Ask for:
+
 - Quarter (Q1/Q2/Q3/Q4 + Year)
 - Draft goals or aspirations (messy is fine)
 - Available time per week for goal work
@@ -14,6 +15,7 @@ Ask for:
 ## Phase 1: Goal Analysis
 
 Review draft goals and identify:
+
 - Outcome vs process goals
 - External dependencies
 - Resource requirements
@@ -43,34 +45,40 @@ For each goal (max 5):
 Recommend one method per goal:
 
 **Chain Method** (daily habits)
+
 - Visual calendar, mark X each day
 - Don't break the chain
 
 **Progress Bar** (quantitative goals)
-- Current: __/Target: __
+
+- Current: **/Target: **
 - Weekly increment needed
 
 **Scorecard** (multi-metric goals)
+
 - Points per activity
 - Target weekly score
 
 | Goal | Method | Why |
-|------|--------|-----|
+| ---- | ------ | --- |
 
 ## Phase 4: Friday Review Ritual
 
 **15-Minute Check-in Template:**
 
 1. **Celebrate** (2 min)
+
    - What went well?
    - Which lead indicators hit?
 
 2. **Measure** (5 min)
+
    - Update trackers
    - Calculate weekly progress %
    - Note obstacles
 
 3. **Adjust** (5 min)
+
    - What needs to change?
    - Next week's priority
    - Calendar block for goal work

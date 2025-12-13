@@ -19,13 +19,16 @@ moo.md/
 ```
 
 Each plugin follows:
+
 ```
 <plugin>/
-├── .claude-plugin/plugin.json
+├── .claude-plugin/plugin.json    # name, version, description, keywords, author
 ├── skills/<name>/SKILL.md
 ├── skills/<name>/references/
 └── commands/<verb>.md
 ```
+
+Plugin discovery uses `.claude-plugin/marketplace.json` at repo root (lists all plugins).
 
 ## Local Testing
 
@@ -69,6 +72,7 @@ description: Single line. What it does and when to use it.
 
 - Place in `skills/<skill-name>/references/`
 - One level deep only (no nested references)
+- Exception: intra-plugin sharing allowed (e.g., `trace` referencing `soul/references/blameless.md`)
 - Keep SKILL.md under 500 lines; split to references if larger
 
 ### Token Efficiency
@@ -81,7 +85,7 @@ description: Single line. What it does and when to use it.
 ## Core Philosophy (Preserve These)
 
 - **Confidence gates:** <70% research, 70-85% ship+monitor, ≥85% ship
-- **Quality footer:** Confidence, Alternative, Reversible, Complexity
+- **Quality footer:** Confidence, Alternative, Reversible, Key Assumption, Complexity
 - **Workflows:** A=Build, B=Debug, C=Refactor
 - **Learnings:** `~/.claude/learnings/*.jsonl`
 
@@ -97,11 +101,13 @@ description: Single line. What it does and when to use it.
 Track all changes in `CHANGELOG.md` at repo root.
 
 **When committing:**
+
 - Add entry under `[Unreleased]` section
 - Use categories: Added, Changed, Fixed, Removed
 - Reference plugin name in entry (e.g., "feat(hope): ...")
 
 **When releasing:**
+
 - Move unreleased items to new version section
 - Update version in affected plugin.json files
 - Tag the release

@@ -4,14 +4,14 @@ Career development workflows for Claude Code.
 
 ---
 
-| Say this | Get this |
-|----------|----------|
-| "assess my AI fluency" | Rubric-based scoring + 90-day roadmap |
-| "simulate an interview for X role" | Scenario practice with scoring |
-| "build STAR stories from my experience" | Evidence-tagged interview narratives |
-| "analyze weaknesses in my work" | Pattern recognition + practice drills |
+| Say this                                    | Get this                                 |
+| ------------------------------------------- | ---------------------------------------- |
+| "assess my AI fluency"                      | Rubric-based scoring + 90-day roadmap    |
+| "simulate an interview for X role"          | Scenario practice with scoring           |
+| "build STAR stories from my experience"     | Evidence-tagged interview narratives     |
+| "analyze weaknesses in my work"             | Pattern recognition + practice drills    |
 | "help me navigate this political situation" | Stakeholder matrix + 72-hour action plan |
-| "what's the true cost of this meeting?" | Focus capacity analysis |
+| "what's the true cost of this meeting?"     | Focus capacity analysis                  |
 
 ---
 
@@ -24,6 +24,7 @@ Career development workflows for Claude Code.
 ## When It Activates
 
 Auto-triggers on:
+
 - Interview preparation, behavioral questions
 - Career/skill assessment, gap analysis
 - Job posting analysis, company research
@@ -35,31 +36,31 @@ Auto-triggers on:
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `/car:assess` | AI fluency assessment. 5 competencies, rubric scoring, 90-day roadmap. |
-| `/car:simulate` | Interview simulator. Messy scenarios, 5-dimension scoring, expert calibration. |
-| `/car:star` | STAR-C narratives. Transform bullets into evidence-tagged interview stories. |
-| `/car:gap` | Weakness analysis. Pattern recognition across evaluations, targeted drills. |
-| `/car:drill` | Practice drills. Messy situation → constrained exercise → evaluation. |
-| `/car:eval-comm` | Communication eval. Score executive updates on 5 dimensions + BLUF rewrite. |
-| `/car:stakeholder` | Political navigator. Stakeholder matrix, 3 options, 72-hour action plan. |
-| `/car:reframe` | Perspective shift. 3 radical viewpoints on career challenges. |
-| `/car:focus` | Focus capacity. λ/Δ/θ model OR meeting cost analysis. |
-| `/car:osint` | Job intel. OSINT from job postings with evidence table. |
+| Command            | Purpose                                                                        |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `/car:assess`      | AI fluency assessment. 5 competencies, rubric scoring, 90-day roadmap.         |
+| `/car:simulate`    | Interview simulator. Messy scenarios, 5-dimension scoring, expert calibration. |
+| `/car:star`        | STAR-C narratives. Transform bullets into evidence-tagged interview stories.   |
+| `/car:gap`         | Weakness analysis. Pattern recognition across evaluations, targeted drills.    |
+| `/car:drill`       | Practice drills. Messy situation → constrained exercise → evaluation.          |
+| `/car:eval-comm`   | Communication eval. Score executive updates on 5 dimensions + BLUF rewrite.    |
+| `/car:stakeholder` | Political navigator. Stakeholder matrix, 3 options, 72-hour action plan.       |
+| `/car:reframe`     | Perspective shift. 3 radical viewpoints on career challenges.                  |
+| `/car:focus`       | Focus capacity. λ/Δ/θ model OR meeting cost analysis.                          |
+| `/car:osint`       | Job intel. OSINT from job postings with evidence table.                        |
 
 ## When to Use
 
-| Situation | Command |
-|-----------|---------|
-| Preparing for interviews | `/car:simulate` then `/car:star` |
-| Want honest skill assessment | `/car:assess` |
-| Have feedback, need patterns | `/car:gap` |
-| Stuck on a career challenge | `/car:reframe` |
-| Navigating office politics | `/car:stakeholder` |
-| Writing for executives | `/car:eval-comm` |
-| Evaluating a job opportunity | `/car:osint` |
-| Too many meetings | `/car:focus` |
+| Situation                    | Command                          |
+| ---------------------------- | -------------------------------- |
+| Preparing for interviews     | `/car:simulate` then `/car:star` |
+| Want honest skill assessment | `/car:assess`                    |
+| Have feedback, need patterns | `/car:gap`                       |
+| Stuck on a career challenge  | `/car:reframe`                   |
+| Navigating office politics   | `/car:stakeholder`               |
+| Writing for executives       | `/car:eval-comm`                 |
+| Evaluating a job opportunity | `/car:osint`                     |
+| Too many meetings            | `/car:focus`                     |
 
 ---
 
@@ -67,13 +68,13 @@ Auto-triggers on:
 
 The `/car:assess` command evaluates across 5 weighted competencies:
 
-| Competency | Weight | What it measures |
-|------------|--------|------------------|
-| Prompt Mastery | 40% | Effective prompt construction |
-| Technical Understanding | 15% | AI systems knowledge |
-| Practical Application | 20% | Workflow integration |
-| Critical Evaluation | 15% | Validation practices |
-| Workflow Design | 10% | Documented processes |
+| Competency              | Weight | What it measures              |
+| ----------------------- | ------ | ----------------------------- |
+| Prompt Mastery          | 40%    | Effective prompt construction |
+| Technical Understanding | 15%    | AI systems knowledge          |
+| Practical Application   | 20%    | Workflow integration          |
+| Critical Evaluation     | 15%    | Validation practices          |
+| Workflow Design         | 10%    | Documented processes          |
 
 **Plus:** Learning velocity assessment (informs roadmap)
 
@@ -84,6 +85,7 @@ Includes 6-part interview: core skill tests, technical understanding, critical e
 ## Interview Simulator
 
 The `/car:simulate` command creates messy, realistic scenarios with:
+
 - Conflicting stakeholder requirements
 - Incomplete or contradictory data
 - Time pressure and trade-offs
@@ -91,6 +93,7 @@ The `/car:simulate` command creates messy, realistic scenarios with:
 - Resource constraints
 
 **Scoring (1-5 each):**
+
 - Constraint Discovery — Did you surface hidden limitations?
 - Systematic Thinking — Did you break down the problem?
 - Risk Assessment — Did you identify failure modes?
@@ -103,13 +106,13 @@ The `/car:simulate` command creates messy, realistic scenarios with:
 
 The `/car:star` command transforms experience bullets into interview stories:
 
-| Component | Focus |
-|-----------|-------|
-| **S**ituation | Start with hardest constraint, quantify |
-| **T**ask | Success criteria, stakes, who to satisfy |
-| **A**ction | Decision points (not activities), reasoning |
-| **R**esult | Metrics, baseline comparison, impact |
-| **C**onstraint | What you'd change, what you learned |
+| Component      | Focus                                       |
+| -------------- | ------------------------------------------- |
+| **S**ituation  | Start with hardest constraint, quantify     |
+| **T**ask       | Success criteria, stakes, who to satisfy    |
+| **A**ction     | Decision points (not activities), reasoning |
+| **R**esult     | Metrics, baseline comparison, impact        |
+| **C**onstraint | What you'd change, what you learned         |
 
 **Evidence tagging:** Each sentence tagged as [FACT], [INFERENCE], [OPINION], or [TK-VERIFY].
 
@@ -131,15 +134,15 @@ Requires minimum 3 evaluated artifacts.
 
 The `/car:drill` command transforms messy situations into focused exercises:
 
-| Skill | Indicators | Artifact |
-|-------|------------|----------|
-| Judgment | Multiple valid paths | Decision doc |
-| Orchestration | Many moving parts | Spec / Brief |
-| Coordination | Multiple stakeholders | RACI |
-| Taste | Standards undefined | Rubric |
-| Updating | New information | Pivot memo |
-| Synthesis | Too much info | Executive summary |
-| Framing | Problem unclear | Problem statement |
+| Skill         | Indicators            | Artifact          |
+| ------------- | --------------------- | ----------------- |
+| Judgment      | Multiple valid paths  | Decision doc      |
+| Orchestration | Many moving parts     | Spec / Brief      |
+| Coordination  | Multiple stakeholders | RACI              |
+| Taste         | Standards undefined   | Rubric            |
+| Updating      | New information       | Pivot memo        |
+| Synthesis     | Too much info         | Executive summary |
+| Framing       | Problem unclear       | Problem statement |
 
 **Output:** Constrained drill (15-30 min, word limit, required sections), evaluation against criteria, next drill suggestion.
 
@@ -147,13 +150,13 @@ The `/car:drill` command transforms messy situations into focused exercises:
 
 The `/car:eval-comm` command scores on 5 dimensions (1-5 each):
 
-| Dimension | 5 = Best | 1 = Worst |
-|-----------|----------|-----------|
-| BLUF | Key message in first sentence | Must read entire doc |
-| Ask Clarity | Explicit, actionable ask | Implied, reader must infer |
-| Context Economy | Minimum context, no excess | All context, no update |
-| Risk Surfacing | Explicit with mitigations | Known risks not mentioned |
-| Scannability | 30-second skim works | Wall of text |
+| Dimension       | 5 = Best                      | 1 = Worst                  |
+| --------------- | ----------------------------- | -------------------------- |
+| BLUF            | Key message in first sentence | Must read entire doc       |
+| Ask Clarity     | Explicit, actionable ask      | Implied, reader must infer |
+| Context Economy | Minimum context, no excess    | All context, no update     |
+| Risk Surfacing  | Explicit with mitigations     | Known risks not mentioned  |
+| Scannability    | 30-second skim works          | Wall of text               |
 
 **Output:** Scores with quoted evidence, edit to raise each by 1 point, BLUF-optimized rewrite.
 
@@ -173,13 +176,13 @@ Each option includes success probability (be honest, not optimistic).
 
 The `/car:reframe` command generates 3 perspectives (practical → radical):
 
-| Component | Format |
-|-----------|--------|
-| Reframe title | 5-10 words |
-| Core insight | 1 sentence |
-| Vivid story | 100-150 words |
-| Memorable metaphor | 1 sentence |
-| Action tagline | Under 12 words |
+| Component          | Format         |
+| ------------------ | -------------- |
+| Reframe title      | 5-10 words     |
+| Core insight       | 1 sentence     |
+| Vivid story        | 100-150 words  |
+| Memorable metaphor | 1 sentence     |
+| Action tagline     | Under 12 words |
 
 **Implementation bridge** for most practical option: tomorrow's step, metric, obstacle handling.
 
@@ -191,12 +194,14 @@ The `/car:focus` command has two modes:
 
 **Mode 1: Parameter Estimation**
 Discover your personal λ/Δ/θ values (Can Duruk's model):
+
 - λ (lambda) — Interruptions per hour
 - Δ (delta) — Minutes to resume deep work
 - θ (theta) — Minimum block for meaningful progress
 
 **Mode 2: Meeting Cost Analysis**
 Calculate true cost of a specific meeting:
+
 - Direct time (attendees × duration)
 - Fragmentation cost (focus blocks destroyed)
 - Context-switch tax (Δ × attendees)
@@ -208,11 +213,13 @@ Calculate true cost of a specific meeting:
 The `/car:osint` command analyzes job postings:
 
 **Signal extraction:**
+
 - Growth cues — "First hire," "founding member," "new team"
 - Stability cues — Renewals, compliance, backfills
 - Red flags — >90 days open, reposted, contradictory requirements
 
 **Output:**
+
 - Executive summary
 - Where they're investing
 - Career opportunities (hot vs stale roles)

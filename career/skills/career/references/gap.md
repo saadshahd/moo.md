@@ -20,6 +20,7 @@ Use ask tool to gather:
 Ask user to paste scores and feedback for each evaluated artifact.
 
 Format requested:
+
 ```
 Artifact 1: [Type]
 Scores: [Dimension]: X, [Dimension]: Y, ...
@@ -33,21 +34,23 @@ Artifact 2: ...
 Analyze across all artifacts for:
 
 **Recurring Low Scores:**
+
 - Which dimensions consistently score below average?
 - Is there a pattern across artifact types?
 
 **Repeated Feedback Themes:**
+
 - What language appears in multiple evaluations?
 - Are the same issues flagged by different evaluators?
 
 **Surface vs Deep Issues:**
 
-| Surface Issues | Deep Issues |
-|----------------|-------------|
-| Formatting, structure | Reasoning, judgment |
-| Word choice, length | Prioritization, framing |
-| Missing sections | Missing insights |
-| Readability | Strategic thinking |
+| Surface Issues        | Deep Issues             |
+| --------------------- | ----------------------- |
+| Formatting, structure | Reasoning, judgment     |
+| Word choice, length   | Prioritization, framing |
+| Missing sections      | Missing insights        |
+| Readability           | Strategic thinking      |
 
 ### Step 3: Prioritization
 

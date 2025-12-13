@@ -41,28 +41,29 @@ Before claiming: "done", "fixed", "complete", "working", "ready"
 
 ## Evidence Hierarchy
 
-| Level | Type | Sufficient? |
-|-------|------|-------------|
-| 1 | Execution (command output, logs) | Yes |
-| 2 | Observation (screenshots, debugger) | Yes |
-| 3 | Measurement (metrics, benchmarks) | Yes |
-| 4 | Inspection (code review) | Weak |
-| 5 | Assumption ("should work") | No |
+| Level | Type                                | Sufficient? |
+| ----- | ----------------------------------- | ----------- |
+| 1     | Execution (command output, logs)    | Yes         |
+| 2     | Observation (screenshots, debugger) | Yes         |
+| 3     | Measurement (metrics, benchmarks)   | Yes         |
+| 4     | Inspection (code review)            | Weak        |
+| 5     | Assumption ("should work")          | No          |
 
 Require Level 1-3 before completion claims.
 
 ## Anti-Patterns
 
-| Claim | Problem | Required |
-|-------|---------|----------|
-| "Should work" | Speculation | Actual output |
-| "Looks good" | No verification | Test results |
-| "Fixed the issue" | No proof | Before/after |
-| "I think this resolves it" | No confidence % | X-Y% + basis |
+| Claim                      | Problem         | Required      |
+| -------------------------- | --------------- | ------------- |
+| "Should work"              | Speculation     | Actual output |
+| "Looks good"               | No verification | Test results  |
+| "Fixed the issue"          | No proof        | Before/after  |
+| "I think this resolves it" | No confidence % | X-Y% + basis  |
 
 ## Incomplete Work
 
 When blocked, state:
+
 - What's done (with evidence)
 - What's blocking (specific)
 - What's remaining

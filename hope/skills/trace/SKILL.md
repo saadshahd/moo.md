@@ -10,12 +10,12 @@ Root cause analysis when surface fixes fail.
 
 ## When to Use
 
-| Trigger | Action |
-|---------|--------|
-| Bug persists after initial fix | Run trace |
-| Production incident (SEV 1-2) | Run trace |
+| Trigger                            | Action    |
+| ---------------------------------- | --------- |
+| Bug persists after initial fix     | Run trace |
+| Production incident (SEV 1-2)      | Run trace |
 | Complex failure (multiple sources) | Run trace |
-| Trivial bug (< 10 min fix) | Skip |
+| Trivial bug (< 10 min fix)         | Skip      |
 
 ## 1. Timeline
 
@@ -51,6 +51,8 @@ Beyond root cause, what amplified impact?
 
 List 2-4 factors with specific mechanisms.
 
+**Tools:** [Ishikawa](../soul/references/tools/ishikawa.md) for categorization, [Iceberg](../soul/references/tools/iceberg.md) for deep structure analysis.
+
 ## 4. Impact
 
 **Users**: Count, experience, business cost (quantified)
@@ -59,6 +61,7 @@ List 2-4 factors with specific mechanisms.
 ## 5. Prevention Hierarchy
 
 ### Immediate (< 1 week)
+
 ```
 1. [Code/config change]
    File: [path:line]
@@ -67,6 +70,7 @@ List 2-4 factors with specific mechanisms.
 ```
 
 ### Short-Term (< 1 month)
+
 ```
 1. [Alert/test/automation]
    Trigger: [when it fires]
@@ -74,6 +78,7 @@ List 2-4 factors with specific mechanisms.
 ```
 
 ### Long-Term (< 1 quarter)
+
 ```
 1. [Architectural change]
    Problem class: [what it prevents]
@@ -117,9 +122,9 @@ Focus on system gaps, not individual mistakes.
 
 ## Anti-Patterns
 
-| Bad | Good |
-|-----|------|
-| "Human error" | Identify automation gap |
-| "Communication failure" | Identify process gap |
-| "Be more careful" | Add system safeguard |
-| "Performance issue" | Specific: "Pool exhausted at 1K req/s" |
+| Bad                     | Good                                   |
+| ----------------------- | -------------------------------------- |
+| "Human error"           | Identify automation gap                |
+| "Communication failure" | Identify process gap                   |
+| "Be more careful"       | Add system safeguard                   |
+| "Performance issue"     | Specific: "Pool exhausted at 1K req/s" |

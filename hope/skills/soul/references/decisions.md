@@ -4,11 +4,11 @@
 
 Spend deep analysis only on irreversible decisions.
 
-| Type | Rollback | Examples | Action |
-|------|----------|----------|--------|
-| **2A** | < 1 min | Config, rename, CSS | Execute immediately |
-| **2B** | < 5 min | Dependency, refactor | Execute with monitoring |
-| **1** | Hours+ | Schema, public API, data model | Deep analysis required |
+| Type   | Rollback | Examples                       | Action                  |
+| ------ | -------- | ------------------------------ | ----------------------- |
+| **2A** | < 1 min  | Config, rename, CSS            | Execute immediately     |
+| **2B** | < 5 min  | Dependency, refactor           | Execute with monitoring |
+| **1**  | Hours+   | Schema, public API, data model | Deep analysis required  |
 
 ### Classification Questions
 
@@ -49,13 +49,13 @@ Two versions = 4x load (not 2x)
 
 ## Story Points
 
-| Pts | Complexity | Characteristics |
-|-----|------------|-----------------|
-| 1 | Trivial | < 10 lines, obvious |
-| 3 | Standard | Existing patterns |
-| 5 | Complex | Some unknowns |
-| 8 | Architecture | Multiple subsystems |
-| 13+ | Too Big | Break down |
+| Pts | Complexity   | Characteristics     |
+| --- | ------------ | ------------------- |
+| 1   | Trivial      | < 10 lines, obvious |
+| 3   | Standard     | Existing patterns   |
+| 5   | Complex      | Some unknowns       |
+| 8   | Architecture | Multiple subsystems |
+| 13+ | Too Big      | Break down          |
 
 **Never time.** Complexity is objective; velocity varies.
 
@@ -63,38 +63,38 @@ Two versions = 4x load (not 2x)
 
 ## Library-First Protocol
 
-| Domain | Library Saves | Custom Costs |
-|--------|---------------|--------------|
-| Auth | 6+ months | Tokens, sessions, MFA, security |
-| Payments | 2+ years | PCI, fraud, disputes |
-| Rate limiting | 2-4 weeks | Race conditions, distributed state |
-| Email | 1-2 months | Deliverability, templates |
+| Domain        | Library Saves | Custom Costs                       |
+| ------------- | ------------- | ---------------------------------- |
+| Auth          | 6+ months     | Tokens, sessions, MFA, security    |
+| Payments      | 2+ years      | PCI, fraud, disputes               |
+| Rate limiting | 2-4 weeks     | Race conditions, distributed state |
+| Email         | 1-2 months    | Deliverability, templates          |
 
 Every library = 1000 bugs avoided.
 
 ### Evaluation Criteria
 
-| Criterion | Good | Bad |
-|-----------|------|-----|
-| Downloads | > 100k/week | < 1k/week |
+| Criterion   | Good               | Bad             |
+| ----------- | ------------------ | --------------- |
+| Downloads   | > 100k/week        | < 1k/week       |
 | Maintenance | Commits this month | 6+ months stale |
-| Security | No CVEs | Unpatched vulns |
+| Security    | No CVEs            | Unpatched vulns |
 
 ---
 
 ## Confidence Gates
 
-| Confidence | Action |
-|------------|--------|
-| **< 70%** | Research first. Surface unknowns. Don't recommend. |
-| **70-85%** | Ship with monitoring and fallback plan. |
-| **≥ 85%** | Ship immediately with confidence. |
+| Confidence | Action                                             |
+| ---------- | -------------------------------------------------- |
+| **< 70%**  | Research first. Surface unknowns. Don't recommend. |
+| **70-85%** | Ship with monitoring and fallback plan.            |
+| **≥ 85%**  | Ship immediately with confidence.                  |
 
 ### Novelty Decay
 
-| Situation | Max Confidence |
-|-----------|---------------|
-| Done 3+ times | No cap |
-| Done 1-2 times | 85% |
-| First time, familiar tech | 70% |
-| First time, new tech | 60% |
+| Situation                 | Max Confidence |
+| ------------------------- | -------------- |
+| Done 3+ times             | No cap         |
+| Done 1-2 times            | 85%            |
+| First time, familiar tech | 70%            |
+| First time, new tech      | 60%            |

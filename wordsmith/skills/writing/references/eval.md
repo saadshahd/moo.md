@@ -5,6 +5,7 @@ Evaluate blog posts and content for quality, specificity, and actionability.
 ## Input Required
 
 Ask for:
+
 - Content to evaluate (paste or file path)
 - Context: What's the goal of this content?
 
@@ -13,6 +14,7 @@ Ask for:
 Score each 0-5:
 
 ### 1. Specificity
+
 Does it contain concrete, verifiable examples?
 
 - 5: At least 3 specific examples with names, numbers, or dates
@@ -20,6 +22,7 @@ Does it contain concrete, verifiable examples?
 - 0: Entirely generic ("many customers", "significant improvements")
 
 ### 2. Proof Density
+
 Are claims backed by evidence?
 
 - 5: Every major claim has data, quotes, or sources
@@ -27,6 +30,7 @@ Are claims backed by evidence?
 - 0: All assertions, no backing
 
 ### 3. Positioning Clarity
+
 Is audience and problem immediately clear?
 
 - 5: First paragraph names audience, problem, and solution
@@ -34,6 +38,7 @@ Is audience and problem immediately clear?
 - 0: Unclear who should care
 
 ### 4. Differentiation
+
 Does it explain why not alternatives?
 
 - 5: Explicitly addresses competitors/status quo with unique POV
@@ -41,6 +46,7 @@ Does it explain why not alternatives?
 - 0: Could be about any product in category
 
 ### 5. Call-to-Action
+
 Is next step clear and low-friction?
 
 - 5: Specific next step matching reader intent
@@ -70,10 +76,7 @@ Return JSON:
     "call_to_action": 5
   },
   "verdict": "ACCEPT/REVISE/REJECT",
-  "critical_gaps": [
-    "[Gap 1]",
-    "[Gap 2]"
-  ],
+  "critical_gaps": ["[Gap 1]", "[Gap 2]"],
   "top_fixes": [
     {
       "priority": 1,

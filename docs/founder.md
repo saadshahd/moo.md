@@ -4,16 +4,16 @@ Startup workflows for Claude Code.
 
 ---
 
-| Say this | Get this |
-|----------|----------|
-| "validate my idea" | GO/ITERATE/KILL verdict + falsification test |
-| "size my market" | TAM/SAM/SOM calculations + Marp slide |
-| "analyze my competitors" | Threat matrix + positioning |
-| "build my pitch deck" | 10-12 slide Marp deck |
-| "prep me for investors" | Q&A document (10 brutal questions) |
-| "model my financials" | Spreadsheet-ready tables |
-| "plan my launch" | 90-day execution plan |
-| "prepare my board report" | Marp deck + metrics summary |
+| Say this                  | Get this                                     |
+| ------------------------- | -------------------------------------------- |
+| "validate my idea"        | GO/ITERATE/KILL verdict + falsification test |
+| "size my market"          | TAM/SAM/SOM calculations + Marp slide        |
+| "analyze my competitors"  | Threat matrix + positioning                  |
+| "build my pitch deck"     | 10-12 slide Marp deck                        |
+| "prep me for investors"   | Q&A document (10 brutal questions)           |
+| "model my financials"     | Spreadsheet-ready tables                     |
+| "plan my launch"          | 90-day execution plan                        |
+| "prepare my board report" | Marp deck + metrics summary                  |
 
 ---
 
@@ -26,6 +26,7 @@ Startup workflows for Claude Code.
 ## When It Activates
 
 Auto-triggers on:
+
 - Idea validation, value proposition testing
 - Market sizing (TAM/SAM/SOM)
 - Competitive analysis, threat assessment
@@ -37,28 +38,28 @@ Auto-triggers on:
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `/founder:validate` | Idea validation. DFV scoring + stress test + GO/ITERATE/KILL verdict. |
-| `/founder:market-size` | Market sizing. Top-down + bottom-up TAM/SAM/SOM with Marp slide. |
-| `/founder:compete` | Competition analysis. Blitzscaling scores + threat matrix + positioning. |
-| `/founder:pitch` | Pitch deck. 10-12 Marp slides + brutalist YC-style evaluation. |
-| `/founder:investor-prep` | Investor prep. 10 brutal questions with honest answers. |
-| `/founder:financials` | Financial modeling. Unit economics + 3Y projection + 13W cash flow. |
-| `/founder:launch` | Launch planning. 90-day phased roadmap with weekly tasks. |
-| `/founder:board` | Board reporting. Marp deck with revenue, runway, KPIs. |
+| Command                  | Purpose                                                                  |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `/founder:validate`      | Idea validation. DFV scoring + stress test + GO/ITERATE/KILL verdict.    |
+| `/founder:market-size`   | Market sizing. Top-down + bottom-up TAM/SAM/SOM with Marp slide.         |
+| `/founder:compete`       | Competition analysis. Blitzscaling scores + threat matrix + positioning. |
+| `/founder:pitch`         | Pitch deck. 10-12 Marp slides + brutalist YC-style evaluation.           |
+| `/founder:investor-prep` | Investor prep. 10 brutal questions with honest answers.                  |
+| `/founder:financials`    | Financial modeling. Unit economics + 3Y projection + 13W cash flow.      |
+| `/founder:launch`        | Launch planning. 90-day phased roadmap with weekly tasks.                |
+| `/founder:board`         | Board reporting. Marp deck with revenue, runway, KPIs.                   |
 
 ## When to Use
 
-| Situation | Command |
-|-----------|---------|
-| Have an idea, unsure if worth pursuing | `/founder:validate` |
-| Investors asking about market size | `/founder:market-size` |
-| Need to understand competitive landscape | `/founder:compete` |
-| Preparing for investor meetings | `/founder:pitch` then `/founder:investor-prep` |
-| Need financial projections | `/founder:financials` |
-| Launching a product | `/founder:launch` |
-| Quarterly board meeting | `/founder:board` |
+| Situation                                | Command                                        |
+| ---------------------------------------- | ---------------------------------------------- |
+| Have an idea, unsure if worth pursuing   | `/founder:validate`                            |
+| Investors asking about market size       | `/founder:market-size`                         |
+| Need to understand competitive landscape | `/founder:compete`                             |
+| Preparing for investor meetings          | `/founder:pitch` then `/founder:investor-prep` |
+| Need financial projections               | `/founder:financials`                          |
+| Launching a product                      | `/founder:launch`                              |
+| Quarterly board meeting                  | `/founder:board`                               |
 
 ---
 
@@ -67,6 +68,7 @@ Auto-triggers on:
 The `/founder:validate` command scores ideas across two dimensions:
 
 **DFV Quick Score (0-10 each):**
+
 - Desirability — Do users actually want this?
 - Feasibility — Can we build this with current tech?
 - Viability — Can we make money from this?
@@ -93,6 +95,7 @@ The `/founder:market-size` command uses three methodologies:
 3. **Comparable** — Revenue-per-employee from similar companies
 
 Outputs:
+
 - TAM/SAM/SOM tables with citations
 - Marp slide ready for pitch deck
 
@@ -116,18 +119,18 @@ The `/founder:compete` command produces:
 
 The `/founder:pitch` command generates a complete Marp deck:
 
-| Slide | Content |
-|-------|---------|
-| 1 | Title + one-liner |
-| 2 | Problem (stakes) |
-| 3 | Solution (demo) |
-| 4 | Market (TAM/SAM/SOM) |
-| 5 | Business Model |
-| 6 | Traction |
-| 7 | Competition |
-| 8 | Team |
-| 9 | Financials |
-| 10 | Ask |
+| Slide | Content              |
+| ----- | -------------------- |
+| 1     | Title + one-liner    |
+| 2     | Problem (stakes)     |
+| 3     | Solution (demo)      |
+| 4     | Market (TAM/SAM/SOM) |
+| 5     | Business Model       |
+| 6     | Traction             |
+| 7     | Competition          |
+| 8     | Team                 |
+| 9     | Financials           |
+| 10    | Ask                  |
 
 Includes brutalist self-evaluation with simulated PG and Sam Altman votes (2% acceptance rate mindset).
 
@@ -146,17 +149,20 @@ The `/founder:investor-prep` command generates:
 The `/founder:financials` command generates three spreadsheet-ready tables:
 
 **Unit Economics:**
+
 - CAC by channel (direct, inside, paid, organic, partner)
 - LTV calculation with contribution margin
 - LTV:CAC ratio (benchmark: >3:1)
 - Payback period (benchmark: <12 months)
 
 **3-Year Projection:**
+
 - Revenue model (customers, churn, MRR, ARR)
 - Expense model (COGS, engineering, S&M, G&A)
 - P&L summary with margins
 
 **13-Week Cash Flow:**
+
 - Weekly cash in/out
 - Ending balance
 - Runway alert (🟢 >26w / 🟡 13-26w / 🔴 <13w)
@@ -165,11 +171,11 @@ The `/founder:financials` command generates three spreadsheet-ready tables:
 
 The `/founder:launch` command creates a 90-day plan:
 
-| Phase | Days | Focus |
-|-------|------|-------|
-| Pre-Launch | 1-30 | Audience building, content, waitlist |
-| Launch | 31-60 | Public launch, PR, partnerships |
-| Growth | 61-90 | Optimization, retention, scale |
+| Phase      | Days  | Focus                                |
+| ---------- | ----- | ------------------------------------ |
+| Pre-Launch | 1-30  | Audience building, content, waitlist |
+| Launch     | 31-60 | Public launch, PR, partnerships      |
+| Growth     | 61-90 | Optimization, retention, scale       |
 
 Each phase includes weekly tasks, example copy, and success metrics.
 
@@ -189,11 +195,11 @@ The `/founder:board` command generates a Marp deck with:
 
 All workflows produce markdown. Convert to final formats:
 
-| Artifact | Command |
-|----------|---------|
-| Slides → PowerPoint | `npx @marp-team/marp-cli slides.md --pptx` |
-| Slides → PDF | `npx @marp-team/marp-cli slides.md --pdf` |
-| Document → PDF | `npx md-to-pdf document.md` |
+| Artifact             | Command                                        |
+| -------------------- | ---------------------------------------------- |
+| Slides → PowerPoint  | `npx @marp-team/marp-cli slides.md --pptx`     |
+| Slides → PDF         | `npx @marp-team/marp-cli slides.md --pdf`      |
+| Document → PDF       | `npx md-to-pdf document.md`                    |
 | Tables → Spreadsheet | Copy markdown tables, paste into Google Sheets |
 
 ---

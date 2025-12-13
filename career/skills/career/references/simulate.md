@@ -28,26 +28,31 @@ Create a messy, realistic situation involving:
 Score user response on 5 dimensions (1-5 each):
 
 ### 1. Constraint Discovery
+
 - Did they identify unstated limitations?
 - Did they ask clarifying questions about trade-offs?
 - Did they surface assumptions that needed validation?
 
 ### 2. Systematic Thinking
+
 - Did they break down the problem logically?
 - Did they consider multiple approaches?
 - Did they explain their reasoning process?
 
 ### 3. Risk Assessment
+
 - Did they identify potential failure modes?
 - Did they consider downstream consequences?
 - Did they address compliance/ethical concerns?
 
 ### 4. AI Tool Usage
+
 - Did they choose appropriate tools for tasks?
 - Did they explain their verification process?
 - Did they demonstrate judgment over AI outputs?
 
 ### 5. Communication Clarity
+
 - Did they structure their response logically?
 - Did they adapt to the audience?
 - Did they invite feedback and iteration?
@@ -98,6 +103,7 @@ After user responds, provide:
 ### Step 3: Offer Continuation
 
 Ask if they want to:
+
 1. Try the do-over variant
 2. Try a completely new scenario
 3. Deep-dive on a specific weakness
@@ -105,12 +111,15 @@ Ask if they want to:
 ## Example Scenarios by Domain
 
 ### Engineering
+
 "Your team is 2 weeks from a major release. A security audit just found a critical vulnerability in a third-party library. The fix requires breaking API changes. Sales has already pre-sold the feature to 3 enterprise clients with contractual penalties for delays. Your senior engineer just gave notice. How do you proceed?"
 
 ### Product
+
 "User research shows customers want Feature A (60% demand). Data shows Feature B would reduce churn by 15%. Engineering says Feature C would cut technical debt that's slowing all development. You have resources for one. Your CEO is pushing for Feature A because a board member's company needs it. What's your approach?"
 
 ### Sales
+
 "A prospect is ready to sign a $500K deal but wants a feature that doesn't exist. Product says it's 6 months out minimum. Your competitor just announced something similar. Your commission would be $75K. The prospect's deadline is 2 weeks. What do you do?"
 
 ## Rules
