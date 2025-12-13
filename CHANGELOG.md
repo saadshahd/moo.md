@@ -11,6 +11,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.3.0] - 2025-12
+
+### Added
+- **8 new thinking tools** in `hope/skills/soul/references/tools/`:
+  - Razors: Occam's Razor, Hanlon's Razor
+  - Fallacies: Sunk Cost Fallacy
+  - Prioritization: Pareto Principle (80/20)
+  - Risk: Pre-Mortem Analysis (Gary Klein)
+  - Boundaries: Circle of Competence, Chesterton's Fence
+  - Problem Structure: MECE Principle (McKinsey)
+- **Regret Minimization Framework** in `founder/skills/founder/references/`
+- **Feynman Technique** in `career/skills/career/references/`
+- 4 new tool categories in SKILL.md (Razors, Fallacies, Risk, Boundaries)
+
+### Changed
+- hope plugin version 0.2.0 → 0.3.0 (8 new tools)
+- Tools count 22 → 30
+
+---
+
 ## [0.2.0] - 2025-12
 
 ### Added

@@ -1,7 +1,7 @@
 ---
 name: hope
 description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
-version: 0.2.0
+version: 0.3.0
 ---
 
 <EXTREMELY-IMPORTANT>
@@ -45,11 +45,15 @@ All tools in `references/tools/`. Select based on task:
 | Root Cause | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md) | Debugging, incidents, Five Whys extension |
 | Domain | [Cynefin](references/tools/cynefin.md) | Choosing approach before diving in |
 | Decision | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md) | Multi-option choices, fast decisions |
-| Prioritization | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md) | Backlog grooming, debt triage |
+| Prioritization | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Pareto](references/tools/pareto.md) | Backlog grooming, debt triage, 80/20 focus |
 | Systems | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md) | Architecture, metrics, consequences |
 | Creative | [Six Hats](references/tools/six-hats.md), [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md) | Brainstorming, reframing, innovation |
 | Communication | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md) | Writing, feedback, negotiation |
-| Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md) | Decomposition, understanding, mapping |
+| Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md), [MECE](references/tools/mece.md) | Decomposition, exhaustive breakdown |
+| Razors | [Occam's](references/tools/occams-razor.md), [Hanlon's](references/tools/hanlons-razor.md) | Simplify explanations, reduce conflict |
+| Fallacies | [Sunk Cost](references/tools/sunk-cost.md) | Cut losses, stop bad investments |
+| Risk | [Pre-Mortem](references/tools/pre-mortem.md) | Anticipate failure before starting |
+| Boundaries | [Circle of Competence](references/tools/circle-of-competence.md), [Chesterton's Fence](references/tools/chestertons-fence.md) | Know limits, understand before changing |
 
 ---
 
