@@ -11,6 +11,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.1] - 2025-12-13
+
+### Added
+- **Munger's 25 Cognitive Biases** checklist in `hope/skills/soul/references/tools/munger-biases.md`
+  - Pre-decision bias check for high-stakes decisions
+  - Quick checklist for scanning common misjudgments
+  - Lollapalooza effect warning (multiple biases combining)
+
+### Changed
+- hope plugin version 0.4.0 → 0.4.1
+- Thinking tools count 34 → 35
+
+---
+
 ## [0.4.0] - 2025-12-13
 
 ### Added

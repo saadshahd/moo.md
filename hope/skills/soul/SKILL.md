@@ -1,7 +1,7 @@
 ---
 name: hope
 description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
-version: 0.4.0
+version: 0.4.1
 ---
 
 <EXTREMELY-IMPORTANT>
@@ -69,6 +69,7 @@ All tools in `references/tools/`. Select based on task:
 | Boundaries | [Circle of Competence](references/tools/circle-of-competence.md), [Chesterton's Fence](references/tools/chestertons-fence.md) | Know limits, understand before changing |
 | Probability | [Bayesian Thinking](references/tools/bayesian-thinking.md) | Update beliefs with evidence, calibrate confidence |
 | Abstraction | [Map vs Territory](references/tools/map-territory.md), [Lindy Effect](references/tools/lindy-effect.md) | Models ≠ reality, prefer time-tested |
+| Biases | [Munger's 25](references/tools/munger-biases.md) | Pre-decision bias check, high-stakes decisions |
 
 ---
 
