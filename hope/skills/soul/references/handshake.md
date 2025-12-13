@@ -134,3 +134,7 @@ We'll sync next Thursday to confirm we're on track."
 ## Key Insight
 
 Agreement without commitment is just politeness. A handshake isn't real until both parties know exactly what they're doing next.
+
+---
+
+*Composite: SCQA (Minto) + commitment protocols*

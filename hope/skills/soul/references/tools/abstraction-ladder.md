@@ -94,3 +94,7 @@ Reframe problems by moving up or down levels of abstraction.
 ## Key Insight
 
 Problems reframed at a higher level often have simpler solutions. Moving up expands options; moving down clarifies execution.
+
+---
+
+*Source: S.I. Hayakawa, "Language in Thought and Action" 1939*

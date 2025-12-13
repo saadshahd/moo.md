@@ -78,3 +78,7 @@ Calculation for Auth0:
 | Equal weights         | Forces you to pick what matters most |
 | Score inflation       | Anchor on 3 = "adequate"             |
 | Ignoring close scores | Within 0.3 = effectively tied        |
+
+---
+
+*Source: Pugh Matrix, Stuart Pugh 1980s*

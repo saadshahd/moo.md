@@ -89,3 +89,7 @@ MECE CHECK:
 ## Key Insight
 
 The tree forces structured thinking. If you can't make branches MECE, you don't understand the problem well enough yet.
+
+---
+
+*Source: McKinsey, MECE principle*

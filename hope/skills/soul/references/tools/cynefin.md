@@ -83,3 +83,7 @@ Response: probe → sense → respond
 
 **Wrong approach:** Hiring expensive consultant (Complicated response)
 **Right approach:** Safe-to-fail experiments (Complex response)
+
+---
+
+*Source: Dave Snowden, 1999*

@@ -173,3 +173,7 @@ Calibration: Scope is tight. Good for Friday deadline.
 ## Key Insight
 
 The work you do before you start determines whether the work you do will matter. Ten minutes of scoping saves ten hours of rework.
+
+---
+
+*Composite: pre-mortem thinking + scoping heuristics*

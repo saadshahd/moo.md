@@ -93,3 +93,7 @@ Gap detected → action taken → gap closes → action stops
 - (B1) Stabilizer: Slow velocity → hire → onboarding load → velocity stays flat
 
 **Leverage point:** Break R1 by allocating 20% to debt paydown
+
+---
+
+*Source: Systems Dynamics, Jay Forrester 1950s*

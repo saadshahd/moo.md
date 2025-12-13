@@ -88,3 +88,7 @@ Prioritize by urgency and importance.
 ```
 
 **Key insight:** Most people spend too much time in Q1 and Q3, not enough in Q2. Schedule Q2 work first.
+
+---
+
+*Source: Eisenhower Matrix, popularized by Covey*

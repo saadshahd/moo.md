@@ -85,3 +85,7 @@ ACT:
 
 **Wrong approach:** 2-week competitive analysis (too slow)
 **Right approach:** Ship and observe within 48 hours
+
+---
+
+*Source: John Boyd, 1976*

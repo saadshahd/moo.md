@@ -140,3 +140,7 @@ Eventually: Level 10 (Goals) - redefine success metrics
 ## Key Insight
 
 Most interventions happen at levels 1-3 (parameters, buffers, structure) because they're visible and easy. The leverage is at levels 7-10 (info, rules, goals, paradigms) but they're invisible and hard. The gap between where we intervene and where we should intervene is where change fails.
+
+---
+
+*Source: Donella Meadows, "Leverage Points" (1999)*

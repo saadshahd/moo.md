@@ -71,3 +71,7 @@ Sample combinations:
 ## Key Insight
 
 The box forces you past the first obvious answer. Most innovation comes from unusual combinations that you wouldn't naturally consider.
+
+---
+
+*Source: Fritz Zwicky, morphological analysis 1940s*

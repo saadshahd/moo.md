@@ -75,3 +75,7 @@ Uncover root causes by looking below surface events.
 
 - Surface fix: Rollback this deploy
 - Deep fix: Challenge "testing slows us down" belief, add staging
+
+---
+
+*Source: Systems Thinking iceberg model*

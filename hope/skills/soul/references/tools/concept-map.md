@@ -111,3 +111,7 @@ Visualize relationships between ideas to deepen understanding.
 ## Key Insight
 
 Concept maps externalize mental models. If you can't map it, you don't fully understand it. The act of mapping reveals gaps.
+
+---
+
+*Source: Joseph Novak, Cornell 1970s*

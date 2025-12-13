@@ -98,3 +98,7 @@ First-order thinking: "This action has this benefit."
 Second-order thinking: "This action has this benefit, which causes these effects, which incentivizes these behaviors."
 
 Most bad decisions look good at first order.
+
+---
+
+*Source: Second-order thinking, Howard Marks*

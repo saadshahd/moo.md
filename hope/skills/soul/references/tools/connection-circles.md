@@ -85,3 +85,7 @@ Map causal relationships to understand system behavior.
 ## Key Insight
 
 Connection circles reveal non-obvious relationships. The goal isn't to map everything—it's to find the 2-3 variables where intervention has outsized effect.
+
+---
+
+*Source: Systems Thinking, Senge/Meadows*

@@ -94,3 +94,7 @@ SBI FEEDBACK:
 ## Key Insight
 
 SBI separates observation from interpretation. "You interrupted" is observable. "You're disrespectful" is interpretation. Stick to observable behavior.
+
+---
+
+*Source: Center for Creative Leadership*

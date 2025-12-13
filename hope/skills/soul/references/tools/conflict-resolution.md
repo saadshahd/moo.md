@@ -95,3 +95,7 @@ WIN-WIN SOLUTION:
 ## Key Insight
 
 Most conflicts are between **positions**, not **needs**. When you surface the underlying needs and challenge assumptions connecting needs to positions, the conflict often "evaporates."
+
+---
+
+*Source: Thomas-Kilmann Conflict Mode Instrument*

@@ -92,3 +92,7 @@ Pyramid:
 ## Key Insight
 
 Most people write bottom-up (evidence → conclusion). Busy readers need top-down (conclusion → evidence). They can stop reading when they have enough.
+
+---
+
+*Source: Barbara Minto, McKinsey 1970s*

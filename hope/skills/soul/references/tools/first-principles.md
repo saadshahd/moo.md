@@ -114,3 +114,7 @@ RECONSTRUCT:
 ## Key Insight
 
 Most constraints are inherited assumptions, not fundamental truths. First principles thinking strips away the assumptions to reveal what's actually required.
+
+---
+
+*Source: Aristotle; popularized by Elon Musk*

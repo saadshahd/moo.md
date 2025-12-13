@@ -99,3 +99,7 @@ Time allocation (2-hour session):
    Week 5-6: Test and iterate
    Owner: Product team, supported by support
 ```
+
+---
+
+*Source: Tim Hurson, "Think Better" 2007*

@@ -96,3 +96,7 @@ Neither answer is wrong. The choice reveals your values.
 
 **Wrong approach:** More analysis (won't help—options are on par)
 **Right approach:** Decide who you want to be, then commit fully
+
+---
+
+*Source: Ruth Chang, "Hard Choices" TED 2014*

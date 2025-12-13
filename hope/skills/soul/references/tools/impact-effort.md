@@ -100,3 +100,7 @@ Prioritize by weighing results against required work.
 Priority: Dark mode → Cache API → Search rebuild (validate first)
 Skip: Admin dashboard (money pit)
 ```
+
+---
+
+*Source: 2x2 prioritization, Agile/Lean practice*

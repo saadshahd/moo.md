@@ -74,3 +74,7 @@ Identify root causes by categorizing contributing factors.
 ```
 
 **Root causes to investigate:** Cold caches + Monday traffic spike
+
+---
+
+*Source: Kaoru Ishikawa, 1968*

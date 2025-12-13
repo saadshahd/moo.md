@@ -90,3 +90,7 @@ Climbing back down:
 ```
 
 **Key insight:** The jump from data to meaning is where we usually go wrong.
+
+---
+
+*Source: Chris Argyris, organizational learning*

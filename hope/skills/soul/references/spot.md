@@ -173,3 +173,7 @@ Plan B: If still happening → Friday deploy freeze
 ## Key Insight
 
 Patterns are only useful if they lead to action. Recognition without intervention is just complaint. SPOT forces the connection: every pattern gets typed, every type gets an intervention, every intervention gets tracked.
+
+---
+
+*Composite: pattern classification + retrospective techniques*
