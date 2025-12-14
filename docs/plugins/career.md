@@ -229,4 +229,4 @@ The `/car:osint` command analyzes job postings:
 
 ---
 
-→ Source: [`career/skills/career/SKILL.md`](../career/skills/career/SKILL.md)
+→ Source: [`career/skills/career/SKILL.md`](../../career/skills/career/SKILL.md)

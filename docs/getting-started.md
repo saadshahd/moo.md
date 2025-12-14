@@ -1,15 +1,6 @@
 # 5-Minute Start
 
-Install hope. Run one command. See value.
-
-## Install
-
-Requires SSH key with repo access.
-
-```bash
-/plugin marketplace add git@github.com:saadshahd/moo.md.git
-/plugin install hope@moo.md
-```
+[Install first](../README.md#install), then run your first command.
 
 ## Your First Command
 
@@ -40,13 +31,9 @@ The soul skill activated. Every response runs through a silent audit:
 
 You don't see this checklist. You see better answers.
 
-## Three Keywords to Remember
+## Quick Start Keywords
 
-| Say this                        | Get this                                  |
-| ------------------------------- | ----------------------------------------- |
-| "delve into how X works"        | Deep code investigation                   |
-| "plan building X"               | Structured plan with intent clarification |
-| "recall what I learned about X" | Surface insights from past sessions       |
+See [Quick Start](../README.md#quick-start) for the three keywords that trigger key workflows.
 
 Try one now:
 
@@ -64,18 +51,5 @@ Your thinking compounds.
 
 ## Next Steps
 
-**Learn more:**
-
 - [Learnings System](learnings-system.md) — How your thinking compounds
-
-**Plugin Reference:**
-
-- [hope](hope.md) — cognitive operating system
-- [product](product.md) — PRDs, competitive analysis, metrics
-- [wordsmith](wordsmith.md) — editing, voice extraction, narrative
-- [founder](founder.md) — idea validation, pitch decks, financials
-- [career](career.md) — career development, growth planning
-
----
-
-Install hope. Say "plan building X". Let the system remember what you forget.
+- [Plugin Reference](index.md) — All available plugins

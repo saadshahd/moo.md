@@ -132,4 +132,4 @@ The `/product:debt` command produces:
 
 ---
 
-→ Source: [`product/skills/product/SKILL.md`](../product/skills/product/SKILL.md)
+→ Source: [`product/skills/product/SKILL.md`](../../product/skills/product/SKILL.md)

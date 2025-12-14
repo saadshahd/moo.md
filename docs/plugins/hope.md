@@ -22,7 +22,7 @@ Cognitive operating system for structured thinking.
 
 ## Skills
 
-Three skills that auto-activate:
+Four skills that auto-activate:
 
 | Skill         | Purpose                                                                 | Triggers on                 |
 | ------------- | ----------------------------------------------------------------------- | --------------------------- |
@@ -52,6 +52,21 @@ Three skills that auto-activate:
 | `/hope:reframe`     | Alternative framings for stuck problems. Transform constraints into advantages.     |
 | `/hope:interrogate` | Generate penetrating questions to deepen understanding.                             |
 | `/hope:calibrate`   | Review confidence calibration from prediction history.                              |
+
+## Thinking Tools
+
+34 tools for structured thinking. [Full reference →](../../hope/skills/soul/SKILL.md#all-tools-when-default-doesnt-fit)
+
+**Defaults by situation:**
+
+| Situation              | Tool                                                                       |
+| ---------------------- | -------------------------------------------------------------------------- |
+| Prioritizing work      | [Impact-Effort](../../hope/skills/soul/references/tools/impact-effort.md)  |
+| Breaking down problems | [Issue Trees](../../hope/skills/soul/references/tools/issue-trees.md)      |
+| Finding root cause     | [Ishikawa](../../hope/skills/soul/references/tools/ishikawa.md)            |
+| Making decisions       | [Decision Matrix](../../hope/skills/soul/references/tools/decision-matrix.md) |
+| Understanding systems  | [Feedback Loops](../../hope/skills/soul/references/tools/feedback-loops.md) |
+| Communicating clearly  | [Minto Pyramid](../../hope/skills/soul/references/tools/minto-pyramid.md)  |
 
 ## When to Use
 
@@ -119,8 +134,8 @@ Three types of learnings stored in `~/.claude/learnings/`:
 | `discoveries.jsonl` | Insights with confidence and applicability |
 | `constraints.jsonl` | Boundaries (permanent or temporary)        |
 
-See [Learnings System](learnings-system.md) for full documentation.
+See [Learnings System](../learnings-system.md) for full documentation.
 
 ---
 
-→ Source: [`hope/skills/soul/SKILL.md`](../hope/skills/soul/SKILL.md)
+→ Source: [`hope/skills/soul/SKILL.md`](../../hope/skills/soul/SKILL.md)

@@ -129,4 +129,4 @@ For each issue, provides exact replacement text.
 
 ---
 
-→ Source: [`wordsmith/skills/writing/SKILL.md`](../wordsmith/skills/writing/SKILL.md)
+→ Source: [`wordsmith/skills/writing/SKILL.md`](../../wordsmith/skills/writing/SKILL.md)

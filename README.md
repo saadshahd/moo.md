@@ -50,11 +50,11 @@ delve into how authentication works in this repo
 - [Learnings System](docs/learnings-system.md) — How your thinking compounds
 
 **Plugin Reference:**
-- [hope](docs/hope.md) — cognitive operating system
-- [product](docs/product.md) — PRDs, competitive analysis, metrics
-- [wordsmith](docs/wordsmith.md) — editing, voice extraction, narrative
-- [founder](docs/founder.md) — idea validation, pitch decks, financials
-- [career](docs/career.md) — interview prep, skill gaps, stakeholder navigation
+- [hope](docs/plugins/hope.md) — cognitive operating system
+- [product](docs/plugins/product.md) — PRDs, competitive analysis, metrics
+- [wordsmith](docs/plugins/wordsmith.md) — editing, voice extraction, narrative
+- [founder](docs/plugins/founder.md) — idea validation, pitch decks, financials
+- [career](docs/plugins/career.md) — interview prep, skill gaps, stakeholder navigation
 
 ## Update
 

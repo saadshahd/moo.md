@@ -204,4 +204,4 @@ All workflows produce markdown. Convert to final formats:
 
 ---
 
-→ Source: [`founder/skills/founder/SKILL.md`](../founder/skills/founder/SKILL.md)
+→ Source: [`founder/skills/founder/SKILL.md`](../../founder/skills/founder/SKILL.md)
