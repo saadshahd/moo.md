@@ -4,12 +4,12 @@ Argue against the strongest version of opposing positions.
 
 ## When to Use
 
-| Trigger                              | Use This Tool                    |
-| ------------------------------------ | -------------------------------- |
-| "Their argument is obviously wrong"  | Before critiquing any position   |
-| Code review disagreement             | Ensure fair evaluation           |
-| Design debate getting heated         | Find strongest opposing case     |
-| Writing a rebuttal                   | Avoid attacking weak version     |
+| Trigger                             | Use This Tool                  |
+| ----------------------------------- | ------------------------------ |
+| "Their argument is obviously wrong" | Before critiquing any position |
+| Code review disagreement            | Ensure fair evaluation         |
+| Design debate getting heated        | Find strongest opposing case   |
+| Writing a rebuttal                  | Avoid attacking weak version   |
 
 ## The Framework
 
@@ -45,22 +45,27 @@ Argue against the strongest version of opposing positions.
 **The Steel Man Process:**
 
 1. **STATE** — Write their position in their words
+
    - Quote directly where possible
    - No paraphrasing that shifts meaning
 
 2. **STRENGTHEN** — Re-express it better than they did
+
    - Add structure, remove ambiguity
    - Fill in implicit assumptions charitably
 
 3. **STEELMAN** — Find the strongest version
+
    - What's the best evidence for their view?
    - What would a smart proponent say?
 
 4. **VALIDATE** — Check your work
+
    - Would they say "I wish I'd put it that way"?
    - If not, you haven't steel-manned yet
 
 5. **CRITIQUE** — Only now identify weaknesses
+
    - Attack the strong version, not the weak one
    - Your critique is now worth something
 
@@ -71,14 +76,17 @@ Argue against the strongest version of opposing positions.
 ## Anti-Patterns
 
 **Straw Man:** Misrepresent to easily defeat
+
 - "So you're saying we should never write tests?"
 - Reality: They said tests slow down prototyping
 
 **Hollow Man:** Attack position no one holds
+
 - "Some people think code quality doesn't matter"
 - Reality: No serious developer believes this
 
 **Iron Man:** Make your position unfalsifiable
+
 - "My approach is more elegant" (no criteria)
 - Better: Define specific, measurable tradeoffs
 
@@ -131,10 +139,11 @@ Steel man process:
 ## Combination
 
 Pairs well with:
+
 - [Ladder of Inference](ladder-inference.md): Check assumptions about their position
 - [Conflict Resolution](conflict-resolution.md): Navigate productive disagreement
 - [Bayesian Thinking](bayesian-thinking.md): Update your beliefs when steel man is compelling
 
 ---
 
-*Source: Daniel Dennett, "Intuition Pumps" (2013); Anatol Rapoport's Rules for Criticism*
+_Source: Daniel Dennett, "Intuition Pumps" (2013); Anatol Rapoport's Rules for Criticism_

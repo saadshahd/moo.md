@@ -102,4 +102,4 @@ Time allocation (2-hour session):
 
 ---
 
-*Source: Tim Hurson, "Think Better" 2007*
+_Source: Tim Hurson, "Think Better" 2007_

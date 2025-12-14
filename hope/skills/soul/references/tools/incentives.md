@@ -4,11 +4,11 @@ Predict and explain behavior by finding the reward structure.
 
 ## When to Use
 
-| Trigger                              | Use This Tool              |
-| ------------------------------------ | -------------------------- |
-| "Why do they keep doing X?"          | Find the hidden incentive  |
-| Designing a system or policy         | Check what you're rewarding|
-| Policy not working as intended       | Look for perverse effects  |
+| Trigger                        | Use This Tool               |
+| ------------------------------ | --------------------------- |
+| "Why do they keep doing X?"    | Find the hidden incentive   |
+| Designing a system or policy   | Check what you're rewarding |
+| Policy not working as intended | Look for perverse effects   |
 
 ## The Framework
 
@@ -30,12 +30,12 @@ Predict and explain behavior by finding the reward structure.
 
 ## Incentive Types
 
-| Type             | Mechanism                     | Example                                    |
-| ---------------- | ----------------------------- | ------------------------------------------ |
-| **Financial**    | Money, bonuses, equity        | Sales commission → aggressive selling      |
-| **Social**       | Status, recognition, approval | Leaderboards → competitive behavior        |
-| **Moral**        | Duty, ethics, identity        | "Do the right thing" → intrinsic care      |
-| **Fear**         | Avoiding pain or loss         | Deadline pressure → rushing                |
+| Type          | Mechanism                     | Example                               |
+| ------------- | ----------------------------- | ------------------------------------- |
+| **Financial** | Money, bonuses, equity        | Sales commission → aggressive selling |
+| **Social**    | Status, recognition, approval | Leaderboards → competitive behavior   |
+| **Moral**     | Duty, ethics, identity        | "Do the right thing" → intrinsic care |
+| **Fear**      | Avoiding pain or loss         | Deadline pressure → rushing           |
 
 ## How to Apply
 
@@ -48,12 +48,12 @@ Predict and explain behavior by finding the reward structure.
 
 ## Common Perverse Incentives
 
-| Incentive                    | Intended Outcome     | Actual Outcome           |
-| ---------------------------- | -------------------- | ------------------------ |
-| Pay per bug found            | More testing         | Creating bugs to find    |
-| Lines of code written        | Productivity         | Verbose, unmaintainable  |
-| Tickets closed per day       | Fast support         | Cherry-picking easy ones |
-| Meetings attended            | Collaboration        | Calendar bloat           |
+| Incentive              | Intended Outcome | Actual Outcome           |
+| ---------------------- | ---------------- | ------------------------ |
+| Pay per bug found      | More testing     | Creating bugs to find    |
+| Lines of code written  | Productivity     | Verbose, unmaintainable  |
+| Tickets closed per day | Fast support     | Cherry-picking easy ones |
+| Meetings attended      | Collaboration    | Calendar bloat           |
 
 ## Example
 
@@ -82,4 +82,4 @@ Fix: Include test coverage in "done" definition.
 
 ---
 
-*Source: Charlie Munger, Poor Charlie's Almanack*
+_Source: Charlie Munger, Poor Charlie's Almanack_

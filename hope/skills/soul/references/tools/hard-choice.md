@@ -99,4 +99,4 @@ Neither answer is wrong. The choice reveals your values.
 
 ---
 
-*Source: Ruth Chang, "Hard Choices" TED 2014*
+_Source: Ruth Chang, "Hard Choices" TED 2014_

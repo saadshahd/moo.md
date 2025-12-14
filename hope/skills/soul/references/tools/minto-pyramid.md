@@ -95,4 +95,4 @@ Most people write bottom-up (evidence → conclusion). Busy readers need top-dow
 
 ---
 
-*Source: Barbara Minto, McKinsey 1970s*
+_Source: Barbara Minto, McKinsey 1970s_

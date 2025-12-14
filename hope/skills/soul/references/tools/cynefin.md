@@ -86,4 +86,4 @@ Response: probe → sense → respond
 
 ---
 
-*Source: Dave Snowden, 1999*
+_Source: Dave Snowden, 1999_

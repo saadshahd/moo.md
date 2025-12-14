@@ -15,25 +15,25 @@ Expert performance = opportunity + deliberate practice + motivation. Not talent.
 
 ```
     ┌───────────────────────────────────────────────────┐
-    │                   PANIC ZONE                       │
-    │              (Anxiety, no learning)                │
-    │                                                    │
+    │                   PANIC ZONE                      │
+    │              (Anxiety, no learning)               │
+    │                                                   │
     │    ┌───────────────────────────────────────┐      │
     │    │           LEARNING ZONE               │      │
     │    │        (Growth happens here)          │      │
     │    │                                       │      │
-    │    │    ┌───────────────────────────┐     │      │
-    │    │    │      COMFORT ZONE         │     │      │
-    │    │    │    (No improvement)       │     │      │
-    │    │    │                           │     │      │
-    │    │    │         YOU               │     │      │
-    │    │    │                           │     │      │
-    │    │    └───────────────────────────┘     │      │
+    │    │    ┌───────────────────────────┐      │      │
+    │    │    │       COMFORT ZONE        │      │      │
+    │    │    │      (No improvement)     │      │      │
+    │    │    │                           │      │      │
+    │    │    │         YOU               │      │      │
+    │    │    │                           │      │      │
+    │    │    └───────────────────────────┘      │      │
     │    │                                       │      │
-    │    │    ◀── DELIBERATE PRACTICE ──▶       │      │
+    │    │    ◀── DELIBERATE PRACTICE ──▶        │      │
     │    │        pushes INTO this zone          │      │
     │    └───────────────────────────────────────┘      │
-    │                                                    │
+    │                                                   │
     └───────────────────────────────────────────────────┘
 
     "20 years of experience might be 1 year repeated 20 times."

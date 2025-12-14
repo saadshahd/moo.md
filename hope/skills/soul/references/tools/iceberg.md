@@ -78,4 +78,4 @@ Uncover root causes by looking below surface events.
 
 ---
 
-*Source: Systems Thinking iceberg model*
+_Source: Systems Thinking iceberg model_

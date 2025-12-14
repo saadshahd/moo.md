@@ -97,4 +97,4 @@ SBI separates observation from interpretation. "You interrupted" is observable. 
 
 ---
 
-*Source: Center for Creative Leadership*
+_Source: Center for Creative Leadership_

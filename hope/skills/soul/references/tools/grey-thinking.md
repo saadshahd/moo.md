@@ -4,12 +4,12 @@ Reality exists in shades of grey. The dose makes the poison.
 
 ## When to Use
 
-| Trigger                              | Use This Tool                    |
-| ------------------------------------ | -------------------------------- |
-| "X is always bad"                    | Binary framing detected          |
-| "There's no middle ground"           | Force nuanced thinking           |
-| Heated policy debate                 | Escape false dichotomy           |
-| Catch yourself saying "never/always" | Check for oversimplification     |
+| Trigger                              | Use This Tool                |
+| ------------------------------------ | ---------------------------- |
+| "X is always bad"                    | Binary framing detected      |
+| "There's no middle ground"           | Force nuanced thinking       |
+| Heated policy debate                 | Escape false dichotomy       |
+| Catch yourself saying "never/always" | Check for oversimplification |
 
 ## The Framework
 
@@ -36,6 +36,7 @@ Reality exists in shades of grey. The dose makes the poison.
 ```
 
 **The Paracelsus Principle:**
+
 > "The dose makes the poison."
 > Water kills at 6 liters. Arsenic is safe at trace amounts.
 > Everything depends on quantity and context.
@@ -45,24 +46,29 @@ Reality exists in shades of grey. The dose makes the poison.
 **The Grey Thinking Process:**
 
 1. **DETECT** — Is this being framed as binary?
+
    - Listen for: "always", "never", "either/or", "good/bad"
    - Notice: Heated debate often signals false dichotomy
 
 2. **CONTINUUM** — Place on spectrum
+
    - Where exactly does this fall? 30% bad? 70% good?
    - What would move it left or right?
 
 3. **DOSE** — At what scale does it become problematic?
+
    - Small amounts: effect?
    - Large amounts: effect?
    - Threshold: where does it flip?
 
 4. **CONTEXT** — What conditions change the evaluation?
+
    - In situation A: good or bad?
    - In situation B: different answer?
    - For person/team X vs Y?
 
 5. **STEELMAN BOTH** — Strongest case for each pole
+
    - Best argument for "always good"?
    - Best argument for "always bad"?
    - Both positions have kernels of truth
@@ -75,6 +81,7 @@ Reality exists in shades of grey. The dose makes the poison.
 ## Triggers (automatic detection)
 
 When you hear or think:
+
 - "X is always bad/good"
 - "You either have Y or you don't"
 - "This is black and white"
@@ -85,14 +92,17 @@ When you hear or think:
 ## Anti-Patterns
 
 **False dichotomy:**
+
 - "Either we ship fast or we write tests"
 - Reality: Testing speed varies; ROI varies by test type
 
 **Slippery slope:**
+
 - "If we allow X, soon it'll be Y"
 - Reality: Mechanisms exist to stop at reasonable points
 
 **Slogans replacing thinking:**
+
 - "Move fast and break things"
 - "Slow is smooth, smooth is fast"
 - Both can be true depending on context
@@ -148,10 +158,11 @@ Grey thinking process:
 ## Combination
 
 Pairs well with:
+
 - [Steel Man](steel-man.md): Strengthen both sides before integrating
 - [Bayesian Thinking](bayesian-thinking.md): Probability over certainty
 - [Decision Matrix](decision-matrix.md): Score on continuum, not binary
 
 ---
 
-*Source: Paracelsus (16th century); Farnam Street "The Value of Grey Thinking"*
+_Source: Paracelsus (16th century); Farnam Street "The Value of Grey Thinking"_

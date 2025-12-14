@@ -88,4 +88,4 @@ ACT:
 
 ---
 
-*Source: John Boyd, 1976*
+_Source: John Boyd, 1976_

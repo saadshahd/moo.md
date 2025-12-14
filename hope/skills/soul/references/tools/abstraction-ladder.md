@@ -97,4 +97,4 @@ Problems reframed at a higher level often have simpler solutions. Moving up expa
 
 ---
 
-*Source: S.I. Hayakawa, "Language in Thought and Action" 1939*
+_Source: S.I. Hayakawa, "Language in Thought and Action" 1939_

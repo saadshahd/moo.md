@@ -103,4 +103,4 @@ Skip: Admin dashboard (money pit)
 
 ---
 
-*Source: 2x2 prioritization, Agile/Lean practice*
+_Source: 2x2 prioritization, Agile/Lean practice_

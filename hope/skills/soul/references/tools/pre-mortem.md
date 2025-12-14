@@ -17,6 +17,7 @@ Imagine the project has already failed. Work backward to identify why.
 ## The Framework
 
 ### Setup
+
 "It's 6 months from now. The project has failed spectacularly."
 
 ### Process
@@ -56,12 +57,12 @@ Imagine the project has already failed. Work backward to identify why.
 
 ## vs Post-Mortem
 
-| Pre-Mortem | Post-Mortem |
-|------------|-------------|
-| Before failure | After failure |
-| Imagined scenarios | Actual events |
-| Preventive | Reactive |
-| Low cost | High cost (failure already happened) |
+| Pre-Mortem         | Post-Mortem                          |
+| ------------------ | ------------------------------------ |
+| Before failure     | After failure                        |
+| Imagined scenarios | Actual events                        |
+| Preventive         | Reactive                             |
+| Low cost           | High cost (failure already happened) |
 
 ---
 
@@ -92,11 +93,11 @@ Pre-mortem identifies failures. Practice failure builds muscle memory for respon
 
 **Practice scenarios by role:**
 
-| Role | Practice Drill |
-|------|----------------|
+| Role      | Practice Drill                          |
+| --------- | --------------------------------------- |
 | Developer | Rollback deployment under time pressure |
-| On-call | Triage ambiguous alerts |
-| Team lead | Communicate outage to stakeholders |
+| On-call   | Triage ambiguous alerts                 |
+| Team lead | Communicate outage to stakeholders      |
 
 **Key insight**: Pre-mortem without practice = knowing what could go wrong. Pre-mortem WITH practice = knowing what to do when it does.
 
@@ -105,6 +106,7 @@ Pre-mortem identifies failures. Practice failure builds muscle memory for respon
 ## Combination
 
 Pairs well with:
+
 - [Deliberate Practice](deliberate-practice.md): Structure the practice drills
 - [Feedback Loops](feedback-loops.md): Design learning from drills
 

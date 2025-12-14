@@ -28,11 +28,11 @@ The cost of a decision isn't just what you spend—it's what you can't do with t
 Opportunity Cost = Value of Best Alternative Foregone
 ```
 
-| You Choose | You Spend | Opportunity Cost |
-|------------|-----------|------------------|
-| Build feature A | 2 weeks | Feature B, C, or D you could have built |
-| Learn framework X | 40 hours | Deep dive into fundamentals |
-| Attend meeting | 1 hour | 1 hour of focused work |
+| You Choose        | You Spend | Opportunity Cost                        |
+| ----------------- | --------- | --------------------------------------- |
+| Build feature A   | 2 weeks   | Feature B, C, or D you could have built |
+| Learn framework X | 40 hours  | Deep dive into fundamentals             |
+| Attend meeting    | 1 hour    | 1 hour of focused work                  |
 
 ---
 
@@ -43,6 +43,7 @@ Opportunity Cost = Value of Best Alternative Foregone
 **Choice**: Build custom auth system
 **Direct cost**: 3 weeks dev time
 **Opportunity cost**:
+
 - 3 weeks of product features
 - Using Auth0/Cognito and shipping in 3 days
 - Tech debt reduction work
@@ -54,6 +55,7 @@ Opportunity Cost = Value of Best Alternative Foregone
 **Choice**: Stay at current job
 **Direct cost**: Apparent stability
 **Opportunity cost**:
+
 - Higher salary elsewhere
 - New skills and challenges
 - Different network and opportunities
@@ -64,11 +66,11 @@ Opportunity Cost = Value of Best Alternative Foregone
 
 When ranking features:
 
-| Feature | Value | Dev Time | Opportunity Cost |
-|---------|-------|----------|------------------|
-| A | High | 1 week | Low (quick win) |
-| B | Medium | 4 weeks | High (blocks A, C, D, E) |
-| C | High | 2 weeks | Medium |
+| Feature | Value  | Dev Time | Opportunity Cost         |
+| ------- | ------ | -------- | ------------------------ |
+| A       | High   | 1 week   | Low (quick win)          |
+| B       | Medium | 4 weeks  | High (blocks A, C, D, E) |
+| C       | High   | 2 weeks  | Medium                   |
 
 **Insight**: B's opportunity cost makes it less attractive than raw value suggests.
 
@@ -76,13 +78,13 @@ When ranking features:
 
 ## Hidden Opportunity Costs
 
-| Action | Hidden Cost |
-|--------|-------------|
-| "Quick" meeting | Deep work interruption |
-| Saying yes to project | Everything you can't do instead |
-| Technical debt | Future velocity |
-| Premature optimization | Features not built |
-| Over-engineering | Simplicity lost |
+| Action                 | Hidden Cost                     |
+| ---------------------- | ------------------------------- |
+| "Quick" meeting        | Deep work interruption          |
+| Saying yes to project  | Everything you can't do instead |
+| Technical debt         | Future velocity                 |
+| Premature optimization | Features not built              |
+| Over-engineering       | Simplicity lost                 |
 
 ---
 
@@ -107,6 +109,7 @@ When ranking features:
 ## Combination
 
 Pairs with:
+
 - [Sunk Cost Fallacy](sunk-cost.md): Don't let past costs inflate opportunity cost
 - [Pareto Principle](pareto.md): Focus on 20% with highest opportunity cost differential
 - [Eisenhower Matrix](eisenhower.md): Urgent tasks often have hidden opportunity costs

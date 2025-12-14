@@ -91,4 +91,4 @@ Prioritize by urgency and importance.
 
 ---
 
-*Source: Eisenhower Matrix, popularized by Covey*
+_Source: Eisenhower Matrix, popularized by Covey_

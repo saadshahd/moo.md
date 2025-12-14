@@ -22,6 +22,7 @@ The map is not the territory. Models, abstractions, and representations are not 
 > — Alfred Korzybski
 
 Every representation loses information:
+
 - Code comments describe code, not what code actually does
 - Architecture diagrams show intended design, not deployed reality
 - Documentation describes expected behavior, not actual behavior
@@ -39,6 +40,7 @@ Every representation loses information:
 ## Code Examples
 
 ### Map (Documentation)
+
 ```python
 # Returns user's full name
 def get_name(user):
@@ -46,6 +48,7 @@ def get_name(user):
 ```
 
 ### Territory (Actual Behavior)
+
 ```python
 def get_name(user):
     return user.name  # Returns None if user.name not set!
@@ -57,13 +60,13 @@ The map says "returns full name." The territory includes a None case.
 
 ## Common Map-Territory Confusions
 
-| Map | Territory | Danger |
-|-----|-----------|--------|
-| Type definitions | Runtime values | Types can lie |
-| Test coverage % | Actual test quality | Coverage ≠ correctness |
-| Estimates | Actual time | Off by 2-10x typically |
-| Metrics | User experience | Goodhart's Law |
-| Org chart | How work flows | Informal networks exist |
+| Map              | Territory           | Danger                  |
+| ---------------- | ------------------- | ----------------------- |
+| Type definitions | Runtime values      | Types can lie           |
+| Test coverage %  | Actual test quality | Coverage ≠ correctness  |
+| Estimates        | Actual time         | Off by 2-10x typically  |
+| Metrics          | User experience     | Goodhart's Law          |
+| Org chart        | How work flows      | Informal networks exist |
 
 ---
 
@@ -99,6 +102,7 @@ Each layer is a map of the layer below. Bugs hide in the gaps.
 ## Verification Protocol
 
 When a map seems wrong:
+
 1. Don't immediately blame the map
 2. Check the territory (run the code, observe the system)
 3. Update whichever is wrong (map or your understanding)

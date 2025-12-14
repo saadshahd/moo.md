@@ -98,4 +98,4 @@ Most conflicts are between **positions**, not **needs**. When you surface the un
 
 ---
 
-*Source: Thomas-Kilmann Conflict Mode Instrument*
+_Source: Thomas-Kilmann Conflict Mode Instrument_

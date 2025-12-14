@@ -74,4 +74,4 @@ The box forces you past the first obvious answer. Most innovation comes from unu
 
 ---
 
-*Source: Fritz Zwicky, morphological analysis 1940s*
+_Source: Fritz Zwicky, morphological analysis 1940s_

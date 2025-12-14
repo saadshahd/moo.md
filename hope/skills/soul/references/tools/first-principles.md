@@ -117,4 +117,4 @@ Most constraints are inherited assumptions, not fundamental truths. First princi
 
 ---
 
-*Source: Aristotle; popularized by Elon Musk*
+_Source: Aristotle; popularized by Elon Musk_

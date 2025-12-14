@@ -77,4 +77,4 @@ Identify root causes by categorizing contributing factors.
 
 ---
 
-*Source: Kaoru Ishikawa, 1968*
+_Source: Kaoru Ishikawa, 1968_

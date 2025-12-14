@@ -92,4 +92,4 @@ The tree forces structured thinking. If you can't make branches MECE, you don't 
 
 ---
 
-*Source: McKinsey, MECE principle*
+_Source: McKinsey, MECE principle_

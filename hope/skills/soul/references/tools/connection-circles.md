@@ -88,4 +88,4 @@ Connection circles reveal non-obvious relationships. The goal isn't to map every
 
 ---
 
-*Source: Systems Thinking, Senge/Meadows*
+_Source: Systems Thinking, Senge/Meadows_

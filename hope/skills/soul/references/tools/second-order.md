@@ -101,4 +101,4 @@ Most bad decisions look good at first order.
 
 ---
 
-*Source: Second-order thinking, Howard Marks*
+_Source: Second-order thinking, Howard Marks_

@@ -114,4 +114,4 @@ Concept maps externalize mental models. If you can't map it, you don't fully und
 
 ---
 
-*Source: Joseph Novak, Cornell 1970s*
+_Source: Joseph Novak, Cornell 1970s_

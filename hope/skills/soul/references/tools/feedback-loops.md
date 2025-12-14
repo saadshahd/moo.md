@@ -96,4 +96,4 @@ Gap detected → action taken → gap closes → action stops
 
 ---
 
-*Source: Systems Dynamics, Jay Forrester 1950s*
+_Source: Systems Dynamics, Jay Forrester 1950s_

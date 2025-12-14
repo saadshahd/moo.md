@@ -4,11 +4,11 @@ Find and exploit the single constraint limiting throughput.
 
 ## When to Use
 
-| Trigger                              | Use This Tool                   |
-| ------------------------------------ | ------------------------------- |
-| "Everything is slow"                 | Find the one binding constraint |
-| Optimizing without improvement       | You're fixing the wrong thing   |
-| System underperforming capacity      | Constraint is hidden elsewhere  |
+| Trigger                         | Use This Tool                   |
+| ------------------------------- | ------------------------------- |
+| "Everything is slow"            | Find the one binding constraint |
+| Optimizing without improvement  | You're fixing the wrong thing   |
+| System underperforming capacity | Constraint is hidden elsewhere  |
 
 ## The Framework
 
@@ -17,9 +17,9 @@ Find and exploit the single constraint limiting throughput.
 │                                                         │
 │  "A chain is only as strong as its weakest link."       │
 │                                                         │
-│  ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐       │
-│  │ 100 │──▶│ 80  │──▶│ 40  │──▶│ 90  │──▶│ 70  │       │
-│  └─────┘   └─────┘   └─────┘   └─────┘   └─────┘       │
+│  ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐   ┌─────┐        │
+│  │ 100 │──▶│ 80  │──▶│ 40  │──▶│ 90  │──▶│ 70  │        │
+│  └─────┘   └─────┘   └─────┘   └─────┘   └─────┘        │
 │                         ▲                               │
 │                         │                               │
 │                    BOTTLENECK                           │
@@ -32,13 +32,13 @@ Find and exploit the single constraint limiting throughput.
 
 ## The Five Focusing Steps
 
-| Step           | Action                              | Question to Ask                     |
-| -------------- | ----------------------------------- | ----------------------------------- |
-| **1. IDENTIFY**| Find the constraint                 | What limits our throughput?         |
-| **2. EXPLOIT** | Maximize constraint's output        | How do we get 100% from it?         |
-| **3. SUBORDINATE** | Align everything else to it     | What should slow down to help?      |
-| **4. ELEVATE** | Increase constraint's capacity      | What investment breaks the limit?   |
-| **5. REPEAT**  | Find the new constraint             | Where did the bottleneck move?      |
+| Step               | Action                         | Question to Ask                   |
+| ------------------ | ------------------------------ | --------------------------------- |
+| **1. IDENTIFY**    | Find the constraint            | What limits our throughput?       |
+| **2. EXPLOIT**     | Maximize constraint's output   | How do we get 100% from it?       |
+| **3. SUBORDINATE** | Align everything else to it    | What should slow down to help?    |
+| **4. ELEVATE**     | Increase constraint's capacity | What investment breaks the limit? |
+| **5. REPEAT**      | Find the new constraint        | Where did the bottleneck move?    |
 
 ## How to Apply
 
@@ -51,12 +51,12 @@ Find and exploit the single constraint limiting throughput.
 
 ## Constraint Types
 
-| Type           | Example                           | Intervention                        |
-| -------------- | --------------------------------- | ----------------------------------- |
-| **Physical**   | Machine, server, person           | Add capacity, optimize utilization  |
-| **Policy**     | Approval process, batch size      | Change the rule                     |
-| **Market**     | Not enough demand                 | Improve product/marketing           |
-| **Knowledge**  | Team doesn't know how             | Training, hiring                    |
+| Type          | Example                      | Intervention                       |
+| ------------- | ---------------------------- | ---------------------------------- |
+| **Physical**  | Machine, server, person      | Add capacity, optimize utilization |
+| **Policy**    | Approval process, batch size | Change the rule                    |
+| **Market**    | Not enough demand            | Improve product/marketing          |
+| **Knowledge** | Team doesn't know how        | Training, hiring                   |
 
 ## Example
 
@@ -89,4 +89,4 @@ Five Steps Applied:
 
 ---
 
-*Source: Eliyahu Goldratt, "The Goal" 1984*
+_Source: Eliyahu Goldratt, "The Goal" 1984_
