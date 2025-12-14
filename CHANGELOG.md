@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.4.4] - 2025-12-14
+
+### Added
+- **hope**: SessionStart hook now injects today's date (e.g., "Today's date is 14 December 2025") into Claude's context
+
+---
+
 ## [0.4.3] - 2025-12-14
 
 ### Added
