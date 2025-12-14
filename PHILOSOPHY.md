@@ -12,6 +12,12 @@ Until you find it, every action risks being wasted effort.
 
 ---
 
+## Foundation
+
+Decision-making is a learnable skill, not innate talent. Mental models are the curriculum.
+
+---
+
 ## What moo.md Does
 
 Externalizes mental models so they apply automatically—surfacing what matters when pressure makes you forget.

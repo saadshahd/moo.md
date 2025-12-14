@@ -9,15 +9,31 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.4.3] - 2025-12-14
+
 ### Added
-- **2 thinking tools** (fills genuine gaps from Farnam Street audit):
+- **6 thinking tools** (Farnam Street research):
   - `incentives.md` - Munger's "show me the incentive" for predicting/explaining behavior
   - `bottlenecks.md` - Goldratt's Theory of Constraints for finding binding limits
+  - `steel-man.md` - Argue against strongest version of opposing positions (Dennett/Rapoport)
+  - `deliberate-practice.md` - Expert skill development at edge of competence (Ericsson)
+  - `grey-thinking.md` - Avoid binary thinking, dose makes the poison (Paracelsus)
+  - `systems-over-goals.md` - Habits compound, goals have endpoints (Clear/Adams)
 
 ### Changed
 - hope plugin version 0.4.2 → 0.4.3
-- Thinking tools count 28 → 30
+- Thinking tools count 28 → 34
 - Systems category now includes Incentives and Bottlenecks
+- Decision category now includes Grey Thinking
+- Prioritization category now includes Systems Over Goals
+- Communication category now includes Steel Man
+- Creative category now includes Deliberate Practice
+- PHILOSOPHY.md: Added "Foundation" section (decision-making as learnable skill)
+- `pre-mortem.md`: Added "Practice Failure" section - simulate, don't just anticipate
+- `circle-of-competence.md`: Added "Evaluating Others' Expertise" section
+- `bayesian-thinking.md`: Added "Grey Thinking Integration" section
 
 ---
 

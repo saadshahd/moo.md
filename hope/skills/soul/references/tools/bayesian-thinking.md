@@ -25,6 +25,7 @@ Posterior ∝ Likelihood × Prior
 ```
 
 In plain language:
+
 - **Prior**: What you believed before new evidence
 - **Likelihood**: How probable is this evidence if hypothesis is true?
 - **Posterior**: Updated belief after seeing evidence
@@ -42,6 +43,7 @@ In plain language:
 ## Example: Debugging
 
 **Prior beliefs:**
+
 - 60%: Database timeout
 - 30%: Network issue
 - 10%: Application bug
@@ -51,6 +53,7 @@ In plain language:
 **Update**: Network and DB issues less likely to be time-specific. Application bug (scheduled job?) now more probable.
 
 **New posterior:**
+
 - 20%: Database timeout
 - 10%: Network issue
 - 70%: Application bug (check cron jobs)
@@ -59,12 +62,12 @@ In plain language:
 
 ## Key Principles
 
-| Principle | Meaning |
-|-----------|---------|
-| **Never 0% or 100%** | Leave room for surprise |
-| **Evidence moves beliefs** | Strong evidence = big shift |
-| **Priors matter** | Extraordinary claims need extraordinary evidence |
-| **Update incrementally** | Don't swing wildly on single data point |
+| Principle                  | Meaning                                          |
+| -------------------------- | ------------------------------------------------ |
+| **Never 0% or 100%**       | Leave room for surprise                          |
+| **Evidence moves beliefs** | Strong evidence = big shift                      |
+| **Priors matter**          | Extraordinary claims need extraordinary evidence |
+| **Update incrementally**   | Don't swing wildly on single data point          |
 
 ---
 
@@ -73,10 +76,10 @@ In plain language:
 Track your predictions. If you say "80% confident" 10 times, you should be right ~8 times.
 
 | Stated Confidence | Should Be Right |
-|-------------------|-----------------|
-| 50% | 5/10 times |
-| 80% | 8/10 times |
-| 95% | 19/20 times |
+| ----------------- | --------------- |
+| 50%               | 5/10 times      |
+| 80%               | 8/10 times      |
+| 95%               | 19/20 times     |
 
 If you're always right at 80%, you're underconfident. If rarely right, overconfident.
 
@@ -91,9 +94,51 @@ If you're always right at 80%, you're underconfident. If rarely right, overconfi
 
 ---
 
+## Grey Thinking Integration
+
+Bayesian thinking naturally supports nuance over binary categorization.
+
+**The dose makes the poison** (Paracelsus):
+
+- Nothing is universally good or bad
+- Everything depends on quantity and context
+- Assign probabilities on a continuum, not in buckets
+
+**False dichotomy detection:**
+
+When you catch yourself thinking binary:
+
+- "Is this a good or bad idea?" → "What probability of success?"
+- "Should we do X or not?" → "Under what conditions does X make sense?"
+- "Is this person right or wrong?" → "What percentage of their argument holds?"
+
+**Continuum questions:**
+
+1. Where does this fall on the spectrum? (30%? 70%?)
+2. At what scale/dose does it become problematic?
+3. What context would shift the probability?
+
+**Example:**
+
+```
+Binary: "Technical debt is bad"
+
+Bayesian + Grey:
+- Probability debt causes problems = f(interest rate, payoff timeline)
+- Strategic debt (knowingly taken, planned payoff): 20% harmful
+- Accidental debt (accumulated unknowingly): 80% harmful
+- Context: Fast-moving startup vs regulated enterprise
+
+Updated belief: "Technical debt probability of harm depends
+on intentionality, visibility, and payoff timeline"
+```
+
+---
+
 ## Combination
 
 Pairs with:
+
 - [Confidence Gates](../../../SKILL.md): Bayesian updates inform confidence levels
 - [Pre-Mortem](pre-mortem.md): Assign probabilities to failure modes
 

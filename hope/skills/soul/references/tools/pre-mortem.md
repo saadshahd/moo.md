@@ -73,6 +73,43 @@ Imagine the project has already failed. Work backward to identify why.
 
 ---
 
+## Practice Failure
+
+Pre-mortem identifies failures. Practice failure builds muscle memory for response.
+
+**Why practice?** Pilots practice stalls and spins before real emergencies. "A slow response from seldom having accomplished the acts" is preventable.
+
+**How to practice:**
+
+1. **Identify critical failure modes** from pre-mortem
+2. **Simulate the scenario** in controlled environment
+   - Inject database failure in staging
+   - Run deployment rollback drill
+   - Practice incident response with mock pages
+3. **Time-box the drill** (30 min max)
+4. **Debrief**: What worked? What fumbled?
+5. **Repeat** until response is automatic
+
+**Practice scenarios by role:**
+
+| Role | Practice Drill |
+|------|----------------|
+| Developer | Rollback deployment under time pressure |
+| On-call | Triage ambiguous alerts |
+| Team lead | Communicate outage to stakeholders |
+
+**Key insight**: Pre-mortem without practice = knowing what could go wrong. Pre-mortem WITH practice = knowing what to do when it does.
+
+---
+
+## Combination
+
+Pairs well with:
+- [Deliberate Practice](deliberate-practice.md): Structure the practice drills
+- [Feedback Loops](feedback-loops.md): Design learning from drills
+
+---
+
 ## Provenance
 
 Gary Klein, 2007. Published in Harvard Business Review. Based on Mitchell, Russo & Pennington's 1989 research on prospective hindsight. Klein found pre-mortems reduced overconfidence more than any other critiquing technique.

@@ -1,7 +1,7 @@
 ---
 name: hope
 description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
-version: 0.4.2
+version: 0.4.3
 ---
 
 <EXTREMELY-IMPORTANT>
@@ -68,11 +68,11 @@ For most situations, use these first:
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Root Cause        | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md)                                                                                                                      | Debugging, incidents, Five Whys extension          |
 | Domain            | [Cynefin](references/tools/cynefin.md)                                                                                                                                                                | Choosing approach before diving in                 |
-| Decision          | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md) | Multi-option choices, fast decisions               |
-| Prioritization    | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Opportunity Cost](references/tools/opportunity-cost.md)                                            | Backlog grooming, debt triage, tradeoffs           |
+| Decision          | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md), [Grey Thinking](references/tools/grey-thinking.md) | Multi-option choices, fast decisions, avoid binary traps |
+| Prioritization    | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Opportunity Cost](references/tools/opportunity-cost.md), [Systems Over Goals](references/tools/systems-over-goals.md) | Backlog grooming, debt triage, tradeoffs, habits   |
 | Systems           | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md), [Incentives](references/tools/incentives.md), [Bottlenecks](references/tools/bottlenecks.md) | Architecture, metrics, behavior, constraints       |
-| Creative          | [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md)                            | Brainstorming, reframing, innovation               |
-| Communication     | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md)                                                    | Writing, feedback, negotiation                     |
+| Creative          | [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md), [Deliberate Practice](references/tools/deliberate-practice.md) | Brainstorming, reframing, innovation, skill building |
+| Communication     | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md), [Steel Man](references/tools/steel-man.md) | Writing, feedback, negotiation, argumentation      |
 | Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md)                                              | Decomposition, exhaustive breakdown                |
 | Risk              | [Pre-Mortem](references/tools/pre-mortem.md)                                                                                                                                                          | Anticipate failure before starting                 |
 | Boundaries        | [Circle of Competence](references/tools/circle-of-competence.md), [Chesterton's Fence](references/tools/chestertons-fence.md)                                                                         | Know limits, understand before changing            |
