@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **docs**: Restructured for DRY and discoverability
+  - Plugin docs moved to `docs/plugins/`
+  - Internal docs (audit, research, adrs) moved to `docs/dev/`
+  - Added `docs/index.md` navigation hub
+  - Fixed hope.md: "Three skills" → "Four skills", added Thinking Tools section
+- **CLAUDE.md**: Updated structure comment, added DRY anti-pattern for docs
+
 ---
 
 ## [0.4.4] - 2025-12-14

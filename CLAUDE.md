@@ -14,7 +14,7 @@ moo.md/
 ├── founder/                 # Startup validation, financials
 ├── career/                  # Interview prep, skill gaps
 ├── prompts/                 # Standalone prompt library
-├── docs/                    # Documentation
+├── docs/                    # User docs: plugins/, dev/ (internal)
 └── scripts/install.sh       # Multi-tool installer
 ```
 
@@ -94,6 +94,7 @@ description: Single line. What it does and when to use it.
 - Generic names (`*Manager`, `*Helper`, `*Utils`)
 - Nested reference chains (A → B → C)
 - Time estimates instead of story points
+- Duplicating content across docs (link to single source)
 - Windows paths or magic numbers in scripts
 
 ## Changelog
