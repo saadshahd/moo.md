@@ -1,66 +1,59 @@
-# moo.md
+<p align="center">
+  <img src="docs/assets/poster.png" alt="moo.md - Structured thinking for Claude Code" width="600">
+  <br/>
+  Plugins that make claude state confidence, list failures, and present structured reasoning before acting.
+</p>
 
-Thoughtful plugins for Claude Code.
+<br/>
 
-## Why This Exists
+| Before moo.md                | After moo.md                           |
+| ---------------------------- | -------------------------------------- |
+| "This should work"           | "85% confident because [evidence]"     |
+| Builds first, searches later | Searches libraries before writing code |
+| Hopes nothing breaks         | Lists failure modes before starting    |
+| Forgets what worked          | Recalls insights from past sessions    |
 
-Under stress, I forget to think clearly.
+## See It In Action
 
-Pause before building. Name the unknowns. Search for prior art. Surface what could fail. Simple disciplines — gone the moment pressure hits.
+Every response ends with a verdict box:
 
-So I wrote them down.
+<p>
+  <img src="docs/assets/verdict.svg" alt="moo.md - verdict box" width="420">
+</p>
 
-When I forget, Claude remembers.
+## What Runs Quietly
 
-## What It Does
+Before responding, Claude checks:
 
-Clarify intent. State confidence. Identify failure modes. Ship with honesty.
+- Intent clear?
+- Libraries searched?
+- Failure modes listed?
+- Confidence stated?
+- Reversibility assessed?
 
-Your thinking compounds across sessions.
+30+ thinking tools run automatically: Inversion, Pre-Mortem, Ishikawa, Five Whys, Decision Matrix.
 
 ## Install
 
-Requires SSH key with repo access.
-
 ```bash
-# Claude Code
-/plugin marketplace add git@github.com:saadshahd/moo.md.git
+/plugin marketplace add saadshahd/moo.md
 /plugin install hope@moo.md
 ```
 
-## Quick Start
+## Plugins
 
-Three keywords to remember:
-
-| Say this | Get this |
-|----------|----------|
-| "delve into how X works" | Deep code investigation |
-| "plan building X" | Structured plan with intent clarification |
-| "recall what I learned about X" | Surface insights from past sessions |
-
-Try one:
-
-```
-delve into how authentication works in this repo
-```
+| Plugin                                 | What It Does                                                     |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| [hope](docs/plugins/hope.md)           | Core thinking system — confidence gates, silent audit, workflows |
+| [product](docs/plugins/product.md)     | PRDs, competitive analysis, metrics                              |
+| [wordsmith](docs/plugins/wordsmith.md) | Editing, voice extraction, narrative                             |
+| [founder](docs/plugins/founder.md)     | Idea validation, pitch decks, financials                         |
+| [career](docs/plugins/career.md)       | Interview prep, skill gaps, stakeholder navigation               |
 
 ## Documentation
 
 - [5-Minute Start](docs/getting-started.md) — Install and see value immediately
-- [Learnings System](docs/learnings-system.md) — How your thinking compounds
-
-**Plugin Reference:**
-- [hope](docs/plugins/hope.md) — cognitive operating system
-- [product](docs/plugins/product.md) — PRDs, competitive analysis, metrics
-- [wordsmith](docs/plugins/wordsmith.md) — editing, voice extraction, narrative
-- [founder](docs/plugins/founder.md) — idea validation, pitch decks, financials
-- [career](docs/plugins/career.md) — interview prep, skill gaps, stakeholder navigation
-
-## Update
-
-```bash
-/plugin marketplace update moo.md
-```
+- [Learnings System](docs/learnings-system.md) — Insights persist across sessions
 
 ## Issues
 
@@ -73,3 +66,5 @@ Something broken? Onboarding unclear? Feature request?
 **[Nate B. Jones](https://www.natebjones.com/)** — grounded thinking, advanced prompting
 
 **[Superpowers](https://github.com/obra/superpowers)** — prior art
+
+**[Farnam Street](https://fs.blog/blog/)** - For the excellent writings
