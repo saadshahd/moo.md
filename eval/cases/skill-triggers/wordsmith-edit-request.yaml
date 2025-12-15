@@ -1,0 +1,29 @@
+# Test: wordsmith:writing triggers on editing/writing tasks
+---
+name: wordsmith-triggers-on-edit-request
+description: Writing skill should auto-activate on edit, prose review, writing improvement tasks
+category: skill-trigger
+plugin: wordsmith
+skill: writing
+
+prompt: |
+  Edit this paragraph to be clearer and more concise:
+
+  "The implementation of the new feature was completed by the development team after they had spent several weeks working on it and testing it extensively to make sure that it would work properly in production."
+
+model_tier: sonnet
+timeout_ms: 120000
+
+evaluators:
+  - trigger-evaluator:
+      expected_skill: "wordsmith:writing"
+      pass_threshold: 0.70
+
+expected_behaviors:
+  - "Writing skill activates on edit requests"
+  - "Applies editing principles (cut fluff, preserve voice)"
+  - "Shows markup or before/after comparison"
+  - "Mentions specific improvements made"
+
+tags: [core, regression, phase1]
+created: 2024-12-15

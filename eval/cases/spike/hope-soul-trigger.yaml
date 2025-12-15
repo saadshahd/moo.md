@@ -1,0 +1,32 @@
+# Spike Test Case: hope:soul auto-triggering
+# Purpose: Validate the evaluation framework architecture
+---
+name: hope-soul-triggers-on-planning
+description: Soul skill should auto-activate on planning tasks
+category: skill-trigger
+
+# Test input - a prompt that should trigger hope:soul
+prompt: "Help me plan a new authentication feature for a web app"
+
+# Model configuration
+model_tier: haiku
+timeout_ms: 60000
+max_tokens: 4000
+
+# Evaluation configuration
+evaluators:
+  - trigger-evaluator:
+      expected_skill: "hope:soul"
+      pass_threshold: 0.70
+
+# Expected behaviors (for human reference)
+expected_behaviors:
+  - "Soul skill auto-activates due to planning context"
+  - "Silent Audit checklist should appear"
+  - "Quality Footer should be present"
+  - "Confidence percentages used instead of vague terms"
+
+# Metadata
+tags: [spike, core, quick]
+created: 2024-12-15
+author: moo.md-eval

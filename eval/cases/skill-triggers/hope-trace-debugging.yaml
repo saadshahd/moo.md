@@ -1,0 +1,26 @@
+# Test: hope:trace triggers on debugging/root cause tasks
+---
+name: hope-trace-triggers-on-debugging
+description: Trace skill should auto-activate for root cause analysis and debugging
+category: skill-trigger
+plugin: hope
+skill: trace
+
+prompt: "Why does the API keep returning 500 errors? The bug keeps coming back after we fix it."
+
+model_tier: sonnet
+timeout_ms: 120000
+
+evaluators:
+  - trigger-evaluator:
+      expected_skill: "hope:trace"
+      pass_threshold: 0.70
+
+expected_behaviors:
+  - "Trace skill activates on 'why' questions about bugs"
+  - "Effect -> Cause -> Root chain mentioned"
+  - "Confidence levels for potential causes"
+  - "Five Whys or similar root cause technique"
+
+tags: [core, regression, phase1]
+created: 2024-12-15
