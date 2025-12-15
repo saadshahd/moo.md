@@ -31,22 +31,26 @@ You will receive:
 
 ### Step 1: Parse Output
 
-Extract from the test output:
+Extract from the test output JSON:
 - `result` field: The response text
-- Tool call history (if available in JSON)
+- `permission_denials` array: Tool calls that were attempted but blocked
 
 ### Step 2: Check for Skill Invocation
 
-Look for evidence of skill triggering:
+Look for evidence of skill triggering (in order of strength):
 
-1. **Direct tool call**: `Skill` tool was called with expected parameter
-2. **Announcement**: Text like "I'm using [skill-name]" or "Using the [skill-name] skill"
-3. **Workflow markers**: Presence of skill-specific output (e.g., "Silent Audit", "Quality Footer" for hope:soul)
+1. **Permission denial**: `permission_denials` contains Skill tool call with expected skill param (strongest evidence - model DID try to invoke)
+2. **Direct tool call**: `Skill` tool was called with expected parameter
+3. **Announcement**: Text like "I'm using [skill-name]" or "Using the [skill-name] skill"
+4. **Workflow markers**: Presence of skill-specific output (e.g., "Silent Audit", "Quality Footer" for hope:soul)
+
+**IMPORTANT**: A permission denial IS evidence of successful triggering. The model correctly identified the skill to use and attempted to invoke it - the denial is a test infrastructure limitation, not a skill failure.
 
 ### Step 3: Determine Confidence
 
 | Evidence | Confidence |
 |----------|------------|
+| Permission denial with exact skill | 0.95-1.0 |
 | Tool call with exact skill param | 0.95-1.0 |
 | Announcement + workflow markers | 0.85-0.95 |
 | Workflow markers only | 0.70-0.85 |
@@ -62,13 +66,14 @@ Return **ONLY** valid JSON:
   "triggered": true,
   "expected_skill": "hope:soul",
   "evidence": {
-    "tool_call_found": true,
+    "permission_denial_found": true,
+    "tool_call_found": false,
     "announcement_found": true,
     "workflow_markers": ["Silent Audit", "Quality Footer"]
   },
   "confidence": 0.95,
   "verdict": "PASS",
-  "rationale": "Skill tool invoked with hope:soul parameter at turn 1"
+  "rationale": "Skill tool call found in permission_denials with hope:soul parameter"
 }
 ```
 
@@ -132,7 +137,32 @@ If unable to evaluate:
 }
 ```
 
-## Example
+## Examples
+
+### Example 1: Permission Denial (Strongest Evidence)
+
+**Input:**
+- Test output JSON with `permission_denials: [{"tool_name":"Skill","tool_input":{"skill":"hope:trace"}}]`
+- Expected skill: `hope:trace`
+
+**Output:**
+```json
+{
+  "triggered": true,
+  "expected_skill": "hope:trace",
+  "evidence": {
+    "permission_denial_found": true,
+    "tool_call_found": false,
+    "announcement_found": false,
+    "workflow_markers": []
+  },
+  "confidence": 0.95,
+  "verdict": "PASS",
+  "rationale": "Skill tool call found in permission_denials with hope:trace parameter - model correctly triggered skill"
+}
+```
+
+### Example 2: Announcement + Markers
 
 **Input:**
 - Test output: Response containing "I'm using hope:soul for structured thinking..." followed by Silent Audit checklist
@@ -144,6 +174,7 @@ If unable to evaluate:
   "triggered": true,
   "expected_skill": "hope:soul",
   "evidence": {
+    "permission_denial_found": false,
     "tool_call_found": false,
     "announcement_found": true,
     "workflow_markers": ["Silent Audit", "Confidence:", "Alternative:"]

@@ -6,10 +6,7 @@ category: skill-trigger
 plugin: wordsmith
 skill: writing
 
-prompt: |
-  Edit this paragraph to be clearer and more concise:
-
-  "The implementation of the new feature was completed by the development team after they had spent several weeks working on it and testing it extensively to make sure that it would work properly in production."
+prompt: "Edit this text to be clearer: The implementation was completed by the team after spending weeks testing it to ensure it would work in production."
 
 model_tier: sonnet
 timeout_ms: 120000

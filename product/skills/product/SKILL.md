@@ -1,7 +1,7 @@
 ---
 name: product
-description: Use when doing competitive analysis, writing PRDs, defining metrics/OKRs, synthesizing user research, analyzing cohort retention, evaluating PRD quality, or prioritizing technical debt. Auto-activates on product management, strategy, roadmap, or requirements tasks.
-version: 0.0.2
+description: Product workflows router. Use when user mentions "PRD", "competitive analysis", "metrics", "OKRs", "cohort", "requirements", or "technical debt". Triggers on product management and strategy tasks.
+version: 0.0.3
 ---
 
 # Product Skill

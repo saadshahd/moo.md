@@ -101,8 +101,9 @@ while read -r CASE_FILE; do
     # Save raw output
     echo "$TEST_OUTPUT" > "$RESULTS_DIR/$TEST_NAME.output.json"
 
-    # Extract result
+    # Extract result and permission_denials
     RESULT=$(echo "$TEST_OUTPUT" | jq -r '.result // "NO_RESULT"')
+    PERMISSION_DENIALS=$(echo "$TEST_OUTPUT" | jq -c '.permission_denials // []')
 
     if [ "$RESULT" = "NO_RESULT" ]; then
         echo "  ERROR: No result from Claude"
@@ -118,13 +119,20 @@ while read -r CASE_FILE; do
 TEST NAME: $TEST_NAME
 EXPECTED SKILL: $EXPECTED_SKILL
 
-TEST OUTPUT:
+PERMISSION DENIALS (tool calls that were attempted but blocked):
+$PERMISSION_DENIALS
+
+TEST OUTPUT (response text):
 $RESULT
 
-Analyze whether the expected skill was triggered. Look for:
-1. Skill announcement (\"I'm using $EXPECTED_SKILL\")
-2. Workflow markers specific to the skill
-3. Tool calls to the Skill tool
+Analyze whether the expected skill was triggered. Check IN ORDER:
+1. PERMISSION DENIALS - If permission_denials contains a Skill tool call with the expected skill, that IS successful triggering (model tried to invoke it)
+2. Skill announcement (\"I'm using $EXPECTED_SKILL\")
+3. Workflow markers specific to the skill
+
+IMPORTANT RULES:
+- A permission denial for the Skill tool with the expected skill = PASS with high confidence (0.95+). The model correctly triggered the skill; the denial is a test infrastructure limitation.
+- SPECIAL CASE for hope:soul: This skill is ALWAYS injected via SessionStart hook. It will NOT appear in permission_denials or as a Skill tool call. For hope:soul ONLY, evaluate by checking for workflow markers: \"Silent Audit\", confidence percentages (X% or X-Y%), \"Intent Clarification\". If these markers are present, it's a PASS (0.90+).
 
 Return ONLY valid JSON:
 {
