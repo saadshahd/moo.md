@@ -76,10 +76,7 @@ State confidence as range:
 - [How we know it works]
 
 ---
-Confidence: X-Y% (evidence: [specific])
-Alternative: [different approach] (X-Y%)
-Reversible: Type [2A/2B/1]
-Complexity: X story points
+[Quality Footer - see ../skills/soul/references/quality-footer.md]
 ```
 
 ## Phase 5b: Project-Level Planning (≥8 story points only)

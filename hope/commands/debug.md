@@ -85,9 +85,7 @@ Only after root cause verified and instrumentation planned:
 
 ---
 
-**Confidence:** X-Y%
-**Reversible:** Type [2A/2B/1]
-**Complexity:** X story points
+[Quality Footer - see ../skills/soul/references/quality-footer.md]
 
 ---
 

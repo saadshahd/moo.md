@@ -98,9 +98,7 @@ Present findings:
 [Which reframing to explore first and why]
 
 ---
-Confidence: X-Y% (evidence: [basis for recommendations])
-Key Assumption: [what would invalidate these reframings]
-Complexity: X story points (to explore top reframing)
+[Quality Footer - see ../skills/soul/references/quality-footer.md]
 ```
 
 ## Phase 5: Wait

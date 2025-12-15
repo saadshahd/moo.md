@@ -167,9 +167,7 @@ How will we know these measures worked?
 - [Review timeline]
 
 ---
-Confidence: X-Y% (evidence: [basis for root cause assessment])
-Key Assumption: [what could invalidate this analysis]
-Complexity: X story points (total for all prevention measures)
+[Quality Footer - see ../skills/soul/references/quality-footer.md]
 ```
 
 ## Phase 8: Learning Persistence

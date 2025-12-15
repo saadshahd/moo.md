@@ -86,8 +86,7 @@ Rank questions by:
 11-15. [Questions that expand thinking]
 
 ---
-Confidence: X-Y% (evidence: [basis for question relevance])
-Key Assumption: [what this question set assumes about the problem]
+[Quality Footer - see ../skills/soul/references/quality-footer.md]
 ```
 
 ## Phase 5: Wait

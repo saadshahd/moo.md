@@ -125,10 +125,4 @@ Read `/prompt` and apply its techniques, then use ecosystem template:
 
 1. State full file path
 2. Verify frontmatter (single-line, no multi-line YAML)
-3. Quality footer:
-
-```
-Confidence: X-Y%
-Location: [file path]
-Complexity: X story points
-```
+3. Quality footer (see [reference](hope/skills/soul/references/quality-footer.md)) + Location: [file path]

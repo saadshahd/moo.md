@@ -76,9 +76,7 @@ Present findings:
 3. [Question that surfaces risk]
 
 ---
-Confidence: X-Y% (evidence: [specific basis for assessment])
-Key Assumption: [what this analysis depends on]
-Reversible: Type [2A/2B/1]
+[Quality Footer - see ../skills/soul/references/quality-footer.md]
 ```
 
 ## Phase 5: Wait

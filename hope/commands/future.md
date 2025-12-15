@@ -108,10 +108,7 @@ Evaluate across multiple timeframes:
 - [Prediction about how you'll feel about this decision]
 
 ---
-Confidence: X-Y% (evidence: [basis for analysis])
-Key Assumption: [what values/priorities this assumes]
-Reversible: Type [2A/2B/1]
-Complexity: X story points (to execute choice)
+[Quality Footer - see ../skills/soul/references/quality-footer.md]
 ```
 
 ## Phase 6: Wait

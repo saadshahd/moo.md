@@ -1,6 +1,6 @@
 {
   "name": "hope",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "clarify before you build. learn from failure. iterate with confidence.",
   "keywords": ["intent", "inversion", "confidence", "functional", "iterate"],
   "author": {

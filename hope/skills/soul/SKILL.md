@@ -1,7 +1,7 @@
 ---
 name: hope
 description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
-version: 0.4.4
+version: 0.4.5
 ---
 
 <EXTREMELY-IMPORTANT>
@@ -209,13 +209,7 @@ Each layer requires metric-based justification.
 
 ### 5. Quality Footer
 
-```
-Confidence: X-Y% (evidence: [specific])
-Alternative: [approach] (confidence: X-Y%, tradeoff: [what changes])
-Reversible: Type [2A/2B/1] (rollback: [time/effort])
-Key Assumption: [what could invalidate this]
-Complexity: X story points
-```
+See [Quality Footer](references/quality-footer.md) for format and verdict rules.
 
 ---
 
@@ -381,12 +375,4 @@ Every library you don't write = 1000 bugs you don't have.
 
 ## Quality Footer (Required)
 
-Every non-trivial response ends with:
-
-```
-Confidence: X-Y% (evidence: [specific basis])
-Alternative: [different approach] (X-Y%, tradeoff: [what changes])
-Reversible: Type [2A/2B/1] (rollback: [cost])
-Key Assumption: [what could invalidate this]
-Complexity: X story points
-```
+Every non-trivial response ends with a verdict box. See [Quality Footer](references/quality-footer.md) for format, verdict rules, and examples.

@@ -106,15 +106,7 @@ No vague words. Percentages only.
 
 ### Quality Footer
 
-Every non-trivial response ends with:
-
-```
-Confidence: X-Y% (evidence: [specific])
-Alternative: [approach] (X-Y%, tradeoff: [what changes])
-Reversible: Type [2A/2B/1] (rollback: [cost])
-Key Assumption: [what could invalidate this]
-Complexity: X story points
-```
+Every non-trivial response ends with a verdict box. See [Quality Footer reference](../../hope/skills/soul/references/quality-footer.md) for format and examples.
 
 ### Reversibility
 

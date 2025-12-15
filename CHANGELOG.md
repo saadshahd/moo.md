@@ -9,13 +9,23 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.4.5] - 2025-12-15
+
+### Added
+- **hope**: New Quality Footer format with verdict box (🟢 SHIP / 🟡 MONITOR / 🔴 RESEARCH)
+- **hope**: Single source of truth reference file `references/quality-footer.md`
+
 ### Changed
-- **docs**: Restructured for DRY and discoverability
-  - Plugin docs moved to `docs/plugins/`
-  - Internal docs (audit, research, adrs) moved to `docs/dev/`
-  - Added `docs/index.md` navigation hub
-  - Fixed hope.md: "Three skills" → "Four skills", added Thinking Tools section
+- **hope**: All commands now reference Quality Footer instead of inline duplication
+  - Updated: interrogate, reframe, mirror, plan, postmortem, future, debug
+- **docs**: Plugin docs moved to `docs/plugins/`
+- **docs**: Internal docs (audit, research, adrs) moved to `docs/dev/`
+- **docs**: Added `docs/index.md` navigation hub
+- **docs**: Fixed hope.md: "Three skills" → "Four skills", added Thinking Tools section
 - **CLAUDE.md**: Updated structure comment, added DRY anti-pattern for docs
+- hope plugin version 0.4.4 → 0.4.5
 
 ---
 
