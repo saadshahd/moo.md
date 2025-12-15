@@ -23,7 +23,6 @@ Run the moo.md evaluation suite.
 ## Options
 
 - `--model MODEL` - Model to test (haiku, sonnet, opus). Default: sonnet
-- `--parallel N` - Number of parallel tests. Default: 3
 - `--verbose` - Show detailed output
 
 ## Examples

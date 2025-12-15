@@ -82,15 +82,15 @@ while read -r CASE_FILE; do
 
     echo "  Expected skill: $EXPECTED_SKILL"
 
-    # Step 1: Run test prompt
+    # Step 1: Run test prompt (2 min timeout)
     echo "  Executing test prompt..."
     START_TIME=$(date +%s)
 
-    TEST_OUTPUT=$(claude -p "$PROMPT" \
+    TEST_OUTPUT=$(timeout 120s claude -p "$PROMPT" \
         --output-format json \
         --model "$MODEL" \
         2>&1) || {
-        echo "  ERROR: Claude CLI failed"
+        echo "  ERROR: Claude CLI failed or timed out"
         echo "{\"test\":\"$TEST_NAME\",\"status\":\"ERROR\",\"reason\":\"cli_failed\"}" >> "$RESULTS_FILE"
         continue
     }
@@ -143,11 +143,11 @@ Return ONLY valid JSON:
   \"rationale\": string
 }"
 
-    EVAL_OUTPUT=$(claude -p "$EVAL_PROMPT" \
+    EVAL_OUTPUT=$(timeout 60s claude -p "$EVAL_PROMPT" \
         --output-format json \
         --model haiku \
         2>&1) || {
-        echo "  ERROR: Evaluator failed"
+        echo "  ERROR: Evaluator failed or timed out"
         echo "{\"test\":\"$TEST_NAME\",\"status\":\"ERROR\",\"reason\":\"evaluator_failed\"}" >> "$RESULTS_FILE"
         continue
     }
@@ -157,14 +157,13 @@ Return ONLY valid JSON:
 
     EVAL_RESULT=$(echo "$EVAL_OUTPUT" | jq -r '.result // "NO_RESULT"')
 
-    # Extract verdict
-    VERDICT=$(echo "$EVAL_RESULT" | grep -o '"verdict"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//' | tr -d '"' || echo "UNKNOWN")
-    CONFIDENCE=$(echo "$EVAL_RESULT" | grep -o '"confidence"[[:space:]]*:[[:space:]]*[0-9.]*' | head -1 | sed 's/.*: *//' || echo "0")
-    TRIGGERED=$(echo "$EVAL_RESULT" | grep -o '"triggered"[[:space:]]*:[[:space:]]*[a-z]*' | head -1 | sed 's/.*: *//' || echo "unknown")
+    # Extract verdict using jq
+    VERDICT=$(echo "$EVAL_RESULT" | jq -r '.verdict // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+    CONFIDENCE=$(echo "$EVAL_RESULT" | jq -r '.confidence // 0' 2>/dev/null || echo "0")
+    TRIGGERED=$(echo "$EVAL_RESULT" | jq -r '.triggered // false' 2>/dev/null || echo "false")
 
     echo "  Result: $VERDICT (confidence: $CONFIDENCE, triggered: $TRIGGERED)"
 
-    # Record result
     echo "{\"test\":\"$TEST_NAME\",\"expected_skill\":\"$EXPECTED_SKILL\",\"triggered\":$TRIGGERED,\"confidence\":$CONFIDENCE,\"verdict\":\"$VERDICT\",\"duration\":$DURATION}" >> "$RESULTS_FILE"
 
     echo ""
