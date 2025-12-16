@@ -1,31 +1,37 @@
 # Skill Evaluations
 
-Automated testing for skill triggering and output quality using claude-code-action.
+Automated testing for skill triggering and output quality.
+
+## Quick Start
+
+**Run locally before every PR:**
+
+```bash
+./eval/run.sh --simple
+```
+
+Local testing is required - it properly loads plugins and validates auto-triggering.
 
 ## How It Works
 
 1. **Test cases** define prompts and expected behaviors
 2. **Claude evaluates Claude** - processes the prompt and self-evaluates results
-3. **JSON schema** enforces structured output via constrained decoding
-4. **CI runs on every PR** touching plugin code
+3. **Local testing** loads all plugins and validates skill auto-triggering
 
 ## Running Locally
 
 ```bash
-# Run all tests (simple mode - works with OAuth)
+# Run all tests (recommended before PR)
 ./eval/run.sh --simple
 
 # Run single test
 ./eval/run.sh --simple hope-gate-completion
 
-# With JSON schema (requires API key, may not work with OAuth)
-./eval/run.sh hope-gate-completion
-
 # Help
 ./eval/run.sh --help
 ```
 
-**Note:** Use `--simple` for local testing with Claude Max (OAuth). JSON schema mode requires API key.
+**Note:** Use `--simple` for Claude Max (OAuth).
 
 ## Test Cases
 
