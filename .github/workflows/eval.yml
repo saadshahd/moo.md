@@ -1,7 +1,8 @@
 name: Skill Evaluations
 
 on:
-  pull_request:
+  push:
+    branches: [main]
     paths:
       - 'hope/**'
       - 'product/**'
@@ -32,14 +33,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # NOTE: Plugin loading in CI is blocked by anthropics/claude-code-action bug
-      # (--plugin-dir only loads last directory). Use ./eval/run.sh --simple locally.
-      # Bug report: https://github.com/anthropics/claude-code-action/issues/XXX
       - name: Run Eval - ${{ matrix.test }}
         id: eval
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          plugin_marketplaces: |
+            https://github.com/saadshahd/moo.md.git
+          plugins: |
+            hope@moo.md
+            product@moo.md
+            wordsmith@moo.md
+            founder@moo.md
+            career@moo.md
           prompt: |
             You are evaluating skill auto-triggering for the moo.md plugin marketplace.
 
@@ -48,58 +54,19 @@ jobs:
             2. Extract the "prompt" and "expected_behaviors" fields
             3. Process the prompt as if a user sent it (let skills auto-trigger naturally)
             4. Self-evaluate your response against expected behaviors
-
-            ## Required Output Format
-            You MUST end your response with exactly one of these lines:
-            - `VERDICT: PASS` - if skill triggered AND all expected behaviors observed
-            - `VERDICT: PARTIAL` - if skill triggered but some behaviors missing
-            - `VERDICT: FAIL` - if skill did not trigger or wrong skill triggered
-
-            Before the verdict, explain your reasoning briefly.
-          show_full_output: true
+            5. Return JSON matching the schema with verdict: PASS (all behaviors), PARTIAL (some), FAIL (skill didn't trigger)
+          claude_args: '--output-format json --json-schema eval/schema.json'
 
       - name: Check Verdict
-        env:
-          EXECUTION_FILE: ${{ steps.eval.outputs.execution_file }}
-          SESSION_ID: ${{ steps.eval.outputs.session_id }}
-          TEST_NAME: ${{ matrix.test }}
         run: |
-          echo "=== Debug Info ==="
-          echo "Test: $TEST_NAME"
-          echo "Execution file: $EXECUTION_FILE"
-          echo "Session ID: $SESSION_ID"
-          echo ""
+          RESULT='${{ steps.eval.outputs.structured_output }}'
+          echo "Test: ${{ matrix.test }}"
+          echo "$RESULT" | jq .
 
-          # Check if execution file exists
-          if [ -z "$EXECUTION_FILE" ]; then
-            echo "::error::execution_file output is empty"
-            echo "This likely means claude-code-action did not run successfully."
+          VERDICT=$(echo "$RESULT" | jq -r '.verdict')
+          if [ "$VERDICT" = "FAIL" ]; then
+            echo "::error::Test ${{ matrix.test }} failed"
+            echo "Reasoning: $(echo "$RESULT" | jq -r '.reasoning')"
             exit 1
           fi
-
-          if [ ! -f "$EXECUTION_FILE" ]; then
-            echo "::error::Execution file does not exist: $EXECUTION_FILE"
-            echo "Available files in workspace:"
-            ls -la
-            exit 1
-          fi
-
-          echo "=== Execution Output ==="
-          RESULT=$(cat "$EXECUTION_FILE")
-          echo "$RESULT"
-          echo ""
-          echo "=== Verdict Check ==="
-
-          # Check for verdict in output
-          if echo "$RESULT" | grep -q "VERDICT: PASS"; then
-            echo "✓ $TEST_NAME: PASS"
-          elif echo "$RESULT" | grep -q "VERDICT: PARTIAL"; then
-            echo "⚠ $TEST_NAME: PARTIAL"
-          elif echo "$RESULT" | grep -q "VERDICT: FAIL"; then
-            echo "::error::Test $TEST_NAME failed"
-            exit 1
-          else
-            echo "::warning::No verdict found in output for $TEST_NAME"
-            echo "The output may not contain the expected VERDICT line."
-            exit 1
-          fi
+          echo "✓ ${{ matrix.test }}: $VERDICT"

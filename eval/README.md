@@ -4,24 +4,27 @@ Automated testing for skill triggering and output quality.
 
 ## Quick Start
 
-**Run locally before every PR:**
+**Run locally before merging:**
 
 ```bash
 ./eval/run.sh --simple
 ```
 
-Local testing is required - it properly loads plugins and validates auto-triggering.
-
 ## How It Works
+
+| Stage | What Happens |
+|-------|--------------|
+| **Local** | `./eval/run.sh --simple` loads plugins, validates auto-triggering |
+| **CI** | Runs on push to main, loads plugins via marketplace, returns structured JSON |
 
 1. **Test cases** define prompts and expected behaviors
 2. **Claude evaluates Claude** - processes the prompt and self-evaluates results
-3. **Local testing** loads all plugins and validates skill auto-triggering
+3. **JSON schema** enforces structured output via constrained decoding
 
 ## Running Locally
 
 ```bash
-# Run all tests (recommended before PR)
+# Run all tests (recommended before merge)
 ./eval/run.sh --simple
 
 # Run single test
