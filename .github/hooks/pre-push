@@ -1,0 +1,41 @@
+#!/bin/bash
+# Pre-push hook: Run evals only for changed plugins
+set -e
+
+PLUGINS="hope product wordsmith founder career"
+
+# Get changed files (compare against what's being pushed)
+get_changed_files() {
+  git diff --name-only "@{push}..HEAD" 2>/dev/null || \
+  git diff --name-only "origin/main..HEAD" 2>/dev/null || \
+  git diff --name-only "HEAD~1"
+}
+
+# Find which plugins changed
+CHANGED_PLUGINS=""
+for plugin in $PLUGINS; do
+  if get_changed_files | grep -q "^$plugin/"; then
+    CHANGED_PLUGINS="$CHANGED_PLUGINS $plugin"
+  fi
+done
+
+if [ -z "$CHANGED_PLUGINS" ]; then
+  echo "✓ No plugin changes, skipping eval"
+  exit 0
+fi
+
+echo "Running evals for:$CHANGED_PLUGINS"
+
+# Run matching test cases
+for plugin in $CHANGED_PLUGINS; do
+  for test in eval/cases/skill-triggers/${plugin}*.yaml; do
+    [ -f "$test" ] || continue
+    name=$(basename "$test" .yaml)
+    echo ""
+    echo "=== $name ==="
+    ./eval/run.sh --simple "$name"
+  done
+done
+
+echo ""
+echo "✓ All evals passed"

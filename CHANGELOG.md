@@ -10,11 +10,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- **eval**: Skill evaluation framework using claude-code-action
-  - CI via workflow_dispatch with plugins loaded via marketplace
+- **eval**: Skill evaluation framework with git pre-push hook
+  - Pre-push hook runs evals only for changed plugins
   - Local testing via `./eval/run.sh --simple`
-  - Structured JSON output via `--json-schema eval/schema.json`
   - 5 test cases for skill auto-triggering (hope:gate, hope:soul, hope:trace, product, wordsmith)
+
+### Removed
+- **ci**: Removed all GitHub Actions workflows (eval, claude-code-review, claude)
+  - Replaced with local git hooks (zero dependencies, faster feedback)
 
 ---
 

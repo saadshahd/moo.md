@@ -4,9 +4,11 @@ Automated testing for skill triggering and output quality.
 
 ## Quick Start
 
-**Run locally before merging:**
-
 ```bash
+# One-time setup: enable git hooks
+git config core.hooksPath .github/hooks
+
+# Run all tests manually
 ./eval/run.sh --simple
 ```
 
@@ -14,17 +16,17 @@ Automated testing for skill triggering and output quality.
 
 | Stage | What Happens |
 |-------|--------------|
-| **Local** | `./eval/run.sh --simple` loads plugins, validates auto-triggering |
-| **CI** | Manual trigger via workflow_dispatch, loads plugins via marketplace |
+| **Pre-push hook** | Automatically runs evals for changed plugins only |
+| **Manual** | `./eval/run.sh --simple` runs all tests |
 
 1. **Test cases** define prompts and expected behaviors
 2. **Claude evaluates Claude** - processes the prompt and self-evaluates results
-3. **JSON schema** enforces structured output via constrained decoding
+3. **Git hook** detects which plugins changed and runs only their tests
 
-## Running Locally
+## Running Manually
 
 ```bash
-# Run all tests (recommended before merge)
+# Run all tests
 ./eval/run.sh --simple
 
 # Run single test
@@ -61,7 +63,7 @@ expected_behaviors:
   - "Observable behavior 2"
 ```
 
-Then add to CI matrix in `.github/workflows/eval.yml`.
+Name the file with the plugin prefix (e.g., `hope-*`, `product-*`) for automatic hook detection.
 
 ## Interpreting Results
 
@@ -71,11 +73,12 @@ Then add to CI matrix in `.github/workflows/eval.yml`.
 | PARTIAL | Skill triggered but some behaviors missing |
 | FAIL | Wrong/no skill triggered |
 
+## Skipping Hooks
+
+```bash
+git push --no-verify
+```
+
 ## Schema
 
 See `eval/schema.json` for the structured output format.
-
-## CI Notes
-
-- **First-time workflow**: When adding the eval workflow via PR, it won't run on that PR due to GitHub security validation. It starts working on subsequent PRs after merge.
-- **Workflow changes**: Same applies when modifying `.github/workflows/eval.yml` - changes only take effect after merge.

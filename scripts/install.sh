@@ -30,11 +30,17 @@ install_copilot() {
   echo "Copilot: Installed (project-local)"
 }
 
+install_hooks() {
+  git config core.hooksPath .github/hooks
+  echo "Git hooks: Enabled (pre-push runs evals for changed plugins)"
+}
+
 case "${1:-help}" in
   claude)  install_claude ;;
   codex)   install_codex ;;
   cursor)  install_cursor ;;
   copilot) install_copilot ;;
+  hooks)   install_hooks ;;
   all)
     install_claude
     install_codex
@@ -42,6 +48,8 @@ case "${1:-help}" in
     install_copilot
     ;;
   *)
-    echo "Usage: install.sh [claude|codex|cursor|copilot|all]"
+    echo "Usage: install.sh [claude|codex|cursor|copilot|hooks|all]"
+    echo ""
+    echo "  hooks   Enable git pre-push hook for contributors"
     ;;
 esac
