@@ -65,3 +65,8 @@ Then add to CI matrix in `.github/workflows/eval.yml`.
 ## Schema
 
 See `eval/schema.json` for the structured output format.
+
+## CI Notes
+
+- **First-time workflow**: When adding the eval workflow via PR, it won't run on that PR due to GitHub security validation. It starts working on subsequent PRs after merge.
+- **Workflow changes**: Same applies when modifying `.github/workflows/eval.yml` - changes only take effect after merge.
