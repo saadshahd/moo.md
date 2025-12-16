@@ -9,7 +9,7 @@ Automated testing for skill triggering and output quality.
 git config core.hooksPath .github/hooks
 
 # Run all tests manually
-./eval/run.sh --simple
+./eval/run.sh
 ```
 
 ## How It Works
@@ -27,16 +27,14 @@ git config core.hooksPath .github/hooks
 
 ```bash
 # Run all tests
-./eval/run.sh --simple
+./eval/run.sh
 
 # Run single test
-./eval/run.sh --simple hope-gate-completion
+./eval/run.sh hope-gate-completion
 
 # Help
 ./eval/run.sh --help
 ```
-
-**Note:** Use `--simple` for Claude Max (OAuth).
 
 ## Test Cases
 

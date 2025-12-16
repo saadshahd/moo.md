@@ -31,9 +31,7 @@ for plugin in $CHANGED_PLUGINS; do
   for test in eval/cases/skill-triggers/${plugin}*.yaml; do
     [ -f "$test" ] || continue
     name=$(basename "$test" .yaml)
-    echo ""
-    echo "=== $name ==="
-    ./eval/run.sh --simple "$name"
+    ./eval/run.sh "$name"
   done
 done
 
