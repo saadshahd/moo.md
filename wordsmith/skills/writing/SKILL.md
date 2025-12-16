@@ -1,7 +1,7 @@
 ---
 name: writing
-description: MANDATORY when user provides draft text, asks to edit prose, review writing, or improve copy. Auto-activates on "edit this", "improve this", "review my writing", "fix my prose", draft text in quotes, any content refinement, voice extraction, narrative structure, or microcopy tasks.
-version: 0.0.3
+description: Precision editing for prose and copy. Use when user says "edit this", "improve this", "review my writing", or provides draft text to refine. Triggers on editing, voice extraction, narrative structure, microcopy.
+version: 0.0.4
 ---
 
 # Writing Skill
