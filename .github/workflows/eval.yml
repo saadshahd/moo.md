@@ -58,13 +58,7 @@ jobs:
             - `VERDICT: FAIL` - if skill did not trigger or wrong skill triggered
 
             Before the verdict, explain your reasoning briefly.
-          plugin_marketplaces: ./
-          plugins: |
-            hope@moo.md
-            product@moo.md
-            wordsmith@moo.md
-            founder@moo.md
-            career@moo.md
+          claude_args: '--plugin-dir ./hope ./product ./wordsmith ./founder ./career'
           show_full_output: true
 
       - name: Check Verdict
