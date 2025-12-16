@@ -1,0 +1,26 @@
+# Test: hope:gate triggers on completion claims
+---
+name: hope-gate-triggers-on-completion
+description: Gate skill should auto-activate when claiming work is done/fixed/complete
+category: skill-trigger
+plugin: hope
+skill: gate
+
+prompt: "I've finished implementing the login feature. The code is done and ready to merge."
+
+model_tier: sonnet
+timeout_ms: 120000
+
+evaluators:
+  - trigger-evaluator:
+      expected_skill: "hope:gate"
+      pass_threshold: 0.70
+
+expected_behaviors:
+  - "Gate skill activates on 'done/finished/complete' claims"
+  - "Verification checklist should appear"
+  - "Evidence hierarchy mentioned"
+  - "Asks for proof before accepting completion"
+
+tags: [core, regression, phase1]
+created: 2024-12-15
