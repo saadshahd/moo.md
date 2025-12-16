@@ -54,17 +54,39 @@ jobs:
 
             Before the verdict, explain your reasoning briefly.
           claude_args: '--plugin-dir ./hope --plugin-dir ./product --plugin-dir ./wordsmith --plugin-dir ./founder --plugin-dir ./career'
-          timeout_minutes: 5
+          show_full_output: true
 
       - name: Check Verdict
         env:
-          RESULT: ${{ steps.eval.outputs.result }}
+          EXECUTION_FILE: ${{ steps.eval.outputs.execution_file }}
+          SESSION_ID: ${{ steps.eval.outputs.session_id }}
           TEST_NAME: ${{ matrix.test }}
         run: |
+          echo "=== Debug Info ==="
           echo "Test: $TEST_NAME"
-          echo "---"
+          echo "Execution file: $EXECUTION_FILE"
+          echo "Session ID: $SESSION_ID"
+          echo ""
+
+          # Check if execution file exists
+          if [ -z "$EXECUTION_FILE" ]; then
+            echo "::error::execution_file output is empty"
+            echo "This likely means claude-code-action did not run successfully."
+            exit 1
+          fi
+
+          if [ ! -f "$EXECUTION_FILE" ]; then
+            echo "::error::Execution file does not exist: $EXECUTION_FILE"
+            echo "Available files in workspace:"
+            ls -la
+            exit 1
+          fi
+
+          echo "=== Execution Output ==="
+          RESULT=$(cat "$EXECUTION_FILE")
           echo "$RESULT"
-          echo "---"
+          echo ""
+          echo "=== Verdict Check ==="
 
           # Check for verdict in output
           if echo "$RESULT" | grep -q "VERDICT: PASS"; then
@@ -76,5 +98,6 @@ jobs:
             exit 1
           else
             echo "::warning::No verdict found in output for $TEST_NAME"
+            echo "The output may not contain the expected VERDICT line."
             exit 1
           fi
