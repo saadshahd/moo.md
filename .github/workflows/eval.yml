@@ -1,0 +1,80 @@
+name: Skill Evaluations
+
+on:
+  pull_request:
+    paths:
+      - 'hope/**'
+      - 'product/**'
+      - 'wordsmith/**'
+      - 'founder/**'
+      - 'career/**'
+      - 'eval/**'
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - hope-gate-completion
+          - hope-soul-planning
+          - hope-trace-debugging
+          - product-prd-request
+          - wordsmith-edit-request
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Eval - ${{ matrix.test }}
+        id: eval
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are evaluating skill auto-triggering for the moo.md plugin marketplace.
+
+            ## Instructions
+            1. Read eval/cases/skill-triggers/${{ matrix.test }}.yaml
+            2. Extract the "prompt" and "expected_behaviors" fields
+            3. Process the prompt as if a user sent it (let skills auto-trigger naturally)
+            4. Self-evaluate your response against expected behaviors
+
+            ## Required Output Format
+            You MUST end your response with exactly one of these lines:
+            - `VERDICT: PASS` - if skill triggered AND all expected behaviors observed
+            - `VERDICT: PARTIAL` - if skill triggered but some behaviors missing
+            - `VERDICT: FAIL` - if skill did not trigger or wrong skill triggered
+
+            Before the verdict, explain your reasoning briefly.
+          claude_args: '--plugin-dir ./hope --plugin-dir ./product --plugin-dir ./wordsmith --plugin-dir ./founder --plugin-dir ./career'
+          timeout_minutes: 5
+
+      - name: Check Verdict
+        env:
+          RESULT: ${{ steps.eval.outputs.result }}
+          TEST_NAME: ${{ matrix.test }}
+        run: |
+          echo "Test: $TEST_NAME"
+          echo "---"
+          echo "$RESULT"
+          echo "---"
+
+          # Check for verdict in output
+          if echo "$RESULT" | grep -q "VERDICT: PASS"; then
+            echo "✓ $TEST_NAME: PASS"
+          elif echo "$RESULT" | grep -q "VERDICT: PARTIAL"; then
+            echo "⚠ $TEST_NAME: PARTIAL"
+          elif echo "$RESULT" | grep -q "VERDICT: FAIL"; then
+            echo "::error::Test $TEST_NAME failed"
+            exit 1
+          else
+            echo "::warning::No verdict found in output for $TEST_NAME"
+            exit 1
+          fi

@@ -38,6 +38,13 @@ Plugin discovery uses `.claude-plugin/marketplace.json` at repo root (lists all 
 /plugin install hope@moo.md
 ```
 
+## Evaluations
+
+Run `./eval/run.sh --simple` to test skill auto-triggering locally. CI runs evals on PRs touching plugin code.
+
+**When adding skills:** Add test case to `eval/cases/skill-triggers/`.
+**When adding plugins:** Add `--plugin-dir ./new-plugin` to `.github/workflows/eval.yml`.
+
 ## Conventions
 
 ### Frontmatter (Required)
