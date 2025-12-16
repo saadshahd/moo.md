@@ -15,7 +15,8 @@ moo.md/
 ├── career/                  # Interview prep, skill gaps
 ├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs: plugins/, dev/ (internal)
-└── scripts/install.sh       # Multi-tool installer
+├── eval/                    # Skill evaluation tests
+└── .github/hooks/           # Git hooks (pre-push runs evals)
 ```
 
 Each plugin follows:
