@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["test_name", "skill_triggered", "skill_name", "behaviors", "verdict"],
+  "properties": {
+    "test_name": {
+      "type": "string",
+      "description": "Name of the test case"
+    },
+    "skill_triggered": {
+      "type": "boolean",
+      "description": "Whether the expected skill was invoked"
+    },
+    "skill_name": {
+      "type": "string",
+      "description": "Name of skill that triggered (or 'none')"
+    },
+    "behaviors": {
+      "type": "array",
+      "description": "Expected behaviors and whether they were observed",
+      "items": {
+        "type": "object",
+        "required": ["name", "passed", "evidence"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Expected behavior from test case"
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Whether this behavior was observed"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "Quote or description proving observation"
+          }
+        }
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["PASS", "PARTIAL", "FAIL"],
+      "description": "PASS=all behaviors, PARTIAL=some, FAIL=skill didn't trigger"
+    },
+    "reasoning": {
+      "type": "string",
+      "description": "Brief explanation of the verdict"
+    }
+  }
+}

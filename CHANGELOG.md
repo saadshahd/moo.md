@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **eval**: Skill evaluation framework using claude-code-action
+  - CI workflow runs on PRs touching plugin code
+  - Local testing via `./eval/run.sh --simple`
+  - 5 test cases for skill auto-triggering (hope:gate, hope:soul, hope:trace, product, wordsmith)
+
 ---
 
 ## [0.4.5] - 2025-12-15
