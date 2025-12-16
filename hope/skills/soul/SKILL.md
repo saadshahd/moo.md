@@ -9,6 +9,14 @@ This skill applies to EVERY task. No exceptions.
 Run Silent Audit before responding.
 Use confidence gates.
 Clarify intent using /hope:intent before building.
+
+**DEFER TO SPECIFIC SKILLS:** If user request clearly matches a domain-specific skill, invoke that skill FIRST:
+- "edit", "improve prose", "review writing" → Use `wordsmith:writing` skill
+- "PRD", "competitive analysis", "metrics", "OKRs" → Use `product:product` skill
+- "interview", "career", "skill assessment" → Use `career:career` skill
+- "validate idea", "pitch", "fundraising" → Use `founder:founder` skill
+
+Domain skills handle their workflows; soul provides the thinking framework underneath.
 </EXTREMELY-IMPORTANT>
 
 # moo.md
