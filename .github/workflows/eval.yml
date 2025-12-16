@@ -46,6 +46,11 @@ jobs:
             3. Process the prompt as if a user sent it (let skills auto-trigger naturally)
             4. Self-evaluate your response against expected behaviors
 
+            ## CRITICAL
+            - The skill MUST actually auto-trigger via the Skill tool
+            - Do NOT simulate or roleplay the skill behavior
+            - If the skill does not trigger, report VERDICT: FAIL
+
             ## Required Output Format
             You MUST end your response with exactly one of these lines:
             - `VERDICT: PASS` - if skill triggered AND all expected behaviors observed
@@ -53,7 +58,13 @@ jobs:
             - `VERDICT: FAIL` - if skill did not trigger or wrong skill triggered
 
             Before the verdict, explain your reasoning briefly.
-          claude_args: '--plugin-dir ./hope --plugin-dir ./product --plugin-dir ./wordsmith --plugin-dir ./founder --plugin-dir ./career'
+          plugin_marketplaces: ./
+          plugins: |
+            hope@moo.md
+            product@moo.md
+            wordsmith@moo.md
+            founder@moo.md
+            career@moo.md
           show_full_output: true
 
       - name: Check Verdict
