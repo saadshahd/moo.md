@@ -15,7 +15,7 @@ Automated testing for skill triggering and output quality.
 | Stage | What Happens |
 |-------|--------------|
 | **Local** | `./eval/run.sh --simple` loads plugins, validates auto-triggering |
-| **CI** | Runs on push to main, loads plugins via marketplace, returns structured JSON |
+| **CI** | Manual trigger via workflow_dispatch, loads plugins via marketplace |
 
 1. **Test cases** define prompts and expected behaviors
 2. **Claude evaluates Claude** - processes the prompt and self-evaluates results

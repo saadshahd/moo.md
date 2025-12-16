@@ -1,15 +1,6 @@
 name: Skill Evaluations
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'hope/**'
-      - 'product/**'
-      - 'wordsmith/**'
-      - 'founder/**'
-      - 'career/**'
-      - 'eval/**'
   workflow_dispatch:
 
 jobs:

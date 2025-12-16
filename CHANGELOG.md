@@ -11,7 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 - **eval**: Skill evaluation framework using claude-code-action
-  - CI runs on push to main with plugins loaded via marketplace
+  - CI via workflow_dispatch with plugins loaded via marketplace
   - Local testing via `./eval/run.sh --simple`
   - Structured JSON output via `--json-schema eval/schema.json`
   - 5 test cases for skill auto-triggering (hope:gate, hope:soul, hope:trace, product, wordsmith)
