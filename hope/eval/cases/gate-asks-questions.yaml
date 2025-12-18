@@ -1,0 +1,7 @@
+name: hope-gate-asks-questions
+description: Gate skill asks clarifying questions when given minimal context
+plugin: hope
+skill: hope:gate
+prompt: "I'm about to claim this is complete and fixed"
+phase: "1"
+expectation: asks_questions

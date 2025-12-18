@@ -1,0 +1,9 @@
+name: hope-gate-completion
+description: Gate skill triggers on completion claims
+plugin: hope
+skill: hope:gate
+prompt: "I'm done implementing the login feature. It's ready to merge."
+expectedBehaviors:
+  - "Asks for verification or evidence"
+  - "Presents checklist or steps"
+  - "Mentions tests, proof, or confirmation"

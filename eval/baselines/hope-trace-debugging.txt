@@ -1,0 +1,25 @@
+I need more information to diagnose this properly. Let me ask:
+
+1. **Which endpoint(s)** are returning 500 errors?
+2. **What pattern** does "keeps coming back" follow - after deploys, after some time, under load, or randomly?
+3. **What fix** was previously applied that didn't stick?
+4. **Do you have error logs** or stack traces from the failures?
+
+The fact that the bug "keeps coming back after we fix it" is a strong signal that previous fixes addressed **symptoms rather than root cause**. Common patterns:
+
+| Recurrence Pattern | Likely Root Cause |
+|---|---|
+| After deploy | Fix not committed, wrong branch, or deploy pipeline issue |
+| After time | Resource leak, cache expiration, token/cert expiry |
+| Under load | Race condition, connection pool exhaustion, timeout |
+| Intermittent | Flaky dependency, network issues, state corruption |
+
+---
+
+**Confidence: 30-40%** - Cannot diagnose without:
+- Error messages/stack traces
+- Which endpoint(s) affected
+- Recurrence pattern
+- What was tried before
+
+What information can you share?

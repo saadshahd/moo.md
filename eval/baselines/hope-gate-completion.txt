@@ -1,0 +1,43 @@
+No learnings found to recall. Proceeding with verification.
+
+---
+
+## Gate Check: "Login feature ready to merge"
+
+**Halt.** I don't see evidence of a login feature in the current changes.
+
+### What I Found
+
+| Check | Status | Evidence |
+|-------|--------|----------|
+| Login feature code exists? | ❌ Unknown | No login-related files in git status |
+| Tests pass? | ❌ Not verified | No test run evidence |
+| Code reviewed? | ❌ Unknown | No PR or review visible |
+| On feature branch? | ❌ No | Currently on `main` |
+
+### Current Git State
+
+- **Branch:** `main` (not a feature branch)
+- **Changes:** Eval infrastructure refactoring (deleted yaml files, modified run.sh → run.ts)
+- **No login code visible** in the diff
+
+### Questions Before Proceeding
+
+1. **Where is the login feature?** Is it on a different branch?
+2. **What does "login feature" include?** (auth flow, UI, API endpoints, session management?)
+3. **Have tests been run?** What's the test command and result?
+4. **Is there a PR?** Or are you merging directly to main?
+
+---
+
+```
+┌─────────────────────────────────────────────────┐
+│ VERDICT: ❌ BLOCKED                             │
+│ Confidence: 90-95%                              │
+│ Reason: No login feature code found in current  │
+│         working state. May be on wrong branch.  │
+│ Action: Clarify location of login feature code  │
+└─────────────────────────────────────────────────┘
+```
+
+Can you point me to where the login feature lives?
