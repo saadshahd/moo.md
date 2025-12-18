@@ -1,135 +1,164 @@
-import type { LayerDResult, TestCase, EvalConfig } from "../types";
+import type {
+  LayerDResult,
+  TestCase,
+  EvalConfig,
+  Result,
+  QualityEval,
+} from "../types";
+import { CLIOutputSchema, QualityEvalSchema, Ok, Err } from "../types";
 import { DEFAULT_CONFIG, QUALITY_RUBRIC } from "../config";
+import {
+  spawnWithTimeout,
+  buildClaudeArgs,
+  buildSimpleClaudeArgs,
+} from "../process";
+import { safeJsonParse, extractAndValidate } from "../parse";
 
-// Run Layer D: Quality evaluation (advisory - does not gate CI)
-export async function runLayerD(
-  testCase: TestCase,
-  config: EvalConfig = DEFAULT_CONFIG,
-): Promise<LayerDResult | null> {
-  // Skip if no phase/expectations defined
+type Phase =
+  | { type: "skip"; reason: string }
+  | { type: "phase1"; expectation: "asks_questions" | "acts_directly" }
+  | { type: "phase2"; behaviors: string[] };
+
+const detectPhase = (testCase: TestCase): Phase => {
   const hasPhase1 = testCase.phase === "1" && testCase.expectation;
   const hasPhase2 =
     testCase.expectedBehaviors && testCase.expectedBehaviors.length > 0;
 
   if (!hasPhase1 && !hasPhase2) {
-    return null;
+    return { type: "skip", reason: "No phase/expectations defined" };
   }
 
-  if (config.skipLayerD) {
-    return null;
+  if (hasPhase1) {
+    return { type: "phase1", expectation: testCase.expectation! };
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+  return { type: "phase2", behaviors: testCase.expectedBehaviors! };
+};
 
-  try {
-    // First, run the actual prompt to get Claude's response
-    const promptProc = Bun.spawn(
-      [
-        "claude",
-        "-p",
-        testCase.prompt,
-        "--plugin-dir",
-        `./${testCase.plugin}`,
-        "--output-format",
-        "json",
-      ],
-      {
-        signal: controller.signal,
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
+const evaluatePhase1 = (
+  response: string,
+  expectation: "asks_questions" | "acts_directly",
+): { passed: boolean; hasQuestions: boolean } => {
+  const hasQuestions = /\?/.test(response);
+  const expected = expectation === "asks_questions";
+  return { passed: hasQuestions === expected, hasQuestions };
+};
 
-    await promptProc.exited;
-    const promptOutput = await new Response(promptProc.stdout).text();
-    const promptJson = JSON.parse(promptOutput);
-    const claudeResponse = promptJson.result;
-
-    // Phase 1: Simple check - does response contain questions?
-    // No extra LLM call needed
-    if (testCase.phase === "1") {
-      const hasQuestions = /\?/.test(claudeResponse);
-      const expected = testCase.expectation === "asks_questions";
-      const passed = hasQuestions === expected;
-
-      clearTimeout(timeoutId);
-      return {
-        layer: "D",
-        advisory: true,
-        scores: {
-          intent: passed ? 2 : 0,
-          confidence: 0,
-          process: 0,
-          value: 0,
-        },
-        verdict: passed ? "PASS" : "FAIL",
-        reasoning: hasQuestions
-          ? "Response contains questions"
-          : "Response does not contain questions",
-      };
-    }
-
-    // Phase 2: Full quality rubric evaluation (requires LLM call)
-    const evalPrompt = `
+const buildEvalPrompt = (response: string, behaviors: string[]): string => `
 ${QUALITY_RUBRIC}
 
 ## Claude's Output to Evaluate:
-${claudeResponse}
+${response}
 
 ## Expected Behaviors (from test case):
-${testCase.expectedBehaviors?.map((b, i) => `${i + 1}. ${b}`).join("\n")}
+${behaviors.map((b, i) => `${i + 1}. ${b}`).join("\n")}
 
 Evaluate now:
 `;
 
-    const evalProc = Bun.spawn(
-      ["claude", "-p", evalPrompt, "--output-format", "json"],
-      {
-        signal: controller.signal,
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
+const failureResult = (reason: string): LayerDResult => ({
+  layer: "D",
+  advisory: true,
+  scores: { intent: 0, confidence: 0, process: 0, value: 0 },
+  verdict: "FAIL",
+  reasoning: reason,
+});
 
-    await evalProc.exited;
-    clearTimeout(timeoutId);
+const phase1Result = (
+  passed: boolean,
+  hasQuestions: boolean,
+): LayerDResult => ({
+  layer: "D",
+  advisory: true,
+  scores: {
+    intent: passed ? 2 : 0,
+    confidence: 0,
+    process: 0,
+    value: 0,
+  },
+  verdict: passed ? "PASS" : "FAIL",
+  reasoning: hasQuestions
+    ? "Response contains questions"
+    : "Response does not contain questions",
+});
 
-    const evalOutput = await new Response(evalProc.stdout).text();
-    const evalJson = JSON.parse(evalOutput);
+const successResult = (eval_: QualityEval): LayerDResult => ({
+  layer: "D",
+  advisory: true,
+  scores: eval_.scores,
+  verdict: eval_.verdict,
+  reasoning: eval_.reasoning,
+});
 
-    // Parse the evaluation result
-    const evalResult = evalJson.result;
-    const jsonMatch = evalResult.match(/\{[\s\S]*\}/);
+async function getClaudeResponse(
+  testCase: TestCase,
+  config: EvalConfig,
+): Promise<Result<string, string>> {
+  const args = buildClaudeArgs(testCase.prompt, testCase.plugin, config.model);
+  const result = await spawnWithTimeout(args, config.timeout);
 
-    if (!jsonMatch) {
-      return {
-        layer: "D",
-        advisory: true,
-        scores: { intent: 0, confidence: 0, process: 0, value: 0 },
-        verdict: "FAIL",
-        reasoning: "Could not parse evaluation result",
-      };
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-
-    return {
-      layer: "D",
-      advisory: true,
-      scores: parsed.scores,
-      verdict: parsed.verdict,
-      reasoning: parsed.reasoning,
-    };
-  } catch (e) {
-    clearTimeout(timeoutId);
-
-    return {
-      layer: "D",
-      advisory: true,
-      scores: { intent: 0, confidence: 0, process: 0, value: 0 },
-      verdict: "FAIL",
-      reasoning: e instanceof Error ? e.message : String(e),
-    };
+  if (!result.ok) return Err(result.error);
+  if (result.value.exitCode !== 0) {
+    return Err(`Exit code: ${result.value.exitCode}`);
   }
+
+  const cliResult = safeJsonParse(result.value.stdout, CLIOutputSchema);
+  if (!cliResult.ok) return cliResult;
+
+  return Ok(cliResult.value.result);
+}
+
+async function runQualityEval(
+  response: string,
+  behaviors: string[],
+  config: EvalConfig,
+): Promise<Result<QualityEval, string>> {
+  const prompt = buildEvalPrompt(response, behaviors);
+  const args = buildSimpleClaudeArgs(prompt);
+  const result = await spawnWithTimeout(args, config.timeout);
+
+  if (!result.ok) return Err(result.error);
+  if (result.value.exitCode !== 0) {
+    return Err(`Exit code: ${result.value.exitCode}`);
+  }
+
+  const cliResult = safeJsonParse(result.value.stdout, CLIOutputSchema);
+  if (!cliResult.ok) return cliResult;
+
+  return extractAndValidate(cliResult.value.result, QualityEvalSchema);
+}
+
+export async function runLayerD(
+  testCase: TestCase,
+  config: EvalConfig = DEFAULT_CONFIG,
+): Promise<LayerDResult | null> {
+  const phase = detectPhase(testCase);
+
+  if (phase.type === "skip" || config.skipLayerD) {
+    return null;
+  }
+
+  const response = await getClaudeResponse(testCase, config);
+  if (!response.ok) {
+    return failureResult(response.error);
+  }
+
+  if (phase.type === "phase1") {
+    const { passed, hasQuestions } = evaluatePhase1(
+      response.value,
+      phase.expectation,
+    );
+    return phase1Result(passed, hasQuestions);
+  }
+
+  const evalResult = await runQualityEval(
+    response.value,
+    phase.behaviors,
+    config,
+  );
+  if (!evalResult.ok) {
+    return failureResult(evalResult.error);
+  }
+
+  return successResult(evalResult.value);
 }

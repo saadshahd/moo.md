@@ -1,16 +1,50 @@
-// Test case schema (validated with Zod in cases/schema.ts)
+import { z } from "zod";
+
+export type Result<T, E = Error> =
+  | { ok: true; value: T }
+  | { ok: false; error: E };
+
+export const Ok = <T>(value: T): Result<T, never> => ({ ok: true, value });
+export const Err = <E>(error: E): Result<never, E> => ({ ok: false, error });
+
+export const CLIOutputSchema = z.object({
+  result: z.string(),
+});
+
+export const SkillDetectionSchema = z.object({
+  skill: z.string().nullable(),
+});
+
+export const QualityEvalSchema = z.object({
+  scores: z.object({
+    intent: z.number().min(0).max(2),
+    confidence: z.number().min(0).max(2),
+    process: z.number().min(0).max(2),
+    value: z.number().min(0).max(2),
+  }),
+  verdict: z.enum(["PASS", "PARTIAL", "FAIL"]),
+  reasoning: z.string(),
+});
+export type QualityEval = z.infer<typeof QualityEvalSchema>;
+
+export interface ProcessResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  duration: number;
+}
+
 export interface TestCase {
   name: string;
   description?: string;
   plugin: string;
   skill: string;
   prompt: string;
-  phase?: "1" | "2"; // Phase 1 = test questioning, Phase 2 = test output
-  expectation?: "asks_questions" | "acts_directly"; // For phase 1
-  expectedBehaviors?: string[]; // For phase 2
+  phase?: "1" | "2";
+  expectation?: "asks_questions" | "acts_directly";
+  expectedBehaviors?: string[];
 }
 
-// Layer result types
 export interface LayerAResult {
   layer: "A";
   passed: boolean;
@@ -28,6 +62,8 @@ export interface LayerCResult {
   passed: boolean;
   expected: string;
   detected: string | null;
+  duration?: number;
+  error?: string;
 }
 
 export interface LayerDResult {
@@ -45,7 +81,6 @@ export interface LayerDResult {
 
 export type LayerResult = LayerAResult | LayerCResult | LayerDResult;
 
-// Full test result
 export interface TestResult {
   name: string;
   plugin: string;
@@ -53,16 +88,11 @@ export interface TestResult {
   layerResults: LayerResult[];
   failedAt?: "A" | "C" | "D";
   advisory?: LayerDResult;
-  elapsed?: number; // Execution time in seconds
+  elapsed?: number;
 }
 
-// Config
 export interface EvalConfig {
   timeout: number;
   skipLayerD: boolean;
+  model?: string;
 }
-
-export const DEFAULT_CONFIG: EvalConfig = {
-  timeout: 60000,
-  skipLayerD: false,
-};

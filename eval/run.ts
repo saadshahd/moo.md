@@ -3,14 +3,13 @@ import { parse } from "yaml";
 import pLimit from "p-limit";
 import { runTest } from "./lib/runner";
 import { validateTestCase } from "./cases/schema";
+import { CONCURRENCY } from "./lib/config";
 import type {
   TestCase,
   TestResult,
   LayerAResult,
   LayerCResult,
 } from "./lib/types";
-
-const MAX_CONCURRENT = 10;
 
 async function discoverTests(): Promise<TestCase[]> {
   const cases: TestCase[] = [];
@@ -19,8 +18,6 @@ async function discoverTests(): Promise<TestCase[]> {
   for await (const file of glob.scan({ cwd: "." })) {
     const content = await Bun.file(file).text();
     const rawCase = parse(content);
-
-    // Validate with Zod
     const testCase = validateTestCase(rawCase);
     cases.push(testCase);
   }
@@ -37,43 +34,60 @@ async function ensureResultsDir(): Promise<void> {
   }
 }
 
-function printLayerResult(result: TestResult): void {
+const formatTestResult = (result: TestResult): string[] => {
+  const lines: string[] = [];
   const elapsed = result.elapsed ? ` (${result.elapsed.toFixed(2)}s)` : "";
-  console.log(`\n=== ${result.name}${elapsed} ===`);
+
+  lines.push(`\n=== ${result.name}${elapsed} ===`);
 
   if (result.passed) {
-    console.log("✓ PASS");
+    lines.push("✓ PASS");
   } else {
-    console.log(`✗ FAIL at Layer ${result.failedAt}`);
+    lines.push(`✗ FAIL at Layer ${result.failedAt}`);
 
-    // Show layer-specific details
     for (const layer of result.layerResults) {
       if (layer.layer === "A" && !layer.passed) {
         const layerA = layer as LayerAResult;
-        console.log("\n  Layer A Errors:");
+        lines.push("\n  Layer A Errors:");
         for (const err of layerA.errors) {
-          console.log(`    ${err.file}: ${err.message}`);
+          lines.push(`    ${err.file}: ${err.message}`);
         }
       }
-      if (layer.layer === "C" && !layer.passed) {
+      if (layer.layer === "C") {
         const layerC = layer as LayerCResult;
-        console.log(
-          `\n  Layer C: Expected '${layerC.expected}', detected '${layerC.detected}'`,
-        );
+        if (layerC.duration) {
+          lines.push(`  [C] ${layerC.duration.toFixed(2)}s`);
+        }
+        if (!layerC.passed) {
+          lines.push(
+            `  Layer C: Expected '${layerC.expected}', detected '${layerC.detected}'`,
+          );
+          if (layerC.error) {
+            lines.push(`    Error: ${layerC.error}`);
+          }
+        }
       }
     }
   }
 
-  // Show advisory Layer D results
   if (result.advisory) {
-    console.log("\n  Advisory (Layer D):");
-    console.log(`    Intent: ${result.advisory.scores.intent}/2`);
-    console.log(`    Confidence: ${result.advisory.scores.confidence}/2`);
-    console.log(`    Process: ${result.advisory.scores.process}/2`);
-    console.log(`    Value: ${result.advisory.scores.value}/2`);
-    console.log(`    Verdict: ${result.advisory.verdict}`);
+    lines.push("\n  Advisory (Layer D):");
+    lines.push(`    Intent: ${result.advisory.scores.intent}/2`);
+    lines.push(`    Confidence: ${result.advisory.scores.confidence}/2`);
+    lines.push(`    Process: ${result.advisory.scores.process}/2`);
+    lines.push(`    Value: ${result.advisory.scores.value}/2`);
+    lines.push(`    Verdict: ${result.advisory.verdict}`);
   }
-}
+
+  return lines;
+};
+
+const printLines = (lines: string[]): void => {
+  lines.forEach((line) => console.log(line));
+};
+
+const printTestResult = (result: TestResult): void =>
+  printLines(formatTestResult(result));
 
 async function main(): Promise<void> {
   const args = Bun.argv.slice(2);
@@ -103,7 +117,6 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Count unique plugins for info
   const pluginCount = new Set(cases.map((c) => c.plugin)).size;
   console.log(
     `Found ${cases.length} test case(s) across ${pluginCount} plugin(s)\n`,
@@ -111,10 +124,9 @@ async function main(): Promise<void> {
 
   const totalStart = performance.now();
 
-  // Run ALL tests in parallel with concurrency limit
-  const limit = pLimit(MAX_CONCURRENT);
+  const limit = pLimit(CONCURRENCY.MAX_PARALLEL);
   console.log(
-    `Running ${cases.length} tests (max ${MAX_CONCURRENT} concurrent)...`,
+    `Running ${cases.length} tests (max ${CONCURRENCY.MAX_PARALLEL} concurrent)...`,
   );
 
   const results = (await Promise.all(
@@ -122,7 +134,7 @@ async function main(): Promise<void> {
       limit(async () => {
         const start = performance.now();
         const result = await runTest(test, {
-          timeout: 60000,
+          timeout: CONCURRENCY.DEFAULT_TIMEOUT_MS,
           skipLayerD,
           model,
         });
@@ -134,24 +146,21 @@ async function main(): Promise<void> {
 
   const totalElapsed = (performance.now() - totalStart) / 1000;
 
-  // Print results
   console.log("\n" + "━".repeat(50));
   let failed = 0;
 
   for (const result of results) {
-    printLayerResult(result);
+    printTestResult(result);
     if (!result.passed) {
       failed++;
     }
   }
 
-  // Save results
   await ensureResultsDir();
   const resultFile = `eval/results/run-${Date.now()}.json`;
   await Bun.write(resultFile, JSON.stringify(results, null, 2));
   console.log(`\nResults saved to: ${resultFile}`);
 
-  // Summary with timing
   console.log("\n" + "━".repeat(50));
   console.log(
     `Total: ${results.length} | Passed: ${results.length - failed} | Failed: ${failed} | Time: ${totalElapsed.toFixed(2)}s`,

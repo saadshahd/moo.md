@@ -1,19 +1,15 @@
-import { z } from "zod";
+import type { EvalConfig } from "./types";
 
-export const ConfigSchema = z.object({
-  timeout: z.number().min(1000).default(60000),
-  skipLayerD: z.boolean().default(false),
-  model: z.string().optional(),
-});
-
-export type EvalConfig = z.infer<typeof ConfigSchema>;
+export const CONCURRENCY = {
+  MAX_PARALLEL: 10,
+  DEFAULT_TIMEOUT_MS: 60_000,
+} as const;
 
 export const DEFAULT_CONFIG: EvalConfig = {
-  timeout: 60000,
+  timeout: CONCURRENCY.DEFAULT_TIMEOUT_MS,
   skipLayerD: false,
 };
 
-// Prompt templates
 export const DETECT_SKILL_PROMPT = (userMessage: string) => `
 For this user message: '${userMessage}'
 Which skill would you use? Return ONLY: {"skill": "name"} or {"skill": null}

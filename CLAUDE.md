@@ -41,10 +41,9 @@ Plugin discovery uses `.claude-plugin/marketplace.json` at repo root (lists all 
 
 ## Evaluations
 
-Run `./eval/run.sh --simple` to test skill auto-triggering locally. CI runs evals on PRs touching plugin code.
+Run `bun run eval/run.ts [plugin]` to test skill triggering. Pre-push hook runs evals automatically for changed plugins.
 
-**When adding skills:** Add test case to `eval/cases/skill-triggers/`.
-**When adding plugins:** Add `--plugin-dir ./new-plugin` to `.github/workflows/eval.yml`.
+**When adding skills:** Add test case YAML to `<plugin>/eval/cases/`.
 
 ## Conventions
 
