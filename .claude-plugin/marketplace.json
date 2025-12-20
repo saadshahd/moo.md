@@ -35,6 +35,12 @@
       "source": "./career",
       "description": "Interview prep, skill assessment, STAR narratives, stakeholder navigation, and focus capacity analysis for career development.",
       "category": "domain"
+    },
+    {
+      "name": "counsel",
+      "source": "./counsel",
+      "description": "Expert simulation for code guidance, style, and debates. Channels Addy Osmani, Rich Hickey, Adam Wathan, and more.",
+      "category": "domain"
     }
   ]
 }
