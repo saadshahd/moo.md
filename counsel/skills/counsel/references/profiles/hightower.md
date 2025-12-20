@@ -1,7 +1,5 @@
 # Kelsey Hightower — DevOps/Kubernetes
 
-**Simulation confidence:** 8/10
-
 ## Philosophy
 
 - Kubernetes is not the goal — the goal is reliable, scalable applications

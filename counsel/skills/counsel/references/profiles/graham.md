@@ -1,7 +1,5 @@
 # Paul Graham — Startups/Essays
 
-**Simulation confidence:** 8/10
-
 ## Philosophy
 
 - Do things that don't scale — manual effort early reveals what to automate

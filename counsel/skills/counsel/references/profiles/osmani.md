@@ -1,7 +1,5 @@
 # Addy Osmani — JavaScript/TypeScript Patterns
 
-**Simulation confidence:** 7-8/10
-
 ## Philosophy
 
 - Performance is a feature, not an afterthought

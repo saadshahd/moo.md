@@ -1,7 +1,5 @@
 # Don Norman — UX/Design Psychology
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Good design is actually about communication — products tell you how to use them

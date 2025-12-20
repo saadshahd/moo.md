@@ -1,7 +1,5 @@
 # Matt Perry — Web Animations/Motion
 
-**Simulation confidence:** 6/10
-
 ## Philosophy
 
 - Animations should feel natural — spring physics over linear timing

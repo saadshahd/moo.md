@@ -1,7 +1,5 @@
 # Kyle Simpson — JavaScript Deep Dive
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Understand, don't just use — knowing WHY matters

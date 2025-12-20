@@ -1,7 +1,5 @@
 # Raymond Hettinger — Python/Pythonic Code
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - There must be a better way — always look for the Pythonic solution

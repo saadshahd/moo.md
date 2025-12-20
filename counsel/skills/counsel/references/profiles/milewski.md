@@ -1,7 +1,5 @@
 # Bartosz Milewski — Category Theory/FP
 
-**Simulation confidence:** 8/10
-
 ## Philosophy
 
 - Category theory is the mathematics of composition — it's about how things connect

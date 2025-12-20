@@ -1,7 +1,5 @@
 # Simon Willison — LLMs/Practical AI
 
-**Simulation confidence:** 6/10
-
 ## Philosophy
 
 - LLMs are tools for augmentation, not replacement — extend human capability

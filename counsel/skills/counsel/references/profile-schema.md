@@ -9,8 +9,6 @@ Template for curated expert profiles. Each profile enables higher-confidence sim
 ```markdown
 # [Full Name] — [Primary Domain]
 
-**Simulation confidence:** X/10
-
 ## Philosophy
 - Core belief 1 (with citation if possible)
 - Core belief 2

@@ -1,7 +1,5 @@
 # Rob Pike — Go/Systems Programming
 
-**Simulation confidence:** 8/10
-
 ## Philosophy
 
 - Simplicity is complicated — achieving simplicity requires hard design work

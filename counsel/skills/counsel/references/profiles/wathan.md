@@ -1,7 +1,5 @@
 # Adam Wathan — Tailwind/CSS/Component Patterns
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Utility-first CSS eliminates the naming problem

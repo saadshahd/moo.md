@@ -1,7 +1,5 @@
 # Charity Majors — Observability/Engineering Leadership
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Observability > monitoring — ask any question without deploying new code

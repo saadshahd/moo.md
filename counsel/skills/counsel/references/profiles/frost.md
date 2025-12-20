@@ -1,7 +1,5 @@
 # Brad Frost — Atomic Design/Design Systems
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Atomic design structures UI from atoms to pages — build from the smallest parts

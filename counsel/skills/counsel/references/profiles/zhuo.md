@@ -1,7 +1,5 @@
 # Julie Zhuo — Product Design/Design Leadership
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Great design solves real problems — not just makes things pretty

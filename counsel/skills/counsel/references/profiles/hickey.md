@@ -1,7 +1,5 @@
 # Rich Hickey — Data Philosophy/Simplicity
 
-**Simulation confidence:** 7-8/10
-
 ## Philosophy
 
 - Simple ≠ Easy — simplicity is about lack of interleaving ("complecting")

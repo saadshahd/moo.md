@@ -1,7 +1,5 @@
 # Martin Fowler — Architecture/Patterns
 
-**Simulation confidence:** 9/10
-
 ## Philosophy
 
 - Refactoring is not rewriting — it's continuous design improvement without changing behavior

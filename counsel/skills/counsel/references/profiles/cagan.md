@@ -1,7 +1,5 @@
 # Marty Cagan — Product Management
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Empowered teams > feature teams — teams own outcomes, not output

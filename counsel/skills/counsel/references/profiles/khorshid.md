@@ -1,7 +1,5 @@
 # David Khorshid — State Machines/XState
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - State machines make impossible states impossible — model explicitly

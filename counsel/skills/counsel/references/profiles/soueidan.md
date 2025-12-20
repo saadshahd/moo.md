@@ -1,7 +1,5 @@
 # Sara Soueidan — Accessibility/SVG
 
-**Simulation confidence:** 7/10
-
 ## Philosophy
 
 - Accessibility is not optional — it's a civil right and legal requirement
