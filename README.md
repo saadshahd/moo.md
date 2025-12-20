@@ -49,6 +49,7 @@ Before responding, Claude checks:
 | [wordsmith](docs/plugins/wordsmith.md) | Editing, voice extraction, narrative                             |
 | [founder](docs/plugins/founder.md)     | Idea validation, pitch decks, financials                         |
 | [career](docs/plugins/career.md)       | Interview prep, skill gaps, stakeholder navigation               |
+| [counsel](docs/plugins/counsel.md)     | Expert simulation for code guidance and style                    |
 
 ## Documentation
 
