@@ -20,12 +20,35 @@ When code files are in context:
 
 | Signal | Inferred Domain | Default Expert |
 |--------|-----------------|----------------|
-| `.tsx`, `.jsx`, React imports | React/Frontend | Osmani |
+| `.tsx`, `.jsx`, React imports | React/Frontend | Osmani or Abramov |
+| React hooks, useEffect, useState | React internals | Abramov |
 | `tailwind.config`, `@apply` | CSS/Tailwind | Wathan |
 | `.clj`, `.edn`, Clojure | Functional/Data | Hickey |
 | Complex JS, scope issues | JS Deep Dive | Simpson |
-| `.go`, Go imports | Go/Backend | (no curated profile yet) |
-| `.rs`, Rust imports | Rust/Systems | (no curated profile yet) |
+| `.go`, Go imports | Go/Backend | Pike |
+| `.py`, Python imports | Python | Hettinger |
+| `framer-motion`, motion imports | Animations | Perry |
+| XState, state machine imports | State Machines | Khorshid |
+| Kubernetes, k8s, Docker | DevOps/Infrastructure | Hightower |
+| ARIA, a11y, accessibility | Accessibility | Soueidan |
+| Category theory, functors, monads | FP Theory | Milewski |
+| LLM, GPT, Claude, AI imports | LLMs/AI | Willison |
+
+---
+
+## Domain Signal Inference
+
+When discussing topics without code context:
+
+| Topic Keywords | Inferred Expert |
+|----------------|-----------------|
+| Refactoring, patterns, architecture, microservices | Fowler |
+| Startup, founder, Y Combinator, growth | Graham |
+| Product discovery, roadmap, empowered teams | Cagan |
+| Design systems, atomic design, pattern library | Frost |
+| Product design, design team, design leadership | Zhuo |
+| UX, usability, affordances, mental models | Norman |
+| Observability, on-call, incident, production debugging | Majors |
 
 ---
 

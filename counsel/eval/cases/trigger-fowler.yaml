@@ -1,0 +1,10 @@
+name: counsel-fowler-trigger
+description: Counsel triggers Fowler for architecture/refactoring questions
+plugin: counsel
+skill: counsel
+prompt: "I'm considering rewriting this legacy module. It's messy but works. What would Martin Fowler say?"
+expectedBehaviors:
+  - "Fowler mentioned or profile loaded"
+  - "Confidence score displayed (9/10)"
+  - "Refactoring over rewriting advocated"
+  - "Strangler fig pattern or incremental approach suggested"

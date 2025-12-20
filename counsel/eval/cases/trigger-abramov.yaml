@@ -1,0 +1,10 @@
+name: counsel-abramov-trigger
+description: Counsel triggers Abramov for React internals questions
+plugin: counsel
+skill: counsel
+prompt: "My useEffect is running more than I expect. How should I think about this?"
+expectedBehaviors:
+  - "Abramov mentioned or profile loaded"
+  - "Confidence score displayed (8/10)"
+  - "Effects as synchronization explained"
+  - "Mental model approach used"

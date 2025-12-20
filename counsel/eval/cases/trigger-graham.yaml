@@ -1,0 +1,10 @@
+name: counsel-graham-trigger
+description: Counsel triggers Graham for startup questions
+plugin: counsel
+skill: counsel
+prompt: "We're a startup with 10 users. Should we focus on scaling our infrastructure or talking to more users?"
+expectedBehaviors:
+  - "Graham mentioned or profile loaded"
+  - "Confidence score displayed (8/10)"
+  - "Do things that don't scale referenced"
+  - "User focus prioritized over infrastructure"
