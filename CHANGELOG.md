@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] - 2025-12-20
+
 ### Added
 - **counsel**: New plugin for expert simulation
   - Channels documented expert perspectives (Addy Osmani, Rich Hickey, Adam Wathan, Kyle Simpson)
@@ -17,6 +21,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `/counsel:calibrate` - Correct simulation errors with persistent calibrations
   - Hybrid expert source: curated profiles (high confidence) + dynamic inference (lower confidence)
   - Project-local calibration logs (`.claude/logs/counsel-*.jsonl`)
+- **docs**: Power user reference for counsel plugin (`docs/plugins/counsel.md`)
 - **eval**: Skill evaluation framework with git pre-push hook
   - Pre-push hook runs evals only for changed plugins
   - Local testing via `./eval/run.sh --simple`

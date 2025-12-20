@@ -86,12 +86,7 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 
 ## Curated Profiles
 
-| Expert | Domain | Confidence | Profile |
-|--------|--------|------------|---------|
-| Addy Osmani | JS/TS patterns | 7-8/10 | [osmani.md](references/profiles/osmani.md) |
-| Adam Wathan | Tailwind/CSS | 7/10 | [wathan.md](references/profiles/wathan.md) |
-| Rich Hickey | Data/simplicity | 7-8/10 | [hickey.md](references/profiles/hickey.md) |
-| Kyle Simpson | JS deep dive | 7/10 | [simpson.md](references/profiles/simpson.md) |
+20 experts available. See [inference.md](references/inference.md) for the complete catalog with domain routing.
 
 ---
 

@@ -4,6 +4,33 @@ Logic for detecting which expert to simulate when not explicitly specified.
 
 ---
 
+## Curated Profiles
+
+| Expert | Domain | Profile |
+|--------|--------|---------|
+| Dan Abramov | React/State | [abramov.md](profiles/abramov.md) |
+| Marty Cagan | Product Discovery | [cagan.md](profiles/cagan.md) |
+| Martin Fowler | Architecture/Patterns | [fowler.md](profiles/fowler.md) |
+| Brad Frost | Design Systems | [frost.md](profiles/frost.md) |
+| Paul Graham | Startups/Essays | [graham.md](profiles/graham.md) |
+| Raymond Hettinger | Python | [hettinger.md](profiles/hettinger.md) |
+| Rich Hickey | Data/Simplicity | [hickey.md](profiles/hickey.md) |
+| Kelsey Hightower | DevOps/Kubernetes | [hightower.md](profiles/hightower.md) |
+| David Khorshid | State Machines/XState | [khorshid.md](profiles/khorshid.md) |
+| Charity Majors | Observability | [majors.md](profiles/majors.md) |
+| Bartosz Milewski | Category Theory/FP | [milewski.md](profiles/milewski.md) |
+| Don Norman | UX/Design Psychology | [norman.md](profiles/norman.md) |
+| Addy Osmani | JS/TS Patterns | [osmani.md](profiles/osmani.md) |
+| Matt Perry | Animation/Framer Motion | [perry.md](profiles/perry.md) |
+| Rob Pike | Go/Systems | [pike.md](profiles/pike.md) |
+| Kyle Simpson | JS Deep Dive | [simpson.md](profiles/simpson.md) |
+| Sara Soueidan | Accessibility/ARIA | [soueidan.md](profiles/soueidan.md) |
+| Adam Wathan | Tailwind/CSS | [wathan.md](profiles/wathan.md) |
+| Simon Willison | LLMs/AI Tools | [willison.md](profiles/willison.md) |
+| Julie Zhuo | Design Leadership | [zhuo.md](profiles/zhuo.md) |
+
+---
+
 ## Detection Order
 
 1. **Explicit mention** — Expert name in query → direct match
