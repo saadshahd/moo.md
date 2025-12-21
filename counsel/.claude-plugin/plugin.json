@@ -3,5 +3,8 @@
   "version": "0.1.0",
   "description": "Expert simulation for code guidance, style, and debates. Channels domain experts like Addy Osmani, Rich Hickey, Adam Wathan.",
   "keywords": ["expert", "simulation", "guidance", "style", "panel"],
-  "author": "moo.md"
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
 }
