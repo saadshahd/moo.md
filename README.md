@@ -18,7 +18,7 @@
 Every response ends with a verdict box:
 
 <p>
-  <img src="docs/assets/verdict.svg" alt="moo.md - verdict box" width="420">
+  <img src="docs/assets/verdict.png" alt="moo.md - verdict box" width="420">
 </p>
 
 ## What Runs Quietly
