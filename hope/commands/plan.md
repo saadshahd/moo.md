@@ -27,6 +27,12 @@ Before anything else, identify what's unclear.
 
 **Wait for answers before proceeding.**
 
+## Phase 1b: Prime Skills
+
+Once intent is ≥85% confident, invoke `/hope:prime` to select and load relevant skills for the task.
+
+This ensures the right workflows and tools are in context before planning begins.
+
 ## Phase 2: Classify & Invert
 
 Once intent is clear:

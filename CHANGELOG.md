@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
+- feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
+
 ---
 
 ## [0.5.0] - 2025-12-20
