@@ -15,11 +15,49 @@
 
 ## See It In Action
 
-Every response ends with a verdict box:
-
-<p>
-  <img src="docs/assets/verdict.png" alt="moo verdict box" width="420">
-</p>
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <p><sub>Planning phase</sub></p>
+      <img src="docs/assets/plan.png" alt="moo planning phase" style="max-width: 100%;">
+    </td>
+    <td align="center" valign="top" width="50%">
+      <p><sub>Verdict box</sub></p>
+      <img src="docs/assets/verdict.png" alt="moo verdict box" style="max-width: 100%;;">
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <p><sub>Root Cause Analysis</sub></p>
+      <img src="docs/assets/ishikawa.png" alt="Ishikawa diagram" style="max-width: 100%;;"><br>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <p><sub>Five Whys</sub></p>
+      <img src="docs/assets/five-whys.png" alt="Five Whys"  style="max-width: 100%;;"><br>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <p><sub>Decision Matrix</sub></p>
+      <img src="docs/assets/decision.png" alt="Decision matrix" style="max-width: 100%;;"><br>
+    </td>
+    <td align="center" valign="top">
+      <p><sub>Impact-Effort</sub></p>
+      <img src="docs/assets/impact.png" alt="Impact-effort matrix" style="max-width: 100%;;"><br>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <p><sub>Minto Pyramid</sub></p>
+      <img src="docs/assets/minto.png" alt="Minto pyramid" style="max-width: 100%;;"><br>
+    </td>
+    <td align="center" valign="top">
+      <p><sub>Pre-Mortem</sub></p>
+      <img src="docs/assets/premortem.png" alt="Pre-mortem" style="max-width: 100%;;"><br>
+    </td>
+    
+  </tr>
+</table>
 
 ## What Runs Quietly
 
@@ -30,8 +68,6 @@ Before responding, Claude checks:
 - Failure modes listed?
 - Confidence stated?
 - Reversibility assessed?
-
-30+ thinking tools run automatically: Inversion, Pre-Mortem, Ishikawa, Five Whys, Decision Matrix.
 
 ## Install
 
