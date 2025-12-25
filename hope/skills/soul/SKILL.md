@@ -1,6 +1,6 @@
 ---
 name: hope
-description: moo.md hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
+description: moo hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
 version: 0.4.5
 ---
 
@@ -19,7 +19,9 @@ Clarify intent using /hope:intent before building.
 Domain skills handle their workflows; soul provides the thinking framework underneath.
 </EXTREMELY-IMPORTANT>
 
-# moo.md
+# moo
+
+mind on output. Stay present with AI.
 
 Cognitive operating system for structured thinking.
 

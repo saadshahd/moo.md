@@ -1,5 +1,5 @@
 #!/bin/bash
-# moo.md SessionEnd hook: Trigger learnings extraction
+# moo SessionEnd hook: Trigger learnings extraction
 
 # Skip if this is a hook-spawned session (prevents infinite loop)
 [ "$HOPE_EXTRACTING" = "1" ] && echo '{"decision":"approve","reason":"Skipped - extraction session"}' && exit 0

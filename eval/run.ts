@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     (a) => !a.startsWith("--") && args.indexOf(a) !== modelIndex + 1,
   );
 
-  console.log("moo.md Plugin Evaluation (v3 - optimized)");
+  console.log("moo Plugin Evaluation (v3 - optimized)");
   if (model) {
     console.log(`Using model: ${model}`);
   }

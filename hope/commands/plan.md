@@ -1,10 +1,10 @@
 ---
-description: Start a task with full moo.md workflow. Surfaces unknowns, clarifies intent, searches libraries, assesses confidence, presents plan. Will NOT proceed until intent is clear.
+description: Start a task with full moo workflow. Surfaces unknowns, clarifies intent, searches libraries, assesses confidence, presents plan. Will NOT proceed until intent is clear.
 ---
 
 # /plan
 
-Start a task the moo.md way. **Will not proceed until ≥85% confident in intent.**
+Start a task the moo way. **Will not proceed until ≥85% confident in intent.**
 
 ## Phase 1: Surface Unknowns
 

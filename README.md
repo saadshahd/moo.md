@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="docs/assets/poster.png" alt="moo.md - Structured thinking for Claude Code" width="600">
+  <img src="docs/assets/poster.png" alt="mind on output — stay present with AI" width="600">
   <br/>
-  Plugins that make claude state confidence, list failures, and present structured reasoning before acting.
+  Plugins that make Claude state confidence, list failures, and present structured reasoning before acting.
 </p>
 
 <br/>
 
-| Before moo.md                | After moo.md                           |
+| Before                       | After                                  |
 | ---------------------------- | -------------------------------------- |
 | "This should work"           | "85% confident because [evidence]"     |
 | Builds first, searches later | Searches libraries before writing code |
@@ -18,7 +18,7 @@
 Every response ends with a verdict box:
 
 <p>
-  <img src="docs/assets/verdict.png" alt="moo.md - verdict box" width="420">
+  <img src="docs/assets/verdict.png" alt="moo verdict box" width="420">
 </p>
 
 ## What Runs Quietly

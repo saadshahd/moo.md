@@ -18,7 +18,9 @@ Decision-making is a learnable skill, not innate talent. Mental models are the c
 
 ---
 
-## What moo.md Does
+## What moo Does
+
+mind on output. Stay present with AI reasoning.
 
 Externalizes mental models so they apply automatically—surfacing what matters when pressure makes you forget.
 

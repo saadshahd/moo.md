@@ -2,7 +2,7 @@
 
 ## What This Is
 
-moo.md — thoughtful plugins for Claude Code.
+moo — mind on output. Stay present with AI.
 
 ## Structure
 

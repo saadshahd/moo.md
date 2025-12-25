@@ -1,10 +1,10 @@
 ---
-description: Generate command/skill/agent files for moo.md ecosystem. Applies /prompt techniques automatically.
+description: Generate command/skill/agent files for moo ecosystem. Applies /prompt techniques automatically.
 ---
 
 # /generate
 
-Create production-ready `.md` files for the moo.md marketplace.
+Create production-ready `.md` files for the moo marketplace.
 
 **Internally applies:** `/prompt` techniques to all generated content.
 

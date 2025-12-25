@@ -4,7 +4,7 @@ description: Update plugin documentation with quality workflow. Voice extraction
 
 # Documentation Workflow
 
-Update or create documentation for moo.md plugins.
+Update or create documentation for moo plugins.
 
 ## Principles
 

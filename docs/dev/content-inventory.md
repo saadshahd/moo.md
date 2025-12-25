@@ -1,21 +1,21 @@
 # Content Inventory - Gap Analysis
 
 **Date**: 2025-12-13 (Updated)
-**Source**: `~/Downloads/prompts/` vs existing moo.md
+**Source**: `~/Downloads/prompts/` vs existing moo
 **PRD Reference**: `~/.claude/plans/dreamy-squishing-pebble.md`
 
 ## Executive Summary
 
-**The shallow audit was wrong.** Most Downloads prompts duplicate what moo.md already has.
+**The shallow audit was wrong.** Most Downloads prompts duplicate what moo already has.
 
 | Category                      | Count | Reality                                       |
 | ----------------------------- | ----- | --------------------------------------------- |
-| Already covered by moo.md     | ~500  | Product, founder, career, wordsmith skills    |
+| Already covered by moo     | ~500  | Product, founder, career, wordsmith skills    |
 | True gaps (new functionality) | ~50   | Agent design, sales, consulting, visual tools |
 | Partial overlap (variants)    | ~100  | Spreadsheet series, deck templates            |
 | Discards                      | ~36   | Vertical-specific, platform-specific          |
 
-## What moo.md ALREADY Has
+## What moo ALREADY Has
 
 ### 8 Skills, 33 References, 44 Commands
 
@@ -37,7 +37,7 @@ Already listed: Cynefin, OODA, Ishikawa, Eisenhower, Iceberg, Decision Matrix, I
 
 ### ALREADY COVERED (~500 prompts)
 
-These Downloads prompts duplicate existing moo.md functionality:
+These Downloads prompts duplicate existing moo functionality:
 
 | Downloads Prompt              | Covered By                                                    |
 | ----------------------------- | ------------------------------------------------------------- |
@@ -76,7 +76,7 @@ These Downloads prompts duplicate existing moo.md functionality:
 
 ### TRUE GAPS (~50 prompts worth building)
 
-These are NOT in moo.md and represent genuine opportunities:
+These are NOT in moo and represent genuine opportunities:
 
 #### 1. Agent Design (17 prompts → NEW PLUGIN?)
 
@@ -171,7 +171,7 @@ Enhanced output:
 
 **Recommendation**: Add ASCII enhancement sections to 4-5 existing references
 
-#### 5. Meta-Prompts (not in moo.md)
+#### 5. Meta-Prompts (not in moo)
 
 | Prompt | Value | Notes |
 |--------|-------|-------|
@@ -181,7 +181,7 @@ Enhanced output:
 
 **Recommendation**: Add to hope as reference
 
-#### 6. Cognitive Tools (not in moo.md)
+#### 6. Cognitive Tools (not in moo)
 
 | Prompt | Value | Notes |
 |--------|-------|-------|
@@ -203,9 +203,9 @@ Enhanced output:
 
 ### PARTIAL OVERLAP (~100 prompts - variants of existing)
 
-These exist in moo.md but Downloads has additional variants:
+These exist in moo but Downloads has additional variants:
 
-| Downloads | moo.md Equivalent | Gap |
+| Downloads | moo Equivalent | Gap |
 |-----------|-------------------|-----|
 | Spreadsheet s1-s5 series | founder/financials.md | Step-by-step vs overview |
 | Crisis Management Deck | founder/board.md | Different template |
@@ -283,7 +283,7 @@ Add 2-3 references to founder:
 
 | Previous Audit | Reality |
 |----------------|---------|
-| "220 unique prompts to add" | ~50 true gaps (most already in moo.md) |
+| "220 unique prompts to add" | ~50 true gaps (most already in moo) |
 | "All 10 PRD tools missing" | Names in tools.md, need ASCII in skill outputs |
 | "Create new references for tools" | Modify 4 existing files instead |
 | "Thinking tools highest priority" | Agent design is the REAL gap |

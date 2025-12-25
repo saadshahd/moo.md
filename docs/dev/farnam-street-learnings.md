@@ -1,4 +1,4 @@
-# Research: Farnam Street → moo.md Plugin Learnings
+# Research: Farnam Street → moo Plugin Learnings
 
 **Date:** 2025-12-13
 **Source:** 13 Farnam Street blog articles
@@ -7,9 +7,9 @@
 
 ## Executive Summary
 
-Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Found strong alignment with existing tools and identified 4 high-value gaps for potential new tools.
+Analyzed 13 FS blog articles for applicability to moo marketplace plugins. Found strong alignment with existing tools and identified 4 high-value gaps for potential new tools.
 
-**Key Insight:** moo.md already embodies many FS principles (first principles, circle of competence, bayesian thinking). The biggest gaps are in **argumentation quality** and **deliberate practice frameworks**.
+**Key Insight:** moo already embodies many FS principles (first principles, circle of competence, bayesian thinking). The biggest gaps are in **argumentation quality** and **deliberate practice frameworks**.
 
 ---
 
@@ -23,7 +23,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - Active minds > open minds - engagement over passive listening
 - Examine inner states - motivations, triggers, reasoning
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `first-principles.md` - Direct match
 - `hope:soul` Silent Audit - Partially captures "examine assumptions"
 - Gap: No explicit "active mind" vs "open mind" distinction
@@ -38,7 +38,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - Avoid ideological slippery-slope fallacy
 - Truth lies somewhere in between extremes
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `bayesian-thinking.md` - Updates beliefs with evidence
 - Gap: No explicit "grey thinking" framework forcing nuance
 - Gap: No false dichotomy detection tool
@@ -57,7 +57,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - Comfort with "I don't know"
 - Popularizers ≠ experts (communication skill ≠ deep expertise)
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `circle-of-competence.md` - Direct match (know your limits)
 - Confidence gates (<70%, 70-85%, ≥85%) - Captures "admit uncertainty"
 - Gap: No tool for evaluating others' expertise
@@ -72,7 +72,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - "Slow response from seldom having accomplished the acts" = failure
 - Build optionality through practiced failure responses
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `pre-mortem.md` - Anticipates failure BEFORE starting
 - Gap: No tool for practicing failure DURING development
 - Gap: No "muscle memory" framework for crisis response
@@ -92,7 +92,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - Blind auditions increased female orchestra representation 5% → 30%
 - Work samples beat interviews
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `career/skills/career/references/simulate.md` - Interview practice
 - Gap: No "structured > unstructured" explicit framework
 - Gap: No bias-removal assessment design tool
@@ -109,7 +109,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - **Steel Man:** Re-express opponent's position so clearly they say "I wish I'd thought of putting it that way"
 - **Ideological Turing Test:** Argue opponent's position so well observers can't tell your real view
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `munger-biases.md` - Covers some cognitive traps
 - `ladder-inference.md` - Checks assumptions
 - **MAJOR GAP:** No argumentation quality tool
@@ -135,7 +135,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - Backsliding doesn't negate progress - just resume
 - Consistency > perfection
 
-**moo.md Alignment:**
+**moo Alignment:**
 - Learnings system (`~/.claude/learnings/`) - Captures discoveries over time
 - Gap: No explicit "compound gains" framework
 - Gap: No "tiny improvements" vs "big leaps" distinction
@@ -151,7 +151,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - £21 coffee = longest argument
 - "The simpler a topic, the more people have opinions"
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `SCOPE` framework - Right-size analysis before starting
 - `eisenhower.md` - Urgent vs important
 - Strong alignment - This principle IS the SCOPE framework
@@ -166,7 +166,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - Crisis = opportunity for value reflection
 - Intrinsically rewarding activities ground you during uncertainty
 
-**moo.md Alignment:**
+**moo Alignment:**
 - Gap: No values clarification tool
 - Gap: No "stated vs demonstrated values" framework
 - Partial: `opportunity-cost.md` forces value tradeoffs
@@ -185,7 +185,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 6. Hold competing thoughts simultaneously
 7. Intellectual humility
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `ladder-inference.md` - Checks assumptions
 - `bayesian-thinking.md` - Update beliefs with evidence
 - `munger-biases.md` - Overconfidence bias
@@ -203,7 +203,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - "First we make our habits, then our habits make us"
 - Keystone habits trigger cascades
 
-**moo.md Alignment:**
+**moo Alignment:**
 - Workflows A/B/C - Systematic approaches
 - Gap: No explicit "habits > goals" framework
 - Gap: No keystone habit identification tool
@@ -231,7 +231,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - 10,000 hours only works with QUALITY practice
 - "20 years experience might be 1 year repeated 20 times"
 
-**moo.md Alignment:**
+**moo Alignment:**
 - `career/skills/career/references/drill.md` - Practice exercises
 - Gap: No "edge of competence" framework
 - Gap: No chunking/pattern recognition tool
@@ -258,7 +258,7 @@ Analyzed 13 FS blog articles for applicability to moo.md marketplace plugins. Fo
 - Permission to quit mediocre books
 - Speed is irrelevant; comprehension matters
 
-**moo.md Alignment:**
+**moo Alignment:**
 - Gap: No input quality filter
 - Gap: No "reading level selection" framework
 - Partial: SCOPE framework could extend to input selection

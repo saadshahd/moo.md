@@ -1,5 +1,5 @@
 #!/bin/bash
-# moo.md UserPromptSubmit hook: Backup reminder for soul skill
+# moo UserPromptSubmit hook: Backup reminder for soul skill
 # Only fires on first few messages to ensure soul is applied
 
 INPUT=$(cat)

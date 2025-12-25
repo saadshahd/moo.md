@@ -1,5 +1,5 @@
 #!/bin/bash
-# moo.md SessionStart hook: Inject soul skill content + today's date
+# moo SessionStart hook: Inject soul skill content + today's date
 
 PLUGIN_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 

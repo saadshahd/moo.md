@@ -1,5 +1,5 @@
 ---
-description: Debug using moo.md Workflow B. Five Whys to root cause, instrumentation, then fix. No workarounds.
+description: Debug using moo Workflow B. Five Whys to root cause, instrumentation, then fix. No workarounds.
 ---
 
 # /debug

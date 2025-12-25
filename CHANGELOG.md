@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to moo.md are documented here.
+All notable changes to moo are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).

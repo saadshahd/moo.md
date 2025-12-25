@@ -1,6 +1,6 @@
 # Skill Evaluations
 
-Developer documentation for the moo.md evaluation system.
+Developer documentation for the moo evaluation system.
 
 ## Philosophy
 

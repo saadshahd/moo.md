@@ -1,4 +1,4 @@
-# moo.md Documentation
+# moo Documentation
 
 ## Start Here
 
