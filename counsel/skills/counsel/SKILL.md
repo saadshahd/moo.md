@@ -117,6 +117,23 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 
 ---
 
+## Output Anonymization
+
+**Never use expert names in output.** Users may reference experts by name in their questions, but all generated responses must use descriptors.
+
+**Process:**
+1. User mentions expert (by name or description)
+2. Identify: "Why is this expert relevant to this question?"
+3. Generate descriptor from that relevance (e.g., "an immutability advocate")
+4. Use descriptor in all output — headers, panel labels, citations
+
+**Allowed in input:** "What would Rich Hickey say about my Redux state?"
+**Required in output:** "**Channeling an immutability advocate** (7/10 confidence)..."
+
+See [confidence.md](references/confidence.md#descriptor-generation) for descriptor examples.
+
+---
+
 ## Calibration Protocol
 
 If user says "[Expert] wouldn't say that": acknowledge, ask for correction, log to `.claude/logs/counsel-calibrations.jsonl`, apply in future. See `/counsel:calibrate` for details.

@@ -27,21 +27,23 @@ Load history from `.claude/logs/counsel-reviews.jsonl` if exists. Select 2-3 exp
 
 ### Step 2: Generate Review
 
+For each panelist, generate a descriptor based on their relevance to this question (see [confidence.md](../skills/counsel/references/confidence.md#descriptor-generation)). Never use expert names in output.
+
 ```
 ## Panel Review: [Topic]
 
-**Panelists:** [Name] (X/10), [Name] (Y/10), [Name] (Z/10)
+**Panelists:** [descriptor A] (X/10), [descriptor B] (Y/10), [descriptor C] (Z/10)
 
 ### Consensus
 - [Point all panelists would likely agree on]
 - [Another agreed point]
 
 ### Dissent
-**[Panelist A]:** [Position] — (cf. [prior work])
-  ↳ **[Panelist B] responds:** [Counter-position]
+**[descriptor A]:** [Position] — (cf. documented work)
+  ↳ **[descriptor B] responds:** [Counter-position]
 
-**[Panelist C]:** [Different angle] — (cf. [prior work])
-  ↳ **[Panelist A] responds:** [Rebuttal]
+**[descriptor C]:** [Different angle] — (cf. documented work)
+  ↳ **[descriptor A] responds:** [Rebuttal]
 
 ### Related Past Reviews
 [If any: "This connects to your [date] review of [topic]..."]

@@ -39,6 +39,8 @@ Logic for detecting which expert to simulate when not explicitly specified.
 4. **Domain signals** — Topic-based routing
 5. **No match** — Ask user to specify or proceed with generic guidance
 
+**After detection:** Generate a descriptor based on why the expert is relevant to this question. Never use expert names in output. See [confidence.md](confidence.md#descriptor-generation).
+
 ---
 
 ## File Context Inference
@@ -87,16 +89,18 @@ When no expert can be inferred, offer options: specify expert name, share code f
 
 ## Dynamic Simulation Warning
 
-For experts without curated profiles:
+For experts without curated profiles, generate a descriptor from general knowledge about their philosophy:
 
 ```
-**Channeling [Expert Name]** (4/10 confidence — no curated profile)
+**Channeling [descriptor]** (4/10 confidence — no curated profile)
 
-⚠️ LOW CONFIDENCE: This simulation is based on general knowledge about [Expert].
+⚠️ LOW CONFIDENCE: This simulation is based on general knowledge.
 For higher-quality simulation, consider adding a curated profile.
 
 [Response attempt]
 ```
+
+Example: User asks about DHH → descriptor: "a convention-over-configuration advocate"
 
 ---
 
@@ -113,4 +117,4 @@ Example:
 > "Should I use Zustand or Redux for state management?"
 
 Detected: Hickey (data philosophy), Osmani (React patterns), Simpson (JS mechanics)
-→ Route to panel with all three.
+→ Route to panel with descriptors: a simplicity advocate, a performance-focused engineer, a JS fundamentals advocate
