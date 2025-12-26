@@ -1,7 +1,7 @@
 name: counsel-pike-trigger
 description: Counsel triggers Pike for Go questions
 plugin: counsel
-skill: counsel
+skill: counsel:counsel
 prompt: "Should I add generics to this Go function or keep it simple with concrete types?"
 expectedBehaviors:
   - "Pike mentioned or profile loaded"
