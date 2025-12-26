@@ -42,7 +42,7 @@ From `hope/skills/soul/references/tools/`:
 | ------------------------------------------------------------------------------------- | ----------------------------------------- |
 | [Second-Order Thinking](../../hope/skills/soul/references/tools/second-order.md)      | Predict consequences of product decisions |
 | [Pre-Mortem](../../hope/skills/soul/references/tools/pre-mortem.md)                   | Anticipate launch failures                |
-| [Pareto](../../hope/skills/soul/references/tools/pareto.md)                           | Focus on 20% of features that deliver 80% value |
+| [Impact-Effort](../../hope/skills/soul/references/tools/impact-effort.md)             | Focus on high-impact, low-effort features |
 
 From this skill's `references/`:
 
