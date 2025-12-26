@@ -1,0 +1,9 @@
+name: design-compare-request
+description: Design skill triggers on competitive UX analysis requests
+plugin: design
+skill: design:design
+prompt: "I want to analyze how Spotify, Apple Music, and YouTube Music handle their onboarding flow"
+expectedBehaviors:
+  - "Design skill activates on UX comparison requests"
+  - "Uses Trigger-Action-Reward framework"
+  - "Identifies patterns and differentiators"

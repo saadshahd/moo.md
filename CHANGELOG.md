@@ -12,6 +12,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
+- **design**: New plugin for design exploration workflows
+  - Router skill with 8 workflows for design thinking
+  - `/design:constraints` - Surface technical, brand, and accessibility limits
+  - `/design:journey` - Map user journey with stages, emotions, touchpoints
+  - `/design:ia` - Information architecture with structure options and labeling
+  - `/design:directions` - Generate 3 distinct visual directions (conceptual)
+  - `/design:system` - Establish design system principles (conceptual)
+  - `/design:copy` - Explore microcopy in 3 brand tones
+  - `/design:compare` - Competitive UX flow teardown (Trigger-Action-Reward)
+  - `/design:critique` - Structured design feedback giving/receiving
+  - Philosophy: Exploration mode, anti-convergence, accessibility-first
+  - No visual execution (conceptual output only)
+
+### Changed
+- **design**: Revised all 8 workflows based on counsel panel audit
+  - Shortened workflows to 60-80 lines (principle-based, not template-heavy)
+  - Added global "never assume" rule to SKILL.md router
+  - Added Source/Confidence tracking for all required inputs
+  - Added Evidence Check table to journey.md
+  - Added explicit Reasoning Step to directions.md, journey.md, ia.md
+  - Added Commitment Readiness with handoff artifacts to all workflows
+  - Added cross-workflow references (Before/After/Complements)
+  - Lowered confidence threshold from 50% to 30% in journey.md (per panel recommendation)
+  - Added Usage Modes to copy.md (standard vs exploratory)
 
 ---
 
@@ -275,6 +299,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## Notes
 
 - **hope** is the core plugin (category: `core`)
-- **product**, **wordsmith**, **founder**, **career** are domain plugins (category: `domain`)
+- **product**, **wordsmith**, **founder**, **career**, **counsel**, **design** are domain plugins (category: `domain`)
 - Domain plugins recommend but don't require hope
 - Versioning applies to the marketplace; individual plugins have their own versions in plugin.json

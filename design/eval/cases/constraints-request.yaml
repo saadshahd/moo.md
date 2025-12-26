@@ -1,0 +1,9 @@
+name: design-constraints-request
+description: Design skill triggers on constraint surfacing requests
+plugin: design
+skill: design:design
+prompt: "Before we start designing, what constraints should we consider for this mobile app redesign?"
+expectedBehaviors:
+  - "Design skill activates on constraint requests"
+  - "Asks about technical, brand, and accessibility limits"
+  - "Surfaces unknowns and questions"

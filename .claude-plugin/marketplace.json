@@ -41,6 +41,12 @@
       "source": "./counsel",
       "description": "Expert simulation for code guidance, style, and debates. Channels Addy Osmani, Rich Hickey, Adam Wathan, and more.",
       "category": "domain"
+    },
+    {
+      "name": "design",
+      "source": "./design",
+      "description": "Design exploration workflows for research, direction-finding, and surfacing unknowns. Journey mapping, IA, visual directions, and UX comparison.",
+      "category": "domain"
     }
   ]
 }
