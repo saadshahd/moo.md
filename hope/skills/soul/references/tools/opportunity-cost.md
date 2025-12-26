@@ -110,9 +110,8 @@ When ranking features:
 
 Pairs with:
 
-- [Sunk Cost Fallacy](sunk-cost.md): Don't let past costs inflate opportunity cost
-- [Pareto Principle](pareto.md): Focus on 20% with highest opportunity cost differential
 - [Eisenhower Matrix](eisenhower.md): Urgent tasks often have hidden opportunity costs
+- [Impact-Effort](impact-effort.md): Weigh opportunity cost when prioritizing work
 
 ---
 

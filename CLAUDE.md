@@ -78,7 +78,8 @@ description: Single line. What it does and when to use it.
 ### Reference Files
 
 - Place in `skills/<skill-name>/references/`
-- One level deep only (no nested references)
+- Subdirectories allowed for organization (e.g., `references/tools/`, `references/profiles/`)
+- No reference chains: a reference file should not require loading another reference to function
 - Exception: intra-plugin sharing allowed (e.g., `trace` referencing `soul/references/blameless.md`)
 - Keep SKILL.md under 500 lines; split to references if larger
 

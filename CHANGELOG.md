@@ -12,6 +12,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
+
+### Fixed
+- fix(product): Replaced broken Pareto reference with Impact-Effort in SKILL.md
+- fix(wordsmith): Replaced broken Six Hats reference with Productive Thinking in SKILL.md
+- fix(hope): Removed broken Pareto and Sunk Cost references from opportunity-cost.md
+- fix(hope): Version mismatch in SKILL.md (0.4.5 → 0.4.6)
+
+### Changed
+- docs(CLAUDE.md): Clarified "nested references" rule - subdirectories allowed, chains forbidden
 - **design**: New plugin for design exploration workflows
   - Router skill with 8 workflows for design thinking
   - `/design:constraints` - Surface technical, brand, and accessibility limits

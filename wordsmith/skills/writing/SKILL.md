@@ -43,7 +43,7 @@ From `hope/skills/soul/references/tools/`:
 | Tool                                                                      | When to Use                                |
 | ------------------------------------------------------------------------- | ------------------------------------------ |
 | [Minto Pyramid](../../hope/skills/soul/references/tools/minto-pyramid.md) | Structure executive summaries, SCQA format |
-| [Six Hats](../../hope/skills/soul/references/tools/six-hats.md)           | Multi-perspective content review           |
+| [Productive Thinking](../../hope/skills/soul/references/tools/productive-thinking.md) | Multi-perspective content review |
 
 ## Usage
 
