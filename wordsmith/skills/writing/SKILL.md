@@ -1,7 +1,7 @@
 ---
 name: writing
-description: Precision editing for prose and copy. Use when user says "edit this", "improve this", "review my writing", or provides draft text to refine. Triggers on editing, voice extraction, narrative structure, microcopy.
-version: 0.0.4
+description: Precision editing for prose and copy. Use when user says "edit this", "improve this", "review my writing", "use [name]'s voice", or provides draft text to refine. Triggers on editing, voice extraction, voice library, narrative structure, microcopy.
+version: 0.0.5
 ---
 
 # Writing Skill
@@ -14,6 +14,7 @@ You're working on:
 
 - Editing prose or documentation
 - Extracting or matching author voice
+- Managing saved voice profiles (list, apply, delete)
 - Structuring narratives or stories
 - Writing UI microcopy
 - Evaluating content quality
@@ -22,13 +23,14 @@ You're working on:
 
 Announce which workflow you're using:
 
-| Task Type                                    | Workflow            | Reference                 |
-| -------------------------------------------- | ------------------- | ------------------------- |
-| Analyze writing style, extract voice profile | Voice Extraction    | `references/voice.md`     |
-| Edit text, cut fluff, tighten prose          | Precision Editing   | `references/editing.md`   |
-| Structure story, build narrative arc         | Narrative Structure | `references/narrative.md` |
-| Write UI copy, tone variations               | Microcopy Tones     | `references/copy.md`      |
-| Evaluate blog/content quality, score         | Content Evaluation  | `references/eval.md`      |
+| Task Type                                    | Workflow            | Reference                   |
+| -------------------------------------------- | ------------------- | --------------------------- |
+| Analyze writing style, extract voice profile | Voice Extraction    | `references/voice.md`       |
+| List, apply, or delete saved voices          | Voice Library       | `/wordsmith:voices` command |
+| Edit text, cut fluff, tighten prose          | Precision Editing   | `references/editing.md`     |
+| Structure story, build narrative arc         | Narrative Structure | `references/narrative.md`   |
+| Write UI copy, tone variations               | Microcopy Tones     | `references/copy.md`        |
+| Evaluate blog/content quality, score         | Content Evaluation  | `references/eval.md`        |
 
 ## Strategic Framework
 

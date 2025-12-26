@@ -75,3 +75,47 @@ Rewrite this in the extracted voice to demonstrate the profile.
 - Demo rewrite must clearly show the extracted style
 - Be specific about patterns, not vague ("uses short sentences" not "writes concisely")
 - Use ask tool if sample is too short
+
+---
+
+## Voice Persistence
+
+After extracting a voice profile, offer to save it for reuse.
+
+### Save Voice
+
+Ask for a name to identify this voice, then append to library:
+
+```bash
+mkdir -p ~/.claude/learnings
+```
+
+**JSONL schema for `~/.claude/learnings/voices.jsonl`:**
+
+```json
+{
+  "ts": "2024-01-15T10:30:00Z",
+  "name": "author_name_or_identifier",
+  "context": "blog|docs|marketing|personal",
+  "style_profile": { "tone": "...", "cadence": "...", "vocabulary": "...", "syntax": "...", "rhetorical_moves": "..." },
+  "voice_guideline": "150-word guide...",
+  "source_sample_hash": "first_50_chars_of_sample"
+}
+```
+
+### Load Voice
+
+When user asks to "write like [name]" or "use [name]'s voice":
+
+1. Read `~/.claude/learnings/voices.jsonl`
+2. Match by name (case-insensitive, partial match OK)
+3. If found, display `voice_guideline` and apply to subsequent writing
+4. If not found, offer to extract from new sample
+
+### Prompt After Extraction
+
+After outputting the extracted profile:
+
+> Save this voice profile? Provide a name to save it for reuse, or skip to continue without saving.
+
+See `/wordsmith:voices` command for listing, applying, and deleting saved voices.

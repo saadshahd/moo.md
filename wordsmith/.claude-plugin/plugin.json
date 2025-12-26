@@ -1,10 +1,10 @@
 {
   "name": "wordsmith",
-  "version": "0.0.5",
-  "description": "Voice extraction, precision editing, narrative structure, and copy evaluation for writing work.",
+  "version": "0.0.6",
+  "description": "Voice extraction with persistence, precision editing, narrative structure, and copy evaluation for writing work.",
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"
   },
-  "keywords": ["voice", "editing", "narrative", "copy", "writing"]
+  "keywords": ["voice", "editing", "narrative", "copy", "writing", "voice-library"]
 }
