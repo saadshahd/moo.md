@@ -1,7 +1,6 @@
 ---
 name: trace
 description: Root cause analysis for complex bugs. Use when initial fix fails or incident is severe. Traces Effect → Cause → Root with confidence levels and prevention hierarchy.
-version: 0.0.1
 ---
 
 # trace

@@ -1,7 +1,6 @@
 ---
 name: product
 description: Product workflows router. Use when user mentions "PRD", "competitive analysis", "metrics", "OKRs", "cohort", "requirements", or "technical debt". Triggers on product management and strategy tasks.
-version: 0.0.3
 ---
 
 # Product Skill

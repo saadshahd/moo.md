@@ -1,7 +1,6 @@
 ---
 name: career
 description: Use when preparing for interviews, assessing skills, analyzing job opportunities, navigating stakeholder politics, or developing professional capabilities. Auto-activates on interview prep, career assessment, job search, skill gaps, feedback interpretation, leadership development, or professional growth tasks.
-version: 0.0.2
 ---
 
 # Career Skill

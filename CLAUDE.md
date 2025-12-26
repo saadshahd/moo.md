@@ -55,9 +55,10 @@ Run `bun run eval/run.ts [plugin]` to test skill triggering. Pre-push hook runs 
 ---
 name: kebab-case-name
 description: Single line. Trigger condition + what it does. Max 1024 chars.
-version: 0.0.1
 ---
 ```
+
+> **Note:** Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
 
 **Commands/Agents:**
 
@@ -74,6 +75,20 @@ description: Single line. What it does and when to use it.
 - Skills: `skills/<skill-name>/SKILL.md` (kebab-case)
 - Commands: `commands/<verb>.md` (e.g., `plan.md`, `debug.md`)
 - Agents: `agents/<role>.md` (e.g., `explorer.md`)
+
+### Command Architecture
+
+Commands are **thin wrappers** that enable slash command discovery. The flow is:
+
+```
+/plugin:command → commands/verb.md → SKILL.md (router) → references/workflow.md
+```
+
+- **Command file:** Brief description + pointer to workflow (< 20 lines ideal)
+- **SKILL.md:** Router that detects task type and loads appropriate reference
+- **Reference file:** Full workflow details (can be 100+ lines)
+
+This ensures DRY (logic in one place) while enabling slash command discoverability.
 
 ### Reference Files
 

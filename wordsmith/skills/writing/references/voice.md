@@ -84,11 +84,11 @@ After extracting a voice profile, offer to save it for reuse.
 
 ### Save Voice
 
-Ask for a name to identify this voice, then append to library:
+Ask for a name to identify this voice, then save to library:
 
-```bash
-mkdir -p ~/.claude/learnings
-```
+1. Use the Bash tool to ensure directory exists: `mkdir -p ~/.claude/learnings`
+2. Use the Read tool to load existing `~/.claude/learnings/voices.jsonl` (if exists)
+3. Append new entry and use the Write tool to save
 
 **JSONL schema for `~/.claude/learnings/voices.jsonl`:**
 
@@ -107,7 +107,7 @@ mkdir -p ~/.claude/learnings
 
 When user asks to "write like [name]" or "use [name]'s voice":
 
-1. Read `~/.claude/learnings/voices.jsonl`
+1. Use the Read tool to load `~/.claude/learnings/voices.jsonl`
 2. Match by name (case-insensitive, partial match OK)
 3. If found, display `voice_guideline` and apply to subsequent writing
 4. If not found, offer to extract from new sample

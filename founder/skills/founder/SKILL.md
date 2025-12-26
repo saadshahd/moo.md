@@ -1,7 +1,6 @@
 ---
 name: founder
 description: Use when validating ideas, sizing markets, building pitch decks, preparing for investors, modeling financials, planning launches, or creating board reports. Auto-activates on fundraising, pitch, investor, TAM/SAM/SOM, unit economics, runway, or board deck tasks.
-version: 0.0.2
 ---
 
 # Founder Skill

@@ -1,7 +1,6 @@
 ---
 name: design
 description: Explore visual design, UI/UX, and design systems. Use when designing visual directions, user journeys, information architecture, color palettes, typography, or reviewing design feedback. NOT for feature planning or technical architecture.
-version: 0.0.3
 ---
 
 # Design Skill
