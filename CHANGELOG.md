@@ -12,7 +12,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
-- feat(hope): `references/tools-catalog.md` - extracted tool tables for on-demand loading
 
 ### Fixed
 - fix(product): Replaced broken Pareto reference with Impact-Effort in SKILL.md
@@ -21,7 +20,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - fix(hope): Version mismatch in SKILL.md (0.4.5 → 0.4.6)
 
 ### Changed
-- refactor(hope): soul/SKILL.md reduced from 389 to 350 lines by extracting tool tables
 - docs(CLAUDE.md): Clarified "nested references" rule - subdirectories allowed, chains forbidden
 - **design**: New plugin for design exploration workflows
   - Router skill with 8 workflows for design thinking

@@ -46,11 +46,49 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 
 ---
 
-## Thinking Tools
+## Strategic Frameworks
 
-See [Tools Catalog](references/tools-catalog.md) for strategic frameworks and full tool reference.
+Higher-level frameworks for complex situations. Use before diving into tactical tools.
 
-**Quick defaults:** Prioritizing → Impact-Effort | Root cause → Ishikawa | Decisions → Decision Matrix | Systems → Feedback Loops | Communication → Minto Pyramid
+| Framework                                        | Purpose                               | When to Use                                   |
+| ------------------------------------------------ | ------------------------------------- | --------------------------------------------- |
+| [Handshake](references/handshake.md)             | Drive action from communication       | Meetings, negotiations, getting buy-in        |
+| [SCOPE](references/scope.md)                     | Right-size analysis before starting   | Research, investigation, any analysis work    |
+| [Leverage Points](references/leverage-points.md) | Find where to intervene in systems    | Complex system change, choosing interventions |
+| [SPOT](references/spot.md)                       | Surface and act on recurring patterns | Retrospectives, debugging recurring issues    |
+
+---
+
+## Default Tools
+
+For most situations, use these first:
+
+| Situation              | Default                                                | When to Use                            |
+| ---------------------- | ------------------------------------------------------ | -------------------------------------- |
+| Prioritizing work      | [Impact-Effort](references/tools/impact-effort.md)     | Backlog grooming, what to do next      |
+| Breaking down problems | [Issue Trees](references/tools/issue-trees.md)         | Complex problems, exhaustive analysis  |
+| Finding root cause     | [Ishikawa](references/tools/ishikawa.md)               | Debugging, incidents, postmortems      |
+| Making decisions       | [Decision Matrix](references/tools/decision-matrix.md) | Multi-option choices with tradeoffs    |
+| Understanding systems  | [Feedback Loops](references/tools/feedback-loops.md)   | Architecture, metrics, consequences    |
+| Communicating clearly  | [Minto Pyramid](references/tools/minto-pyramid.md)     | Writing, presentations, exec summaries |
+
+## All Tools (when default doesn't fit)
+
+| Category          | Tools                                                                                                                                                                                                 | When to Use                                        |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Root Cause        | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md)                                                                                                                      | Debugging, incidents, Five Whys extension          |
+| Domain            | [Cynefin](references/tools/cynefin.md)                                                                                                                                                                | Choosing approach before diving in                 |
+| Decision          | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md), [Grey Thinking](references/tools/grey-thinking.md) | Multi-option choices, fast decisions, avoid binary traps |
+| Prioritization    | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Opportunity Cost](references/tools/opportunity-cost.md), [Systems Over Goals](references/tools/systems-over-goals.md) | Backlog grooming, debt triage, tradeoffs, habits   |
+| Systems           | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md), [Incentives](references/tools/incentives.md), [Bottlenecks](references/tools/bottlenecks.md) | Architecture, metrics, behavior, constraints       |
+| Creative          | [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md), [Deliberate Practice](references/tools/deliberate-practice.md) | Brainstorming, reframing, innovation, skill building |
+| Communication     | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md), [Steel Man](references/tools/steel-man.md) | Writing, feedback, negotiation, argumentation      |
+| Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md)                                              | Decomposition, exhaustive breakdown                |
+| Risk              | [Pre-Mortem](references/tools/pre-mortem.md)                                                                                                                                                          | Anticipate failure before starting                 |
+| Boundaries        | [Circle of Competence](references/tools/circle-of-competence.md), [Chesterton's Fence](references/tools/chestertons-fence.md)                                                                         | Know limits, understand before changing            |
+| Probability       | [Bayesian Thinking](references/tools/bayesian-thinking.md)                                                                                                                                            | Update beliefs with evidence, calibrate confidence |
+| Abstraction       | [Map vs Territory](references/tools/map-territory.md)                                                                                                                                                 | Models ≠ reality, question assumptions             |
+| Biases            | [Munger's 25](references/tools/munger-biases.md)                                                                                                                                                      | Pre-decision bias check, high-stakes decisions     |
 
 ---
 
