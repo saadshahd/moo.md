@@ -68,6 +68,41 @@ Before moving to implementation:
 
 **Handoff artifact:** Design principles document
 
+## Handoff Options
+
+Before generating final output, ask:
+
+> What format would you like for handoff?
+> 1. **DTCG JSON** — Full design tokens for Figma/code (`/design:tokens`)
+> 2. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 3. **Figma AI prompt** — Component library starter (`/design:figma-prompt`)
+> 4. **Markdown** — Structured text (copy-paste anywhere)
+
+### DTCG Token Structure
+
+```json
+{
+  "$schema": "https://design-tokens.org/schema.json",
+  "color": {
+    "primary": { "$type": "color", "$value": "#0066FF" },
+    "background": { "$type": "color", "$value": "#FFFFFF" },
+    "text": { "$type": "color", "$value": "#111827" }
+  },
+  "typography": {
+    "font-family": {
+      "base": { "$type": "fontFamily", "$value": "Inter, sans-serif" }
+    },
+    "font-size": {
+      "base": { "$type": "dimension", "$value": "16px" }
+    }
+  },
+  "spacing": {
+    "4": { "$type": "dimension", "$value": "16px" },
+    "8": { "$type": "dimension", "$value": "32px" }
+  }
+}
+```
+
 ## Related Workflows
 
 - **Before:** directions

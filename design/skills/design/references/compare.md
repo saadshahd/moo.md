@@ -60,6 +60,37 @@ Before moving to next workflow:
 
 **Handoff artifact:** Competitive insights + recommendations
 
+## Handoff Options
+
+Before generating final output, ask:
+
+> What format would you like for handoff?
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **Markdown table** — Comparison matrix for documentation
+> 3. **Figma AI prompt** — UI based on best practices found (`/design:figma-prompt`)
+
+### Markdown Comparison Table
+
+| Step | Competitor A | Competitor B | Our Approach | Rationale |
+|------|--------------|--------------|--------------|-----------|
+| Signup | Email + Google | Email only | Both | Lower friction |
+| Onboarding | 5 steps | 3 steps | 3 steps | Reduce drop-off |
+
+### Mermaid Comparison (renders in GitHub, mermaid.live, or via CLI)
+
+```mermaid
+graph LR
+    subgraph "Competitor A"
+    A1[Step 1] --> A2[Step 2] --> A3[Step 3]
+    end
+    subgraph "Competitor B"
+    B1[Step 1] --> B2[Step 2]
+    end
+    subgraph "Our Approach"
+    O1[Step 1] --> O2[Step 2]
+    end
+```
+
 ## Related Workflows
 
 - **Before:** constraints, journey

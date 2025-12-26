@@ -60,6 +60,40 @@ Before moving to implementation:
 
 **Handoff artifact:** Recommended copy + tone guidelines
 
+## Handoff Options
+
+Before generating final output, ask:
+
+> What format would you like for handoff?
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **Figma AI prompt** — UI with specific copy applied (`/design:figma-prompt`)
+> 3. **Markdown table** — Copy variants for dev handoff
+> 4. **JSON** — Structured copy for i18n/CMS
+
+### Markdown Table Format
+
+| Element | Recommended Copy | Tone | Notes |
+|---------|------------------|------|-------|
+| CTA Button | "Get Started" | Friendly | 12 chars max |
+| Error Message | "Couldn't save. Try again." | Clear | Avoid blame |
+
+### JSON Format
+
+```json
+{
+  "cta_primary": {
+    "text": "Get Started",
+    "tone": "friendly",
+    "max_chars": 12
+  },
+  "error_save": {
+    "text": "Couldn't save. Try again.",
+    "tone": "clear",
+    "context": "Form submission failure"
+  }
+}
+```
+
 ## Related Workflows
 
 - **Before:** directions, system (voice foundation)

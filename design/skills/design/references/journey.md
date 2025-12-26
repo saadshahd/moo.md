@@ -81,6 +81,29 @@ Before moving to next workflow:
 
 **Handoff artifact:** Journey map + moments that matter (with confidence levels)
 
+## Handoff Options
+
+Before generating final output, ask:
+
+> What format would you like for handoff?
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **WireMD wireframe** — Screen mockups for key moments (`/design:wireframe`)
+> 3. **Figma AI prompt** — Text to paste into Figma AI (`/design:figma-prompt`)
+> 4. **Mermaid diagram** — Journey visualization (renders in GitHub, mermaid.live, or via CLI)
+> 5. **Markdown** — Structured text (copy-paste anywhere)
+
+### Mermaid Journey Format
+
+```mermaid
+journey
+    title [Journey Name]
+    section [Stage 1]
+      [Action]: [Score 1-5]: [Actor]
+      [Action]: [Score]: [Actor]
+    section [Stage 2]
+      [Action]: [Score]: [Actor]
+```
+
 ## Related Workflows
 
 - **Before:** constraints

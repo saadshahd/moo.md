@@ -72,6 +72,44 @@ Before moving to next workflow:
 
 **Handoff artifact:** Recommended structure + labeling decisions
 
+## Handoff Options
+
+Before generating final output, ask:
+
+> What format would you like for handoff?
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **WireMD wireframe** — Navigation mockups (`/design:wireframe`)
+> 3. **Figma AI prompt** — Text to paste into Figma AI (`/design:figma-prompt`)
+> 4. **D2/Mermaid diagram** — Hierarchy visualization (renders in GitHub, mermaid.live, or via CLI)
+> 5. **Markdown** — Structured text (copy-paste anywhere)
+
+### D2 Hierarchy Format
+
+```d2
+Home: {
+  Products: {
+    Category A
+    Category B
+  }
+  About: {
+    Team
+    Story
+  }
+  Contact
+}
+```
+
+### Mermaid Flowchart Format
+
+```mermaid
+graph TD
+    Home --> Products
+    Home --> About
+    Home --> Contact
+    Products --> CategoryA
+    Products --> CategoryB
+```
+
 ## Related Workflows
 
 - **Before:** constraints, journey

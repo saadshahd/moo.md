@@ -74,6 +74,34 @@ Before moving to next workflow:
 
 **Handoff artifact:** Chosen direction brief with rationale
 
+## Handoff Options
+
+Before generating final output, ask:
+
+> What format would you like for handoff?
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **Figma AI prompt** — Text to paste into Figma AI (`/design:figma-prompt`)
+> 3. **DTCG JSON** — Design tokens for implementation (`/design:tokens`)
+> 4. **Markdown** — Structured text (copy-paste anywhere)
+
+### DTCG Token Preview
+
+From a chosen direction, extract preliminary tokens:
+
+```json
+{
+  "color": {
+    "primary": {
+      "$type": "color",
+      "$value": "#[from direction]",
+      "$description": "[mood/rationale]"
+    }
+  }
+}
+```
+
+Note: Full tokens should wait for System workflow. Directions produce conceptual guidance, not implementation values.
+
 ## Related Workflows
 
 - **Before:** constraints, journey, ia
