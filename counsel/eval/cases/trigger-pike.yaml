@@ -6,7 +6,7 @@ acceptableSkills:
   - counsel:summon
 prompt: "What would Rob Pike say about this Go function? Should I add generics or keep it simple with concrete types?"
 expectedBehaviors:
-  - "Pike mentioned or profile loaded"
+  - "Descriptor used instead of name (e.g., 'a simplicity advocate')"
   - "Confidence score displayed (8/10)"
   - "Simplicity advocated"
   - "Clear is better than clever referenced"

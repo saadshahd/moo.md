@@ -6,7 +6,7 @@ acceptableSkills:
   - counsel:summon
 prompt: "I'm considering rewriting this legacy module. It's messy but works. What would Martin Fowler say?"
 expectedBehaviors:
-  - "Fowler mentioned or profile loaded"
+  - "Descriptor used instead of name (e.g., 'a refactoring advocate')"
   - "Confidence score displayed (9/10)"
   - "Refactoring over rewriting advocated"
   - "Strangler fig pattern or incremental approach suggested"
