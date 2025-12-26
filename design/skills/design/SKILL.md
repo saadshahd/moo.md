@@ -1,7 +1,7 @@
 ---
 name: design
-description: Design exploration workflows router. Use when user mentions "design direction", "color palette", "typography", "user journey", "information architecture", "UX comparison", or "design feedback". Triggers on design thinking and exploration tasks.
-version: 0.0.2
+description: Explore visual design, UI/UX, and design systems. Use when designing visual directions, user journeys, information architecture, color palettes, typography, or reviewing design feedback. NOT for feature planning or technical architecture.
+version: 0.0.3
 ---
 
 # Design Skill

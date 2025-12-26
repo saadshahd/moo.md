@@ -43,6 +43,8 @@ export const buildClaudeArgs = (
     prompt,
     "--plugin-dir",
     `./${pluginDir}`,
+    "--setting-sources",
+    "project",
     "--output-format",
     "json",
   ];

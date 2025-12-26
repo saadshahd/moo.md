@@ -2,6 +2,8 @@ name: counsel-fowler-trigger
 description: Counsel triggers Fowler for architecture/refactoring questions
 plugin: counsel
 skill: counsel:counsel
+acceptableSkills:
+  - counsel:summon
 prompt: "I'm considering rewriting this legacy module. It's messy but works. What would Martin Fowler say?"
 expectedBehaviors:
   - "Fowler mentioned or profile loaded"

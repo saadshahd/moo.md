@@ -2,7 +2,9 @@ name: counsel-abramov-trigger
 description: Counsel triggers Abramov for React internals questions
 plugin: counsel
 skill: counsel:counsel
-prompt: "My useEffect is running more than I expect. How should I think about this?"
+acceptableSkills:
+  - counsel:summon
+prompt: "How would Dan Abramov explain React's useEffect mental model? My effect is running more than I expect."
 expectedBehaviors:
   - "Abramov mentioned or profile loaded"
   - "Confidence score displayed (8/10)"

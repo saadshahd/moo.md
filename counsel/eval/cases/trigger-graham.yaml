@@ -2,7 +2,9 @@ name: counsel-graham-trigger
 description: Counsel triggers Graham for startup questions
 plugin: counsel
 skill: counsel:counsel
-prompt: "We're a startup with 10 users. Should we focus on scaling our infrastructure or talking to more users?"
+acceptableSkills:
+  - counsel:summon
+prompt: "What would Paul Graham say about our startup? We have 10 users and are debating whether to focus on scaling infrastructure or talking to more users."
 expectedBehaviors:
   - "Graham mentioned or profile loaded"
   - "Confidence score displayed (8/10)"

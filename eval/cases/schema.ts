@@ -6,6 +6,7 @@ export const TestCaseSchema = z.object({
   description: z.string().optional(),
   plugin: z.string().min(1),
   skill: z.string().min(1),
+  acceptableSkills: z.array(z.string()).optional(), // Alternative skills that are also valid
   prompt: z.string().min(1),
   phase: z.enum(["1", "2"]).optional(), // Phase 1 = test questioning, Phase 2 = test output
   expectation: z.enum(["asks_questions", "acts_directly"]).optional(), // For phase 1

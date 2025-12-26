@@ -39,6 +39,7 @@ export interface TestCase {
   description?: string;
   plugin: string;
   skill: string;
+  acceptableSkills?: string[]; // Alternative skills that are also valid
   prompt: string;
   phase?: "1" | "2";
   expectation?: "asks_questions" | "acts_directly";

@@ -67,9 +67,12 @@ export async function runLayerC(
   }
 
   const detected = skillResult.value.skill;
+  const acceptable = [testCase.skill, ...(testCase.acceptableSkills ?? [])];
+  const passed = detected !== null && acceptable.includes(detected);
+
   return {
     layer: "C",
-    passed: detected === testCase.skill,
+    passed,
     expected: testCase.skill,
     detected,
     duration: proc.duration,

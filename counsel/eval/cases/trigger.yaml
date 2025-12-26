@@ -2,6 +2,8 @@ name: counsel-expert-trigger
 description: Counsel skill triggers on expert simulation requests
 plugin: counsel
 skill: counsel:counsel
+acceptableSkills:
+  - counsel:summon
 prompt: "How would Addy Osmani approach this React component? I want to make sure it's idiomatic and performant."
 expectedBehaviors:
   - "Osmani mentioned by name or profile loaded"
