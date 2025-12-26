@@ -4,6 +4,7 @@ plugin: counsel
 skill: counsel:counsel
 acceptableSkills:
   - counsel:summon
+  - counsel
 prompt: "What would Rob Pike say about this Go function? Should I add generics or keep it simple with concrete types?"
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a simplicity advocate')"

@@ -4,6 +4,7 @@ plugin: counsel
 skill: counsel:counsel
 acceptableSkills:
   - counsel:summon
+  - counsel
 prompt: "How would Addy Osmani approach this React component? I want to make sure it's idiomatic and performant."
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a performance-focused engineer')"
