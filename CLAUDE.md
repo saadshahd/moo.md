@@ -25,8 +25,7 @@ Each plugin follows:
 <plugin>/
 ├── .claude-plugin/plugin.json    # name, version, description, keywords, author
 ├── skills/<name>/SKILL.md
-├── skills/<name>/references/
-└── commands/<verb>.md
+└── skills/<name>/references/
 ```
 
 Plugin discovery uses `.claude-plugin/marketplace.json` at repo root (lists all plugins).
@@ -55,15 +54,17 @@ Run `bun run eval/run.ts [plugin]` to test skill triggering. Pre-push hook runs 
 ---
 name: kebab-case-name
 description: Single line. Trigger condition + what it does. Max 1024 chars.
-version: 0.0.1
 ---
 ```
 
-**Commands/Agents:**
+> **Note:** Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
+
+**Agents:**
 
 ```yaml
 ---
 description: Single line. What it does and when to use it.
+tools: Read, Glob, Grep, Bash
 ---
 ```
 
@@ -72,8 +73,7 @@ description: Single line. What it does and when to use it.
 ### File Naming
 
 - Skills: `skills/<skill-name>/SKILL.md` (kebab-case)
-- Commands: `commands/<verb>.md` (e.g., `plan.md`, `debug.md`)
-- Agents: `agents/<role>.md` (e.g., `explorer.md`)
+- Agents: `agents/<role>.md` (e.g., `explorer.md`, `delve.md`)
 
 ### Reference Files
 

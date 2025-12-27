@@ -1,7 +1,6 @@
 ---
 name: recall
 description: Auto-activates at session start to surface relevant learnings. Use when starting work in a domain to recall past insights from ~/.claude/learnings/.
-version: 0.0.1
 ---
 
 # Recall Skill
@@ -21,13 +20,13 @@ Optional context hint (e.g., "hooks", "testing", "typescript"). If empty, infer 
 
 ## Process
 
-1. **Read learnings files**:
+1. **Read learnings files** using the Read tool:
 
-   ```bash
-   cat ~/.claude/learnings/failures.jsonl 2>/dev/null
-   cat ~/.claude/learnings/discoveries.jsonl 2>/dev/null
-   cat ~/.claude/learnings/constraints.jsonl 2>/dev/null
-   ```
+   - `~/.claude/learnings/failures.jsonl`
+   - `~/.claude/learnings/discoveries.jsonl`
+   - `~/.claude/learnings/constraints.jsonl`
+
+   If files don't exist, skip silently.
 
 2. **Filter by relevance**:
 
