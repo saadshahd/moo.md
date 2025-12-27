@@ -2,7 +2,7 @@ import type { LayerCResult, TestCase, EvalConfig } from "../types";
 import { CLIOutputSchema, SkillDetectionSchema } from "../types";
 import { DEFAULT_CONFIG, DETECT_SKILL_PROMPT } from "../config";
 import { spawnWithTimeout, buildClaudeArgs } from "../process";
-import { safeJsonParse } from "../parse";
+import { safeJsonParse, extractAndValidate } from "../parse";
 
 export async function runLayerC(
   testCase: TestCase,
@@ -51,7 +51,7 @@ export async function runLayerC(
     };
   }
 
-  const skillResult = safeJsonParse(
+  const skillResult = extractAndValidate(
     cliResult.value.result,
     SkillDetectionSchema,
   );

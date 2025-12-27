@@ -18,7 +18,11 @@ export const safeJsonParse = <T>(
 };
 
 const extractJsonFromText = (text: string): Result<unknown, string> => {
-  const match = text.match(/\{[\s\S]*\}/);
+  // Strip markdown code fences first (```json ... ``` or ``` ... ```)
+  const stripped = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, "$1");
+
+  // Find JSON object - use non-greedy match to avoid grabbing too much
+  const match = stripped.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
   if (!match) {
     return Err("No JSON object found in text");
   }

@@ -1,19 +1,35 @@
-<p align="center">
+<div align="center">
   <img src="docs/assets/poster.png" alt="mind on output — stay present with AI" width="600">
+  <br/><br/>
+  <strong>Plugins that make Claude</strong>
   <br/>
-  Plugins that make Claude state confidence, list failures, and present structured reasoning before acting.
-</p>
-
-<br/>
-
-| Before                       | After                                  |
-| ---------------------------- | -------------------------------------- |
-| "This should work"           | "85% confident because [evidence]"     |
-| Builds first, searches later | Searches libraries before writing code |
-| Hopes nothing breaks         | Lists failure modes before starting    |
-| Forgets what worked          | Recalls insights from past sessions    |
-
-## See It In Action
+  state confidence, list failures, and present structured reasoning<br/>before acting
+  <br/><br/><br/>
+  <table>
+    <tr>
+      <th>Before</th>
+      <th>After</th>
+    </tr>
+    <tr>
+      <td>"This should work"</td>
+      <td>"85% confident because [evidence]"</td>
+    </tr>
+    <tr>
+      <td>Builds first, searches later</td>
+      <td>Searches libraries before writing code</td>
+    </tr>
+    <tr>
+      <td>Hopes nothing breaks</td>
+      <td>Lists failure modes before starting</td>
+    </tr>
+    <tr>
+      <td>Forgets what worked</td>
+      <td>Recalls insights from past sessions</td>
+    </tr>
+  </table>
+</div>
+<br/><br/>
+<h2 align="center">See It In Action</h2>
 
 <table>
   <tr>
@@ -55,7 +71,6 @@
       <p><sub>Pre-Mortem</sub></p>
       <img src="docs/assets/premortem.png" alt="Pre-mortem" style="max-width: 100%;;"><br>
     </td>
-    
   </tr>
 </table>
 
