@@ -127,14 +127,6 @@ Each stage reveals push/pull/anxiety/habit forces.
 
 ---
 
-## Combination
-
-Pairs with:
-- [Working Backwards](../../founder/skills/founder/references/regret-minimization.md): Write press release for the job
-- [Inversion](../../hope/skills/soul/SKILL.md): What would make customers fire your product?
-
----
-
 ## Provenance
 
 Developed by Tony Ulwick (1990s), popularized by Clayton Christensen at Harvard Business School. *Competing Against Luck* (2016) is the definitive book.

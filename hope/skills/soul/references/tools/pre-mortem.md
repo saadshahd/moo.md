@@ -103,15 +103,6 @@ Pre-mortem identifies failures. Practice failure builds muscle memory for respon
 
 ---
 
-## Combination
-
-Pairs well with:
-
-- [Deliberate Practice](deliberate-practice.md): Structure the practice drills
-- [Feedback Loops](feedback-loops.md): Design learning from drills
-
----
-
 ## Provenance
 
 Gary Klein, 2007. Published in Harvard Business Review. Based on Mitchell, Russo & Pennington's 1989 research on prospective hindsight. Klein found pre-mortems reduced overconfidence more than any other critiquing technique.

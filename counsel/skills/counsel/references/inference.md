@@ -39,7 +39,7 @@ Logic for detecting which expert to simulate when not explicitly specified.
 4. **Domain signals** — Topic-based routing
 5. **No match** — Ask user to specify or proceed with generic guidance
 
-**After detection:** Generate a descriptor based on why the expert is relevant to this question. Never use expert names in output. See [confidence.md](confidence.md#descriptor-generation).
+**After detection:** Generate a descriptor based on why the expert is relevant to this question. Never use expert names in output. See the Confidence & Guardrails reference for descriptor generation rules.
 
 ---
 

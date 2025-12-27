@@ -14,7 +14,7 @@ Claude as collaborative creative partner for research, inspiration, and surfacin
 If ANY required input is missing or unclear:
 
 1. **STOP**
-2. Use ask tool to gather missing information
+2. Use AskUserQuestion tool to gather missing information
 3. Do NOT proceed with assumptions
 
 For every input, require:

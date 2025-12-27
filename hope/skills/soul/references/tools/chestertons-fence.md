@@ -68,14 +68,6 @@ time.sleep(0.1)
 
 ---
 
-## Combination
-
-Pairs well with:
-- [Second-Order Thinking](second-order.md): What happens if we remove this?
-- [Pre-Mortem](pre-mortem.md): Imagine removal has caused disaster
-
----
-
 ## Provenance
 
 G.K. Chesterton, "The Thing" (1929). Popular with Wikipedia editors ("Don't remove a rule until you understand it") and software engineers. JFK reportedly kept this as a guiding principle.

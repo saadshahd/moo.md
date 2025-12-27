@@ -155,14 +155,4 @@ Grey thinking process:
 
 ---
 
-## Combination
-
-Pairs well with:
-
-- [Steel Man](steel-man.md): Strengthen both sides before integrating
-- [Bayesian Thinking](bayesian-thinking.md): Probability over certainty
-- [Decision Matrix](decision-matrix.md): Score on continuum, not binary
-
----
-
 _Source: Paracelsus (16th century); Farnam Street "The Value of Grey Thinking"_

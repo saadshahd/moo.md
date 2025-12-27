@@ -65,7 +65,7 @@ From this skill's `references/`:
 
 ## Rules
 
-- Use ask tool to gather input before proceeding
+- Use AskUserQuestion tool to gather input before proceeding
 - Be direct and honest—career growth requires uncomfortable feedback
 - Focus on actionable improvements, not encouragement
 - Ground recommendations in evidence from user responses

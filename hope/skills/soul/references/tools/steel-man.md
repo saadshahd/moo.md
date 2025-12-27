@@ -136,14 +136,4 @@ Steel man process:
 
 ---
 
-## Combination
-
-Pairs well with:
-
-- [Ladder of Inference](ladder-inference.md): Check assumptions about their position
-- [Conflict Resolution](conflict-resolution.md): Navigate productive disagreement
-- [Bayesian Thinking](bayesian-thinking.md): Update your beliefs when steel man is compelling
-
----
-
 _Source: Daniel Dennett, "Intuition Pumps" (2013); Anatol Rapoport's Rules for Criticism_

@@ -71,14 +71,6 @@ He left a high-paying hedge fund job to start Amazon.
 
 ---
 
-## Combination
-
-Use with:
-- [Pre-Mortem](../../hope/skills/soul/references/tools/pre-mortem.md): Identify failure modes before leaping
-- [Circle of Competence](../../hope/skills/soul/references/tools/circle-of-competence.md): Leap into areas you understand
-
----
-
 ## Provenance
 
 Jeff Bezos, on deciding to leave D.E. Shaw & Co. to start Amazon (1994). Popularized through numerous interviews and speeches.

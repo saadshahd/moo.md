@@ -59,7 +59,7 @@ From this skill's `references/`:
 
 ## Rules
 
-- Use ask tool to gather input before proceeding
+- Use AskUserQuestion tool to gather input before proceeding
 - Ground recommendations in evidence
 - Use story points, never time estimates
 - Challenge assumptions and cut scope by default

@@ -135,15 +135,6 @@ on intentionality, visibility, and payoff timeline"
 
 ---
 
-## Combination
-
-Pairs with:
-
-- [Confidence Gates](../../../SKILL.md): Bayesian updates inform confidence levels
-- [Pre-Mortem](pre-mortem.md): Assign probabilities to failure modes
-
----
-
 ## Provenance
 
 Thomas Bayes (1701-1761), formalized by Pierre-Simon Laplace. Foundation of modern statistics, machine learning, and scientific reasoning.

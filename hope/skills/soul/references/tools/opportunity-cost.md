@@ -106,15 +106,6 @@ When ranking features:
 
 ---
 
-## Combination
-
-Pairs with:
-
-- [Eisenhower Matrix](eisenhower.md): Urgent tasks often have hidden opportunity costs
-- [Impact-Effort](impact-effort.md): Weigh opportunity cost when prioritizing work
-
----
-
 ## Provenance
 
 Foundational concept in economics. Formalized by Friedrich von Wieser (1914). Applies universally to any scarce resource allocation.

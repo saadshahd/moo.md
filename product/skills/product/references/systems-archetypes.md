@@ -133,15 +133,6 @@ Recurring patterns of system behavior that produce predictable outcomes. Recogni
 
 ---
 
-## Combination
-
-Pairs with:
-- [Second-Order Thinking](../../hope/skills/soul/references/tools/second-order.md): Predict archetype consequences
-- [Feedback Loops](../../hope/skills/soul/references/tools/feedback-loops.md): Archetypes are specific loop patterns
-- [Pre-Mortem](../../hope/skills/soul/references/tools/pre-mortem.md): Use archetypes to generate failure modes
-
----
-
 ## Provenance
 
 Peter Senge, *The Fifth Discipline* (1990). Based on system dynamics work by Jay Forrester at MIT. Widely used in organizational development and strategic planning.

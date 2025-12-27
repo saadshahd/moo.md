@@ -160,14 +160,4 @@ Deliberate practice design:
 
 ---
 
-## Combination
-
-Pairs well with:
-
-- [Circle of Competence](circle-of-competence.md): Identify edges to work on
-- [Pre-Mortem](pre-mortem.md): Practice failure scenarios before they happen
-- [Feedback Loops](feedback-loops.md): Design learning reinforcement
-
----
-
 _Source: K. Anders Ericsson, "Peak" (2016); "The Role of Deliberate Practice in the Acquisition of Expert Performance" (1993)_

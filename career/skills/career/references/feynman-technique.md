@@ -77,14 +77,6 @@ He rebuilt his understanding from scratch.
 
 ---
 
-## Combination
-
-Pairs with:
-- [Rubber Duck Debugging](rubber-duck.md): Similar principle for code
-- [Socratic Questioning](socratic.md): Probe your own understanding
-
----
-
 ## Provenance
 
 Richard Feynman, Nobel laureate physicist. Known for making complex physics accessible. The technique is derived from his learning and teaching methods documented in biographies and his own writings.

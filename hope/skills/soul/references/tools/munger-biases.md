@@ -118,16 +118,6 @@ Use inversion: Instead of asking "How do I decide well?", ask "How would I decid
 
 ---
 
-## Combination
-
-Use with:
-
-- [Pre-Mortem](pre-mortem.md): Which biases might cause failure?
-- [Bayesian Thinking](bayesian-thinking.md): Update beliefs despite Inconsistency-Avoidance
-- Confidence Gates: Run bias check before claiming ≥85% confidence
-
----
-
 ## Provenance
 
 Charlie Munger, "The Psychology of Human Misjudgment" speech (1995). Expanded version in _Poor Charlie's Almanack_. Munger credits his multidisciplinary approach—psychology, economics, biology—for identifying these patterns.

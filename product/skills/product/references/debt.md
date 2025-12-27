@@ -20,7 +20,7 @@ Score each factor 1-5.
 
 ## Priority Tiers
 
-**Tools:** [Eisenhower](../../../../hope/skills/soul/references/tools/eisenhower.md) for urgent/important triage, [Impact-Effort](../../../../hope/skills/soul/references/tools/impact-effort.md) for ROI-based prioritization.
+**Tools:** Eisenhower Matrix for urgent/important triage, Impact-Effort for ROI-based prioritization.
 
 ### Priority 1: Critical Path Blockers
 
@@ -123,4 +123,4 @@ Provide 3-sentence summary for stakeholders:
 - Ground recommendations in evidence
 - No P2 before all P1 complete
 - Phase items >2 sprints
-- Use ask tool for missing context
+- Use AskUserQuestion tool for missing context

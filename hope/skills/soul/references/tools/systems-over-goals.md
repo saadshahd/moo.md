@@ -161,14 +161,4 @@ Result: 365 × 200 = 73,000 words/year
 
 ---
 
-## Combination
-
-Pairs well with:
-
-- [Impact-Effort](impact-effort.md): Prioritize which systems to build
-- [Feedback Loops](feedback-loops.md): Design reinforcement for habits
-- [Second-Order](second-order.md): Map cascade effects of keystone habits
-
----
-
 _Source: James Clear, "Atomic Habits" (2018); Scott Adams, "How to Fail at Almost Everything and Still Win Big" (2013)_

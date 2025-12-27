@@ -116,15 +116,6 @@ Not all claimed experts are genuine. Use these probes:
 
 ---
 
-## Combination
-
-Pairs well with:
-
-- [Confidence Gates](../../../SKILL.md): Match confidence to circle position
-- [Sunk Cost](sunk-cost.md): Don't persist in areas outside your circle just because you started
-
----
-
 ## Provenance
 
 Warren Buffett & Charlie Munger. Buffett's 1996 shareholder letter formalized the concept. Andrew Carnegie earlier advised investing only in what you understand.

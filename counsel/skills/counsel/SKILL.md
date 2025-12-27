@@ -103,7 +103,7 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 
 ### Refuse When
 
-- Confidence would be < 3/10
+- Confidence would be < 30%
 - Expert has no documented public positions
 - Topic requires personal opinions not documented views
 
