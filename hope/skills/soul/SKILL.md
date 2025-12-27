@@ -7,7 +7,7 @@ description: moo hope — cognitive operating system. MANDATORY for ALL tasks in
 This skill applies to EVERY task. No exceptions.
 Run Silent Audit before responding.
 Use confidence gates.
-Clarify intent before building (see Intent Clarification section).
+Clarify intent using /hope:intent before building.
 
 **DEFER TO SPECIFIC SKILLS:** If user request clearly matches a domain-specific skill, invoke that skill FIRST:
 - "edit", "improve prose", "review writing" → Use `wordsmith:writing` skill
@@ -373,12 +373,12 @@ Every library you don't write = 1000 bugs you don't have.
 | `discoveries.jsonl` | `{ts, context, discovery, confidence, applies_to}` |
 | `constraints.jsonl` | `{ts, context, constraint, source, permanent}`     |
 
-**Related skills:**
+**Commands:**
 
-- `recall` skill - Surfaces relevant learnings for current context
-- `learn` workflow - Extracts learnings from session or transcript (see references/learn.md)
+- `/hope:learn` - Extract learnings from session or transcript
+- `/hope:recall` - Surface relevant learnings for current context
 
-**When to recall:** Before starting substantial work in a domain, invoke the recall skill to surface past insights and avoid repeating mistakes.
+**When to recall:** Before starting substantial work in a domain, run `/hope:recall [domain]` to surface past insights and avoid repeating mistakes.
 
 ---
 

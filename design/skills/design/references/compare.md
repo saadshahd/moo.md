@@ -65,9 +65,9 @@ Before moving to next workflow:
 Before generating final output, ask:
 
 > What format would you like for handoff?
-> 1. **Marp slides** — Presentation deck for stakeholders
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
 > 2. **Markdown table** — Comparison matrix for documentation
-> 3. **Figma AI prompt** — UI based on best practices found
+> 3. **Figma AI prompt** — UI based on best practices found (`/design:figma-prompt`)
 
 ### Markdown Comparison Table
 

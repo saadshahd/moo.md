@@ -79,9 +79,9 @@ Before moving to next workflow:
 Before generating final output, ask:
 
 > What format would you like for handoff?
-> 1. **Marp slides** — Presentation deck for stakeholders
-> 2. **Figma AI prompt** — Text to paste into Figma AI
-> 3. **DTCG JSON** — Design tokens for implementation
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **Figma AI prompt** — Text to paste into Figma AI (`/design:figma-prompt`)
+> 3. **DTCG JSON** — Design tokens for implementation (`/design:tokens`)
 > 4. **Markdown** — Structured text (copy-paste anywhere)
 
 ### DTCG Token Preview

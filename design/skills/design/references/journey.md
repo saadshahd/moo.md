@@ -86,9 +86,9 @@ Before moving to next workflow:
 Before generating final output, ask:
 
 > What format would you like for handoff?
-> 1. **Marp slides** — Presentation deck for stakeholders
-> 2. **WireMD wireframe** — Screen mockups for key moments
-> 3. **Figma AI prompt** — Text to paste into Figma AI
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **WireMD wireframe** — Screen mockups for key moments (`/design:wireframe`)
+> 3. **Figma AI prompt** — Text to paste into Figma AI (`/design:figma-prompt`)
 > 4. **Mermaid diagram** — Journey visualization (renders in GitHub, mermaid.live, or via CLI)
 > 5. **Markdown** — Structured text (copy-paste anywhere)
 

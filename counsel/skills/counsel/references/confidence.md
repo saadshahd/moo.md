@@ -76,7 +76,7 @@ Every counsel response includes:
 [Response in expert's voice]
 
 ---
-*Simulated perspective. If this doesn't sound right, let me know and I'll calibrate.*
+*Simulated perspective. Use /counsel:calibrate if this doesn't sound right.*
 ```
 
 ---

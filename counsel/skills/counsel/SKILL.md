@@ -75,13 +75,7 @@ One expert perspective on the query.
 
 ### Panel
 
-Multiple experts debate. Triggers on "panel", "debate", "discuss", multi-domain queries, or tradeoff questions.
-
-**Panel format:**
-- Select 2-3 experts with distinct perspectives
-- Generate descriptors based on relevance to question
-- Show consensus points, then dissent with counter-responses
-- Flag genuine tradeoffs that panel cannot resolve
+Multiple experts debate. Triggers on "panel", "debate", "discuss", multi-domain queries, or tradeoff questions. See `/counsel:panel` for format.
 
 ### Style Modifier
 
@@ -92,6 +86,16 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 ## Curated Profiles
 
 20 experts available. See [inference.md](references/inference.md) for the complete catalog with domain routing.
+
+---
+
+## Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/counsel:summon [expert]` | Explicit single-expert invocation |
+| `/counsel:panel [question]` | Multi-expert debate |
+| `/counsel:calibrate [correction]` | Correct simulation errors |
 
 ---
 
@@ -131,8 +135,4 @@ See [confidence.md](references/confidence.md#descriptor-generation) for descript
 
 ## Calibration Protocol
 
-If user says "[Expert] wouldn't say that":
-1. Acknowledge the correction
-2. Ask what the expert would more likely say
-3. Log to `.claude/logs/counsel-calibrations.jsonl`
-4. Apply in future simulations for this expert
+If user says "[Expert] wouldn't say that": acknowledge, ask for correction, log to `.claude/logs/counsel-calibrations.jsonl`, apply in future. See `/counsel:calibrate` for details.

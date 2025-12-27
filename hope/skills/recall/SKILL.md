@@ -12,7 +12,7 @@ Surface relevant learnings from past sessions.
 - Session start (new or resumed)
 - Before substantial work in a domain
 - When soul skill's Silent Audit prompts "Learnings recalled?"
-- When user asks to "recall learnings" or "check past insights"
+- Explicitly via `/hope:recall [context]`
 
 ## Input
 

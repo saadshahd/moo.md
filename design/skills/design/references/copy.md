@@ -65,8 +65,8 @@ Before moving to implementation:
 Before generating final output, ask:
 
 > What format would you like for handoff?
-> 1. **Marp slides** — Presentation deck for stakeholders
-> 2. **Figma AI prompt** — UI with specific copy applied
+> 1. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
+> 2. **Figma AI prompt** — UI with specific copy applied (`/design:figma-prompt`)
 > 3. **Markdown table** — Copy variants for dev handoff
 > 4. **JSON** — Structured copy for i18n/CMS
 

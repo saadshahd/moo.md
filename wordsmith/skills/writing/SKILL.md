@@ -22,14 +22,14 @@ You're working on:
 
 Announce which workflow you're using:
 
-| Task Type                                    | Workflow            | Reference                 |
-| -------------------------------------------- | ------------------- | ------------------------- |
-| Analyze writing style, extract voice profile | Voice Extraction    | `references/voice.md`     |
-| List, apply, or delete saved voices          | Voice Library       | `references/voice.md`     |
-| Edit text, cut fluff, tighten prose          | Precision Editing   | `references/editing.md`   |
-| Structure story, build narrative arc         | Narrative Structure | `references/narrative.md` |
-| Write UI copy, tone variations               | Microcopy Tones     | `references/copy.md`      |
-| Evaluate blog/content quality, score         | Content Evaluation  | `references/eval.md`      |
+| Task Type                                    | Workflow            | Reference                   |
+| -------------------------------------------- | ------------------- | --------------------------- |
+| Analyze writing style, extract voice profile | Voice Extraction    | `references/voice.md`       |
+| List, apply, or delete saved voices          | Voice Library       | `/wordsmith:voices` command |
+| Edit text, cut fluff, tighten prose          | Precision Editing   | `references/editing.md`     |
+| Structure story, build narrative arc         | Narrative Structure | `references/narrative.md`   |
+| Write UI copy, tone variations               | Microcopy Tones     | `references/copy.md`        |
+| Evaluate blog/content quality, score         | Content Evaluation  | `references/eval.md`        |
 
 ## Strategic Framework
 
