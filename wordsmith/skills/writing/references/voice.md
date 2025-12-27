@@ -118,4 +118,4 @@ After outputting the extracted profile:
 
 > Save this voice profile? Provide a name to save it for reuse, or skip to continue without saving.
 
-See `/wordsmith:voices` command for listing, applying, and deleting saved voices.
+To list, apply, or delete saved voices, ask to "manage voice profiles" or "list saved voices".

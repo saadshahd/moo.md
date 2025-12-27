@@ -73,9 +73,9 @@ Before moving to implementation:
 Before generating final output, ask:
 
 > What format would you like for handoff?
-> 1. **DTCG JSON** — Full design tokens for Figma/code (`/design:tokens`)
-> 2. **Marp slides** — Presentation deck for stakeholders (`/hope:slides`)
-> 3. **Figma AI prompt** — Component library starter (`/design:figma-prompt`)
+> 1. **DTCG JSON** — Full design tokens for Figma/code
+> 2. **Marp slides** — Presentation deck for stakeholders
+> 3. **Figma AI prompt** — Component library starter
 > 4. **Markdown** — Structured text (copy-paste anywhere)
 
 ### DTCG Token Structure
