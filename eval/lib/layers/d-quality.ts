@@ -6,7 +6,7 @@ import type {
   QualityEval,
 } from "../types";
 import { CLIOutputSchema, QualityEvalSchema, Ok, Err } from "../types";
-import { DEFAULT_CONFIG, QUALITY_RUBRIC } from "../config";
+import { DEFAULT_CONFIG, QUALITY_RUBRIC, CONCURRENCY } from "../config";
 import {
   spawnWithTimeout,
   buildClaudeArgs,
@@ -95,7 +95,7 @@ async function getClaudeResponse(
   config: EvalConfig,
 ): Promise<Result<string, string>> {
   const args = buildClaudeArgs(testCase.prompt, testCase.plugin, config.model);
-  const result = await spawnWithTimeout(args, config.timeout);
+  const result = await spawnWithTimeout(args, CONCURRENCY.LAYER_D_TIMEOUT_MS);
 
   if (!result.ok) return Err(result.error);
   if (result.value.exitCode !== 0) {
@@ -115,7 +115,7 @@ async function runQualityEval(
 ): Promise<Result<QualityEval, string>> {
   const prompt = buildEvalPrompt(response, behaviors);
   const args = buildSimpleClaudeArgs(prompt);
-  const result = await spawnWithTimeout(args, config.timeout);
+  const result = await spawnWithTimeout(args, CONCURRENCY.LAYER_D_TIMEOUT_MS);
 
   if (!result.ok) return Err(result.error);
   if (result.value.exitCode !== 0) {
