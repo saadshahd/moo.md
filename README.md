@@ -28,7 +28,9 @@
     </tr>
   </table>
 </div>
+
 <br/><br/>
+
 <h2 align="center">See It In Action</h2>
 
 <table>

@@ -1,0 +1,11 @@
+name: wordsmith-template-adr
+description: Template skill triggers on ADR and architecture decision requests
+plugin: wordsmith
+skill: wordsmith:template
+prompt: "Help me document our decision to use PostgreSQL over MongoDB for the user service"
+expectedBehaviors:
+  - "Template skill activates on architecture decision"
+  - "Uses ADR template with Y-statement format"
+  - "Asks for options considered"
+  - "Includes consequences section with pros and cons"
+  - "Prompts for /wordsmith:edit after scaffolding"

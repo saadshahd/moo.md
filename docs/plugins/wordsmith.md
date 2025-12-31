@@ -11,6 +11,9 @@ Writing and content workflows for Claude Code.
 | "structure a narrative for X" | 3-act story with beats         |
 | "write this in 3 tones"       | UI copy variations             |
 | "is this ready to publish?"   | Quality score + verdict        |
+| "RFC for adding X"            | Structured RFC draft           |
+| "ADR for choosing X"          | MADR-formatted decision record |
+| "blog post about X"           | Hook-first blog structure      |
 
 ---
 
@@ -30,6 +33,7 @@ Auto-triggers on:
 - Narrative structure tasks
 - UI microcopy writing
 - Content quality evaluation
+- RFC, ADR, design doc, blog template requests
 
 ## Commands
 
@@ -127,6 +131,48 @@ The `/wordsmith:blog-eval` command scores on 5 dimensions (0-5 each):
 
 For each issue, provides exact replacement text.
 
+## Document Templates
+
+The template skill scaffolds structured documents using industry best practices.
+
+### Workflow
+
+```
+Template (Draft) → Edit (/wordsmith:edit) → Final Document
+```
+
+1. **Template** produces structured draft based on document type
+2. **Edit** refines prose, cuts fluff, tightens argument
+3. **Iterate** until satisfied
+
+### Built-in Templates
+
+| Template | Structure | Source |
+|----------|-----------|--------|
+| RFC | Context → Goals/Non-Goals → Design → Alternatives | Google, Uber, HashiCorp |
+| ADR | Context → Options → Decision → Consequences | MADR 3.0, Nygard |
+| Blog | Hook → Body → Takeaway | Write the Docs, DevRel |
+
+### Using Templates
+
+```
+"Write an RFC for adding caching"     → RFC template with trade-offs focus
+"ADR for choosing PostgreSQL"         → MADR with Y-statement format
+"Blog post about TypeScript generics" → Hook-first structure with length tiers
+```
+
+### Custom Templates
+
+Create your own templates that persist across sessions:
+
+```
+"create a custom RFC template"    # Interactive builder
+"list my templates"               # See all available
+"delete my technical-rfc template" # Remove user template
+```
+
+Custom templates stored at: `~/.claude/wordsmith/templates.jsonl`
+
 ---
 
-→ Source: [`wordsmith/skills/writing/SKILL.md`](../../wordsmith/skills/writing/SKILL.md)
+→ Source: [`wordsmith/skills/writing/SKILL.md`](../../wordsmith/skills/writing/SKILL.md), [`wordsmith/skills/template/SKILL.md`](../../wordsmith/skills/template/SKILL.md)

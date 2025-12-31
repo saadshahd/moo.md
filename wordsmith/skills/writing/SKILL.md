@@ -30,6 +30,7 @@ Announce which workflow you're using:
 | Structure story, build narrative arc         | Narrative Structure | `references/narrative.md`   |
 | Write UI copy, tone variations               | Microcopy Tones     | `references/copy.md`        |
 | Evaluate blog/content quality, score         | Content Evaluation  | `references/eval.md`        |
+| Create RFC, ADR, design doc, or blog         | Document Template   | `../template/SKILL.md`      |
 
 ## Strategic Framework
 

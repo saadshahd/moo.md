@@ -12,6 +12,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
+- feat(wordsmith): Template skill for document scaffolding (RFC, ADR, Blog)
+  - RFC template: Google/Uber/HashiCorp best practices (Context → Goals/Non-Goals → Design → Alternatives)
+  - ADR template: MADR 3.0 with Y-statement format (Context → Options → Decision → Consequences)
+  - Blog template: DevRel/Write the Docs style (Hook → Body → Takeaway, length tiers)
+  - Custom template storage at `~/.claude/wordsmith/templates.jsonl`
+  - Post-scaffold prompt: "Draft ready. Use `/wordsmith:edit` to refine prose."
+  - wordsmith plugin version 0.0.6 → 0.0.7
 
 ---
 
