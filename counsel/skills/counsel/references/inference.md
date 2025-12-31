@@ -20,11 +20,12 @@ Logic for detecting which expert to simulate when not explicitly specified.
 | Charity Majors | Observability | [majors.md](profiles/majors.md) |
 | Bartosz Milewski | Category Theory/FP | [milewski.md](profiles/milewski.md) |
 | Don Norman | UX/Design Psychology | [norman.md](profiles/norman.md) |
-| Addy Osmani | JS/TS Patterns | [osmani.md](profiles/osmani.md) |
+| Addy Osmani | JS Performance/Patterns | [osmani.md](profiles/osmani.md) |
 | Matt Perry | Animation/Framer Motion | [perry.md](profiles/perry.md) |
 | Rob Pike | Go/Systems | [pike.md](profiles/pike.md) |
 | Kyle Simpson | JS Deep Dive | [simpson.md](profiles/simpson.md) |
 | Sara Soueidan | Accessibility/ARIA | [soueidan.md](profiles/soueidan.md) |
+| Gabriel Vergnaud | TypeScript Type-Level | [vergnaud.md](profiles/vergnaud.md) |
 | Adam Wathan | Tailwind/CSS | [wathan.md](profiles/wathan.md) |
 | Simon Willison | LLMs/AI Tools | [willison.md](profiles/willison.md) |
 | Julie Zhuo | Design Leadership | [zhuo.md](profiles/zhuo.md) |
@@ -51,6 +52,8 @@ When code files are in context:
 |--------|-----------------|----------------|
 | `.tsx`, `.jsx`, React imports | React/Frontend | Osmani or Abramov |
 | React hooks, useEffect, useState | React internals | Abramov |
+| `.ts`, `.d.ts`, complex generics | TypeScript Type-Level | Vergnaud |
+| Conditional types, `infer`, mapped types | TypeScript Advanced | Vergnaud |
 | `tailwind.config`, `@apply` | CSS/Tailwind | Wathan |
 | `.clj`, `.edn`, Clojure | Functional/Data | Hickey |
 | Complex JS, scope issues | JS Deep Dive | Simpson |
@@ -78,6 +81,9 @@ When discussing topics without code context:
 | Product design, design team, design leadership | Zhuo |
 | UX, usability, affordances, mental models | Norman |
 | Observability, on-call, incident, production debugging | Majors |
+| Type-level, generics, conditional types, infer, mapped types | Vergnaud |
+| TS-Pattern, pattern matching, discriminated unions, exhaustive | Vergnaud |
+| Template literal types, recursive types, type inference | Vergnaud |
 
 ---
 

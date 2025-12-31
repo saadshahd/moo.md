@@ -12,6 +12,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
+- feat(counsel): Gabriel Vergnaud expert profile for TypeScript type-level programming
+  - Based on Type-Level TypeScript course (12 chapters)
+  - Replaces general TS coverage with deep type-system focus
+  - Trigger keywords: type-level, generics, conditional types, infer, mapped types, TS-Pattern
 
 ### Fixed
 - fix(product): Replaced broken Pareto reference with Impact-Effort in SKILL.md
