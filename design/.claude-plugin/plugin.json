@@ -1,7 +1,7 @@
 {
   "name": "design",
-  "version": "0.0.2",
-  "description": "Design exploration workflows for research, direction-finding, and surfacing unknowns",
+  "version": "0.1.0",
+  "description": "Design exploration workflows for research, direction-finding, and surfacing unknowns. Requires hope plugin for thinking tools.",
   "keywords": [
     "design",
     "ux",

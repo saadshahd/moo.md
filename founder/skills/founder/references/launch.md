@@ -175,4 +175,4 @@ Deliver as a structured 90-day plan:
 - Include specific metrics for every task
 - Tasks must be actionable by a solo founder
 - Budget constraints should inform channel selection
-- Use ask tool to understand resources before planning
+- Use Ask tool to understand resources before planning

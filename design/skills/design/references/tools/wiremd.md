@@ -2,7 +2,7 @@
 
 Generate low-fidelity wireframes from markdown. External CLI tool.
 
-**Status:** ⚠️ Experimental (Nov 2025, v0.1.x)
+**Status:** Experimental (v0.1.x)
 
 ## When to Use
 
@@ -11,66 +11,37 @@ Generate low-fidelity wireframes from markdown. External CLI tool.
 | Visualizing user flows | Sketch screens |
 | Lo-fi prototype needed | Quick mockups |
 | Presenting IA structure | Interactive hierarchy |
-| Design handoff | Developers can read/edit |
 
-## Installation
+## Installation & Usage
 
 ```bash
 npm install -g wiremd
-```
-
-## Basic Usage
-
-```bash
 wiremd input.md --style sketch -o output.html
-wiremd input.md --watch                         # Live reload
-wiremd input.md --serve                         # Dev server
+wiremd input.md --watch   # Live reload
 ```
 
 ## Styles
 
-| Style | Look |
-|-------|------|
-| `sketch` | Hand-drawn, Balsamiq-like (recommended for lo-fi) |
-| `wireframe` | Clean lines, formal |
-| `clean` | Minimal, modern |
-| `material` | Material Design |
-| `tailwind` | Tailwind CSS styling |
-| `brutal` | Bold, high-contrast |
-| `none` | Unstyled semantic HTML |
+`sketch` (hand-drawn) | `wireframe` (formal) | `clean` | `material` | `tailwind` | `brutal`
 
 ---
 
-## Complete Syntax Reference
+## Essential Syntax
 
-### Navigation Bars
+### Navigation
 
 ```markdown
-[[ Logo | Home | Products | About | Contact ]]
-[[ :logo: Brand | Home | [Sign In] ]]{.nav}
+[[ Logo | Home | Products | [Sign In] ]]{.nav}
 ```
 
-- Pipe `|` separates items
-- Icons with `:icon-name:`
-- Buttons with `[Button]`
-
-### Buttons
+### Inputs & Buttons
 
 ```markdown
-[Button Text]                    # Basic button
-[Button Text]*                   # Primary/active
-[Button Text]{.primary}          # Class-based
-[Button Text]{:disabled}         # Disabled state
-[Submit]{.primary :loading}      # Combined states
-```
-
-### Text Inputs
-
-```markdown
-[_______________]                          # Empty input
-[Email_______________]                     # With placeholder
-[_______________]{type:email required}     # With attributes
-[***********************]                  # Password field
+[_______________]             # Text input
+[Email___________]            # With placeholder
+[*****************]           # Password
+[Submit]{.primary}            # Primary button
+[Cancel]{:disabled}           # Disabled
 ```
 
 ### Textareas
@@ -78,85 +49,49 @@ wiremd input.md --serve                         # Dev server
 ```markdown
 [ ]
 [ ]
-[ ]                                        # Multi-line visual
+[ ]                           # Multi-line visual
 
-[Message...]{rows:5}                       # Compact with rows
+[Message...]{rows:5}          # Compact with rows
 ```
 
-### Dropdowns
+### Form Elements
 
 ```markdown
-[Choose option___________v]
-[Choose option___________v]{required}
-- Option 1
-- Option 2
-- Option 3
-```
-
-### Radio Buttons
-
-```markdown
-( ) Unselected option
-(•) Selected option
-(x) Alternative selected
-```
-
-### Checkboxes
-
-```markdown
-- [ ] Unchecked
-- [x] Checked
+[Choose option_______v]       # Dropdown
+( ) Option A                  # Radio
+(•) Selected                  # Radio selected
+- [ ] Unchecked               # Checkbox
+- [x] Checked                 # Checkbox checked
 ```
 
 ### Icons
 
 ```markdown
-:house: :user: :gear: :search: :menu:
-:logo: :cart: :heart: :star: :close:
+:house: :user: :gear: :search: :menu: :cart: :logo:
 ```
 
----
-
-## Containers
-
-### Generic Containers
+### Containers
 
 ```markdown
 ::: hero
 # Welcome
-Your tagline here
 [Get Started]{.primary}
 :::
 
 ::: card
 ### Feature
-Description text
+Description
 :::
 
 ::: modal
 ## Dialog Title
-Content here
 [Cancel] [Confirm]{.primary}
-:::
-
-::: alert
-⚠️ Warning message here
 :::
 ```
 
 Container types: `hero`, `card`, `modal`, `sidebar`, `footer`, `alert`
 
-### Inline Containers
-
-```markdown
-[[ item 1 | item 2 | item 3 ]]
-```
-
----
-
-## Layouts
-
-### Grid Layouts
+### Layouts
 
 ```markdown
 ## Features {.grid-3}
@@ -165,9 +100,6 @@ Container types: `hero`, `card`, `modal`, `sidebar`, `footer`, `alert`
 Description
 
 ### Feature Two
-Description
-
-### Feature Three
 Description
 ```
 
@@ -188,73 +120,45 @@ Main content area
 :::
 ```
 
----
-
-## Attributes
-
-### Classes
+### Attributes
 
 ```markdown
-{.primary}
-{.class-one .class-two}
-```
-
-### Key-Value
-
-```markdown
-{type:email}
-{rows:5}
-{placeholder:"Enter text"}
-```
-
-### States
-
-```markdown
-{:disabled}
-{:loading}
-{:active}
-{:error}
-{:success}
-```
-
-### Combined
-
-```markdown
-[Submit]{.primary type:submit :disabled}
+{.primary}                    # Class
+{type:email required}         # Key-value
+{:disabled :loading}          # States
 ```
 
 ---
 
-## State Patterns
-
-### Loading State
+## States
 
 ```markdown
 ::: loading
 :spinner: Loading...
-Please wait
 :::
-```
 
-### Empty State
-
-```markdown
 ::: empty-state
-:empty-box:
 ## No items found
-[Create Item]{.primary}
+[Create]{.primary}
 :::
-```
 
-### Error State
-
-```markdown
 ::: error-state
-:warning:
 ## Something went wrong
 [Retry]{.primary}
 :::
 ```
+
+---
+
+## Output Formats
+
+| Format | Command |
+|--------|---------|
+| HTML | `wiremd input.md -o output.html` |
+| JSON | `wiremd input.md --format json` |
+| React | `wiremd input.md --format react` |
+
+Exports can be imported into Figma via WireMD Figma Plugin.
 
 ---
 
@@ -306,19 +210,4 @@ $19.99
 
 ---
 
-## Output Formats
-
-| Format | Command |
-|--------|---------|
-| HTML | `wiremd input.md -o output.html` |
-| JSON | `wiremd input.md --format json` |
-| React | `wiremd input.md --format react` |
-| Tailwind | `wiremd input.md --format tailwind` |
-
-## Figma Import
-
-WireMD exports can be imported into Figma via the WireMD Figma Plugin as fully editable native Figma designs.
-
----
-
-_Source: [WireMD](https://wiremd.dev/), [Syntax Spec v0.1](https://github.com/akonan/wiremd/blob/main/SYNTAX-SPEC-v0.1.md)_
+_Full syntax: [wiremd.dev](https://wiremd.dev/), [Syntax Spec v0.1](https://github.com/akonan/wiremd/blob/main/SYNTAX-SPEC-v0.1.md)_

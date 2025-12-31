@@ -81,4 +81,4 @@ Before returning:
 - Keep beats concrete, not abstract
 - Opening hook must create tension or curiosity
 - Closing CTA must be specific and actionable
-- Use ask tool if concept is unclear
+- Use Ask tool if concept is unclear

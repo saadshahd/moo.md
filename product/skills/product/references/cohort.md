@@ -114,7 +114,7 @@ Generate actionable findings:
 
 ## Rules
 
-- Use ask tool to gather data
+- Use Ask tool to gather data
 - Mark immature cohorts (<3 months) as preliminary
 - Quantify recommendations with expected impact
 - Compare to SaaS benchmarks

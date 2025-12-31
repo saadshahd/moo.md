@@ -87,7 +87,7 @@ Only after user confirms, generate:
 
 ## Rules
 
-- Use the ask tool
+- Use Ask tool
 - Do not proceed without user confirmation
 - Challenge every feature: "Can we ship without this?"
 - Default to cutting scope, not adding

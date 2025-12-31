@@ -140,4 +140,4 @@ Deliver as a single Q&A prep document:
 - Cover all common startup failure modes
 - Include at least one question about team weakness
 - Include at least one question about competition from Big Tech
-- Use ask tool to understand context before generating questions
+- Use Ask tool to understand context before generating questions

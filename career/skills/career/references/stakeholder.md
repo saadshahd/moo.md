@@ -4,7 +4,7 @@ Analyze complex political situations and develop strategic paths forward.
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **Situation Context:** All relevant emails, meeting notes, background (be thorough)
 2. **Your Role:** Position, authority level, reporting structure

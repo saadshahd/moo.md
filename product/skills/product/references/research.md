@@ -89,8 +89,7 @@ Each linked to quotes and data points.
 
 ## Rules
 
-- Use Ask Tool
+- Use Ask tool
 - Let patterns emerge—don't force preconceived categories
 - Look beyond sentiment to tensions and contradictions
 - Every insight must connect to a potential decision
-- Use ask tool

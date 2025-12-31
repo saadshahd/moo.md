@@ -101,4 +101,4 @@ Return JSON:
 - Give 3-5 specific fixes with exact replacement text
 - Point to exact locations in the content
 - Prioritize fixes by impact on credibility and reader action
-- Use ask tool if content purpose is unclear
+- Use Ask tool if content purpose is unclear

@@ -56,4 +56,4 @@ Before returning:
 - Keep rewrites action-oriented where appropriate
 - Preserve the original meaning
 - Don't add information not in the original
-- Use ask tool if UI context is unclear
+- Use Ask tool if UI context is unclear

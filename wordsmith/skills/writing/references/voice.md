@@ -74,7 +74,7 @@ Rewrite this in the extracted voice to demonstrate the profile.
 - Voice guideline must be 140-160 words
 - Demo rewrite must clearly show the extracted style
 - Be specific about patterns, not vague ("uses short sentences" not "writes concisely")
-- Use ask tool if sample is too short
+- Use Ask tool if sample is too short
 
 ---
 

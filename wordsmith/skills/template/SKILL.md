@@ -97,7 +97,7 @@ Built-in templates: `rfc`, `adr`, `blog`
 ## Rules
 
 - Always check for custom templates before using built-ins
-- Use AskUserQuestion tool for required inputs before scaffolding
+- Use Ask tool for required inputs before scaffolding
 - Include quality checks at end of generated document
 - Prompt for `/wordsmith:edit` after scaffolding
 - Preserve user's existing content if iterating on a draft

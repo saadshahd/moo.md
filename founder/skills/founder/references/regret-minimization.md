@@ -56,7 +56,7 @@ He left a high-paying hedge fund job to start Amazon.
 
 ## When NOT to Use
 
-- Day-to-day decisions (use [10/10/10 Rule](10-10-10.md) instead)
+- Day-to-day decisions (use [10/10/10 Rule](../../../hope/skills/soul/references/tools/10-10-10.md) instead)
 - Reversible choices (not high-stakes enough)
 - When you're rationalizing recklessness
 - Financial decisions that could ruin others

@@ -193,4 +193,4 @@ Include:
 - Include formulas as comments where helpful
 - Benchmark against SaaS standards (LTV:CAC >3:1, payback <12mo, GM >70%)
 - Flag metrics that need attention (🟢/🟡/🔴)
-- Use ask tool to gather key assumptions before generating tables
+- Use Ask tool to gather key assumptions before generating tables

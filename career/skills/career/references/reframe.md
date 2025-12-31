@@ -4,7 +4,7 @@ Break out of conventional thinking by generating radically different viewpoints.
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **Challenge:** The specific problem or goal (1-2 sentences)
 2. **Current Approach:** How they're thinking about it now (1 paragraph max)

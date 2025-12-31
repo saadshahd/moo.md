@@ -56,7 +56,7 @@ From `hope/skills/soul/references/tools/`:
 
 ## Rules
 
-- Use AskUserQuestion tool to gather input before proceeding
+- Use Ask tool to gather input before proceeding
 - Preserve author voice when editing
 - Be specific about changes and rationale
 - For evaluations, provide exact replacement text for fixes

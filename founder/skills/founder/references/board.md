@@ -238,4 +238,4 @@ Deliver:
 - Flag metrics that need attention (🟢/🟡/🔴)
 - Include decisions requested explicitly
 - No surprises—if there's bad news, surface it clearly
-- Use ask tool to gather all metrics before generating
+- Use Ask tool to gather all metrics before generating

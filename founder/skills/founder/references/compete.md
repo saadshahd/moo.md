@@ -103,4 +103,4 @@ Key Moat: [Network effects / Data / Brand / Switching costs]
 - Evidence must be ≤20 words per item
 - Timing estimates in months, not vague terms
 - Mitigation strategies must be actionable
-- Use ask tool to clarify niche/differentiation before analysis
+- Use Ask tool to clarify niche/differentiation before analysis

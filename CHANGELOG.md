@@ -18,7 +18,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Blog template: DevRel/Write the Docs style (Hook → Body → Takeaway, length tiers)
   - Custom template storage at `~/.claude/wordsmith/templates.jsonl`
   - Post-scaffold prompt: "Draft ready. Use `/wordsmith:edit` to refine prose."
-  - wordsmith plugin version 0.0.6 → 0.0.7
+
+---
+
+## [0.1.0] - 2025-12-31
+
+### Added
+- feat(hope): 10-10-10 Rule lifted from career to hope as single source of truth
+- feat(hope): Rationalization tables in gate and soul skills
+- feat(founder): Quality Footer section for high-stakes outputs
+- feat(founder): Rationalization table for startup thinking traps
+- feat(career): Quality Footer section for assessments
+- feat(counsel): Lazy loading instruction in SKILL.md Step 2
+
+### Changed
+- **All domain plugins** now explicitly document hope dependency in plugin.json description
+- **Tool naming standardized**: All "ask tool" references now "Ask tool" (40+ files)
+- **Token efficiency**: wiremd.md trimmed from 325 → 141 lines (57% reduction)
+- **Version bumps to 0.1.0** (signals marketplace maturity):
+  - product: 0.0.4 → 0.1.0
+  - wordsmith: 0.0.7 → 0.1.0
+  - founder: 0.0.4 → 0.1.0
+  - career: 0.0.4 → 0.1.0
+  - design: 0.0.2 → 0.1.0
+
+### Fixed
+- fix(founder): Broken 10-10-10 reference in regret-minimization.md (now points to hope)
+- fix(product): Duplicate "Use ask tool" line removed from research.md
 
 ---
 

@@ -4,7 +4,7 @@ Identify weakness patterns across multiple evaluations to prioritize improvement
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **Number of evaluated documents** available
 2. **For each document:**

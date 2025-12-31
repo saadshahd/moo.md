@@ -80,3 +80,30 @@ After generating markdown artifacts, users can convert them:
 - Use markdown tables for spreadsheet data (easy paste)
 - Be brutally honest in evaluations (2% YC acceptance rate mindset)
 - Include confidence levels and key assumptions
+
+## Quality Footer (Required for High-Stakes Outputs)
+
+All validation, pitch, and financial outputs MUST end with:
+
+```
+---
+| Confidence | X-Y% |
+| Key Assumption | [What would change this verdict] |
+| Reversibility | Type 2A/2B/1 |
+```
+
+**Verdict rules:**
+- GO verdict requires ≥70% confidence
+- ITERATE requires identifying specific unknowns to resolve
+- KILL must cite specific evidence, not intuition
+
+## Common Rationalizations (All Wrong)
+
+| Thought | Reality |
+|---------|---------|
+| "The market is huge" | TAM without SAM/SOM is meaningless. |
+| "Nobody's doing this" | If nobody's doing it, ask why. |
+| "We just need 1% of the market" | That's not a strategy, it's wishful math. |
+| "First mover advantage" | First movers usually lose. Execution wins. |
+| "Build it and they will come" | Distribution is harder than product. |
+| "We're different" | Every founder says this. Prove it with evidence. |

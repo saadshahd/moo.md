@@ -4,7 +4,7 @@ OSINT analysis of job postings to surface insider intelligence for job seekers.
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **Company name or careers URL**
 2. **Specific roles of interest** (optional)

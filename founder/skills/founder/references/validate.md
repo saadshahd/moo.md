@@ -77,4 +77,4 @@ Also provide:
 - Cite evidence or explicitly note "no evidence"
 - Killer assumption must be ≤15 words
 - Falsification test must be doable in 48 hours
-- Use ask tool to gather missing context before scoring
+- Use Ask tool to gather missing context before scoring

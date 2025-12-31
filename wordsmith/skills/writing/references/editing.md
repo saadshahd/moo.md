@@ -151,4 +151,4 @@ The edited text without markup.
 - Explain non-obvious edits
 - Preserve author's distinctive phrases and rhythms
 - If voice is unclear, ask for more context
-- Use ask tool if passage is ambiguous
+- Use Ask tool if passage is ambiguous

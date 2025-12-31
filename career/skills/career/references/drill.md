@@ -4,7 +4,7 @@ Transform messy real-world situations into focused skill-building exercises.
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **The messy situation:** Slack thread, vague request, half-formed idea, confusing email chain—whatever they're staring at
 2. **Optional context:** Deadline, stakeholders involved, why it matters

@@ -21,7 +21,7 @@ This workflow has two modes:
 
 ### Interview Questions
 
-Use ask tool to gather (5-7 questions):
+Use Ask tool to gather (5-7 questions):
 
 1. **Interruption Sources:** What typically interrupts your focused work? (meetings, Slack, email, colleagues, self-initiated breaks)
 
@@ -81,7 +81,7 @@ Use ask tool to gather (5-7 questions):
 
 ### Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **Meeting name/type**
 2. **Duration** (minutes)

@@ -113,4 +113,4 @@ Priority = (Market Pressure × Deal Impact × Strategic Fit) / Build Effort
 - Ground recommendations in evidence (quotes, data, patterns)
 - Distinguish table stakes from differentiators
 - Focus on gaps that affect revenue, not vanity features
-- Use ask tool
+- Use Ask tool

@@ -4,7 +4,7 @@ Transform bullet points into compelling behavioral interview stories using STAR-
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **Experience bullet points or project descriptions** to transform
 2. **Target role/level** (helps calibrate emphasis)

@@ -4,7 +4,7 @@ Score executive communications against a rubric designed for busy decision-maker
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **The communication to evaluate:** Executive update, one-pager, email to leadership, status report
 2. **Context (optional):** Audience, stakes, what prompted this communication

@@ -53,7 +53,7 @@ From this skill's `references/`:
 
 | Tool                                      | When to Use                             |
 | ----------------------------------------- | --------------------------------------- |
-| [10/10/10 Rule](references/10-10-10.md)   | Daily career decisions with time clarity |
+| [10/10/10 Rule](../../hope/skills/soul/references/tools/10-10-10.md) | Daily career decisions with time clarity |
 | [Feynman Technique](references/feynman-technique.md) | Deep learning, interview prep, verify understanding |
 
 ## Usage
@@ -65,8 +65,24 @@ From this skill's `references/`:
 
 ## Rules
 
-- Use AskUserQuestion tool to gather input before proceeding
+- Use Ask tool to gather input before proceeding
 - Be direct and honest—career growth requires uncomfortable feedback
 - Focus on actionable improvements, not encouragement
 - Ground recommendations in evidence from user responses
 - Use story points for effort estimates, never time
+
+## Quality Footer (Required for Assessments)
+
+All assessment, simulation, and stakeholder navigation outputs MUST end with:
+
+```
+---
+| Confidence | X-Y% |
+| Key Assumption | [What would change this assessment] |
+| Reversibility | Type 2A/2B/1 |
+```
+
+**Evidence requirements:**
+- Assessments must cite specific user responses
+- Simulations must ground feedback in observable patterns
+- Stakeholder analysis must distinguish [FACT] from [INFERENCE]

@@ -132,4 +132,4 @@ marp: true
 - Be conservative—investors discount inflated TAMs
 - SAM filters must be defensible
 - SOM must tie to actual resources (sales headcount, marketing budget)
-- Use ask tool to gather each input ONE at a time
+- Use Ask tool to gather each input ONE at a time

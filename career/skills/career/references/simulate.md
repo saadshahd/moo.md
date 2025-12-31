@@ -4,7 +4,7 @@ Interactive scenario-based interview practice with structured feedback.
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 1. **Role Level:** Junior / Mid / Senior / Executive
 2. **Domain:** Engineering / Product / Sales / Marketing / Operations / Other

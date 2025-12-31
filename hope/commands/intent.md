@@ -22,7 +22,7 @@ Privately list every fact or constraint you still need.
 
 ### 1 Clarify Loop
 
-Use the ask tool until you estimate ≥ 95% confidence you can ship the correct result.
+Use the Ask tool until you estimate ≥ 95% confidence you can ship the correct result.
 
 Cover:
 

@@ -120,4 +120,4 @@ Calculate overall score (average of 5 dimensions):
 - Give 3-5 specific fixes with exact replacement text
 - Point to exact locations in the PRD
 - Prioritize fixes by impact on engineering clarity
-- Use ask tool if PRD is unclear
+- Use Ask tool if PRD is unclear

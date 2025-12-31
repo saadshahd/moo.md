@@ -51,6 +51,8 @@ Follow [inference.md](references/inference.md) detection order:
 
 ### Step 2: Load Profile
 
+**CRITICAL: Lazy loading only.** After Step 1 detection, load ONLY the matched profile. Never preload multiple profiles. For panels, load max 3-4 profiles.
+
 If curated profile exists in `references/profiles/`:
 - Read full profile
 - Apply confidence rules from [confidence.md](references/confidence.md)

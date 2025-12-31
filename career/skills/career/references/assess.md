@@ -4,7 +4,7 @@ Evidence-based evaluation of AI collaboration skills with scoring rubrics and im
 
 ## Input Required
 
-Use ask tool to gather:
+Use Ask tool to gather:
 
 - 25-35 minutes of focused time from user
 - Honest, specific responses (not aspirational)

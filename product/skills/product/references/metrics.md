@@ -107,4 +107,4 @@ Recommend one method per goal:
 - Every goal needs a weekly lead indicator
 - First action must be concrete and immediate
 - No time estimates for milestones—use phases
-- Use ask tool
+- Use Ask tool

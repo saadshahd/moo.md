@@ -17,7 +17,7 @@ Understand the topic:
 
 ## Phase 2: Question Generation
 
-Generate 15-20 questions across 5 categories, use ask tool:
+Generate 15-20 questions across 5 categories, use Ask tool:
 
 ### 1. Root Cause (5 Whys)
 

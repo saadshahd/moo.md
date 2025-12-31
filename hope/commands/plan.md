@@ -19,7 +19,7 @@ Before anything else, identify what's unclear.
 - What constraints exist (tech, perf, compat)?
 - What's been tried before?
 
-**If confidence < 85%**, ask the user 3-5 targeted questions using the ask tool:
+**If confidence < 85%**, ask the user 3-5 targeted questions using the Ask tool:
 
 - Open-ended (no yes/no)
 - Designed to surface blind spots

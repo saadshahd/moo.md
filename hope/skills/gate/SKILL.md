@@ -71,3 +71,14 @@ When blocked, state:
 
 Trivial changes (< 1 min rollback): completion allowed without full gate.
 Document undo command.
+
+## Common Rationalizations (All Wrong)
+
+| Thought | Reality |
+|---------|---------|
+| "The tests passed" | Tests ≠ verification. Did you run the ACTUAL command? |
+| "It should work" | "Should" = assumption. Show evidence. |
+| "I already checked" | When? Show the output. |
+| "The user is waiting" | Rushed verification = rework later. |
+| "It's a simple change" | Simple changes break production too. |
+| "I'm pretty sure it works" | Pretty sure ≠ evidence. Run it. |

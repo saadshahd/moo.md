@@ -1,7 +1,7 @@
 {
   "name": "career",
-  "version": "0.0.4",
-  "description": "Interview prep, skill assessment, STAR narratives, stakeholder navigation, and focus capacity analysis for career development",
+  "version": "0.1.0",
+  "description": "Interview prep, skill assessment, STAR narratives, stakeholder navigation, and focus capacity analysis for career development. Requires hope plugin for thinking tools.",
   "keywords": [
     "interview prep",
     "career assessment",

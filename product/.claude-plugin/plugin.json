@@ -1,7 +1,7 @@
 {
   "name": "product",
-  "version": "0.0.4",
-  "description": "PRD generation, competitive analysis, research synthesis, and goal systems for product work.",
+  "version": "0.1.0",
+  "description": "PRD generation, competitive analysis, research synthesis, and goal systems for product work. Requires hope plugin for thinking tools.",
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

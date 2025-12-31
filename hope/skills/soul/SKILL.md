@@ -77,7 +77,7 @@ For most situations, use these first:
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Root Cause        | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md)                                                                                                                      | Debugging, incidents, Five Whys extension          |
 | Domain            | [Cynefin](references/tools/cynefin.md)                                                                                                                                                                | Choosing approach before diving in                 |
-| Decision          | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md), [Grey Thinking](references/tools/grey-thinking.md) | Multi-option choices, fast decisions, avoid binary traps |
+| Decision          | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md), [Grey Thinking](references/tools/grey-thinking.md), [10-10-10](references/tools/10-10-10.md) | Multi-option choices, fast decisions, avoid binary traps, time perspective |
 | Prioritization    | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Opportunity Cost](references/tools/opportunity-cost.md), [Systems Over Goals](references/tools/systems-over-goals.md) | Backlog grooming, debt triage, tradeoffs, habits   |
 | Systems           | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md), [Incentives](references/tools/incentives.md), [Bottlenecks](references/tools/bottlenecks.md) | Architecture, metrics, behavior, constraints       |
 | Creative          | [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md), [Deliberate Practice](references/tools/deliberate-practice.md) | Brainstorming, reframing, innovation, skill building |
@@ -109,13 +109,16 @@ Common combinations for complex problems:
 
 ## Common Rationalizations (All Wrong)
 
-If you catch yourself thinking:
-
-- "This is just a simple question" → WRONG. Run Silent Audit.
-- "I already know the answer" → WRONG. State confidence percentage.
-- "This doesn't need a library search" → WRONG. Search anyway.
-- "The user wants me to just do it" → WRONG. Clarify intent first.
-- "This is too small for workflows" → WRONG. Workflow B for any fix.
+| Thought | Reality |
+|---------|---------|
+| "This is just a simple question" | Run Silent Audit anyway. |
+| "I already know the answer" | State confidence percentage. |
+| "This doesn't need a library search" | Search anyway. Every library not written = 1000 bugs avoided. |
+| "The user wants me to just do it" | Clarify intent first. Wrong fast = waste. |
+| "This is too small for workflows" | Workflow B for any fix. |
+| "I can skip the inversion" | Inversion catches failures cheaper than debugging. |
+| "The pattern is obvious" | Document it anyway. Future you will forget. |
+| "I'll add tests later" | "Later" = never. Test now or don't claim done. |
 
 **Every rationalization = skipped step = compounding failure.**
 
