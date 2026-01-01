@@ -2,7 +2,7 @@
 
 Generate low-fidelity wireframes from markdown. External CLI tool.
 
-**Status:** Experimental (v0.1.x)
+**Version:** 0.1.5 (pin this version — alpha tool, breaking changes possible)
 
 ## When to Use
 
@@ -12,10 +12,10 @@ Generate low-fidelity wireframes from markdown. External CLI tool.
 | Lo-fi prototype needed | Quick mockups |
 | Presenting IA structure | Interactive hierarchy |
 
-## Installation & Usage
+## Installation
 
 ```bash
-npm install -g wiremd
+npm install -g wiremd@0.1.5
 wiremd input.md --style sketch -o output.html
 wiremd input.md --watch   # Live reload
 ```
@@ -26,22 +26,53 @@ wiremd input.md --watch   # Live reload
 
 ---
 
+## What Works vs What Doesn't
+
+### Works
+| Syntax | Notes |
+|--------|-------|
+| Single `:::` containers | No nesting |
+| `{.class}` attributes | Single or multiple classes |
+| Inline HTML (`<small>`, `<span>`) | Passed through to output |
+| Grid via heading hierarchy | See below |
+| Standard markdown | Headings, bold, lists, links |
+
+### Does NOT Work
+| Syntax | Issue |
+|--------|-------|
+| Nested `:::` inside `:::` | Parser doesn't handle recursion |
+| `{.sidebar-main}` layout | Documented but non-functional |
+| Custom CSS classes | Adds class but no styling — only predefined types render |
+| Quoted attributes `{key:"value"}` | No quote handling |
+
+---
+
 ## Essential Syntax
 
 ### Navigation
 
 ```markdown
-[[ Logo | Home | Products | [Sign In] ]]{.nav}
+[[ :logo: Brand | Home | Products | [Sign In] ]]{.nav}
 ```
 
-### Inputs & Buttons
+### Buttons
+
+```markdown
+[Button]                      # Basic
+[Submit]*                     # Primary (asterisk suffix)
+[Submit]{.primary}            # Primary (class)
+[Cancel]{.secondary}          # Secondary
+[Delete]{.danger}             # Danger
+[Disabled]{:disabled}         # Disabled state
+```
+
+### Inputs
 
 ```markdown
 [_______________]             # Text input
 [Email___________]            # With placeholder
 [*****************]           # Password
-[Submit]{.primary}            # Primary button
-[Cancel]{:disabled}           # Disabled
+[___]{type:email required}    # With attributes
 ```
 
 ### Textareas
@@ -57,8 +88,8 @@ wiremd input.md --watch   # Live reload
 ### Form Elements
 
 ```markdown
-[Choose option_______v]       # Dropdown
-( ) Option A                  # Radio
+[Choose option_______v]       # Dropdown (v suffix)
+( ) Option A                  # Radio unselected
 (•) Selected                  # Radio selected
 - [ ] Unchecked               # Checkbox
 - [x] Checked                 # Checkbox checked
@@ -67,10 +98,22 @@ wiremd input.md --watch   # Live reload
 ### Icons
 
 ```markdown
-:house: :user: :gear: :search: :menu: :cart: :logo:
+:house: :user: :gear: :search: :menu: :cart: :logo: :rocket: :shield:
 ```
 
-### Containers
+### Badges (Backtick Syntax)
+
+```markdown
+Status `active`               # Renders as badge/pill
+Notifications `3`
+Version `beta`
+```
+
+---
+
+## Containers (Styled Types Only)
+
+Only these container types have CSS styling:
 
 ```markdown
 ::: hero
@@ -79,58 +122,45 @@ wiremd input.md --watch   # Live reload
 :::
 
 ::: card
-### Feature
-Description
+### Feature Title
+Description text
 :::
 
 ::: modal
 ## Dialog Title
 [Cancel] [Confirm]{.primary}
 :::
-```
 
-Container types: `hero`, `card`, `modal`, `sidebar`, `footer`, `alert`
+::: footer
+[[ Privacy | Terms | Contact ]]
+:::
 
-### Layouts
-
-```markdown
-## Features {.grid-3}
-
-### Feature One
-Description
-
-### Feature Two
-Description
-```
-
-Grids: `.grid-2`, `.grid-3`, `.grid-4`, `.grid-auto`
-
-### Sidebar + Main
-
-```markdown
-::: layout {.sidebar-main}
-
-## Sidebar {.sidebar}
-- Nav item 1
-- Nav item 2
-
-## Main {.main}
-Main content area
-
+::: section
+General content section
 :::
 ```
 
-### Attributes
+### Alert with Variants
 
 ```markdown
-{.primary}                    # Class
-{type:email required}         # Key-value
-{:disabled :loading}          # States
+::: alert
+Default alert message
+:::
+
+::: alert {:error}
+Error: Something went wrong
+:::
+
+::: alert {:success}
+Success: Operation completed
+:::
+
+::: alert {.warning}
+Warning: Check your input
+:::
 ```
 
----
-
-## States
+### State Containers
 
 ```markdown
 ::: loading
@@ -150,6 +180,61 @@ Main content area
 
 ---
 
+## Grid Layout (Heading Hierarchy)
+
+Grids use implicit heading hierarchy — NOT nested containers:
+
+```markdown
+## Features {.grid-3}
+
+### Feature One
+Fast and reliable performance
+
+### Feature Two
+Enterprise-grade security
+
+### Feature Three
+Powerful developer tools
+```
+
+**Rules:**
+- Heading with `{.grid-N}` becomes grid container
+- Subheadings (exactly +1 level) become grid items
+- Content after subheading belongs to that item
+- Stops at next heading at same or higher level
+
+Grids: `.grid-2`, `.grid-3`, `.grid-4`, `.grid-auto`
+
+---
+
+## Inline HTML
+
+Inline HTML tags pass through to output:
+
+```markdown
+**Product Name** <small>500mg</small>
+
+<span>Styled text</span>
+
+Price: <strong>$29.99</strong>
+```
+
+Use for styling that wiremd doesn't support natively.
+
+---
+
+## Attributes
+
+```markdown
+{.primary}                    # Single class
+{.btn .large}                 # Multiple classes
+{type:email required}         # Key-value pairs
+{:disabled}                   # State
+{rows:5}                      # Numeric value
+```
+
+---
+
 ## Output Formats
 
 | Format | Command |
@@ -157,8 +242,6 @@ Main content area
 | HTML | `wiremd input.md -o output.html` |
 | JSON | `wiremd input.md --format json` |
 | React | `wiremd input.md --format react` |
-
-Exports can be imported into Figma via WireMD Figma Plugin.
 
 ---
 
@@ -180,25 +263,25 @@ Manage your inventory
 
 ## Products {.grid-3}
 
-::: card
-### Widget A
+### Widget A <small>SKU-001</small>
 $29.99
 - [x] In stock
 [Edit] [Delete]{:disabled}
-:::
 
-::: card
-### Widget B
-$49.99
+### Widget B <small>SKU-002</small>
+$49.99 `sale`
 - [ ] Out of stock
-[Edit] [Delete]
-:::
+[Edit] [Notify]
 
-::: card
-### Widget C
+### Widget C <small>SKU-003</small>
 $19.99
 - [x] In stock
 [Edit] [Delete]
+
+---
+
+::: alert {:success}
+3 products loaded successfully
 :::
 
 ---
@@ -208,6 +291,13 @@ $19.99
 :::
 ```
 
+**Key patterns:**
+- Flat structure (no nested `:::` blocks)
+- Grid items via heading hierarchy
+- Inline HTML for extra styling (`<small>`)
+- Badges via backticks (`sale`)
+- Sections separated by `---`
+
 ---
 
-_Full syntax: [wiremd.dev](https://wiremd.dev/), [Syntax Spec v0.1](https://github.com/akonan/wiremd/blob/main/SYNTAX-SPEC-v0.1.md)_
+_Docs: [wiremd.dev](https://wiremd.dev/) | [Syntax Spec](https://github.com/akonan/wiremd/blob/main/SYNTAX-SPEC-v0.1.md)_

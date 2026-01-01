@@ -13,11 +13,32 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
 - feat(wordsmith): Template skill for document scaffolding (RFC, ADR, Blog)
-  - RFC template: Google/Uber/HashiCorp best practices (Context → Goals/Non-Goals → Design → Alternatives)
-  - ADR template: MADR 3.0 with Y-statement format (Context → Options → Decision → Consequences)
-  - Blog template: DevRel/Write the Docs style (Hook → Body → Takeaway, length tiers)
-  - Custom template storage at `~/.claude/wordsmith/templates.jsonl`
-  - Post-scaffold prompt: "Draft ready. Use `/wordsmith:edit` to refine prose."
+
+---
+
+## [design@0.1.1] - 2026-01-01
+
+### Changed
+- WireMD syntax reference rewritten to match v0.1.5 verified behavior
+  - Pinned to version 0.1.5 (alpha tool, avoid breakage)
+  - Documented: flat containers only (no nesting), grid heading hierarchy, inline HTML support
+  - Removed: sidebar-main layout, nested container examples (non-functional)
+  - Added: badge backtick syntax, alert variants, styled container types list
+- `/wireframe` command now auto-detects wiremd CLI and asks before installing
+
+### Fixed
+- Removed unsupported nested `:::` patterns from WireMD documentation (GitHub issue #9)
+- Removed non-functional `{.sidebar-main}` layout from examples
+
+---
+
+## [hope@0.4.8] - 2026-01-01
+
+### Added
+- CLI installation pattern reference (`cli-install.md`) for reusable tool detection flow
+
+### Changed
+- `/slides` command now auto-detects marp CLI and asks before installing
 
 ---
 

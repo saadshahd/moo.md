@@ -14,6 +14,20 @@ Context from current conversation or explicit content request.
 
 ## Process
 
+### 0. Check Marp Installation
+
+1. Run: `which marp`
+2. If not found, use AskUserQuestion:
+   ```
+   Marp CLI is not installed. Would you like me to install it?
+
+   Command: npm install -g @marp-team/marp-cli
+
+   [Yes, install it] / [No, show manual instructions]
+   ```
+3. If approved: Run `npm install -g @marp-team/marp-cli` then verify with `marp --version`
+4. If declined: Continue generating markdown, include install instructions in output
+
 ### 1. Determine Content Source
 
 - If arguments specify a topic/content, use that
@@ -138,8 +152,10 @@ Simplify payment to single step
 
 ## Requirements
 
-- Marp CLI must be installed: `npm install -g @marp-team/marp-cli`
-- For PDF output: Chrome/Chromium required
+- Marp CLI: Auto-detected and installed on first use
+- Manual install: `npm install -g @marp-team/marp-cli`
+- For PDF output: Chrome/Chromium required (cannot auto-install)
+- See [CLI Install Pattern](../skills/soul/references/cli-install.md)
 
 ## Related
 
