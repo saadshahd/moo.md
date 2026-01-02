@@ -14,6 +14,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
 - feat(wordsmith): Template skill for document scaffolding (RFC, ADR, Blog)
 
+### Changed
+- fix(design): WireMD syntax corrected based on parser analysis
+  - Use state containers (`error-state`, `success-state`, etc.) instead of alert variants
+  - Blank lines required after `:::`, between elements, and before closing `:::`
+  - Removed `---` horizontal rules from examples
+  - Removed invalid `::: alert {:error}` syntax (use `::: error-state` instead)
+- refactor(design): `/wireframe` command restructured with Anthropic prompting patterns
+  - Example moved to top (Claude reads linearly)
+  - Converted to Goal + Constraints format
+  - Added "Adapt to Context" escape hatch
+
 ---
 
 ## [design@0.1.1] - 2026-01-01

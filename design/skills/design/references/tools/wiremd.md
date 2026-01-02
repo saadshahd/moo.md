@@ -17,7 +17,7 @@ Generate low-fidelity wireframes from markdown. External CLI tool.
 ```bash
 npm install -g wiremd@0.1.5
 wiremd input.md --style sketch -o output.html
-wiremd input.md --watch   # Live reload
+wiremd input.md --serve 3200   # Live reload on port 3200
 ```
 
 ## Styles
@@ -113,68 +113,85 @@ Version `beta`
 
 ## Containers (Styled Types Only)
 
+**Critical:** Every container needs blank lines after opening `:::`, between elements, and before closing `:::`.
+
 Only these container types have CSS styling:
 
 ```markdown
 ::: hero
+
 # Welcome
+
 [Get Started]{.primary}
+
 :::
 
 ::: card
+
 ### Feature Title
+
 Description text
+
 :::
 
 ::: modal
+
 ## Dialog Title
+
 [Cancel] [Confirm]{.primary}
+
 :::
 
 ::: footer
+
 [[ Privacy | Terms | Contact ]]
+
 :::
 
 ::: section
+
 General content section
-:::
-```
 
-### Alert with Variants
-
-```markdown
-::: alert
-Default alert message
-:::
-
-::: alert {:error}
-Error: Something went wrong
-:::
-
-::: alert {:success}
-Success: Operation completed
-:::
-
-::: alert {.warning}
-Warning: Check your input
 :::
 ```
 
 ### State Containers
 
+Use these for feedback states:
+
 ```markdown
-::: loading
-:spinner: Loading...
+::: error-state
+
+Error: Something went wrong
+
+[Retry]{.primary}
+
+:::
+
+::: success-state
+
+Success: Operation completed
+
+:::
+
+::: warning-state
+
+Warning: Check your input
+
 :::
 
 ::: empty-state
-## No items found
+
+No items found
+
 [Create]{.primary}
+
 :::
 
-::: error-state
-## Something went wrong
-[Retry]{.primary}
+::: loading-state
+
+:spinner: Loading...
+
 :::
 ```
 
@@ -250,54 +267,61 @@ Use for styling that wiremd doesn't support natively.
 ```markdown
 [[ :logo: MyApp | Dashboard | Products | [Sign Out] ]]{.nav}
 
----
-
 ::: hero
+
 # Product Dashboard
+
 Manage your inventory
 
 [Search products_____] [Add New]{.primary}
-:::
 
----
+:::
 
 ## Products {.grid-3}
 
 ### Widget A <small>SKU-001</small>
+
 $29.99
+
 - [x] In stock
+
 [Edit] [Delete]{:disabled}
 
 ### Widget B <small>SKU-002</small>
+
 $49.99 `sale`
+
 - [ ] Out of stock
+
 [Edit] [Notify]
 
 ### Widget C <small>SKU-003</small>
+
 $19.99
+
 - [x] In stock
+
 [Edit] [Delete]
 
----
+::: success-state
 
-::: alert {:success}
 3 products loaded successfully
+
 :::
 
----
-
 ::: footer
+
 [[ Privacy | Terms | Contact ]]
+
 :::
 ```
 
 **Key patterns:**
 - Flat structure (no nested `:::` blocks)
+- Blank lines after opening `:::`, between elements, before closing `:::`
 - Grid items via heading hierarchy
 - Inline HTML for extra styling (`<small>`)
 - Badges via backticks (`sale`)
-- Sections separated by `---`
-
----
+- State containers for feedback (success-state, error-state, etc.)
 
 _Docs: [wiremd.dev](https://wiremd.dev/) | [Syntax Spec](https://github.com/akonan/wiremd/blob/main/SYNTAX-SPEC-v0.1.md)_
