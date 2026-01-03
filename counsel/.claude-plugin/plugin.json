@@ -1,6 +1,6 @@
 {
   "name": "counsel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Expert simulation for code guidance, style, and debates. Channels domain experts like Addy Osmani, Rich Hickey, Adam Wathan.",
   "keywords": ["expert", "simulation", "guidance", "style", "panel"],
   "author": {

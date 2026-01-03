@@ -31,3 +31,4 @@ Channel a specific expert's perspective.
 - Always show confidence rating
 - Always offer calibration option
 - Refuse if confidence would be < 3/10
+- Refuse if profile is on user's blocklist → explain and offer `/counsel:unblock`

@@ -39,6 +39,15 @@ You are NOT the expert. You are simulating their perspective based on documented
 Read `.claude/logs/counsel-calibrations.jsonl` if it exists.
 Apply all calibrations to matching expert simulations.
 
+### Step 0.5: Load Blocklist
+
+Read `~/.claude/counsel-blocklist.json` if it exists. Build excluded set from blocked profile names.
+
+These profiles are invisible to detection, paneling, and summoning.
+
+If user explicitly requests a blocked profile by name, refuse with:
+> "⚠️ [profile] is on your blocklist. Use `/counsel:unblock [name]` to remove."
+
 ### Step 1: Detect Expert
 
 Follow [inference.md](references/inference.md) detection order:
@@ -98,6 +107,9 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 | `/counsel:summon [expert]` | Explicit single-expert invocation |
 | `/counsel:panel [question]` | Multi-expert debate |
 | `/counsel:calibrate [correction]` | Correct simulation errors |
+| `/counsel:block [name]` | Block a profile from simulations |
+| `/counsel:unblock [name]` | Remove a profile from blocklist |
+| `/counsel:blocked` | List blocked profiles |
 
 ---
 

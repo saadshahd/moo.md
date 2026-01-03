@@ -27,6 +27,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [counsel@0.3.0] - 2026-01-03
+
+### Added
+- Profile blocking via `/counsel:block`, `/counsel:unblock`, `/counsel:blocked`
+  - Block profiles by name (case-insensitive, partial match)
+  - User-global storage at `~/.claude/counsel-blocklist.json`
+  - Blocked profiles excluded from paneling, summoning, and auto-detection
+
+---
+
 ## [design@0.1.1] - 2026-01-01
 
 ### Changed

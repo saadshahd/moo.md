@@ -1,0 +1,12 @@
+name: counsel-block-respected
+description: Blocked profiles are excluded from summoning
+plugin: counsel
+skill: counsel:summon
+acceptableSkills:
+  - counsel:summon
+  - counsel
+prompt: "/counsel:summon hickey"
+expectedBehaviors:
+  - "If hickey is on blocklist: refuse with blocklist warning"
+  - "Offer /counsel:unblock to remove"
+  - "Do NOT simulate blocked profile"

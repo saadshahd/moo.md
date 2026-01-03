@@ -23,7 +23,9 @@ Assemble an expert panel for debate and guidance.
 
 ### Step 1: Select Panelists
 
-Load history from `.claude/logs/counsel-reviews.jsonl` if exists. Select 2-3 experts with distinct perspectives — each panelist should ask a fundamentally different question. If `--experts` specified, use those; otherwise auto-select per [inference.md](../skills/counsel/references/inference.md). If ambiguous, ask 1-2 clarifying questions first.
+**Pre-filter:** Load `~/.claude/counsel-blocklist.json` and remove blocked profiles before selection. If `--experts` flag includes a blocked profile, warn and exclude it.
+
+Load history from `.claude/logs/counsel-reviews.jsonl` if exists. Select 2-3 experts with distinct perspectives — each panelist should ask a fundamentally different question. If `--experts` specified, use those (minus blocked); otherwise auto-select per [inference.md](../skills/counsel/references/inference.md). If ambiguous, ask 1-2 clarifying questions first.
 
 ### Step 2: Generate Review
 

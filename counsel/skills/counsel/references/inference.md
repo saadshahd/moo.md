@@ -32,6 +32,22 @@ Logic for detecting which expert to simulate when not explicitly specified.
 
 ---
 
+## Blocked Profile Filtering
+
+Before detection, filter out blocked profiles:
+
+1. Load `~/.claude/counsel-blocklist.json`
+2. Remove blocked names from curated profiles table (case-insensitive, partial match)
+3. Proceed with detection on remaining profiles
+
+**If blocked profile would have been primary match:** Select next best candidate.
+
+**If all candidates blocked:** Ask user to specify or proceed without expert simulation.
+
+**If user explicitly requests blocked profile:** Refuse with blocklist warning (see SKILL.md Step 0.5).
+
+---
+
 ## Detection Order
 
 1. **Explicit mention** — Expert name in query → direct match
