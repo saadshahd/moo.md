@@ -1,37 +1,28 @@
-<div align="center">
-  <img src="docs/assets/poster.png" alt="mind on output — stay present with AI" width="600">
-  <br/><br/>
-  <strong>Plugins that make Claude</strong>
-  <br/>
-  state confidence, list failures, and present structured reasoning<br/>before acting
-  <br/><br/><br/>
-  <table>
-    <tr>
-      <th>Before</th>
-      <th>After</th>
-    </tr>
-    <tr>
-      <td>"This should work"</td>
-      <td>"85% confident because [evidence]"</td>
-    </tr>
-    <tr>
-      <td>Builds first, searches later</td>
-      <td>Searches libraries before writing code</td>
-    </tr>
-    <tr>
-      <td>Hopes nothing breaks</td>
-      <td>Lists failure modes before starting</td>
-    </tr>
-    <tr>
-      <td>Forgets what worked</td>
-      <td>Recalls insights from past sessions</td>
-    </tr>
-  </table>
-</div>
+# moo — mind on output
 
-<br/><br/>
+Claude says "this should work" and builds first.
+moo makes Claude think first.
 
-<h2 align="center">See It In Action</h2>
+## Before vs After
+
+| Without moo | With moo |
+|-------------|----------|
+| "This should work" | "85% confident because [evidence]" |
+| Builds first, searches later | Searches libraries before writing code |
+| Hopes nothing breaks | Lists failure modes before starting |
+| Forgets what worked | Recalls insights from past sessions |
+
+## What moo Does
+
+Before every response, Claude checks:
+
+- Intent clear?
+- Libraries searched?
+- Failure modes listed?
+- Confidence stated?
+- Reversibility assessed?
+
+## See It In Action
 
 <table>
   <tr>
@@ -41,50 +32,40 @@
     </td>
     <td align="center" valign="top" width="50%">
       <p><sub>Verdict box</sub></p>
-      <img src="docs/assets/verdict.png" alt="moo verdict box" style="max-width: 100%;;">
+      <img src="docs/assets/verdict.png" alt="moo verdict box" style="max-width: 100%;">
     </td>
   </tr>
   <tr>
     <td align="center" valign="top" width="50%">
       <p><sub>Root Cause Analysis</sub></p>
-      <img src="docs/assets/ishikawa.png" alt="Ishikawa diagram" style="max-width: 100%;;"><br>
+      <img src="docs/assets/ishikawa.png" alt="Ishikawa diagram" style="max-width: 100%;">
     </td>
     <td align="center" valign="top" width="50%">
       <p><sub>Five Whys</sub></p>
-      <img src="docs/assets/five-whys.png" alt="Five Whys"  style="max-width: 100%;;"><br>
+      <img src="docs/assets/five-whys.png" alt="Five Whys" style="max-width: 100%;">
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
       <p><sub>Decision Matrix</sub></p>
-      <img src="docs/assets/decision.png" alt="Decision matrix" style="max-width: 100%;;"><br>
+      <img src="docs/assets/decision.png" alt="Decision matrix" style="max-width: 100%;">
     </td>
     <td align="center" valign="top">
       <p><sub>Impact-Effort</sub></p>
-      <img src="docs/assets/impact.png" alt="Impact-effort matrix" style="max-width: 100%;;"><br>
+      <img src="docs/assets/impact.png" alt="Impact-effort matrix" style="max-width: 100%;">
     </td>
   </tr>
   <tr>
     <td align="center" valign="top">
       <p><sub>Minto Pyramid</sub></p>
-      <img src="docs/assets/minto.png" alt="Minto pyramid" style="max-width: 100%;;"><br>
+      <img src="docs/assets/minto.png" alt="Minto pyramid" style="max-width: 100%;">
     </td>
     <td align="center" valign="top">
       <p><sub>Pre-Mortem</sub></p>
-      <img src="docs/assets/premortem.png" alt="Pre-mortem" style="max-width: 100%;;"><br>
+      <img src="docs/assets/premortem.png" alt="Pre-mortem" style="max-width: 100%;">
     </td>
   </tr>
 </table>
-
-## What Runs Quietly
-
-Before responding, Claude checks:
-
-- Intent clear?
-- Libraries searched?
-- Failure modes listed?
-- Confidence stated?
-- Reversibility assessed?
 
 ## Install
 
@@ -95,14 +76,14 @@ Before responding, Claude checks:
 
 ## Plugins
 
-| Plugin                                 | What It Does                                                     |
-| -------------------------------------- | ---------------------------------------------------------------- |
-| [hope](docs/plugins/hope.md)           | Core thinking system — confidence gates, silent audit, workflows |
-| [product](docs/plugins/product.md)     | PRDs, competitive analysis, metrics                              |
-| [wordsmith](docs/plugins/wordsmith.md) | Editing, voice extraction, narrative                             |
-| [founder](docs/plugins/founder.md)     | Idea validation, pitch decks, financials                         |
-| [career](docs/plugins/career.md)       | Interview prep, skill gaps, stakeholder navigation               |
-| [counsel](docs/plugins/counsel.md)     | Expert simulation for code guidance and style                    |
+| Plugin | What It Does |
+|--------|--------------|
+| [hope](docs/plugins/hope.md) | Think before building — confidence gates, failure modes, library search |
+| [product](docs/plugins/product.md) | Validate before building — PRDs, competitive analysis, metrics |
+| [wordsmith](docs/plugins/wordsmith.md) | Write clearly — editing, voice matching, structure |
+| [founder](docs/plugins/founder.md) | Test your idea — validation, pitch structure, unit economics |
+| [career](docs/plugins/career.md) | Navigate your career — interview prep, skill gaps, stakeholders |
+| [counsel](docs/plugins/counsel.md) | Get expert perspective — simulate Hickey, Graham, Fowler, etc. |
 
 ## Documentation
 
@@ -111,8 +92,7 @@ Before responding, Claude checks:
 
 ## Issues
 
-Something broken? Onboarding unclear? Feature request?
-
+Something broken? Feature request?
 → [Open an issue](https://github.com/saadshahd/moo.md/issues)
 
 ## Gratitude
@@ -121,4 +101,4 @@ Something broken? Onboarding unclear? Feature request?
 
 **[Superpowers](https://github.com/obra/superpowers)** — prior art
 
-**[Farnam Street](https://fs.blog/blog/)** - For the excellent writings
+**[Farnam Street](https://fs.blog/blog/)** — excellent writings on mental models
