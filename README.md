@@ -45,5 +45,14 @@ Claude will:
 
 ---
 
-![After moo, Claude shows verification with evidence](docs/assets/verdict.png)
+```
+╭─ 🟢 SHIP ──────────────────────────╮
+│ Verified: execution output         │
+│ Checklist: 4/4 workflow items      │
+│ Subjective: ~85% · Type 2A · 3pt   │
+├────────────────────────────────────┤
+│ ↳ Alt: [alternative approach]      │
+│ ↳ Risk: [key assumption]           │
+╰────────────────────────────────────╯
+```
 *Every response ends with evidence, not hope.*
