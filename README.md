@@ -49,6 +49,8 @@ Claude will:
 |---------|---------|
 | Verified | execution output |
 | Checklist | 4/4 |
-| Subjective | ~85% |
+| Subjective | ~85% · Type 2A · 3pt |
+| Alt | [alternative approach] |
+| Risk | [key assumption] |
 
 *Every response ends with evidence, not hope.*
