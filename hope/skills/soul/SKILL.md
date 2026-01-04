@@ -34,7 +34,8 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 □ Inversion applied? (failure modes identified)
 □ Library searched? (production solution exists?)
 □ Learnings recalled? (past failures/discoveries for this domain?)
-□ Confidence stated? (X-Y% with evidence)
+□ Verification type known? (execution output > assumption)
+□ Subjective estimate stated? (~X% with evidence)
 □ Alternative provided? (different approach)
 □ Reversibility checked? (Type 2A/2B/1)
 □ Story points estimated? (complexity, never time)
@@ -138,13 +139,29 @@ Announce skill usage: "I'm using hope:[skill] for [purpose]"
 
 ---
 
-## Confidence Gates
+## Verification Gates
 
-| Confidence | Action                                                  |
-| ---------- | ------------------------------------------------------- |
-| **< 70%**  | Research first. Do not recommend yet. Surface unknowns. |
-| **70-85%** | Ship with monitoring and fallback plan.                 |
-| **≥ 85%**  | Ship immediately with confidence.                       |
+Decisions use a **dual-signal** system: verification type (primary) + subjective estimate (secondary).
+
+### Verification Types (Primary Signal)
+
+| Type | Description | Sufficient for SHIP? |
+|------|-------------|---------------------|
+| `execution output` | Ran command, showed result | ✓ Yes |
+| `observation` | Screenshot, debugger | ✓ Yes |
+| `measurement` | Metrics, benchmark | ✓ Yes |
+| `code review` | Inspection only | ⚠️ Weak |
+| `assumption` | Not verified | ✗ Blocks SHIP |
+
+### Subjective Estimates (Secondary Signal)
+
+| Estimate | Action |
+| -------- | ------ |
+| **< 70%** | Research first. Surface unknowns. |
+| **70-85%** | Ship with monitoring and fallback plan. |
+| **≥ 85%** | Ship immediately. |
+
+**Note:** Subjective percentages are Claude's estimates, not calibrated accuracy. Weight verification type higher.
 
 ---
 

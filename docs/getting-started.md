@@ -1,55 +1,28 @@
-# 5-Minute Start
+# Start in 30 seconds
 
-[Install first](../README.md#install), then run your first command.
-
-## Your First Command
-
-```
-/hope:plan "build a CLI tool that converts markdown to PDF"
+```bash
+/plugin marketplace add saadshahd/moo.md
+/plugin install hope@moo.md
 ```
 
-What happens:
-
-1. **Intent clarified** — Questions surface before building starts
-2. **Failure modes listed** — What could go wrong, before it does
-3. **Library search** — Prior art before custom code
-4. **Confidence stated** — Percentage, not "probably"
-
-The system does what you forget under pressure.
-
-## What Just Happened
-
-The soul skill activated. Every response runs through a silent audit:
-
+Now try:
 ```
-□ Failure modes identified?
-□ Library searched?
-□ Past learnings recalled?
-□ Confidence stated with evidence?
-□ Intent ≥85% clear?
+plan building a CLI that converts markdown to PDF
 ```
 
-You don't see this checklist. You see better answers.
+## What you'll see
 
-## Quick Start Keywords
+Claude will:
+1. Ask clarifying questions before building
+2. Search for existing libraries before writing code
+3. List what could go wrong before starting
+4. State confidence with evidence, not hope
 
-See [Quick Start](../README.md#quick-start) for the three keywords that trigger key workflows.
+## What's running
 
-Try one now:
+The `hope` skill audits every response. You don't see the checklist. You see better answers.
 
-```
-delve into how authentication works in this repo
-```
+## Next
 
-## The Payoff
-
-Learnings persist.
-
-When sessions end, the system captures failures and discoveries to `~/.claude/learnings/`. Next session, it surfaces what you learned.
-
-Your thinking compounds.
-
-## Next Steps
-
-- [Learnings System](learnings-system.md) — How your thinking compounds
-- [Plugin Reference](index.md) — All available plugins
+- [How learnings persist](learnings-system.md) — Insights compound across sessions
+- [All plugins](plugins/) — Beyond hope

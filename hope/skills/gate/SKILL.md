@@ -38,17 +38,17 @@ Before claiming: "done", "fixed", "complete", "working", "ready"
 □ No new abstraction without justification
 ```
 
-## Evidence Hierarchy
+## Verification Types
 
-| Level | Type                                | Sufficient? |
-| ----- | ----------------------------------- | ----------- |
-| 1     | Execution (command output, logs)    | Yes         |
-| 2     | Observation (screenshots, debugger) | Yes         |
-| 3     | Measurement (metrics, benchmarks)   | Yes         |
-| 4     | Inspection (code review)            | Weak        |
-| 5     | Assumption ("should work")          | No          |
+| Type | Description | Sufficient for SHIP? |
+|------|-------------|---------------------|
+| `execution output` | Ran command, showed result | ✓ Yes |
+| `observation` | Screenshot, debugger session | ✓ Yes |
+| `measurement` | Metrics, benchmark data | ✓ Yes |
+| `code review` | Inspection only | ⚠️ Weak |
+| `assumption` | Not verified | ✗ Blocks SHIP |
 
-Require Level 1-3 before completion claims.
+Require `execution output`, `observation`, or `measurement` before completion claims.
 
 ## Anti-Patterns
 

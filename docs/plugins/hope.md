@@ -1,133 +1,89 @@
-# hope — Power User Reference
+# hope
 
-Cognitive operating system for structured thinking.
-
----
-
-| Say this                        | Get this                               |
-| ------------------------------- | -------------------------------------- |
-| "delve into how X works"        | Deep code investigation                |
-| "plan building X"               | Intent clarification + structured plan |
-| "recall what I learned about X" | Surface past learnings                 |
-| "/hope:debug 'problem'"         | Root cause analysis                    |
-| "/hope:postmortem 'incident'"   | Structured incident review             |
+Think before building.
 
 ---
 
-## Install
+## What changes
+
+Before hope:
+> "This should work" → guess → debug → rebuild
+
+After hope:
+> Clarify intent → search solutions → list risks → build once
+
+Every response runs through a silent checklist:
+- Intent clear?
+- Libraries searched?
+- Failure modes listed?
+- Verification stated?
+
+You don't see the checklist. You see better answers.
+
+---
+
+## Quick start
 
 ```bash
 /plugin install hope@moo.md
 ```
 
-## Skills
+Try:
+```
+delve into how authentication works in this repo
+```
 
-Four skills that auto-activate:
+Or:
+```
+plan building a REST API for user management
+```
 
-| Skill         | Purpose                                                                 | Triggers on                 |
-| ------------- | ----------------------------------------------------------------------- | --------------------------- |
-| `hope:soul`   | Foundation for all thinking. Silent audit, confidence gates, workflows. | Every session (mandatory)   |
-| `hope:gate`   | Verification before claiming done. Checklists by workflow type.         | "done", "fixed", "complete" |
-| `hope:trace`  | Root cause analysis. Five Whys, prevention hierarchy.                   | Bugs, failures, incidents   |
-| `hope:recall` | Surface relevant learnings from past sessions.                          | Session start, domain work  |
+---
 
-## Agents
+## Trigger keywords
 
-| Agent        | Purpose                                    | Trigger keywords                                         |
-| ------------ | ------------------------------------------ | -------------------------------------------------------- |
-| `hope:delve` | Deep code investigation with tiered output | "how does", "why does", "explain", "trace", "understand" |
+| Say this | Get this |
+|----------|----------|
+| "delve into how X works" | Deep code investigation |
+| "plan building X" | Intent clarification + structured plan |
+| "recall what I learned about X" | Surface past learnings |
+
+---
 
 ## Commands
 
-| Command             | Purpose                                                                             |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| `/hope:plan`        | Start task with full workflow. Clarify intent, search libraries, assess confidence. |
-| `/hope:debug`       | Systematic debugging. Effect → Cause → Root → Fix → Prevent.                        |
-| `/hope:postmortem`  | Structured post-incident review. Timeline, Five Whys, prevention measures.          |
-| `/hope:learn`       | Extract learnings from session into `~/.claude/learnings/`.                         |
-| `/hope:recall`      | Surface relevant learnings from past sessions.                                      |
-| `/hope:compact`     | Merge duplicate learnings, prune stale entries.                                     |
-| `/hope:mirror`      | Detect blind spots in a decision. Hidden assumptions, missing perspectives.         |
-| `/hope:future`      | Regret minimization. Project to age 80, evaluate what you'll regret not doing.      |
-| `/hope:reframe`     | Alternative framings for stuck problems. Transform constraints into advantages.     |
-| `/hope:interrogate` | Generate penetrating questions to deepen understanding.                             |
-| `/hope:calibrate`   | Review confidence calibration from prediction history.                              |
-
-## Thinking Tools
-
-34 tools for structured thinking. [Full reference →](../../hope/skills/soul/SKILL.md#all-tools-when-default-doesnt-fit)
-
-**Defaults by situation:**
-
-| Situation              | Tool                                                                       |
-| ---------------------- | -------------------------------------------------------------------------- |
-| Prioritizing work      | [Impact-Effort](../../hope/skills/soul/references/tools/impact-effort.md)  |
-| Breaking down problems | [Issue Trees](../../hope/skills/soul/references/tools/issue-trees.md)      |
-| Finding root cause     | [Ishikawa](../../hope/skills/soul/references/tools/ishikawa.md)            |
-| Making decisions       | [Decision Matrix](../../hope/skills/soul/references/tools/decision-matrix.md) |
-| Understanding systems  | [Feedback Loops](../../hope/skills/soul/references/tools/feedback-loops.md) |
-| Communicating clearly  | [Minto Pyramid](../../hope/skills/soul/references/tools/minto-pyramid.md)  |
-
-## When to Use
-
-### Plan vs Just Code
-
-| Situation                    | Approach   |
-| ---------------------------- | ---------- |
-| < 3 story points, clear path | Just code  |
-| Unfamiliar territory         | Plan first |
-| Multiple valid approaches    | Plan first |
-| Will touch > 3 files         | Plan first |
-| Has failure modes            | Plan first |
+| Command | Purpose |
+|---------|---------|
+| `/hope:plan` | Clarify intent, search libraries, list risks |
+| `/hope:debug` | Effect → Cause → Root → Fix → Prevent |
+| `/hope:postmortem` | Structured post-incident review |
+| `/hope:learn` | Extract insights to `~/.claude/learnings/` |
+| `/hope:recall` | Surface relevant learnings for context |
+| `/hope:mirror` | Detect blind spots in a decision |
+| `/hope:reframe` | Alternative framings for stuck problems |
 
 ---
 
-## Core Concepts
+## Verification gates
 
-### Confidence Gates
+Dual-signal system: verification type (primary) + subjective estimate (secondary).
 
-No vague words. Percentages only.
+| Verification Type | Sufficient for SHIP? |
+|-------------------|---------------------|
+| `execution output` | ✓ Yes |
+| `observation` | ✓ Yes |
+| `measurement` | ✓ Yes |
+| `code review` | ⚠️ Weak |
+| `assumption` | ✗ Blocks SHIP |
 
-| Confidence | Action                                |
-| ---------- | ------------------------------------- |
-| **< 70%**  | Research first. Do not recommend yet. |
-| **70-85%** | Ship with monitoring and fallback.    |
-| **≥ 85%**  | Ship immediately.                     |
-
-**Forbidden:** "probably", "likely", "maybe", "might", "could"
-
-### Workflows
-
-| Task                    | Workflow | Gate                          |
-| ----------------------- | -------- | ----------------------------- |
-| Build / Feature         | A        | Intent clear + Library search |
-| Debug / Fix             | B        | Root cause before workaround  |
-| Refactor / Architecture | C        | Deletion before redesign      |
-
-### Quality Footer
-
-Every non-trivial response ends with a verdict box. See [Quality Footer reference](../../hope/skills/soul/references/quality-footer.md) for format and examples.
-
-### Reversibility
-
-| Type   | Rollback | Examples             | Action                  |
-| ------ | -------- | -------------------- | ----------------------- |
-| **2A** | < 1 min  | Config, rename       | Execute immediately     |
-| **2B** | < 5 min  | Dependency, refactor | Execute with monitoring |
-| **1**  | Hours+   | Schema, public API   | Deep analysis required  |
-
-### Learnings System
-
-Three types of learnings stored in `~/.claude/learnings/`:
-
-| File                | What it stores                             |
-| ------------------- | ------------------------------------------ |
-| `failures.jsonl`    | Root causes and prevention measures        |
-| `discoveries.jsonl` | Insights with confidence and applicability |
-| `constraints.jsonl` | Boundaries (permanent or temporary)        |
-
-See [Learnings System](../learnings-system.md) for full documentation.
+Subjective percentages are Claude's estimates, not calibrated accuracy. Weight verification type higher.
 
 ---
+
+## Deep reference
+
+- [Thinking tools](../../hope/skills/soul/SKILL.md#all-tools-when-default-doesnt-fit) — 34 mental models
+- [Quality footer](../../hope/skills/soul/references/quality-footer.md) — Verdict format
+- [Learnings system](../learnings-system.md) — How insights persist
 
 → Source: [`hope/skills/soul/SKILL.md`](../../hope/skills/soul/SKILL.md)

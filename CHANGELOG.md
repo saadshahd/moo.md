@@ -7,14 +7,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [hope@0.5.0] - 2026-01-05
 
 ### Added
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
 - feat(wordsmith): Template skill for document scaffolding (RFC, ADR, Blog)
+- docs: STRATEGY.md with competitive analysis vs design-os and marketing roadmap
+- docs: MARKETING-TASKS.md with GitHub topics, marketplace submissions, content calendar
 
 ### Changed
+- **hope:** Quality footer now shows dual signal: Verified type (primary), Checklist items, Subjective percentage (labeled)
+  - Format: `Verified: execution output | Checklist: 4/4 | Subjective: ~85%`
+  - Verification types: execution output > observation > measurement > code review > assumption
+  - `assumption` blocks SHIP regardless of subjective percentage
+- **hope:** "Confidence Gates" renamed to "Verification Gates" throughout
+- **hope:** Subjective percentages now labeled honestly as "Claude's estimates, not calibrated accuracy"
+- **docs:** Removed `/hope:calibrate` command (non-functional per ADR-001)
+
+**Why dual-signal?** Research shows self-reported confidence percentages are systematically inflated (80-100% range). Our verification funnel uses extrinsic feedback which research validates. Sources: [MIT/TACL 2024](https://direct.mit.edu/tacl/article/doi/10.1162/tacl_a_00713), [Anthropic 2022](https://arxiv.org/abs/2207.05221)
+
+- docs: Complete documentation rewrite following expert panel review (Hickey/Graham/Jobs principles)
+  - **README**: Problem → transformation → action structure
+    - Hook: "Claude answers fast. moo makes it answer right."
+    - Before/after blockquotes replace feature tables
+    - Horizontal plugin links instead of table
+    - One screenshot at bottom (proof, not sales)
+  - **hope.md**: Value-first structure
+    - Opens with "What changes" (before/after), not command table
+    - "You don't see the checklist. You see better answers."
+  - **getting-started.md**: "Start in 30 seconds" (under-promise, over-deliver)
 - fix(design): WireMD syntax corrected based on parser analysis
   - Use state containers (`error-state`, `success-state`, etc.) instead of alert variants
   - Blank lines required after `:::`, between elements, and before closing `:::`
