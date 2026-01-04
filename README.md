@@ -45,14 +45,10 @@ Claude will:
 
 ---
 
-```
-╭─ 🟢 SHIP ──────────────────────────╮
-│ Verified: execution output         │
-│ Checklist: 4/4 workflow items      │
-│ Subjective: ~85% · Type 2A · 3pt   │
-├────────────────────────────────────┤
-│ ↳ Alt: [alternative approach]      │
-│ ↳ Risk: [key assumption]           │
-╰────────────────────────────────────╯
-```
+| Verdict | 🟢 SHIP |
+|---------|---------|
+| Verified | execution output |
+| Checklist | 4/4 |
+| Subjective | ~85% |
+
 *Every response ends with evidence, not hope.*
