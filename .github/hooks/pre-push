@@ -4,7 +4,7 @@ set -e
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 CHANGED_PLUGINS=""
-for plugin in hope product wordsmith founder career; do
+for plugin in hope product wordsmith founder career counsel design; do
   if git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q "^$plugin/"; then
     CHANGED_PLUGINS="$CHANGED_PLUGINS $plugin"
   elif git diff --name-only "origin/main..HEAD" 2>/dev/null | grep -q "^$plugin/"; then

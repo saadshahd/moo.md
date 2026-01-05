@@ -2,8 +2,8 @@ import type { EvalConfig } from "./types";
 
 export const CONCURRENCY = {
   MAX_PARALLEL: 10,
-  DEFAULT_TIMEOUT_MS: 60_000,
-  LAYER_D_TIMEOUT_MS: 120_000, // Layer D runs 2 Claude calls
+  DEFAULT_TIMEOUT_MS: 180_000, // 3 minutes - some tests take 140s+
+  LAYER_D_TIMEOUT_MS: 180_000, // Layer D runs 2 Claude calls
 } as const;
 
 export const DEFAULT_CONFIG: EvalConfig = {
