@@ -1,6 +1,6 @@
 {
   "name": "wordsmith",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Voice extraction with persistence, precision editing, narrative structure, copy evaluation, and document templates for writing work.",
   "author": {
     "name": "Saad Shahd",
