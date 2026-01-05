@@ -7,6 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Revert] - 2026-01-06
+
+### Reverted
+- **Breaking change reverted:** Rolled back "decompose router skills into 61 focused skills" (commit 3028506)
+- Claude Code truncates available_skills list at token budget limit
+- 61 skills caused truncation → counsel plugin invisible → auto-triggering broken
+- Restored router skill pattern (11 skills total across all plugins)
+
+### Why Router Pattern Works
+- Fewer top-level skills = all visible in Claude Code's skill list
+- Workflows contained in reference files (same functionality)
+- Important slash commands remain directly invocable
+
+### Skill Counts (Post-Revert)
+| Plugin | Skills |
+|--------|--------|
+| counsel | 1 |
+| wordsmith | 2 |
+| product | 1 |
+| founder | 1 |
+| career | 1 |
+| design | 1 |
+| hope | 4 |
+| **Total** | **11** |
+
+---
+
 ## [hope@0.5.0] - 2026-01-05
 
 ### Added
