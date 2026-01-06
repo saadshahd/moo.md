@@ -9,23 +9,35 @@ Logic for detecting which expert to simulate when not explicitly specified.
 | Expert | Domain | Profile |
 |--------|--------|---------|
 | Dan Abramov | React/State | [abramov.md](profiles/abramov.md) |
+| Christopher Alexander | Pattern Languages | [alexander.md](profiles/alexander.md) |
+| Maggie Appleton | Digital Gardens/Visual Essays | [appleton.md](profiles/appleton.md) |
+| Gordon Brander | Protocol Thinking | [brander.md](profiles/brander.md) |
 | Marty Cagan | Product Discovery | [cagan.md](profiles/cagan.md) |
+| Nicky Case | Explorable Explanations | [case.md](profiles/case.md) |
+| Michael Feathers | Legacy Code | [feathers.md](profiles/feathers.md) |
 | Martin Fowler | Architecture/Patterns | [fowler.md](profiles/fowler.md) |
 | Brad Frost | Design Systems | [frost.md](profiles/frost.md) |
 | Paul Graham | Startups/Essays | [graham.md](profiles/graham.md) |
 | Raymond Hettinger | Python | [hettinger.md](profiles/hettinger.md) |
 | Rich Hickey | Data/Simplicity | [hickey.md](profiles/hickey.md) |
 | Kelsey Hightower | DevOps/Kubernetes | [hightower.md](profiles/hightower.md) |
+| Ink & Switch | Malleable Software Research | [inkandswitch.md](profiles/inkandswitch.md) |
+| Steve Jobs | Product/Communication | [jobs.md](profiles/jobs.md) |
+| Alan Kay | OOP/Computing Vision | [kay.md](profiles/kay.md) |
 | David Khorshid | State Machines/XState | [khorshid.md](profiles/khorshid.md) |
+| Geoffrey Litt | End-User Programming | [litt.md](profiles/litt.md) |
 | Charity Majors | Observability | [majors.md](profiles/majors.md) |
+| Andy Matuschak | Tools for Thought | [matuschak.md](profiles/matuschak.md) |
 | Bartosz Milewski | Category Theory/FP | [milewski.md](profiles/milewski.md) |
 | Don Norman | UX/Design Psychology | [norman.md](profiles/norman.md) |
 | Addy Osmani | JS Performance/Patterns | [osmani.md](profiles/osmani.md) |
+| Seymour Papert | Constructionism/Learning | [papert.md](profiles/papert.md) |
 | Matt Perry | Animation/Framer Motion | [perry.md](profiles/perry.md) |
 | Rob Pike | Go/Systems | [pike.md](profiles/pike.md) |
 | Kyle Simpson | JS Deep Dive | [simpson.md](profiles/simpson.md) |
 | Sara Soueidan | Accessibility/ARIA | [soueidan.md](profiles/soueidan.md) |
 | Gabriel Vergnaud | TypeScript Type-Level | [vergnaud.md](profiles/vergnaud.md) |
+| Bret Victor | Dynamic Media | [victor.md](profiles/victor.md) |
 | Adam Wathan | Tailwind/CSS | [wathan.md](profiles/wathan.md) |
 | Simon Willison | LLMs/AI Tools | [willison.md](profiles/willison.md) |
 | Julie Zhuo | Design Leadership | [zhuo.md](profiles/zhuo.md) |
@@ -90,9 +102,11 @@ When discussing topics without code context:
 
 | Topic Keywords | Inferred Expert |
 |----------------|-----------------|
-| Refactoring, patterns, architecture, microservices | Fowler |
+| Refactoring, design patterns, architecture, microservices | Fowler |
+| Pattern language, quality without a name, QWAN, centers, wholeness | Alexander |
 | Startup, founder, Y Combinator, growth | Graham |
 | Product discovery, roadmap, empowered teams | Cagan |
+| Product taste, say no, simplify, intersection of tech, insanely great | Jobs |
 | Design systems, atomic design, pattern library | Frost |
 | Product design, design team, design leadership | Zhuo |
 | UX, usability, affordances, mental models | Norman |
@@ -100,6 +114,16 @@ When discussing topics without code context:
 | Type-level, generics, conditional types, infer, mapped types | Vergnaud |
 | TS-Pattern, pattern matching, discriminated unions, exhaustive | Vergnaud |
 | Template literal types, recursive types, type inference | Vergnaud |
+| Legacy code, seams, characterization tests, sprout method | Feathers |
+| Inventing on principle, learnable programming, immediate feedback, dynamic media | Victor |
+| Real OOP, messaging not methods, Dynabook, Smalltalk philosophy | Kay |
+| Constructionism, Logo, Mindstorms, learning by making | Papert |
+| Evergreen notes, spaced repetition, tools for thought, mnemonic medium | Matuschak |
+| Digital garden, visual essays, programming portals | Appleton |
+| Explorable explanations, interactive essay, educational games | Case |
+| Local-first, CRDTs, malleable software, end-user programming, Automerge | Ink & Switch |
+| Noosphere, Subconscious, protocol thinking, credible exit | Brander |
+| Spreadsheets as programming, malleable, context-oriented EUP | Litt |
 
 ---
 

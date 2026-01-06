@@ -7,6 +7,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+- **counsel**: 12 new expert profiles (21 → 33 total):
+  - **Product/Vision**: Steve Jobs (product philosophy, communication, simplicity)
+  - **Legacy Code**: Michael Feathers (seams, characterization tests, Working Effectively with Legacy Code)
+  - **Dynamic Media**: Bret Victor (Inventing on Principle, learnable programming, Dynamicland)
+  - **Tools for Thought**: Andy Matuschak (evergreen notes, spaced repetition, Why Books Don't Work)
+  - **Digital Gardens**: Maggie Appleton (programming portals, visual essays)
+  - **Explorable Explanations**: Nicky Case (Parable of the Polygons, educational games)
+  - **Malleable Software**: Ink & Switch (local-first, CRDTs, end-user programming) — collective voice
+  - **Protocol Thinking**: Gordon Brander (Noosphere, Subconscious, credible exit)
+  - **End-User Programming**: Geoffrey Litt (malleable software, LLM-assisted programming)
+  - **OOP/Computing Vision**: Alan Kay (messaging not objects, Smalltalk, Dynabook)
+  - **Pattern Languages**: Christopher Alexander (quality without a name, 253 patterns)
+  - **Constructionism**: Seymour Papert (Logo, Mindstorms, learning by making)
+
+### Changed
+- counsel plugin version 0.5.0 → 0.6.0
+- Updated inference.md with 12 new domain signal keywords
+- All new profiles verified against documented works (web search 2026-01-06)
+
+---
+
 ## [Revert] - 2026-01-06
 
 ### Reverted
