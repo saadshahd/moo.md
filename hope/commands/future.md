@@ -121,4 +121,4 @@ This is a framework for thinking, not a replacement for judgment.
 
 ## Task
 
-$ARGUMENTS
+$0

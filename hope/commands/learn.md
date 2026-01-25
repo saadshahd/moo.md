@@ -8,7 +8,7 @@ Extract session learnings into compound knowledge.
 
 ## Input
 
-$ARGUMENTS
+$0
 
 If a transcript path is provided above, read it using the Read tool. Otherwise, analyze the current session context.
 

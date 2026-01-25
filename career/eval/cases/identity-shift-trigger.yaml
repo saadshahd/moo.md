@@ -1,0 +1,11 @@
+name: career-identity-shift
+description: Career skill detects role transition needs
+plugin: career
+skill: career:career
+acceptableSkills:
+  - career
+prompt: "I'm an engineer thinking about moving into management. What should I consider?"
+expectedBehaviors:
+  - "Identity shift framework referenced"
+  - "Competency transfer analysis suggested"
+  - "Gap analysis approach outlined"

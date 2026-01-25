@@ -8,7 +8,7 @@ Generate a text prompt optimized for Figma AI's design generation.
 
 ## Input
 
-$ARGUMENTS
+$0
 
 Context from current design workflow or explicit design request.
 

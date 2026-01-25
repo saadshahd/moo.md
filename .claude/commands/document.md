@@ -68,4 +68,4 @@ After editing, step back:
 3. Verify navigation flow makes sense
 4. Confirm no content drift from source
 
-$ARGUMENTS
+$0

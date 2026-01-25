@@ -1,0 +1,15 @@
+name: loop-cost-pause
+description: Loop pauses on cost limit, doesn't kill
+plugin: loop
+skill: loop:start
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - soul
+  - hope:soul
+prompt: "Run loop with a $5 budget limit"
+expectedBehaviors:
+  - "Budget limit acknowledged"
+  - "Pause behavior described (not termination)"
+  - "Continue command mentioned"

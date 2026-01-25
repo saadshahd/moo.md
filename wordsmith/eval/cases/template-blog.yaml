@@ -2,6 +2,10 @@ name: wordsmith-template-blog
 description: Template skill triggers on blog post and article requests
 plugin: wordsmith
 skill: wordsmith:template
+acceptableSkills:
+  - template
+  - writing
+  - wordsmith:writing
 prompt: "I want to write a blog post about TypeScript generics for intermediate developers"
 expectedBehaviors:
   - "Template skill activates on blog request"

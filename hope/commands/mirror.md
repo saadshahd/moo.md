@@ -87,4 +87,4 @@ Present findings:
 
 ## Task
 
-$ARGUMENTS
+$0

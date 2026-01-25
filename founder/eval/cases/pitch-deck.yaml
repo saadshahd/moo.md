@@ -1,0 +1,11 @@
+name: founder-pitch-deck
+description: Founder skill helps with pitch deck creation
+plugin: founder
+skill: founder:founder
+acceptableSkills:
+  - founder
+prompt: "I need to create a pitch deck for my Series A fundraise"
+expectedBehaviors:
+  - "Standard deck sections outlined"
+  - "Investor perspective considered"
+  - "Metrics and traction framing discussed"

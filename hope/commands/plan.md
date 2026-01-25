@@ -6,6 +6,39 @@ description: Start a task with full moo workflow. Surfaces unknowns, clarifies i
 
 Start a task the moo way. **Will not proceed until ≥85% confident in intent.**
 
+## Phase 0: Fit Decision
+
+Before planning, score 5 dimensions (0-10 each):
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Spec Clarity | /10 | |
+| Verification Cost | /10 | |
+| Reversibility | /10 | |
+| Hidden Coupling | /10 | |
+| Shape Confidence | /10 | |
+| **Total** | /50 | |
+
+- **Total ≥40:** Tool-shaped plan (milestones)
+- **Total 25-39:** Colleague-shaped plan (iteration cycles)
+- **Total <25:** Run /hope:intent first
+
+## Phase 0b: Spec Score Gate
+
+Quick-score request against spec rubric:
+
+| Dimension | Score |
+|-----------|-------|
+| Outcome | /2 |
+| Scope | /2 |
+| Constraints | /2 |
+| Success Criteria | /2 |
+| Done Definition | /2 |
+| **Total** | /10 |
+
+- **≥8:** Proceed to Phase 1 (surface unknowns)
+- **<8:** Run clarification loop first
+
 ## Phase 1: Surface Unknowns
 
 Before anything else, identify what's unclear.
@@ -120,4 +153,4 @@ If user provides feedback, incorporate and re-present plan.
 
 ## Task
 
-$ARGUMENTS
+$0

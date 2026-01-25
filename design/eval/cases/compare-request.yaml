@@ -2,6 +2,8 @@ name: design-compare-request
 description: Design skill triggers on competitive UX analysis requests
 plugin: design
 skill: design:design
+acceptableSkills:
+  - design
 prompt: "Compare the UX patterns and user journey in Spotify, Apple Music, and YouTube Music onboarding flows"
 expectedBehaviors:
   - "Design skill activates on UX comparison requests"

@@ -103,6 +103,46 @@ Pre-mortem identifies failures. Practice failure builds muscle memory for respon
 
 ---
 
+## Feature Blast Radius Triage
+
+Before building, assess potential damage:
+
+### Blast Radius Categories
+
+| Category | Scope | Examples |
+|----------|-------|----------|
+| **Contained** | Single file/function | Bug fix, util function |
+| **Local** | Single module/feature | New endpoint, UI component |
+| **Cross-cutting** | Multiple modules | Auth change, logging update |
+| **System-wide** | Entire application | Database schema, core abstraction |
+
+### Triage Questions
+
+1. What breaks if this fails?
+2. Who gets paged at 2am?
+3. Can we feature-flag this?
+4. What's the rollback time?
+5. Does this touch money/auth/PII?
+
+### Risk Mitigation by Blast Radius
+
+| Blast Radius | Mitigation Required |
+|--------------|---------------------|
+| Contained | Standard code review |
+| Local | Tests + staged rollout |
+| Cross-cutting | Feature flag + monitoring |
+| System-wide | RFC + phased migration |
+
+### Red Flags (Escalate Immediately)
+
+- Changing database schemas
+- Modifying authentication flows
+- Touching payment processing
+- Updating encryption/hashing
+- Changing public API contracts
+
+---
+
 ## Provenance
 
 Gary Klein, 2007. Published in Harvard Business Review. Based on Mitchell, Russo & Pennington's 1989 research on prospective hindsight. Klein found pre-mortems reduced overconfidence more than any other critiquing technique.

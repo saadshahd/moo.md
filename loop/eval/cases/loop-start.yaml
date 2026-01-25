@@ -1,0 +1,17 @@
+name: loop-start
+description: Loop triggers on autonomous iteration requests
+plugin: loop
+skill: loop:start
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - soul
+  - hope:soul
+  - intent
+  - hope:intent
+prompt: "Loop until you've implemented the full feature. Keep going until the tests pass."
+expectedBehaviors:
+  - "Spec scoring rubric applied"
+  - "Workflow shape determined (Tool or Colleague)"
+  - "TaskCreate called with iteration metadata"

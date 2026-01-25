@@ -10,50 +10,95 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- **counsel**: 12 new expert profiles (21 → 33 total):
-  - **Product/Vision**: Steve Jobs (product philosophy, communication, simplicity)
-  - **Legacy Code**: Michael Feathers (seams, characterization tests, Working Effectively with Legacy Code)
-  - **Dynamic Media**: Bret Victor (Inventing on Principle, learnable programming, Dynamicland)
-  - **Tools for Thought**: Andy Matuschak (evergreen notes, spaced repetition, Why Books Don't Work)
-  - **Digital Gardens**: Maggie Appleton (programming portals, visual essays)
-  - **Explorable Explanations**: Nicky Case (Parable of the Polygons, educational games)
-  - **Malleable Software**: Ink & Switch (local-first, CRDTs, end-user programming) — collective voice
-  - **Protocol Thinking**: Gordon Brander (Noosphere, Subconscious, credible exit)
-  - **End-User Programming**: Geoffrey Litt (malleable software, LLM-assisted programming)
-  - **OOP/Computing Vision**: Alan Kay (messaging not objects, Smalltalk, Dynabook)
-  - **Pattern Languages**: Christopher Alexander (quality without a name, 253 patterns)
-  - **Constructionism**: Seymour Papert (Logo, Mindstorms, learning by making)
+
+- **loop**: New plugin for autonomous iteration with spec-driven quality gates
+  - `/loop:start` - Start autonomous iteration loop
+  - `/loop:cancel` - Terminate active loops cleanly
+  - `/loop:help` - Plugin documentation
+  - Tasks API integration for state tracking across iterations
+  - Prompt-based Stop hook for intelligent termination
+  - 5-dimension spec clarity rubric (Outcome, Scope, Constraints, Success Criteria, Done Definition)
+  - Workflow shape detection (Tool-shaped vs Colleague-shaped)
+  - Cost controls: $25 default budget, 10 iteration limit, circuit breakers
+  - CI/CD examples for GitHub Actions and GitLab CI
+  - Headless mode documentation for automated environments
+- **hope**: 9 prompt kit framework references in `skills/soul/references/`:
+  - `fit-decision.md` - 5-dimension scoring for AI task appropriateness
+  - `high-grade-intent.md` - NON-GOALS and STOP CONDITIONS for drift prevention
+  - `workflow-shape.md` - Tool-shaped (CNC) vs Colleague-shaped (Machinist Loop) patterns
+  - `trust-ladder.md` - 4-stage graduated AI delegation (Observe/Draft/Act+Guardrails/Act+Trust)
+  - `volatility-budget.md` - GREEN/YELLOW/RED change frequency tiers
+  - `attention-budget.md` - CORE/ENABLING/OVERHEAD classification
+  - `pattern-vs-taste.md` - Delegatable rules vs human judgment
+  - `agency-debugger.md` - "Why am I stuck?" diagnostic (6 blocker types)
+  - `spec-rubric.md` - Spec clarity scoring (0-10 scale)
+- **hope**: Silent Audit extended with 4 new checkboxes (Fit decision, Workflow shape, Trust level, Attention budget)
+- **hope**: Setup hook creates `~/.claude/learnings/` directory on init
+- **hope**: `/hope:intent` now includes Task Definition Protocol and Spec Score Check
+- **hope**: `/hope:plan` now includes Phase 0: Fit Decision and Spec Score Gate
+- **career**: 2 new framework references:
+  - `identity-shift.md` - Role transition framework (IC → Manager, Engineer → PM)
+  - `ownership.md` - Loop 1 (proactive) vs Loop 2 (reactive) agency diagnostic
+- **career**: Agency Debugger integration in `stakeholder.md`
+- **career**: 3 eval cases (career-trigger, interview-simulator, identity-shift-trigger)
+- **founder**: 1 new framework reference:
+  - `depth-ranking.md` - Claim validation levels (Intuition/Anecdote/Validated)
+- **founder**: Loop 1 Ownership accountability in `launch.md`
+- **founder**: 3 eval cases (founder-trigger, validate-idea, pitch-deck)
+- **product**: `volatility-budget.md` - Metrics volatility tiers (High/Medium/Stable)
+- **product**: Spec Clarity Rubric in `prd.md`
+- **counsel**: `colleague-framework.md` - Expert deferral decision tree and trust ladder
+- **design**: `token-volatility.md` - Design token change frequency and Pattern vs Taste
+- **wordsmith**: Attention Budget stop gates in `editing.md`
+- **hope**: 3 additional framework references:
+  - `delegation.md` - Anti-footgun rules for safe AI delegation
+  - `altitude.md` - Strategic Deep-Diving (zoom in/out, evidence levels)
+  - Verification Plan framework in gate skill
+- **hope**: Feature Blast Radius Triage in `pre-mortem.md`
+- **hope**: Build vs Buy analysis in `opportunity-cost.md`
+- **hope**: Temporal Separation guidance in Learnings System
+- **hope**: Action Specification (Loop 1) in `/hope:intent`
 
 ### Changed
-- counsel plugin version 0.5.0 → 0.6.0
-- Updated inference.md with 12 new domain signal keywords
-- All new profiles verified against documented works (web search 2026-01-06)
+
+- **hope**: intent.md restructured with Task Definition Protocol + Spec Score Check + High-Grade Intent output + Action Specification
+- **hope**: plan.md now gates on Fit Decision (5 dimensions) and Spec Score before Phase 1
+- **hope**: soul SKILL.md Silent Audit expanded from 9 to 13 checkboxes
+- **hope**: gate SKILL.md now includes Verification Plan with stakes-based requirements
+- **eval**: Added `acceptableSkills` to test cases for short name variants (founder, career, design)
+- **loop** added to marketplace.json under "core" category
+- **syntax**: Migrated 15 command files from `$ARGUMENTS` to `$0` (new Claude Code syntax)
+- **counsel**: 12 new expert profiles (21 → 33 total) - Steve Jobs, Michael Feathers, Bret Victor, Andy Matuschak, Maggie Appleton, Nicky Case, Ink & Switch, Gordon Brander, Geoffrey Litt, Alan Kay, Christopher Alexander, Seymour Papert
+- **counsel**: Updated inference.md with 12 new domain signal keywords
 
 ---
 
 ## [Revert] - 2026-01-06
 
 ### Reverted
+
 - **Breaking change reverted:** Rolled back "decompose router skills into 61 focused skills" (commit 3028506)
 - Claude Code truncates available_skills list at token budget limit
 - 61 skills caused truncation → counsel plugin invisible → auto-triggering broken
 - Restored router skill pattern (11 skills total across all plugins)
 
 ### Why Router Pattern Works
+
 - Fewer top-level skills = all visible in Claude Code's skill list
 - Workflows contained in reference files (same functionality)
 - Important slash commands remain directly invocable
 
 ### Skill Counts (Post-Revert)
-| Plugin | Skills |
-|--------|--------|
-| counsel | 1 |
-| wordsmith | 2 |
-| product | 1 |
-| founder | 1 |
-| career | 1 |
-| design | 1 |
-| hope | 4 |
+
+| Plugin    | Skills |
+| --------- | ------ |
+| counsel   | 1      |
+| wordsmith | 2      |
+| product   | 1      |
+| founder   | 1      |
+| career    | 1      |
+| design    | 1      |
+| hope      | 4      |
 | **Total** | **11** |
 
 ---
@@ -61,6 +106,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [hope@0.5.0] - 2026-01-05
 
 ### Added
+
 - feat(hope): `/hope:prime` command for dynamic skill selection from available_skills block
 - feat(hope): `/hope:plan` now invokes `/prime` after intent reaches ≥85% confidence
 - feat(wordsmith): Template skill for document scaffolding (RFC, ADR, Blog)
@@ -68,6 +114,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - docs: MARKETING-TASKS.md with GitHub topics, marketplace submissions, content calendar
 
 ### Changed
+
 - **hope:** Quality footer now shows dual signal: Verified type (primary), Checklist items, Subjective percentage (labeled)
   - Format: `Verified: execution output | Checklist: 4/4 | Subjective: ~85%`
   - Verification types: execution output > observation > measurement > code review > assumption
@@ -103,6 +150,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [counsel@0.3.0] - 2026-01-03
 
 ### Added
+
 - Profile blocking via `/counsel:block`, `/counsel:unblock`, `/counsel:blocked`
   - Block profiles by name (case-insensitive, partial match)
   - User-global storage at `~/.claude/counsel-blocklist.json`
@@ -113,6 +161,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [design@0.1.1] - 2026-01-01
 
 ### Changed
+
 - WireMD syntax reference rewritten to match v0.1.5 verified behavior
   - Pinned to version 0.1.5 (alpha tool, avoid breakage)
   - Documented: flat containers only (no nesting), grid heading hierarchy, inline HTML support
@@ -121,6 +170,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `/wireframe` command now auto-detects wiremd CLI and asks before installing
 
 ### Fixed
+
 - Removed unsupported nested `:::` patterns from WireMD documentation (GitHub issue #9)
 - Removed non-functional `{.sidebar-main}` layout from examples
 
@@ -129,9 +179,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [hope@0.4.8] - 2026-01-01
 
 ### Added
+
 - CLI installation pattern reference (`cli-install.md`) for reusable tool detection flow
 
 ### Changed
+
 - `/slides` command now auto-detects marp CLI and asks before installing
 
 ---
@@ -139,6 +191,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.1.0] - 2025-12-31
 
 ### Added
+
 - feat(hope): 10-10-10 Rule lifted from career to hope as single source of truth
 - feat(hope): Rationalization tables in gate and soul skills
 - feat(founder): Quality Footer section for high-stakes outputs
@@ -147,6 +200,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(counsel): Lazy loading instruction in SKILL.md Step 2
 
 ### Changed
+
 - **All domain plugins** now explicitly document hope dependency in plugin.json description
 - **Tool naming standardized**: All "ask tool" references now "Ask tool" (40+ files)
 - **Token efficiency**: wiremd.md trimmed from 325 → 141 lines (57% reduction)
@@ -158,6 +212,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - design: 0.0.2 → 0.1.0
 
 ### Fixed
+
 - fix(founder): Broken 10-10-10 reference in regret-minimization.md (now points to hope)
 - fix(product): Duplicate "Use ask tool" line removed from research.md
 
@@ -166,6 +221,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [counsel@0.2.0] - 2025-12-31
 
 ### Added
+
 - feat(counsel): Gabriel Vergnaud expert profile for TypeScript type-level programming
   - Based on Type-Level TypeScript course (12 chapters)
   - Philosophy: types as sets, type system as real programming language
@@ -173,12 +229,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Trigger keywords: type-level, generics, conditional types, infer, mapped types, TS-Pattern
 
 ### Fixed
+
 - fix(product): Replaced broken Pareto reference with Impact-Effort in SKILL.md
 - fix(wordsmith): Replaced broken Six Hats reference with Productive Thinking in SKILL.md
 - fix(hope): Removed broken Pareto and Sunk Cost references from opportunity-cost.md
 - fix(hope): Version mismatch in SKILL.md (0.4.5 → 0.4.6)
 
 ### Changed
+
 - docs(CLAUDE.md): Clarified "nested references" rule - subdirectories allowed, chains forbidden
 - **design**: New plugin for design exploration workflows
   - Router skill with 8 workflows for design thinking
@@ -194,6 +252,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - No visual execution (conceptual output only)
 
 ### Changed
+
 - **design**: Revised all 8 workflows based on counsel panel audit
   - Shortened workflows to 60-80 lines (principle-based, not template-heavy)
   - Added global "never assume" rule to SKILL.md router
@@ -210,6 +269,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.5.0] - 2025-12-20
 
 ### Added
+
 - **counsel**: New plugin for expert simulation
   - Channels documented expert perspectives (Addy Osmani, Rich Hickey, Adam Wathan, Kyle Simpson)
   - `/counsel:summon` - Single-expert invocation with explicit confidence
@@ -224,6 +284,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - 5 test cases for skill auto-triggering (hope:gate, hope:soul, hope:trace, product, wordsmith)
 
 ### Removed
+
 - **ci**: Removed all GitHub Actions workflows (eval, claude-code-review, claude)
   - Replaced with local git hooks (zero dependencies, faster feedback)
 
@@ -232,10 +293,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.5] - 2025-12-15
 
 ### Added
+
 - **hope**: New Quality Footer format with verdict box (🟢 SHIP / 🟡 MONITOR / 🔴 RESEARCH)
 - **hope**: Single source of truth reference file `references/quality-footer.md`
 
 ### Changed
+
 - **hope**: All commands now reference Quality Footer instead of inline duplication
   - Updated: interrogate, reframe, mirror, plan, postmortem, future, debug
 - **docs**: Plugin docs moved to `docs/plugins/`
@@ -250,6 +313,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.4] - 2025-12-14
 
 ### Added
+
 - **hope**: SessionStart hook now injects today's date (e.g., "Today's date is 14 December 2025") into Claude's context
 
 ---
@@ -257,6 +321,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.3] - 2025-12-14
 
 ### Added
+
 - **6 thinking tools** (Farnam Street research):
   - `incentives.md` - Munger's "show me the incentive" for predicting/explaining behavior
   - `bottlenecks.md` - Goldratt's Theory of Constraints for finding binding limits
@@ -266,6 +331,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `systems-over-goals.md` - Habits compound, goals have endpoints (Clear/Adams)
 
 ### Changed
+
 - hope plugin version 0.4.2 → 0.4.3
 - Thinking tools count 28 → 34
 - Systems category now includes Incentives and Bottlenecks
@@ -283,6 +349,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.2] - 2025-12-13
 
 ### Removed
+
 - **7 redundant thinking tools** (bloat reduction per Anthropic guidelines):
   - `hanlons-razor.md` - Too niche (5% use cases)
   - `occams-razor.md` - First Principles is more actionable
@@ -293,11 +360,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `six-hats.md` - 70% overlap with Productive Thinking
 
 ### Added
+
 - **Default Tools section** in hope SKILL.md - 6 go-to tools for common situations
   - Follows Anthropic's "default with escape hatch" pattern
   - Reduces decision paralysis from 27+ tool options
 
 ### Changed
+
 - hope plugin version 0.4.1 → 0.4.2
 - Thinking tools count 35 → 28
 - Tools table now has "Default Tools" + "All Tools" structure
@@ -307,12 +376,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.1] - 2025-12-13
 
 ### Added
+
 - **Munger's 25 Cognitive Biases** checklist in `hope/skills/soul/references/tools/munger-biases.md`
   - Pre-decision bias check for high-stakes decisions
   - Quick checklist for scanning common misjudgments
   - Lollapalooza effect warning (multiple biases combining)
 
 ### Changed
+
 - hope plugin version 0.4.0 → 0.4.1
 - Thinking tools count 34 → 35
 
@@ -321,6 +392,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.4.0] - 2025-12-13
 
 ### Added
+
 - **5 Strategic Frameworks** (meta-level thinking frameworks):
   - `hope/skills/soul/references/handshake.md` - Align/Build/Commit for driving action
   - `hope/skills/soul/references/scope.md` - SCOPE pre-analysis right-sizing
@@ -342,6 +414,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Content audit in `docs/audit/`
 
 ### Changed
+
 - hope plugin version 0.3.0 → 0.4.0 (strategic frameworks + 4 tools)
 - wordsmith plugin version 0.0.3 → 0.0.4 (Open Loop framework)
 - product plugin version 0.0.2 → 0.0.3 (JTBD, Systems Archetypes references)
@@ -355,6 +428,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.3.0] - 2025-12
 
 ### Added
+
 - **8 new thinking tools** in `hope/skills/soul/references/tools/`:
   - Razors: Occam's Razor, Hanlon's Razor
   - Fallacies: Sunk Cost Fallacy
@@ -367,6 +441,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 4 new tool categories in SKILL.md (Razors, Fallacies, Risk, Boundaries)
 
 ### Changed
+
 - hope plugin version 0.2.0 → 0.3.0 (8 new tools)
 - Tools count 22 → 30
 
@@ -375,6 +450,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.2.0] - 2025-12
 
 ### Added
+
 - **22 Thinking Tools** in `hope/skills/soul/references/tools/`:
   - Root Cause: Ishikawa (fishbone), Iceberg Model
   - Domain: Cynefin Framework
@@ -394,6 +470,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Version field to product, founder, career skill frontmatter
 
 ### Changed
+
 - Categories now use `core` (hope) and `domain` (satellites)
 - CLAUDE.md structure diagram reflects all 5 plugins
 - Quality footer now includes "Key Assumption" field (CLAUDE.md)
@@ -406,6 +483,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - wordsmith plugin version 0.0.2 → 0.0.3 (tool references)
 
 ### Fixed
+
 - Version mismatch in hope/skills/soul/SKILL.md (0.0.1 → 0.1.2)
 - "cVoice" typo in marketplace.json
 - Missing version field in product/founder/career SKILL.md frontmatter
@@ -415,6 +493,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.1.2] - 2025-12
 
 ### Added
+
 - `/hope:intent` command for clarification protocol
 
 ---
@@ -422,12 +501,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.1.1] - 2025-12
 
 ### Added
+
 - Career plugin with 10 commands (assess, simulate, star, gap, drill, eval-comm, stakeholder, reframe, focus, osint)
 - Founder plugin with 8 commands (validate, market-size, compete, pitch, investor-prep, financials, launch, board)
 - Founder power user reference docs
 - Career power user reference docs
 
 ### Fixed
+
 - Missing hookEventName in UserPromptSubmit hook
 - Career plugin.json name, description, and keywords
 
@@ -436,6 +517,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.1.0] - 2025-12
 
 ### Added
+
 - Learnings recall skill with auto-triggering
 - Learnings compaction command
 - Smart gating for learnings
@@ -443,6 +525,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `/document` command for repo maintenance
 
 ### Changed
+
 - Documentation rewritten with progressive disclosure
 - Keyword-first approach in docs
 - Simplified update instructions
@@ -453,6 +536,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.0.2] - 2025-11
 
 ### Added
+
 - Hope plugin (soul, gate, trace, recall skills)
 - Product plugin (prd, compete, research, metrics, cohort, prd-eval, debt)
 - Wordsmith plugin (edit, voice, narrative, copy, blog-eval)
@@ -460,6 +544,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Learnings system (`~/.claude/learnings/`)
 
 ### Changed
+
 - Initial public structure
 
 ---

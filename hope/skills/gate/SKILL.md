@@ -50,6 +50,33 @@ Before claiming: "done", "fixed", "complete", "working", "ready"
 
 Require `execution output`, `observation`, or `measurement` before completion claims.
 
+## Verification Plan
+
+Before claiming completion, define how you'll verify:
+
+| Verification Type | Evidence Required | Time Cost |
+|-------------------|-------------------|-----------|
+| **Execution output** | Command output, test results | < 1 min |
+| **Observation** | Screenshot, debugger inspection | 1-5 min |
+| **Measurement** | Metrics, benchmarks, profiling | 5-15 min |
+| **Code review** | Manual inspection only | Variable |
+| **Assumption** | No verification | 0 (blocks SHIP) |
+
+### Verification Requirements by Stakes
+
+| Stakes | Minimum Verification |
+|--------|---------------------|
+| High | Execution output + Observation |
+| Medium | Execution output |
+| Low | Code review acceptable |
+
+### Anti-Footgun Rules
+
+- Never claim "done" with only assumptions
+- "It compiles" is not verification
+- "Tests pass" requires showing test output
+- If verification would take > 15 min, that's a smell (task too big)
+
 ## Anti-Patterns
 
 | Claim                      | Problem         | Required      |

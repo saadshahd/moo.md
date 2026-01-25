@@ -1,0 +1,13 @@
+name: hope-intent-spec-score
+description: Intent command shows spec clarity scoring
+plugin: hope
+skill: hope:intent
+acceptableSkills:
+  - intent
+  - soul
+  - hope:soul
+prompt: "I want to add a button to the page"
+expectedBehaviors:
+  - "Task Definition Protocol fields requested"
+  - "Spec score table shown"
+  - "Workflow shape determined based on score"

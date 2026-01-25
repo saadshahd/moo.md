@@ -2,6 +2,8 @@ name: design-constraints-request
 description: Design skill triggers on constraint surfacing requests
 plugin: design
 skill: design:design
+acceptableSkills:
+  - design
 prompt: "What UI/UX design constraints and accessibility requirements should we document for this mobile app redesign?"
 expectedBehaviors:
   - "Design skill activates on constraint requests"

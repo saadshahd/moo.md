@@ -31,6 +31,17 @@
           }
         ]
       }
+    ],
+    "Setup": [
+      {
+        "matcher": "init|maintenance",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p ~/.claude/learnings && echo 'Learnings directory ready'"
+          }
+        ]
+      }
     ]
   }
 }

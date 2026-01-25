@@ -1,0 +1,19 @@
+name: loop-spec-scoring
+description: Loop scores specs and rejects vague ones
+plugin: loop
+skill: loop:start
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - soul
+  - hope:soul
+  - hope
+  - hope:hope
+  - intent
+  - hope:intent
+prompt: "Make the app better and fix all the problems"
+expectedBehaviors:
+  - "Spec score calculated"
+  - "Score < 8 identified"
+  - "Clarification requested or /hope:intent suggested"

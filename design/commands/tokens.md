@@ -8,7 +8,7 @@ Export design system decisions as W3C DTCG-compliant design tokens JSON.
 
 ## Input
 
-$ARGUMENTS
+$0
 
 Context from directions or system workflow, or explicit token request.
 

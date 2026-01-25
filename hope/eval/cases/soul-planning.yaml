@@ -2,6 +2,12 @@ name: hope-soul-confidence
 description: Soul skill triggers on confidence-gated decisions
 plugin: hope
 skill: hope:soul
+acceptableSkills:
+  - hope
+  - soul
+  - hope:hope
+  - hope:intent
+  - intent
 prompt: "I need to make a decision about which database to use. I'm about 60% confident PostgreSQL is the right choice."
 expectedBehaviors:
   - "Silent Audit checklist appears or is implied"

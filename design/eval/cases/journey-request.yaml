@@ -2,6 +2,10 @@ name: design-journey-request
 description: Design skill triggers on user journey mapping requests
 plugin: design
 skill: design:design
+acceptableSkills:
+  - design
+  - product
+  - product:product
 prompt: "Help me map the user journey for onboarding new users to our platform"
 expectedBehaviors:
   - "Design skill activates on journey requests"

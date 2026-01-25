@@ -1,0 +1,11 @@
+name: career-interview-simulator
+description: Career skill runs interview simulation
+plugin: career
+skill: career:career
+acceptableSkills:
+  - career
+prompt: "Can you help me practice for a system design interview?"
+expectedBehaviors:
+  - "System design topics identified"
+  - "Practice structure suggested"
+  - "Feedback approach discussed"

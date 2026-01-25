@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "Setup": [
+      {
+        "matcher": "init",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p ~/.claude/loop"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "You are evaluating loop completion.\n\nCheck:\n1. Is the spec fully satisfied? (score against 5-dimension rubric)\n2. Has cost exceeded $LOOP_BUDGET (default $25)?\n3. Are there blocking errors requiring user input?\n4. For colleague-shaped work: has convergence signal been reached?\n\nReturn {\"ok\": true} to stop if spec satisfied or limits reached.\nReturn {\"ok\": false, \"reason\": \"[next action]\"} to continue.",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

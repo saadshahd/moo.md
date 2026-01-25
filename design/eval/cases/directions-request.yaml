@@ -2,6 +2,8 @@ name: design-directions-request
 description: Design skill triggers on visual direction requests
 plugin: design
 skill: design:design
+acceptableSkills:
+  - design
 prompt: "I need to explore visual directions for a fintech app targeting young professionals"
 expectedBehaviors:
   - "Design skill activates on direction requests"

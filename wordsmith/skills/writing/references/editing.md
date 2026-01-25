@@ -145,6 +145,54 @@ The edited text without markup.
 3. [Change category]: [Brief explanation]
 ```
 
+## Attention Budget
+
+Editing has diminishing returns. Track optimization level to know when to stop.
+
+### Optimization Assessment
+
+After each editing pass, estimate:
+
+```
+Document is [X]% optimized. Further editing returns ~[Y]% improvement.
+```
+
+| Pass | Typical Improvement | Focus |
+|------|---------------------|-------|
+| 1 | 30-50% | Structure, major cuts, flow |
+| 2 | 15-25% | Tightening, transitions, clarity |
+| 3 | 5-10% | Polish, rhythm, word choice |
+| 4+ | <5% | Diminishing returns territory |
+
+### Stop Gate
+
+When improvement estimate drops below 5%, issue:
+
+```
+⏹️ Stop editing. Ship. Measure real feedback.
+
+This document is ~[X]% optimized. Further passes yield <5% improvement.
+Reader feedback will be more valuable than additional editing.
+```
+
+### Revision Cycle Limits
+
+| Document Type | Max Passes | Rationale |
+|---------------|------------|-----------|
+| Internal docs | 2 | Speed > polish |
+| External copy | 3 | Reputation matters, but diminishing returns |
+| High-stakes (legal, PR) | 4 | Precision critical, but still has limits |
+
+### When to Override
+
+- Substantive feedback received (restarts cycle)
+- New requirements emerged
+- Target audience changed
+
+**Not valid overrides:** Perfectionism, anxiety, "one more look"
+
+---
+
 ## Rules
 
 - Show ALL changes in markup, not just major ones

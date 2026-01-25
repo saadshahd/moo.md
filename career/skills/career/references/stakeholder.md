@@ -157,6 +157,37 @@ Select the recommended option and justify:
 - Exit strategy if needed: [When and how to cut losses]
 ```
 
+## When Politically Stuck: Agency Debugger
+
+Diagnose why you're blocked:
+
+| Blocker | Symptoms | Prescription |
+|---------|----------|--------------|
+| **Clarity** | Don't know what to do next | Map the political landscape first |
+| **Skill Gap** | Don't know HOW to navigate | Find a mentor who's done it |
+| **Fear** | Know what, avoiding it | Name the fear, smallest courageous action |
+| **Energy** | Depleted from politics | Rest, then smallest possible action |
+| **Audience** | Don't know who to align with | Identify one key stakeholder today |
+| **Accountability** | No one tracking your progress | Tell someone your political goal |
+
+### Prescription Template
+
+ONE move for next 60 minutes that:
+
+- Addresses actual blocker (not generic networking)
+- Produces an artifact (email drafted, meeting scheduled)
+- Has someone who will see it today
+- Is small enough you can't talk yourself out of it
+
+### Resistance Reveals
+
+If you resist the prescription, that resistance tells you the real blocker.
+
+- Resist mapping stakeholders? You're avoiding seeing the full picture
+- Resist asking for mentorship? Pride or fear of appearing political
+- Resist the courageous action? The fear is bigger than you admitted
+- Resist identifying allies? You're not ready to commit to a path
+
 ## Rules
 
 - All stakeholders have interests—surface them
@@ -164,3 +195,4 @@ Select the recommended option and justify:
 - Success probability must be honest, not optimistic
 - 72-hour plan forces immediate action
 - Always include an exit strategy
+- When stuck, debug agency before strategizing further

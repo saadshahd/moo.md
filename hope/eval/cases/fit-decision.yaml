@@ -1,0 +1,18 @@
+name: hope-soul-fit-decision
+description: Soul skill applies fit decision for AI delegation
+plugin: hope
+skill: hope:soul
+acceptableSkills:
+  - hope:mirror
+  - mirror
+  - hope
+  - soul
+  - hope:soul
+  - hope:hope
+  - hope:intent
+  - intent
+prompt: "Should I have AI write this entire authentication system?"
+expectedBehaviors:
+  - "5 dimensions scored (Spec Clarity, Verification Cost, Reversibility, Hidden Coupling, Shape Confidence)"
+  - "Total score calculated"
+  - "Tool-shaped vs Colleague-shaped recommendation"

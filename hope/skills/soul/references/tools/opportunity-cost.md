@@ -106,6 +106,56 @@ When ranking features:
 
 ---
 
+## Build vs Buy Analysis
+
+Every custom solution has hidden costs.
+
+### True Cost of Building
+
+| Cost Category | Often Missed |
+|---------------|--------------|
+| **Initial development** | Usually estimated |
+| **Testing & QA** | 2-3x dev time |
+| **Documentation** | Often skipped → future debt |
+| **Maintenance** | Ongoing forever |
+| **Opportunity cost** | What else could team build? |
+| **Bus factor** | Knowledge concentration risk |
+
+### When to Buy (Use Library/Service)
+
+- Core competency is elsewhere
+- Problem is well-understood (solved before)
+- Time-to-market matters more than customization
+- Team lacks domain expertise
+- Maintenance burden would distract from core work
+
+### When to Build
+
+- Exact fit to unusual requirements
+- Core differentiator for product
+- Security/compliance requires full control
+- Existing solutions have unacceptable tradeoffs
+- Learning investment pays off long-term
+
+### Decision Framework
+
+| Factor | Buy | Build |
+|--------|-----|-------|
+| Uniqueness | Generic need | Unique requirement |
+| Expertise | Outside core | Core competency |
+| Timeline | Urgent | Can invest time |
+| Control | Acceptable | Must own fully |
+| Cost | TCO favorable | TCO favorable |
+
+### The Hidden Tax
+
+Every library you don't write = 1000 bugs you don't have.
+Every library you do write = 1000 bugs you now own.
+
+Choose wisely.
+
+---
+
 ## Provenance
 
 Foundational concept in economics. Formalized by Friedrich von Wieser (1914). Applies universally to any scarce resource allocation.

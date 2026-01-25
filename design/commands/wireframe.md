@@ -81,7 +81,7 @@ If the design requires patterns not in WireMD, use inline HTML or simplify the w
 
 ## Input
 
-$ARGUMENTS
+$0
 
 Context from current design workflow or explicit screen/flow request.
 

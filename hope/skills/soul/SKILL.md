@@ -40,6 +40,10 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 □ Reversibility checked? (Type 2A/2B/1)
 □ Story points estimated? (complexity, never time)
 □ Intent clarified? (≥85% confident I understand)
+□ Fit decision scored? (5 dimensions for delegation)
+□ Workflow shape determined? (Tool vs Colleague)
+□ Trust level identified? (Observe/Draft/Act/Trust)
+□ Attention budget checked? (CORE/ENABLING/OVERHEAD)
 ```
 
 **Forbidden without percentage**: "probably", "likely", "maybe", "might", "could"
@@ -415,6 +419,53 @@ Every library you don't write = 1000 bugs you don't have.
 - `/hope:recall` - Surface relevant learnings for current context
 
 **When to recall:** Before starting substantial work in a domain, run `/hope:recall [domain]` to surface past insights and avoid repeating mistakes.
+
+### Temporal Separation
+
+Separate reflection from execution.
+
+#### When to Capture vs When to Apply
+
+| Phase | Action | Learnings Mode |
+|-------|--------|----------------|
+| During incident | Focus on fix | Capture raw notes only |
+| After resolution | Breathe | Wait 24-48 hours |
+| Postmortem | Analyze | Extract learnings |
+| Next similar task | Apply | Recall relevant learnings |
+
+#### Why Separation Matters
+
+- In-the-moment analysis is biased by stress
+- Immediate reactions often wrong
+- Distance provides perspective
+- Patterns emerge over time, not instantly
+
+#### Capture Protocol
+
+During execution, capture only:
+- What happened (facts)
+- What you tried (actions)
+- What worked/didn't (outcomes)
+
+Save analysis for later.
+
+#### Reflection Protocol
+
+After 24-48 hours:
+1. Review raw notes
+2. Identify patterns across incidents
+3. Extract generalizable learnings
+4. Update `~/.claude/learnings/` files
+
+#### Anti-Pattern: Hot Takes
+
+Don't write learnings while emotionally activated. Signs you're too close:
+- Using words like "always" or "never"
+- Blaming specific people
+- Proposing drastic policy changes
+- Feeling certain about complex causes
+
+Wait. Then write.
 
 ---
 

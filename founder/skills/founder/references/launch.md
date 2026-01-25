@@ -169,6 +169,37 @@ Deliver as a structured 90-day plan:
 | Revenue    |        |        |         |        |
 ```
 
+## Loop 1 Ownership: Launch Accountability
+
+Each launch task needs clear ownership:
+
+| Task | Owner | Agency Level | Metric | Deadline |
+|------|-------|--------------|--------|----------|
+| [Task] | [Name] | Owned/Delegated/Blocked | [Success metric] | [Date] |
+
+### Agency Levels
+
+- **Owned**: You can complete this without anyone else
+- **Delegated**: Someone else is doing it, you're tracking
+- **Blocked**: Waiting on external dependency
+
+### Warning Signs (Loop 2 Thinking)
+
+If you find yourself:
+- Waiting for someone else before YOU can act
+- Blaming external factors for delays
+- No clear next action you can take TODAY
+
+...you're in Loop 2. Break the task down until you own a piece.
+
+### Daily Launch Standup
+
+For each blocked item:
+1. What's the actual blocker?
+2. Who can unblock it?
+3. What's YOUR next action to unblock? (Not "wait")
+4. Deadline for unblocking action
+
 ## Rules
 
 - Each task must have example copy or deliverable

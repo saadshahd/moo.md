@@ -11,4 +11,4 @@ description: Prime skills and thinking tools for current task. Use before starti
 
 If intent unclear (<70%), run `/hope:intent` first.
 
-$ARGUMENTS
+$0

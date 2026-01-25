@@ -91,4 +91,4 @@ Only after root cause verified and instrumentation planned:
 
 ## Issue
 
-$ARGUMENTS
+$0

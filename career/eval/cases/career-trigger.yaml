@@ -1,0 +1,11 @@
+name: career-basic-trigger
+description: Career skill triggers on career development questions
+plugin: career
+skill: career:career
+acceptableSkills:
+  - career
+prompt: "How should I prepare for a technical interview at a FAANG company?"
+expectedBehaviors:
+  - "Interview preparation framework applied"
+  - "Assessment of current skills suggested"
+  - "Practice plan outlined"

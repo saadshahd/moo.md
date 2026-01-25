@@ -85,6 +85,45 @@ Only after user confirms, generate:
 |------|--------|------------|
 ```
 
+## Spec Clarity Rubric
+
+Score each requirement before including in PRD:
+
+| Dimension | 0-1 | 2-3 | 4-5 |
+|-----------|-----|-----|-----|
+| **Evidence** | Assumption | Anecdotal | Validated data |
+| **Clarity** | Ambiguous | Mostly clear | Unambiguous, testable |
+| **Dependency** | Blocked by unknowns | Some dependencies | Self-contained |
+
+### Scoring
+
+- **Evidence (0-5):** How validated is this requirement?
+- **Clarity (1-5):** Can an engineer implement without questions?
+- **Dependency (1-5):** How independent is this from other decisions?
+
+### Gate
+
+**Requirement must score ≥8 total to include in PRD.**
+
+| Score | Action |
+|-------|--------|
+| < 6 | Reject — needs validation or clarification |
+| 6-7 | Flag — include with explicit assumptions |
+| ≥ 8 | Include — ready for implementation |
+
+### Application
+
+In Phase 2 (Interrogate), score each feature. In Phase 4 (Generate PRD), include only features that pass the gate.
+
+```
+| Feature | Evidence | Clarity | Dependency | Total | Status |
+|---------|----------|---------|------------|-------|--------|
+| [Name]  | 4        | 4       | 3          | 11    | ✓      |
+| [Name]  | 2        | 3       | 2          | 7     | ⚠ Flag |
+```
+
+---
+
 ## Rules
 
 - Use Ask tool

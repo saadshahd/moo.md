@@ -8,7 +8,7 @@ Generate presentation slides from structured content using Marp markdown format.
 
 ## Input
 
-$ARGUMENTS
+$0
 
 Context from current conversation or explicit content request.
 

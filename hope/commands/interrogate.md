@@ -99,4 +99,4 @@ If user answers specific questions, generate follow-up questions based on respon
 
 ## Task
 
-$ARGUMENTS
+$0

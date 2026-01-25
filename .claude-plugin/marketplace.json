@@ -47,6 +47,12 @@
       "source": "./design",
       "description": "Design exploration workflows for research, direction-finding, and surfacing unknowns. Journey mapping, IA, visual directions, and UX comparison.",
       "category": "domain"
+    },
+    {
+      "name": "loop",
+      "source": "./loop",
+      "description": "Autonomous iteration with spec-driven quality gates. Uses Tasks API for state, Stop hooks for intelligent termination.",
+      "category": "core"
     }
   ]
 }
