@@ -23,6 +23,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **eval**: Added single test mode (`--test <name>`)
 - **eval**: Fixed plugin filter bug (positional arg parsing)
 - **docs**: Added counsel, design, loop to docs/index.md and README.md
+
+### Fixed
+
+- **marketplace.json**: Removed invalid `skills` field from plugin entries (not part of schema)
 - **loop**: Merged `/loop:help` into `/loop:start` (redundancy audit)
   - Added help triggers to start description ("what is loop", "how does loop work", "loop help")
   - Moved tips section from help into start
