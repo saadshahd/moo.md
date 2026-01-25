@@ -96,7 +96,7 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 
 ## Curated Profiles
 
-20 experts available. See [inference.md](references/inference.md) for the complete catalog with domain routing.
+33 experts available. See [inference.md](references/inference.md) for the complete catalog with domain routing.
 
 ---
 

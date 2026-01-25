@@ -44,7 +44,7 @@ Auto-triggers on:
 
 **Calibration:** Corrections stored in `.claude/logs/counsel-calibrations.jsonl`. Applied automatically in future sessions.
 
-**Expert Catalog:** See [inference.md](../../counsel/skills/counsel/references/inference.md) for full list of 20 curated experts.
+**Expert Catalog:** See [inference.md](../../counsel/skills/counsel/references/inference.md) for full list of 33 curated experts.
 
 ---
 
