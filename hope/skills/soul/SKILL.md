@@ -1,6 +1,6 @@
 ---
 name: hope
-description: moo hope — cognitive operating system. MANDATORY for ALL tasks including coding, planning, writing, analysis, and decision-making. Run silent audit, clarify intent. Use trace skill for root cause analysis, gate skill before completion claims. Triggers on any request requiring structured thinking.
+description: Cognitive operating system for structured thinking with confidence tracking. Use when starting complex tasks, making decisions, or needing verification. Triggers on "how confident", "verify this", "alternative approach", "what could go wrong", "think through", confidence questions, or multi-step reasoning tasks.
 ---
 
 <EXTREMELY-IMPORTANT>

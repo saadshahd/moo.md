@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [0.9.1] - 2026-01-25
+
+### Changed
+
+- **hope/soul**: Improved description with explicit trigger KEYWORDS
+  - Added: "how confident", "verify this", "alternative approach", "what could go wrong", "think through"
+  - Removed overly broad "MANDATORY for ALL tasks" trigger
+  - Clearer WHAT/WHEN/KEYWORDS structure for reliable activation
+
+---
+
 ## [0.9.0] - 2026-01-25
 
 ### Changed

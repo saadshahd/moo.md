@@ -11,3 +11,6 @@ eval/dist/
 
 # Build outputs
 dist/
+
+# Local
+*.local.md
