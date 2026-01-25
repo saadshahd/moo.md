@@ -2,7 +2,13 @@ name: hope-skill-judge-review
 description: Skill-judge triggers on skill review before publishing
 plugin: hope
 skill: hope:skill-judge
-prompt: "Review this skill before I publish it to the marketplace"
+acceptableSkills:
+  - skill-judge
+  - soul
+  - hope:soul
+  - gate
+  - hope:gate
+prompt: "Use skill-judge to evaluate this SKILL.md file quality"
 expectedBehaviors:
   - "Full evaluation with dimension scores"
   - "Description validation checklist"
