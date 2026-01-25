@@ -1,68 +1,58 @@
 ---
 name: interactive-code-review
-description: Human-in-the-loop, chunk-by-chunk review that mimics a git add -p flow for code and textual artifacts. Use when a user asks to review a PR, diff, draft, patch, document, or work-in-progress and wants an interactive approve/reject/chat loop over reviewable chunks.
+description: Human-in-the-loop code review with chunk-by-chunk approve/reject/chat loop (git add -p style). Use when reviewing PRs, diffs, patches, or documents interactively. Triggers on "review my PR", "walk through changes", "interactive review".
 ---
 
 # Interactive Code Review
 
-## Overview
+Run a structured, interactive review session that presents changes in small, readable chunks and waits for the human to approve, reject, or chat before moving on.
 
-Run a structured, interactive review session that presents changes or sections in small, readable chunks and waits for the human to approve, reject, or chat before moving on.
+## Framework
 
-## Named Framework
-
-Structured Walkthrough: author intent is surfaced first, then the reviewer probes for risks, gaps, and misunderstandings.
-
-## Evidence It Works
-
-Structured walkthroughs are an established software quality practice used in industry and described in software engineering literature for defect detection and shared understanding.
+Structured Walkthrough: author intent is surfaced first, then the reviewer probes for risks, gaps, and misunderstandings. Established software quality practice (IEEE 1028) for defect detection and shared understanding.
 
 ## Workflow
 
-1. Confirm the review target and intent.
+1. **Confirm target and intent.**
    - Ask for the diff source if unclear (branch range, file paths, or patch).
-   - Clarify what “good” looks like (correctness, style, performance, risk).
+   - Clarify what "good" looks like (correctness, style, performance, risk).
 
-2. Gather the review material.
-   - For code: prefer `git status -sb`, `git diff --stat`, then `git diff <base>...<head>` or `git diff -- <paths>`.
-   - For documents or drafts: ask for the text, sections, or the relevant excerpt.
+2. **Gather material.**
+   - For code: `git status -sb`, `git diff --stat`, then `git diff <base>...<head>`.
+   - For documents: ask for the text, sections, or relevant excerpt.
 
-3. Chunk the review.
-   - Default to file-by-file, then hunk-by-hunk within each file.
-   - Keep chunks small (target 40–120 lines of diff). Split large hunks.
-   - For prose or structured text, split by headings, sections, or logical paragraphs.
+3. **Chunk the review.**
+   - File-by-file, then hunk-by-hunk within each file.
+   - Target 40–120 lines per chunk. Split large hunks.
+   - Order: module boundaries (entry points, public interfaces) first, then internals, finally tests.
+   - For prose: split by headings or logical paragraphs.
 
-4. Present each chunk with a standard template and pause for a human decision.
-   - Only advance after an explicit response.
-   - Accept: approve, reject, chat.
+4. **Present each chunk** with the standard template. Pause for explicit response.
 
-5. Handle responses.
-   - Approve: mark as approved and continue.
-   - Reject: explain issues, propose concrete edits, and ask for confirmation before changing files.
-   - Chat: answer questions or show more context, then ask for approve/reject.
+5. **Handle responses.**
+   - **Approve**: mark approved, continue.
+   - **Reject**: explain issue, propose concrete edit, confirm before changing files.
+   - **Chat**: answer questions, show context. Re-prompt with same actions. Chat loops until user gives approve/reject/skip.
+   - **Skip**: mark for later, continue.
+   - **Done**: end review immediately, show summary.
+   - **Jump [file]**: skip to specific file.
 
-6. Wrap up with a review summary.
-   - List approved chunks, rejected chunks, and open questions.
-   - Offer to apply edits or re-run review on updated diffs.
+6. **Wrap up with summary.**
+   - List approved, rejected, skipped chunks.
+   - Offer to apply edits or re-run on updated diffs.
 
-## Reviewer Conduct
+## Actions
 
-- Be technically rigorous; verify before asserting or applying edits.
-- Ask clarifying questions when feedback or intent is unclear.
-- Avoid performative agreement; focus on evidence and fixes.
-  - State the issue, impact, and proposed change instead.
-  - Do not use gratitude or hype phrases in review output.
+| Action | Aliases | Effect |
+|--------|---------|--------|
+| approve | ok, lgtm, yes, y, +1 | Mark approved, continue |
+| reject | no, fix, change, -1 | Explain issue, propose edit |
+| chat | ?, context, explain, why | More context, re-prompt |
+| skip | later, defer | Mark for later, continue |
+| done | stop, abort | End review, show summary |
+| jump [file] | go [file] | Skip to specific file |
 
-## Optional Deep Review Mode
-
-If the user asks for a full review beyond chunk approval (e.g., “production readiness”):
-- Collect plan/requirements and the git range or artifact scope.
-- Run a structured assessment: plan alignment, code quality, architecture, testing, and readiness.
-- Provide a severity-labeled issue list and a merge/ship verdict.
-
-## Interactive Chunk Template
-
-ALWAYS use this format for each chunk:
+## Chunk Template
 
 ```
 Review chunk [i/N]
@@ -71,14 +61,34 @@ Summary: <1–2 lines>
 
 <diff snippet>
 
-Action? (approve / reject / chat)
+Action? (approve / reject / chat / skip / done)
 ```
 
-If the user asks for a different action, translate it into approve/reject/chat and confirm.
+## Progress Indicator
 
-## Optional Deep Review Output
+After every 5 chunks or on request:
+```
+Progress: [====------] 4/10 | 2 approved | 1 rejected | 1 skipped
+```
 
-When running deep review mode, use this format:
+## Reviewer Conduct
+
+- Verify before asserting or applying edits.
+- Ask clarifying questions when feedback or intent is unclear.
+- Avoid performative agreement; focus on evidence and fixes.
+- Keep tone neutral and concise; avoid rewriting unless requested.
+
+## Review Heuristics
+
+- Flag correctness risks, security issues, breaking changes, and missing tests first.
+- At module boundaries: verify the contract (inputs/outputs) is preserved.
+- For legacy code: check if change increases or decreases testability.
+- For text: flag unclear intent, inconsistencies, missing context.
+- If rejecting, include: issue, why it matters, and a concrete fix.
+
+## Deep Review Mode
+
+If user asks for full assessment (e.g., "production readiness"):
 
 ### Strengths
 [What's well done.]
@@ -99,22 +109,21 @@ When running deep review mode, use this format:
 
 ### Assessment
 
-**Ready to merge?** [Yes/No/With fixes]
+**Ready to merge?** [Yes/No/With fixes] (X-Y% confident)
+
+**Key assumptions:** [List 2-3 assumptions behind assessment]
 
 **Reasoning:** [1-2 sentences]
 
-## Review Heuristics
+## Integration
 
-- Flag correctness risks, security issues, breaking changes, and missing tests first.
-- For text, flag unclear intent, inconsistencies, missing context, and factual gaps.
-- Call out surprising behavior or unclear intent.
-- If rejecting, include: issue, why it matters, and a concrete fix.
-- Keep tone neutral and concise; avoid rewriting unless requested.
+- Before claiming review complete: run `hope:gate` checklist
+- If rejection reveals systemic issue: suggest `hope:trace` for root cause
+- For security-focused reviews: reference `soul/references/differential-review.md`
 
 ## Safety
 
-Do not stage, commit, or modify files unless the user explicitly asks.
-
-## Provenance
-
-Adapted to a Claude Code skill with a git add -p style interaction and a Structured Walkthrough framing.
+- Do not stage, commit, or modify files unless user explicitly asks.
+- Maximum: 20 files or 2000 lines of diff per session. Larger reviews: split by directory.
+- Binary files: skip with note "Binary file, review manually"
+- Merge conflicts: pause and ask user to resolve first

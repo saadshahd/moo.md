@@ -54,13 +54,52 @@ From this skill's `references/`:
 | ------------------------------------------------- | --------------------------------------- |
 | [Regret Minimization](references/regret-minimization.md) | Major founder decisions (quit job, pivot, shut down) |
 
+## Dimensions
+
+This skill has multiple configuration dimensions. See [compatibility-matrix.md](references/compatibility-matrix.md) for:
+
+- Workflow x Stage (Pre-Seed to Growth)
+- Validation Verdict x Next Workflow
+- Pitch Deck x Audience
+- Financial Model Depth x Funding Stage
+- Board Report x Company Health
+- Market Size Approach x Market Type
+- Launch Phase x Traction Level
+
+Use ✓✓ combinations when possible; avoid ✗ combinations.
+
 ## Usage
 
 1. Detect which workflow applies based on user's task
-2. Announce: "I'm using the founder skill for [workflow]"
-3. Load the appropriate reference file
-4. Execute the workflow exactly as written
-5. Produce the specified artifact
+2. Check [compatibility matrix](references/compatibility-matrix.md) for dimension compatibility
+3. Announce: "I'm using the founder skill for [workflow]"
+4. Load the appropriate reference file
+5. Execute the workflow with confirmation gates (see below)
+6. Produce the specified artifact
+
+## Confirmation Gates
+
+Multi-step workflows pause at checkpoints to prevent wasted work when intent drifts.
+
+**Gate Points:**
+
+| Phase | Gate |
+|-------|------|
+| After research/discovery | ⚠️ CHECKPOINT: "Does this understanding match your intent?" |
+| After approach/structure | ⚠️ CHECKPOINT: "Here's my proposed approach. Should I proceed?" |
+| Before final artifact | ⚠️ CHECKPOINT: "Ready to generate [artifact]. Confirm?" |
+
+**Skip gates:** Say "proceed without confirmation" to run uninterrupted.
+
+**In workflows:** Each reference file should pause at these points:
+
+```
+### Phase 2: Analysis
+
+[... phase content ...]
+
+⚠️ **CHECKPOINT**: Present findings summary. Ask: "Does this capture the key insights? Any adjustments before I continue?"
+```
 
 ## Artifact Tooling
 

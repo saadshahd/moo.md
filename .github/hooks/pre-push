@@ -4,7 +4,7 @@ set -e
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 CHANGED_PLUGINS=""
-for plugin in hope product wordsmith founder career counsel design; do
+for plugin in hope product wordsmith founder career counsel design loop; do
   if git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q "^$plugin/"; then
     CHANGED_PLUGINS="$CHANGED_PLUGINS $plugin"
   elif git diff --name-only "origin/main..HEAD" 2>/dev/null | grep -q "^$plugin/"; then
@@ -17,12 +17,47 @@ if [ -z "$CHANGED_PLUGINS" ]; then
   exit 0
 fi
 
-echo "Running evals for:$CHANGED_PLUGINS"
+ERRORS=""
+
+for plugin in $CHANGED_PLUGINS; do
+  plugin_dir="$REPO_ROOT/$plugin"
+  [ ! -d "$plugin_dir/skills" ] && continue
+
+  for skill_file in "$plugin_dir"/skills/*/SKILL.md; do
+    [ ! -f "$skill_file" ] && continue
+
+    # Line count check
+    lines=$(wc -l < "$skill_file" | tr -d ' ')
+    if [ "$lines" -ge 500 ]; then
+      ERRORS="${ERRORS}${skill_file}: ${lines} lines (max 499)\n"
+    fi
+
+    # Frontmatter check
+    if ! head -1 "$skill_file" | grep -q '^---$'; then
+      ERRORS="${ERRORS}${skill_file}: missing frontmatter\n"
+    fi
+
+    # Multi-line YAML check
+    if head -20 "$skill_file" | grep -qE '^description:\s*[|>]'; then
+      ERRORS="${ERRORS}${skill_file}: multi-line description (use single line)\n"
+    fi
+  done
+done
+
+if [ -n "$ERRORS" ]; then
+  echo "=== Skill Validation Errors ==="
+  echo -e "$ERRORS"
+  exit 1
+fi
+
+echo "✓ Skill validation passed"
+echo ""
+echo "=== Running Evaluations ==="
+echo "Plugins:$CHANGED_PLUGINS"
 
 cd "$REPO_ROOT"
 for plugin in $CHANGED_PLUGINS; do
   bun run eval/run.ts "$plugin"
 done
 
-echo ""
 echo "✓ All evals passed"

@@ -47,12 +47,49 @@ From `hope/skills/soul/references/tools/`:
 | [Minto Pyramid](../../hope/skills/soul/references/tools/minto-pyramid.md) | Structure executive summaries, SCQA format |
 | [Productive Thinking](../../hope/skills/soul/references/tools/productive-thinking.md) | Multi-perspective content review |
 
+## Dimensions
+
+This skill has multiple configuration dimensions. See [compatibility-matrix.md](references/compatibility-matrix.md) for:
+
+- Workflow x Voice Type
+- Tone x Format (Microcopy)
+- Editing Pass x Document Type
+- Voice Dimension x Content Type
+- Narrative Structure x Audience
+
+Use ✓✓ combinations when possible; avoid ✗ combinations.
+
 ## Usage
 
 1. Detect which workflow applies based on user's task
-2. Announce: "I'm using the writing skill for [workflow]"
-3. Load the appropriate reference file
-4. Execute the workflow exactly as written
+2. Check [compatibility matrix](references/compatibility-matrix.md) for dimension compatibility
+3. Announce: "I'm using the writing skill for [workflow]"
+4. Load the appropriate reference file
+5. Execute the workflow with confirmation gates (see below)
+
+## Confirmation Gates
+
+Multi-step workflows pause at checkpoints to prevent wasted work when intent drifts.
+
+**Gate Points:**
+
+| Phase | Gate |
+|-------|------|
+| After voice/style analysis | ⚠️ CHECKPOINT: "Does this capture the voice you want?" |
+| After outline/structure | ⚠️ CHECKPOINT: "Here's my proposed structure. Should I proceed?" |
+| Before final output | ⚠️ CHECKPOINT: "Ready to generate final version. Confirm?" |
+
+**Skip gates:** Say "proceed without confirmation" to run uninterrupted.
+
+**In workflows:** Each reference file should pause at these points:
+
+```
+### Phase 2: Analysis
+
+[... phase content ...]
+
+⚠️ **CHECKPOINT**: Present findings summary. Ask: "Does this capture the voice/style? Any adjustments before I continue?"
+```
 
 ## Rules
 

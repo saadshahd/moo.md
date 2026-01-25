@@ -57,7 +57,31 @@ From this skill's `references/`:
 1. Detect which workflow applies based on user's task
 2. Announce: "I'm using the product skill for [workflow]"
 3. Load the appropriate reference file
-4. Execute the workflow exactly as written
+4. Execute the workflow with confirmation gates (see below)
+
+## Confirmation Gates
+
+Multi-step workflows pause at checkpoints to prevent wasted work when intent drifts.
+
+**Gate Points:**
+
+| Phase | Gate |
+|-------|------|
+| After research/discovery | ⚠️ CHECKPOINT: "Does this understanding match your intent?" |
+| After approach selection | ⚠️ CHECKPOINT: "Here's my proposed approach. Should I proceed?" |
+| Before final artifact | ⚠️ CHECKPOINT: "Ready to generate final output. Confirm?" |
+
+**Skip gates:** Say "proceed without confirmation" to run uninterrupted.
+
+**In workflows:** Each reference file should pause at these points:
+
+```
+### Phase 2: Analysis
+
+[... phase content ...]
+
+⚠️ **CHECKPOINT**: Present findings summary. Ask: "Does this capture the key insights? Any adjustments before I continue?"
+```
 
 ## Rules
 

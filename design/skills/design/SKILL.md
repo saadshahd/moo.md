@@ -81,10 +81,48 @@ critique → (anytime for feedback)
 | [Issue Trees](../../hope/skills/soul/references/tools/issue-trees.md)           | Break down complex design problems    |
 | [Decision Matrix](../../hope/skills/soul/references/tools/decision-matrix.md)   | Choose between design directions      |
 
+## Dimensions
+
+This skill has multiple configuration dimensions. See [compatibility-matrix.md](references/compatibility-matrix.md) for:
+
+- Workflow x Project Phase
+- Visual Direction Type x Brand Attribute
+- Handoff Format x Stakeholder
+- Accessibility Level x Design Approach
+- Journey Confidence x Recommended Action
+- Workflow Sequence Compatibility
+
+Use ✓✓ combinations when possible; avoid ✗ combinations.
+
 ## Usage
 
 1. Detect which workflow applies
-2. Announce: "I'm using the design skill for [workflow]"
-3. **Ask for ALL required inputs before proceeding**
-4. Execute workflow with evidence tracking
-5. Include commitment readiness check
+2. Check [compatibility matrix](references/compatibility-matrix.md) for dimension compatibility
+3. Announce: "I'm using the design skill for [workflow]"
+4. **Ask for ALL required inputs before proceeding**
+5. Execute workflow with confirmation gates (see below)
+6. Include commitment readiness check
+
+## Confirmation Gates
+
+Multi-step workflows pause at checkpoints to prevent wasted work when intent drifts.
+
+**Gate Points:**
+
+| Phase | Gate |
+|-------|------|
+| After constraints/research | ⚠️ CHECKPOINT: "Does this understanding match your intent?" |
+| After options generation | ⚠️ CHECKPOINT: "Here are the directions. Which resonates before I expand?" |
+| Before final output | ⚠️ CHECKPOINT: "Ready to finalize. Confirm?" |
+
+**Skip gates:** Say "proceed without confirmation" to run uninterrupted.
+
+**In workflows:** Each reference file should pause at these points:
+
+```
+### Phase 2: Exploration
+
+[... phase content ...]
+
+⚠️ **CHECKPOINT**: Present options summary. Ask: "Do these directions capture what you're looking for? Any adjustments before I continue?"
+```

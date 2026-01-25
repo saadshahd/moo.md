@@ -14,6 +14,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **loop**: Merged `/loop:help` into `/loop:start` (redundancy audit)
   - Added help triggers to start description ("what is loop", "how does loop work", "loop help")
   - Moved tips section from help into start
+- **.github/hooks/pre-push**: Simplified quality gates (objective checks only)
+  - Line count < 500, frontmatter exists, no multi-line YAML
+  - Removed unreliable WHAT/WHEN/KEYWORDS regex validation
+- **wordsmith, design, founder**: Added confirmation gates to multi-step workflows
+  - Gates at research, approach selection, and final output phases
+  - Skip with "proceed without confirmation"
+- **hope/interactive-code-review**: Streamlined workflow, added Skip/Done/Jump commands
 
 ### Removed
 
@@ -21,6 +28,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **wordsmith, design, founder**: Compatibility matrices for multi-dimensional skills
+  - `references/compatibility-matrix.md` in each plugin
+  - Voice × Format, Style × Audience, Workflow × Stage combinations
 - **hope**: `/hope:skill-judge` meta-skill for evaluating skill quality
   - 8-dimension evaluation framework (120 points total)
   - Knowledge Delta classification ([E]xpert / [A]ctivation / [R]edundant)
