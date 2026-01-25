@@ -6,6 +6,8 @@ acceptableSkills:
   - design
   - product
   - product:product
+  - design:wireframe
+  - wireframe
 prompt: "Help me map the user journey for onboarding new users to our platform"
 expectedBehaviors:
   - "Design skill activates on journey requests"
