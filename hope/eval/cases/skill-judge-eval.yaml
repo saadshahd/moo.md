@@ -2,7 +2,13 @@ name: hope-skill-judge-eval
 description: Skill-judge triggers on skill evaluation and quality review requests
 plugin: hope
 skill: hope:skill-judge
-prompt: "Can you evaluate this skill for quality? I want to make sure it follows best practices before publishing."
+acceptableSkills:
+  - skill-judge
+  - soul
+  - hope:soul
+  - gate
+  - hope:gate
+prompt: "Use /skill-judge to evaluate this SKILL.md quality"
 expectedBehaviors:
   - "Uses 8-dimension evaluation framework"
   - "Classifies knowledge delta as E/A/R"
