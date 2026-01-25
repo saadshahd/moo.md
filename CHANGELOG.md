@@ -14,7 +14,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **loop**: Merged `/loop:help` into `/loop:start` (redundancy audit)
   - Added help triggers to start description ("what is loop", "how does loop work", "loop help")
   - Moved tips section from help into start
-  - Recommendation: DELETE `loop/skills/help/` directory
+
+### Removed
+
+- **loop**: Deleted `loop/skills/help/` directory (content merged into start)
 
 ### Added
 

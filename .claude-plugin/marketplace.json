@@ -68,7 +68,7 @@
       "description": "Autonomous iteration with spec-driven quality gates. Uses Tasks API for state, Stop hooks for intelligent termination.",
       "category": "core",
       "keywords": ["autonomous", "iteration", "persist", "continue", "until-done", "multi-step"],
-      "skills": ["start", "cancel", "help"]
+      "skills": ["start", "cancel"]
     }
   ]
 }
