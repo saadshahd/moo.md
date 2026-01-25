@@ -6,7 +6,9 @@ acceptableSkills:
   - intent
   - soul
   - hope:soul
-prompt: "I want to add a button to the page"
+  - hope:plan
+  - plan
+prompt: "Help me clarify the requirements for adding a login button to the page"
 expectedBehaviors:
   - "Task Definition Protocol fields requested"
   - "Spec score table shown"

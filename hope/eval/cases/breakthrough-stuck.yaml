@@ -2,6 +2,10 @@ name: hope-breakthrough-stuck
 description: Breakthrough skill triggers when user is stuck or blocked
 plugin: hope
 skill: hope:breakthrough
+acceptableSkills:
+  - breakthrough
+  - hope:reframe
+  - reframe
 prompt: "I'm stuck on this auth system design. I've tried three different approaches but they all feel over-engineered. I can't figure out the right abstraction."
 expectedBehaviors:
   - "Identifies symptom (over-engineered, can't find right abstraction)"
