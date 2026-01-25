@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **eval**: Optimized for speed and cost
+  - Quick mode (default): Layer A + C only, haiku model, 30s timeout
+  - Full mode (`--full`): Adds Layer D with default model
+  - Deep mode (`--deep`): Original behavior with expensive model
+  - Full suite: 10+ minutes → ~30 seconds
+- **eval**: Fixed plugin filter bug (positional arg parsing)
 - **loop**: Merged `/loop:help` into `/loop:start` (redundancy audit)
   - Added help triggers to start description ("what is loop", "how does loop work", "loop help")
   - Moved tips section from help into start

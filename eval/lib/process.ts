@@ -35,24 +35,20 @@ export async function spawnWithTimeout(
 export const buildClaudeArgs = (
   prompt: string,
   pluginDir: string,
-  model?: string,
-): string[] => {
-  const args = [
-    "claude",
-    "-p",
-    prompt,
-    "--plugin-dir",
-    `./${pluginDir}`,
-    "--setting-sources",
-    "project",
-    "--output-format",
-    "json",
-  ];
-  if (model) {
-    args.push("--model", model);
-  }
-  return args;
-};
+  model: string = "haiku",
+): string[] => [
+  "claude",
+  "-p",
+  prompt,
+  "--plugin-dir",
+  `./${pluginDir}`,
+  "--setting-sources",
+  "project",
+  "--output-format",
+  "json",
+  "--model",
+  model,
+];
 
 export const buildSimpleClaudeArgs = (prompt: string): string[] => [
   "claude",

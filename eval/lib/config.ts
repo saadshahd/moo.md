@@ -2,9 +2,12 @@ import type { EvalConfig } from "./types";
 
 export const CONCURRENCY = {
   MAX_PARALLEL: 10,
-  DEFAULT_TIMEOUT_MS: 180_000, // 3 minutes - some tests take 140s+
-  LAYER_D_TIMEOUT_MS: 180_000, // Layer D runs 2 Claude calls
+  QUICK_TIMEOUT_MS: 30_000,
+  DEFAULT_TIMEOUT_MS: 60_000,
+  LAYER_D_TIMEOUT_MS: 90_000,
 } as const;
+
+export const DEFAULT_MODEL = "haiku";
 
 export const DEFAULT_CONFIG: EvalConfig = {
   timeout: CONCURRENCY.DEFAULT_TIMEOUT_MS,

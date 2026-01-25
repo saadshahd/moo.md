@@ -91,16 +91,26 @@ const printTestResult = (result: TestResult): void =>
 
 async function main(): Promise<void> {
   const args = Bun.argv.slice(2);
-  const skipLayerD = args.includes("--skip-layer-d");
+  const deepMode = args.includes("--deep");
+  const fullMode = args.includes("--full") || deepMode;
+  const skipLayerD = !fullMode;
   const modelIndex = args.indexOf("--model");
-  const model = modelIndex !== -1 ? args[modelIndex + 1] : undefined;
+  const model =
+    modelIndex !== -1 ? args[modelIndex + 1] : deepMode ? undefined : "haiku";
   const filterPlugin = args.find(
-    (a) => !a.startsWith("--") && args.indexOf(a) !== modelIndex + 1,
+    (a) =>
+      !a.startsWith("--") &&
+      (modelIndex === -1 || args.indexOf(a) !== modelIndex + 1),
   );
 
-  console.log("moo Plugin Evaluation (v3 - optimized)");
+  const mode = deepMode ? "deep" : fullMode ? "full" : "quick";
+  const timeout =
+    mode === "quick"
+      ? CONCURRENCY.QUICK_TIMEOUT_MS
+      : CONCURRENCY.DEFAULT_TIMEOUT_MS;
+  console.log(`moo Plugin Evaluation (${mode} mode)`);
   if (model) {
-    console.log(`Using model: ${model}`);
+    console.log(`Model: ${model}`);
   }
   console.log();
 
@@ -134,7 +144,7 @@ async function main(): Promise<void> {
       limit(async () => {
         const start = performance.now();
         const result = await runTest(test, {
-          timeout: CONCURRENCY.DEFAULT_TIMEOUT_MS,
+          timeout,
           skipLayerD,
           model,
         });
