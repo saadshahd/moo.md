@@ -18,20 +18,22 @@ You're working on:
 - Cohort and retention analysis
 - PRD quality evaluation
 - Technical debt prioritization
+- Game-changing feature ideation
 
 ## Workflow Selection
 
 Announce which workflow you're using:
 
-| Task Type                                   | Workflow             | Reference                |
-| ------------------------------------------- | -------------------- | ------------------------ |
-| Competitive analysis, market gaps, win/loss | Competitive Analysis | `references/compete.md`  |
-| Feature specs, requirements, MVP scoping    | PRD Generation       | `references/prd.md`      |
-| Goals, OKRs, KPIs, tracking systems         | Metrics & Goals      | `references/metrics.md`  |
-| User interviews, qualitative data, insights | Research Synthesis   | `references/research.md` |
-| Retention, LTV, churn, cohort data          | Cohort Analysis      | `references/cohort.md`   |
-| PRD review, completeness check, scoring     | PRD Evaluation       | `references/prd-eval.md` |
-| Tech debt triage, remediation planning      | Debt Prioritization  | `references/debt.md`     |
+| Task Type                                   | Workflow             | Reference                           |
+| ------------------------------------------- | -------------------- | ----------------------------------- |
+| Competitive analysis, market gaps, win/loss | Competitive Analysis | `references/compete.md`             |
+| Feature specs, requirements, MVP scoping    | PRD Generation       | `references/prd.md`                 |
+| Goals, OKRs, KPIs, tracking systems         | Metrics & Goals      | `references/metrics.md`             |
+| User interviews, qualitative data, insights | Research Synthesis   | `references/research.md`            |
+| Retention, LTV, churn, cohort data          | Cohort Analysis      | `references/cohort.md`              |
+| PRD review, completeness check, scoring     | PRD Evaluation       | `references/prd-eval.md`            |
+| Tech debt triage, remediation planning      | Debt Prioritization  | `references/debt.md`                |
+| Breakthrough features, innovation ideation  | Game-Changing Features | `references/game-changing-features.md` |
 
 ## Related Thinking Tools
 

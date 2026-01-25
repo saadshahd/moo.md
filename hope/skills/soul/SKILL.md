@@ -63,6 +63,22 @@ Higher-level frameworks for complex situations. Use before diving into tactical 
 
 ---
 
+## Specialized References
+
+Deep-dive references for specific contexts:
+
+| Reference                                                | When to Use                                      |
+| -------------------------------------------------------- | ------------------------------------------------ |
+| [Reducing Entropy](references/reducing-entropy.md)       | Philosophy for minimizing codebase complexity    |
+| [Property Testing](references/property-testing.md)       | Advanced testing with automatic edge case discovery |
+| [Variant Analysis](references/variant-analysis.md)       | Finding similar bugs from a known vulnerability  |
+| [Differential Review](references/differential-review.md) | Security-focused code review methodology         |
+| [Prior Art](references/prior-art.md)                     | Research existing solutions before building      |
+| [Research Methodology](references/research-methodology.md) | Structured research with confidence tagging    |
+| [Plugin Forge](references/plugin-forge.md)               | Creating Claude Code plugins and skills          |
+
+---
+
 ## Default Tools
 
 For most situations, use these first:
@@ -137,6 +153,7 @@ When task matches, use the appropriate skill:
 | ---------------------------------------------- | ------------------------ | ---------------------------------------- |
 | Root cause analysis (bugs, failures, problems) | `hope:trace`             | "why did this fail", incident, debugging |
 | Before claiming done/fixed/complete            | `hope:gate`              | Verification checkpoint                  |
+| Stuck, blocked, creative breakthrough needed   | `hope:breakthrough`      | "stuck", "blocked", "can't figure out"   |
 | Foundation for ALL thinking                    | `hope:soul` (this skill) | Default for everything                   |
 
 Announce skill usage: "I'm using hope:[skill] for [purpose]"

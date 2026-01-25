@@ -11,6 +11,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **hope**: `/hope:skill-judge` meta-skill for evaluating skill quality
+  - 8-dimension evaluation framework (120 points total)
+  - Knowledge Delta classification ([E]xpert / [A]ctivation / [R]edundant)
+  - Description validation (WHAT + WHEN + KEYWORDS)
+  - 5 design pattern templates (Mindset, Navigation, Philosophy, Process, Tool)
+  - 9 anti-pattern detection patterns
+  - References: evaluation-dimensions.md, knowledge-delta.md, design-patterns.md, anti-patterns.md
+- **hope**: `/hope:breakthrough` skill for creative problem-solving when stuck
+  - 6 techniques: Simplification Cascade, Scale Game, Meta-Pattern Recognition, Assumption Inversion, Constraint Removal, Fresh Perspective
+  - Symptom-based dispatch table for technique selection
+  - Decision tree for chaining techniques
+  - References: techniques.md, symptoms.md, when-not-to-use.md
+- **hope**: 7 new specialized references in `skills/soul/references/`:
+  - `reducing-entropy.md` - Philosophy for minimizing codebase complexity ("LESS TOTAL CODE")
+  - `property-testing.md` - Advanced testing with automatic edge case discovery
+  - `variant-analysis.md` - Finding similar bugs from a known vulnerability (Trail of Bits)
+  - `differential-review.md` - Security-focused code review methodology (Trail of Bits)
+  - `prior-art.md` - Research existing solutions before building
+  - `research-methodology.md` - Structured research with confidence tagging
+  - `plugin-forge.md` - Creating Claude Code plugins and skills
+- **hope**: Specialized References section added to soul SKILL.md
+- **hope**: 3 infrastructure references in `references/`:
+  - `archive-pattern.md` - .hope-archive/ directory pattern for skill outputs
+  - `extensibility.md` - EXTEND.md pattern for user/project customization
+  - `design-patterns.md` - 5 skill design patterns with line count guidance
+- **product**: Game-changing features workflow added to product router
+  - 6-criteria evaluation matrix (Impact, Reach, Frequency, Differentiation, Defensibility, Feasibility)
+  - 9-category forced exploration (Speed, Automation, Intelligence, Integration, Collaboration, Personalization, Visibility, Confidence, Delight)
+  - Three scales of innovation (Massive, Medium, Small)
+  - Reference: `game-changing-features.md`
 - **loop**: New plugin for autonomous iteration with spec-driven quality gates
   - `/loop:start` - Start autonomous iteration loop
   - `/loop:cancel` - Terminate active loops cleanly
