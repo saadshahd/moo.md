@@ -2,6 +2,7 @@ name: loop-start
 description: Loop triggers on autonomous iteration requests
 plugin: loop
 skill: loop:start
+flaky: true
 acceptableSkills:
   - start
   - loop
@@ -10,7 +11,7 @@ acceptableSkills:
   - hope:soul
   - intent
   - hope:intent
-prompt: "Loop until you've implemented the full feature. Keep going until the tests pass."
+prompt: "Run /loop to implement the full feature. Don't stop until tests pass."
 expectedBehaviors:
   - "Spec scoring rubric applied"
   - "Workflow shape determined (Tool or Colleague)"

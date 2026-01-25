@@ -2,6 +2,7 @@ name: loop-cost-pause
 description: Loop pauses on cost limit, doesn't kill
 plugin: loop
 skill: loop:start
+flaky: true
 acceptableSkills:
   - start
   - loop

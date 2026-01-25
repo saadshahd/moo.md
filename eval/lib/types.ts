@@ -39,11 +39,12 @@ export interface TestCase {
   description?: string;
   plugin: string;
   skill: string;
-  acceptableSkills?: string[]; // Alternative skills that are also valid
+  acceptableSkills?: string[];
   prompt: string;
   phase?: "1" | "2";
   expectation?: "asks_questions" | "acts_directly";
   expectedBehaviors?: string[];
+  flaky?: boolean;
 }
 
 export interface LayerAResult {
@@ -90,6 +91,7 @@ export interface TestResult {
   failedAt?: "A" | "C" | "D";
   advisory?: LayerDResult;
   elapsed?: number;
+  flakyAttempts?: number;
 }
 
 export interface EvalConfig {

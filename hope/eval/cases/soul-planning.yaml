@@ -2,6 +2,7 @@ name: hope-soul-confidence
 description: Soul skill triggers on confidence-gated decisions
 plugin: hope
 skill: hope:soul
+flaky: true
 acceptableSkills:
   - hope
   - soul

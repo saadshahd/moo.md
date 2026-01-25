@@ -11,6 +11,9 @@
 - [wordsmith](plugins/wordsmith.md) — editing, voice, narrative
 - [founder](plugins/founder.md) — startup validation, financials
 - [career](plugins/career.md) — interview prep, skill gaps
+- [counsel](plugins/counsel.md) — expert simulation, panels
+- [design](plugins/design.md) — UX exploration, visual directions
+- [loop](plugins/loop.md) — autonomous iteration
 
 ## Concepts
 

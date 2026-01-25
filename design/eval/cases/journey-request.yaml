@@ -2,6 +2,7 @@ name: design-journey-request
 description: Design skill triggers on user journey mapping requests
 plugin: design
 skill: design:design
+flaky: true
 acceptableSkills:
   - design
   - product

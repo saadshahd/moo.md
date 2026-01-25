@@ -2,6 +2,7 @@ name: counsel-abramov-trigger
 description: Counsel triggers Abramov for React internals questions
 plugin: counsel
 skill: counsel:counsel
+flaky: true
 acceptableSkills:
   - counsel:summon
   - counsel

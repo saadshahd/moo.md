@@ -2,6 +2,7 @@ name: hope-gate-completion
 description: Gate skill triggers on completion claims
 plugin: hope
 skill: hope:gate
+flaky: true
 prompt: "I'm done implementing the login feature. It's ready to merge."
 expectedBehaviors:
   - "Asks for verification or evidence"

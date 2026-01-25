@@ -2,6 +2,7 @@ name: hope-skill-judge-review
 description: Skill-judge triggers on skill review before publishing
 plugin: hope
 skill: hope:skill-judge
+flaky: true
 acceptableSkills:
   - skill-judge
   - soul

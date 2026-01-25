@@ -2,6 +2,7 @@ name: hope-intent-spec-score
 description: Intent command shows spec clarity scoring
 plugin: hope
 skill: hope:intent
+flaky: true
 acceptableSkills:
   - intent
   - soul

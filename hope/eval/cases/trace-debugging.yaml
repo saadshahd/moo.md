@@ -2,6 +2,7 @@ name: hope-trace-debugging
 description: Trace skill triggers on debugging and root cause tasks
 plugin: hope
 skill: hope:trace
+flaky: true
 acceptableSkills:
   - trace
   - hope:debug

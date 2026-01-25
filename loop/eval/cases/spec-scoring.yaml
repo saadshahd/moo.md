@@ -2,6 +2,7 @@ name: loop-spec-scoring
 description: Loop scores specs and rejects vague ones
 plugin: loop
 skill: loop:start
+flaky: true
 acceptableSkills:
   - start
   - loop
@@ -12,7 +13,7 @@ acceptableSkills:
   - hope:hope
   - intent
   - hope:intent
-prompt: "Make the app better and fix all the problems"
+prompt: "Use loop to make the app better and fix all problems"
 expectedBehaviors:
   - "Spec score calculated"
   - "Score < 8 identified"

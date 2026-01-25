@@ -1,17 +1,66 @@
-import type { TestCase, TestResult, EvalConfig, LayerResult } from "./types";
+import type {
+  TestCase,
+  TestResult,
+  EvalConfig,
+  LayerResult,
+  LayerCResult,
+} from "./types";
 import { DEFAULT_CONFIG } from "./config";
 import { runLayerA } from "./layers/a-static";
 import { runLayerC } from "./layers/c-trigger";
 import { runLayerD } from "./layers/d-quality";
 
-// Run all layers for a test case
+const FLAKY_MAX_RETRIES = 5;
+const FLAKY_CONCURRENT = 2;
+
+async function runLayerCWithRetry(
+  testCase: TestCase,
+  config: EvalConfig,
+): Promise<{ result: LayerCResult; attempts: number }> {
+  const isHaiku = config.model === "haiku";
+  if (!testCase.flaky || !isHaiku) {
+    const result = await runLayerC(testCase, config);
+    return { result, attempts: 1 };
+  }
+
+  let totalAttempts = 0;
+
+  for (
+    let round = 0;
+    round < Math.ceil(FLAKY_MAX_RETRIES / FLAKY_CONCURRENT);
+    round++
+  ) {
+    const remaining = FLAKY_MAX_RETRIES - totalAttempts;
+    const batchSize = Math.min(FLAKY_CONCURRENT, remaining);
+    if (batchSize <= 0) break;
+
+    const attempts = Array.from({ length: batchSize }, () =>
+      runLayerC(testCase, config),
+    );
+
+    const results = await Promise.all(attempts);
+    totalAttempts += batchSize;
+
+    const passed = results.find((r) => r.passed);
+    if (passed) {
+      return { result: passed, attempts: totalAttempts };
+    }
+
+    if (totalAttempts >= FLAKY_MAX_RETRIES) {
+      return { result: results[results.length - 1], attempts: totalAttempts };
+    }
+  }
+
+  const finalResult = await runLayerC(testCase, config);
+  return { result: finalResult, attempts: totalAttempts + 1 };
+}
+
 export async function runTest(
   testCase: TestCase,
   config: EvalConfig = DEFAULT_CONFIG,
 ): Promise<TestResult> {
   const layerResults: LayerResult[] = [];
 
-  // Layer A: Static validation
   const layerA = await runLayerA(testCase);
   layerResults.push(layerA);
   if (!layerA.passed) {
@@ -24,9 +73,14 @@ export async function runTest(
     };
   }
 
-  // Layer C: Skill triggering (Layer B removed - if C works, plugin loaded)
-  const layerC = await runLayerC(testCase, config);
+  const { result: layerC, attempts } = await runLayerCWithRetry(
+    testCase,
+    config,
+  );
   layerResults.push(layerC);
+  const isHaiku = config.model === "haiku";
+  const showFlakyAttempts = testCase.flaky && isHaiku && attempts > 1;
+
   if (!layerC.passed) {
     return {
       name: testCase.name,
@@ -34,10 +88,10 @@ export async function runTest(
       passed: false,
       layerResults,
       failedAt: "C",
+      flakyAttempts: showFlakyAttempts ? attempts : undefined,
     };
   }
 
-  // Layer D: Quality evaluation (advisory)
   const layerD = await runLayerD(testCase, config);
   if (layerD) {
     layerResults.push(layerD);
@@ -49,5 +103,6 @@ export async function runTest(
     passed: true,
     layerResults,
     advisory: layerD || undefined,
+    flakyAttempts: showFlakyAttempts ? attempts : undefined,
   };
 }

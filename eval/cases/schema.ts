@@ -6,11 +6,12 @@ export const TestCaseSchema = z.object({
   description: z.string().optional(),
   plugin: z.string().min(1),
   skill: z.string().min(1),
-  acceptableSkills: z.array(z.string()).optional(), // Alternative skills that are also valid
+  acceptableSkills: z.array(z.string()).optional(),
   prompt: z.string().min(1),
-  phase: z.enum(["1", "2"]).optional(), // Phase 1 = test questioning, Phase 2 = test output
-  expectation: z.enum(["asks_questions", "acts_directly"]).optional(), // For phase 1
-  expectedBehaviors: z.array(z.string()).optional(), // For phase 2
+  phase: z.enum(["1", "2"]).optional(),
+  expectation: z.enum(["asks_questions", "acts_directly"]).optional(),
+  expectedBehaviors: z.array(z.string()).optional(),
+  flaky: z.boolean().optional(),
 });
 
 export type TestCase = z.infer<typeof TestCaseSchema>;

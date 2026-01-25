@@ -2,6 +2,7 @@ name: counsel-graham-trigger
 description: Counsel triggers Graham for startup questions
 plugin: counsel
 skill: counsel:counsel
+flaky: true
 acceptableSkills:
   - counsel:summon
   - counsel

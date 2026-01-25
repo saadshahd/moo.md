@@ -33,7 +33,7 @@ Claude will:
 
 ## Plugins
 
-[hope](docs/plugins/hope.md) · [product](docs/plugins/product.md) · [wordsmith](docs/plugins/wordsmith.md) · [counsel](docs/plugins/counsel.md) · [founder](docs/plugins/founder.md) · [career](docs/plugins/career.md)
+[hope](docs/plugins/hope.md) · [product](docs/plugins/product.md) · [wordsmith](docs/plugins/wordsmith.md) · [counsel](docs/plugins/counsel.md) · [design](docs/plugins/design.md) · [loop](docs/plugins/loop.md) · [founder](docs/plugins/founder.md) · [career](docs/plugins/career.md)
 
 → [Documentation](docs/) · [Issues](https://github.com/saadshahd/moo.md/issues)
 

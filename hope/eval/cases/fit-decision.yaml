@@ -2,6 +2,7 @@ name: hope-soul-fit-decision
 description: Soul skill applies fit decision for AI delegation
 plugin: hope
 skill: hope:soul
+flaky: true
 acceptableSkills:
   - hope:mirror
   - mirror

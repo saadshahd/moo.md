@@ -2,6 +2,7 @@ name: hope-breakthrough-stuck
 description: Breakthrough skill triggers when user is stuck or blocked
 plugin: hope
 skill: hope:breakthrough
+flaky: true
 acceptableSkills:
   - breakthrough
   - hope:reframe

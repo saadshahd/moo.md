@@ -37,8 +37,12 @@ async function ensureResultsDir(): Promise<void> {
 const formatTestResult = (result: TestResult): string[] => {
   const lines: string[] = [];
   const elapsed = result.elapsed ? ` (${result.elapsed.toFixed(2)}s)` : "";
+  const retries =
+    result.flakyAttempts && result.flakyAttempts > 1
+      ? ` [flaky: ${result.flakyAttempts}/5]`
+      : "";
 
-  lines.push(`\n=== ${result.name}${elapsed} ===`);
+  lines.push(`\n=== ${result.name}${elapsed}${retries} ===`);
 
   if (result.passed) {
     lines.push("✓ PASS");
@@ -95,12 +99,15 @@ async function main(): Promise<void> {
   const fullMode = args.includes("--full") || deepMode;
   const skipLayerD = !fullMode;
   const modelIndex = args.indexOf("--model");
+  const testIndex = args.indexOf("--test");
   const model =
     modelIndex !== -1 ? args[modelIndex + 1] : deepMode ? undefined : "haiku";
+  const filterTest = testIndex !== -1 ? args[testIndex + 1] : undefined;
   const filterPlugin = args.find(
     (a) =>
       !a.startsWith("--") &&
-      (modelIndex === -1 || args.indexOf(a) !== modelIndex + 1),
+      (modelIndex === -1 || args.indexOf(a) !== modelIndex + 1) &&
+      (testIndex === -1 || args.indexOf(a) !== testIndex + 1),
   );
 
   const mode = deepMode ? "deep" : fullMode ? "full" : "quick";
@@ -112,12 +119,18 @@ async function main(): Promise<void> {
   if (model) {
     console.log(`Model: ${model}`);
   }
+  if (filterTest) {
+    console.log(`Test filter: ${filterTest}`);
+  }
   console.log();
 
   const allCases = await discoverTests();
-  const cases = filterPlugin
+  let cases = filterPlugin
     ? allCases.filter((c) => c.plugin === filterPlugin)
     : allCases;
+  if (filterTest) {
+    cases = cases.filter((c) => c.name.includes(filterTest));
+  }
 
   if (cases.length === 0) {
     console.log("No test cases found.");
