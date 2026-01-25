@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Auto-activates at session start to surface relevant learnings. Use when starting work in a domain to recall past insights from ~/.claude/learnings/.
+description: Surface relevant learnings from past sessions. Use when starting work in a domain to avoid repeating mistakes. Triggers on "recall learnings", "past failures", "surface insights", "what did I learn".
 ---
 
 # Recall Skill

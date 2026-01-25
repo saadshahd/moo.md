@@ -1,6 +1,6 @@
 ---
 name: start
-description: Start autonomous iteration loop. Use when user requests "loop", "keep going", "don't stop", "continue until done", "until tests pass", "implement full feature", "fix all problems", "make better", or any persistence pattern. Executes multi-step tasks without stopping until complete or limits reached.
+description: Start autonomous iteration loop OR explain how Loop works. Triggers on "loop", "keep going", "don't stop", "continue until done", "until tests pass", "implement full feature", "fix all problems", "make better", "what is loop", "how does loop work", "loop help", or any persistence pattern. Executes multi-step tasks without stopping until complete or limits reached.
 ---
 
 # Loop
@@ -91,6 +91,12 @@ See `references/headless.md` for CI/CD integration:
 - Environment variables (`LOOP_HEADLESS`, `LOOP_BUDGET`, `LOOP_MAX_ITERATIONS`)
 - Exit codes and output artifacts
 - GitHub Actions and GitLab CI examples in `ci/`
+
+## Tips
+
+- Clear specs (>=8/10) run faster with less interruption
+- Vague specs? Run `/hope:intent` first to clarify requirements
+- Pause is not failure — resume anytime with `/loop continue`
 
 ## Example
 

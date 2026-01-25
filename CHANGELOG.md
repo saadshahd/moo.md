@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **loop**: Merged `/loop:help` into `/loop:start` (redundancy audit)
+  - Added help triggers to start description ("what is loop", "how does loop work", "loop help")
+  - Moved tips section from help into start
+  - Recommendation: DELETE `loop/skills/help/` directory
+
 ### Added
 
 - **hope**: `/hope:skill-judge` meta-skill for evaluating skill quality
