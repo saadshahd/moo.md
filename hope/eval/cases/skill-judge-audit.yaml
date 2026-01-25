@@ -1,0 +1,10 @@
+name: hope-skill-judge-audit
+description: Skill-judge triggers on batch skill audit requests
+plugin: hope
+skill: hope:skill-judge
+prompt: "Audit all the skills in the hope plugin and tell me which ones need improvement"
+expectedBehaviors:
+  - "Batch evaluation table with scores"
+  - "Knowledge delta classification for each skill"
+  - "Priority fixes listed"
+  - "Verdict for each skill (SHIP/REVISE/REDESIGN/REJECT)"

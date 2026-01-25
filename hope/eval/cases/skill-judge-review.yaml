@@ -1,0 +1,10 @@
+name: hope-skill-judge-review
+description: Skill-judge triggers on skill review before publishing
+plugin: hope
+skill: hope:skill-judge
+prompt: "Review this skill before I publish it to the marketplace"
+expectedBehaviors:
+  - "Full evaluation with dimension scores"
+  - "Description validation checklist"
+  - "Anti-pattern detection"
+  - "Clear verdict on whether to ship"

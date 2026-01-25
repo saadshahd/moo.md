@@ -1,0 +1,10 @@
+name: hope-breakthrough-cant-figure
+description: Breakthrough skill triggers on "can't figure out" phrases
+plugin: hope
+skill: hope:breakthrough
+prompt: "I can't figure out how to structure this data model. Nothing I try feels right."
+expectedBehaviors:
+  - "Identifies symptom from user's description"
+  - "Selects technique from 6 available options"
+  - "Applies structured technique steps"
+  - "Provides clear path forward"

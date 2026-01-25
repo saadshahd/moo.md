@@ -1,0 +1,10 @@
+name: hope-skill-judge-worth
+description: Skill-judge triggers on skill value assessment questions
+plugin: hope
+skill: hope:skill-judge
+prompt: "Is this skill worth it? It seems like Claude might already know how to do this."
+expectedBehaviors:
+  - "Runs Knowledge Delta check"
+  - "Classifies as Expert, Activation, or Redundant"
+  - "Answers whether skill adds value beyond Claude's base capabilities"
+  - "Recommends keep, merge, or delete"
