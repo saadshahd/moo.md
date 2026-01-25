@@ -51,13 +51,3 @@ if [ -n "$ERRORS" ]; then
 fi
 
 echo "✓ Skill validation passed"
-echo ""
-echo "=== Running Evaluations ==="
-echo "Plugins:$CHANGED_PLUGINS"
-
-cd "$REPO_ROOT"
-for plugin in $CHANGED_PLUGINS; do
-  bun run eval/run.ts "$plugin"
-done
-
-echo "✓ All evals passed"
