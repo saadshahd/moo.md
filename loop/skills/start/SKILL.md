@@ -7,104 +7,188 @@ description: Start autonomous iteration loop OR explain how Loop works. Triggers
 
 Autonomous iteration that continues until spec is satisfied or limits reached.
 
-## Activation
+## Before You Start (Required Checklist)
 
-Score the user's spec against the 5-dimension rubric (see `references/spec-rubric.md`).
+□ Score the spec (use rubric below)
+□ Determine shape (Tool ≥8, Colleague 5-7, Intent <5)
+□ Decompose into concrete steps
+□ Create task with state schema
+□ Announce: `[LOOP] Starting | Shape: X | Steps: N | Budget: $Y`
+
+**If any checkbox is unclear, STOP and clarify before proceeding.**
+
+---
+
+## Spec Clarity Rubric (Inline)
+
+Score on 5 dimensions (0-2 each, max 10):
+
+| Dimension | 0 | 1 | 2 |
+|-----------|---|---|---|
+| **Outcome** | "Make it better" | "Improve performance" | "p95 latency <100ms" |
+| **Scope** | "Fix the app" | "Fix auth" | "Fix /api/auth/token" |
+| **Constraints** | None stated | "Use existing stack" | "No new deps, <500 LOC" |
+| **Success** | None stated | "Tests pass" | "All tests + manual QA" |
+| **Done** | Implied | "When it works" | "PR merged to main" |
 
 **Decision:**
-- **Score ≥8:** Proceed autonomously (Tool-shaped)
-- **Score 5-7:** Clarify gaps OR proceed as Colleague-shaped (iterate together)
-- **Score <5:** Run `/hope:intent` first to clarify requirements
+- **≥8:** Tool-shaped — execute silently, report on completion
+- **5-7:** Colleague-shaped — check in after each iteration
+- **<5:** Run `/hope:intent` first
 
-## Workflow Shape
+---
 
-| Shape | When | Behavior |
-|-------|------|----------|
-| **Tool-shaped** | Clear spec (≥8/10), well-defined success | Execute silently, report on completion |
-| **Colleague-shaped** | Ambiguous spec (5-7/10), needs judgment | Check in after each iteration, seek feedback |
+## State Schema (Required)
 
-## Loop Protocol
+Create task with this exact structure:
 
-### 1. Initialize
-
-```
-TaskCreate:
-  subject: "Complete: [one-line spec summary]"
-  description: Full spec + success criteria
-  metadata:
-    iteration: 1
-    cost: 0
-    shape: "tool" | "colleague"
-    budget: 25
-    maxIterations: 10
-```
-
-### 2. Each Iteration
-
-```
-TaskGet → Retrieve current state
-Execute → Do the work (one logical unit)
-TaskUpdate → Increment iteration, accumulate cost
-Stop Hook → Evaluate: done? limit hit? blocked?
+```json
+{
+  "subject": "Loop: [one-line spec summary]",
+  "description": "Full spec with success criteria",
+  "metadata": {
+    "iteration": 1,
+    "cost": 0,
+    "shape": "tool|colleague",
+    "budget": 25,
+    "maxIterations": 10,
+    "steps": ["step1", "step2", "step3"],
+    "completedSteps": [],
+    "errors": []
+  }
+}
 ```
 
-### 3. Termination Conditions
+---
 
-| Condition | Action |
-|-----------|--------|
-| Spec satisfied | TaskUpdate status=completed, report summary |
-| Budget exceeded | Pause, save state, prompt for `/loop continue` |
-| Iteration limit | Pause, save state, prompt for continuation |
-| Circuit breaker | Pause, explain blocker, request guidance |
-| Blocked/confused | Pause, ask clarifying question |
+## Rigid Enforcement Gates
 
-## Stop Hook Evaluation
+**These outputs are MANDATORY. The Stop hook checks for them.**
 
-After each iteration, evaluate:
+### Before Each Iteration
 
-1. **Progress check:** Did this iteration move toward the spec?
-2. **Completion check:** Does current state satisfy all success criteria?
-3. **Limit check:** Budget, iterations, circuit breakers
-4. **Blocker check:** Stuck? Same error 3x? Same file 5x?
+```
+[LOOP] Iteration N/max | Cost: $X/$budget | Step: [current step]
+```
 
-If Tool-shaped and not done → continue silently
-If Colleague-shaped → report progress, continue with permission
+### After Each Iteration
+
+```
+[LOOP] ✓ [step name] complete | Progress: N/total | Next: [next step]
+```
+
+### On Completion (CRITICAL)
+
+```
+<loop-complete>
+All success criteria satisfied:
+- [criterion 1]: ✓
+- [criterion 2]: ✓
+- [criterion 3]: ✓
+</loop-complete>
+```
+
+**The Stop hook looks for `<loop-complete>`. Without it, the loop continues.**
+
+### On Pause
+
+```
+[LOOP] ⏸ Paused: [reason]
+Progress: N steps complete, M remaining
+Resume: /loop continue
+```
+
+---
+
+## Iteration Protocol
+
+```
+1. TaskGet → Retrieve current state
+2. Announce → [LOOP] Iteration N/max | Cost: $X | Step: [name]
+3. Execute → Do ONE logical unit of work
+4. Update → Move step to completedSteps, increment iteration
+5. Announce → [LOOP] ✓ Step complete | Progress: N/total
+6. Check → All steps done? Output <loop-complete>
+7. TaskUpdate → Save state
+→ Stop hook evaluates automatically
+```
+
+---
+
+## Circuit Breakers
+
+| Trigger | Threshold | Action |
+|---------|-----------|--------|
+| Same error | 3x consecutive | Pause, request help |
+| Same file edits | 5x in one iteration | Pause, likely thrashing |
+| Budget exceeded | $25 default | Pause, offer continue |
+| Iteration limit | 10 default | Pause, offer continue |
+| No progress | 3 iterations | Pause, reassess approach |
+
+---
 
 ## Commands
 
 | Command | Effect |
 |---------|--------|
-| `/loop` | Start new loop |
+| `/loop [spec]` | Start new loop |
 | `/loop continue` | Resume paused loop |
+| `/loop continue --budget=25` | Add budget and resume |
 | `/loop cancel` | Terminate and clean up |
-| `/loop status` | Show current iteration, cost, progress |
+| `/loop status` | Show current state |
+
+---
 
 ## Cost Controls
 
-See `references/cost-controls.md` for limits and overrides.
+| Protection | Default | Max | Override |
+|------------|---------|-----|----------|
+| Budget cap | $25 | $100 | `--budget=N` |
+| Iterations | 10 | 50 | `--iterations=N` |
 
-Key principle: **Pause, don't kill.** User can always continue.
+**Principle:** Pause, don't kill. User can always continue.
 
-## Headless Mode (CI/CD)
-
-See `references/headless.md` for CI/CD integration:
-- Environment variables (`LOOP_HEADLESS`, `LOOP_BUDGET`, `LOOP_MAX_ITERATIONS`)
-- Exit codes and output artifacts
-- GitHub Actions and GitLab CI examples in `ci/`
-
-## Tips
-
-- Clear specs (>=8/10) run faster with less interruption
-- Vague specs? Run `/hope:intent` first to clarify requirements
-- Pause is not failure — resume anytime with `/loop continue`
+---
 
 ## Example
 
-User: "loop - refactor all API routes to use the new validation middleware"
+User: "loop - refactor all API routes to use validation middleware"
 
-1. Score spec: Outcome=2, Scope=2, Constraints=1, Success=1, Done=1 → **7/10**
-2. Shape: Colleague (ambiguous success criteria)
-3. TaskCreate with iteration tracking
-4. Per route: refactor → test → TaskUpdate
-5. After each: "Completed /api/users, /api/auth next. Continue?"
-6. On completion: TaskUpdate status=completed, summary report
+```
+[LOOP] Starting | Shape: Colleague (7/10) | Steps: 4 | Budget: $25
+
+Spec scoring:
+- Outcome: 2 (clear refactor)
+- Scope: 2 (API routes)
+- Constraints: 1 (middleware implied)
+- Success: 1 (implicit: works)
+- Done: 1 (implicit: all routes)
+Total: 7/10 → Colleague-shaped
+
+[LOOP] Iteration 1/10 | Cost: $0.50/$25 | Step: Refactor /api/users
+... work happens ...
+[LOOP] ✓ /api/users complete | Progress: 1/4 | Next: /api/auth
+
+Continue? [Y/n]
+```
+
+On completion:
+```
+<loop-complete>
+All success criteria satisfied:
+- /api/users refactored: ✓
+- /api/auth refactored: ✓
+- /api/products refactored: ✓
+- /api/orders refactored: ✓
+- All tests pass: ✓
+</loop-complete>
+```
+
+---
+
+## References
+
+- `references/loop-mechanics.md` — Tasks API details, stop_hook_active handling
+- `references/spec-rubric.md` — Scoring examples
+- `references/cost-controls.md` — Override syntax, continuation
+- `references/headless.md` — CI/CD integration

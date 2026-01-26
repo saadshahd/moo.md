@@ -4,6 +4,63 @@
 
 The loop uses Tasks API for persistent state across iterations.
 
+---
+
+## Stop Hook Behavior
+
+The Stop hook fires after each Claude response. It receives JSON input via `$ARGUMENTS`:
+
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "~/.claude/projects/.../abc123.jsonl",
+  "cwd": "/path/to/project",
+  "hook_event_name": "Stop",
+  "stop_hook_active": true
+}
+```
+
+### stop_hook_active Field
+
+**Critical for preventing infinite loops.**
+
+- `stop_hook_active: false` — First evaluation, loop hasn't continued yet
+- `stop_hook_active: true` — Already continuing from a previous stop hook
+
+The stop hook prompt checks: "Has stop_hook_active been true for 3+ consecutive evaluations?" to prevent runaway loops.
+
+### Response Schema
+
+The stop hook MUST return JSON only (no explanation, no markdown):
+
+```json
+{"ok": true, "reason": "complete"}
+```
+
+or
+
+```json
+{"ok": false, "reason": "next: [specific action]"}
+```
+
+**Exit code 0 required.** Any preamble text causes "JSON validation failed" error.
+
+### Completion Detection
+
+The stop hook checks for `<loop-complete>` in the last message:
+
+```
+<loop-complete>
+All success criteria satisfied:
+- [criterion]: ✓
+</loop-complete>
+```
+
+If found → `{"ok": true, "reason": "complete"}`
+If not found → `{"ok": false, "reason": "next: [action]"}`
+
+---
+
 ### State Schema
 
 ```json
@@ -88,3 +145,34 @@ Update task metadata after every successful iteration:
 - Preserves progress on interruption
 - Enables accurate cost tracking
 - Supports clean resume
+
+---
+
+## Troubleshooting
+
+### "Stop hook error: JSON validation failed"
+
+**Cause:** The LLM response included text before/after the JSON object.
+
+**Fix:** The stop hook prompt ends with "JSON ONLY:" to enforce pure JSON output. If still failing:
+1. Check that the prompt hasn't been modified
+2. Verify timeout is sufficient (30s default)
+3. The LLM (Haiku) may occasionally add preamble — retry typically succeeds
+
+### Loop runs forever
+
+**Cause:** Missing `<loop-complete>` marker or stop_hook_active not being tracked.
+
+**Fix:**
+1. Ensure you output `<loop-complete>` when all criteria are met
+2. Check circuit breakers are triggering (same error 3x, etc.)
+3. Verify stop_hook_active counter logic is working
+
+### Loop stops too early
+
+**Cause:** False positive on completion detection.
+
+**Fix:**
+1. Don't output `<loop-complete>` until ALL criteria verified
+2. Use colleague-shaped (5-7 score) for ambiguous specs
+3. Check if budget/iteration limits are too low

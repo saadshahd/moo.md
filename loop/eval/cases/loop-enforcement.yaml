@@ -1,0 +1,18 @@
+name: loop-enforcement
+description: Loop produces rigid enforcement gates and completion markers
+plugin: loop
+skill: loop:start
+flaky: true
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - soul
+  - hope:soul
+prompt: "loop - add input validation to all form components in /components/forms"
+expectedBehaviors:
+  - "Outputs [LOOP] Starting announcement with shape, steps, budget"
+  - "Outputs [LOOP] Iteration N/max for each iteration"
+  - "Outputs [LOOP] ✓ step complete after each step"
+  - "Uses <loop-complete> marker when all criteria satisfied"
+  - "Creates task with steps and completedSteps in metadata"

@@ -7,6 +7,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@1.0.1] - 2026-01-26
+
+### Fixed
+
+- **loop**: Stop hook "JSON validation failed" error
+  - Rewrote prompt with explicit "JSON ONLY:" suffix to prevent Haiku from adding preamble
+  - Added `<loop-complete>` completion marker detection
+  - Added `stop_hook_active` counter check to prevent infinite loops
+- **loop**: Abstract protocol not being followed
+  - Added "Rigid Enforcement Gates" section with mandatory output formats
+  - Inlined spec rubric, state schema, and circuit breakers into SKILL.md
+  - Added "Before You Start" checklist
+  - Added concrete `[LOOP]` announcement formats for iterations
+- **loop**: Added stop_hook_active handling documentation to loop-mechanics.md
+- **loop**: Added troubleshooting section for common hook failures
+
+### Added
+
+- **loop**: New eval test `loop-enforcement.yaml` for protocol compliance verification
+
+---
+
 ## [0.9.1] - 2026-01-25
 
 ### Changed

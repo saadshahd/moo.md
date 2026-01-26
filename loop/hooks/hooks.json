@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "You are evaluating loop completion.\n\nCheck:\n1. Is the spec fully satisfied? (score against 5-dimension rubric)\n2. Has cost exceeded $LOOP_BUDGET (default $25)?\n3. Are there blocking errors requiring user input?\n4. For colleague-shaped work: has convergence signal been reached?\n\nReturn {\"ok\": true} to stop if spec satisfied or limits reached.\nReturn {\"ok\": false, \"reason\": \"[next action]\"} to continue.",
+            "prompt": "Evaluate if the loop should stop. Input: $ARGUMENTS\n\nCheck these criteria:\n1. Did the last message contain <loop-complete>? If yes, stop.\n2. Has cost exceeded budget? If yes, stop.\n3. Are there blocking errors requiring user input? If yes, stop.\n4. Has stop_hook_active been true for 3+ consecutive evaluations? If yes, stop (prevent infinite loop).\n\nRESPOND WITH ONLY ONE OF THESE JSON OBJECTS (no explanation, no preamble, no markdown):\n\nTo STOP: {\"ok\": true, \"reason\": \"complete\"}\nTo CONTINUE: {\"ok\": false, \"reason\": \"next: [specific action]\"}\n\nJSON ONLY:",
             "timeout": 30
           }
         ]
