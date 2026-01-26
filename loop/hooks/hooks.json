@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Evaluate if the loop should stop. Input: $ARGUMENTS\n\nCheck these criteria:\n1. Did the last message contain <loop-complete>? If yes, stop.\n2. Has cost exceeded budget? If yes, stop.\n3. Are there blocking errors requiring user input? If yes, stop.\n4. Has stop_hook_active been true for 3+ consecutive evaluations? If yes, stop (prevent infinite loop).\n\nRESPOND WITH ONLY ONE OF THESE JSON OBJECTS (no explanation, no preamble, no markdown):\n\nTo STOP: {\"ok\": true, \"reason\": \"complete\"}\nTo CONTINUE: {\"ok\": false, \"reason\": \"next: [specific action]\"}\n\nJSON ONLY:",
+            "prompt": "Check if an autonomous loop is active. Input: $ARGUMENTS\n\nFIRST: Is there an active loop task with [LOOP] announcements in the transcript?\n- If NO loop is active, return: {\"ok\": true}\n- If loop IS active, evaluate:\n  1. Did the last message contain <loop-complete>? Stop.\n  2. Has stop_hook_active been true 3+ times? Stop.\n  3. Otherwise, continue.\n\nRESPOND WITH ONLY JSON (no explanation):\n{\"ok\": true} to allow stop\n{\"ok\": false, \"reason\": \"next: [action]\"} to continue loop\n\nJSON ONLY:",
             "timeout": 30
           }
         ]
