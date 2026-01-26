@@ -7,6 +7,37 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@1.1.0] - 2026-01-26
+
+### Added
+
+- **loop**: File-based state persistence (`.loop/state.json`) for cross-session recovery
+  - State file survives compaction and session boundaries
+  - Contains spec, criteria, criteriaStatus, steps, and progress
+  - Stop hook reads criteriaStatus to make informed continue/stop decisions
+- **loop**: SessionStart hook for compaction recovery
+  - Detects active loops on session start
+  - Announces resume with progress and unmet criteria
+- **loop**: Criteria-aware stop hook
+  - Reads `.loop/state.json` to verify spec criteria before stopping
+  - Returns `{ok: false}` when criteria are unmet
+  - Circuit breaker: stops after 5x consecutive same unmet criteria
+
+### Changed
+
+- **loop**: Setup hook now creates project-local `.loop/` directory instead of `~/.claude/loop`
+- **loop**: State File Protocol section added to SKILL.md
+- **loop**: Iteration Protocol updated to include state file read/write steps
+- **loop**: Dual-State Model documented in loop-mechanics.md (Tasks API + file-based)
+
+### Fixed
+
+- **loop**: Stop hook returning `{ok: true}` when loop should continue due to unmet spec criteria
+  - Root cause: stop hook couldn't verify criteria without state file
+  - Fix: criteriaStatus object in state file provides source of truth
+
+---
+
 ## [loop@1.0.2] - 2026-01-26
 
 ### Fixed

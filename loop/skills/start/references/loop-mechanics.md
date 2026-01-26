@@ -1,8 +1,29 @@
 # Loop Mechanics
 
-## Tasks API Integration
+## Dual-State Model
 
-The loop uses Tasks API for persistent state across iterations.
+The loop uses **two persistence mechanisms** for robustness:
+
+1. **Tasks API** — Primary state, survives within a session
+2. **`.loop/state.json`** — File-based, survives across sessions/compaction
+
+### Why Both?
+
+| Mechanism | Survives Compaction | Stop Hook Readable | Human Inspectable |
+|-----------|--------------------|--------------------|-------------------|
+| Tasks API | ✗ | ✗ (internal) | ✗ |
+| `.loop/state.json` | ✓ | ✓ | ✓ |
+
+The stop hook cannot read Tasks API directly — it can only evaluate the transcript and files. The state file provides criteria information that the stop hook needs to make informed decisions.
+
+### State File Location
+
+Project root: `.loop/state.json`
+
+This follows the "Ralph pattern" — project-local state that can be:
+- Committed if desired (add to `.gitignore` to exclude)
+- Inspected during debugging
+- Resumed after compaction or new session
 
 ---
 
@@ -47,17 +68,41 @@ or
 
 ### Completion Detection
 
-The stop hook checks for `<loop-complete>` in the last message:
+The stop hook uses a **two-phase check**:
 
+**Phase 1: Read state file**
 ```
-<loop-complete>
-All success criteria satisfied:
-- [criterion]: ✓
-</loop-complete>
+.loop/state.json → criteriaStatus object
 ```
 
-If found → `{"ok": true, "reason": "complete"}`
-If not found → `{"ok": false, "reason": "next: [action]"}`
+**Phase 2: Evaluate**
+```
+IF .loop/state.json doesn't exist → {ok: true} (no active loop)
+IF ANY criteriaStatus value is false → {ok: false, reason: "unmet: [criteria]"}
+IF ALL criteriaStatus values are true AND <loop-complete> present → {ok: true}
+```
+
+The `<loop-complete>` marker signals intent, but the state file provides the source of truth for criteria satisfaction.
+
+### State File Schema
+
+```json
+{
+  "spec": "original user request",
+  "criteria": ["test passes", "no lint errors"],
+  "criteriaStatus": {
+    "test passes": true,
+    "no lint errors": false
+  },
+  "steps": ["step1", "step2"],
+  "completedSteps": ["step1"],
+  "remainingSteps": ["step2"],
+  "iteration": 2,
+  "status": "in_progress"
+}
+```
+
+**Critical:** The `criteriaStatus` object is what the stop hook checks. Update it after each verification.
 
 ---
 
@@ -161,18 +206,29 @@ Update task metadata after every successful iteration:
 
 ### Loop runs forever
 
-**Cause:** Missing `<loop-complete>` marker or stop_hook_active not being tracked.
+**Cause:** Missing `<loop-complete>` marker or criteriaStatus not being updated.
 
 **Fix:**
-1. Ensure you output `<loop-complete>` when all criteria are met
-2. Check circuit breakers are triggering (same error 3x, etc.)
-3. Verify stop_hook_active counter logic is working
+1. Ensure you write `.loop/state.json` with `criteriaStatus` after each iteration
+2. Verify all criteria are explicitly listed in the `criteria` array
+3. Check that `criteriaStatus` values are being updated to `true` when verified
+4. Output `<loop-complete>` only when ALL criteriaStatus values are `true`
 
 ### Loop stops too early
 
-**Cause:** False positive on completion detection.
+**Cause:** Stop hook returns `{ok: true}` when no state file exists, or criteriaStatus is missing/malformed.
 
 **Fix:**
-1. Don't output `<loop-complete>` until ALL criteria verified
-2. Use colleague-shaped (5-7 score) for ambiguous specs
-3. Check if budget/iteration limits are too low
+1. Ensure `.loop/state.json` is written at loop start
+2. Don't output `<loop-complete>` until ALL criteria verified
+3. Use colleague-shaped (5-7 score) for ambiguous specs
+4. Check if budget/iteration limits are too low
+
+### Session resumed but loop doesn't continue
+
+**Cause:** SessionStart hook didn't detect active loop.
+
+**Fix:**
+1. Verify `.loop/state.json` exists with `status: "in_progress"`
+2. Check that the file is valid JSON
+3. The SessionStart hook announces resume — if no announcement, state file may be missing

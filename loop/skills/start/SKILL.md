@@ -11,8 +11,10 @@ Autonomous iteration that continues until spec is satisfied or limits reached.
 
 □ Score the spec (use rubric below)
 □ Determine shape (Tool ≥8, Colleague 5-7, Intent <5)
+□ Extract success criteria from spec (explicit list)
 □ Decompose into concrete steps
 □ Create task with state schema
+□ Write `.loop/state.json` with criteria array
 □ Announce: `[LOOP] Starting | Shape: X | Steps: N | Budget: $Y`
 
 **If any checkbox is unclear, STOP and clarify before proceeding.**
@@ -100,16 +102,53 @@ Resume: /loop continue
 
 ---
 
+## State File Protocol (Required)
+
+After EVERY iteration, write `.loop/state.json`:
+
+```json
+{
+  "spec": "original user request verbatim",
+  "criteria": ["tests pass", "all routes refactored", "no lint errors"],
+  "criteriaStatus": {
+    "tests pass": false,
+    "all routes refactored": false,
+    "no lint errors": true
+  },
+  "steps": ["step1", "step2", "step3"],
+  "completedSteps": ["step1"],
+  "remainingSteps": ["step2", "step3"],
+  "iteration": 2,
+  "status": "in_progress"
+}
+```
+
+**The stop hook reads this file to decide whether to continue.**
+
+### Criteria Verification (Before `<loop-complete>`)
+
+1. For each criterion in `criteria` array:
+   - Run verification (test command, grep, etc.)
+   - Update `criteriaStatus[criterion]` = true/false
+2. Write updated state to `.loop/state.json`
+3. Only if ALL criteriaStatus values are `true`:
+   - Output `<loop-complete>` marker
+   - Set `status: "completed"`
+
+---
+
 ## Iteration Protocol
 
 ```
 1. TaskGet → Retrieve current state
-2. Announce → [LOOP] Iteration N/max | Cost: $X | Step: [name]
-3. Execute → Do ONE logical unit of work
-4. Update → Move step to completedSteps, increment iteration
-5. Announce → [LOOP] ✓ Step complete | Progress: N/total
-6. Check → All steps done? Output <loop-complete>
-7. TaskUpdate → Save state
+2. Read .loop/state.json if exists (recovery case)
+3. Announce → [LOOP] Iteration N/max | Cost: $X | Step: [name]
+4. Execute → Do ONE logical unit of work
+5. Verify → Check affected criteria, update criteriaStatus
+6. Write → .loop/state.json with updated state
+7. TaskUpdate → Save to Tasks API (backup)
+8. Announce → [LOOP] ✓ Step complete | Progress: N/total
+9. Check → All criteriaStatus true? Output <loop-complete>
 → Stop hook evaluates automatically
 ```
 
