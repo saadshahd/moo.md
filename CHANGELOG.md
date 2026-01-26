@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@1.0.2] - 2026-01-26
+
+### Fixed
+
+- **loop**: Stop hook was blocking normal conversation stops when no loop was active
+  - Hook now checks for active loop (via `[LOOP]` announcements) before evaluating
+  - Returns `{"ok": true}` immediately when no loop is running
+
+---
+
 ## [loop@1.0.1] - 2026-01-26
 
 ### Fixed
