@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "description": "Autonomous iteration with spec-driven quality gates. Uses Tasks API for state, Stop hooks for intelligent termination.",
   "keywords": ["autonomous", "iteration", "loop", "spec-driven"],
-  "author": "moo.md"
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
 }
