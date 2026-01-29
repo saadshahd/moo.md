@@ -7,6 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **hope**: Delegation Operating System - enforcement over advice for AI delegation
+  - `references/delegation-failures.md` - Library of common delegation failure patterns
+  - `references/adversarial-precheck.md` - Protocol for high-stakes delegations (Reversibility < 5)
+  - `delegation.jsonl` - New learnings category for capturing delegation misses
+
+### Changed
+
+- **hope/soul**: Silent Audit now has **blocking items** that force verdicts
+  - Spec score < 5 → Forces 🔴 RESEARCH, must run /hope:intent
+  - Fit score < 25 → Forces 🔴 RESEARCH, must clarify
+  - Verification type "assumption" → Forces 🔴 RESEARCH
+  - High stakes + Reversibility < 5 → Requires adversarial pre-check
+- **hope/soul**: Fit decision auto-selects workflow shape based on score
+  - 40+: Tool-shaped, 30-39: Tool-with-review, 25-29: Colleague-shaped, <25: BLOCKED
+- **hope/gate**: Added Pre-Work Gate (before starting work)
+  - Verification method must be locked (not "assumption")
+  - At least 2 "must NOT" criteria required
+  - Fit score must determine workflow shape
+- **hope/recall**: Now surfaces delegation learnings from past sessions
+- **hope/learn**: Captures delegation failures with pattern classification
+
+---
+
 ## [loop@1.1.0] - 2026-01-26
 
 ### Added

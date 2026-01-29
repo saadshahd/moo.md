@@ -35,8 +35,39 @@ Before delegating to AI, score each dimension 0-10.
 3. If total 25-39, plan iteration checkpoints
 4. If total ≥40, write acceptance criteria and let go
 
+## Auto-Selection Thresholds
+
+Silent Audit enforces shape based on fit score:
+
+| Fit Score | Shape | Rationale |
+|-----------|-------|-----------|
+| **40+** | Tool | High confidence, cheap verification, reversible |
+| **30-39** | Tool-with-review | Good enough but checkpoint major steps |
+| **25-29** | Colleague | Iterate, don't fire-and-forget |
+| **<25** | **BLOCKED** | Must clarify before proceeding |
+
+### Borderline Rules
+
+| Condition | Override |
+|-----------|----------|
+| Score 35-45 + Verification Cost < 5 | Default to Colleague |
+| Score 30-35 + past failures in domain | Default to Colleague |
+| Score 25-29 + high urgency | May use Tool-with-review (document risk) |
+
+Verification difficulty outweighs other factors in borderline cases.
+
+### Enforcement
+
+When fit score < 25:
+- Silent Audit forces 🔴 RESEARCH verdict
+- Cannot proceed without clarifying spec
+- Run `/hope:intent` to improve spec clarity
+
+---
+
 ## When to Re-Score
 
 - After first draft reveals hidden complexity
 - When scope changes mid-task
 - When verification takes longer than expected
+- After delegation failure (see [delegation-failures.md](delegation-failures.md))

@@ -11,6 +11,34 @@ Verify before claiming completion.
 
 Before claiming: "done", "fixed", "complete", "working", "ready"
 
+---
+
+## Pre-Work Gate (Before Starting)
+
+Run before substantial work begins. Blocks execution if missing.
+
+```
+□ Verification method locked (not "assumption")
+  → What type: execution output / observation / measurement?
+  → What evidence will you show?
+
+□ At least 2 "must NOT" criteria exist
+  → What should this NOT do?
+  → What scope should NOT expand?
+
+□ Fit score determined workflow shape
+  → <25: BLOCKED - clarify first
+  → 25-29: Colleague-shaped (iterate each step)
+  → 30-39: Tool-with-review (checkpoint major steps)
+  → 40+: Tool-shaped (milestones only)
+```
+
+**If any missing:** STOP. Complete before proceeding.
+
+---
+
+## Post-Work Gate (Before Claiming Done)
+
 ## Workflow A: Build
 
 ```

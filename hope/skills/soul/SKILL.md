@@ -30,20 +30,24 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 
 ## Silent Audit (Run Before Every Response)
 
+**Blocking items (force verdicts):**
+
+| Check | Threshold | Action |
+|-------|-----------|--------|
+| Spec score | <5 | 🔴 RESEARCH → run /hope:intent |
+| Fit score | <25 | 🔴 RESEARCH → clarify first |
+| Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
+| Verification | "assumption" | 🔴 RESEARCH → define method |
+| High stakes + Reversibility <5 | Yes | Run [adversarial pre-check](references/adversarial-precheck.md) |
+
+**Standard checks:**
+
 ```
-□ Inversion applied? (failure modes identified)
-□ Library searched? (production solution exists?)
-□ Learnings recalled? (past failures/discoveries for this domain?)
-□ Verification type known? (execution output > assumption)
-□ Subjective estimate stated? (~X% with evidence)
-□ Alternative provided? (different approach)
-□ Reversibility checked? (Type 2A/2B/1)
-□ Story points estimated? (complexity, never time)
-□ Intent clarified? (≥85% confident I understand)
-□ Fit decision scored? (5 dimensions for delegation)
-□ Workflow shape determined? (Tool vs Colleague)
-□ Trust level identified? (Observe/Draft/Act/Trust)
-□ Attention budget checked? (CORE/ENABLING/OVERHEAD)
+□ Inversion applied? (failure modes)    □ Library searched? (prior art)
+□ Learnings recalled? (past mistakes)   □ Subjective estimate? (~X%)
+□ Alternative provided?                 □ Story points? (complexity only)
+□ Intent ≥85% clear?                    □ Trust level? (Observe/Draft/Act/Trust)
+□ Attention budget? (CORE/ENABLING/OVERHEAD)
 ```
 
 **Forbidden without percentage**: "probably", "likely", "maybe", "might", "could"
@@ -76,6 +80,8 @@ Deep-dive references for specific contexts:
 | [Prior Art](references/prior-art.md)                     | Research existing solutions before building      |
 | [Research Methodology](references/research-methodology.md) | Structured research with confidence tagging    |
 | [Plugin Forge](references/plugin-forge.md)               | Creating Claude Code plugins and skills          |
+| [Delegation Failures](references/delegation-failures.md) | Common delegation failure patterns               |
+| [Adversarial Pre-check](references/adversarial-precheck.md) | Pre-check protocol for high-stakes delegations |
 
 ---
 
@@ -429,6 +435,7 @@ Every library you don't write = 1000 bugs you don't have.
 | `failures.jsonl`    | `{ts, context, failure, root_cause, prevention}`   |
 | `discoveries.jsonl` | `{ts, context, discovery, confidence, applies_to}` |
 | `constraints.jsonl` | `{ts, context, constraint, source, permanent}`     |
+| `delegation.jsonl`  | `{ts, context, spec_score, fit_score, shape_chosen, verification_type, outcome, failure_pattern, root_cause, prevention}` |
 
 **Commands:**
 

@@ -37,6 +37,7 @@ If a transcript path is provided above, read it using the Read tool. Otherwise, 
    cat ~/.claude/learnings/failures.jsonl 2>/dev/null
    cat ~/.claude/learnings/discoveries.jsonl 2>/dev/null
    cat ~/.claude/learnings/constraints.jsonl 2>/dev/null
+   cat ~/.claude/learnings/delegation.jsonl 2>/dev/null
    ```
 
 4. **Deduplication rules** (apply before writing each learning):
@@ -66,6 +67,20 @@ Limits, blockers, requirements discovered.
 ```json
 {"ts":"ISO","context":"area","constraint":"limit","source":"how found","permanent":bool}
 ```
+
+### Delegation Failures → `~/.claude/learnings/delegation.jsonl`
+When output misses the mark due to delegation issues.
+```json
+{"ts":"ISO","context":"delegation","spec_score":7,"fit_score":32,"shape_chosen":"tool","verification_type":"code-review","outcome":"miss","failure_pattern":"alternative-interpretation","root_cause":"why it failed","prevention":"how to prevent"}
+```
+
+**Failure patterns** (use one):
+- `shape-mismatch` - Wrong workflow shape for task
+- `verification-gap` - No verification method defined
+- `scope-creep` - Unrequested additions
+- `ambiguity` - Multiple valid interpretations
+- `hallucination` - Invented APIs/facts
+- `context-gap` - Wrong audience or missing context
 
 6. **Be selective**: Only significant learnings. Skip routine actions.
 

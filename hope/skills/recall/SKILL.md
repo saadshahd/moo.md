@@ -25,6 +25,7 @@ Optional context hint (e.g., "hooks", "testing", "typescript"). If empty, infer 
    - `~/.claude/learnings/failures.jsonl`
    - `~/.claude/learnings/discoveries.jsonl`
    - `~/.claude/learnings/constraints.jsonl`
+   - `~/.claude/learnings/delegation.jsonl`
 
    If files don't exist, skip silently.
 
@@ -48,5 +49,10 @@ Optional context hint (e.g., "hooks", "testing", "typescript"). If empty, infer 
 ### Active Constraints
 
 - **[context]**: [constraint] (permanent: yes/no)
+
+### Delegation Learnings
+
+- **[shape_chosen] → [outcome]**: [root_cause] → Prevention: [prevention]
+  - Fit score: [fit_score], Pattern: [failure_pattern]
 
 4. **If no relevant learnings**: Report "No learnings found for [context]"
