@@ -15,9 +15,9 @@
       {
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "Check for active loop state. Input: $ARGUMENTS (contains cwd field)\n\n1. Check if .loop/state.json exists in the current working directory\n2. If NO file exists: return {\"ok\": true, \"message\": \"\"}\n3. If file exists, read it and check status field:\n   - If status is \"completed\": return {\"ok\": true, \"message\": \"\"}\n   - If status is \"in_progress\": return resume announcement\n\nResume announcement format:\n{\"ok\": true, \"message\": \"[LOOP RESUME] Active loop detected\\nSpec: [spec from file]\\nProgress: [completedSteps.length]/[steps.length] | Iteration: [iteration]\\nUnmet criteria: [list where criteriaStatus=false]\\nNext: Continue with [remainingSteps[0]]\"}\n\nRESPOND WITH ONLY JSON:\n{\"ok\": true, \"message\": \"[announcement or empty string]\"}\n\nJSON ONLY:",
-            "timeout": 30
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-resume.sh",
+            "timeout": 10
           }
         ]
       }
@@ -26,9 +26,9 @@
       {
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "Check if loop should continue. Input: $ARGUMENTS (contains cwd, stop_hook_active fields)\n\n1. Check if .loop/state.json exists in cwd\n   - If NO file exists: {\"ok\": true} (no active loop)\n\n2. Read .loop/state.json and check criteriaStatus object:\n   - If ALL criteria values are true AND last message has <loop-complete>: {\"ok\": true}\n   - If ANY criteria value is false: {\"ok\": false, \"reason\": \"unmet: [list false criteria], next: verify and complete [first unmet]\"}\n\n3. Circuit breaker: If stop_hook_active has been true 5x consecutive with same unmet criteria: {\"ok\": true, \"reason\": \"circuit breaker - no progress\"}\n\nRESPOND WITH ONLY JSON (no explanation):\n{\"ok\": true} to stop\n{\"ok\": false, \"reason\": \"next: [action]\"} to continue\n\nJSON ONLY:",
-            "timeout": 30
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-check.sh",
+            "timeout": 10
           }
         ]
       }

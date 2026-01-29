@@ -26,11 +26,26 @@ Cancel when you want control back. Let it complete when spec is being satisfied.
 
 ## What Happens
 
-1. **Find active loop** — TaskList for in_progress task (subject starts with "Complete:")
-2. **Mark terminated** — TaskUpdate status=completed with cancellation note
-3. **Report state** — Iterations, cost, accomplished work, remaining items
+1. **Read state** — Load `.loop/state.json`
+2. **Set status** — Update status to `"cancelled"` in state file
+3. **Find active task** — TaskList for in_progress task (subject starts with "Loop:")
+4. **Mark terminated** — TaskUpdate status=completed with cancellation note
+5. **Report state** — Iterations, cost, accomplished work, remaining items
 
 Current iteration completes before cancel takes effect. No mid-operation interruption.
+
+## State File Update (Required)
+
+Update `.loop/state.json`:
+
+```json
+{
+  "status": "cancelled",
+  "exit_signal": false
+}
+```
+
+This ensures the stop hook allows the cancellation to proceed.
 
 ## Output
 
@@ -44,12 +59,17 @@ Accomplished:
 Remaining:
 - [list of incomplete steps]
 
+Criteria status:
+- [criterion 1]: ✓/✗
+- [criterion 2]: ✓/✗
+
 To restart: /loop [spec]
 ```
 
 ## Guarantees
 
 - All completed work preserved (no rollback)
+- State file updated to prevent resume
 - Clean termination (no dangling state)
 - Full accounting (iterations, cost, progress)
 - Restart possible with same or modified spec

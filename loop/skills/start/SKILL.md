@@ -40,32 +40,122 @@ Score on 5 dimensions (0-2 each, max 10):
 
 ---
 
-## State Schema (Required)
+## State File Schema (CRITICAL)
 
-Create task with this exact structure:
+Write `.loop/state.json` at loop start and update after EVERY iteration:
 
 ```json
 {
-  "subject": "Loop: [one-line spec summary]",
-  "description": "Full spec with success criteria",
-  "metadata": {
-    "iteration": 1,
-    "cost": 0,
-    "shape": "tool|colleague",
-    "budget": 25,
-    "maxIterations": 10,
-    "steps": ["step1", "step2", "step3"],
-    "completedSteps": [],
-    "errors": []
+  "spec": "original user request verbatim",
+  "criteria": ["tests pass", "all routes refactored", "no lint errors"],
+  "criteriaStatus": {
+    "tests pass": false,
+    "all routes refactored": false,
+    "no lint errors": true
+  },
+  "exit_signal": false,
+  "steps": ["step1", "step2", "step3"],
+  "completedSteps": ["step1"],
+  "remainingSteps": ["step2", "step3"],
+  "iteration": 2,
+  "status": "in_progress",
+  "circuitBreaker": {
+    "stuckCount": 0,
+    "lastUnmet": "tests pass"
   }
 }
 ```
 
+**The stop hook reads this file to decide whether to continue.**
+
 ---
 
-## Rigid Enforcement Gates
+## Dual-Condition Exit (CRITICAL)
 
-**These outputs are MANDATORY. The Stop hook checks for them.**
+The stop hook requires BOTH conditions to stop:
+
+1. **All `criteriaStatus` values are `true`**
+2. **`exit_signal` is `true`**
+
+If either condition is false, the loop continues.
+
+### Why Dual-Condition?
+
+Prevents premature stops. Claude must:
+1. Actually verify each criterion (tests pass, lint clean, etc.)
+2. Explicitly signal completion intent
+
+---
+
+## Iteration Protocol
+
+```
+1. TaskGet → Retrieve current state
+2. Read .loop/state.json if exists (recovery case)
+3. Announce → [LOOP] Iteration N/max | Cost: $X | Step: [name]
+4. Execute → Do ONE logical unit of work
+5. Verify → Run verification commands for affected criteria
+6. Update state → Write .loop/state.json with updated criteriaStatus
+7. Check circuit breaker → Increment stuckCount if same criteria unmet
+8. Output status block → ---LOOP_STATUS--- (required)
+9. TaskUpdate → Save to Tasks API (backup)
+```
+
+---
+
+## Status Block (REQUIRED)
+
+After EACH iteration, output this exact format:
+
+```
+---LOOP_STATUS---
+EXIT_SIGNAL: false
+CRITERIA: {"tests pass": false, "lint clean": true}
+STUCK_COUNT: 0
+NEXT: Fix failing tests
+---END_STATUS---
+```
+
+**Rules:**
+- `EXIT_SIGNAL: true` ONLY when ALL criteria verified true
+- `CRITERIA` must match `criteriaStatus` in state file
+- `STUCK_COUNT` increments when same criteria remain unmet
+- `NEXT` describes the next action
+
+---
+
+## State Update Protocol
+
+After each iteration:
+
+1. **Run verification commands** for criteria you worked on
+2. **Update `criteriaStatus`** based on actual verification results
+3. **Check for stuck state:**
+   - If same criteria unmet as last iteration, increment `circuitBreaker.stuckCount`
+   - If different criteria unmet, reset `stuckCount` to 0
+4. **Set `exit_signal`:**
+   - `true` ONLY if ALL criteriaStatus values are true
+   - `false` otherwise
+5. **Write updated state** to `.loop/state.json`
+6. **Output status block**
+
+---
+
+## Circuit Breakers
+
+| Trigger | Threshold | Action |
+|---------|-----------|--------|
+| Same criteria unmet | 5x consecutive | Stop hook opens circuit |
+| Same error | 3x consecutive | Pause, request help |
+| Same file edits | 5x in one iteration | Pause, likely thrashing |
+| Budget exceeded | $25 default | Pause, offer continue |
+| Iteration limit | 10 default | Pause, offer continue |
+
+The stop hook checks `circuitBreaker.stuckCount >= 5` and returns `{ok: true}` to stop.
+
+---
+
+## Announcements
 
 ### Before Each Iteration
 
@@ -79,7 +169,7 @@ Create task with this exact structure:
 [LOOP] ✓ [step name] complete | Progress: N/total | Next: [next step]
 ```
 
-### On Completion (CRITICAL)
+### On Completion
 
 ```
 <loop-complete>
@@ -90,7 +180,9 @@ All success criteria satisfied:
 </loop-complete>
 ```
 
-**The Stop hook looks for `<loop-complete>`. Without it, the loop continues.**
+Output `<loop-complete>` ONLY after:
+1. All criteriaStatus values are true
+2. exit_signal set to true in state file
 
 ### On Pause
 
@@ -99,70 +191,6 @@ All success criteria satisfied:
 Progress: N steps complete, M remaining
 Resume: /loop continue
 ```
-
----
-
-## State File Protocol (Required)
-
-After EVERY iteration, write `.loop/state.json`:
-
-```json
-{
-  "spec": "original user request verbatim",
-  "criteria": ["tests pass", "all routes refactored", "no lint errors"],
-  "criteriaStatus": {
-    "tests pass": false,
-    "all routes refactored": false,
-    "no lint errors": true
-  },
-  "steps": ["step1", "step2", "step3"],
-  "completedSteps": ["step1"],
-  "remainingSteps": ["step2", "step3"],
-  "iteration": 2,
-  "status": "in_progress"
-}
-```
-
-**The stop hook reads this file to decide whether to continue.**
-
-### Criteria Verification (Before `<loop-complete>`)
-
-1. For each criterion in `criteria` array:
-   - Run verification (test command, grep, etc.)
-   - Update `criteriaStatus[criterion]` = true/false
-2. Write updated state to `.loop/state.json`
-3. Only if ALL criteriaStatus values are `true`:
-   - Output `<loop-complete>` marker
-   - Set `status: "completed"`
-
----
-
-## Iteration Protocol
-
-```
-1. TaskGet → Retrieve current state
-2. Read .loop/state.json if exists (recovery case)
-3. Announce → [LOOP] Iteration N/max | Cost: $X | Step: [name]
-4. Execute → Do ONE logical unit of work
-5. Verify → Check affected criteria, update criteriaStatus
-6. Write → .loop/state.json with updated state
-7. TaskUpdate → Save to Tasks API (backup)
-8. Announce → [LOOP] ✓ Step complete | Progress: N/total
-9. Check → All criteriaStatus true? Output <loop-complete>
-→ Stop hook evaluates automatically
-```
-
----
-
-## Circuit Breakers
-
-| Trigger | Threshold | Action |
-|---------|-----------|--------|
-| Same error | 3x consecutive | Pause, request help |
-| Same file edits | 5x in one iteration | Pause, likely thrashing |
-| Budget exceeded | $25 default | Pause, offer continue |
-| Iteration limit | 10 default | Pause, offer continue |
-| No progress | 3 iterations | Pause, reassess approach |
 
 ---
 
@@ -208,11 +236,25 @@ Total: 7/10 → Colleague-shaped
 ... work happens ...
 [LOOP] ✓ /api/users complete | Progress: 1/4 | Next: /api/auth
 
+---LOOP_STATUS---
+EXIT_SIGNAL: false
+CRITERIA: {"/api/users refactored": true, "/api/auth refactored": false, "tests pass": false}
+STUCK_COUNT: 0
+NEXT: Refactor /api/auth
+---END_STATUS---
+
 Continue? [Y/n]
 ```
 
 On completion:
 ```
+---LOOP_STATUS---
+EXIT_SIGNAL: true
+CRITERIA: {"/api/users refactored": true, "/api/auth refactored": true, "tests pass": true}
+STUCK_COUNT: 0
+NEXT: none
+---END_STATUS---
+
 <loop-complete>
 All success criteria satisfied:
 - /api/users refactored: ✓
@@ -227,7 +269,7 @@ All success criteria satisfied:
 
 ## References
 
-- `references/loop-mechanics.md` — Tasks API details, stop_hook_active handling
+- `references/loop-mechanics.md` — Command-based stop hook, state schema, circuit breaker
 - `references/spec-rubric.md` — Scoring examples
 - `references/cost-controls.md` — Override syntax, continuation
 - `references/headless.md` — CI/CD integration

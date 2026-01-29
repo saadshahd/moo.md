@@ -7,6 +7,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@1.2.0] - 2026-01-29
+
+### Changed
+
+- **loop**: Stop hook rewritten from prompt-based to command-based
+  - Root cause: LLM-based stop hook couldn't reliably read files, defaulted to stopping
+  - Fix: Bash script (`stop-check.sh`) reads `.loop/state.json` directly for deterministic decisions
+- **loop**: Dual-condition exit now enforced by script
+  - Both `criteriaStatus` all true AND `exit_signal: true` required to stop
+  - Prevents premature stops when criteria verified but intent not confirmed
+- **loop**: State file schema extended with `exit_signal` boolean and `circuitBreaker` object
+- **loop**: Circuit breaker moved from LLM judgment to state file tracking
+  - `stuckCount` increments when same criteria remain unmet across iterations
+  - Script opens circuit at 5 stuck iterations
+- **loop**: Session resume now uses command-based hook (`session-resume.sh`)
+- **loop**: SKILL.md rewritten with EXIT_SIGNAL protocol and `---LOOP_STATUS---` block format
+
+### Added
+
+- **loop**: `hooks/scripts/stop-check.sh` - Deterministic stop decision script
+- **loop**: `hooks/scripts/session-resume.sh` - Session start resume detection script
+
+### Fixed
+
+- **loop**: Stop hook returns `{ok: true}` when it should return `{ok: false}` to continue
+  - LLM prompt couldn't access files, always defaulted to stopping
+  - Command-based script reads state file directly
+
+---
+
 ## [hope@0.10.0] - 2026-01-29
 
 ### Added
