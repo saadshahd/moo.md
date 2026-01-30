@@ -124,6 +124,64 @@ In Phase 2 (Interrogate), score each feature. In Phase 4 (Generate PRD), include
 
 ---
 
+## Story Size Gate
+
+Before including a user story in the PRD, apply the **2-3 sentence test**:
+
+> Can you describe this change in 2-3 sentences?
+
+| Test Result | Action |
+|-------------|--------|
+| Yes, easily | Story is right-sized |
+| Requires paragraph | Split into smaller stories |
+| "It depends..." | Definitely split |
+
+### Right-sized examples:
+
+- "Add a database column and migration"
+- "Add a UI component to an existing page"
+- "Add a filter dropdown to a list"
+
+### Too big (split these):
+
+- "Build the entire dashboard" → schema, queries, UI, filters
+- "Add authentication" → schema, middleware, login UI, session handling
+- "Refactor the API" → one story per endpoint or pattern
+
+**Rule of thumb:** If an AI agent can't complete it in one context window, it's too big.
+
+---
+
+## Story Dependency Ordering
+
+Stories must be ordered so earlier stories don't depend on later ones.
+
+### Dependency order:
+
+| Priority | Layer | Examples |
+|----------|-------|----------|
+| 1 | Schema | Add column, create table, migration |
+| 2 | Backend | Server action, API endpoint, service |
+| 3 | UI | Component, form, display |
+| 4 | Aggregation | Dashboard, report, summary |
+
+### Validation checklist:
+
+```
+□ Schema stories come before backend stories
+□ Backend stories come before UI stories
+□ UI stories come before aggregation stories
+□ No story references entities created in later stories
+```
+
+### Anti-pattern detection:
+
+- Story mentions "the X we created earlier" → X must have lower priority number
+- Story uses type/model not yet defined → dependency violation
+- UI story references API that doesn't exist yet → wrong order
+
+---
+
 ## Rules
 
 - Use Ask tool

@@ -1,8 +1,8 @@
 {
   "name": "loop",
-  "version": "1.1.0",
-  "description": "Autonomous iteration with spec-driven quality gates. Uses Tasks API for state, Stop hooks for intelligent termination.",
-  "keywords": ["autonomous", "iteration", "loop", "spec-driven"],
+  "version": "1.2.0",
+  "description": "Autonomous iteration with spec-driven quality gates. Includes Ralph Bridge for hybrid prd.json execution with Silent Audit.",
+  "keywords": ["autonomous", "iteration", "loop", "spec-driven", "ralph", "prd"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

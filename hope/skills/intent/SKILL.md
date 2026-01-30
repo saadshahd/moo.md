@@ -31,7 +31,39 @@ If any field blank after 2 asks: proceed with [ASSUMPTION] labels.
 
 Privately list every fact or constraint you still need.
 
-### 0c Action Specification (Loop 1)
+### 0c Rapid Clarification Format
+
+When asking clarifying questions, use lettered options where possible:
+
+```
+1. What is the scope of this change?
+   A. Minimal viable (just core functionality)
+   B. Full-featured (complete implementation)
+   C. Proof of concept (exploratory)
+   D. Other: [specify]
+
+2. What are the constraints?
+   A. Must use existing patterns/libraries
+   B. Can introduce new dependencies
+   C. Performance-critical
+   D. Other: [specify]
+```
+
+**User can respond:** "1A, 2B" for rapid iteration.
+
+**When to use MCQ format:**
+- Scope decisions (minimal vs full)
+- Target user selection
+- Technology choices
+- Priority ordering
+- Yes/no confirmations with nuance
+
+**When NOT to use:**
+- Open-ended requirements gathering
+- Creative decisions
+- Complex tradeoffs requiring discussion
+
+### 0d Action Specification (Loop 1)
 
 Transform vague requests into actionable specs.
 

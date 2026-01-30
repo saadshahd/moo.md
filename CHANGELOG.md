@@ -7,6 +7,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **loop**: Ralph Bridge hybrid architecture for moo.md + Ralph integration
+  - `skills/ralph-bridge/SKILL.md` - Execute prd.json stories with Silent Audit
+  - `scripts/moo-ralph.sh` - Bash orchestration loop with blocked/colleague signal handling
+  - Applies fit scoring before each story execution
+  - Outputs `<ralph-blocked>` signal when story not ready
+  - Outputs `<promise>COMPLETE</promise>` for Ralph compatibility
+  - Colleague mode pauses for review on fit 25-39
+
+- **hope/intent**: Rapid Clarification Format (MCQ pattern from Ralph)
+  - Lettered options for common clarification questions
+  - User responds "1A, 2B" for faster iteration
+  - When to use: scope, users, tech choices, priorities
+
+- **product/prd**: Story Size Gate and Dependency Ordering
+  - 2-3 sentence test: "If you can't describe it in 2-3 sentences, it's too big"
+  - Split pattern: schema → backend → UI → aggregation
+  - Dependency validation checklist
+  - Anti-pattern detection for forward dependencies
+
+- **docs**: Ralph comparison analysis (`docs/analysis/ralph-comparison.md`)
+  - Deep architectural comparison with moo.md
+  - Cherry-pickable patterns identified
+  - Hybrid architecture opportunity documented
+
+---
+
 ## [hope@0.10.0] - 2026-01-29
 
 ### Added
