@@ -170,11 +170,29 @@ After EVERY iteration, write `.loop/state.json`:
 
 | Command | Effect |
 |---------|--------|
-| `/loop [spec]` | Start new loop |
+| `/loop [spec]` | Start new loop from spec |
+| `/loop:prd [path]` | Execute PRD tasks autonomously |
+| `/loop:prd [path] --parallel` | Execute with parallel task support |
 | `/loop continue` | Resume paused loop |
 | `/loop continue --budget=25` | Add budget and resume |
 | `/loop cancel` | Terminate and clean up |
 | `/loop status` | Show current state |
+
+### PRD Mode
+
+Execute tasks from a product PRD with dependency ordering and parallel execution.
+
+```
+/loop:prd ./tasks/feature-prd.md --parallel
+```
+
+**Features:**
+- Parses task blocks from PRD markdown
+- Respects `blockedBy` dependencies
+- Parallel execution for independent tasks (via Task tool subagents)
+- Auto-verifies acceptance criteria
+
+See `references/prd-mode.md` for full documentation.
 
 ---
 
@@ -228,6 +246,7 @@ All success criteria satisfied:
 ## References
 
 - `references/loop-mechanics.md` — Tasks API details, stop_hook_active handling
+- `references/prd-mode.md` — PRD execution with dependencies and parallel tasks
 - `references/spec-rubric.md` — Scoring examples
 - `references/cost-controls.md` — Override syntax, continuation
 - `references/headless.md` — CI/CD integration

@@ -11,6 +11,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **loop**: PRD execution mode (`/loop:prd`) for autonomous task execution
+  - Parse tasks from PRD markdown with `<!-- task -->` metadata blocks
+  - Dependency ordering via `blockedBy` field
+  - Parallel execution for independent tasks via Task tool subagents
+  - Auto-verification of acceptance criteria
+  - New `references/prd-mode.md` documentation
 - **product**: Machine-verifiable acceptance criteria patterns in `prd.md`
   - Pattern table: Command, File check, API, UI nav, UI action, State, Console
   - Forbidden vague criteria list with examples
@@ -19,6 +25,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - One concern per task rule
   - Investigation vs implementation separation
   - Dependency ordering (schema → backend → UI → tests)
+- **product**: Loop-compatible task format with `id`, `blockedBy`, `parallel` fields
 - **product**: New `testing-patterns.md` reference
   - Browser testing patterns (navigation, interaction, state, viewport)
   - API testing patterns (request/response, data validation)
@@ -26,14 +33,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Command patterns (build, test, git)
   - Database patterns (schema, data)
   - Anti-patterns with fixes
-- **product**: Research analysis of compound-product in `references/research/compound-product-analysis.md`
-  - Competitive analysis: what they do well, what we do better
-  - Cherry-pickable patterns identified
-  - Synthesis recommendations
+- **product**: Research analysis of compound-product in `references/research/`
+  - `compound-product-analysis.md` - Competitive analysis, cherry-pickable patterns
+  - `compound-product-mechanics.md` - Deep dive into HOW and WHY it works
 
 ### Changed
 
 - **product/prd.md**: PRD template now includes Tasks section (section 4)
+- **product/prd.md**: Task format updated with loop-compatible metadata blocks
+- **loop/start**: Added `/loop:prd` command for PRD-based autonomous execution
 
 ---
 

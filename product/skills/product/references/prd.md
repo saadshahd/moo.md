@@ -118,10 +118,18 @@ T-003: Implement fix based on T-001/T-002 findings
 4. **UI component changes**
 5. **Verification tasks**
 
-### Task Format
+### Task Format (Loop-Compatible)
+
+Tasks must be parseable by `/loop:prd` for autonomous execution.
 
 ```markdown
 ### T-001: [Specific action verb] [specific target]
+<!-- task
+id: T-001
+blockedBy: []
+parallel: false
+-->
+
 **Description:** What to do and why (1-2 sentences)
 
 **Acceptance Criteria:**
@@ -129,6 +137,42 @@ T-003: Implement fix based on T-001/T-002 findings
 - [ ] [Another criterion]
 - [ ] Quality checks pass
 ```
+
+**Field reference:**
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| `id` | Yes | Unique identifier (T-001, T-002, etc.) |
+| `blockedBy` | Yes | Array of task IDs that must complete first |
+| `parallel` | No | If true, can run simultaneously with other parallel tasks |
+
+**Example with dependencies:**
+
+```markdown
+### T-001: Investigate auth configuration
+<!-- task
+id: T-001
+blockedBy: []
+parallel: true
+-->
+
+### T-002: Investigate middleware setup
+<!-- task
+id: T-002
+blockedBy: []
+parallel: true
+-->
+
+### T-003: Implement auth fix
+<!-- task
+id: T-003
+blockedBy: [T-001, T-002]
+parallel: false
+-->
+```
+
+T-001 and T-002 run in parallel (both `parallel: true`, no blockers).
+T-003 waits for both to complete (`blockedBy: [T-001, T-002]`).
 
 ---
 
