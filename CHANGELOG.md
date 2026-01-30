@@ -7,6 +7,30 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@0.11.0] - 2026-01-30
+
+### Added
+
+- **hope**: Shape skill for expert consultation before substantial builds
+  - Auto-triggers after /intent when spec score ≥5
+  - Loop detects missing SHAPE.md and runs shape first
+  - Two modes: Present (shows reasoning) and Autonomous (silent)
+  - Parallel expert consultation using counsel profiles
+  - Aspect discovery: Visual/UI, Data/Schema, API, Security, User Flows, Domain Logic, etc.
+  - Anchor expert hierarchy: Hickey (simplicity) → Fowler (pragmatism) → simpler option
+  - Output: `.loop/shape/SHAPE.md` with locked decisions, constraints, verification criteria
+  - Loop integration: criteria[], mustNot[], verification{} feed directly into loop
+  - References: shape-template.md, aspect-discovery.md, anchor-experts.md
+
+### Changed
+
+- **hope**: Shape skill creates iron-clad specs through expert consultation
+  - Transforms /intent (WHAT) into implementation spec (HOW)
+  - Uses counsel profiles where available, inference for gaps
+  - Conflict resolution via anchor experts (Hickey/Fowler philosophy)
+
+---
+
 ## [hope@0.10.0] - 2026-01-29
 
 ### Added
