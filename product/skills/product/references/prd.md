@@ -70,19 +70,101 @@ Only after user confirms, generate:
 |---------|--------------|----------|
 | [Name]  | [Why must-have] | P0/P1 |
 
-## 4. Technical Requirements
+## 4. Tasks
+[8-15 granular tasks with acceptance criteria - see Task Explosion below]
+
+## 5. Technical Requirements
 [Stack, constraints, integrations]
 
-## 5. Success Metrics
+## 6. Success Metrics
 | Metric | Target | Measurement Method |
 |--------|--------|-------------------|
 
-## 6. Timeline & Milestones
+## 7. Timeline & Milestones
 [Phases with deliverables - no time estimates]
 
-## 7. Risks & Mitigations
+## 8. Risks & Mitigations
 | Risk | Impact | Mitigation |
 |------|--------|------------|
+```
+
+---
+
+## Task Explosion
+
+Break features into **8-15 granular tasks**. If you have < 6 tasks, split further.
+
+### One Concern Per Task
+
+| Bad | Good |
+|-----|------|
+| "Test signup and fix issues" | T-001: Load page, T-002: Test inputs, T-003: Test submit, T-004: Identify issue, T-005: Implement fix, T-006: Verify fix |
+
+### Investigation vs Implementation
+
+Never combine "find the problem" with "fix the problem":
+
+```
+T-001: Check SignUp component configuration
+T-002: Check middleware auth config
+T-003: Implement fix based on T-001/T-002 findings
+```
+
+### Dependency Order
+
+1. **Investigation tasks** (understand before changing)
+2. **Schema/database changes**
+3. **Backend logic changes**
+4. **UI component changes**
+5. **Verification tasks**
+
+### Task Format
+
+```markdown
+### T-001: [Specific action verb] [specific target]
+**Description:** What to do and why (1-2 sentences)
+
+**Acceptance Criteria:**
+- [ ] [Boolean pass/fail criterion]
+- [ ] [Another criterion]
+- [ ] Quality checks pass
+```
+
+---
+
+## Machine-Verifiable Acceptance Criteria
+
+Every criterion must be **boolean pass/fail**. An agent (or engineer) must be able to definitively verify without judgment.
+
+### Patterns
+
+| Type | Pattern | Example |
+|------|---------|---------|
+| Command | "Run `[cmd]` - exits with code 0" | "`npm test` exits 0" |
+| File check | "File `[path]` contains `[string]`" | "`config.ts` contains `apiUrl`" |
+| API | "[METHOD] `[url]` returns `[status]`" | "POST `/api/user` returns 201" |
+| UI nav | "Navigate to `[url]` - `[element]` visible" | "/dashboard shows user name" |
+| UI action | "Click `[element]` - `[result]`" | "Click Submit - redirects to /dashboard" |
+| State | "`[variable]` equals `[value]`" | "`user.role` equals 'admin'" |
+| Console | "Browser console shows no errors" | |
+
+### Forbidden (Vague)
+
+- "Works correctly"
+- "Review the code"
+- "Verify it looks good"
+- "Document the findings"
+- "Identify the issue"
+
+### Good Examples
+
+```markdown
+**Acceptance Criteria:**
+- [ ] File `src/auth/config.ts` contains `redirectUrl: '/onboarding'`
+- [ ] Run `npm run typecheck` - exits with code 0
+- [ ] Navigate to /signup - form renders with email and password fields
+- [ ] POST /api/signup with valid data returns 200
+- [ ] Click Submit with empty email - error message "Email required" appears
 ```
 
 ## Spec Clarity Rubric

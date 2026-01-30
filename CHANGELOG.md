@@ -7,6 +7,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **product**: Machine-verifiable acceptance criteria patterns in `prd.md`
+  - Pattern table: Command, File check, API, UI nav, UI action, State, Console
+  - Forbidden vague criteria list with examples
+- **product**: Task explosion protocol in `prd.md`
+  - Target: 8-15 granular tasks per feature
+  - One concern per task rule
+  - Investigation vs implementation separation
+  - Dependency ordering (schema → backend → UI → tests)
+- **product**: New `testing-patterns.md` reference
+  - Browser testing patterns (navigation, interaction, state, viewport)
+  - API testing patterns (request/response, data validation)
+  - File system patterns (existence, content, configuration)
+  - Command patterns (build, test, git)
+  - Database patterns (schema, data)
+  - Anti-patterns with fixes
+- **product**: Research analysis of compound-product in `references/research/compound-product-analysis.md`
+  - Competitive analysis: what they do well, what we do better
+  - Cherry-pickable patterns identified
+  - Synthesis recommendations
+
+### Changed
+
+- **product/prd.md**: PRD template now includes Tasks section (section 4)
+
+---
+
 ## [hope@0.10.0] - 2026-01-29
 
 ### Added
