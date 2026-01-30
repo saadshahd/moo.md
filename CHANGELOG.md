@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@0.10.1] - 2026-01-30
+
+### Fixed
+
+- **hope**: `ensure-soul.sh` hook failing on systems where jq doesn't accept file argument
+  - Changed from `jq '.name' "$plugin_json"` to `jq '.name' < "$plugin_json"` (stdin)
+  - Affects SessionStart hook that ensures soul skill is loaded
+
+---
+
 ## [loop@1.2.0] - 2026-01-29
 
 ### Changed
