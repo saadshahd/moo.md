@@ -6,7 +6,7 @@ INPUT=$(cat)
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path')
 
 # Count existing messages - only inject reminder early in session
-MSG_COUNT=$(jq -s 'length' "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)
+MSG_COUNT=$(jq -s 'length' < "$TRANSCRIPT_PATH" 2>/dev/null || echo 0)
 
 if [ "$MSG_COUNT" -lt 3 ]; then
   cat << 'EOF'
