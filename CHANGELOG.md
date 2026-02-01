@@ -13,6 +13,14 @@ _No unreleased changes._
 
 ---
 
+## [hope@0.12.0, loop@1.5.0, product@0.7.0, counsel@0.7.0, founder@0.4.0, career@0.4.0, design@0.4.0, wordsmith@0.4.0] - 2026-02-01
+
+### Changed
+
+- **all**: Minor version bump for release synchronization
+
+---
+
 ## [hope@0.11.0, product@0.6.0, loop@1.4.0] - 2026-02-01
 
 ### Added
