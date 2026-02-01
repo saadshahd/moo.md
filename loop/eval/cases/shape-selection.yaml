@@ -1,0 +1,19 @@
+name: shape-selection-routing
+description: Low spec scores route to /hope:intent before loop
+plugin: loop
+skill: loop:start
+flaky: true
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - intent
+  - hope:intent
+  - soul
+  - hope:soul
+prompt: "loop - make it better"
+expectedBehaviors:
+  - "Spec scored against 5 dimensions"
+  - "Score <5 routes to /hope:intent for clarification"
+  - "Vague request like 'make it better' scores low"
+  - "Does NOT start autonomous execution without clear spec"

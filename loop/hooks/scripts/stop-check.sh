@@ -46,7 +46,15 @@ if [ "$stuck_count" -ge 5 ] 2>/dev/null; then
 fi
 
 # Dual-condition exit: ALL criteria must be true AND exit_signal must be true
-all_criteria_met=$(jq '[.criteriaStatus // {} | to_entries[] | .value] | if length == 0 then false else all end' "$STATE_FILE" 2>/dev/null || echo "false")
+# Handle both old format (value is boolean) and new format (value is {met, verification})
+all_criteria_met=$(jq '[.criteriaStatus // {} | to_entries[] | .value | if type == "boolean" then . elif type == "object" then .met else false end] | if length == 0 then false else all end' "$STATE_FILE" 2>/dev/null || echo "false")
+
+# Check for assumption-only verification (blocks exit)
+has_assumption=$(jq '[.criteriaStatus // {} | to_entries[] | .value | if type == "object" then .verification else "execution output" end] | any(. == "assumption")' "$STATE_FILE" 2>/dev/null || echo "false")
+if [ "$has_assumption" = "true" ] && [ "$all_criteria_met" = "true" ]; then
+  echo '{"ok": false, "reason": "criterion verified by assumption only - requires actual verification"}'
+  exit 0
+fi
 exit_signal=$(jq -r '.exit_signal // false' "$STATE_FILE" 2>/dev/null || echo "false")
 
 if [ "$all_criteria_met" = "true" ] && [ "$exit_signal" = "true" ]; then
@@ -60,8 +68,8 @@ if [ "$all_criteria_met" = "true" ] && [ "$exit_signal" = "false" ]; then
   exit 0
 fi
 
-# List unmet criteria for continuation message
-unmet=$(jq -r '[.criteriaStatus // {} | to_entries[] | select(.value == false) | .key] | join(", ")' "$STATE_FILE" 2>/dev/null || echo "unknown")
+# List unmet criteria for continuation message (handle both old and new formats)
+unmet=$(jq -r '[.criteriaStatus // {} | to_entries[] | select((.value | if type == "boolean" then . == false elif type == "object" then .met == false else true end)) | .key] | join(", ")' "$STATE_FILE" 2>/dev/null || echo "unknown")
 if [ -z "$unmet" ]; then
   unmet="unknown"
 fi

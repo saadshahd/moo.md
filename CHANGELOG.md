@@ -7,6 +7,54 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@1.3.0] - 2026-02-01
+
+### Added
+
+- 4 new eval test cases for loop verification
+  - `dual-exit.yaml` - Both criteriaStatus AND exit_signal required
+  - `circuit-breaker.yaml` - stuckCount >= 5 triggers stop
+  - `shape-selection.yaml` - Score <5 routes to /hope:intent
+  - `tool-shape.yaml` - Score >=8 runs autonomously as tool-shaped
+- Workflow A/B/C detection based on spec content (build/debug/refactor)
+- Reversibility classification in Before You Start checklist (Type 2A/2B/1)
+- Quality footer required after `<loop-complete>` with verdict mapping
+- Verification types for criteria in state schema (`execution output`, `observation`, `measurement`, `code review`, `assumption`)
+
+### Changed
+
+- State schema `criteriaStatus` now tracks verification type per criterion
+  - Format: `{"criterion": {"met": false, "verification": "assumption"}}`
+  - Backward-compatible: old boolean format still supported
+- `stop-check.sh` updated to block exit when any criterion has "assumption" verification
+- Announcement format now includes workflow: `[LOOP] Starting | Shape: X | Workflow: [A/B/C] | Steps: N`
+
+---
+
+## [product@0.5.0] - 2026-02-01
+
+### Added
+
+- Pre-work spec gate with 5-dimension scoring (Problem, Audience, Constraints, Success, Done)
+- Quality footer requirement in Rules section
+- 3 new eval test cases (compete-request, metrics-request, research-request)
+- `references/market-sizing.md` - TAM/SAM/SOM framework
+- `references/experimentation.md` - A/B testing framework
+
+### Changed
+
+- Workflow table expanded with Market Sizing and Experimentation workflows
+
+---
+
+## [hope@0.10.2] - 2026-02-01
+
+### Added
+
+- `loop:start` added to Available Hope Skills table in soul SKILL.md
+
+---
+
 ## [hope@0.10.1] - 2026-01-30
 
 ### Fixed

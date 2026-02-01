@@ -11,13 +11,24 @@ Autonomous iteration that continues until spec is satisfied or limits reached.
 
 □ Score the spec (use rubric below)
 □ Determine shape (Tool ≥8, Colleague 5-7, Intent <5)
+□ Classify reversibility (see below)
 □ Extract success criteria from spec (explicit list)
 □ Decompose into concrete steps
 □ Create task with state schema
 □ Write `.loop/state.json` with criteria array
-□ Announce: `[LOOP] Starting | Shape: X | Steps: N | Budget: $Y`
+□ Announce: `[LOOP] Starting | Shape: X | Workflow: [A/B/C] | Steps: N | Budget: $Y`
 
 **If any checkbox is unclear, STOP and clarify before proceeding.**
+
+### Reversibility Classification
+
+| Type | Rollback | Examples | Action |
+|------|----------|----------|--------|
+| **2A** | < 1 min | Config changes, renames | Execute freely |
+| **2B** | < 5 min | Dependencies, refactors | Checkpoint each step |
+| **1** | Hours+ | Schema changes, public APIs | Require [adversarial pre-check](../../hope/skills/soul/references/adversarial-precheck.md) |
+
+See [fit-decision.md](../../hope/skills/soul/references/fit-decision.md) for full delegation scoring.
 
 ---
 
@@ -37,6 +48,22 @@ Score on 5 dimensions (0-2 each, max 10):
 - **≥8:** Tool-shaped — execute silently, report on completion
 - **5-7:** Colleague-shaped — check in after each iteration
 - **<5:** Run `/hope:intent` first
+
+---
+
+## Workflow Type Detection
+
+After scoring spec, detect workflow type from content:
+
+| Workflow | Indicators | Gate |
+|----------|------------|------|
+| **A (Build)** | "add", "implement", "create", "new feature" | Library search required |
+| **B (Debug)** | "fix", "debug", "broken", "error", "failing" | Root cause before workaround |
+| **C (Refactor)** | "refactor", "clean up", "reorganize", "migrate" | Deletion before redesign |
+
+Update announcement to include workflow: `[LOOP] Starting | Shape: X | Workflow: [A/B/C] | Steps: N`
+
+Reference [hope/skills/soul](../../hope/skills/soul/SKILL.md) for workflow details.
 
 ---
 
@@ -183,6 +210,26 @@ All success criteria satisfied:
 Output `<loop-complete>` ONLY after:
 1. All criteriaStatus values are true
 2. exit_signal set to true in state file
+
+**Quality Footer Required:** After `<loop-complete>`, include a verdict box:
+
+```
+╭─ 🟢 SHIP ──────────────────────────╮
+│ Verified: [execution output/observation/measurement] │
+│ Checklist: N/N criteria verified    │
+│ Subjective: ~X% · Type 2A/2B · Npt  │
+├────────────────────────────────────┤
+│ ↳ Alt: [alternative approach]       │
+│ ↳ Risk: [key assumption]            │
+╰────────────────────────────────────╯
+```
+
+Map loop outcomes to verdicts:
+- **🟢 SHIP:** All criteria verified with execution output/observation/measurement
+- **🟡 MONITOR:** Criteria passed but verification was code review only
+- **🔴 RESEARCH:** Any criterion verified by assumption only
+
+See [quality-footer.md](../../hope/skills/soul/references/quality-footer.md) for format details.
 
 ### On Pause
 

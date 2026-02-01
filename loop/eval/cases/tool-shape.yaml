@@ -1,0 +1,15 @@
+name: tool-shaped-execution
+description: High spec scores (>=8) run autonomously as tool-shaped
+plugin: loop
+skill: loop:start
+flaky: true
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+prompt: "loop - refactor src/api/users.ts to use zod validation. All existing tests must pass. No new dependencies."
+expectedBehaviors:
+  - "Spec scores >=8 (clear outcome, scope, constraints, success, done)"
+  - "Shape announced as Tool (>=8)"
+  - "Executes without intermediate confirmations"
+  - "Reports on completion, not during iterations"

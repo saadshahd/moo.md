@@ -20,6 +20,25 @@ You're working on:
 - Technical debt prioritization
 - Game-changing feature ideation
 
+## Pre-Work Spec Gate
+
+Before proceeding, score the incoming request (5 dimensions, 0-2 each, max 10):
+
+| Dimension | 0 | 1 | 2 |
+|-----------|---|---|---|
+| **Problem** | "Make it better" | "Improve onboarding" | "Reduce signup dropout by 20%" |
+| **Audience** | None stated | "Our users" | "B2B SaaS teams >50 employees" |
+| **Constraints** | None stated | "This quarter" | "No new hires, <$10k budget" |
+| **Success** | None stated | "More engagement" | "NPS +10, churn <5%" |
+| **Done** | Implied | "When shipped" | "Customer interviews confirm" |
+
+**Decision:**
+- **≥8:** Proceed with workflow
+- **5-7:** Colleague mode — confirm understanding before analysis
+- **<5:** Run `/hope:intent` first — spec too vague
+
+See [fit-decision.md](../../hope/skills/soul/references/fit-decision.md) for full scoring guidance.
+
 ## Workflow Selection
 
 Announce which workflow you're using:
@@ -34,6 +53,8 @@ Announce which workflow you're using:
 | PRD review, completeness check, scoring     | PRD Evaluation       | `references/prd-eval.md`            |
 | Tech debt triage, remediation planning      | Debt Prioritization  | `references/debt.md`                |
 | Breakthrough features, innovation ideation  | Game-Changing Features | `references/game-changing-features.md` |
+| TAM/SAM/SOM, market opportunity sizing      | Market Sizing        | `references/market-sizing.md`       |
+| A/B tests, controlled experiments           | Experimentation      | `references/experimentation.md`     |
 
 ## Related Thinking Tools
 
@@ -89,3 +110,4 @@ Multi-step workflows pause at checkpoints to prevent wasted work when intent dri
 - Ground recommendations in evidence
 - Use story points, never time estimates
 - Challenge assumptions and cut scope by default
+- **Quality footer required** after each workflow completes — see [quality-footer.md](../../hope/skills/soul/references/quality-footer.md)

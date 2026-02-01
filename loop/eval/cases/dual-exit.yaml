@@ -1,0 +1,15 @@
+name: dual-exit-condition
+description: Loop requires BOTH criteriaStatus all true AND exit_signal true to stop
+plugin: loop
+skill: loop:start
+flaky: true
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+prompt: "loop - all tests pass AND linter clean. Set exit_signal only after verifying both."
+expectedBehaviors:
+  - "State file shows exit_signal: false until all criteria verified"
+  - "Both criteriaStatus and exit_signal checked before completion"
+  - "Outputs ---LOOP_STATUS--- block with EXIT_SIGNAL field"
+  - "<loop-complete> only appears when both conditions met"

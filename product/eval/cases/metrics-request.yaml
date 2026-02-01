@@ -1,0 +1,12 @@
+name: product-metrics-request
+description: Product skill triggers on OKR/metrics/goals requests
+plugin: product
+skill: product:product
+acceptableSkills:
+  - product
+prompt: "Help me define OKRs for our Q2 product goals. We want to focus on retention and expansion."
+expectedBehaviors:
+  - "Product skill activates on OKR/metrics request"
+  - "Routes to metrics.md workflow"
+  - "Asks about current baseline metrics"
+  - "Proposes measurable key results"

@@ -67,9 +67,9 @@ This prevents:
   "spec": "original user request verbatim",
   "criteria": ["tests pass", "lint clean", "no type errors"],
   "criteriaStatus": {
-    "tests pass": false,
-    "lint clean": true,
-    "no type errors": false
+    "tests pass": {"met": false, "verification": "assumption"},
+    "lint clean": {"met": true, "verification": "execution output"},
+    "no type errors": {"met": false, "verification": "assumption"}
   },
   "exit_signal": false,
   "steps": ["step1", "step2", "step3"],
@@ -90,7 +90,7 @@ This prevents:
 |-------|------|-------------|
 | spec | string | Original user request, verbatim |
 | criteria | string[] | List of success criteria |
-| criteriaStatus | object | Map of criterion → true/false |
+| criteriaStatus | object | Map of criterion → {met, verification} |
 | exit_signal | boolean | True only when ALL criteria verified |
 | steps | string[] | Planned work steps |
 | completedSteps | string[] | Finished steps |
@@ -98,6 +98,22 @@ This prevents:
 | iteration | number | Current iteration count |
 | status | string | "in_progress", "completed", "cancelled" |
 | circuitBreaker | object | Stuck detection state |
+
+### Verification Types
+
+Each criterion tracks how it was verified:
+
+| Type | Description | Blocks Exit? |
+|------|-------------|--------------|
+| `execution output` | Ran command, showed result | No |
+| `observation` | Screenshot, debugger session | No |
+| `measurement` | Metrics, benchmark data | No |
+| `code review` | Inspection only | No (⚠️ weak) |
+| `assumption` | Not verified | **Yes** |
+
+**Exit Blocked:** If any criterion has `verification: "assumption"`, exit_signal cannot be set to true.
+
+See [quality-footer.md](../../../hope/skills/soul/references/quality-footer.md) for verdict mapping.
 
 ### Circuit Breaker Object
 

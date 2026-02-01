@@ -160,6 +160,7 @@ When task matches, use the appropriate skill:
 | Root cause analysis (bugs, failures, problems) | `hope:trace`             | "why did this fail", incident, debugging |
 | Before claiming done/fixed/complete            | `hope:gate`              | Verification checkpoint                  |
 | Stuck, blocked, creative breakthrough needed   | `hope:breakthrough`      | "stuck", "blocked", "can't figure out"   |
+| Autonomous iteration until done                | `loop:start`             | "loop", "keep going", "until done", "don't stop" |
 | Foundation for ALL thinking                    | `hope:soul` (this skill) | Default for everything                   |
 
 Announce skill usage: "I'm using hope:[skill] for [purpose]"
