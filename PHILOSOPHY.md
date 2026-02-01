@@ -38,6 +38,14 @@ Externalizes mental models so they apply automatically—surfacing what matters 
 
 5. **Automatic over remembered** — If humans forget under pressure, encode it so they don't have to remember.
 
+6. **Machine-verifiable over ambiguous** — Acceptance criteria must be boolean. Exit codes, string presence, HTTP status. Not "works correctly" or "looks good."
+
+7. **Investigation before implementation** — Separate cognitive modes for discovery vs action. Never combine "find the problem" + "fix the problem" in one task.
+
+8. **Expert hierarchy for conflicts** — When experts disagree: Hickey (simplicity) → Fowler (pragmatism) → fewer dependencies.
+
+9. **Fresh context when exhausted** — Multi-story features (N>5) may need fresh instances. Each story gets full context window.
+
 ---
 
 ## Skill Requirements

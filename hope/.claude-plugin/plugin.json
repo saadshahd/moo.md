@@ -1,8 +1,8 @@
 {
   "name": "hope",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "description": "clarify before you build. learn from failure. iterate with confidence.",
-  "keywords": ["intent", "inversion", "confidence", "functional", "iterate", "skill-judge", "breakthrough"],
+  "keywords": ["intent", "inversion", "confidence", "functional", "iterate", "skill-judge", "breakthrough", "shape"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

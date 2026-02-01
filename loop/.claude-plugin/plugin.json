@@ -1,8 +1,8 @@
 {
   "name": "loop",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Autonomous iteration with spec-driven quality gates. Command-based stop hooks for deterministic termination, file-based state for cross-session recovery.",
-  "keywords": ["autonomous", "iteration", "loop", "spec-driven"],
+  "keywords": ["autonomous", "iteration", "loop", "spec-driven", "prd-mode", "ralph-bridge"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

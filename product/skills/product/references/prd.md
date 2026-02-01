@@ -124,9 +124,100 @@ In Phase 2 (Interrogate), score each feature. In Phase 4 (Generate PRD), include
 
 ---
 
+## Story Size Gate
+
+Before adding a feature to the PRD, test if it's right-sized:
+
+**Test:** Can you describe this story in 2-3 sentences?
+
+| Result | Action |
+|--------|--------|
+| Yes, easily | Right-sized for one context window |
+| Requires paragraph | Split into multiple stories |
+| "It depends..." | Definitely split |
+
+### Split Pattern (enforced order)
+
+1. **Schema** — Add columns, tables, migrations
+2. **Backend** — Server actions, API routes, business logic
+3. **UI** — Display components, interactions
+4. **Aggregation** — Dashboard updates, reports, rollups
+
+**Anti-Pattern:** "Build dashboard" → too big
+**Right-Sized:** "Add status column to tasks table"
+
+---
+
+## Task Explosion Protocol
+
+When generating implementation tasks, target 8-15 granular tasks per feature.
+
+### Why 8-15?
+
+- Context window sizing: small tasks fit in one iteration
+- Atomicity: each task = one commit = reversible
+- Dependency clarity: explicit ordering prevents blockers
+
+### One Concern Per Task
+
+| Bad | Good |
+|-----|------|
+| "Test signup and fix issues" | T-001: Load signup page, T-002: Test email validation, T-003: Test password rules, T-004: Identify failing case, T-005: Implement fix |
+
+### Investigation vs Implementation
+
+**NEVER combine "find the problem" + "fix the problem"**
+
+```
+Bad:
+T-001: Investigate and fix auth issue
+
+Good:
+T-001: Check SignUp component config → log findings
+T-002: Check middleware auth config → log findings
+T-003: Implement fix based on T-001/T-002 findings
+```
+
+**Why:** Preserves diagnosis even if fix fails.
+
+### Task Format for /loop:prd
+
+```markdown
+### T-001: [Action verb] [target]
+<!-- task
+id: T-001
+blockedBy: []
+parallel: false
+-->
+
+**Acceptance Criteria:**
+- [ ] [Boolean criterion 1]
+- [ ] [Boolean criterion 2]
+```
+
+### Dependency Ordering
+
+Standard dependency chain for features:
+
+```
+Schema (T-001..003)
+    ↓
+Backend (T-004..008)
+    ↓
+UI (T-009..012)
+    ↓
+Tests (T-013..015)
+```
+
+**Parallel candidates:** UI components that don't share state can run parallel.
+
+---
+
 ## Rules
 
 - Use Ask tool
 - Do not proceed without user confirmation
 - Challenge every feature: "Can we ship without this?"
 - Default to cutting scope, not adding
+- Score every requirement before including (≥8 to include)
+- Apply story size gate before adding to PRD

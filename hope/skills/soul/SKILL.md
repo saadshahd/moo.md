@@ -160,6 +160,7 @@ When task matches, use the appropriate skill:
 | Root cause analysis (bugs, failures, problems) | `hope:trace`             | "why did this fail", incident, debugging |
 | Before claiming done/fixed/complete            | `hope:gate`              | Verification checkpoint                  |
 | Stuck, blocked, creative breakthrough needed   | `hope:breakthrough`      | "stuck", "blocked", "can't figure out"   |
+| Bridge intent to implementation                | `hope:shape`             | Auto after intent (spec≥5), "how should I build" |
 | Autonomous iteration until done                | `loop:start`             | "loop", "keep going", "until done", "don't stop" |
 | Foundation for ALL thinking                    | `hope:soul` (this skill) | Default for everything                   |
 
@@ -493,7 +494,6 @@ Don't write learnings while emotionally activated. Signs you're too close:
 Wait. Then write.
 
 ---
-
 ## Quality Footer (Required)
 
 Every non-trivial response ends with a verdict box. See [Quality Footer](references/quality-footer.md) for format, verdict rules, and examples.

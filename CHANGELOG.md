@@ -7,51 +7,80 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [loop@1.3.0] - 2026-02-01
+## [Unreleased]
+
+_No unreleased changes._
+
+---
+
+## [hope@0.11.0, product@0.6.0, loop@1.4.0] - 2026-02-01
 
 ### Added
 
-- 4 new eval test cases for loop verification
+- **hope/shape**: New skill bridging WHAT (intent) to HOW (implementation)
+  - Aspect discovery (12 dimensions: Data, API, UI, Auth, Performance, Error, Testing, Migration, Integration, Deployment, Observability, Documentation)
+  - Anchor experts for each aspect (Hickey, Fowler, Norman, OWASP, Gregg, Nygard, Beck, Newman, Hohpe, Humble)
+  - Expert hierarchy for conflict resolution (Hickey → Fowler → fewer deps)
+  - Outputs SHAPE.md with criteria[], mustNot[], verification{}
+  - Present mode (show reasoning) vs Autonomous mode (apply hierarchy silently)
+  - References: aspect-discovery.md, anchor-experts.md, shape-template.md
+- **hope/intent**: MCQ rapid clarification format (lettered options for 3-5x faster iteration)
+- **hope/intent**: Shape suggestion after spec_score ≥5 (bridges intent→shape→loop pipeline)
+- **hope/soul**: Shape skill added to Available Hope Skills table
+- **hope**: Shape trigger eval test (`shape-trigger.yaml`)
+- **loop/prd**: New skill for PRD execution mode (`/loop:prd`)
+  - Executes pre-decomposed tasks from PRD with machine-verifiable criteria
+  - Supports T-NNN task format with blockedBy dependencies
+  - Parallel execution with `--parallel` flag (max 3 subagents)
+- **loop/start**: SHAPE.md integration
+  - Extracts criteria[], mustNot[], verification{} from .loop/shape/SHAPE.md
+  - mustNot conditions trigger circuit breaker
+  - verification types block exit when "assumption"
+- **loop**: `references/prd-mode.md` - PRD execution mode for pre-decomposed tasks
+- **loop/ralph-bridge**: New skill for fresh-instance orchestration
+  - Spawns fresh Claude per story via moo-ralph.sh
+  - Solves context exhaustion for N>5 stories
+- **product**: `references/testing-patterns.md` - Machine-verifiable acceptance criteria patterns
+- **product**: Story Size Gate and Task Explosion Protocol in prd.md
+- **PHILOSOPHY**: 4 new principles (machine-verifiable, investigation before implementation, expert hierarchy, fresh context)
+
+### Changed
+
+- **loop/start**: Added Confirmation Gates by Shape section
+  - Tool-shaped (≥8): No confirmation gates, runs autonomously
+  - Colleague-shaped (5-7): Three gates (G1, G2, G3)
+  - Intent-required (<5): Block and route to /hope:intent
+- **loop**: State schema `criteriaStatus` tracks verification type per criterion
+- **product**: prd.md Rules section expanded with story sizing and requirement scoring gates
+
+---
+
+## [loop@1.3.0, product@0.5.0, hope@0.10.2] - 2026-02-01
+
+### Added
+
+- **loop**: 4 new eval test cases for loop verification
   - `dual-exit.yaml` - Both criteriaStatus AND exit_signal required
   - `circuit-breaker.yaml` - stuckCount >= 5 triggers stop
   - `shape-selection.yaml` - Score <5 routes to /hope:intent
   - `tool-shape.yaml` - Score >=8 runs autonomously as tool-shaped
-- Workflow A/B/C detection based on spec content (build/debug/refactor)
-- Reversibility classification in Before You Start checklist (Type 2A/2B/1)
-- Quality footer required after `<loop-complete>` with verdict mapping
-- Verification types for criteria in state schema (`execution output`, `observation`, `measurement`, `code review`, `assumption`)
+- **loop**: Workflow A/B/C detection based on spec content (build/debug/refactor)
+- **loop**: Reversibility classification in Before You Start checklist (Type 2A/2B/1)
+- **loop**: Quality footer required after `<loop-complete>` with verdict mapping
+- **loop**: Verification types for criteria in state schema
+- **product**: Pre-work spec gate with 5-dimension scoring (Problem, Audience, Constraints, Success, Done)
+- **product**: Quality footer requirement in Rules section
+- **product**: 3 new eval test cases (compete-request, metrics-request, research-request)
+- **product**: `references/market-sizing.md` - TAM/SAM/SOM framework
+- **product**: `references/experimentation.md` - A/B testing framework
+- **hope**: `loop:start` added to Available Hope Skills table in soul SKILL.md
 
 ### Changed
 
-- State schema `criteriaStatus` now tracks verification type per criterion
-  - Format: `{"criterion": {"met": false, "verification": "assumption"}}`
-  - Backward-compatible: old boolean format still supported
-- `stop-check.sh` updated to block exit when any criterion has "assumption" verification
-- Announcement format now includes workflow: `[LOOP] Starting | Shape: X | Workflow: [A/B/C] | Steps: N`
-
----
-
-## [product@0.5.0] - 2026-02-01
-
-### Added
-
-- Pre-work spec gate with 5-dimension scoring (Problem, Audience, Constraints, Success, Done)
-- Quality footer requirement in Rules section
-- 3 new eval test cases (compete-request, metrics-request, research-request)
-- `references/market-sizing.md` - TAM/SAM/SOM framework
-- `references/experimentation.md` - A/B testing framework
-
-### Changed
-
-- Workflow table expanded with Market Sizing and Experimentation workflows
-
----
-
-## [hope@0.10.2] - 2026-02-01
-
-### Added
-
-- `loop:start` added to Available Hope Skills table in soul SKILL.md
+- **loop**: State schema `criteriaStatus` now tracks verification type per criterion
+- **loop**: `stop-check.sh` updated to block exit when any criterion has "assumption" verification
+- **loop**: Announcement format now includes workflow
+- **product**: Workflow table expanded with Market Sizing and Experimentation workflows
 
 ---
 

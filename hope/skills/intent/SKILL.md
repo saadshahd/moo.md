@@ -31,7 +31,35 @@ If any field blank after 2 asks: proceed with [ASSUMPTION] labels.
 
 Privately list every fact or constraint you still need.
 
-### 0c Action Specification (Loop 1)
+### 0c Rapid Clarification Format (MCQ)
+
+When clarifying scope, users, or constraints, use lettered options for faster iteration:
+
+```
+1. What is the scope of this change?
+   A. Minimal viable (just core functionality)
+   B. Full-featured (complete implementation)
+   C. Proof of concept (exploratory)
+
+2. What are the constraints?
+   A. Must use existing patterns/libraries
+   B. Can introduce new dependencies
+   C. Performance-critical
+```
+
+**User responds:** "1A, 2B" (3-5x faster than open-ended)
+
+| When to Use | When NOT |
+|-------------|----------|
+| Scope clarification | Open-ended gathering |
+| User/persona selection | Creative decisions |
+| Tech stack choices | Complex tradeoffs |
+| Priority ranking | Philosophical questions |
+| Yes/no with nuance | |
+
+---
+
+### 0d Action Specification (Loop 1)
 
 Transform vague requests into actionable specs.
 
@@ -102,8 +130,8 @@ After clarifying, score the request:
 | Done Definition | /2 | |
 | **Total** | /10 | |
 
-- **≥8:** Proceed to build (Tool-shaped)
-- **5-7:** Iterate together (Colleague-shaped) OR clarify more
+- **≥8:** Proceed to build (Tool-shaped) → suggest `/hope:shape` for criteria
+- **5-7:** Iterate together (Colleague-shaped) → suggest `/hope:shape` for criteria
 - **<5:** Continue clarification loop
 
 ### 3 Echo Check
@@ -158,6 +186,19 @@ STOP CONDITIONS (3-5 bullets):
 -
 -
 ```
+
+**After outputting High-Grade Intent:**
+
+If spec_score ≥ 5, append:
+
+```
+───────────────────────────────────
+Next: /hope:shape — discover implementation aspects
+      (criteria, mustNot, verification plan)
+───────────────────────────────────
+```
+
+This bridges WHAT (intent) → HOW (shape) → DO (loop).
 
 ### 7 Build & Self-Test
 
