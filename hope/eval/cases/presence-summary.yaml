@@ -1,0 +1,15 @@
+name: hope-presence-summary
+description: Presence skill triggers on progress summary requests
+plugin: hope
+skill: hope:presence
+flaky: true
+acceptableSkills:
+  - presence
+  - hope:presence
+  - soul
+  - hope:soul
+prompt: "Summarize our progress and tell me what I need to know right now"
+expectedBehaviors:
+  - "Summary of work or decisions"
+  - "Key items requiring attention"
+  - "Structured output format"

@@ -1,0 +1,15 @@
+name: hope-presence-overwhelmed
+description: Presence skill triggers when user expresses being overwhelmed
+plugin: hope
+skill: hope:presence
+flaky: true
+acceptableSkills:
+  - presence
+  - hope:presence
+  - soul
+  - hope:soul
+prompt: "I'm completely lost track of what we've been doing. What decisions have we made and what still needs my attention?"
+expectedBehaviors:
+  - "Decisions Made section or equivalent"
+  - "Assumptions or uncertainties surfaced"
+  - "Verification or attention items listed"
