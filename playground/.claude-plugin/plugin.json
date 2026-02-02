@@ -1,0 +1,7 @@
+{
+  "name": "playground",
+  "version": "0.1.0",
+  "description": "Interactive HTML playgrounds for temporal exploration. Create throwaway sandboxes to visualize systems and timelines, then extract insights.",
+  "keywords": ["playground", "visualization", "interactive", "system-dynamics", "timeline", "exploration"],
+  "author": "moo.md"
+}

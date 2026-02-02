@@ -1,6 +1,8 @@
 ---
 name: start
 description: Start autonomous iteration loop OR explain how Loop works. Triggers on "loop", "keep going", "don't stop", "continue until done", "until tests pass", "implement full feature", "fix all problems", "make better", "what is loop", "how does loop work", "loop help", or any persistence pattern. Executes multi-step tasks without stopping until complete or limits reached.
+model: opus
+allowed-tools: Bash, Read
 ---
 
 # Loop

@@ -1,58 +1,42 @@
 ---
 name: recall
 description: Surface relevant learnings from past sessions. Use when starting work in a domain to avoid repeating mistakes. Triggers on "recall learnings", "past failures", "surface insights", "what did I learn".
+model: haiku
+allowed-tools: Read
+context: fork
+agent: Explore
 ---
 
-# Recall Skill
+# Recall Learnings
 
-Surface relevant learnings from past sessions.
+Search ~/.claude/learnings/ for entries matching: $ARGUMENTS
 
-## When This Skill Activates
+## Task
 
-- Session start (new or resumed)
-- Before substantial work in a domain
-- When soul skill's Silent Audit prompts "Learnings recalled?"
-- Explicitly via `/hope:recall [context]`
-
-## Input
-
-Optional context hint (e.g., "hooks", "testing", "typescript"). If empty, infer from current project/conversation.
-
-## Process
-
-1. **Read learnings files** using the Read tool:
-
+1. Read these files (skip silently if missing):
    - `~/.claude/learnings/failures.jsonl`
    - `~/.claude/learnings/discoveries.jsonl`
    - `~/.claude/learnings/constraints.jsonl`
    - `~/.claude/learnings/delegation.jsonl`
 
-   If files don't exist, skip silently.
+2. Filter entries where `context` or `applies_to` matches the provided hint (or infer from $ARGUMENTS if empty)
 
-2. **Filter by relevance**:
+3. Prioritize:
+   - Recent entries (last 30 days)
+   - High-confidence discoveries (>= 0.8)
 
-   - Match `context` field against provided hint or inferred domain
-   - Match `applies_to` tags against current work
-   - Prioritize recent entries (last 30 days)
-   - Prioritize high-confidence discoveries (>= 0.8)
-
-3. **Output format**:
+4. Return top 5 most relevant learnings in this format:
 
 ### Relevant Failures
-
 - **[context]**: [failure] → Prevention: [prevention]
 
 ### Relevant Discoveries
-
 - **[context]** (confidence: X): [discovery]
 
 ### Active Constraints
-
 - **[context]**: [constraint] (permanent: yes/no)
 
 ### Delegation Learnings
+- **[shape_chosen] → [outcome]**: [prevention]
 
-- **[shape_chosen] → [outcome]**: [root_cause] → Prevention: [prevention]
-  - Fit score: [fit_score], Pattern: [failure_pattern]
-
-4. **If no relevant learnings**: Report "No learnings found for [context]"
+5. If no matches found: "No learnings found for [hint]"

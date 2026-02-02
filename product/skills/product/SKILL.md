@@ -1,6 +1,8 @@
 ---
 name: product
 description: Product workflows router. Use when validating product ideas, writing specs, analyzing competitors, or tracking metrics. Triggers on "PRD", "competitive analysis", "metrics", "OKRs", "cohort", "requirements", "tech debt", "game-changing features", market positioning, retention analysis, or product strategy tasks.
+model: sonnet
+allowed-tools: Read
 ---
 
 # Product Skill

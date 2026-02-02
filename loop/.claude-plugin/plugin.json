@@ -1,6 +1,6 @@
 {
   "name": "loop",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Autonomous iteration with spec-driven quality gates. Command-based stop hooks for deterministic termination, file-based state for cross-session recovery.",
   "keywords": ["autonomous", "iteration", "loop", "spec-driven", "prd-mode", "ralph-bridge"],
   "author": {

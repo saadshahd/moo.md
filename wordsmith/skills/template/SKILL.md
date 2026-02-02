@@ -1,6 +1,8 @@
 ---
 name: template
 description: Scaffold structured documents (RFC, ADR, Blog) using industry best practices. Use when creating RFCs, ADRs, blog posts, or technical articles. Triggers on "write RFC", "create ADR", "blog post template", "scaffold document", "RFC template". Produces draft for refinement with /wordsmith:edit.
+model: sonnet
+allowed-tools: Read
 ---
 
 # Template Skill

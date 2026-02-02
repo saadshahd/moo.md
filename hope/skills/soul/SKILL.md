@@ -1,6 +1,8 @@
 ---
 name: hope
 description: Cognitive operating system for structured thinking with confidence tracking. Use when starting complex tasks, making decisions, or needing verification. Triggers on "how confident", "verify this", "alternative approach", "what could go wrong", "think through", confidence questions, or multi-step reasoning tasks.
+model: opus
+allowed-tools: Read, Grep, Glob
 ---
 
 <EXTREMELY-IMPORTANT>
@@ -474,7 +476,6 @@ During execution, capture only:
 - What worked/didn't (outcomes)
 
 Save analysis for later.
-
 #### Reflection Protocol
 
 After 24-48 hours:
@@ -495,5 +496,4 @@ Wait. Then write.
 
 ---
 ## Quality Footer (Required)
-
 Every non-trivial response ends with a verdict box. See [Quality Footer](references/quality-footer.md) for format, verdict rules, and examples.

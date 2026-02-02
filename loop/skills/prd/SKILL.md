@@ -1,6 +1,8 @@
 ---
 name: prd
 description: Execute pre-decomposed PRD with machine-verifiable tasks. Triggers on "loop prd", "run prd", "execute tasks from PRD", "prd execution". Parses task blocks with T-NNN format, respects dependencies, supports parallel execution with --parallel flag.
+model: opus
+allowed-tools: Bash, Read, Glob
 ---
 
 # PRD Execution

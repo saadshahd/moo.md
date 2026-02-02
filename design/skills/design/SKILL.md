@@ -1,6 +1,8 @@
 ---
 name: design
 description: Explore visual design, UI/UX, and design systems. Use when designing visual directions, user journeys, information architecture, color palettes, typography, or reviewing design feedback. NOT for feature planning or technical architecture.
+model: sonnet
+allowed-tools: Read
 ---
 
 # Design Skill

@@ -1,6 +1,8 @@
 ---
 name: ralph-bridge
 description: Fresh-instance orchestration for multi-story features. Use when N>5 stories risk context exhaustion. Spawns fresh Claude per story via bash script. Triggers on "ralph", "fresh instances", "multi-story loop", "context exhaustion".
+model: opus
+allowed-tools: Bash, Read
 ---
 
 # Ralph Bridge

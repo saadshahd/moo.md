@@ -11,13 +11,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [hope@0.13.0] - 2026-02-02
+## [hope@0.13.0, loop@1.6.0, product@0.8.0, counsel@0.8.0, founder@0.5.0, career@0.5.0, design@0.5.0, wordsmith@0.5.0] - 2026-02-02
 
 ### Added
 
+- **wordsmith/voices**: New skill for voice profile management (list, apply, delete)
 - **hope**: Stop hooks for learnings capture on `trace`, `breakthrough`, and `shape` skills
   - Prompts user to run `/hope:learn` when session produces valuable insights
-  - Captures root cause patterns (trace), creative breakthroughs (breakthrough), design decisions (shape)
+
+### Changed
+
+- **all skills**: Added `model:` and `allowed-tools:` frontmatter fields for optimization
+  - Opus (9 skills): soul, shape, trace, breakthrough, skill-judge, loop:start, loop:prd, ralph-bridge, founder, counsel
+  - Sonnet (8 skills): intent, interactive-code-review, product, writing, template, career, design
+  - Haiku (4 skills): gate, recall, cancel, voices
+- **hope/recall**: Added `context: fork` with `agent: Explore` for isolated execution
 
 ---
 

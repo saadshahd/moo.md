@@ -1,6 +1,8 @@
 ---
 name: counsel
 description: Expert simulation for code guidance and style. Triggers on "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", or domain-specific keywords. Channels documented expert perspectives with explicit confidence.
+model: opus
+allowed-tools: Read, Bash
 ---
 
 # counsel
