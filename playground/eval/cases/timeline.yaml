@@ -1,0 +1,12 @@
+name: playground-timeline-trigger
+description: Timeline playground triggers on temporal decision analysis requests
+plugin: playground
+skill: playground:timeline
+prompt: "I'm deciding between taking this new job offer or staying at my current company. Can you help me 10-10-10 this decision?"
+expectedBehaviors:
+  - "Identifies decision options (new job vs stay)"
+  - "Clarifies expected outcomes at each time horizon"
+  - "Generates single HTML file with parallel tracks"
+  - "Shows probability decay over time"
+  - "Includes regret marker functionality"
+  - "Generates comparative analysis in prompt output"

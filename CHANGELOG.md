@@ -11,6 +11,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [playground@0.1.0] - 2026-02-02
+
+### Added
+
+- **playground**: New plugin for interactive HTML playgrounds
+  - `playground:system` - Feedback loop visualizer with poke mode
+    - Canvas-based system dynamics visualization
+    - Auto loop detection (reinforcing/balancing classification)
+    - "Poke" mode simulates value changes rippling through connected nodes
+    - Leverage point ranking based on Meadows' hierarchy
+  - `playground:timeline` - 10-10-10 timeline simulator
+    - Parallel tracks for decision options
+    - Three time zones (10 min / 10 months / 10 years)
+    - Probability cones with decay over time
+    - Regret markers for flagging future regret points
+  - Pattern: Single HTML file, no external deps, live preview, copy-to-clipboard prompt output
+  - Learned from Anthropic's official playground plugin patterns
+
+---
+
 ## [hope@0.13.0, loop@1.6.0, product@0.8.0, counsel@0.8.0, founder@0.5.0, career@0.5.0, design@0.5.0, wordsmith@0.5.0] - 2026-02-02
 
 ### Added

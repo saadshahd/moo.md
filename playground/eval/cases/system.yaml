@@ -1,0 +1,11 @@
+name: playground-system-trigger
+description: System playground triggers on feedback loop visualization requests
+plugin: playground
+skill: playground:system
+prompt: "I want to map out why our team keeps falling into the same cycle of crunch time followed by burnout. Can you help me see the loops?"
+expectedBehaviors:
+  - "Identifies system to model (team dynamics, crunch/burnout cycle)"
+  - "Clarifies key variables before generating"
+  - "Generates single HTML file with canvas-based visualizer"
+  - "Includes poke mode for simulation"
+  - "Detects reinforcing and balancing loops"
