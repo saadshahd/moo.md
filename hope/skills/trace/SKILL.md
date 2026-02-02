@@ -1,6 +1,13 @@
 ---
 name: trace
 description: Root cause analysis for complex bugs. Use when initial fix fails or incident is severe. Traces Effect → Cause → Root with confidence levels and prevention hierarchy.
+model: opus
+allowed-tools: Read, Grep, Bash
+hooks:
+  Stop:
+    - hooks:
+        - type: prompt
+          prompt: "If this trace session identified a root cause or prevention pattern, return {\"ok\": false, \"reason\": \"Consider running /hope:learn to capture this root cause pattern for future reference.\"}. If no significant findings, return {\"ok\": true}."
 ---
 
 # trace
