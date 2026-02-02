@@ -40,3 +40,17 @@ Search ~/.claude/learnings/ for entries matching: $ARGUMENTS
 - **[shape_chosen] → [outcome]**: [prevention]
 
 5. If no matches found: "No learnings found for [hint]"
+
+---
+
+## Boundary
+
+**User controls retention. No silent persistence.**
+
+On first learn capture, disclose:
+> "Learnings stored in ~/.claude/learnings/. Default retention: 90 days."
+> "Adjust with: `/hope:retention [days|forever|off]`"
+
+- User can delete any learning at any time
+- User can disable capture entirely
+- Recall surfaces patterns, user decides meaning

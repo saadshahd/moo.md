@@ -128,3 +128,15 @@ Multi-step workflows pause at checkpoints to prevent wasted work when intent dri
 
 ⚠️ **CHECKPOINT**: Present options summary. Ask: "Do these directions capture what you're looking for? Any adjustments before I continue?"
 ```
+
+---
+
+## Boundary
+
+**Design is subjective. Claude generates options, user chooses.**
+
+- Never converge to a single "best" direction unprompted
+- Always present alternatives with tradeoffs
+- If user rejects all options, the skill failed — recalibrate
+
+Design skill explores possibility space. Commitment is the user's act.

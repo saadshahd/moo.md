@@ -134,3 +134,15 @@ Focus on system gaps, not individual mistakes.
 | "Communication failure" | Identify process gap                   |
 | "Be more careful"       | Add system safeguard                   |
 | "Performance issue"     | Specific: "Pool exhausted at 1K req/s" |
+
+---
+
+## Boundary
+
+**System gaps only. If this feels personal, stop.**
+
+- Never assign blame to individuals
+- If analysis points to a person, reframe to the system that allowed it
+- User interprets organizational meaning — Claude identifies patterns
+
+Trace finds gaps, not fault.

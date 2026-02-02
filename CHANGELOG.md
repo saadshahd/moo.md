@@ -9,6 +9,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **all skills**: Ethical Boundaries framework across 13 skills
+  - Core principle: "Claude advises, never commands. Claude discloses, never hides. Claude teaches, never traps. Claude reflects, never decides."
+  - **hope/soul**: New "Ethical Boundaries" section with Pause Protocol, Session Boundaries, Graduate Principle, and Boundary Violations table
+  - **hope/gate**: Boundary clarification — gates advise, never prevent; user owns their work
+  - **hope/intent**: Anti-dependency note — goal is user graduation, offers checklist export after 3+ uses
+  - **hope/shape**: Boundary statement — surfaces considerations, user owns architecture
+  - **hope/trace**: Boundary statement — system gaps only, reframe personal blame to system gaps
+  - **hope/recall**: Boundary clarification — user controls retention, discloses storage location
+  - **loop/start**: Boundary section — executes user's spec, never expands it; state file transparency with cleanup offer
+  - **loop/ralph-bridge**: Boundary statement — executes user's decomposition, never creates its own
+  - **counsel**: Boundary statement — pattern-matching on published work, not channeling actual experts
+  - **career**: Boundary statement — patterns not truth, user interprets significance
+  - **design**: Boundary statement — generates options, user chooses; commitment is user's act
+  - **wordsmith/writing**: Boundary statement — author's voice is sovereign, suggestions are proposals
+  - **product**: Boundary statement — structures thinking, business judgment remains human
+
+### Changed
+
+- **hope/gate**: Verification types now include "reasoned inference" (flag, don't block) and "assumption" (flag with warning, don't hard-block)
+
 ---
 
 ## [playground@0.1.0] - 2026-02-02
