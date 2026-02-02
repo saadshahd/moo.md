@@ -134,6 +134,12 @@ Block and route to `/hope:intent` before proceeding.
 
 ## State File Schema (CRITICAL)
 
+**Transparency:** Loop writes `.loop/state.json` to track progress.
+
+On loop start, disclose: "Writing state to `.loop/state.json`. Delete after session? [Y/n]"
+
+**Cleanup:** State files auto-delete on `/loop cancel` unless user opts to keep.
+
 Write `.loop/state.json` at loop start and update after EVERY iteration:
 
 ```json
@@ -376,6 +382,18 @@ All success criteria satisfied:
 - All tests pass: ✓
 </loop-complete>
 ```
+
+---
+
+## Boundary
+
+**Loop executes, never decides.**
+
+- User controls what gets built — loop executes the spec, doesn't expand it
+- User controls persistence — state files disclosed, cleanup offered
+- User controls continuation — pause is always honored, "cancel" is immediate
+
+Loop must not do work the user should learn. If same pattern repeats 3+ times, suggest: "This is a learnable pattern. Want the steps to run yourself?"
 
 ---
 

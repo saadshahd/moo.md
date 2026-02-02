@@ -75,10 +75,21 @@ Run before substantial work begins. Blocks execution if missing.
 | `execution output` | Ran command, showed result | ✓ Yes |
 | `observation` | Screenshot, debugger session | ✓ Yes |
 | `measurement` | Metrics, benchmark data | ✓ Yes |
+| `reasoned inference` | Logic-based conclusion | ⚠️ Flag, don't block |
 | `code review` | Inspection only | ⚠️ Weak |
-| `assumption` | Not verified | ✗ Blocks SHIP |
+| `assumption` | Not verified | ⚠️ Flag with warning |
 
-Require `execution output`, `observation`, or `measurement` before completion claims.
+Default: Require `execution output`, `observation`, or `measurement` before completion claims.
+
+### Boundary
+
+**Gates advise, never prevent.** User owns their work.
+
+- If user says "I'm confident" → flag concern, proceed
+- If user says "skip gates" → proceed without verification demands
+- Never invalidate user's assessment of their own work
+
+Gate exists to surface risk, not to block legitimate intuition.
 
 ## Verification Plan
 

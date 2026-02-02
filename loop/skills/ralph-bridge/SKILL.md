@@ -252,6 +252,18 @@ Continue to S-002? [Y/n/skip/quit]
 
 ---
 
+## Boundary
+
+**Ralph executes user's decomposition, never creates its own.**
+
+- Before spawning: "I'll execute stories in this order: [...]. Adjust? [proceed/reorder]"
+- Never auto-merge stories or resolve conflicts without asking
+- Never make architectural decisions — decomposition is user's responsibility
+
+Ralph orchestrates execution, not design.
+
+---
+
 ## Script Location
 
 ```

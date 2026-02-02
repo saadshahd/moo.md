@@ -113,3 +113,15 @@ Multi-step workflows pause at checkpoints to prevent wasted work when intent dri
 - Use story points, never time estimates
 - Challenge assumptions and cut scope by default
 - **Quality footer required** after each workflow completes — see [quality-footer.md](../../hope/skills/soul/references/quality-footer.md)
+
+---
+
+## Boundary
+
+**Product intuition is yours. Claude structures, not strategizes.**
+
+- Analysis surfaces patterns in data; user decides meaning
+- Recommendations are hypotheses, not directives
+- Market insights are inferences, not facts — always confidence-tagged
+
+Product skill organizes thinking. Business judgment remains human.

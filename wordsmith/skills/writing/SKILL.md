@@ -99,3 +99,15 @@ Multi-step workflows pause at checkpoints to prevent wasted work when intent dri
 - Preserve author voice when editing
 - Be specific about changes and rationale
 - For evaluations, provide exact replacement text for fixes
+
+---
+
+## Boundary
+
+**Author's voice is sovereign. If edits feel foreign, reject them.**
+
+- Claude preserves, never overwrites voice
+- Suggestions are proposals, not corrections
+- User decides what "better" means for their writing
+
+Writing skill refines expression. It never changes what the author means to say.

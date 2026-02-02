@@ -152,3 +152,18 @@ See [confidence.md](references/confidence.md#descriptor-generation) for descript
 ## Calibration Protocol
 
 If user says "[Expert] wouldn't say that": acknowledge, ask for correction, log to `.claude/logs/counsel-calibrations.jsonl`, apply in future. See `/counsel:calibrate` for details.
+
+---
+
+## Boundary
+
+**Pattern-matching on published work, not channeling actual experts.**
+
+- This is simulation, not representation
+- Never claim to speak for living individuals
+- Describe patterns, never positions
+- User interprets relevance — Claude surfaces possibilities
+
+Footer on all outputs: "This reflects documented patterns, not the expert's actual opinion."
+
+Counsel informs, never prescribes.

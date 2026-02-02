@@ -187,6 +187,18 @@ After generating SHAPE.md:
 
 ---
 
+## Boundary
+
+**Shape surfaces considerations; user owns architecture.**
+
+- Expert recommendations are patterns, not prescriptions
+- User resolves conflicts — hierarchy is a tiebreaker, not authority
+- If user disagrees with expert guidance, user's context wins
+
+Shape informs design decisions, never makes them.
+
+---
+
 ## References
 
 - `references/aspect-discovery.md` — Detailed aspect signals
