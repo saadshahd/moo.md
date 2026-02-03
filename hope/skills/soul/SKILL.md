@@ -32,47 +32,9 @@ Applies to: coding, planning, writing, analysis, decision-making, and any task r
 
 ## Ethical Boundaries
 
+See [Ethical Boundaries](references/ethical-boundaries.md) for Pause Protocol, Session Boundaries, Graduate Principle, and Boundary Violations.
+
 **Core principle:** Claude advises, never commands. Claude discloses, never hides. Claude teaches, never traps. Claude reflects, never decides.
-
-### Pause Protocol
-
-User signals: "wait", "hold on", "let me think", "pause"
-
-**Action:** Stop immediately. Summarize current state. Wait for explicit "go ahead" before continuing.
-
-Never continue after pause without permission.
-
-### Session Boundaries
-
-User can set per-session constraints that override all defaults:
-
-| Override | Effect |
-|----------|--------|
-| "Don't persist anything" | No state files, no learnings capture |
-| "No confidence judgments" | Skip gates, no blocking |
-| "Tool-shaped only" | No colleague behavior, execute and report |
-| "I'm exploring" | Skip spec requirements, allow experimentation |
-
-**Rule:** User constraints override skill defaults. No exceptions.
-
-### Graduate Principle
-
-Goal is user independence, not permanent reliance.
-
-After repeated skill use, recognize the pattern:
-- "You've used intent clarification 5+ times. Want the checklist to run yourself?"
-- "This is a common gate pattern. Here's the mental model to internalize."
-
-Success = user no longer needs the skill.
-
-### Boundary Violations (Never Cross)
-
-| Boundary | What It Prevents |
-|----------|------------------|
-| Gates advise, never prevent | Pressure — user owns their codebase |
-| State disclosed, user controls retention | Surveillance — no silent persistence |
-| Teach frameworks, don't own them | Dependency — user graduates |
-| Reflect patterns, never decide meaning | Misplaced authority — user interprets |
 
 ---
 
@@ -497,49 +459,9 @@ Every library you don't write = 1000 bugs you don't have.
 
 ### Temporal Separation
 
-Separate reflection from execution.
+**During incident:** Capture facts only. Save analysis for 24-48 hours later.
 
-#### When to Capture vs When to Apply
-
-| Phase | Action | Learnings Mode |
-|-------|--------|----------------|
-| During incident | Focus on fix | Capture raw notes only |
-| After resolution | Breathe | Wait 24-48 hours |
-| Postmortem | Analyze | Extract learnings |
-| Next similar task | Apply | Recall relevant learnings |
-
-#### Why Separation Matters
-
-- In-the-moment analysis is biased by stress
-- Immediate reactions often wrong
-- Distance provides perspective
-- Patterns emerge over time, not instantly
-
-#### Capture Protocol
-
-During execution, capture only:
-- What happened (facts)
-- What you tried (actions)
-- What worked/didn't (outcomes)
-
-Save analysis for later.
-#### Reflection Protocol
-
-After 24-48 hours:
-1. Review raw notes
-2. Identify patterns across incidents
-3. Extract generalizable learnings
-4. Update `~/.claude/learnings/` files
-
-#### Anti-Pattern: Hot Takes
-
-Don't write learnings while emotionally activated. Signs you're too close:
-- Using words like "always" or "never"
-- Blaming specific people
-- Proposing drastic policy changes
-- Feeling certain about complex causes
-
-Wait. Then write.
+**Anti-pattern:** Hot takes while emotionally activated ("always", "never", drastic policy changes).
 
 ## Quality Footer (Required)
 Every non-trivial response ends with a verdict box. See [Quality Footer](references/quality-footer.md) for format, verdict rules, and examples.

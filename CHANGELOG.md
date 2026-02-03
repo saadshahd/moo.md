@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@0.15.0, loop@1.7.0, product@0.9.0, counsel@0.9.0, career@0.6.0, design@0.6.0, wordsmith@0.6.0] - 2026-02-03
+
 ### Added
 
 - **all skills**: Ethical Boundaries framework across 13 skills
