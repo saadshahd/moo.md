@@ -1,3 +1,7 @@
+<p style="border-radius: 24px; overflow: hidden;">
+  <img src="assets/cover.jpg" alt="moo.md - Stay present with AI">
+</p>
+
 # moo
 
 Claude answers fast. moo makes it answer right.
@@ -5,9 +9,11 @@ Claude answers fast. moo makes it answer right.
 ---
 
 Before moo:
+
 > "This should work" → debug → rebuild → debug again
 
 After moo:
+
 > Think → verify → build once
 
 ---
@@ -20,11 +26,13 @@ After moo:
 ```
 
 Then:
+
 ```
 plan building a markdown-to-PDF CLI
 ```
 
 Claude will:
+
 - Ask before building
 - Search before writing
 - Verify before claiming done
@@ -45,12 +53,12 @@ Claude will:
 
 ---
 
-| Verdict | 🟢 SHIP |
-|---------|---------|
-| Verified | execution output |
-| Checklist | 4/4 |
-| Subjective | ~85% · Type 2A · 3pt |
-| Alt | [alternative approach] |
-| Risk | [key assumption] |
+| Verdict    | 🟢 SHIP                |
+| ---------- | ---------------------- |
+| Verified   | execution output       |
+| Checklist  | 4/4                    |
+| Subjective | ~85% · Type 2A · 3pt   |
+| Alt        | [alternative approach] |
+| Risk       | [key assumption]       |
 
-*Every response ends with evidence, not hope.*
+_Every response ends with evidence, not hope._
