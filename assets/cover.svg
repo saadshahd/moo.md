@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <clipPath id="rounded">
+      <rect width="1200" height="630" rx="24" ry="24"/>
+    </clipPath>
+  </defs>
+  <image xlink:href="cover.jpg" width="1200" height="630" clip-path="url(#rounded)"/>
+</svg>

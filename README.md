@@ -1,5 +1,5 @@
-<p style="border-radius: 24px; overflow: hidden;">
-  <img src="assets/cover.jpg" alt="moo.md - Stay present with AI">
+<p>
+  <img src="assets/cover.svg" alt="moo.md - Stay present with AI">
 </p>
 
 # moo
