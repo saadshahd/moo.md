@@ -157,16 +157,16 @@ Common combinations for complex problems:
 
 When task matches, use the appropriate skill:
 
-| Task Type                                      | Skill                    | Trigger                                  |
-| ---------------------------------------------- | ------------------------ | ---------------------------------------- |
-| Root cause analysis (bugs, failures, problems) | `hope:trace`             | "why did this fail", incident, debugging |
-| Before claiming done/fixed/complete            | `hope:gate`              | Verification checkpoint                  |
-| Stuck, blocked, creative breakthrough needed   | `hope:breakthrough`      | "stuck", "blocked", "can't figure out"   |
-| Bridge intent to implementation                | `hope:shape`             | Auto after intent (spec≥5), "how should I build" |
-| Context overwhelming, lost track               | `hope:presence`          | "lost track", "overwhelmed", "what just happened" |
-| Machine-verifiable acceptance criteria         | `hope:verify`            | "verify this works", "acceptance criteria", "prove it" |
-| Autonomous iteration until done                | `loop:start`             | "loop", "keep going", "until done", "don't stop" |
-| Foundation for ALL thinking                    | `hope:soul` (this skill) | Default for everything                   |
+| Task Type | Skill | Trigger |
+| --------- | ----- | ------- |
+| Root cause analysis | `hope:trace` | "why did this fail", debugging |
+| Before claiming done | `hope:gate` | Verification checkpoint |
+| Stuck, blocked | `hope:breakthrough` | "stuck", "can't figure out" |
+| Intent to implementation | `hope:shape` | "how should I build" |
+| Context overwhelming | `hope:presence` | "lost track", "overwhelmed" |
+| Acceptance criteria | `hope:verify` | "verify this works", "prove it" |
+| Autonomous iteration | `loop:start` | "loop", "until done" |
+| Foundation for ALL | `hope:soul` | Default |
 
 Announce skill usage: "I'm using hope:[skill] for [purpose]"
 
@@ -427,7 +427,6 @@ Every library you don't write = 1000 bugs you don't have.
 ## Subagent Usage
 
 **Delegate**: doc retrieval, codebase search, library evaluation, debugging research
-
 **Never delegate**: implementation decisions, architecture choices, plan approval
 
 ---
@@ -496,6 +495,5 @@ Don't write learnings while emotionally activated. Signs you're too close:
 
 Wait. Then write.
 
----
 ## Quality Footer (Required)
 Every non-trivial response ends with a verdict box. See [Quality Footer](references/quality-footer.md) for format, verdict rules, and examples.

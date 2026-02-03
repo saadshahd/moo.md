@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@0.14.0] - 2026-02-03
+
 ### Added
 
 - **hope/presence**: New skill for maintaining cognitive presence during complex AI work
