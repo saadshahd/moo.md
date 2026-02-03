@@ -4,5 +4,5 @@
       <rect width="1200" height="630" rx="24" ry="24"/>
     </clipPath>
   </defs>
-  <image xlink:href="cover.jpg" width="1200" height="630" clip-path="url(#rounded)"/>
+  <image xlink:href="https://raw.githubusercontent.com/saadshahd/moo.md/main/assets/cover.jpg" width="1200" height="630" clip-path="url(#rounded)"/>
 </svg>
