@@ -9,6 +9,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **hope/presence**: New skill for maintaining cognitive presence during complex AI work
+  - Surfaces decisions made, assumptions active, uncertainties open, and verification needed
+  - Triggers on "lost track", "overwhelmed", "what just happened", "summarize progress"
+  - Frequency calibration based on context length
+  - Integration points with soul, gate, trace, shape skills
+- **hope/verify**: New skill for machine-verifiable acceptance criteria
+  - Phase 1: Lock boolean criteria before building
+  - Phase 2: Execute verification after building
+  - agent-browser CLI integration for browser verification (93% less context than MCP)
+  - Criterion types: exit code, string presence, HTTP status, element visible, state change
+  - Vague-to-boolean conversion table for common acceptance criteria
+- **hope**: 4 new eval test cases for presence and verify skills
+
 ---
 
 ## [playground@0.1.0] - 2026-02-02

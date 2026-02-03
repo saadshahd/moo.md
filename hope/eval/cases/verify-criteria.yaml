@@ -1,0 +1,17 @@
+name: hope-verify-criteria
+description: Verify skill triggers when defining acceptance criteria
+plugin: hope
+skill: hope:verify
+flaky: true
+acceptableSkills:
+  - verify
+  - hope:verify
+  - gate
+  - hope:gate
+  - soul
+  - hope:soul
+prompt: "Before I build this login form, help me define machine-verifiable acceptance criteria"
+expectedBehaviors:
+  - "Boolean criteria defined"
+  - "Verification commands or methods specified"
+  - "Must pass and must NOT sections"

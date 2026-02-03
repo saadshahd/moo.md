@@ -163,6 +163,8 @@ When task matches, use the appropriate skill:
 | Before claiming done/fixed/complete            | `hope:gate`              | Verification checkpoint                  |
 | Stuck, blocked, creative breakthrough needed   | `hope:breakthrough`      | "stuck", "blocked", "can't figure out"   |
 | Bridge intent to implementation                | `hope:shape`             | Auto after intent (spec≥5), "how should I build" |
+| Context overwhelming, lost track               | `hope:presence`          | "lost track", "overwhelmed", "what just happened" |
+| Machine-verifiable acceptance criteria         | `hope:verify`            | "verify this works", "acceptance criteria", "prove it" |
 | Autonomous iteration until done                | `loop:start`             | "loop", "keep going", "until done", "don't stop" |
 | Foundation for ALL thinking                    | `hope:soul` (this skill) | Default for everything                   |
 
