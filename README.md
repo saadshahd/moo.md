@@ -1,6 +1,4 @@
-<p>
-  <img src="assets/cover-rounded.svg" alt="moo.md - Stay present with AI">
-</p>
+<img src="assets/cover-rounded.svg" alt="moo.md - Stay present with AI" width="100%">
 
 # moo
 
