@@ -1,7 +1,7 @@
 {
   "name": "loop",
-  "version": "1.7.0",
-  "description": "Autonomous iteration with spec-driven quality gates. Command-based stop hooks for deterministic termination, file-based state for cross-session recovery.",
+  "version": "2.0.0",
+  "description": "Autonomous iteration with wave-based parallel execution. Ralph Wiggum mechanics: atomic tasks, parallel subagents, self-unblocking via counsel.",
   "keywords": ["autonomous", "iteration", "loop", "spec-driven", "prd-mode", "ralph-bridge"],
   "author": {
     "name": "Saad Shahd",

@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [loop@2.0.0, hope@0.17.0, counsel@0.10.0] - 2026-02-04
+
 ### Added
 
 - **loop**: Ralph Wiggum wave-based execution mechanics
