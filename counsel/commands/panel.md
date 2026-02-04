@@ -81,6 +81,78 @@ When panel splits with no resolution: flag as "GENUINE TRADEOFF — requires you
 
 ---
 
+## Clarification Mode (Loop Integration)
+
+When invoked with `clarify {dimension} for: {spec}` pattern:
+
+### Process
+
+1. **Parse dimension** — Identify which spec dimension (Outcome/Scope/Constraints/Success/Done)
+
+2. **Select experts** — Use dimension mapping:
+   - Outcome → vision experts (Jobs, Graham, Kay, Victor)
+   - Scope → architecture experts (Fowler, Hickey, Feathers, Alexander)
+   - Constraints → engineering experts (Pike, Osmani, Hightower, Gregg)
+   - Success → quality experts (Norman, Majors, Zhuo, Beck)
+   - Done → delivery experts (Cagan, Humble, Newman)
+
+3. **Generate options** — Each expert proposes a concrete clarification
+   - Specific and measurable
+   - Include brief reasoning from expert's philosophy
+
+4. **Format response:**
+   ```
+   ### Clarification Options: {Dimension}
+
+   **[Expert A descriptor]** recommends:
+   "[Specific, measurable clarification]"
+   _Reasoning: [Why from their philosophy]_
+
+   **[Expert B descriptor]** recommends:
+   "[Alternative clarification]"
+   _Reasoning: [Why from their philosophy]_
+
+   **[Expert C descriptor]** recommends:
+   "[Another angle]"
+   _Reasoning: [Why from their philosophy]_
+   ```
+
+### Extended Aspect Mappings
+
+For aspects beyond the 5 core dimensions:
+
+| Aspect | Experts |
+|--------|---------|
+| **Design** | Norman, Zhuo, Frost, Alexander |
+| **UI** | Abramov, Osmani, Perry, Wathan |
+| **UX** | Norman, Zhuo, Victor, Case |
+| **Innovation** | Jobs, Kay, Victor, Matuschak |
+
+### Example
+
+```
+/counsel:panel clarify outcome for: make auth better
+```
+
+**Response:**
+```
+### Clarification Options: Outcome
+
+**A user experience expert (8/10)** recommends:
+"Users complete login in under 3 seconds with zero failed attempts"
+_Reasoning: Outcome should be measurable from user's perspective_
+
+**A pragmatic systems thinker (7/10)** recommends:
+"Reduce auth code complexity by 50%, making it modifiable in one sitting"
+_Reasoning: Simpler code = easier to iterate, which is the real unlock_
+
+**A systems architect (8/10)** recommends:
+"Auth becomes a composable module usable across all products"
+_Reasoning: Building blocks over bespoke solutions_
+```
+
+---
+
 ## Stuck Mode (Loop Integration)
 
 When invoked with `stuck on [task]: [error]` pattern (from loop:start):

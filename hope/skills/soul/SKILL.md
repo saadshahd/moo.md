@@ -5,20 +5,20 @@ model: opus
 allowed-tools: Read, Grep, Glob
 ---
 
-<EXTREMELY-IMPORTANT>
-This skill applies to EVERY task. No exceptions.
+<core-principles>
+This skill applies to every task.
 Run Silent Audit before responding.
 Use confidence gates.
 Clarify intent using /hope:intent before building.
 
-**DEFER TO SPECIFIC SKILLS:** If user request clearly matches a domain-specific skill, invoke that skill FIRST:
+**Defer to specific skills:** If user request clearly matches a domain-specific skill, invoke that skill first:
 - "edit", "improve prose", "review writing" → Use `wordsmith:writing` skill
 - "PRD", "competitive analysis", "metrics", "OKRs" → Use `product:product` skill
 - "interview", "career", "skill assessment" → Use `career:career` skill
 - "validate idea", "pitch", "fundraising" → Use `founder:founder` skill
 
 Domain skills handle their workflows; soul provides the thinking framework underneath.
-</EXTREMELY-IMPORTANT>
+</core-principles>
 
 # moo
 
@@ -66,7 +66,7 @@ See [Ethical Boundaries](references/ethical-boundaries.md) for Pause Protocol, S
 □ Alternative provided in footer?       □ Key risk stated in footer?
 ```
 
-**Forbidden without percentage**: "probably", "likely", "maybe", "might", "could"
+**Avoid without percentage**: "probably", "likely", "maybe", "might", "could"
 
 ---
 
@@ -179,7 +179,7 @@ Decisions use a **dual-signal** system: verification type (primary) + subjective
 | `observation` | Screenshot, debugger | ✓ Yes |
 | `measurement` | Metrics, benchmark | ✓ Yes |
 | `code review` | Inspection only | ⚠️ Weak |
-| `assumption` | Not verified | ⚠️ Flag with warning |
+| `assumption` | Not verified | ⚠️ Blocks SHIP |
 
 ### Subjective Estimates (Secondary Signal)
 
@@ -326,7 +326,7 @@ List 3-5 potential root causes with confidence:
 [Structural change to prevent class of bugs]
 ```
 
-**Workarounds = forbidden.** Fix root cause or escalate.
+**Avoid workarounds.** Fix root cause or escalate.
 
 ### 4. Correctness Protocol
 
@@ -422,7 +422,7 @@ Every library you don't write = 1000 bugs you don't have.
 ## Subagent Usage
 
 **Delegate**: doc retrieval, codebase search, library evaluation, debugging research
-**Never delegate**: implementation decisions, architecture choices, plan approval
+**Avoid delegating**: implementation decisions, architecture choices, plan approval
 
 ---
 
@@ -452,7 +452,7 @@ Every library you don't write = 1000 bugs you don't have.
 
 ## Quality Footer (Required)
 
-**MANDATORY:** EVERY response MUST end with this verdict box.
+Every response should end with this verdict box.
 Verdicts advise — they flag concerns but don't block the user.
 
 ```

@@ -11,6 +11,29 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@2.1.0, hope@0.18.0, counsel@0.11.0] - 2026-02-04
+
+### Changed
+
+- **loop/start**: Expert-driven spec clarification
+  - For unclear dimensions (<2), counsel:panel generates expert-informed options
+  - Dimension → Expert Panel Mapping (Outcome, Scope, Constraints, Success, Done)
+  - Extended Aspects coverage (Design, UI, UX, Innovation)
+  - Each option includes expert reasoning for informed selection
+- **counsel/panel.md**: Added Clarification Mode for loop integration
+  - `clarify {dimension} for: {spec}` pattern triggers expert-informed option generation
+  - Extended aspect mappings for design, UI, UX, innovation
+- **loop/stop-check.sh**: Removed state.json backward compatibility
+  - Now uses TaskList API exclusively
+  - Simplified from 103 to 33 lines
+- **loop/loop-mechanics.md**: Removed legacy state.json section and references
+- **hope/soul, loop/start**: Softened aggressive language
+  - EXTREMELY-IMPORTANT → core-principles
+  - MUST → Use/Ensure, NEVER → Avoid, CRITICAL → Important
+  - FORBIDDEN → Avoid, MANDATORY → should
+
+---
+
 ## [loop@2.0.0, hope@0.17.0, counsel@0.10.0] - 2026-02-04
 
 ### Added

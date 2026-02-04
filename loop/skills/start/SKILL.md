@@ -74,6 +74,82 @@ Score the user request on 5 dimensions (0-2 each, max 10):
 
 ---
 
+## Step 1.5: Expert-Driven Clarification (if score <5)
+
+For each dimension scoring <2, invoke counsel:panel to generate expert-informed options.
+
+### Dimension → Expert Panel Mapping
+
+| Dimension | Experts | Focus |
+|-----------|---------|-------|
+| **Outcome** | Jobs, Graham, Kay, Victor | Vision, impact, what "done" looks like |
+| **Scope** | Fowler, Hickey, Feathers, Alexander | Boundaries, simplicity, patterns |
+| **Constraints** | Pike, Osmani, Hightower, Gregg | Engineering limits, performance, ops |
+| **Success** | Norman, Majors, Zhuo, Beck | Quality, observability, UX, testing |
+| **Done** | Cagan, Humble, Newman | Delivery, release criteria, ship gates |
+
+### Extended Aspects
+
+| Aspect | Experts |
+|--------|---------|
+| **Design** | Norman, Zhuo, Frost, Alexander |
+| **UI** | Abramov, Osmani, Perry, Wathan |
+| **UX** | Norman, Zhuo, Victor, Case |
+| **Innovation** | Jobs, Kay, Victor, Matuschak |
+
+### Protocol
+
+1. **Identify unclear dimensions** — Which scored 0 or 1?
+
+2. **For each unclear dimension:**
+   ```
+   Skill(skill="counsel:panel", args="clarify {dimension} for: {spec}")
+   ```
+   Panel returns 3-4 expert-recommended approaches.
+
+3. **Present options:**
+   ```
+   AskUserQuestion:
+     question: "How would you describe the {dimension}?"
+     options:
+       - Expert A's recommendation (with reasoning)
+       - Expert B's recommendation (with reasoning)
+       - Expert C's recommendation (with reasoning)
+   ```
+   User can select an expert option or provide custom input via "Other".
+
+4. **Apply selection** — Update spec with clarified dimension
+
+5. **Re-score** — After all dimensions clarified, re-score spec
+
+### Example: Unclear Outcome
+
+For "loop - make auth better":
+- Outcome scores 0 ("make better" is vague)
+
+Panel invocation:
+```
+counsel:panel "clarify outcome for: make auth better"
+```
+
+Panel response:
+- Jobs-perspective: "Users complete login 50% faster"
+- Graham-perspective: "Reduce code complexity, easier to modify"
+- Kay-perspective: "Auth becomes composable building block"
+
+AskUserQuestion:
+```
+question: "What outcome do you want for auth?"
+options:
+  - "Users complete login faster" (Jobs: user-centric)
+  - "Simpler code, easier to change" (Graham: pragmatic)
+  - "Composable auth system" (Kay: systemic)
+```
+
+User selects → Outcome now scores 2.
+
+---
+
 ## Step 2: Shape Generation (if score ≥5)
 
 Invoke shape skill to get implementation approach:
@@ -157,7 +233,7 @@ IF stuckCount >= 1:
   Retry with new approach
 ```
 
-**No human escalation.** Only pause at max iterations.
+Pauses only at max iterations (no mid-loop human escalation).
 
 ### Progress Update
 

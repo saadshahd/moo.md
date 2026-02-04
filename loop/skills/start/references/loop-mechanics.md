@@ -115,34 +115,9 @@ Human-readable progress file in `.loop/PROGRESS.md`:
 - Counsel consulted: No
 ```
 
-### Legacy: .loop/state.json
-
-For backward compatibility, the stop hook also checks `.loop/state.json`:
-
-```json
-{
-  "spec": "original user request",
-  "criteria": ["tests pass", "lint clean"],
-  "criteriaStatus": {
-    "tests pass": {"met": false, "verification": "assumption"},
-    "lint clean": {"met": true, "verification": "execution output"}
-  },
-  "exit_signal": false,
-  "status": "in_progress",
-  "circuitBreaker": {
-    "stuckCount": 0,
-    "lastUnmet": "tests pass"
-  }
-}
-```
-
 ## Stop Hook
 
-The stop hook reads from stdin (not environment variables) and checks:
-
-1. **stop_hook_active** → If true, allow stop (prevents infinite loops)
-2. **TaskList** → If CLAUDE_CODE_TASK_LIST_ID set, check task files
-3. **state.json** → Fall back to legacy state file
+The stop hook reads from stdin and checks TaskList state.
 
 ### Stop Decision Logic
 
@@ -153,12 +128,7 @@ The stop hook reads from stdin (not environment variables) and checks:
    - Check task files for pending/in_progress
    - None pending → {ok: true}
    - Tasks pending → {ok: false, reason: "pending tasks: ..."}
-4. If state.json exists:
-   - status = completed/cancelled → {ok: true}
-   - stuckCount >= 5 → {ok: true}
-   - ALL criteria true AND exit_signal true → {ok: true}
-   - Otherwise → {ok: false, reason: "..."}
-5. No state → {ok: true}
+4. No task list → {ok: true}
 ```
 
 ## Self-Unblocking
