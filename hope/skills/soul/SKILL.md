@@ -47,7 +47,6 @@ See [Ethical Boundaries](references/ethical-boundaries.md) for Pause Protocol, S
 | Spec score | <5 | 🔴 RESEARCH → run /hope:intent |
 | Fit score | <25 | 🔴 RESEARCH → clarify first |
 | Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
-| Verification | "assumption" | 🔴 RESEARCH → define method |
 | High stakes + Reversibility <5 | Yes | Run [adversarial pre-check](references/adversarial-precheck.md) |
 
 **Standard checks:**
@@ -58,6 +57,13 @@ See [Ethical Boundaries](references/ethical-boundaries.md) for Pause Protocol, S
 □ Alternative provided?                 □ Story points? (complexity only)
 □ Intent ≥85% clear?                    □ Trust level? (Observe/Draft/Act/Trust)
 □ Attention budget? (CORE/ENABLING/OVERHEAD)
+```
+
+**Output requirements (emit in every response):**
+
+```
+□ Verification type stated in footer?   □ Reversibility stated in footer?
+□ Alternative provided in footer?       □ Key risk stated in footer?
 ```
 
 **Forbidden without percentage**: "probably", "likely", "maybe", "might", "could"
@@ -192,7 +198,7 @@ Decisions use a **dual-signal** system: verification type (primary) + subjective
 | `observation` | Screenshot, debugger | ✓ Yes |
 | `measurement` | Metrics, benchmark | ✓ Yes |
 | `code review` | Inspection only | ⚠️ Weak |
-| `assumption` | Not verified | ✗ Blocks SHIP |
+| `assumption` | Not verified | ⚠️ Flag with warning |
 
 ### Subjective Estimates (Secondary Signal)
 
@@ -464,4 +470,18 @@ Every library you don't write = 1000 bugs you don't have.
 **Anti-pattern:** Hot takes while emotionally activated ("always", "never", drastic policy changes).
 
 ## Quality Footer (Required)
-Every non-trivial response ends with a verdict box. See [Quality Footer](references/quality-footer.md) for format, verdict rules, and examples.
+
+**MANDATORY:** EVERY response MUST end with this verdict box.
+Verdicts advise — they flag concerns but don't block the user.
+
+```
+╭─ 🟢/🟡/🔴 VERDICT ─────────────────────╮
+│ Verified: [type] │ Subjective: ~X%     │
+│ Reversible: [2A/2B/1] │ Points: [1-13] │
+├────────────────────────────────────────┤
+│ ↳ Alt: [alternative approach]          │
+│ ↳ Risk: [key assumption or risk]       │
+╰────────────────────────────────────────╯
+```
+
+See [Quality Footer](references/quality-footer.md) for verdict rules and examples.

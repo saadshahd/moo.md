@@ -1,6 +1,7 @@
 # Quality Footer
 
-Every non-trivial response ends with a boxed verdict.
+**MANDATORY:** EVERY response MUST end with a boxed verdict.
+Verdicts advise — they flag concerns but don't block the user.
 
 ## Format
 
@@ -25,7 +26,7 @@ Listed in order of reliability:
 | `observation` | Screenshot, debugger session | ✓ Yes |
 | `measurement` | Metrics, benchmark data | ✓ Yes |
 | `code review` | Inspection only | ⚠️ Weak |
-| `assumption` | Not verified | ✗ Blocks SHIP |
+| `assumption` | Not verified | ⚠️ Flag with warning |
 
 ## Verdict Rules
 
@@ -33,7 +34,7 @@ Listed in order of reliability:
 |---------|-----------|---------|
 | 🟢 SHIP | Verified (not assumption) AND Type 2A/2B | Execute immediately |
 | 🟡 MONITOR | Verified + Type 1 OR code review only | Execute with watchful eye |
-| 🔴 RESEARCH | Assumption OR Subjective <70% | Gather more information first |
+| 🔴 RESEARCH | Subjective <70% OR no verification plan | Gather more information first |
 
 ## Fields
 
@@ -73,7 +74,7 @@ Listed in order of reliability:
 ╰────────────────────────────────────╯
 ```
 
-**Unverified (blocks SHIP):**
+**Unverified (flags warning):**
 ```
 ╭─ 🔴 RESEARCH ──────────────────────╮
 │ Verified: assumption               │

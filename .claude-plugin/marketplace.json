@@ -61,13 +61,6 @@
       "description": "Autonomous iteration with spec-driven quality gates. Uses Tasks API for state, Stop hooks for intelligent termination.",
       "category": "core",
       "keywords": ["autonomous", "iteration", "persist", "continue", "until-done", "multi-step"]
-    },
-    {
-      "name": "playground",
-      "source": "./playground",
-      "description": "Interactive HTML playgrounds for temporal exploration. Visualize systems and timelines, then extract insights.",
-      "category": "domain",
-      "keywords": ["playground", "visualization", "system-dynamics", "timeline", "feedback-loops", "10-10-10"]
     }
   ]
 }

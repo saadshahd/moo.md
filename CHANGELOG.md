@@ -11,6 +11,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@0.16.0] - 2026-02-04
+
+### Fixed
+
+- **hope/soul**: Quality footer regression — footer stopped appearing after recent changes
+  - Root cause: Commit a949b47 (Jan 29) condensed Silent Audit checklist, losing explicit output reminders
+  - Root cause: Commit ae4b3bf (Feb 2) softened gate from blocker to advisory without syncing quality-footer.md
+  - Fix: Added explicit "Output requirements" checklist to Silent Audit (verification, reversibility, alternative, risk)
+  - Fix: Synced quality-footer.md with advisory philosophy (`assumption` → ⚠️ Flag with warning)
+  - Fix: Strengthened footer emission directive with inline template and MANDATORY language
+  - Fix: Removed `assumption` from blocking table (now flags, doesn't force verdict)
+  - Fix: Updated verdict rules — RESEARCH triggered by low confidence OR no verification plan, not assumption alone
+
+### Changed
+
+- **hope/soul**: Quality Footer section now includes inline template (not just reference link)
+- **hope/soul**: Verification Gates table updated — `assumption` now flags warning instead of blocking SHIP
+- **hope/references/quality-footer.md**: Updated to advisory philosophy — verdicts advise, don't block
+
+### Removed
+
+- **playground**: Deleted plugin entirely (user requested removal)
+  - Removed playground directory
+  - Removed from marketplace.json
+
+---
+
 ## [hope@0.15.0, loop@1.7.0, product@0.9.0, counsel@0.9.0, career@0.6.0, design@0.6.0, wordsmith@0.6.0] - 2026-02-03
 
 ### Added
