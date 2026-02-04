@@ -1,0 +1,15 @@
+name: hope-verify-lock-criteria
+description: Verify skill locks criteria after shape generation
+plugin: hope
+skill: hope:verify
+flaky: true
+acceptableSkills:
+  - verify
+  - hope:verify
+  - shape
+  - hope:shape
+prompt: "Lock the acceptance criteria from the shape output into boolean verification commands"
+expectedBehaviors:
+  - "Criteria converted to boolean"
+  - "Verification commands generated"
+  - "Tool discovery attempted"

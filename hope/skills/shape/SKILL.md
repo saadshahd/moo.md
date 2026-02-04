@@ -131,6 +131,34 @@ See [shape-template.md](references/shape-template.md) for full template.
 
 ---
 
+## Verify Integration
+
+After generating SHAPE.md, trigger verify to lock criteria:
+
+```
+Skill(skill="hope:verify", args="lock criteria from shape")
+```
+
+This:
+1. Converts criteria to boolean checks
+2. Discovers project verification tools
+3. Generates verification commands per criterion
+4. Stores in `.loop/verify-config.json`
+
+**Output appended to SHAPE.md:**
+
+```markdown
+### Verification Commands (Auto-generated)
+
+| Criterion | Boolean | Command |
+|-----------|---------|---------|
+| [Criterion 1] | [Exact condition] | `[verification command]` |
+
+Tools discovered: test=`npm test`, lint=`npm run lint`
+```
+
+---
+
 ## Modes
 
 ### Present Mode (Default)

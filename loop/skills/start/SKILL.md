@@ -221,6 +221,19 @@ Task(prompt="Execute: {subject}. {description}", subagent_type="general-purpose"
    - Success → `TaskUpdate(taskId, status="completed")`
    - Failed → Increment stuckCount, check for stuck handling
 
+### Quick Verification After Task
+
+After each task completes, run quick verify:
+
+```
+Skill(skill="hope:verify", args="quick")
+```
+
+Quick tier (< 5s): fastest discovered check only. If fails:
+- Don't mark task complete
+- Escalate to standard tier for diagnostics
+- Fix issue before proceeding
+
 ### Stuck Handling
 
 When task fails (verification command doesn't pass):
@@ -272,12 +285,19 @@ After each wave:
 
 When all tasks have status="completed":
 
-1. Invoke verification gate:
+1. Run thorough verification:
+```
+Skill(skill="hope:verify", args="thorough")
+```
+
+Thorough tier (< 2min): all checks + criterion-specific commands + evidence.
+
+2. Invoke verification gate:
 ```
 Skill(skill="hope:gate", args="loop completion verification")
 ```
 
-2. If gate passes, emit completion:
+3. If gate passes (verify passed), emit completion:
 ```
 <loop-complete>
 All tasks verified:

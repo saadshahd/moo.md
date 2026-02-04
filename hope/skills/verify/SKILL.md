@@ -1,23 +1,13 @@
 ---
 name: verify
-description: Define and execute machine-verifiable acceptance criteria. Use before building to lock criteria, after building to run verification. Triggers on "verify this works", "acceptance criteria", "how do we test", "prove it works", "machine-verifiable".
+description: Define and execute machine-verifiable acceptance criteria with tiered verification. Use before building to lock criteria, after building to run verification. Triggers on "verify this works", "acceptance criteria", "how do we test", "prove it works", "machine-verifiable".
 model: sonnet
-allowed-tools: Read, Bash, Glob
+allowed-tools: Read, Bash, Glob, AskUserQuestion
 ---
 
 # verify
 
-Machine-verifiable over ambiguous. Acceptance criteria must be boolean.
-
-## When to Use
-
-| Trigger | Action |
-| ------- | ------ |
-| Before building feature | Lock acceptance criteria |
-| After claiming "done" | Execute verification |
-| User asks "how do we test this" | Define verification plan |
-| Vague success criteria exist | Convert to boolean checks |
-| Browser/UI verification needed | Use agent-browser workflow |
+Machine-verifiable acceptance criteria with tiered execution and tool discovery.
 
 ## Core Principle
 
@@ -25,103 +15,281 @@ Machine-verifiable over ambiguous. Acceptance criteria must be boolean.
 
 Every acceptance criterion must be:
 - **Boolean**: Pass or fail, no "partial"
-- **Automated**: Runnable without human judgment
+- **Automated**: Runnable without human judgment (or explicit manual fallback)
 - **Specific**: One thing, not "works well"
 - **Independent**: Fails alone, not with others
 
-## Phase 1: Lock Criteria (Before Building)
+---
+
+## Modes
+
+| Mode | When | Action |
+|------|------|--------|
+| **Lock** | Before building (after shape) | Convert criteria to boolean, discover tools, generate commands |
+| **Execute** | After building (claiming done) | Run verification commands, collect evidence |
+
+---
+
+## Verification Tiers
+
+| Tier | Budget | When | Purpose |
+|------|--------|------|---------|
+| **Quick** | < 5s | Mid-task, in-progress | Velocity — fastest check only |
+| **Standard** | < 30s | After atomic task | Balance — catch obvious failures |
+| **Thorough** | < 2min | Claiming done | Quality — prove with evidence |
+
+See [tiers.md](references/tiers.md) for tier selection logic.
+
+---
+
+## Phase 1: Tool Discovery
+
+**Before running any verification, discover what tools the project uses.**
+
+### Discovery Protocol
+
+1. Detect project type from config files
+2. Extract verification commands from scripts
+3. Fall back to common conventions
+4. **Ask user if ambiguous or nothing found**
+
+### Project Detection
+
+| File | Project Type |
+|------|--------------|
+| `package.json` | Node.js / TypeScript |
+| `pyproject.toml` | Python |
+| `Cargo.toml` | Rust |
+| `go.mod` | Go |
+| `Makefile` | Check targets |
+
+### Extract Commands
+
+```bash
+# Prefer project scripts
+jq -r '.scripts.test // empty' package.json
+jq -r '.scripts.lint // empty' package.json
+
+# Detect tools from dependencies
+jq -r '.devDependencies | keys[]' package.json | grep -E '^(vitest|jest|eslint|biome|typescript)$'
+```
+
+### When Nothing Detected
+
+```
+AskUserQuestion:
+  question: "What verification commands should I run?"
+  header: "Verify"
+  options:
+    - label: "npm test"
+      description: "Run package.json test script"
+    - label: "pytest"
+      description: "Run Python tests"
+    - label: "make test"
+      description: "Run Makefile test target"
+```
+
+See [tool-discovery.md](references/tool-discovery.md) for full protocol.
+
+---
+
+## Phase 2: Lock Criteria (Before Building)
+
+Convert each acceptance criterion to a boolean check with verification command.
 
 ### Criterion Types
 
-| Type | Example | Verification Method |
-| ---- | ------- | ------------------- |
-| Exit code | Command returns 0 | `bash -c "cmd; echo $?"` |
-| String presence | Output contains "Success" | `grep -q "Success"` |
+| Type | Example | Verification |
+|------|---------|--------------|
+| Exit code | Command returns 0 | `cmd && echo PASS` |
+| String presence | Output contains "Success" | `cmd \| grep -q "Success"` |
 | HTTP status | API returns 200 | `curl -s -o /dev/null -w "%{http_code}"` |
-| File existence | Config file created | `test -f path/to/file` |
-| JSON shape | Response has `.data.id` | `jq -e '.data.id'` |
-| Element visible | Button appears on page | `agent-browser snapshot` + ref check |
-| State change | Database row updated | Query before/after comparison |
+| File existence | Config created | `test -f path/to/file` |
+| JSON shape | Response has `.data.id` | `curl -s URL \| jq -e '.data.id'` |
+| Element visible | Button on page | Screenshot + vision |
 
-### Criteria Template
+### Lock Output
 
-```
-## Acceptance Criteria
+```markdown
+## Locked Criteria
 
-### Must Pass
-1. [Criterion]: [Exact verification command]
-2. [Criterion]: [Exact verification command]
-3. [Criterion]: [Exact verification command]
+| # | Criterion | Boolean | Command | Tier |
+|---|-----------|---------|---------|------|
+| 1 | Login returns token | POST /auth returns 200 with 'token' | `curl ... \| jq -e '.token'` | standard |
+| 2 | Invalid login fails | POST /auth with bad creds returns 401 | `curl ... -w "%{http_code}"` | standard |
+| 3 | Tests pass | Test suite exits 0 | `npm test` | thorough |
 
-### Must NOT
-1. [Anti-criterion]: [How to verify absence]
-2. [Anti-criterion]: [How to verify absence]
-
-### Verification Method
-Type: [execution output / observation / measurement]
-Tool: [bash / agent-browser / curl / test framework]
+## Discovered Tools
+- test: `npm test`
+- lint: `npm run lint`
+- types: `npx tsc --noEmit`
 ```
 
-## Phase 2: Execute Verification (After Building)
+---
 
-### CLI Verification
+## Phase 3: Execute Verification (After Building)
+
+Run verification based on tier.
+
+### Quick Tier
 
 ```bash
-# Exit code check
-command_here && echo "PASS" || echo "FAIL"
-
-# String presence
-output=$(command_here)
-echo "$output" | grep -q "expected" && echo "PASS" || echo "FAIL"
-
-# HTTP status
-status=$(curl -s -o /dev/null -w "%{http_code}" URL)
-[ "$status" = "200" ] && echo "PASS" || echo "FAIL"
+# Single fastest check
+npm run lint 2>&1 | head -20
+echo "Exit: $?"
 ```
 
-### Browser Verification (agent-browser)
+Output:
+```
+[VERIFY:quick] ✓ passed (2.1s)
+```
 
-For UI/browser verification, use agent-browser CLI:
+### Standard Tier
 
 ```bash
-# 1. Open page
-agent-browser open http://localhost:3000
-
-# 2. Get interactive snapshot with refs
-agent-browser snapshot -i
-
-# 3. Verify element exists by ref
-agent-browser get text @e1  # Get text of element
-
-# 4. Interact if needed
-agent-browser click @e2
-agent-browser fill @e3 "test input"
-
-# 5. Re-snapshot after interaction
-agent-browser snapshot -i
-
-# 6. Screenshot for evidence
-agent-browser screenshot evidence.png
-
-# 7. Close
-agent-browser close
+# All discovered checks
+npm run lint && npm run typecheck && npm test
 ```
 
-**Why agent-browser:**
-- 93% less context than MCP servers
-- No config required
-- Accessibility-based refs (`@e1`) are stable
-- Works via Bash (no MCP setup)
+Output:
+```
+[VERIFY:standard] ✓ All checks passed (18.4s)
+  ✓ Lint: clean
+  ✓ Types: clean
+  ✓ Tests: 47 passed
+```
 
-### Verification Output
+### Thorough Tier
+
+Run all checks + criterion-specific commands + evidence collection.
+
+Output:
+```
+[VERIFY:thorough] ✓ SHIP — All criteria verified (1m 12s)
+
+## Criteria Results
+| Criterion | Result | Evidence |
+|-----------|--------|----------|
+| Login returns token | PASS | Response: {"token":"eyJ..."} |
+| Invalid login fails | PASS | Status: 401 |
+| Tests pass | PASS | 47/47 passed |
+
+## Code Checks
+✓ Lint: clean
+✓ Types: clean
+✓ Tests: 47/47 (coverage: 87%)
+
+verification_type: execution output
+confidence: ~92%
+```
+
+---
+
+## Visual Verification
+
+Only when criteria involve UI elements.
+
+### Provider Selection
 
 ```
-## Verification Results
+IF $GEMINI_API_KEY exists → Use Gemini (better at visuals, cheaper)
+ELSE → Use Claude vision
+On Gemini failure → Fallback to Claude
+```
+
+### If No Visual Framework
+
+```
+AskUserQuestion:
+  question: "How should I verify the UI?"
+  header: "Visual"
+  options:
+    - label: "I'll provide screenshots"
+      description: "Take screenshots manually, share path"
+    - label: "Skip visual verification"
+      description: "Trust code changes are correct"
+```
+
+See [tools-visual.md](references/tools-visual.md) for visual verification.
+
+---
+
+## Integration Points
+
+### After hope:shape
+
+```
+Skill(skill="hope:verify", args="lock criteria from shape")
+```
+
+Locks criteria as boolean, discovers tools, generates commands.
+
+### After Atomic Task (Loop)
+
+```
+Skill(skill="hope:verify", args="quick")
+```
+
+Quick tier only — don't slow execution.
+
+### Before Claiming Done
+
+```
+Skill(skill="hope:verify", args="thorough")
+```
+
+Full verification with evidence before gate.
+
+See [integration-points.md](references/integration-points.md) for flow diagram.
+
+---
+
+## Expert Consultation
+
+### For Verification Strategy
+
+When locking criteria, optionally consult testing experts:
+
+```
+Skill(skill="counsel:panel", args="verification strategy for: {criteria}")
+```
+
+**Experts:** Beck (TDD), Fowler (testing patterns), Norman (UX verification)
+
+### For Failure Diagnosis
+
+When verification fails:
+
+```
+Skill(skill="counsel:panel", args="verification failed: {error}")
+```
+
+**Experts:** Hickey (root cause), Pike (debugging), Gregg (performance)
+
+---
+
+## Verification Output Format
+
+### During Lock
+
+```
+[VERIFY:lock] Criteria locked | {N} criteria | Tools: {discovered}
+```
+
+### During Execute
+
+```
+[VERIFY:{tier}] {✓/✗} {summary} ({time})
+```
+
+### Final Report
+
+```
+## Verification Report
 
 | Criterion | Command | Result | Evidence |
-| --------- | ------- | ------ | -------- |
-| [Criterion 1] | `[cmd]` | PASS/FAIL | [output or screenshot] |
-| [Criterion 2] | `[cmd]` | PASS/FAIL | [output or screenshot] |
+|-----------|---------|--------|----------|
+| ... | ... | PASS/FAIL | ... |
 
 ### Summary
 - Total: X criteria
@@ -130,62 +298,51 @@ agent-browser close
 
 ### Verdict
 [ALL PASS → SHIP] or [ANY FAIL → list failures]
+
+verification_type: {execution output / observation / assumption}
 ```
 
-## Criterion Quality Checks
+---
 
-Before accepting criteria, verify:
+## No Tools? No Problem.
+
+When project has no verification tools configured:
+
+1. **Check for scripts:** `npm test`, `make test`, etc.
+2. **Generate curl commands:** For API criteria
+3. **Ask user:** What commands to run
+4. **Manual fallback:** List what to verify, ask user to confirm
 
 ```
-[ ] Boolean? (not "works well", "looks good")
-[ ] Automated? (no human judgment required)
-[ ] Specific? (one thing per criterion)
-[ ] Independent? (fails alone)
-[ ] Fast? (< 30 seconds per check)
+[VERIFY:manual] Requires human verification
+
+Please verify:
+1. [ ] Login button visible on /login
+2. [ ] Form submits without errors
+
+Reply "verified" when confirmed.
 ```
 
-## Converting Vague to Boolean
-
-| Vague | Boolean |
-| ----- | ------- |
-| "Works correctly" | "Returns exit code 0" |
-| "Looks good" | "Element @login-btn visible in snapshot" |
-| "Fast enough" | "Response time < 200ms" |
-| "User can log in" | "After fill @email + fill @password + click @submit, snapshot contains 'Dashboard'" |
-| "Data is saved" | "GET /api/item/123 returns 200 with body containing submitted values" |
-| "Handles errors" | "Invalid input returns 400 with error.message present" |
+---
 
 ## Anti-Patterns
 
 | Bad | Good |
-| --- | ---- |
-| "Verify it works" | List specific boolean criteria |
-| Manual verification for automatable checks | Script the check |
-| "I looked and it seems fine" | Show command output |
-| Criteria defined after building | Lock criteria before building |
-| Single criterion for complex feature | One criterion per behavior |
-| "The tests pass" | Show test output as evidence |
+|-----|------|
+| Assume tsc exists | Discover from package.json |
+| Run vitest without checking | Check devDependencies first |
+| Skip verification if no tools | Ask user for commands |
+| Same rigor for quick and thorough | Tier-appropriate checks |
+| "Tests pass" without output | Show test output as evidence |
 
-## Integration with gate
+---
 
-`verify` defines WHAT to check. `gate` defines WHEN to check.
+## References
 
-```
-verify (before building) → define criteria
-  ↓
-build feature
-  ↓
-gate (before claiming done) → triggers verify execution
-  ↓
-verify (after building) → execute and report
-```
-
-## Common Rationalizations (All Wrong)
-
-| Thought | Reality |
-| ------- | ------- |
-| "This is too simple to need criteria" | Simple things break production too |
-| "I'll know it when I see it" | Subjective ≠ verifiable |
-| "The user will test it" | Your job to prove it works |
-| "Tests cover this" | Show test output, not assumption |
-| "It worked in dev" | Verify in target environment |
+- [tiers.md](references/tiers.md) — Quick/Standard/Thorough definitions
+- [tool-discovery.md](references/tool-discovery.md) — How to find project tools
+- [tools-code.md](references/tools-code.md) — Code verification tools
+- [tools-visual.md](references/tools-visual.md) — Visual verification tools
+- [tools-api.md](references/tools-api.md) — API verification tools
+- [tools-llm.md](references/tools-llm.md) — LLM output verification
+- [integration-points.md](references/integration-points.md) — Where verify triggers

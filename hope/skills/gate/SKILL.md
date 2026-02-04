@@ -41,6 +41,21 @@ Run before substantial work begins. Blocks execution if missing.
 
 ## Post-Work Gate (Before Claiming Done)
 
+### Verify Integration
+
+Before running workflow-specific checks, ensure verify passed:
+
+```
+□ hope:verify thorough tier passed?
+  → Check .loop/verify-config.json for results
+  → All criteria must show PASS
+  → Evidence must be captured
+```
+
+If verify not run or failed → block gate until verify passes.
+
+---
+
 ## Workflow A: Build
 
 ```
@@ -80,6 +95,16 @@ Run before substantial work begins. Blocks execution if missing.
 | `assumption` | Not verified | ⚠️ Flag with warning |
 
 Default: Require `execution output`, `observation`, or `measurement` before completion claims.
+
+### Verification Tiers (from hope:verify)
+
+| Tier | When | What Gate Expects |
+|------|------|-------------------|
+| Quick | Mid-task | Not checked by gate |
+| Standard | After task | Passing status |
+| Thorough | Before gate | Full evidence report |
+
+Gate requires **thorough** tier results before allowing completion claim.
 
 ### Boundary
 

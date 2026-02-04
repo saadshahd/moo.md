@@ -11,6 +11,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@0.19.0, loop@2.2.0] - 2026-02-04
+
+### Added
+
+- **hope/verify**: Complete redesign with tiered architecture
+  - Three verification tiers: Quick (<5s), Standard (<30s), Thorough (<2min)
+  - Tool discovery phase — detects project tools from package.json, pyproject.toml, Makefile
+  - AskUserQuestion fallback when tools not detected
+  - Lock mode (before building) + Execute mode (after building)
+  - Gemini visual verification as default when `GEMINI_API_KEY` exists, with Claude fallback
+  - Expert consultation integration (counsel:panel for strategy and failure diagnosis)
+  - 7 new reference files: tiers.md, tool-discovery.md, tools-code.md, tools-visual.md, tools-api.md, tools-llm.md, integration-points.md
+  - 4 new eval test cases: verify-tiered-quick, verify-tiered-thorough, verify-tool-discovery, verify-lock-criteria
+- **hope/shape**: Verify integration — triggers verify to lock criteria after shape generation
+- **loop/start**: Verify integration at two points:
+  - Quick verify after each atomic task completion
+  - Thorough verify before claiming done (before gate)
+- **hope/gate**: Verify integration — checks thorough tier results before allowing completion
+
+### Changed
+
+- **hope/verify**: No longer assumes specific tools (tsc, biome, etc.) — discovers from project
+- **hope/verify**: Tiered execution replaces single-mode verification
+- **hope/gate**: Verification tiers section added with tier expectations
+
+---
+
 ## [loop@2.1.0, hope@0.18.0, counsel@0.11.0] - 2026-02-04
 
 ### Changed
