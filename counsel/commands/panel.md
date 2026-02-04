@@ -78,3 +78,96 @@ Output log entry for `.claude/logs/counsel-reviews.jsonl` with: ts, topic, panel
 ## Escalation
 
 When panel splits with no resolution: flag as "GENUINE TRADEOFF — requires your judgment" and summarize both positions with citations.
+
+---
+
+## Stuck Mode (Loop Integration)
+
+When invoked with `stuck on [task]: [error]` pattern (from loop:start):
+
+### Process
+
+1. **Parse stuck context** — Extract task description, error message, failed approach
+2. **Select diagnostic experts** — Auto-select 2-3 experts based on domain (debugging, architecture, testing)
+3. **Generate diagnosis** — Each expert diagnoses the issue from their perspective
+4. **Build consensus** — Find agreed-upon approach or present options
+
+### Output Format
+
+```
+## Stuck Analysis: [task]
+
+**Error:** [error summary]
+**Failed Approach:** [what was tried]
+
+### Diagnosis
+
+**[Expert A descriptor] (X/10):** [diagnosis from their philosophy]
+**[Expert B descriptor] (Y/10):** [diagnosis from their philosophy]
+
+### Recommendations
+
+1. **[approach]** (confidence: X/10)
+   - Expert A supports because: [reason]
+   - Expert B adds: [reason]
+
+2. **[alternative approach]** (confidence: Y/10)
+   - Expert C suggests because: [reason]
+
+### Consensus Recommendation
+
+[Most agreed-upon approach with confidence level]
+
+### If Still Stuck
+
+[What to try if first recommendation fails]
+```
+
+### Example Invocation
+
+```
+/counsel:panel stuck on "Add ValidationError import to auth.ts": "Module not found: './errors'"
+```
+
+**Response:**
+```
+## Stuck Analysis: Add ValidationError import
+
+**Error:** Module not found: './errors'
+**Failed Approach:** Direct import from relative path
+
+### Diagnosis
+
+**A dependency expert (7/10):** The error indicates the module path is incorrect or the file doesn't exist. Check if errors.ts exists and the path is relative to auth.ts.
+
+**A project structure expert (8/10):** This is likely a path resolution issue. Verify the errors file location and whether you need @/ alias or different relative path.
+
+### Recommendations
+
+1. **Check file existence** (confidence: 8/10)
+   - Run: `ls -la src/errors.ts` or `find . -name "errors.ts"`
+   - If missing, create it first
+
+2. **Fix import path** (confidence: 7/10)
+   - If errors.ts is in different directory, adjust path
+   - Check tsconfig paths for aliases
+
+### Consensus Recommendation
+
+First verify the errors file exists, then adjust the import path based on actual location. (8/10 confidence)
+
+### If Still Stuck
+
+Check if ValidationError is exported from errors.ts. May need named export.
+```
+
+### Integration
+
+Loop invokes counsel:panel when:
+- Task fails verification (stuckCount >= 1)
+- Same error occurs twice
+
+Loop applies recommendation by:
+1. Extracting consensus recommendation
+2. Updating task approach based on diagnosis
+3. Retrying with new approach

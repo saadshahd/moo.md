@@ -9,6 +9,64 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **loop**: Ralph Wiggum wave-based execution mechanics
+  - Atomic task decomposition with "one sentence without and" test
+  - Wave detection: tasks with no blockedBy execute in parallel
+  - Parallel subagent spawning via Task tool
+  - TaskList API as source of truth (persists to ~/.claude/tasks/)
+  - Human-readable `.loop/PROGRESS.md` for status tracking
+  - `references/decomposition.md` — Atomic task format and guidelines
+  - `references/waves.md` — Wave execution protocol
+- **loop**: Self-unblocking via counsel integration
+  - First failure (stuckCount >= 1) triggers immediate counsel:panel
+  - No human escalation — only pause at max iterations
+  - User configures max iterations at loop start
+- **loop**: User configuration at loop start via AskUserQuestion
+  - Task list mode (new/resume/session-only)
+  - Max iterations (10/25/50/unlimited)
+  - Budget limit ($10/$25/$50/none)
+- **counsel**: Stuck mode for loop integration
+  - `stuck on [task]: [error]` pattern triggers diagnostic mode
+  - Expert diagnosis from multiple perspectives
+  - Consensus recommendation with confidence level
+  - 3 new eval test cases: stuck-unblock, panel-conflict, calibration-persistence
+- **hope/recall**: Expanded from 57 to 115 lines
+  - Capture guidance: when and what to capture
+  - Loop integration: automatic recall before decomposition
+  - Example learnings for each category
+  - Integration points documented
+
+### Changed
+
+- **loop/start**: Complete redesign with Ralph mechanics
+  - Architecture: spec scoring → shape generation → decomposition → wave execution → completion
+  - Auto-invoke hope:intent when spec score <5
+  - Auto-invoke hope:shape when spec score ≥5
+  - Completion gate via hope:gate before claiming done
+  - allowed-tools updated to include Task, TaskCreate, TaskUpdate, TaskList, TaskGet, Skill, AskUserQuestion
+- **loop/stop-check.sh**: Fixed stdin input parsing
+  - Changed from environment variable ($ARGUMENTS) to stdin (cat)
+  - Added stop_hook_active check to prevent infinite loops
+  - Added TaskList file reading for new wave-based state
+  - Maintains backward compatibility with .loop/state.json
+- **loop/loop-mechanics.md**: Rewritten for new architecture
+  - TaskList API as primary state management
+  - PROGRESS.md as human-readable secondary
+  - Stop hook stdin protocol documented
+  - Self-unblocking flow documented
+- **hope/soul**: Extracted references to reduce size
+  - Tool Pairings → references/tool-pairings.md
+  - Common Rationalizations → references/rationalizations.md
+  - Inline sections replaced with concise summaries + links
+- **counsel/panel.md**: Added stuck mode section for loop integration
+
+### Removed
+
+- **hope/agents/delve.md**: Deleted (native Explore is better)
+- **hope/references/design-patterns.md**: Deleted duplicate (keeping skill-judge version)
+
 ---
 
 ## [hope@0.16.0] - 2026-02-04

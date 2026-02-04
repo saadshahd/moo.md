@@ -1,81 +1,133 @@
 # Loop Mechanics
 
-## Command-Based Stop Hook
+## Architecture Overview
 
-The loop uses a **deterministic bash script** for stop decisions, not an LLM prompt. This ensures reliable, predictable behavior.
+```
+User Request
+    ↓
+┌─────────────────────────────────────────┐
+│            SPEC SCORING                 │
+│  Score request on 5 dimensions          │
+│  <5 → auto-invoke hope:intent           │
+│  ≥5 → proceed to shape                  │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│          SHAPE GENERATION               │
+│  Auto-invoke hope:shape                 │
+│  Extract criteria, mustNot, verification│
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│            DECOMPOSITION                │
+│  Parse into atomic tasks (TaskCreate)   │
+│  Set dependencies (TaskUpdate blockedBy)│
+│  Group into waves                       │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│          WAVE EXECUTION                 │
+│  Spawn parallel subagents per wave      │
+│  Each: execute → verify → report        │
+│  Stuck 1x → counsel:panel               │
+│  Continue until done or max iterations  │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│           COMPLETION                    │
+│  All tasks verified → hope:gate         │
+│  Emit <loop-complete>                   │
+└─────────────────────────────────────────┘
+```
 
-### Hook Configuration
+## State Management
+
+### Primary: TaskList API
+
+Claude Code's TaskList is the source of truth for task state.
+
+**Task creation:**
+```
+TaskCreate(
+  subject="Add ValidationError import",
+  description="Add import to src/auth.ts. Verify: grep 'ValidationError' src/auth.ts",
+  activeForm="Adding import"
+)
+```
+
+**Task metadata:**
+```
+TaskUpdate(taskId="1", metadata={
+  "wave": 1,
+  "loopId": "auth-validation",
+  "verification": "execution output",
+  "stuckCount": 0
+})
+```
+
+**Dependencies:**
+```
+TaskUpdate(taskId="4", addBlockedBy=["1", "3"])
+```
+
+### Persistence
+
+Tasks persist to disk at: `~/.claude/tasks/{CLAUDE_CODE_TASK_LIST_ID}/`
+
+```
+~/.claude/tasks/my-loop/
+├── .highwatermark    # Highest task ID
+├── .lock             # Concurrency lock
+├── 1.json            # Task 1
+├── 2.json            # Task 2
+└── ...
+```
+
+**Persistence verified across:**
+- Context compaction ✓
+- Session clear (`/clear`) ✓
+- New session (restart CLI) ✓
+- Across days ✓
+
+### Secondary: PROGRESS.md
+
+Human-readable progress file in `.loop/PROGRESS.md`:
+
+```markdown
+# Loop Progress: Add validation to auth
+
+**Status:** Wave 2 of 4 | Iteration 3 | Cost: $2.50/$25
+
+## ✅ Completed (Wave 1)
+- [x] T-001: Add ValidationError import to auth.ts
+- [x] T-002: Add ValidationError import to api.ts
+
+## 🔄 In Progress (Wave 2)
+- [ ] T-003: Create validation schema (assigned to subagent)
+- [ ] T-004: Implement validateToken
+
+## ⏳ Pending (Wave 3+)
+- [ ] T-005: Implement validateUser (blocked by T-003)
+
+## 📊 Metrics
+- Tasks: 2/6 complete
+- Stuck count: 0
+- Counsel consulted: No
+```
+
+### Legacy: .loop/state.json
+
+For backward compatibility, the stop hook also checks `.loop/state.json`:
 
 ```json
 {
-  "Stop": [{
-    "hooks": [{
-      "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-check.sh",
-      "timeout": 10
-    }]
-  }]
-}
-```
-
-### Stop Decision Logic
-
-The `stop-check.sh` script reads `.loop/state.json` and makes a deterministic decision:
-
-```
-1. No state file? → {ok: true} (no active loop)
-2. Status is "completed" or "cancelled"? → {ok: true}
-3. Circuit breaker stuckCount >= 5? → {ok: true}
-4. ALL criteriaStatus true AND exit_signal true? → {ok: true}
-5. Otherwise → {ok: false, reason: "unmet criteria: X, Y"}
-```
-
-### Why Command-Based?
-
-| Approach | Problem |
-|----------|---------|
-| Prompt-based | LLM cannot reliably read files, defaults to stopping |
-| Command-based | Bash script reads file directly, deterministic result |
-
----
-
-## Dual-Condition Exit
-
-The stop hook requires **both** conditions to allow stopping:
-
-1. **All `criteriaStatus` values are `true`**
-2. **`exit_signal` is `true`**
-
-### Why Both?
-
-| Condition | Purpose |
-|-----------|---------|
-| criteriaStatus | Tracks actual verification of each criterion |
-| exit_signal | Claude's explicit intent to complete |
-
-This prevents:
-- Premature stops when criteria not actually verified
-- Accidental stops from state file initialization
-- Stops when Claude hasn't confirmed completion
-
----
-
-## State File Schema
-
-```json
-{
-  "spec": "original user request verbatim",
-  "criteria": ["tests pass", "lint clean", "no type errors"],
+  "spec": "original user request",
+  "criteria": ["tests pass", "lint clean"],
   "criteriaStatus": {
     "tests pass": {"met": false, "verification": "assumption"},
-    "lint clean": {"met": true, "verification": "execution output"},
-    "no type errors": {"met": false, "verification": "assumption"}
+    "lint clean": {"met": true, "verification": "execution output"}
   },
   "exit_signal": false,
-  "steps": ["step1", "step2", "step3"],
-  "completedSteps": ["step1"],
-  "remainingSteps": ["step2", "step3"],
-  "iteration": 2,
   "status": "in_progress",
   "circuitBreaker": {
     "stuckCount": 0,
@@ -84,149 +136,146 @@ This prevents:
 }
 ```
 
-### Field Descriptions
+## Stop Hook
 
-| Field | Type | Description |
-|-------|------|-------------|
-| spec | string | Original user request, verbatim |
-| criteria | string[] | List of success criteria |
-| criteriaStatus | object | Map of criterion → {met, verification} |
-| exit_signal | boolean | True only when ALL criteria verified |
-| steps | string[] | Planned work steps |
-| completedSteps | string[] | Finished steps |
-| remainingSteps | string[] | Steps not yet done |
-| iteration | number | Current iteration count |
-| status | string | "in_progress", "completed", "cancelled" |
-| circuitBreaker | object | Stuck detection state |
+The stop hook reads from stdin (not environment variables) and checks:
 
-### Verification Types
+1. **stop_hook_active** → If true, allow stop (prevents infinite loops)
+2. **TaskList** → If CLAUDE_CODE_TASK_LIST_ID set, check task files
+3. **state.json** → Fall back to legacy state file
 
-Each criterion tracks how it was verified:
+### Stop Decision Logic
 
-| Type | Description | Blocks Exit? |
-|------|-------------|--------------|
-| `execution output` | Ran command, showed result | No |
-| `observation` | Screenshot, debugger session | No |
-| `measurement` | Metrics, benchmark data | No |
-| `code review` | Inspection only | No (⚠️ weak) |
-| `assumption` | Not verified | **Yes** |
-
-**Exit Blocked:** If any criterion has `verification: "assumption"`, exit_signal cannot be set to true.
-
-See [quality-footer.md](../../../hope/skills/soul/references/quality-footer.md) for verdict mapping.
-
-### Circuit Breaker Object
-
-```json
-{
-  "stuckCount": 0,
-  "lastUnmet": "tests pass"
-}
+```
+1. Read JSON from stdin
+2. If stop_hook_active → {ok: true}
+3. If TaskList ID set:
+   - Check task files for pending/in_progress
+   - None pending → {ok: true}
+   - Tasks pending → {ok: false, reason: "pending tasks: ..."}
+4. If state.json exists:
+   - status = completed/cancelled → {ok: true}
+   - stuckCount >= 5 → {ok: true}
+   - ALL criteria true AND exit_signal true → {ok: true}
+   - Otherwise → {ok: false, reason: "..."}
+5. No state → {ok: true}
 ```
 
-- `stuckCount`: Incremented when same criteria remain unmet across iterations
-- `lastUnmet`: First unmet criterion from previous iteration (for comparison)
+## Self-Unblocking
 
----
+When stuck (task fails verification):
+
+1. **First failure** → Increment stuckCount in task metadata
+2. **stuckCount >= 1** → Immediately invoke `/counsel:panel`
+3. **Apply recommendation** → Update approach based on expert consensus
+4. **Retry** → Execute with new approach
+5. **Only pause** → At max iterations (user-configurable)
+
+**No human escalation during loop.** Users configure max iterations at loop start.
+
+## Wave Execution Protocol
+
+```
+1. TaskList() → Get all tasks
+2. Filter: status="pending" AND blockedBy empty → Wave N
+3. For each task in wave:
+   - TaskUpdate(status="in_progress")
+   - Spawn subagent: Task(prompt="...", subagent_type="general-purpose")
+4. Wait for all subagents
+5. For each completed:
+   - Success → TaskUpdate(status="completed")
+   - Failure → Increment stuckCount, invoke counsel if ≥1
+6. Update PROGRESS.md
+7. Repeat until no pending tasks
+```
+
+## User Configuration
+
+At loop start, AskUserQuestion configures:
+
+1. **Task list mode:**
+   - New (project-based ID)
+   - Resume existing
+   - Session-only (no persistence)
+
+2. **Max iterations:**
+   - 10 (quick task)
+   - 25 (medium feature)
+   - 50 (large refactor)
+   - Unlimited
+
+3. **Budget limit:**
+   - $10, $25, $50, or no limit
 
 ## Session Resume
 
-The `session-resume.sh` script runs on SessionStart:
+SessionStart hook checks for active loops:
 
-1. Check if `.loop/state.json` exists
-2. If status is "in_progress", output resume announcement
-3. Otherwise, output empty message
+```bash
+# session-resume.sh
+# Check TaskList files and .loop/state.json
+# Announce resume if loop in progress
+```
 
-### Resume Announcement Format
-
+Resume announcement:
 ```
 [LOOP RESUME] Active loop detected
-Spec: [spec summary]
-Progress: N/M steps | Iteration: X
-Unmet criteria: [list]
-Next: [first remaining step]
+Spec: {summary}
+Progress: N/M tasks | Wave: X
+Next: {first pending task}
 ```
 
----
+## Completion
 
-## State Lifecycle
+When all tasks complete:
 
-### On Loop Start
+1. Invoke `hope:gate` for verification
+2. If gate passes → emit `<loop-complete>`
+3. If gate fails → create remediation tasks, continue loop
 
-1. Parse user spec
-2. Score against rubric
-3. Extract criteria from spec
-4. Decompose into steps
-5. Write initial `.loop/state.json`:
-   - All criteriaStatus values: `false`
-   - exit_signal: `false`
-   - status: `"in_progress"`
-   - circuitBreaker: `{stuckCount: 0, lastUnmet: ""}`
+```
+<loop-complete>
+All tasks verified:
+- T-001: ✓ Add ValidationError import
+- T-002: ✓ Create validation schema
+- T-003: ✓ Implement validateToken
+- T-004: ✓ Add tests
 
-### On Each Iteration
-
-1. Execute one step
-2. Run verification for affected criteria
-3. Update criteriaStatus based on verification
-4. Check circuit breaker:
-   - Get first unmet criterion
-   - If same as lastUnmet, increment stuckCount
-   - If different, reset stuckCount to 0
-   - Update lastUnmet
-5. If ALL criteriaStatus true, set exit_signal: true
-6. Write updated state file
-7. Output status block
-
-### On Completion
-
-1. Verify all criteriaStatus values are true
-2. Set exit_signal: true
-3. Set status: "completed"
-4. Write final state
-5. Output `<loop-complete>` marker
-
-### On Cancel
-
-1. Set status: "cancelled"
-2. Write state (preserves progress)
-3. Report completed/remaining work
-
----
+╭─ 🟢 SHIP ──────────────────────────╮
+│ Verified: execution output          │
+│ Tasks: 4/4 complete                 │
+│ Subjective: ~90% · Type 2B · 5pt   │
+├────────────────────────────────────┤
+│ ↳ Alt: Manual verification          │
+│ ↳ Risk: Edge cases in validation    │
+╰────────────────────────────────────╯
+</loop-complete>
+```
 
 ## Troubleshooting
 
 ### Loop stops too early
 
-**Cause:** State file missing, exit_signal true by accident, or criteriaStatus incorrect.
+**Cause:** Stop hook not reading stdin, or tasks not in TaskList.
 
 **Fix:**
-1. Verify `.loop/state.json` exists at loop start
-2. Ensure exit_signal starts as `false`
-3. Only set exit_signal `true` after verifying ALL criteria
+1. Verify stop hook reads from `cat` (stdin)
+2. Check CLAUDE_CODE_TASK_LIST_ID is set
+3. Verify task files exist in ~/.claude/tasks/
 
 ### Loop runs forever
 
-**Cause:** exit_signal never set to true, or criteriaStatus never updated.
+**Cause:** Tasks never completing, or dependencies circular.
 
 **Fix:**
-1. After each iteration, update criteriaStatus with actual verification results
-2. When ALL criteria pass, explicitly set exit_signal: true
-3. Check circuit breaker is incrementing stuckCount
+1. Check task verification commands
+2. Review blockedBy for cycles
+3. Check max iterations is set
 
-### Circuit breaker triggers unexpectedly
+### Counsel not invoked
 
-**Cause:** Same criterion failing repeatedly.
-
-**Fix:**
-1. Check the criterion is achievable
-2. Review the verification command for that criterion
-3. Consider if the approach needs to change
-
-### Session resume doesn't work
-
-**Cause:** State file missing or status not "in_progress".
+**Cause:** stuckCount not incrementing.
 
 **Fix:**
-1. Verify `.loop/state.json` exists
-2. Check status field is "in_progress"
-3. Ensure the file is valid JSON
+1. Verify task metadata includes stuckCount
+2. Check failure detection in subagent response

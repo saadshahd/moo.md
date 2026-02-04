@@ -4,16 +4,41 @@
 # Returns JSON: {ok: true} to stop, {ok: false, reason: "..."} to continue.
 #
 # CRITICAL: Must ALWAYS output valid JSON, never exit with error.
+# CRITICAL: Read input from stdin (Claude Code passes JSON via stdin, NOT env vars).
 
-# Parse cwd from $ARGUMENTS JSON (passed by Claude Code)
-CWD="."
-if [ -n "${ARGUMENTS:-}" ]; then
-  parsed_cwd=$(echo "$ARGUMENTS" | jq -r '.cwd // empty' 2>/dev/null)
-  if [ -n "$parsed_cwd" ]; then
-    CWD="$parsed_cwd"
+# Read JSON from stdin (Claude Code passes input this way)
+INPUT=$(cat)
+
+# Check stop_hook_active to prevent infinite loops
+if [ "$(echo "$INPUT" | jq -r '.stop_hook_active // false')" = "true" ]; then
+  echo '{"ok": true}'
+  exit 0
+fi
+
+# Get cwd from stdin input
+CWD=$(echo "$INPUT" | jq -r '.cwd // "."')
+
+# Try TaskList-based detection first (new wave-based loop)
+TASK_LIST_ID="${CLAUDE_CODE_TASK_LIST_ID:-}"
+if [ -n "$TASK_LIST_ID" ]; then
+  TASK_DIR="$HOME/.claude/tasks/$TASK_LIST_ID"
+  if [ -d "$TASK_DIR" ]; then
+    # Check if any tasks are pending or in_progress
+    PENDING=$(find "$TASK_DIR" -name "*.json" -exec jq -r 'select(.status == "pending" or .status == "in_progress") | .subject' {} \; 2>/dev/null | head -3)
+
+    if [ -z "$PENDING" ]; then
+      echo '{"ok": true}'
+      exit 0
+    else
+      # Escape newlines for JSON
+      PENDING_ESCAPED=$(echo "$PENDING" | tr '\n' ',' | sed 's/,$//')
+      echo "{\"ok\": false, \"reason\": \"pending tasks: ${PENDING_ESCAPED}\"}"
+      exit 0
+    fi
   fi
 fi
 
+# Fall back to .loop/state.json (legacy state file approach)
 STATE_FILE="${CWD}/.loop/state.json"
 
 # No state file = no active loop, allow stop
@@ -46,7 +71,6 @@ if [ "$stuck_count" -ge 5 ] 2>/dev/null; then
 fi
 
 # Dual-condition exit: ALL criteria must be true AND exit_signal must be true
-# Handle both old format (value is boolean) and new format (value is {met, verification})
 all_criteria_met=$(jq '[.criteriaStatus // {} | to_entries[] | .value | if type == "boolean" then . elif type == "object" then .met else false end] | if length == 0 then false else all end' "$STATE_FILE" 2>/dev/null || echo "false")
 
 # Check for assumption-only verification (blocks exit)

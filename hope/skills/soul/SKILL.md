@@ -134,34 +134,15 @@ For most situations, use these first:
 
 ## Tool Pairings
 
-Common combinations for complex problems:
+See [Tool Pairings](references/tool-pairings.md) for common combinations.
 
-| Primary Tool | Pairs With | Use Case |
-|-------------|------------|----------|
-| Pre-Mortem | Deliberate Practice | Practice drills for failure modes |
-| Pre-Mortem | Feedback Loops | Learn from drill outcomes |
-| Bayesian Thinking | Pre-Mortem | Update priors from failure analysis |
-| Circle of Competence | Sunk Cost | Know when to exit outside expertise |
-| Grey Thinking | Steel Man + Decision Matrix | Multi-perspective evaluation |
-| Systems Over Goals | Feedback Loops | Design habit systems with measurement |
-| Munger's 25 | Confidence Gates | Run bias check before claiming ≥85% |
-| Opportunity Cost | Eisenhower + Impact-Effort | Weigh hidden costs when prioritizing |
-| Chesterton's Fence | Second-Order Thinking | Understand before removing |
+Key pairings: Pre-Mortem + Deliberate Practice, Bayesian + Pre-Mortem, Grey Thinking + Steel Man + Decision Matrix, Munger's 25 + Confidence Gates.
 
 ---
 
-## Common Rationalizations (All Wrong)
+## Common Rationalizations
 
-| Thought | Reality |
-|---------|---------|
-| "This is just a simple question" | Run Silent Audit anyway. |
-| "I already know the answer" | State confidence percentage. |
-| "This doesn't need a library search" | Search anyway. Every library not written = 1000 bugs avoided. |
-| "The user wants me to just do it" | Clarify intent first. Wrong fast = waste. |
-| "This is too small for workflows" | Workflow B for any fix. |
-| "I can skip the inversion" | Inversion catches failures cheaper than debugging. |
-| "The pattern is obvious" | Document it anyway. Future you will forget. |
-| "I'll add tests later" | "Later" = never. Test now or don't claim done. |
+See [Common Rationalizations](references/rationalizations.md) for the full list.
 
 **Every rationalization = skipped step = compounding failure.**
 

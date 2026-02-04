@@ -1,0 +1,13 @@
+name: counsel-panel-conflict
+description: Panel handles expert disagreement with explicit dissent
+plugin: counsel
+skill: counsel:panel
+acceptableSkills:
+  - counsel:counsel
+  - counsel
+prompt: "/counsel:panel Should I use inheritance or composition for my React components?"
+expectedBehaviors:
+  - "Multiple expert perspectives (2-3 panelists)"
+  - "Dissent section with back-and-forth responses"
+  - "Consensus points identified"
+  - "Open questions flagged for user judgment"
