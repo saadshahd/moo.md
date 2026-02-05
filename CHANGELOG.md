@@ -11,6 +11,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@2.4.0] - 2026-02-05
+
+### Removed
+
+- **loop/ralph-bridge**: Removed fresh-instance orchestration skill (context summarization makes it unnecessary)
+- **loop/prd**: Removed pre-decomposed PRD execution skill (simplify to single `/loop` entry point)
+
+### Changed
+
+- **loop/start**: Wave execution now uses adaptive parallelization via `counsel:panel`
+  - Panel advises on task coupling (sequential) vs independence (parallel) per wave
+- **loop/start**: Removed `--budget` flag from continue command (ask via question if needed)
+
+---
+
 ## [loop@2.3.1] - 2026-02-05
 
 ### Fixed

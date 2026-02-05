@@ -71,7 +71,7 @@ Rules:
 | Refactor | 5-15 tasks | Per-file changes, dependency updates |
 | Large feature | 10-25 tasks | Break into smaller features first |
 
-If > 25 tasks → decompose into multiple loops or use `/loop:ralph-bridge`
+If > 25 tasks → decompose into multiple loops
 
 ## Verification Per Task
 

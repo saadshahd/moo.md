@@ -1,8 +1,8 @@
 {
   "name": "loop",
-  "version": "2.3.1",
-  "description": "Autonomous iteration with wave-based parallel execution. Ralph Wiggum mechanics: atomic tasks, parallel subagents, self-unblocking via counsel.",
-  "keywords": ["autonomous", "iteration", "loop", "spec-driven", "prd-mode", "ralph-bridge"],
+  "version": "2.4.0",
+  "description": "Autonomous iteration with adaptive wave execution. Atomic tasks, parallel subagents, self-unblocking via counsel.",
+  "keywords": ["autonomous", "iteration", "loop", "spec-driven", "waves", "adaptive"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

@@ -262,6 +262,28 @@ A **wave** is tasks with no blockedBy dependencies or all blockedBy tasks comple
 3. Current wave = matching tasks
 ```
 
+### Wave Strategy (Adaptive)
+
+Before executing each wave, consult panel on strategy:
+
+```
+Skill(skill="counsel:panel", args="wave execution strategy for {N} tasks: {task_summaries}")
+```
+
+Panel analyzes:
+- **Task coupling** — same files/modules → run sequential
+- **Independence** — different areas → run parallel
+- **Risk level** — risky tasks → sequential with review
+
+```
+[LOOP] Wave 2: 4 tasks ready
+[LOOP] Consulting panel on execution strategy...
+Panel recommendation:
+  Sequential: T-003 → T-004 (both modify auth/)
+  Parallel: [T-005, T-006] (independent)
+[LOOP] Executing strategy...
+```
+
 ### Execute Wave
 
 For each task in wave:
@@ -418,7 +440,6 @@ Reference [hope/skills/soul](../../hope/skills/soul/SKILL.md) for workflow detai
 |---------|--------|
 | `/loop [spec]` | Start new loop |
 | `/loop continue` | Resume paused loop |
-| `/loop continue --budget=25` | Add budget and resume |
 | `/loop cancel` | Terminate and clean up |
 | `/loop status` | Show current state from TaskList |
 
@@ -463,20 +484,13 @@ User: "loop - add validation to auth module"
 
 ## References
 
-- [decomposition.md](references/decomposition.md) — Atomic task format, "one sentence" test
-- [waves.md](references/waves.md) — Wave execution protocol, parallel subagents
-- [loop-mechanics.md](references/loop-mechanics.md) — State management, workflow-state schema, resume logic
-- [expert-review.md](references/expert-review.md) — Light/thorough review protocol, expert-to-aspect mapping
+- [decomposition.md](references/decomposition.md)
+- [waves.md](references/waves.md)
+- [loop-mechanics.md](references/loop-mechanics.md)
+- [expert-review.md](references/expert-review.md)
 
 ---
 
 ## Boundary
 
-**Loop executes, never decides.**
-
-- User controls what gets built — loop executes the spec, doesn't expand it
-- User controls persistence — state disclosed, cleanup offered
-- User controls continuation — pause is always honored, "cancel" is immediate
-
-Loop advises when patterns emerge. If same task pattern repeats 3+ times:
-> "This is a repeating pattern. Want the steps to run yourself?"
+**Loop executes, never decides.** User controls what gets built, persistence, and continuation.
