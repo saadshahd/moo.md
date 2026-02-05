@@ -1,6 +1,6 @@
 ---
 name: gate
-description: Verification before completion claims. Use when about to say "done", "fixed", or "complete". Runs checklist by workflow type with evidence requirements.
+description: Verification before completion claims. Use when about to say "done", "fixed", or "complete". Triggers on completion language.
 model: haiku
 allowed-tools: Read
 ---

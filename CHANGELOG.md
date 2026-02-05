@@ -19,6 +19,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **counsel/panel**: DOT notation workflow for panel assembly process
 - **counsel/counsel**: DOT notation for main workflow (Steps 0-3)
 - **counsel/confidence**: DOT notation pipeline for confidence scoring
+- **CLAUDE.md**: DOT notation guidelines (color palette, node conventions, when to use)
+- **CLAUDE.md**: Description Trap warning in conventions and anti-patterns
+
+### Fixed
+
+- **hope/gate**: Remove process details from description (trigger-only)
+- **hope/intent**: Remove process details from description (trigger-only)
+- **hope/shape**: Remove process details from description (trigger-only)
+- **hope/trace**: Remove process details from description (trigger-only)
+- **loop/cancel**: Remove process details from description (trigger-only)
+- **loop/start**: Remove process details from description (trigger-only)
 
 ---
 

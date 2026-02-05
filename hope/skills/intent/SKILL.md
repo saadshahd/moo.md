@@ -1,6 +1,6 @@
 ---
 name: intent
-description: Turn rough ideas into iron-clad work orders through 6-step clarification protocol before building. Use when request is vague like "add a button", "make it better", "fix the thing". Produces spec score and workflow shape.
+description: Turn rough ideas into iron-clad work orders. Use when request is vague like "add a button", "make it better", "fix the thing". Triggers on ambiguous or underspecified requests.
 model: sonnet
 allowed-tools: Read, Bash
 ---

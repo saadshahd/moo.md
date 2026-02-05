@@ -1,6 +1,6 @@
 ---
 name: shape
-description: Bridge WHAT (intent) to HOW (implementation). Auto-triggers after /hope:intent when spec_score >=5. Discovers relevant aspects, consults anchor experts, outputs SHAPE.md with criteria/mustNot/verification. Triggers on "shape this", "how should I build", "implementation approach".
+description: Bridge WHAT (intent) to HOW (implementation). Use when spec is clear but approach is not. Triggers on "shape this", "how should I build", "implementation approach".
 model: opus
 allowed-tools: Read, Bash
 hooks:
