@@ -87,7 +87,7 @@ User Request
 ```
 
 **Stage transitions update the file:**
-- intent → shape → decompose → executing → review → complete
+- intent → shape → decompose → planning → executing → review → complete
 
 **Resume logic:**
 1. On `/loop:start`, check for workflow-state.json
@@ -284,6 +284,7 @@ Next: {suggested_action}
 | intent | Read spec_score, continue to shape |
 | shape | Read SHAPE.md, continue to decompose |
 | decompose | Continue creating tasks |
+| planning | Read plan content, skip to decompose |
 | executing | Read TaskList, continue waves |
 | review | Load review state, continue resolution |
 | complete | Offer new loop |
@@ -340,6 +341,77 @@ All tasks verified:
 ╰────────────────────────────────────╯
 </loop-complete>
 ```
+
+## Team Execution
+
+### Team Decision (Step 3.5)
+
+After decomposition, calculate team score to decide execution mode:
+
+```
+team_score = (cross_layer_count × 2) + (review_count × 3) + (hypothesis_count × 4)
+```
+
+- ≥ 12: Agent teams (spawn teammates, assign ownership)
+- 10-11 + cross-layer: Hybrid (teams for complex, subagents for simple)
+- < 10: Subagent waves (default)
+
+### Team Lifecycle
+
+```
+SpawnTeam → Spawn Teammates → Assign Tasks → Execute → Review → Shutdown → Cleanup
+```
+
+**State tracking:** workflow-state.json gains a `team` object:
+
+```json
+{
+  "team": {
+    "enabled": true,
+    "team_name": "auth-refactor-loop",
+    "team_score": 18,
+    "teammates": [
+      { "name": "frontend-builder", "role": "implementation", "assigned_tasks": ["1", "3"] },
+      { "name": "backend-builder", "role": "implementation", "assigned_tasks": ["2", "4"] }
+    ],
+    "mode": "delegate",
+    "shutdown_status": "active"
+  }
+}
+```
+
+**Task list coupling:** When using teams, the team name doubles as the task list ID. No separate CLAUDE_CODE_TASK_LIST_ID configuration needed.
+
+### Team Shutdown
+
+The stop hook blocks exit when `team.enabled = true` and `team.shutdown_status = "active"`. Lead must:
+
+1. Verify all tasks completed
+2. Send shutdown_request to each teammate
+3. Wait for approvals
+4. Run Teammate cleanup
+5. Update shutdown_status to "completed"
+
+### Session Resume Fallback
+
+If a team-mode loop resumes in a new session where teammates can't be restored, fall back to subagent wave execution for remaining tasks. The task list persists across sessions, so pending tasks are still available.
+
+See [agent-teams.md](references/agent-teams.md) and [team-roles.md](references/team-roles.md) for full protocol.
+
+---
+
+## Plan Mode Recovery
+
+When loop writes `stage: "planning"` to workflow-state.json, it persists enough state to resume after a plan mode transition:
+
+- spec_score and fit_score are saved
+- SHAPE.md exists in `.loop/shape/`
+- On resume: skip directly to decomposition
+- Plan content (from plan mode or shape output) informs task breakdown
+
+This ensures loop state survives if Claude enters plan mode mid-pipeline. The session-resume hook detects the "planning" stage and announces it.
+
+---
 
 ## Troubleshooting
 

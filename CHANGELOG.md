@@ -9,6 +9,39 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **loop**: Agent teams integration for complex coordination (hybrid approach)
+  - Step 3.5: Team Decision — calculates team_score from cross-layer, review, and hypothesis factors
+  - Subagent waves (default, team_score < 10) preserved as proven execution path
+  - Agent teams mode (team_score ≥ 12) spawns specialized teammates with role-based ownership
+  - Hybrid mode (team_score 10-11 with cross-layer) mixes both execution strategies
+  - Teammates inherit lead's model, no plan_mode_required — counsel:panel provides plan and review gates
+  - Cross-session resume falls back to subagent waves when teammates can't be restored
+  - `references/agent-teams.md` — team score calculation, lifecycle, cost considerations, troubleshooting
+  - `references/team-roles.md` — teammate specialization mapping, spawn patterns, delegation/shutdown protocol
+  - `references/waves.md` — execution mode selection section (subagent/team/hybrid)
+  - Stop hook blocks exit when active team running (checks `team.shutdown_status`)
+  - `schemas/workflow-state.schema.json` — optional `team` and `plan` objects
+  - 2 new eval cases: `team-detection.yaml`, `team-execution.yaml`
+  - `loop-mechanics.md` — team execution section with lifecycle and state tracking
+- **loop**: Plan-to-loop bridge for surviving plan mode transitions
+  - Step 2.5: Plan Persistence — writes `stage: "planning"` before decomposition
+  - Step 0a: Detects "planning" stage and offers to execute or start fresh
+  - DOT diagram updated with plan detection path
+  - Session-resume hook announces pending plans on session start
+  - Stop hook blocks exit during "planning" stage (plan not yet executed)
+  - `schemas/workflow-state.schema.json` — "planning" stage + optional `plan` object (file_path, approved, spec_extracted)
+  - `loop-mechanics.md` — plan mode recovery section, stage-specific resume table updated
+- **loop/start**: Teammate and SendMessage added to allowed-tools
+- **loop/start**: Completion step includes team shutdown and cleanup for team-mode loops
+- **loop/start**: References table includes agent-teams.md and team-roles.md
+
+### Changed
+
+- **loop**: Version bumped to 3.0.0 (major: new execution mode + plan bridge)
+- **loop/start**: Architecture diagram includes Team Decision and team cleanup steps
+
 ---
 
 ## [hope@0.21.0, loop@2.5.0, counsel@0.13.0] - 2026-02-05

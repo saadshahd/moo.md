@@ -44,12 +44,23 @@ spec_score=$(jq -r '.spec_score // "?"' "$STATE_FILE" 2>/dev/null || echo "?")
 fit_score=$(jq -r '.fit_score // "?"' "$STATE_FILE" 2>/dev/null || echo "?")
 shape=$(jq -r '.shape_chosen // "unknown"' "$STATE_FILE" 2>/dev/null || echo "unknown")
 
-# Build message
-message="[LOOP RESUME] Active loop detected
+# Build message based on stage
+case "$stage" in
+  "planning")
+    message="[LOOP RESUME] Plan created but not yet executed
+Task: ${task}
+Stage: planning | Shape: ${shape}
+Spec: ${spec_score}/10 | Fit: ${fit_score}
+A plan was created for this loop. Run /loop:start to execute it or /loop:cancel to discard."
+    ;;
+  *)
+    message="[LOOP RESUME] Active loop detected
 Task: ${task}
 Stage: ${stage} | Shape: ${shape}
 Spec: ${spec_score}/10 | Fit: ${fit_score}
 Run /loop:start to resume or /loop:cancel to clear."
+    ;;
+esac
 
 # Escape for JSON using jq
 escaped_message=$(echo "$message" | jq -Rs '.' 2>/dev/null || echo '"[LOOP RESUME] Active loop detected"')

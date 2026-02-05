@@ -2,7 +2,7 @@
 name: start
 description: Start autonomous iteration loop. Triggers on "loop", "keep going", "continue until done", "implement feature", "fix all", "loop help".
 model: sonnet
-allowed-tools: Bash, Read, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, Skill, AskUserQuestion
+allowed-tools: Bash, Read, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, Skill, AskUserQuestion, Teammate, SendMessage
 ---
 
 # Loop
@@ -24,11 +24,13 @@ User Request
     ↓
 [DECOMPOSITION] → atomic tasks via TaskCreate
     ↓
-[WAVE EXECUTION] → parallel subagents + light expert review
+[TEAM DECISION] → team_score → subagents / teams / hybrid
+    ↓
+[WAVE EXECUTION] → parallel subagents or teammates + light review
     ↓
 [THOROUGH REVIEW] → counsel:panel, resolve blockers
     ↓
-[COMPLETION] → hope:gate verification
+[COMPLETION] → team cleanup (if teams) → hope:gate verification
 ```
 
 ---
@@ -44,6 +46,7 @@ Before starting, check for existing workflow state:
 2. Check .loop/shape/SHAPE.md exists
 3. Check TaskList for pending/in_progress tasks
 4. Read workflow-state.json if exists
+5. If stage == "planning": plan created but not yet executed
 ```
 
 ### 0b. Resume Decision
@@ -57,6 +60,9 @@ digraph ResumeDecision {
   Check [label="Check for\nworkflow-state.json"]
   Exists [label="State\nexists?", shape=diamond, fillcolor="#fff4cc"]
   NoState [label="No state\nfound"]
+  PlanCheck [label="stage ==\nplanning?", shape=diamond, fillcolor="#fff4cc"]
+  PlanAsk [label="Plan exists.\nExecute / Fresh?", fillcolor="#ffe6cc"]
+  SkipToDecompose [label="Skip to\nStep 3", fillcolor="#ccffcc"]
   Ask [label="AskUserQuestion:\nResume / Fresh / Status", fillcolor="#ffe6cc"]
 
   Resume [label="Resume", fillcolor="#ccffcc"]
@@ -70,9 +76,14 @@ digraph ResumeDecision {
   Config [label="Step 0c:\nUser Config"]
 
   Start -> Check -> Exists
-  Exists -> Ask [label="yes"]
+  Exists -> PlanCheck [label="yes"]
   Exists -> NoState [label="no"]
   NoState -> Config
+
+  PlanCheck -> PlanAsk [label="yes"]
+  PlanCheck -> Ask [label="no"]
+  PlanAsk -> SkipToDecompose [label="execute"]
+  PlanAsk -> Delete [label="fresh"]
 
   Ask -> Resume
   Ask -> Fresh
@@ -87,6 +98,7 @@ digraph ResumeDecision {
 On "Resume": Skip to current stage (read from workflow-state.json)
 On "Start fresh": Delete `.loop/` directory, proceed to Step 0c
 On "View status": Show status (see `/loop:status`), then re-ask
+On "planning" stage: Plan was created but loop didn't execute → skip to Step 3
 
 **If no existing state:** Proceed to Step 0c
 
@@ -118,25 +130,11 @@ Set `CLAUDE_CODE_TASK_LIST_ID` based on choice.
 
 ### Workflow State Schema
 
-Write `.loop/workflow-state.json` at each stage transition:
+Write `.loop/workflow-state.json` at each stage transition. Schema: `schemas/workflow-state.schema.json`
 
-```json
-{
-  "version": 1,
-  "stage": "intent|shape|decompose|executing|review|complete",
-  "task": "original user request",
-  "spec_score": 7,
-  "fit_score": 35,
-  "shape_chosen": "colleague|tool-review|tool",
-  "started_at": "2026-02-05T10:00:00Z",
-  "last_updated": "2026-02-05T10:15:00Z",
-  "recall_surfaced": ["auth edge cases", "validation patterns"],
-  "reviews": {
-    "wave_1": { "score": 8, "issues": 2, "blockers": 0 },
-    "thorough": { "passed": false, "blockers_remaining": 1 }
-  }
-}
-```
+Key fields: version, stage, task, spec_score, fit_score, shape_chosen, timestamps, recall_surfaced, reviews, team (optional).
+
+See [loop-mechanics.md](references/loop-mechanics.md) for full schema example.
 
 ---
 
@@ -153,18 +151,6 @@ Before spec scoring, surface relevant learnings:
    - Active constraints
 4. User confirms or dismisses
 5. Save surfaced learnings to workflow-state.json
-```
-
-**Output:**
-```
-[LOOP] Surfacing past learnings for: {domain}
-
-Relevant learnings found:
-- [failure] Auth tokens: Missing refresh caused session drops → Prevention: Always implement refresh flow
-- [discovery] (85%): JWT validation should happen middleware-level, not per-route
-- [constraint] Auth: Must use existing session store (permanent)
-
-→ Apply these learnings? [Y/n]
 ```
 
 If user dismisses: proceed without applying, note in workflow-state.json
@@ -252,6 +238,14 @@ Extract from SHAPE.md output:
 
 ---
 
+## Step 2.5: Plan Persistence
+
+After shape generation, write `stage: "planning"` to workflow-state.json with spec_score and fit_score. If Claude enters plan mode, state is already persisted. On plan approval, loop resumes from "planning" stage → skips to Step 3. If no plan mode needed, proceed directly to Step 3.
+
+See [loop-mechanics.md](references/loop-mechanics.md#plan-mode-recovery) for details.
+
+---
+
 ## Step 3: Task Decomposition
 
 Break work into atomic tasks using the "one sentence without and" test.
@@ -279,15 +273,42 @@ TaskUpdate(taskId="4", addBlockedBy=["1", "3"])
 
 ---
 
+## Step 3.5: Team Decision
+
+After decomposition, decide between subagent waves and agent teams:
+
+### Team Score Calculation
+
+```
+team_score = (cross_layer_count × 2) + (review_count × 3) + (hypothesis_count × 4)
+```
+
+Factors: **cross_layer** (different subsystems ×2), **review** (expert perspectives ×3), **hypothesis** (competing approaches ×4).
+
+| team_score | Mode | Action |
+|-----------|------|--------|
+| ≥ 12 | Agent Teams | Spawn team, assign teammates |
+| 10-11 + cross-layer | Hybrid | Teams for complex, subagents for simple |
+| < 10 | Subagent Waves | Default parallel execution |
+
+**If Teams (≥ 12):** Spawn team → spawn teammates → assign tasks via owner → skip task list question → update workflow-state.json.
+
+**If Subagents (< 10):** Continue with existing wave execution (Step 4).
+
+See [agent-teams.md](references/agent-teams.md) for team score details and [team-roles.md](references/team-roles.md) for teammate specialization.
+
+---
+
 ## Step 4: Wave Execution
 
 A **wave** is tasks with no blockedBy dependencies or all blockedBy tasks completed.
 
 See [waves.md](references/waves.md) for full protocol including:
 - Wave detection algorithm
-- Parallel subagent spawning
+- Parallel subagent spawning (or teammate coordination in team mode)
 - Progress tracking in PROGRESS.md
 - Handling tasks that need another attempt
+- Execution mode selection (subagent/team/hybrid)
 
 ### Adaptive Strategy
 
@@ -348,7 +369,13 @@ Thorough tier (< 2min): all checks + criterion-specific commands + evidence.
 Skill(skill="hope:gate", args="loop completion verification")
 ```
 
-3. If gate passes (verify passed), emit completion:
+3. If team mode active:
+   - Send `shutdown_request` to all teammates
+   - Wait for shutdown approvals
+   - Run `Teammate(operation="cleanup")`
+   - Update workflow-state.json: `team.shutdown_status → "completed"`
+
+4. Emit completion:
 ```
 <loop-complete>
 🎉 Loop completed successfully!
@@ -372,7 +399,7 @@ All tasks verified:
 </loop-complete>
 ```
 
-3. If gate fails → create remediation tasks, continue loop
+5. If gate fails → create remediation tasks, continue loop
 
 ---
 
@@ -453,6 +480,8 @@ User: "loop - add validation to auth module"
 | Stage | Reference | When |
 |-------|-----------|------|
 | decompose | [decomposition.md](references/decomposition.md) | Before TaskCreate |
+| team decision | [agent-teams.md](references/agent-teams.md) | After decompose, team_score ≥ 10 |
+| team decision | [team-roles.md](references/team-roles.md) | When spawning teammates |
 | executing | [waves.md](references/waves.md) | If wave strategy unclear |
 | review | [expert-review.md](references/expert-review.md) | Before counsel:panel |
 

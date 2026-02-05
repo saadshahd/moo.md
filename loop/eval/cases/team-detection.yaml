@@ -1,0 +1,16 @@
+name: team-detection
+description: Verify team vs subagent decision logic for cross-layer tasks
+plugin: loop
+skill: loop:start
+flaky: true
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - soul
+  - hope:soul
+prompt: "loop - refactor authentication to use JWT across frontend React components, backend Express API, and integration tests"
+expectedBehaviors:
+  - "Team score calculation performed"
+  - "Cross-layer tasks detected (frontend + backend + tests)"
+  - "Agent team or subagent decision made based on complexity"

@@ -1,8 +1,8 @@
 {
   "name": "loop",
-  "version": "2.5.0",
-  "description": "Autonomous iteration with adaptive wave execution. Atomic tasks, parallel subagents, self-unblocking via counsel.",
-  "keywords": ["autonomous", "iteration", "loop", "spec-driven", "waves", "adaptive"],
+  "version": "3.0.0",
+  "description": "Autonomous iteration with adaptive wave execution. Atomic tasks, parallel subagents or agent teams, self-unblocking via counsel.",
+  "keywords": ["autonomous", "iteration", "loop", "spec-driven", "waves", "adaptive", "agent-teams"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

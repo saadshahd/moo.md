@@ -167,6 +167,48 @@ export CLAUDE_CODE_TASK_LIST_ID=my-feature-loop
 
 Resume across sessions by using same ID.
 
+## Execution Mode Selection
+
+### Subagent Wave (Default)
+
+**When:** team_score < 10, simple parallel execution
+
+1. Get current wave (pending + unblocked)
+2. Spawn parallel subagents in single message
+3. Wait for all to complete
+4. Light review (counsel:panel)
+5. Update PROGRESS.md
+6. Loop to next wave
+
+### Teammate Wave (Complex)
+
+**When:** team_score ≥ 12, coordination required
+
+1. Spawn team: `Teammate(operation="spawnTeam", team_name="{project}-loop")`
+2. Spawn specialized teammates based on aspects (see [team-roles.md](team-roles.md))
+3. TaskCreate for all decomposed tasks
+4. TaskUpdate to assign tasks to teammates (owner field)
+5. Teammates claim and execute tasks
+6. Teammates message lead on completion
+7. Light review after each teammate batch
+8. Thorough review when all tasks complete
+9. Shutdown teammates: `SendMessage(type="shutdown_request")`
+10. Cleanup team: `Teammate(operation="cleanup")`
+
+### Hybrid Wave (Mixed)
+
+**When:** team_score 10-11 with cross-layer tasks
+
+1. Split tasks into simple_wave and complex_wave
+2. Execute simple_wave with subagents (same message, parallel)
+3. Spawn team for complex_wave (cross-layer ownership)
+4. Aggregate results from both
+5. Cleanup team after complex tasks complete
+
+See [agent-teams.md](agent-teams.md) for team score calculation and full protocol.
+
+---
+
 ## Wave Size Guidelines
 
 | Wave Size | Recommended | Notes |

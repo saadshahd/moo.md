@@ -20,6 +20,15 @@ if [ -f "$STATE_FILE" ]; then
   fi
 fi
 
+# Block exit during planning stage (plan not yet executed)
+if [ -f "$STATE_FILE" ]; then
+  STAGE=$(jq -r '.stage // "unknown"' "$STATE_FILE" 2>/dev/null)
+  if [ "$STAGE" = "planning" ]; then
+    echo '{"ok": false, "reason": "Loop has a plan pending execution. Run /loop:start to execute or /loop:cancel to discard."}'
+    exit 0
+  fi
+fi
+
 # TaskList-based detection
 TASK_LIST_ID="${CLAUDE_CODE_TASK_LIST_ID:-}"
 if [ -n "$TASK_LIST_ID" ]; then
@@ -33,6 +42,17 @@ if [ -n "$TASK_LIST_ID" ]; then
       PENDING_ESCAPED=$(echo "$PENDING" | tr '\n' ',' | sed 's/,$//')
       echo "{\"ok\": false, \"reason\": \"pending tasks: ${PENDING_ESCAPED}\"}"
     fi
+    exit 0
+  fi
+fi
+
+# Check for active team
+if [ -f "$STATE_FILE" ]; then
+  TEAM_ENABLED=$(jq -r '.team.enabled // false' "$STATE_FILE" 2>/dev/null)
+  SHUTDOWN_STATUS=$(jq -r '.team.shutdown_status // "none"' "$STATE_FILE" 2>/dev/null)
+
+  if [ "$TEAM_ENABLED" = "true" ] && [ "$SHUTDOWN_STATUS" = "active" ]; then
+    echo '{"ok": false, "reason": "Active team still running. Send shutdown requests to teammates first."}'
     exit 0
   fi
 fi
