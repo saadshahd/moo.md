@@ -59,6 +59,8 @@ description: Single line. Trigger condition + what it does. Max 1024 chars.
 
 > **Note:** Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
 
+**⚠️ DESCRIPTION TRAP WARNING:** Skill descriptions must be **trigger-only**. If descriptions contain process summaries or workflow steps, Claude follows the short description instead of reading the detailed flowchart/instructions. Keep descriptions focused on "Use when X" patterns only.
+
 **Agents:**
 
 ```yaml
@@ -90,6 +92,40 @@ tools: Read, Glob, Grep, Bash
 - No vague terminology; pick one term per concept
 - Use forward slashes only (`/`), never backslashes
 
+### DOT Notation (Graphviz)
+
+Use DOT for process documentation. Claude follows DOT-written processes more reliably than prose.
+
+**When to use:**
+- Non-obvious decision points
+- Process loops or cycles
+- Multi-path workflows with branching
+
+**When NOT to use:**
+- Linear instructions (use numbered lists)
+- Code examples (embed code directly)
+- Simple single-path processes
+
+**Direction conventions:**
+- `rankdir=TB` — Hierarchical decisions, top-down flows
+- `rankdir=LR` — Cyclic processes, state machines, retry loops
+
+**Color palette:**
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Blue | `#e6f3ff` | Start/input nodes |
+| Orange | `#ffe6cc` | Key action steps |
+| Yellow | `#fff4cc` | Decision diamonds |
+| Green | `#ccffcc` | Success/completion |
+| Red | `#ffcccc` | Blocked/error states |
+| Gray | `#f5f5f5` | Standard nodes (default) |
+
+**Node conventions:**
+- `shape=box` with `style="rounded,filled"` for actions
+- `shape=diamond` for decision points
+- `shape=ellipse` for continuation/terminal nodes
+- `[style=dashed]` on edges for fallback/retry paths
+
 ## Core Philosophy (Preserve These)
 
 - **Confidence gates:** <70% research, 70-85% ship+monitor, ≥85% ship
@@ -104,6 +140,7 @@ tools: Read, Glob, Grep, Bash
 - Time estimates instead of story points
 - Duplicating content across docs (link to single source)
 - Windows paths or magic numbers in scripts
+- **Process details in skill descriptions** (causes Claude to skip flowcharts)
 
 ## Changelog
 
