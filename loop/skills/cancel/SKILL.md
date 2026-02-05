@@ -1,6 +1,6 @@
 ---
 name: cancel
-description: Cancel active Loop. Use when loop needs to stop early, done iterating manually, want to abort, or change direction. Triggers on "cancel loop", "stop iterating", "end loop", "terminate loop", "abort loop", "kill loop", "stop the loop", "halt".
+description: Cancel active loop. Triggers on "cancel loop", "stop loop", "abort", "halt", "end loop".
 model: haiku
 allowed-tools: Read
 ---

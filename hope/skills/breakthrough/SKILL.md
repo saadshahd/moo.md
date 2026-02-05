@@ -1,6 +1,6 @@
 ---
 name: breakthrough
-description: Creative problem-solving techniques when stuck. Use when progress has stalled, solutions feel forced, or conventional approaches have failed. Triggers on "stuck", "blocked", "can't figure out", "hitting a wall".
+description: Problem-solving techniques when stuck. Use when progress stalled or approaches failed. Triggers on "stuck", "blocked", "can't figure out".
 model: opus
 allowed-tools: Read
 hooks:

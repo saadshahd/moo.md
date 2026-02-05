@@ -1,6 +1,6 @@
 ---
 name: recall
-description: Surface relevant learnings from past sessions. Use when starting work in a domain to avoid repeating mistakes. Triggers on "recall learnings", "past failures", "surface insights", "what did I learn".
+description: Surface learnings from past sessions. Use when starting work in a domain. Triggers on "recall learnings", "past failures", "what did I learn".
 model: haiku
 allowed-tools: Read
 context: fork

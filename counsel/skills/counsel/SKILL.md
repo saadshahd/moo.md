@@ -1,6 +1,6 @@
 ---
 name: counsel
-description: Expert simulation for code guidance. Use when asking "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", or needing domain-specific guidance.
+description: Use when asking "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", or needing domain guidance.
 model: sonnet
 allowed-tools: Read, Bash
 ---

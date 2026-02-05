@@ -1,6 +1,6 @@
 ---
 name: skill-judge
-description: Evaluate skill quality using 8-dimension framework. Use when reviewing skills, before publishing, or auditing existing skills. Triggers on "evaluate skill", "review skill", "skill quality", "audit skills".
+description: Evaluate skill quality. Use when reviewing skills, before publishing, or auditing. Triggers on "evaluate skill", "skill quality", "audit skills".
 model: opus
 allowed-tools: Read, Glob
 ---
