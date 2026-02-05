@@ -14,7 +14,7 @@ if [ -n "${ARGUMENTS:-}" ]; then
   fi
 fi
 
-STATE_FILE="${CWD}/.loop/state.json"
+STATE_FILE="${CWD}/.loop/workflow-state.json"
 
 # No state file = no active loop
 if [ ! -f "$STATE_FILE" ]; then
@@ -28,30 +28,28 @@ if ! jq empty "$STATE_FILE" 2>/dev/null; then
   exit 0
 fi
 
-# Check status
-status=$(jq -r '.status // "active"' "$STATE_FILE" 2>/dev/null || echo "active")
+# Check stage
+stage=$(jq -r '.stage // "executing"' "$STATE_FILE" 2>/dev/null || echo "executing")
 
-case "$status" in
-  "completed"|"cancelled")
+case "$stage" in
+  "complete"|"cancelled")
     echo '{"ok": true, "message": ""}'
     exit 0
     ;;
 esac
 
 # Active loop found - build resume announcement
-spec=$(jq -r '.spec // "unknown"' "$STATE_FILE" 2>/dev/null | head -c 100 || echo "unknown")
-iteration=$(jq -r '.iteration // 1' "$STATE_FILE" 2>/dev/null || echo "1")
-completed_count=$(jq -r '[.completedSteps // [] | length] | .[0]' "$STATE_FILE" 2>/dev/null || echo "0")
-total_steps=$(jq -r '[.steps // [] | length] | .[0]' "$STATE_FILE" 2>/dev/null || echo "0")
-unmet=$(jq -r '[.criteriaStatus // {} | to_entries[] | select(.value == false) | .key] | join(", ")' "$STATE_FILE" 2>/dev/null || echo "unknown")
-next_step=$(jq -r '.remainingSteps[0] // "continue work"' "$STATE_FILE" 2>/dev/null || echo "continue work")
+task=$(jq -r '.task // "unknown"' "$STATE_FILE" 2>/dev/null | head -c 100 || echo "unknown")
+spec_score=$(jq -r '.spec_score // "?"' "$STATE_FILE" 2>/dev/null || echo "?")
+fit_score=$(jq -r '.fit_score // "?"' "$STATE_FILE" 2>/dev/null || echo "?")
+shape=$(jq -r '.shape_chosen // "unknown"' "$STATE_FILE" 2>/dev/null || echo "unknown")
 
 # Build message
 message="[LOOP RESUME] Active loop detected
-Spec: ${spec}
-Progress: ${completed_count}/${total_steps} steps | Iteration: ${iteration}
-Unmet criteria: ${unmet:-none}
-Next: ${next_step}"
+Task: ${task}
+Stage: ${stage} | Shape: ${shape}
+Spec: ${spec_score}/10 | Fit: ${fit_score}
+Run /loop to resume or /loop cancel to clear."
 
 # Escape for JSON using jq
 escaped_message=$(echo "$message" | jq -Rs '.' 2>/dev/null || echo '"[LOOP RESUME] Active loop detected"')

@@ -1,6 +1,6 @@
 {
   "name": "loop",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Autonomous iteration with wave-based parallel execution. Ralph Wiggum mechanics: atomic tasks, parallel subagents, self-unblocking via counsel.",
   "keywords": ["autonomous", "iteration", "loop", "spec-driven", "prd-mode", "ralph-bridge"],
   "author": {

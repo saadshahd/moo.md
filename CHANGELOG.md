@@ -11,6 +11,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@2.3.1] - 2026-02-05
+
+### Fixed
+
+- **loop/session-resume.sh**: Hook reading wrong state file after compaction
+  - Root cause: Hook read `.loop/state.json` (legacy) but loop writes `.loop/workflow-state.json` (current)
+  - Fix: Updated file path and jq field names to match current schema
+  - SessionStart hook now properly detects active loops after compaction
+
+---
+
 ## [loop@2.3.0, hope@0.20.0, counsel@0.12.0] - 2026-02-05
 
 ### Added
