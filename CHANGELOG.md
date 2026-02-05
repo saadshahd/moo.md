@@ -11,6 +11,57 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@2.3.0, hope@0.20.0, counsel@0.12.0] - 2026-02-05
+
+### Added
+
+- **loop/start**: Complete workflow state management and cross-session resume
+  - Step 0: State detection checks `.loop/workflow-state.json`, SHAPE.md, and TaskList
+  - Resume decision MCQ: Resume / Start fresh / View status
+  - `workflow-state.json` schema with version, stage, task, spec_score, fit_score, shape_chosen, timestamps, recall_surfaced, reviews
+- **loop/start**: Recall learnings before decomposition (Step 0.5)
+  - Extracts domain hints from task
+  - Invokes `hope:recall` to surface past failures/discoveries/constraints
+  - User confirms or dismisses; persists to workflow-state.json
+- **loop/start**: Fit score calculation for workflow shape selection
+  - Formula: spec_score × 5 + constraints + success_criteria + done_definition + domain_familiarity
+  - Shape decision: 40+ Tool, 30-39 Tool-review, 25-29 Colleague, <25 BLOCKED
+- **loop/start**: Light expert review after each wave (Step 4 enhancement)
+  - counsel:panel invoked with domain-relevant experts
+  - Quick idiomaticity/cleanliness/delivery check (~30s)
+  - Non-blocking: issues shown as guidance
+- **loop/start**: Thorough expert review before gate (Step 5)
+  - Full expert panel with interactive findings loop
+  - Severity levels: BLOCKER / WARNING / SUGGESTION
+  - Constraint-aware guidance respects SHAPE.md mustNot
+  - Creates remediation tasks for unresolved blockers
+- **loop/status**: New skill showing workflow state
+  - Stage, spec/fit scores, task progress, review status
+  - Suggested next action based on current stage
+- **loop/references**: `expert-review.md` documenting review protocol
+  - Expert-to-aspect mapping for light and thorough reviews
+  - Severity level definitions
+  - Constraint-aware guidance rules
+- **hope/intent**: Spec score persistence to `.loop/workflow-state.json`
+  - Enables loop to read persisted score instead of recalculating
+- **counsel/panel**: Review mode for loop integration
+  - Light review pattern: `review wave {N} changes for: {spec}`
+  - Thorough review pattern: `thorough review for: {spec} with constraints: {mustNot}`
+  - Severity levels with interactive approve/reject/create-task
+  - Constraint checking against SHAPE.md mustNot
+
+### Changed
+
+- **loop/start**: Architecture now 7 steps (0, 0.5, 1, 2, 3, 4, 5, 6)
+- **loop/loop-mechanics.md**: Rewritten with workflow-state schema, fit_score calculation, expert review stage, session resume protocol
+- **hope/gate**: Added expert review requirement check (`reviews.thorough.passed`)
+
+### Removed
+
+- **loop/references**: Deleted orphaned reference files (spec-rubric.md, cost-controls.md, headless.md)
+
+---
+
 ## [hope@0.19.0, loop@2.2.0] - 2026-02-04
 
 ### Added

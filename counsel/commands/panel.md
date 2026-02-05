@@ -243,3 +243,128 @@ Loop applies recommendation by:
 1. Extracting consensus recommendation
 2. Updating task approach based on diagnosis
 3. Retrying with new approach
+
+---
+
+## Review Mode (Loop Integration)
+
+When invoked with `review` or `thorough review` pattern:
+
+### Light Review Pattern
+
+Invoked with: `review wave {N} changes for: {spec}`
+
+```
+1. Parse wave number and spec
+2. Identify aspects touched (API, state, testing, etc.)
+3. Select 2-3 experts based on aspect mapping
+4. Quick review (~30s) for idiomaticity, cleanliness, delivery
+5. Output score + findings with severity
+```
+
+### Output Format (Light)
+
+```
+## Wave {N} Review: {score}/10
+
+**Reviewers:** [expert A descriptor] (X/10), [expert B descriptor] (Y/10)
+
+### Findings
+
+| Severity | Issue | Guidance |
+|----------|-------|----------|
+| SUGGESTION | Consider extracting validation | Move to utils/validation.ts |
+| WARNING | Missing null check | Add `user?.email` guard |
+
+### Summary
+- Score: {score}/10
+- Issues: {count} ({blockers} blockers, {warnings} warnings)
+
+*Non-blocking review. Loop continues.*
+```
+
+### Thorough Review Pattern
+
+Invoked with: `thorough review for: {spec} with constraints: {mustNot}`
+
+```
+1. Parse spec and mustNot constraints
+2. Load full expert panel (3-4 experts)
+3. Review all changes made during loop
+4. Check each suggested fix against mustNot constraints
+5. Interactive findings with approve/reject/create-task options
+```
+
+### Output Format (Thorough)
+
+```
+## Thorough Review
+
+**Panel:** [expert A] (X/10), [expert B] (Y/10), [expert C] (Z/10)
+
+### Finding 1 of {N}
+
+┌─ {BLOCKER|WARNING|SUGGESTION} ─────────────────────┐
+│ {Issue description}                                 │
+├─────────────────────────────────────────────────────┤
+│ **Guidance:** {Idiomatic fix approach}              │
+│ **Constraint check:** {✓ Clean | ⚠ BLOCKED - ...}  │
+└─────────────────────────────────────────────────────┘
+
+**If fix violates constraint:**
+  → Alternative: {Constraint-respecting approach}
+
+[Approve] [Create task] [Discuss] [Skip]
+
+---
+
+### Finding 2 of {N}
+...
+```
+
+### Severity Definitions
+
+| Severity | Definition | Action |
+|----------|------------|--------|
+| **BLOCKER** | Must fix before ship | Auto-creates task if not approved |
+| **WARNING** | Should fix | Requires acknowledgment |
+| **SUGGESTION** | Optional improvement | Informational |
+
+### Constraint-Aware Guidance
+
+Before suggesting fixes, check against mustNot from SHAPE.md:
+
+```
+1. Load constraints from .loop/shape/SHAPE.md
+2. For each suggested fix:
+   - Evaluate if fix violates any mustNot
+   - If violation: mark as "BLOCKED - violates: {constraint}"
+   - Provide alternative that respects constraints
+3. Include constraint check in output
+```
+
+### Example: Constrained Fix
+
+```
+┌─ WARNING ──────────────────────────────────────────┐
+│ Session storage could benefit from Redis           │
+├────────────────────────────────────────────────────┤
+│ **Guidance:** Use Redis for session persistence    │
+│ **Constraint check:** ⚠ BLOCKED                    │
+│   → Violates: "no external dependencies"           │
+│ **Alternative:** File-based session store          │
+│   → Does not violate constraints ✓                 │
+└────────────────────────────────────────────────────┘
+```
+
+### Expert-to-Aspect Mapping
+
+| Aspect | Light Review | Thorough Review |
+|--------|--------------|-----------------|
+| API Design | Fowler | Fowler, Fielding |
+| State | Hickey | Hickey, Abramov |
+| Testing | Beck | Beck, Freeman |
+| Security | OWASP | OWASP, Pike |
+| Performance | Gregg | Gregg, Osmani |
+| UI/UX | Norman | Norman, Zhuo |
+| Architecture | Martin | Martin, Evans, Vernon |

@@ -136,6 +136,26 @@ After clarifying, score the request:
 - **5-7:** Iterate together (Colleague-shaped) → suggest `/hope:shape` for criteria
 - **<5:** Continue clarification loop
 
+### Persist Spec Score
+
+After calculating spec_score, persist to workflow state for loop integration:
+
+```bash
+mkdir -p .loop
+cat > .loop/workflow-state.json << EOF
+{
+  "version": 1,
+  "stage": "intent",
+  "task": "$TASK_DESCRIPTION",
+  "spec_score": $SPEC_SCORE,
+  "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+```
+
+This enables `/loop` to read the persisted score instead of recalculating.
+
 ### 3 Echo Check
 
 Reply with one crisp sentence stating: **deliverable + #1 must-include fact + hardest constraint.**
@@ -195,12 +215,14 @@ If spec_score ≥ 5, append:
 
 ```
 ───────────────────────────────────
-Next: /hope:shape — discover implementation aspects
-      (criteria, mustNot, verification plan)
+Next: /loop — continues to shape and execution
+      (or /hope:shape for criteria only)
+
+Spec score persisted to .loop/workflow-state.json
 ───────────────────────────────────
 ```
 
-This bridges WHAT (intent) → HOW (shape) → DO (loop).
+This bridges WHAT (intent) → HOW (shape) → DO (loop). Running `/loop` after intent will read the persisted spec_score and continue automatically.
 
 ### 7 Build & Self-Test
 

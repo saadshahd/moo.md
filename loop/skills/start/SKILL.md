@@ -14,22 +14,64 @@ Autonomous iteration with wave-based parallel execution. Continues until spec is
 ```
 User Request
     ↓
-[SPEC SCORING] → <5? auto-invoke hope:intent
+[STATE DETECTION] → Resume? / Start fresh?
     ↓
-[SHAPE GENERATION] → auto-invoke hope:shape
+[RECALL LEARNINGS] → surface past failures/discoveries
+    ↓
+[SPEC + FIT SCORING] → <5? hope:intent, calculate fit_score
+    ↓
+[SHAPE GENERATION] → hope:shape, extract criteria/mustNot
     ↓
 [DECOMPOSITION] → atomic tasks via TaskCreate
     ↓
-[WAVE EXECUTION] → parallel subagents per wave
+[WAVE EXECUTION] → parallel subagents + light expert review
+    ↓
+[THOROUGH REVIEW] → counsel:panel, resolve blockers
     ↓
 [COMPLETION] → hope:gate verification
 ```
 
 ---
 
-## Step 0: User Configuration
+## Step 0: State Detection & Resume
 
-Before starting, ask user to configure the loop:
+Before starting, check for existing workflow state:
+
+### 0a. Detect Existing State
+
+```
+1. Check .loop/workflow-state.json exists
+2. Check .loop/shape/SHAPE.md exists
+3. Check TaskList for pending/in_progress tasks
+4. Read workflow-state.json if exists
+```
+
+### 0b. Resume Decision
+
+**If existing state found:**
+
+```
+AskUserQuestion:
+  question: "Active loop detected. What would you like to do?"
+  header: "Resume"
+  options:
+    - label: "Resume (Recommended)"
+      description: "Continue from {stage}, {N} tasks remaining"
+    - label: "Start fresh"
+      description: "Discard existing state and begin new loop"
+    - label: "View status"
+      description: "Show detailed status then decide"
+```
+
+On "Resume": Skip to current stage (read from workflow-state.json)
+On "Start fresh": Delete `.loop/` directory, proceed to Step 0c
+On "View status": Show status (see `/loop status`), then re-ask
+
+**If no existing state:** Proceed to Step 0c
+
+### 0c. User Configuration
+
+Ask user to configure the new loop:
 
 ```
 AskUserQuestion:
@@ -53,6 +95,59 @@ AskUserQuestion:
 
 Set `CLAUDE_CODE_TASK_LIST_ID` based on choice.
 
+### Workflow State Schema
+
+Write `.loop/workflow-state.json` at each stage transition:
+
+```json
+{
+  "version": 1,
+  "stage": "intent|shape|decompose|executing|review|complete",
+  "task": "original user request",
+  "spec_score": 7,
+  "fit_score": 35,
+  "shape_chosen": "colleague|tool-review|tool",
+  "started_at": "2026-02-05T10:00:00Z",
+  "last_updated": "2026-02-05T10:15:00Z",
+  "recall_surfaced": ["auth edge cases", "validation patterns"],
+  "reviews": {
+    "wave_1": { "score": 8, "issues": 2, "blockers": 0 },
+    "thorough": { "passed": false, "blockers_remaining": 1 }
+  }
+}
+```
+
+---
+
+## Step 0.5: Recall Past Learnings
+
+Before spec scoring, surface relevant learnings:
+
+```
+1. Extract domain hints from task (e.g., "auth", "validation", "API")
+2. Invoke: Skill(skill="hope:recall", args="{domain hints}")
+3. Display top 3-5 relevant learnings:
+   - Past failures in this domain
+   - High-confidence discoveries
+   - Active constraints
+4. User confirms or dismisses
+5. Save surfaced learnings to workflow-state.json
+```
+
+**Output:**
+```
+[LOOP] Surfacing past learnings for: {domain}
+
+Relevant learnings found:
+- [failure] Auth tokens: Missing refresh caused session drops → Prevention: Always implement refresh flow
+- [discovery] (85%): JWT validation should happen middleware-level, not per-route
+- [constraint] Auth: Must use existing session store (permanent)
+
+→ Apply these learnings? [Y/n]
+```
+
+If user dismisses: proceed without applying, note in workflow-state.json
+
 ---
 
 ## Step 1: Spec Scoring
@@ -72,81 +167,44 @@ Score the user request on 5 dimensions (0-2 each, max 10):
 - **5-7:** Colleague-shaped — confirm approach after decomposition
 - **<5:** Run `Skill(skill="hope:intent", args="$ARGUMENTS")` first
 
+### Fit Score Calculation
+
+After spec scoring, calculate fit_score for workflow shape:
+
+```
+fit_score = spec_score × 5  (base conversion)
+         + (has_constraints ? 5 : 0)
+         + (has_success_criteria ? 5 : 0)
+         + (has_done_definition ? 5 : 0)
+         + (domain_familiarity ? 0-10 : 0)  // from recall
+```
+
+**Fit Decision:**
+- **40+:** Tool-shaped — autonomous execution, milestones only
+- **30-39:** Tool-with-review — checkpoint major steps
+- **25-29:** Colleague-shaped — iterate each step
+- **<25:** BLOCKED — clarify first, cannot proceed
+
+**Persist to workflow-state.json:**
+```json
+{
+  "spec_score": 7,
+  "fit_score": 35,
+  "shape_chosen": "tool-review"
+}
+```
+
 ---
 
 ## Step 1.5: Expert-Driven Clarification (if score <5)
 
-For each dimension scoring <2, invoke counsel:panel to generate expert-informed options.
+For dimensions scoring <2, invoke counsel:panel for expert-informed options.
 
-### Dimension → Expert Panel Mapping
-
-| Dimension | Experts | Focus |
-|-----------|---------|-------|
-| **Outcome** | Jobs, Graham, Kay, Victor | Vision, impact, what "done" looks like |
-| **Scope** | Fowler, Hickey, Feathers, Alexander | Boundaries, simplicity, patterns |
-| **Constraints** | Pike, Osmani, Hightower, Gregg | Engineering limits, performance, ops |
-| **Success** | Norman, Majors, Zhuo, Beck | Quality, observability, UX, testing |
-| **Done** | Cagan, Humble, Newman | Delivery, release criteria, ship gates |
-
-### Extended Aspects
-
-| Aspect | Experts |
-|--------|---------|
-| **Design** | Norman, Zhuo, Frost, Alexander |
-| **UI** | Abramov, Osmani, Perry, Wathan |
-| **UX** | Norman, Zhuo, Victor, Case |
-| **Innovation** | Jobs, Kay, Victor, Matuschak |
-
-### Protocol
-
-1. **Identify unclear dimensions** — Which scored 0 or 1?
-
-2. **For each unclear dimension:**
-   ```
-   Skill(skill="counsel:panel", args="clarify {dimension} for: {spec}")
-   ```
-   Panel returns 3-4 expert-recommended approaches.
-
-3. **Present options:**
-   ```
-   AskUserQuestion:
-     question: "How would you describe the {dimension}?"
-     options:
-       - Expert A's recommendation (with reasoning)
-       - Expert B's recommendation (with reasoning)
-       - Expert C's recommendation (with reasoning)
-   ```
-   User can select an expert option or provide custom input via "Other".
-
-4. **Apply selection** — Update spec with clarified dimension
-
-5. **Re-score** — After all dimensions clarified, re-score spec
-
-### Example: Unclear Outcome
-
-For "loop - make auth better":
-- Outcome scores 0 ("make better" is vague)
-
-Panel invocation:
 ```
-counsel:panel "clarify outcome for: make auth better"
+Skill(skill="counsel:panel", args="clarify {dimension} for: {spec}")
 ```
 
-Panel response:
-- Jobs-perspective: "Users complete login 50% faster"
-- Graham-perspective: "Reduce code complexity, easier to modify"
-- Kay-perspective: "Auth becomes composable building block"
-
-AskUserQuestion:
-```
-question: "What outcome do you want for auth?"
-options:
-  - "Users complete login faster" (Jobs: user-centric)
-  - "Simpler code, easier to change" (Graham: pragmatic)
-  - "Composable auth system" (Kay: systemic)
-```
-
-User selects → Outcome now scores 2.
+See [expert-review.md](references/expert-review.md) for dimension → expert mapping.
 
 ---
 
@@ -250,40 +308,50 @@ Pauses only at max iterations (no mid-loop human escalation).
 
 ### Progress Update
 
-After each wave, update `.loop/PROGRESS.md`:
+After each wave, update `.loop/PROGRESS.md` with completed/pending task status.
 
-```markdown
-# Loop Progress: {goal}
+### Announcements
 
-**Status:** Wave {N} | Iteration {i} | Cost: ${spent}/${budget}
-
-## ✅ Completed
-- [x] T-001: {subject}
-
-## 🔄 In Progress
-- [ ] T-002: {subject}
-
-## ⏳ Pending
-- [ ] T-003: {subject} (blocked by T-002)
+```
+[LOOP] Wave {N} | Iteration {i}/{max} | Cost: ${X}/${budget} | Tasks: {N}
+[LOOP] ✓ Wave {N} complete | Progress: {completed}/{total}
 ```
 
-### Iteration Announcement
+### Light Expert Review (After Each Wave)
 
-Before each wave:
 ```
-[LOOP] Wave {N} | Iteration {i}/{max} | Cost: ${X}/${budget} | Tasks: {executing}
+Skill(skill="counsel:panel", args="review wave {N} changes for: {spec}")
 ```
 
-After each wave:
-```
-[LOOP] ✓ Wave {N} complete | Progress: {completed}/{total} | Next: {next_wave_tasks}
-```
+- Quick check (~30s): idiomaticity, cleanliness, delivery alignment
+- Non-blocking: issues are guidance only
+- Persist review score to workflow-state.json
+
+See [expert-review.md](references/expert-review.md) for protocol.
 
 ---
 
-## Step 5: Completion
+## Step 5: Thorough Expert Review
 
-When all tasks have status="completed":
+When all tasks complete, before gate:
+
+```
+Skill(skill="counsel:panel", args="thorough review for: {spec}")
+```
+
+- Full expert panel based on all task aspects
+- Interactive findings with severity: BLOCKER / WARNING / SUGGESTION
+- Constraint-aware: checks fixes against SHAPE.md mustNot
+- Blockers create remediation tasks → return to Wave Execution
+- All blockers resolved → `reviews.thorough.passed = true` → proceed to gate
+
+See [expert-review.md](references/expert-review.md) for full protocol.
+
+---
+
+## Step 6: Completion
+
+**Prerequisites:** All tasks completed + thorough review passed.
 
 1. Run thorough verification:
 ```
@@ -361,67 +429,32 @@ Reference [hope/skills/soul](../../hope/skills/soul/SKILL.md) for workflow detai
 User: "loop - add validation to auth module"
 
 ```
-[LOOP] Configuring...
+[LOOP] Surfacing past learnings for: auth, validation
+→ 2 relevant learnings found
 
-Spec scoring:
-- Outcome: 1 (add validation - clear but no specifics)
-- Scope: 2 (auth module - specific)
-- Constraints: 0 (none stated)
-- Success: 0 (implicit)
-- Done: 0 (implicit)
-Total: 3/10 → Intent-shaped
+[LOOP] Spec scoring: 3/10 → Running /hope:intent
+[After clarification: 7/10, fit_score: 35]
 
-[LOOP] Spec unclear (3/10). Running intent clarification...
-→ Invoking /hope:intent
+[LOOP] Starting | Shape: Colleague | Tasks: 6 | Budget: $25
 
-[After intent clarification, spec is now 7/10]
+[LOOP] Wave 1 | T-001, T-002 (parallel)
+[LOOP] Wave 1 review: 8/10 | 1 suggestion
+[LOOP] ✓ Wave 1 complete | Progress: 2/6
 
-[LOOP] Generating implementation shape...
-→ Invoking /hope:shape
+[LOOP] Wave 2 | T-003, T-004 (parallel)
+[LOOP] Wave 2 review: 9/10 | 0 issues
+[LOOP] ✓ Wave 2 complete | Progress: 4/6
 
-[LOOP] Starting | Shape: Colleague (7/10) | Tasks: 6 | Budget: $25
+[LOOP] Wave 3 | T-005, T-006 (parallel)
+[LOOP] ✓ Wave 3 complete | Progress: 6/6
 
-Tasks created:
-- T-001: Add ValidationError class to errors.ts
-- T-002: Create user validation schema
-- T-003: Add validateUser function (blocked by T-001, T-002)
-- T-004: Add validateToken function (blocked by T-001)
-- T-005: Add tests for validation (blocked by T-003, T-004)
-- T-006: Update auth routes to use validation (blocked by T-003, T-004)
-
-[LOOP] Wave 1 | Iteration 1/25 | Cost: $0/$25 | Tasks: T-001, T-002
-→ Spawning 2 parallel subagents...
-
-[LOOP] ✓ Wave 1 complete | Progress: 2/6 | Next: T-003, T-004
-
-[LOOP] Wave 2 | Iteration 2/25 | Cost: $1.50/$25 | Tasks: T-003, T-004
-→ Spawning 2 parallel subagents...
-
-[LOOP] ✓ Wave 2 complete | Progress: 4/6 | Next: T-005, T-006
-
-[LOOP] Wave 3 | Iteration 3/25 | Cost: $3.00/$25 | Tasks: T-005, T-006
-→ Spawning 2 parallel subagents...
-
-[LOOP] ✓ Wave 3 complete | Progress: 6/6 | Next: completion
-
-[LOOP] Running completion gate...
+[LOOP] Thorough review: 3 findings, 0 blockers ✓
+[LOOP] Running gate...
 
 <loop-complete>
-All tasks verified:
-- T-001: ✓ Add ValidationError class
-- T-002: ✓ Create user validation schema
-- T-003: ✓ Add validateUser function
-- T-004: ✓ Add validateToken function
-- T-005: ✓ Add validation tests
-- T-006: ✓ Update auth routes
-
 ╭─ 🟢 SHIP ──────────────────────────╮
 │ Verified: execution output          │
-│ Tasks: 6/6 complete                 │
-│ Subjective: ~90% · Type 2B · 5pt   │
-├────────────────────────────────────┤
-│ ↳ Alt: Manual integration testing   │
-│ ↳ Risk: Edge cases in schema        │
+│ Tasks: 6/6 · Reviews: all passed    │
 ╰────────────────────────────────────╯
 </loop-complete>
 ```
@@ -432,7 +465,8 @@ All tasks verified:
 
 - [decomposition.md](references/decomposition.md) — Atomic task format, "one sentence" test
 - [waves.md](references/waves.md) — Wave execution protocol, parallel subagents
-- [loop-mechanics.md](references/loop-mechanics.md) — State management, stop hook, completion
+- [loop-mechanics.md](references/loop-mechanics.md) — State management, workflow-state schema, resume logic
+- [expert-review.md](references/expert-review.md) — Light/thorough review protocol, expert-to-aspect mapping
 
 ---
 

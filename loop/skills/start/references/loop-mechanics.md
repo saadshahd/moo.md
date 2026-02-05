@@ -6,41 +6,110 @@
 User Request
     ↓
 ┌─────────────────────────────────────────┐
-│            SPEC SCORING                 │
+│         STATE DETECTION (Step 0)        │
+│  Check .loop/workflow-state.json        │
+│  Check TaskList for active tasks        │
+│  Offer: Resume / Start fresh / Status   │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│        RECALL LEARNINGS (Step 0.5)      │
+│  Surface past failures and discoveries  │
+│  User confirms or dismisses             │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│     SPEC SCORING + FIT (Step 1)         │
 │  Score request on 5 dimensions          │
+│  Calculate fit_score for shape          │
 │  <5 → auto-invoke hope:intent           │
 │  ≥5 → proceed to shape                  │
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
-│          SHAPE GENERATION               │
+│       SHAPE GENERATION (Step 2)         │
 │  Auto-invoke hope:shape                 │
 │  Extract criteria, mustNot, verification│
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
-│            DECOMPOSITION                │
+│        DECOMPOSITION (Step 3)           │
 │  Parse into atomic tasks (TaskCreate)   │
 │  Set dependencies (TaskUpdate blockedBy)│
 │  Group into waves                       │
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
-│          WAVE EXECUTION                 │
+│      WAVE EXECUTION (Step 4)            │
 │  Spawn parallel subagents per wave      │
 │  Each: execute → verify → report        │
+│  Light expert review after each wave    │
 │  Stuck 1x → counsel:panel               │
-│  Continue until done or max iterations  │
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
-│           COMPLETION                    │
-│  All tasks verified → hope:gate         │
+│    THOROUGH REVIEW (Step 5)             │
+│  Full expert panel review               │
+│  Interactive blocker resolution         │
+│  Loop back if blockers remain           │
+└─────────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────────┐
+│        COMPLETION (Step 6)              │
+│  Thorough review passed → hope:gate     │
 │  Emit <loop-complete>                   │
 └─────────────────────────────────────────┘
 ```
 
 ## State Management
+
+### Workflow State (Cross-Session)
+
+`.loop/workflow-state.json` persists workflow progress across sessions:
+
+```json
+{
+  "version": 1,
+  "stage": "intent|shape|decompose|executing|review|complete",
+  "task": "original user request",
+  "spec_score": 7,
+  "fit_score": 35,
+  "shape_chosen": "colleague|tool-review|tool",
+  "started_at": "2026-02-05T10:00:00Z",
+  "last_updated": "2026-02-05T10:15:00Z",
+  "recall_surfaced": ["auth edge cases", "validation patterns"],
+  "reviews": {
+    "wave_1": { "score": 8, "issues": 2, "blockers": 0 },
+    "wave_2": { "score": 7, "issues": 3, "blockers": 1 },
+    "thorough": { "passed": false, "blockers_remaining": 1 }
+  }
+}
+```
+
+**Stage transitions update the file:**
+- intent → shape → decompose → executing → review → complete
+
+**Resume logic:**
+1. On `/loop`, check for workflow-state.json
+2. If exists and stage != complete, offer resume
+3. On resume, skip to current stage
+4. On "start fresh", delete `.loop/` directory
+
+### Fit Score Calculation
+
+```
+fit_score = spec_score × 5  (base: 0-50)
+         + (has_constraints ? 5 : 0)
+         + (has_success_criteria ? 5 : 0)
+         + (has_done_definition ? 5 : 0)
+         + (domain_familiarity ? 0-10 : 0)
+```
+
+**Shape decision:**
+- 40+: Tool-shaped (autonomous)
+- 30-39: Tool-with-review (checkpoints)
+- 25-29: Colleague-shaped (iterate each step)
+- <25: BLOCKED (clarify first)
 
 ### Primary: TaskList API
 
@@ -183,25 +252,75 @@ SessionStart hook checks for active loops:
 
 ```bash
 # session-resume.sh
-# Check TaskList files and .loop/state.json
+# Check .loop/workflow-state.json
+# Check TaskList files
 # Announce resume if loop in progress
 ```
 
 Resume announcement:
 ```
 [LOOP RESUME] Active loop detected
-Spec: {summary}
+Stage: {stage} | Spec: {spec_score}/10 | Fit: {fit_score}
 Progress: N/M tasks | Wave: X
-Next: {first pending task}
+Reviews: {wave_reviews_summary}
+Next: {suggested_action}
 ```
+
+### Resume Protocol
+
+1. On session start, check `.loop/workflow-state.json`
+2. If exists and stage != "complete":
+   - Read current stage, scores, review state
+   - Offer: "Resume loop? [Y/n/status]"
+3. On resume:
+   - Skip to current stage (no re-execution of completed stages)
+   - Read persisted spec_score and fit_score (don't recalculate)
+   - Continue from last wave or review state
+
+### Stage-Specific Resume
+
+| Stage | Resume Action |
+|-------|---------------|
+| intent | Read spec_score, continue to shape |
+| shape | Read SHAPE.md, continue to decompose |
+| decompose | Continue creating tasks |
+| executing | Read TaskList, continue waves |
+| review | Load review state, continue resolution |
+| complete | Offer new loop |
+
+## Expert Review Stage
+
+After all tasks complete, before gate:
+
+### Light Review (Per Wave)
+
+Non-blocking expert feedback after each wave:
+- Select 2-3 experts based on task aspects
+- Quick check: idiomaticity, cleanliness, delivery alignment
+- Output score + issues (informational)
+- Persist to workflow-state.json
+
+### Thorough Review (Before Gate)
+
+Blocking expert review before completion:
+- Full expert panel (3-4 experts)
+- Interactive resolution for each finding
+- Severity levels: BLOCKER / WARNING / SUGGESTION
+- Constraint-aware guidance (checks mustNot from SHAPE.md)
+- Creates remediation tasks for unresolved blockers
+- Must pass (blockers_remaining = 0) before gate
+
+See [expert-review.md](expert-review.md) for full protocol.
 
 ## Completion
 
-When all tasks complete:
+Prerequisites: All tasks complete + thorough review passed.
 
-1. Invoke `hope:gate` for verification
-2. If gate passes → emit `<loop-complete>`
-3. If gate fails → create remediation tasks, continue loop
+1. Check `reviews.thorough.passed` in workflow-state.json
+2. If false → return to review stage
+3. If true → invoke `hope:gate` for verification
+4. If gate passes → emit `<loop-complete>`
+5. If gate fails → create remediation tasks, continue loop
 
 ```
 <loop-complete>

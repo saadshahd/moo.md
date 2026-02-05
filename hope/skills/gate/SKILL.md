@@ -41,6 +41,19 @@ Run before substantial work begins. Blocks execution if missing.
 
 ## Post-Work Gate (Before Claiming Done)
 
+### Expert Review Check (Loop Integration)
+
+When invoked after loop execution, check expert review status:
+
+```
+□ Thorough expert review passed?
+  → Check .loop/workflow-state.json for reviews.thorough.passed
+  → Must be true to proceed
+  → If false: "⚠️ Expert review has {N} unresolved blockers. Resolve before gate."
+```
+
+If `reviews.thorough.passed` is false → block gate until review passes.
+
 ### Verify Integration
 
 Before running workflow-specific checks, ensure verify passed:
@@ -105,6 +118,17 @@ Default: Require `execution output`, `observation`, or `measurement` before comp
 | Thorough | Before gate | Full evidence report |
 
 Gate requires **thorough** tier results before allowing completion claim.
+
+### Expert Review Requirement (Loop Integration)
+
+When loop is active, gate also checks:
+
+| Check | Source | Requirement |
+|-------|--------|-------------|
+| Thorough review | workflow-state.json | `reviews.thorough.passed = true` |
+| Blockers resolved | workflow-state.json | `reviews.thorough.blockers_remaining = 0` |
+
+If either fails → block completion, suggest resolving review findings.
 
 ### Boundary
 
