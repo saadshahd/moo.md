@@ -1,7 +1,7 @@
 ---
 name: start
 description: Start autonomous iteration loop OR explain how Loop works. Triggers on "loop", "keep going", "don't stop", "continue until done", "until tests pass", "implement full feature", "fix all problems", "make better", "what is loop", "how does loop work", "loop help", or any persistence pattern.
-model: opus
+model: sonnet
 allowed-tools: Bash, Read, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, Skill, AskUserQuestion
 ---
 
@@ -527,12 +527,15 @@ User: "loop - add validation to auth module"
 
 ---
 
-## References
+## References (Load by Stage)
 
-- [decomposition.md](references/decomposition.md)
-- [waves.md](references/waves.md)
-- [loop-mechanics.md](references/loop-mechanics.md)
-- [expert-review.md](references/expert-review.md)
+| Stage | Reference | When |
+|-------|-----------|------|
+| decompose | [decomposition.md](references/decomposition.md) | Before TaskCreate |
+| executing | [waves.md](references/waves.md) | If wave strategy unclear |
+| review | [expert-review.md](references/expert-review.md) | Before counsel:panel |
+
+Architecture overview: [loop-mechanics.md](references/loop-mechanics.md) (for troubleshooting only)
 
 ---
 

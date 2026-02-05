@@ -116,21 +116,9 @@ For most situations, use these first:
 
 ## All Tools (when default doesn't fit)
 
-| Category          | Tools                                                                                                                                                                                                 | When to Use                                        |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Root Cause        | [Ishikawa](references/tools/ishikawa.md), [Iceberg](references/tools/iceberg.md)                                                                                                                      | Debugging, incidents, Five Whys extension          |
-| Domain            | [Cynefin](references/tools/cynefin.md)                                                                                                                                                                | Choosing approach before diving in                 |
-| Decision          | [Decision Matrix](references/tools/decision-matrix.md), [Hard Choice](references/tools/hard-choice.md), [OODA](references/tools/ooda.md), [Ladder of Inference](references/tools/ladder-inference.md), [Grey Thinking](references/tools/grey-thinking.md), [10-10-10](references/tools/10-10-10.md) | Multi-option choices, fast decisions, avoid binary traps, time perspective |
-| Prioritization    | [Eisenhower](references/tools/eisenhower.md), [Impact-Effort](references/tools/impact-effort.md), [Opportunity Cost](references/tools/opportunity-cost.md), [Systems Over Goals](references/tools/systems-over-goals.md) | Backlog grooming, debt triage, tradeoffs, habits   |
-| Systems           | [Feedback Loops](references/tools/feedback-loops.md), [Connection Circles](references/tools/connection-circles.md), [Second-Order](references/tools/second-order.md), [Incentives](references/tools/incentives.md), [Bottlenecks](references/tools/bottlenecks.md) | Architecture, metrics, behavior, constraints       |
-| Creative          | [Zwicky Box](references/tools/zwicky-box.md), [Abstraction Ladder](references/tools/abstraction-ladder.md), [Productive Thinking](references/tools/productive-thinking.md), [Deliberate Practice](references/tools/deliberate-practice.md) | Brainstorming, reframing, innovation, skill building |
-| Communication     | [Minto Pyramid](references/tools/minto-pyramid.md), [SBI](references/tools/sbi.md), [Conflict Resolution](references/tools/conflict-resolution.md), [Steel Man](references/tools/steel-man.md) | Writing, feedback, negotiation, argumentation      |
-| Problem Structure | [Issue Trees](references/tools/issue-trees.md), [First Principles](references/tools/first-principles.md), [Concept Map](references/tools/concept-map.md)                                              | Decomposition, exhaustive breakdown                |
-| Risk              | [Pre-Mortem](references/tools/pre-mortem.md)                                                                                                                                                          | Anticipate failure before starting                 |
-| Boundaries        | [Circle of Competence](references/tools/circle-of-competence.md), [Chesterton's Fence](references/tools/chestertons-fence.md)                                                                         | Know limits, understand before changing            |
-| Probability       | [Bayesian Thinking](references/tools/bayesian-thinking.md)                                                                                                                                            | Update beliefs with evidence, calibrate confidence |
-| Abstraction       | [Map vs Territory](references/tools/map-territory.md)                                                                                                                                                 | Models ≠ reality, question assumptions             |
-| Biases            | [Munger's 25](references/tools/munger-biases.md)                                                                                                                                                      | Pre-decision bias check, high-stakes decisions     |
+See [Tools Index](references/tools/_index.md) for full catalog organized by category.
+
+Load specific tool only when default tools above don't fit the situation.
 
 ## Tool Pairings
 
