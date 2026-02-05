@@ -22,6 +22,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **CLAUDE.md**: DOT notation guidelines (color palette, node conventions, when to use)
 - **CLAUDE.md**: Description Trap warning in conventions and anti-patterns
 
+### Changed
+
+- **counsel**: Switch from `model: opus` to `model: sonnet` (cost optimization - expert simulation is pattern matching, not complex reasoning)
+- **loop/start**: Switch from `model: opus` to `model: sonnet` (cost optimization - orchestration, not reasoning)
+- **hope/soul**: Replace 37-tool inline table with [Tools Index](hope/skills/soul/references/tools/_index.md) for selective loading
+- **loop/start**: Stage-conditional reference loading (load only decomposition/waves/expert-review when needed)
+- **counsel/panel**: Default to 2 experts with progressive disclosure ("expand" to add more)
+
 ### Fixed
 
 - **hope/gate**: Remove process details from description (trigger-only)

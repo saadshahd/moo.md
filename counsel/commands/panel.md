@@ -66,7 +66,7 @@ digraph PanelWorkflow {
 
 **Pre-filter:** Load `~/.claude/counsel-blocklist.json` and remove blocked profiles before selection. If `--experts` flag includes a blocked profile, warn and exclude it.
 
-Load history from `.claude/logs/counsel-reviews.jsonl` if exists. Select 2-3 experts with distinct perspectives — each panelist should ask a fundamentally different question. If `--experts` specified, use those (minus blocked); otherwise auto-select per [inference.md](../skills/counsel/references/inference.md). If ambiguous, ask 1-2 clarifying questions first.
+Load history from `.claude/logs/counsel-reviews.jsonl` if exists. Select 2 experts with distinct perspectives — each panelist should ask a fundamentally different question. If `--experts` specified, use those (minus blocked, max 2 unless `--expand`); otherwise auto-select per [inference.md](../skills/counsel/references/inference.md). If ambiguous, ask 1-2 clarifying questions first.
 
 ### Step 2: Generate Review
 
@@ -105,9 +105,9 @@ Output log entry for `.claude/logs/counsel-reviews.jsonl` with: ts, topic, panel
 
 ## Panel Size
 
-- **Minimum:** 2 experts
-- **Maximum:** 4 experts
-- **Optimal:** 3 experts (manageable debate, diverse views)
+- **Default:** 2 experts (load only 2 profiles)
+- **Maximum:** 4 experts (only if user requests `--expand`)
+- **Progressive:** After initial response, offer "Want another perspective? Reply 'expand' to add 1-2 more experts."
 
 ## Constraints
 
@@ -130,12 +130,14 @@ When invoked with `clarify {dimension} for: {spec}` pattern:
 
 1. **Parse dimension** — Identify which spec dimension (Outcome/Scope/Constraints/Success/Done)
 
-2. **Select experts** — Use dimension mapping:
-   - Outcome → vision experts (Jobs, Graham, Kay, Victor)
-   - Scope → architecture experts (Fowler, Hickey, Feathers, Alexander)
-   - Constraints → engineering experts (Pike, Osmani, Hightower, Gregg)
-   - Success → quality experts (Norman, Majors, Zhuo, Beck)
-   - Done → delivery experts (Cagan, Humble, Newman)
+2. **Select 2 experts** — Pick 2 from dimension pool (most relevant to context):
+   - Outcome → vision: Jobs, Graham, Kay, Victor
+   - Scope → architecture: Fowler, Hickey, Feathers, Alexander
+   - Constraints → engineering: Pike, Osmani, Hightower, Gregg
+   - Success → quality: Norman, Majors, Zhuo, Beck
+   - Done → delivery: Cagan, Humble, Newman
+
+   Load only the 2 selected profiles. Offer "expand" for more perspectives.
 
 3. **Generate options** — Each expert proposes a concrete clarification
    - Specific and measurable
