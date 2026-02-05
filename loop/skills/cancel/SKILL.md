@@ -65,7 +65,7 @@ Criteria status:
 - [criterion 1]: ✓/✗
 - [criterion 2]: ✓/✗
 
-To restart: /loop [spec]
+To restart: /loop:start [spec]
 ```
 
 ## Guarantees

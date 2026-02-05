@@ -11,7 +11,7 @@ acceptableSkills:
   - hope:soul
   - intent
   - hope:intent
-prompt: "Run /loop to implement the full feature. Don't stop until tests pass."
+prompt: "Run /loop:start to implement the full feature. Don't stop until tests pass."
 expectedBehaviors:
   - "Spec scoring rubric applied"
   - "Workflow shape determined (Tool or Colleague)"

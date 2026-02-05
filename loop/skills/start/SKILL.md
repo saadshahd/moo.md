@@ -65,7 +65,7 @@ AskUserQuestion:
 
 On "Resume": Skip to current stage (read from workflow-state.json)
 On "Start fresh": Delete `.loop/` directory, proceed to Step 0c
-On "View status": Show status (see `/loop status`), then re-ask
+On "View status": Show status (see `/loop:status`), then re-ask
 
 **If no existing state:** Proceed to Step 0c
 
@@ -438,10 +438,10 @@ Reference [hope/skills/soul](../../hope/skills/soul/SKILL.md) for workflow detai
 
 | Command | Effect |
 |---------|--------|
-| `/loop [spec]` | Start new loop |
-| `/loop continue` | Resume paused loop |
-| `/loop cancel` | Terminate and clean up |
-| `/loop status` | Show current state from TaskList |
+| `/loop:start [spec]` | Start new loop |
+| `/loop:start` | Resume paused loop (auto-detects) |
+| `/loop:cancel` | Terminate and clean up |
+| `/loop:status` | Show current state from TaskList |
 
 ---
 

@@ -49,7 +49,7 @@ message="[LOOP RESUME] Active loop detected
 Task: ${task}
 Stage: ${stage} | Shape: ${shape}
 Spec: ${spec_score}/10 | Fit: ${fit_score}
-Run /loop to resume or /loop cancel to clear."
+Run /loop:start to resume or /loop:cancel to clear."
 
 # Escape for JSON using jq
 escaped_message=$(echo "$message" | jq -Rs '.' 2>/dev/null || echo '"[LOOP RESUME] Active loop detected"')

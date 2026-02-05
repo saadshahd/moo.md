@@ -90,7 +90,7 @@ User Request
 - intent → shape → decompose → executing → review → complete
 
 **Resume logic:**
-1. On `/loop`, check for workflow-state.json
+1. On `/loop:start`, check for workflow-state.json
 2. If exists and stage != complete, offer resume
 3. On resume, skip to current stage
 4. On "start fresh", delete `.loop/` directory

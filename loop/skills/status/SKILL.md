@@ -57,13 +57,13 @@ Based on current stage:
 
 | Stage | Suggested Action |
 |-------|-----------------|
-| (no state) | "Run `/loop [task]` to start a new loop" |
-| intent | "Run `/loop` to continue to shape" |
-| shape | "Run `/loop` to start decomposition" |
-| decompose | "Run `/loop` to begin execution" |
-| executing | "Run `/loop` to continue wave {N}" |
-| review | "Run `/loop` to resolve {blockers} blockers" |
-| complete | "Loop finished. Run `/loop [new task]` for new work" |
+| (no state) | "Run `/loop:start [task]` to start a new loop" |
+| intent | "Run `/loop:start` to continue to shape" |
+| shape | "Run `/loop:start` to start decomposition" |
+| decompose | "Run `/loop:start` to begin execution" |
+| executing | "Run `/loop:start` to continue wave {N}" |
+| review | "Run `/loop:start` to resolve {blockers} blockers" |
+| complete | "Loop finished. Run `/loop:start [new task]` for new work" |
 
 ---
 
@@ -76,10 +76,7 @@ If no `.loop/workflow-state.json` exists:
 │ No active loop detected.                        │
 │                                                 │
 │ Start a new loop:                               │
-│   /loop "add auth to app"                       │
-│                                                 │
-│ Or check task list:                             │
-│   /loop continue                                │
+│   /loop:start "add auth to app"                 │
 ╰─────────────────────────────────────────────────╯
 ```
 
@@ -89,7 +86,6 @@ If no `.loop/workflow-state.json` exists:
 
 | Command | Effect |
 |---------|--------|
-| `/loop status` | Show current state (this command) |
-| `/loop` | Resume or start loop |
-| `/loop continue` | Resume paused loop |
-| `/loop cancel` | Terminate and clean up |
+| `/loop:status` | Show current state (this command) |
+| `/loop:start` | Resume or start loop |
+| `/loop:cancel` | Terminate and clean up |
