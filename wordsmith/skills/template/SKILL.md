@@ -24,9 +24,9 @@ Announce which template you're using:
 
 | Request Pattern | Action | Reference |
 |-----------------|--------|-----------|
-| "RFC", "request for comments", "design doc", "proposal" | Apply RFC template | `references/templates/rfc.md` |
-| "ADR", "architecture decision", "decision record" | Apply ADR template | `references/templates/adr.md` |
-| "blog", "blog post", "article", "technical post" | Apply Blog template | `references/templates/blog.md` |
+| "RFC", "request for comments", "design doc", "proposal" | Apply RFC template | `rfc.md` |
+| "ADR", "architecture decision", "decision record" | Apply ADR template | `adr.md` |
+| "blog", "blog post", "article", "technical post" | Apply Blog template | `blog.md` |
 | "[custom name]" template | Apply user template | `~/.claude/wordsmith/templates.jsonl` |
 | "list templates", "show my templates" | List all templates | See Template Management below |
 | "create custom template", "save as template" | Create user template | See Template Management below |

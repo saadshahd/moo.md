@@ -25,7 +25,7 @@ Each plugin follows:
 <plugin>/
 ├── .claude-plugin/plugin.json    # name, version, description, keywords, author
 ├── skills/<name>/SKILL.md
-└── skills/<name>/references/
+└── skills/<name>/[data files]    # profiles/, templates — flat alongside SKILL.md
 ```
 
 Plugin discovery uses `.claude-plugin/marketplace.json` at repo root (lists all plugins).
@@ -77,13 +77,15 @@ tools: Read, Glob, Grep, Bash
 - Skills: `skills/<skill-name>/SKILL.md` (kebab-case)
 - Agents: `agents/<role>.md` (e.g., `explorer.md`, `delve.md`)
 
-### Reference Files
+### File Limits
 
-- Place in `skills/<skill-name>/references/`
-- Subdirectories allowed for organization (e.g., `references/tools/`, `references/profiles/`)
-- No reference chains: a reference file should not require loading another reference to function
-- Exception: intra-plugin sharing allowed (e.g., `trace` referencing `soul/references/blameless.md`)
-- Keep SKILL.md under 500 lines; split to references if larger
+- SKILL.md: **200 lines max**
+- No `references/` directories — flat files alongside SKILL.md only when essential
+- Supporting files: max 3 per skill (data files like profiles, templates)
+- Self-contained: SKILL.md works without loading external files
+- Decision tables > prose explanations
+- No inline code examples > 5 lines
+- No navigation/catalog sections in skills
 
 ### Token Efficiency
 
@@ -162,11 +164,14 @@ JSON state files have formal schemas in `schemas/`:
 ## Anti-Patterns
 
 - Generic names (`*Manager`, `*Helper`, `*Utils`)
-- Nested reference chains (A → B → C)
+- Reference chains or deep `references/` hierarchies
 - Time estimates instead of story points
 - Duplicating content across docs (link to single source)
 - Windows paths or magic numbers in scripts
 - **Process details in skill descriptions** (causes Claude to skip flowcharts)
+- Inline examples longer than 5 lines
+- Navigation/catalog sections in skills (tool indexes, skill tables)
+- Skills over 200 lines
 
 ## Changelog
 

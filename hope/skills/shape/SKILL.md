@@ -14,11 +14,10 @@ hooks:
 
 Bridge between intent clarification and implementation. Transforms WHAT into HOW.
 
-## When This Skill Activates
+## When to Use Shape
 
 - After `/hope:intent` when spec_score >= 5
 - Explicit request: "shape this", "how should I build this"
-- Implementation approach questions
 - Architecture decisions needed before coding
 
 **If spec_score < 5:** Return to `/hope:intent` for clarification first.
@@ -27,208 +26,127 @@ Bridge between intent clarification and implementation. Transforms WHAT into HOW
 
 ## Protocol
 
-### 1. Aspect Discovery
+### 1. Extract Intent
 
-Not all aspects apply to every task. Discover which are relevant:
+From user request or prior `/hope:intent`, extract: goal, constraints, scope.
 
-| Aspect | Signal Keywords | When Relevant |
-|--------|-----------------|---------------|
-| Data | database, schema, storage, persist | Stateful changes |
-| API | endpoint, route, request, response | Service boundaries |
-| UI | component, display, user, interaction | Visual interfaces |
-| Auth | permission, role, access, security | Protected resources |
-| Performance | fast, scale, concurrent, cache | High-traffic paths |
-| Error | fail, recover, retry, fallback | Resilience needed |
-| Testing | verify, confidence, coverage | Quality requirements |
-| Migration | existing, legacy, transition | Brownfield work |
-| Integration | third-party, external, sync | Cross-system |
-| Deployment | release, rollback, feature flag | Delivery concerns |
+### 2. Identify Candidate Shapes
 
-**Rule:** Only shape aspects that appear in the spec or have clear dependencies.
+Three collaboration modes determine how user and agent interact during implementation:
 
----
+| Shape | Interaction | Best When |
+|-------|-------------|-----------|
+| **Colleague** | Iterate every step together | High ambiguity, novel domain, irreversible decisions |
+| **Tool-Review** | Autonomous with checkpoints at major decisions | Moderate complexity, known patterns with unknowns |
+| **Tool** | Fully autonomous, milestone announcements only | Clear requirements, well-trodden patterns, low risk |
 
-### 2. Expert Consultation
+### 3. Score Aspects
 
-For each relevant aspect, consult the appropriate expert:
+For each aspect in the discovery table below, determine which shape column the task falls into.
 
-| Aspect | Anchor Expert | Philosophy |
-|--------|---------------|------------|
-| Data | Rich Hickey | Immutability, simplicity, facts over place |
-| API | Martin Fowler | Pragmatic patterns, evolvability |
-| UI | Don Norman | User-centered, affordances, feedback |
-| Auth | OWASP | Defense in depth, least privilege |
-| Performance | Brendan Gregg | Measure first, optimize bottlenecks |
-| Error | Michael Nygard | Stability patterns, circuit breakers |
-| Testing | Kent Beck | Test behavior, not implementation |
-| Migration | Sam Newman | Strangler fig, incremental migration |
-| Integration | Gregor Hohpe | Messaging patterns, loose coupling |
-| Deployment | Jez Humble | Continuous delivery, reversibility |
+### 4. Select Shape
 
-See [anchor-experts.md](references/anchor-experts.md) for detailed guidance.
+Count which column each aspect lands in:
+
+- **Majority Colleague** → Colleague shape
+- **Majority Tool** → Tool shape
+- **Mixed or majority Tool-Review** → Tool-Review shape
+- **Override:** Any Colleague in Risk or Interdependency → at minimum Tool-Review
+- **Default when uncertain:** Tool-Review
+
+### 5. Emit SHAPE.md
+
+Write `.loop/shape/SHAPE.md` with: selected shape, relevant aspects with evidence, criteria (boolean/verifiable), mustNot constraints.
 
 ---
 
-### 3. Conflict Resolution
+## Aspect Discovery
 
-When experts disagree, apply the anchor hierarchy:
+Score each aspect for the task. The column where most aspects land determines the shape.
 
-```
-1. Hickey (simplicity) — "Is this genuinely simple, or just familiar?"
-2. Fowler (pragmatism) — "Can I change this later without a rewrite?"
-3. If still tied — Pick option with fewer dependencies
-```
+| Aspect | Colleague | Tool-Review | Tool |
+|--------|-----------|-------------|------|
+| Decomposition | Cannot break down without user | Breaks down, user validates | Self-decomposes fully |
+| Interdependency | High coupling across unknowns | Moderate, checkpoints at boundaries | Low, independent pieces |
+| Novelty | No precedent, unknown patterns | Known patterns with variations | Well-trodden, clear precedent |
+| Risk | High blast radius, irreversible | Medium, partially reversible | Low, fully reversible |
+| Ambiguity | Requirements unclear or conflicting | Mostly clear, few open questions | Crisp, complete requirements |
+| Domain knowledge | Needs user context to proceed | Partial context, can infer rest | Full context available |
+| Verification | User must define pass/fail | User approves test plan | Self-verifiable criteria |
+| Reversibility | Hard to undo, high stakes | Moderate rollback effort | Trivial to revert |
 
-**Document conflicts:** Note which experts disagreed and why one was chosen.
-
----
-
-### 4. SHAPE.md Output
-
-Generate `.loop/shape/SHAPE.md`:
-
-```markdown
-## Shape: [Task Name]
-
-### Relevant Aspects
-- [Aspect 1]: [Why relevant]
-- [Aspect 2]: [Why relevant]
-
-### Implementation Criteria
-
-criteria:
-- [Criterion 1 — Boolean, verifiable]
-- [Criterion 2 — Specific outcome]
-- [Criterion 3 — Measurable state]
-
-### Must-NOT Constraints
-
-mustNot:
-- [Constraint 1 — What to avoid]
-- [Constraint 2 — Anti-pattern to prevent]
-
-### Verification Plan
-
-| Criterion | Verification Type | Command/Method |
-|-----------|------------------|----------------|
-| [Criterion 1] | execution output | `npm test` |
-| [Criterion 2] | observation | Visual check in browser |
-| [Criterion 3] | measurement | Response time < 100ms |
-
-### Expert Decisions
-
-| Aspect | Expert | Recommendation | Confidence |
-|--------|--------|----------------|------------|
-| Data | Hickey | Use immutable events | 85% |
-| API | Fowler | REST with HATEOAS | 75% |
-
-### Conflicts Resolved
-
-[If any experts disagreed, document here with reasoning]
-```
-
-See [shape-template.md](references/shape-template.md) for full template.
+**Rule:** Only score aspects that appear in the spec or have clear dependencies. Skip irrelevant rows.
 
 ---
 
-## Verify Integration
+## Expert Consultation
 
-After generating SHAPE.md, trigger verify to lock criteria:
+For each relevant implementation dimension, consult the anchor expert:
 
-```
-Skill(skill="hope:verify", args="lock criteria from shape")
-```
+| Dimension | Expert | Core Question |
+|-----------|--------|---------------|
+| Data | Rich Hickey | "Is this genuinely simple, or just familiar?" |
+| API | Martin Fowler | "Can I change this later without a rewrite?" |
+| UI | Don Norman | "What does this afford?" |
+| Auth | OWASP | "What's the blast radius if this fails?" |
+| Performance | Brendan Gregg | "Where is the actual bottleneck?" |
+| Error | Michael Nygard | "What happens when this fails?" |
+| Testing | Kent Beck | "Am I testing behavior or implementation?" |
+| Migration | Sam Newman | "Can we do this incrementally?" |
+| Integration | Gregor Hohpe | "What if delivered twice?" |
+| Deployment | Jez Humble | "Can we roll this back in minutes?" |
 
-This:
-1. Converts criteria to boolean checks
-2. Discovers project verification tools
-3. Generates verification commands per criterion
-4. Stores in `.loop/verify-config.json`
+**Conflict hierarchy:** Hickey (simplicity) → Fowler (pragmatism) → option with fewer dependencies.
 
-**Output appended to SHAPE.md:**
-
-```markdown
-### Verification Commands (Auto-generated)
-
-| Criterion | Boolean | Command |
-|-----------|---------|---------|
-| [Criterion 1] | [Exact condition] | `[verification command]` |
-
-Tools discovered: test=`npm test`, lint=`npm run lint`
-```
+Document which experts disagreed and why one was chosen.
 
 ---
 
-## Modes
+## Decision Logic
 
-### Present Mode (Default)
+digraph shape_decision {
+  rankdir=TB
+  node [shape=box style="rounded,filled" fillcolor="#f5f5f5"]
 
-Show reasoning, ask user on conflicts:
+  start [label="Spec ready\n(score >= 5)" fillcolor="#e6f3ff"]
+  score [label="Score 8 aspects\nagainst 3 shapes" fillcolor="#ffe6cc"]
+  decide [label="Majority column?" shape=diamond fillcolor="#fff4cc"]
+  override [label="Risk or Interdep\n= Colleague?" shape=diamond fillcolor="#fff4cc"]
+  colleague [label="Colleague shape" fillcolor="#ccffcc"]
+  tool_review [label="Tool-Review shape" fillcolor="#ccffcc"]
+  tool [label="Tool shape" fillcolor="#ccffcc"]
 
-1. Display discovered aspects with evidence
-2. Show expert recommendations
-3. Pause on conflicts: "Hickey suggests X, Fowler suggests Y. Which aligns with your goals?"
-4. Generate SHAPE.md after user approval
-
-### Autonomous Mode
-
-Apply anchor hierarchy silently:
-
-1. Discover aspects
-2. Consult experts
-3. Resolve conflicts using hierarchy
-4. Generate SHAPE.md
-5. Announce: `[SHAPE] Generated .loop/shape/SHAPE.md | N criteria | M mustNot`
-
-**Trigger autonomous:** "shape this autonomously" or fit_score >= 40
+  start -> score -> decide
+  decide -> colleague [label="Colleague"]
+  decide -> tool_review [label="Mixed/Tool-Review"]
+  decide -> override [label="Tool"]
+  override -> tool_review [label="Yes" style=dashed]
+  override -> tool [label="No"]
+}
 
 ---
 
-## Loop Integration
+## Integration
 
-SHAPE.md feeds directly into `/loop:start`:
+1. Invoke `/hope:soul` to ground decisions in user values
+2. Run this skill's protocol (steps 1-5)
+3. Write `.loop/shape/SHAPE.md`
+4. Invoke `/hope:verify` to lock criteria: `Skill(skill="hope:verify", args="lock criteria from shape")`
 
-| SHAPE Field | Loop Field |
+SHAPE.md feeds into `/loop:start`:
+
+| SHAPE Field | Loop Usage |
 |-------------|------------|
-| `criteria:` | `criteriaStatus` |
+| `criteria:` | `criteriaStatus` tracking |
 | `mustNot:` | Circuit breaker triggers |
-| `verification:` | Verification type per criterion |
-
-**Exit blocked:** If any criterion has verification type "assumption", exit_signal cannot be true.
-
----
-
-## Quality Footer
-
-After generating SHAPE.md:
-
-```
-╭─ [VERDICT] ──────────────────────────────╮
-│ Aspects: N shaped | Experts: M consulted │
-│ Criteria: X | MustNot: Y                 │
-│ Conflicts: Z resolved via hierarchy      │
-├──────────────────────────────────────────┤
-│ ↳ Alt: [alternative approach]            │
-│ ↳ Key assumption: [main uncertainty]     │
-╰──────────────────────────────────────────╯
-```
+| `shape:` | Interaction mode for waves |
 
 ---
 
 ## Boundary
 
-**Shape surfaces considerations; user owns architecture.**
+Shape surfaces considerations; user owns architecture.
 
 - Expert recommendations are patterns, not prescriptions
 - User resolves conflicts — hierarchy is a tiebreaker, not authority
-- If user disagrees with expert guidance, user's context wins
-
-Shape informs design decisions, never makes them.
-
----
-
-## References
-
-- `references/aspect-discovery.md` — Detailed aspect signals
-- `references/anchor-experts.md` — Expert philosophies and guidance
-- `references/shape-template.md` — Full SHAPE.md template
+- Shape informs design decisions, never makes them

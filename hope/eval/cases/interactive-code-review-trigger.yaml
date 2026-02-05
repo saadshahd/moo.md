@@ -1,0 +1,13 @@
+name: hope-interactive-code-review-trigger
+description: Interactive code review skill triggers on PR review requests
+plugin: hope
+skill: hope:interactive-code-review
+flaky: true
+acceptableSkills:
+  - interactive-code-review
+  - hope:interactive-code-review
+prompt: "review my PR changes — walk me through the diff and let me give feedback on each section"
+expectedBehaviors:
+  - "Interactive code review skill activates on PR review request"
+  - "Offers to walk through changes section by section"
+  - "Supports Skip/Done/Jump commands for navigation"

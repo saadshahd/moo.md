@@ -1,8 +1,8 @@
 ---
 name: counsel
 description: Use when asking "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", or needing domain guidance.
-model: sonnet
-allowed-tools: Read, Bash
+model: opus
+allowed-tools: Read, Grep, Glob
 ---
 
 # counsel
@@ -17,22 +17,19 @@ Simulate expert perspectives for code guidance, style, and debates.
 - "what would [expert] say", "ask [expert]"
 - "review", "audit", "panel", "guidance"
 - "idiomatic", "best practice", "clean code"
-- Domain keywords from curated profiles (see [inference.md](references/inference.md))
+- Domain keywords matching curated profiles below
 
 ---
 
 ## Core Constraint
 
-You excel at simulating expert perspectives based on documented work. This is pattern-matching on published material, not claiming to be the expert themselves.
+Pattern-matching on published material, not claiming to be the expert.
 
-**You're skilled at:**
-- Stating confidence explicitly (X/10) — this shows thoughtfulness
-- Citing prior work — intellectual honesty
-- Using "would likely" — honoring uncertainty
-- Flagging low confidence — transparency builds trust
-- Checking calibrations — learning from feedback
-
-Take your time with each simulation. You've got this.
+- State confidence explicitly (X/10)
+- Cite prior work
+- Use "would likely" to honor uncertainty
+- Flag low confidence
+- Check calibrations
 
 ---
 
@@ -42,133 +39,125 @@ Take your time with each simulation. You've got this.
 digraph CounselWorkflow {
   rankdir=TB
   node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
-
-  Start [label="User Query", fillcolor="#e6f3ff"]
-
-  // Step 0
-  LoadCal [label="Step 0:\nLoad calibrations"]
-  CheckCal [label="calibrations.jsonl\nexists?", shape=diamond, fillcolor="#fff4cc"]
-  ApplyCal [label="Apply to\nmatching experts"]
-  NoCal [label="Skip"]
-
-  // Step 0.5
-  LoadBlock [label="Step 0.5:\nLoad blocklist"]
-  CheckBlock [label="blocklist.json\nexists?", shape=diamond, fillcolor="#fff4cc"]
-  BuildExcluded [label="Build excluded\nset"]
-  NoBlock [label="Skip"]
-
-  // Step 1
-  Detect [label="Step 1:\nDetect Expert", fillcolor="#ffe6cc"]
-  CheckExplicit [label="Explicit\nname?", shape=diamond, fillcolor="#fff4cc"]
-  CheckKeyword [label="Trigger\nkeyword?", shape=diamond, fillcolor="#fff4cc"]
-  CheckContext [label="File\ncontext?", shape=diamond, fillcolor="#fff4cc"]
-  CheckDomain [label="Domain\nsignal?", shape=diamond, fillcolor="#fff4cc"]
-  AskUser [label="Ask user or\ngeneric guidance"]
-
-  // Step 2
-  Load [label="Step 2:\nLoad Profile", fillcolor="#ffe6cc"]
-  CheckCurated [label="Curated\nprofile?", shape=diamond, fillcolor="#fff4cc"]
-  LoadCurated [label="Load profile\nbase 6/10"]
-  LoadDynamic [label="Dynamic sim\nbase 4/10\n+ warning"]
-
-  // Step 3
-  Generate [label="Step 3:\nGenerate Response", fillcolor="#ccffcc"]
-
-  Start -> LoadCal
-  LoadCal -> CheckCal
-  CheckCal -> ApplyCal [label="yes"]
-  CheckCal -> NoCal [label="no"]
-  ApplyCal -> LoadBlock
-  NoCal -> LoadBlock
-
-  LoadBlock -> CheckBlock
-  CheckBlock -> BuildExcluded [label="yes"]
-  CheckBlock -> NoBlock [label="no"]
-  BuildExcluded -> Detect
-  NoBlock -> Detect
-
-  Detect -> CheckExplicit
-  CheckExplicit -> Load [label="match"]
-  CheckExplicit -> CheckKeyword [label="no"]
-  CheckKeyword -> Load [label="match"]
-  CheckKeyword -> CheckContext [label="no"]
-  CheckContext -> Load [label="match"]
-  CheckContext -> CheckDomain [label="no"]
-  CheckDomain -> Load [label="match"]
-  CheckDomain -> AskUser [label="no"]
-  AskUser -> Load [style=dashed]
-
-  Load -> CheckCurated
-  CheckCurated -> LoadCurated [label="yes"]
-  CheckCurated -> LoadDynamic [label="no"]
-  LoadCurated -> Generate
-  LoadDynamic -> Generate
+  Input [label="User Query", fillcolor="#e6f3ff"]
+  Blocklist [label="Step 0: Load blocklist\n+ calibrations"]
+  Detect [label="Step 1: Detect Domain\n-> Match Expert", fillcolor="#ffe6cc"]
+  Infer [label="Step 2: Load Profile\n-> Score Confidence", fillcolor="#ffe6cc"]
+  Generate [label="Step 3: Generate\nResponse", fillcolor="#ccffcc"]
+  Input -> Blocklist -> Detect -> Infer -> Generate
 }
 ```
 
-### Step 0: Load Calibrations
+### Step 0: Load State
 
-Read `.claude/logs/counsel-calibrations.jsonl` if it exists.
-Apply all calibrations to matching expert simulations.
-
-### Step 0.5: Load Blocklist
-
-Read `~/.claude/counsel-blocklist.json` if it exists. Build excluded set from blocked profile names.
-
-These profiles are invisible to detection, paneling, and summoning.
-
-If user explicitly requests a blocked profile by name, refuse with:
-> "⚠️ [profile] is on your blocklist. Use `/counsel:unblock [name]` to remove."
+Read `~/.claude/counsel-blocklist.json` and `.claude/logs/counsel-calibrations.jsonl` if they exist. Blocked profiles are invisible to detection and panels. If user requests a blocked profile by name, refuse and suggest `/counsel:unblock`.
 
 ### Step 1: Detect Expert
 
-Follow [inference.md](references/inference.md) detection order:
+Detection order (first match wins):
 
-1. Explicit name mention → direct match
-2. Trigger keywords → match to curated profile
-3. File context → infer from extensions/imports
-4. Domain signals → topic-based routing
-5. No match → ask user or provide generic guidance
+1. **Explicit name** -- expert named in query
+2. **Trigger keywords** -- match curated profile keywords
+3. **File context** -- infer from extensions/imports (`.tsx` -> React, `.go` -> Go, `.py` -> Python)
+4. **Domain signals** -- topic-based routing via domain map below
+5. **No match** -- ask user or provide generic guidance
 
-### Step 2: Load Profile
+### Step 2: Load Profile + Score Confidence
 
-**Efficiency note:** After Step 1 detection, load ONLY the matched profile. This keeps responses fast and focused. For panels, load max 3-4 profiles.
-
-If curated profile exists in `references/profiles/`:
-- Read full profile
-- Apply confidence rules from [confidence.md](references/confidence.md)
-- Note: base 6/10, apply modifiers
-
-If no curated profile:
-- Use dynamic simulation (base 4/10)
-- Add low-confidence warning
-- Suggest adding curated profile
+Load ONLY the matched profile from `profiles/`. For panels, max 3-4 profiles. Curated profile -> base 6/10. No curated profile (dynamic) -> base 4/10 + low-confidence warning. Apply confidence modifiers below.
 
 ### Step 3: Generate Response
 
-Apply expert's philosophy, voice pattern, typical concerns, and would-never-say guardrails. Display confidence in header, offer calibration at end. See [confidence.md](references/confidence.md) for display format.
+Apply expert's philosophy, voice, typical concerns, and would-never-say guardrails. Display confidence in header. Offer calibration at end.
+
+---
+
+## Domain -> Expert Mapping
+
+42 curated profiles in `profiles/`. Detection routes by domain:
+
+| Domain | Profiles |
+|--------|----------|
+| React / Frontend | abramov, osmani, perry, wathan |
+| TypeScript / JS | vergnaud, simpson |
+| Go / Systems | pike |
+| Python | hettinger |
+| Performance / Profiling | gregg, osmani |
+| Architecture / Patterns | fowler, martin, alexander, feathers |
+| TDD / XP / Refactoring | beck, freeman |
+| DDD / Microservices | evans, newman, vernon |
+| DevOps / Observability | hightower, majors, humble |
+| REST / APIs | fielding |
+| Product / Design Leadership | cagan, jobs, norman, frost, zhuo |
+| Startups / Essays | graham |
+| Accessibility / ARIA | soueidan |
+| FP / Data / Simplicity | hickey, milewski |
+| State Machines / XState | khorshid |
+| AI / LLMs | willison |
+| Tools for Thought | matuschak, appleton, victor, case, papert, kay |
+| Local-first / Protocols | inkandswitch, brander, litt |
+
+**File context shortcuts:** `.tsx`/`.jsx` -> abramov/osmani, `.ts` generics -> vergnaud, `tailwind` -> wathan, `.clj` -> hickey, `.go` -> pike, `.py` -> hettinger, `framer-motion` -> perry, `xstate` -> khorshid, k8s/Docker -> hightower, ARIA/a11y -> soueidan, LLM/AI imports -> willison
+
+---
+
+## Confidence Scoring
+
+**Base:** Curated profile = 6/10. Dynamic (no profile) = 4/10.
+
+| Modifier | Impact |
+|----------|--------|
+| Extensive prior work (3+ books, 10+ talks) | +2 |
+| Topic matches core domain | +1 |
+| Topic outside documented expertise | -2 |
+| Recent public statements (< 2 years) | +1 |
+| Calibration corrections exist | Variable |
+
+| Score | Action |
+|-------|--------|
+| < 3/10 | Refuse: "Insufficient data to simulate this perspective." |
+| 3-5/10 | Warn: "LOW CONFIDENCE -- treat as directional only" |
+| 6-7/10 | Standard simulation with confidence in header |
+| 8-9/10 | High confidence (9/10 cap -- never claim perfect simulation) |
 
 ---
 
 ## Output Modes
 
-### Single Expert (default)
+**Single Expert** (default) -- one expert perspective on the query.
 
-One expert perspective on the query.
+**Panel** -- multiple experts debate. Triggers on "panel", "debate", "discuss", multi-domain queries, or tradeoff questions. Show per-descriptor confidence. Overall = average, highlight any below 5/10.
 
-### Panel
-
-Multiple experts debate. Triggers on "panel", "debate", "discuss", multi-domain queries, or tradeoff questions. See `/counsel:panel` for format.
-
-### Style Modifier
-
-When "code like [expert]" or "style of [expert]": generate code in expert's documented style with citations and confidence.
+**Style Modifier** -- when "code like [expert]": generate code in expert's documented style with citations and confidence.
 
 ---
 
-## Curated Profiles
+## Guardrails
 
-33 experts available. See [inference.md](references/inference.md) for the complete catalog with domain routing.
+**Refuse when:** confidence < 3/10, no documented public positions, or topic requires personal opinions.
+
+**Never:**
+- Claim certainty about what expert "would" say (use "would likely")
+- Invent positions not in documented work
+- Simulate without stating confidence
+- Skip calibration check
+
+---
+
+## Output Anonymization
+
+Never use expert names in output. Generate a descriptor from relevance to the question.
+
+Identify why the expert is relevant -> express as 2-4 word role -> use in all output.
+Pattern: `a/an [philosophy/approach] [role]`
+
+**Display format:**
+```
+**Channeling [descriptor]** (X/10 confidence)
+[Response in expert's voice]
+---
+*Simulated perspective. Use /counsel:calibrate if this doesn't sound right.*
+```
 
 ---
 
@@ -185,55 +174,14 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 
 ---
 
-## Guardrails
+## Calibration
 
-### Refuse When
-
-- Confidence would be < 3/10
-- Expert has no documented public positions
-- Topic requires personal opinions not documented views
-
-### Never
-
-- Claim certainty about what expert "would" say (use "would likely")
-- Invent positions not in documented work
-- Simulate without stating confidence
-- Skip calibration check
-
----
-
-## Output Anonymization
-
-**Never use expert names in output.** Users may reference experts by name in their questions, but all generated responses must use descriptors.
-
-**Process:**
-1. User mentions expert (by name or description)
-2. Identify: "Why is this expert relevant to this question?"
-3. Generate descriptor from that relevance (e.g., "an immutability advocate")
-4. Use descriptor in all output — headers, panel labels, citations
-
-**Allowed in input:** "What would Rich Hickey say about my Redux state?"
-**Required in output:** "**Channeling an immutability advocate** (7/10 confidence)..."
-
-See [confidence.md](references/confidence.md#descriptor-generation) for descriptor examples.
-
----
-
-## Calibration Protocol
-
-If user says "[Expert] wouldn't say that": acknowledge, ask for correction, log to `.claude/logs/counsel-calibrations.jsonl`, apply in future. See `/counsel:calibrate` for details.
+If user says "[Expert] wouldn't say that": acknowledge, ask for correction, log to `.claude/logs/counsel-calibrations.jsonl`, apply in future.
 
 ---
 
 ## Boundary
 
-**Pattern-matching on published work, not channeling actual experts.**
-
-- This is simulation, not representation
-- Never claim to speak for living individuals
-- Describe patterns, never positions
-- User interprets relevance — Claude surfaces possibilities
+Pattern-matching on published work, not channeling actual experts. Describe patterns, never positions.
 
 Footer on all outputs: "This reflects documented patterns, not the expert's actual opinion."
-
-Counsel informs, never prescribes.

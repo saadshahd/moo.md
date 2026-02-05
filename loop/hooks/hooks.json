@@ -13,6 +13,7 @@
     ],
     "SessionStart": [
       {
+        "async": true,
         "hooks": [
           {
             "type": "command",

@@ -14,8 +14,6 @@ hooks:
 
 Structured creativity when conventional approaches fail.
 
-**You're in good company.** Every expert developer gets stuck. The difference is having systematic techniques to move forward. Let's find your breakthrough together.
-
 ## When to Use
 
 | Trigger | Action |
@@ -27,29 +25,16 @@ Structured creativity when conventional approaches fail.
 | Problem is well-defined | Skip (just execute) |
 | Haven't researched yet | Research first |
 
-## Quick Reference: 6 Techniques
+## Symptom Dispatch
 
-| Technique | One-Liner | Best For |
-|-----------|-----------|----------|
-| [Simplification Cascade](references/techniques.md#1-simplification-cascade) | Strip to essence, solve trivial, add back | Problem feels too big |
-| [Scale Game](references/techniques.md#2-scale-game) | 1000x smaller? 1000x larger? | Over-engineered solutions |
-| [Meta-Pattern](references/techniques.md#3-meta-pattern-recognition) | What class of problem is this? | "This shouldn't be this hard" |
-| [Assumption Inversion](references/techniques.md#4-assumption-inversion) | List assumptions, flip each | All options seem bad |
-| [Constraint Removal](references/techniques.md#5-constraint-removal) | Remove constraint, solve, then work within | Stuck on specific constraint |
-| [Fresh Perspective](references/techniques.md#6-fresh-perspective) | Explain to duck, draw it, channel expert | Can't see the forest |
-
-## Symptom-Based Dispatch
-
-See [symptoms.md](references/symptoms.md) for full table.
-
-| Symptom | Technique |
-|---------|-----------|
-| Problem feels overwhelming | Simplification Cascade |
-| Solution feels too complex | Scale Game |
-| "This shouldn't be this hard" | Meta-Pattern Recognition |
-| Every option has fatal flaws | Assumption Inversion |
-| One constraint blocking all paths | Constraint Removal |
-| Lost in details, can't zoom out | Fresh Perspective |
+| Symptom | Technique | One-Liner |
+|---------|-----------|-----------|
+| Problem feels overwhelming | Simplification Cascade | Strip to essence, solve trivial, add back |
+| Solution feels too complex | Scale Game | 1000x smaller? 1000x larger? |
+| "This shouldn't be this hard" | Meta-Pattern Recognition | What class of problem is this? |
+| Every option has fatal flaws | Assumption Inversion | List assumptions, flip each |
+| One constraint blocking all paths | Constraint Removal | Remove constraint, solve, work within |
+| Lost in details, can't zoom out | Fresh Perspective | Explain to duck, draw it, channel expert |
 
 ## Decision Tree
 
@@ -60,7 +45,6 @@ digraph BreakthroughDecision {
 
   Start [label="What's the\nprimary symptom?", shape=diamond, fillcolor="#ffe6cc"]
 
-  // Symptoms
   S1 [label="Too big /\noverwhelming", fillcolor="#e6f3ff"]
   S2 [label="Over-engineered /\ntoo complex", fillcolor="#e6f3ff"]
   S3 [label="Wrong framing /\nthis shouldn't be hard", fillcolor="#e6f3ff"]
@@ -68,7 +52,6 @@ digraph BreakthroughDecision {
   S5 [label="Specific constraint\nblocking", fillcolor="#e6f3ff"]
   S6 [label="Can't see clearly /\nlost", fillcolor="#e6f3ff"]
 
-  // Techniques
   T1 [label="Simplification\nCascade", fillcolor="#ccffcc"]
   T2 [label="Scale\nGame", fillcolor="#ccffcc"]
   T3 [label="Meta-Pattern\nRecognition", fillcolor="#ccffcc"]
@@ -76,7 +59,6 @@ digraph BreakthroughDecision {
   T5 [label="Constraint\nRemoval", fillcolor="#ccffcc"]
   T6 [label="Fresh\nPerspective", fillcolor="#ccffcc"]
 
-  // Primary routing
   Start -> S1; Start -> S2; Start -> S3
   Start -> S4; Start -> S5; Start -> S6
 
@@ -87,7 +69,6 @@ digraph BreakthroughDecision {
   S5 -> T5
   S6 -> T6
 
-  // Fallback chains (if still stuck)
   T1 -> T6 [style=dashed, label="fallback"]
   T2 -> T1 [style=dashed, label="fallback"]
   T3 -> T4 [style=dashed, label="fallback"]
@@ -99,14 +80,12 @@ digraph BreakthroughDecision {
 
 ## Protocol
 
-### 1. Name the Stuck (Clarity First)
-
-First, let's get clarity on where you are. No judgment — just mapping the territory.
+### 1. Name the Stuck
 
 ```
 SYMPTOM: [What exactly is stuck]
-TRIED: [What approaches failed — each attempt taught you something]
-CONSTRAINT: [What feels immovable — we'll test that assumption]
+TRIED: [What approaches failed]
+CONSTRAINT: [What feels immovable]
 ```
 
 ### 2. Select Technique
@@ -115,7 +94,41 @@ Use symptom dispatch table or decision tree.
 
 ### 3. Apply Technique
 
-Follow detailed steps in [techniques.md](references/techniques.md).
+**Simplification Cascade**
+1. Strip every feature, constraint, edge case
+2. Solve the trivial case
+3. Add complexity back one piece at a time
+4. Note where difficulty jumps — that's your real problem
+
+**Scale Game**
+1. Shrink 1000x — what's the trivial solution?
+2. Grow 1000x — what dominates?
+3. Compare solutions at both extremes
+4. Find what must be true at any scale
+
+**Meta-Pattern Recognition**
+1. Name the problem class (scheduling? resource allocation? search?)
+2. Find precedents — what solved this class before?
+3. Translate adjacent solution to your domain
+4. Adapt for your specific constraints
+
+**Assumption Inversion**
+1. List every assumption ("given" or "must")
+2. Invert each — what if the opposite were true?
+3. Explore what becomes possible per inversion
+4. Test which assumptions are actually required
+
+**Constraint Removal**
+1. Identify the specific blocking constraint
+2. Remove it — pretend it doesn't exist
+3. Design the ideal unconstrained solution
+4. Approximate the ideal within the real constraint
+
+**Fresh Perspective**
+1. Rubber duck — explain aloud, articulating reveals gaps
+2. Expert channel — "What would [specific expert] do?"
+3. Draw it — sequence for flow, entity for data, state machine for logic
+4. Teach it — write explanation for a newcomer, notice what you skip
 
 ### 4. Evaluate Result
 
@@ -124,11 +137,9 @@ Follow detailed steps in [techniques.md](references/techniques.md).
 | New path visible | Proceed with solution |
 | Partial clarity | Chain to second technique |
 | Still stuck | Try opposite technique |
-| Fundamental blocker | Escalate or reframe problem entirely |
+| Fundamental blocker | Escalate or reframe entirely |
 
 ### 5. Document Learning
-
-If breakthrough succeeds:
 
 ```
 PROBLEM: [Original stuck point]
@@ -151,8 +162,6 @@ When single technique insufficient:
 | Fresh Perspective | Simplification | Got distance, now reduce complexity |
 
 ## When NOT to Use
-
-See [when-not-to-use.md](references/when-not-to-use.md).
 
 - Problem is well-defined (just execute)
 - Haven't done basic research

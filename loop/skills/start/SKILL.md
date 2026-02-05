@@ -12,154 +12,61 @@ Autonomous iteration with wave-based parallel execution. Continues until spec is
 ## Architecture
 
 ```
-User Request
-    ↓
-[STATE DETECTION] → Resume? / Start fresh?
-    ↓
-[RECALL LEARNINGS] → surface past failures/discoveries
-    ↓
-[SPEC + FIT SCORING] → <5? hope:intent, calculate fit_score
-    ↓
-[SHAPE GENERATION] → hope:shape, extract criteria/mustNot
-    ↓
-[DECOMPOSITION] → atomic tasks via TaskCreate
-    ↓
-[TEAM DECISION] → team_score → subagents / teams / hybrid
-    ↓
-[WAVE EXECUTION] → parallel subagents or teammates + light review
-    ↓
-[THOROUGH REVIEW] → counsel:panel, resolve blockers
-    ↓
-[COMPLETION] → team cleanup (if teams) → hope:gate verification
+User Request -> [STATE DETECTION] -> Resume? / Start fresh?
+  -> [RECALL LEARNINGS] -> surface past failures/discoveries
+  -> [SPEC + FIT SCORING] -> <5? hope:intent, calculate fit_score
+  -> [SHAPE GENERATION] -> hope:shape, extract criteria/mustNot
+  -> [DECOMPOSITION] -> atomic tasks via TaskCreate
+  -> [TEAM DECISION] -> team_score -> subagents / teams / hybrid
+  -> [WAVE EXECUTION] -> parallel subagents or teammates + light review
+  -> [THOROUGH REVIEW] -> counsel:panel, resolve blockers
+  -> [COMPLETION] -> team cleanup (if teams) -> hope:gate verification
 ```
 
 ---
 
 ## Step 0: State Detection & Resume
 
-Before starting, check for existing workflow state:
-
-### 0a. Detect Existing State
-
-```
-1. Check .loop/workflow-state.json exists
-2. Check .loop/shape/SHAPE.md exists
-3. Check TaskList for pending/in_progress tasks
-4. Read workflow-state.json if exists
-5. If stage == "planning": plan created but not yet executed
-```
-
-### 0b. Resume Decision
+1. Check `.loop/workflow-state.json` and `.loop/shape/SHAPE.md` exist
+2. Check TaskList for pending/in_progress tasks
+3. If `stage == "planning"`: plan created but not yet executed
 
 ```dot
 digraph ResumeDecision {
   rankdir=TB
   node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
-
   Start [label="/loop:start", fillcolor="#e6f3ff"]
-  Check [label="Check for\nworkflow-state.json"]
-  Exists [label="State\nexists?", shape=diamond, fillcolor="#fff4cc"]
-  NoState [label="No state\nfound"]
-  PlanCheck [label="stage ==\nplanning?", shape=diamond, fillcolor="#fff4cc"]
-  PlanAsk [label="Plan exists.\nExecute / Fresh?", fillcolor="#ffe6cc"]
-  SkipToDecompose [label="Skip to\nStep 3", fillcolor="#ccffcc"]
-  Ask [label="AskUserQuestion:\nResume / Fresh / Status", fillcolor="#ffe6cc"]
-
-  Resume [label="Resume", fillcolor="#ccffcc"]
-  Fresh [label="Start Fresh", fillcolor="#ffffcc"]
-  Status [label="View Status", fillcolor="#e6f3ff"]
-
-  ReadStage [label="Read current_stage\nfrom state"]
-  SkipTo [label="Jump to\nstage logic"]
-  Delete [label="Delete .loop/\ndirectory"]
-  ShowStatus [label="/loop:status"]
-  Config [label="Step 0c:\nUser Config"]
-
-  Start -> Check -> Exists
-  Exists -> PlanCheck [label="yes"]
-  Exists -> NoState [label="no"]
-  NoState -> Config
-
-  PlanCheck -> PlanAsk [label="yes"]
-  PlanCheck -> Ask [label="no"]
-  PlanAsk -> SkipToDecompose [label="execute"]
-  PlanAsk -> Delete [label="fresh"]
-
-  Ask -> Resume
-  Ask -> Fresh
-  Ask -> Status
-
-  Resume -> ReadStage -> SkipTo
-  Fresh -> Delete -> Config
-  Status -> ShowStatus -> Ask [style=dashed]
+  Exists [label="State exists?", shape=diamond, fillcolor="#fff4cc"]
+  Planning [label="stage==planning?", shape=diamond, fillcolor="#fff4cc"]
+  Ask [label="Resume / Fresh / Status", fillcolor="#ffe6cc"]
+  Config [label="Step 0c: Config", fillcolor="#f5f5f5"]
+  Skip3 [label="Skip to Step 3", fillcolor="#ccffcc"]
+  Jump [label="Jump to saved stage", fillcolor="#ccffcc"]
+  Start -> Exists
+  Exists -> Planning [label="yes"]
+  Exists -> Config [label="no"]
+  Planning -> Skip3 [label="yes"]
+  Planning -> Ask [label="no"]
+  Ask -> Jump [label="resume"]
+  Ask -> Config [label="fresh: delete .loop/"]
 }
 ```
 
-On "Resume": Skip to current stage (read from workflow-state.json)
-On "Start fresh": Delete `.loop/` directory, proceed to Step 0c
-On "View status": Show status (see `/loop:status`), then re-ask
-On "planning" stage: Plan was created but loop didn't execute → skip to Step 3
-
-**If no existing state:** Proceed to Step 0c
-
-### 0c. User Configuration
-
-Ask user to configure the new loop:
-
-```
-AskUserQuestion:
-  1. "How should this loop track tasks?"
-     - "New task list (project-based)" → Fresh start with '{project-name}-loop' ID
-     - "Resume existing" → Continue from existing task list
-     - "Session-only" → No persistence
-
-  2. "Max iterations before pausing?"
-     - "10 iterations (quick task)"
-     - "25 iterations (medium feature)"
-     - "50 iterations (large refactor)"
-     - "Unlimited (manual stop only)"
-
-  3. "Budget limit?"
-     - "$10 (conservative)"
-     - "$25 (default)"
-     - "$50 (large task)"
-     - "No limit"
-```
-
-Set `CLAUDE_CODE_TASK_LIST_ID` based on choice.
-
-### Workflow State Schema
-
-Write `.loop/workflow-state.json` at each stage transition. Schema: `schemas/workflow-state.schema.json`
-
-Key fields: version, stage, task, spec_score, fit_score, shape_chosen, timestamps, recall_surfaced, reviews, team (optional).
-
-See [loop-mechanics.md](references/loop-mechanics.md) for full schema example.
+AskUserQuestion for new loops: task list mode (new/resume/session-only), max iterations (10/25/50/unlimited), budget ($10/$25/$50/none). Set `CLAUDE_CODE_TASK_LIST_ID`.
 
 ---
 
 ## Step 0.5: Recall Past Learnings
 
-Before spec scoring, surface relevant learnings:
-
-```
-1. Extract domain hints from task (e.g., "auth", "validation", "API")
-2. Invoke: Skill(skill="hope:recall", args="{domain hints}")
-3. Display top 3-5 relevant learnings:
-   - Past failures in this domain
-   - High-confidence discoveries
-   - Active constraints
-4. User confirms or dismisses
-5. Save surfaced learnings to workflow-state.json
-```
-
-If user dismisses: proceed without applying, note in workflow-state.json
+- Invoke `Skill(skill="hope:recall", args="{domain hints from task}")`
+- Display top 3-5 relevant learnings (past failures, discoveries, constraints)
+- Save surfaced learnings to workflow-state.json
 
 ---
 
 ## Step 1: Spec Scoring
 
-Score the user request on 5 dimensions (0-2 each, max 10):
+Score on 5 dimensions (0-2 each, max 10):
 
 | Dimension | 0 | 1 | 2 |
 |-----------|---|---|---|
@@ -169,36 +76,23 @@ Score the user request on 5 dimensions (0-2 each, max 10):
 | **Success** | None stated | "Tests pass" | "All tests + manual QA" |
 | **Done** | Implied | "When it works" | "PR merged to main" |
 
-**Decision:**
-
 ```dot
 digraph SpecDecision {
   rankdir=LR
   node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
-
-  Score [label="Spec Score\n(0-10)", fillcolor="#e6f3ff"]
+  Score [label="Score (0-10)", fillcolor="#e6f3ff"]
   Check [label="Score?", shape=diamond, fillcolor="#fff4cc"]
-
-  High [label="≥8\nTool-shaped", fillcolor="#ccffcc"]
-  Mid [label="5-7\nColleague-shaped", fillcolor="#ffffcc"]
-  Low [label="<5\nNot ready", fillcolor="#ffcccc"]
-
-  Decompose [label="Proceed to\ndecomposition"]
-  Confirm [label="Confirm approach\nafter decompose"]
-  Intent [label="Run\nhope:intent"]
-
+  High [label=">=8: Tool", fillcolor="#ccffcc"]
+  Mid [label="5-7: Colleague", fillcolor="#ffffcc"]
+  Low [label="<5: Not ready", fillcolor="#ffcccc"]
+  Intent [label="hope:intent", fillcolor="#ffe6cc"]
   Score -> Check
-  Check -> High [label="≥8"]
+  Check -> High [label=">=8"]
   Check -> Mid [label="5-7"]
   Check -> Low [label="<5"]
-
-  High -> Decompose
-  Mid -> Confirm
   Low -> Intent -> Check [style=dashed]
 }
 ```
-
-### Fit Score → Shape Decision
 
 | Fit Score | Shape | Behavior |
 |-----------|-------|----------|
@@ -207,149 +101,62 @@ digraph SpecDecision {
 | 25-29 | Colleague | Iterate each step |
 | <25 | BLOCKED | Clarify first |
 
-See [loop-mechanics.md](references/loop-mechanics.md#fit-score-calculation) for calculation formula.
+Calculation: spec_score × 5 + constraints + success_criteria + done_definition + domain_familiarity
 
 ---
 
-## Step 1.5: Expert-Driven Clarification (if score <5)
+## Step 2: Shape Generation
 
-For dimensions scoring <2, invoke counsel:panel for expert-informed options.
+Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")`. Extract from SHAPE.md: **criteria[]** (success), **mustNot[]** (circuit breakers), **verification{}** (how to verify).
 
-```
-Skill(skill="counsel:panel", args="clarify {dimension} for: {spec}")
-```
-
-See [expert-review.md](references/expert-review.md) for dimension → expert mapping.
-
----
-
-## Step 2: Shape Generation (if score ≥5)
-
-Invoke shape skill to get implementation approach:
-
-```
-Skill(skill="hope:shape", args="$ARGUMENTS")
-```
-
-Extract from SHAPE.md output:
-- **criteria[]** → Success criteria for completion
-- **mustNot[]** → Circuit breaker conditions
-- **verification{}** → How to verify each criterion
-
----
-
-## Step 2.5: Plan Persistence
-
-After shape generation, write `stage: "planning"` to workflow-state.json with spec_score and fit_score. If Claude enters plan mode, state is already persisted. On plan approval, loop resumes from "planning" stage → skips to Step 3. If no plan mode needed, proceed directly to Step 3.
-
-See [loop-mechanics.md](references/loop-mechanics.md#plan-mode-recovery) for details.
+Write `stage: "planning"` to `.loop/workflow-state.json` with spec_score/fit_score (schema: `schemas/workflow-state.schema.json`). On plan approval, resume from Step 3.
 
 ---
 
 ## Step 3: Task Decomposition
 
-Break work into atomic tasks using the "one sentence without and" test.
+Atomic tasks, each passes "one sentence without and" test.
 
-See [decomposition.md](references/decomposition.md) for details.
+`TaskCreate(subject="[imperative action]", description="[what + criteria + verify cmd]", activeForm="[present continuous]")`
+`TaskUpdate(taskId="4", addBlockedBy=["1", "3"])`
 
-**For each atomic unit:**
-```
-TaskCreate(
-  subject="[imperative action]",
-  description="[detailed what + acceptance criteria + verify command]",
-  activeForm="[present continuous for spinner]"
-)
-```
-
-**Set dependencies:**
-```
-TaskUpdate(taskId="4", addBlockedBy=["1", "3"])
-```
-
-**Announce:**
-```
-[LOOP] Starting | Shape: {Tool/Colleague} ({score}/10) | Tasks: {N} | Budget: ${budget}
-```
+Announce: `[LOOP] Starting | Shape: {Tool/Colleague} ({score}/10) | Tasks: {N} | Budget: ${budget}`
 
 ---
 
 ## Step 3.5: Team Decision
 
-After decomposition, decide between subagent waves and agent teams:
-
-### Team Score Calculation
-
-```
-team_score = (cross_layer_count × 2) + (review_count × 3) + (hypothesis_count × 4)
-```
-
-Factors: **cross_layer** (different subsystems ×2), **review** (expert perspectives ×3), **hypothesis** (competing approaches ×4).
+`team_score = (cross_layer_count * 2) + (review_count * 3) + (hypothesis_count * 4)`
 
 | team_score | Mode | Action |
 |-----------|------|--------|
-| ≥ 12 | Agent Teams | Spawn team, assign teammates |
+| >= 12 | Agent Teams | Spawn team, assign teammates |
 | 10-11 + cross-layer | Hybrid | Teams for complex, subagents for simple |
 | < 10 | Subagent Waves | Default parallel execution |
 
-**If Teams (≥ 12):** Spawn team → spawn teammates → assign tasks via owner → skip task list question → update workflow-state.json.
-
-**If Subagents (< 10):** Continue with existing wave execution (Step 4).
-
-See [agent-teams.md](references/agent-teams.md) for team score details and [team-roles.md](references/team-roles.md) for teammate specialization.
+**Teams (>= 12):** Spawn team, assign tasks via owner, update workflow-state.json.
+**Subagents (< 10):** Continue to Step 4.
 
 ---
 
 ## Step 4: Wave Execution
 
-A **wave** is tasks with no blockedBy dependencies or all blockedBy tasks completed.
+A **wave** = tasks with no unresolved blockedBy. Find tasks where blockedBy is empty or all resolved. Spawn parallel subagents (or teammates in team mode).
 
-See [waves.md](references/waves.md) for full protocol including:
-- Wave detection algorithm
-- Parallel subagent spawning (or teammate coordination in team mode)
-- Progress tracking in PROGRESS.md
-- Handling tasks that need another attempt
-- Execution mode selection (subagent/team/hybrid)
-
-### Adaptive Strategy
-
-Before each wave, consult panel on strategy:
-```
-Skill(skill="counsel:panel", args="wave execution strategy for {N} tasks: {task_summaries}")
-```
-
-Panel recommends sequential (coupled tasks) vs parallel (independent tasks).
-
-### Quick Verification
-
-After each task: `Skill(skill="hope:verify", args="quick")`
-
-### Light Expert Review (After Each Wave)
-
-```
-Skill(skill="counsel:panel", args="review wave {N} changes for: {spec}")
-```
-
-Non-blocking: issues are guidance only. Persist review score to workflow-state.json.
-
-See [expert-review.md](references/expert-review.md) for protocol.
+- Before wave: `Skill(skill="counsel:panel", args="wave strategy for {N} tasks: {summaries}")`
+- After task: `Skill(skill="hope:verify", args="quick")`
+- After wave: `Skill(skill="counsel:panel", args="review wave {N} changes for: {spec}")` — non-blocking, persist review score
 
 ---
 
 ## Step 5: Thorough Expert Review
 
-When all tasks complete, before gate:
+When all tasks complete: `Skill(skill="counsel:panel", args="thorough review for: {spec}")`
 
-```
-Skill(skill="counsel:panel", args="thorough review for: {spec}")
-```
-
-- Full expert panel based on all task aspects
-- Interactive findings with severity: BLOCKER / WARNING / SUGGESTION
-- Constraint-aware: checks fixes against SHAPE.md mustNot
-- Blockers create remediation tasks → return to Wave Execution
-- All blockers resolved → `reviews.thorough.passed = true` → proceed to gate
-
-See [expert-review.md](references/expert-review.md) for full protocol.
+- Findings: BLOCKER / WARNING / SUGGESTION
+- Checks against SHAPE.md mustNot
+- Blockers create remediation tasks, return to Wave Execution
+- All resolved: `reviews.thorough.passed = true`, proceed to gate
 
 ---
 
@@ -357,63 +164,11 @@ See [expert-review.md](references/expert-review.md) for full protocol.
 
 **Prerequisites:** All tasks completed + thorough review passed.
 
-1. Run thorough verification:
-```
-Skill(skill="hope:verify", args="thorough")
-```
-
-Thorough tier (< 2min): all checks + criterion-specific commands + evidence.
-
-2. Invoke verification gate:
-```
-Skill(skill="hope:gate", args="loop completion verification")
-```
-
-3. If team mode active:
-   - Send `shutdown_request` to all teammates
-   - Wait for shutdown approvals
-   - Run `Teammate(operation="cleanup")`
-   - Update workflow-state.json: `team.shutdown_status → "completed"`
-
-4. Emit completion:
-```
-<loop-complete>
-🎉 Loop completed successfully!
-
-All tasks verified:
-- T-001: ✓ {subject}
-- T-002: ✓ {subject}
-- T-003: ✓ {subject}
-
-╭─ 🟢 SHIP ──────────────────────────╮
-│ Verified: execution output          │
-│ Tasks: {N}/{N} complete             │
-│ Subjective: ~X% · Type 2B · Npt    │
-├────────────────────────────────────┤
-│ Great work! The systematic          │
-│ approach paid off.                  │
-├────────────────────────────────────┤
-│ ↳ Alt: [alternative approach]       │
-│ ↳ Risk: [key assumption]            │
-╰────────────────────────────────────╯
-</loop-complete>
-```
-
-5. If gate fails → create remediation tasks, continue loop
-
----
-
-## Workflow Detection
-
-After spec scoring, detect workflow type:
-
-| Workflow | Indicators | Gate |
-|----------|------------|------|
-| **A (Build)** | "add", "implement", "create" | Library search required |
-| **B (Debug)** | "fix", "debug", "broken", "error" | Root cause before workaround |
-| **C (Refactor)** | "refactor", "clean up", "migrate" | Deletion before redesign |
-
-Reference [hope/skills/soul](../../hope/skills/soul/SKILL.md) for workflow details.
+1. `Skill(skill="hope:verify", args="thorough")`
+2. `Skill(skill="hope:gate", args="loop completion verification")`
+3. If team mode: `shutdown_request` all teammates, `Teammate(operation="cleanup")`, set `team.shutdown_status = "completed"`
+4. Emit `<loop-complete>` with task list, SHIP footer (tasks, confidence, alt, risk)
+5. If gate fails: create remediation tasks, continue loop
 
 ---
 
@@ -421,71 +176,9 @@ Reference [hope/skills/soul](../../hope/skills/soul/SKILL.md) for workflow detai
 
 | Trigger | Threshold | Action |
 |---------|-----------|--------|
-| Max iterations reached | User-configured | Pause, announce progress |
+| Max iterations | User-configured | Pause, announce progress |
 | Budget exceeded | User-configured | Pause, offer continue |
-| mustNot condition true | From SHAPE.md | Stop immediately, announce |
-
----
-
-## Commands
-
-| Command | Effect |
-|---------|--------|
-| `/loop:start [spec]` | Start new loop |
-| `/loop:start` | Resume paused loop (auto-detects) |
-| `/loop:cancel` | Terminate and clean up |
-| `/loop:status` | Show current state from TaskList |
-
----
-
-## Example
-
-User: "loop - add validation to auth module"
-
-```
-[LOOP] Surfacing past learnings for: auth, validation
-→ 2 relevant learnings found
-
-[LOOP] Spec scoring: 3/10 → Running /hope:intent
-[After clarification: 7/10, fit_score: 35]
-
-[LOOP] Starting | Shape: Colleague | Tasks: 6 | Budget: $25
-
-[LOOP] Wave 1 | T-001, T-002 (parallel)
-[LOOP] Wave 1 review: 8/10 | 1 suggestion
-[LOOP] ✓ Wave 1 complete | Progress: 2/6
-
-[LOOP] Wave 2 | T-003, T-004 (parallel)
-[LOOP] Wave 2 review: 9/10 | 0 issues
-[LOOP] ✓ Wave 2 complete | Progress: 4/6
-
-[LOOP] Wave 3 | T-005, T-006 (parallel)
-[LOOP] ✓ Wave 3 complete | Progress: 6/6
-
-[LOOP] Thorough review: 3 findings, 0 blockers ✓
-[LOOP] Running gate...
-
-<loop-complete>
-╭─ 🟢 SHIP ──────────────────────────╮
-│ Verified: execution output          │
-│ Tasks: 6/6 · Reviews: all passed    │
-╰────────────────────────────────────╯
-</loop-complete>
-```
-
----
-
-## References (Load by Stage)
-
-| Stage | Reference | When |
-|-------|-----------|------|
-| decompose | [decomposition.md](references/decomposition.md) | Before TaskCreate |
-| team decision | [agent-teams.md](references/agent-teams.md) | After decompose, team_score ≥ 10 |
-| team decision | [team-roles.md](references/team-roles.md) | When spawning teammates |
-| executing | [waves.md](references/waves.md) | If wave strategy unclear |
-| review | [expert-review.md](references/expert-review.md) | Before counsel:panel |
-
-Architecture overview: [loop-mechanics.md](references/loop-mechanics.md) (for troubleshooting only)
+| mustNot true | From SHAPE.md | Stop immediately |
 
 ---
 

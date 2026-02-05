@@ -3,6 +3,7 @@
     "SessionStart": [
       {
         "matcher": "startup|resume|clear|compact",
+        "async": true,
         "hooks": [
           {
             "type": "command",

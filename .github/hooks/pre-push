@@ -26,10 +26,16 @@ for plugin in $CHANGED_PLUGINS; do
   for skill_file in "$plugin_dir"/skills/*/SKILL.md; do
     [ ! -f "$skill_file" ] && continue
 
-    # Line count check
+    # Line count check (200 max)
     lines=$(wc -l < "$skill_file" | tr -d ' ')
-    if [ "$lines" -ge 500 ]; then
-      ERRORS="${ERRORS}${skill_file}: ${lines} lines (max 499)\n"
+    if [ "$lines" -gt 200 ]; then
+      ERRORS="${ERRORS}${skill_file}: ${lines} lines (max 200)\n"
+    fi
+
+    # No references/ directory check
+    skill_dir=$(dirname "$skill_file")
+    if [ -d "$skill_dir/references" ]; then
+      ERRORS="${ERRORS}${skill_dir}: has references/ directory (use flat files)\n"
     fi
 
     # Frontmatter check

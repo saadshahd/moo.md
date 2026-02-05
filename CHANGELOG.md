@@ -9,6 +9,44 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@0.22.0, loop@3.1.0, counsel@0.14.0, wordsmith@0.7.0] - 2026-02-05
+
+### Changed
+
+- **hope/soul**: Rewritten to 142 lines (was 456) — 200-line max, self-contained, all references inlined
+- **hope/verify**: Rewritten to 142 lines (was 348) — self-contained, references inlined
+- **hope/intent**: Rewritten to 159 lines (was 259) — compressed protocols, removed verbose templates
+- **hope/shape**: Rewritten to 152 lines (was 234) — aspect discovery table + expert consultation inlined
+- **hope/skill-judge**: Rewritten to 133 lines (was 236) — evaluation dimensions inlined
+- **hope/breakthrough**: Rewritten to 191 lines (was 183 + 3 refs) — technique steps inlined from references
+- **loop/start**: Rewritten to 187 lines (was 494) — compressed architecture, inlined wave/decomposition logic
+- **counsel/counsel**: Rewritten to 187 lines (was 239) — inlined inference + confidence scoring from references
+- **wordsmith/writing**: Rewritten to 151 lines (was 113 + 7 refs) — all 5 workflows inlined from references
+- **counsel**: Profile data files moved from `references/profiles/` to `profiles/` (flat alongside SKILL.md)
+- **wordsmith/template**: Template files moved from `references/templates/` to flat alongside SKILL.md
+- **CLAUDE.md**: New 200-line limit, flat structure conventions, no references/ directories
+- **.github/hooks/pre-push**: Enforces 200-line limit + references/ directory check (was 500)
+
+### Removed
+
+- **hope**: All `references/` directories (soul: ~71 files, verify: 7, shape: 3, skill-judge: 4, breakthrough: 3)
+- **loop**: All `references/` directories (start: 7 files)
+- **counsel**: Reference docs deleted (inference.md, confidence.md, 3 mode files, colleague-framework.md, profile-schema.md)
+- **wordsmith**: All `references/` directories (writing: 7 files, template: references/ structure)
+
+### Added
+
+- **hope**: 2 new eval cases (interactive-code-review-trigger, recall-trigger)
+- **wordsmith**: 2 new eval cases (voices-trigger, writing-voice)
+- **counsel**: 1 new eval case (counsel-mode-panel)
+
+### Fixed
+
+- **hope/hooks.json**: Added `async: true` to SessionStart hook for cross-platform compatibility
+- **loop/hooks.json**: Added `async: true` to SessionStart hook for cross-platform compatibility
+
 ### Added
 
 - **loop**: Agent teams integration for complex coordination (hybrid approach)

@@ -1,0 +1,15 @@
+name: wordsmith-writing-voice
+description: Writing skill triggers on voice extraction requests
+plugin: wordsmith
+skill: wordsmith:writing
+flaky: true
+acceptableSkills:
+  - writing
+  - wordsmith:writing
+  - voices
+  - wordsmith:voices
+prompt: "extract the voice from this writing sample and create a reusable profile I can apply to future content"
+expectedBehaviors:
+  - "Writing skill activates on voice extraction request"
+  - "Asks for writing sample (300-500 words)"
+  - "Analyzes tone, cadence, vocabulary, syntax, rhetorical moves"
