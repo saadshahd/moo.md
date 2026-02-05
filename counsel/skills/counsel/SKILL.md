@@ -1,6 +1,6 @@
 ---
 name: counsel
-description: Expert simulation for code guidance and style. Triggers on "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", or domain-specific keywords. Channels documented expert perspectives with explicit confidence.
+description: Expert simulation for code guidance and style. Triggers on "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", or domain-specific keywords.
 model: sonnet
 allowed-tools: Read, Bash
 ---
@@ -187,7 +187,7 @@ When "code like [expert]" or "style of [expert]": generate code in expert's docu
 
 ### Refuse When
 
-- Confidence would be < 30%
+- Confidence would be < 3/10
 - Expert has no documented public positions
 - Topic requires personal opinions not documented views
 
