@@ -212,32 +212,16 @@ digraph SpecDecision {
 }
 ```
 
-### Fit Score Calculation
+### Fit Score → Shape Decision
 
-After spec scoring, calculate fit_score for workflow shape:
+| Fit Score | Shape | Behavior |
+|-----------|-------|----------|
+| 40+ | Tool | Autonomous, milestones only |
+| 30-39 | Tool-review | Checkpoint major steps |
+| 25-29 | Colleague | Iterate each step |
+| <25 | BLOCKED | Clarify first |
 
-```
-fit_score = spec_score × 5  (base conversion)
-         + (has_constraints ? 5 : 0)
-         + (has_success_criteria ? 5 : 0)
-         + (has_done_definition ? 5 : 0)
-         + (domain_familiarity ? 0-10 : 0)  // from recall
-```
-
-**Fit Decision:**
-- **40+:** Tool-shaped — autonomous execution, milestones only
-- **30-39:** Tool-with-review — checkpoint major steps
-- **25-29:** Colleague-shaped — iterate each step
-- **<25:** BLOCKED — clarify first, cannot proceed
-
-**Persist to workflow-state.json:**
-```json
-{
-  "spec_score": 7,
-  "fit_score": 35,
-  "shape_chosen": "tool-review"
-}
-```
+See [loop-mechanics.md](references/loop-mechanics.md#fit-score-calculation) for calculation formula.
 
 ---
 

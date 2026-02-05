@@ -82,4 +82,4 @@ Enthusiastic teacher with functional programming sensibilities. Uses vivid analo
 
 ## Trigger Keywords
 
-type-level, generics, conditional types, infer, mapped types, template literal types, utility types, discriminated unions, type inference, variance, assignability, TS-Pattern, pattern matching, recursive types, tuples, `never`, `unknown`, type narrowing, exhaustive, branded types, type constraints, Turing complete, set theory, tail recursion, HOTScript, distributive, entries pattern, key remapping, homomorphic, Extract, Exclude, Pick, Omit, Partial, Required, Readonly, DeepPartial, type-safe DSL, covariance, contravariance, type validator, API design, structural typing
+type-level, TS-Pattern, HOTScript, conditional types, infer, mapped types, template literal types, set theory, distributive, entries pattern, tail recursion, assignability, type constraints, recursive types, pattern matching
