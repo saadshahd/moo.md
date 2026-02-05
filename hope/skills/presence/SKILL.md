@@ -1,6 +1,6 @@
 ---
 name: presence
-description: Surface what needs human attention during complex AI work. Use when context is large, user seems overwhelmed, or after substantial output. Triggers on "what just happened", "summarize progress", "what do I need to know", "lost track", "overwhelmed".
+description: Surface what matters when context overwhelms. Use when context large, user overwhelmed, or after substantial output. Triggers on "lost track", "overwhelmed", "what just happened", "summarize".
 model: haiku
 allowed-tools: Read
 ---

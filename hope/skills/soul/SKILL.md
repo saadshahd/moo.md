@@ -1,6 +1,6 @@
 ---
 name: hope
-description: Cognitive operating system for structured thinking with confidence tracking. Use when starting complex tasks, making decisions, or needing verification. Triggers on "how confident", "verify this", "alternative approach", "what could go wrong", "think through", confidence questions, or multi-step reasoning tasks.
+description: Structured thinking framework. Use when starting complex tasks, making decisions, or verifying work. Triggers on "how confident", "verify this", "think through", "what could go wrong".
 model: opus
 allowed-tools: Read, Grep, Glob
 ---

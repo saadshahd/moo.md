@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Define and execute machine-verifiable acceptance criteria with tiered verification. Use before building to lock criteria, after building to run verification. Triggers on "verify this works", "acceptance criteria", "how do we test", "prove it works", "machine-verifiable".
+description: Machine-verifiable acceptance criteria. Use before building to lock criteria, after building to verify. Triggers on "verify this works", "acceptance criteria", "prove it works".
 model: sonnet
 allowed-tools: Read, Bash, Glob, AskUserQuestion
 ---
