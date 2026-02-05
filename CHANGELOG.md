@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [loop@2.4.1] - 2026-02-05
+
+### Fixed
+
+- **loop/docs**: Corrected slash command syntax (`/loop:start`, `/loop:status`, `/loop:cancel`)
+
+---
+
 ## [loop@2.4.0] - 2026-02-05
 
 ### Removed
