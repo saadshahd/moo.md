@@ -40,12 +40,12 @@ See [Ethical Boundaries](references/ethical-boundaries.md) for Pause Protocol, S
 
 ## Silent Audit (Run Before Every Response)
 
-**Blocking items (force verdicts):**
+**Clarity checkpoints (guide next steps):**
 
-| Check | Threshold | Action |
-|-------|-----------|--------|
-| Spec score | <5 | 🔴 RESEARCH → run /hope:intent |
-| Fit score | <25 | 🔴 RESEARCH → clarify first |
+| Check | Threshold | Guidance |
+|-------|-----------|----------|
+| Spec score | <5 | 💡 CLARIFY → run /hope:intent to sharpen understanding |
+| Fit score | <25 | 💡 EXPLORE → gather more context before building |
 | Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
 | High stakes + Reversibility <5 | Yes | Run [adversarial pre-check](references/adversarial-precheck.md) |
 

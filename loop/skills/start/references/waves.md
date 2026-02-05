@@ -60,8 +60,8 @@ digraph WaveExecution {
   CheckWave [label="Wave empty?", shape=diamond, fillcolor="#fff4cc"]
   CheckPending [label="Pending tasks\nexist?", shape=diamond, fillcolor="#fff4cc"]
 
-  Stuck [label="STUCK STATE\nCircular deps\nor failures", fillcolor="#ffcccc"]
-  Counsel [label="Invoke\ncounsel:panel", fillcolor="#ffe6cc"]
+  NeedsHelp [label="TIME FOR EXPERT HELP\nComplex dependencies\nor edge cases", fillcolor="#e6f3ff"]
+  Counsel [label="Consult\ncounsel:panel", fillcolor="#ffe6cc"]
 
   Done [label="ALL DONE\nExit loop", fillcolor="#ccffcc"]
 
@@ -79,9 +79,9 @@ digraph WaveExecution {
   CheckWave -> CheckPending [label="yes"]
   CheckWave -> MarkProgress [label="no"]
 
-  CheckPending -> Stuck [label="yes"]
+  CheckPending -> NeedsHelp [label="yes"]
   CheckPending -> Done [label="no"]
-  Stuck -> Counsel -> Start [style=dashed]
+  NeedsHelp -> Counsel -> Start [style=dashed]
 
   MarkProgress -> Spawn -> Wait -> CheckResult
   CheckResult -> MarkComplete [label="yes"]
@@ -95,18 +95,22 @@ digraph WaveExecution {
 ## Subagent Prompt Template
 
 ```
-Execute this task and verify completion:
+Execute this task with excellence — you're part of a parallel wave where each task contributes to the overall goal.
 
-**Task:** {subject}
+**Your task:** {subject}
 
 **Details:** {description}
 
 **Verification:** After completing, run the verification command and confirm it passes.
 
-**Rules:**
+**Context:** Other agents are handling complementary tasks in this wave. Do your part well — the wave succeeds when each task succeeds.
+
+**Guidelines:**
 - Do exactly what the task describes
 - Report actual output from verification
-- If blocked or failed, explain why clearly
+- If you need another approach, explain what you learned
+
+You've got this.
 ```
 
 ## Progress Tracking
@@ -134,15 +138,19 @@ Update `.loop/PROGRESS.md` after each wave:
 - Counsel consulted: {yes/no}
 ```
 
-## Handling Stuck Tasks
+## Handling Tasks That Need Another Attempt
 
-When a task fails (verification doesn't pass):
+When a task needs iteration (verification doesn't pass yet):
 
-1. **First failure** → Increment `stuckCount` in task metadata
-2. **stuckCount >= 1** → Immediately invoke counsel:panel
-3. **Apply recommendation** → Update task description or approach
-4. **Retry** → Re-execute with new approach
-5. **Continued failure** → Only pause at max iterations
+**Iteration is normal.** Complex tasks often need refinement. Here's how to handle it:
+
+1. **First attempt incomplete** → Note what was learned, increment attempt count
+2. **Attempt count >= 1** → Time for expert perspective — invoke counsel:panel
+3. **Apply insight** → Update task description or approach based on recommendation
+4. **Try again** → Re-execute with refined approach. You've got this.
+5. **Continued iteration** → Only pause at max iterations
+
+**Remember:** Each attempt teaches something. Iteration is thoroughness, not failure.
 
 No human escalation during loop — only pause when:
 - Max iterations reached

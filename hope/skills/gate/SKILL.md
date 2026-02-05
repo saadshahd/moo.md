@@ -35,7 +35,7 @@ Run before substantial work begins. Blocks execution if missing.
   → 40+: Tool-shaped (milestones only)
 ```
 
-**If any missing:** STOP. Complete before proceeding.
+**If any unclear:** Pause here. Clarifying these now prevents rework later.
 
 ---
 
@@ -52,7 +52,7 @@ When invoked after loop execution, check expert review status:
   → If false: "⚠️ Expert review has {N} unresolved blockers. Resolve before gate."
 ```
 
-If `reviews.thorough.passed` is false → block gate until review passes.
+If `reviews.thorough.passed` is false → resolve findings to ensure quality before proceeding.
 
 ### Verify Integration
 
@@ -65,7 +65,7 @@ Before running workflow-specific checks, ensure verify passed:
   → Evidence must be captured
 ```
 
-If verify not run or failed → block gate until verify passes.
+If verify not run or failed → address findings before completion to ensure quality.
 
 ---
 
@@ -128,7 +128,7 @@ When loop is active, gate also checks:
 | Thorough review | workflow-state.json | `reviews.thorough.passed = true` |
 | Blockers resolved | workflow-state.json | `reviews.thorough.blockers_remaining = 0` |
 
-If either fails → block completion, suggest resolving review findings.
+If either fails → resolve review findings before completion to ensure quality.
 
 ### Boundary
 
@@ -169,13 +169,15 @@ When blocked, state:
 Trivial changes (< 1 min rollback): completion allowed without full gate.
 Document undo command.
 
-## Common Rationalizations (All Wrong)
+## Common Shortcuts to Avoid
 
-| Thought | Reality |
-|---------|---------|
-| "The tests passed" | Tests ≠ verification. Did you run the ACTUAL command? |
-| "It should work" | "Should" = assumption. Show evidence. |
-| "I already checked" | When? Show the output. |
-| "The user is waiting" | Rushed verification = rework later. |
-| "It's a simple change" | Simple changes break production too. |
-| "I'm pretty sure it works" | Pretty sure ≠ evidence. Run it. |
+These thoughts feel convincing but lead to missed issues:
+
+| Thought | Better Approach |
+|---------|-----------------|
+| "The tests passed" | Tests are great — now show the actual execution output |
+| "It should work" | Let's verify it actually works — run it and capture output |
+| "I already checked" | Excellent — show me what you saw |
+| "The user is waiting" | A few more seconds now saves rework later |
+| "It's a simple change" | Simple changes deserve simple verification — quick to do |
+| "I'm pretty sure it works" | Trust but verify — run it and we'll both be confident |

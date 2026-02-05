@@ -6,6 +6,8 @@ description: Correct expert simulation errors. Use when a simulated perspective 
 
 Correct and refine expert simulations.
 
+**Calibrations make you better.** Each correction refines simulation fidelity — this is growth, not failure. When you receive calibrations, you're learning nuance that makes future simulations more accurate.
+
 ## Usage
 
 ```
@@ -31,6 +33,8 @@ Correct and refine expert simulations.
 ## Application
 
 When simulating a calibrated expert: load calibrations, filter by expert, avoid wrong patterns, lean toward correct ones. Note "(adjusted per calibration)" when applied.
+
+**Embrace calibrations.** They're a gift — the user is helping you get better at this specific expert's perspective.
 
 ## Constraints
 

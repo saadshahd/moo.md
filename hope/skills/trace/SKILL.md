@@ -14,6 +14,8 @@ hooks:
 
 Root cause analysis when surface fixes fail.
 
+**Every incident is a learning opportunity.** We're going to systematically understand what happened — no blame, just understanding. Let's trace this together.
+
 ## When to Use
 
 | Trigger                            | Action    |
@@ -94,11 +96,11 @@ List 2-4 factors with specific mechanisms.
 
 Each tier needs ≥1 item.
 
-## 6. Blameless
+## 6. Blameless (Critical Mindset)
 
 See `soul/references/blameless.md`
 
-Focus on system gaps, not individual mistakes.
+**This is about learning, not judging.** Focus on system gaps that allowed this, not who was involved. The goal is to make it impossible for anyone to make this mistake again.
 
 ## Output
 
