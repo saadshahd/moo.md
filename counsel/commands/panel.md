@@ -21,6 +21,47 @@ Assemble an expert panel for debate and guidance.
 
 ## Process
 
+```dot
+digraph PanelWorkflow {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
+
+  Start [label="Panel Request", fillcolor="#e6f3ff"]
+
+  // Step 1
+  LoadBlock [label="Load blocklist\n(~/.claude/counsel-blocklist.json)"]
+  CheckExperts [label="--experts\nflag set?", shape=diamond, fillcolor="#fff4cc"]
+  UseExplicit [label="Use explicit list\n(minus blocked)"]
+  AutoSelect [label="Auto-select 2-3\n(distinct perspectives)"]
+  FilterBlocked [label="Filter out\nblocked profiles"]
+  FinalPanel [label="Final panel\n(2-4 experts)", fillcolor="#ffe6cc"]
+
+  // Step 2
+  LoadHistory [label="Load history\n(counsel-reviews.jsonl)"]
+  GenDescriptors [label="Generate descriptors\nper relevance"]
+  GenConsensus [label="Identify consensus\npoints"]
+  GenDissent [label="Extract\ndisagreements"]
+  FormatOutput [label="Format panel\noutput"]
+
+  // Step 3
+  LogEntry [label="Log to\ncounsel-reviews.jsonl"]
+  OfferDefense [label="Offer defense\nround"]
+  Done [label="Complete", fillcolor="#ccffcc"]
+
+  Start -> LoadBlock -> CheckExperts
+  CheckExperts -> UseExplicit [label="yes"]
+  CheckExperts -> AutoSelect [label="no"]
+  UseExplicit -> FilterBlocked
+  AutoSelect -> FilterBlocked
+  FilterBlocked -> FinalPanel
+
+  FinalPanel -> LoadHistory -> GenDescriptors
+  GenDescriptors -> GenConsensus -> GenDissent -> FormatOutput
+
+  FormatOutput -> LogEntry -> OfferDefense -> Done
+}
+```
+
 ### Step 1: Select Panelists
 
 **Pre-filter:** Load `~/.claude/counsel-blocklist.json` and remove blocked profiles before selection. If `--experts` flag includes a blocked profile, warn and exclude it.
