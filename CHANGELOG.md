@@ -11,6 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **counsel/references/modes**: Progressive disclosure mode references for panel command
+  - `clarify.md` — Clarification mode with dimension pools and expert selection
+  - `diagnose.md` — Stuck mode with formalized retry loop (3 attempts → escalate)
+  - `review.md` — Light and thorough review with interactive findings loop DOT
 - **hope/breakthrough**: DOT notation decision tree for symptom→technique routing (replaces ASCII art)
 - **hope/fit-decision**: DOT notation decision flow for score→shape routing
 - **hope/differential-review**: DOT notation 6-phase workflow with risk-based routing
@@ -24,6 +28,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **counsel/panel**: Refactored to progressive disclosure — mode-specific logic extracted to references/modes/
+  - Panel.md reduced from 414 → 192 lines (54% reduction)
+  - Mode detection DOT diagram routes to appropriate reference
+  - Same public interface preserved
 - **counsel**: Switch from `model: opus` to `model: sonnet` (cost optimization - expert simulation is pattern matching, not complex reasoning)
 - **loop/start**: Switch from `model: opus` to `model: sonnet` (cost optimization - orchestration, not reasoning)
 - **hope/soul**: Replace 37-tool inline table with [Tools Index](hope/skills/soul/references/tools/_index.md) for selective loading
@@ -32,6 +40,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **counsel**: Remove process details from skill description (trigger-only per Superpowers 4.0)
+- **counsel**: Confidence threshold consistency — changed "< 30%" to "< 3/10" to match other references
 - **hope/gate**: Remove process details from description (trigger-only)
 - **hope/intent**: Remove process details from description (trigger-only)
 - **hope/shape**: Remove process details from description (trigger-only)

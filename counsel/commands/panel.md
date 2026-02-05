@@ -1,5 +1,5 @@
 ---
-description: Assemble multiple experts for debate and consensus. Use for design decisions, architecture reviews, or tradeoff discussions.
+description: Assemble multiple experts for debate and consensus. Use for design decisions, architecture reviews, tradeoff discussions, spec clarification, stuck debugging, or code review.
 ---
 
 # /counsel:panel
@@ -12,84 +12,100 @@ Assemble an expert panel for debate and guidance.
 /counsel:panel "Should I use Zustand or Redux?"
 /counsel:panel --experts="osmani,hickey" review this architecture
 /counsel:panel for this PR
+/counsel:panel clarify outcome for: make auth better
+/counsel:panel stuck on "Add ValidationError": "Module not found"
+/counsel:panel review wave 1 changes for: {spec}
+/counsel:panel thorough review for: {spec}
+```
+
+## Mode Detection
+
+```dot
+digraph PanelModes {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
+
+  Input [label="Panel Request", fillcolor="#e6f3ff"]
+
+  CheckClarify [label="clarify {dim}\nfor: pattern?", shape=diamond, fillcolor="#fff4cc"]
+  CheckStuck [label="stuck on\n[task]: pattern?", shape=diamond, fillcolor="#fff4cc"]
+  CheckReview [label="review wave\nor thorough?", shape=diamond, fillcolor="#fff4cc"]
+
+  ClarifyMode [label="Clarification Mode\n(see modes/clarify.md)", fillcolor="#ffe6cc"]
+  DiagnoseMode [label="Diagnose Mode\n(see modes/diagnose.md)", fillcolor="#ffe6cc"]
+  ReviewMode [label="Review Mode\n(see modes/review.md)", fillcolor="#ffe6cc"]
+  DebateMode [label="Debate Mode\n(default)", fillcolor="#ffe6cc"]
+
+  Input -> CheckClarify
+  CheckClarify -> ClarifyMode [label="yes"]
+  CheckClarify -> CheckStuck [label="no"]
+  CheckStuck -> DiagnoseMode [label="yes"]
+  CheckStuck -> CheckReview [label="no"]
+  CheckReview -> ReviewMode [label="yes"]
+  CheckReview -> DebateMode [label="no"]
+}
 ```
 
 ## Inputs
 
-- `$1` — Question or topic (required)
+- `$1` — Question, topic, or mode-specific pattern (required)
 - `--experts` — Comma-separated expert names (optional, auto-selects if omitted)
 
-## Process
+---
+
+## Debate Mode (Default)
+
+For design decisions, architecture reviews, and tradeoff discussions.
+
+### Process
 
 ```dot
-digraph PanelWorkflow {
+digraph DebateWorkflow {
   rankdir=TB
   node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
 
   Start [label="Panel Request", fillcolor="#e6f3ff"]
-
-  // Step 1
-  LoadBlock [label="Load blocklist\n(~/.claude/counsel-blocklist.json)"]
-  CheckExperts [label="--experts\nflag set?", shape=diamond, fillcolor="#fff4cc"]
-  UseExplicit [label="Use explicit list\n(minus blocked)"]
-  AutoSelect [label="Auto-select 2-3\n(distinct perspectives)"]
-  FilterBlocked [label="Filter out\nblocked profiles"]
+  LoadBlock [label="Load blocklist"]
+  CheckExperts [label="--experts\nset?", shape=diamond, fillcolor="#fff4cc"]
+  UseExplicit [label="Use explicit\n(minus blocked)"]
+  AutoSelect [label="Auto-select 2\n(distinct views)"]
   FinalPanel [label="Final panel\n(2-4 experts)", fillcolor="#ffe6cc"]
-
-  // Step 2
-  LoadHistory [label="Load history\n(counsel-reviews.jsonl)"]
-  GenDescriptors [label="Generate descriptors\nper relevance"]
-  GenConsensus [label="Identify consensus\npoints"]
-  GenDissent [label="Extract\ndisagreements"]
-  FormatOutput [label="Format panel\noutput"]
-
-  // Step 3
-  LogEntry [label="Log to\ncounsel-reviews.jsonl"]
-  OfferDefense [label="Offer defense\nround"]
+  LoadHistory [label="Load history"]
+  GenDescriptors [label="Generate\ndescriptors"]
+  GenConsensus [label="Identify\nconsensus"]
+  GenDissent [label="Extract\ndissent"]
+  Format [label="Format output"]
+  Log [label="Log + offer\ndefense"]
   Done [label="Complete", fillcolor="#ccffcc"]
 
   Start -> LoadBlock -> CheckExperts
   CheckExperts -> UseExplicit [label="yes"]
   CheckExperts -> AutoSelect [label="no"]
-  UseExplicit -> FilterBlocked
-  AutoSelect -> FilterBlocked
-  FilterBlocked -> FinalPanel
-
-  FinalPanel -> LoadHistory -> GenDescriptors
-  GenDescriptors -> GenConsensus -> GenDissent -> FormatOutput
-
-  FormatOutput -> LogEntry -> OfferDefense -> Done
+  UseExplicit -> FinalPanel
+  AutoSelect -> FinalPanel
+  FinalPanel -> LoadHistory -> GenDescriptors -> GenConsensus -> GenDissent -> Format -> Log -> Done
 }
 ```
 
-### Step 1: Select Panelists
+### Panel Selection
 
-**Pre-filter:** Load `~/.claude/counsel-blocklist.json` and remove blocked profiles before selection. If `--experts` flag includes a blocked profile, warn and exclude it.
+**Pre-filter:** Load `~/.claude/counsel-blocklist.json` and remove blocked profiles.
 
-Load history from `.claude/logs/counsel-reviews.jsonl` if exists. Select 2 experts with distinct perspectives — each panelist should ask a fundamentally different question. If `--experts` specified, use those (minus blocked, max 2 unless `--expand`); otherwise auto-select per [inference.md](../skills/counsel/references/inference.md). If ambiguous, ask 1-2 clarifying questions first.
+**Selection:** Load history from `.claude/logs/counsel-reviews.jsonl`. Select 2 experts with distinct perspectives. If `--experts` specified, use those (minus blocked, max 2 unless `--expand`).
 
-### Step 2: Generate Review
-
-For each panelist, generate a descriptor based on their relevance to this question (see [confidence.md](../skills/counsel/references/confidence.md#descriptor-generation)). Never use expert names in output.
+### Output Format
 
 ```
 ## Panel Review: [Topic]
 
-**Panelists:** [descriptor A] (X/10), [descriptor B] (Y/10), [descriptor C] (Z/10)
+**Panelists:** [descriptor A] (X/10), [descriptor B] (Y/10)
 
 ### Consensus
 - [Point all panelists would likely agree on]
-- [Another agreed point]
 
 ### Dissent
 **[descriptor A]:** [Position] — (cf. documented work)
-  ↳ **[descriptor B] responds:** [Counter-position]
-
-**[descriptor C]:** [Different angle] — (cf. documented work)
-  ↳ **[descriptor A] responds:** [Rebuttal]
-
-### Related Past Reviews
-[If any: "This connects to your [date] review of [topic]..."]
+  -> **[descriptor B] responds:** [Counter-position]
 
 ### Open Questions
 - [What panel cannot resolve — requires your judgment]
@@ -99,315 +115,77 @@ For each panelist, generate a descriptor based on their relevance to this questi
 *Use /counsel:calibrate if any perspective doesn't sound right.*
 ```
 
-### Step 3: Log + Offer Defense
-
-Output log entry for `.claude/logs/counsel-reviews.jsonl` with: ts, topic, panelists, consensus, dissent, tags. Offer defense round — if user pushes back, present defense to panel and generate counter-responses.
-
-## Panel Size
+### Panel Size
 
 - **Default:** 2 experts (load only 2 profiles)
 - **Maximum:** 4 experts (only if user requests `--expand`)
-- **Progressive:** After initial response, offer "Want another perspective? Reply 'expand' to add 1-2 more experts."
+- **Progressive:** After initial response, offer "Want another perspective? Reply 'expand'."
 
-## Constraints
+### Constraints
 
 - Every panelist must have distinct perspective
 - Cite prior work for every strong position
 - Flag genuine tradeoffs that panel cannot resolve
 - Never manufacture false consensus
 
-## Escalation
+### Escalation
 
 When panel splits with no resolution: flag as "GENUINE TRADEOFF — requires your judgment" and summarize both positions with citations.
 
 ---
 
-## Clarification Mode (Loop Integration)
+## Clarification Mode
 
-When invoked with `clarify {dimension} for: {spec}` pattern:
+Pattern: `clarify {dimension} for: {spec}`
 
-### Process
+See [modes/clarify.md](../skills/counsel/references/modes/clarify.md) for full logic.
 
-1. **Parse dimension** — Identify which spec dimension (Outcome/Scope/Constraints/Success/Done)
-
-2. **Select 2 experts** — Pick 2 from dimension pool (most relevant to context):
-   - Outcome → vision: Jobs, Graham, Kay, Victor
-   - Scope → architecture: Fowler, Hickey, Feathers, Alexander
-   - Constraints → engineering: Pike, Osmani, Hightower, Gregg
-   - Success → quality: Norman, Majors, Zhuo, Beck
-   - Done → delivery: Cagan, Humble, Newman
-
-   Load only the 2 selected profiles. Offer "expand" for more perspectives.
-
-3. **Generate options** — Each expert proposes a concrete clarification
-   - Specific and measurable
-   - Include brief reasoning from expert's philosophy
-
-4. **Format response:**
-   ```
-   ### Clarification Options: {Dimension}
-
-   **[Expert A descriptor]** recommends:
-   "[Specific, measurable clarification]"
-   _Reasoning: [Why from their philosophy]_
-
-   **[Expert B descriptor]** recommends:
-   "[Alternative clarification]"
-   _Reasoning: [Why from their philosophy]_
-
-   **[Expert C descriptor]** recommends:
-   "[Another angle]"
-   _Reasoning: [Why from their philosophy]_
-   ```
-
-### Extended Aspect Mappings
-
-For aspects beyond the 5 core dimensions:
-
-| Aspect | Experts |
-|--------|---------|
-| **Design** | Norman, Zhuo, Frost, Alexander |
-| **UI** | Abramov, Osmani, Perry, Wathan |
-| **UX** | Norman, Zhuo, Victor, Case |
-| **Innovation** | Jobs, Kay, Victor, Matuschak |
-
-### Example
-
-```
-/counsel:panel clarify outcome for: make auth better
-```
-
-**Response:**
-```
-### Clarification Options: Outcome
-
-**A user experience expert (8/10)** recommends:
-"Users complete login in under 3 seconds with zero failed attempts"
-_Reasoning: Outcome should be measurable from user's perspective_
-
-**A pragmatic systems thinker (7/10)** recommends:
-"Reduce auth code complexity by 50%, making it modifiable in one sitting"
-_Reasoning: Simpler code = easier to iterate, which is the real unlock_
-
-**A systems architect (8/10)** recommends:
-"Auth becomes a composable module usable across all products"
-_Reasoning: Building blocks over bespoke solutions_
-```
+**Quick reference:**
+- Dimensions: Outcome, Scope, Constraints, Success, Done
+- Select 2 experts from dimension pool
+- Each expert proposes concrete, measurable clarification
+- Output includes reasoning from expert's philosophy
 
 ---
 
-## Stuck Mode (Loop Integration)
+## Diagnose Mode (Stuck)
 
-When invoked with `stuck on [task]: [error]` pattern (from loop:start):
+Pattern: `stuck on [task]: [error]`
 
-### Process
+See [modes/diagnose.md](../skills/counsel/references/modes/diagnose.md) for full logic.
 
-1. **Parse stuck context** — Extract task description, error message, failed approach
-2. **Select diagnostic experts** — Auto-select 2-3 experts based on domain (debugging, architecture, testing)
-3. **Generate diagnosis** — Each expert diagnoses the issue from their perspective
-4. **Build consensus** — Find agreed-upon approach or present options
+**Quick reference:**
+- Parse task, error, failed approach
+- Select 2-3 diagnostic experts
+- Generate diagnosis + consensus recommendation
+- **Retry loop:** 3 attempts before escalating to thorough review
 
-### Output Format
-
-```
-## Stuck Analysis: [task]
-
-**Error:** [error summary]
-**Failed Approach:** [what was tried]
-
-### Diagnosis
-
-**[Expert A descriptor] (X/10):** [diagnosis from their philosophy]
-**[Expert B descriptor] (Y/10):** [diagnosis from their philosophy]
-
-### Recommendations
-
-1. **[approach]** (confidence: X/10)
-   - Expert A supports because: [reason]
-   - Expert B adds: [reason]
-
-2. **[alternative approach]** (confidence: Y/10)
-   - Expert C suggests because: [reason]
-
-### Consensus Recommendation
-
-[Most agreed-upon approach with confidence level]
-
-### If Still Stuck
-
-[What to try if first recommendation fails]
-```
-
-### Example Invocation
-
-```
-/counsel:panel stuck on "Add ValidationError import to auth.ts": "Module not found: './errors'"
-```
-
-**Response:**
-```
-## Stuck Analysis: Add ValidationError import
-
-**Error:** Module not found: './errors'
-**Failed Approach:** Direct import from relative path
-
-### Diagnosis
-
-**A dependency expert (7/10):** The error indicates the module path is incorrect or the file doesn't exist. Check if errors.ts exists and the path is relative to auth.ts.
-
-**A project structure expert (8/10):** This is likely a path resolution issue. Verify the errors file location and whether you need @/ alias or different relative path.
-
-### Recommendations
-
-1. **Check file existence** (confidence: 8/10)
-   - Run: `ls -la src/errors.ts` or `find . -name "errors.ts"`
-   - If missing, create it first
-
-2. **Fix import path** (confidence: 7/10)
-   - If errors.ts is in different directory, adjust path
-   - Check tsconfig paths for aliases
-
-### Consensus Recommendation
-
-First verify the errors file exists, then adjust the import path based on actual location. (8/10 confidence)
-
-### If Still Stuck
-
-Check if ValidationError is exported from errors.ts. May need named export.
-```
-
-### Integration
-
-Loop invokes counsel:panel when:
-- Task fails verification (stuckCount >= 1)
-- Same error occurs twice
-
-Loop applies recommendation by:
-1. Extracting consensus recommendation
-2. Updating task approach based on diagnosis
-3. Retrying with new approach
+**Loop integration:**
+- Loop invokes when stuckCount >= 1 or same error twice
+- Loop extracts consensus, updates approach, retries
+- After 3 failures: escalates to thorough review
 
 ---
 
-## Review Mode (Loop Integration)
+## Review Mode
 
-When invoked with `review` or `thorough review` pattern:
+Patterns: `review wave {N}` or `thorough review for:`
 
-### Light Review Pattern
+See [modes/review.md](../skills/counsel/references/modes/review.md) for full logic.
 
-Invoked with: `review wave {N} changes for: {spec}`
+### Light Review
 
-```
-1. Parse wave number and spec
-2. Identify aspects touched (API, state, testing, etc.)
-3. Select 2-3 experts based on aspect mapping
-4. Quick review (~30s) for idiomaticity, cleanliness, delivery
-5. Output score + findings with severity
-```
+Pattern: `review wave {N} changes for: {spec}`
 
-### Output Format (Light)
+- Quick (~30s) idiomaticity check
+- Non-blocking: loop continues
+- Output: score/10 + findings table
 
-```
-## Wave {N} Review: {score}/10
+### Thorough Review
 
-**Reviewers:** [expert A descriptor] (X/10), [expert B descriptor] (Y/10)
+Pattern: `thorough review for: {spec} with constraints: {mustNot}`
 
-### Findings
-
-| Severity | Issue | Guidance |
-|----------|-------|----------|
-| SUGGESTION | Consider extracting validation | Move to utils/validation.ts |
-| WARNING | Missing null check | Add `user?.email` guard |
-
-### Summary
-- Score: {score}/10
-- Issues: {count} ({blockers} blockers, {warnings} warnings)
-
-*Non-blocking review. Loop continues.*
-```
-
-### Thorough Review Pattern
-
-Invoked with: `thorough review for: {spec} with constraints: {mustNot}`
-
-```
-1. Parse spec and mustNot constraints
-2. Load full expert panel (3-4 experts)
-3. Review all changes made during loop
-4. Check each suggested fix against mustNot constraints
-5. Interactive findings with approve/reject/create-task options
-```
-
-### Output Format (Thorough)
-
-```
-## Thorough Review
-
-**Panel:** [expert A] (X/10), [expert B] (Y/10), [expert C] (Z/10)
-
-### Finding 1 of {N}
-
-┌─ {BLOCKER|WARNING|SUGGESTION} ─────────────────────┐
-│ {Issue description}                                 │
-├─────────────────────────────────────────────────────┤
-│ **Guidance:** {Idiomatic fix approach}              │
-│ **Constraint check:** {✓ Clean | ⚠ BLOCKED - ...}  │
-└─────────────────────────────────────────────────────┘
-
-**If fix violates constraint:**
-  → Alternative: {Constraint-respecting approach}
-
-[Approve] [Create task] [Discuss] [Skip]
-
----
-
-### Finding 2 of {N}
-...
-```
-
-### Severity Definitions
-
-| Severity | Definition | Action |
-|----------|------------|--------|
-| **BLOCKER** | Must fix before ship | Auto-creates task if not approved |
-| **WARNING** | Should fix | Requires acknowledgment |
-| **SUGGESTION** | Optional improvement | Informational |
-
-### Constraint-Aware Guidance
-
-Before suggesting fixes, check against mustNot from SHAPE.md:
-
-```
-1. Load constraints from .loop/shape/SHAPE.md
-2. For each suggested fix:
-   - Evaluate if fix violates any mustNot
-   - If violation: mark as "BLOCKED - violates: {constraint}"
-   - Provide alternative that respects constraints
-3. Include constraint check in output
-```
-
-### Example: Constrained Fix
-
-```
-┌─ WARNING ──────────────────────────────────────────┐
-│ Session storage could benefit from Redis           │
-├────────────────────────────────────────────────────┤
-│ **Guidance:** Use Redis for session persistence    │
-│ **Constraint check:** ⚠ BLOCKED                    │
-│   → Violates: "no external dependencies"           │
-│ **Alternative:** File-based session store          │
-│   → Does not violate constraints ✓                 │
-└────────────────────────────────────────────────────┘
-```
-
-### Expert-to-Aspect Mapping
-
-| Aspect | Light Review | Thorough Review |
-|--------|--------------|-----------------|
-| API Design | Fowler | Fowler, Fielding |
-| State | Hickey | Hickey, Abramov |
-| Testing | Beck | Beck, Freeman |
-| Security | OWASP | OWASP, Pike |
-| Performance | Gregg | Gregg, Osmani |
-| UI/UX | Norman | Norman, Zhuo |
-| Architecture | Martin | Martin, Evans, Vernon |
+- Full panel (3-4 experts)
+- Interactive findings loop: [Approve] [Create task] [Discuss] [Skip]
+- Constraint-aware: checks fixes against SHAPE.md mustNot
+- Severity levels: BLOCKER / WARNING / SUGGESTION
