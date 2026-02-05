@@ -36,6 +36,74 @@ You are NOT the expert. You are simulating their perspective based on documented
 
 ## Process
 
+```dot
+digraph CounselWorkflow {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
+
+  Start [label="User Query", fillcolor="#e6f3ff"]
+
+  // Step 0
+  LoadCal [label="Step 0:\nLoad calibrations"]
+  CheckCal [label="calibrations.jsonl\nexists?", shape=diamond, fillcolor="#fff4cc"]
+  ApplyCal [label="Apply to\nmatching experts"]
+  NoCal [label="Skip"]
+
+  // Step 0.5
+  LoadBlock [label="Step 0.5:\nLoad blocklist"]
+  CheckBlock [label="blocklist.json\nexists?", shape=diamond, fillcolor="#fff4cc"]
+  BuildExcluded [label="Build excluded\nset"]
+  NoBlock [label="Skip"]
+
+  // Step 1
+  Detect [label="Step 1:\nDetect Expert", fillcolor="#ffe6cc"]
+  CheckExplicit [label="Explicit\nname?", shape=diamond, fillcolor="#fff4cc"]
+  CheckKeyword [label="Trigger\nkeyword?", shape=diamond, fillcolor="#fff4cc"]
+  CheckContext [label="File\ncontext?", shape=diamond, fillcolor="#fff4cc"]
+  CheckDomain [label="Domain\nsignal?", shape=diamond, fillcolor="#fff4cc"]
+  AskUser [label="Ask user or\ngeneric guidance"]
+
+  // Step 2
+  Load [label="Step 2:\nLoad Profile", fillcolor="#ffe6cc"]
+  CheckCurated [label="Curated\nprofile?", shape=diamond, fillcolor="#fff4cc"]
+  LoadCurated [label="Load profile\nbase 6/10"]
+  LoadDynamic [label="Dynamic sim\nbase 4/10\n+ warning"]
+
+  // Step 3
+  Generate [label="Step 3:\nGenerate Response", fillcolor="#ccffcc"]
+
+  Start -> LoadCal
+  LoadCal -> CheckCal
+  CheckCal -> ApplyCal [label="yes"]
+  CheckCal -> NoCal [label="no"]
+  ApplyCal -> LoadBlock
+  NoCal -> LoadBlock
+
+  LoadBlock -> CheckBlock
+  CheckBlock -> BuildExcluded [label="yes"]
+  CheckBlock -> NoBlock [label="no"]
+  BuildExcluded -> Detect
+  NoBlock -> Detect
+
+  Detect -> CheckExplicit
+  CheckExplicit -> Load [label="match"]
+  CheckExplicit -> CheckKeyword [label="no"]
+  CheckKeyword -> Load [label="match"]
+  CheckKeyword -> CheckContext [label="no"]
+  CheckContext -> Load [label="match"]
+  CheckContext -> CheckDomain [label="no"]
+  CheckDomain -> Load [label="match"]
+  CheckDomain -> AskUser [label="no"]
+  AskUser -> Load [style=dashed]
+
+  Load -> CheckCurated
+  CheckCurated -> LoadCurated [label="yes"]
+  CheckCurated -> LoadDynamic [label="no"]
+  LoadCurated -> Generate
+  LoadDynamic -> Generate
+}
+```
+
 ### Step 0: Load Calibrations
 
 Read `.claude/logs/counsel-calibrations.jsonl` if it exists.

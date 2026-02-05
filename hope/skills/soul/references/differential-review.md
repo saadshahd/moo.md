@@ -14,52 +14,50 @@ Premise: Every change is an attack surface. Review defensively.
 
 ## 6-Phase Workflow
 
-```
-    +----------------------------------------------------------+
-    |                 DIFFERENTIAL REVIEW                       |
-    |      Triage -> Review -> Test -> Blast -> Context -> Adversarial
-    +----------------------------------------------------------+
+```dot
+digraph DifferentialReview {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
 
-    +-----------+
-    | 1. TRIAGE |  Quick risk assessment
-    |           |
-    | 2 minutes |  --> Size, category, sensitivity
-    +-----+-----+
-          |
-          v
-    +------------+
-    | 2. CODE    |  Line-by-line diff analysis
-    |    REVIEW  |
-    | Variable   |  --> Purpose, correctness, gaps
-    +-----+------+
-          |
-          v
-    +------------+
-    | 3. TEST    |  Evaluate test changes
-    |    REVIEW  |
-    | Variable   |  --> Coverage, edge cases, missing
-    +-----+------+
-          |
-          v
-    +-------------+
-    | 4. BLAST    |  Failure impact analysis
-    |    RADIUS   |
-    | 5 minutes   |  --> Dependencies, rollback
-    +-----+-------+
-          |
-          v
-    +-------------+
-    | 5. CONTEXT  |  Look beyond the diff
-    |    GATHER   |
-    | Variable    |  --> Related files, history
-    +-----+-------+
-          |
-          v
-    +-------------+
-    | 6. ATTACK   |  Think like an attacker
-    |    MINDSET  |
-    | 5 minutes   |  --> Abuse, violations, malice
-    +-------------+
+  Start [label="Code Change\nReceived", fillcolor="#e6f3ff"]
+
+  Triage [label="1. TRIAGE\n(2 min)\nRisk assessment", fillcolor="#ffe6cc"]
+  RiskCheck [label="Risk Level?", shape=diamond, fillcolor="#fff4cc"]
+
+  High [label="HIGH\n(auth/crypto/parsing)", fillcolor="#ffcccc"]
+  Med [label="MEDIUM\n(config/deps)", fillcolor="#ffffcc"]
+  Low [label="LOW\n(UI/tests)", fillcolor="#ccffcc"]
+
+  Code [label="2. CODE REVIEW\nLine-by-line analysis"]
+  Test [label="3. TEST REVIEW\nCoverage check"]
+  Blast [label="4. BLAST RADIUS\n(5 min)\nFailure impact"]
+  Context [label="5. CONTEXT\nBeyond the diff"]
+  Attack [label="6. ATTACK MINDSET\n(5 min)\nThink like attacker"]
+
+  Decision [label="Decision?", shape=diamond, fillcolor="#fff4cc"]
+  Approve [label="APPROVE", fillcolor="#ccffcc"]
+  Request [label="REQUEST\nCHANGES", fillcolor="#ffffcc"]
+  Discuss [label="NEEDS\nDISCUSSION", fillcolor="#e6f3ff"]
+
+  Start -> Triage -> RiskCheck
+  RiskCheck -> High [label="sensitive"]
+  RiskCheck -> Med [label="moderate"]
+  RiskCheck -> Low [label="safe"]
+
+  High -> Code
+  Med -> Code
+  Low -> Code
+
+  Code -> Test -> Blast
+  Blast -> Context [label="HIGH risk"]
+  Blast -> Attack [label="MED/LOW"]
+  Context -> Attack
+  Attack -> Decision
+
+  Decision -> Approve [label="clean"]
+  Decision -> Request [label="issues"]
+  Decision -> Discuss [label="complex"]
+}
 ```
 
 ## Phase 1: Triage

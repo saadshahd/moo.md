@@ -50,31 +50,46 @@ Each subagent:
 
 ## Wave Execution Protocol
 
-```
-LOOP:
-  1. wave_tasks = get_current_wave()
+```dot
+digraph WaveExecution {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
 
-  2. IF wave_tasks is empty AND pending_tasks exist:
-       → Stuck state (circular dependencies or failed tasks)
-       → Invoke counsel:panel for unblocking
+  Start [label="Get Current Wave\n(pending + unblocked)", fillcolor="#e6f3ff"]
 
-  3. IF wave_tasks is empty AND no pending_tasks:
-       → All done, exit loop
+  CheckWave [label="Wave empty?", shape=diamond, fillcolor="#fff4cc"]
+  CheckPending [label="Pending tasks\nexist?", shape=diamond, fillcolor="#fff4cc"]
 
-  4. FOR each task in wave_tasks:
-       TaskUpdate(taskId, status="in_progress")
+  Stuck [label="STUCK STATE\nCircular deps\nor failures", fillcolor="#ffcccc"]
+  Counsel [label="Invoke\ncounsel:panel", fillcolor="#ffe6cc"]
 
-  5. Spawn parallel subagents (one Task call per task)
+  Done [label="ALL DONE\nExit loop", fillcolor="#ccffcc"]
 
-  6. Wait for all subagents to complete
+  MarkProgress [label="TaskUpdate\nstatus=in_progress"]
+  Spawn [label="Spawn parallel\nsubagents"]
+  Wait [label="Wait for\ncompletion"]
 
-  7. FOR each completed task:
-       - IF success: TaskUpdate(taskId, status="completed")
-       - IF failed: increment stuckCount in metadata
+  CheckResult [label="Task\nsucceeded?", shape=diamond, fillcolor="#fff4cc"]
+  MarkComplete [label="TaskUpdate\nstatus=completed", fillcolor="#ccffcc"]
+  MarkStuck [label="Increment\nstuckCount", fillcolor="#ffcccc"]
 
-  8. Update PROGRESS.md
+  Update [label="Update\nPROGRESS.md"]
 
-  9. GOTO 1
+  Start -> CheckWave
+  CheckWave -> CheckPending [label="yes"]
+  CheckWave -> MarkProgress [label="no"]
+
+  CheckPending -> Stuck [label="yes"]
+  CheckPending -> Done [label="no"]
+  Stuck -> Counsel -> Start [style=dashed]
+
+  MarkProgress -> Spawn -> Wait -> CheckResult
+  CheckResult -> MarkComplete [label="yes"]
+  CheckResult -> MarkStuck [label="no"]
+  MarkComplete -> Update
+  MarkStuck -> Update
+  Update -> Start [style=dashed, label="loop"]
+}
 ```
 
 ## Subagent Prompt Template

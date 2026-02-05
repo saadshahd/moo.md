@@ -2,6 +2,59 @@
 
 Rules for calculating and displaying simulation confidence.
 
+## Scoring Pipeline
+
+```dot
+digraph ConfidenceScoring {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
+
+  Start [label="Begin Scoring", fillcolor="#e6f3ff"]
+
+  // Base
+  CheckProfile [label="Curated\nprofile?", shape=diamond, fillcolor="#fff4cc"]
+  Base6 [label="Base = 6/10"]
+  Base4 [label="Base = 4/10\n(dynamic)"]
+
+  // Modifiers
+  Mod1 [label="+2: Extensive work?\n(3+ books, 10+ talks)"]
+  Mod2 [label="+1: Core domain\nmatch?"]
+  Mod3 [label="-2: Outside\nexpertise?"]
+  Mod4 [label="+1: Recent\nstatements?"]
+  ModCal [label="Variable:\nCalibrations"]
+
+  Total [label="Calculate\nFinal Score", fillcolor="#ffe6cc"]
+
+  // Actions
+  CheckScore [label="Score?", shape=diamond, fillcolor="#fff4cc"]
+  Refuse [label="< 3/10\nREFUSE", fillcolor="#ffcccc"]
+  Warn [label="3-5/10\nWARN\n(low conf)", fillcolor="#ffffcc"]
+  Standard [label="6-7/10\nStandard\n(with conf)"]
+  High [label="8-9/10\nHigh conf\n(9 max)", fillcolor="#ccffcc"]
+
+  Output [label="Generate\nDescriptor"]
+
+  Start -> CheckProfile
+  CheckProfile -> Base6 [label="yes"]
+  CheckProfile -> Base4 [label="no"]
+  Base6 -> Mod1
+  Base4 -> Mod1
+
+  Mod1 -> Mod2 -> Mod3 -> Mod4 -> ModCal -> Total
+
+  Total -> CheckScore
+  CheckScore -> Refuse [label="<3"]
+  CheckScore -> Warn [label="3-5"]
+  CheckScore -> Standard [label="6-7"]
+  CheckScore -> High [label="8-9"]
+
+  Refuse -> Output
+  Warn -> Output
+  Standard -> Output
+  High -> Output
+}
+```
+
 ---
 
 ## Base Score

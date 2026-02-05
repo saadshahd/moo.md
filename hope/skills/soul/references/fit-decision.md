@@ -20,6 +20,37 @@ Before delegating to AI, score each dimension 0-10.
 | **25-39** | Colleague-shaped | Iterate together |
 | **<25** | Not ready | Clarify first, don't delegate |
 
+### Decision Flow
+
+```dot
+digraph FitDecision {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
+
+  Score [label="Score 5 Dimensions\n(0-10 each)", fillcolor="#e6f3ff"]
+  Total [label="Calculate\nTotal Score", fillcolor="#ffe6cc"]
+
+  Check [label="Total Score?", shape=diamond, fillcolor="#fff4cc"]
+
+  Tool [label="Tool-shaped\n(≥40)", fillcolor="#ccffcc"]
+  Colleague [label="Colleague-shaped\n(25-39)", fillcolor="#ffffcc"]
+  Blocked [label="BLOCKED\n(<25)", fillcolor="#ffcccc"]
+
+  ActionTool [label="Delegate\nand forget"]
+  ActionColleague [label="Iterate\ntogether"]
+  ActionBlocked [label="Clarify first\n→ hope:intent"]
+
+  Score -> Total -> Check
+  Check -> Tool [label="≥40"]
+  Check -> Colleague [label="25-39"]
+  Check -> Blocked [label="<25"]
+
+  Tool -> ActionTool
+  Colleague -> ActionColleague
+  Blocked -> ActionBlocked
+}
+```
+
 ## Failure Modes
 
 | Wrong Choice | Symptom | Cost |

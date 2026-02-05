@@ -1,6 +1,6 @@
 ---
 name: trace
-description: Root cause analysis for complex bugs. Use when initial fix fails or incident is severe. Traces Effect → Cause → Root with confidence levels and prevention hierarchy.
+description: Root cause analysis for complex bugs. Use when initial fix fails, bug keeps returning, or incident is severe. Triggers on "root cause", "why does this keep happening", "trace the bug".
 model: opus
 allowed-tools: Read, Grep, Bash
 hooks:

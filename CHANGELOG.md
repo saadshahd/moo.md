@@ -9,6 +9,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **hope/breakthrough**: DOT notation decision tree for symptom→technique routing (replaces ASCII art)
+- **hope/fit-decision**: DOT notation decision flow for score→shape routing
+- **hope/differential-review**: DOT notation 6-phase workflow with risk-based routing
+- **loop/waves**: DOT notation state machine for wave execution protocol
+- **loop/start**: DOT notation for resume decision flow and spec→fit scoring
+- **counsel/panel**: DOT notation workflow for panel assembly process
+- **counsel/counsel**: DOT notation for main workflow (Steps 0-3)
+- **counsel/confidence**: DOT notation pipeline for confidence scoring
+- **CLAUDE.md**: DOT notation guidelines (color palette, node conventions, when to use)
+- **CLAUDE.md**: Description Trap warning in conventions and anti-patterns
+
+### Fixed
+
+- **hope/gate**: Remove process details from description (trigger-only)
+- **hope/intent**: Remove process details from description (trigger-only)
+- **hope/shape**: Remove process details from description (trigger-only)
+- **hope/trace**: Remove process details from description (trigger-only)
+- **loop/cancel**: Remove process details from description (trigger-only)
+- **loop/start**: Remove process details from description (trigger-only)
+
 ---
 
 ## [loop@2.4.1] - 2026-02-05
