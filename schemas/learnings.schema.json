@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "definitions": {
+    "failure": {
+      "type": "object",
+      "required": ["ts", "context", "failure", "root_cause", "prevention"],
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "context": { "type": "string" },
+        "failure": { "type": "string" },
+        "root_cause": { "type": "string" },
+        "prevention": { "type": "string" }
+      }
+    },
+    "discovery": {
+      "type": "object",
+      "required": ["ts", "context", "discovery", "confidence", "applies_to"],
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "context": { "type": "string" },
+        "discovery": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 100 },
+        "applies_to": { "type": "string" }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "required": ["ts", "context", "constraint", "source", "permanent"],
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "context": { "type": "string" },
+        "constraint": { "type": "string" },
+        "source": { "type": "string" },
+        "permanent": { "type": "boolean" }
+      }
+    },
+    "delegation": {
+      "type": "object",
+      "required": ["ts", "context", "spec_score", "outcome"],
+      "properties": {
+        "ts": { "type": "string", "format": "date-time" },
+        "context": { "type": "string" },
+        "spec_score": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "fit_score": { "type": "integer" },
+        "shape_chosen": { "type": "string" },
+        "verification_type": { "type": "string" },
+        "outcome": { "type": "string" },
+        "failure_pattern": { "type": "string" },
+        "root_cause": { "type": "string" },
+        "prevention": { "type": "string" }
+      }
+    }
+  }
+}

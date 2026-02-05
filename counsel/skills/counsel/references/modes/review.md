@@ -142,7 +142,7 @@ digraph FindingsLoop {
 | API Design | Fowler | Fowler, Fielding |
 | State | Hickey | Hickey, Abramov |
 | Testing | Beck | Beck, Freeman |
-| Security | OWASP | OWASP, Pike |
+| Security | Pike | Pike, Hightower |
 | Performance | Gregg | Gregg, Osmani |
 | UI/UX | Norman | Norman, Zhuo |
 | Architecture | Martin | Martin, Evans, Vernon |

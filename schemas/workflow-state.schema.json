@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "stage", "task"],
+  "properties": {
+    "version": { "const": 1 },
+    "stage": { "enum": ["intent", "shape", "decompose", "executing", "review", "complete", "cancelled"] },
+    "task": { "type": "string" },
+    "spec_score": { "type": "integer", "minimum": 0, "maximum": 10 },
+    "fit_score": { "type": "integer", "minimum": 0, "maximum": 75 },
+    "shape_chosen": { "enum": ["colleague", "tool-review", "tool"] },
+    "started_at": { "type": "string", "format": "date-time" },
+    "last_updated": { "type": "string", "format": "date-time" },
+    "exit_signal": { "type": "boolean" },
+    "recall_surfaced": { "type": "array", "items": { "type": "string" } },
+    "reviews": { "type": "object" }
+  }
+}

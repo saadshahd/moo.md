@@ -11,6 +11,15 @@ if [ "$(echo "$INPUT" | jq -r '.stop_hook_active // false')" = "true" ]; then
   exit 0
 fi
 
+# Basic schema validation for state file
+STATE_FILE=".loop/workflow-state.json"
+if [ -f "$STATE_FILE" ]; then
+  if ! jq -e '.version and .stage and .task' "$STATE_FILE" > /dev/null 2>&1; then
+    echo '{"ok": true, "reason": "Invalid state schema"}'
+    exit 0
+  fi
+fi
+
 # TaskList-based detection
 TASK_LIST_ID="${CLAUDE_CODE_TASK_LIST_ID:-}"
 if [ -n "$TASK_LIST_ID" ]; then

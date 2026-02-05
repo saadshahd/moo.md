@@ -9,20 +9,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
+---
 
-- **loop/cancel**: Fix wrong state file reference (`state.json` → `workflow-state.json`) - would cause cancel to fail
-- **loop/status**: Remove process details from description (trigger-only)
-- **counsel/counsel**: Remove process details from description (trigger-only)
-
-### Changed
-
-- **hope/gate**: Remove redundant Verification Plan section (duplicated with verify skill)
-- **loop/start**: Simplify fit score to table, reference loop-mechanics.md for formula
-- **counsel/vergnaud**: Trim keywords from 43 to 15 (align with other profiles)
+## [hope@0.21.0, loop@2.5.0, counsel@0.13.0] - 2026-02-05
 
 ### Added
 
+- **counsel**: 9 new expert profiles (33 → 42 total)
+  - Kent Beck — Testing/TDD, XP, red-green-refactor
+  - Steve Freeman — GOOS, mock objects, outside-in testing
+  - Roy Fielding — REST, HATEOAS, HTTP semantics
+  - Brendan Gregg — Systems performance, flame graphs, USE method
+  - Robert C. Martin — Clean Code, Clean Architecture, SOLID
+  - Eric Evans — DDD, bounded contexts, ubiquitous language
+  - Vaughn Vernon — IDDD, aggregates, event sourcing, CQRS
+  - Jez Humble — Continuous Delivery, DORA metrics, deployment pipelines
+  - Sam Newman — Microservices, service decomposition, distributed systems
+- **schemas/**: New directory with formal JSON schemas for state files
+  - `workflow-state.schema.json` — Loop state file schema
+  - `learnings.schema.json` — Learnings JSONL schemas
+  - `README.md` — Schema usage guide
+- **CLAUDE.md**: State File Schemas policy section
 - **counsel/references/modes**: Progressive disclosure mode references for panel command
   - `clarify.md` — Clarification mode with dimension pools and expert selection
   - `diagnose.md` — Stuck mode with formalized retry loop (3 attempts → escalate)
@@ -45,8 +52,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **CLAUDE.md**: DOT notation guidelines (color palette, node conventions, when to use)
 - **CLAUDE.md**: Description Trap warning in conventions and anti-patterns
 
+### Fixed
+
+- **loop/cancel**: Add `TaskList, TaskUpdate` to allowed-tools (was missing, causing permission prompts)
+- **loop/cancel**: Fix schema alignment (`status` → `stage: cancelled`)
+- **loop/cancel**: Fix wrong state file reference (`state.json` → `workflow-state.json`)
+- **counsel/review**: Replace OWASP (framework) with Pike (expert) in security mapping
+- **loop/stop-check.sh**: Add basic schema validation for state file
+- **loop/status**: Remove process details from description (trigger-only)
+- **counsel/counsel**: Remove process details from skill description (trigger-only per Superpowers 4.0)
+- **counsel**: Confidence threshold consistency — changed "< 30%" to "< 3/10" to match other references
+- **hope/gate**: Remove process details from description (trigger-only)
+- **hope/intent**: Remove process details from description (trigger-only)
+- **hope/shape**: Remove process details from description (trigger-only)
+- **hope/trace**: Remove process details from description (trigger-only)
+- **loop/start**: Remove process details from description (trigger-only)
+
 ### Changed
 
+- **hope/gate**: Remove redundant Verification Plan section (duplicated with verify skill)
+- **loop/start**: Simplify fit score to table, reference loop-mechanics.md for formula
+- **counsel/vergnaud**: Trim keywords from 43 to 15 (align with other profiles)
 - **counsel/panel**: Refactored to progressive disclosure — mode-specific logic extracted to references/modes/
   - Panel.md reduced from 414 → 192 lines (54% reduction)
   - Mode detection DOT diagram routes to appropriate reference
@@ -62,17 +88,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **hope/soul**: Replace 37-tool inline table with [Tools Index](hope/skills/soul/references/tools/_index.md) for selective loading
 - **loop/start**: Stage-conditional reference loading (load only decomposition/waves/expert-review when needed)
 - **counsel/panel**: Default to 2 experts with progressive disclosure ("expand" to add more)
-
-### Fixed
-
-- **counsel**: Remove process details from skill description (trigger-only per Superpowers 4.0)
-- **counsel**: Confidence threshold consistency — changed "< 30%" to "< 3/10" to match other references
-- **hope/gate**: Remove process details from description (trigger-only)
-- **hope/intent**: Remove process details from description (trigger-only)
-- **hope/shape**: Remove process details from description (trigger-only)
-- **hope/trace**: Remove process details from description (trigger-only)
-- **loop/cancel**: Remove process details from description (trigger-only)
-- **loop/start**: Remove process details from description (trigger-only)
 
 ---
 

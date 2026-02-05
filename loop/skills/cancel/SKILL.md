@@ -2,7 +2,7 @@
 name: cancel
 description: Cancel active loop. Triggers on "cancel loop", "stop loop", "abort", "halt", "end loop".
 model: haiku
-allowed-tools: Read
+allowed-tools: Read, TaskList, TaskUpdate
 ---
 
 # Cancel Loop
@@ -42,7 +42,7 @@ Update `.loop/workflow-state.json`:
 
 ```json
 {
-  "status": "cancelled",
+  "stage": "cancelled",
   "exit_signal": false
 }
 ```

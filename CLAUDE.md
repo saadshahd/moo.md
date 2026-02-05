@@ -133,6 +133,32 @@ Use DOT for process documentation. Claude follows DOT-written processes more rel
 - **Workflows:** A=Build, B=Debug, C=Refactor
 - **Learnings:** `~/.claude/learnings/*.jsonl`
 
+## State File Schemas
+
+JSON state files have formal schemas in `schemas/`:
+
+| File Pattern | Schema | Used By |
+|--------------|--------|---------|
+| `.loop/workflow-state.json` | `workflow-state.schema.json` | loop plugin |
+| `~/.claude/learnings/*.jsonl` | `learnings.schema.json` | hope/learn, hope/recall |
+
+**When modifying state files:**
+1. Check schema in `schemas/` before adding fields
+2. New fields must be optional (backward compatible)
+3. Breaking changes require `version` bump + migration in consuming hooks
+4. Update all skills/hooks that read the state file
+
+**When creating skills that use state:**
+- Define schema in `schemas/` if new file type
+- Document schema in skill's references/
+- Validate required fields before processing
+- Fail gracefully on schema mismatch
+
+**Schema evolution:**
+- Version field tracks breaking changes
+- Hooks handle migration for old versions
+- Document changes in CHANGELOG.md
+
 ## Anti-Patterns
 
 - Generic names (`*Manager`, `*Helper`, `*Utils`)

@@ -283,97 +283,24 @@ TaskUpdate(taskId="4", addBlockedBy=["1", "3"])
 
 A **wave** is tasks with no blockedBy dependencies or all blockedBy tasks completed.
 
-### Wave Detection
+See [waves.md](references/waves.md) for full protocol including:
+- Wave detection algorithm
+- Parallel subagent spawning
+- Progress tracking in PROGRESS.md
+- Handling tasks that need another attempt
 
-```
-1. TaskList() → Get all tasks
-2. Filter: status="pending" AND blockedBy is empty or all complete
-3. Current wave = matching tasks
-```
+### Adaptive Strategy
 
-### Wave Strategy (Adaptive)
-
-Before executing each wave, consult panel on strategy:
-
+Before each wave, consult panel on strategy:
 ```
 Skill(skill="counsel:panel", args="wave execution strategy for {N} tasks: {task_summaries}")
 ```
 
-Panel analyzes:
-- **Task coupling** — same files/modules → run sequential
-- **Independence** — different areas → run parallel
-- **Risk level** — risky tasks → sequential with review
+Panel recommends sequential (coupled tasks) vs parallel (independent tasks).
 
-```
-[LOOP] Wave 2: 4 tasks ready
-[LOOP] Consulting panel on execution strategy...
-Panel recommendation:
-  Sequential: T-003 → T-004 (both modify auth/)
-  Parallel: [T-005, T-006] (independent)
-[LOOP] Executing strategy...
-```
+### Quick Verification
 
-### Execute Wave
-
-For each task in wave:
-
-1. `TaskUpdate(taskId, status="in_progress")`
-
-2. Spawn parallel subagents (all Task calls in single message):
-```
-Task(prompt="Execute this task with excellence — you're part of a parallel wave where each task contributes to the overall goal.
-
-**Your task:** {subject}
-**Details:** {description}
-
-Other agents are handling complementary tasks in this wave. Do your part well. You've got this.", subagent_type="general-purpose")
-```
-
-3. Wait for all subagents to complete
-
-4. For each completed:
-   - Success → `TaskUpdate(taskId, status="completed")`
-   - Failed → Increment stuckCount, check for stuck handling
-
-### Quick Verification After Task
-
-After each task completes, run quick verify:
-
-```
-Skill(skill="hope:verify", args="quick")
-```
-
-Quick tier (< 5s): fastest discovered check only. If fails:
-- Don't mark task complete
-- Escalate to standard tier for diagnostics
-- Fix issue before proceeding
-
-### When Tasks Need Another Attempt
-
-When task needs iteration (verification command doesn't pass yet):
-
-```
-IF attemptCount >= 1:
-  Announce: "[LOOP] Task {id} needs expert perspective. Consulting panel..."
-  Skill(skill="counsel:panel", args="needs help with {subject}: {error}")
-  Apply recommendation from panel
-  Retry with refined approach — you've got this
-```
-
-**Remember:** Iteration is thoroughness, not failure. Each attempt teaches something.
-
-Pauses only at max iterations (no mid-loop human escalation).
-
-### Progress Update
-
-After each wave, update `.loop/PROGRESS.md` with completed/pending task status.
-
-### Announcements
-
-```
-[LOOP] Wave {N} | Iteration {i}/{max} | Cost: ${X}/${budget} | Tasks: {N}
-[LOOP] ✓ Wave {N} complete | Progress: {completed}/{total}
-```
+After each task: `Skill(skill="hope:verify", args="quick")`
 
 ### Light Expert Review (After Each Wave)
 
@@ -381,9 +308,7 @@ After each wave, update `.loop/PROGRESS.md` with completed/pending task status.
 Skill(skill="counsel:panel", args="review wave {N} changes for: {spec}")
 ```
 
-- Quick check (~30s): idiomaticity, cleanliness, delivery alignment
-- Non-blocking: issues are guidance only
-- Persist review score to workflow-state.json
+Non-blocking: issues are guidance only. Persist review score to workflow-state.json.
 
 See [expert-review.md](references/expert-review.md) for protocol.
 
