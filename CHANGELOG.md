@@ -27,6 +27,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `clarify.md` — Clarification mode with dimension pools and expert selection
   - `diagnose.md` — Stuck mode with formalized retry loop (3 attempts → escalate)
   - `review.md` — Light and thorough review with interactive findings loop DOT
+- **hope/anchor-experts**: Code examples for all 10 experts (gene transfer for style matching)
+- **loop/decomposition**: Extended TaskCreate examples by task type (file, test, verify, refactor)
+- **hope/breakthrough**: Supportive opening framing ("You're in good company")
+- **hope/trace**: Learning-oriented opening ("Every incident is a learning opportunity")
+- **counsel/calibrate**: Growth mindset framing ("Calibrations make you better")
+- **loop/start**: Completion celebration with encouragement
+- **loop/waves**: Subagent motivation with parallel wave context
 - **hope/breakthrough**: DOT notation decision tree for symptom→technique routing (replaces ASCII art)
 - **hope/fit-decision**: DOT notation decision flow for score→shape routing
 - **hope/differential-review**: DOT notation 6-phase workflow with risk-based routing
@@ -44,6 +51,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - Panel.md reduced from 414 → 192 lines (54% reduction)
   - Mode detection DOT diagram routes to appropriate reference
   - Same public interface preserved
+- **hope/gate**: Reframe blocking language to supportive guidance ("STOP" → "Pause here", "block gate" → "resolve findings")
+- **hope/soul**: Reframe blocking items to clarity checkpoints (🔴 RESEARCH → 💡 CLARIFY)
+- **loop/waves**: Reframe "STUCK STATE" to "TIME FOR EXPERT HELP" (iteration is normal)
+- **loop/start**: Reframe stuck handling to "tasks that need another attempt"
+- **counsel/SKILL.md**: Soften core constraint from "You are NOT the expert" to "You excel at simulating"
+- **counsel/SKILL.md**: Change "CRITICAL: Lazy loading only" to "Efficiency note"
 - **counsel**: Switch from `model: opus` to `model: sonnet` (cost optimization - expert simulation is pattern matching, not complex reasoning)
 - **loop/start**: Switch from `model: opus` to `model: sonnet` (cost optimization - orchestration, not reasoning)
 - **hope/soul**: Replace 37-tool inline table with [Tools Index](hope/skills/soul/references/tools/_index.md) for selective loading

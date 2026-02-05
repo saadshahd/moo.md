@@ -321,7 +321,12 @@ For each task in wave:
 
 2. Spawn parallel subagents (all Task calls in single message):
 ```
-Task(prompt="Execute: {subject}. {description}", subagent_type="general-purpose")
+Task(prompt="Execute this task with excellence — you're part of a parallel wave where each task contributes to the overall goal.
+
+**Your task:** {subject}
+**Details:** {description}
+
+Other agents are handling complementary tasks in this wave. Do your part well. You've got this.", subagent_type="general-purpose")
 ```
 
 3. Wait for all subagents to complete
@@ -343,17 +348,19 @@ Quick tier (< 5s): fastest discovered check only. If fails:
 - Escalate to standard tier for diagnostics
 - Fix issue before proceeding
 
-### Stuck Handling
+### When Tasks Need Another Attempt
 
-When task fails (verification command doesn't pass):
+When task needs iteration (verification command doesn't pass yet):
 
 ```
-IF stuckCount >= 1:
-  Announce: "[LOOP] Task {id} stuck. Consulting expert panel..."
-  Skill(skill="counsel:panel", args="stuck on {subject}: {error}")
+IF attemptCount >= 1:
+  Announce: "[LOOP] Task {id} needs expert perspective. Consulting panel..."
+  Skill(skill="counsel:panel", args="needs help with {subject}: {error}")
   Apply recommendation from panel
-  Retry with new approach
+  Retry with refined approach — you've got this
 ```
+
+**Remember:** Iteration is thoroughness, not failure. Each attempt teaches something.
 
 Pauses only at max iterations (no mid-loop human escalation).
 
@@ -419,6 +426,8 @@ Skill(skill="hope:gate", args="loop completion verification")
 3. If gate passes (verify passed), emit completion:
 ```
 <loop-complete>
+🎉 Loop completed successfully!
+
 All tasks verified:
 - T-001: ✓ {subject}
 - T-002: ✓ {subject}
@@ -428,6 +437,9 @@ All tasks verified:
 │ Verified: execution output          │
 │ Tasks: {N}/{N} complete             │
 │ Subjective: ~X% · Type 2B · Npt    │
+├────────────────────────────────────┤
+│ Great work! The systematic          │
+│ approach paid off.                  │
 ├────────────────────────────────────┤
 │ ↳ Alt: [alternative approach]       │
 │ ↳ Risk: [key assumption]            │

@@ -33,6 +33,25 @@ When experts disagree, apply in order:
 - What is complected that could be separated?
 - Can this be data instead of code?
 
+**Code Example:**
+```typescript
+// ❌ Mutable, place-oriented (complex)
+class UserAccount {
+  status: "active" | "suspended";
+  suspendedAt?: Date;
+  suspend() { this.status = "suspended"; this.suspendedAt = new Date(); }
+}
+
+// ✅ Immutable, value-oriented (simple)
+type UserAccount =
+  | { type: "active"; user: User }
+  | { type: "suspended"; user: User; suspendedAt: Date };
+
+function suspend(account: ActiveAccount, at: Date): SuspendedAccount {
+  return { type: "suspended", user: account.user, suspendedAt: at };
+}
+```
+
 ---
 
 ### Martin Fowler (API, Pragmatism)
@@ -53,6 +72,23 @@ When experts disagree, apply in order:
 - Can I change this later without a rewrite?
 - What's the simplest thing that could possibly work?
 - Am I building for today or hypothetical tomorrow?
+
+**Code Example:**
+```typescript
+// ❌ Big upfront design (over-engineered)
+interface PaymentProcessor {
+  process(payment: Payment): Promise<Result>;
+  refund(id: string): Promise<Result>;
+  subscribe(plan: Plan): Promise<Subscription>;
+  cancelSubscription(id: string): Promise<void>;
+}
+
+// ✅ Evolutionary design (start simple)
+async function processPayment(amount: number, method: string) {
+  // Start here. Add refund() when you need it.
+  return stripe.charges.create({ amount, source: method });
+}
+```
 
 ---
 
@@ -75,6 +111,21 @@ When experts disagree, apply in order:
 - How does the user know what happened?
 - What errors can we prevent by design?
 
+**Code Example:**
+```tsx
+// ❌ No affordance, no feedback
+<button onClick={save}>💾</button>
+
+// ✅ Clear affordance + feedback
+<button
+  onClick={save}
+  disabled={!hasChanges}
+  aria-label="Save changes"
+>
+  {saving ? "Saving..." : hasChanges ? "Save Changes" : "Saved ✓"}
+</button>
+```
+
 ---
 
 ### OWASP (Auth, Security)
@@ -95,6 +146,21 @@ When experts disagree, apply in order:
 - What's the threat model?
 - What's the blast radius if this fails?
 - Is there an existing secure pattern?
+
+**Code Example:**
+```typescript
+// ❌ SQL injection vulnerable
+const user = await db.query(`SELECT * FROM users WHERE id = ${req.params.id}`);
+
+// ✅ Parameterized query
+const user = await db.query("SELECT * FROM users WHERE id = $1", [req.params.id]);
+
+// ❌ Trusts user input
+if (req.body.isAdmin) grantAdmin(user);
+
+// ✅ Validates at boundary
+const { isAdmin } = adminSchema.parse(req.body); // throws if invalid
+```
 
 ---
 
@@ -117,6 +183,18 @@ When experts disagree, apply in order:
 - What does the flame graph show?
 - Is this optimization premature?
 
+**Code Example:**
+```typescript
+// ❌ Premature optimization (guessing)
+const cache = new LRUCache({ max: 10000 }); // Why 10000?
+
+// ✅ Measure first, then optimize
+// 1. Profile: 80% of requests hit getUserById
+// 2. Measure: avg 50ms DB query, 1000 req/min
+// 3. Size cache: 1000 users × 5min TTL = 5000 entries
+const cache = new LRUCache({ max: 5000, ttl: 300_000 });
+```
+
 ---
 
 ### Michael Nygard (Error, Resilience)
@@ -137,6 +215,18 @@ When experts disagree, apply in order:
 - What happens when this fails?
 - Is there a fallback?
 - Can failures cascade?
+
+**Code Example:**
+```typescript
+// ❌ Optimistic (will cascade failures)
+const user = await fetchUserFromService(id);
+const orders = await fetchOrdersFromService(user.id);
+
+// ✅ Cynical with circuit breaker
+const user = await circuitBreaker.fire(() =>
+  fetchUserFromService(id, { timeout: 2000 })
+).catch(() => cachedUser(id) ?? { id, name: "Unknown" });
+```
 
 ---
 
@@ -159,6 +249,23 @@ When experts disagree, apply in order:
 - Can I delete this test after refactoring?
 - Does this test document intent?
 
+**Code Example:**
+```typescript
+// ❌ Testing implementation (brittle)
+test("calls validateEmail then hashPassword", () => {
+  const spy1 = jest.spyOn(utils, "validateEmail");
+  const spy2 = jest.spyOn(utils, "hashPassword");
+  createUser(data);
+  expect(spy1).toHaveBeenCalledBefore(spy2);
+});
+
+// ✅ Testing behavior (robust)
+test("rejects invalid email addresses", () => {
+  expect(() => createUser({ email: "not-an-email" }))
+    .toThrow("Invalid email");
+});
+```
+
 ---
 
 ### Sam Newman (Migration)
@@ -179,6 +286,21 @@ When experts disagree, apply in order:
 - Can we do this incrementally?
 - What's the rollback plan?
 - Where are the seams?
+
+**Code Example:**
+```typescript
+// ❌ Big bang migration
+// Day 1: Delete old auth, deploy new auth (pray)
+
+// ✅ Strangler fig pattern
+const getUser = async (id: string) => {
+  if (featureFlag("new-auth")) {
+    return newAuthService.getUser(id);  // New system
+  }
+  return legacyAuth.getUser(id);  // Old system
+};
+// Gradually shift traffic, rollback = flip flag
+```
 
 ---
 
@@ -201,6 +323,25 @@ When experts disagree, apply in order:
 - What if this message is delivered twice?
 - How do we trace across services?
 
+**Code Example:**
+```typescript
+// ❌ Not idempotent (breaks on retry)
+async function processPayment(orderId: string) {
+  await chargeCard(orderId);
+  await db.orders.update(orderId, { paid: true });
+}
+
+// ✅ Idempotent with correlation
+async function processPayment(orderId: string, correlationId: string) {
+  const existing = await db.payments.findBy({ correlationId });
+  if (existing) return existing; // Already processed
+
+  const result = await chargeCard(orderId, { idempotencyKey: correlationId });
+  await db.payments.create({ orderId, correlationId, result });
+  return result;
+}
+```
+
 ---
 
 ### Jez Humble (Deployment)
@@ -221,6 +362,21 @@ When experts disagree, apply in order:
 - Can we roll this back in minutes?
 - Should this be behind a flag?
 - Is this deployment reversible?
+
+**Code Example:**
+```typescript
+// ❌ Long-lived feature branch (merge pain)
+// git checkout -b feature/new-checkout  // 3 weeks later...
+
+// ✅ Trunk-based with feature flag
+// main branch, always deployable
+export function Checkout() {
+  if (featureFlag("new-checkout", { user })) {
+    return <NewCheckout />;  // Progressive rollout
+  }
+  return <LegacyCheckout />;  // Safe fallback
+}
+```
 
 ---
 

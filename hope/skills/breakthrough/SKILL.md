@@ -14,6 +14,8 @@ hooks:
 
 Structured creativity when conventional approaches fail.
 
+**You're in good company.** Every expert developer gets stuck. The difference is having systematic techniques to move forward. Let's find your breakthrough together.
+
 ## When to Use
 
 | Trigger | Action |
@@ -97,12 +99,14 @@ digraph BreakthroughDecision {
 
 ## Protocol
 
-### 1. Name the Stuck
+### 1. Name the Stuck (Clarity First)
+
+First, let's get clarity on where you are. No judgment — just mapping the territory.
 
 ```
 SYMPTOM: [What exactly is stuck]
-TRIED: [What approaches failed]
-CONSTRAINT: [What feels immovable]
+TRIED: [What approaches failed — each attempt taught you something]
+CONSTRAINT: [What feels immovable — we'll test that assumption]
 ```
 
 ### 2. Select Technique
