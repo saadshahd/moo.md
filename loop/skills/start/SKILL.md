@@ -48,19 +48,40 @@ Before starting, check for existing workflow state:
 
 ### 0b. Resume Decision
 
-**If existing state found:**
+```dot
+digraph ResumeDecision {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
 
-```
-AskUserQuestion:
-  question: "Active loop detected. What would you like to do?"
-  header: "Resume"
-  options:
-    - label: "Resume (Recommended)"
-      description: "Continue from {stage}, {N} tasks remaining"
-    - label: "Start fresh"
-      description: "Discard existing state and begin new loop"
-    - label: "View status"
-      description: "Show detailed status then decide"
+  Start [label="/loop:start", fillcolor="#e6f3ff"]
+  Check [label="Check for\nworkflow-state.json"]
+  Exists [label="State\nexists?", shape=diamond, fillcolor="#fff4cc"]
+  NoState [label="No state\nfound"]
+  Ask [label="AskUserQuestion:\nResume / Fresh / Status", fillcolor="#ffe6cc"]
+
+  Resume [label="Resume", fillcolor="#ccffcc"]
+  Fresh [label="Start Fresh", fillcolor="#ffffcc"]
+  Status [label="View Status", fillcolor="#e6f3ff"]
+
+  ReadStage [label="Read current_stage\nfrom state"]
+  SkipTo [label="Jump to\nstage logic"]
+  Delete [label="Delete .loop/\ndirectory"]
+  ShowStatus [label="/loop:status"]
+  Config [label="Step 0c:\nUser Config"]
+
+  Start -> Check -> Exists
+  Exists -> Ask [label="yes"]
+  Exists -> NoState [label="no"]
+  NoState -> Config
+
+  Ask -> Resume
+  Ask -> Fresh
+  Ask -> Status
+
+  Resume -> ReadStage -> SkipTo
+  Fresh -> Delete -> Config
+  Status -> ShowStatus -> Ask [style=dashed]
+}
 ```
 
 On "Resume": Skip to current stage (read from workflow-state.json)
@@ -163,9 +184,33 @@ Score the user request on 5 dimensions (0-2 each, max 10):
 | **Done** | Implied | "When it works" | "PR merged to main" |
 
 **Decision:**
-- **≥8:** Tool-shaped — proceed directly to decomposition
-- **5-7:** Colleague-shaped — confirm approach after decomposition
-- **<5:** Run `Skill(skill="hope:intent", args="$ARGUMENTS")` first
+
+```dot
+digraph SpecDecision {
+  rankdir=LR
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
+
+  Score [label="Spec Score\n(0-10)", fillcolor="#e6f3ff"]
+  Check [label="Score?", shape=diamond, fillcolor="#fff4cc"]
+
+  High [label="≥8\nTool-shaped", fillcolor="#ccffcc"]
+  Mid [label="5-7\nColleague-shaped", fillcolor="#ffffcc"]
+  Low [label="<5\nNot ready", fillcolor="#ffcccc"]
+
+  Decompose [label="Proceed to\ndecomposition"]
+  Confirm [label="Confirm approach\nafter decompose"]
+  Intent [label="Run\nhope:intent"]
+
+  Score -> Check
+  Check -> High [label="≥8"]
+  Check -> Mid [label="5-7"]
+  Check -> Low [label="<5"]
+
+  High -> Decompose
+  Mid -> Confirm
+  Low -> Intent -> Check [style=dashed]
+}
+```
 
 ### Fit Score Calculation
 
