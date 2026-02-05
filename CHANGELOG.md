@@ -9,6 +9,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **loop/cancel**: Fix wrong state file reference (`state.json` → `workflow-state.json`) - would cause cancel to fail
+- **loop/status**: Remove process details from description (trigger-only)
+- **counsel/counsel**: Remove process details from description (trigger-only)
+
+### Changed
+
+- **hope/gate**: Remove redundant Verification Plan section (duplicated with verify skill)
+- **loop/start**: Simplify fit score to table, reference loop-mechanics.md for formula
+- **counsel/vergnaud**: Trim keywords from 43 to 15 (align with other profiles)
+
 ### Added
 
 - **counsel/references/modes**: Progressive disclosure mode references for panel command

@@ -28,7 +28,7 @@ Cancel when you want control back. Let it complete when spec is being satisfied.
 
 ## What Happens
 
-1. **Read state** — Load `.loop/state.json`
+1. **Read state** — Load `.loop/workflow-state.json`
 2. **Set status** — Update status to `"cancelled"` in state file
 3. **Find active task** — TaskList for in_progress task (subject starts with "Loop:")
 4. **Mark terminated** — TaskUpdate status=completed with cancellation note
@@ -38,7 +38,7 @@ Current iteration completes before cancel takes effect. No mid-operation interru
 
 ## State File Update (Required)
 
-Update `.loop/state.json`:
+Update `.loop/workflow-state.json`:
 
 ```json
 {

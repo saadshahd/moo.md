@@ -140,26 +140,6 @@ If either fails → block completion, suggest resolving review findings.
 
 Gate exists to surface risk, not to block legitimate intuition.
 
-## Verification Plan
-
-Before claiming completion, define how you'll verify:
-
-| Verification Type | Evidence Required | Time Cost |
-|-------------------|-------------------|-----------|
-| **Execution output** | Command output, test results | < 1 min |
-| **Observation** | Screenshot, debugger inspection | 1-5 min |
-| **Measurement** | Metrics, benchmarks, profiling | 5-15 min |
-| **Code review** | Manual inspection only | Variable |
-| **Assumption** | No verification | 0 (blocks SHIP) |
-
-### Verification Requirements by Stakes
-
-| Stakes | Minimum Verification |
-|--------|---------------------|
-| High | Execution output + Observation |
-| Medium | Execution output |
-| Low | Code review acceptable |
-
 ### Anti-Footgun Rules
 
 - Never claim "done" with only assumptions

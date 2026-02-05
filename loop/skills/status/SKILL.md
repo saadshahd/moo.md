@@ -1,6 +1,6 @@
 ---
 name: status
-description: Show current loop workflow state. Use when asking "where am I", "loop status", "what's the progress". Shows stage, scores, task progress, and next suggested action.
+description: Display loop state. Use when asking "where am I", "loop status", "what's the progress", "how far along", "what's left".
 model: haiku
 allowed-tools: Read, TaskList
 ---
