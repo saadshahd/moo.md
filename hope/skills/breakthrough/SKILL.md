@@ -51,32 +51,48 @@ See [symptoms.md](references/symptoms.md) for full table.
 
 ## Decision Tree
 
-```
-START: What's the primary symptom?
+```dot
+digraph BreakthroughDecision {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
 
-├─ "Too big / overwhelming"
-│  └─ Simplification Cascade
-│     └─ If still stuck → Fresh Perspective
-│
-├─ "Over-engineered / too complex"
-│  └─ Scale Game
-│     └─ If still stuck → Simplification Cascade
-│
-├─ "Wrong framing / this shouldn't be hard"
-│  └─ Meta-Pattern Recognition
-│     └─ If still stuck → Assumption Inversion
-│
-├─ "All options bad"
-│  └─ Assumption Inversion
-│     └─ If still stuck → Constraint Removal
-│
-├─ "Specific constraint blocking"
-│  └─ Constraint Removal
-│     └─ If still stuck → Meta-Pattern Recognition
-│
-└─ "Can't see clearly / lost"
-   └─ Fresh Perspective
-      └─ If still stuck → Simplification Cascade
+  Start [label="What's the\nprimary symptom?", shape=diamond, fillcolor="#ffe6cc"]
+
+  // Symptoms
+  S1 [label="Too big /\noverwhelming", fillcolor="#e6f3ff"]
+  S2 [label="Over-engineered /\ntoo complex", fillcolor="#e6f3ff"]
+  S3 [label="Wrong framing /\nthis shouldn't be hard", fillcolor="#e6f3ff"]
+  S4 [label="All options\nbad", fillcolor="#e6f3ff"]
+  S5 [label="Specific constraint\nblocking", fillcolor="#e6f3ff"]
+  S6 [label="Can't see clearly /\nlost", fillcolor="#e6f3ff"]
+
+  // Techniques
+  T1 [label="Simplification\nCascade", fillcolor="#ccffcc"]
+  T2 [label="Scale\nGame", fillcolor="#ccffcc"]
+  T3 [label="Meta-Pattern\nRecognition", fillcolor="#ccffcc"]
+  T4 [label="Assumption\nInversion", fillcolor="#ccffcc"]
+  T5 [label="Constraint\nRemoval", fillcolor="#ccffcc"]
+  T6 [label="Fresh\nPerspective", fillcolor="#ccffcc"]
+
+  // Primary routing
+  Start -> S1; Start -> S2; Start -> S3
+  Start -> S4; Start -> S5; Start -> S6
+
+  S1 -> T1
+  S2 -> T2
+  S3 -> T3
+  S4 -> T4
+  S5 -> T5
+  S6 -> T6
+
+  // Fallback chains (if still stuck)
+  T1 -> T6 [style=dashed, label="fallback"]
+  T2 -> T1 [style=dashed, label="fallback"]
+  T3 -> T4 [style=dashed, label="fallback"]
+  T4 -> T5 [style=dashed, label="fallback"]
+  T5 -> T3 [style=dashed, label="fallback"]
+  T6 -> T1 [style=dashed, label="fallback"]
+}
 ```
 
 ## Protocol
