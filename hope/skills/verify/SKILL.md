@@ -214,6 +214,65 @@ See [tools-visual.md](references/tools-visual.md) for visual verification.
 
 ---
 
+## Console Bridge (Browser Errors)
+
+Surface browser console errors during webapp verification. Zero user effort when possible.
+
+```dot
+digraph console_strategy {
+    "Browser testing framework?" [shape=diamond];
+    "Dev server detected?" [shape=diamond];
+    "User approves?" [shape=diamond];
+
+    "Native capture" [shape=box];
+    "Inject middleware" [shape=box];
+    "Skip console" [shape=box];
+
+    "Browser testing framework?" -> "Native capture" [label="yes"];
+    "Browser testing framework?" -> "Dev server detected?" [label="no"];
+    "Dev server detected?" -> "User approves?" [label="yes"];
+    "Dev server detected?" -> "Skip console" [label="no"];
+    "User approves?" -> "Inject middleware" [label="yes"];
+    "User approves?" -> "Skip console" [label="no"];
+}
+```
+
+### Strategy Tiers
+
+| Detection | Action | User Effort |
+|-----------|--------|-------------|
+| Playwright/Puppeteer/Cypress | Native `page.on('console')` | Zero |
+| Vite/Next/CRA | Offer middleware injection | One approval |
+| Unknown framework | Devtools snippet | Paste one-liner |
+
+### Capture Filter
+
+Only capture actionable signals:
+- `console.error` — Always
+- `console.warn` — Always
+- `unhandledrejection` — Always
+- `console.log/debug` — Never (noise)
+
+### Output
+
+```
+## Console
+✓ clean (8 logs captured)
+```
+
+Or:
+
+```
+## Console
+✗ 2 error(s):
+  - TypeError: Cannot read property 'map' of undefined
+  - Failed to fetch /api/users: 404
+```
+
+See [tools-console.md](references/tools-console.md) for implementation.
+
+---
+
 ## Integration Points
 
 ### After hope:shape
@@ -345,4 +404,5 @@ Reply "verified" when confirmed.
 - [tools-visual.md](references/tools-visual.md) — Visual verification tools
 - [tools-api.md](references/tools-api.md) — API verification tools
 - [tools-llm.md](references/tools-llm.md) — LLM output verification
+- [tools-console.md](references/tools-console.md) — Browser console error capture
 - [integration-points.md](references/integration-points.md) — Where verify triggers

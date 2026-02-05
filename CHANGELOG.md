@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **hope/verify**: Console Bridge for browser error visibility during webapp verification
+  - Zero-effort capture when Playwright/Puppeteer/Cypress detected (native `page.on('console')`)
+  - One-approval middleware injection for Vite/Next/CRA dev servers
+  - Devtools snippet fallback for unknown frameworks
+  - Captures only actionable signals: `console.error`, `console.warn`, `unhandledrejection`
+  - DOT flowchart for strategy selection (Jesse Vincent's graphviz pattern)
+  - Reference: `tools-console.md`
+
 ---
 
 ## [loop@2.4.1] - 2026-02-05
