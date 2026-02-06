@@ -130,6 +130,8 @@ Core beliefs — every change to this project must align:
 2. **Encode what humans forget** — If it matters under pressure, encode it in skills/hooks. Not docs. Not willpower.
 3. **Perspectives prevent blindness** — Solo thinking has systematic blind spots. Seek multiple expert lenses.
 4. **Adapt to context** — Never force one workflow. Respect session type and engagement level.
+5. **Primer over tool** — moo instills thinking habits, not just processes. Context AND behavior persist.
+6. **Loose coupling** — Natural language triggers between skills. No hard imports. If a skill isn't installed, nothing breaks.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -139,6 +141,13 @@ Core beliefs — every change to this project must align:
 - [ ] Could an existing skill/framework handle this? → Proven over invented
 - [ ] Does this encode something humans forget, or duplicate what they'd remember? → Automatic over remembered
 - [ ] Was this investigated before implemented? → Never combine find + fix
+- [ ] Does this hardcode references to specific skills? → Natural language triggers only
+- [ ] Does this create coupling that breaks if a skill is missing? → Loose coupling required
+- [ ] Does this build something Claude will do natively? → Don't compete with the platform
+
+### Statechart (Canonical Reference)
+
+See `docs/statechart.md` for the full hierarchical state machine. This is the single source of truth for plugin flow. When adding or modifying skills, verify alignment with the statechart. When the statechart changes, update affected skills.
 
 See `PHILOSOPHY.md` for full beliefs, principles (stance + why), and constraints.
 
@@ -162,6 +171,10 @@ When compacting conversation history, always preserve:
 - Skills over 200 lines
 - Persistent state files (.jsonl, workflow-state.json)
 - Task management APIs in skills (TaskCreate/TaskList/TaskUpdate)
+- Hardcoded `Skill(skill="specific:name")` cross-references in skills
+- Building features Claude Code will ship natively (task management, memory, tool orchestration)
+- Cargo cult process steps (ritual without reason)
+- Skill behavior that contradicts `docs/statechart.md` (statechart is canonical)
 
 ## Changelog
 
