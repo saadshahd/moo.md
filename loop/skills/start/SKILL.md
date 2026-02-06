@@ -106,9 +106,9 @@ Calculation: spec_score × 5 + constraints + success_criteria + done_definition 
 
 ---
 
-## Step 2: Shape Generation & Approval (Phase 2 — Plan Bridge)
+## Step 2: Shape Generation & Approval
 
-Set `LOOP_BRIDGE_ENABLED=true`. Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")` — writes SHAPE.md, doesn't invoke EnterPlanMode.
+Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")` — writes SHAPE.md and returns.
 
 Extract: **criteria[]**, **mustNot[]**, **verification{}** from SHAPE.md.
 
