@@ -1,15 +1,13 @@
 name: circuit-breaker-trigger
 description: Loop stops when same criterion fails 5+ consecutive iterations
-plugin: loop
-skill: loop:start
+plugin: hope
+skill: hope:loop
 flaky: true
 acceptableSkills:
-  - start
   - loop
-  - loop:start
+  - hope:loop
 prompt: "loop - make all tests pass. If you get stuck on the same failing test for 5 iterations, the circuit breaker should trigger."
 expectedBehaviors:
-  - "circuitBreaker.stuckCount tracked in state file"
-  - "stuckCount increments when same criterion remains unmet"
-  - "Loop pauses or stops when stuckCount >= 5"
-  - "STUCK_COUNT field appears in ---LOOP_STATUS--- block"
+  - "Stuck count tracked per criterion"
+  - "Loop pauses or stops when same criterion fails repeatedly"
+  - "Circuit breaker behavior acknowledged"

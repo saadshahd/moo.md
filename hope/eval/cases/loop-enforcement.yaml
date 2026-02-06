@@ -1,12 +1,11 @@
 name: loop-enforcement
 description: Loop produces wave announcements and completion markers
-plugin: loop
-skill: loop:start
+plugin: hope
+skill: hope:loop
 flaky: true
 acceptableSkills:
-  - start
   - loop
-  - loop:start
+  - hope:loop
   - soul
   - hope:soul
 prompt: "loop - add input validation to all form components in /components/forms"

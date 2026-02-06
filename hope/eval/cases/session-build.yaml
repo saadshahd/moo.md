@@ -1,0 +1,16 @@
+name: session-build-detection
+description: Soul detects Build session type from implementation signals
+plugin: hope
+skill: hope:soul
+flaky: true
+acceptableSkills:
+  - soul
+  - hope:soul
+  - hope
+  - intent
+  - hope:intent
+prompt: "Build a REST API for user management with CRUD endpoints"
+expectedBehaviors:
+  - "Session type detected as Build"
+  - "Engagement level asked or defaulted"
+  - "Pipeline follows intent → shape → loop"

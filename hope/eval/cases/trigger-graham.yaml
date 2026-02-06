@@ -1,11 +1,12 @@
-name: counsel-graham-trigger
-description: Counsel triggers Graham for startup questions
-plugin: counsel
-skill: counsel:counsel
+name: consult-graham-trigger
+description: Consult triggers Graham for startup questions
+plugin: hope
+skill: hope:consult
 flaky: true
 acceptableSkills:
-  - counsel:summon
-  - counsel
+  - consult
+  - hope:consult
+  - hope:summon
 prompt: "What would Paul Graham say about our startup? We have 10 users and are debating whether to focus on scaling infrastructure or talking to more users."
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a startup strategist')"

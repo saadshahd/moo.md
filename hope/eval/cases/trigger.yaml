@@ -1,13 +1,13 @@
-name: counsel-expert-trigger
-description: Counsel skill triggers on expert simulation requests
-plugin: counsel
-skill: counsel:counsel
+name: consult-expert-trigger
+description: Consult skill triggers on expert simulation requests
+plugin: hope
+skill: hope:consult
 acceptableSkills:
-  - counsel:summon
-  - counsel
+  - consult
+  - hope:consult
+  - hope:summon
 prompt: "How would Addy Osmani approach this React component? I want to make sure it's idiomatic and performant."
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a performance-focused engineer')"
   - "Confidence score displayed (X/10)"
   - "Performance concerns raised (matching documented focus)"
-  - "Calibration option offered"

@@ -1,10 +1,11 @@
-name: counsel-pike-trigger
-description: Counsel triggers Pike for Go questions
-plugin: counsel
-skill: counsel:counsel
+name: consult-pike-trigger
+description: Consult triggers Pike for Go questions
+plugin: hope
+skill: hope:consult
 acceptableSkills:
-  - counsel:summon
-  - counsel
+  - consult
+  - hope:consult
+  - hope:summon
 prompt: "What would Rob Pike say about this Go function? Should I add generics or keep it simple with concrete types?"
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a simplicity advocate')"

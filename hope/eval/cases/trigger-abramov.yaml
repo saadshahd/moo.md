@@ -1,11 +1,12 @@
-name: counsel-abramov-trigger
-description: Counsel triggers Abramov for React internals questions
-plugin: counsel
-skill: counsel:counsel
+name: consult-abramov-trigger
+description: Consult triggers Abramov for React internals questions
+plugin: hope
+skill: hope:consult
 flaky: true
 acceptableSkills:
-  - counsel:summon
-  - counsel
+  - consult
+  - hope:consult
+  - hope:summon
 prompt: "How would Dan Abramov explain React's useEffect mental model? My effect is running more than I expect."
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a React mental models advocate')"

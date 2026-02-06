@@ -1,17 +1,16 @@
 name: loop-start
 description: Loop triggers on autonomous iteration requests
-plugin: loop
-skill: loop:start
+plugin: hope
+skill: hope:loop
 flaky: true
 acceptableSkills:
-  - start
   - loop
-  - loop:start
+  - hope:loop
   - soul
   - hope:soul
   - intent
   - hope:intent
-prompt: "Run /loop:start to implement the full feature. Don't stop until tests pass."
+prompt: "Run /hope:loop to implement the full feature. Don't stop until tests pass."
 expectedBehaviors:
   - "Spec scoring rubric applied"
   - "Workflow shape determined (Tool or Colleague)"

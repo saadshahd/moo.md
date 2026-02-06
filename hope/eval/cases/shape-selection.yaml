@@ -1,12 +1,11 @@
 name: shape-selection-routing
 description: Low spec scores route to /hope:intent before loop
-plugin: loop
-skill: loop:start
+plugin: hope
+skill: hope:loop
 flaky: true
 acceptableSkills:
-  - start
   - loop
-  - loop:start
+  - hope:loop
   - intent
   - hope:intent
   - soul

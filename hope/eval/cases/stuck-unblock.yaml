@@ -1,11 +1,12 @@
-name: counsel-stuck-unblock
-description: Counsel panel handles stuck mode for loop integration
-plugin: counsel
-skill: counsel:panel
+name: consult-stuck-unblock
+description: Consult handles stuck mode for loop integration
+plugin: hope
+skill: hope:consult
 acceptableSkills:
-  - counsel:counsel
-  - counsel
-prompt: "/counsel:panel stuck on 'Add ValidationError import to auth.ts': Module not found: './errors'"
+  - consult
+  - hope:consult
+  - hope:panel
+prompt: "/hope:panel stuck on 'Add ValidationError import to auth.ts': Module not found: './errors'"
 expectedBehaviors:
   - "Error summary extracted"
   - "Multiple expert perspectives on diagnosis"

@@ -1,13 +1,12 @@
-name: counsel-mode-panel
+name: consult-mode-panel
 description: Panel mode triggers on multi-expert debate requests
-plugin: counsel
-skill: counsel:panel
+plugin: hope
+skill: hope:consult
 flaky: true
 acceptableSkills:
-  - panel
-  - counsel:panel
-  - counsel
-  - counsel:counsel
+  - consult
+  - hope:consult
+  - hope:panel
 prompt: "panel debate — should we use Redux or Zustand for state management in this React app? I want multiple expert perspectives"
 expectedBehaviors:
   - "Panel mode activates on debate/panel request"

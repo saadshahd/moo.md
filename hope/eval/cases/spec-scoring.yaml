@@ -1,16 +1,14 @@
 name: loop-spec-scoring
 description: Loop scores specs and rejects vague ones
-plugin: loop
-skill: loop:start
+plugin: hope
+skill: hope:loop
 flaky: true
 acceptableSkills:
-  - start
   - loop
-  - loop:start
+  - hope:loop
   - soul
   - hope:soul
   - hope
-  - hope:hope
   - intent
   - hope:intent
 prompt: "Use loop to make the app better and fix all problems"

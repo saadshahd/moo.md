@@ -1,12 +1,13 @@
-name: counsel-block-respected
+name: consult-block-respected
 description: Blocked profiles are excluded from summoning
-plugin: counsel
-skill: counsel:summon
+plugin: hope
+skill: hope:consult
 acceptableSkills:
-  - counsel:summon
-  - counsel
-prompt: "/counsel:summon hickey"
+  - consult
+  - hope:consult
+  - hope:summon
+prompt: "/hope:summon hickey"
 expectedBehaviors:
   - "If hickey is on blocklist: refuse with blocklist warning"
-  - "Offer /counsel:unblock to remove"
+  - "Offer /hope:unblock to remove"
   - "Do NOT simulate blocked profile"

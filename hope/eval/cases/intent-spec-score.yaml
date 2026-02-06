@@ -5,12 +5,11 @@ skill: hope:intent
 flaky: true
 acceptableSkills:
   - intent
+  - hope:intent
   - soul
   - hope:soul
-  - hope:plan
-  - plan
 prompt: "Help me clarify the requirements for adding a login button to the page"
 expectedBehaviors:
   - "Task Definition Protocol fields requested"
   - "Spec score table shown"
-  - "Workflow shape determined based on score"
+  - "Session-type context applied (Build focus)"

@@ -1,14 +1,13 @@
 name: dual-exit-condition
 description: Loop requires both verification and review before claiming completion
-plugin: loop
-skill: loop:start
+plugin: hope
+skill: hope:loop
 flaky: true
 acceptableSkills:
-  - start
   - loop
-  - loop:start
+  - hope:loop
 prompt: "loop - all tests pass AND linter clean. Verify both before claiming done."
 expectedBehaviors:
-  - "hope:verify thorough invoked before completion"
-  - "counsel:panel review invoked before completion"
+  - "Thorough verification invoked before completion"
+  - "hope:consult review invoked before completion"
   - "<loop-complete> only appears when both conditions met"

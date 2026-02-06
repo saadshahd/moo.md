@@ -1,13 +1,12 @@
-name: counsel-panel-trigger
-description: Panel skill triggers on multi-expert debate requests
-plugin: counsel
-skill: counsel:panel
+name: consult-panel-trigger
+description: Panel mode triggers on multi-expert debate requests
+plugin: hope
+skill: hope:consult
 flaky: true
 acceptableSkills:
-  - panel
-  - counsel:panel
-  - counsel
-  - counsel:counsel
+  - consult
+  - hope:consult
+  - hope:panel
 prompt: "I need a panel debate on whether to use a monorepo or polyrepo for this project"
 expectedBehaviors:
   - "Multiple expert perspectives presented"
