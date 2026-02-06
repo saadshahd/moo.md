@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, Task, Skill, AskUserQuestion
 
 # Loop
 
-Autonomous iteration: spec scoring → shape → decompose → wave execution → review → verify + gate.
+Autonomous iteration: spec scoring → shape → decompose → wave execution → review → verify + gate → user review & feedback.
 
 ---
 
@@ -36,7 +36,7 @@ digraph SpecDecision {
   Check -> High [label=">=8"]
   Check -> Mid [label="5-7"]
   Check -> Low [label="<5"]
-  Low -> Intent -> Check [style=dashed]
+  Low -> Intent -> Check
 }
 ```
 
@@ -53,7 +53,7 @@ Calculation: spec_score x 5 + constraints + success_criteria + done_definition +
 
 ## Step 2: Shape Generation & Approval
 
-Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")` — returns shape choice in conversation.
+Request shape generation for the spec — returns shape choice, criteria, mustNot constraints, and verification approach.
 
 Extract: **criteria[]**, **mustNot[]**, **verification{}** from shape output.
 
@@ -92,22 +92,22 @@ digraph WaveExecution {
   Ready -> Spawn -> Monitor -> Review -> Check
   Check -> Next [label="yes"]
   Check -> Done [label="no"]
-  Next -> Ready [style=dashed]
+  Next -> Ready
 }
 ```
 
 1. **Identify ready items:** Work items with no pending dependencies
 2. **Spawn subagents:** `Task(prompt="HOPE CONTEXT: [session strategy + criteria + mustNot]\n\n[work item instructions]", subagent_type="general-purpose")` for each ready item
 3. **Collect results:** Wait for all subagents in the wave
-4. **Review:** `Skill(skill="hope:consult", args="panel: scope review — executed within boundaries?")` — check work stays within spec
+4. **Review:** Request expert panel to review scope compliance — check work stays within spec
 5. **Log:** `[WAVE {N} COMPLETE] {completed}/{total} items done`
-6. **Blocked detection:** If no progress → invoke `Skill(skill="hope:consult", args="stuck on: {blocker}")` to auto-unblock. Continue, pivot, or escalate to user.
+6. **Blocked detection:** If no progress → request expert diagnosis for the blocker to auto-unblock. Continue, pivot, or escalate to user.
 
 ---
 
 ## Step 5: Thorough Expert Review
 
-When all items complete: `Skill(skill="hope:consult", args="panel: thorough review for: {spec}")`
+When all items complete, request thorough expert panel review of completed work against spec.
 
 - Findings: BLOCKER / WARNING / SUGGESTION
 - Checks against mustNot constraints
@@ -140,9 +140,22 @@ Run thorough. Report: `[VERIFY] {PASS/FAIL} | {N} criteria | Passed: {Y} | Faile
 
 Thorough verification passed (all PASS with evidence), expert review passed (no BLOCKERs), feature executes without errors (show output), edge cases tested.
 
-If gate fails: create remediation items, continue loop. Emit `<loop-complete>` + quality footer.
+If gate fails: create remediation items, continue loop.
 
 Never claim "done" with only assumptions. "Tests pass" requires showing test output.
+
+---
+
+## Step 7: Review & Feedback
+
+After verification passes, present the full journey for user review:
+
+1. **Journey summary** — Recap: original intent, shape chosen, items completed, key decisions made, verification results
+2. **Open for questions** — User can ask about any decision, inspect any change, or discuss tradeoffs
+3. **Gather feedback** — Ask: "Anything to adjust, extend, or revisit?"
+4. **Next action:**
+   - Feedback yields new work → refine intent from feedback, re-enter loop (Step 1)
+   - User satisfied → emit `<loop-complete>` + quality footer
 
 ---
 

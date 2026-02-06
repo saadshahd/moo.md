@@ -78,19 +78,9 @@ Score each aspect for the task. The column where most aspects land determines th
 
 ## Expert Consultation
 
-Invoke hope:consult for expert guidance on implementation approach:
+After scoring aspects, seek expert guidance on the implementation approach. For tradeoff-heavy decisions, request a panel debate on the key tensions.
 
-```
-Skill(skill="hope:consult", args="review approach for: {goal}")
-```
-
-For tradeoff-heavy decisions, invoke panel mode:
-
-```
-Skill(skill="hope:consult", args="panel: tradeoffs for: {goal}")
-```
-
-Consult handles expert selection, confidence scoring, and conflict resolution. Shape uses the output to inform aspect scoring and approach selection.
+Expert input informs aspect scoring and approach selection — shape decides, experts advise.
 
 ---
 
@@ -110,7 +100,7 @@ digraph shape_decision {
   decide -> colleague [label="Colleague"]
   decide -> tool_review [label="Mixed/Tool-Review"]
   decide -> override [label="Tool"]
-  override -> tool_review [label="Yes" style=dashed]
+  override -> tool_review [label="Yes"]
   override -> tool [label="No"]
 }
 ```
