@@ -1,0 +1,17 @@
+name: wave-context-bridge
+description: Loop writes context file and logs wave progress during execution
+plugin: loop
+skill: loop:start
+flaky: true
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - soul
+  - hope:soul
+prompt: "loop - add error handling to all API endpoints in /api/"
+expectedBehaviors:
+  - "Writes .loop/current-context.json before wave execution"
+  - "Logs [WAVE N START] with task count"
+  - "Task descriptions include LOOP CONTEXT preamble"
+  - "Logs [WAVE N COMPLETE] after wave finishes"

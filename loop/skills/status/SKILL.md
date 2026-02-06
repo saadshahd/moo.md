@@ -24,6 +24,7 @@ Display current workflow state without modifying anything.
 ```
 Read .loop/workflow-state.json if exists
 Read .loop/shape/SHAPE.md if exists
+Read .loop/current-context.json if exists
 TaskList() to get task counts
 ```
 
@@ -39,6 +40,7 @@ TaskList() to get task counts
 │   ▸ In Progress: {N}                            │
 │   ○ Pending: {N}                                │
 ├─────────────────────────────────────────────────┤
+│ Wave: {wave_number} ({completed}/{task_count})   │
 │ Reviews:                                        │
 │   Wave 1: {score}/10 ({issues} issues)          │
 │   Wave 2: {score}/10 ({issues} issues)          │

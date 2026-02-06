@@ -1,0 +1,19 @@
+name: plan-approval-gate
+description: Loop pauses for user approval after shape generation before decomposition
+plugin: loop
+skill: loop:start
+flaky: true
+acceptableSkills:
+  - start
+  - loop
+  - loop:start
+  - shape
+  - hope:shape
+  - soul
+  - hope:soul
+prompt: "loop - refactor the authentication module to use JWT tokens"
+expectedBehaviors:
+  - "Invokes hope:shape to generate SHAPE.md"
+  - "Asks user to approve plan before proceeding to task decomposition"
+  - "Does NOT invoke EnterPlanMode"
+  - "Sets plan.approved in workflow-state.json after user confirms"
