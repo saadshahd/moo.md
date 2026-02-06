@@ -109,37 +109,18 @@ tools: Read, Glob, Grep, Bash
 
 ### DOT Notation (Graphviz)
 
-Use DOT for process documentation. Claude follows DOT-written processes more reliably than prose.
+Use DOT for non-linear decision flows. Claude follows DOT structure more reliably than prose.
 
-**When to use:**
-- Non-obvious decision points
-- Process loops or cycles
-- Multi-path workflows with branching
+**When to use:** Multi-path decisions, loops, branching workflows.
+**When NOT to use:** Linear steps (use numbered lists).
 
-**When NOT to use:**
-- Linear instructions (use numbered lists)
-- Code examples (embed code directly)
-- Simple single-path processes
+**Keep structural only:**
+- Node labels (the text)
+- Edge connections (the arrows)
+- Edge labels (conditions)
+- `rankdir=TB` or `rankdir=LR` (flow direction)
 
-**Direction conventions:**
-- `rankdir=TB` — Hierarchical decisions, top-down flows
-- `rankdir=LR` — Cyclic processes, state machines, retry loops
-
-**Color palette:**
-| Color | Hex | Usage |
-|-------|-----|-------|
-| Blue | `#e6f3ff` | Start/input nodes |
-| Orange | `#ffe6cc` | Key action steps |
-| Yellow | `#fff4cc` | Decision diamonds |
-| Green | `#ccffcc` | Success/completion |
-| Red | `#ffcccc` | Blocked/error states |
-| Gray | `#f5f5f5` | Standard nodes (default) |
-
-**Node conventions:**
-- `shape=box` with `style="rounded,filled"` for actions
-- `shape=diamond` for decision points
-- `shape=ellipse` for continuation/terminal nodes
-- `[style=dashed]` on edges for fallback/retry paths
+**Strip visual attributes:** `fillcolor`, `style`, `shape` — LLMs can't render these.
 
 ## Core Philosophy (Preserve These)
 
