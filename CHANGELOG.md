@@ -9,6 +9,27 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **loop**: Agents losing orchestration context after compact command — now explicit loop context bridge via .loop/current-context.json (Phase 1)
+- **loop + hope**: Plan mode handoff breaking (EnterPlanMode escaping skill context) — new LOOP_BRIDGE_ENABLED flag + Step 2.5 approval gate (Phase 2)
+- **loop**: Wave progress invisible to user — added [WAVE N START/COMPLETE] logging + context file updates
+- **loop**: Agents executing manually instead of staying orchestrated — task descriptions now carry explicit LOOP CONTEXT preambles + counsel:panel scope reviews (Phase 3)
+
+### Added
+
+- **schemas**: New `workflows-context.schema.json` for `.loop/current-context.json` state file (wave metadata, phase tracking)
+- **loop/start**: Phase 1 — file-based context propagation (verified feasible, replaces unfeasible env vars)
+- **loop/start**: Phase 2 — plan approval gate (Step 2.5) with [Yes/Edit/Cancel] user interaction
+- **loop/start**: Phase 3 — hope:verify quick-checks + counsel:panel scope reviews for orchestration verification
+- **hope/shape**: LOOP_BRIDGE_ENABLED detection — skips EnterPlanMode when invoked from loop:start, maintains backward compatibility
+
+### Changed
+
+- **loop/start**: Enhanced Step 4 (Wave Execution) with context file writing, [WAVE N] logging, task description preambles, hybrid signal mode
+- **loop/start**: Compressed Step 2 to add plan bridge mechanism (194 lines, under 200-line limit)
+- **hope/shape**: Added bridge mode section explaining LOOP_BRIDGE_ENABLED flag behavior (stays under 200-line limit)
+
 ---
 
 ## [hope@0.22.0, loop@3.1.0, counsel@0.14.0, wordsmith@0.7.0] - 2026-02-05
