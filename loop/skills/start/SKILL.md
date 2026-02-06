@@ -2,7 +2,7 @@
 name: start
 description: Start autonomous iteration loop. Triggers on "loop", "keep going", "continue until done", "implement feature", "fix all", "loop help".
 model: sonnet
-allowed-tools: Bash, Read, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, Skill, AskUserQuestion, Teammate, SendMessage
+allowed-tools: Bash, Read, Task, Skill, AskUserQuestion
 ---
 
 # Loop
@@ -12,56 +12,14 @@ Autonomous iteration with wave-based parallel execution. Continues until spec is
 ## Architecture
 
 ```
-User Request -> [STATE DETECTION] -> Resume? / Start fresh?
-  -> [RECALL LEARNINGS] -> surface past failures/discoveries
-  -> [SPEC + FIT SCORING] -> <5? hope:intent, calculate fit_score
+User Request
+  -> [SPEC SCORING] -> <5? hope:intent
   -> [SHAPE GENERATION] -> hope:shape, extract criteria/mustNot
-  -> [DECOMPOSITION] -> atomic tasks via TaskCreate
-  -> [TEAM DECISION] -> team_score -> subagents / teams / hybrid
-  -> [WAVE EXECUTION] -> parallel subagents or teammates + light review
+  -> [DECOMPOSITION] -> atomic work items (prose)
+  -> [WAVE EXECUTION] -> parallel subagents + counsel review
   -> [THOROUGH REVIEW] -> counsel:panel, resolve blockers
-  -> [COMPLETION] -> team cleanup (if teams) -> hope:gate verification
+  -> [COMPLETION] -> hope:gate verification
 ```
-
----
-
-## Step 0: State Detection & Resume
-
-1. Check `.loop/workflow-state.json` and `.loop/shape/SHAPE.md` exist
-2. Check TaskList for pending/in_progress tasks
-3. Check `.loop/current-context.json` if exists (Phase 1: wave context, omit if doesn't exist)
-4. If `stage == "planning"`: plan created but not yet executed
-
-```dot
-digraph ResumeDecision {
-  rankdir=TB
-  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
-  Start [label="/loop:start", fillcolor="#e6f3ff"]
-  Exists [label="State exists?", shape=diamond, fillcolor="#fff4cc"]
-  Planning [label="stage==planning?", shape=diamond, fillcolor="#fff4cc"]
-  Ask [label="Resume / Fresh / Status", fillcolor="#ffe6cc"]
-  Config [label="Step 0c: Config", fillcolor="#f5f5f5"]
-  Skip3 [label="Skip to Step 3", fillcolor="#ccffcc"]
-  Jump [label="Jump to saved stage", fillcolor="#ccffcc"]
-  Start -> Exists
-  Exists -> Planning [label="yes"]
-  Exists -> Config [label="no"]
-  Planning -> Skip3 [label="yes"]
-  Planning -> Ask [label="no"]
-  Ask -> Jump [label="resume"]
-  Ask -> Config [label="fresh: delete .loop/"]
-}
-```
-
-AskUserQuestion for new loops: task list mode (new/resume/session-only), max iterations (10/25/50/unlimited), budget ($10/$25/$50/none). Set `CLAUDE_CODE_TASK_LIST_ID`.
-
----
-
-## Step 0.5: Recall Past Learnings
-
-- Invoke `Skill(skill="hope:recall", args="{domain hints from task}")`
-- Display top 3-5 relevant learnings (past failures, discoveries, constraints)
-- Save surfaced learnings to workflow-state.json
 
 ---
 
@@ -108,74 +66,83 @@ Calculation: spec_score × 5 + constraints + success_criteria + done_definition 
 
 ## Step 2: Shape Generation & Approval
 
-Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")` — writes SHAPE.md and returns.
+Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")` — returns shape choice in conversation.
 
-Extract: **criteria[]**, **mustNot[]**, **verification{}** from SHAPE.md.
+Extract: **criteria[]**, **mustNot[]**, **verification{}** from shape output.
 
-Ask user: "Plan ready? [Yes/Edit/Cancel]" → **Yes:** set `plan.approved=true`, go to Step 3. **Edit:** user modifies SHAPE.md, re-ask. **Cancel:** cleanup, exit.
-
----
-
-## Step 3: Task Decomposition
-
-Atomic tasks, each passes "one sentence without and" test.
-
-`TaskCreate(subject="[imperative action]", description="[what + criteria + verify cmd]", activeForm="[present continuous]")`
-`TaskUpdate(taskId="4", addBlockedBy=["1", "3"])`
-
-**Note (Phase 1):** Task descriptions will be enhanced with LOOP CONTEXT preambles during Step 4 execution, before subagents spawn. This ensures agents know they're part of autonomous orchestration.
-
-Announce: `[LOOP] Starting | Shape: {Tool/Colleague} ({score}/10) | Tasks: {N} | Budget: ${budget}`
+Ask user: "Plan ready? [Yes/Edit/Cancel]" → **Yes:** proceed to Step 3. **Edit:** re-run shape with modifications. **Cancel:** exit.
 
 ---
 
-## Step 3.5: Team Decision
+## Step 3: Decomposition
 
-`team_score = (cross_layer_count * 2) + (review_count * 3) + (hypothesis_count * 4)`
+Break spec into atomic work items. Each passes the "one sentence without and" test.
 
-| team_score | Mode | Action |
-|-----------|------|--------|
-| >= 12 | Agent Teams | Spawn team, assign teammates |
-| 10-11 + cross-layer | Hybrid | Teams for complex, subagents for simple |
-| < 10 | Subagent Waves | Default parallel execution |
+Output numbered work items as prose instructions:
 
-**Teams (>= 12):** Spawn team, assign tasks via owner, update workflow-state.json.
-**Subagents (< 10):** Continue to Step 4.
+```
+Work Items:
+1. [imperative action] — [what + criteria + verify command]
+2. [imperative action] — [what + criteria + verify command]
+3. [imperative action] — [what + criteria + verify command]
+```
+
+Mark dependencies: items that must complete before others can start.
+
+Announce: `[LOOP] Starting | Shape: {Tool/Colleague} ({score}/10) | Items: {N}`
 
 ---
 
-## Step 4: Wave Execution (Phase 1, 2, 3)
+## Step 4: Wave Execution
 
-**Wave** = tasks with no unresolved blockedBy. Spawn parallel subagents or teammates.
+**Wave** = work items with no unresolved dependencies. Invoke parallel subagents.
 
-1. **Setup:** Write `.loop/current-context.json` + log `[WAVE {N} START]`. Invoke `Skill(skill="hope:verify", args="quick")` to confirm orchestration context.
-2. **Strategy:** `Skill(skill="counsel:panel", args="wave strategy: staying within loop boundaries?")`
-3. **Task descriptions:** Prefix with `LOOP CONTEXT: Stage {N}, Wave {W}. See .loop/current-context.json.` (signals agents they're orchestrated, not manual)
-4. **Monitor:** Watch for optional `[LOOP SIGNAL]` in agent output; warn if absent (hybrid mode: proceed but log weakness)
-5. **Review:** Update context file, log `[WAVE {N} COMPLETE]`. Invoke `Skill(skill="counsel:panel", args="scope review: executed within loop boundaries?")`, persist findings
+```dot
+digraph WaveExecution {
+  rankdir=TB
+  node [shape=box, style="rounded,filled", fillcolor="#f5f5f5"]
+  Ready [label="Identify ready\nwork items", fillcolor="#e6f3ff"]
+  Spawn [label="Invoke parallel\nsubagents", fillcolor="#ffe6cc"]
+  Monitor [label="Collect results", fillcolor="#f5f5f5"]
+  Review [label="counsel:panel\nscope review", fillcolor="#ffe6cc"]
+  Check [label="More items?", shape=diamond, fillcolor="#fff4cc"]
+  Next [label="Next wave", fillcolor="#e6f3ff"]
+  Done [label="All complete", fillcolor="#ccffcc"]
+  Ready -> Spawn -> Monitor -> Review -> Check
+  Check -> Next [label="yes"]
+  Check -> Done [label="no"]
+  Next -> Ready [style=dashed]
+}
+```
+
+1. **Identify ready items:** Work items with no pending dependencies
+2. **Spawn subagents:** `Task(prompt="[work item instructions]", subagent_type="general-purpose")` for each ready item
+3. **Collect results:** Wait for all subagents in the wave to complete
+4. **Review:** `Skill(skill="counsel:panel", args="scope review: executed within boundaries?")` — check work stays within spec
+5. **Log:** `[WAVE {N} COMPLETE] {completed}/{total} items done`
+6. **Blocked detection:** If no progress after a wave → invoke `Skill(skill="counsel:panel", args="stuck on: {blocker}")` to auto-unblock. Counsel decides: continue, pivot, or escalate to user.
 
 ---
 
 ## Step 5: Thorough Expert Review
 
-When all tasks complete: `Skill(skill="counsel:panel", args="thorough review for: {spec}")`
+When all items complete: `Skill(skill="counsel:panel", args="thorough review for: {spec}")`
 
 - Findings: BLOCKER / WARNING / SUGGESTION
-- Checks against SHAPE.md mustNot
-- Blockers create remediation tasks, return to Wave Execution
-- All resolved: `reviews.thorough.passed = true`, proceed to gate
+- Checks against mustNot constraints
+- Blockers create new work items, return to Wave Execution
+- All resolved: proceed to completion
 
 ---
 
 ## Step 6: Completion
 
-**Prerequisites:** All tasks completed + thorough review passed.
+**Prerequisites:** All items completed + thorough review passed.
 
 1. `Skill(skill="hope:verify", args="thorough")`
 2. `Skill(skill="hope:gate", args="loop completion verification")`
-3. If team mode: `shutdown_request` all teammates, `Teammate(operation="cleanup")`, set `team.shutdown_status = "completed"`
-4. Emit `<loop-complete>` with task list, SHIP footer (tasks, confidence, alt, risk)
-5. If gate fails: create remediation tasks, continue loop
+3. Emit `<loop-complete>` with summary, SHIP footer (items, confidence, alt, risk)
+4. If gate fails: create remediation items, continue loop
 
 ---
 
@@ -185,10 +152,10 @@ When all tasks complete: `Skill(skill="counsel:panel", args="thorough review for
 |---------|-----------|--------|
 | Max iterations | User-configured | Pause, announce progress |
 | Budget exceeded | User-configured | Pause, offer continue |
-| mustNot true | From SHAPE.md | Stop immediately |
+| mustNot true | From shape output | Stop immediately |
 
 ---
 
 ## Boundary
 
-**Loop executes, never decides.** User controls what gets built, persistence, and continuation.
+**Loop executes, never decides.** User controls what gets built and continuation.

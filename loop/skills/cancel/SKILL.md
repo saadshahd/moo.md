@@ -2,7 +2,7 @@
 name: cancel
 description: Cancel active loop. Triggers on "cancel loop", "stop loop", "abort", "halt", "end loop".
 model: haiku
-allowed-tools: Read, TaskList, TaskUpdate
+allowed-tools: Read
 ---
 
 # Cancel Loop
@@ -28,42 +28,22 @@ Cancel when you want control back. Let it complete when spec is being satisfied.
 
 ## What Happens
 
-1. **Read state** — Load `.loop/workflow-state.json`
-2. **Set status** — Update status to `"cancelled"` in state file
-3. **Find active task** — TaskList for in_progress task (subject starts with "Loop:")
-4. **Mark terminated** — TaskUpdate status=completed with cancellation note
-5. **Report state** — Iterations, cost, accomplished work, remaining items
+1. **Acknowledge cancel** — Confirm user intent to stop
+2. **Report progress** — Summarize what was accomplished
+3. **List remaining** — Show what's left undone
 
 Current iteration completes before cancel takes effect. No mid-operation interruption.
-
-## State File Update (Required)
-
-Update `.loop/workflow-state.json`:
-
-```json
-{
-  "stage": "cancelled",
-  "exit_signal": false
-}
-```
-
-This ensures the stop hook allows the cancellation to proceed.
 
 ## Output
 
 ```
 Loop cancelled.
 
-Completed: [N] iterations, $[X] cost
 Accomplished:
-- [list of completed steps]
+- [list of completed work items]
 
 Remaining:
-- [list of incomplete steps]
-
-Criteria status:
-- [criterion 1]: ✓/✗
-- [criterion 2]: ✓/✗
+- [list of incomplete work items]
 
 To restart: /loop:start [spec]
 ```
@@ -71,7 +51,6 @@ To restart: /loop:start [spec]
 ## Guarantees
 
 - All completed work preserved (no rollback)
-- State file updated to prevent resume
 - Clean termination (no dangling state)
-- Full accounting (iterations, cost, progress)
+- Full accounting (progress summary)
 - Restart possible with same or modified spec
