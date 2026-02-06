@@ -1,6 +1,6 @@
-# counsel — Power User Reference
+# counsel
 
-Expert simulation for code guidance and style.
+Expert simulation for code guidance, style, and debates.
 
 ---
 
@@ -10,7 +10,6 @@ Expert simulation for code guidance and style.
 | "what would Rich Hickey say"   | Expert perspective         |
 | "/counsel:panel 'question'"    | Multi-expert debate        |
 | "review this idiomatically"    | Auto-detected expert guidance |
-| "/counsel:calibrate 'fix'"     | Correct simulation errors  |
 
 ---
 
@@ -27,25 +26,22 @@ Auto-triggers on:
 - "code like [expert]", "write like [expert]"
 - "what would [expert] say", "ask [expert]"
 - "idiomatic", "best practice", "clean code"
-- "panel", "review", "audit"
+- "panel", "review", "audit", "debate", "tradeoffs"
 - Domain keywords from curated profiles
 
-## Commands
+## Skills
 
-| Command               | Purpose                                                           |
-| --------------------- | ----------------------------------------------------------------- |
-| `/counsel:summon`     | Invoke single expert. Usage: `/counsel:summon addy osmani`        |
-| `/counsel:panel`      | Multi-expert debate. Usage: `/counsel:panel "Redux vs Zustand?"`  |
-| `/counsel:calibrate`  | Correct simulation errors. Stored for future sessions.            |
+| Skill | Purpose |
+|-------|---------|
+| `counsel:counsel` | Single-expert guidance, style matching |
+| `counsel:panel` | Multi-expert debate for complex decisions |
 
 ## Core Concepts
 
 **Confidence:** Curated profiles start at 6/10, dynamic simulation at 4/10. Ceiling is 9/10 (never claim perfect simulation). Floor is 3/10 (below this, refuse).
 
-**Calibration:** Corrections stored in `.claude/logs/counsel-calibrations.jsonl`. Applied automatically in future sessions.
-
-**Expert Catalog:** See [inference.md](../../counsel/skills/counsel/references/inference.md) for full list of 33 curated experts.
+**42 curated profiles** across: React/Frontend, TypeScript/JS, Go/Systems, Python, Architecture, TDD, DDD, DevOps, Product, FP, Tools for Thought, Local-first.
 
 ---
 
-→ Source: [`counsel/skills/counsel/SKILL.md`](../../counsel/skills/counsel/SKILL.md)
+> Source: [`counsel/skills/counsel/SKILL.md`](../../counsel/skills/counsel/SKILL.md)

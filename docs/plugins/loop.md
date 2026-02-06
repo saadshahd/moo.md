@@ -1,14 +1,14 @@
-# loop — Power User Reference
+# loop
 
-Autonomous iteration for Claude Code.
+Autonomous iteration with subagent waves.
 
 ---
 
 | Say this                 | Get this                                |
 | ----------------------- | ---------------------------------------- |
-| "loop until done"       | Persistent iteration until spec complete |
-| "keep going"            | Continue work across iterations          |
-| "fix all problems"      | Multi-step loop with stop hooks          |
+| "loop until done"       | Autonomous iteration until spec complete |
+| "keep going"            | Continue work with parallel subagents    |
+| "fix all problems"      | Multi-step loop with counsel auto-unblock |
 | "continue until tests pass" | Iterate until success or limits hit   |
 
 ---
@@ -19,32 +19,23 @@ Autonomous iteration for Claude Code.
 /plugin install loop@moo.md
 ```
 
-## When It Activates
-
-Auto-triggers on:
-
-- "loop", "keep going", "don't stop"
-- "continue until done", "until tests pass"
-- "implement full feature", "fix all problems"
-
-## Workflows (Skill-Driven)
-
-Loop runs as a skill workflow triggered by natural language, not slash commands.
-
-Example triggers:
-```
-loop until done
-keep going
-continue until tests pass
-implement full feature
-```
-
 ## How It Works
 
-- Scores spec clarity before starting
-- Chooses tool-shaped or colleague-shaped workflow
-- Uses stop hooks to decide when to pause or finish
+1. **Spec scoring** — Scores clarity (0-10) before starting
+2. **Shape** — Chooses Tool / Tool-Review / Colleague workflow
+3. **Decompose** — Breaks spec into atomic work items
+4. **Wave execution** — Invokes parallel subagents per wave
+5. **Auto-unblock** — counsel:panel reviews when stuck
+6. **Completion** — hope:verify + hope:gate before claiming done
+
+## Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `loop:start` | Start or resume autonomous loop |
+| `loop:status` | Show current progress |
+| `loop:cancel` | Gracefully terminate loop |
 
 ---
 
-→ Source: [`loop/skills/start/SKILL.md`](../../loop/skills/start/SKILL.md)
+> Source: [`loop/skills/start/SKILL.md`](../../loop/skills/start/SKILL.md)

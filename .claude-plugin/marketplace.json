@@ -9,58 +9,23 @@
     {
       "name": "hope",
       "source": "./hope",
-      "description": "clarify before you build. learn from failure. iterate with confidence.",
+      "description": "Clarify intent, verify decisions, break through obstacles. Core thinking framework.",
       "category": "core",
-      "keywords": ["intent", "confidence", "debugging", "root-cause", "verification", "learnings", "workflow"]
-    },
-    {
-      "name": "product",
-      "source": "./product",
-      "description": "PRD generation, competitive analysis, research synthesis, and goal systems for product work.",
-      "category": "domain",
-      "keywords": ["PRD", "competitive-analysis", "metrics", "OKRs", "requirements", "cohort", "strategy"]
-    },
-    {
-      "name": "wordsmith",
-      "source": "./wordsmith",
-      "description": "Voice extraction, precision editing, narrative structure, and copy evaluation for writing work.",
-      "category": "domain",
-      "keywords": ["editing", "voice", "prose", "narrative", "microcopy", "RFC", "ADR", "blog"]
-    },
-    {
-      "name": "founder",
-      "source": "./founder",
-      "description": "Complete workflows for startup validation, fundraising, and financial modeling with Marp slides and spreadsheet outputs.",
-      "category": "domain",
-      "keywords": ["pitch", "fundraising", "TAM", "unit-economics", "runway", "investor", "board-deck"]
-    },
-    {
-      "name": "career",
-      "source": "./career",
-      "description": "Interview prep, skill assessment, STAR narratives, stakeholder navigation, and focus capacity analysis for career development.",
-      "category": "domain",
-      "keywords": ["interview", "skill-gaps", "STAR", "stakeholder", "leadership", "job-search", "feedback"]
+      "keywords": ["intent", "confidence", "verification", "shape", "breakthrough", "trace"]
     },
     {
       "name": "counsel",
       "source": "./counsel",
-      "description": "Expert simulation for code guidance, style, and debates. Channels Addy Osmani, Rich Hickey, Adam Wathan, and more.",
-      "category": "domain",
-      "keywords": ["expert", "idiomatic", "best-practice", "panel", "code-review", "style", "guidance"]
-    },
-    {
-      "name": "design",
-      "source": "./design",
-      "description": "Design exploration workflows for research, direction-finding, and surfacing unknowns. Journey mapping, IA, visual directions, and UX comparison.",
-      "category": "domain",
-      "keywords": ["UI", "UX", "visual-design", "journey-map", "information-architecture", "typography", "color"]
+      "description": "Expert simulation for guidance, style, and debates. 42 curated profiles.",
+      "category": "core",
+      "keywords": ["expert", "simulation", "guidance", "style", "panel", "debate"]
     },
     {
       "name": "loop",
       "source": "./loop",
-      "description": "Autonomous iteration with spec-driven quality gates. Uses Tasks API for state, Stop hooks for intelligent termination.",
+      "description": "Autonomous iteration with subagent waves. Spec-driven execution, auto-unblock via counsel.",
       "category": "core",
-      "keywords": ["autonomous", "iteration", "persist", "continue", "until-done", "multi-step"]
+      "keywords": ["autonomous", "iteration", "loop", "spec-driven", "waves", "subagent"]
     }
   ]
 }

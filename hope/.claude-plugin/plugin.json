@@ -1,8 +1,8 @@
 {
   "name": "hope",
-  "version": "0.23.0",
-  "description": "clarify before you build. learn from failure. iterate with confidence.",
-  "keywords": ["intent", "inversion", "confidence", "functional", "iterate", "skill-judge", "breakthrough", "shape", "presence", "verify"],
+  "version": "1.0.0",
+  "description": "Clarify intent, verify decisions, break through obstacles. Core thinking framework.",
+  "keywords": ["intent", "confidence", "verification", "shape", "breakthrough", "trace", "presence", "skill-judge"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

@@ -8,11 +8,9 @@ moo — mind on output. Stay present with AI.
 
 ```
 moo.md/
-├── hope/                    # Cognitive operating system
-├── product/                 # PRDs, competitive analysis, metrics
-├── wordsmith/               # Editing, voice, narrative
-├── founder/                 # Startup validation, financials
-├── career/                  # Interview prep, skill gaps
+├── hope/                    # Clarify intent, verify decisions, break through obstacles
+├── counsel/                 # Expert simulation for guidance, style, debates
+├── loop/                    # Autonomous iteration with subagent waves
 ├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs: plugins/, dev/ (internal)
 ├── eval/                    # Skill evaluation tests
@@ -59,7 +57,7 @@ description: Single line. Trigger condition + what it does. Max 1024 chars.
 
 > **Note:** Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
 
-**⚠️ DESCRIPTION TRAP WARNING:** Skill descriptions must be **trigger-only**. If descriptions contain process summaries or workflow steps, Claude follows the short description instead of reading the detailed flowchart/instructions. Keep descriptions focused on "Use when X" patterns only.
+**DESCRIPTION TRAP WARNING:** Skill descriptions must be **trigger-only**. If descriptions contain process summaries or workflow steps, Claude follows the short description instead of reading the detailed flowchart/instructions. Keep descriptions focused on "Use when X" patterns only.
 
 **Agents:**
 
@@ -133,33 +131,8 @@ Use DOT for process documentation. Claude follows DOT-written processes more rel
 - **Confidence gates:** <70% research, 70-85% ship+monitor, ≥85% ship
 - **Quality footer:** Confidence, Alternative, Reversible, Key Assumption, Complexity
 - **Workflows:** A=Build, B=Debug, C=Refactor
-- **Learnings:** `~/.claude/learnings/*.jsonl`
-
-## State File Schemas
-
-JSON state files have formal schemas in `schemas/`:
-
-| File Pattern | Schema | Used By |
-|--------------|--------|---------|
-| `.loop/workflow-state.json` | `workflow-state.schema.json` | loop plugin |
-| `~/.claude/learnings/*.jsonl` | `learnings.schema.json` | hope/learn, hope/recall |
-
-**When modifying state files:**
-1. Check schema in `schemas/` before adding fields
-2. New fields must be optional (backward compatible)
-3. Breaking changes require `version` bump + migration in consuming hooks
-4. Update all skills/hooks that read the state file
-
-**When creating skills that use state:**
-- Define schema in `schemas/` if new file type
-- Document schema in skill's references/
-- Validate required fields before processing
-- Fail gracefully on schema mismatch
-
-**Schema evolution:**
-- Version field tracks breaking changes
-- Hooks handle migration for old versions
-- Document changes in CHANGELOG.md
+- **Stateless:** No persistent state files. Conversation history is source of truth.
+- **Execution model:** Human-driven exploration → machine-verified execution
 
 ## Anti-Patterns
 
@@ -172,6 +145,8 @@ JSON state files have formal schemas in `schemas/`:
 - Inline examples longer than 5 lines
 - Navigation/catalog sections in skills (tool indexes, skill tables)
 - Skills over 200 lines
+- Persistent state files (.jsonl, workflow-state.json)
+- Task management APIs in skills (TaskCreate/TaskList/TaskUpdate)
 
 ## Changelog
 

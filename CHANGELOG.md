@@ -7,6 +7,78 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@1.0.0, counsel@1.0.0, loop@4.0.0] - 2026-02-06 (Marketplace Reset)
+
+### BREAKING CHANGES
+
+**Learnings System Removed**
+- Deleted: hope:learn command, hope:recall skill
+- Deleted: ~/.claude/learnings/ persistence (.jsonl files)
+- Deleted: SessionEnd hook (was capturing learnings)
+- Deleted: learnings.schema.json
+- Users now rely on conversation history for learning patterns
+
+**State File Persistence Removed**
+- Deleted: .loop/workflow-state.json, current-context.json
+- Deleted: workflow-state.schema.json, workflows-context.schema.json
+- Deleted: SessionStart/Stop hooks from loop
+- Execution now conversation-driven; state inferred from conversation context
+
+**Task Management Removed from loop**
+- Deleted: TaskCreate/TaskList/TaskUpdate integration
+- Deleted: spawnTeam (agent teams)
+- Deleted: team_score calculation
+- loop:start now uses simple subagent waves only
+
+**Plugins Simplified**
+- Deleted: design, founder, product, wordsmith, career plugins
+- Remaining: hope (9 skills), counsel (2 skills), loop (3 skills) — 14 total
+- Why: Refocus marketplace on core philosophy
+
+### Added
+
+- **counsel:panel**: Explicit skill for multi-expert debate (was implicit mode within counsel)
+- **counsel:panel**: New eval case (panel-trigger)
+
+### Changed
+
+- **hope:shape**: Outputs conversation only (no .loop/ files)
+- **hope:gate**: Verifies inline via hope:verify + counsel:panel (no state file read)
+- **loop:start**: Uses subagent skill invocation (no TaskCreate)
+- **loop:status**: Reads conversation context (no workflow-state.json)
+- **loop:cancel**: Conversation-based progress report (no state file update)
+- **marketplace.json**: 3 plugins (was 8), all category: core
+- **CLAUDE.md**: Removed State File Schemas section, updated anti-patterns
+- **PHILOSOPHY.md**: Added Execution Model section, stateless principle
+
+### Removed
+
+- hope:recall skill, /hope:learn command
+- hope/hooks/ SessionEnd hook, Setup hook
+- hope/scripts/extract-learnings.sh
+- loop/hooks/ (SessionStart, Stop hooks)
+- loop/hooks/scripts/ (session-resume.sh, stop-check.sh)
+- design/, founder/, product/, wordsmith/, career/ plugins
+- schemas/ directory (learnings, workflow-state, workflows-context)
+- counsel:calibrate command and calibration-persistence eval case
+- counsel calibration system (.claude/logs/counsel-calibrations.jsonl)
+- hope:compact command (learnings compaction)
+- Eval cases: recall-trigger, team-detection, team-execution, wave-context, plan-approval-gate, calibration-persistence
+
+### Migration Guide
+
+**From v0.x (hope/counsel):**
+- Learnings are not carried forward (conversation history is new source)
+- Domain plugins must be re-installed if needed
+
+**From v3.x (loop):**
+- TaskList-based execution no longer available
+- Use subagent waves instead of agent teams
+- No session-resume or state file recovery
+- loop:start is simpler (no orchestration overhead)
+
+---
+
 ## [hope@0.23.0, loop@3.2.0] - 2026-02-06
 
 ### Fixed

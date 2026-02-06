@@ -170,31 +170,7 @@ How will we know these measures worked?
 [Quality Footer - see ../skills/soul/references/quality-footer.md]
 ```
 
-## Phase 8: Learning Persistence
-
-Propose additions to `~/.claude/learnings/`:
-
-```
-failures.jsonl:
-{
-  "ts": "[timestamp]",
-  "context": "[system/feature]",
-  "failure": "[what happened]",
-  "root_cause": "[deepest cause]",
-  "prevention": "[primary measure]"
-}
-
-discoveries.jsonl:
-{
-  "ts": "[timestamp]",
-  "context": "[system/feature]",
-  "discovery": "[what we learned]",
-  "confidence": "X-Y%",
-  "applies_to": "[where else this matters]"
-}
-```
-
-## Phase 9: Wait
+## Phase 8: Wait
 
 **Do not implement prevention measures.** Present postmortem and wait for user to prioritize actions.
 

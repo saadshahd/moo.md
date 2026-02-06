@@ -30,37 +30,30 @@ You don't see the checklist. You see better answers.
 
 Try:
 ```
-delve into how authentication works in this repo
+plan building a REST API for user management
 ```
 
 Or:
 ```
-plan building a REST API for user management
+shape the implementation approach for a settings page
 ```
 
 ---
 
-## Trigger keywords
+## Skills
 
-| Say this | Get this |
-|----------|----------|
-| "delve into how X works" | Deep code investigation |
-| "plan building X" | Intent clarification + structured plan |
-| "recall what I learned about X" | Surface past learnings |
-
----
-
-## Commands
-
-| Command | Purpose |
-|---------|---------|
-| `/hope:plan` | Clarify intent, search libraries, list risks |
-| `/hope:debug` | Effect → Cause → Root → Fix → Prevent |
-| `/hope:postmortem` | Structured post-incident review |
-| `/hope:learn` | Extract insights to `~/.claude/learnings/` |
-| `/hope:recall` | Surface relevant learnings for context |
-| `/hope:mirror` | Detect blind spots in a decision |
-| `/hope:reframe` | Alternative framings for stuck problems |
+| Skill | Purpose |
+|-------|---------|
+| `hope:soul` | Core thinking framework (auto-applied) |
+| `hope:intent` | Clarify vague requests into iron-clad specs |
+| `hope:shape` | Bridge WHAT to HOW — select collaboration shape |
+| `hope:verify` | Machine-verifiable acceptance criteria |
+| `hope:gate` | Verification before claiming done |
+| `hope:breakthrough` | Creative unblocking when stuck |
+| `hope:trace` | Root cause analysis |
+| `hope:interactive-code-review` | PR walkthrough |
+| `hope:presence` | Focus and attention tracking |
+| `hope:skill-judge` | Quality audit for skills |
 
 ---
 
@@ -70,20 +63,14 @@ Dual-signal system: verification type (primary) + subjective estimate (secondary
 
 | Verification Type | Sufficient for SHIP? |
 |-------------------|---------------------|
-| `execution output` | ✓ Yes |
-| `observation` | ✓ Yes |
-| `measurement` | ✓ Yes |
-| `code review` | ⚠️ Weak |
-| `assumption` | ✗ Blocks SHIP |
+| `execution output` | Yes |
+| `observation` | Yes |
+| `measurement` | Yes |
+| `code review` | Weak |
+| `assumption` | Blocks SHIP |
 
 Subjective percentages are Claude's estimates, not calibrated accuracy. Weight verification type higher.
 
 ---
 
-## Deep reference
-
-- [Thinking tools](../../hope/skills/soul/SKILL.md#all-tools-when-default-doesnt-fit) — 34 mental models
-- [Quality footer](../../hope/skills/soul/references/quality-footer.md) — Verdict format
-- [Learnings system](../learnings-system.md) — How insights persist
-
-→ Source: [`hope/skills/soul/SKILL.md`](../../hope/skills/soul/SKILL.md)
+> Source: [`hope/skills/soul/SKILL.md`](../../hope/skills/soul/SKILL.md)

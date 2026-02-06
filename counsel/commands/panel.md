@@ -91,7 +91,7 @@ digraph DebateWorkflow {
 
 **Pre-filter:** Load `~/.claude/counsel-blocklist.json` and remove blocked profiles.
 
-**Selection:** Load history from `.claude/logs/counsel-reviews.jsonl`. Select 2 experts with distinct perspectives. If `--experts` specified, use those (minus blocked, max 2 unless `--expand`).
+**Selection:** Select 2 experts with distinct perspectives. If `--experts` specified, use those (minus blocked, max 2 unless `--expand`).
 
 ### Output Format
 
@@ -112,7 +112,7 @@ digraph DebateWorkflow {
 
 ---
 *Defense round available. Reply to push back on any point.*
-*Use /counsel:calibrate if any perspective doesn't sound right.*
+*Simulated perspectives based on documented work, not the experts' actual opinions.*
 ```
 
 ### Panel Size

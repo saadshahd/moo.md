@@ -1,8 +1,8 @@
 {
   "name": "counsel",
-  "version": "0.14.0",
-  "description": "Expert simulation for guidance, style, and debates. 42 curated profiles: simplicity advocates, legacy code specialists, tools-for-thought researchers, foundational computing pioneers.",
-  "keywords": ["expert", "simulation", "guidance", "style", "panel"],
+  "version": "1.0.0",
+  "description": "Expert simulation for guidance, style, and debates. 42 curated profiles.",
+  "keywords": ["expert", "simulation", "guidance", "style", "panel", "debate"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

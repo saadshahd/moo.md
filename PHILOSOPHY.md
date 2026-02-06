@@ -26,6 +26,18 @@ Externalizes mental models so they apply automatically—surfacing what matters 
 
 ---
 
+## Execution Model
+
+**Human-Driven Exploration → Machine-Verified Execution**
+
+- **Phase 1** (Exploration): User clarifies intent. Consults experts. Researches and iterates.
+- **Phase 2** (Commitment): Machine locks approach. Verifiable criteria. Final approval.
+- **Phase 3** (Execution): Loop runs spec to completion. Subagent waves in parallel. Counsel auto-unblocks if stuck. Loop continues until spec met + verified + counsel approved.
+
+No persistent state. No complex orchestration. Just clear thinking → expert guidance → reliable execution.
+
+---
+
 ## Principles
 
 1. **Depth over surface** — Trace symptoms to root causes. Five Whys, not quick fixes.
@@ -44,7 +56,7 @@ Externalizes mental models so they apply automatically—surfacing what matters 
 
 8. **Expert hierarchy for conflicts** — When experts disagree: Hickey (simplicity) → Fowler (pragmatism) → fewer dependencies.
 
-9. **Fresh context when exhausted** — Multi-story features (N>5) may need fresh instances. Each story gets full context window.
+9. **Stateless over persistent** — Conversation history is the source of truth. No .jsonl files, no state schemas, no cross-session persistence.
 
 ---
 
@@ -61,5 +73,6 @@ Every skill must have:
 
 ## Structure
 
-**hope** = core thinking models
-**Domain plugins** = specialized applications of the same principles
+**hope** = clarify intent, verify decisions, break through obstacles
+**counsel** = expert simulation for guidance, style, debates
+**loop** = autonomous iteration with subagent waves

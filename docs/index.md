@@ -6,15 +6,6 @@
 
 ## Plugin Reference
 
-- [hope](plugins/hope.md) — cognitive operating system
-- [product](plugins/product.md) — PRDs, competitive analysis, metrics
-- [wordsmith](plugins/wordsmith.md) — editing, voice, narrative
-- [founder](plugins/founder.md) — startup validation, financials
-- [career](plugins/career.md) — interview prep, skill gaps
-- [counsel](plugins/counsel.md) — expert simulation, panels
-- [design](plugins/design.md) — UX exploration, visual directions
-- [loop](plugins/loop.md) — autonomous iteration
-
-## Concepts
-
-- [Learnings System](learnings-system.md) — how your thinking compounds
+- [hope](plugins/hope.md) — clarify intent, verify decisions, break through obstacles
+- [counsel](plugins/counsel.md) — expert simulation, panels, debates
+- [loop](plugins/loop.md) — autonomous iteration with subagent waves

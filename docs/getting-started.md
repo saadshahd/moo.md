@@ -24,5 +24,6 @@ The `hope` skill audits every response. You don't see the checklist. You see bet
 
 ## Next
 
-- [How learnings persist](learnings-system.md) — Insights compound across sessions
-- [All plugins](plugins/) — Beyond hope
+- [hope](plugins/hope.md) — Core thinking framework
+- [counsel](plugins/counsel.md) — Expert simulation
+- [loop](plugins/loop.md) — Autonomous iteration

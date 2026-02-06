@@ -73,15 +73,6 @@ Use MCQ format for speed (user responds "1A, 2B"):
 - **5-7:** Iterate with user, suggest `/hope:shape`
 - **<5:** Return to Step 2
 
-Persist score:
-
-```bash
-mkdir -p .loop
-cat > .loop/workflow-state.json << EOF
-{"version":1,"stage":"intent","task":"$TASK","spec_score":$SCORE,"started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
-EOF
-```
-
 ### Step 4: Echo Check
 
 One sentence: **deliverable + #1 must-include + hardest constraint.**
@@ -116,7 +107,6 @@ After outputting the brief:
 ```
 Next: /loop — continues to shape and execution
       (or /hope:shape for criteria only)
-Spec score persisted to .loop/workflow-state.json
 ```
 
 After YES-GO: generate code/copy/analysis. Self-review before delivery.

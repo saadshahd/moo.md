@@ -29,7 +29,6 @@ Pattern-matching on published material, not claiming to be the expert.
 - Cite prior work
 - Use "would likely" to honor uncertainty
 - Flag low confidence
-- Check calibrations
 
 ---
 
@@ -50,7 +49,7 @@ digraph CounselWorkflow {
 
 ### Step 0: Load State
 
-Read `~/.claude/counsel-blocklist.json` and `.claude/logs/counsel-calibrations.jsonl` if they exist. Blocked profiles are invisible to detection and panels. If user requests a blocked profile by name, refuse and suggest `/counsel:unblock`.
+Read `~/.claude/counsel-blocklist.json` if it exists. Blocked profiles are invisible to detection and panels. If user requests a blocked profile by name, refuse and suggest `/counsel:unblock`.
 
 ### Step 1: Detect Expert
 
@@ -111,7 +110,6 @@ Apply expert's philosophy, voice, typical concerns, and would-never-say guardrai
 | Topic matches core domain | +1 |
 | Topic outside documented expertise | -2 |
 | Recent public statements (< 2 years) | +1 |
-| Calibration corrections exist | Variable |
 
 | Score | Action |
 |-------|--------|
@@ -140,7 +138,6 @@ Apply expert's philosophy, voice, typical concerns, and would-never-say guardrai
 - Claim certainty about what expert "would" say (use "would likely")
 - Invent positions not in documented work
 - Simulate without stating confidence
-- Skip calibration check
 
 ---
 
@@ -167,16 +164,9 @@ Pattern: `a/an [philosophy/approach] [role]`
 |---------|---------|
 | `/counsel:summon [expert]` | Explicit single-expert invocation |
 | `/counsel:panel [question]` | Multi-expert debate |
-| `/counsel:calibrate [correction]` | Correct simulation errors |
 | `/counsel:block [name]` | Block a profile from simulations |
 | `/counsel:unblock [name]` | Remove a profile from blocklist |
 | `/counsel:blocked` | List blocked profiles |
-
----
-
-## Calibration
-
-If user says "[Expert] wouldn't say that": acknowledge, ask for correction, log to `.claude/logs/counsel-calibrations.jsonl`, apply in future.
 
 ---
 

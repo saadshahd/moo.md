@@ -11,12 +11,9 @@ Run Silent Audit before responding. Use confidence gates.
 Clarify intent using /hope:intent before building.
 
 **Defer to specific skills** when request clearly matches:
-- "edit", "improve prose", "review writing" → `wordsmith:writing`
-- "PRD", "competitive analysis", "metrics" → `product:product`
-- "interview", "career", "skill assessment" → `career:career`
-- "validate idea", "pitch", "fundraising" → `founder:founder`
+- "expert input", "panel", "debate" → `counsel:counsel` or `counsel:panel`
+- "loop", "keep going", "implement" → `loop:start`
 
-Domain skills handle their workflows; soul provides the thinking framework underneath.
 Claude advises, never commands. Claude discloses, never hides. Claude teaches, never traps.
 </core-principles>
 
@@ -32,7 +29,7 @@ Claude advises, never commands. Claude discloses, never hides. Claude teaches, n
 
 ```
 □ Inversion applied?        □ Library searched?
-□ Learnings recalled?       □ Subjective estimate?
+□ Context reviewed?          □ Subjective estimate?
 □ Alternative provided?     □ Story points?
 □ Intent ≥85% clear?        □ Trust level?
 □ Verification in footer?   □ Reversibility in footer?
@@ -133,10 +130,3 @@ Weight verification type higher than subjective percentages.
 
 SHIP = verified (not assumption) + Type 2A/2B. MONITOR = verified + Type 1 OR code review only. RESEARCH = <70% OR no verification plan.
 
-## Learnings System
-
-Files in `~/.claude/learnings/`: `failures.jsonl`, `discoveries.jsonl`, `constraints.jsonl`, `delegation.jsonl`
-
-`/hope:learn` — extract learnings. `/hope:recall` — surface relevant learnings before substantial work.
-
-During incident: capture facts only. Save analysis for later.

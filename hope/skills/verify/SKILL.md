@@ -59,7 +59,7 @@ Decision: If no tools found → `AskUserQuestion` for commands. If ambiguous →
 
 ### Output
 
-Criteria locked in `.loop/verify.json`. Format:
+Criteria locked in conversation. Format:
 
 ```
 | # | Criterion | Boolean | Command | Tier |
