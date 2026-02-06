@@ -1,9 +1,0 @@
-name: wordsmith-edit-request
-description: Writing skill triggers on editing requests
-plugin: wordsmith
-skill: wordsmith:writing
-prompt: "Edit this text to be clearer: The implementation was completed by the team after spending weeks testing it to ensure it would work in production."
-expectedBehaviors:
-  - "Writing skill activates on edit requests"
-  - "Applies editing principles like cutting fluff"
-  - "Shows markup or before after comparison"
