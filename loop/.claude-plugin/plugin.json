@@ -1,6 +1,6 @@
 {
   "name": "loop",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Autonomous iteration with adaptive wave execution. Atomic tasks, parallel subagents or agent teams, self-unblocking via counsel.",
   "keywords": ["autonomous", "iteration", "loop", "spec-driven", "waves", "adaptive", "agent-teams"],
   "author": {

@@ -7,7 +7,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [hope@0.23.0, loop@3.2.0] - 2026-02-06
 
 ### Fixed
 
