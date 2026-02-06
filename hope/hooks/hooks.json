@@ -22,27 +22,6 @@
           }
         ]
       }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/extract-learnings.sh"
-          }
-        ]
-      }
-    ],
-    "Setup": [
-      {
-        "matcher": "init|maintenance",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "mkdir -p ~/.claude/learnings && echo 'Learnings directory ready'"
-          }
-        ]
-      }
     ]
   }
 }
