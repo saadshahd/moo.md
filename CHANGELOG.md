@@ -7,6 +7,75 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.0.0] - 2026-02-06
+
+### BREAKING CHANGES
+
+**Three Plugins Merged into One**
+- Merged counsel (expert simulation) and loop (autonomous iteration) into hope
+- 15 skills reduced to 5: soul, intent, shape, loop, consult
+- 16 commands reduced to 6: intent, panel, summon, block, unblock, blocked
+- All `counsel:*` references become `hope:consult` or `hope:*` commands
+- All `loop:*` references become `hope:loop`
+
+**Session Strategy Replaces Workflows A/B/C**
+- Soul now auto-detects session type: Build, Debug, Plan, Reflect
+- Engagement level asked once per session: Autonomous, Collaborative, Guided
+- `[SESSION]` marker persists through compaction
+- Workflows A/B/C removed from soul (replaced by session types)
+
+**Skills Absorbed**
+- hope:verify absorbed into hope:loop (tool discovery, tiered verification, criterion types)
+- hope:gate absorbed into hope:loop (pre/post-work checklists, anti-footgun rules)
+- counsel:panel absorbed into hope:consult (panel mode within single skill)
+- loop:cancel and loop:status absorbed as sections within hope:loop
+
+### Added
+
+- **hope:consult**: New unified skill merging counsel + panel (single-expert, panel, unblock modes)
+- **hope:loop**: New unified skill merging loop:start + verify + gate
+- **hope/soul**: Session type detection table (Build/Debug/Plan/Reflect)
+- **hope/soul**: Engagement levels (Autonomous/Collaborative/Guided) with prompt
+- **hope/soul**: Session marker `[SESSION] Type: X | Engagement: Y`
+- **hope/intent**: Session-type context table adapting focus per session type
+- **hope/shape**: Consult-driven expert consultation (replaces hardcoded expert table)
+- **hooks**: SubagentStart hook for session strategy propagation to subagents
+- **hooks**: Per-turn session strategy injector (ensure-soul.sh rewritten)
+- **CLAUDE.md**: Compact Instructions section for compaction guidance
+- **CLAUDE.md**: Skill Pipeline section showing intent → shape → loop → consult flow
+
+### Changed
+
+- **marketplace.json**: 1 plugin (was 3)
+- **plugin.json**: Version 3.0.0
+- **.github/hooks/pre-push**: Only validates hope plugin
+
+### Removed
+
+- **counsel/**: Entire directory (merged into hope/skills/consult/)
+- **loop/**: Entire directory (merged into hope/skills/loop/)
+- **Skills**: interactive-code-review, trace, breakthrough, presence, skill-judge, verify, gate
+- **Commands**: debug, future, mirror, interrogate, reframe, postmortem, prime, slides, plan
+- **hope/references/**: Entire directory
+- **loop/ci/**: CI templates
+- **hope/scripts/session-start.sh**: Replaced by per-turn injector
+- **hooks**: SessionStart hook removed (broken for plugins, #16538)
+- **docs/plugins/counsel.md**, **docs/plugins/loop.md**
+- **docs/dev/skill-audit-2026-01.md**
+
+### Migration Guide
+
+**From v2.0.0 (3 plugins):**
+- Install only `hope@moo.md` (counsel and loop are included)
+- `counsel:counsel` → `hope:consult`
+- `counsel:panel` → `hope:consult` (panel mode) or `/hope:panel` command
+- `loop:start` → `hope:loop`
+- `loop:cancel` / `loop:status` → absorbed into `hope:loop`
+- `/counsel:summon` → `/hope:summon`
+- `/counsel:block` → `/hope:block`
+
+---
+
 ## [hope@1.0.0, counsel@1.0.0, loop@4.0.0] - 2026-02-06 (Marketplace Reset)
 
 ### BREAKING CHANGES

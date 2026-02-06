@@ -9,23 +9,9 @@
     {
       "name": "hope",
       "source": "./hope",
-      "description": "Clarify intent, verify decisions, break through obstacles. Core thinking framework.",
+      "description": "Clarify intent, shape approach, execute with verification, consult experts. Session strategy with 5 skills.",
       "category": "core",
-      "keywords": ["intent", "confidence", "verification", "shape", "breakthrough", "trace"]
-    },
-    {
-      "name": "counsel",
-      "source": "./counsel",
-      "description": "Expert simulation for guidance, style, and debates. 42 curated profiles.",
-      "category": "core",
-      "keywords": ["expert", "simulation", "guidance", "style", "panel", "debate"]
-    },
-    {
-      "name": "loop",
-      "source": "./loop",
-      "description": "Autonomous iteration with subagent waves. Spec-driven execution, auto-unblock via counsel.",
-      "category": "core",
-      "keywords": ["autonomous", "iteration", "loop", "spec-driven", "waves", "subagent"]
+      "keywords": ["intent", "shape", "loop", "consult", "session", "verification", "expert"]
     }
   ]
 }

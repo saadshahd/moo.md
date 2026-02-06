@@ -20,10 +20,8 @@ Claude will:
 
 ## What's running
 
-The `hope` skill audits every response. You don't see the checklist. You see better answers.
+The `hope:soul` skill audits every response and manages session strategy. You don't see the checklist. You see better answers.
 
 ## Next
 
-- [hope](plugins/hope.md) — Core thinking framework
-- [counsel](plugins/counsel.md) — Expert simulation
-- [loop](plugins/loop.md) — Autonomous iteration
+- [hope](plugins/hope.md) — 5 skills: soul, intent, shape, loop, consult

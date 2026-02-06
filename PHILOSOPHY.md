@@ -30,9 +30,11 @@ Externalizes mental models so they apply automatically—surfacing what matters 
 
 **Human-Driven Exploration → Machine-Verified Execution**
 
-- **Phase 1** (Exploration): User clarifies intent. Consults experts. Researches and iterates.
-- **Phase 2** (Commitment): Machine locks approach. Verifiable criteria. Final approval.
-- **Phase 3** (Execution): Loop runs spec to completion. Subagent waves in parallel. Counsel auto-unblocks if stuck. Loop continues until spec met + verified + counsel approved.
+Session strategy auto-detects task type and asks engagement level once per session.
+
+- **Phase 1** (Exploration): Intent clarifies WHAT. Consult provides expert guidance. User iterates.
+- **Phase 2** (Commitment): Shape locks HOW. Verifiable criteria. Final approval.
+- **Phase 3** (Execution): Loop runs spec to completion. Subagent waves in parallel. Consult auto-unblocks if stuck. Loop continues until spec met + verified + consult approved.
 
 No persistent state. No complex orchestration. Just clear thinking → expert guidance → reliable execution.
 
@@ -73,6 +75,9 @@ Every skill must have:
 
 ## Structure
 
-**hope** = clarify intent, verify decisions, break through obstacles
-**counsel** = expert simulation for guidance, style, debates
-**loop** = autonomous iteration with subagent waves
+**hope** — single plugin, 5 skills:
+- **soul** = session strategy + thinking framework
+- **intent** = clarify WHAT
+- **shape** = decide HOW (consult-driven)
+- **loop** = execute + verify + complete
+- **consult** = expert simulation (42 profiles)

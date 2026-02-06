@@ -6,6 +6,4 @@
 
 ## Plugin Reference
 
-- [hope](plugins/hope.md) — clarify intent, verify decisions, break through obstacles
-- [counsel](plugins/counsel.md) — expert simulation, panels, debates
-- [loop](plugins/loop.md) — autonomous iteration with subagent waves
+- [hope](plugins/hope.md) — clarify intent, shape approach, execute, consult experts

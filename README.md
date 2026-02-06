@@ -37,9 +37,15 @@ Claude will:
 
 ---
 
-## Plugins
+## Skills
 
-[hope](docs/plugins/hope.md) · [counsel](docs/plugins/counsel.md) · [loop](docs/plugins/loop.md)
+| Skill | Purpose |
+|-------|---------|
+| `hope:soul` | Session strategy + thinking framework (auto-applied) |
+| `hope:intent` | Clarify vague requests into iron-clad specs |
+| `hope:shape` | Bridge WHAT to HOW — select collaboration shape |
+| `hope:loop` | Autonomous iteration with wave-based execution |
+| `hope:consult` | Expert simulation — 42 curated profiles |
 
 > [Documentation](docs/) · [Issues](https://github.com/saadshahd/moo.md/issues)
 

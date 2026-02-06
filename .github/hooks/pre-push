@@ -3,51 +3,43 @@ set -e
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-CHANGED_PLUGINS=""
-for plugin in hope product wordsmith founder career counsel design loop; do
-  if git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q "^$plugin/"; then
-    CHANGED_PLUGINS="$CHANGED_PLUGINS $plugin"
-  elif git diff --name-only "origin/main..HEAD" 2>/dev/null | grep -q "^$plugin/"; then
-    CHANGED_PLUGINS="$CHANGED_PLUGINS $plugin"
-  fi
-done
+CHANGED=""
+if git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q "^hope/"; then
+  CHANGED="hope"
+elif git diff --name-only "origin/main..HEAD" 2>/dev/null | grep -q "^hope/"; then
+  CHANGED="hope"
+fi
 
-if [ -z "$CHANGED_PLUGINS" ]; then
+if [ -z "$CHANGED" ]; then
   echo "✓ No plugin changes, skipping eval"
   exit 0
 fi
 
 ERRORS=""
 
-for plugin in $CHANGED_PLUGINS; do
-  plugin_dir="$REPO_ROOT/$plugin"
-  [ ! -d "$plugin_dir/skills" ] && continue
+plugin_dir="$REPO_ROOT/hope"
+[ ! -d "$plugin_dir/skills" ] && exit 0
 
-  for skill_file in "$plugin_dir"/skills/*/SKILL.md; do
-    [ ! -f "$skill_file" ] && continue
+for skill_file in "$plugin_dir"/skills/*/SKILL.md; do
+  [ ! -f "$skill_file" ] && continue
 
-    # Line count check (200 max)
-    lines=$(wc -l < "$skill_file" | tr -d ' ')
-    if [ "$lines" -gt 200 ]; then
-      ERRORS="${ERRORS}${skill_file}: ${lines} lines (max 200)\n"
-    fi
+  lines=$(wc -l < "$skill_file" | tr -d ' ')
+  if [ "$lines" -gt 200 ]; then
+    ERRORS="${ERRORS}${skill_file}: ${lines} lines (max 200)\n"
+  fi
 
-    # No references/ directory check
-    skill_dir=$(dirname "$skill_file")
-    if [ -d "$skill_dir/references" ]; then
-      ERRORS="${ERRORS}${skill_dir}: has references/ directory (use flat files)\n"
-    fi
+  skill_dir=$(dirname "$skill_file")
+  if [ -d "$skill_dir/references" ]; then
+    ERRORS="${ERRORS}${skill_dir}: has references/ directory (use flat files)\n"
+  fi
 
-    # Frontmatter check
-    if ! head -1 "$skill_file" | grep -q '^---$'; then
-      ERRORS="${ERRORS}${skill_file}: missing frontmatter\n"
-    fi
+  if ! head -1 "$skill_file" | grep -q '^---$'; then
+    ERRORS="${ERRORS}${skill_file}: missing frontmatter\n"
+  fi
 
-    # Multi-line YAML check
-    if head -20 "$skill_file" | grep -qE '^description:\s*[|>]'; then
-      ERRORS="${ERRORS}${skill_file}: multi-line description (use single line)\n"
-    fi
-  done
+  if head -20 "$skill_file" | grep -qE '^description:\s*[|>]'; then
+    ERRORS="${ERRORS}${skill_file}: multi-line description (use single line)\n"
+  fi
 done
 
 if [ -n "$ERRORS" ]; then

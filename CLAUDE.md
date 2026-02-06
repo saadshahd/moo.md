@@ -8,25 +8,40 @@ moo — mind on output. Stay present with AI.
 
 ```
 moo.md/
-├── hope/                    # Clarify intent, verify decisions, break through obstacles
-├── counsel/                 # Expert simulation for guidance, style, debates
-├── loop/                    # Autonomous iteration with subagent waves
+├── hope/                    # Single plugin: 5 skills, 6 commands, hooks
+│   ├── skills/
+│   │   ├── soul/            # Session strategy + thinking framework
+│   │   ├── intent/          # Clarify WHAT
+│   │   ├── shape/           # Decide HOW (consult-driven)
+│   │   ├── loop/            # Execute + verify + complete
+│   │   └── consult/         # Expert simulation (42 profiles)
+│   ├── commands/            # panel, summon, block, unblock, blocked, intent
+│   ├── hooks/               # UserPromptSubmit + SubagentStart
+│   └── scripts/             # Per-turn session strategy injector
 ├── prompts/                 # Standalone prompt library
-├── docs/                    # User docs: plugins/, dev/ (internal)
+├── docs/                    # User docs
 ├── eval/                    # Skill evaluation tests
 └── .github/hooks/           # Git hooks (pre-push runs evals)
 ```
 
-Each plugin follows:
+Plugin follows:
 
 ```
-<plugin>/
+hope/
 ├── .claude-plugin/plugin.json    # name, version, description, keywords, author
 ├── skills/<name>/SKILL.md
-└── skills/<name>/[data files]    # profiles/, templates — flat alongside SKILL.md
+└── skills/<name>/[data files]    # profiles/ — flat alongside SKILL.md
 ```
 
-Plugin discovery uses `.claude-plugin/marketplace.json` at repo root (lists all plugins).
+Plugin discovery uses `.claude-plugin/marketplace.json` at repo root.
+
+## Skill Pipeline
+
+```
+intent (clarify WHAT) → shape (decide HOW) → loop (execute + verify) → consult (expert guidance)
+```
+
+Session strategy (in soul) auto-detects type (Build/Debug/Plan/Reflect) and asks engagement level (Autonomous/Collaborative/Guided). The `[SESSION]` marker persists through compaction.
 
 ## Local Testing
 
@@ -38,9 +53,9 @@ Plugin discovery uses `.claude-plugin/marketplace.json` at repo root (lists all 
 
 ## Evaluations
 
-Run `bun run eval/run.ts [plugin]` to test skill triggering. Pre-push hook runs evals automatically for changed plugins.
+Run `bun run eval/run.ts hope` to test skill triggering. Pre-push hook runs evals automatically.
 
-**When adding skills:** Add test case YAML to `<plugin>/eval/cases/`.
+**When adding skills:** Add test case YAML to `hope/eval/cases/`.
 
 ## Conventions
 
@@ -130,9 +145,16 @@ Use DOT for process documentation. Claude follows DOT-written processes more rel
 
 - **Confidence gates:** <70% research, 70-85% ship+monitor, ≥85% ship
 - **Quality footer:** Confidence, Alternative, Reversible, Key Assumption, Complexity
-- **Workflows:** A=Build, B=Debug, C=Refactor
+- **Session types:** Build/Debug/Plan/Reflect with engagement levels (Autonomous/Collaborative/Guided)
 - **Stateless:** No persistent state files. Conversation history is source of truth.
 - **Execution model:** Human-driven exploration → machine-verified execution
+
+## Compact Instructions
+
+When compacting conversation history, always preserve:
+- The `[SESSION] Type: X | Engagement: Y` marker
+- Active criteria and mustNot constraints from shape
+- Current loop progress (wave number, items completed)
 
 ## Anti-Patterns
 

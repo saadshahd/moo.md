@@ -10,7 +10,7 @@ Before hope:
 > "This should work" → guess → debug → rebuild
 
 After hope:
-> Clarify intent → search solutions → list risks → build once
+> Clarify intent → shape approach → execute with verification → consult experts
 
 Every response runs through a silent checklist:
 - Intent clear?
@@ -44,16 +44,29 @@ shape the implementation approach for a settings page
 
 | Skill | Purpose |
 |-------|---------|
-| `hope:soul` | Core thinking framework (auto-applied) |
+| `hope:soul` | Session strategy + thinking framework (auto-applied) |
 | `hope:intent` | Clarify vague requests into iron-clad specs |
 | `hope:shape` | Bridge WHAT to HOW — select collaboration shape |
-| `hope:verify` | Machine-verifiable acceptance criteria |
-| `hope:gate` | Verification before claiming done |
-| `hope:breakthrough` | Creative unblocking when stuck |
-| `hope:trace` | Root cause analysis |
-| `hope:interactive-code-review` | PR walkthrough |
-| `hope:presence` | Focus and attention tracking |
-| `hope:skill-judge` | Quality audit for skills |
+| `hope:loop` | Autonomous iteration with wave-based execution |
+| `hope:consult` | Expert simulation — 42 curated profiles, panels, unblocking |
+
+---
+
+## Session Strategy
+
+Soul auto-detects session type from your first message:
+
+| Type | When | Pipeline |
+|------|------|----------|
+| **Build** | "build", "implement", "create" | intent → shape → loop |
+| **Debug** | "fix", "bug", "error" | intent → shape → loop |
+| **Plan** | "plan", "design", "explore" | intent → shape → output |
+| **Reflect** | "postmortem", "review" | intent → consult → output |
+
+Then asks engagement level once:
+- **Autonomous** — experts clarify and execute
+- **Collaborative** — co-drive with expert assist (default)
+- **Guided** — you make all decisions
 
 ---
 
