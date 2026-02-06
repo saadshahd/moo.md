@@ -1,10 +1,10 @@
 name: hope-gate-completion
-description: Gate skill triggers on completion claims
+description: Gate skill triggers on completion claims with inline verify + counsel review
 plugin: hope
 skill: hope:gate
 flaky: true
 prompt: "I'm done implementing the login feature. It's ready to merge."
 expectedBehaviors:
   - "Asks for verification or evidence"
-  - "Presents checklist or steps"
+  - "References hope:verify or counsel:panel"
   - "Mentions tests, proof, or confirmation"

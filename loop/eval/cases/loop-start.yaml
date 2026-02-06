@@ -15,4 +15,4 @@ prompt: "Run /loop:start to implement the full feature. Don't stop until tests p
 expectedBehaviors:
   - "Spec scoring rubric applied"
   - "Workflow shape determined (Tool or Colleague)"
-  - "TaskCreate called with iteration metadata"
+  - "Work items decomposed as prose instructions"

@@ -1,5 +1,5 @@
 name: dual-exit-condition
-description: Loop requires BOTH criteriaStatus all true AND exit_signal true to stop
+description: Loop requires both verification and review before claiming completion
 plugin: loop
 skill: loop:start
 flaky: true
@@ -7,9 +7,8 @@ acceptableSkills:
   - start
   - loop
   - loop:start
-prompt: "loop - all tests pass AND linter clean. Set exit_signal only after verifying both."
+prompt: "loop - all tests pass AND linter clean. Verify both before claiming done."
 expectedBehaviors:
-  - "State file shows exit_signal: false until all criteria verified"
-  - "Both criteriaStatus and exit_signal checked before completion"
-  - "Outputs ---LOOP_STATUS--- block with EXIT_SIGNAL field"
+  - "hope:verify thorough invoked before completion"
+  - "counsel:panel review invoked before completion"
   - "<loop-complete> only appears when both conditions met"

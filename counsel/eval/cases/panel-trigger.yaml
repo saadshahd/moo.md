@@ -1,0 +1,15 @@
+name: counsel-panel-trigger
+description: Panel skill triggers on multi-expert debate requests
+plugin: counsel
+skill: counsel:panel
+flaky: true
+acceptableSkills:
+  - panel
+  - counsel:panel
+  - counsel
+  - counsel:counsel
+prompt: "I need a panel debate on whether to use a monorepo or polyrepo for this project"
+expectedBehaviors:
+  - "Multiple expert perspectives presented"
+  - "Tradeoffs surfaced"
+  - "Synthesis or recommendation provided"
