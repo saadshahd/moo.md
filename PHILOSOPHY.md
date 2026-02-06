@@ -1,75 +1,77 @@
 # PHILOSOPHY.md
 
-Internal guide. Ensures all skills align with core principles.
+moo — thinking infrastructure for AI work.
+
+Encodes good judgment as system behavior so it applies automatically — especially when pressure makes you forget.
 
 ---
 
-## Core Belief
+## Beliefs
 
-There's always a deeper problem underneath the visible one.
+### 1. Better thinking and mistake prevention are inseparable
 
-Until you find it, every action risks being wasted effort.
+Quality output requires quality thinking before it. There is no separate "safety" concern — think well and mistakes don't happen. Think poorly and no amount of testing saves you.
 
----
+### 2. Humans skip good thinking under pressure
 
-## Foundation
+People know they should clarify intent, verify work, consider alternatives. They skip all of it when stakes are high or deadlines close. moo encodes these habits as infrastructure so they apply automatically.
 
-Decision-making is a learnable skill, not innate talent. Mental models are the curriculum.
+### 3. Solo thinking has blind spots
 
----
+Every individual has systematic blind spots — domain biases, recency bias, confirmation bias. Multiple expert perspectives are the cure. Not access to knowledge (that's what search engines do) — access to different ways of seeing the same problem.
 
-## What moo Does
+### 4. The right AI involvement depends on context
 
-mind on output. Stay present with AI reasoning.
-
-Externalizes mental models so they apply automatically—surfacing what matters when pressure makes you forget.
-
----
-
-## Execution Model
-
-**Human-Driven Exploration → Machine-Verified Execution**
-
-Session strategy auto-detects task type and asks engagement level once per session.
-
-- **Phase 1** (Exploration): Intent clarifies WHAT. Consult provides expert guidance. User iterates.
-- **Phase 2** (Commitment): Shape locks HOW. Verifiable criteria. Final approval.
-- **Phase 3** (Execution): Loop runs spec to completion. Subagent waves in parallel. Consult auto-unblocks if stuck. Loop continues until spec met + verified + consult approved.
-
-No persistent state. No complex orchestration. Just clear thinking → expert guidance → reliable execution.
+A debugging session needs different thinking than a greenfield build. A user who knows exactly what they want needs different engagement than one exploring. One framework that reads the room, not four separate tools.
 
 ---
 
 ## Principles
 
-1. **Depth over surface** — Trace symptoms to root causes. Five Whys, not quick fixes.
+Each principle has a stance and a reason. Derived from beliefs above.
 
-2. **Signal over noise** — Filter what matters from what screams loudest.
+### From belief 2: Humans skip under pressure
 
-3. **Proven over invented** — Named frameworks with evidence (Inversion, Confidence Calibration, Reversibility, Regret Minimization). No made-up methodology.
+- **Automatic over remembered** — If humans forget it under pressure, encode it. Cognitive load degrades judgment. Willpower fails. Infrastructure doesn't.
 
-4. **Clarity before action** — Understand intent before building. ≥85% confident or ask.
+- **Clarity before action** — ≥85% confident or ask. Rework always costs more than clarification.
 
-5. **Automatic over remembered** — If humans forget under pressure, encode it so they don't have to remember.
+### From belief 1: Thinking = prevention
 
-6. **Machine-verifiable over ambiguous** — Acceptance criteria must be boolean. Exit codes, string presence, HTTP status. Not "works correctly" or "looks good."
+- **Depth over surface** — Five Whys, not quick fixes. Symptoms recur when root causes persist.
 
-7. **Investigation before implementation** — Separate cognitive modes for discovery vs action. Never combine "find the problem" + "fix the problem" in one task.
+- **Investigation before implementation** — Never combine "find" + "fix" in one task. Mixing cognitive modes degrades both.
 
-8. **Expert hierarchy for conflicts** — When experts disagree: Hickey (simplicity) → Fowler (pragmatism) → fewer dependencies.
+### From belief 3: Perspectives prevent blindness
 
-9. **Stateless over persistent** — Conversation history is the source of truth. No .jsonl files, no state schemas, no cross-session persistence.
+- **Multiple perspectives over solo judgment** — Expert lenses catch what one mind misses. Blind spots are systematic, not random. You can't see your own.
+
+- **Proven over invented** — Named frameworks with evidence. Novel methodology is untested. Knowledge compounds on shoulders of giants.
+
+### From belief 4: Fluid AI involvement
+
+- **Adapt to context** — Session type and engagement level shape system behavior. Build ≠ Debug ≠ Plan ≠ Reflect. One size fits none.
+
+### Cross-cutting
+
+- **Signal over noise** — Filter what matters from what screams loudest. Attention is finite. Overwhelm causes paralysis.
+
+- **Machine-verifiable over ambiguous** — Criteria must be boolean. Ambiguity lets you fool yourself into "done."
+
+- **Stateless** — Conversation is the only state. No persistent files. Hidden state creates invisible dependencies. What you see is what there is.
+
+- **Simplicity wins conflicts** — When perspectives disagree, bias toward simplicity, then pragmatism, then fewer dependencies. Complexity is debt. Every abstraction must justify its existence.
 
 ---
 
-## Skill Requirements
+## Constraints
 
-Every skill must have:
+Rules for skill authors, derived from principles above.
 
-- [ ] Named framework (not invented)
-- [ ] Evidence it works (research, practice, or adoption)
-- [ ] Clear trigger condition (when to use)
-- [ ] Provenance documented
+- Every skill must have: named framework (not invented), evidence it works, clear trigger condition, provenance documented
+- Machine-verifiable exit criteria for every workflow
+- ≤200 lines per SKILL.md
+- Self-contained: works without external files
 
 ---
 

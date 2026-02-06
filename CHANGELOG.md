@@ -13,6 +13,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hope): Compaction guidance in ensure-soul.sh — PRESERVE/DISCARD lists for context compression (inspired by AutoForge's PreCompact hook pattern)
 - feat(hope): Enriched SubagentStart hook with compaction guidance for loop wave subagents
 
+### Changed
+- **PHILOSOPHY.md**: Full rewrite — flat principles replaced with layered structure: beliefs → principles (stance + why) → constraints
+  - 4 beliefs: thinking=prevention, encode what humans forget, perspectives prevent blindness, adapt to context
+  - 11 principles derived from beliefs, each with stance + reason
+  - Removed principle 8 (expert hierarchy with hardcoded names) — replaced by "simplicity wins conflicts"
+  - Added: adaptation to context, multiple perspectives, fluid AI involvement
+  - Tagline evolved: "thinking infrastructure for AI work"
+- **CLAUDE.md**: Replaced passive "Core Philosophy (Preserve These)" with active "Philosophy (Enforce These)" + philosophy audit checklist that runs before committing changes
+
 ## [hope@3.0.0] - 2026-02-06
 
 ### BREAKING CHANGES
