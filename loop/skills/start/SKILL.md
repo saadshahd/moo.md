@@ -29,7 +29,8 @@ User Request -> [STATE DETECTION] -> Resume? / Start fresh?
 
 1. Check `.loop/workflow-state.json` and `.loop/shape/SHAPE.md` exist
 2. Check TaskList for pending/in_progress tasks
-3. If `stage == "planning"`: plan created but not yet executed
+3. Check `.loop/current-context.json` if exists (Phase 1: wave context, omit if doesn't exist)
+4. If `stage == "planning"`: plan created but not yet executed
 
 ```dot
 digraph ResumeDecision {
@@ -105,11 +106,13 @@ Calculation: spec_score × 5 + constraints + success_criteria + done_definition 
 
 ---
 
-## Step 2: Shape Generation
+## Step 2: Shape Generation & Approval (Phase 2 — Plan Bridge)
 
-Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")`. Extract from SHAPE.md: **criteria[]** (success), **mustNot[]** (circuit breakers), **verification{}** (how to verify).
+Set `LOOP_BRIDGE_ENABLED=true`. Invoke `Skill(skill="hope:shape", args="$ARGUMENTS")` — writes SHAPE.md, doesn't invoke EnterPlanMode.
 
-Write `stage: "planning"` to `.loop/workflow-state.json` with spec_score/fit_score (schema: `schemas/workflow-state.schema.json`). On plan approval, resume from Step 3.
+Extract: **criteria[]**, **mustNot[]**, **verification{}** from SHAPE.md.
+
+Ask user: "Plan ready? [Yes/Edit/Cancel]" → **Yes:** set `plan.approved=true`, go to Step 3. **Edit:** user modifies SHAPE.md, re-ask. **Cancel:** cleanup, exit.
 
 ---
 
@@ -119,6 +122,8 @@ Atomic tasks, each passes "one sentence without and" test.
 
 `TaskCreate(subject="[imperative action]", description="[what + criteria + verify cmd]", activeForm="[present continuous]")`
 `TaskUpdate(taskId="4", addBlockedBy=["1", "3"])`
+
+**Note (Phase 1):** Task descriptions will be enhanced with LOOP CONTEXT preambles during Step 4 execution, before subagents spawn. This ensures agents know they're part of autonomous orchestration.
 
 Announce: `[LOOP] Starting | Shape: {Tool/Colleague} ({score}/10) | Tasks: {N} | Budget: ${budget}`
 
@@ -139,13 +144,15 @@ Announce: `[LOOP] Starting | Shape: {Tool/Colleague} ({score}/10) | Tasks: {N} |
 
 ---
 
-## Step 4: Wave Execution
+## Step 4: Wave Execution (Phase 1, 2, 3)
 
-A **wave** = tasks with no unresolved blockedBy. Find tasks where blockedBy is empty or all resolved. Spawn parallel subagents (or teammates in team mode).
+**Wave** = tasks with no unresolved blockedBy. Spawn parallel subagents or teammates.
 
-- Before wave: `Skill(skill="counsel:panel", args="wave strategy for {N} tasks: {summaries}")`
-- After task: `Skill(skill="hope:verify", args="quick")`
-- After wave: `Skill(skill="counsel:panel", args="review wave {N} changes for: {spec}")` — non-blocking, persist review score
+1. **Setup:** Write `.loop/current-context.json` + log `[WAVE {N} START]`. Invoke `Skill(skill="hope:verify", args="quick")` to confirm orchestration context.
+2. **Strategy:** `Skill(skill="counsel:panel", args="wave strategy: staying within loop boundaries?")`
+3. **Task descriptions:** Prefix with `LOOP CONTEXT: Stage {N}, Wave {W}. See .loop/current-context.json.` (signals agents they're orchestrated, not manual)
+4. **Monitor:** Watch for optional `[LOOP SIGNAL]` in agent output; warn if absent (hybrid mode: proceed but log weakness)
+5. **Review:** Update context file, log `[WAVE {N} COMPLETE]`. Invoke `Skill(skill="counsel:panel", args="scope review: executed within loop boundaries?")`, persist findings
 
 ---
 

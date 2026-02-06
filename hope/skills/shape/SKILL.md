@@ -19,8 +19,19 @@ Bridge between intent clarification and implementation. Transforms WHAT into HOW
 - After `/hope:intent` when spec_score >= 5
 - Explicit request: "shape this", "how should I build this"
 - Architecture decisions needed before coding
+- Invoked by `/loop:start` with LOOP_BRIDGE_ENABLED=true (Phase 2: plan mode bridge)
 
 **If spec_score < 5:** Return to `/hope:intent` for clarification first.
+
+### Loop Bridge Mode (Phase 2)
+
+If LOOP_BRIDGE_ENABLED environment variable is set:
+1. Write `.loop/shape/SHAPE.md` with shape, criteria, mustNot (as normal)
+2. **Skip EnterPlanMode** — return control to loop:start for Step 2.5 (approval gate)
+3. Loop will pause and ask user to approve plan before proceeding
+
+If LOOP_BRIDGE_ENABLED is not set:
+- Proceed as standalone skill (may invoke EnterPlanMode for complex decisions)
 
 ---
 
