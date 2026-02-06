@@ -46,10 +46,18 @@ Session strategy (in soul) auto-detects type (Build/Debug/Plan/Reflect) and asks
 ## Local Testing
 
 ```bash
-# From parent directory:
+# Dev mode — loads directly from source, restart to pick up changes:
+claude --plugin-dir ./moo.md
+
+# If hope is installed from marketplace, disable it first to avoid duplicates:
+/plugin disable hope@moo.md
+
+# Pre-release verification — tests the packaged user experience:
 /plugin marketplace add ./moo.md
 /plugin install hope@moo.md
 ```
+
+See [docs/dev/local-development.md](docs/dev/local-development.md) for full workflow.
 
 ## Evaluations
 
@@ -113,6 +121,7 @@ Use DOT for non-linear decision flows. Claude follows DOT structure more reliabl
 
 **When to use:** Multi-path decisions, loops, branching workflows.
 **When NOT to use:** Linear steps (use numbered lists).
+**Exception:** `docs/statechart.md` uses Mermaid `stateDiagram-v2` — better fit for hierarchical state machines with composite states, parallel regions, and choice pseudostates. Skills continue using DOT for inline decision flows.
 
 **Keep structural only:**
 - Node labels (the text)

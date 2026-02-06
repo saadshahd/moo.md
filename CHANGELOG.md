@@ -9,7 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@3.1.0] - 2026-02-06
+
+### Changed
+- feat(hope): Rewrite `docs/statechart.md` — DOT → Mermaid `stateDiagram-v2`, multi-diagram hierarchy (top-level + 5 detail), session-type routing, soul interrupt edges, 4 consult invocation paths, concrete back-transition criteria, engagement-level effects table, cancel/circuit breakers/stall detection in loop, hook-to-state mappings, deadlock prevention guarantees
+- chore: CLAUDE.md — add Mermaid exception for statechart in DOT Notation section
+
 ### Added
+- **docs**: Local development guide (`docs/dev/local-development.md`) — `--plugin-dir` workflow, duplicate avoidance, isolation testing
 - feat(hope): Compaction guidance in ensure-soul.sh — PRESERVE/DISCARD lists for context compression (inspired by AutoForge's PreCompact hook pattern)
 - feat(hope): Enriched SubagentStart hook with compaction guidance for loop wave subagents
 - **docs/statechart.md**: Canonical full-hierarchy statechart — all states, nested sub-states per skill, parallel regions, transitions, feedback loop. Single source of truth for plugin flow.

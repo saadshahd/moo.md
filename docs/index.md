@@ -7,3 +7,8 @@
 ## Plugin Reference
 
 - [hope](plugins/hope.md) — clarify intent, shape approach, execute, consult experts
+
+## Development
+
+- [Local Development](dev/local-development.md) — Dev workflow with `--plugin-dir`
+- [Evaluations](dev/evaluations.md) — Skill triggering tests
