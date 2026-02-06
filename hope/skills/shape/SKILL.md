@@ -17,7 +17,7 @@ Bridge between intent clarification and implementation. Transforms WHAT into HOW
 
 **If spec_score < 5:** Return to `/hope:intent` for clarification first.
 
-**Output:** Always writes `.loop/shape/SHAPE.md` and returns. Never invokes EnterPlanMode. Caller decides next action (loop:start runs approval gate, standalone user reviews directly).
+**Output:** Returns shape choice, approach, risks, and criteria in conversation. Never writes files. Caller decides next action.
 
 ---
 
@@ -51,9 +51,9 @@ Count which column each aspect lands in:
 - **Override:** Any Colleague in Risk or Interdependency → at minimum Tool-Review
 - **Default when uncertain:** Tool-Review
 
-### 5. Emit SHAPE.md
+### 5. Output Shape
 
-Write `.loop/shape/SHAPE.md` with: selected shape, relevant aspects with evidence, criteria (boolean/verifiable), mustNot constraints.
+Present in conversation: selected shape, relevant aspects with evidence, criteria (boolean/verifiable), mustNot constraints.
 
 ---
 
@@ -127,16 +127,16 @@ digraph shape_decision {
 
 1. Invoke `/hope:soul` to ground decisions in user values
 2. Run this skill's protocol (steps 1-5)
-3. Write `.loop/shape/SHAPE.md`
+3. Output shape choice + approach + risks in conversation
 4. Invoke `/hope:verify` to lock criteria: `Skill(skill="hope:verify", args="lock criteria from shape")`
 
-SHAPE.md feeds into `/loop:start`:
+Shape output feeds into `/loop:start`:
 
-| SHAPE Field | Loop Usage |
+| Shape Output | Loop Usage |
 |-------------|------------|
-| `criteria:` | `criteriaStatus` tracking |
-| `mustNot:` | Circuit breaker triggers |
-| `shape:` | Interaction mode for waves |
+| `criteria` | Verification tracking |
+| `mustNot` | Circuit breaker triggers |
+| `shape` | Interaction mode for waves |
 
 ---
 
