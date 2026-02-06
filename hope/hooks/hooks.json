@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Return the current session strategy [SESSION] marker and any active criteria/mustNot constraints as additionalContext for the subagent."
+            "prompt": "Return as additionalContext: (1) [SESSION] marker, (2) active criteria/mustNot constraints, (3) compaction guidance — PRESERVE: work item status, criteria, verification results; DISCARD (summarize, don't keep verbatim): long tool output, repeated file reads, install/build logs."
           }
         ]
       }

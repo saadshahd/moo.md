@@ -7,6 +7,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+- feat(hope): Compaction guidance in ensure-soul.sh — PRESERVE/DISCARD lists for context compression (inspired by AutoForge's PreCompact hook pattern)
+- feat(hope): Enriched SubagentStart hook with compaction guidance for loop wave subagents
+
 ## [hope@3.0.0] - 2026-02-06
 
 ### BREAKING CHANGES
