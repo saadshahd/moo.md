@@ -122,13 +122,25 @@ Use DOT for non-linear decision flows. Claude follows DOT structure more reliabl
 
 **Strip visual attributes:** `fillcolor`, `style`, `shape` — LLMs can't render these.
 
-## Core Philosophy (Preserve These)
+## Philosophy (Enforce These)
 
-- **Confidence gates:** <70% research, 70-85% ship+monitor, ≥85% ship
-- **Quality footer:** Confidence, Alternative, Reversible, Key Assumption, Complexity
-- **Session types:** Build/Debug/Plan/Reflect with engagement levels (Autonomous/Collaborative/Guided)
-- **Stateless:** No persistent state files. Conversation history is source of truth.
-- **Execution model:** Human-driven exploration → machine-verified execution
+Core beliefs — every change to this project must align:
+
+1. **Thinking = prevention** — Better thinking prevents mistakes. They're inseparable. Don't add safety nets separate from the thinking process.
+2. **Encode what humans forget** — If it matters under pressure, encode it in skills/hooks. Not docs. Not willpower.
+3. **Perspectives prevent blindness** — Solo thinking has systematic blind spots. Seek multiple expert lenses.
+4. **Adapt to context** — Never force one workflow. Respect session type and engagement level.
+
+### Philosophy Audit (Before Committing Changes)
+
+- [ ] Does this add complexity without justification? → Simplicity wins conflicts
+- [ ] Does this introduce persistent state? → Conversation is the only state
+- [ ] Are exit criteria machine-verifiable? → No ambiguous "works correctly"
+- [ ] Could an existing skill/framework handle this? → Proven over invented
+- [ ] Does this encode something humans forget, or duplicate what they'd remember? → Automatic over remembered
+- [ ] Was this investigated before implemented? → Never combine find + fix
+
+See `PHILOSOPHY.md` for full beliefs, principles (stance + why), and constraints.
 
 ## Compact Instructions
 
