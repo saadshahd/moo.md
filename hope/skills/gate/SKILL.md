@@ -41,31 +41,31 @@ Run before substantial work begins. Blocks execution if missing.
 
 ## Post-Work Gate (Before Claiming Done)
 
-### Expert Review Check (Loop Integration)
+### Inline Verification
 
-When invoked after loop execution, check expert review status:
-
-```
-□ Thorough expert review passed?
-  → Check .loop/workflow-state.json for reviews.thorough.passed
-  → Must be true to proceed
-  → If false: "⚠️ Expert review has {N} unresolved blockers. Resolve before gate."
-```
-
-If `reviews.thorough.passed` is false → resolve findings to ensure quality before proceeding.
-
-### Verify Integration
-
-Before running workflow-specific checks, ensure verify passed:
+Run hope:verify in thorough mode directly — do not rely on cached state:
 
 ```
 □ hope:verify thorough tier passed?
-  → Check .loop/verify-config.json for results
+  → Invoke: Skill(skill="hope:verify", args="thorough")
   → All criteria must show PASS
   → Evidence must be captured
 ```
 
-If verify not run or failed → address findings before completion to ensure quality.
+If verify not run or failed → address findings before completion.
+
+### Inline Expert Review
+
+Invoke counsel:panel for final approval — do not read cached review state:
+
+```
+□ counsel:panel review passed?
+  → Invoke: Skill(skill="counsel:panel", args="thorough review for: {spec}")
+  → All BLOCKERs must be resolved
+  → WARNINGs acknowledged
+```
+
+If review has unresolved blockers → resolve findings before completion.
 
 ---
 
@@ -100,12 +100,12 @@ If verify not run or failed → address findings before completion to ensure qua
 
 | Type | Description | Sufficient for SHIP? |
 |------|-------------|---------------------|
-| `execution output` | Ran command, showed result | ✓ Yes |
-| `observation` | Screenshot, debugger session | ✓ Yes |
-| `measurement` | Metrics, benchmark data | ✓ Yes |
-| `reasoned inference` | Logic-based conclusion | ⚠️ Flag, don't block |
-| `code review` | Inspection only | ⚠️ Weak |
-| `assumption` | Not verified | ⚠️ Flag with warning |
+| `execution output` | Ran command, showed result | Yes |
+| `observation` | Screenshot, debugger session | Yes |
+| `measurement` | Metrics, benchmark data | Yes |
+| `reasoned inference` | Logic-based conclusion | Flag, don't block |
+| `code review` | Inspection only | Weak |
+| `assumption` | Not verified | Flag with warning |
 
 Default: Require `execution output`, `observation`, or `measurement` before completion claims.
 
@@ -118,17 +118,6 @@ Default: Require `execution output`, `observation`, or `measurement` before comp
 | Thorough | Before gate | Full evidence report |
 
 Gate requires **thorough** tier results before allowing completion claim.
-
-### Expert Review Requirement (Loop Integration)
-
-When loop is active, gate also checks:
-
-| Check | Source | Requirement |
-|-------|--------|-------------|
-| Thorough review | workflow-state.json | `reviews.thorough.passed = true` |
-| Blockers resolved | workflow-state.json | `reviews.thorough.blockers_remaining = 0` |
-
-If either fails → resolve review findings before completion to ensure quality.
 
 ### Boundary
 
