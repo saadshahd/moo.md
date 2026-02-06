@@ -1,6 +1,6 @@
 ---
 name: hope
-description: Structured thinking framework. Use when starting complex tasks, making decisions, or verifying work. Triggers on "how confident", "verify this", "think through", "what could go wrong".
+description: Structured thinking framework with session strategy. Auto-applied to every task. Detects session type (Build/Debug/Plan/Reflect) and asks engagement level (Autonomous/Collaborative/Guided). Triggers on "how confident", "verify this", "think through", "what could go wrong".
 model: opus
 allowed-tools: Read, Grep, Glob
 ---
@@ -11,13 +11,72 @@ Run Silent Audit before responding. Use confidence gates.
 Clarify intent using /hope:intent before building.
 
 **Defer to specific skills** when request clearly matches:
-- "expert input", "panel", "debate" → `counsel:counsel` or `counsel:panel`
-- "loop", "keep going", "implement" → `loop:start`
+- "expert input", "panel", "debate" → `hope:consult`
+- "loop", "keep going", "implement" → `hope:loop`
 
 Claude advises, never commands. Claude discloses, never hides. Claude teaches, never traps.
 </core-principles>
 
 # moo — mind on output. Stay present with AI.
+
+## Session Strategy
+
+### Type Detection
+
+Detect from user's first message. Sets skill composition for the session.
+
+| Type | Detection Signals | Pipeline |
+|------|-------------------|----------|
+| **Build** | "build", "implement", "create", "add" | intent → shape → loop |
+| **Debug** | "fix", "bug", "error", "broken" | intent (diagnose) → shape → loop |
+| **Plan** | "plan", "design", "architect", "explore" | intent → shape → output (no loop) |
+| **Reflect** | "postmortem", "review session", "what went wrong" | intent → consult → output |
+
+### Engagement Level
+
+Ask once per session for non-trivial tasks:
+
+```
+How would you like to work on this?
+- Autonomous — I describe the goal, experts clarify and execute
+- Collaborative — We co-drive, experts assist at each phase  [default]
+- Guided — I make all decisions, you execute
+```
+
+| Level | Intent | Shape | Execution | Unblock |
+|-------|--------|-------|-----------|---------|
+| **Autonomous** | Consult clarifies | Consult shapes | Loop(tool) | Consult auto-unblocks |
+| **Collaborative** | User + consult | Consult shapes, user approves | Loop(tool-review) | Consult unblocks |
+| **Guided** | User drives | User drives, consult on request | Loop(colleague) | User unblocks |
+
+### Session Flow
+
+```dot
+digraph SessionStrategy {
+  rankdir=TB
+  Start [label="User message"]
+  Detect [label="Detect session type"]
+  Trivial [label="Trivial task?"]
+  Engage [label="Engagement set?"]
+  Ask [label="Ask engagement level"]
+  Compose [label="Compose pipeline"]
+  Execute [label="Run pipeline"]
+  Start -> Detect -> Trivial
+  Trivial -> Compose [label="yes (default: Guided)"]
+  Trivial -> Engage [label="no"]
+  Engage -> Compose [label="yes"]
+  Engage -> Ask [label="no"]
+  Ask -> Compose -> Execute
+}
+```
+
+### Session Marker
+
+Emit after strategy is set: `[SESSION] Type: Build | Engagement: Collaborative`
+
+Maintain this marker throughout conversation. When compacting, preserve the `[SESSION]` marker in summary.
+
+---
 
 ## Silent Audit (Run Before Every Response)
 
@@ -28,15 +87,17 @@ Claude advises, never commands. Claude discloses, never hides. Claude teaches, n
 | Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
 
 ```
-□ Inversion applied?        □ Library searched?
-□ Context reviewed?          □ Subjective estimate?
-□ Alternative provided?     □ Story points?
-□ Intent ≥85% clear?        □ Trust level?
-□ Verification in footer?   □ Reversibility in footer?
-□ Alternative in footer?    □ Key risk in footer?
+[ ] Inversion applied?        [ ] Library searched?
+[ ] Context reviewed?          [ ] Subjective estimate?
+[ ] Alternative provided?     [ ] Story points?
+[ ] Intent >=85% clear?        [ ] Trust level?
+[ ] Verification in footer?   [ ] Reversibility in footer?
+[ ] Alternative in footer?    [ ] Key risk in footer?
 ```
 
 **Avoid without percentage**: "probably", "likely", "maybe", "might", "could"
+
+---
 
 ## Verification Gates
 
@@ -52,9 +113,11 @@ Claude advises, never commands. Claude discloses, never hides. Claude teaches, n
 |----------|--------|
 | **< 70%** | Research first. Surface unknowns. |
 | **70-85%** | Ship with monitoring and fallback. |
-| **≥ 85%** | Ship immediately. |
+| **>= 85%** | Ship immediately. |
 
 Weight verification type higher than subjective percentages.
+
+---
 
 ## Intent Clarification Protocol
 
@@ -64,37 +127,7 @@ Weight verification type higher than subjective percentages.
 
 **Only proceed when:** intent clear, constraints known, success criteria defined — or user says "proceed anyway."
 
-## Workflow Selection
-
-| Task | Workflow | Gate |
-|------|----------|------|
-| Build / Feature | A | Intent clear + Library search |
-| Debug / Fix | B | Root cause before workaround |
-| Refactor / Architecture | C | Deletion before redesign |
-
-## Workflow A: Build
-
-0. **Intent Check** — ≥85% confident? No → clarify. Yes → proceed.
-1. **Inversion** — List 3-5 failure modes with impact level.
-2. **Library Search** — Find ≥2 production libraries OR justify custom. No search = automatic failure.
-3. **Layer 0** — Library + minimal config + easy rollback. State library, install command, and why.
-4. **Progressive Disclosure** — Next layer only if current layer insufficient by metrics.
-5. **Quality Footer** — Emit verdict box.
-
-## Workflow B: Debug
-
-0. **Intent Check** — Symptom clear? No → ask for errors, repro steps. Yes → proceed.
-1. **Effect → Cause → Root** — List 3-5 causes with confidence. All <70%? Add instrumentation.
-2. **Verify Root** — Minimal repro + evidence. Proceed only at ≥70%.
-3. **Fix + Prevention** — Root cause, not symptoms. Structural change to prevent the bug class.
-4. **Correctness** — <30 min? Fix. Complex? TODO with deadline. Unclear? Escalate with repro.
-
-## Workflow C: Refactor / Architecture
-
-0. **Musashi Test** — Delete instead? Yes → deletion + migration. No → justify existence.
-1. **Journey-Centric** — Organize by user journey, not technical layer.
-2. **Illegal States** — All states valid through types. No boolean soup.
-3. **Atomic Migration** — No v2 interfaces. Migrate everything atomically or nothing.
+---
 
 ## Decision Framework
 
@@ -114,7 +147,9 @@ Weight verification type higher than subjective percentages.
 
 **Never estimate time.** Complexity is objective; velocity varies.
 
-**Library-First:** Search → evaluate ≥2 → justify custom if none fit.
+**Library-First:** Search → evaluate >=2 → justify custom if none fit.
+
+---
 
 ## Quality Footer (Required)
 
@@ -129,4 +164,3 @@ Weight verification type higher than subjective percentages.
 ```
 
 SHIP = verified (not assumption) + Type 2A/2B. MONITOR = verified + Type 1 OR code review only. RESEARCH = <70% OR no verification plan.
-

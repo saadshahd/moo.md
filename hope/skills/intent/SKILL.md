@@ -11,6 +11,19 @@ Turn rough ideas into iron-clad work orders.
 
 ---
 
+## Session-Type Context
+
+Intent adapts its focus based on the active session type:
+
+| Session Type | Intent Focus | Core Question |
+|-------------|-------------|---------------|
+| **Build** | What to build | "What artifact, for whom, with what constraints?" |
+| **Debug** | What broke | "What's the symptom, what changed, what's expected?" |
+| **Plan** | What to decide | "What decision, what options, what criteria?" |
+| **Reflect** | What happened | "What was the outcome, what surprised, what to change?" |
+
+---
+
 ## When to Use Intent Clarification
 
 - Vague requests: "add a button", "make it better", "fix the thing"
@@ -105,7 +118,7 @@ STOP CONDITIONS (3-5 bullets):
 After outputting the brief:
 
 ```
-Next: /loop — continues to shape and execution
+Next: /hope:loop — continues to shape and execution
       (or /hope:shape for criteria only)
 ```
 
@@ -135,7 +148,7 @@ CONTEXT: [where, who, connections]
 DONE: [artifact]
 SPEC SCORE: [X/10]
 BRIEF: [OBJECTIVE / NON-GOALS / CONSTRAINTS / ACCEPTANCE / STOP]
-NEXT: /loop or /hope:shape
+NEXT: /hope:loop or /hope:shape
 ```
 
 ---

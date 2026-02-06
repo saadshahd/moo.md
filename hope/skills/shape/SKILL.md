@@ -2,7 +2,7 @@
 name: shape
 description: Bridge WHAT (intent) to HOW (implementation). Use when spec is clear but approach is not. Triggers on "shape this", "how should I build", "implementation approach".
 model: opus
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, Skill
 ---
 
 # Shape
@@ -78,41 +78,34 @@ Score each aspect for the task. The column where most aspects land determines th
 
 ## Expert Consultation
 
-For each relevant implementation dimension, consult the anchor expert:
+Invoke hope:consult for expert guidance on implementation approach:
 
-| Dimension | Expert | Core Question |
-|-----------|--------|---------------|
-| Data | Rich Hickey | "Is this genuinely simple, or just familiar?" |
-| API | Martin Fowler | "Can I change this later without a rewrite?" |
-| UI | Don Norman | "What does this afford?" |
-| Auth | OWASP | "What's the blast radius if this fails?" |
-| Performance | Brendan Gregg | "Where is the actual bottleneck?" |
-| Error | Michael Nygard | "What happens when this fails?" |
-| Testing | Kent Beck | "Am I testing behavior or implementation?" |
-| Migration | Sam Newman | "Can we do this incrementally?" |
-| Integration | Gregor Hohpe | "What if delivered twice?" |
-| Deployment | Jez Humble | "Can we roll this back in minutes?" |
+```
+Skill(skill="hope:consult", args="review approach for: {goal}")
+```
 
-**Conflict hierarchy:** Hickey (simplicity) → Fowler (pragmatism) → option with fewer dependencies.
+For tradeoff-heavy decisions, invoke panel mode:
 
-Document which experts disagreed and why one was chosen.
+```
+Skill(skill="hope:consult", args="panel: tradeoffs for: {goal}")
+```
+
+Consult handles expert selection, confidence scoring, and conflict resolution. Shape uses the output to inform aspect scoring and approach selection.
 
 ---
 
 ## Decision Logic
 
+```dot
 digraph shape_decision {
   rankdir=TB
-  node [shape=box style="rounded,filled" fillcolor="#f5f5f5"]
-
-  start [label="Spec ready\n(score >= 5)" fillcolor="#e6f3ff"]
-  score [label="Score 8 aspects\nagainst 3 shapes" fillcolor="#ffe6cc"]
-  decide [label="Majority column?" shape=diamond fillcolor="#fff4cc"]
-  override [label="Risk or Interdep\n= Colleague?" shape=diamond fillcolor="#fff4cc"]
-  colleague [label="Colleague shape" fillcolor="#ccffcc"]
-  tool_review [label="Tool-Review shape" fillcolor="#ccffcc"]
-  tool [label="Tool shape" fillcolor="#ccffcc"]
-
+  start [label="Spec ready\n(score >= 5)"]
+  score [label="Score 8 aspects\nagainst 3 shapes"]
+  decide [label="Majority column?"]
+  override [label="Risk or Interdep\n= Colleague?"]
+  colleague [label="Colleague shape"]
+  tool_review [label="Tool-Review shape"]
+  tool [label="Tool shape"]
   start -> score -> decide
   decide -> colleague [label="Colleague"]
   decide -> tool_review [label="Mixed/Tool-Review"]
@@ -120,6 +113,7 @@ digraph shape_decision {
   override -> tool_review [label="Yes" style=dashed]
   override -> tool [label="No"]
 }
+```
 
 ---
 
@@ -128,9 +122,9 @@ digraph shape_decision {
 1. Invoke `/hope:soul` to ground decisions in user values
 2. Run this skill's protocol (steps 1-5)
 3. Output shape choice + approach + risks in conversation
-4. Invoke `/hope:verify` to lock criteria: `Skill(skill="hope:verify", args="lock criteria from shape")`
+4. Invoke hope:consult for expert review of approach
 
-Shape output feeds into `/loop:start`:
+Shape output feeds into `/hope:loop`:
 
 | Shape Output | Loop Usage |
 |-------------|------------|
@@ -145,5 +139,5 @@ Shape output feeds into `/loop:start`:
 Shape surfaces considerations; user owns architecture.
 
 - Expert recommendations are patterns, not prescriptions
-- User resolves conflicts — hierarchy is a tiebreaker, not authority
+- User resolves conflicts
 - Shape informs design decisions, never makes them
