@@ -2,14 +2,14 @@
 description: List all blocked profiles.
 ---
 
-# /counsel:blocked
+# /hope:blocked
 
-Show your counsel blocklist.
+Show your expert blocklist.
 
 ## Usage
 
 ```
-/counsel:blocked
+/hope:blocked
 ```
 
 ## Output
@@ -23,7 +23,7 @@ If blocklist exists:
 |------|--------|------------|
 | pocock | Shallow recommendations | 2026-01-03 |
 
-Use /counsel:unblock [name] to remove entries.
+Use /hope:unblock [name] to remove entries.
 ```
 
 If no blocklist or empty:
@@ -31,7 +31,7 @@ If no blocklist or empty:
 ```
 No blocked profiles.
 
-Use /counsel:block [name] to block a profile.
+Use /hope:block [name] to block a profile.
 ```
 
 ## Process

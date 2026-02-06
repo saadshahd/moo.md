@@ -1,15 +1,15 @@
 ---
-description: Remove a profile from counsel blocklist.
+description: Remove a profile from expert blocklist.
 ---
 
-# /counsel:unblock
+# /hope:unblock
 
 Remove a profile from your blocklist.
 
 ## Usage
 
 ```
-/counsel:unblock pocock
+/hope:unblock pocock
 ```
 
 ## Inputs
@@ -26,17 +26,13 @@ Remove a profile from your blocklist.
 ## Output
 
 ```
-✓ pocock unblocked.
-
-This profile is now available for counsel simulations.
+[name] unblocked. This profile is now available for expert simulations.
 ```
 
 If not found:
 
 ```
-⚠️ pocock is not on your blocklist.
-
-Use /counsel:blocked to view current blocklist.
+[name] is not on your blocklist. Use /hope:blocked to view current blocklist.
 ```
 
 ## Constraints
