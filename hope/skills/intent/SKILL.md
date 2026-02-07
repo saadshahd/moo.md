@@ -75,9 +75,11 @@ If any field blank after 2 asks, proceed with [ASSUMPTION] labels.
 
 ### Step 2: Clarify
 
-Ask 3-5 focused questions per round until ≥95% confidence you can ship the correct result.
-
-Categories: Purpose, Audience, Must-include, Success criteria, Format, Tech stack, Edge cases, Risk tolerances.
+Each clarify round must satisfy ALL:
+1. Close the 3 highest-uncertainty dimensions from {Purpose, Audience, Must-include, Success criteria, Format, Tech stack, Edge cases, Risk tolerances} — skip resolved
+2. Each question ≤15 words — if longer, you haven't found the real question
+3. At least one question must be adversarial: "what should this NOT do" or "what would make this wrong"
+4. Stop at ≥95% confidence, not when you run out of categories
 
 Per round, emit:
 ```
@@ -87,12 +89,7 @@ Resolved: [locked dimensions] | Open: [remaining]
 ```
 Vague quantities ("some", "several", "key [noun]"): add MCQ converting to numeric range.
 
-Use MCQ format for speed (user responds "1A, 2B"):
-
-```
-1. Scope? A. Minimal viable  B. Full-featured  C. Proof of concept
-2. Constraints? A. Existing patterns only  B. New deps OK  C. Perf-critical
-```
+Use MCQ format for speed (user responds "1A, 2B").
 
 ### Step 3: Score the Spec
 
@@ -129,15 +126,11 @@ When stuck in vague territory:
 
 ### Step 6: Emit Iron-Clad Brief
 
-Score ≥8 required. Produce:
-
-```
-OBJECTIVE:
-NON-GOALS (3-5 bullets):
-CONSTRAINTS:
-ACCEPTANCE CRITERIA (7-12 bullets ≤20w each, 2+ "must NOT" — protect verifiable conditions, sacrifice rationale):
-STOP CONDITIONS (3-5 bullets):
-```
+Score ≥8 required. Produce the brief satisfying ALL:
+1. OBJECTIVE (1 sentence) + NON-GOALS (3-5) + CONSTRAINTS + ACCEPTANCE (7-12 bullets ≤20w, 2+ "must NOT") + STOP (3-5)
+2. Every ACCEPTANCE bullet must be testable by a stranger with no context — if it requires interpretation, rewrite until boolean
+3. NON-GOALS must name things a reasonable developer WOULD attempt — obvious exclusions are noise
+4. STOP CONDITIONS must name observable failure states, not process labels — "API returns 5xx on auth endpoint" not "tests fail"
 
 SELF-AUDIT (after brief, revise before presenting if any FAIL) →
   OBJECTIVE present           → [pass/fail] → [first 5 words]

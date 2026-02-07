@@ -98,13 +98,11 @@ Would drop to {lower shape} if {which input change would cross the threshold}
 Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot]\n\n[work item]", subagent_type="general-purpose")`
 Review: expert panel checks scope compliance after each wave.
 
-```
-[WAVE {N}] {ready_count} items | Shape: {shape}
-- [ ] {item}: pending | Verify: {command}
-- [x] {item}: {done ≤10w} | Verify: {PASS/FAIL}
-[WAVE {N} COMPLETE] {completed}/{total} items
-```
-No progress → expert diagnosis to auto-unblock. Continue, pivot, or escalate.
+Wave report must satisfy ALL:
+1. Format: `[WAVE {N}]` header, checklist `{done ≤10w} | Verify: {PASS/FAIL}`, `[WAVE {N} COMPLETE] {completed}/{total}`
+2. Each completed item: cite the verification command and its exit state — "ran X, got Y" not just "verified"
+3. Flag any item where verification was weaker than execution output — these carry into the next wave
+4. No progress → expert diagnosis to auto-unblock — continue, pivot, or escalate
 
 ---
 

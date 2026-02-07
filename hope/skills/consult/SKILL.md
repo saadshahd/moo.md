@@ -89,7 +89,11 @@ Load ONLY the matched profile from `profiles/`. Curated profile → base 6/10. N
 
 ### Step 3: Generate Response
 
-Reason from documented positions to user's context. Filter through would-never-say. Match voice density, not persona. Display confidence.
+Generate response satisfying ALL:
+1. Reason from documented positions to user's context — filter through would-never-say, match voice density not persona
+2. Name the one thing this expert would push back on in the user's current approach — agreement without friction is simulation failure
+3. State where this expert's documented work stops covering the question — the boundary, not just the confidence score
+4. Land on a concrete recommendation the user can act on today
 
 ---
 
@@ -104,17 +108,19 @@ Reason from documented positions to user's context. Filter through would-never-s
 *Simulated perspective based on documented work, not the expert's actual opinion.*
 ```
 SELF-AUDIT (silent — revise if FAIL) →
-  Confidence ≤9               → [pass/fail] → [cite X/10]
-  Topic within domain boundary → [pass/fail] → [cite matching domain]
+  Confidence ≤9 + topic within domain boundary → [pass/fail] → [cite X/10 + domain]
 
 ### Panel Mode
 
 Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="panel: ..."`. When `POSITION:` / `TRIED:` present, experts respond TO the user's stance — challenge, validate, or extend it.
 
-1. **Select experts** — Pick 3-5 from profiles whose domains are relevant. Prioritize productive disagreement.
-2. **Debate** — Each reasons from documented positions to the specific context. Evidence required. Anonymized descriptors.
-3. **Surface tensions** — Map disagreements to 2-3 concrete tradeoffs.
-4. **Synthesize** — Consensus + key tradeoff + recommendation + dissent.
+1. **Select** 3-5 relevant experts — prioritize productive disagreement. Anonymized descriptors.
+2. **Debate** — each reasons from documented positions to context. Evidence required.
+3. **Surface + Synthesize** satisfying ALL:
+   1. Consensus must be strong enough that dissent genuinely opposes it — if both could be true, consensus is too weak
+   2. Dissent must name a specific scenario where the recommendation fails — not a preference, a failure mode
+   3. Test must be runnable this session with observable outcome — "run X, if Y then recommendation holds, if Z then dissent wins"
+   4. Synthesis must read as one argument with internal tension, not five independent fields
 
 ```
 ## Panel: [question]
@@ -176,17 +182,12 @@ If fails: [next action or "escalate"] | Attempt: [N]/3
 
 ---
 
-## Output Anonymization
-
-Never use expert names. Descriptor: `a/an [philosophy/approach] [role]`
-
----
-
 ## Guardrails
 
 **Refuse when:** confidence < 3/10, no documented public positions, or topic requires personal opinions.
 
 **Never:**
+- Use expert names — descriptor: `a/an [philosophy/approach] [role]`
 - Claim certainty about what expert "would" say (use "would likely")
 - Invent positions not in documented work
 - Simulate without stating confidence

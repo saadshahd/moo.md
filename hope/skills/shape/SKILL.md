@@ -75,16 +75,11 @@ If feasibility is `none`: skip this step.
 
 ### 6. Output Shape
 
-Present shape output:
-
-| Aspect | Column | Because (≤12w) | Would change if (≤15w) | Feasible: [axis] (≤10w) |
-|--------|--------|----------------|------------------------|--------------------------|
-| [aspect] | [Col/TR/Tool] | [observable fact] | [falsifiable condition, or assumption] | [why it survives, omit if none] |
-
-Tally: Colleague: [N] | Tool-Review: [N] | Tool: [N]
-Criteria: [boolean/verifiable condition], ...
-MustNot: [constraint], ...
-Challenge: user counter-evidence → re-score that aspect.
+Present shape output satisfying ALL:
+1. Table: Aspect | Column | Because (≤12w) | Would change if (≤15w) | Feasible: [axis] (≤10w, omit if none)
+2. Because must cite a specific observable — file names, line counts, dependency chains, API shapes — not adjectives
+3. Would-change-if must be a condition someone could CHECK tomorrow — "if auth moves to middleware (check router.ts)" not "if things change"
+4. Tally columns, select majority, emit criteria[] (boolean) + mustNot[] (≥2) — user counter-evidence re-scores that aspect
 
 SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
   ≥5 aspects scored         → [pass/fail] → [count]

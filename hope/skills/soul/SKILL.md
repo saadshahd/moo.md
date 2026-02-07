@@ -159,10 +159,12 @@ Verification type IS the confidence. Observable > inspected > assumed.
 │ Feasible: [axis] ([bound]) — [why it fits] (omit if none) │
 ├────────────────────────────────────────┤
 │ ↳ Alt: [alternative approach] (≤12 words)          │
-│   e.g. "AST parser via typescript-estree — handles nested templates natively"
 │ ↳ Risk: [key assumption or risk] (≤15 words)       │
-│   e.g. "Unvalidated — compound index may degrade past 1M rows on new query pattern"
 ╰────────────────────────────────────────╯
 ```
 
-SHIP = verified (not assumption) + Type 2A/2B. MONITOR = verified + Type 1 OR code review only. RESEARCH = assumption-only OR no verification plan.
+Determine verdict satisfying ALL:
+1. Match evidence: SHIP = verified (not assumption) + Type 2A/2B; MONITOR = verified + Type 1 OR code review only; RESEARCH = assumption-only OR no verification plan
+2. Name the single scenario that would flip verdict one level worse — if you cannot articulate one, downgrade
+3. Alt must be a real alternative implementable tomorrow; Risk must be a condition that would block shipping if true
+4. Land on one verdict — commit, don't hedge
