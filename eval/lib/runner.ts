@@ -97,11 +97,15 @@ export async function runTest(
     layerResults.push(layerD);
   }
 
+  const layerDFailed =
+    layerD && !config.skipLayerD && layerD.verdict === "FAIL";
+
   return {
     name: testCase.name,
     plugin: testCase.plugin,
-    passed: true,
+    passed: !layerDFailed,
     layerResults,
+    failedAt: layerDFailed ? "D" : undefined,
     advisory: layerD || undefined,
     flakyAttempts: showFlakyAttempts ? attempts : undefined,
   };

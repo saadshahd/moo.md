@@ -1,0 +1,14 @@
+name: session-reflect-pipeline
+description: Soul detects Reflect session type and routes to consult pipeline
+plugin: hope
+skill: hope:soul
+acceptableSkills:
+  - soul
+  - hope:soul
+  - consult
+  - hope:consult
+prompt: "Let's do a postmortem on what went wrong with the deployment"
+expectedBehaviors:
+  - "Session type detected as Reflect"
+  - "Pipeline follows intent then consult then output"
+  - "Seeks multiple perspectives on what happened"

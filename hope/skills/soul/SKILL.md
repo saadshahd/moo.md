@@ -1,6 +1,6 @@
 ---
 name: hope
-description: Structured thinking framework with session strategy. Auto-applied to every task. Detects session type (Build/Debug/Plan/Reflect) and asks engagement level (Autonomous/Collaborative/Guided). Triggers on "how confident", "verify this", "think through", "what could go wrong".
+description: Use when starting any task, thinking through confidence, verifying work, or asking "what could go wrong". Triggers on every non-trivial request, "how confident", "verify this", "think through".
 model: opus
 allowed-tools: Read, Grep, Glob
 ---

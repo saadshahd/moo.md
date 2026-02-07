@@ -18,6 +18,8 @@ Simulate expert perspectives for code guidance, style, debates, and unblocking.
 - "review", "audit", "panel", "guidance", "debate", "tradeoffs"
 - "idiomatic", "best practice", "clean code"
 - "stuck on" (auto-invoked by hope:loop when execution stalls)
+- "tradeoff", "evaluate approach", "expert input on" (skill-to-skill bridge)
+- "review approach", "review implementation" (from shape scoring)
 - Domain keywords matching curated profiles below
 
 ---

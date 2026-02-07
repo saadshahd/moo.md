@@ -41,7 +41,11 @@ Three collaboration modes determine how user and agent interact during implement
 
 For each aspect in the discovery table below, determine which shape column the task falls into.
 
-### 4. Select Shape
+### 4. Expert Consultation
+
+When aspect scores are split or competing, seek expert input on tradeoffs. For high-risk aspects, request panel debate. Re-score at most once if expert input changes evaluations. If still competing after re-score, default to Tool-Review. Unanimous scores skip consultation.
+
+### 5. Select Shape
 
 Count which column each aspect lands in:
 
@@ -51,7 +55,7 @@ Count which column each aspect lands in:
 - **Override:** Any Colleague in Risk or Interdependency → at minimum Tool-Review
 - **Default when uncertain:** Tool-Review
 
-### 5. Output Shape
+### 6. Output Shape
 
 Present in conversation: selected shape, relevant aspects with evidence, criteria (boolean/verifiable), mustNot constraints.
 
@@ -76,14 +80,6 @@ Score each aspect for the task. The column where most aspects land determines th
 
 ---
 
-## Expert Consultation
-
-After scoring aspects, seek expert guidance on the implementation approach. For tradeoff-heavy decisions, request a panel debate on the key tensions.
-
-Expert input informs aspect scoring and approach selection — shape decides, experts advise.
-
----
-
 ## Decision Logic
 
 ```dot
@@ -91,12 +87,16 @@ digraph shape_decision {
   rankdir=TB
   start [label="Spec ready\n(score >= 5)"]
   score [label="Score 8 aspects\nagainst 3 shapes"]
+  consult [label="Expert input\non tradeoffs"]
   decide [label="Majority column?"]
   override [label="Risk or Interdep\n= Colleague?"]
   colleague [label="Colleague shape"]
   tool_review [label="Tool-Review shape"]
   tool [label="Tool shape"]
-  start -> score -> decide
+  start -> score
+  score -> consult [label="split/competing"]
+  score -> decide [label="unanimous"]
+  consult -> decide
   decide -> colleague [label="Colleague"]
   decide -> tool_review [label="Mixed/Tool-Review"]
   decide -> override [label="Tool"]
@@ -109,12 +109,11 @@ digraph shape_decision {
 
 ## Integration
 
-1. Invoke `/hope:soul` to ground decisions in user values
-2. Run this skill's protocol (steps 1-5)
+1. Ground decisions in session values
+2. Run this skill's protocol (steps 1-6)
 3. Output shape choice + approach + risks in conversation
-4. Invoke hope:consult for expert review of approach
 
-Shape output feeds into `/hope:loop`:
+Shape output feeds into the execution loop:
 
 | Shape Output | Loop Usage |
 |-------------|------------|

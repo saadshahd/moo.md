@@ -71,6 +71,12 @@ const formatTestResult = (result: TestResult): string[] => {
           }
         }
       }
+      if (layer.layer === "D" && !layer.passed) {
+        lines.push(`\n  Layer D (quality): FAIL`);
+        lines.push(
+          `    ${(layer as import("./lib/types").LayerDResult).reasoning}`,
+        );
+      }
     }
   }
 

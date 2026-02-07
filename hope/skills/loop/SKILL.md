@@ -11,6 +11,15 @@ Autonomous iteration: spec scoring → shape → decompose → wave execution �
 
 ---
 
+## Pipeline Context
+
+Scan conversation for existing pipeline artifacts:
+- Intent brief (OBJECTIVE/NON-GOALS/CONSTRAINTS/ACCEPTANCE) → use as spec input
+- Shape output (criteria[]/mustNot[]/shape) → skip Step 2, proceed to decomposition
+- Neither → proceed normally from Step 1
+
+---
+
 ## Step 1: Spec Scoring
 
 Score on 5 dimensions (0-2 each, max 10):
@@ -159,22 +168,11 @@ After verification passes, present the full journey for user review:
 
 ---
 
-## Cancel
+## Cancel & Status
 
-Triggers: "cancel loop", "stop loop", "abort", "halt"
+**Cancel** ("cancel loop", "stop", "abort"): Acknowledge, report completed/remaining. Current iteration completes before cancel.
 
-1. Acknowledge cancel
-2. Report completed work items
-3. List remaining items
-4. Current iteration completes before cancel takes effect
-
----
-
-## Status
-
-Triggers: "loop status", "where am I", "what's the progress"
-
-Scan conversation for `[LOOP] Starting`, `[WAVE N COMPLETE]`, `<loop-complete>`. Display progress summary.
+**Status** ("loop status", "progress"): Scan for `[LOOP] Starting`, `[WAVE N COMPLETE]`, `<loop-complete>` markers. Display progress summary.
 
 ---
 

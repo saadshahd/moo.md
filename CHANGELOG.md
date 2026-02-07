@@ -9,6 +9,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@3.2.0] - 2026-02-07
+
+### Changed
+- feat(hope): Enriched `ensure-soul.sh` hook — pipeline table, trivial-task gate, state evaluation checklist, compaction rules (1027 chars payload)
+- feat(hope): Fixed soul description trap — trigger-only description, removed process summary that caused Claude to skip SKILL.md body
+- feat(hope): Shape DOT graph now includes conditional expert consultation node — split/competing scores route to consult, unanimous scores bypass
+- feat(hope): Shape Integration section uses natural language triggers instead of hardcoded skill references
+- feat(hope): Consult skill-facing triggers added — "tradeoff", "evaluate approach", "expert input on", "review approach" patterns in When This Activates
+- feat(hope): Loop pipeline awareness — scans conversation for existing intent/shape artifacts before re-running spec/shape
+- feat(hope): Loop Cancel & Status sections compressed into single combined section
+
+### Added
+- feat(hope): 4 new pipeline trigger eval cases — `pipeline-intent-entry`, `shape-consult-bridge`, `consult-tradeoff-trigger`, `session-reflect-pipeline`
+- feat(eval): Layer D soft-blocking in `--full` mode — quality rubric FAIL verdict now blocks test passage
+
+### Removed
+- feat(hope): Removed redundant standalone Expert Consultation section from shape (covered by Protocol Step 4)
+- feat(hope): Removed hardcoded `hope:consult` and `/hope:soul` references from shape Integration
+
 ## [hope@3.1.0] - 2026-02-06
 
 ### Changed
