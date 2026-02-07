@@ -89,17 +89,13 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 | Fit score | <25 | EXPLORE → gather more context |
 | Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
 
-```
-[ ] Inversion applied?        [ ] Library searched?
-[ ] Context reviewed?          [ ] Verification basis?
-[ ] Alternative provided?     [ ] Story points?
-[ ] Intent >=85% clear?        [ ] Trust level?
-[ ] Verification in footer?   [ ] Reversibility in footer?
-[ ] Alternative in footer?    [ ] Key risk in footer?
-[ ] Feasibility applied?     [ ] Feasible alt in footer?
-```
-
-**Avoid without verification type**: "probably", "likely", "maybe", "might", "could"
+SELF-AUDIT (silent — do not emit, revise if any FAIL) →
+  Footer has Verified: type  → [pass/fail] → [cite Verified: line]
+  Footer has Unverified: gap → [pass/fail] → [cite line or "none needed"]
+  Footer has Alt:            → [pass/fail] → [cite Alt: line]
+  Footer has Risk:           → [pass/fail] → [cite Risk: line]
+  Feasibility addressed      → [pass/fail] → [cite Feasible: or "axis: none"]
+  No hedging without basis   → [pass/fail] → [scan for "probably/likely/maybe"]
 
 ---
 

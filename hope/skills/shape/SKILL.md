@@ -77,13 +77,15 @@ If feasibility is `none`: skip this step.
 
 Present in conversation: selected shape, scored aspects, criteria (boolean/verifiable), mustNot constraints.
 
-Each scored aspect must include:
-- **Because:** one observable fact (≤12 words)
-  e.g. "No test runner, directory, or script in package.json"
-- **Would change if:** one falsifiable condition (≤15w) that flips the score column (must be checkable with project's current tools — if not, flag as assumption)
-- **Feasible because:** why this aspect survives the active feasibility axis (≤10 words, omit if axis is none)
+Each scored aspect: **Because** (≤12w observable) + **Would change if** (≤15w falsifiable, flag assumption if uncheckable) + **Feasible because** (≤10w, omit if none). User can challenge any Because with counter-evidence.
 
-User can challenge any "Because" — if they provide counter-evidence, re-score that aspect.
+SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
+  ≥5 aspects scored         → [pass/fail] → [count]
+  Each has Because           → [pass/fail] → [count with / total]
+  Each has Would-change-if   → [pass/fail] → [count with / total]
+  criteria[] non-empty       → [pass/fail] → [count items]
+  mustNot[] has ≥2 items     → [pass/fail] → [cite items]
+  Shape selected + justified → [pass/fail] → [cite majority column]
 
 ---
 

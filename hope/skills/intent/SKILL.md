@@ -143,16 +143,13 @@ ACCEPTANCE CRITERIA (7-12 bullets ≤20w each, 2+ "must NOT" — protect verifia
 STOP CONDITIONS (3-5 bullets):
 ```
 
-After outputting the brief:
-
-```
-Next: /hope:loop — continues to shape and execution
-      (or /hope:shape for criteria only)
-```
-
-After YES-GO: generate code/copy/analysis. Self-review before delivery.
-
-RESET at any time restarts at Step 1.
+SELF-AUDIT (after brief, revise before presenting if any FAIL) →
+  OBJECTIVE present           → [pass/fail] → [first 5 words]
+  NON-GOALS has 3-5 bullets   → [pass/fail] → [count]
+  ACCEPTANCE has 7-12 bullets  → [pass/fail] → [count]
+  ≥2 bullets say "must NOT"   → [pass/fail] → [cite them]
+  STOP CONDITIONS has 3-5     → [pass/fail] → [count]
+  All bullets ≤20 words       → [pass/fail] → [longest word count]
 
 ---
 

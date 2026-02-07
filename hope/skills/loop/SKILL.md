@@ -134,9 +134,9 @@ When all items complete, request thorough expert panel review of completed work 
 
 ## Step 6: Completion
 
-### Pre-Work Gate
-
-Verify before starting: verification method locked (not "assumption"), at least 2 "must NOT" criteria, fit score determined shape.
+### Pre-Work Gate — cite evidence or STOP:
+  Verification method locked  → [pass/fail] → [cite verification{} from shape]
+  ≥2 mustNot in mustNot[]     → [pass/fail] → [cite mustNot items]
 
 ### Tool Discovery
 
@@ -160,13 +160,12 @@ Unverified: "{criterion}" — {why it couldn't be verified by execution}
 
 Any criterion not backed by execution output must appear in an `Unverified:` line. User decides whether to ship with assertion-only criteria or test manually.
 
-### Post-Work Gate
-
-Thorough verification passed (all PASS with evidence), expert review passed (no BLOCKERs), feature executes without errors (show output), edge cases: list which were tested or state "assertion only".
-
-If gate fails: create remediation items, continue loop.
-
-Never claim "done" with only assumptions. "Tests pass" requires showing test output.
+### Post-Work Gate — all must PASS or create remediation items:
+  Thorough verification    → [pass/fail] → [cite VERIFY output]
+  Expert review clear      → [pass/fail] → [cite "no BLOCKERs" or list]
+  Feature executes         → [pass/fail] → [cite execution output]
+  Edge cases accounted     → [pass/fail] → [cite tested list or "assertion: {which}"]
+  No assumption-only done  → [pass/fail] → [cite verification type per criterion]
 
 ---
 

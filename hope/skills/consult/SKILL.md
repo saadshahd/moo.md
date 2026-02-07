@@ -100,21 +100,19 @@ Apply expert's philosophy, voice, typical concerns, and would-never-say guardrai
 
 ### Single Expert (default)
 
-One expert perspective on the query. Use anonymized descriptors.
-
 ```
 **Channeling [descriptor]** (X/10: [modifiers that applied])
-Outside [boundary of documented expertise], confidence drops to Y/10.
-[Response in expert's voice — dense: protect stance + evidence, sacrifice preamble + hedging]
+[Response in expert's voice — dense: protect stance + evidence, sacrifice preamble]
 ---
 *Simulated perspective based on documented work, not the expert's actual opinion.*
 ```
+SELF-AUDIT (silent — revise if FAIL) →
+  Confidence ≤9               → [pass/fail] → [cite X/10]
+  Topic within domain boundary → [pass/fail] → [cite matching domain]
 
 ### Panel Mode
 
-Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="panel: ..."`.
-
-**Context grounding:** When `POSITION:` and/or `TRIED:` present in request, each expert responds TO the user's stance rather than debating abstractly. The user's position frames the debate — experts challenge, validate, or extend it.
+Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="panel: ..."`. When `POSITION:` / `TRIED:` present, experts respond TO the user's stance — challenge, validate, or extend it.
 
 1. **Select experts** — Pick 3-5 from profiles whose domains are relevant. Prioritize productive disagreement.
 2. **Debate** — Each argues their position with evidence from documented work. Use anonymized descriptors.
@@ -123,18 +121,19 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 
 ```
 ## Panel: [question]
-**[Descriptor A]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement, sacrifice background]
-**[Descriptor B]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement, sacrifice background]
+**[Descriptor A]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement]
+**[Descriptor B]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement]
 ### Synthesis
-- **Consensus:** [what they agree on] (≤15 words, e.g. "Incremental migration, data layer first, integration tests gate each phase.")
-- **Key tradeoff:** [main tension] (≤20w — protect the fork, sacrifice framing)
-  - A's basis: [source type] (≤10w)
-  - B's basis: [source type] (≤10w)
-- **Recommendation:** [lean + reasoning] (≤20w — protect the lean, sacrifice caveats) — feasible on [axis]: [yes/no]
-- **Dissent:** [strongest counter] (≤15w — protect the risk, sacrifice diplomacy)
-- **Test:** [one experiment] (≤15w)
-  If right: [observable] (≤10w). If wrong: [observable] (≤10w).
+- **Consensus:** [what they agree on] (≤15 words)
+- **Key tradeoff:** [main tension] (≤20w) | A: [source] (≤10w) | B: [source] (≤10w)
+- **Recommendation:** [lean + reasoning] (≤20w) — feasible on [axis]: [yes/no]
+- **Dissent:** [strongest counter] (≤15w)
+- **Test:** [experiment] (≤15w) | If right: (≤10w) | If wrong: (≤10w)
 ```
+SELF-AUDIT → revise before presenting if any FAIL:
+  Dissent present + non-trivial → [pass/fail] → [cite Dissent line]
+  Test has if-right AND if-wrong → [pass/fail] → [cite observables]
+  All experts have confidence    → [pass/fail] → [cite X/10 scores]
 
 ### Unblock Mode
 
