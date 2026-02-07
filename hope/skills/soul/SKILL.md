@@ -142,8 +142,8 @@ Weight verification type higher than subjective percentages.
 |-----|------------|-----------------|
 | 1 | Trivial | < 10 lines, obvious |
 | 3 | Standard | Existing patterns |
-| 5 | Complex | Some unknowns, design needed |
-| 8 | Architecture | Multiple subsystems |
+| 5 | Complex | 1-3 unknowns, design needed |
+| 8 | Architecture | 2+ subsystems |
 | 13+ | Too Big | Break down further |
 
 **Never estimate time.** Complexity is objective; velocity varies.

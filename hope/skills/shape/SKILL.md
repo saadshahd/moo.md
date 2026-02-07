@@ -78,7 +78,7 @@ Score each aspect for the task. The column where most aspects land determines th
 | Verification | User must define pass/fail | User approves test plan | Self-verifiable criteria |
 | Reversibility | Hard to undo, high stakes | Moderate rollback effort | Trivial to revert |
 
-**Rule:** Only score aspects that appear in the spec or have clear dependencies. Skip irrelevant rows.
+**Rule:** Score at least 5 of 8 aspects. Skip only those genuinely absent from the spec.
 
 ---
 

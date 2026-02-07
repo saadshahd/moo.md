@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- feat(hope): Numeric hard constraints across all 5 skills — replaced vague quantifiers ("some", "multiple", "key") with exact counts. Intent: 3-5 questions/round, 3-7 blueprint steps, vague-quantity MCQ detection. Loop: 5-21 work items, top 3 decisions in summary. Shape: min 5/8 aspects scored. Consult: 2-3 panel tradeoffs. Soul: 1-3 unknowns, 2+ subsystems in complexity table.
+
 ### Added
 - feat(hope): Context injection slots across all 5 skills — users paste labeled blocks (TASK/CONTEXT/DONE/STAKES/CONSTRAINTS) to skip clarification rounds
 - feat(hope): Scaffold template in intent — "what do you need from me" emits fillable slot template

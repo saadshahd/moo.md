@@ -74,7 +74,7 @@ If any field blank after 2 asks, proceed with [ASSUMPTION] labels.
 
 ### Step 2: Clarify
 
-Ask until ≥95% confidence you can ship the correct result.
+Ask 3-5 focused questions per round until ≥95% confidence you can ship the correct result.
 
 Cover these categories:
 - Purpose
@@ -85,6 +85,8 @@ Cover these categories:
 - Tech stack (if code)
 - Edge cases
 - Risk tolerances
+
+When any answer contains "some", "several", "multiple", "various", or "key [noun]" without a count — include one MCQ that converts the vague quantity to a numeric range.
 
 Use MCQ format for speed (user responds "1A, 2B"):
 
@@ -114,7 +116,7 @@ One sentence: **deliverable + #1 must-include + hardest constraint.**
 
 User responds: YES to lock / EDITS / BLUEPRINT / RISK... WAIT
 
-- BLUEPRINT: list key steps + sample I/O, pause for YES / EDITS
+- BLUEPRINT: list 3-7 key steps + sample I/O, pause for YES / EDITS
 - RISK: list top 3 failure scenarios, pause for YES / EDITS
 
 ### Step 5: Refine Constraints

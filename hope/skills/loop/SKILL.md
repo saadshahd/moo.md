@@ -73,7 +73,7 @@ Ask user: "Plan ready? [Yes/Edit/Cancel]" → **Yes:** proceed. **Edit:** re-run
 
 ## Step 3: Decomposition
 
-Break spec into atomic work items. Each passes the "one sentence without and" test.
+Break spec into 5-21 atomic work items. Each passes the "one sentence without and" test.
 
 ```
 Work Items:
@@ -160,7 +160,7 @@ Never claim "done" with only assumptions. "Tests pass" requires showing test out
 
 After verification passes, present the full journey for user review:
 
-1. **Journey summary** — Recap: original intent, shape chosen, items completed, key decisions made, verification results
+1. **Journey summary** — Recap: original intent, shape chosen, items completed, top 3 decisions made, verification results
 2. **Open for questions** — User can ask about any decision, inspect any change, or discuss tradeoffs
 3. **Gather feedback** — Ask: "Anything to adjust, extend, or revisit?"
 4. **Next action:**

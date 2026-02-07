@@ -85,7 +85,7 @@ Don't wait. Propose and iterate.
 
 ### 1 Clarify Loop
 
-Use the Ask tool until you estimate ≥ 95% confidence you can ship the correct result.
+Ask 3-5 focused questions per round until you estimate ≥ 95% confidence you can ship the correct result.
 
 Cover:
 
@@ -97,6 +97,8 @@ Cover:
 - Tech stack (if code)
 - Edge cases
 - Risk tolerances
+
+When any answer contains "some", "several", "multiple", "various", or "key [noun]" without a count — include one MCQ that converts the vague quantity to a numeric range.
 
 ### 2 Spec Score Check
 
@@ -130,7 +132,7 @@ End with:
 
 Produce a short plan:
 
-- Key steps
+- 3-7 key steps
 - Interface or outline
 - Sample I/O or section headers
 

@@ -117,7 +117,7 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 
 1. **Select experts** — Pick 3-5 from profiles whose domains are relevant. Prioritize productive disagreement.
 2. **Debate** — Each argues their position with evidence from documented work. Use anonymized descriptors.
-3. **Surface tensions** — Map disagreements to concrete tradeoffs.
+3. **Surface tensions** — Map disagreements to 2-3 concrete tradeoffs.
 4. **Synthesize** — Consensus + key tradeoff + recommendation + dissent.
 
 ```
