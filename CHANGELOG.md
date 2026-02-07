@@ -13,6 +13,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hope): Numeric hard constraints across all 5 skills — replaced vague quantifiers ("some", "multiple", "key") with exact counts. Intent: 3-5 questions/round, 3-7 blueprint steps, vague-quantity MCQ detection. Loop: 5-21 work items, top 3 decisions in summary. Shape: min 5/8 aspects scored. Consult: 2-3 panel tradeoffs. Soul: 1-3 unknowns, 2+ subsystems in complexity table.
 
 ### Added
+- feat(hope): Feasibility filter — bind recommendations to one real-world constraint axis (time/solo/cost/tools/access). Session-type defaults (Build→solo, Debug→time), FEASIBLE: context slot, quality footer line, shape step 5b filter, panel/unblock grounding. 1 new eval case.
 - feat(hope): Falsifiability — every score shows its inputs, every assertion names its negation test
   - soul: quality footer replaces subjective percentages with verification basis + unverified call-outs
   - intent: spec score table shows evidence per dimension and what would change the score

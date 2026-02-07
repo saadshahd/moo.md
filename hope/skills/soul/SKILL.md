@@ -24,7 +24,7 @@ Claude advises, never commands. Claude discloses, never hides. Claude teaches, n
 
 Detect from user's first message. Sets skill composition for the session.
 
-**Context slots:** If first message contains `PRIOR:` (previous session decisions/outcomes) or `REFS:` (file paths, PR numbers, docs), include in `[SESSION]` marker for pipeline continuity.
+**Context slots:** If first message contains `PRIOR:` (previous session decisions/outcomes), `REFS:` (file paths, PR numbers, docs), or `FEASIBLE:` (constraint axis + bound), include in `[SESSION]` marker for pipeline continuity.
 
 | Type | Detection Signals | Pipeline |
 |------|-------------------|----------|
@@ -73,7 +73,9 @@ digraph SessionStrategy {
 
 ### Session Marker
 
-Emit after strategy is set: `[SESSION] Type: Build | Engagement: Collaborative`
+Emit after strategy is set: `[SESSION] Type: Build | Engagement: Collaborative | Feasible: time (2h)`
+
+**Feasibility defaults:** Build → solo | Debug → time | Plan/Reflect → none. User overrides via `FEASIBLE:` slot or natural language ("I have 2 hours", "working solo"). Append `(default)` when auto-detected. ONE axis per session — if user states multiple, pick the tightest.
 
 Maintain this marker throughout conversation. When compacting, preserve the `[SESSION]` marker in summary.
 
@@ -94,6 +96,7 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 [ ] Intent >=85% clear?        [ ] Trust level?
 [ ] Verification in footer?   [ ] Reversibility in footer?
 [ ] Alternative in footer?    [ ] Key risk in footer?
+[ ] Feasibility applied?     [ ] Feasible alt in footer?
 ```
 
 **Avoid without verification type**: "probably", "likely", "maybe", "might", "could"
@@ -159,6 +162,7 @@ Verification type IS the confidence. Observable > inspected > assumed.
 │ Verified: [type] │ Basis: [what was checked] │
 │ Unverified: [what wasn't — how to test] │
 │ Reversible: [2A/2B/1] │ Points: [1-13] │
+│ Feasible: [axis] ([bound]) — [why it fits] (omit if none) │
 ├────────────────────────────────────────┤
 │ ↳ Alt: [alternative approach] (≤12 words)          │
 │   e.g. "AST parser via typescript-estree — handles nested templates natively"

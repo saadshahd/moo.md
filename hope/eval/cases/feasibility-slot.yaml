@@ -1,0 +1,24 @@
+name: hope-feasibility-slot
+description: FEASIBLE context slot recognized and propagated through pipeline
+plugin: hope
+skill: hope:intent
+flaky: true
+acceptableSkills:
+  - intent
+  - hope:intent
+  - soul
+  - hope:soul
+  - shape
+  - hope:shape
+prompt: |
+  Add WebSocket support to our Express API for real-time notifications
+
+  TASK: Add per-user WebSocket notifications
+  CONTEXT: Express.js API, 3 routes, existing auth middleware
+  DONE: Round-trip test passes
+  FEASIBLE: solo, 2 hours
+  CONSTRAINTS: No client-side build changes
+expectedBehaviors:
+  - "FEASIBLE slot recognized and extracted"
+  - "Feasibility axis identified (time or solo)"
+  - "Session marker or output includes feasibility"

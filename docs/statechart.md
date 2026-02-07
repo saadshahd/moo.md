@@ -297,7 +297,7 @@ stateDiagram-v2
   explore_interrupt --> [*] : hand-off to shape
 ```
 
-**Session marker:** `[SESSION] Type: Build | Engagement: Collaborative` — emitted after strategy set, maintained through conversation, preserved on compaction.
+**Session marker:** `[SESSION] Type: Build | Engagement: Collaborative | Feasible: time (2h)` — emitted after strategy set, maintained through conversation, preserved on compaction. Feasibility defaults: Build → solo, Debug → time, Plan/Reflect → none. User overrides via `FEASIBLE:` slot.
 
 **Compaction resilience:** If marker lost, re-derive from conversation artifacts. If re-derivation fails, ask user. Be transparent about gaps.
 
@@ -358,7 +358,7 @@ Every cycle has a break condition:
 - **Intent is sacred** — never changes without user consent
 - **Shape changes must be communicated** — user always knows when approach shifts
 - **Gates advise, never prevent** — user owns their work
-- **Compaction preserve list:** [SESSION] marker, criteria, mustNot, wave number, key decisions
+- **Compaction preserve list:** [SESSION] marker (including Feasible: axis), criteria, mustNot, feasibility axis + bound, wave number, key decisions
 
 ---
 

@@ -130,7 +130,7 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 - **Key tradeoff:** [main tension]
   - A's basis: [documented pattern / published project / theoretical]
   - B's basis: [documented pattern / published project / theoretical]
-- **Recommendation:** [lean + reasoning]
+- **Recommendation:** [lean + reasoning] — feasible on [axis]: [yes/no + why]
 - **Dissent:** [strongest counter]
 - **Test:** [one experiment that validates the recommendation]
   If right, you'll see: [observable]. If wrong: [observable].
@@ -142,7 +142,7 @@ Triggered by: "stuck on", or auto-invoked by hope:loop when execution stalls.
 
 1. Parse task, error, failed approach
 2. Select 2-3 diagnostic experts
-3. Generate diagnosis + consensus recommendation
+3. Generate diagnosis + consensus recommendation — bound by active feasibility axis (when stuck, recommendations must be actionable within the user's stated constraint)
 4. Retry loop: 3 attempts before escalating to thorough review
 
 ---

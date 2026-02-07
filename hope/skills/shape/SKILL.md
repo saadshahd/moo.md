@@ -25,9 +25,9 @@ DECIDE. Bridge between intent clarification and implementation. Transforms WHAT 
 
 ### 1. Extract Intent
 
-From user request or prior `/hope:intent`, extract: goal, constraints, scope.
+From user request or prior `/hope:intent`, extract: goal, constraints, scope, feasibility axis + bound.
 
-Also scan for context slots: `PATTERNS:` (existing conventions/precedent) and `BOUNDARIES:` (architectural constraints, team norms). When present, use as evidence when scoring Novelty, Domain knowledge, and Risk aspects.
+Also scan for context slots: `PATTERNS:` (existing conventions/precedent), `BOUNDARIES:` (architectural constraints, team norms), and `FEASIBLE:` (constraint axis + bound from intent or session default). When present, use as evidence when scoring Novelty, Domain knowledge, and Risk aspects.
 
 ### 2. Identify Candidate Shapes
 
@@ -57,6 +57,22 @@ Count which column each aspect lands in:
 - **Override:** Any Colleague in Risk or Interdependency → at minimum Tool-Review
 - **Default when uncertain:** Tool-Review
 
+### 5b. Feasibility Filter
+
+When a feasibility axis is active (from `FEASIBLE:` slot or session default), apply it AFTER shape selection to filter the approach:
+
+| Axis | Eliminate approaches that... |
+|------|----------------------------|
+| **Time** | Require learning curves or multi-phase migrations exceeding the bound |
+| **Solo** | Require coordination, specialized roles, or multi-agent orchestration beyond one pass |
+| **Cost** | Require paid services or licensed tools |
+| **Tools** | Require dependencies not in the project |
+| **Access** | Require permissions or environments the user lacks |
+
+If ALL candidate approaches eliminated: surface the conflict — `"Feasibility ([axis]) eliminates all shaped approaches. Recommend: relax [axis] or reduce scope."`
+
+If feasibility is `none`: skip this step.
+
 ### 6. Output Shape
 
 Present in conversation: selected shape, scored aspects, criteria (boolean/verifiable), mustNot constraints.
@@ -64,7 +80,8 @@ Present in conversation: selected shape, scored aspects, criteria (boolean/verif
 Each scored aspect must include:
 - **Because:** one observable fact (≤12 words)
   e.g. "No test runner, directory, or script in package.json"
-- **Would change if:** what evidence would flip the score to a different column
+- **Would change if:** what evidence would flip the score to a different column (must be checkable with project's current tools — if not, flag as assumption)
+- **Feasible because:** why this aspect survives the active feasibility axis (≤10 words, omit if axis is none)
 
 User can challenge any "Because" — if they provide counter-evidence, re-score that aspect.
 

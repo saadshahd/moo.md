@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Return as additionalContext: (1) [SESSION] marker, (2) active criteria/mustNot constraints, (3) compaction guidance — PRESERVE: work item status, criteria, verification results; DISCARD (summarize, don't keep verbatim): long tool output, repeated file reads, install/build logs."
+            "prompt": "Return as additionalContext: (1) [SESSION] marker (including Feasible: axis), (2) active criteria/mustNot constraints, (3) feasibility axis + bound, (4) compaction guidance — PRESERVE: work item status, criteria, feasibility, verification results; DISCARD (summarize, don't keep verbatim): long tool output, repeated file reads, install/build logs."
           }
         ]
       }

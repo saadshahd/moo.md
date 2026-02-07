@@ -38,7 +38,7 @@ Intent adapts its focus based on the active session type:
 
 ### Step 1: Acknowledge + Define
 
-**Context Recognition:** Before filling the template, scan user input for labeled blocks: `TASK:`, `CONTEXT:`, `DONE:`, `STAKES:`, `CONSTRAINTS:`. Pre-populate matching fields and mark `[USER-PROVIDED]`. Score normally — ask only about gaps or fields scoring 0-1.
+**Context Recognition:** Before filling the template, scan user input for labeled blocks: `TASK:`, `CONTEXT:`, `DONE:`, `STAKES:`, `CONSTRAINTS:`, `FEASIBLE:`. Pre-populate matching fields and mark `[USER-PROVIDED]`. Score normally — ask only about gaps or fields scoring 0-1. For `FEASIBLE:`, extract ONE axis (time/solo/cost/tools/access) + bound. If multiple stated, pick the tightest.
 
 When user asks "what do you need from me" or "give me the template", emit the scaffold and wait:
 
@@ -174,6 +174,7 @@ RESET at any time restarts at Step 1.
 TASK: [verb + object + outcome] (≤15 words)
 CONTEXT: [where, who, connections]
 DONE: [artifact]
+FEASIBLE: [axis] — [bound] (omit if none stated and session default is none)
 SPEC SCORE: [X/10]
 BRIEF: [OBJECTIVE / NON-GOALS / CONSTRAINTS / ACCEPTANCE / STOP]
 NEXT: /hope:loop or /hope:shape
