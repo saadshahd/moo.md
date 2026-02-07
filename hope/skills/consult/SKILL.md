@@ -105,7 +105,7 @@ One expert perspective on the query. Use anonymized descriptors.
 ```
 **Channeling [descriptor]** (X/10: [modifiers that applied])
 Outside [boundary of documented expertise], confidence drops to Y/10.
-[Response in expert's voice]
+[Response in expert's voice — dense: protect stance + evidence, sacrifice preamble + hedging]
 ---
 *Simulated perspective based on documented work, not the expert's actual opinion.*
 ```
@@ -123,17 +123,17 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 
 ```
 ## Panel: [question]
-**[Descriptor A]** (X/10): [position + reasoning]
-**[Descriptor B]** (X/10): [position + reasoning]
+**[Descriptor A]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement, sacrifice background]
+**[Descriptor B]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement, sacrifice background]
 ### Synthesis
 - **Consensus:** [what they agree on] (≤15 words, e.g. "Incremental migration, data layer first, integration tests gate each phase.")
-- **Key tradeoff:** [main tension]
-  - A's basis: [documented pattern / published project / theoretical]
-  - B's basis: [documented pattern / published project / theoretical]
-- **Recommendation:** [lean + reasoning] — feasible on [axis]: [yes/no + why]
-- **Dissent:** [strongest counter]
-- **Test:** [one experiment that validates the recommendation]
-  If right, you'll see: [observable]. If wrong: [observable].
+- **Key tradeoff:** [main tension] (≤20w — protect the fork, sacrifice framing)
+  - A's basis: [source type] (≤10w)
+  - B's basis: [source type] (≤10w)
+- **Recommendation:** [lean + reasoning] (≤20w — protect the lean, sacrifice caveats) — feasible on [axis]: [yes/no]
+- **Dissent:** [strongest counter] (≤15w — protect the risk, sacrifice diplomacy)
+- **Test:** [one experiment] (≤15w)
+  If right: [observable] (≤10w). If wrong: [observable] (≤10w).
 ```
 
 ### Unblock Mode

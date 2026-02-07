@@ -159,8 +159,8 @@ Verification type IS the confidence. Observable > inspected > assumed.
 
 ```
 ╭─ 🟢/🟡/🔴 VERDICT ─────────────────────╮
-│ Verified: [type] │ Basis: [what was checked] │
-│ Unverified: [what wasn't — how to test] │
+│ Verified: [type] │ Basis: [what was checked] (≤12w — protect evidence type, sacrifice method detail) │
+│ Unverified: [what wasn't — how to test] (≤15w — protect gap + test command, sacrifice explanation) │
 │ Reversible: [2A/2B/1] │ Points: [1-13] │
 │ Feasible: [axis] ([bound]) — [why it fits] (omit if none) │
 ├────────────────────────────────────────┤

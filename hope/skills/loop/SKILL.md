@@ -174,7 +174,7 @@ Never claim "done" with only assumptions. "Tests pass" requires showing test out
 
 After verification passes, present the full journey for user review:
 
-1. **Journey summary** — Recap: original intent, shape chosen, items completed, top 3 decisions (≤20 words each, pattern: "chose X over Y — because Z"), verification results
+1. **Journey summary** — ≤10 lines total. Protect: top 3 decisions (≤20w each, "chose X over Y — because Z") + verification verdicts. Sacrifice: recap of intent/shape (user already knows).
    e.g. "In-memory Map over Redis — under 10MB, single instance, no distributed state needed"
 2. **Open for questions** — User can ask about any decision, inspect any change, or discuss tradeoffs
 3. **Gather feedback** — Ask: "Anything to adjust, extend, or revisit?"

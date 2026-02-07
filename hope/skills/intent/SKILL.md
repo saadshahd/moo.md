@@ -139,7 +139,7 @@ Score ≥8 required. Produce:
 OBJECTIVE:
 NON-GOALS (3-5 bullets):
 CONSTRAINTS:
-ACCEPTANCE CRITERIA (7-12 bullets, 2+ "must NOT"):
+ACCEPTANCE CRITERIA (7-12 bullets ≤20w each, 2+ "must NOT" — protect verifiable conditions, sacrifice rationale):
 STOP CONDITIONS (3-5 bullets):
 ```
 

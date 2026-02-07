@@ -80,7 +80,7 @@ Present in conversation: selected shape, scored aspects, criteria (boolean/verif
 Each scored aspect must include:
 - **Because:** one observable fact (≤12 words)
   e.g. "No test runner, directory, or script in package.json"
-- **Would change if:** what evidence would flip the score to a different column (must be checkable with project's current tools — if not, flag as assumption)
+- **Would change if:** one falsifiable condition (≤15w) that flips the score column (must be checkable with project's current tools — if not, flag as assumption)
 - **Feasible because:** why this aspect survives the active feasibility axis (≤10 words, omit if axis is none)
 
 User can challenge any "Because" — if they provide counter-evidence, re-score that aspect.

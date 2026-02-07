@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- feat(hope): Compression signals — density directives with protect/sacrifice priorities on 12 previously unconstrained output fields across all 5 skills. Consult: expert voice (dense: protect stance), panel positions (≤3 sentences), synthesis fields (≤10-20w each). Soul: footer Basis (≤12w) and Unverified (≤15w). Intent: acceptance criteria (≤20w/bullet). Shape: "Would change if" (≤15w). Loop: journey summary (≤10 lines). Plugin goes from 7 to 19 density controls.
 - feat(hope): Numeric hard constraints across all 5 skills — replaced vague quantifiers ("some", "multiple", "key") with exact counts. Intent: 3-5 questions/round, 3-7 blueprint steps, vague-quantity MCQ detection. Loop: 5-21 work items, top 3 decisions in summary. Shape: min 5/8 aspects scored. Consult: 2-3 panel tradeoffs. Soul: 1-3 unknowns, 2+ subsystems in complexity table.
 
 ### Added
