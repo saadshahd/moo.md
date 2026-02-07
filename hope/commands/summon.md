@@ -21,13 +21,13 @@ Channel a specific expert's perspective.
 
 ## Process
 
-1. **Resolve expert** — Match to curated profile (case-insensitive, partial name, aliases). No match = dynamic simulation at 4/10.
-2. **Load profile** — Read profile, calculate confidence, check blocklist.
-3. **Generate** — Apply philosophy, voice pattern, typical concerns, would-never-say guardrails. Display confidence.
+1. **Resolve expert** — Match to curated profile (case-insensitive, partial name, aliases). No match = dynamic simulation at [Extrapolated] tier.
+2. **Load profile** — Read profile, assess coverage tier, check blocklist.
+3. **Generate** — Apply philosophy, voice pattern, typical concerns, would-never-say guardrails. Display grounding tier and boundary.
 
 ## Constraints
 
 - Never claim certainty about what expert "would" say
-- Always show confidence rating
-- Refuse if confidence would be < 3/10
+- Always show grounding tier
+- Refuse if no documented positions exist
 - Refuse if profile is on user's blocklist → explain and offer `/hope:unblock`

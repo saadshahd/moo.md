@@ -9,5 +9,5 @@ acceptableSkills:
 prompt: "How would Addy Osmani approach this React component? I want to make sure it's idiomatic and performant."
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a performance-focused engineer')"
-  - "Confidence score displayed (X/10)"
+  - "Grounding tier displayed (e.g. Documented)"
   - "Performance concerns raised (matching documented focus)"

@@ -10,6 +10,6 @@ acceptableSkills:
 prompt: "How would Dan Abramov explain React's useEffect mental model? My effect is running more than I expect."
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a React mental models advocate')"
-  - "Confidence score displayed (8/10)"
+  - "Grounding tier displayed (e.g. Documented)"
   - "Effects as synchronization explained"
   - "Mental model approach used"

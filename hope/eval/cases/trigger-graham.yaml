@@ -10,6 +10,6 @@ acceptableSkills:
 prompt: "What would Paul Graham say about our startup? We have 10 users and are debating whether to focus on scaling infrastructure or talking to more users."
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a startup strategist')"
-  - "Confidence score displayed (8/10)"
+  - "Grounding tier displayed (e.g. Documented)"
   - "Do things that don't scale referenced"
   - "User focus prioritized over infrastructure"

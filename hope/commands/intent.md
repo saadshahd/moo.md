@@ -85,7 +85,7 @@ Don't wait. Propose and iterate.
 
 ### 1 Clarify Loop
 
-Ask 3-5 focused questions per round until you estimate ≥ 95% confidence you can ship the correct result.
+Ask 3-5 focused questions per round until no remaining question would change the brief.
 
 Cover:
 

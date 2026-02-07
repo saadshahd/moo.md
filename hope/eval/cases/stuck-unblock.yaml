@@ -10,5 +10,5 @@ prompt: "/hope:panel stuck on 'Add ValidationError import to auth.ts': Module no
 expectedBehaviors:
   - "Error summary extracted"
   - "Multiple expert perspectives on diagnosis"
-  - "Consensus recommendation with confidence"
+  - "Consensus recommendation with grounding provenance"
   - "Actionable next steps provided"

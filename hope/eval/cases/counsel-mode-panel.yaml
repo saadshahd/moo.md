@@ -11,4 +11,4 @@ prompt: "panel debate — should we use Redux or Zustand for state management in
 expectedBehaviors:
   - "Panel mode activates on debate/panel request"
   - "Assembles multiple relevant experts (React, architecture)"
-  - "Shows per-expert confidence scores"
+  - "Shows per-expert grounding tiers"

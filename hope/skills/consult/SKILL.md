@@ -26,9 +26,9 @@ SIMULATE. Expert perspectives for code guidance, style, debates, and unblocking.
 
 ## Core Constraint
 
-Score confidence from documented work (6-9/10 base). State X/10, cite source, use "likely" language, flag gaps.
+Ground in documented work. Name the position being extrapolated and the condition where it breaks.
 
-Cap: 9/10. Never claim certainty — use "would likely."
+Never claim certainty — state which source you're extending and where coverage stops.
 
 ---
 
@@ -41,7 +41,7 @@ digraph ConsultWorkflow {
   Blocklist [label="Step 0: Load blocklist"]
   ModeDetect [label="Single or Panel?"]
   Detect [label="Step 1: Detect Domain\n-> Match Expert"]
-  Infer [label="Step 2: Load Profile\n-> Score Confidence"]
+  Infer [label="Step 2: Load Profile\n-> Assess Coverage"]
   Generate [label="Step 3: Generate\nResponse"]
   PanelSelect [label="Select 3-5 experts"]
   Debate [label="Each argues position"]
@@ -69,30 +69,30 @@ Detection order (first match wins):
 4. **Domain signals** — topic-based routing via domain map below
 5. **No match** — ask user or provide generic guidance
 
-### Step 2: Load Profile + Score Confidence
+### Step 2: Load Profile + Assess Coverage
 
-Load matched profile from `profiles/`. Guided: [CONFIDENCE] block. Curated → base 6/10. Dynamic → base 4/10 + low-confidence warning.
+Load matched profile from `profiles/`. Guided: [COVERAGE] block. Curated → Standard baseline. Dynamic → Extrapolated baseline + warn.
 
-| Modifier | Impact |
-|----------|--------|
-| Extensive prior work (3+ books, 10+ talks) | +2 |
-| Topic matches core domain | +1 |
-| Topic outside documented expertise | -2 |
-| Recent public statements (< 2 years) | +1 |
+| Signal | Tier |
+|--------|------|
+| 3+ books/10+ talks on THIS topic | Documented |
+| Topic in core domain, no direct statement | Inferred |
+| Topic outside documented expertise | Extrapolated |
+| No documented public positions | Refuse |
 
-| Score | Action |
-|-------|--------|
-| < 3/10 | Refuse: "Insufficient data to simulate this perspective." |
-| 3-5/10 | Warn: "LOW CONFIDENCE — treat as directional only" |
-| 6-7/10 | Standard simulation with confidence in header |
-| 8-9/10 | High confidence (9/10 cap — never claim perfect simulation) |
+| Tier | Action |
+|------|--------|
+| Refuse | "Insufficient documented positions to simulate this perspective." |
+| Extrapolated | Warn: "EXTRAPOLATING — treat as directional only" |
+| Inferred | Standard — state source + where extrapolation begins |
+| Documented | Cite specific works; still state where coverage stops |
 
 ### Step 3: Generate Response
 
 Generate response satisfying ALL:
 1. Reason from documented positions to user's context — filter through would-never-say, match voice density not persona
 2. Name what this expert would push back on — if it reframes the problem itself, say so. Agreement without friction is failure
-3. State where this expert's documented work stops covering the question — the boundary, not just the confidence score
+3. State where this expert's documented work stops covering the question — the boundary, not just the tier
 4. Land on a concrete recommendation the user can act on today
 
 ---
@@ -102,13 +102,13 @@ Generate response satisfying ALL:
 ### Single Expert (default)
 
 ```
-**Applying [descriptor]** (X/10: [modifiers that applied])
+**Applying [descriptor]** [tier: primary source]
 [Response from documented positions — dense: protect stance + evidence, sacrifice preamble]
 ---
 *Simulated perspective based on documented work, not the expert's actual opinion.*
 ```
 SELF-AUDIT (silent — revise if FAIL) →
-  Confidence ≤9 + topic within domain boundary → [pass/fail] → [cite X/10 + domain]
+  Source cited + extrapolation boundary stated → [pass/fail] → [cite source + gap]
 
 ### Panel Mode
 
@@ -124,19 +124,20 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 
 ```
 ## Panel: [question]
-**[Descriptor A]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement]
-**[Descriptor B]** (X/10): [position + reasoning — ≤3 sentences, protect disagreement]
+**[Descriptor A]** [tier]: [position + reasoning — ≤3 sentences, protect disagreement]
+**[Descriptor B]** [tier]: [position + reasoning — ≤3 sentences, protect disagreement]
 ### Synthesis
 - **Consensus:** [what they agree on] (≤15 words)
 - **Key tradeoff:** [main tension] (≤20w) | A: [source] (≤10w) | B: [source] (≤10w)
 - **Recommendation:** [lean + reasoning] (≤20w) — feasible on [axis]: [yes/no]
 - **Dissent:** [strongest counter] (≤15w)
+- **Least-grounded:** [which position + why] (≤15w)
 - **Test:** [experiment] (≤15w) | If right: (≤10w) | If wrong: (≤10w)
 ```
 SELF-AUDIT → revise before presenting if any FAIL:
   Dissent present + non-trivial → [pass/fail] → [cite Dissent line]
   Test has if-right AND if-wrong → [pass/fail] → [cite observables]
-  All experts have confidence    → [pass/fail] → [cite X/10 scores]
+  Least-grounded position named → [pass/fail] → [cite which + gap]
 
 ### Unblock Mode
 
@@ -145,9 +146,10 @@ Triggers: "stuck on", auto-invoked when loop stalls.
 ```
 **Unblock: [task ≤10w]**
 Stuck: [error ≤15w] | Tried: [failed approach ≤15w]
-[Descriptor A] (X/10): [diagnosis ≤2 sentences]
-[Descriptor B] (X/10): [diagnosis ≤2 sentences]
+[Descriptor A] [tier]: [diagnosis ≤2 sentences]
+[Descriptor B] [tier]: [diagnosis ≤2 sentences]
 Consensus: [action ≤20w] — feasible on [axis]: [yes/no]
+Weakest link: [which diagnosis + gap] (≤15w)
 If fails: [re-diagnose from output] | Attempt: [N]/3
 ```
 
@@ -184,13 +186,11 @@ If fails: [re-diagnose from output] | Attempt: [N]/3
 
 ## Guardrails
 
-**Refuse when:** confidence < 3/10, no documented public positions, or topic requires personal opinions.
-
-**Never:**
+**Refuse when:** no documented public positions or topic requires personal opinions. **Never:**
 - Use expert names — descriptor: `a/an [philosophy/approach] [role]`
 - Claim certainty about what expert "would" say (use "would likely")
 - Invent positions not in documented work
-- Simulate without stating confidence
+- Simulate without stating source and extrapolation boundary
 
 ---
 

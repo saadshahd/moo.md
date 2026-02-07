@@ -101,7 +101,7 @@ digraph DebateWorkflow {
 ```
 ## Panel Review: [Topic]
 
-**Panelists:** [descriptor A] (X/10), [descriptor B] (Y/10)
+**Panelists:** [descriptor A] [tier], [descriptor B] [tier]
 
 ### Consensus
 - [Point all panelists would likely agree on]

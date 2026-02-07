@@ -75,7 +75,7 @@ stateDiagram-v2
   [*] --> acknowledge
 
   state "acknowledge\nTASK / CONTEXT / DONE / STAKES / REVIEWS" as acknowledge
-  state "clarify\nMCQ rounds, ≥ 95% confidence" as clarify
+  state "clarify\nMCQ rounds, until no question would change brief" as clarify
   state score_check <<choice>>
   state "echo_check\ndeliverable + constraint + must-include" as echo_check
   state "refine\nbest guess + assumptions + 1 question" as refine
@@ -213,15 +213,15 @@ stateDiagram-v2
 
   state "Single Expert" as single {
     detect_expert --> load_profile
-    load_profile --> score_confidence
+    load_profile --> assess_coverage
     state conf_check <<choice>>
-    score_confidence --> conf_check
-    conf_check --> generate : ≥ 3/10
-    conf_check --> refuse : < 3/10 (insufficient data)
+    assess_coverage --> conf_check
+    conf_check --> generate : has documented positions
+    conf_check --> refuse : no documented positions
 
     state "detect_expert\nname / keyword / file / domain" as detect_expert
-    state "load_profile\ncurated (base 6) or dynamic (base 4)" as load_profile
-    state "score_confidence\n1–9 scale (9 cap)" as score_confidence
+    state "load_profile\ncurated or dynamic" as load_profile
+    state "assess_coverage\nDocumented / Inferred / Extrapolated" as assess_coverage
     state "generate_response\nexpert voice + citations" as generate
     state "refuse\ninsufficient data to simulate" as refuse
   }
@@ -369,5 +369,5 @@ Every cycle has a break condition:
 | user_need → clarifying | intent | acknowledge, clarify, score_spec, echo_check, refine, emit_brief |
 | clear_intent → session_execution | shape | extract, score_aspects, expert_consultation, select_shape, output_shape |
 | session_execution | loop | spec_scoring, shape_approval, decompose, wave_execution, stall_detection, expert_review, verify_gate, review_feedback, cancel, circuit_breaker, paused |
-| (any stage) | consult | load_blocklist, detect_mode — single: detect_expert, load_profile, score_confidence, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
+| (any stage) | consult | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
 | (parallel, always) | soul | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer |

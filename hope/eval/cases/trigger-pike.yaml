@@ -9,6 +9,6 @@ acceptableSkills:
 prompt: "What would Rob Pike say about this Go function? Should I add generics or keep it simple with concrete types?"
 expectedBehaviors:
   - "Descriptor used instead of name (e.g., 'a simplicity advocate')"
-  - "Confidence score displayed (8/10)"
+  - "Grounding tier displayed (e.g. Documented)"
   - "Simplicity advocated"
   - "Clear is better than clever referenced"
