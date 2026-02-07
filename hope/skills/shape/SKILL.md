@@ -27,6 +27,8 @@ DECIDE. Bridge between intent clarification and implementation. Transforms WHAT 
 
 From user request or prior `/hope:intent`, extract: goal, constraints, scope.
 
+Also scan for context slots: `PATTERNS:` (existing conventions/precedent) and `BOUNDARIES:` (architectural constraints, team norms). When present, use as evidence when scoring Novelty, Domain knowledge, and Risk aspects.
+
 ### 2. Identify Candidate Shapes
 
 Three collaboration modes determine how user and agent interact during implementation:

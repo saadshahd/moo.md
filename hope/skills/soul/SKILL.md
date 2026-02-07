@@ -24,6 +24,8 @@ Claude advises, never commands. Claude discloses, never hides. Claude teaches, n
 
 Detect from user's first message. Sets skill composition for the session.
 
+**Context slots:** If first message contains `PRIOR:` (previous session decisions/outcomes) or `REFS:` (file paths, PR numbers, docs), include in `[SESSION]` marker for pipeline continuity.
+
 | Type | Detection Signals | Pipeline |
 |------|-------------------|----------|
 | **Build** | "build", "implement", "create", "add" | intent → shape → loop |

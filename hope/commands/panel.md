@@ -16,6 +16,9 @@ MODERATE. Assemble an expert panel for debate and guidance.
 /hope:panel stuck on "Add ValidationError": "Module not found"
 /hope:panel review wave 1 changes for: {spec}
 /hope:panel thorough review for: {spec}
+/hope:panel Should we use event sourcing?
+POSITION: Leaning yes for audit trail
+TRADEOFF: complexity vs compliance
 ```
 
 ## Mode Detection
@@ -45,6 +48,14 @@ digraph PanelModes {
 
 - `$1` — Question, topic, or mode-specific pattern (required)
 - `--experts` — Comma-separated expert names (optional, auto-selects if omitted)
+
+**Context slots** (optional, recognized from user input):
+- `POSITION:` — user's current stance and reasoning
+- `TRIED:` — previous attempts and their outcomes
+- `TRADEOFF:` — specific tension being weighed
+- `CONSTRAINT:` — non-negotiable factor limiting solution space
+
+When present, inject into debate framing. Each expert responds to the stated position and respects stated constraints.
 
 ---
 

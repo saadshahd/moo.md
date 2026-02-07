@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat(hope): Context injection slots across all 5 skills — users paste labeled blocks (TASK/CONTEXT/DONE/STAKES/CONSTRAINTS) to skip clarification rounds
+- feat(hope): Scaffold template in intent — "what do you need from me" emits fillable slot template
+- feat(hope): Artifact injection in intent — ARTIFACT + ARTIFACT-TYPE slots for structured extraction from error logs, specs, PRDs, test output
+- feat(hope): Panel position grounding — POSITION/TRIED/TRADEOFF/CONSTRAINT slots frame expert debates around user's actual stance
+- feat(hope): Shape domain slots — PATTERNS/BOUNDARIES recognized as evidence for aspect scoring
+- feat(hope): Loop acceptance slots — PASS/FAIL merge into criteria/mustNot during shape generation
+- feat(hope): Soul session bridging — PRIOR/REFS slots enrich session marker with cross-session context
+- feat(hope): 3 new eval cases — `intent-context-slots`, `intent-scaffold`, `panel-position-slot`
+
 ## [hope@3.2.0] - 2026-02-07
 
 ### Changed

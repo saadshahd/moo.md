@@ -113,6 +113,8 @@ One expert perspective on the query. Use anonymized descriptors.
 
 Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="panel: ..."`.
 
+**Context grounding:** When `POSITION:` and/or `TRIED:` present in request, each expert responds TO the user's stance rather than debating abstractly. The user's position frames the debate — experts challenge, validate, or extend it.
+
 1. **Select experts** — Pick 3-5 from profiles whose domains are relevant. Prioritize productive disagreement.
 2. **Debate** — Each argues their position with evidence from documented work. Use anonymized descriptors.
 3. **Surface tensions** — Map disagreements to concrete tradeoffs.

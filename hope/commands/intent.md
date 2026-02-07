@@ -14,6 +14,12 @@ Turn rough ideas into iron-clad work orders, then deliver the work only after bo
 
 ---
 
+## Context Recognition
+
+Before Step 0: scan `$0` for labeled blocks (`TASK:`, `CONTEXT:`, `DONE:`, `STAKES:`, `CONSTRAINTS:`, `ARTIFACT:`, `ARTIFACT-TYPE:`). Pre-fill the corresponding Step 0 fields with user-provided values. Score pre-filled fields normally — only ask about gaps.
+
+If user says "what do you need", "scaffold", or "template": emit the slot template and wait for the user to fill and return it.
+
 ## Protocol
 
 ### 0 Task Definition Protocol

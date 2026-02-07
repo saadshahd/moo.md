@@ -16,6 +16,7 @@ EXECUTE. Autonomous iteration: spec scoring → shape → decompose → wave exe
 Scan conversation for existing pipeline artifacts:
 - Intent brief (OBJECTIVE/NON-GOALS/CONSTRAINTS/ACCEPTANCE) → use as spec input
 - Shape output (criteria[]/mustNot[]/shape) → skip Step 2, proceed to decomposition
+- Context slots: `PASS:` (user-stated acceptance criteria) and `FAIL:` (user-stated failure conditions) → merge into criteria[] and mustNot[] during shape generation
 - Neither → proceed normally from Step 1
 
 ---

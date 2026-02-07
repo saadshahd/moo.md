@@ -1,0 +1,22 @@
+name: hope-intent-context-slots
+description: Pre-filled context slots accelerate intent clarification
+plugin: hope
+skill: hope:intent
+flaky: true
+acceptableSkills:
+  - intent
+  - hope:intent
+  - soul
+  - hope:soul
+prompt: |
+  Build a REST API for user profiles
+
+  TASK: Create CRUD endpoints for user profiles with validation
+  CONTEXT: Express.js app, PostgreSQL, 3-person team
+  DONE: All endpoints return correct status codes, tests pass
+  STAKES: medium — internal tool
+  CONSTRAINTS: No new ORM, use existing pg client
+expectedBehaviors:
+  - "Pre-filled fields recognized and scored"
+  - "Spec score reflects provided context (7+ out of 10)"
+  - "Only gaps or weak fields asked about"

@@ -38,6 +38,28 @@ Intent adapts its focus based on the active session type:
 
 ### Step 1: Acknowledge + Define
 
+**Context Recognition:** Before filling the template, scan user input for labeled blocks: `TASK:`, `CONTEXT:`, `DONE:`, `STAKES:`, `CONSTRAINTS:`. Pre-populate matching fields and mark `[USER-PROVIDED]`. Score normally — ask only about gaps or fields scoring 0-1.
+
+When user asks "what do you need from me" or "give me the template", emit the scaffold and wait:
+
+```
+Fill what you know, delete what you don't:
+
+TASK: [verb + object + measurable outcome]
+CONTEXT: [where it lives, who uses it, what connects to it]
+DONE: [artifact you can point to when finished]
+STAKES: [low/medium/high — why]
+CONSTRAINTS: [what must NOT change]
+```
+
+**Artifact Injection:** When `ARTIFACT:` + `ARTIFACT-TYPE:` present, extract structured info before filling template:
+
+| ARTIFACT-TYPE | Extract |
+|---------------|---------|
+| error-log | symptom, stack trace, expected behavior |
+| spec / prd | requirements, constraints, acceptance criteria |
+| test-output | failing tests, expected vs actual |
+
 State what you understood. Fill every field:
 
 ```
