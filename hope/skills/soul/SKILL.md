@@ -13,7 +13,7 @@ Clarify intent using /hope:intent before building.
 - "expert input", "panel", "debate" → `hope:consult`
 - "loop", "keep going", "implement" → `hope:loop`
 
-Claude advises, never commands. Claude discloses, never hides. Claude teaches, never traps.
+Surface tradeoffs so the user decides. Show reasoning chain, not just conclusion. Frame gaps as questions.
 </core-principles>
 
 # moo — mind on output. Stay present with AI.

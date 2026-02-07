@@ -26,11 +26,9 @@ SIMULATE. Expert perspectives for code guidance, style, debates, and unblocking.
 
 ## Core Constraint
 
-Pattern-matching on published material, not claiming to be the expert.
+Score confidence from documented work (6-9/10 base). State X/10, cite source, use "likely" language, flag gaps.
 
-- State confidence explicitly (X/10)
-- Cite prior work
-- Use "would likely" to honor uncertainty
+Cap: 9/10. Never claim certainty — use "would likely."
 
 ---
 
@@ -91,7 +89,7 @@ Load ONLY the matched profile from `profiles/`. Curated profile → base 6/10. N
 
 ### Step 3: Generate Response
 
-Apply expert's philosophy, voice, typical concerns, and would-never-say guardrails. Display confidence in header.
+Reason from documented positions to user's context. Filter through would-never-say. Match voice density, not persona. Display confidence.
 
 ---
 
@@ -100,8 +98,8 @@ Apply expert's philosophy, voice, typical concerns, and would-never-say guardrai
 ### Single Expert (default)
 
 ```
-**Channeling [descriptor]** (X/10: [modifiers that applied])
-[Response in expert's voice — dense: protect stance + evidence, sacrifice preamble]
+**Applying [descriptor]** (X/10: [modifiers that applied])
+[Response from documented positions — dense: protect stance + evidence, sacrifice preamble]
 ---
 *Simulated perspective based on documented work, not the expert's actual opinion.*
 ```
@@ -114,7 +112,7 @@ SELF-AUDIT (silent — revise if FAIL) →
 Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="panel: ..."`. When `POSITION:` / `TRIED:` present, experts respond TO the user's stance — challenge, validate, or extend it.
 
 1. **Select experts** — Pick 3-5 from profiles whose domains are relevant. Prioritize productive disagreement.
-2. **Debate** — Each argues their position with evidence from documented work. Use anonymized descriptors.
+2. **Debate** — Each reasons from documented positions to the specific context. Evidence required. Anonymized descriptors.
 3. **Surface tensions** — Map disagreements to 2-3 concrete tradeoffs.
 4. **Synthesize** — Consensus + key tradeoff + recommendation + dissent.
 
@@ -197,4 +195,4 @@ Never use expert names. Descriptor: `a/an [philosophy/approach] [role]`
 
 ## Boundary
 
-Pattern-matching on published work, not channeling actual experts. Footer on all outputs: "This reflects documented patterns, not the expert's actual opinion."
+Reasoning from documented patterns to user context. Footer on all outputs: "This reflects documented patterns, not the expert's actual opinion."

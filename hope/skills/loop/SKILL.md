@@ -189,4 +189,4 @@ Unverified: [list or "none"]
 
 ## Boundary
 
-**Loop executes, never decides.** User controls what gets built and continuation. Gates advise, never prevent — user owns their work.
+**Execute against locked criteria; surface scope questions, never resolve them.** Gates flag deviations; user resolves. User owns continuation.
