@@ -45,7 +45,8 @@ When user asks "what do you need from me" or "give me the template", emit the sc
 ```
 Fill what you know, delete what you don't:
 
-TASK: [verb + object + measurable outcome]
+TASK: [verb + object + outcome] (≤15 words)
+  e.g. "Extract JWT validation into shared module — both gateways reuse, tests pass"
 CONTEXT: [where it lives, who uses it, what connects to it]
 DONE: [artifact you can point to when finished]
 STAKES: [low/medium/high — why]
@@ -114,7 +115,8 @@ Use anchored rubric (0 = vague, 1 = directional, 2 = testable). Cite user's own 
 
 ### Step 4: Echo Check
 
-One sentence: **deliverable + #1 must-include + hardest constraint.**
+One sentence (≤20 words): **deliverable + #1 must-include + hardest constraint.**
+  e.g. "Shared JWT module for both gateways — must keep existing token format, no new deps."
 
 User responds: YES to lock / EDITS / BLUEPRINT / RISK... WAIT
 
@@ -169,7 +171,7 @@ RESET at any time restarts at Step 1.
 ## Output Format
 
 ```
-TASK: [verb] + [object] + [outcome]
+TASK: [verb + object + outcome] (≤15 words)
 CONTEXT: [where, who, connections]
 DONE: [artifact]
 SPEC SCORE: [X/10]

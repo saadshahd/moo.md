@@ -126,7 +126,7 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 **[Descriptor A]** (X/10): [position + reasoning]
 **[Descriptor B]** (X/10): [position + reasoning]
 ### Synthesis
-- **Consensus:** [what they agree on]
+- **Consensus:** [what they agree on] (≤15 words, e.g. "Incremental migration, data layer first, integration tests gate each phase.")
 - **Key tradeoff:** [main tension]
   - A's basis: [documented pattern / published project / theoretical]
   - B's basis: [documented pattern / published project / theoretical]

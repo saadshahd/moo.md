@@ -62,7 +62,8 @@ Count which column each aspect lands in:
 Present in conversation: selected shape, scored aspects, criteria (boolean/verifiable), mustNot constraints.
 
 Each scored aspect must include:
-- **Because:** one observable fact that justifies the column placement
+- **Because:** one observable fact (≤12 words)
+  e.g. "No test runner, directory, or script in package.json"
 - **Would change if:** what evidence would flip the score to a different column
 
 User can challenge any "Because" — if they provide counter-evidence, re-score that aspect.

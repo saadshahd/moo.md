@@ -160,8 +160,10 @@ Verification type IS the confidence. Observable > inspected > assumed.
 │ Unverified: [what wasn't — how to test] │
 │ Reversible: [2A/2B/1] │ Points: [1-13] │
 ├────────────────────────────────────────┤
-│ ↳ Alt: [alternative approach]          │
-│ ↳ Risk: [key assumption or risk]       │
+│ ↳ Alt: [alternative approach] (≤12 words)          │
+│   e.g. "AST parser via typescript-estree — handles nested templates natively"
+│ ↳ Risk: [key assumption or risk] (≤15 words)       │
+│   e.g. "Unvalidated — compound index may degrade past 1M rows on new query pattern"
 ╰────────────────────────────────────────╯
 ```
 
