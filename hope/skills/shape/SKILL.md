@@ -75,9 +75,16 @@ If feasibility is `none`: skip this step.
 
 ### 6. Output Shape
 
-Present in conversation: selected shape, scored aspects, criteria (boolean/verifiable), mustNot constraints.
+Present shape output:
 
-Each scored aspect: **Because** (≤12w observable) + **Would change if** (≤15w falsifiable, flag assumption if uncheckable) + **Feasible because** (≤10w, omit if none). User can challenge any Because with counter-evidence.
+| Aspect | Column | Because (≤12w) | Would change if (≤15w) | Feasible: [axis] (≤10w) |
+|--------|--------|----------------|------------------------|--------------------------|
+| [aspect] | [Col/TR/Tool] | [observable fact] | [falsifiable condition, or assumption] | [why it survives, omit if none] |
+
+Tally: Colleague: [N] | Tool-Review: [N] | Tool: [N]
+Criteria: [boolean/verifiable condition], ...
+MustNot: [constraint], ...
+Challenge: user counter-evidence → re-score that aspect.
 
 SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
   ≥5 aspects scored         → [pass/fail] → [count]

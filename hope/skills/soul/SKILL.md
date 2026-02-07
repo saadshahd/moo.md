@@ -89,13 +89,11 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 | Fit score | <25 | EXPLORE → gather more context |
 | Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
 
-SELF-AUDIT (silent — do not emit, revise if any FAIL) →
-  Footer has Verified: type  → [pass/fail] → [cite Verified: line]
-  Footer has Unverified: gap → [pass/fail] → [cite line or "none needed"]
-  Footer has Alt:            → [pass/fail] → [cite Alt: line]
-  Footer has Risk:           → [pass/fail] → [cite Risk: line]
-  Feasibility addressed      → [pass/fail] → [cite Feasible: or "axis: none"]
-  No hedging without basis   → [pass/fail] → [scan for "probably/likely/maybe"]
+When audit triggers an interrupt, surface:
+```
+[AUDIT] Spec: [N]/10 | Fit: [N] | Verdict: [PROCEED/CLARIFY/EXPLORE]
+Gap: [what's missing ≤15w] | Action: [next step ≤10w]
+```
 
 ---
 

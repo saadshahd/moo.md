@@ -31,7 +31,6 @@ Pattern-matching on published material, not claiming to be the expert.
 - State confidence explicitly (X/10)
 - Cite prior work
 - Use "would likely" to honor uncertainty
-- Flag low confidence
 
 ---
 
@@ -137,12 +136,16 @@ SELF-AUDIT → revise before presenting if any FAIL:
 
 ### Unblock Mode
 
-Triggered by: "stuck on", or auto-invoked by hope:loop when execution stalls.
+Triggers: "stuck on", auto-invoked when loop stalls.
 
-1. Parse task, error, failed approach
-2. Select 2-3 diagnostic experts
-3. Generate diagnosis + consensus recommendation — bound by active feasibility axis (when stuck, recommendations must be actionable within the user's stated constraint)
-4. Retry loop: 3 attempts before escalating to thorough review
+```
+**Unblock: [task ≤10w]**
+Stuck: [error ≤15w] | Tried: [failed approach ≤15w]
+[Descriptor A] (X/10): [diagnosis ≤2 sentences]
+[Descriptor B] (X/10): [diagnosis ≤2 sentences]
+Consensus: [action ≤20w] — feasible on [axis]: [yes/no]
+If fails: [next action or "escalate"] | Attempt: [N]/3
+```
 
 ---
 
@@ -177,9 +180,7 @@ Triggered by: "stuck on", or auto-invoked by hope:loop when execution stalls.
 
 ## Output Anonymization
 
-Never use expert names in output. Generate a descriptor from relevance to the question.
-
-Pattern: `a/an [philosophy/approach] [role]`
+Never use expert names. Descriptor: `a/an [philosophy/approach] [role]`
 
 ---
 

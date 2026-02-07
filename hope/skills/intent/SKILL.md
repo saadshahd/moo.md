@@ -77,17 +77,15 @@ If any field blank after 2 asks, proceed with [ASSUMPTION] labels.
 
 Ask 3-5 focused questions per round until ≥95% confidence you can ship the correct result.
 
-Cover these categories:
-- Purpose
-- Audience
-- Must-include facts
-- Success criteria
-- Length/format
-- Tech stack (if code)
-- Edge cases
-- Risk tolerances
+Categories: Purpose, Audience, Must-include, Success criteria, Format, Tech stack, Edge cases, Risk tolerances.
 
-When any answer contains "some", "several", "multiple", "various", or "key [noun]" without a count — include one MCQ that converts the vague quantity to a numeric range.
+Per round, emit:
+```
+Round [N]: [resolved]/8 dimensions
+1. [Category]: A. [option] / B. [option] / C. [option]
+Resolved: [locked dimensions] | Open: [remaining]
+```
+Vague quantities ("some", "several", "key [noun]"): add MCQ converting to numeric range.
 
 Use MCQ format for speed (user responds "1A, 2B"):
 
@@ -98,20 +96,18 @@ Use MCQ format for speed (user responds "1A, 2B"):
 
 ### Step 3: Score the Spec
 
-Use anchored rubric (0 = vague, 1 = directional, 2 = testable). Cite user's own words as evidence. "To score 2" states what would change the score — user can challenge or fill the gap.
+Anchored rubric (0=vague, 1=directional, 2=testable). Cite user's words. "To score 2" = what would change score.
 
-| Dimension | /2 | Evidence (user's words) | To score 2 |
-|-----------|-----|-------------------------|------------|
-| Outcome | | | |
-| Scope | | | |
-| Constraints | | | |
-| Success Criteria | | | |
-| Done Definition | | | |
-| **Total** | **/10** | | |
+| Dimension | /2 | Evidence (user's words, or TBD) | To score 2 |
+|-----------|-----|----------------------------------|------------|
+| Outcome | [0-2] | "[quote]" or TBD | [what's needed] |
+| Scope | [0-2] | "[quote]" or TBD | [what's needed] |
+| Constraints | [0-2] | "[quote]" or TBD | [what's needed] |
+| Success Criteria | [0-2] | "[quote]" or TBD | [what's needed] |
+| Done Definition | [0-2] | "[quote]" or TBD | [what's needed] |
+| **Total** | **[N]/10** | | **Route: [PROCEED / ITERATE / CLARIFY]** |
 
-- **≥8:** Proceed to Step 6
-- **5-7:** Iterate — user fills gaps visible in "To score 2" column
-- **<5:** Return to Step 2
+>=8: proceed to Step 6 | 5-7: fill "To score 2" gaps | <5: return to Step 2
 
 ### Step 4: Echo Check
 

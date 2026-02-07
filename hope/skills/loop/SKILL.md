@@ -95,29 +95,16 @@ Would drop to {lower shape} if {which input change would cross the threshold}
 
 **Wave** = work items with no unresolved dependencies.
 
-```dot
-digraph WaveExecution {
-  rankdir=TB
-  Ready [label="Identify ready\nwork items"]
-  Spawn [label="Invoke parallel\nsubagents"]
-  Monitor [label="Collect results"]
-  Review [label="hope:consult panel\nscope review"]
-  Check [label="More items?"]
-  Next [label="Next wave"]
-  Done [label="All complete"]
-  Ready -> Spawn -> Monitor -> Review -> Check
-  Check -> Next [label="yes"]
-  Check -> Done [label="no"]
-  Next -> Ready
-}
-```
+Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot]\n\n[work item]", subagent_type="general-purpose")`
+Review: expert panel checks scope compliance after each wave.
 
-1. **Identify ready items:** Work items with no pending dependencies
-2. **Spawn subagents:** `Task(prompt="EXECUTE. [session strategy + criteria + mustNot]\n\n[work item instructions]", subagent_type="general-purpose")` for each ready item
-3. **Collect results:** Wait for all subagents in the wave
-4. **Review:** Request expert panel to review scope compliance — check work stays within spec
-5. **Log:** `[WAVE {N} COMPLETE] {completed}/{total} items done`
-6. **Blocked detection:** If no progress → request expert diagnosis for the blocker to auto-unblock. Continue, pivot, or escalate to user.
+```
+[WAVE {N}] {ready_count} items | Shape: {shape}
+- [ ] {item}: pending | Verify: {command}
+- [x] {item}: {done ≤10w} | Verify: {PASS/FAIL}
+[WAVE {N} COMPLETE] {completed}/{total} items
+```
+No progress → expert diagnosis to auto-unblock. Continue, pivot, or escalate.
 
 ---
 
@@ -173,10 +160,16 @@ Any criterion not backed by execution output must appear in an `Unverified:` lin
 
 After verification passes, present the full journey for user review:
 
-1. **Journey summary** — ≤10 lines total. Protect: top 3 decisions (≤20w each, "chose X over Y — because Z") + verification verdicts. Sacrifice: recap of intent/shape (user already knows).
-   e.g. "In-memory Map over Redis — under 10MB, single instance, no distributed state needed"
-2. **Open for questions** — User can ask about any decision, inspect any change, or discuss tradeoffs
-3. **Gather feedback** — Ask: "Anything to adjust, extend, or revisit?"
+1. **Journey summary:**
+```
+Decisions:
+1. [chose X over Y] — [because Z] (≤20w)
+2. [chose X over Y] — [because Z] (≤20w)
+3. [chose X over Y] — [because Z] (≤20w)
+Verified: [PASS/FAIL] | [Y]/[N] criteria | Evidence: [type]
+Unverified: [list or "none"]
+```
+2. **Gather feedback** — "Anything to adjust, extend, or revisit?"
 4. **Next action:**
    - Feedback yields new work → refine intent from feedback, re-enter loop (Step 1)
    - User satisfied → emit `<loop-complete>` + quality footer
