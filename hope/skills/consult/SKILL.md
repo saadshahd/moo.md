@@ -7,7 +7,7 @@ allowed-tools: Read, Grep, Glob
 
 # consult
 
-Simulate expert perspectives for code guidance, style, debates, and unblocking.
+SIMULATE. Expert perspectives for code guidance, style, debates, and unblocking.
 
 ---
 

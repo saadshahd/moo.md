@@ -7,7 +7,7 @@ allowed-tools: Read, Bash
 
 # Intent Translator
 
-Turn rough ideas into iron-clad work orders.
+CLARIFY. Turn rough ideas into iron-clad work orders.
 
 ---
 

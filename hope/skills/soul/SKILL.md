@@ -6,8 +6,7 @@ allowed-tools: Read, Grep, Glob
 ---
 
 <core-principles>
-This skill applies to every task.
-Run Silent Audit before responding. Use confidence gates.
+EVALUATE. Run Silent Audit before responding. Use confidence gates.
 Clarify intent using /hope:intent before building.
 
 **Defer to specific skills** when request clearly matches:

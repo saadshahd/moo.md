@@ -4,7 +4,7 @@ description: Assemble multiple experts for debate and consensus. Use for design 
 
 # /hope:panel
 
-Assemble an expert panel for debate and guidance.
+MODERATE. Assemble an expert panel for debate and guidance.
 
 ## Usage
 

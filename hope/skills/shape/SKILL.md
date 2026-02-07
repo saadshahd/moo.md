@@ -7,7 +7,7 @@ allowed-tools: Read, Bash, Skill
 
 # Shape
 
-Bridge between intent clarification and implementation. Transforms WHAT into HOW.
+DECIDE. Bridge between intent clarification and implementation. Transforms WHAT into HOW.
 
 ## When to Use Shape
 

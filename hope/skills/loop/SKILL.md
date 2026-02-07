@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, Task, Skill, AskUserQuestion
 
 # Loop
 
-Autonomous iteration: spec scoring → shape → decompose → wave execution → review → verify + gate → user review & feedback.
+EXECUTE. Autonomous iteration: spec scoring → shape → decompose → wave execution → review → verify + gate → user review & feedback.
 
 ---
 
@@ -106,7 +106,7 @@ digraph WaveExecution {
 ```
 
 1. **Identify ready items:** Work items with no pending dependencies
-2. **Spawn subagents:** `Task(prompt="HOPE CONTEXT: [session strategy + criteria + mustNot]\n\n[work item instructions]", subagent_type="general-purpose")` for each ready item
+2. **Spawn subagents:** `Task(prompt="EXECUTE. [session strategy + criteria + mustNot]\n\n[work item instructions]", subagent_type="general-purpose")` for each ready item
 3. **Collect results:** Wait for all subagents in the wave
 4. **Review:** Request expert panel to review scope compliance — check work stays within spec
 5. **Log:** `[WAVE {N} COMPLETE] {completed}/{total} items done`
