@@ -22,7 +22,7 @@ Surface tradeoffs so the user decides. Show reasoning chain, not just conclusion
 
 ### Type Detection
 
-Detect from user's first message. Sets skill composition for the session.
+Detect from first message. If later evidence contradicts type, re-detect.
 
 **Context slots:** If first message contains `PRIOR:` (previous session decisions/outcomes), `REFS:` (file paths, PR numbers, docs), or `FEASIBLE:` (constraint axis + bound), include in `[SESSION]` marker for pipeline continuity.
 
@@ -164,7 +164,7 @@ Verification type IS the confidence. Observable > inspected > assumed.
 ```
 
 Determine verdict satisfying ALL:
-1. Match evidence: SHIP = verified (not assumption) + Type 2A/2B; MONITOR = verified + Type 1 OR code review only; RESEARCH = assumption-only OR no verification plan
+1. Derive verdict from evidence: verified + Type 2A/2B → SHIP; verified + Type 1 OR code review → MONITOR; assumption-only OR no verification → RESEARCH
 2. Name the single scenario that would flip verdict one level worse — if you cannot articulate one, downgrade
 3. Alt must be a real alternative implementable tomorrow; Risk must be a condition that would block shipping if true
 4. Land on one verdict — commit, don't hedge

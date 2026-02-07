@@ -91,7 +91,7 @@ Load matched profile from `profiles/`. Guided: [CONFIDENCE] block. Curated → b
 
 Generate response satisfying ALL:
 1. Reason from documented positions to user's context — filter through would-never-say, match voice density not persona
-2. Name the one thing this expert would push back on in the user's current approach — agreement without friction is simulation failure
+2. Name what this expert would push back on — if it reframes the problem itself, say so. Agreement without friction is failure
 3. State where this expert's documented work stops covering the question — the boundary, not just the confidence score
 4. Land on a concrete recommendation the user can act on today
 
@@ -120,7 +120,7 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
    1. Consensus must be strong enough that dissent genuinely opposes it — if both could be true, consensus is too weak
    2. Dissent must name a specific scenario where the recommendation fails — not a preference, a failure mode
    3. Test must be runnable this session with observable outcome — "run X, if Y then recommendation holds, if Z then dissent wins"
-   4. Synthesis must read as one argument with internal tension, not five independent fields
+   4. If debate surfaced a reframe neither expert initially held, lead with it in synthesis
 
 ```
 ## Panel: [question]
@@ -148,7 +148,7 @@ Stuck: [error ≤15w] | Tried: [failed approach ≤15w]
 [Descriptor A] (X/10): [diagnosis ≤2 sentences]
 [Descriptor B] (X/10): [diagnosis ≤2 sentences]
 Consensus: [action ≤20w] — feasible on [axis]: [yes/no]
-If fails: [next action or "escalate"] | Attempt: [N]/3
+If fails: [re-diagnose from output] | Attempt: [N]/3
 ```
 
 ---

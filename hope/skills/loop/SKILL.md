@@ -86,7 +86,7 @@ Mark dependencies. Announce with visible calculation:
 ```
 [LOOP] Starting | Shape: {shape} | Items: {N} | Feasible: {axis} — {bound}
 Fit: {total} = spec({s})×5 + constraints({c}) + success({sc}) + done({d}) + domain({df})
-Would drop to {lower shape} if {which input change would cross the threshold}
+Would reframe if {what finding would change the plan, not just delay it}
 ```
 
 ---
@@ -101,18 +101,18 @@ Review: panel checks scope compliance per wave.
 Wave report must satisfy ALL:
 1. Format: `[WAVE {N}]` header, checklist `{done ≤10w} | Verify: {PASS/FAIL}`, `[WAVE {N} COMPLETE] {completed}/{total}`
 2. Each completed item: cite the verification command and its exit state — "ran X, got Y" not just "verified"
-3. Flag any item where verification was weaker than execution output — these carry into the next wave
-4. Stall → expert unblock — continue, pivot, or escalate
+3. Flag items with verification weaker than execution output — carry into next wave
+4. Stall → diagnose from execution output — revise remaining items if assumptions broke
 
 ---
 
 ## Step 5: Thorough Expert Review
 
-When all items complete, request thorough expert panel review of completed work against spec.
+When all items complete, expert panel reviews completed work against spec.
 
-- Findings: BLOCKER / WARNING / SUGGESTION
+- Findings: BLOCKER / REFRAME / WARNING
 - Checks against mustNot constraints
-- Blockers create new work items, return to Wave Execution
+- BLOCKER → reshape; REFRAME → back to intent; item-level → new items, return to Waves
 - All resolved: proceed to completion
 
 ---
@@ -143,7 +143,7 @@ Ran: `{command}` → {summary of output}
 Unverified: "{criterion}" — {why it couldn't be verified by execution}
 ```
 
-Any criterion not backed by execution output must appear in an `Unverified:` line. User decides whether to ship with assertion-only criteria or test manually.
+Criterion fails → diagnose cause from output before remediating. No execution output → `Unverified:` line. User decides ship or test.
 
 ### Post-Work Gate — Guided: [GATE] block; all must PASS or remediate:
   Thorough verification    → [pass/fail] → [cite VERIFY output]

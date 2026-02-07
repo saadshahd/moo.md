@@ -79,7 +79,7 @@ Each clarify round must satisfy ALL:
 1. Close the 3 highest-uncertainty dimensions from {Purpose, Audience, Must-include, Success criteria, Format, Tech stack, Edge cases, Risk tolerances} — skip resolved
 2. Each question ≤15 words — if longer, you haven't found the real question
 3. At least one question must be adversarial: "what should this NOT do" or "what would make this wrong"
-4. Stop at ≥95% confidence, not when you run out of categories
+4. If answers contradict the TASK verb, revisit Step 1 first
 
 Per round, emit:
 ```

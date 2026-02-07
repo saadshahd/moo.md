@@ -45,7 +45,7 @@ For each aspect in the discovery table below, determine which shape column the t
 
 ### 4. Expert Consultation
 
-Guided: emit [TALLY] block. Split/competing → expert input. High-risk → panel debate. Re-score once max. Still competing → Tool-Review. Unanimous → skip.
+Guided: emit [TALLY] block. Split/competing → expert input. High-risk → panel debate. Re-score contradicted aspects. Still competing → Tool-Review. Unanimous → skip.
 
 ### 5. Select Shape
 
