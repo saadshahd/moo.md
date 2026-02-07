@@ -57,7 +57,7 @@ digraph SpecDecision {
 | 25-29 | Colleague | Iterate each step |
 | <25 | BLOCKED | Clarify first |
 
-Calculation: spec_score x 5 + constraints + success_criteria + done_definition + domain_familiarity
+Guided: assess factors in [SCORING] block. Then: spec_score×5 + constraints + success_criteria + done_definition + domain_familiarity
 
 ---
 
@@ -96,13 +96,13 @@ Would drop to {lower shape} if {which input change would cross the threshold}
 **Wave** = work items with no unresolved dependencies.
 
 Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot]\n\n[work item]", subagent_type="general-purpose")`
-Review: expert panel checks scope compliance after each wave.
+Review: panel checks scope compliance per wave.
 
 Wave report must satisfy ALL:
 1. Format: `[WAVE {N}]` header, checklist `{done ≤10w} | Verify: {PASS/FAIL}`, `[WAVE {N} COMPLETE] {completed}/{total}`
 2. Each completed item: cite the verification command and its exit state — "ran X, got Y" not just "verified"
 3. Flag any item where verification was weaker than execution output — these carry into the next wave
-4. No progress → expert diagnosis to auto-unblock — continue, pivot, or escalate
+4. Stall → expert unblock — continue, pivot, or escalate
 
 ---
 
@@ -145,7 +145,7 @@ Unverified: "{criterion}" — {why it couldn't be verified by execution}
 
 Any criterion not backed by execution output must appear in an `Unverified:` line. User decides whether to ship with assertion-only criteria or test manually.
 
-### Post-Work Gate — all must PASS or create remediation items:
+### Post-Work Gate — Guided: [GATE] block; all must PASS or remediate:
   Thorough verification    → [pass/fail] → [cite VERIFY output]
   Expert review clear      → [pass/fail] → [cite "no BLOCKERs" or list]
   Feature executes         → [pass/fail] → [cite execution output]

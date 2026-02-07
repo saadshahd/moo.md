@@ -93,7 +93,7 @@ Use MCQ format for speed (user responds "1A, 2B").
 
 ### Step 3: Score the Spec
 
-Anchored rubric (0=vague, 1=directional, 2=testable). Cite user's words. "To score 2" = what would change score.
+Guided: emit [SCORING] block. Anchored rubric (0=vague/1=directional/2=testable). Cite user's words, then table.
 
 | Dimension | /2 | Evidence (user's words, or TBD) | To score 2 |
 |-----------|-----|----------------------------------|------------|
@@ -132,7 +132,7 @@ Score ≥8 required. Produce the brief satisfying ALL:
 3. NON-GOALS must name things a reasonable developer WOULD attempt — obvious exclusions are noise
 4. STOP CONDITIONS must name observable failure states, not process labels — "API returns 5xx on auth endpoint" not "tests fail"
 
-SELF-AUDIT (after brief, revise before presenting if any FAIL) →
+SELF-AUDIT (Guided: emit in [AUDIT] block; revise if any FAIL) →
   OBJECTIVE present           → [pass/fail] → [first 5 words]
   NON-GOALS has 3-5 bullets   → [pass/fail] → [count]
   ACCEPTANCE has 7-12 bullets  → [pass/fail] → [count]

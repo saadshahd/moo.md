@@ -45,7 +45,7 @@ For each aspect in the discovery table below, determine which shape column the t
 
 ### 4. Expert Consultation
 
-When aspect scores are split or competing, seek expert input on tradeoffs. For high-risk aspects, request panel debate. Re-score at most once if expert input changes evaluations. If still competing after re-score, default to Tool-Review. Unanimous scores skip consultation.
+Guided: emit [TALLY] block. Split/competing → expert input. High-risk → panel debate. Re-score once max. Still competing → Tool-Review. Unanimous → skip.
 
 ### 5. Select Shape
 

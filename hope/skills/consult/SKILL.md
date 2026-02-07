@@ -71,7 +71,7 @@ Detection order (first match wins):
 
 ### Step 2: Load Profile + Score Confidence
 
-Load ONLY the matched profile from `profiles/`. Curated profile → base 6/10. No curated profile (dynamic) → base 4/10 + low-confidence warning.
+Load matched profile from `profiles/`. Guided: [CONFIDENCE] block. Curated → base 6/10. Dynamic → base 4/10 + low-confidence warning.
 
 | Modifier | Impact |
 |----------|--------|

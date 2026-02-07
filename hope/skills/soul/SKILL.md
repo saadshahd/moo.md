@@ -81,7 +81,7 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 
 ---
 
-## Silent Audit (Run Before Every Response)
+## Silent Audit (Guided: always surface; other: on interrupt)
 
 | Check | Threshold | Guidance |
 |-------|-----------|----------|
@@ -89,7 +89,7 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 | Fit score | <25 | EXPLORE → gather more context |
 | Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
 
-When audit triggers an interrupt, surface:
+On interrupt (Guided: every turn):
 ```
 [AUDIT] Spec: [N]/10 | Fit: [N] | Verdict: [PROCEED/CLARIFY/EXPLORE]
 Gap: [what's missing ≤15w] | Action: [next step ≤10w]
