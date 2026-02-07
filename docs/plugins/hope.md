@@ -72,7 +72,7 @@ Then asks engagement level once:
 
 ## Verification gates
 
-Dual-signal system: verification type (primary) + subjective estimate (secondary).
+Verification type IS the confidence. Observable > inspected > assumed.
 
 | Verification Type | Sufficient for SHIP? |
 |-------------------|---------------------|
@@ -82,7 +82,7 @@ Dual-signal system: verification type (primary) + subjective estimate (secondary
 | `code review` | Weak |
 | `assumption` | Blocks SHIP |
 
-Subjective percentages are Claude's estimates, not calibrated accuracy. Weight verification type higher.
+Every score shows its inputs. Every assertion names what would disprove it. No subjective percentages — verification type replaces them.
 
 ---
 

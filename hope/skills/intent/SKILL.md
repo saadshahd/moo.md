@@ -97,17 +97,19 @@ Use MCQ format for speed (user responds "1A, 2B"):
 
 ### Step 3: Score the Spec
 
-| Dimension | /2 | Gap |
-|-----------|-----|-----|
-| Outcome | | |
-| Scope | | |
-| Constraints | | |
-| Success Criteria | | |
-| Done Definition | | |
-| **Total** | **/10** | |
+Use anchored rubric (0 = vague, 1 = directional, 2 = testable). Cite user's own words as evidence. "To score 2" states what would change the score — user can challenge or fill the gap.
+
+| Dimension | /2 | Evidence (user's words) | To score 2 |
+|-----------|-----|-------------------------|------------|
+| Outcome | | | |
+| Scope | | | |
+| Constraints | | | |
+| Success Criteria | | | |
+| Done Definition | | | |
+| **Total** | **/10** | | |
 
 - **≥8:** Proceed to Step 6
-- **5-7:** Iterate with user, suggest `/hope:shape`
+- **5-7:** Iterate — user fills gaps visible in "To score 2" column
 - **<5:** Return to Step 2
 
 ### Step 4: Echo Check

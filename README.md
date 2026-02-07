@@ -57,12 +57,13 @@ Claude will:
 
 ---
 
-| Verdict    | 🟢 SHIP                |
-| ---------- | ---------------------- |
-| Verified   | execution output       |
-| Checklist  | 4/4                    |
-| Subjective | ~85% · Type 2A · 3pt   |
-| Alt        | [alternative approach] |
-| Risk       | [key assumption]       |
+| Verdict    | 🟢 SHIP                         |
+| ---------- | -------------------------------- |
+| Verified   | execution output                 |
+| Basis      | ran tests + type-check           |
+| Unverified | [what wasn't — how to test]      |
+| Reversible | 2A · 3pt                         |
+| Alt        | [alternative approach]           |
+| Risk       | [key assumption]                 |
 
 _Every response ends with evidence, not hope._

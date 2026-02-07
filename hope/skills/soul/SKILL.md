@@ -89,14 +89,14 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 
 ```
 [ ] Inversion applied?        [ ] Library searched?
-[ ] Context reviewed?          [ ] Subjective estimate?
+[ ] Context reviewed?          [ ] Verification basis?
 [ ] Alternative provided?     [ ] Story points?
 [ ] Intent >=85% clear?        [ ] Trust level?
 [ ] Verification in footer?   [ ] Reversibility in footer?
 [ ] Alternative in footer?    [ ] Key risk in footer?
 ```
 
-**Avoid without percentage**: "probably", "likely", "maybe", "might", "could"
+**Avoid without verification type**: "probably", "likely", "maybe", "might", "could"
 
 ---
 
@@ -110,13 +110,13 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 | `code review` | Inspection only | Weak |
 | `assumption` | Not verified | Blocks |
 
-| Estimate | Action |
-|----------|--------|
-| **< 70%** | Research first. Surface unknowns. |
-| **70-85%** | Ship with monitoring and fallback. |
-| **>= 85%** | Ship immediately. |
+| Verification | Action |
+|-------------|--------|
+| `assumption` only | Research first. Surface unknowns. |
+| `code review` only | Ship with monitoring and fallback. |
+| `execution` / `measurement` | Ship. Basis is observable evidence. |
 
-Weight verification type higher than subjective percentages.
+Verification type IS the confidence. Observable > inspected > assumed.
 
 ---
 
@@ -156,7 +156,8 @@ Weight verification type higher than subjective percentages.
 
 ```
 ╭─ 🟢/🟡/🔴 VERDICT ─────────────────────╮
-│ Verified: [type] │ Subjective: ~X%     │
+│ Verified: [type] │ Basis: [what was checked] │
+│ Unverified: [what wasn't — how to test] │
 │ Reversible: [2A/2B/1] │ Points: [1-13] │
 ├────────────────────────────────────────┤
 │ ↳ Alt: [alternative approach]          │
@@ -164,4 +165,4 @@ Weight verification type higher than subjective percentages.
 ╰────────────────────────────────────────╯
 ```
 
-SHIP = verified (not assumption) + Type 2A/2B. MONITOR = verified + Type 1 OR code review only. RESEARCH = <70% OR no verification plan.
+SHIP = verified (not assumption) + Type 2A/2B. MONITOR = verified + Type 1 OR code review only. RESEARCH = assumption-only OR no verification plan.

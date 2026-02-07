@@ -59,7 +59,13 @@ Count which column each aspect lands in:
 
 ### 6. Output Shape
 
-Present in conversation: selected shape, relevant aspects with evidence, criteria (boolean/verifiable), mustNot constraints.
+Present in conversation: selected shape, scored aspects, criteria (boolean/verifiable), mustNot constraints.
+
+Each scored aspect must include:
+- **Because:** one observable fact that justifies the column placement
+- **Would change if:** what evidence would flip the score to a different column
+
+User can challenge any "Because" — if they provide counter-evidence, re-score that aspect.
 
 ---
 

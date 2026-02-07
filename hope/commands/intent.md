@@ -104,17 +104,17 @@ When any answer contains "some", "several", "multiple", "various", or "key [noun
 
 After clarifying, score the request:
 
-| Dimension | Score | Gap |
-|-----------|-------|-----|
-| Outcome | /2 | |
-| Scope | /2 | |
-| Constraints | /2 | |
-| Success Criteria | /2 | |
-| Done Definition | /2 | |
-| **Total** | /10 | |
+| Dimension | /2 | Evidence (user's words) | To score 2 |
+|-----------|-----|-------------------------|------------|
+| Outcome | | | |
+| Scope | | | |
+| Constraints | | | |
+| Success Criteria | | | |
+| Done Definition | | | |
+| **Total** | **/10** | | |
 
 - **≥8:** Proceed to build (Tool-shaped)
-- **5-7:** Iterate together (Colleague-shaped) OR clarify more
+- **5-7:** Iterate — user fills gaps visible in "To score 2" column
 - **<5:** Continue clarification loop
 
 ### 3 Echo Check

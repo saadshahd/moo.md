@@ -81,7 +81,13 @@ Work Items:
 2. [imperative action] — [what + criteria + verify command]
 ```
 
-Mark dependencies. Announce: `[LOOP] Starting | Shape: {Tool/Colleague} ({score}/10) | Items: {N}`
+Mark dependencies. Announce with visible calculation:
+
+```
+[LOOP] Starting | Shape: {shape} | Items: {N}
+Fit: {total} = spec({s})×5 + constraints({c}) + success({sc}) + done({d}) + domain({df})
+Would drop to {lower shape} if {which input change would cross the threshold}
+```
 
 ---
 
@@ -144,11 +150,19 @@ Detect tools before verifying — never assume. Check: `package.json` scripts, `
 | **Standard** | < 30s | Lint + types + tests |
 | **Thorough** | < 2min | Full suite + evidence |
 
-Run thorough. Report: `[VERIFY] {PASS/FAIL} | {N} criteria | Passed: {Y} | Failed: {Z} | verification_type: execution output`
+Run thorough. Report with evidence:
+
+```
+[VERIFY] {PASS/FAIL} | {Y}/{N} criteria | Type: execution output
+Ran: `{command}` → {summary of output}
+Unverified: "{criterion}" — {why it couldn't be verified by execution}
+```
+
+Any criterion not backed by execution output must appear in an `Unverified:` line. User decides whether to ship with assertion-only criteria or test manually.
 
 ### Post-Work Gate
 
-Thorough verification passed (all PASS with evidence), expert review passed (no BLOCKERs), feature executes without errors (show output), edge cases tested.
+Thorough verification passed (all PASS with evidence), expert review passed (no BLOCKERs), feature executes without errors (show output), edge cases: list which were tested or state "assertion only".
 
 If gate fails: create remediation items, continue loop.
 
@@ -169,23 +183,16 @@ After verification passes, present the full journey for user review:
 
 ---
 
-## Cancel & Status
+## Cancel, Status & Circuit Breakers
 
-**Cancel** ("cancel loop", "stop", "abort"): Acknowledge, report completed/remaining. Current iteration completes before cancel.
-
-**Status** ("loop status", "progress"): Scan for `[LOOP] Starting`, `[WAVE N COMPLETE]`, `<loop-complete>` markers. Display progress summary.
-
----
-
-## Circuit Breakers
+**Cancel** ("cancel loop", "stop", "abort"): Report completed/remaining. Current iteration completes before cancel.
+**Status** ("loop status", "progress"): Scan for `[LOOP] Starting`, `[WAVE N COMPLETE]`, `<loop-complete>` markers.
 
 | Trigger | Threshold | Action |
 |---------|-----------|--------|
 | Max iterations | User-configured | Pause, announce progress |
 | Budget exceeded | User-configured | Pause, offer continue |
 | mustNot true | From shape output | Stop immediately |
-
----
 
 ## Boundary
 

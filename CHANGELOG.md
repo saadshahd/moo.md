@@ -13,6 +13,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hope): Numeric hard constraints across all 5 skills — replaced vague quantifiers ("some", "multiple", "key") with exact counts. Intent: 3-5 questions/round, 3-7 blueprint steps, vague-quantity MCQ detection. Loop: 5-21 work items, top 3 decisions in summary. Shape: min 5/8 aspects scored. Consult: 2-3 panel tradeoffs. Soul: 1-3 unknowns, 2+ subsystems in complexity table.
 
 ### Added
+- feat(hope): Falsifiability — every score shows its inputs, every assertion names its negation test
+  - soul: quality footer replaces subjective percentages with verification basis + unverified call-outs
+  - intent: spec score table shows evidence per dimension and what would change the score
+  - shape: aspect scoring outputs "Because" evidence and "Would change if" conditions
+  - consult: expert confidence shows formula modifiers; panel synthesis includes evidence basis and test line
+  - loop: fit score shows full calculation; VERIFY format calls out unverified assertions
 - feat(hope): Context injection slots across all 5 skills — users paste labeled blocks (TASK/CONTEXT/DONE/STAKES/CONSTRAINTS) to skip clarification rounds
 - feat(hope): Scaffold template in intent — "what do you need from me" emits fillable slot template
 - feat(hope): Artifact injection in intent — ARTIFACT + ARTIFACT-TYPE slots for structured extraction from error logs, specs, PRDs, test output

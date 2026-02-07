@@ -103,7 +103,8 @@ Apply expert's philosophy, voice, typical concerns, and would-never-say guardrai
 One expert perspective on the query. Use anonymized descriptors.
 
 ```
-**Channeling [descriptor]** (X/10 confidence)
+**Channeling [descriptor]** (X/10: [modifiers that applied])
+Outside [boundary of documented expertise], confidence drops to Y/10.
 [Response in expert's voice]
 ---
 *Simulated perspective based on documented work, not the expert's actual opinion.*
@@ -127,8 +128,12 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 ### Synthesis
 - **Consensus:** [what they agree on]
 - **Key tradeoff:** [main tension]
+  - A's basis: [documented pattern / published project / theoretical]
+  - B's basis: [documented pattern / published project / theoretical]
 - **Recommendation:** [lean + reasoning]
 - **Dissent:** [strongest counter]
+- **Test:** [one experiment that validates the recommendation]
+  If right, you'll see: [observable]. If wrong: [observable].
 ```
 
 ### Unblock Mode
