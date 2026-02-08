@@ -309,6 +309,7 @@ stateDiagram-v2
 
 | Hook | Trigger | State Effect |
 |------|---------|-------------|
+| `SessionStart` | Session start/resume/clear/compact | Injects full soul SKILL.md into context via `session-start.sh` |
 | `UserPromptSubmit` | Every user message | → `soul.audit` via `ensure-soul.sh` (injects session context) |
 | `SubagentStart` | Every subagent spawn | Propagates [SESSION] + criteria + mustNot + compaction guidance |
 
