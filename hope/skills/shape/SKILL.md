@@ -9,15 +9,9 @@ allowed-tools: Read, Bash, Skill
 
 DECIDE. Bridge between intent clarification and implementation. Transforms WHAT into HOW.
 
-## When to Use Shape
+## Entry
 
-- After `/hope:intent` when spec_score >= 5
-- Explicit request: "shape this", "how should I build this"
-- Architecture decisions needed before coding
-
-**If spec_score < 5:** Return to `/hope:intent` for clarification first.
-
-**Output:** Returns shape choice, approach, risks, and criteria in conversation. Never writes files. Caller decides next action.
+Requires spec_score >= 5 (otherwise return to intent). Output: shape + criteria[] + mustNot[] in conversation. Never writes files.
 
 ---
 
@@ -100,6 +94,11 @@ SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
   Shape selected + justified → [pass/fail] → [cite majority column]
   Approach grid spread met (≥1 ≤3, ≥1 ≥8) or single approach → [pass/fail]
 
+### 7. Action Bridge
+
+After shape output, append: `→ Start: [first atomic action from highest-priority criterion ≤15w — produces visible artifact]`
+Colleague → action is a question to ask. Tool-Review/Tool → action is a command or file to create.
+
 ---
 
 ## Aspect Discovery
@@ -124,7 +123,7 @@ Score each aspect for the task. The column where most aspects land determines th
 ## Integration
 
 1. Ground decisions in session values
-2. Run this skill's protocol (steps 1-6)
+2. Run this skill's protocol (steps 1-7)
 3. Output shape choice + approach + risks in conversation
 
 Shape output feeds into the execution loop:

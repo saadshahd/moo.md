@@ -13,11 +13,7 @@ EXECUTE. Autonomous iteration: spec scoring → shape → decompose → wave exe
 
 ## Pipeline Context
 
-Scan conversation for existing pipeline artifacts:
-- Intent brief (OBJECTIVE/NON-GOALS/CONSTRAINTS/ACCEPTANCE) → use as spec input
-- Shape output (criteria[]/mustNot[]/shape) → skip Step 2, proceed to decomposition
-- Context slots: `PASS:`, `FAIL:`, `FEASIBLE:` → merge into criteria[], mustNot[], and decomposition bounds
-- Neither → proceed normally from Step 1
+Scan for: intent brief → spec input | shape output (criteria[]/mustNot[]/shape) → skip Step 2 | `PASS:`/`FAIL:`/`FEASIBLE:` slots → merge into constraints/bounds. Nothing → Step 1.
 
 ---
 
@@ -167,10 +163,11 @@ Decisions:
 Verified: [PASS/FAIL] | Pass/Fail/Unverified: [names] | Evidence: [type]
 Unverified: [list or "none"]
 ```
-2. **Gather feedback** — "Anything to adjust, extend, or revisit?"
-4. **Next action:**
-   - Feedback yields new work → refine intent from feedback, re-enter loop (Step 1)
-   - User satisfied → emit `<loop-complete>` + quality footer
+2. **Next action:**
+   → Next: [one action from remaining/unverified criteria ≤15w] | Alt: [alternative ≤10w]
+   "Adjust, or proceed with the above?"
+   - Adjust → refine, re-enter loop (Step 1)
+   - Proceed → emit `<loop-complete>` + quality footer
 
 ---
 

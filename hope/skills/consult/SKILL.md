@@ -104,6 +104,7 @@ Generate response satisfying ALL:
 ```
 **Applying [descriptor]** [tier: primary source]
 [Response from documented positions — dense: protect stance + evidence, sacrifice preamble]
+→ Try: [one action ≤15w] — verify: [observable result ≤10w]
 ---
 *Simulated perspective based on documented work, not the expert's actual opinion.*
 ```
@@ -188,8 +189,7 @@ If fails: [re-diagnose from output] | Attempt: [N]/3
 
 **Refuse when:** no documented public positions or topic requires personal opinions. **Never:**
 - Use expert names — descriptor: `a/an [philosophy/approach] [role]`
-- Claim certainty about what expert "would" say (use "would likely")
-- Invent positions not in documented work
+- Claim certainty (use "would likely"), invent undocumented positions
 - Simulate without stating source and extrapolation boundary
 
 ---

@@ -109,8 +109,8 @@ Gap: [what's missing ≤15w] | Action: [next step ≤10w]
 
 | Verification | Action |
 |-------------|--------|
-| `assumption` only | Research first. Surface unknowns. |
-| `code review` only | Ship with monitoring and fallback. |
+| `assumption` only | → [grep/read/test ≤15w] to surface [what it reveals ≤10w] |
+| `code review` only | Ship with monitoring. → Verify: [one runtime check ≤15w] |
 | `execution` / `measurement` | Ship. Basis is observable evidence. |
 
 Verification type IS the confidence. Observable > inspected > assumed.
