@@ -43,9 +43,19 @@ Three collaboration modes determine how user and agent interact during implement
 
 For each aspect in the discovery table below, determine which shape column the task falls into.
 
-### 4. Expert Consultation
+### 4. Expert Consultation (+ Approach Comparison)
 
 Guided: emit [TALLY] block. Split/competing → expert input. High-risk → panel debate. Re-score contradicted aspects. Still competing → Tool-Review. Unanimous → skip.
+
+When 2+ candidate approaches surface in extraction or scoring:
+
+| ? | [Aspect question A] | [Aspect question B] | [Aspect question C] | Notes (≤15w) |
+|---|---|---|---|---|
+| [Approach A] | [0-10] | [0-10] | [0-10] | |
+| [Approach B] | [0-10] | [0-10] | [0-10] | |
+**Spread:** ≥1 cell ≤3, ≥1 cell ≥8. Scale: 0=clearly no, 10=clearly yes
+Columns: relevant aspects as questions where approaches diverge (>2pt gap). If spread fails, wrong columns.
+User picks approach → continue aspect scoring with chosen approach.
 
 ### 5. Select Shape
 
@@ -88,6 +98,7 @@ SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
   criteria[] non-empty       → [pass/fail] → [count items]
   mustNot[] has ≥2 items     → [pass/fail] → [cite items]
   Shape selected + justified → [pass/fail] → [cite majority column]
+  Approach grid spread met (≥1 ≤3, ≥1 ≥8) or single approach → [pass/fail]
 
 ---
 
@@ -107,33 +118,6 @@ Score each aspect for the task. The column where most aspects land determines th
 | Reversibility | Hard to undo, high stakes | Moderate rollback effort | Trivial to revert |
 
 **Rule:** Score at least 5 of 8. **Horizon tiebreaker** (columns split evenly): Tactical → Decomposition + Ambiguity decide | Strategic → Risk + Reversibility decide | Existential → Novelty + Interdependency decide.
-
----
-
-## Decision Logic
-
-```dot
-digraph shape_decision {
-  rankdir=TB
-  start [label="Spec ready\n(score >= 5)"]
-  score [label="Score 8 aspects\nagainst 3 shapes"]
-  consult [label="Expert input\non tradeoffs"]
-  decide [label="Majority column?"]
-  override [label="Risk or Interdep\n= Colleague?"]
-  colleague [label="Colleague shape"]
-  tool_review [label="Tool-Review shape"]
-  tool [label="Tool shape"]
-  start -> score
-  score -> consult [label="split/competing"]
-  score -> decide [label="unanimous"]
-  consult -> decide
-  decide -> colleague [label="Colleague"]
-  decide -> tool_review [label="Mixed/Tool-Review"]
-  decide -> override [label="Tool"]
-  override -> tool_review [label="Yes"]
-  override -> tool [label="No"]
-}
-```
 
 ---
 

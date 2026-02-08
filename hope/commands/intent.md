@@ -1,5 +1,5 @@
 ---
-description: Turn rough ideas into iron-clad work orders through 6-step clarification protocol before building
+description: Turn rough ideas into iron-clad work orders through 5-step clarification protocol before building
 ---
 
 # Intent Translator

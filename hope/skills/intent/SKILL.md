@@ -34,7 +34,7 @@ Intent adapts its focus based on the active session type:
 
 ---
 
-## 6-Step Protocol
+## 5-Step Protocol
 
 ### Step 1: Acknowledge + Define
 
@@ -102,7 +102,16 @@ Guided: emit [SCORING] block. Anchored rubric (0=vague/1=directional/2=testable)
 | Done Definition | [0-2] | "[quote]" or TBD | [what's needed] |
 | **Total** | **[N]/10** | | **Route: [PROCEED / ITERATE / CLARIFY]** |
 
->=8: proceed to Step 6 | 5-7: fill "To score 2" gaps | <5: return to Step 2
+>=8: proceed to Step 5 | <5: return to Step 2
+5-7 with 2+ interpretations diverging on 2+ dimensions → comparison grid:
+
+| ? | [Outcome question] | [Scope question] | [Constraint question] | Notes (≤15w) |
+|---|---|---|---|---|
+| [Interpretation A] | [0-10] | [0-10] | [0-10] | |
+| [Interpretation B] | [0-10] | [0-10] | [0-10] | |
+**Spread:** ≥1 cell ≤3, ≥1 cell ≥8. Scale: 0=clearly no, 10=clearly yes. If not met, wrong dimensions — swap.
+User picks → re-score with chosen interpretation → route normally
+5-7 otherwise: fill "To score 2" gaps
 
 ### Step 4: Echo Check
 
@@ -114,15 +123,7 @@ User responds: YES to lock / EDITS / BLUEPRINT / RISK... WAIT
 - BLUEPRINT: list 3-7 key steps + sample I/O, pause for YES / EDITS
 - RISK: list top 3 failure scenarios, pause for YES / EDITS
 
-### Step 5: Refine Constraints
-
-When stuck in vague territory:
-1. Write your best guess at the spec
-2. List assumptions explicitly
-3. Ask ONE clarifying question
-4. Propose a specific solution
-
-### Step 6: Emit Iron-Clad Brief
+### Step 5: Emit Iron-Clad Brief
 
 Score ≥8 required. Produce the brief satisfying ALL:
 1. OBJECTIVE (1 sentence) + NON-GOALS (3-5) + CONSTRAINTS + ACCEPTANCE (7-12 bullets ≤20w, 2+ "must NOT") + STOP (3-5)

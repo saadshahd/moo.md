@@ -117,25 +117,25 @@ Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="pane
 1. **Select** 3-5 relevant experts — prioritize productive disagreement. Anonymized descriptors.
 2. **Debate** — each reasons from documented positions to context. Evidence required.
 3. **Surface + Synthesize** satisfying ALL:
-   1. Consensus must be strong enough that dissent genuinely opposes it — if both could be true, consensus is too weak
-   2. Dissent must name a specific scenario where the recommendation fails — not a preference, a failure mode
-   3. Test must be runnable this session with observable outcome — "run X, if Y then recommendation holds, if Z then dissent wins"
-   4. If debate surfaced a reframe neither expert initially held, lead with it in synthesis
+   1. Consensus strong enough that dissent names a failure mode — if both could be true, consensus too weak
+   2. Test runnable this session — "run X, if Y then holds, if Z then dissent wins"
+   3. If debate reframed the problem, lead with reframe. If 2+ approaches diverge, use comparison grid
 
 ```
 ## Panel: [question]
 **[Descriptor A]** [tier]: [position + reasoning — ≤3 sentences, protect disagreement]
 **[Descriptor B]** [tier]: [position + reasoning — ≤3 sentences, protect disagreement]
-### Synthesis
-- **Consensus:** [what they agree on] (≤15 words)
-- **Key tradeoff:** [main tension] (≤20w) | A: [source] (≤10w) | B: [source] (≤10w)
-- **Recommendation:** [lean + reasoning] (≤20w) — feasible on [axis]: [yes/no]
-- **Dissent:** [strongest counter] (≤15w)
-- **Least-grounded:** [which position + why] (≤15w)
-- **Test:** [experiment] (≤15w) | If right: (≤10w) | If wrong: (≤10w)
+### Synthesis — comparison grid (divergent) or bullets (unanimous)
+| ? | [Dim A question] | [Dim B question] | [Dim C question] | Why? (≤15w) |
+|---|---|---|---|---|
+| [Approach A] | [0-10] | [0-10] | [0-10] | |
+| [Approach B] | [0-10] | [0-10] | [0-10] | |
+**Spread:** ≥1 cell ≤3, ≥1 cell ≥8. Scale: 0=clearly no, 10=clearly yes | **Least-grounded:** [position + gap] (≤15w)
+**Recommendation:** [lean + reason] (≤20w) | **Test:** [experiment] (≤15w)
+Unanimous: **Consensus** (≤15w) | **Recommendation** (≤20w) | **Test** (≤15w)
 ```
 SELF-AUDIT → revise before presenting if any FAIL:
-  Dissent present + non-trivial → [pass/fail] → [cite Dissent line]
+  Spread met (≥1 cell ≤3, ≥1 ≥8) or unanimous (bullets) → [pass/fail]
   Test has if-right AND if-wrong → [pass/fail] → [cite observables]
   Least-grounded position named → [pass/fail] → [cite which + gap]
 

@@ -1,0 +1,16 @@
+name: shape-approach-comparison
+description: Shape produces comparison grid when user presents competing technical approaches
+plugin: hope
+skill: hope:shape
+flaky: true
+acceptableSkills:
+  - shape
+  - hope:shape
+  - intent
+  - hope:intent
+prompt: "I need to add search to the product catalog. Torn between Elasticsearch and Postgres full-text search. Shape the approach."
+expectedBehaviors:
+  - "Comparison grid scoring approaches against relevant aspects"
+  - "Forced spread in scores (at least one ≤3, one ≥8)"
+  - "User asked to pick approach before aspect scoring continues"
+  - "Shape output with criteria and mustNot constraints"
