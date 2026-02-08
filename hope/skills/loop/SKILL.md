@@ -53,7 +53,7 @@ digraph SpecDecision {
 | 15-24 | Colleague | Iterate each step |
 | <15 | BLOCKED | Clarify first |
 
-Guided: assess factors in [SCORING] block. Then: spec_score × 5 + domain_familiarity (0-10)
+Guided: [SCORING] block. spec × 5 + domain (0-10) — tiers 10 apart = domain's range, so domain shifts ±1 tier
 
 ---
 
@@ -89,7 +89,7 @@ Would reframe if {what finding would change the plan, not just delay it}
 
 ## Step 4: Wave Execution
 
-**Wave** = work items with no unresolved dependencies.
+**Wave** = work items with no unresolved dependencies. Within wave: reversible before irreversible.
 
 Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot]\n\n[work item]", subagent_type="general-purpose")`
 Review: panel checks scope compliance per wave.
@@ -167,6 +167,7 @@ User: Adjust → re-enter loop (Step 1) | Proceed → emit `<loop-complete>` + q
 | Max iterations | User-configured | Pause, announce progress |
 | Budget exceeded | User-configured | Pause, offer continue |
 | mustNot true | From shape output | Stop immediately |
+| Would-reframe-if true | From shape output | Pause, surface finding |
 
 ## Boundary
 
