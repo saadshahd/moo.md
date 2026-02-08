@@ -7,7 +7,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [hope@3.4.0] - Unreleased
+## [hope@3.4.0] - 2026-02-08
 
 ### Added
 - feat(hope): bond skill — team composition thinking. Assesses task fitness (Team/Subagent/Solo) across 4 dimensions (Independence, File ownership, Coordination, Scope), designs team structure with role boundaries and coupling checks, emits creation spec for native agent team tools after user approval. 3-step pipeline (assess → design → confirm+handoff). Session-aware decomposition using Horizon. Anti-pattern detection for common team failures. Pipeline context scan for upstream shape/feasibility. `/hope:bond` command as entry point.
@@ -15,6 +15,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - feat(hope): explicit mission statement — three aims (reduce decision regret, increase conceptual clarity, fewer but stronger artifacts) added to PHILOSOPHY.md and CLAUDE.md. Profile curation stance replaces "never shrink" accumulation. Philosophy Audit gains aim-alignment check.
 - refactor(hope): bond audit — 8 fixes. Separated thinking from creation (bond designs, Claude orchestrates with native tools). Moved anti-patterns into assessment, self-audit inline after blueprint. Added pipeline context scan and integration section. Replaced time estimates with story points. Added deadlock prevention (max 3 adjust revisions). Updated statechart deadlock table.
+- feat(hope): loop skill tightened against three aims — monitor would-reframe-if conditions during waves, sequence reversible items before irreversible, self-documenting fit score formula rationale
 - feat(hope): command cleanup — removed Usage, Inputs, and Output template sections from 5 commands (panel, summon, block, unblock, blocked). Commands now use `$0` substitution directly and keep only the protocol Claude needs to execute. -111 lines total. Intent command already clean, unchanged.
 
 ### Removed
