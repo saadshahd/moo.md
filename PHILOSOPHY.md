@@ -13,6 +13,18 @@ Moo is a **primer** — it sets up context (clear intent, shaped approach, engag
 
 ---
 
+## Mission
+
+Three outcomes moo drives toward:
+
+1. **Reduce decision regret** — Surface tradeoffs before committing. Name what would change the decision. Make reversibility visible.
+2. **Increase conceptual clarity** — Turn fog into specs. Measurable dimensions over vague assessments. If you can't compress it to one sentence, you don't understand it yet.
+3. **Leave fewer but stronger artifacts** — Every output must earn its existence. Proportional to stakes. No ceremony for ceremony's sake.
+
+The beliefs below explain *why* these outcomes require infrastructure, not willpower.
+
+---
+
 ## Beliefs
 
 ### 1. Better thinking and mistake prevention are inseparable
@@ -159,7 +171,7 @@ If the user has a matching skill installed, the trigger fires it. If not, moo ha
 - **loop** = execute + verify + complete
 - **consult** = expert simulation (42+ profiles)
 
-Profiles are data assets — they grow beyond 42, never shrink. Invocation is context-driven (domain signals in the conversation select relevant experts). No hardcoded hierarchy between experts.
+Profiles are curated, not accumulated — each must be grounded in documented positions (3+ primary sources) and serve a distinct perspective not covered by existing profiles. Retire profiles that lack documentation depth or consistently fail to earn selection. Invocation is context-driven (domain signals in the conversation select relevant experts). No hardcoded hierarchy between experts.
 
 ---
 

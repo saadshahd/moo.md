@@ -129,6 +129,8 @@ Use DOT for non-linear decision flows. Claude follows DOT structure more reliabl
 
 Core beliefs — every change to this project must align:
 
+moo drives toward three outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**. Every belief and principle below serves at least one.
+
 1. **Thinking = prevention** — Better thinking prevents mistakes. They're inseparable. Don't add safety nets separate from the thinking process.
 2. **Encode what humans forget** — If it matters under pressure, encode it in skills/hooks. Not docs. Not willpower.
 3. **Perspectives prevent blindness** — Solo thinking has systematic blind spots. Seek multiple expert lenses.
@@ -147,6 +149,7 @@ Core beliefs — every change to this project must align:
 - [ ] Does this hardcode references to specific skills? → Natural language triggers only
 - [ ] Does this create coupling that breaks if a skill is missing? → Loose coupling required
 - [ ] Does this build something Claude will do natively? → Don't compete with the platform
+- [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts)? → Every mechanism must trace to an outcome
 
 ### Statechart (Canonical Reference)
 
