@@ -6,18 +6,7 @@ description: Assemble multiple experts for debate and consensus. Use for design 
 
 MODERATE. Assemble an expert panel for debate and guidance.
 
-## Usage
-
-```
-/hope:panel "Should I use Zustand or Redux?"
-/hope:panel --experts="osmani,hickey" review this architecture
-/hope:panel for this PR
-/hope:panel stuck on "Add ValidationError": "Module not found"
-/hope:panel thorough review for: {spec}
-/hope:panel Should we use event sourcing?
-POSITION: Leaning yes for audit trail
-TRADEOFF: complexity vs compliance
-```
+**Request:** $0
 
 ## Mode Detection
 
@@ -38,12 +27,7 @@ digraph PanelModes {
 }
 ```
 
-## Inputs
-
-- `$1` — Question, topic, or mode-specific pattern (required)
-- `--experts` — Comma-separated expert names (optional, auto-selects if omitted)
-
-**Context slots** (optional, recognized from user input):
+**Context slots** (recognized from input):
 - `POSITION:` — user's current stance and reasoning
 - `TRIED:` — previous attempts and their outcomes
 - `TRADEOFF:` — specific tension being weighed
@@ -55,17 +39,11 @@ When present, inject into debate framing. Each expert responds to the stated pos
 
 ## Debate Mode (Default)
 
-For design decisions, architecture reviews, and tradeoff discussions.
-
 Run the consult panel mode: select experts with distinct perspectives, debate from documented positions, surface disagreements, synthesize recommendation.
 
-### Panel Size
-
-- **Default:** 2 experts (load only 2 profiles)
-- **Maximum:** 4 experts (only if user requests `--expand`)
+- **Default:** 2 experts
+- **Maximum:** 4 experts (only with `--expand`)
 - **Progressive:** After initial response, offer "Want another perspective? Reply 'expand'."
-
-### Escalation
 
 When panel splits with no resolution: flag as "GENUINE TRADEOFF — requires your judgment" and summarize both positions with citations.
 
@@ -79,8 +57,6 @@ Pattern: `stuck on [task]: [error]`
 - Select 2-3 diagnostic experts
 - Run the consult unblock mode: diagnosis + consensus recommendation
 - Max 3 attempts with re-diagnosis between each before escalating to thorough review
-
-**Loop integration:** Loop stall detection triggers this mode. Consult tracks attempts internally. After 3 failures: escalates to thorough expert review.
 
 ---
 

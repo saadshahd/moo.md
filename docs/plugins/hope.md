@@ -49,6 +49,7 @@ shape the implementation approach for a settings page
 | `hope:shape` | Bridge WHAT to HOW — select collaboration shape |
 | `hope:loop` | Autonomous iteration with wave-based execution |
 | `hope:consult` | Expert simulation — 42 curated profiles, panels, unblocking |
+| `hope:bond` | Team composition — assess fitness, design roles, create teams |
 
 ---
 
@@ -83,6 +84,22 @@ Verification type IS the confidence. Observable > inspected > assumed.
 | `assumption` | Blocks SHIP |
 
 Every score shows its inputs. Every assertion names what would disprove it. No subjective percentages — verification type replaces them.
+
+---
+
+---
+
+## Team composition
+
+Bond designs agent team structure before creation. Assesses whether a task benefits from a team (vs subagents or solo), then recommends roles, file boundaries, models, and coordination shape.
+
+```
+/hope:bond refactor the auth module across API and frontend
+```
+
+Bond creates the team directly after user approval — no copy-paste step.
+
+> Source: [`hope/skills/bond/SKILL.md`](../../hope/skills/bond/SKILL.md)
 
 ---
 

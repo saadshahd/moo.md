@@ -1,8 +1,8 @@
 {
   "name": "hope",
-  "version": "3.3.0",
-  "description": "Clarify intent, shape approach, execute with verification, consult experts. Session strategy with 5 skills.",
-  "keywords": ["intent", "shape", "loop", "consult", "session", "verification", "expert", "panel"],
+  "version": "3.4.0",
+  "description": "Clarify intent, shape approach, execute with verification, consult experts, compose teams. Session strategy with 6 skills.",
+  "keywords": ["intent", "shape", "loop", "consult", "bond", "session", "verification", "expert", "panel", "team"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

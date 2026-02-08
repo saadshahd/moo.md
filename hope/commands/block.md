@@ -6,39 +6,15 @@ description: Block a profile from all expert simulations.
 
 Block a profile from expert simulations.
 
-## Usage
-
-```
-/hope:block pocock
-/hope:block pocock --reason "prefer deeper expertise"
-```
-
-## Inputs
-
-- `$1` — Profile name to block (required, case-insensitive)
-- `--reason` — Optional reason for blocking
+**Profile:** $0
 
 ## Process
 
 1. Read `~/.claude/counsel-blocklist.json` (create if missing)
 2. Check if profile already blocked → skip if exists
-3. Add entry: `{name, reason, blockedAt}`
+3. Add entry: `{name, reason, blockedAt}` (parse `--reason` from input if present)
 4. Write back to file
-5. Confirm: "[profile] blocked from expert simulations."
-
-## Output
-
-```
-[profile] blocked from expert simulations.
-
-This profile will be excluded from:
-- Auto-detection and inference
-- Panel selection
-- Explicit summoning
-
-Use /hope:blocked to view your blocklist.
-Use /hope:unblock [name] to remove.
-```
+5. Confirm with exclusion scope (auto-detection, panels, summoning) and unblock hint
 
 ## Constraints
 

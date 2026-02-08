@@ -6,18 +6,7 @@ description: Explicitly invoke a single expert for guidance. Use when you want a
 
 Channel a specific expert's perspective.
 
-## Usage
-
-```
-/hope:summon addy osmani
-/hope:summon "Rich Hickey" for this data model
-/hope:summon kyle simpson — explain closures
-```
-
-## Inputs
-
-- `$1` — Expert name (required)
-- `$2+` — Context or question (optional, uses conversation context if omitted)
+**Expert:** $0
 
 ## Process
 

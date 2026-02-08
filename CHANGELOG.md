@@ -7,6 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.4.0] - Unreleased
+
+### Added
+- feat(hope): bond skill — team composition thinking. Assesses task fitness (Team/Subagent/Solo) across 4 dimensions (Independence, File ownership, Coordination, Scope), designs team structure with role boundaries and coupling checks, emits creation spec for native agent team tools after user approval. 3-step pipeline (assess → design → confirm+handoff). Session-aware decomposition using Horizon. Anti-pattern detection for common team failures. Pipeline context scan for upstream shape/feasibility. `/hope:bond` command as entry point.
+- feat(hope): statechart §6 — bond detail with Mermaid state diagram. Invocation from `/hope:bond` command or shape trigger (high Independence + large Scope). Section numbers shifted: Soul→§7, Hooks→§8, Cross-cutting→§9, Mapping→§10.
+### Changed
+- refactor(hope): bond audit — 8 fixes. Separated thinking from creation (bond designs, Claude orchestrates with native tools). Moved anti-patterns into assessment, self-audit inline after blueprint. Added pipeline context scan and integration section. Replaced time estimates with story points. Added deadlock prevention (max 3 adjust revisions). Updated statechart deadlock table.
+- feat(hope): command cleanup — removed Usage, Inputs, and Output template sections from 5 commands (panel, summon, block, unblock, blocked). Commands now use `$0` substitution directly and keep only the protocol Claude needs to execute. -111 lines total. Intent command already clean, unchanged.
+
+### Removed
+- chore: eval system — deleted `eval/` framework (runner, layers, configs), `hope/eval/` test cases (39 YAML files), `docs/dev/evaluations.md`. Pre-push hook retains structural validation (line counts, frontmatter, no references/).
+
+---
+
 ## [hope@3.3.0] - 2026-02-08
 
 ### Changed

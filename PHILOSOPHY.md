@@ -151,10 +151,11 @@ If the user has a matching skill installed, the trigger fires it. If not, moo ha
 
 ## Expert System
 
-**hope** — single plugin, 5 skills:
+**hope** — single plugin, 6 skills:
 - **soul** = session strategy + thinking framework
 - **intent** = clarify WHAT
 - **shape** = decide HOW (consult-driven)
+- **bond** = compose WHO (agent team design)
 - **loop** = execute + verify + complete
 - **consult** = expert simulation (42+ profiles)
 

@@ -2,7 +2,7 @@
 
 Single source of truth for hope plugin behavior. Skills implement this statechart. When this file changes, update affected skills to match.
 
-**How to read:** Section 1 shows the full pipeline at a glance. Sections 2–6 expand each composite state. Section 7 maps hooks/commands to states. Section 8 lists cross-cutting rules.
+**How to read:** Section 1 shows the full pipeline at a glance. Sections 2–7 expand each composite state. Section 8 maps hooks/commands to states. Section 9 lists cross-cutting rules.
 
 ---
 
@@ -12,7 +12,7 @@ Single source of truth for hope plugin behavior. Skills implement this statechar
 stateDiagram-v2
   [*] --> user_need
 
-  state "soul (parallel — every turn, see §6)" as soul
+  state "soul (parallel — every turn, see §7)" as soul
 
   state route <<choice>>
   user_need --> route
@@ -258,7 +258,39 @@ Consult may also be invoked by any skill via natural language triggers ("what wo
 
 ---
 
-## 6. Soul Detail
+## 6. Bond Detail
+
+```mermaid
+stateDiagram-v2
+  state "Invocation Sources" as sources {
+    user_cmd : /hope:bond [task]
+    shape_trigger : shape detects high Independence + large Scope
+  }
+
+  state "assess\n4 dimensions: Independence, File ownership,\nCoordination, Scope" as assess
+  state fitness_check <<choice>>
+  state "redirect\nexplain: subagent or solo" as redirect
+  state "design\nroles, boundaries, models,\ncoupling check" as design
+  state "confirm\nblueprint table → user approval" as confirm
+  state "handoff\nemit creation spec → native tools" as create
+
+  sources --> assess
+  assess --> fitness_check
+  fitness_check --> design : Team
+  fitness_check --> redirect : Subagent or Solo
+  design --> confirm
+  confirm --> design : Adjust
+  confirm --> create : Yes
+  confirm --> [*] : Cancel
+  create --> [*]
+  redirect --> [*]
+```
+
+**Session-aware decomposition:** Tactical → maximize parallel. Strategic → phase by dependency chain. Existential → foundation layers first.
+
+---
+
+## 7. Soul Detail
 
 ```mermaid
 stateDiagram-v2
@@ -303,7 +335,7 @@ stateDiagram-v2
 
 ---
 
-## 7. Hooks and Commands
+## 8. Hooks and Commands
 
 ### Hooks
 
@@ -323,10 +355,11 @@ stateDiagram-v2
 | `/hope:block` | (no state change) | Modifies blocklist, affects future consult |
 | `/hope:unblock` | (no state change) | Removes from blocklist |
 | `/hope:blocked` | (no state change) | Read-only blocklist display |
+| `/hope:bond` | `bond.assess` | Team composition, standalone or from shape |
 
 ---
 
-## 8. Cross-Cutting Rules
+## 9. Cross-Cutting Rules
 
 ### Back-Transition Criteria
 
@@ -352,6 +385,7 @@ Every cycle has a break condition:
 | shape tied scores | Default Tool-Review |
 | soul audit → intent interrupt | Intent handles with its own max-round clarify loop |
 | loop → intent back-transition | Intent's clarify loop has its own escape |
+| bond adjust loop | Max 3 revisions → proceed with current or cancel |
 | cancel | Always available from loop |
 
 ### Key Rules
@@ -363,7 +397,7 @@ Every cycle has a break condition:
 
 ---
 
-## 9. Skill-to-State Mapping
+## 10. Skill-to-State Mapping
 
 | State Region | Primary Skill | Sub-States |
 |---|---|---|
@@ -372,3 +406,4 @@ Every cycle has a break condition:
 | session_execution | loop | spec_scoring, shape_approval, decompose, wave_execution, stall_detection, expert_review, verify_gate, review_feedback, cancel, circuit_breaker, paused |
 | (any stage) | consult | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
 | (parallel, always) | soul | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer |
+| shape → loop (team path) | bond | assess, design, confirm_create |

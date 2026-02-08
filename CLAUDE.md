@@ -8,20 +8,20 @@ moo — mind on output. Stay present with AI.
 
 ```
 moo.md/
-├── hope/                    # Single plugin: 5 skills, 6 commands, hooks
+├── hope/                    # Single plugin: 6 skills, 7 commands, hooks
 │   ├── skills/
 │   │   ├── soul/            # Session strategy + thinking framework
 │   │   ├── intent/          # Clarify WHAT
 │   │   ├── shape/           # Decide HOW (consult-driven)
 │   │   ├── loop/            # Execute + verify + complete
-│   │   └── consult/         # Expert simulation (42 profiles)
-│   ├── commands/            # panel, summon, block, unblock, blocked, intent
+│   │   ├── consult/         # Expert simulation (42 profiles)
+│   │   └── bond/            # Team composition (agent teams)
+│   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond
 │   ├── hooks/               # UserPromptSubmit + SubagentStart
 │   └── scripts/             # Per-turn session strategy injector
 ├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs
-├── eval/                    # Skill evaluation tests
-└── .github/hooks/           # Git hooks (pre-push runs evals)
+└── .github/hooks/           # Git hooks (pre-push validates skills)
 ```
 
 Plugin follows:
@@ -38,7 +38,7 @@ Plugin discovery uses `.claude-plugin/marketplace.json` at repo root.
 ## Skill Pipeline
 
 ```
-intent (clarify WHAT) → shape (decide HOW) → loop (execute + verify) → consult (expert guidance)
+intent (clarify WHAT) → shape (decide HOW) → bond (compose WHO) → loop (execute + verify) → consult (expert guidance)
 ```
 
 Session strategy (in soul) auto-detects type (Build/Debug/Plan/Reflect) and asks engagement level (Autonomous/Collaborative/Guided). The `[SESSION]` marker persists through compaction.
@@ -58,12 +58,6 @@ claude --plugin-dir ./moo.md
 ```
 
 See [docs/dev/local-development.md](docs/dev/local-development.md) for full workflow.
-
-## Evaluations
-
-Run `bun run eval/run.ts hope` to test skill triggering. Pre-push hook runs evals automatically.
-
-**When adding skills:** Add test case YAML to `hope/eval/cases/`.
 
 ## Conventions
 
