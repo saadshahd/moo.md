@@ -5,10 +5,6 @@ prompts
 node_modules/
 bun.lockb
 
-# Eval artifacts
-eval/results/
-eval/dist/
-
 # Build outputs
 dist/
 
