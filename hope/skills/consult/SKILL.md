@@ -136,8 +136,8 @@ Unanimous: **Consensus** (≤15w) | **Recommendation** (≤20w) | **Test** (≤1
 ```
 SELF-AUDIT → revise before presenting if any FAIL:
   Spread met (≥1 cell ≤3, ≥1 ≥8) or unanimous (bullets) → [pass/fail]
-  Test has if-right AND if-wrong → [pass/fail] → [cite observables]
-  Least-grounded position named → [pass/fail] → [cite which + gap]
+  Test if-right AND if-wrong → [pass/fail] → [cite observables]
+  All selected spoke + weakest named → [pass/fail] → [voiced/silent: names]
 
 ### Unblock Mode
 

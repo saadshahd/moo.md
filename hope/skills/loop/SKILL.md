@@ -73,12 +73,12 @@ Ask user: "Plan ready? [Yes/Edit/Cancel]" → **Yes:** proceed. **Edit:** re-run
 
 ## Step 3: Decomposition
 
-Break spec into 5-21 atomic work items. Each passes the "one sentence without and" test.
+5-21 atomic work items. Each passes "one sentence without and" test.
 
 ```
-Work Items:
-1. [imperative action] — [what + criteria + verify command]
-2. [imperative action] — [what + criteria + verify command]
+Work Items (every criteria[] entry maps to ≥1 item):
+1. [imperative action] — [verify command] → criteria: [names]
+2. [imperative action] — [verify command] → criteria: [names]
 ```
 
 Mark dependencies. Decompose by horizon: Tactical → maximize parallel items per wave | Strategic → phase by dependency chain | Existential → foundation layers first. Announce:
@@ -99,10 +99,10 @@ Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot]\n\n[
 Review: panel checks scope compliance per wave.
 
 Wave report must satisfy ALL:
-1. Format: `[WAVE {N}]` header, checklist `{done ≤10w} | Verify: {PASS/FAIL}`, `[WAVE {N} COMPLETE] {completed}/{total}`
-2. Each completed item: cite the verification command and its exit state — "ran X, got Y" not just "verified"
-3. Flag items with verification weaker than execution output — carry into next wave
-4. Stall → diagnose from execution output — revise remaining items if assumptions broke
+1. `[WAVE {N}]` header, per item: `{done ≤10w} | Verify: {PASS/FAIL}` — cite command + exit state
+2. Footer: `[WAVE {N} COMPLETE] Done: {n} | Carry: {n} | Stall: {n}` — must equal total
+3. Carry = verification weaker than execution output — retry next wave
+4. Stall → diagnose from execution output — revise remaining if assumptions broke
 
 ---
 
@@ -138,9 +138,9 @@ Detect tools before verifying — never assume. Check: `package.json` scripts, `
 Run thorough. Report with evidence:
 
 ```
-[VERIFY] {PASS/FAIL} | {Y}/{N} criteria | Type: execution output
+[VERIFY] {PASS/FAIL} | Pass: {names} | Fail: {names} | Type: execution output
 Ran: `{command}` → {summary of output}
-Unverified: "{criterion}" — {why it couldn't be verified by execution}
+Unverified: {names} — {why no evidence} | Coverage: buckets == criteria[]
 ```
 
 Criterion fails → diagnose cause from output before remediating. No execution output → `Unverified:` line. User decides ship or test.
@@ -164,7 +164,7 @@ Decisions:
 1. [chose X over Y] — [because Z] (≤20w)
 2. [chose X over Y] — [because Z] (≤20w)
 3. [chose X over Y] — [because Z] (≤20w)
-Verified: [PASS/FAIL] | [Y]/[N] criteria | Evidence: [type]
+Verified: [PASS/FAIL] | Pass/Fail/Unverified: [names] | Evidence: [type]
 Unverified: [list or "none"]
 ```
 2. **Gather feedback** — "Anything to adjust, extend, or revisit?"

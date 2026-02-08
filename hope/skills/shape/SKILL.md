@@ -92,7 +92,7 @@ Present shape output satisfying ALL:
 4. Tally columns, select majority, emit criteria[] (boolean) + mustNot[] (≥2) — user counter-evidence re-scores that aspect
 
 SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
-  ≥5 aspects scored         → [pass/fail] → [count]
+  ≥5 aspects scored         → [pass/fail] → scored/deferred: [names]
   Each has Because           → [pass/fail] → [count with / total]
   Each has Would-change-if   → [pass/fail] → [count with / total]
   criteria[] non-empty       → [pass/fail] → [count items]
