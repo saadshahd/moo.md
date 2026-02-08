@@ -81,10 +81,10 @@ Work Items:
 2. [imperative action] — [what + criteria + verify command]
 ```
 
-Mark dependencies. Announce with visible calculation:
+Mark dependencies. Decompose by horizon: Tactical → maximize parallel items per wave | Strategic → phase by dependency chain | Existential → foundation layers first. Announce:
 
 ```
-[LOOP] Starting | Shape: {shape} | Items: {N} | Feasible: {axis} — {bound}
+[LOOP] Starting | Shape: {shape} | Horizon: {horizon} | Items: {N} | Feasible: {axis} — {bound}
 Fit: {total} = spec({s})×5 + constraints({c}) + success({sc}) + done({d}) + domain({df})
 Would reframe if {what finding would change the plan, not just delay it}
 ```

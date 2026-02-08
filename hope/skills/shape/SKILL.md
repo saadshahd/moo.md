@@ -106,7 +106,7 @@ Score each aspect for the task. The column where most aspects land determines th
 | Verification | User must define pass/fail | User approves test plan | Self-verifiable criteria |
 | Reversibility | Hard to undo, high stakes | Moderate rollback effort | Trivial to revert |
 
-**Rule:** Score at least 5 of 8 aspects. Skip only those genuinely absent from the spec.
+**Rule:** Score at least 5 of 8. **Horizon tiebreaker** (columns split evenly): Tactical → Decomposition + Ambiguity decide | Strategic → Risk + Reversibility decide | Existential → Novelty + Interdependency decide.
 
 ---
 

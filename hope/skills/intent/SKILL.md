@@ -49,7 +49,7 @@ TASK: [verb + object + outcome] (≤15 words)
   e.g. "Extract JWT validation into shared module — both gateways reuse, tests pass"
 CONTEXT: [where it lives, who uses it, what connects to it]
 DONE: [artifact you can point to when finished]
-STAKES: [low/medium/high — why]
+STAKES: [low/medium/high — why at this horizon]
 CONSTRAINTS: [what must NOT change]
 ```
 
@@ -87,9 +87,7 @@ Round [N]: [resolved]/8 dimensions
 1. [Category]: A. [option] / B. [option] / C. [option]
 Resolved: [locked dimensions] | Open: [remaining]
 ```
-Vague quantities ("some", "several", "key [noun]"): add MCQ converting to numeric range.
-
-Use MCQ format for speed (user responds "1A, 2B").
+Vague quantities → MCQ with numeric ranges; format: "1A, 2B" for speed.
 
 ### Step 3: Score the Spec
 
@@ -160,7 +158,8 @@ SELF-AUDIT (Guided: emit in [AUDIT] block; revise if any FAIL) →
 TASK: [verb + object + outcome] (≤15 words)
 CONTEXT: [where, who, connections]
 DONE: [artifact]
-FEASIBLE: [axis] — [bound] (omit if none stated and session default is none)
+FEASIBLE: [axis] — [bound] (omit if none)
+HORIZON: [Tactical/Strategic/Existential] — [what future-self would question]
 SPEC SCORE: [X/10]
 BRIEF: [OBJECTIVE / NON-GOALS / CONSTRAINTS / ACCEPTANCE / STOP]
 NEXT: /hope:loop or /hope:shape

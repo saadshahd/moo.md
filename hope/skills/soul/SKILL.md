@@ -24,7 +24,7 @@ Surface tradeoffs so the user decides. Show reasoning chain, not just conclusion
 
 Detect from first message. If later evidence contradicts type, re-detect.
 
-**Context slots:** If first message contains `PRIOR:` (previous session decisions/outcomes), `REFS:` (file paths, PR numbers, docs), or `FEASIBLE:` (constraint axis + bound), include in `[SESSION]` marker for pipeline continuity.
+**Context slots:** If first message contains `PRIOR:` (previous session decisions/outcomes), `REFS:` (file paths, PR numbers, docs), `HORIZON:` (tactical/strategic/existential), or `FEASIBLE:` (constraint axis + bound), include in `[SESSION]` marker for pipeline continuity.
 
 | Type | Detection Signals | Pipeline |
 |------|-------------------|----------|
@@ -42,13 +42,13 @@ How would you like to work on this?
 - Autonomous — I describe the goal, experts clarify and execute
 - Collaborative — We co-drive, experts assist at each phase  [default]
 - Guided — I make all decisions, you execute
+
+What's the time horizon?
+- Tactical — ship it, iterate later
+- Strategic — build it to last  [default]
 ```
 
-| Level | Intent | Shape | Execution | Unblock |
-|-------|--------|-------|-----------|---------|
-| **Autonomous** | Consult clarifies | Consult shapes | Loop(tool) | Consult auto-unblocks |
-| **Collaborative** | User + consult | Consult shapes, user approves | Loop(tool-review) | Consult unblocks |
-| **Guided** | User drives | User drives, consult on request | Loop(colleague) | User unblocks |
+Engagement affects density: Autonomous (consult-driven) → Collaborative (co-driven, default) → Guided (user-driven).
 
 ### Session Flow
 
@@ -73,9 +73,9 @@ digraph SessionStrategy {
 
 ### Session Marker
 
-Emit after strategy is set: `[SESSION] Type: Build | Engagement: Collaborative | Feasible: time (2h)`
+Emit after strategy is set: `[SESSION] Type: Build | Engagement: Collaborative | Horizon: Strategic | Feasible: time (2h)`
 
-**Feasibility defaults:** Build → solo | Debug → time | Plan/Reflect → none. User overrides via `FEASIBLE:` slot or natural language ("I have 2 hours", "working solo"). Append `(default)` when auto-detected. ONE axis per session — if user states multiple, pick the tightest.
+**Defaults:** Horizon: Build/Plan → Strategic, Debug → Tactical, Reflect → Existential (infer when clear, ask when ambiguous). Feasibility: Build → solo, Debug → time, Plan/Reflect → none. Append `(default)` when auto-detected. ONE value per field.
 
 Maintain this marker throughout conversation. When compacting, preserve the `[SESSION]` marker in summary.
 

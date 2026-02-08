@@ -163,8 +163,8 @@ See `PHILOSOPHY.md` for full beliefs, principles (stance + why), and constraints
 ## Compact Instructions
 
 When compacting conversation history, always preserve:
-- The `[SESSION] Type: X | Engagement: Y | Feasible: Z` marker
-- Active criteria, mustNot constraints, and feasibility axis + bound from shape
+- The `[SESSION] Type: X | Engagement: Y | Horizon: Z | Feasible: W` marker
+- Active criteria, mustNot constraints, horizon, and feasibility axis + bound from shape
 - Current loop progress (wave number, items completed)
 
 ## Anti-Patterns

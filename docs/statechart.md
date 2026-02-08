@@ -269,7 +269,7 @@ stateDiagram-v2
   check_marker --> marker_check
 
   state "detect_type\nBuild / Debug / Plan / Reflect" as detect_type
-  state "ask_engagement\nAutonomous / Collaborative / Guided\n(once per session)" as ask_engagement
+  state "ask_engagement\nAutonomous / Collaborative / Guided\n+ Horizon (Tactical / Strategic / Existential)\n(once per session)" as ask_engagement
   state "silent_audit\nspec score, fit score, 12-item checklist" as audit
   state "quality_footer\nverdict + verification + risk\n(every response)" as footer
 
@@ -297,7 +297,7 @@ stateDiagram-v2
   explore_interrupt --> [*] : hand-off to shape
 ```
 
-**Session marker:** `[SESSION] Type: Build | Engagement: Collaborative | Feasible: time (2h)` — emitted after strategy set, maintained through conversation, preserved on compaction. Feasibility defaults: Build → solo, Debug → time, Plan/Reflect → none. User overrides via `FEASIBLE:` slot.
+**Session marker:** `[SESSION] Type: Build | Engagement: Collaborative | Horizon: Strategic | Feasible: time (2h)` — emitted after strategy set, maintained through conversation, preserved on compaction. Horizon defaults: Build/Plan → Strategic, Debug → Tactical, Reflect → Existential. Feasibility defaults: Build → solo, Debug → time, Plan/Reflect → none.
 
 **Compaction resilience:** If marker lost, re-derive from conversation artifacts. If re-derivation fails, ask user. Be transparent about gaps.
 
@@ -358,7 +358,7 @@ Every cycle has a break condition:
 - **Intent is sacred** — never changes without user consent
 - **Shape changes must be communicated** — user always knows when approach shifts
 - **Gates advise, never prevent** — user owns their work
-- **Compaction preserve list:** [SESSION] marker (including Feasible: axis), criteria, mustNot, feasibility axis + bound, wave number, key decisions
+- **Compaction preserve list:** [SESSION] marker (including Horizon + Feasible), criteria, mustNot, horizon, feasibility axis + bound, wave number, key decisions
 
 ---
 

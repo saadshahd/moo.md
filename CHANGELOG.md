@@ -10,6 +10,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- feat(hope): future-self horizon — session-level Tactical/Strategic/Existential time horizon across soul, intent, shape, loop. Soul captures horizon alongside engagement (infer from signals when clear, ask when ambiguous). Intent grounds STAKES to horizon, emits HORIZON field in brief. Shape uses horizon tiebreaker on split aspect scores. Loop tunes decomposition strategy by horizon. Infrastructure: ensure-soul.sh, hooks.json, statechart updated. Token-neutral (4 skill swaps, 0 net lines).
+
 - feat(hope): aha moment invitations — 6 token-neutral swaps across soul, intent, consult, loop that activate evidence-gated revision at points where premature framing causes downstream waste. Soul: session type re-detection when TASK verb contradicts initial classification. Intent: TASK verb revision gate when clarification answers contradict Step 1 framing. Consult: expert pushback escalation from approach-level to problem-level reframing; panel synthesis leads with emergent insight when recommendation differs from all expert positions. Loop: plan-changing announcement replaces shape-downgrade priming; REFRAME finding type operationalizes statechart's loop→intent back-transition. Net -23 chars.
 
 - feat(hope): structured output templates — 7 labeled-field skeletons across all 5 skills replacing prose instructions. Shape: scored aspects table with tally row. Loop: wave progress checklist + journey summary with 3 decision rows. Consult: unblock diagnosis template. Soul: audit interrupt surface. Intent: clarification round tracker + typed spec score table with inline routing.
