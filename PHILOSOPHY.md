@@ -125,7 +125,7 @@ By stage, what to do when progress stalls.
 
 ## Hard Constraints — "Never Do"
 
-1. **No persistent state** — Conversation markers only. Files create invisible dependencies.
+1. **No persistent state** — Conversation markers only. Files create invisible dependencies. (User preferences like `counsel-blocklist.json` are configuration, not workflow state — they don't affect pipeline transitions.)
 2. **No Claude Code hacks** — If it wouldn't survive a Claude Code update, it doesn't belong.
 3. **No building what Claude will do natively** — No task management, memory systems, or tool orchestration. Compete on thinking quality.
 4. **No rigid frameworks** — Adapt to context. If a step doesn't apply, skip it.

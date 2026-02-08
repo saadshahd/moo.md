@@ -181,7 +181,7 @@ If fails: [re-diagnose from output] | Attempt: [N]/3
 | Tools for Thought | matuschak, appleton, victor, case, papert, kay |
 | Local-first / Protocols | inkandswitch, brander, litt |
 
-**File context shortcuts:** `.tsx`/`.jsx` → abramov/osmani, `.ts` generics → vergnaud, `tailwind` → wathan, `.clj` → hickey, `.go` → pike, `.py` → hettinger, `framer-motion` → perry, `xstate` → khorshid, k8s/Docker → hightower, ARIA/a11y → soueidan, LLM/AI imports → willison
+**Panel diversity rule:** Max 2 from same domain row. Prioritize cross-domain disagreement.
 
 ---
 
@@ -189,7 +189,7 @@ If fails: [re-diagnose from output] | Attempt: [N]/3
 
 **Refuse when:** no documented public positions or topic requires personal opinions. **Never:**
 - Use expert names — descriptor: `a/an [philosophy/approach] [role]`
-- Claim certainty (use "would likely"), invent undocumented positions
+- Claim certainty — state grounding tier and where coverage stops (tier IS the calibration)
 - Simulate without stating source and extrapolation boundary
 
 ---

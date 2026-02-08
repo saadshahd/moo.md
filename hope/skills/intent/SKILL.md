@@ -76,14 +76,14 @@ If any field blank after 2 asks, proceed with [ASSUMPTION] labels.
 ### Step 2: Clarify
 
 Each clarify round must satisfy ALL:
-1. Close the 3 highest-uncertainty dimensions from {Purpose, Audience, Must-include, Success criteria, Format, Tech stack, Edge cases, Risk tolerances} — skip resolved
+1. Close the 3 highest-uncertainty dimensions from {Outcome, Scope, Constraints, Success Criteria, Done Definition} — skip resolved
 2. Each question ≤15 words — if longer, you haven't found the real question
 3. At least one question must be adversarial: "what should this NOT do" or "what would make this wrong"
 4. If answers contradict the TASK verb, revisit Step 1 first
 
 Per round, emit:
 ```
-Round [N]: [resolved]/8 dimensions
+Round [N]: [resolved]/5 dimensions
 1. [Category]: A. [option] / B. [option] / C. [option]
 Resolved: [locked dimensions] | Open: [remaining]
 ```

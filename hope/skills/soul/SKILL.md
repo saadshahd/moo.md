@@ -85,9 +85,10 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 
 | Check | Threshold | Guidance |
 |-------|-----------|----------|
-| Spec score | <5 | CLARIFY → run /hope:intent |
-| Fit score | <25 | EXPLORE → gather more context |
-| Fit score | 25-29 / 30-39 / 40+ | Colleague / Tool-review / Tool |
+| Spec score | <5 | CLARIFY → run intent |
+| Fit score | <15 | EXPLORE → gather more context |
+| Shape set? | No shape before executing | SHAPE first |
+| Verification plan? | criteria/mustNot empty | Establish constraints |
 
 On interrupt (Guided: every turn):
 ```
@@ -149,12 +150,20 @@ Verification type IS the confidence. Observable > inspected > assumed.
 
 ---
 
-## Quality Footer (Required)
+## Quality Footer
+
+Emit proportional to decision type:
+
+- **Type 1** (hours+ rollback): Full footer below
+- **Type 2A/2B** (< 5 min rollback): `Verified: [type] | Reversible: [2A/2B] | Risk: [key assumption ≤15w]`
+- **Trivial** (no decision): Omit
+
+### Full Footer (Type 1 only)
 
 ```
 ╭─ 🟢/🟡/🔴 VERDICT ─────────────────────╮
-│ Verified: [type] │ Basis: [what was checked] (≤12w — protect evidence type, sacrifice method detail) │
-│ Unverified: [what wasn't — how to test] (≤15w — protect gap + test command, sacrifice explanation) │
+│ Verified: [type] │ Basis: [what was checked] (≤12w) │
+│ Unverified: [what wasn't — how to test] (≤15w) │
 │ Reversible: [2A/2B/1] │ Points: [1-13] │
 │ Feasible: [axis] ([bound]) — [why it fits] (omit if none) │
 ├────────────────────────────────────────┤

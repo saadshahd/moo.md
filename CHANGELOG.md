@@ -7,7 +7,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [hope@3.3.0] - 2026-02-08
+
+### Changed
+- feat(hope): commands as thin wrappers — intent command (148→47 lines) delegates protocol to intent skill, eliminating 8-step/5-step divergence. Panel command (158→95 lines) delegates debate/unblock to consult skill, removes stuckCount ghost reference and duplicated selection/output logic. Commands own entry point (input capture, context slots, mode routing); skills own behavior.
+- feat(hope): Opus 4.6 audit evolution — shape aspects reduced from 8 to 5 (keep Interdependency, Novelty, Risk, Ambiguity, Reversibility; drop Decomposition, Domain Knowledge, Verification). Fit score simplified to `spec_score×5 + domain_familiarity` with adjusted thresholds (35+/25-34/15-24/<15). Quality footer conditional on decision type (full for Type 1, one-line for Type 2A/2B, omit for trivial). Silent audit trimmed to 4-check gate (spec, fit, shape, verification). Intent clarify dimensions aligned with 5 spec scoring dimensions. Expert consultation gated on actual uncertainty (2+ aspect disagreement or Risk-Colleague). Review & feedback lightened to 3-item journey summary. Consult hedging guardrail uses grounding tiers as calibration. Panel diversity rule: max 2 from same domain row.
+
+### Removed
+- feat(hope): Loop 1/Loop 2 framework from intent command (redundant with spec scoring protocol)
+- feat(hope): Clarification Mode from panel command (redundant with intent clarification)
+- feat(hope): Light Review mode from panel command (extended thinking handles inter-wave quality)
+- feat(hope): Tool Discovery section from loop (native to Claude Code)
+- feat(hope): File context shortcuts from consult (Opus 4.6 infers from file context natively)
 
 ### Added
 - feat(hope): SessionStart hook — injects full soul SKILL.md at session start via `session-start.sh`, guaranteeing hope is active without relying on auto-trigger. UserPromptSubmit retained as per-turn reminder. Re-enables SessionStart after #16538 fix.

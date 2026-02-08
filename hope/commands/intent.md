@@ -16,13 +16,11 @@ Turn rough ideas into iron-clad work orders, then deliver the work only after bo
 
 ## Context Recognition
 
-Before Step 0: scan `$0` for labeled blocks (`TASK:`, `CONTEXT:`, `DONE:`, `STAKES:`, `CONSTRAINTS:`, `ARTIFACT:`, `ARTIFACT-TYPE:`). Pre-fill the corresponding Step 0 fields with user-provided values. Score pre-filled fields normally — only ask about gaps.
+Before starting: scan `$0` for labeled blocks (`TASK:`, `CONTEXT:`, `DONE:`, `STAKES:`, `CONSTRAINTS:`, `ARTIFACT:`, `ARTIFACT-TYPE:`). Pre-fill the corresponding fields with user-provided values. Score pre-filled fields normally — only ask about gaps.
 
 If user says "what do you need", "scaffold", or "template": emit the slot template and wait for the user to fill and return it.
 
-## Protocol
-
-### 0 Task Definition Protocol
+## Task Definition
 
 Fill every field before proceeding:
 
@@ -36,157 +34,13 @@ WHO REVIEWS: Before shipping: / After shipping:
 
 If any field blank after 2 asks: proceed with [ASSUMPTION] labels.
 
-### 0b Silent Scan
+Privately list every fact or constraint you still need. Each item must pass "one sentence without and" — if it needs "and", split it.
 
-Privately list every fact or constraint you still need.
+## Protocol
 
-### 0c Action Specification (Loop 1)
+Run the intent clarification protocol: score the spec on 5 dimensions, clarify gaps, echo-check, emit an iron-clad brief.
 
-Transform vague requests into actionable specs.
-
-#### Vague → Specific Transformation
-
-| Vague (Loop 2) | Specific (Loop 1) |
-|----------------|-------------------|
-| "Improve performance" | "Reduce p95 latency from 200ms to <100ms" |
-| "Fix the bug" | "Null check on line 42 of auth.ts" |
-| "Make it better" | "Add input validation for email field" |
-| "Update the docs" | "Add API examples to README section 3" |
-
-#### Action Spec Template
-
-For every task, fill in:
-
-```
-VERB: [Create/Update/Delete/Fix/Add/Remove]
-OBJECT: [Specific file, function, or component]
-OUTCOME: [Measurable end state]
-CONSTRAINT: [What NOT to change]
-VERIFY: [How to confirm done]
-```
-
-#### Loop 2 Warning Signs
-
-You're in reactive mode if:
-- Waiting for someone to clarify
-- "I don't know what they want"
-- Multiple interpretations possible
-- Success criteria is "they'll tell me"
-
-#### Loop 1 Recovery
-
-When stuck in Loop 2:
-1. Write down your best guess at the spec
-2. List your assumptions explicitly
-3. Ask ONE clarifying question
-4. Propose a specific solution
-
-Don't wait. Propose and iterate.
-
-### 1 Clarify Loop
-
-Ask 3-5 focused questions per round until no remaining question would change the brief.
-
-Cover:
-
-- Purpose
-- Audience
-- Must-include facts
-- Success criteria
-- Length/format
-- Tech stack (if code)
-- Edge cases
-- Risk tolerances
-
-When any answer contains "some", "several", "multiple", "various", or "key [noun]" without a count — include one MCQ that converts the vague quantity to a numeric range.
-
-### 2 Spec Score Check
-
-After clarifying, score the request:
-
-| Dimension | /2 | Evidence (user's words) | To score 2 |
-|-----------|-----|-------------------------|------------|
-| Outcome | | | |
-| Scope | | | |
-| Constraints | | | |
-| Success Criteria | | | |
-| Done Definition | | | |
-| **Total** | **/10** | | |
-
-- **≥8:** Proceed to build (Tool-shaped)
-- **5-7:** Iterate — user fills gaps visible in "To score 2" column
-- **<5:** Continue clarification loop
-
-### 3 Echo Check
-
-Reply with one crisp sentence stating: **deliverable + #1 must-include fact + hardest constraint.**
-
-End with:
-
-- YES to lock
-- EDITS
-- BLUEPRINT
-- RISK… WAIT
-
-### 4 Blueprint (if asked)
-
-Produce a short plan:
-
-- 3-7 key steps
-- Interface or outline
-- Sample I/O or section headers
-
-Pause for: YES / EDITS / RISK
-
-### 5 Risk (if asked)
-
-List the top three failure scenarios (logic, legal, security, perf).
-
-Pause for: YES / EDITS
-
-### 6 High-Grade Intent (score ≥8 only)
-
-For well-specified requests, produce:
-
-```
-OBJECTIVE:
-
-NON-GOALS (3-5 bullets):
--
--
--
-
-CONSTRAINTS:
-
-ACCEPTANCE CRITERIA (7-12 bullets, 2+ "must NOT"):
--
--
-- must NOT:
-- must NOT:
-
-STOP CONDITIONS (3-5 bullets):
--
--
--
-```
-
-### 7 Build & Self-Test
-
-Generate code / copy / analysis only after **YES–GO**.
-
-**If code:**
-
-- Run static self-review for type errors & obvious perf hits
-- Fix anything you find, then deliver
-
-**If prose:**
-
-- Check tone & fact alignment
-- Fix anything you find, then deliver
-
-### 8 Reset
-
-If user types **RESET**, forget everything and restart at Step 0.
+If user types **RESET**: forget everything and restart.
 
 ---
 

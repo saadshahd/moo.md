@@ -12,11 +12,11 @@ Before hope:
 After hope:
 > Clarify intent → shape approach → execute with verification → consult experts
 
-Every response runs through a silent checklist:
-- Intent clear?
-- Libraries searched?
-- Failure modes listed?
-- Verification stated?
+Every response runs through a silent 4-check gate:
+- Spec clear?
+- Fit score adequate?
+- Approach shaped?
+- Verification plan set?
 
 You don't see the checklist. You see better answers.
 

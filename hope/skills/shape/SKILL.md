@@ -21,7 +21,7 @@ Requires spec_score >= 5 (otherwise return to intent). Output: shape + criteria[
 
 From user request or prior `/hope:intent`, extract: goal, constraints, scope, feasibility axis + bound.
 
-Also scan for context slots: `PATTERNS:` (existing conventions/precedent), `BOUNDARIES:` (architectural constraints, team norms), and `FEASIBLE:` (constraint axis + bound from intent or session default). When present, use as evidence when scoring Novelty, Domain knowledge, and Risk aspects.
+Also scan for context slots: `PATTERNS:` (existing conventions/precedent), `BOUNDARIES:` (architectural constraints, team norms), and `FEASIBLE:` (constraint axis + bound from intent or session default). When present, use as evidence when scoring Novelty and Risk aspects.
 
 ### 2. Identify Candidate Shapes
 
@@ -39,7 +39,7 @@ For each aspect in the discovery table below, determine which shape column the t
 
 ### 4. Expert Consultation (+ Approach Comparison)
 
-Guided: emit [TALLY] block. Split/competing → expert input. High-risk → panel debate. Re-score contradicted aspects. Still competing → Tool-Review. Unanimous → skip.
+Guided: emit [TALLY] block. Expert consultation only when: (a) 2+ aspects disagree by 2+ columns, OR (b) any aspect scores Colleague in Risk. Re-score contradicted aspects. Still competing → Tool-Review. Unanimous → skip.
 
 When 2+ candidate approaches surface in extraction or scoring:
 
@@ -86,7 +86,7 @@ Present shape output satisfying ALL:
 4. Tally columns, select majority, emit criteria[] (boolean) + mustNot[] (≥2) — user counter-evidence re-scores that aspect
 
 SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
-  ≥5 aspects scored         → [pass/fail] → scored/deferred: [names]
+  All 5 aspects scored      → [pass/fail] → scored/deferred: [names]
   Each has Because           → [pass/fail] → [count with / total]
   Each has Would-change-if   → [pass/fail] → [count with / total]
   criteria[] non-empty       → [pass/fail] → [count items]
@@ -107,16 +107,13 @@ Score each aspect for the task. The column where most aspects land determines th
 
 | Aspect | Colleague | Tool-Review | Tool |
 |--------|-----------|-------------|------|
-| Decomposition | Cannot break down without user | Breaks down, user validates | Self-decomposes fully |
 | Interdependency | High coupling across unknowns | Moderate, checkpoints at boundaries | Low, independent pieces |
 | Novelty | No precedent, unknown patterns | Known patterns with variations | Well-trodden, clear precedent |
 | Risk | High blast radius, irreversible | Medium, partially reversible | Low, fully reversible |
 | Ambiguity | Requirements unclear or conflicting | Mostly clear, few open questions | Crisp, complete requirements |
-| Domain knowledge | Needs user context to proceed | Partial context, can infer rest | Full context available |
-| Verification | User must define pass/fail | User approves test plan | Self-verifiable criteria |
 | Reversibility | Hard to undo, high stakes | Moderate rollback effort | Trivial to revert |
 
-**Rule:** Score at least 5 of 8. **Horizon tiebreaker** (columns split evenly): Tactical → Decomposition + Ambiguity decide | Strategic → Risk + Reversibility decide | Existential → Novelty + Interdependency decide.
+**Rule:** Score all 5. **Horizon tiebreaker** (columns split evenly): Tactical → Ambiguity decides | Strategic → Risk + Reversibility decide | Existential → Novelty + Interdependency decide.
 
 ---
 

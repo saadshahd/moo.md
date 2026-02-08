@@ -37,7 +37,7 @@ stateDiagram-v2
   completed --> user_need : feedback yields new work
 
   soul --> intent : CLARIFY (spec < 5)
-  soul --> shape : EXPLORE (fit < 25)
+  soul --> shape : EXPLORE (fit < 15)
 
   loop --> intent : wrong intent (see §8)
   loop --> shape : reshape needed
@@ -108,7 +108,7 @@ stateDiagram-v2
   [*] --> extract
 
   state "extract_intent\ngoal, constraints, scope" as extract
-  state "score_aspects\n8 aspects × 3 shapes" as score
+  state "score_aspects\n5 aspects × 3 shapes" as score
   state "expert_consultation\npanel on tradeoffs" as expert
   state select_check <<choice>>
   state "select_shape\nmajority column, risk override,\ndefault: Tool-Review" as select
@@ -125,7 +125,7 @@ stateDiagram-v2
   output --> [*]
 ```
 
-**Expert consult:** After scoring aspects, invoke consult panel on tradeoffs. Expert input informs selection — shape decides, experts advise. If expert insight changes aspect evaluation, re-score before selecting.
+**Expert consult:** Invoke only when 2+ aspects disagree by 2+ columns or any aspect scores Colleague in Risk. Expert input informs selection — shape decides, experts advise. If expert insight changes aspect evaluation, re-score before selecting. Unanimous scoring → skip consultation.
 
 **Engagement annotations:**
 - Autonomous: consult shapes, auto-selects
@@ -146,7 +146,7 @@ stateDiagram-v2
   state "wave_execution\nidentify ready → spawn subagents\n→ collect → scope review → log" as wave_exec
   state "stall_detection\nno progress on wave" as stall
   state "expert_review\nthorough panel vs spec + mustNot\nBLOCKER / WARNING / SUGGESTION" as expert_review
-  state "verify_gate\ntool discovery → thorough tier\n→ post-work gate" as verify_gate
+  state "verify_gate\nthorough tier → post-work gate" as verify_gate
   state "review_feedback\njourney summary → questions\n→ feedback" as review_feedback
   state "cancel\nacknowledge + report progress\ncurrent wave completes first" as cancel
   state "circuit_breaker\nmax iterations or budget exceeded" as circuit_break
@@ -270,8 +270,8 @@ stateDiagram-v2
 
   state "detect_type\nBuild / Debug / Plan / Reflect" as detect_type
   state "ask_engagement\nAutonomous / Collaborative / Guided\n+ Horizon (Tactical / Strategic / Existential)\n(once per session)" as ask_engagement
-  state "silent_audit\nspec score, fit score, 12-item checklist" as audit
-  state "quality_footer\nverdict + verification + risk\n(every response)" as footer
+  state "silent_audit\n4-check gate: spec, fit, shape, verification" as audit
+  state "quality_footer\nverdict + verification + risk\n(proportional to decision type)" as footer
 
   state check_marker : check [SESSION] marker
 
@@ -287,7 +287,7 @@ stateDiagram-v2
 
   audit_result --> footer : scores OK
   audit_result --> intent_interrupt : spec < 5
-  audit_result --> explore_interrupt : fit < 25
+  audit_result --> explore_interrupt : fit < 15
 
   state "→ intent.acknowledge (CLARIFY)" as intent_interrupt
   state "→ shape.extract or gather context (EXPLORE)" as explore_interrupt

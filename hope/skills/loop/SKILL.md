@@ -48,12 +48,12 @@ digraph SpecDecision {
 
 | Fit Score | Shape | Behavior |
 |-----------|-------|----------|
-| 40+ | Tool | Autonomous, milestones only |
-| 30-39 | Tool-review | Checkpoint major steps |
-| 25-29 | Colleague | Iterate each step |
-| <25 | BLOCKED | Clarify first |
+| 35+ | Tool | Autonomous, milestones only |
+| 25-34 | Tool-review | Checkpoint major steps |
+| 15-24 | Colleague | Iterate each step |
+| <15 | BLOCKED | Clarify first |
 
-Guided: assess factors in [SCORING] block. Then: spec_score×5 + constraints + success_criteria + done_definition + domain_familiarity
+Guided: assess factors in [SCORING] block. Then: spec_score × 5 + domain_familiarity (0-10)
 
 ---
 
@@ -81,7 +81,7 @@ Mark dependencies. Decompose by horizon: Tactical → maximize parallel items pe
 
 ```
 [LOOP] Starting | Shape: {shape} | Horizon: {horizon} | Items: {N} | Feasible: {axis} — {bound}
-Fit: {total} = spec({s})×5 + constraints({c}) + success({sc}) + done({d}) + domain({df})
+Fit: {total} = spec({s})×5 + domain({df})
 Would reframe if {what finding would change the plan, not just delay it}
 ```
 
@@ -119,10 +119,6 @@ When all items complete, expert panel reviews completed work against spec.
   Verification method locked  → [pass/fail] → [cite verification{} from shape]
   ≥2 mustNot in mustNot[]     → [pass/fail] → [cite mustNot items]
 
-### Tool Discovery
-
-Detect tools before verifying — never assume. Check: `package.json` scripts, `pyproject.toml` pytest/ruff, `Cargo.toml` test/clippy, `go.mod` test/vet, `Makefile` targets. If none found → ask user.
-
 ### Verification Tiers
 
 | Tier | Budget | Scope |
@@ -152,22 +148,12 @@ Criterion fails → diagnose cause from output before remediating. No execution 
 
 ## Step 7: Review & Feedback
 
-After verification passes, present the full journey for user review:
+After verification, present journey summary satisfying ALL:
+1. Top 3 decisions: `[chose X over Y] — [because Z] (≤20w)` + verification status per criterion
+2. Unverified items (if any) with suggested verification command
+3. Next: `[one action ≤15w] | Alt: [alternative ≤10w]`
 
-1. **Journey summary:**
-```
-Decisions:
-1. [chose X over Y] — [because Z] (≤20w)
-2. [chose X over Y] — [because Z] (≤20w)
-3. [chose X over Y] — [because Z] (≤20w)
-Verified: [PASS/FAIL] | Pass/Fail/Unverified: [names] | Evidence: [type]
-Unverified: [list or "none"]
-```
-2. **Next action:**
-   → Next: [one action from remaining/unverified criteria ≤15w] | Alt: [alternative ≤10w]
-   "Adjust, or proceed with the above?"
-   - Adjust → refine, re-enter loop (Step 1)
-   - Proceed → emit `<loop-complete>` + quality footer
+User: Adjust → re-enter loop (Step 1) | Proceed → emit `<loop-complete>` + quality footer
 
 ---
 
