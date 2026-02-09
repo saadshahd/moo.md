@@ -7,6 +7,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.5.0] - 2026-02-09
+
+### Changed
+- feat(hope): retrieval-first enforcement — codified "retrieved over recalled" principle across pipeline. Shape requires search evidence before scoring Novelty and reading manifests before Feasibility filtering, with strict self-audit fail on recall-only Because columns. Loop spawn prompts and post-work gate now mandate retrieval. Soul silent audit surfaces grounding status every turn. SubagentStart hook injects retrieval mandate to all spawned agents. PHILOSOPHY.md adds principle + hard constraint #9. CLAUDE.md philosophy audit gains retrieval check.
+
+---
+
 ## [hope@3.4.0] - 2026-02-08
 
 ### Added

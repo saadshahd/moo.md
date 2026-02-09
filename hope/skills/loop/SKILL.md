@@ -92,6 +92,7 @@ Would reframe if {what finding would change the plan, not just delay it}
 **Wave** = work items with no unresolved dependencies. Within wave: reversible before irreversible.
 
 Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot]\n\n[work item]", subagent_type="general-purpose")`
+Include in spawn prompt: "Retrieve facts (APIs, types, dependencies, current docs) using available tools before asserting from memory."
 Review: panel checks scope compliance per wave.
 
 Wave report must satisfy ALL:
@@ -108,6 +109,7 @@ When all items complete, expert panel reviews completed work against spec.
 
 - Findings: BLOCKER / REFRAME / WARNING
 - Checks against mustNot constraints
+- Checks that key decisions cite retrieved evidence (file reads, grep results, web searches), not recall-only assertions
 - BLOCKER → reshape; REFRAME → back to intent; item-level → new items, return to Waves
 - All resolved: proceed to completion
 
@@ -143,6 +145,7 @@ Criterion fails → diagnose cause from output before remediating. No execution 
   Feature executes         → [pass/fail] → [cite execution output]
   Edge cases accounted     → [pass/fail] → [cite tested list or "assertion: {which}"]
   No assumption-only done  → [pass/fail] → [cite verification type per criterion]
+  Key facts retrieved (not recalled) → [pass/fail] → [cite read/grep/search evidence per decision]
 
 ---
 

@@ -61,6 +61,8 @@ Each principle has a stance and a reason. Derived from beliefs above.
 
 - **Investigation before implementation** — Never combine "find" + "fix" in one task. Mixing cognitive modes degrades both.
 
+- **Retrieved over recalled** — Facts that can be looked up — locally (code, configs, manifests) or online (docs, APIs, versions) — must be looked up. Pre-training knowledge is stale. Retrieval is cheap. Wrong facts compound.
+
 ### From belief 3: Perspectives prevent blindness
 
 - **Multiple perspectives over solo judgment** — Expert lenses catch what one mind misses. Blind spots are systematic, not random. You can't see your own.
@@ -145,6 +147,7 @@ By stage, what to do when progress stalls.
 6. **No feature chasing** — If it doesn't serve thinking quality, it's scope creep.
 7. **No hard dependencies on other skills** — Prime and trigger naturally, never import.
 8. **No cargo cult process** — Every step must have a reason, not just ritual.
+9. **No recall-based assertions for verifiable facts** — If a tool can check it (grep, read, glob, WebSearch, WebFetch), recall is not acceptable evidence.
 
 ---
 

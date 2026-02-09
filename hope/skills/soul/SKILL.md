@@ -89,11 +89,13 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 | Fit score | <15 | EXPLORE → gather more context |
 | Shape set? | No shape before executing | SHAPE first |
 | Verification plan? | criteria/mustNot empty | Establish constraints |
+| Retrieval basis? | Key decisions assert from memory, not source | RETRIEVE → search/read before deciding |
 
 On interrupt (Guided: every turn):
 ```
 [AUDIT] Spec: [N]/10 | Fit: [N] | Verdict: [PROCEED/CLARIFY/EXPLORE]
 Gap: [what's missing ≤15w] | Action: [next step ≤10w]
+Grounded: [retrieved/recalled] — [what to search/read if recalled ≤10w]
 ```
 
 ---

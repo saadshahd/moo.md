@@ -23,6 +23,8 @@ From user request or prior `/hope:intent`, extract: goal, constraints, scope, fe
 
 Also scan for context slots: `PATTERNS:` (existing conventions/precedent), `BOUNDARIES:` (architectural constraints, team norms), and `FEASIBLE:` (constraint axis + bound from intent or session default). When present, use as evidence when scoring Novelty and Risk aspects.
 
+When PATTERNS slot is empty, retrieve existing conventions — search codebase (grep/glob) and current docs/standards (WebSearch/WebFetch) before scoring Novelty. When FEASIBLE axis is `tools`, read the project's dependency manifest before filtering approaches.
+
 ### 2. Identify Candidate Shapes
 
 Three collaboration modes determine how user and agent interact during implementation:
@@ -36,6 +38,8 @@ Three collaboration modes determine how user and agent interact during implement
 ### 3. Score Aspects
 
 For each aspect in the discovery table below, determine which shape column the task falls into.
+
+For Novelty: retrieve before scoring — search codebase for existing patterns AND search online for current approaches. "No precedent" requires search evidence, not absence of recall.
 
 ### 4. Expert Consultation (+ Approach Comparison)
 
@@ -73,6 +77,8 @@ When a feasibility axis is active (from `FEASIBLE:` slot or session default), ap
 | **Tools** | Require dependencies not in the project |
 | **Access** | Require permissions or environments the user lacks |
 
+For Tools and Access axes: read project files (manifests, configs) and check current docs (WebSearch) before eliminating. Never filter by recall alone.
+
 If ALL candidate approaches eliminated: surface the conflict — `"Feasibility ([axis]) eliminates all shaped approaches. Recommend: relax [axis] or reduce scope."`
 
 If feasibility is `none`: skip this step.
@@ -93,6 +99,7 @@ SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
   mustNot[] has ≥2 items     → [pass/fail] → [cite items]
   Shape selected + justified → [pass/fail] → [cite majority column]
   Approach grid spread met (≥1 ≤3, ≥1 ≥8) or single approach → [pass/fail]
+  Because cites retrieved observable (not recalled) → [pass/fail] → [count verified / total]
 
 ### 7. Action Bridge
 

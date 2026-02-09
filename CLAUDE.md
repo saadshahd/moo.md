@@ -150,6 +150,7 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 - [ ] Does this create coupling that breaks if a skill is missing? → Loose coupling required
 - [ ] Does this build something Claude will do natively? → Don't compete with the platform
 - [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts)? → Every mechanism must trace to an outcome
+- [ ] Does this assert verifiable facts from memory? → Retrieved over recalled
 
 ### Statechart (Canonical Reference)
 
