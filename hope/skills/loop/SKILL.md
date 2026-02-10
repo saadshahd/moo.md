@@ -92,9 +92,10 @@ Would reframe if {what finding would change the plan, not just delay it}
 
 Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot + intent ACCEPTANCE criteria]\n\n[work item]\n\nVerify against ACCEPTANCE criteria and STOP conditions from the intent brief.", subagent_type="general-purpose")`
 Include in spawn prompt: "Retrieve facts (APIs, types, dependencies, current docs) using available tools before asserting from memory. Per work item: WHAT/WHY questions (intent, preference, priority) → ask the user. HOW/WHAT-EXISTS questions (API, file, dependency) → retrieve with tools."
-Review: panel checks scope compliance per wave.
+Review: run the consult skill: Skill(skill="hope:consult", args="panel checks scope compliance per wave")
 
 Wave report must satisfy ALL:
+
 1. `[WAVE {N}]` header, per item: `{done ≤10w} | Verify: {PASS/FAIL}` — cite command + exit state
 2. Footer: `[WAVE {N} COMPLETE] Done: {n} | Carry: {n} | Stall: {n}` — must equal total
 3. `[LEARN] What this wave revealed: [one insight ≤15w about the problem domain, not the process]`
@@ -105,7 +106,7 @@ Wave report must satisfy ALL:
 
 ## Step 5: Thorough Expert Review
 
-When all items complete, expert panel reviews completed work against spec.
+When all items complete, expert panel Skill(skill="hope:consult", args="reviews completed work against spec") .
 
 - Findings: BLOCKER / REFRAME / WARNING
 - Checks against mustNot constraints

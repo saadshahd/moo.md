@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.2] - 2026-02-10
+
+### Changed
+- refactor(hope): loop consult invocations converted from natural language to explicit Skill() calls
+
+---
+
 ## [hope@3.7.1] - 2026-02-10
 
 ### Changed
