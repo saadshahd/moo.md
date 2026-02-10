@@ -100,7 +100,7 @@ Coupling risks: [named risks or "none detected"]
 Create this team? [Yes / Adjust / Cancel]
 ```
 
-SELF-AUDIT (before presenting blueprint, revise if any FAIL) →
+SELF-AUDIT (emit before presenting, revise if any FAIL) →
   Fitness assessed before design         → [pass/fail]
   Each role has distinct file ownership  → [pass/fail] → overlap: [names or "none"]
   Coupling risks named                   → [pass/fail] → risks: [list or "none detected"]

@@ -94,6 +94,7 @@ Generate response satisfying ALL:
 2. Name what this expert would push back on — if it reframes the problem itself, say so. Agreement without friction is failure
 3. State where this expert's documented work stops covering the question — the boundary, not just the tier
 4. Land on a concrete recommendation the user can act on today
+5. Emit checkpoint: `[EXTRACT] Key insight: [one reusable finding ≤15w for downstream skills]`
 
 ---
 

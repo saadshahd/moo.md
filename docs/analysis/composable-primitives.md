@@ -155,12 +155,43 @@ Every pattern in the augmented-coding-patterns catalog is a specific composition
 
 | Skill | Primitive composition (design time) |
 |-------|-------------------------------------|
-| soul | Gate(audit) → Zoom(session_type) |
-| intent | Gate(spec_score) → Transform(clarify) → Verify(echo_check) → Extract(brief) |
-| shape | Zoom(aspects) → Gate(score) → Transform(select) → Verify(self-audit) → Extract(criteria) |
-| loop | Gate(spec) → Compose(Transform(wave) → Verify(gate) → Extract(report)) × N |
-| consult | Zoom(domain) → Gate(coverage) → Transform(simulate) → Verify(grounding) |
-| bond | Gate(fitness) → Transform(design) → Verify(user_approval) → Extract(blueprint) |
+| soul | Zoom(marker) → Zoom(session_type) → Transform(engagement) → Gate(audit) |
+| intent | Transform(acknowledge) → Transform(clarify) → Gate(spec_score) → Verify(echo_check) → Extract(brief) |
+| shape | Transform(extract_intent) → Zoom(aspects) → Gate(score) → Transform(select) → Verify(self-audit) → Extract(criteria) |
+| loop | Gate(spec) → Transform(decompose) → Compose(Transform(wave) → Verify(wave) → Extract(report+learn)) × N → Gate(expert_review) → Verify(thorough) → Gate(post_work) |
+| consult | Gate(detect) → Gate(coverage) → Transform(simulate\|debate\|diagnose) → Verify(grounding) → Extract(insight) |
+| bond | Gate(fitness) → Transform(design) → Verify(self-audit) → Gate(user_approval) |
+
+**Consult mode-specific compositions:**
+
+| Mode | Primitive composition |
+|------|----------------------|
+| single | Gate(detect) → Gate(coverage) → Transform(simulate) → Verify(grounding) → Extract(insight) |
+| panel | Gate(detect) → Gate(coverage) → Transform(debate) → Transform(synthesize) → Verify(spread+grounding) → Extract(insight) |
+| unblock | Gate(detect) → Gate(coverage) → Compose(Transform(diagnose) → Verify(consensus), max=3) → Extract(insight) |
+
+---
+
+## How Hooks Map
+
+Hooks are runtime orchestration that wraps skills. They perform primitive operations but aren't skills themselves.
+
+| Hook | Primitive operation | What it does |
+|------|-------------------|--------------|
+| SessionStart | Extract → Zoom | Extracts soul content, zooms session context |
+| UserPromptSubmit | Gate(audit) → Zoom(route) | Runs silent audit, routes to pipeline stage |
+| SubagentStart | Extract(criteria) → Transform(prompt) | Propagates criteria/mustNot into spawn context |
+| PreCompact | Extract(preserve) → Verify(no_loss) | Extracts state markers, verifies preservation |
+
+---
+
+## Compose Parameters
+
+Compose contracts accept failure-handling parameters from the statechart. These are cross-cutting rules enforced at the pipeline level.
+
+- `max_iterations`: Circuit breaker threshold (loop: user-configured, intent clarify: 3, consult unblock: 3, bond adjust: 3)
+- `escape_action`: What happens when breaker trips (pause + announce | escalate | proceed anyway)
+- `mustNot_enforcement`: Hard stop on constraint violation — overrides all other Compose behavior
 
 ---
 

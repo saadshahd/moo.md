@@ -7,6 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.6.1] - 2026-02-10
+
+### Changed
+- fix(hope): corrected all 6 skill-to-primitive composition mappings in composable-primitives.md — validated against actual SKILL.md step-by-step flows
+- feat(hope): consult emits `[EXTRACT] Key insight` checkpoint after every response (serves Law 1: Conservation of Understanding)
+- feat(hope): bond self-audit emits results before presenting blueprint (makes Verify visible)
+
+### Added
+- docs: hook-primitive mapping — how SessionStart, UserPromptSubmit, SubagentStart, PreCompact map to primitive contracts
+- docs: compose parameters — circuit breaker thresholds, escape actions, mustNot enforcement as cross-cutting rules
+- docs: consult mode-specific compositions — single, panel, unblock each mapped to distinct primitive sequences
+
+---
+
 ## [hope@3.6.0] - 2026-02-10
 
 ### Added
