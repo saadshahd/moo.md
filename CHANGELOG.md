@@ -7,6 +7,36 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.5.4] - 2026-02-10
+
+### Added
+- feat(hope): /hope:full command — explicit pipeline orchestrator that guarantees session → intent → shape → consult → loop sequence
+
+### Changed
+- feat(hope): consult promoted to pipeline stage — Build/Debug/Plan now route through consult after shape for visible expert validation before execution
+- feat(hope): shape "After Shape" handoff routes through consult before loop/output
+- feat(hope): all cross-skill references converted from natural language ("invoke /hope:X") to explicit Skill() tool syntax across soul, intent, shape, and full command
+- feat(hope): statechart updated — §1 pipeline transitions, §5 consult invocation sources, §8 commands table
+- feat(hope): shape "After Shape" handoff — routes Build/Debug to loop, Plan to output after Action Bridge
+- feat(hope): ensure-soul softened from pipeline mandate to informational reminder, surfaces /hope:full as guaranteed path
+
+---
+
+## [hope@3.5.1] - 2026-02-10
+
+### Fixed
+- fix(hope): pipeline delivery — ensure-soul rewritten from evaluation checklist to action directives (Opus 4.6 follows explicit numbered steps, not self-evaluation checklists)
+- fix(hope): SessionStart hook changed from async to sync — soul content now available on turn 1 instead of turn 2
+- fix(hope): intent → shape handoff — added Skill to allowed-tools, "After Brief" section auto-invokes next pipeline stage instead of passive NEXT label
+- fix(hope): soul silent audit shape gate strengthened — "SHAPE first" replaced with explicit "Invoke /hope:shape — do not write code without shaped criteria"
+- fix(hope): loop wave spawn now includes intent ACCEPTANCE criteria and STOP conditions for subagent verification
+
+### Added
+- feat(hope): PreCompact hook — extracts [SESSION] marker, intent brief, shape output, and loop progress before compaction to ensure state survival
+- docs: hooks architecture section in CLAUDE.md — sync/async rationale, key learnings from impact analysis
+
+---
+
 ## [hope@3.5.0] - 2026-02-09
 
 ### Changed

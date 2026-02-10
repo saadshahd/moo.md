@@ -2,7 +2,7 @@
 name: intent
 description: Turn rough ideas into iron-clad work orders. Use when request is vague like "add a button", "make it better", "fix the thing". Triggers on ambiguous or underspecified requests.
 model: sonnet
-allowed-tools: Read, Bash
+allowed-tools: Read, Bash, Skill
 ---
 
 # Intent Translator
@@ -139,6 +139,13 @@ SELF-AUDIT (Guided: emit in [AUDIT] block; revise if any FAIL) →
   STOP CONDITIONS has 3-5     → [pass/fail] → [count]
   All bullets ≤20 words       → [pass/fail] → [longest word count]
 
+### After Brief
+
+Brief is locked. Proceed to the next pipeline stage immediately:
+- Build / Debug / Plan: run Skill(skill="hope:shape") with this brief
+- Reflect: run Skill(skill="hope:consult") with this brief
+- User said "skip" or "just build": run Skill(skill="hope:loop") directly
+
 ---
 
 ## Refinement Options Table
@@ -163,7 +170,7 @@ FEASIBLE: [axis] — [bound] (omit if none)
 HORIZON: [Tactical/Strategic/Existential] — [what future-self would question]
 SPEC SCORE: [X/10]
 BRIEF: [OBJECTIVE / NON-GOALS / CONSTRAINTS / ACCEPTANCE / STOP]
-NEXT: /hope:loop or /hope:shape
+ROUTE → Run Skill(skill="hope:shape") now (Build/Debug/Plan) or Skill(skill="hope:consult") (Reflect)
 ```
 
 ---

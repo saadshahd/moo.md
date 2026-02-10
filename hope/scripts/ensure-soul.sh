@@ -1,13 +1,12 @@
 #!/bin/bash
-# moo UserPromptSubmit hook: Per-turn session strategy injector
-# Fires on every user message. Injects pipeline table + state evaluation checklist.
-# Hook evaluates state; skills instruct behavior.
+# moo UserPromptSubmit hook: Per-turn pipeline enforcer
+# Fires on every user message. Detects pipeline state and injects next action.
 
 cat << 'EOF'
 {
   "hookSpecificOutput": {
     "hookEventName": "UserPromptSubmit",
-    "additionalContext": "<session-context>\nROUTE. Follow pipeline for session type:\nBuild: intent->shape->loop | Debug: intent(diagnose)->shape->loop | Plan: intent->shape->output | Reflect: intent->consult->output\n\nBefore responding, evaluate:\n- Trivial request (single-line fix, factual question, greeting)? Execute directly, skip remaining checks.\n- Is [SESSION] marker set? If no: detect type, ask engagement + horizon for non-trivial tasks, emit marker.\n- Is intent clear (spec >= 5)? If no: clarify before building.\n- Is approach shaped? If building/debugging without shape output yet: shape before executing.\n- Executing without verification plan? Establish criteria and mustNot first.\n- Is horizon captured? If no HORIZON: stated: apply session-type default.\n- Is feasibility captured? If Build/Debug and no FEASIBLE: stated: apply session-type default.\n\nWhen compacting PRESERVE: [SESSION] marker, work item status, criteria/mustNot, horizon, feasibility axis + bound, verification results (pass/fail + evidence), completed items list, current wave number, key decisions\nWhen compacting DISCARD (summarize, don't keep verbatim): long tool output, repeated file reads, install/build logs, full stack traces (keep root cause only)\n</session-context>"
+    "additionalContext": "<session-context>\nPIPELINE CHECK — scan conversation and take the FIRST matching action:\n\n1. Trivial request (greeting, single-line fix, factual question)? → Respond directly. Stop checking.\n2. No [SESSION] marker yet? → Detect type (Build/Debug/Plan/Reflect), ask engagement + horizon, emit [SESSION]. Stop.\n3. [SESSION] exists but no intent brief (OBJECTIVE/ACCEPTANCE/STOP)? → Run Skill(skill=\"hope:intent\") NOW.\n4. Intent brief exists but no shape output (criteria[]/mustNot[])? → For Build/Debug/Plan: run Skill(skill=\"hope:shape\") NOW. For Reflect: skip to step 5.\n5. Shape output exists but no consult panel synthesis? → Run Skill(skill=\"hope:consult\", args=\"evaluate approach\") NOW. For Reflect without shape: run Skill(skill=\"hope:consult\") with the intent brief.\n6. Consult done but no loop started? → For Build/Debug: run Skill(skill=\"hope:loop\") NOW. For Plan/Reflect: present output.\n7. All stages complete? → Continue naturally.\n\nPipeline: Build/Debug: intent → shape → consult → loop | Plan: intent → shape → consult → output | Reflect: intent → consult → output\n\nWhen compacting PRESERVE: [SESSION] marker, intent brief, criteria/mustNot, consult synthesis, wave progress\nWhen compacting DISCARD (summarize): tool output, file reads, build logs, stack traces (keep root cause only)\n</session-context>"
   }
 }
 EOF

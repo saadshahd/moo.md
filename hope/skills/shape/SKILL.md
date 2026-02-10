@@ -106,6 +106,12 @@ SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
 After shape output, append: `→ Start: [first atomic action from highest-priority criterion ≤15w — produces visible artifact]`
 Colleague → action is a question to ask. Tool-Review/Tool → action is a command or file to create.
 
+### After Shape
+
+Shape is locked. Validate approach before execution:
+- Build / Debug / Plan: run Skill(skill="hope:consult", args="evaluate approach") with criteria[]/mustNot[] and selected shape
+- After consult synthesis: Build / Debug → run Skill(skill="hope:loop") | Plan → present output
+
 ---
 
 ## Aspect Discovery

@@ -28,9 +28,9 @@ stateDiagram-v2
   intent --> shape : Build / Debug / Plan (spec ≥ 5)
   intent --> consult : Reflect (spec ≥ 5)
 
-  shape --> loop : Build / Debug (shaped)
-  shape --> completed : Plan (output delivered)
-  consult --> completed : Reflect (output delivered)
+  shape --> consult : Build / Debug / Plan (validate approach)
+  consult --> loop : Build / Debug
+  consult --> completed : Plan / Reflect (output delivered)
 
   loop --> completed : user satisfied
   completed --> [*]
@@ -49,9 +49,9 @@ Soul detects type from the user's first message. Sets skill composition for the 
 
 | Type | Signals | Pipeline |
 |------|---------|----------|
-| **Build** | "build", "implement", "create", "add" | intent → shape → loop |
-| **Debug** | "fix", "bug", "error", "broken" | intent (diagnose) → shape → loop |
-| **Plan** | "plan", "design", "architect", "explore" | intent → shape → output |
+| **Build** | "build", "implement", "create", "add" | intent → shape → consult → loop |
+| **Debug** | "fix", "bug", "error", "broken" | intent (diagnose) → shape → consult → loop |
+| **Plan** | "plan", "design", "architect", "explore" | intent → shape → consult → output |
 | **Reflect** | "postmortem", "review session", "what went wrong" | intent → consult → output |
 
 ### Engagement Level Effects
@@ -199,6 +199,7 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
   state "Invocation Sources" as sources {
+    shape_complete : shape output locked (Build/Debug/Plan)
     shape_step : shape step 3 (tradeoff panel)
     loop_stall : loop stall detect (auto-unblock)
     loop_review : loop expert review (thorough panel)
@@ -356,6 +357,7 @@ stateDiagram-v2
 | `/hope:unblock` | (no state change) | Removes from blocklist |
 | `/hope:blocked` | (no state change) | Read-only blocklist display |
 | `/hope:bond` | `bond.assess` | Team composition, standalone or from shape |
+| `/hope:full` | `soul.detect_type` | Full pipeline orchestrator |
 
 ---
 

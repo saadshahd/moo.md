@@ -2,16 +2,16 @@
 name: hope
 description: Use when starting any task, thinking through confidence, verifying work, or asking "what could go wrong". Triggers on every non-trivial request, "how confident", "verify this", "think through".
 model: opus
-allowed-tools: Read, Grep, Glob
+allowed-tools: Read, Grep, Glob, Skill
 ---
 
 <core-principles>
 EVALUATE. Run Silent Audit before responding. Use confidence gates.
-Clarify intent using /hope:intent before building.
+After emitting [SESSION], run Skill(skill="hope:intent") before any exploration or code.
 
 **Defer to specific skills** when request clearly matches:
-- "expert input", "panel", "debate" → `hope:consult`
-- "loop", "keep going", "implement" → `hope:loop`
+- "expert input", "panel", "debate" → Skill(skill="hope:consult")
+- "loop", "keep going", "implement" → Skill(skill="hope:loop")
 
 Surface tradeoffs so the user decides. Show reasoning chain, not just conclusion. Frame gaps as questions.
 </core-principles>
@@ -28,9 +28,9 @@ Detect from first message. If later evidence contradicts type, re-detect.
 
 | Type | Detection Signals | Pipeline |
 |------|-------------------|----------|
-| **Build** | "build", "implement", "create", "add" | intent → shape → loop |
-| **Debug** | "fix", "bug", "error", "broken" | intent (diagnose) → shape → loop |
-| **Plan** | "plan", "design", "architect", "explore" | intent → shape → output (no loop) |
+| **Build** | "build", "implement", "create", "add" | intent → shape → consult → loop |
+| **Debug** | "fix", "bug", "error", "broken" | intent (diagnose) → shape → consult → loop |
+| **Plan** | "plan", "design", "architect", "explore" | intent → shape → consult → output |
 | **Reflect** | "postmortem", "review session", "what went wrong" | intent → consult → output |
 
 ### Engagement Level
@@ -60,16 +60,18 @@ digraph SessionStrategy {
   Trivial [label="Trivial task?"]
   Engage [label="Engagement set?"]
   Ask [label="Ask engagement level"]
-  Compose [label="Compose pipeline"]
-  Execute [label="Run pipeline"]
+  Marker [label="Emit [SESSION] marker"]
+  Intent [label="Run Skill(hope:intent)"]
   Start -> Detect -> Trivial
-  Trivial -> Compose [label="yes (default: Guided)"]
+  Trivial -> Marker [label="yes (default: Guided)"]
   Trivial -> Engage [label="no"]
-  Engage -> Compose [label="yes"]
+  Engage -> Marker [label="yes"]
   Engage -> Ask [label="no"]
-  Ask -> Compose -> Execute
+  Ask -> Marker -> Intent
 }
 ```
+
+After [SESSION] marker is emitted, your next action MUST be: Skill(skill="hope:intent"). Do not explore, plan, or write code before intent completes.
 
 ### Session Marker
 
@@ -87,7 +89,7 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 |-------|-----------|----------|
 | Spec score | <5 | CLARIFY → run intent |
 | Fit score | <15 | EXPLORE → gather more context |
-| Shape set? | No shape before executing | SHAPE first |
+| Shape set? | No criteria[]/mustNot[] before code | Run Skill(skill="hope:shape") — do not write code without shaped criteria |
 | Verification plan? | criteria/mustNot empty | Establish constraints |
 | Retrieval basis? | Key decisions assert from memory, not source | RETRIEVE → search/read before deciding |
 
@@ -120,13 +122,9 @@ Verification type IS the confidence. Observable > inspected > assumed.
 
 ---
 
-## Intent Clarification Protocol
+## Intent Clarification
 
-**If uncertain, ask about:** purpose, success criteria, constraints, edge cases.
-
-**Surface unknowns:** What problem does this solve today? Simplest version that works? What causes catastrophic failure?
-
-**Only proceed when:** intent clear, constraints known, success criteria defined — or user says "proceed anyway."
+Do not clarify intent inline. Run Skill(skill="hope:intent") — it handles the full 5-step protocol (acknowledge, clarify, score, echo check, emit brief).
 
 ---
 

@@ -91,7 +91,7 @@ Would reframe if {what finding would change the plan, not just delay it}
 
 **Wave** = work items with no unresolved dependencies. Within wave: reversible before irreversible.
 
-Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot]\n\n[work item]", subagent_type="general-purpose")`
+Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot + intent ACCEPTANCE criteria]\n\n[work item]\n\nVerify against ACCEPTANCE criteria and STOP conditions from the intent brief.", subagent_type="general-purpose")`
 Include in spawn prompt: "Retrieve facts (APIs, types, dependencies, current docs) using available tools before asserting from memory."
 Review: panel checks scope compliance per wave.
 

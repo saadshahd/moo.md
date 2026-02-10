@@ -17,7 +17,7 @@ moo.md/
 │   │   ├── consult/         # Expert simulation (42 profiles)
 │   │   └── bond/            # Team composition (agent teams)
 │   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond
-│   ├── hooks/               # UserPromptSubmit + SubagentStart
+│   ├── hooks/               # UserPromptSubmit + SubagentStart + PreCompact
 │   └── scripts/             # Per-turn session strategy injector
 ├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs
@@ -58,6 +58,24 @@ claude --plugin-dir ./moo.md
 ```
 
 See [docs/dev/local-development.md](docs/dev/local-development.md) for full workflow.
+
+## Hooks Architecture
+
+Hooks use `async: true` only when intentional — async output arrives on the **next** turn, not the current one.
+
+| Hook | Sync/Async | Why |
+|------|-----------|-----|
+| SessionStart | **Sync** | Soul content must be available on turn 1 |
+| UserPromptSubmit | **Sync** | Pipeline routing must precede Claude's response |
+| SubagentStart | **Sync** (prompt) | Subagents need criteria before executing |
+| PreCompact | **Sync** (prompt) | Must extract state before compaction runs |
+
+**Key learnings:**
+- `additionalContext` appears as `<system-reminder>` tags — visible to Claude, silent to user
+- Hook context is appended after user message (no prepend mechanism exists)
+- Action directives ("invoke X now") outperform evaluation checklists ("before responding, evaluate...")
+- Plugin hooks may silently discard output for marketplace installs (#12151, #16538) — `--plugin-dir` works reliably
+- Hooks are snapshotted at startup; restart to pick up changes
 
 ## Conventions
 
