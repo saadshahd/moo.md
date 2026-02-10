@@ -90,6 +90,7 @@ Present shape output satisfying ALL:
 2. Because must cite a specific observable — file names, line counts, dependency chains, API shapes — not adjectives
 3. Would-change-if must be a condition someone could CHECK tomorrow — "if auth moves to middleware (check router.ts)" not "if things change"
 4. Tally columns, select majority, emit criteria[] (boolean) + mustNot[] (≥2) — user counter-evidence re-scores that aspect
+5. Emit `Disposable: [yes/no]` — yes when both Novelty and Ambiguity score Colleague (prototype territory). Loop treats disposable work with less investment and faster iteration.
 
 SELF-AUDIT (after shape output, revise before presenting if any FAIL) →
   All 5 aspects scored      → [pass/fail] → scored/deferred: [names]

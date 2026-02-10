@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+- feat(hope): feedback loop in loop — carry items include `[VERIFY] FAIL: [reason]` in retry spawn prompt so retries transform with context, not from scratch
+- feat(hope): disposability signal in shape — `Disposable: [yes/no]` emitted from aspect scores; loop treats disposable work with ≤ 3 items
+- feat(hope): understanding extraction in loop — `[LEARN]` marker in wave reports captures domain insight, not just progress
+- feat(hope): retrieve-vs-ask decision rule in loop — WHAT/WHY questions ask user, HOW/WHAT-EXISTS questions retrieve with tools
+- docs: composable primitives — type contracts (Gate, Transform, Verify, Extract, Zoom, Compose), three laws, category theory alignment, FP parallels
+
+---
+
 ## [hope@3.5.4] - 2026-02-10
 
 ### Added

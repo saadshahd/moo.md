@@ -77,7 +77,7 @@ Work Items (every criteria[] entry maps to ≥1 item):
 2. [imperative action] — [verify command] → criteria: [names]
 ```
 
-Mark dependencies. Decompose by horizon: Tactical → maximize parallel items per wave | Strategic → phase by dependency chain | Existential → foundation layers first. Announce:
+Mark dependencies. Decompose by horizon: Tactical → maximize parallel items per wave | Strategic → phase by dependency chain | Existential → foundation layers first. If Disposable=yes from shape: items target proof-of-concept, not production — keep items ≤ 3, expect to discard. Announce:
 
 ```
 [LOOP] Starting | Shape: {shape} | Horizon: {horizon} | Items: {N} | Feasible: {axis} — {bound}
@@ -92,14 +92,15 @@ Would reframe if {what finding would change the plan, not just delay it}
 **Wave** = work items with no unresolved dependencies. Within wave: reversible before irreversible.
 
 Spawn per ready item: `Task(prompt="EXECUTE. [session + criteria + mustNot + intent ACCEPTANCE criteria]\n\n[work item]\n\nVerify against ACCEPTANCE criteria and STOP conditions from the intent brief.", subagent_type="general-purpose")`
-Include in spawn prompt: "Retrieve facts (APIs, types, dependencies, current docs) using available tools before asserting from memory."
+Include in spawn prompt: "Retrieve facts (APIs, types, dependencies, current docs) using available tools before asserting from memory. Per work item: WHAT/WHY questions (intent, preference, priority) → ask the user. HOW/WHAT-EXISTS questions (API, file, dependency) → retrieve with tools."
 Review: panel checks scope compliance per wave.
 
 Wave report must satisfy ALL:
 1. `[WAVE {N}]` header, per item: `{done ≤10w} | Verify: {PASS/FAIL}` — cite command + exit state
 2. Footer: `[WAVE {N} COMPLETE] Done: {n} | Carry: {n} | Stall: {n}` — must equal total
-3. Carry = verification weaker than execution output — retry next wave
-4. Stall → diagnose from execution output — revise remaining if assumptions broke
+3. `[LEARN] What this wave revealed: [one insight ≤15w about the problem domain, not the process]`
+4. Carry = verification weaker than execution output — retry next wave with feedback: include `[VERIFY] FAIL: [reason]` in spawn prompt so retry transforms with context, not from scratch
+5. Stall → diagnose from execution output — revise remaining if assumptions broke
 
 ---
 
