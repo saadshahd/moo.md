@@ -1,7 +1,7 @@
 ---
 name: bond
 description: Design agent team structure for a task. Use when "set up a team", "team for this", "should I use agents", "design a team", "bond a team", "how many agents", "agent team".
-model: sonnet
+model: opus
 allowed-tools: Read, Grep, Glob, Bash, AskUserQuestion
 ---
 
@@ -41,23 +41,23 @@ digraph bond {
 
 Score 4 dimensions from task description + conversation context. Each dimension maps to one verdict column.
 
-| Dimension | Team | Subagent | Solo |
-|-----------|------|----------|------|
-| **Independence** | Workers don't need each other's output | Tasks isolated, only results matter | Sequential dependency chain |
-| **File ownership** | Each role owns distinct areas | Each task touches isolated files | Same files need editing |
-| **Coordination** | Must share findings or challenge each other | Only report back | One mind holds it all |
-| **Scope** | Multi-module, 8+ story points | Focused exploration or analysis | Single file, 1-3 story points |
+| Dimension          | Team                                        | Subagent                            | Solo                          |
+| ------------------ | ------------------------------------------- | ----------------------------------- | ----------------------------- |
+| **Independence**   | Workers don't need each other's output      | Tasks isolated, only results matter | Sequential dependency chain   |
+| **File ownership** | Each role owns distinct areas               | Each task touches isolated files    | Same files need editing       |
+| **Coordination**   | Must share findings or challenge each other | Only report back                    | One mind holds it all         |
+| **Scope**          | Multi-module, 8+ story points               | Focused exploration or analysis     | Single file, 1-3 story points |
 
 **Scoring:** Majority column wins. Override: any Solo in File ownership → Solo (merge conflicts kill teams). Default when tied: Subagent (cheaper, less coordination overhead).
 
 **Red flags — warn before proceeding:**
 
-| Red Flag | Why It Fails | Suggest Instead |
-|----------|-------------|-----------------|
-| All roles touch same files | Merge conflicts, wasted effort | Single session or sequential subagents |
-| >5 teammates | Coordination cost exceeds parallelism | Reduce scope or phase the work |
-| Tasks have serial dependencies | Team overhead with no parallel gain | Single session with subagents for research |
-| Task is ≤3 story points | Overhead of team setup > benefit | Just do it in current session |
+| Red Flag                       | Why It Fails                          | Suggest Instead                            |
+| ------------------------------ | ------------------------------------- | ------------------------------------------ |
+| All roles touch same files     | Merge conflicts, wasted effort        | Single session or sequential subagents     |
+| >5 teammates                   | Coordination cost exceeds parallelism | Reduce scope or phase the work             |
+| Tasks have serial dependencies | Team overhead with no parallel gain   | Single session with subagents for research |
+| Task is ≤3 story points        | Overhead of team setup > benefit      | Just do it in current session              |
 
 Output: `[BOND] Fitness: {Team/Subagent/Solo} | Why: ≤15w`
 
@@ -67,19 +67,20 @@ Output: `[BOND] Fitness: {Team/Subagent/Solo} | Why: ≤15w`
 
 From task analysis, decompose into independent workstreams. For each workstream, assign a role.
 
-| Decision | Heuristic |
-|----------|-----------|
-| Teammate count | 1 per independent workstream (2-5, never more) |
-| Role names | By responsibility ("auth-impl", "api-reviewer"), never generic ("agent-1") |
-| File boundaries | Each role owns distinct directories or file groups — flag any overlap |
-| Models | Opus: architecture, review, complex reasoning. Sonnet: implementation, refactoring. Haiku: research, exploration |
-| Permission mode | `plan`: architectural or risky changes. `default`: implementation with clear scope |
-| Delegate mode | Recommend when >3 teammates (lead coordinates only) |
-| Task count | 5-6 per teammate, each self-contained with a clear deliverable |
+| Decision        | Heuristic                                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Teammate count  | 1 per independent workstream (2-5, never more)                                                                   |
+| Role names      | By responsibility ("auth-impl", "api-reviewer"), never generic ("agent-1")                                       |
+| File boundaries | Each role owns distinct directories or file groups — flag any overlap                                            |
+| Models          | Opus: architecture, review, complex reasoning. Sonnet: implementation, refactoring. Haiku: research, exploration |
+| Permission mode | `plan`: architectural or risky changes. `default`: implementation with clear scope                               |
+| Delegate mode   | Recommend when >3 teammates (lead coordinates only)                                                              |
+| Task count      | 5-6 per teammate, each self-contained with a clear deliverable                                                   |
 
 **Coupling check:** For each pair of roles, ask: "If role A changes X, does role B's work break?" If yes → merge roles into one OR add explicit coordination checkpoint ("A completes X before B starts Y").
 
 **Session-aware:** If `[SESSION]` marker present, use Horizon for decomposition:
+
 - Tactical → maximize parallel items per wave
 - Strategic → phase by dependency chain
 - Existential → foundation layers first

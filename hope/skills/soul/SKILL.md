@@ -1,5 +1,5 @@
 ---
-name: hope
+name: soul
 description: Use when starting any task, thinking through confidence, verifying work, or asking "what could go wrong". Triggers on every non-trivial request, "how confident", "verify this", "think through".
 model: opus
 allowed-tools: Read, Grep, Glob, Skill
@@ -26,12 +26,12 @@ Detect from first message. If later evidence contradicts type, re-detect.
 
 **Context slots:** If first message contains `PRIOR:` (previous session decisions/outcomes), `REFS:` (file paths, PR numbers, docs), `HORIZON:` (tactical/strategic/existential), or `FEASIBLE:` (constraint axis + bound), include in `[SESSION]` marker for pipeline continuity.
 
-| Type | Detection Signals | Pipeline |
-|------|-------------------|----------|
-| **Build** | "build", "implement", "create", "add" | intent → shape → consult → loop |
-| **Debug** | "fix", "bug", "error", "broken" | intent (diagnose) → shape → consult → loop |
-| **Plan** | "plan", "design", "architect", "explore" | intent → shape → consult → output |
-| **Reflect** | "postmortem", "review session", "what went wrong" | intent → consult → output |
+| Type        | Detection Signals                                 | Pipeline                                   |
+| ----------- | ------------------------------------------------- | ------------------------------------------ |
+| **Build**   | "build", "implement", "create", "add"             | intent → shape → consult → loop            |
+| **Debug**   | "fix", "bug", "error", "broken"                   | intent (diagnose) → shape → consult → loop |
+| **Plan**    | "plan", "design", "architect", "explore"          | intent → shape → consult → output          |
+| **Reflect** | "postmortem", "review session", "what went wrong" | intent → consult → output                  |
 
 ### Engagement Level
 
@@ -85,15 +85,16 @@ Maintain this marker throughout conversation. When compacting, preserve the `[SE
 
 ## Silent Audit (Guided: always surface; other: on interrupt)
 
-| Check | Threshold | Guidance |
-|-------|-----------|----------|
-| Spec score | <5 | CLARIFY → run intent |
-| Fit score | <15 | EXPLORE → gather more context |
-| Shape set? | No criteria[]/mustNot[] before code | Run Skill(skill="hope:shape") — do not write code without shaped criteria |
-| Verification plan? | criteria/mustNot empty | Establish constraints |
-| Retrieval basis? | Key decisions assert from memory, not source | RETRIEVE → search/read before deciding |
+| Check              | Threshold                                    | Guidance                                                                  |
+| ------------------ | -------------------------------------------- | ------------------------------------------------------------------------- |
+| Spec score         | <5                                           | CLARIFY → run intent                                                      |
+| Fit score          | <15                                          | EXPLORE → gather more context                                             |
+| Shape set?         | No criteria[]/mustNot[] before code          | Run Skill(skill="hope:shape") — do not write code without shaped criteria |
+| Verification plan? | criteria/mustNot empty                       | Establish constraints                                                     |
+| Retrieval basis?   | Key decisions assert from memory, not source | RETRIEVE → search/read before deciding                                    |
 
 On interrupt (Guided: every turn):
+
 ```
 [AUDIT] Spec: [N]/10 | Fit: [N] | Verdict: [PROCEED/CLARIFY/EXPLORE]
 Gap: [what's missing ≤15w] | Action: [next step ≤10w]
@@ -104,19 +105,19 @@ Grounded: [retrieved/recalled] — [what to search/read if recalled ≤10w]
 
 ## Verification Gates
 
-| Type | Description | SHIP? |
-|------|-------------|-------|
-| `execution output` | Ran command, showed result | Yes |
-| `observation` | Screenshot, debugger | Yes |
-| `measurement` | Metrics, benchmark | Yes |
-| `code review` | Inspection only | Weak |
-| `assumption` | Not verified | Blocks |
+| Type               | Description                | SHIP?  |
+| ------------------ | -------------------------- | ------ |
+| `execution output` | Ran command, showed result | Yes    |
+| `observation`      | Screenshot, debugger       | Yes    |
+| `measurement`      | Metrics, benchmark         | Yes    |
+| `code review`      | Inspection only            | Weak   |
+| `assumption`       | Not verified               | Blocks |
 
-| Verification | Action |
-|-------------|--------|
-| `assumption` only | → [grep/read/test ≤15w] to surface [what it reveals ≤10w] |
-| `code review` only | Ship with monitoring. → Verify: [one runtime check ≤15w] |
-| `execution` / `measurement` | Ship. Basis is observable evidence. |
+| Verification                | Action                                                    |
+| --------------------------- | --------------------------------------------------------- |
+| `assumption` only           | → [grep/read/test ≤15w] to surface [what it reveals ≤10w] |
+| `code review` only          | Ship with monitoring. → Verify: [one runtime check ≤15w]  |
+| `execution` / `measurement` | Ship. Basis is observable evidence.                       |
 
 Verification type IS the confidence. Observable > inspected > assumed.
 
@@ -130,19 +131,19 @@ Do not clarify intent inline. Run Skill(skill="hope:intent") — it handles the 
 
 ## Decision Framework
 
-| Type | Rollback | Action |
-|------|----------|--------|
-| **2A** | < 1 min (config, rename) | Execute immediately |
+| Type   | Rollback                       | Action                  |
+| ------ | ------------------------------ | ----------------------- |
+| **2A** | < 1 min (config, rename)       | Execute immediately     |
 | **2B** | < 5 min (dependency, refactor) | Execute with monitoring |
-| **1** | Hours+ (schema, public API) | Deep analysis required |
+| **1**  | Hours+ (schema, public API)    | Deep analysis required  |
 
-| Pts | Complexity | Characteristics |
-|-----|------------|-----------------|
-| 1 | Trivial | < 10 lines, obvious |
-| 3 | Standard | Existing patterns |
-| 5 | Complex | 1-3 unknowns, design needed |
-| 8 | Architecture | 2+ subsystems |
-| 13+ | Too Big | Break down further |
+| Pts | Complexity   | Characteristics             |
+| --- | ------------ | --------------------------- |
+| 1   | Trivial      | < 10 lines, obvious         |
+| 3   | Standard     | Existing patterns           |
+| 5   | Complex      | 1-3 unknowns, design needed |
+| 8   | Architecture | 2+ subsystems               |
+| 13+ | Too Big      | Break down further          |
 
 **Never estimate time.** Complexity is objective; velocity varies.
 
@@ -173,6 +174,7 @@ Emit proportional to decision type:
 ```
 
 Determine verdict satisfying ALL:
+
 1. Derive verdict from evidence: verified + Type 2A/2B → SHIP; verified + Type 1 OR code review → MONITOR; assumption-only OR no verification → RESEARCH
 2. Name the single scenario that would flip verdict one level worse — if you cannot articulate one, downgrade
 3. Alt must be a real alternative implementable tomorrow; Risk must be a condition that would block shipping if true

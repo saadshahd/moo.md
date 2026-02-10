@@ -34,12 +34,17 @@ Route by session type:
 ## Stage 4 — Expert Validation
 
 Route by session type:
+
 - **Build / Debug / Plan:** run the consult skill now: Skill(skill="hope:consult", args="evaluate approach")
   STOP. Wait for panel synthesis.
 - **Reflect:** run the consult skill now: Skill(skill="hope:consult", args="reflect on intent brief")
   Present output. Pipeline complete.
 
-## Stage 5 — Execute
+## Stage 5 — Team Building
+
+- Run the bond skill now: Skill(skill="hope:bond")
+
+## Stage 6 — Execute
 
 - **Build / Debug:** run the loop skill now: Skill(skill="hope:loop")
 - **Plan:** present shaped output + consult synthesis to user. Pipeline complete.

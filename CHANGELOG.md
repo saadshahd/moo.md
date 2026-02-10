@@ -7,6 +7,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Changed
+- refactor(hope): intent, panel, summon commands → thin routers with proper Skill() invocation
+- feat(hope): consult skill absorbs Review Mode (BLOCKER/WARNING/SUGGESTION findings, interactive loop) from panel command
+- feat(hope): consult panel mode uses 2-4 experts with progressive expansion (aligned with statechart)
+- feat(hope): consult panel mode recognizes TRADEOFF:/CONSTRAINT: context slots
+- docs: statechart consult detail adds Review path to Panel Mode + escalate→review link from Unblock
+
+---
+
 ## [hope@3.6.1] - 2026-02-10
 
 ### Changed

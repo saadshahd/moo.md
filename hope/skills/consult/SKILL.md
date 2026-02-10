@@ -11,24 +11,11 @@ SIMULATE. Expert perspectives for code guidance, style, debates, and unblocking.
 
 ---
 
-## When This Activates
-
-- "code like [expert name]", "write like [expert]"
-- "what would [expert] say", "ask [expert]"
-- "review", "audit", "panel", "guidance", "debate", "tradeoffs"
-- "idiomatic", "best practice", "clean code"
-- "stuck on" (auto-invoked by hope:loop when execution stalls)
-- "tradeoff", "evaluate approach", "expert input on" (skill-to-skill bridge)
-- "review approach", "review implementation" (from shape scoring)
-- Domain keywords matching curated profiles below
-
----
-
 ## Core Constraint
 
 Ground in documented work. Name the position being extrapolated and the condition where it breaks.
-
-Never claim certainty — state which source you're extending and where coverage stops.
+Never claim certainty — state source + where coverage stops. Refuse when no documented public positions exist.
+Never use expert names — use descriptors: "a [philosophy] [role]". Never simulate without stating source and boundary.
 
 ---
 
@@ -37,21 +24,16 @@ Never claim certainty — state which source you're extending and where coverage
 ```dot
 digraph ConsultWorkflow {
   rankdir=TB
-  Input [label="User Query"]
-  Blocklist [label="Step 0: Load blocklist"]
-  ModeDetect [label="Single or Panel?"]
-  Detect [label="Step 1: Detect Domain\n-> Match Expert"]
-  Infer [label="Step 2: Load Profile\n-> Assess Coverage"]
-  Generate [label="Step 3: Generate\nResponse"]
-  PanelSelect [label="Select 3-5 experts"]
-  Debate [label="Each argues position"]
-  Tension [label="Surface disagreements"]
-  Synth [label="Synthesize recommendation"]
-  Input -> Blocklist -> ModeDetect
-  ModeDetect -> Detect [label="single"]
-  ModeDetect -> PanelSelect [label="panel/debate/tradeoff"]
-  Detect -> Infer -> Generate
-  PanelSelect -> Debate -> Tension -> Synth
+  Query -> Blocklist -> ModeDetect
+  ModeDetect -> DetectExpert [label="single"]
+  ModeDetect -> PanelRoute [label="panel/debate/review"]
+  ModeDetect -> ParseBlocker [label="stuck/unblock"]
+  DetectExpert -> LoadProfile -> Generate
+  PanelRoute -> SelectPanel [label="debate (default)"]
+  PanelRoute -> SelectReview [label="thorough review"]
+  SelectPanel -> Debate -> Synthesize
+  SelectReview -> ReviewFindings
+  ParseBlocker -> Diagnose -> Recommend
 }
 ```
 
@@ -114,9 +96,10 @@ SELF-AUDIT (silent — revise if FAIL) →
 
 ### Panel Mode
 
-Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="panel: ..."`. When `POSITION:` / `TRIED:` present, experts respond TO the user's stance — challenge, validate, or extend it.
+Triggered by: "panel", "debate", tradeoffs, multi-domain queries, or `args="panel: ..."`.
+When `POSITION:` / `TRIED:` / `TRADEOFF:` / `CONSTRAINT:` present, experts respond TO the user's stance — challenge, validate, or extend it. Respect stated constraints as non-negotiable.
 
-1. **Select** 3-5 relevant experts — prioritize productive disagreement. Anonymized descriptors.
+1. **Select** 2-4 relevant experts — prioritize productive disagreement. Anonymized descriptors. Default 2. After synthesis, offer "Want another perspective? Reply 'expand'" (max 4). `--expand` starts at 4.
 2. **Debate** — each reasons from documented positions to context. Evidence required.
 3. **Surface + Synthesize** satisfying ALL:
    1. Consensus strong enough that dissent names a failure mode — if both could be true, consensus too weak
@@ -141,6 +124,23 @@ SELF-AUDIT → revise before presenting if any FAIL:
   Test if-right AND if-wrong → [pass/fail] → [cite observables]
   All selected spoke + weakest named → [pass/fail] → [voiced/silent: names]
 
+### Review Mode
+
+Triggered by: "thorough review", "review against spec", or auto-invoked by loop expert review step.
+
+1. **Select** 3-4 experts — breadth over disagreement. Include domain + architecture lenses.
+2. **Review** against spec + mustNot constraints. Each expert flags:
+   - BLOCKER (must fix before shipping)
+   - WARNING (should fix, risk if not)
+   - SUGGESTION (could improve)
+3. **Interactive loop:** Per finding: [Approve] [Discuss] [Skip]. BLOCKERs cannot be skipped.
+
+```
+## Review: [spec summary ≤10w]
+**[Descriptor]** [tier]: [finding + severity + evidence ≤2 sentences]
+→ [Approve] [Discuss] [Skip]
+```
+
 ### Unblock Mode
 
 Triggers: "stuck on", auto-invoked when loop stalls.
@@ -163,35 +163,22 @@ If fails: [re-diagnose from output] | Attempt: [N]/3
 
 | Domain | Profiles |
 |--------|----------|
-| React / Frontend | abramov, osmani, perry, wathan |
-| TypeScript / JS | vergnaud, simpson |
+| React / Frontend / TS / JS | abramov, osmani, perry, wathan, vergnaud, simpson |
 | Go / Systems | pike |
 | Python | hettinger |
 | Performance / Profiling | gregg, osmani |
-| Architecture / Patterns | fowler, martin, alexander, feathers |
-| TDD / XP / Refactoring | beck, freeman |
-| DDD / Microservices | evans, newman, vernon |
+| Architecture / TDD / DDD | fowler, martin, alexander, feathers, beck, freeman, evans, newman, vernon |
 | DevOps / Observability | hightower, majors, humble |
 | REST / APIs | fielding |
-| Product / Design Leadership | cagan, jobs, norman, frost, zhuo |
+| Product / Design / Leadership | cagan, jobs, norman, frost, zhuo |
 | Startups / Essays | graham |
 | Accessibility / ARIA | soueidan |
 | FP / Data / Simplicity | hickey, milewski |
 | State Machines / XState | khorshid |
 | AI / LLMs | willison |
-| Tools for Thought | matuschak, appleton, victor, case, papert, kay |
-| Local-first / Protocols | inkandswitch, brander, litt |
+| Tools for Thought / Local-first | matuschak, appleton, victor, case, papert, kay, inkandswitch, brander, litt |
 
 **Panel diversity rule:** Max 2 from same domain row. Prioritize cross-domain disagreement.
-
----
-
-## Guardrails
-
-**Refuse when:** no documented public positions or topic requires personal opinions. **Never:**
-- Use expert names — descriptor: `a/an [philosophy/approach] [role]`
-- Claim certainty — state grounding tier and where coverage stops (tier IS the calibration)
-- Simulate without stating source and extrapolation boundary
 
 ---
 

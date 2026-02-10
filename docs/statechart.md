@@ -228,6 +228,10 @@ stateDiagram-v2
   }
 
   state "Panel Mode" as panel {
+    state panel_route <<choice>>
+    panel_route --> select_experts : debate (default)
+    panel_route --> review_select : thorough review
+
     select_experts --> debate
     debate --> surface_tensions
     surface_tensions --> synthesize
@@ -236,6 +240,10 @@ stateDiagram-v2
     state "debate\neach argues position" as debate
     state "surface_tensions\nmap disagreements" as surface_tensions
     state "synthesize\nconsensus + tradeoff + dissent" as synthesize
+
+    review_select --> review_findings
+    state "review_select\n3–4 experts (breadth)" as review_select
+    state "review_findings\nvs spec + mustNot\nBLOCKER / WARNING / SUGGESTION" as review_findings
   }
 
   state "Unblock Mode" as unblock {
@@ -243,6 +251,7 @@ stateDiagram-v2
     diagnose --> recommend
     recommend --> recommend : retry (max 3)
     recommend --> escalate : 3 failures
+    escalate --> review_select : thorough review
 
     state "parse_blocker\ntask + error + failed approach" as parse_blocker
     state "diagnose\n2–3 diagnostic experts" as diagnose
@@ -251,7 +260,7 @@ stateDiagram-v2
   }
 
   mode_check --> detect_expert : single
-  mode_check --> select_experts : panel / debate
+  mode_check --> panel_route : panel / debate / review
   mode_check --> parse_blocker : unblock / stuck
 ```
 
