@@ -7,7 +7,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [hope@3.6.0] - 2026-02-10
 
 ### Added
 - feat(hope): feedback loop in loop — carry items include `[VERIFY] FAIL: [reason]` in retry spawn prompt so retries transform with context, not from scratch
