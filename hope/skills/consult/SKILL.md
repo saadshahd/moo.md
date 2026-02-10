@@ -2,7 +2,6 @@
 name: consult
 description: Use when asking "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", "debate", or needing domain guidance. Triggers on expert names, style requests, tradeoff questions, or "stuck on".
 model: opus
-allowed-tools: Read, Grep, Glob
 ---
 
 # consult
@@ -55,23 +54,24 @@ Detection order (first match wins):
 
 Load matched profile from `profiles/`. Guided: [COVERAGE] block. Curated → Standard baseline. Dynamic → Extrapolated baseline + warn.
 
-| Signal | Tier |
-|--------|------|
-| 3+ books/10+ talks on THIS topic | Documented |
-| Topic in core domain, no direct statement | Inferred |
-| Topic outside documented expertise | Extrapolated |
-| No documented public positions | Refuse |
+| Signal                                    | Tier         |
+| ----------------------------------------- | ------------ |
+| 3+ books/10+ talks on THIS topic          | Documented   |
+| Topic in core domain, no direct statement | Inferred     |
+| Topic outside documented expertise        | Extrapolated |
+| No documented public positions            | Refuse       |
 
-| Tier | Action |
-|------|--------|
-| Refuse | "Insufficient documented positions to simulate this perspective." |
-| Extrapolated | Warn: "EXTRAPOLATING — treat as directional only" |
-| Inferred | Standard — state source + where extrapolation begins |
-| Documented | Cite specific works; still state where coverage stops |
+| Tier         | Action                                                            |
+| ------------ | ----------------------------------------------------------------- |
+| Refuse       | "Insufficient documented positions to simulate this perspective." |
+| Extrapolated | Warn: "EXTRAPOLATING — treat as directional only"                 |
+| Inferred     | Standard — state source + where extrapolation begins              |
+| Documented   | Cite specific works; still state where coverage stops             |
 
 ### Step 3: Generate Response
 
 Generate response satisfying ALL:
+
 1. Reason from documented positions to user's context — filter through would-never-say, match voice density not persona
 2. Name what this expert would push back on — if it reframes the problem itself, say so. Agreement without friction is failure
 3. State where this expert's documented work stops covering the question — the boundary, not just the tier

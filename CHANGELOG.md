@@ -11,6 +11,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.1] - 2026-02-10
+
+### Changed
+- refactor(hope): removed allowed-tools from all 5 skill frontmatters (bond, consult, loop, shape, soul)
+- refactor(hope): loop model changed from sonnet to opus
+- fix(hope): consistent markdown table alignment across all skills
+
+---
+
 ## [hope@3.7.0] - 2026-02-10
 
 ### Added

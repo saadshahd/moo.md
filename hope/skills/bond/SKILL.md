@@ -2,7 +2,6 @@
 name: bond
 description: Design agent team structure for a task. Use when "set up a team", "team for this", "should I use agents", "design a team", "bond a team", "how many agents", "agent team".
 model: opus
-allowed-tools: Read, Grep, Glob, Bash, AskUserQuestion
 ---
 
 # Bond
@@ -122,15 +121,15 @@ After team creation, announce: `[BOND] Team created: {name} | Roles: {N} | Coord
 
 Bond receives shape output (criteria/mustNot) when available, passes them to teammate spawn prompts.
 
-| Bond Input | Source |
-|-----------|--------|
-| Task description | User or intent brief |
-| criteria[] / mustNot[] | shape (if run) |
-| Horizon | [SESSION] marker |
+| Bond Input             | Source               |
+| ---------------------- | -------------------- |
+| Task description       | User or intent brief |
+| criteria[] / mustNot[] | shape (if run)       |
+| Horizon                | [SESSION] marker     |
 
-| Bond Output | Consumer |
-|-------------|----------|
-| Team blueprint | User approval |
+| Bond Output            | Consumer                |
+| ---------------------- | ----------------------- |
+| Team blueprint         | User approval           |
 | Per-role spawn prompts | Native agent team tools |
 
 ---

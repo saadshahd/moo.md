@@ -2,7 +2,6 @@
 name: soul
 description: Use when starting any task, thinking through confidence, verifying work, or asking "what could go wrong". Triggers on every non-trivial request, "how confident", "verify this", "think through".
 model: opus
-allowed-tools: Read, Grep, Glob, Skill
 ---
 
 <core-principles>

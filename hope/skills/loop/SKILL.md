@@ -1,8 +1,7 @@
 ---
 name: loop
 description: Start autonomous iteration loop. Triggers on "loop", "keep going", "continue until done", "implement feature", "fix all", "loop status", "cancel loop".
-model: sonnet
-allowed-tools: Bash, Read, Task, Skill, AskUserQuestion
+model: opus
 ---
 
 # Loop
@@ -21,13 +20,13 @@ Scan for: intent brief → spec input | shape output (criteria[]/mustNot[]/shape
 
 Score on 5 dimensions (0-2 each, max 10):
 
-| Dimension | 0 | 1 | 2 |
-|-----------|---|---|---|
-| **Outcome** | "Make it better" | "Improve performance" | "p95 latency <100ms" |
-| **Scope** | "Fix the app" | "Fix auth" | "Fix /api/auth/token" |
-| **Constraints** | None stated | "Use existing stack" | "No new deps, <500 LOC" |
-| **Success** | None stated | "Tests pass" | "All tests + manual QA" |
-| **Done** | Implied | "When it works" | "PR merged to main" |
+| Dimension       | 0                | 1                     | 2                       |
+| --------------- | ---------------- | --------------------- | ----------------------- |
+| **Outcome**     | "Make it better" | "Improve performance" | "p95 latency <100ms"    |
+| **Scope**       | "Fix the app"    | "Fix auth"            | "Fix /api/auth/token"   |
+| **Constraints** | None stated      | "Use existing stack"  | "No new deps, <500 LOC" |
+| **Success**     | None stated      | "Tests pass"          | "All tests + manual QA" |
+| **Done**        | Implied          | "When it works"       | "PR merged to main"     |
 
 ```dot
 digraph SpecDecision {
@@ -46,12 +45,12 @@ digraph SpecDecision {
 }
 ```
 
-| Fit Score | Shape | Behavior |
-|-----------|-------|----------|
-| 35+ | Tool | Autonomous, milestones only |
-| 25-34 | Tool-review | Checkpoint major steps |
-| 15-24 | Colleague | Iterate each step |
-| <15 | BLOCKED | Clarify first |
+| Fit Score | Shape       | Behavior                    |
+| --------- | ----------- | --------------------------- |
+| 35+       | Tool        | Autonomous, milestones only |
+| 25-34     | Tool-review | Checkpoint major steps      |
+| 15-24     | Colleague   | Iterate each step           |
+| <15       | BLOCKED     | Clarify first               |
 
 Guided: [SCORING] block. spec × 5 + domain (0-10) — tiers 10 apart = domain's range, so domain shifts ±1 tier
 
@@ -119,15 +118,16 @@ When all items complete, expert panel reviews completed work against spec.
 ## Step 6: Completion
 
 ### Pre-Work Gate — cite evidence or STOP:
-  Verification method locked  → [pass/fail] → [cite verification{} from shape]
-  ≥2 mustNot in mustNot[]     → [pass/fail] → [cite mustNot items]
+
+Verification method locked → [pass/fail] → [cite verification{} from shape]
+≥2 mustNot in mustNot[] → [pass/fail] → [cite mustNot items]
 
 ### Verification Tiers
 
-| Tier | Budget | Scope |
-|------|--------|-------|
-| **Quick** | < 5s | Lint or type-check |
-| **Standard** | < 30s | Lint + types + tests |
+| Tier         | Budget | Scope                 |
+| ------------ | ------ | --------------------- |
+| **Quick**    | < 5s   | Lint or type-check    |
+| **Standard** | < 30s  | Lint + types + tests  |
 | **Thorough** | < 2min | Full suite + evidence |
 
 Run thorough. Report with evidence:
@@ -166,12 +166,12 @@ User: Adjust → re-enter loop (Step 1) | Proceed → emit `<loop-complete>` + q
 **Cancel** ("cancel loop", "stop", "abort"): Report completed/remaining. Current iteration completes before cancel.
 **Status** ("loop status", "progress"): Scan for `[LOOP] Starting`, `[WAVE N COMPLETE]`, `<loop-complete>` markers.
 
-| Trigger | Threshold | Action |
-|---------|-----------|--------|
-| Max iterations | User-configured | Pause, announce progress |
-| Budget exceeded | User-configured | Pause, offer continue |
-| mustNot true | From shape output | Stop immediately |
-| Would-reframe-if true | From shape output | Pause, surface finding |
+| Trigger               | Threshold         | Action                   |
+| --------------------- | ----------------- | ------------------------ |
+| Max iterations        | User-configured   | Pause, announce progress |
+| Budget exceeded       | User-configured   | Pause, offer continue    |
+| mustNot true          | From shape output | Stop immediately         |
+| Would-reframe-if true | From shape output | Pause, surface finding   |
 
 ## Boundary
 

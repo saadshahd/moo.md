@@ -2,7 +2,6 @@
 name: shape
 description: Bridge WHAT (intent) to HOW (implementation). Use when spec is clear but approach is not. Triggers on "shape this", "how should I build", "implementation approach".
 model: opus
-allowed-tools: Read, Bash, Skill
 ---
 
 # Shape
@@ -29,11 +28,11 @@ When PATTERNS slot is empty, retrieve existing conventions — search codebase (
 
 Three collaboration modes determine how user and agent interact during implementation:
 
-| Shape | Interaction | Best When |
-|-------|-------------|-----------|
-| **Colleague** | Iterate every step together | High ambiguity, novel domain, irreversible decisions |
-| **Tool-Review** | Autonomous with checkpoints at major decisions | Moderate complexity, known patterns with unknowns |
-| **Tool** | Fully autonomous, milestone announcements only | Clear requirements, well-trodden patterns, low risk |
+| Shape           | Interaction                                    | Best When                                            |
+| --------------- | ---------------------------------------------- | ---------------------------------------------------- |
+| **Colleague**   | Iterate every step together                    | High ambiguity, novel domain, irreversible decisions |
+| **Tool-Review** | Autonomous with checkpoints at major decisions | Moderate complexity, known patterns with unknowns    |
+| **Tool**        | Fully autonomous, milestone announcements only | Clear requirements, well-trodden patterns, low risk  |
 
 ### 3. Score Aspects
 
@@ -47,10 +46,11 @@ Guided: emit [TALLY] block. Expert consultation only when: (a) 2+ aspects disagr
 
 When 2+ candidate approaches surface in extraction or scoring:
 
-| ? | [Aspect question A] | [Aspect question B] | [Aspect question C] | Notes (≤15w) |
-|---|---|---|---|---|
-| [Approach A] | [0-10] | [0-10] | [0-10] | |
-| [Approach B] | [0-10] | [0-10] | [0-10] | |
+| ?            | [Aspect question A] | [Aspect question B] | [Aspect question C] | Notes (≤15w) |
+| ------------ | ------------------- | ------------------- | ------------------- | ------------ |
+| [Approach A] | [0-10]              | [0-10]              | [0-10]              |              |
+| [Approach B] | [0-10]              | [0-10]              | [0-10]              |              |
+
 **Spread:** ≥1 cell ≤3, ≥1 cell ≥8. Scale: 0=clearly no, 10=clearly yes
 Columns: relevant aspects as questions where approaches diverge (>2pt gap). If spread fails, wrong columns.
 User picks approach → continue aspect scoring with chosen approach.
@@ -69,13 +69,13 @@ Count which column each aspect lands in:
 
 When a feasibility axis is active (from `FEASIBLE:` slot or session default), apply it AFTER shape selection to filter the approach:
 
-| Axis | Eliminate approaches that... |
-|------|----------------------------|
-| **Time** | Require learning curves or multi-phase migrations exceeding the bound |
-| **Solo** | Require coordination, specialized roles, or multi-agent orchestration beyond one pass |
-| **Cost** | Require paid services or licensed tools |
-| **Tools** | Require dependencies not in the project |
-| **Access** | Require permissions or environments the user lacks |
+| Axis       | Eliminate approaches that...                                                          |
+| ---------- | ------------------------------------------------------------------------------------- |
+| **Time**   | Require learning curves or multi-phase migrations exceeding the bound                 |
+| **Solo**   | Require coordination, specialized roles, or multi-agent orchestration beyond one pass |
+| **Cost**   | Require paid services or licensed tools                                               |
+| **Tools**  | Require dependencies not in the project                                               |
+| **Access** | Require permissions or environments the user lacks                                    |
 
 For Tools and Access axes: read project files (manifests, configs) and check current docs (WebSearch) before eliminating. Never filter by recall alone.
 
@@ -119,13 +119,13 @@ Shape is locked. Validate approach before execution:
 
 Score each aspect for the task. The column where most aspects land determines the shape.
 
-| Aspect | Colleague | Tool-Review | Tool |
-|--------|-----------|-------------|------|
-| Interdependency | High coupling across unknowns | Moderate, checkpoints at boundaries | Low, independent pieces |
-| Novelty | No precedent, unknown patterns | Known patterns with variations | Well-trodden, clear precedent |
-| Risk | High blast radius, irreversible | Medium, partially reversible | Low, fully reversible |
-| Ambiguity | Requirements unclear or conflicting | Mostly clear, few open questions | Crisp, complete requirements |
-| Reversibility | Hard to undo, high stakes | Moderate rollback effort | Trivial to revert |
+| Aspect          | Colleague                           | Tool-Review                         | Tool                          |
+| --------------- | ----------------------------------- | ----------------------------------- | ----------------------------- |
+| Interdependency | High coupling across unknowns       | Moderate, checkpoints at boundaries | Low, independent pieces       |
+| Novelty         | No precedent, unknown patterns      | Known patterns with variations      | Well-trodden, clear precedent |
+| Risk            | High blast radius, irreversible     | Medium, partially reversible        | Low, fully reversible         |
+| Ambiguity       | Requirements unclear or conflicting | Mostly clear, few open questions    | Crisp, complete requirements  |
+| Reversibility   | Hard to undo, high stakes           | Moderate rollback effort            | Trivial to revert             |
 
 **Rule:** Score all 5. **Horizon tiebreaker** (columns split evenly): Tactical → Ambiguity decides | Strategic → Risk + Reversibility decide | Existential → Novelty + Interdependency decide.
 
@@ -139,11 +139,11 @@ Score each aspect for the task. The column where most aspects land determines th
 
 Shape output feeds into the execution loop:
 
-| Shape Output | Loop Usage |
-|-------------|------------|
-| `criteria` | Verification tracking |
-| `mustNot` | Circuit breaker triggers |
-| `shape` | Interaction mode for waves |
+| Shape Output | Loop Usage                 |
+| ------------ | -------------------------- |
+| `criteria`   | Verification tracking      |
+| `mustNot`    | Circuit breaker triggers   |
+| `shape`      | Interaction mode for waves |
 
 ---
 
