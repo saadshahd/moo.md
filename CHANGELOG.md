@@ -9,7 +9,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@3.7.0] - 2026-02-10
+
+### Added
+- feat(hope): 30 new expert profiles across 11 cross-disciplinary domains (Psychology, Systems Thinking, Strategy, Communication, Anthropology, Economics, Philosophy, Sociology, Biology, Education, Security)
+- feat(hope): kahneman profile folds Tversky's concepts (prospect theory, framing, loss aversion)
+- feat(hope): goodhart profile folds Campbell's Law alongside Goodhart's Law
+- feat(hope): cross-domain literature referenced within profiles (Antifragile, Mythical Man-Month, How Buildings Learn, Systemantics, Metaphors We Live By, Zen and the Art of Motorcycle Maintenance, The Reflective Practitioner)
+
 ### Changed
+- feat(hope): norman.md enriched with Gulf of Execution/Evaluation, 7 stages of action, error classification, Design of Future Things
+- feat(hope): consult SKILL.md domain table expanded from 14 to 25 rows, profile count 42 → 72
 - refactor(hope): intent, panel, summon commands → thin routers with proper Skill() invocation
 - feat(hope): consult skill absorbs Review Mode (BLOCKER/WARNING/SUGGESTION findings, interactive loop) from panel command
 - feat(hope): consult panel mode uses 2-4 experts with progressive expansion (aligned with statechart)

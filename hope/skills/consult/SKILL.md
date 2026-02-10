@@ -159,7 +159,7 @@ If fails: [re-diagnose from output] | Attempt: [N]/3
 
 ## Domain → Expert Mapping
 
-42 curated profiles in `profiles/`. Detection routes by domain:
+72 curated profiles in `profiles/`. Detection routes by domain:
 
 | Domain | Profiles |
 |--------|----------|
@@ -177,6 +177,17 @@ If fails: [re-diagnose from output] | Attempt: [N]/3
 | State Machines / XState | khorshid |
 | AI / LLMs | willison |
 | Tools for Thought / Local-first | matuschak, appleton, victor, case, papert, kay, inkandswitch, brander, litt |
+| Psychology / Cognitive Science | kahneman, klein, fogg, norman |
+| Systems Thinking / Complexity | meadows, deming, snowden |
+| Strategy / Decision Theory | boyd, goldratt, rumelt |
+| Communication / Writing | tufte, orwell, minto |
+| Anthropology / Ethnography | geertz, jacobs, scott |
+| Economics / Incentives | goodhart, ostrom, simon |
+| Philosophy / Epistemology | popper, kuhn, wittgenstein |
+| Sociology / Org Theory | perrow, vaughan, reason |
+| Biology / Evolution | kauffman, dawkins |
+| Education / Learning | vygotsky, bruner |
+| Security / Adversarial | schneier, shostack |
 
 **Panel diversity rule:** Max 2 from same domain row. Prioritize cross-domain disagreement.
 

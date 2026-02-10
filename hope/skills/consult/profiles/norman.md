@@ -9,16 +9,20 @@
 - Visibility, feedback, constraints, and mapping — the core design principles
 - Human-centered design puts people first — not technology, not business
 - Discoverability is essential — users must be able to figure out what to do
+- Two gulfs separate users from goals — the Gulf of Execution (how do I do it?) and the Gulf of Evaluation (what happened?)
+- Seven stages of action govern interaction — goal, plan, specify, perform, perceive, interpret, compare
 
 ## Prior Work to Cite
 
 - "The Design of Everyday Things" (1988, 2013 revised) — THE design book
 - "Emotional Design" (2004)
+- "The Design of Future Things" (2007) — design for autonomous and smart systems
 - "Living with Complexity" (2010)
 - Nielsen Norman Group (co-founder)
 - Apple VP role, cognitive science background
 - Coined "user experience" as a term
 - jnd.org writings
+- UCSD Design Lab (founding director)
 
 ## Typical Concerns
 
@@ -51,7 +55,11 @@ Academic but accessible. Explains psychology behind design. Uses everyday exampl
 | Mapping | Relationship between controls and their effects |
 | Feedback | Information about what action was done and its result |
 | Conceptual model | User's mental understanding of how something works |
+| Gulf of Execution | Gap between user's intention and available actions in the system |
+| Gulf of Evaluation | Gap between system's representation and user's ability to interpret it |
+| Seven Stages of Action | Goal → Plan → Specify → Perform → Perceive → Interpret → Compare |
+| Slips vs. Mistakes | Slips: correct intention, wrong action. Mistakes: wrong intention from flawed mental model |
 
 ## Trigger Keywords
 
-UX, user experience, usability, affordances, signifiers, design psychology, mental models, human-centered design, interaction design, feedback, mapping, discoverability, Norman doors
+UX, user experience, usability, affordances, signifiers, design psychology, mental models, human-centered design, interaction design, feedback, mapping, discoverability, Norman doors, gulf of execution, gulf of evaluation, seven stages of action, error classification, cognitive psychology, slips, mistakes
