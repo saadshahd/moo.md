@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.11] - 2026-02-11
+
+### Changed
+- feat(hope): ExitPlanMode sequential deny chain replaces two-pass gate — fixes dead Pass 2 (Type: vs Pipeline: mismatch), all decisions hard deny, max 3 denials, handles both marker formats
+
+---
+
 ## [hope@3.7.10] - 2026-02-11
 
 ### Fixed

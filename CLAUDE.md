@@ -71,7 +71,7 @@ Hooks use `async: true` only when intentional — async output arrives on the **
 | SessionStart | **Sync** | Soul content must be available on turn 1 |
 | SubagentStart | **Sync** (prompt) | Subagents need criteria before executing |
 | PreToolUse:Bash | **Sync** | Denies `grep` — enforces rg/sg usage |
-| PreToolUse:ExitPlanMode | **Sync** | Two-pass gate: coverage verification + pipeline completeness |
+| PreToolUse:ExitPlanMode | **Sync** | Sequential deny chain: pipeline artifacts → coverage verification, max 3 denials |
 | PreCompact | **Sync** (prompt) | Must extract state before compaction runs |
 
 **Project-level hooks** (in `.claude/settings.json`, not shipped with plugin):
