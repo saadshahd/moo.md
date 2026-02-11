@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.6] - 2026-02-11
+
+### Removed
+- refactor(hope): removed Stop hook (task completion check on session end)
+
+---
+
 ## [hope@3.7.5] - 2026-02-11
 
 ### Added
