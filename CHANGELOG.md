@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.9] - 2026-02-11
+
+### Changed
+- feat(hope): ExitPlanMode hook verifies plan covers original request (deny-then-ask two-pass gate)
+
+---
+
 ## [hope@3.7.8] - 2026-02-11
 
 ### Added

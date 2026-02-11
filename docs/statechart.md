@@ -381,7 +381,7 @@ stateDiagram-v2
 | --------------- | ---------------------------------- | --------------------------------------------------------------- |
 | `SessionStart`  | Session start/resume/clear/compact | Injects full soul SKILL.md into context via `session-start.sh`  |
 | `SubagentStart` | Every subagent spawn               | Propagates [SESSION] + criteria + mustNot + compaction guidance |
-| `PreToolUse:ExitPlanMode` | ExitPlanMode tool call    | Soft-gates on pipeline completeness (intent/shape per session type) |
+| `PreToolUse:ExitPlanMode` | ExitPlanMode tool call    | Two-pass: (1) deny to force plan coverage verification against original ask, (2) soft-gate on pipeline completeness |
 
 ### Commands
 

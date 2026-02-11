@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# moo PreToolUse:ExitPlanMode hook: Soft-gates plan exit on pipeline completeness.
-# Surfaces missing phases (intent/shape) per session type. Never blocks — user decides.
+# moo PreToolUse:ExitPlanMode hook: Two-pass gate.
+# Pass 1: Denies first call to force plan coverage verification against original ask.
+# Pass 2: Soft-gates on pipeline completeness (intent/shape per session type).
 
 set -euo pipefail
 
@@ -23,6 +24,48 @@ if [[ -z "$ALL_TEXT" ]]; then
   exit 0
 fi
 
+escape_for_json() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+# --- PASS 1: Coverage verification ---
+# Search raw JSONL (not ALL_TEXT which skips tool_result where denial reasons appear)
+COVERAGE_DONE=$(rg -c 'PLAN_COVERAGE_GATE: Before exiting plan mode' "$TRANSCRIPT" 2>/dev/null || echo "0")
+
+if [[ "$COVERAGE_DONE" == "0" ]]; then
+  FIRST_ASK=$(jq -s -r '
+    [.[] | select(.type == "user") | .message.content |
+      if type == "string" then .
+      elif type == "array" then [.[] | select(.type == "text") | .text] | join(" ")
+      else "" end
+    ] | .[0] // ""
+  ' "$TRANSCRIPT" 2>/dev/null || true)
+  FIRST_ASK="${FIRST_ASK:0:300}"
+
+  if [[ -n "$FIRST_ASK" ]]; then
+    REASON="PLAN_COVERAGE_GATE: Before exiting plan mode, verify your plan covers the original request. Original ask: \"${FIRST_ASK}\". Review the plan file, confirm all requirements are addressed, and state what you verified. Then call ExitPlanMode again."
+    ESCAPED_REASON=$(escape_for_json "$REASON")
+
+    cat <<EOF
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "${ESCAPED_REASON}"
+  }
+}
+EOF
+    exit 0
+  fi
+fi
+
+# --- PASS 2: Phase completeness ---
 SESSION=$(echo "$ALL_TEXT" | rg -o '\[SESSION\].*' 2>/dev/null | tail -1 || true)
 
 if [[ -z "$SESSION" ]]; then
@@ -75,17 +118,6 @@ if [[ ${#MISSING[@]} -eq 0 ]]; then
 fi
 
 REASON="Exiting plan mode for a ${SESSION_TYPE} session with missing pipeline phases: ${MISSING[*]}. Run the missing phases first, or proceed if intentional."
-
-escape_for_json() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\n'/\\n}"
-  s="${s//$'\r'/\\r}"
-  s="${s//$'\t'/\\t}"
-  printf '%s' "$s"
-}
-
 ESCAPED_REASON=$(escape_for_json "$REASON")
 
 cat <<EOF
