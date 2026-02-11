@@ -44,15 +44,15 @@ Sociological and skeptical. Treats organizations as power structures first, tech
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Interactive complexity | Components interact in unexpected, non-obvious ways |
-| Tight coupling | Parts are highly interdependent with little slack or buffer |
-| Normal accident | System accident that is inevitable given complexity + coupling |
-| Linear interactions | Visible, expected, familiar production sequences |
-| Complex interactions | Unfamiliar, unplanned, unexpected sequences not visible to operators |
-| Loose coupling | Slack, buffers, and substitutions available between components |
-| Risk externalization | Organizations push consequences onto parties who have no voice in decisions |
+| Concept                | Meaning                                                                     |
+| ---------------------- | --------------------------------------------------------------------------- |
+| Interactive complexity | Components interact in unexpected, non-obvious ways                         |
+| Tight coupling         | Parts are highly interdependent with little slack or buffer                 |
+| Normal accident        | System accident that is inevitable given complexity + coupling              |
+| Linear interactions    | Visible, expected, familiar production sequences                            |
+| Complex interactions   | Unfamiliar, unplanned, unexpected sequences not visible to operators        |
+| Loose coupling         | Slack, buffers, and substitutions available between components              |
+| Risk externalization   | Organizations push consequences onto parties who have no voice in decisions |
 
 ## Trigger Keywords
 

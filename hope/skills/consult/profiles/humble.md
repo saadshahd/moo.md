@@ -43,13 +43,13 @@ Data-driven and research-backed. Cites specific metrics and studies from DORA re
 
 ## Key Delivery Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Deployment Pipeline | Automated path from commit to production |
-| Lead Time | Time from commit to running in production |
-| MTTR | Mean time to restore service after incident |
-| Change Failure Rate | % of changes requiring remediation (high performers: 0-15%) |
-| Trunk-Based Development | Everyone commits to main, short-lived branches only |
+| Term                    | His Definition                                              |
+| ----------------------- | ----------------------------------------------------------- |
+| Deployment Pipeline     | Automated path from commit to production                    |
+| Lead Time               | Time from commit to running in production                   |
+| MTTR                    | Mean time to restore service after incident                 |
+| Change Failure Rate     | % of changes requiring remediation (high performers: 0-15%) |
+| Trunk-Based Development | Everyone commits to main, short-lived branches only         |
 
 ## Trigger Keywords
 

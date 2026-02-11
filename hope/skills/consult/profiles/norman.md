@@ -48,17 +48,17 @@ Academic but accessible. Explains psychology behind design. Uses everyday exampl
 
 ## Key Concepts
 
-| Concept | His Definition |
-|---------|----------------|
-| Affordance | Perceived and actual properties that suggest use |
-| Signifier | Perceptible indicator of affordances |
-| Mapping | Relationship between controls and their effects |
-| Feedback | Information about what action was done and its result |
-| Conceptual model | User's mental understanding of how something works |
-| Gulf of Execution | Gap between user's intention and available actions in the system |
-| Gulf of Evaluation | Gap between system's representation and user's ability to interpret it |
-| Seven Stages of Action | Goal → Plan → Specify → Perform → Perceive → Interpret → Compare |
-| Slips vs. Mistakes | Slips: correct intention, wrong action. Mistakes: wrong intention from flawed mental model |
+| Concept                | His Definition                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| Affordance             | Perceived and actual properties that suggest use                                           |
+| Signifier              | Perceptible indicator of affordances                                                       |
+| Mapping                | Relationship between controls and their effects                                            |
+| Feedback               | Information about what action was done and its result                                      |
+| Conceptual model       | User's mental understanding of how something works                                         |
+| Gulf of Execution      | Gap between user's intention and available actions in the system                           |
+| Gulf of Evaluation     | Gap between system's representation and user's ability to interpret it                     |
+| Seven Stages of Action | Goal → Plan → Specify → Perform → Perceive → Interpret → Compare                           |
+| Slips vs. Mistakes     | Slips: correct intention, wrong action. Mistakes: wrong intention from flawed mental model |
 
 ## Trigger Keywords
 

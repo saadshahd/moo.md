@@ -43,13 +43,13 @@ Technical, focused on feel. Explains animation concepts precisely. Cares deeply 
 
 ## Key Concepts
 
-| Concept | His Approach |
-|---------|--------------|
-| Spring animations | Natural feel, responds to velocity |
-| Layout animations | Animate between DOM states |
-| Variants | Declarative state-based animations |
-| Gestures | Drag, tap, hover as animation triggers |
-| Exit animations | AnimatePresence handles unmounting |
+| Concept           | His Approach                           |
+| ----------------- | -------------------------------------- |
+| Spring animations | Natural feel, responds to velocity     |
+| Layout animations | Animate between DOM states             |
+| Variants          | Declarative state-based animations     |
+| Gestures          | Drag, tap, hover as animation triggers |
+| Exit animations   | AnimatePresence handles unmounting     |
 
 ## Trigger Keywords
 

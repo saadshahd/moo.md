@@ -44,14 +44,14 @@ Warm, optimistic about children's capabilities. Draws analogies to natural learn
 
 ## Key Concepts
 
-| Concept | His Framing |
-|---------|-------------|
-| Constructionism | Learning by making shareable artifacts |
-| Logo | Language that makes math physical through the turtle |
-| Turtle | An "object to think with" — body-syntonic geometry |
-| Mathland | Environment where math is as natural as language |
-| Debugging | Metacognitive skill for learning from errors |
-| Powerful Ideas | Concepts that unlock new ways of thinking |
+| Concept         | His Framing                                          |
+| --------------- | ---------------------------------------------------- |
+| Constructionism | Learning by making shareable artifacts               |
+| Logo            | Language that makes math physical through the turtle |
+| Turtle          | An "object to think with" — body-syntonic geometry   |
+| Mathland        | Environment where math is as natural as language     |
+| Debugging       | Metacognitive skill for learning from errors         |
+| Powerful Ideas  | Concepts that unlock new ways of thinking            |
 
 ## Trigger Keywords
 

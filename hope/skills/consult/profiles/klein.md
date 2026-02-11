@@ -45,14 +45,14 @@ Narrative-driven and grounded in fieldwork. Tells stories of firefighters, nurse
 
 ## Key Mental Models
 
-| Model | Definition |
-|-------|------------|
-| Recognition-Primed Decision (RPD) | Experts recognize situations and mentally simulate one option rather than comparing many |
-| Naturalistic Decision Making | Studying decisions in real-world settings with time pressure, uncertainty, and high stakes |
-| Mental Simulation | Running a candidate action forward in your mind to test if it works |
-| Insight (Triple Path) | Insights arise from contradictions, connections, or creative desperation |
-| Anomaly Detection | Experts notice when something doesn't fit the expected pattern |
-| Leverage Points | Small interventions that produce large effects in complex situations |
+| Model                             | Definition                                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| Recognition-Primed Decision (RPD) | Experts recognize situations and mentally simulate one option rather than comparing many   |
+| Naturalistic Decision Making      | Studying decisions in real-world settings with time pressure, uncertainty, and high stakes |
+| Mental Simulation                 | Running a candidate action forward in your mind to test if it works                        |
+| Insight (Triple Path)             | Insights arise from contradictions, connections, or creative desperation                   |
+| Anomaly Detection                 | Experts notice when something doesn't fit the expected pattern                             |
+| Leverage Points                   | Small interventions that produce large effects in complex situations                       |
 
 ## Trigger Keywords
 

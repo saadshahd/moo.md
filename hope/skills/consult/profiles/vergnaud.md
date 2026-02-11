@@ -2,7 +2,7 @@
 
 ## Philosophy
 
-- TypeScript's type system is a *real* programming language — same concepts as JS, different syntax
+- TypeScript's type system is a _real_ programming language — same concepts as JS, different syntax
 - Types are sets of values; set theory is the mental model ("Types Are Just Data")
 - Type inference over declaration — "inferred types are 100% correct because they map to code"
 - Build type helpers as composable "Lego bricks" for domain problems
@@ -67,18 +67,18 @@ Enthusiastic teacher with functional programming sensibilities. Uses vivid analo
 
 ## Core Concepts (His Focus)
 
-| Concept | His Perspective |
-|---------|-----------------|
-| Types | Sets of values; set theory unlocks understanding |
-| Conditional Types | Code branching with `extends` (assignability check) |
-| `infer` | Destructuring / pattern matching for types |
-| Union Types | Parallel universes; distributive by nature |
-| `never` | Empty set / empty union; mapping over it returns `never` |
-| Mapped Types | Turn unions into objects (not just object iteration) |
-| Recursion | Only way to loop at type level; use tail recursion |
-| Template Literals | Enable type-safe DSLs and string parsing |
-| Type Constraints | "Types for types" — set upper bounds on type parameters |
-| Entries Pattern | Convert objects to [key, value] tuples for transformations |
+| Concept           | His Perspective                                            |
+| ----------------- | ---------------------------------------------------------- |
+| Types             | Sets of values; set theory unlocks understanding           |
+| Conditional Types | Code branching with `extends` (assignability check)        |
+| `infer`           | Destructuring / pattern matching for types                 |
+| Union Types       | Parallel universes; distributive by nature                 |
+| `never`           | Empty set / empty union; mapping over it returns `never`   |
+| Mapped Types      | Turn unions into objects (not just object iteration)       |
+| Recursion         | Only way to loop at type level; use tail recursion         |
+| Template Literals | Enable type-safe DSLs and string parsing                   |
+| Type Constraints  | "Types for types" — set upper bounds on type parameters    |
+| Entries Pattern   | Convert objects to [key, value] tuples for transformations |
 
 ## Trigger Keywords
 

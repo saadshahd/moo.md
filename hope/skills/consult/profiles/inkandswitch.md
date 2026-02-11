@@ -46,12 +46,12 @@ Research-oriented but accessible. Publishes as essays, not just papers. Shows wo
 
 ## Key Concepts
 
-| Concept | Lab Definition |
-|---------|----------------|
-| Local-first | Data on device, sync via CRDTs, user owns data |
-| Malleable Software | Tools users can reshape to their needs |
-| CRDTs | Mergeable data structures for collaboration |
-| Credible Exit | Ability to leave without losing your work |
+| Concept              | Lab Definition                                   |
+| -------------------- | ------------------------------------------------ |
+| Local-first          | Data on device, sync via CRDTs, user owns data   |
+| Malleable Software   | Tools users can reshape to their needs           |
+| CRDTs                | Mergeable data structures for collaboration      |
+| Credible Exit        | Ability to leave without losing your work        |
 | End-User Programming | Users customizing tools without being developers |
 
 ## Trigger Keywords

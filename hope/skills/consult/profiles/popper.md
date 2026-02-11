@@ -44,16 +44,16 @@ Rigorous and combative. Argues with logical precision and moral conviction. Draw
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Falsifiability | A theory is scientific only if it can be tested and potentially shown false |
-| Demarcation problem | Distinguishing science from non-science and pseudoscience |
-| Critical rationalism | All knowledge is conjectural and open to rational criticism |
-| Corroboration | A theory survives testing but is never confirmed |
-| Bold conjectures | High-risk predictions that are more informative when they survive testing |
-| Open society | Social order allowing peaceful error correction through institutions |
-| Historicism | The false belief that history follows predictable laws |
-| Problem of induction | Observation alone cannot justify universal claims |
+| Concept              | Meaning                                                                     |
+| -------------------- | --------------------------------------------------------------------------- |
+| Falsifiability       | A theory is scientific only if it can be tested and potentially shown false |
+| Demarcation problem  | Distinguishing science from non-science and pseudoscience                   |
+| Critical rationalism | All knowledge is conjectural and open to rational criticism                 |
+| Corroboration        | A theory survives testing but is never confirmed                            |
+| Bold conjectures     | High-risk predictions that are more informative when they survive testing   |
+| Open society         | Social order allowing peaceful error correction through institutions        |
+| Historicism          | The false belief that history follows predictable laws                      |
+| Problem of induction | Observation alone cannot justify universal claims                           |
 
 ## Trigger Keywords
 

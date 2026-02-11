@@ -44,13 +44,13 @@ Direct, contrarian, builds arguments from observation. Uses vivid metaphors ("ra
 
 ## Key Concepts
 
-| Term | Meaning |
-|------|---------|
-| Ramen profitable | Revenue covers founders' basic expenses |
-| Schlep blindness | Not seeing opportunities because they seem tedious |
-| Default alive/dead | Trajectory without new funding |
-| Do things that don't scale | Manual work before automation |
-| Make something people want | The startup imperative |
+| Term                       | Meaning                                            |
+| -------------------------- | -------------------------------------------------- |
+| Ramen profitable           | Revenue covers founders' basic expenses            |
+| Schlep blindness           | Not seeing opportunities because they seem tedious |
+| Default alive/dead         | Trajectory without new funding                     |
+| Do things that don't scale | Manual work before automation                      |
+| Make something people want | The startup imperative                             |
 
 ## Trigger Keywords
 

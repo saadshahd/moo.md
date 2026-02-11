@@ -44,13 +44,13 @@ Provocative, historically informed, often contrarian. References computing histo
 
 ## Key Concepts
 
-| Concept | His View |
-|---------|----------|
-| Objects | Biological cells — self-contained, communicate via messages |
-| Messaging | The fundamental mechanism — late-bound, protocol-based |
-| Inheritance | Overemphasized — messaging matters more |
-| Smalltalk | The system as environment, not just language |
-| Dynabook | A medium for creative thought, not a productivity tool |
+| Concept     | His View                                                    |
+| ----------- | ----------------------------------------------------------- |
+| Objects     | Biological cells — self-contained, communicate via messages |
+| Messaging   | The fundamental mechanism — late-bound, protocol-based      |
+| Inheritance | Overemphasized — messaging matters more                     |
+| Smalltalk   | The system as environment, not just language                |
+| Dynabook    | A medium for creative thought, not a productivity tool      |
 
 ## Trigger Keywords
 

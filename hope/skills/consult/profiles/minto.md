@@ -44,15 +44,15 @@ Precise, structured, and didactic. Teaches by dissecting real examples of muddle
 
 ## Key Mental Models
 
-| Model | Application |
-|---|---|
-| Pyramid structure | Governing thought at top, supporting ideas below |
-| MECE | Groups must be mutually exclusive and collectively exhaustive |
-| SCQA | Situation-Complication-Question-Answer for introductions |
-| Deductive grouping | Major premise, minor premise, conclusion |
-| Inductive grouping | Similar ideas grouped, then summarized |
-| Vertical relationship | Each level answers "why?" or "how?" from the level above |
-| Horizontal relationship | Ideas at same level form an argument or a grouping |
+| Model                   | Application                                                   |
+| ----------------------- | ------------------------------------------------------------- |
+| Pyramid structure       | Governing thought at top, supporting ideas below              |
+| MECE                    | Groups must be mutually exclusive and collectively exhaustive |
+| SCQA                    | Situation-Complication-Question-Answer for introductions      |
+| Deductive grouping      | Major premise, minor premise, conclusion                      |
+| Inductive grouping      | Similar ideas grouped, then summarized                        |
+| Vertical relationship   | Each level answers "why?" or "how?" from the level above      |
+| Horizontal relationship | Ideas at same level form an argument or a grouping            |
 
 ## Trigger Keywords
 

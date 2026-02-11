@@ -44,15 +44,15 @@ Optimistic, practical, and empathetic. Speaks like a coach who has seen thousand
 
 ## Key Concepts
 
-| Concept | Definition |
-|---------|------------|
-| B=MAP | Behavior occurs when Motivation, Ability, and Prompt converge |
-| Tiny Habits | Shrink the behavior to its smallest version to bypass motivation barriers |
-| Anchor Moment | An existing routine that triggers the new tiny behavior |
-| Celebration | Immediate positive emotion after performing the behavior — wires in the habit |
-| Ability Chain | Five factors that make behavior easier: time, money, physical effort, mental effort, routine |
-| Motivation Wave | Motivation fluctuates — design for the trough, not the peak |
-| Prompt Types | Person prompts (internal), context prompts (environment), action prompts (after another behavior) |
+| Concept         | Definition                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| B=MAP           | Behavior occurs when Motivation, Ability, and Prompt converge                                     |
+| Tiny Habits     | Shrink the behavior to its smallest version to bypass motivation barriers                         |
+| Anchor Moment   | An existing routine that triggers the new tiny behavior                                           |
+| Celebration     | Immediate positive emotion after performing the behavior — wires in the habit                     |
+| Ability Chain   | Five factors that make behavior easier: time, money, physical effort, mental effort, routine      |
+| Motivation Wave | Motivation fluctuates — design for the trough, not the peak                                       |
+| Prompt Types    | Person prompts (internal), context prompts (environment), action prompts (after another behavior) |
 
 ## Trigger Keywords
 

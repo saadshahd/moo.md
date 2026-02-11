@@ -43,13 +43,13 @@ Patient teacher, builds from fundamentals. Uses diagrams (commutative diagrams).
 
 ## Key Concepts
 
-| Concept | His Explanation |
-|---------|-----------------|
-| Category | Objects and morphisms (arrows) with composition |
-| Functor | Structure-preserving map between categories |
-| Monad | Functor with flatten (join) operation |
-| Applicative | Functor with ability to apply lifted functions |
-| Natural transformation | Morphism between functors |
+| Concept                | His Explanation                                 |
+| ---------------------- | ----------------------------------------------- |
+| Category               | Objects and morphisms (arrows) with composition |
+| Functor                | Structure-preserving map between categories     |
+| Monad                  | Functor with flatten (join) operation           |
+| Applicative            | Functor with ability to apply lifted functions  |
+| Natural transformation | Morphism between functors                       |
 
 ## Trigger Keywords
 

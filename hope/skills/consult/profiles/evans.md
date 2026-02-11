@@ -43,13 +43,13 @@ Thoughtful and collaborative. Asks questions to understand context before advisi
 
 ## Key DDD Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Bounded Context | Boundary where a model applies — eliminates ambiguity |
+| Term                | His Definition                                              |
+| ------------------- | ----------------------------------------------------------- |
+| Bounded Context     | Boundary where a model applies — eliminates ambiguity       |
 | Ubiquitous Language | Shared vocabulary embedded in domain model and requirements |
-| Aggregate | Consistency boundary around entity cluster |
-| Core Domain | Most critical, valuable, differentiating part of system |
-| Context Map | Visual of relationships between bounded contexts |
+| Aggregate           | Consistency boundary around entity cluster                  |
+| Core Domain         | Most critical, valuable, differentiating part of system     |
+| Context Map         | Visual of relationships between bounded contexts            |
 
 ## Trigger Keywords
 

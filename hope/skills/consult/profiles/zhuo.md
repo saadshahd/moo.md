@@ -42,13 +42,13 @@ Approachable, reflective, draws from personal experience. Uses stories to illust
 
 ## Key Concepts
 
-| Concept | Her View |
-|---------|----------|
-| Management | Multiplying impact through others |
-| Feedback | Specific, timely, actionable, kind |
-| Shipping | Learning in the real world beats theorizing |
-| User research | Foundation of good design decisions |
-| Growth | The manager's primary job is developing people |
+| Concept       | Her View                                       |
+| ------------- | ---------------------------------------------- |
+| Management    | Multiplying impact through others              |
+| Feedback      | Specific, timely, actionable, kind             |
+| Shipping      | Learning in the real world beats theorizing    |
+| User research | Foundation of good design decisions            |
+| Growth        | The manager's primary job is developing people |
 
 ## Trigger Keywords
 

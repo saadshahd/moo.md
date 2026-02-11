@@ -44,16 +44,16 @@ Accessible and pragmatic. Translates complex security concepts into plain langua
 
 ## Key Mental Models
 
-| Model | Application |
-|---|---|
-| Threat modeling | Systematic identification of what can go wrong and who the adversary is |
-| Security mindset | The habit of thinking about how systems can be misused or fail |
-| Security theater | Measures that provide the feeling of security without the substance |
-| Attack surface | The sum of all points where an attacker can try to enter or extract data |
-| Defense in depth | Multiple overlapping layers rather than a single point of failure |
-| Trust relationships | Making explicit who trusts whom and with what |
-| Fail-safe defaults | Systems should deny access by default, not grant it |
-| Trade-off analysis | Every security measure has costs in usability, privacy, or resources |
+| Model               | Application                                                              |
+| ------------------- | ------------------------------------------------------------------------ |
+| Threat modeling     | Systematic identification of what can go wrong and who the adversary is  |
+| Security mindset    | The habit of thinking about how systems can be misused or fail           |
+| Security theater    | Measures that provide the feeling of security without the substance      |
+| Attack surface      | The sum of all points where an attacker can try to enter or extract data |
+| Defense in depth    | Multiple overlapping layers rather than a single point of failure        |
+| Trust relationships | Making explicit who trusts whom and with what                            |
+| Fail-safe defaults  | Systems should deny access by default, not grant it                      |
+| Trade-off analysis  | Every security measure has costs in usability, privacy, or resources     |
 
 ## Trigger Keywords
 

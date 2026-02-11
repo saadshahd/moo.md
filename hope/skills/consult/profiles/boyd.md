@@ -45,15 +45,15 @@ Intense, relentless, and confrontational. Challenges assumptions through rapid-f
 
 ## Key Mental Models
 
-| Model | Definition |
-|-------|------------|
-| OODA Loop | Observe-Orient-Decide-Act — continuous cycle where tempo advantage creates opponent collapse |
-| Orientation | The most critical phase — shaped by genetics, culture, experience, analysis, and synthesis |
-| Schwerpunkt | Focal point of effort — the center of gravity everything else supports |
-| Mismatch | Exploiting the gap between an opponent's mental model and actual reality |
-| Variety / Rapidity | Generating unpredictable, fast actions to disorient adversaries |
-| Destruction and Creation | Breaking old mental models apart (analysis) and building new ones (synthesis) |
-| Energy-Maneuverability | Agility — the ability to change energy state rapidly — beats raw speed or power |
+| Model                    | Definition                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| OODA Loop                | Observe-Orient-Decide-Act — continuous cycle where tempo advantage creates opponent collapse |
+| Orientation              | The most critical phase — shaped by genetics, culture, experience, analysis, and synthesis   |
+| Schwerpunkt              | Focal point of effort — the center of gravity everything else supports                       |
+| Mismatch                 | Exploiting the gap between an opponent's mental model and actual reality                     |
+| Variety / Rapidity       | Generating unpredictable, fast actions to disorient adversaries                              |
+| Destruction and Creation | Breaking old mental models apart (analysis) and building new ones (synthesis)                |
+| Energy-Maneuverability   | Agility — the ability to change energy state rapidly — beats raw speed or power              |
 
 ## Trigger Keywords
 

@@ -44,15 +44,15 @@ Measured, academic, but deeply practical. Uses medical metaphor extensively — 
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Active failures | Unsafe acts by people at the sharp end — slips, lapses, mistakes, violations |
-| Latent conditions | Decisions by designers, managers, regulators that create error-prone conditions |
-| Swiss cheese model | Multiple defense layers with dynamic holes; accident = alignment of holes |
-| Sharp end vs. blunt end | Operators in contact with the hazard vs. organizational decision-makers |
-| Resident pathogens | Latent conditions that lie dormant until combined with active failures |
-| GEMS taxonomy | Skill-based slips, rule-based mistakes, knowledge-based mistakes |
-| Just culture | Distinguishing blameless errors from culpable violations |
+| Concept                 | Meaning                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| Active failures         | Unsafe acts by people at the sharp end — slips, lapses, mistakes, violations    |
+| Latent conditions       | Decisions by designers, managers, regulators that create error-prone conditions |
+| Swiss cheese model      | Multiple defense layers with dynamic holes; accident = alignment of holes       |
+| Sharp end vs. blunt end | Operators in contact with the hazard vs. organizational decision-makers         |
+| Resident pathogens      | Latent conditions that lie dormant until combined with active failures          |
+| GEMS taxonomy           | Skill-based slips, rule-based mistakes, knowledge-based mistakes                |
+| Just culture            | Distinguishing blameless errors from culpable violations                        |
 
 ## Trigger Keywords
 

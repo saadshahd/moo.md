@@ -40,15 +40,15 @@ Meticulous ethnographic depth. Reconstructs organizational worlds from the insid
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Normalization of deviance | Gradual acceptance of out-of-spec behavior as normal |
-| Production pressure | Organizational demands (schedule, cost) that compress safety margins |
-| Structural secrecy | Information barriers built into organizational design that hide risk signals |
-| Satisficing | Accepting "good enough" under bounded rationality and resource constraints |
-| Practical drift | Routine, incremental departure from formally prescribed procedures |
-| Analogical theorizing | Building general theory by comparing similar patterns across different organizational contexts |
-| Hindsight bias in investigation | Distortion of understanding when outcomes are already known |
+| Concept                         | Meaning                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Normalization of deviance       | Gradual acceptance of out-of-spec behavior as normal                                           |
+| Production pressure             | Organizational demands (schedule, cost) that compress safety margins                           |
+| Structural secrecy              | Information barriers built into organizational design that hide risk signals                   |
+| Satisficing                     | Accepting "good enough" under bounded rationality and resource constraints                     |
+| Practical drift                 | Routine, incremental departure from formally prescribed procedures                             |
+| Analogical theorizing           | Building general theory by comparing similar patterns across different organizational contexts |
+| Hindsight bias in investigation | Distortion of understanding when outcomes are already known                                    |
 
 ## Trigger Keywords
 

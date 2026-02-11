@@ -44,16 +44,16 @@ Historical and analytical. Builds arguments through detailed case studies from t
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Paradigm | Shared framework of theory, methods, standards, and exemplars |
-| Normal science | Puzzle-solving within an accepted paradigm |
-| Anomaly | Observation that resists explanation within the current paradigm |
-| Crisis | Period when accumulated anomalies undermine confidence in the paradigm |
-| Scientific revolution | Replacement of one paradigm by another |
-| Incommensurability | Rival paradigms lack a common measure for comparison |
-| Paradigm shift | The gestalt change when a community adopts a new framework |
-| Exemplars | Canonical problem-solutions that train scientists to see patterns |
+| Concept               | Meaning                                                                |
+| --------------------- | ---------------------------------------------------------------------- |
+| Paradigm              | Shared framework of theory, methods, standards, and exemplars          |
+| Normal science        | Puzzle-solving within an accepted paradigm                             |
+| Anomaly               | Observation that resists explanation within the current paradigm       |
+| Crisis                | Period when accumulated anomalies undermine confidence in the paradigm |
+| Scientific revolution | Replacement of one paradigm by another                                 |
+| Incommensurability    | Rival paradigms lack a common measure for comparison                   |
+| Paradigm shift        | The gestalt change when a community adopts a new framework             |
+| Exemplars             | Canonical problem-solutions that train scientists to see patterns      |
 
 ## Trigger Keywords
 

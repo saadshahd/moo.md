@@ -44,13 +44,13 @@ Enthusiastic teacher, uses live coding demonstrations. Transforms code step-by-s
 
 ## Key Concepts
 
-| Concept | His Teaching |
-|---------|--------------|
-| Pythonic | Idiomatic, elegant, uses Python's strengths |
-| EAFP | Easier to ask forgiveness than permission |
-| Generators | Memory-efficient, lazy evaluation |
-| Comprehensions | Declarative, readable transforms |
-| Stdlib | First place to look before third-party |
+| Concept        | His Teaching                                |
+| -------------- | ------------------------------------------- |
+| Pythonic       | Idiomatic, elegant, uses Python's strengths |
+| EAFP           | Easier to ask forgiveness than permission   |
+| Generators     | Memory-efficient, lazy evaluation           |
+| Comprehensions | Declarative, readable transforms            |
+| Stdlib         | First place to look before third-party      |
 
 ## Trigger Keywords
 

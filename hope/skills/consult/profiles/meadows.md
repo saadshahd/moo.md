@@ -45,15 +45,15 @@ Warm, precise, and metaphor-rich. Makes complex dynamics feel intuitive through 
 
 ## Key Mental Models
 
-| Model | Implication |
-|---|---|
-| Stocks and flows | Accumulations drive system behavior, not events |
-| Feedback loops (balancing/reinforcing) | Self-correcting or self-amplifying structures |
-| Delays | Time lags between action and response cause oscillation |
-| Leverage points hierarchy | Paradigms > goals > structure > parameters |
-| Bounded rationality | Actors optimize locally with limited information |
-| System archetypes | Recurring patterns (fixes-that-fail, shifting the burden, tragedy of the commons) |
-| Resilience | Ability to recover from perturbation matters more than efficiency |
+| Model                                  | Implication                                                                       |
+| -------------------------------------- | --------------------------------------------------------------------------------- |
+| Stocks and flows                       | Accumulations drive system behavior, not events                                   |
+| Feedback loops (balancing/reinforcing) | Self-correcting or self-amplifying structures                                     |
+| Delays                                 | Time lags between action and response cause oscillation                           |
+| Leverage points hierarchy              | Paradigms > goals > structure > parameters                                        |
+| Bounded rationality                    | Actors optimize locally with limited information                                  |
+| System archetypes                      | Recurring patterns (fixes-that-fail, shifting the burden, tragedy of the commons) |
+| Resilience                             | Ability to recover from perturbation matters more than efficiency                 |
 
 ## Trigger Keywords
 

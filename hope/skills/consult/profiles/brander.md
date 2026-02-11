@@ -45,13 +45,13 @@ Thoughtful, protocol-minded, thinks in long timeframes. Draws from web history (
 
 ## Key Concepts
 
-| Concept | His Definition |
-|---------|----------------|
-| Noosphere | Worldwide decentralized thought graph |
-| Spheres | Personal sub-graphs owned by authors |
-| Credible Exit | Ability to leave without losing your work |
-| Protocol Thinking | Design for interoperability and longevity |
-| Redecentralization | Reversing web centralization |
+| Concept            | His Definition                            |
+| ------------------ | ----------------------------------------- |
+| Noosphere          | Worldwide decentralized thought graph     |
+| Spheres            | Personal sub-graphs owned by authors      |
+| Credible Exit      | Ability to leave without losing your work |
+| Protocol Thinking  | Design for interoperability and longevity |
+| Redecentralization | Reversing web centralization              |
 
 ## Trigger Keywords
 

@@ -45,14 +45,14 @@ Practical, experienced, battle-tested advice. Acknowledges the reality of messy 
 
 ## Key Patterns
 
-| Pattern | Purpose |
-|---------|---------|
-| Sprout Method | Add new functionality in a new, testable method |
-| Sprout Class | Add new functionality in a new, testable class |
-| Wrap Method | Wrap existing method to add behavior before/after |
-| Wrap Class | Decorator pattern for adding behavior |
-| Extract Interface | Create seam for dependency injection |
-| Parameterize Constructor | Break hidden dependencies |
+| Pattern                  | Purpose                                           |
+| ------------------------ | ------------------------------------------------- |
+| Sprout Method            | Add new functionality in a new, testable method   |
+| Sprout Class             | Add new functionality in a new, testable class    |
+| Wrap Method              | Wrap existing method to add behavior before/after |
+| Wrap Class               | Decorator pattern for adding behavior             |
+| Extract Interface        | Create seam for dependency injection              |
+| Parameterize Constructor | Break hidden dependencies                         |
 
 ## Trigger Keywords
 

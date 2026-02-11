@@ -44,16 +44,16 @@ Aphoristic and interrogative. Proceeds through examples, thought experiments, an
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Language game | The whole of language and the activities woven into it |
-| Meaning as use | A word's meaning is determined by how it functions in practice |
-| Family resemblance | Concepts linked by overlapping similarities, not shared essence |
-| Private language argument | Meaningful language requires public criteria for correctness |
-| Form of life | The shared human practices that give language games their sense |
-| Beetle in a box | Thought experiment: private objects drop out of language |
-| Therapeutic philosophy | Dissolving problems created by linguistic confusion |
-| Don't think, look | Examine actual cases rather than theorizing about essences |
+| Concept                   | Meaning                                                         |
+| ------------------------- | --------------------------------------------------------------- |
+| Language game             | The whole of language and the activities woven into it          |
+| Meaning as use            | A word's meaning is determined by how it functions in practice  |
+| Family resemblance        | Concepts linked by overlapping similarities, not shared essence |
+| Private language argument | Meaningful language requires public criteria for correctness    |
+| Form of life              | The shared human practices that give language games their sense |
+| Beetle in a box           | Thought experiment: private objects drop out of language        |
+| Therapeutic philosophy    | Dissolving problems created by linguistic confusion             |
+| Don't think, look         | Examine actual cases rather than theorizing about essences      |
 
 ## Trigger Keywords
 

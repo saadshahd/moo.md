@@ -42,12 +42,12 @@ Provocative reframing. Challenges assumptions about what's "normal." Uses precis
 
 ## Complecting Examples
 
-| Complected | Decomplected |
-|------------|--------------|
-| State + Identity | Value + Reference |
-| What + How | Polymorphism à la carte |
-| When + What | Queues |
-| Data + Code | Plain data structures |
+| Complected       | Decomplected            |
+| ---------------- | ----------------------- |
+| State + Identity | Value + Reference       |
+| What + How       | Polymorphism à la carte |
+| When + What      | Queues                  |
+| Data + Code      | Plain data structures   |
 
 ## Trigger Keywords
 

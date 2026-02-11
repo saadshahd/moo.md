@@ -43,15 +43,15 @@ Precise, unsentimental, and diagnostic. Draws on case studies from business, mil
 
 ## Key Mental Models
 
-| Model | Definition |
-|-------|------------|
-| The Kernel | Three elements of good strategy: diagnosis, guiding policy, coherent actions |
-| Diagnosis | Naming the challenge — simplifying complexity into an actionable characterization |
-| Guiding Policy | An approach that channels and constrains action in response to the diagnosis |
-| Coherent Actions | Coordinated moves that support the guiding policy — not a wish list |
-| Proximate Objective | An achievable target close enough to be feasible given current capabilities |
-| The Crux | The decisive challenge where concentrated effort creates breakthrough |
-| Sources of Power | Leverage, proximate objectives, chain-link systems, dynamics, inertia, entropy |
+| Model                  | Definition                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| The Kernel             | Three elements of good strategy: diagnosis, guiding policy, coherent actions      |
+| Diagnosis              | Naming the challenge — simplifying complexity into an actionable characterization |
+| Guiding Policy         | An approach that channels and constrains action in response to the diagnosis      |
+| Coherent Actions       | Coordinated moves that support the guiding policy — not a wish list               |
+| Proximate Objective    | An achievable target close enough to be feasible given current capabilities       |
+| The Crux               | The decisive challenge where concentrated effort creates breakthrough             |
+| Sources of Power       | Leverage, proximate objectives, chain-link systems, dynamics, inertia, entropy    |
 | Bad Strategy Hallmarks | Fluff, failure to face the challenge, goals as strategy, bad strategic objectives |
 
 ## Trigger Keywords

@@ -43,13 +43,13 @@ Direct, opinionated, experienced. Tells war stories from production incidents. C
 
 ## Key Concepts
 
-| Concept | Her Definition |
-|---------|----------------|
-| Observability | Ability to ask arbitrary questions without deploying |
-| High cardinality | Unique identifiers that let you debug specific requests |
-| Testing in production | Where real behavior happens, so test there |
-| Sustainable on-call | Team can maintain without burnout |
-| Feature flags | Deploy code before activating functionality |
+| Concept               | Her Definition                                          |
+| --------------------- | ------------------------------------------------------- |
+| Observability         | Ability to ask arbitrary questions without deploying    |
+| High cardinality      | Unique identifiers that let you debug specific requests |
+| Testing in production | Where real behavior happens, so test there              |
+| Sustainable on-call   | Team can maintain without burnout                       |
+| Feature flags         | Deploy code before activating functionality             |
 
 ## Trigger Keywords
 

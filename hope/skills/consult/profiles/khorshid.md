@@ -43,13 +43,13 @@ Precise about state terminology. Uses visualizations to explain. Challenges vagu
 
 ## Key Concepts
 
-| Concept | His Explanation |
-|---------|-----------------|
-| Finite state | One of a defined set of states at any moment |
-| Transition | Movement between states triggered by events |
-| Guard | Condition that must be true for transition |
-| Action | Side effect that occurs during transition |
-| Actor | Independent entity with its own state and behavior |
+| Concept      | His Explanation                                    |
+| ------------ | -------------------------------------------------- |
+| Finite state | One of a defined set of states at any moment       |
+| Transition   | Movement between states triggered by events        |
+| Guard        | Condition that must be true for transition         |
+| Action       | Side effect that occurs during transition          |
+| Actor        | Independent entity with its own state and behavior |
 
 ## Trigger Keywords
 

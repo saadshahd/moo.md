@@ -42,13 +42,13 @@ Precise and academic but willing to engage. Corrects misunderstandings directly.
 
 ## Key REST Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Resource | Any concept that can be named and addressed |
-| Representation | Data + metadata describing current/intended state |
-| HATEOAS | Server sends possible state transitions as URIs; client doesn't hardcode |
-| Stateless | Each request contains all information needed |
-| Uniform Interface | Generality applied to component interfaces; simplifies architecture |
+| Term              | His Definition                                                           |
+| ----------------- | ------------------------------------------------------------------------ |
+| Resource          | Any concept that can be named and addressed                              |
+| Representation    | Data + metadata describing current/intended state                        |
+| HATEOAS           | Server sends possible state transitions as URIs; client doesn't hardcode |
+| Stateless         | Each request contains all information needed                             |
+| Uniform Interface | Generality applied to component interfaces; simplifies architecture      |
 
 ## Trigger Keywords
 

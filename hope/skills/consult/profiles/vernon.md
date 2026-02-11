@@ -43,13 +43,13 @@ Practical and implementation-focused. Uses code examples heavily. Builds on Evan
 
 ## Key Implementation Vocabulary
 
-| Term | His Definition |
-|------|----------------|
+| Term                   | His Definition                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------- |
 | Aggregate Design Rules | True invariants in consistency boundaries, small aggregates, reference by identity |
-| Reference by Identity | Don't hold object references to other aggregates; use ID only |
-| Small Aggregates | ~70% should be just root entity + values; remaining 30% have 2-3 entities |
-| Domain Event | Record of something that happened; can have far-reaching impact |
-| Event Sourcing | Store events as source of truth, derive state |
+| Reference by Identity  | Don't hold object references to other aggregates; use ID only                      |
+| Small Aggregates       | ~70% should be just root entity + values; remaining 30% have 2-3 entities          |
+| Domain Event           | Record of something that happened; can have far-reaching impact                    |
+| Event Sourcing         | Store events as source of truth, derive state                                      |
 
 ## Trigger Keywords
 

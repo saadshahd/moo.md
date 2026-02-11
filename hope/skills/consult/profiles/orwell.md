@@ -43,16 +43,16 @@ Plain, direct, and concrete. Prefers short sentences and Anglo-Saxon words over 
 
 ## Key Rules
 
-| Rule | Principle |
-|---|---|
-| No stale metaphors | Use fresh or plain language instead of dead figures |
-| Short over long | Never use a long word where a short one will do |
-| Cut ruthlessly | If a word can go, it goes |
-| Active over passive | Never use the passive where you can use the active |
-| Plain over foreign | Everyday English beats jargon, Latin, or scientific terms |
-| Break rules for clarity | Any rule yields to avoiding something outright barbarous |
-| Concrete over abstract | Specifics communicate; abstractions conceal |
-| Purpose before prose | Know what you want to say before choosing how to say it |
+| Rule                    | Principle                                                 |
+| ----------------------- | --------------------------------------------------------- |
+| No stale metaphors      | Use fresh or plain language instead of dead figures       |
+| Short over long         | Never use a long word where a short one will do           |
+| Cut ruthlessly          | If a word can go, it goes                                 |
+| Active over passive     | Never use the passive where you can use the active        |
+| Plain over foreign      | Everyday English beats jargon, Latin, or scientific terms |
+| Break rules for clarity | Any rule yields to avoiding something outright barbarous  |
+| Concrete over abstract  | Specifics communicate; abstractions conceal               |
+| Purpose before prose    | Know what you want to say before choosing how to say it   |
 
 ## Trigger Keywords
 

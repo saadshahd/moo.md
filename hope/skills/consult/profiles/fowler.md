@@ -43,13 +43,13 @@ Measured, pedagogical, precise. Writes like a thoughtful professor — builds de
 
 ## Key Patterns Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Refactoring | Changing internal structure without changing external behavior |
-| Technical Debt | Deliberate shortcuts with understood future cost |
-| Strangler Fig | Incrementally replace legacy system at edges |
-| Feature Toggle | Deploy code before activating it |
-| Microservices | Independently deployable services around business capabilities |
+| Term           | His Definition                                                 |
+| -------------- | -------------------------------------------------------------- |
+| Refactoring    | Changing internal structure without changing external behavior |
+| Technical Debt | Deliberate shortcuts with understood future cost               |
+| Strangler Fig  | Incrementally replace legacy system at edges                   |
+| Feature Toggle | Deploy code before activating it                               |
+| Microservices  | Independently deployable services around business capabilities |
 
 ## Trigger Keywords
 

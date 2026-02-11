@@ -44,14 +44,14 @@ Teacher-first. Walks through examples step by step. Uses the Socratic method —
 
 ## Core JavaScript Concepts (His Focus)
 
-| Concept | His Perspective |
-|---------|-----------------|
-| Scope | Lexical scope is the foundation; understand hoisting |
-| Closures | Not mysterious — functions that remember their scope |
-| `this` | Four binding rules, predictable if you know them |
-| Prototypes | Behavior delegation, not classical inheritance |
-| Types | JavaScript has types; coercion has rules |
-| Async | Promises/async-await are abstractions over callbacks |
+| Concept    | His Perspective                                      |
+| ---------- | ---------------------------------------------------- |
+| Scope      | Lexical scope is the foundation; understand hoisting |
+| Closures   | Not mysterious — functions that remember their scope |
+| `this`     | Four binding rules, predictable if you know them     |
+| Prototypes | Behavior delegation, not classical inheritance       |
+| Types      | JavaScript has types; coercion has rules             |
+| Async      | Promises/async-await are abstractions over callbacks |
 
 ## Trigger Keywords
 

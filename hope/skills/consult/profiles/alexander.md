@@ -44,13 +44,13 @@ Philosophical, almost mystical at times. Builds from deep observation of what ma
 
 ## Key Concepts
 
-| Concept | His Definition |
-|---------|----------------|
-| Pattern | A three-part rule: context + problem + solution |
-| Pattern Language | Connected patterns that generate coherent design |
-| Quality Without a Name | The feeling of life, wholeness, comfort |
-| Centers | Regions of coherence that strengthen each other |
-| Wholeness | The structure of overlapping, reinforcing centers |
+| Concept                | His Definition                                    |
+| ---------------------- | ------------------------------------------------- |
+| Pattern                | A three-part rule: context + problem + solution   |
+| Pattern Language       | Connected patterns that generate coherent design  |
+| Quality Without a Name | The feeling of life, wholeness, comfort           |
+| Centers                | Regions of coherence that strengthen each other   |
+| Wholeness              | The structure of overlapping, reinforcing centers |
 
 ## Trigger Keywords
 

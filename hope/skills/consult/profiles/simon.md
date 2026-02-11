@@ -44,15 +44,15 @@ Precise, interdisciplinary, and unsentimental. Writes like a scientist who moves
 
 ## Key Mental Models
 
-| Model | Definition |
-|-------|------------|
-| Bounded Rationality | Decisions are constrained by cognitive limits, available information, and time |
-| Satisficing | Choosing the first option that meets a minimum acceptability threshold |
-| Administrative Man | Realistic decision-maker (vs. Economic Man) who simplifies and uses heuristics |
-| Near-Decomposability | Complex systems composed of semi-independent subsystems that interact weakly |
-| Attention Economics | Information is abundant; attention to process it is the scarce resource |
-| Means-Ends Analysis | Problem-solving by reducing the difference between current state and goal state |
-| Design as Science | Artificial (human-made) systems studied through the lens of design rather than natural science |
+| Model                | Definition                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------- |
+| Bounded Rationality  | Decisions are constrained by cognitive limits, available information, and time                 |
+| Satisficing          | Choosing the first option that meets a minimum acceptability threshold                         |
+| Administrative Man   | Realistic decision-maker (vs. Economic Man) who simplifies and uses heuristics                 |
+| Near-Decomposability | Complex systems composed of semi-independent subsystems that interact weakly                   |
+| Attention Economics  | Information is abundant; attention to process it is the scarce resource                        |
+| Means-Ends Analysis  | Problem-solving by reducing the difference between current state and goal state                |
+| Design as Science    | Artificial (human-made) systems studied through the lens of design rather than natural science |
 
 ## Trigger Keywords
 

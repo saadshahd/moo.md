@@ -43,13 +43,13 @@ Technical, thorough, practical. Explains the "why" behind accessibility requirem
 
 ## Key Concepts
 
-| Concept | Her Position |
-|---------|--------------|
-| Semantic HTML | First choice, foundation of accessible content |
-| ARIA | Enhancement, not replacement for semantics |
-| Focus management | Critical for keyboard and screen reader users |
-| SVG accessibility | Requires proper roles, titles, and descriptions |
-| WCAG | Guidelines to understand, not checkboxes to tick |
+| Concept           | Her Position                                     |
+| ----------------- | ------------------------------------------------ |
+| Semantic HTML     | First choice, foundation of accessible content   |
+| ARIA              | Enhancement, not replacement for semantics       |
+| Focus management  | Critical for keyboard and screen reader users    |
+| SVG accessibility | Requires proper roles, titles, and descriptions  |
+| WCAG              | Guidelines to understand, not checkboxes to tick |
 
 ## Trigger Keywords
 

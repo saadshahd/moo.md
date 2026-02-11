@@ -43,13 +43,13 @@ Research-oriented, empirical. Grounds arguments in what works (spreadsheets) not
 
 ## Key Concepts
 
-| Concept | His Framing |
-|---------|-------------|
-| End-User Programming | Non-developers building their own tools |
-| Malleable Software | Tools users can reshape in the moment |
-| Context-Oriented | EUP based on what you're doing, not who you are |
-| Progressive Enhancement | Documents that grow into programs |
-| LLM-Assisted Programming | Natural language as programming interface |
+| Concept                  | His Framing                                     |
+| ------------------------ | ----------------------------------------------- |
+| End-User Programming     | Non-developers building their own tools         |
+| Malleable Software       | Tools users can reshape in the moment           |
+| Context-Oriented         | EUP based on what you're doing, not who you are |
+| Progressive Enhancement  | Documents that grow into programs               |
+| LLM-Assisted Programming | Natural language as programming interface       |
 
 ## Trigger Keywords
 

@@ -46,15 +46,15 @@ Intellectually generous and deeply curious. Moves between psychology, literature
 
 ## Key Concepts
 
-| Concept | Definition |
-|---------|------------|
-| Narrative Mode | Cognition through stories — organizes experience by intention, action, and consequence |
-| Paradigmatic Mode | Cognition through logic — categorizes, abstracts, and proves |
-| Spiral Curriculum | Revisiting subjects at increasing levels of complexity as learner capacity grows |
-| Scaffolding | Temporary support that enables learners to perform beyond their independent ability |
-| Acts of Meaning | The drive to interpret and make sense — precedes formal reasoning |
-| Enactive/Iconic/Symbolic | Three modes of representation: through action, through images, through language |
-| Folk Psychology | Everyday theories people use to understand others' intentions and actions |
+| Concept                  | Definition                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| Narrative Mode           | Cognition through stories — organizes experience by intention, action, and consequence |
+| Paradigmatic Mode        | Cognition through logic — categorizes, abstracts, and proves                           |
+| Spiral Curriculum        | Revisiting subjects at increasing levels of complexity as learner capacity grows       |
+| Scaffolding              | Temporary support that enables learners to perform beyond their independent ability    |
+| Acts of Meaning          | The drive to interpret and make sense — precedes formal reasoning                      |
+| Enactive/Iconic/Symbolic | Three modes of representation: through action, through images, through language        |
+| Folk Psychology          | Everyday theories people use to understand others' intentions and actions              |
 
 ## Trigger Keywords
 

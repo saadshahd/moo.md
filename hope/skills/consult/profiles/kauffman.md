@@ -45,15 +45,15 @@ Expansive, intellectually exuberant, and philosophically ambitious. Moves betwee
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Edge of chaos | Phase transition where complex adaptive behavior emerges |
-| Adjacent possible | The set of configurations reachable in one step from the current state |
+| Concept              | Meaning                                                                     |
+| -------------------- | --------------------------------------------------------------------------- |
+| Edge of chaos        | Phase transition where complex adaptive behavior emerges                    |
+| Adjacent possible    | The set of configurations reachable in one step from the current state      |
 | NK fitness landscape | Tunable model: N components, K epistatic interactions — controls ruggedness |
-| Autocatalytic sets | Networks of molecules that collectively catalyze their own formation |
-| Boolean networks | Binary-state nodes with random connections — model of gene regulation |
-| Order for free | Spontaneous order arising from network topology without selection |
-| Autonomous agents | Systems that act on their own behalf in an environment they co-construct |
+| Autocatalytic sets   | Networks of molecules that collectively catalyze their own formation        |
+| Boolean networks     | Binary-state nodes with random connections — model of gene regulation       |
+| Order for free       | Spontaneous order arising from network topology without selection           |
+| Autonomous agents    | Systems that act on their own behalf in an environment they co-construct    |
 
 ## Trigger Keywords
 

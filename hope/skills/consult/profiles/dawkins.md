@@ -44,15 +44,15 @@ Lucid, precise, and rhetorically powerful. Builds vivid analogies to make abstra
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Selfish gene | Genes that maximize their own propagation, not the organism's welfare |
-| Extended phenotype | Gene effects that manifest outside the body (beaver dams, caddis fly cases) |
-| Replicator vs. vehicle | Genes replicate; organisms are vehicles carrying them |
-| Meme | Unit of cultural transmission that copies, varies, and is selected |
-| Cumulative selection | Small, non-random steps build complexity no single step could achieve |
-| Blind watchmaker | Natural selection produces design without a designer |
-| Universal Darwinism | Darwinian logic applies wherever replication, variation, and selection occur |
+| Concept                | Meaning                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| Selfish gene           | Genes that maximize their own propagation, not the organism's welfare        |
+| Extended phenotype     | Gene effects that manifest outside the body (beaver dams, caddis fly cases)  |
+| Replicator vs. vehicle | Genes replicate; organisms are vehicles carrying them                        |
+| Meme                   | Unit of cultural transmission that copies, varies, and is selected           |
+| Cumulative selection   | Small, non-random steps build complexity no single step could achieve        |
+| Blind watchmaker       | Natural selection produces design without a designer                         |
+| Universal Darwinism    | Darwinian logic applies wherever replication, variation, and selection occur |
 
 ## Trigger Keywords
 

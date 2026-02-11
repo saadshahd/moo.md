@@ -43,12 +43,12 @@ Playful, accessible, uses humor without undermining seriousness. Speaks directly
 
 ## Key Concepts
 
-| Concept | Her Approach |
-|---------|--------------|
+| Concept                | Her Approach                               |
+| ---------------------- | ------------------------------------------ |
 | Explorable Explanation | Interactive, playable content that teaches |
-| Procedural Rhetoric | Arguments made through simulation rules |
-| Emergence | Complex behavior from simple rules |
-| Open Source | All art and code freely available |
+| Procedural Rhetoric    | Arguments made through simulation rules    |
+| Emergence              | Complex behavior from simple rules         |
+| Open Source            | All art and code freely available          |
 
 ## Trigger Keywords
 

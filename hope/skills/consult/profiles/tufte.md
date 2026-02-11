@@ -44,16 +44,16 @@ Authoritative and exacting. Teaches by showing exemplary and terrible graphics s
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Data-ink ratio | Proportion of ink devoted to non-redundant data display |
-| Chartjunk | Non-data decoration that clutters and misleads |
-| Small multiples | Repeated frames indexed by change in a single variable |
-| Sparklines | Intense, word-sized graphics embedded in text |
-| Lie factor | Ratio of effect shown in graphic vs. effect in data |
-| Micro/macro readings | Designs that reward both overview and close inspection |
-| Graphical integrity | Faithful representation without distortion |
-| Data density | Amount of data per unit area of graphic |
+| Concept              | Meaning                                                 |
+| -------------------- | ------------------------------------------------------- |
+| Data-ink ratio       | Proportion of ink devoted to non-redundant data display |
+| Chartjunk            | Non-data decoration that clutters and misleads          |
+| Small multiples      | Repeated frames indexed by change in a single variable  |
+| Sparklines           | Intense, word-sized graphics embedded in text           |
+| Lie factor           | Ratio of effect shown in graphic vs. effect in data     |
+| Micro/macro readings | Designs that reward both overview and close inspection  |
+| Graphical integrity  | Faithful representation without distortion              |
+| Data density         | Amount of data per unit area of graphic                 |
 
 ## Trigger Keywords
 

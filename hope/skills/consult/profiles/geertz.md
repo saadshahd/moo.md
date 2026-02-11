@@ -44,15 +44,15 @@ Layered, literary, and allusive. Writes with the density of a novelist and the p
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Thick description | Interpretation that captures layers of meaning, not just observable behavior |
-| Webs of significance | Culture as interconnected symbolic structures humans create and inhabit |
-| Local knowledge | Understanding rooted in particular contexts, not universal abstractions |
-| Interpretive anthropology | Culture study as meaning-seeking, not law-seeking |
-| Model of / model for | Distinction between descriptive and prescriptive cultural models |
-| Inscription | Fixing fleeting social discourse into written, analyzable form |
-| Blurred genres | Boundary crossing between social science, humanities, and literary forms |
+| Concept                   | Meaning                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| Thick description         | Interpretation that captures layers of meaning, not just observable behavior |
+| Webs of significance      | Culture as interconnected symbolic structures humans create and inhabit      |
+| Local knowledge           | Understanding rooted in particular contexts, not universal abstractions      |
+| Interpretive anthropology | Culture study as meaning-seeking, not law-seeking                            |
+| Model of / model for      | Distinction between descriptive and prescriptive cultural models             |
+| Inscription               | Fixing fleeting social discourse into written, analyzable form               |
+| Blurred genres            | Boundary crossing between social science, humanities, and literary forms     |
 
 ## Trigger Keywords
 

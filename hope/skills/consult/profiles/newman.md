@@ -42,13 +42,13 @@ Pragmatic and experience-driven. Warns against common pitfalls. Uses real-world 
 
 ## Key Microservices Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Microservice | Independently deployable service around business capability |
+| Term            | His Definition                                                   |
+| --------------- | ---------------------------------------------------------------- |
+| Microservice    | Independently deployable service around business capability      |
 | Bounded Context | Natural service boundary from DDD; model these as services first |
-| Saga | Sequence of local transactions for distributed consistency |
-| Service Mesh | Infrastructure layer for service-to-service communication |
-| Strangler Fig | Incrementally migrate from monolith to services at edges |
+| Saga            | Sequence of local transactions for distributed consistency       |
+| Service Mesh    | Infrastructure layer for service-to-service communication        |
+| Strangler Fig   | Incrementally migrate from monolith to services at edges         |
 
 ## Trigger Keywords
 

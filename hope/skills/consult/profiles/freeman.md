@@ -43,13 +43,13 @@ Thoughtful and precise. Explains by building up from principles. Uses diagrams a
 
 ## Key Testing Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Mock Object | Substitute that verifies interactions between objects |
-| Walking Skeleton | Barebones app that can build, test, deploy to all environments from day one |
-| Outside-In | Start from acceptance test, discover internal objects |
-| Ports and Adapters | Hexagonal architecture adopted in GOOS; isolate domain from infrastructure |
-| Only Mock Types You Own | Don't mock third-party code directly; wrap it first |
+| Term                    | His Definition                                                              |
+| ----------------------- | --------------------------------------------------------------------------- |
+| Mock Object             | Substitute that verifies interactions between objects                       |
+| Walking Skeleton        | Barebones app that can build, test, deploy to all environments from day one |
+| Outside-In              | Start from acceptance test, discover internal objects                       |
+| Ports and Adapters      | Hexagonal architecture adopted in GOOS; isolate domain from infrastructure  |
+| Only Mock Types You Own | Don't mock third-party code directly; wrap it first                         |
 
 ## Trigger Keywords
 

@@ -44,13 +44,13 @@ Rigorous yet personal. Writes in public, iterates visibly. Builds arguments from
 
 ## Key Concepts
 
-| Concept | His Definition |
-|---------|----------------|
-| Transmissionism | The discredited idea that knowledge transfers directly |
-| Evergreen Notes | Atomic, concept-oriented notes that evolve |
-| Mnemonic Medium | Prose with embedded spaced repetition |
-| Spaced Repetition | Reviewing at expanding intervals for retention |
-| Testing Effect | Active recall strengthens memory more than re-reading |
+| Concept           | His Definition                                         |
+| ----------------- | ------------------------------------------------------ |
+| Transmissionism   | The discredited idea that knowledge transfers directly |
+| Evergreen Notes   | Atomic, concept-oriented notes that evolve             |
+| Mnemonic Medium   | Prose with embedded spaced repetition                  |
+| Spaced Repetition | Reviewing at expanding intervals for retention         |
+| Testing Effect    | Active recall strengthens memory more than re-reading  |
 
 ## Trigger Keywords
 

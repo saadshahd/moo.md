@@ -44,15 +44,15 @@ Practical and encouraging. Meets teams where they are rather than demanding expe
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| STRIDE | Spoofing, Tampering, Repudiation, Info Disclosure, Denial of Service, Elevation of Privilege |
-| Four Question Framework | What are we working on? What can go wrong? What will we do? Did we do well? |
-| Elevation of Privilege | Card game that makes threat identification collaborative and accessible |
-| Data flow diagrams | Visual representation of how data moves through a system, revealing trust boundaries |
-| Trust boundaries | Lines in a diagram where privilege or trust level changes |
-| Threat library | Catalog of known threats mapped to STRIDE categories |
-| Mitigate / Accept / Transfer / Eliminate | Four responses to identified threats |
+| Concept                                  | Meaning                                                                                      |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------- |
+| STRIDE                                   | Spoofing, Tampering, Repudiation, Info Disclosure, Denial of Service, Elevation of Privilege |
+| Four Question Framework                  | What are we working on? What can go wrong? What will we do? Did we do well?                  |
+| Elevation of Privilege                   | Card game that makes threat identification collaborative and accessible                      |
+| Data flow diagrams                       | Visual representation of how data moves through a system, revealing trust boundaries         |
+| Trust boundaries                         | Lines in a diagram where privilege or trust level changes                                    |
+| Threat library                           | Catalog of known threats mapped to STRIDE categories                                         |
+| Mitigate / Accept / Transfer / Eliminate | Four responses to identified threats                                                         |
 
 ## Trigger Keywords
 

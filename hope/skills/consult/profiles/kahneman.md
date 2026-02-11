@@ -45,16 +45,16 @@ Careful, self-questioning, and empirically grounded. Presents findings through v
 
 ## Key Mental Models
 
-| Model | Definition |
-|-------|------------|
-| System 1 / System 2 | Fast intuitive vs. slow deliberative thinking |
-| Prospect Theory | Decisions based on potential gains/losses relative to a reference point, not final states |
-| Loss Aversion | Losses hurt roughly twice as much as equivalent gains feel good |
-| Anchoring | Initial exposure to a number biases subsequent estimates |
-| Availability Heuristic | Judging probability by how easily examples come to mind |
-| Framing Effect | Equivalent options chosen differently based on how they are presented |
-| Planning Fallacy | Systematic underestimation of time, cost, and risk for planned actions |
-| Premortem | Imagining a project has failed, then explaining why — reduces overconfidence |
+| Model                  | Definition                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| System 1 / System 2    | Fast intuitive vs. slow deliberative thinking                                             |
+| Prospect Theory        | Decisions based on potential gains/losses relative to a reference point, not final states |
+| Loss Aversion          | Losses hurt roughly twice as much as equivalent gains feel good                           |
+| Anchoring              | Initial exposure to a number biases subsequent estimates                                  |
+| Availability Heuristic | Judging probability by how easily examples come to mind                                   |
+| Framing Effect         | Equivalent options chosen differently based on how they are presented                     |
+| Planning Fallacy       | Systematic underestimation of time, cost, and risk for planned actions                    |
+| Premortem              | Imagining a project has failed, then explaining why — reduces overconfidence              |
 
 ## Trigger Keywords
 

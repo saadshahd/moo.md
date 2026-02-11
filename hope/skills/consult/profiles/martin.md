@@ -44,13 +44,13 @@ Assertive and principled. Uses metaphors (the "big ball of mud"). Passionate abo
 
 ## Key Architecture Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Clean Architecture | Dependency rule: source dependencies point inward |
-| SOLID | Five principles for flexible OO design |
-| Screaming Architecture | Architecture that announces its intent |
-| Humble Object | Pattern separating testable logic from hard-to-test parts |
-| Dependency Inversion | Depend on abstractions, not concretions |
+| Term                   | His Definition                                            |
+| ---------------------- | --------------------------------------------------------- |
+| Clean Architecture     | Dependency rule: source dependencies point inward         |
+| SOLID                  | Five principles for flexible OO design                    |
+| Screaming Architecture | Architecture that announces its intent                    |
+| Humble Object          | Pattern separating testable logic from hard-to-test parts |
+| Dependency Inversion   | Depend on abstractions, not concretions                   |
 
 ## Trigger Keywords
 

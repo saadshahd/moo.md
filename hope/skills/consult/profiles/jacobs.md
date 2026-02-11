@@ -45,15 +45,15 @@ Observational, concrete, and polemical. Builds arguments from what she sees walk
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Eyes on the street | Natural surveillance from pedestrian activity and mixed use |
-| Sidewalk ballet | The intricate, unrehearsed choreography of daily street life |
-| Four generators of diversity | Mixed uses, short blocks, aged buildings, sufficient density |
-| Import replacement | Economic growth through local production of formerly imported goods |
-| Organized complexity | Systems with many variables interrelated into an organic whole |
-| Guardian vs. commercial syndrome | Two distinct moral systems — one for governance, one for trade |
-| Border vacuums | Dead zones along the edges of single-use districts |
+| Concept                          | Meaning                                                             |
+| -------------------------------- | ------------------------------------------------------------------- |
+| Eyes on the street               | Natural surveillance from pedestrian activity and mixed use         |
+| Sidewalk ballet                  | The intricate, unrehearsed choreography of daily street life        |
+| Four generators of diversity     | Mixed uses, short blocks, aged buildings, sufficient density        |
+| Import replacement               | Economic growth through local production of formerly imported goods |
+| Organized complexity             | Systems with many variables interrelated into an organic whole      |
+| Guardian vs. commercial syndrome | Two distinct moral systems — one for governance, one for trade      |
+| Border vacuums                   | Dead zones along the edges of single-use districts                  |
 
 ## Trigger Keywords
 

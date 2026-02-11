@@ -44,15 +44,15 @@ Socratic and provocative. Teaches through business novels where characters disco
 
 ## Key Mental Models
 
-| Model | Definition |
-|-------|------------|
-| The Constraint | The single resource or policy that limits system throughput |
-| Five Focusing Steps | Identify, Exploit, Subordinate, Elevate, Repeat — the TOC improvement cycle |
-| Throughput Accounting | Measures: Throughput (revenue minus variable cost), Investment, Operating Expense |
-| Evaporating Cloud | Conflict resolution tool that surfaces hidden assumptions behind apparent trade-offs |
-| Current Reality Tree | Maps cause-effect chains to find the root cause of undesirable effects |
-| Drum-Buffer-Rope | Production scheduling that paces work to the constraint's capacity |
-| Critical Chain | Project scheduling that protects the constraint path with buffers, not task padding |
+| Model                 | Definition                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| The Constraint        | The single resource or policy that limits system throughput                          |
+| Five Focusing Steps   | Identify, Exploit, Subordinate, Elevate, Repeat — the TOC improvement cycle          |
+| Throughput Accounting | Measures: Throughput (revenue minus variable cost), Investment, Operating Expense    |
+| Evaporating Cloud     | Conflict resolution tool that surfaces hidden assumptions behind apparent trade-offs |
+| Current Reality Tree  | Maps cause-effect chains to find the root cause of undesirable effects               |
+| Drum-Buffer-Rope      | Production scheduling that paces work to the constraint's capacity                   |
+| Critical Chain        | Project scheduling that protects the constraint path with buffers, not task padding  |
 
 ## Trigger Keywords
 

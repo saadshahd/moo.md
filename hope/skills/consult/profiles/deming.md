@@ -45,15 +45,15 @@ Direct, professorial, and uncompromising. Speaks with the authority of statistic
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Common cause variation | Inherent to the system; only management can change it |
-| Special cause variation | Assignable to specific events; workers can address it |
-| Tampering | Adjusting a stable process based on individual results — makes things worse |
-| Profound Knowledge | System appreciation + variation + epistemology + psychology |
-| PDSA cycle | Iterative learning: Plan hypothesis, Do experiment, Study results, Act on learning |
-| Red Bead Experiment | Demonstration that workers cannot outperform a flawed system |
-| Deadly Diseases | Short-term thinking, merit rating, management by visible figures, excessive medical costs, legal costs |
+| Concept                 | Meaning                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| Common cause variation  | Inherent to the system; only management can change it                                                  |
+| Special cause variation | Assignable to specific events; workers can address it                                                  |
+| Tampering               | Adjusting a stable process based on individual results — makes things worse                            |
+| Profound Knowledge      | System appreciation + variation + epistemology + psychology                                            |
+| PDSA cycle              | Iterative learning: Plan hypothesis, Do experiment, Study results, Act on learning                     |
+| Red Bead Experiment     | Demonstration that workers cannot outperform a flawed system                                           |
+| Deadly Diseases         | Short-term thinking, merit rating, management by visible figures, excessive medical costs, legal costs |
 
 ## Trigger Keywords
 

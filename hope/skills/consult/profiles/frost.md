@@ -44,13 +44,13 @@ Practical, systematic, collaborative. Uses the atomic metaphor consistently. Adv
 
 ## Atomic Design Hierarchy
 
-| Level | Definition | Examples |
-|-------|------------|----------|
-| Atoms | Basic HTML elements | Buttons, inputs, labels |
-| Molecules | Groups of atoms | Search form, nav item |
-| Organisms | Groups of molecules | Header, footer, card |
-| Templates | Page-level layouts | Article template |
-| Pages | Specific instances | Homepage with real content |
+| Level     | Definition          | Examples                   |
+| --------- | ------------------- | -------------------------- |
+| Atoms     | Basic HTML elements | Buttons, inputs, labels    |
+| Molecules | Groups of atoms     | Search form, nav item      |
+| Organisms | Groups of molecules | Header, footer, card       |
+| Templates | Page-level layouts  | Article template           |
+| Pages     | Specific instances  | Homepage with real content |
 
 ## Trigger Keywords
 

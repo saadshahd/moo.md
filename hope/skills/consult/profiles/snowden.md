@@ -44,15 +44,15 @@ Intellectually combative and sharply opinionated. Draws freely on anthropology, 
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Clear (formerly Obvious/Simple) | Best practice — sense, categorize, respond |
-| Complicated | Good practice — sense, analyze, respond (expert domain) |
-| Complex | Emergent practice — probe, sense, respond |
-| Chaotic | Novel practice — act, sense, respond |
-| Confusion (the fold) | Not knowing which domain you're in — the most dangerous state |
-| Safe-to-fail probes | Small experiments designed to be survivable if they fail |
-| Dispositional state | What a system is predisposed to do given current constraints |
+| Concept                         | Meaning                                                       |
+| ------------------------------- | ------------------------------------------------------------- |
+| Clear (formerly Obvious/Simple) | Best practice — sense, categorize, respond                    |
+| Complicated                     | Good practice — sense, analyze, respond (expert domain)       |
+| Complex                         | Emergent practice — probe, sense, respond                     |
+| Chaotic                         | Novel practice — act, sense, respond                          |
+| Confusion (the fold)            | Not knowing which domain you're in — the most dangerous state |
+| Safe-to-fail probes             | Small experiments designed to be survivable if they fail      |
+| Dispositional state             | What a system is predisposed to do given current constraints  |
 
 ## Trigger Keywords
 

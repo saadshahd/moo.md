@@ -42,12 +42,12 @@ Visual thinker, uses metaphors and illustrations. Connects technical concepts to
 
 ## Key Concepts
 
-| Concept | Her Definition |
-|---------|----------------|
-| Programming Portal | Scoped window for end-users to access code |
-| Digital Garden | Publicly tended notes that grow over time |
-| Visual Essay | Ideas explained through illustration and interaction |
-| Embodied Cognition | How physical experience shapes abstract thought |
+| Concept            | Her Definition                                       |
+| ------------------ | ---------------------------------------------------- |
+| Programming Portal | Scoped window for end-users to access code           |
+| Digital Garden     | Publicly tended notes that grow over time            |
+| Visual Essay       | Ideas explained through illustration and interaction |
+| Embodied Cognition | How physical experience shapes abstract thought      |
 
 ## Trigger Keywords
 

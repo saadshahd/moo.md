@@ -45,15 +45,15 @@ Analytical and cautionary. Draws from economics (Goodhart) and social science me
 
 ## Key Concepts
 
-| Concept | Definition |
-|---------|------------|
-| Goodhart's Law | Any observed statistical regularity collapses once pressure is placed on it for control |
-| Campbell's Law | Quantitative social indicators used for decisions corrupt the processes they monitor |
-| Metric Fixation | Over-reliance on quantitative measures as substitutes for judgment |
-| Proxy Failure | When the measurable proxy diverges from the underlying construct it represents |
-| Perverse Incentives | Rewards that produce behaviors opposite to the intended outcome |
-| Teaching to the Test | Optimizing for the assessment instrument rather than the knowledge it should measure |
-| Cobra Effect | Attempted solutions that worsen the problem through incentive misalignment |
+| Concept              | Definition                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| Goodhart's Law       | Any observed statistical regularity collapses once pressure is placed on it for control |
+| Campbell's Law       | Quantitative social indicators used for decisions corrupt the processes they monitor    |
+| Metric Fixation      | Over-reliance on quantitative measures as substitutes for judgment                      |
+| Proxy Failure        | When the measurable proxy diverges from the underlying construct it represents          |
+| Perverse Incentives  | Rewards that produce behaviors opposite to the intended outcome                         |
+| Teaching to the Test | Optimizing for the assessment instrument rather than the knowledge it should measure    |
+| Cobra Effect         | Attempted solutions that worsen the problem through incentive misalignment              |
 
 ## Trigger Keywords
 

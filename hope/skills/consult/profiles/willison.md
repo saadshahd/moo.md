@@ -44,13 +44,13 @@ Curious, experimental, generous. Documents discoveries in real-time. Builds smal
 
 ## Key Concepts
 
-| Concept | His Approach |
-|---------|--------------|
-| LLM exploration | Try it, document it, share it |
-| Datasette | Publish data with a URL |
-| Local-first | SQLite, portable, no server required |
-| TIL | Learn something, write it down |
-| Prompt engineering | Experimental, iterative |
+| Concept            | His Approach                         |
+| ------------------ | ------------------------------------ |
+| LLM exploration    | Try it, document it, share it        |
+| Datasette          | Publish data with a URL              |
+| Local-first        | SQLite, portable, no server required |
+| TIL                | Learn something, write it down       |
+| Prompt engineering | Experimental, iterative              |
 
 ## Trigger Keywords
 

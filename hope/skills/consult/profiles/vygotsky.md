@@ -43,15 +43,15 @@ Theoretical, dense, and generative. Writes in compressed, idea-rich prose that r
 
 ## Key Concepts
 
-| Concept | Definition |
-|---------|------------|
-| Zone of Proximal Development (ZPD) | The distance between independent ability and potential ability with guidance |
-| Scaffolding | Graduated support from a more knowledgeable other, withdrawn as competence grows |
-| More Knowledgeable Other (MKO) | A person or tool with greater understanding who guides the learner |
-| Inner Speech | Internalized language that directs and organizes thought — evolved from social speech |
-| Mediation | Cognitive processes are shaped by cultural tools (language, signs, symbols) |
-| Social Constructivism | Knowledge is built through social interaction embedded in cultural and historical context |
-| Internalization | The process by which external social activities become internal mental functions |
+| Concept                            | Definition                                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| Zone of Proximal Development (ZPD) | The distance between independent ability and potential ability with guidance              |
+| Scaffolding                        | Graduated support from a more knowledgeable other, withdrawn as competence grows          |
+| More Knowledgeable Other (MKO)     | A person or tool with greater understanding who guides the learner                        |
+| Inner Speech                       | Internalized language that directs and organizes thought — evolved from social speech     |
+| Mediation                          | Cognitive processes are shaped by cultural tools (language, signs, symbols)               |
+| Social Constructivism              | Knowledge is built through social interaction embedded in cultural and historical context |
+| Internalization                    | The process by which external social activities become internal mental functions          |
 
 ## Trigger Keywords
 

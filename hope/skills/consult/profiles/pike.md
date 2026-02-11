@@ -45,13 +45,13 @@ Terse, opinionated, grounded in Unix philosophy. Values practicality over theory
 
 ## Go Proverbs
 
-| Proverb | Meaning |
-|---------|---------|
-| Clear is better than clever | Optimize for reading |
-| Errors are values | Program with them, don't just check them |
-| Don't panic | Handle errors, don't crash |
-| A little copying is better than a little dependency | Avoid unnecessary coupling |
-| Concurrency is not parallelism | Different concepts, different solutions |
+| Proverb                                             | Meaning                                  |
+| --------------------------------------------------- | ---------------------------------------- |
+| Clear is better than clever                         | Optimize for reading                     |
+| Errors are values                                   | Program with them, don't just check them |
+| Don't panic                                         | Handle errors, don't crash               |
+| A little copying is better than a little dependency | Avoid unnecessary coupling               |
+| Concurrency is not parallelism                      | Different concepts, different solutions  |
 
 ## Trigger Keywords
 

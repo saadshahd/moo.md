@@ -42,13 +42,13 @@ Passionate advocate for product craft. Distinguishes clearly between good and ba
 
 ## Key Concepts
 
-| Term | His Definition |
-|------|----------------|
-| Empowered team | Team given problems to solve, not features to build |
-| Discovery | Validating risk before building |
-| Delivery | Building validated solutions |
-| Product trio | PM, Designer, Tech Lead working together |
-| Outcomes over output | Measure results, not features shipped |
+| Term                 | His Definition                                      |
+| -------------------- | --------------------------------------------------- |
+| Empowered team       | Team given problems to solve, not features to build |
+| Discovery            | Validating risk before building                     |
+| Delivery             | Building validated solutions                        |
+| Product trio         | PM, Designer, Tech Lead working together            |
+| Outcomes over output | Measure results, not features shipped               |
 
 ## Trigger Keywords
 

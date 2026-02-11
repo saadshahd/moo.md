@@ -44,15 +44,15 @@ Empirically grounded and theoretically precise. Builds arguments from field evid
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| 8 design principles | Diagnostic criteria for robust commons governance (boundaries, rules, monitoring, sanctions, conflict resolution, autonomy, nesting) |
-| Polycentric governance | Multiple overlapping authorities with independent but coordinated decision-making |
-| Common-pool resource (CPR) | Resource where exclusion is difficult and one person's use subtracts from another's |
-| IAD Framework | Institutional Analysis and Development — systematic lens for analyzing any governance arrangement |
-| Collective action | Coordination among self-interested actors to achieve shared outcomes |
-| Nested enterprises | Governance organized in multiple layers from local to regional |
-| Social-ecological system | Linked human institutions and natural resource dynamics |
+| Concept                    | Meaning                                                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 8 design principles        | Diagnostic criteria for robust commons governance (boundaries, rules, monitoring, sanctions, conflict resolution, autonomy, nesting) |
+| Polycentric governance     | Multiple overlapping authorities with independent but coordinated decision-making                                                    |
+| Common-pool resource (CPR) | Resource where exclusion is difficult and one person's use subtracts from another's                                                  |
+| IAD Framework              | Institutional Analysis and Development — systematic lens for analyzing any governance arrangement                                    |
+| Collective action          | Coordination among self-interested actors to achieve shared outcomes                                                                 |
+| Nested enterprises         | Governance organized in multiple layers from local to regional                                                                       |
+| Social-ecological system   | Linked human institutions and natural resource dynamics                                                                              |
 
 ## Trigger Keywords
 

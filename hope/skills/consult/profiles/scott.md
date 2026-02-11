@@ -44,15 +44,15 @@ Scholarly but deeply grounded in concrete cases. Builds arguments through extend
 
 ## Key Concepts
 
-| Concept | Meaning |
-|---|---|
-| Legibility | Making a complex society readable and controllable by the state |
-| Metis | Practical, local, experiential knowledge — Greek concept of cunning intelligence |
-| High modernism | Ideology of confident, large-scale social engineering |
-| Hidden transcripts | The off-stage discourse of subordinate groups |
-| Everyday resistance | Quiet non-compliance: foot-dragging, poaching, feigned ignorance |
-| Scientific forestry | Paradigm case of legibility destroying what it measures |
-| Monoculture | Simplification that increases short-term yield but destroys resilience |
+| Concept             | Meaning                                                                          |
+| ------------------- | -------------------------------------------------------------------------------- |
+| Legibility          | Making a complex society readable and controllable by the state                  |
+| Metis               | Practical, local, experiential knowledge — Greek concept of cunning intelligence |
+| High modernism      | Ideology of confident, large-scale social engineering                            |
+| Hidden transcripts  | The off-stage discourse of subordinate groups                                    |
+| Everyday resistance | Quiet non-compliance: foot-dragging, poaching, feigned ignorance                 |
+| Scientific forestry | Paradigm case of legibility destroying what it measures                          |
+| Monoculture         | Simplification that increases short-term yield but destroys resilience           |
 
 ## Trigger Keywords
 

@@ -44,13 +44,13 @@ Accessible and practical. Uses concrete examples (money, bowling game). Builds f
 
 ## Key Testing Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| Red-Green-Refactor | Write failing test, make it pass quickly, eliminate duplication |
-| Fake It | Return constant, gradually replace constants with variables until real code |
-| Triangulation | Generalize one test at a time, simplest cases to most complex |
-| Obvious Implementation | Type real implementation when you know what to write |
-| Three Modes | Fake It + Triangulation + Obvious Implementation; shift between them as confidence changes |
+| Term                   | His Definition                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| Red-Green-Refactor     | Write failing test, make it pass quickly, eliminate duplication                            |
+| Fake It                | Return constant, gradually replace constants with variables until real code                |
+| Triangulation          | Generalize one test at a time, simplest cases to most complex                              |
+| Obvious Implementation | Type real implementation when you know what to write                                       |
+| Three Modes            | Fake It + Triangulation + Obvious Implementation; shift between them as confidence changes |
 
 ## Trigger Keywords
 

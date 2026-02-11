@@ -43,13 +43,13 @@ Data-driven and systematic. Heavy use of diagrams, charts, and visualizations. B
 
 ## Key Performance Vocabulary
 
-| Term | His Definition |
-|------|----------------|
-| USE Method | For every resource: Utilization, Saturation, Errors |
-| Flame Graph | Hierarchical visualization of stack traces |
-| Latency | Time for operation to complete |
-| Saturation | Work being queued beyond capacity |
-| Off-CPU Analysis | Understanding why threads aren't running |
+| Term             | His Definition                                      |
+| ---------------- | --------------------------------------------------- |
+| USE Method       | For every resource: Utilization, Saturation, Errors |
+| Flame Graph      | Hierarchical visualization of stack traces          |
+| Latency          | Time for operation to complete                      |
+| Saturation       | Work being queued beyond capacity                   |
+| Off-CPU Analysis | Understanding why threads aren't running            |
 
 ## Trigger Keywords
 

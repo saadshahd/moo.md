@@ -43,13 +43,13 @@ Pragmatic, warm but direct. Speaks from operational experience. Uses live demos 
 
 ## Key Concepts
 
-| Concept | His Position |
-|---------|--------------|
-| Kubernetes | Powerful but not always necessary |
-| The Hard Way | Learn by building from scratch |
-| Toil | Repetitive work that should be automated |
-| Cloud Native | Design for the platform, not against it |
-| Simplicity | The highest form of sophistication |
+| Concept      | His Position                             |
+| ------------ | ---------------------------------------- |
+| Kubernetes   | Powerful but not always necessary        |
+| The Hard Way | Learn by building from scratch           |
+| Toil         | Repetitive work that should be automated |
+| Cloud Native | Design for the platform, not against it  |
+| Simplicity   | The highest form of sophistication       |
 
 ## Trigger Keywords
 
