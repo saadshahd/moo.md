@@ -31,12 +31,16 @@ Route by session type:
   STOP. Wait for criteria[]/mustNot[] output.
 - **Reflect:** skip to Stage 4.
 
-## Stage 4 — Expert Validation
+## Stage 4 — Expert Validation (optional)
+
+Shape already includes domain-expert consultation. This stage is an optional
+second-opinion review pass.
 
 Route by session type:
 
-- **Build / Debug / Plan:** run the consult skill now: Skill(skill="hope:consult", args="evaluate approach")
-  STOP. Wait for panel synthesis.
+- **Build / Debug / Plan:** ask the user if they want additional expert
+  validation. If yes: Skill(skill="hope:consult", args="review shaped approach against spec")
+  STOP. Wait for review findings.
 - **Reflect:** run the consult skill now: Skill(skill="hope:consult", args="reflect on intent brief")
   Present output. Pipeline complete.
 

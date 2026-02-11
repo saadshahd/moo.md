@@ -196,7 +196,6 @@ When compacting conversation history, always preserve:
 - Skills over 200 lines
 - Persistent state files (.jsonl, workflow-state.json)
 - Task management APIs in skills (TaskCreate/TaskList/TaskUpdate)
-- Hardcoded `Skill(skill="specific:name")` cross-references in skills
 - Building features Claude Code will ship natively (task management, memory, tool orchestration)
 - Cargo cult process steps (ritual without reason)
 - Skill behavior that contradicts `docs/statechart.md` (statechart is canonical)

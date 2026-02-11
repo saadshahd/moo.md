@@ -108,24 +108,17 @@ stateDiagram-v2
   [*] --> extract
 
   state "extract_intent\ngoal, constraints, scope" as extract
-  state "score_aspects\n5 aspects × 3 shapes" as score
-  state "expert_consultation\npanel on tradeoffs" as expert
-  state select_check <<choice>>
-  state "select_shape\nmajority column, risk override,\ndefault: Tool-Review" as select
-  state "output_shape\nshape + criteria[]\n+ mustNot[] + verification{}" as output
+  state "expert_consultation\ndomain panel on intent brief" as expert
+  state "synthesize\nfindings → mode + criteria + mustNot" as synthesize
+  state "output_shape\nshape + criteria[]\n+ mustNot[] + tensions" as output
 
-  extract --> score
-  score --> expert
-  expert --> select_check
-
-  select_check --> select : clear majority
-  select_check --> select : tied (default Tool-Review)
-
-  select --> output
+  extract --> expert
+  expert --> synthesize
+  synthesize --> output
   output --> [*]
 ```
 
-**Expert consult:** Invoke only when 2+ aspects disagree by 2+ columns or any aspect scores Colleague in Risk. Expert input informs selection — shape decides, experts advise. If expert insight changes aspect evaluation, re-score before selecting. Unanimous scoring → skip consultation.
+**Expert consult:** Default: invoke panel consultation after extract. Expert findings drive mode recommendation (Colleague / Tool-Review / Tool) with cited evidence. Safety valve: high-risk or irreversible findings → minimum Tool-Review. Default when uncertain: Tool-Review. Skip only for trivial tasks (single obvious change, clear precedent, no ambiguity, low risk, trivially reversible).
 
 **Engagement annotations:**
 
@@ -202,7 +195,7 @@ stateDiagram-v2
 stateDiagram-v2
   state "Invocation Sources" as sources {
     shape_complete : shape output locked (Build/Debug/Plan)
-    shape_step : shape step 3 (tradeoff panel)
+    shape_step : shape step 2 (domain consultation on intent brief)
     loop_stall : loop stall detect (auto-unblock)
     loop_review : loop expert review (thorough panel)
     user_cmd : /hope:summon or /hope:panel
@@ -394,7 +387,7 @@ Every cycle has a break condition:
 | intent clarify loop           | Max 3 rounds → "proceed anyway" with [ASSUMPTION] labels              |
 | consult unblock retry         | Max 3 → escalate to thorough review                                   |
 | loop wave execution           | Circuit breaker: max iterations / budget → pause. mustNot → hard stop |
-| shape tied scores             | Default Tool-Review                                                   |
+| shape uncertain mode          | Default Tool-Review                                                   |
 | soul audit → intent interrupt | Intent handles with its own max-round clarify loop                    |
 | loop → intent back-transition | Intent's clarify loop has its own escape                              |
 | bond adjust loop              | Max 3 revisions → proceed with current or cancel                      |
@@ -414,7 +407,7 @@ Every cycle has a break condition:
 | State Region                     | Primary Skill | Sub-States                                                                                                                                                                                                                |
 | -------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | user_need → clarifying           | intent        | acknowledge, clarify, score_spec, echo_check, refine, emit_brief                                                                                                                                                          |
-| clear_intent → session_execution | shape         | extract, score_aspects, expert_consultation, select_shape, output_shape                                                                                                                                                   |
+| clear_intent → session_execution | shape         | extract, expert_consultation, synthesize, output_shape                                                                                                                                                                    |
 | session_execution                | loop          | spec_scoring, shape_approval, decompose, wave_execution, stall_detection, expert_review, verify_gate, review_feedback, cancel, circuit_breaker, paused                                                                    |
 | (any stage)                      | consult       | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
 | (parallel, always)               | soul          | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer                                                                                                                                              |

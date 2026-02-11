@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- feat(hope): shape skill — expert-driven consultation replaces 5-aspect scoring matrix; domain experts analyze intent brief and recommend collaboration mode with cited evidence
+- refactor(hope): shape handoff — direct to loop (consultation happens within shape, no separate post-shape validation required)
+- refactor(hope): full.md Stage 4 — now optional review pass for Build/Debug/Plan (shape includes consultation)
+
+### Removed
+- refactor(hope): removed hardcoded Skill() cross-reference anti-pattern from CLAUDE.md (conflicts with established explicit Skill() call pattern)
+
 ---
 
 ## [hope@3.7.3] - 2026-02-11
