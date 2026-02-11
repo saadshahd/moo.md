@@ -39,6 +39,14 @@ not from scratch.
    item. Mark dependencies between items. If Disposable=yes from shape:
    keep items ≤3, expect to discard.
 
+   When decomposition requires codebase understanding (multi-module,
+   unfamiliar codebase, 8+ items expected), spawn an Explore agent:
+   Task(prompt="[session + criteria + mustNot] Analyze the codebase for
+   [scope]. Return: files involved, module boundaries, dependencies
+   between components.", subagent_type="Explore")
+   Use findings to inform item breakdown. For straightforward tasks,
+   decompose inline.
+
    Announce: `[LOOP] Starting | Shape: {shape} | Items: {N} | Feasible: {axis} — {bound}`
 
 3. **Execute in waves** — A wave = items with no unresolved dependencies.

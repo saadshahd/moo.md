@@ -68,8 +68,32 @@ parallelism.
 3. **Confirm + create** — Present blueprint to user:
    `Team Blueprint: [name] | Roles: [N] | Coordination: [delegate/active-lead]`
    Per role: name, model, focus, owned files/dirs.
-   User: Yes → emit creation spec → Claude creates with native team tools.
-   Adjust → revise. Cancel → suggest alternative.
+   User: Yes → create team and spawn agents:
+
+   TeamCreate(team_name="[name]", description="[objective from intent]")
+
+   Per role:
+   Task(team_name="[name]", name="[role-name]",
+     prompt="[SESSION marker + criteria[] + mustNot[] + ACCEPTANCE criteria]
+     Role: [name]. Focus: [description]. Owned files: [dirs].
+
+     Execute using loop mechanics:
+     1. Decompose your scope into atomic work items (one sentence each,
+        no 'and'). Every criteria[] maps to ≥1 item.
+     2. Execute in waves — reversible before irreversible.
+     3. Per wave: report Done/Carry/Stall. Carry items retry with
+        [VERIFY] FAIL: [reason]. Stall items → diagnose, revise.
+     4. Verify against ACCEPTANCE and STOP conditions.
+     5. mustNot violations are hard stops — surface immediately.
+
+     Retrieve facts with tools before asserting from memory.",
+     subagent_type="[model from design table]",
+     mode="[permission mode from design table]")
+
+   After creation, pipeline is complete — each member executes using
+   loop mechanics independently.
+
+   Adjust → revise blueprint. Cancel → suggest solo or subagent approach.
 
 ## Boundaries
 
@@ -78,6 +102,7 @@ designs after explicit approval — Claude creates with native tools.
 
 ## Handoff
 
-Bond is a service — it returns a team blueprint and creation spec. After
-team creation, teammates execute independently using native agent tools.
-Bond does not manage ongoing team coordination.
+Bond returns results to the calling phase:
+- Team verdict → creates team with full context. Pipeline complete.
+- Solo/Subagent verdict → returns recommendation. Caller proceeds to
+  loop for execution.

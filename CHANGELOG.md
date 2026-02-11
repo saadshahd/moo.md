@@ -11,6 +11,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.3] - 2026-02-11
+
+### Changed
+- refactor(hope): imperative framing across all 6 skills — STRATEGIZE/CLARIFY/SIMULATE/SHAPE/EXECUTE/COMPOSE replace "You are..." identity claims
+- refactor(hope): soul audit table with concrete checks (spec clear? approach shaped? facts retrieved?) replacing prose
+- refactor(hope): shape entry guard routes back to intent when ACCEPTANCE criteria missing
+- refactor(hope): shape citation quality requires observable evidence (file names, line counts), not adjectives
+- feat(hope): loop conditional decomposer agent — spawns Explore for multi-module/unfamiliar codebase analysis
+- feat(hope): bond creates team with full pipeline context after user approval, each member executes using loop mechanics
+- refactor(hope): full.md routes after bond — team path skips loop, solo path runs loop
+- refactor(hope): removed ensure-soul.sh per-turn hook
+
+---
+
 ## [hope@3.7.2] - 2026-02-10
 
 ### Changed

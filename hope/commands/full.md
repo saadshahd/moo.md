@@ -43,8 +43,9 @@ Route by session type:
 ## Stage 5 — Team Building
 
 - Run the bond skill now: Skill(skill="hope:bond")
+- If bond created a team → pipeline complete. Team executes independently.
 
-## Stage 6 — Execute
+## Stage 6 — Execute (solo path only)
 
 - **Build / Debug:** run the loop skill now: Skill(skill="hope:loop")
 - **Plan:** present shaped output + consult synthesis to user. Pipeline complete.
