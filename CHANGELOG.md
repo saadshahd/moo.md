@@ -19,6 +19,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.4] - 2026-02-11
+
+### Added
+- feat(hope): dedicated SubagentStart hook — compact soul primer + pipeline state extraction replaces full SKILL.md injection
+- feat(hope): PreToolUse deny-grep hook — blocks raw grep/rg Bash calls in favor of dedicated Grep tool
+- feat(hope): Stop hook — checks task completion before session end
+
+### Changed
+- refactor(hope): SubagentStart extracts [SESSION], OBJECTIVE, criteria[], mustNot[], ACCEPTANCE, STOP CONDITIONS from transcript instead of injecting full soul skill
+
+---
+
 ## [hope@3.7.3] - 2026-02-11
 
 ### Changed

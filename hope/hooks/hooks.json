@@ -17,7 +17,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/subagent-start.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/deny-grep.sh",
+            "timeout": 5
           }
         ]
       }
@@ -28,6 +40,16 @@
           {
             "type": "prompt",
             "prompt": "Extract and return as additionalContext the following from the conversation if present: (1) the [SESSION] marker line, (2) any intent brief sections (OBJECTIVE, NON-GOALS, ACCEPTANCE, STOP), (3) shape output (criteria[], mustNot[]), (4) current loop progress (wave number, completed items). Format as a compact summary. Input: $ARGUMENTS"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Check if all tasks are complete. If not, respond with {\"ok\": false, \"reason\": \"what remains to be done\"}."
           }
         ]
       }
