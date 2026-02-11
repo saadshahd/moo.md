@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # moo SessionStart hook: Injects full soul SKILL.md at session start.
-# UserPromptSubmit (ensure-soul.sh) provides per-turn lightweight reminders as fallback.
 
 set -euo pipefail
 

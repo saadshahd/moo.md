@@ -11,24 +11,13 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/ensure-soul.sh"
-          }
-        ]
-      }
-    ],
     "SubagentStart": [
       {
         "matcher": "",
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "Return as additionalContext: (1) [SESSION] marker (including Horizon + Feasible), (2) active criteria/mustNot constraints, (3) feasibility axis + bound, (4) compaction guidance — PRESERVE: work item status, criteria, horizon, feasibility, verification results; DISCARD (summarize, don't keep verbatim): long tool output, repeated file reads, install/build logs. (5) Retrieve before asserting — use available tools (read, grep, glob for local; WebSearch, WebFetch for current docs/versions/APIs) before claiming facts. Never assert library versions, API shapes, file structure, or current best practices from memory when retrieval tools can verify."
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh"
           }
         ]
       }
