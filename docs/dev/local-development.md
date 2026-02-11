@@ -60,6 +60,16 @@ Before pushing, test the marketplace install path to catch packaging issues:
 
 This copies files to `~/.claude/plugins/cache/` — the same path users experience.
 
+## Git Hooks
+
+Install the pre-push validation hook:
+
+```bash
+git config core.hooksPath .github/hooks
+```
+
+Validates: SKILL.md ≤ 200 lines, no `references/` dirs, frontmatter present, single-line descriptions.
+
 ## Known Issues
 
 **Stale plugin cache** ([anthropics/claude-code#17361](https://github.com/anthropics/claude-code/issues/17361)): After `/plugin update`, the cache may not refresh. Force it:

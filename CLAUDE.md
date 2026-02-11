@@ -8,17 +8,18 @@ moo — mind on output. Stay present with AI.
 
 ```
 moo.md/
-├── hope/                    # Single plugin: 7 skills, 8 commands, hooks
+├── hope/                    # Single plugin: 8 skills, 9 commands, hooks
 │   ├── skills/
 │   │   ├── soul/            # Session strategy + thinking framework
 │   │   ├── intent/          # Clarify WHAT
 │   │   ├── shape/           # Decide HOW (consult-driven)
 │   │   ├── loop/            # Execute + verify + complete
-│   │   ├── consult/         # Expert simulation (42 profiles)
+│   │   ├── consult/         # Expert simulation (74 profiles)
 │   │   ├── bond/            # Team composition (agent teams)
-│   │   └── forge/           # Persistent agent creation
-│   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, forge
-│   ├── hooks/               # UserPromptSubmit + SubagentStart + PreCompact
+│   │   ├── forge/           # Persistent agent creation
+│   │   └── search/          # Code search (sg/rg) reference
+│   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, forge, full
+│   ├── hooks/               # SessionStart + SubagentStart + PreToolUse + PreCompact
 │   └── scripts/             # Per-turn session strategy injector
 ├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs
@@ -68,9 +69,17 @@ Hooks use `async: true` only when intentional — async output arrives on the **
 | Hook | Sync/Async | Why |
 |------|-----------|-----|
 | SessionStart | **Sync** | Soul content must be available on turn 1 |
-| UserPromptSubmit | **Sync** | Pipeline routing must precede Claude's response |
 | SubagentStart | **Sync** (prompt) | Subagents need criteria before executing |
+| PreToolUse:Bash | **Sync** | Denies `grep` — enforces rg/sg usage |
+| PreToolUse:ExitPlanMode | **Sync** | Two-pass gate: coverage verification + pipeline completeness |
 | PreCompact | **Sync** (prompt) | Must extract state before compaction runs |
+
+**Project-level hooks** (in `.claude/settings.json`, not shipped with plugin):
+
+| Hook | Why |
+|------|-----|
+| PreToolUse:Write | Blocks writes to `references/` directories |
+| PostToolUse:Write/Edit | Warns when SKILL.md exceeds 200 lines |
 
 **Key learnings:**
 - `additionalContext` appears as `<system-reminder>` tags — visible to Claude, silent to user

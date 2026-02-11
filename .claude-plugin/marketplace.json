@@ -9,9 +9,9 @@
     {
       "name": "hope",
       "source": "./hope",
-      "description": "Clarify intent, shape approach, compose teams, execute with verification, consult experts. Session strategy with 6 skills.",
+      "description": "Clarify intent, shape approach, compose teams, execute with verification, consult experts. Session strategy with 8 skills.",
       "category": "core",
-      "keywords": ["intent", "shape", "loop", "consult", "bond", "session", "verification", "expert", "team"]
+      "keywords": ["intent", "shape", "loop", "consult", "bond", "forge", "search", "session", "verification", "expert", "team"]
     }
   ]
 }

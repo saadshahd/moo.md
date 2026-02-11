@@ -11,6 +11,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.10] - 2026-02-11
+
+### Fixed
+- fix(hope): CLAUDE.md stale facts — skill count (7→8), command count (8→9), profile count (42→74), hooks list (removed ghost UserPromptSubmit, added PreToolUse entries)
+
+### Added
+- chore: project-level PostToolUse:Write/Edit hook — warns when SKILL.md exceeds 200 lines (.claude/settings.json)
+- chore: project-level PreToolUse:Write hook — blocks writes to references/ directories (.claude/settings.json)
+- docs(dev): git hook setup instructions in local-development.md
+
+### Changed
+- chore: marketplace.json updated to reflect 8 skills with forge/search keywords
+- chore: removed Bash(cat) and Bash(find) from settings.local.json permissions — use Read/Glob instead
+
+---
+
 ## [hope@3.7.9] - 2026-02-11
 
 ### Changed
