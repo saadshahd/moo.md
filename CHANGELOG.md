@@ -11,6 +11,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.7] - 2026-02-11
+
+### Added
+- feat(hope): Lamport expert profile — formal specification, TLA+, distributed systems consensus
+- feat(hope): Kleppmann expert profile — data systems, CRDTs, distributed correctness, local-first
+- feat(hope): new "Distributed Systems / Formal Verification" domain row in consult routing
+
+---
+
 ## [hope@3.7.6] - 2026-02-11
 
 ### Removed

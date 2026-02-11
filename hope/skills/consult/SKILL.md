@@ -97,12 +97,13 @@ Productive disagreement over comfortable consensus.
 
 ## Domain Map
 
-72 curated profiles in `profiles/`. Detection routes by domain:
+74 curated profiles in `profiles/`. Detection routes by domain:
 
 | Domain                          | Profiles                                                                    |
 | ------------------------------- | --------------------------------------------------------------------------- |
 | React / Frontend / TS / JS      | abramov, osmani, perry, wathan, vergnaud, simpson                           |
 | Go / Systems                    | pike                                                                        |
+| Distributed Systems / Formal V. | lamport, kleppmann                                                          |
 | Python                          | hettinger                                                                   |
 | Performance / Profiling         | gregg, osmani                                                               |
 | Architecture / TDD / DDD        | fowler, martin, alexander, feathers, beck, freeman, evans, newman, vernon   |
@@ -114,7 +115,7 @@ Productive disagreement over comfortable consensus.
 | FP / Data / Simplicity          | hickey, milewski                                                            |
 | State Machines / XState         | khorshid                                                                    |
 | AI / LLMs                       | willison                                                                    |
-| Tools for Thought / Local-first | matuschak, appleton, victor, case, papert, kay, inkandswitch, brander, litt |
+| Tools for Thought / Local-first | matuschak, appleton, victor, case, papert, kay, inkandswitch, brander, litt, kleppmann |
 | Psychology / Cognitive Science  | kahneman, klein, fogg, norman                                               |
 | Systems Thinking / Complexity   | meadows, deming, snowden                                                    |
 | Strategy / Decision Theory      | boyd, goldratt, rumelt                                                      |
