@@ -9,6 +9,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@3.7.5] - 2026-02-11
+
+### Added
+- feat(hope): forge skill — interactive creation of persistent expert agents (.claude/agents/) with dynamic skill discovery
+- feat(hope): /hope:forge command
+
 ### Changed
 - feat(hope): shape skill — expert-driven consultation replaces 5-aspect scoring matrix; domain experts analyze intent brief and recommend collaboration mode with cited evidence
 - refactor(hope): shape handoff — direct to loop (consultation happens within shape, no separate post-shape validation required)

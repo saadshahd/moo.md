@@ -295,6 +295,39 @@ stateDiagram-v2
 
 ---
 
+## 6b. Forge Detail
+
+```mermaid
+stateDiagram-v2
+  state "Invocation Sources" as sources {
+    user_cmd : /hope:forge [role]
+    natural : "create an agent", "make a specialist"
+    bond_suggest : bond suggests persistent role
+  }
+
+  state "gather\nrole + purpose + domain\n5 questions, MCQ, ≤2 rounds" as gather
+  state "discover\nscan installed + marketplace skills\nrank by popularity, match to domain" as discover
+  state "review\nexpert panel critiques design\nBLOCKER / WARNING / SUGGESTION" as review
+  state resolve_check <<choice>>
+  state "confirm\nblueprint → user approval" as confirm
+  state "emit\ngenerate .claude/agents/<name>.md" as emit
+
+  sources --> gather
+  gather --> discover
+  discover --> review
+  review --> resolve_check
+  resolve_check --> review : BLOCKER (max 2 re-reviews)
+  resolve_check --> confirm : no blockers
+  confirm --> emit : Yes
+  confirm --> gather : Adjust
+  confirm --> [*] : Cancel
+  emit --> [*]
+```
+
+**Consult integration:** Review step invokes consult via natural language trigger. If consult unavailable, skip review with warning and proceed to confirm.
+
+---
+
 ## 7. Soul Detail
 
 ```mermaid
@@ -360,6 +393,7 @@ stateDiagram-v2
 | `/hope:unblock` | (no state change)        | Removes from blocklist                     |
 | `/hope:blocked` | (no state change)        | Read-only blocklist display                |
 | `/hope:bond`    | `bond.assess`            | Team composition, standalone or from shape |
+| `/hope:forge`   | `forge.gather`           | Persistent agent creation, standalone      |
 | `/hope:full`    | `soul.detect_type`       | Full pipeline orchestrator                 |
 
 ---
@@ -412,3 +446,4 @@ Every cycle has a break condition:
 | (any stage)                      | consult       | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
 | (parallel, always)               | soul          | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer                                                                                                                                              |
 | shape → loop (team path)         | bond          | assess, design, confirm_create                                                                                                                                                                                            |
+| (standalone entry point)         | forge         | gather, discover, review, confirm, emit                                                                                                                                                                                   |
