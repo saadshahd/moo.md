@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.7.8] - 2026-02-11
+
+### Added
+- feat(hope): PreToolUse ExitPlanMode gate — soft-advises when exiting plan mode without completing pipeline phases (intent/shape per session type)
+
+---
+
 ## [hope@3.7.7] - 2026-02-11
 
 ### Added
