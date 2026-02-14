@@ -10,10 +10,24 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- feat: Belief 5 — human cognitive energy as hidden bottleneck (generation/evaluation asymmetry)
+- feat: Principles "Hypothesis before artifact", "Probe before shipping" (from belief 5)
+- feat: Hard constraint 10 — "Default to less. Expand on request."
+- feat: Unstuck entry — "Understanding stuck"
 - feat: ROADMAP.md — project roadmap with maturity tracking (raw/explored/shaped)
 - chore: SessionStart hook surfaces pending roadmap item count (.claude/scripts/roadmap-surface.sh)
 - chore: PostToolUse hook validates ROADMAP.md line count and line length (.claude/scripts/roadmap-guard.sh)
 - chore: Stop hook nudges roadmap updates at session end (.claude/scripts/roadmap-stop.sh)
+
+### Changed
+- feat: "Signal over noise" principle — added output proportionality dimension
+- feat: "Retrieved over recalled" principle — added ATP conservation dimension (tools > human questions)
+- feat: Deepened Belief 1 with failure-as-knowledge dimension
+- feat: Added "Boundaries over aspirations" principle (from belief 1)
+- feat: Added "Co-located over separated" principle (cross-cutting)
+- feat: Added per-step completion markers to skill author constraints
+- feat: Updated unstuck strategy with failure context preservation
+- chore: Synced CLAUDE.md philosophy summary and compact instructions
 
 ---
 

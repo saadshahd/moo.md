@@ -116,6 +116,8 @@ tools: Read, Glob, Grep, Bash
 
 **WARNING:** Never use multi-line YAML blocks (`|` or `>`). Claude Code truncates them, breaking auto-triggering.
 
+**Performance posture:** Agents must declare speed or thoroughness. Ambiguity defaults to thoroughness.
+
 ### File Naming
 
 - Skills: `skills/<skill-name>/SKILL.md` (kebab-case)
@@ -166,6 +168,8 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 4. **Adapt to context** — Never force one workflow. Respect session type and engagement level.
 5. **Primer over tool** — moo instills thinking habits, not just processes. Context AND behavior persist.
 6. **Loose coupling** — Natural language triggers between skills. No hard imports. If a skill isn't installed, nothing breaks.
+7. **Boundaries over aspirations** — Define forbidden states before ideal states. Negative constraints survive ambiguity.
+8. **Co-located constraints** — Embed rules in the artifact that crosses the boundary. Separate context vanishes.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -193,13 +197,14 @@ When compacting conversation history, always preserve:
 - The `[SESSION] Type: X | Engagement: Y | Horizon: Z | Feasible: W` marker
 - Active criteria, mustNot constraints, horizon, and feasibility axis + bound from shape
 - Current loop progress (wave number, items completed)
+- Failed approaches and what they ruled out
 
 ## Anti-Patterns
 
 - Generic names (`*Manager`, `*Helper`, `*Utils`)
 - Reference chains or deep `references/` hierarchies
 - Time estimates instead of story points
-- Duplicating content across docs (link to single source)
+- Duplicating content across docs (link to single source) — **exception:** constraints that must survive compaction repeat at point of use
 - Windows paths or magic numbers in scripts
 - **Process details in skill descriptions** (causes Claude to skip flowcharts)
 - Inline examples longer than 5 lines

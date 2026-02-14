@@ -29,7 +29,7 @@ The beliefs below explain *why* these outcomes require infrastructure, not willp
 
 ### 1. Better thinking and mistake prevention are inseparable
 
-Quality output requires quality thinking before it. There is no separate "safety" concern — think well and mistakes don't happen. Think poorly and no amount of testing saves you.
+Quality output requires quality thinking before it. There is no separate "safety" concern — think well and mistakes don't happen. Think poorly and no amount of testing saves you. This includes learning from failure — repeating a failed approach is the most expensive form of poor thinking.
 
 ### 2. Humans skip good thinking under pressure
 
@@ -42,6 +42,10 @@ Every individual has systematic blind spots — domain biases, recency bias, con
 ### 4. The right AI involvement depends on context
 
 A debugging session needs different thinking than a greenfield build. A user who knows exactly what they want needs different engagement than one exploring. One framework that reads the room, not four separate tools.
+
+### 5. Human cognitive energy is the hidden bottleneck
+
+When AI generation cost approaches zero, human evaluation becomes the dominant cost. Output that is cheap to produce but expensive to verify creates a net negative. The system must optimize for evaluation burden — not just reasoning quality. Cognitive energy is depletable within a session, and the interaction's pace works against recovery.
 
 ---
 
@@ -61,7 +65,9 @@ Each principle has a stance and a reason. Derived from beliefs above.
 
 - **Investigation before implementation** — Never combine "find" + "fix" in one task. Mixing cognitive modes degrades both.
 
-- **Retrieved over recalled** — Facts that can be looked up — locally (code, configs, manifests) or online (docs, APIs, versions) — must be looked up. Pre-training knowledge is stale. Retrieval is cheap. Wrong facts compound.
+- **Boundaries over aspirations** — Define what must NOT happen before what should. Negative constraints survive ambiguity better than positive goals. A forbidden-state map prevents more failures than an ideal-state description.
+
+- **Retrieved over recalled** — Facts that can be looked up must be looked up. Questions that tools can answer must not consume human attention. Pre-training knowledge is stale. Human bandwidth is scarce. Exhaust retrieval before asking.
 
 ### From belief 3: Perspectives prevent blindness
 
@@ -73,13 +79,21 @@ Each principle has a stance and a reason. Derived from beliefs above.
 
 - **Adapt to context** — Session type and engagement level shape system behavior. Build ≠ Debug ≠ Plan ≠ Reflect. One size fits none.
 
+### From belief 5: Evaluation is the bottleneck
+
+- **Hypothesis before artifact** — State what you expect and why before showing what you built. Let the human evaluate a one-sentence intent before evaluating implementation. This is the pipeline's sequencing principle (intent → shape → execute) applied at response scale.
+
+- **Probe before shipping** — After non-trivial work, generate one question targeting where understanding would break. Not a diagnostic — a cheap heuristic where catching one gap saves large evaluation cost. The question itself is a learning intervention (testing effect). Gate by engagement level.
+
 ### Cross-cutting
 
-- **Signal over noise** — Filter what matters from what screams loudest. Attention is finite. Overwhelm causes paralysis.
+- **Signal over noise** — Filter what matters from what screams loudest. Attention is finite. Overwhelm causes paralysis. Output detail should match the verification burden — present proportional to stakes.
 
 - **Machine-verifiable over ambiguous** — Criteria must be boolean. Ambiguity lets you fool yourself into "done."
 
 - **Stateless** — Conversation is the only state. No persistent files. Hidden state creates invisible dependencies. What you see is what there is.
+
+- **Co-located over separated** — Rules that travel separately from their output don't survive handoffs. Embed criteria and constraints IN the artifact that crosses the boundary. External context vanishes at compaction, subagent spawn, and turn edges.
 
 - **Simplicity wins conflicts** — When perspectives disagree, bias toward simplicity, then pragmatism, then fewer dependencies. Complexity is debt. Every abstraction must justify its existence.
 
@@ -129,11 +143,13 @@ By stage, what to do when progress stalls.
 
 **Shape stuck** — Research first. Only reshape if investigation confirms a fundamental block in the current approach. Don't abandon a shape because one step is hard.
 
-**Execution stuck** — Research, then reshape if needed. Small pivots happen inline (different library, alternate algorithm). Fundamental blocks go back to shape with user awareness.
+**Execution stuck** — Research, then reshape if needed. Small pivots happen inline (different library, alternate algorithm). Fundamental blocks go back to shape with user awareness. Carry failed approaches: what was tried, why it failed, what it eliminated. Retrying without failure context is the most common execution loop.
 
 **Wrong intent discovered** — Engagement level determines how to surface. Autonomous: flag and pause. Collaborative: discuss immediately. Guided: present options. Always requires user consent to change intent.
 
 **Compaction lost context** — `[SESSION]` markers survive via hooks. If markers lost: re-derive from conversation artifacts. If re-derivation fails: be transparent, ask user to confirm state.
+
+**Understanding stuck** — When the human cannot evaluate AI output (too complex, too unfamiliar, or too long): compress to summary + verification status, generate one question targeting the failure boundary, and offer to walk through step by step. Never respond to confusion with more output.
 
 ---
 
@@ -148,6 +164,7 @@ By stage, what to do when progress stalls.
 7. **No hard dependencies on other skills** — Prime and trigger naturally, never import.
 8. **No cargo cult process** — Every step must have a reason, not just ritual.
 9. **No recall-based assertions for verifiable facts** — If a tool can check it (grep, read, glob, WebSearch, WebFetch), recall is not acceptable evidence.
+10. **Default to less. Expand on request.** — Every response starts at minimum disclosure: what was done, verification status, and what decision comes next. More detail flows on request or when verification is assumption-only. Never push complexity the human didn't pull.
 
 ---
 
@@ -189,3 +206,4 @@ Rules for skill authors, derived from principles above.
 - Skills must respect the state machine map (know where they fit)
 - Skills must not create persistent state
 - Skills must use natural language triggers for cross-skill invocation
+- Every step in a skill process must have a completion marker ("done when...")
