@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.8.1] - 2026-02-14
+
+### Changed
+- refactor(hope/consult): Restructure panel output from per-expert monologues to concern-oriented format — enforced via prohibitions, not template suggestions
+- refactor(hope/consult): Merge user-facing and pipeline-invoked panel modes into one unified format
+- refactor(hope/consult): Gate full expert positions behind explicit user request ("expand"/"detail") — progressive disclosure by default
+
 ## [hope@3.8.0] - 2026-02-14
 
 ### Added

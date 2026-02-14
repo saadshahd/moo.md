@@ -68,34 +68,34 @@ Productive disagreement over comfortable consensus.
    diagnostic experts. Consensus recommendation. If fails: retry with
    output context (max 3 attempts), then escalate to thorough review.
 
-   Output templates:
+   Output rules (all modes):
 
-   ```
-   Single:
-   **Applying [descriptor]** [tier: primary source]
-   [Response — dense: protect stance + evidence, sacrifice preamble]
-   → Try: [one action ≤15w] — verify: [observable result ≤10w]
+   1. NEVER organize output by expert. Organize by concern.
+   2. Word limits are hard — truncate, never overflow.
+   3. Expert attribution is parenthetical: "(per a [descriptor], [tier])".
 
-   Panel (user-facing — /hope:panel, direct invocation):
-   1. **Consensus** — 1 sentence: where experts agree
-   2. **Key tension** — 1 sentence: where they disagree and why it matters
-   3. **Detail on request** — full per-expert positions if user asks
-   Synthesis: one runnable test for this session
+   **Single** output:
+   - `**[descriptor]** [tier]:` 1-2 sentences. Position + evidence.
+   - `→ Try: [action ≤15w] — verify: [result ≤10w]`
 
-   Panel (pipeline-invoked — shape step 2, loop review):
-   **[Descriptor A]** [tier]: [position + reasoning ≤3 sentences]
-   **[Descriptor B]** [tier]: [position + reasoning ≤3 sentences]
-   Synthesis: consensus + dissent + one runnable test for this session
+   **Panel** output (user-facing AND pipeline — one format):
+   - Per concern (2-4 concerns max):
+     `**[concern label ≤5w]** — [finding ≤2 sentences, cite experts parenthetically]`
+   - `**Tension** — [where experts disagree ≤1 sentence, why it matters ≤1 sentence]`
+   - `→ Test: [one runnable verification for this session ≤15w]`
+   - NEVER emit per-expert paragraphs. Full positions only on explicit
+     user request ("detail", "expand", "show expert positions").
+   - Pipeline callers (shape, loop review): append severity per concern
+     (BLOCKER / WARNING / SUGGESTION) after the finding sentence.
 
-   Review:
-   **[Descriptor]** [tier]: [finding + severity + evidence ≤2 sentences]
-   Severity: BLOCKER / WARNING / SUGGESTION. BLOCKERs cannot be skipped.
+   **Review** output:
+   - Per finding: `**[concern ≤5w]** [BLOCKER/WARNING/SUGGESTION] — [finding + evidence ≤2 sentences] (per [descriptor], [tier])`
+   - BLOCKERs listed first. BLOCKERs cannot be skipped.
 
-   Unblock:
-   Stuck: [error ≤15w] | Tried: [failed approach ≤15w]
-   [Descriptor A] [tier]: [diagnosis ≤2 sentences]
-   Consensus: [action ≤20w] | Attempt: [N]/3
-   ```
+   **Unblock** output:
+   - `Stuck: [error ≤15w] | Tried: [failed ≤15w]`
+   - Per concern: `**[diagnosis ≤5w]** — [recommendation ≤2 sentences] (per [descriptor], [tier])`
+   - `→ Consensus: [action ≤20w] | Attempt [N]/3`
 
 4. **Close** — Emit `[EXTRACT] Key insight: [one reusable finding ≤15w]`.
    Footer: "This reflects documented patterns, not the expert's actual
