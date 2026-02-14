@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat: ROADMAP.md — project roadmap with maturity tracking (raw/explored/shaped)
+- chore: SessionStart hook surfaces pending roadmap item count (.claude/scripts/roadmap-surface.sh)
+- chore: PostToolUse hook validates ROADMAP.md line count and line length (.claude/scripts/roadmap-guard.sh)
+- chore: Stop hook nudges roadmap updates at session end (.claude/scripts/roadmap-stop.sh)
+
 ---
 
 ## [hope@3.7.11] - 2026-02-11
