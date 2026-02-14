@@ -57,21 +57,31 @@ not from scratch.
 
    Wave report:
    - `[WAVE {N}]` header, per item: `{done ≤10w} | Verify: {PASS/FAIL}`
+   - Risk-ordered: highest-impact item first.
    - Footer: `Done: {n} | Carry: {n} | Stall: {n}` — must equal total
    - `[LEARN] What this wave revealed: [one insight ≤15w]`
-   - Carry = verification weaker than execution output — retry next wave
-     with `[VERIFY] FAIL: [reason]` in prompt
+   - Carry = verification weaker than execution output — retry next wave.
+     Carry items include: what was tried, why it failed, what it eliminated.
+     Context travels WITH the retry prompt (co-located, not referenced).
    - Stall = no progress — diagnose from output, revise remaining items
 
 4. **Review** — When all items complete, get expert review against spec
    and mustNot constraints. Findings: BLOCKER (must fix) / WARNING /
    SUGGESTION. BLOCKERs create new work items, return to waves.
 
-5. **Verify + present** — Run thorough verification. Report with evidence:
-   `[VERIFY] {PASS/FAIL} | Type: execution output`
-   Per criterion: cite the command + output that proves it. Unverified
-   items listed with reason. Present top 3 decisions + verification
-   status. User: Adjust → re-enter | Done → complete.
+5. **Verify + present** — Run thorough verification. Final report structure:
+   - OUTCOME: 1 sentence — what changed + whether it works
+   - DECISIONS: 2-4 bullets, risk-ordered. Each states impact, not just
+     action. Fails: "Updated package.json." Passes: "Pinned lodash@4.17.21
+     — resolves CVE-2021-23337."
+   - EVIDENCE: per criterion, cite the command + output that proves it.
+     Unverified items listed with reason.
+   - DETAILS: grouped by concern (not edit order), available on request.
+
+   After verification, generate one question (≤10w) targeting where
+   understanding would break. Gate: Autonomous=skip, Collaborative/Guided=emit.
+
+   User: Adjust → re-enter | Done → complete.
 
 ### Circuit Breakers
 

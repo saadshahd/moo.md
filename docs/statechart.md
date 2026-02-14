@@ -120,6 +120,8 @@ stateDiagram-v2
 
 **Expert consult:** Default: invoke panel consultation after extract. Expert findings drive mode recommendation (Colleague / Tool-Review / Tool) with cited evidence. Safety valve: high-risk or irreversible findings → minimum Tool-Review. Default when uncertain: Tool-Review. Skip only for trivial tasks (single obvious change, clear precedent, no ambiguity, low risk, trivially reversible).
 
+**Pre-mortem gate:** After synthesize→output, when risk tier = Critical (13+ points OR irreversible OR auth/data/infra): emit `premortem:` alongside criteria[] and mustNot[]. Skipped for Trivial/Standard.
+
 **Engagement annotations:**
 
 - Autonomous: consult shapes, auto-selects
@@ -141,7 +143,7 @@ stateDiagram-v2
   state "stall_detection\nno progress on wave" as stall
   state "expert_review\nthorough panel vs spec + mustNot\nBLOCKER / WARNING / SUGGESTION" as expert_review
   state "verify_gate\nthorough tier → post-work gate" as verify_gate
-  state "review_feedback\njourney summary → questions\n→ feedback" as review_feedback
+  state "review_feedback\njourney summary → probe question\n→ feedback" as review_feedback
   state "cancel\nacknowledge + report progress\ncurrent wave completes first" as cancel
   state "circuit_breaker\nmax iterations or budget exceeded" as circuit_break
   state "paused\noffer: continue or stop" as paused
@@ -340,7 +342,7 @@ stateDiagram-v2
 
   state "detect_type\nBuild / Debug / Plan / Reflect" as detect_type
   state "ask_engagement\nAutonomous / Collaborative / Guided\n+ Horizon (Tactical / Strategic / Existential)\n(once per session)" as ask_engagement
-  state "silent_audit\n4-check gate: spec, fit, shape, verification" as audit
+  state "silent_audit\n5-check gate: spec, fit, shape, verification, user confused" as audit
   state "quality_footer\nverdict + verification + risk\n(proportional to decision type)" as footer
 
   state check_marker : check [SESSION] marker

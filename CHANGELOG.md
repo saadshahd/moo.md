@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@3.8.0] - 2026-02-14
+
 ### Added
 - feat: Belief 5 — human cognitive energy as hidden bottleneck (generation/evaluation asymmetry)
 - feat: Principles "Hypothesis before artifact", "Probe before shipping" (from belief 5)
@@ -18,6 +22,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - chore: SessionStart hook surfaces pending roadmap item count (.claude/scripts/roadmap-surface.sh)
 - chore: PostToolUse hook validates ROADMAP.md line count and line length (.claude/scripts/roadmap-guard.sh)
 - chore: Stop hook nudges roadmap updates at session end (.claude/scripts/roadmap-stop.sh)
+- feat(hope/intent): BLAST RADIUS field in work order brief — names what breaks if intent is wrong
+- feat(hope/soul): Communication Depth table — risk-adaptive output depth (Trivial/Standard/Critical)
+- feat(hope/soul): "User confused?" every-turn check — operationalizes Understanding stuck unstuck entry
+- feat(hope/shape): Pre-mortem gate after Synthesize — fires for Critical risk tier only
+- feat(hope/loop): Pyramid-structured final report (OUTCOME → DECISIONS → EVIDENCE → DETAILS)
+- feat(hope/loop): Probe before shipping — one question targeting understanding gaps
+- feat(hope/loop): Carry items now include what was tried, why it failed, what it eliminated
+- feat(hope/loop): Wave reports risk-ordered (highest-impact first)
+- feat(hope/consult): Progressive disclosure for user-facing panel (consensus → tension → detail on request)
+- docs: Statechart annotations for pre-mortem gate, probe question, user-confused check
 
 ### Changed
 - feat: "Signal over noise" principle — added output proportionality dimension

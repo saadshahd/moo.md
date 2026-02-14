@@ -61,6 +61,7 @@ with vague ones.
    - ACCEPTANCE (7-12 bullets, each ≤20 words, each testable by a
      stranger, ≥2 "must NOT" bullets)
    - STOP CONDITIONS (3-5 observable failure states, not process labels)
+   - BLAST RADIUS (1 sentence: what breaks if this is wrong)
 
    Self-audit (revise before presenting if any FAIL):
    - OBJECTIVE present → [pass/fail]
@@ -69,6 +70,7 @@ with vague ones.
    - ≥2 bullets say "must NOT" → [pass/fail]
    - STOP CONDITIONS has 3-5 → [pass/fail]
    - All bullets ≤20 words → [pass/fail]
+   - BLAST RADIUS present → [pass/fail]
 
 ## Boundaries
 

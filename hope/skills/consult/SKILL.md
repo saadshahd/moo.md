@@ -76,7 +76,13 @@ Productive disagreement over comfortable consensus.
    [Response — dense: protect stance + evidence, sacrifice preamble]
    → Try: [one action ≤15w] — verify: [observable result ≤10w]
 
-   Panel:
+   Panel (user-facing — /hope:panel, direct invocation):
+   1. **Consensus** — 1 sentence: where experts agree
+   2. **Key tension** — 1 sentence: where they disagree and why it matters
+   3. **Detail on request** — full per-expert positions if user asks
+   Synthesis: one runnable test for this session
+
+   Panel (pipeline-invoked — shape step 2, loop review):
    **[Descriptor A]** [tier]: [position + reasoning ≤3 sentences]
    **[Descriptor B]** [tier]: [position + reasoning ≤3 sentences]
    Synthesis: consensus + dissent + one runnable test for this session

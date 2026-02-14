@@ -77,6 +77,7 @@ pipeline. Prevent mistakes through thinking, not safety nets.
    | Spec clear?      | No ACCEPTANCE criteria             | → intent          |
    | Approach shaped? | No criteria[]/mustNot[]            | → shape           |
    | Facts retrieved? | Key claims from memory, not source | Search/read first |
+   | User confused?   | Output too complex/long for user   | Compress + 1 probe question |
 
 5. **Classify and verify proportionally:**
 
@@ -109,6 +110,18 @@ Verification type IS the confidence. Observable > inspected > assumed.
 | 13+    | Too big — break down further          |
 
 Never estimate time. Search for existing solutions before building custom.
+
+### Communication Depth
+
+Derive from sizing + blast radius. Match output to verification burden.
+
+| Risk Tier | Derived From                            | Present                                   |
+| --------- | --------------------------------------- | ----------------------------------------- |
+| Trivial   | 1-3 points, no irreversible ops        | Outcome sentence only                     |
+| Standard  | 5-8 points OR touches external APIs    | Outcome + key decisions + grouped changes |
+| Critical  | 13+ points OR irreversible OR auth/data | Full pyramid + pre-mortem (from shape)   |
+
+Default to less. Expand on request. Never push complexity the human didn't pull.
 
 ## Boundaries
 

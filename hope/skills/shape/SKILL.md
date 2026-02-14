@@ -74,6 +74,13 @@ The right approach, not a generic assessment.
      territory (high ambiguity + no precedent)
    - `→ Start: [first atomic action ≤15w that produces a visible artifact]`
 
+   **Pre-mortem gate** (Critical risk only — 13+ points OR irreversible
+   OR auth/data/infra, derived from BLAST RADIUS + expert findings):
+   "It's two weeks from now and this caused an incident. What's the
+   most likely cause?"
+   - Emit: `premortem: [1-2 sentences]` alongside criteria[] and mustNot[]
+   - Skip for Trivial/Standard tiers
+
    Feasibility filter (when active): eliminate approaches that violate
    the feasibility axis. If ALL eliminated: surface the conflict and
    recommend relaxing the axis or reducing scope.
