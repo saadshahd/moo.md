@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- docs: audit of hope plugin vs Claude Code native system prompts — maps overlaps, unique value, and redundancy
+
 ---
 
 ## [hope@3.7.11] - 2026-02-11
