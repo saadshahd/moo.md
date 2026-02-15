@@ -49,8 +49,9 @@
       {
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "Before ending: check if ROADMAP.md needs updates for ideas explored, decisions made, or items completed this session — max 100 lines, 120 chars/line. If no updates needed, proceed with stopping."
+            "type": "command",
+            "command": "bash .claude/scripts/roadmap-stop.sh",
+            "timeout": 5
           }
         ]
       }

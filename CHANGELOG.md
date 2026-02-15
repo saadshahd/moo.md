@@ -22,7 +22,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - fix: CLAUDE.md SubagentStart hook type corrected from "(prompt)" to "(command)"
 - fix: CLAUDE.md project-level hooks table — add SessionStart, PostToolUse (roadmap-guard), Stop
 - fix: CLAUDE.md remove stale `prompts/` directory from structure tree
-- fix: Stop hook converted from blocking command to prompt — was always blocking (read non-existent field), now soft nudge
+- fix: Stop hook — add comment clarifying block-once-then-allow pattern via `stop_hook_active`
 
 ---
 

@@ -81,7 +81,7 @@ Hooks use `async: true` only when intentional — async output arrives on the **
 | PreToolUse:Write | Blocks writes to `references/` directories |
 | PostToolUse:Write/Edit | Warns when SKILL.md exceeds 200 lines |
 | PostToolUse:Write/Edit | Validates ROADMAP.md line count and line length |
-| Stop (prompt) | Nudges roadmap updates at session end |
+| Stop | Nudges roadmap updates at session end (blocks once, allows on retry via `stop_hook_active`) |
 
 **Key learnings:**
 - `additionalContext` appears as `<system-reminder>` tags — visible to Claude, silent to user
