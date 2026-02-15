@@ -2,9 +2,6 @@
 
 ## Active
 
-- [ ] Strengthen SessionStart action directive for better auto-trigger reliability (audit H3)
-- [ ] Co-locate key guidance in loop/bond Task prompts since subagents lack skills (audit H2)
-
 ## Ideas
 
 ## Decisions
