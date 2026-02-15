@@ -1,5 +1,6 @@
 ---
 description: Assemble multiple experts for debate and consensus. Use for design decisions, architecture reviews, tradeoff discussions, spec clarification, stuck debugging, or code review.
+argument-hint: topic or question for expert panel debate
 ---
 
 # /hope:panel

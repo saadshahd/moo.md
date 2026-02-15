@@ -1,5 +1,6 @@
 ---
 description: Block a profile from all expert simulations.
+argument-hint: "profile name [--reason 'why']"
 ---
 
 # /hope:block

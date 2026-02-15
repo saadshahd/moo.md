@@ -1,6 +1,6 @@
 ---
 name: consult
-description: Use when asking "code like [expert]", "what would [expert] say", "idiomatic", "best practice", "panel", "debate", or needing domain guidance. Triggers on expert names, style requests, tradeoff questions, or "stuck on".
+description: Simulate expert reasoning from documented positions to your context. Use when asking "code like [expert]", "what would [expert] say", "panel", "debate", "best practice", "idiomatic", or "stuck on".
 model: opus
 ---
 

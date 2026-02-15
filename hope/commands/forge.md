@@ -1,5 +1,6 @@
 ---
 description: Create a persistent expert agent file. Designs role, skills, memory, and system prompt with expert review.
+argument-hint: recurring role or task for the new agent
 ---
 
 # /hope:forge

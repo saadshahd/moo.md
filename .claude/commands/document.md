@@ -1,5 +1,6 @@
 ---
 description: Update plugin documentation with quality workflow. Voice extraction, edit, polish, eval passes.
+argument-hint: documentation target or topic
 ---
 
 # Documentation Workflow

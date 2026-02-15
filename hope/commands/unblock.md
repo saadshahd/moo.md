@@ -1,5 +1,6 @@
 ---
 description: Remove a profile from expert blocklist.
+argument-hint: profile name to unblock
 ---
 
 # /hope:unblock

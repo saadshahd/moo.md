@@ -1,6 +1,6 @@
 ---
 name: soul
-description: Use when starting any task, thinking through confidence, verifying work, or asking "what could go wrong". Triggers on every non-trivial request, "how confident", "verify this", "think through".
+description: Session strategy for task detection and confidence verification. Use when starting tasks, asking "what could go wrong", "how confident", "verify this", "think through".
 model: opus
 ---
 
