@@ -1,8 +1,13 @@
 # Roadmap
 
 ## Active
+- [ ] Fix deny-grep.sh broken JSON — nested quotes kill jq output, hook is non-functional
+- [ ] Resolve [SESSION] marker format split — soul uses Pipeline:, statechart uses Type:
+- [ ] Add per-step completion markers to skills — PHILOSOPHY.md constraint unmet by all 7
 
 ## Ideas
+- [ ] Skip bond for Reflect in full.md — statechart says intent → consult → output
+- [ ] Clarify "max 3 supporting files" rule — does profiles/ (74 files) count as 1?
 
 ## Decisions
 - [x] Explore mode added to consult — 5th mode for generative discovery (2026-02-15)
@@ -10,6 +15,7 @@
 - [x] Loose coupling rule removed — explicit Skill() calls are correct (2026-02-15)
 - [x] Forge skill removed — unused, agent creation is native Claude Code (2026-02-15)
 - [x] Full plugin audit — 5 critical, 4 high, 6 medium findings documented (2026-02-15)
+- [x] Philosophy audit — 6 findings, 1 broken hook, 20 checks passed (2026-02-15)
 - [x] Plugin hooks for marketplace still broken (#12151, #16538) — no action possible (2026-02-15)
 - [x] Roadmap surfacing via hooks — SessionStart, PostToolUse guard, Stop nudge (2026-02-14)
 - [x] Stop hook: command over prompt — deterministic bash avoids haiku JSON failures (2026-02-14)
