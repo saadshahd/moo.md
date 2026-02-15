@@ -2,9 +2,23 @@
 
 ## Active
 
+- [ ] Add Explore mode to consult — generative brainstorming for intent-without-know-how (audit C1)
+- [ ] Fix loose coupling — replace hard Skill() calls in soul/intent/shape with natural language (audit C2)
+- [ ] Sizing-aware output scaling — intent/shape scale to 1-3/5-8/13+ points (audit C3)
+- [ ] Connect bond → forge — offer to persist recurring team roles as agents with memory (audit C4)
+- [ ] Fix stale refs — PHILOSOPHY.md, hope.md, statechart §8 (audit M1-M3)
+
 ## Ideas
 
+- [ ] Strengthen SessionStart action directive for better auto-trigger reliability (audit H3)
+- [ ] Co-locate key guidance in loop/bond Task prompts since subagents lack skills (audit H2)
+- [ ] Bond graceful degradation when Agent Teams experimental flag is off (audit M5)
+
 ## Decisions
+- [x] Full plugin audit — 5 critical, 4 high, 6 medium findings documented (2026-02-15)
+- [x] Enrich/probe flow → Explore mode in consult (not a new skill) (2026-02-15)
+- [x] Bond+forge connection feasible now; bond as team-member blocked by #24316 (2026-02-15)
+- [x] Plugin hooks for marketplace still broken (#12151, #16538) — no action possible (2026-02-15)
 - [x] Roadmap surfacing via hooks — SessionStart, PostToolUse guard, Stop nudge (2026-02-14)
 - [x] Stop hook: command over prompt — deterministic bash avoids haiku JSON failures (2026-02-14)
 - [x] PR #21 research distillation — 2 new principles, 1 belief deepening, no new beliefs (2026-02-14)
