@@ -46,10 +46,11 @@ shape the implementation approach for a settings page
 |-------|---------|
 | `hope:soul` | Session strategy + thinking framework (auto-applied) |
 | `hope:intent` | Clarify vague requests into iron-clad specs |
-| `hope:shape` | Bridge WHAT to HOW — select collaboration shape |
+| `hope:shape` | Bridge WHAT to HOW — expert-driven approach selection |
 | `hope:loop` | Autonomous iteration with wave-based execution |
-| `hope:consult` | Expert simulation — 42 curated profiles, panels, unblocking |
+| `hope:consult` | Expert simulation — 74 curated profiles, panels, unblocking |
 | `hope:bond` | Team composition — assess fitness, design roles, create teams |
+| `hope:search` | Pattern reference for ast-grep (sg) and ripgrep (rg) |
 
 ---
 
@@ -59,9 +60,9 @@ Soul auto-detects session type from your first message:
 
 | Type | When | Pipeline |
 |------|------|----------|
-| **Build** | "build", "implement", "create" | intent → shape → loop |
+| **Build** | "build", "implement", "create" | intent → consult explore → shape → bond → loop |
 | **Debug** | "fix", "bug", "error" | intent → shape → loop |
-| **Plan** | "plan", "design", "explore" | intent → shape → output |
+| **Plan** | "plan", "design", "explore" | intent → consult explore → shape → output |
 | **Reflect** | "postmortem", "review" | intent → consult → output |
 
 Then asks engagement level once:
