@@ -6,7 +6,7 @@
 
 ## Plugin Reference
 
-- [hope](plugins/hope.md) — clarify intent, shape approach, execute, consult experts
+- [hope](plugins/hope.md) — clarify intent, shape approach, execute, consult experts, compose teams
 
 ## Development
 

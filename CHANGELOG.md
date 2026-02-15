@@ -16,6 +16,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hope/intent): Sizing-aware brief — Trivial (3 bullets) / Standard (5-7) / Critical (full 7-12)
 - feat(hope/shape): Sizing-aware output — Trivial (criteria + start) / Standard (findings + mode) / Critical (full + pre-mortem)
 
+### Fixed
+- fix(docs): Update skill tables in README.md, hope.md, getting-started.md — add bond + search, fix profile count 42→74
+- fix(docs): Update pipeline in hope.md Session Strategy to reflect consult explore + bond stages
+- fix(docs): Update index.md hope description to mention team composition
+
 ### Changed
 - fix(hope/soul): description rewrite — WHAT+WHEN pattern, drop catch-all trigger
 - fix(hope/consult): description rewrite — lead with purpose ("Simulate expert reasoning")

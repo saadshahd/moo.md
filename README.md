@@ -43,9 +43,11 @@ Claude will:
 |-------|---------|
 | `hope:soul` | Session strategy + thinking framework (auto-applied) |
 | `hope:intent` | Clarify vague requests into iron-clad specs |
-| `hope:shape` | Bridge WHAT to HOW — select collaboration shape |
+| `hope:shape` | Bridge WHAT to HOW — expert-driven approach selection |
 | `hope:loop` | Autonomous iteration with wave-based execution |
-| `hope:consult` | Expert simulation — 42 curated profiles |
+| `hope:consult` | Expert simulation — 74 curated profiles, panels, unblocking |
+| `hope:bond` | Team composition — assess fitness, design roles, create teams |
+| `hope:search` | Pattern reference for ast-grep (sg) and ripgrep (rg) |
 
 > [Documentation](docs/) · [Issues](https://github.com/saadshahd/moo.md/issues)
 

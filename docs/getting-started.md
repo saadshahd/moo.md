@@ -24,4 +24,4 @@ The `hope:soul` skill audits every response and manages session strategy. You do
 
 ## Next
 
-- [hope](plugins/hope.md) — 5 skills: soul, intent, shape, loop, consult
+- [hope](plugins/hope.md) — 7 skills: soul, intent, shape, loop, consult, bond, search
