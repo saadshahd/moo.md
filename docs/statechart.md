@@ -25,9 +25,11 @@ stateDiagram-v2
   route --> intent : all session types
   route --> shape : obvious (spec ≥ 8)
 
-  intent --> shape : Build / Debug / Plan (spec ≥ 5)
+  intent --> shape : Build / Debug / Plan (spec ≥ 5, approach known)
   intent --> consult : Reflect (spec ≥ 5)
+  intent --> consult : Build / Debug / Plan (spec ≥ 5, approach unknown → explore)
 
+  consult --> shape : explore mode (user picks path)
   shape --> consult : Build / Debug / Plan (validate approach)
   consult --> loop : Build / Debug
   consult --> completed : Plan / Reflect (output delivered)
@@ -196,7 +198,7 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
   state "Invocation Sources" as sources {
-    shape_complete : shape output locked (Build/Debug/Plan)
+    soul_explore : soul routes (approach unknown → explore)
     shape_step : shape step 2 (domain consultation on intent brief)
     loop_stall : loop stall detect (auto-unblock)
     loop_review : loop expert review (thorough panel)
@@ -243,6 +245,17 @@ stateDiagram-v2
     state "review_findings\nvs spec + mustNot\nBLOCKER / WARNING / SUGGESTION" as review_findings
   }
 
+  state "Explore Mode" as explore {
+    explore_select --> brainstorm
+    brainstorm --> shortlist
+    shortlist --> user_pick
+
+    state "explore_select\n3–4 cross-domain experts" as explore_select
+    state "brainstorm\neach proposes distinct approach" as brainstorm
+    state "shortlist\n2–4 viable paths + blind spots" as shortlist
+    state "user_pick\nuser selects path → shape" as user_pick
+  }
+
   state "Unblock Mode" as unblock {
     parse_blocker --> diagnose
     diagnose --> recommend
@@ -258,10 +271,11 @@ stateDiagram-v2
 
   mode_check --> detect_expert : single
   mode_check --> panel_route : panel / debate / review
+  mode_check --> explore_select : explore / brainstorm
   mode_check --> parse_blocker : unblock / stuck
 ```
 
-Consult may also be invoked by any skill via natural language triggers ("what would an expert say", "expert input needed"). The 4 sources above are the primary structured invocation paths.
+Consult may also be invoked by any skill via `Skill(skill="hope:consult", ...)`. The 5 modes cover the full spectrum from single-expert queries to generative discovery.
 
 ---
 
@@ -294,39 +308,6 @@ stateDiagram-v2
 ```
 
 **Session-aware decomposition:** Tactical → maximize parallel. Strategic → phase by dependency chain. Existential → foundation layers first.
-
----
-
-## 6b. Forge Detail
-
-```mermaid
-stateDiagram-v2
-  state "Invocation Sources" as sources {
-    user_cmd : /hope:forge [role]
-    natural : "create an agent", "make a specialist"
-    bond_suggest : bond suggests persistent role
-  }
-
-  state "gather\nrole + purpose + domain\n5 questions, MCQ, ≤2 rounds" as gather
-  state "discover\nscan installed + marketplace skills\nrank by popularity, match to domain" as discover
-  state "review\nexpert panel critiques design\nBLOCKER / WARNING / SUGGESTION" as review
-  state resolve_check <<choice>>
-  state "confirm\nblueprint → user approval" as confirm
-  state "emit\ngenerate .claude/agents/<name>.md" as emit
-
-  sources --> gather
-  gather --> discover
-  discover --> review
-  review --> resolve_check
-  resolve_check --> review : BLOCKER (max 2 re-reviews)
-  resolve_check --> confirm : no blockers
-  confirm --> emit : Yes
-  confirm --> gather : Adjust
-  confirm --> [*] : Cancel
-  emit --> [*]
-```
-
-**Consult integration:** Review step invokes consult via natural language trigger. If consult unavailable, skip review with warning and proceed to confirm.
 
 ---
 
@@ -396,7 +377,6 @@ stateDiagram-v2
 | `/hope:unblock` | (no state change)        | Removes from blocklist                     |
 | `/hope:blocked` | (no state change)        | Read-only blocklist display                |
 | `/hope:bond`    | `bond.assess`            | Team composition, standalone or from shape |
-| `/hope:forge`   | `forge.gather`           | Persistent agent creation, standalone      |
 | `/hope:full`    | `soul.detect_type`       | Full pipeline orchestrator                 |
 
 ---
@@ -446,7 +426,6 @@ Every cycle has a break condition:
 | user_need → clarifying           | intent        | acknowledge, clarify, score_spec, echo_check, refine, emit_brief                                                                                                                                                          |
 | clear_intent → session_execution | shape         | extract, expert_consultation, synthesize, output_shape                                                                                                                                                                    |
 | session_execution                | loop          | spec_scoring, shape_approval, decompose, wave_execution, stall_detection, expert_review, verify_gate, review_feedback, cancel, circuit_breaker, paused                                                                    |
-| (any stage)                      | consult       | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
+| (any stage)                      | consult       | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — explore: explore_select, brainstorm, shortlist, user_pick — unblock: parse_blocker, diagnose, recommend, escalate |
 | (parallel, always)               | soul          | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer                                                                                                                                              |
 | shape → loop (team path)         | bond          | assess, design, confirm_create                                                                                                                                                                                            |
-| (standalone entry point)         | forge         | gather, discover, review, confirm, emit                                                                                                                                                                                   |

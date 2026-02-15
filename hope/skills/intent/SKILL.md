@@ -54,23 +54,16 @@ with vague ones.
    #1 must-include + hardest constraint. User responds YES to lock,
    or EDITS to revise.
 
-4. **Emit brief** — Produce the locked work order:
-   - OBJECTIVE (1 sentence)
-   - NON-GOALS (3-5 things a reasonable person WOULD attempt)
-   - CONSTRAINTS (what must not change)
-   - ACCEPTANCE (7-12 bullets, each ≤20 words, each testable by a
-     stranger, ≥2 "must NOT" bullets)
-   - STOP CONDITIONS (3-5 observable failure states, not process labels)
-   - BLAST RADIUS (1 sentence: what breaks if this is wrong)
+4. **Emit brief** — Size the task first, then produce scaled output:
 
-   Self-audit (revise before presenting if any FAIL):
-   - OBJECTIVE present → [pass/fail]
-   - NON-GOALS has 3-5 bullets → [pass/fail]
-   - ACCEPTANCE has 7-12 bullets → [pass/fail]
-   - ≥2 bullets say "must NOT" → [pass/fail]
-   - STOP CONDITIONS has 3-5 → [pass/fail]
-   - All bullets ≤20 words → [pass/fail]
-   - BLAST RADIUS present → [pass/fail]
+   | Sizing    | Points | Brief format                                        |
+   | --------- | ------ | --------------------------------------------------- |
+   | Trivial   | 1-3    | OBJECTIVE + 3 ACCEPTANCE bullets (≥1 "must NOT")    |
+   | Standard  | 5-8    | OBJECTIVE + NON-GOALS (2-3) + ACCEPTANCE (5-7, ≥1 "must NOT") + STOP (2-3) |
+   | Critical  | 13+    | Full: OBJECTIVE + NON-GOALS (3-5) + CONSTRAINTS + ACCEPTANCE (7-12, ≥2 "must NOT") + STOP (3-5) + BLAST RADIUS |
+
+   Every ACCEPTANCE bullet: ≤20 words, testable by a stranger.
+   Default to Trivial when uncertain. Expand on request.
 
 ## Boundaries
 

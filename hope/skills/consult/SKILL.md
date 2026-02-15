@@ -1,6 +1,6 @@
 ---
 name: consult
-description: Simulate expert reasoning from documented positions to your context. Use when asking "code like [expert]", "what would [expert] say", "panel", "debate", "best practice", "idiomatic", or "stuck on".
+description: Simulate expert reasoning from documented positions to your context. Use when asking "code like [expert]", "what would [expert] say", "panel", "debate", "explore options", "brainstorm", "what if", "best practice", "idiomatic", "stuck on", or when user has intent but not know-how.
 model: opus
 ---
 
@@ -36,6 +36,7 @@ Productive disagreement over comfortable consensus.
    | ------------------------------------------ | ------------------------------------------- |
    | Named expert, keyword match, file context  | Single Expert                               |
    | "Panel", "debate", tradeoffs, multi-domain | Panel (default: 2 experts, expandable to 4) |
+   | "Explore", "brainstorm", "what if", "options", intent clear but approach unknown | Explore |
    | "Thorough review", "review against spec"   | Review                                      |
    | "Stuck on", loop stall, repeated failure   | Unblock                                     |
 
@@ -64,6 +65,12 @@ Productive disagreement over comfortable consensus.
    - mustNot constraints. Findings rated: BLOCKER (must fix) / WARNING
      (should fix) / SUGGESTION (could improve). BLOCKERs cannot be skipped.
 
+   **Explore** — User has clear intent but doesn't know HOW. Select 3-4
+   experts from different domains. Each proposes a distinct approach from
+   documented patterns. Surface: what the user doesn't know they don't
+   know. Produce a shortlist of viable paths (2-4), not a recommendation.
+   User picks a path → hand off to shape for evaluation.
+
    **Unblock** — Parse blocker (task + error + failed approach). 2-3
    diagnostic experts. Consensus recommendation. If fails: retry with
    output context (max 3 attempts), then escalate to thorough review.
@@ -91,6 +98,12 @@ Productive disagreement over comfortable consensus.
    **Review** output:
    - Per finding: `**[concern ≤5w]** [BLOCKER/WARNING/SUGGESTION] — [finding + evidence ≤2 sentences] (per [descriptor], [tier])`
    - BLOCKERs listed first. BLOCKERs cannot be skipped.
+
+   **Explore** output:
+   - `**You may not know:** [1-2 blind spots the user likely hasn't considered ≤2 sentences]`
+   - Per path (2-4 paths max):
+     `**[path label ≤5w]** — [what + why ≤2 sentences] (per [descriptor], [tier])`
+   - `→ Pick a path to shape, or ask to explore further.`
 
    **Unblock** output:
    - `Stuck: [error ≤15w] | Tried: [failed ≤15w]`

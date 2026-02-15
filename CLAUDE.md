@@ -8,7 +8,7 @@ moo — mind on output. Stay present with AI.
 
 ```
 moo.md/
-├── hope/                    # Single plugin: 8 skills, 9 commands, hooks
+├── hope/                    # Single plugin: 7 skills, 8 commands, hooks
 │   ├── skills/
 │   │   ├── soul/            # Session strategy + thinking framework
 │   │   ├── intent/          # Clarify WHAT
@@ -16,9 +16,8 @@ moo.md/
 │   │   ├── loop/            # Execute + verify + complete
 │   │   ├── consult/         # Expert simulation (74 profiles)
 │   │   ├── bond/            # Team composition (agent teams)
-│   │   ├── forge/           # Persistent agent creation
 │   │   └── search/          # Code search (sg/rg) reference
-│   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, forge, full
+│   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, full
 │   ├── hooks/               # SessionStart + SubagentStart + PreToolUse + PreCompact
 │   └── scripts/             # Per-turn session strategy injector
 ├── docs/                    # User docs
@@ -39,8 +38,7 @@ Plugin discovery uses `.claude-plugin/marketplace.json` at repo root.
 ## Skill Pipeline
 
 ```
-intent (clarify WHAT) → shape (decide HOW) → bond (compose WHO) → loop (execute + verify) → consult (expert guidance)
-                                               forge (create AGENT) ─┘
+intent (clarify WHAT) → consult explore (discover HOW) → shape (decide HOW) → bond (compose WHO) → loop (execute + verify) → consult (expert guidance)
 ```
 
 Session strategy (in soul) auto-detects type (Build/Debug/Plan/Reflect) and asks engagement level (Autonomous/Collaborative/Guided). The `[SESSION]` marker persists through compaction.
@@ -180,9 +178,8 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 3. **Perspectives prevent blindness** — Solo thinking has systematic blind spots. Seek multiple expert lenses.
 4. **Adapt to context** — Never force one workflow. Respect session type and engagement level.
 5. **Primer over tool** — moo instills thinking habits, not just processes. Context AND behavior persist.
-6. **Loose coupling** — Natural language triggers between skills. No hard imports. If a skill isn't installed, nothing breaks.
-7. **Boundaries over aspirations** — Define forbidden states before ideal states. Negative constraints survive ambiguity.
-8. **Co-located constraints** — Embed rules in the artifact that crosses the boundary. Separate context vanishes.
+6. **Boundaries over aspirations** — Define forbidden states before ideal states. Negative constraints survive ambiguity.
+7. **Co-located constraints** — Embed rules in the artifact that crosses the boundary. Separate context vanishes.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -192,8 +189,6 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 - [ ] Could an existing skill/framework handle this? → Proven over invented
 - [ ] Does this encode something humans forget, or duplicate what they'd remember? → Automatic over remembered
 - [ ] Was this investigated before implemented? → Never combine find + fix
-- [ ] Does this hardcode references to specific skills? → Natural language triggers only
-- [ ] Does this create coupling that breaks if a skill is missing? → Loose coupling required
 - [ ] Does this build something Claude will do natively? → Don't compete with the platform
 - [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts)? → Every mechanism must trace to an outcome
 - [ ] Does this assert verifiable facts from memory? → Retrieved over recalled

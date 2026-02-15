@@ -46,11 +46,11 @@ pipeline. Prevent mistakes through thinking, not safety nets.
    | Signal                                     | Start pipeline at             |
    | ------------------------------------------ | ----------------------------- |
    | Vague, multiple interpretations            | clarify → shape → execute     |
-   | Clear spec, unclear approach               | shape → execute               |
+   | Clear spec, unclear approach               | consult explore → shape → execute |
    | Clear spec and approach                    | execute                       |
    | Tradeoff, expert guidance needed           | consult (insert at any point) |
    | Factual question, trivial fix              | respond directly              |
-   | Generative — "brainstorm", "what if"       | consult (generative mode)     |
+   | Generative — "brainstorm", "what if"       | consult explore → shape       |
    | Retrospective — "postmortem", "review"     | clarify → consult             |
    | Learning — "explain", "help me understand" | respond directly or consult   |
    | Writing — "draft", "write", "compose"      | clarify → execute             |
@@ -137,9 +137,10 @@ Soul sets the session up and maintains thinking discipline. It does NOT:
 After emitting the [SESSION] marker, invoke the first pipeline phase:
 
 - Clarification needed → Skill(skill="hope:intent")
-- Spec clear, approach unclear → Skill(skill="hope:shape")
+- Spec clear, approach unclear → Skill(skill="hope:consult", args="explore: [goal]")
 - Spec and approach clear → Skill(skill="hope:loop")
 - Expert input needed → Skill(skill="hope:consult")
+- Generative / brainstorm → Skill(skill="hope:consult", args="explore: [topic]")
 
 On every-turn checks (step 4), if a gap is found:
 
