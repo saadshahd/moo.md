@@ -12,6 +12,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(hope): argument-hint frontmatter on all 10 commands that accept arguments — autocomplete discoverability
 - chore: CLAUDE.md command frontmatter convention with argument-hint documentation
+- docs(hope): Full plugin audit — 5 critical, 4 high, 6 medium findings (docs/audits/001-plugin-flows.md)
 
 ### Changed
 - fix(hope/soul): description rewrite — WHAT+WHEN pattern, drop catch-all trigger
