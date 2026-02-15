@@ -21,7 +21,6 @@ moo.md/
 │   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, forge, full
 │   ├── hooks/               # SessionStart + SubagentStart + PreToolUse + PreCompact
 │   └── scripts/             # Per-turn session strategy injector
-├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs
 └── .github/hooks/           # Git hooks (pre-push validates skills)
 ```
@@ -69,7 +68,7 @@ Hooks use `async: true` only when intentional — async output arrives on the **
 | Hook | Sync/Async | Why |
 |------|-----------|-----|
 | SessionStart | **Sync** | Soul content must be available on turn 1 |
-| SubagentStart | **Sync** (prompt) | Subagents need criteria before executing |
+| SubagentStart | **Sync** (command) | Subagents need criteria before executing |
 | PreToolUse:Bash | **Sync** | Denies `grep` — enforces rg/sg usage |
 | PreToolUse:ExitPlanMode | **Sync** | Sequential deny chain: pipeline artifacts → coverage verification, max 3 denials |
 | PreCompact | **Sync** (prompt) | Must extract state before compaction runs |
@@ -78,8 +77,11 @@ Hooks use `async: true` only when intentional — async output arrives on the **
 
 | Hook | Why |
 |------|-----|
+| SessionStart | Surfaces pending roadmap item count |
 | PreToolUse:Write | Blocks writes to `references/` directories |
 | PostToolUse:Write/Edit | Warns when SKILL.md exceeds 200 lines |
+| PostToolUse:Write/Edit | Validates ROADMAP.md line count and line length |
+| Stop | Nudges roadmap updates at session end (blocks once, allows on retry via `stop_hook_active`) |
 
 **Key learnings:**
 - `additionalContext` appears as `<system-reminder>` tags — visible to Claude, silent to user
@@ -97,19 +99,30 @@ Hooks use `async: true` only when intentional — async output arrives on the **
 ```yaml
 ---
 name: kebab-case-name
-description: Single line. Trigger condition + what it does. Max 1024 chars.
+description: Single line. WHAT (purpose) + WHEN (triggers). Max 1024 chars.
 ---
 ```
 
 > **Note:** Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
 
-**DESCRIPTION TRAP WARNING:** Skill descriptions must be **trigger-only**. If descriptions contain process summaries or workflow steps, Claude follows the short description instead of reading the detailed flowchart/instructions. Keep descriptions focused on "Use when X" patterns only.
+**DESCRIPTION PATTERN:** Descriptions must contain **WHAT** (purpose statement) + **WHEN** (trigger conditions). Lead with purpose, follow with triggers. A purpose statement ("Session strategy for X") is a trigger. A process summary ("First detect type, then set engagement, then emit marker") is the trap. Never summarize workflow steps in descriptions — Claude follows the short description instead of reading the detailed SKILL.md instructions.
+
+**Commands:**
+
+```yaml
+---
+description: Single line. WHAT + WHEN. Max 1024 chars.
+argument-hint: what to type after the command name
+---
+```
+
+`argument-hint` appears in autocomplete when users type `/hope:`. It tells them what argument to provide. Omit for commands that take no arguments.
 
 **Agents:**
 
 ```yaml
 ---
-description: Single line. What it does and when to use it.
+description: Single line. WHAT + WHEN.
 tools: Read, Glob, Grep, Bash
 ---
 ```

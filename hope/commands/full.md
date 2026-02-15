@@ -1,5 +1,6 @@
 ---
 description: Run the complete hope pipeline — session setup, intent clarification, shape selection, expert validation, and execution in strict sequence
+argument-hint: task or goal for the full pipeline
 ---
 
 # /hope:full

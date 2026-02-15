@@ -9,6 +9,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat(hope): argument-hint frontmatter on all 10 commands that accept arguments — autocomplete discoverability
+- chore: CLAUDE.md command frontmatter convention with argument-hint documentation
+
+### Changed
+- fix(hope/soul): description rewrite — WHAT+WHEN pattern, drop catch-all trigger
+- fix(hope/consult): description rewrite — lead with purpose ("Simulate expert reasoning")
+- fix(hope/search): description rewrite — lead with purpose ("Pattern reference")
+- fix(hope/loop): description rewrite — lead with purpose ("Execute work in verified waves")
+- fix: CLAUDE.md description trap warning rewritten to WHAT+WHEN pattern (per Anthropic guide)
+- fix: CLAUDE.md SubagentStart hook type corrected from "(prompt)" to "(command)"
+- fix: CLAUDE.md project-level hooks table — add SessionStart, PostToolUse (roadmap-guard), Stop
+- fix: CLAUDE.md remove stale `prompts/` directory from structure tree
+- fix: Stop hook — add comment clarifying block-once-then-allow pattern via `stop_hook_active`
+
 ---
 
 ## [hope@3.8.1] - 2026-02-14
@@ -17,6 +32,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - refactor(hope/consult): Restructure panel output from per-expert monologues to concern-oriented format — enforced via prohibitions, not template suggestions
 - refactor(hope/consult): Merge user-facing and pipeline-invoked panel modes into one unified format
 - refactor(hope/consult): Gate full expert positions behind explicit user request ("expand"/"detail") — progressive disclosure by default
+
+---
 
 ## [hope@3.8.0] - 2026-02-14
 

@@ -1,5 +1,6 @@
 ---
 description: Generate command/skill/agent files for moo ecosystem. Applies /prompt techniques automatically.
+argument-hint: "[command|skill|agent] description"
 ---
 
 # /generate

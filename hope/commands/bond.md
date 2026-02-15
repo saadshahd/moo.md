@@ -1,5 +1,6 @@
 ---
 description: Design and create an agent team for your task. Assesses fitness, recommends structure, creates team after approval.
+argument-hint: task description for team design
 ---
 
 # /hope:bond

@@ -1,6 +1,6 @@
 ---
 name: loop
-description: Start autonomous iteration loop. Triggers on "loop", "keep going", "continue until done", "implement feature", "fix all", "loop status", "cancel loop".
+description: Execute work in verified waves against locked criteria. Triggers on "loop", "keep going", "continue until done", "implement feature", "fix all", "loop status", "cancel loop".
 model: opus
 ---
 

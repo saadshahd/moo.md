@@ -1,5 +1,6 @@
 ---
 description: Explicitly invoke a single expert for guidance. Use when you want a specific perspective on code, architecture, or design decisions.
+argument-hint: expert name or domain
 ---
 
 # /hope:summon

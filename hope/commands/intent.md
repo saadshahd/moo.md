@@ -1,5 +1,6 @@
 ---
 description: Turn rough ideas into iron-clad work orders through 5-step clarification protocol before building
+argument-hint: rough idea or task description to clarify
 ---
 
 # /hope:intent
