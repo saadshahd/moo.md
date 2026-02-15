@@ -56,34 +56,26 @@ The right approach, not a generic assessment.
    obvious change with clear precedent, no ambiguity, low risk, and
    trivially reversible — score directly as Tool with minimal criteria.
 
-3. **Synthesize** — From expert findings, produce the shaped output:
+3. **Synthesize** — Scale output to intent sizing:
 
-   - **Key findings** — what experts surfaced as most important for this
-     task, organized by concern (not by expert)
-   - **Tensions** — where experts disagreed and what the user should weigh
-   - **Recommended mode** — Colleague / Tool-Review / Tool with cited
-     reasoning from expert findings
-   - **Safety check:** if experts recommended Tool but findings include
-     high-risk or irreversible elements → elevate to Tool-Review minimum
-   - **Default when uncertain:** Tool-Review
-   - `criteria[]` — boolean pass/fail items drawn from expert findings
-     and ACCEPTANCE criteria
-   - `mustNot[]` — ≥2 inviolable constraints from expert-identified
-     hard boundaries
-   - `Disposable: yes/no` — yes when experts flag this as prototype
-     territory (high ambiguity + no precedent)
+   | Sizing   | Shape output                                                 |
+   | -------- | ------------------------------------------------------------ |
+   | Trivial  | `criteria[]` (2-3) + `mustNot[]` (1) + `→ Start:` action    |
+   | Standard | Findings + mode + `criteria[]` + `mustNot[]` (≥2) + `→ Start:` |
+   | Critical | Full: findings + tensions + mode + `criteria[]` + `mustNot[]` (≥2) + disposable + `→ Start:` + `premortem:` |
+
+   All tiers:
+   - `criteria[]` — boolean pass/fail from expert findings + ACCEPTANCE
+   - `mustNot[]` — inviolable constraints from expert-identified boundaries
    - `→ Start: [first atomic action ≤15w that produces a visible artifact]`
+   - **Safety check:** Tool + high-risk findings → elevate to Tool-Review
+   - **Default when uncertain:** Tool-Review
 
-   **Pre-mortem gate** (Critical risk only — 13+ points OR irreversible
-   OR auth/data/infra, derived from BLAST RADIUS + expert findings):
-   "It's two weeks from now and this caused an incident. What's the
-   most likely cause?"
-   - Emit: `premortem: [1-2 sentences]` alongside criteria[] and mustNot[]
-   - Skip for Trivial/Standard tiers
+   **Pre-mortem** (Critical only): "Two weeks from now this caused an
+   incident. Most likely cause?" Emit: `premortem: [1-2 sentences]`
 
-   Feasibility filter (when active): eliminate approaches that violate
-   the feasibility axis. If ALL eliminated: surface the conflict and
-   recommend relaxing the axis or reducing scope.
+   Feasibility filter (when active): eliminate approaches violating the
+   axis. If ALL eliminated: surface conflict, recommend relaxing axis.
 
 ## Boundaries
 

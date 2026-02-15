@@ -12,7 +12,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(hope): argument-hint frontmatter on all 10 commands that accept arguments — autocomplete discoverability
 - chore: CLAUDE.md command frontmatter convention with argument-hint documentation
-- docs(hope): Full plugin audit — 5 critical, 4 high, 6 medium findings (docs/audits/001-plugin-flows.md)
+- feat(hope/consult): Explore mode — 5th consult mode for generative discovery when user has intent but not know-how
+- feat(hope/intent): Sizing-aware brief — Trivial (3 bullets) / Standard (5-7) / Critical (full 7-12)
+- feat(hope/shape): Sizing-aware output — Trivial (criteria + start) / Standard (findings + mode) / Critical (full + pre-mortem)
 
 ### Changed
 - fix(hope/soul): description rewrite — WHAT+WHEN pattern, drop catch-all trigger
@@ -24,6 +26,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - fix: CLAUDE.md project-level hooks table — add SessionStart, PostToolUse (roadmap-guard), Stop
 - fix: CLAUDE.md remove stale `prompts/` directory from structure tree
 - fix: Stop hook — add comment clarifying block-once-then-allow pattern via `stop_hook_active`
+- refactor(hope/soul): Route "clear spec, unclear approach" to consult explore instead of shape
+- refactor(hope/full): Add Stage 3 Explore for approach discovery before shaping
+- refactor: Pipeline updated — intent → consult explore → shape → bond → loop
+
+### Removed
+- removed(hope): Loose coupling philosophy rule — explicit Skill() calls are correct, natural language is ~50% reliable
+- removed(hope/forge): Forge skill and /hope:forge command — unused, agent creation is native Claude Code
 
 ---
 

@@ -11,7 +11,7 @@
 Five systemic issues, ordered by user impact:
 
 1. **Missing generative flow** — Soul promises "consult (generative mode)" for brainstorming. Consult has no generative mode. Users with intent but not know-how fall through to shape, which assumes an approach exists to evaluate.
-2. **Loose coupling violated in 4/8 skills** — Soul, intent, shape, and the full command use hard `Skill(skill="hope:...")` calls. Only forge correctly uses natural language triggers.
+2. ~~**Loose coupling violated in 4/8 skills**~~ — RESOLVED. Rule removed. Explicit `Skill()` calls are correct.
 3. **Output volume contradicts philosophy** — Hard constraint #10 says "default to less." Skills mandate comprehensive structured output (intent: 6 sections, shape: 8 fields, loop: 4-section report) regardless of task complexity.
 4. **Bond teams are ephemeral — no memory** — Bond creates ad-hoc `Task()` agents. These don't use `.claude/agents/` memory scopes. Teams can't learn across sessions.
 5. **Stale references across docs** — PHILOSOPHY.md says 6 skills/42 profiles (actual: 8/74). docs/plugins/hope.md lists 6 skills, missing forge and search. Statechart §8 omits 2 of 4 hooks.
@@ -34,29 +34,9 @@ Five systemic issues, ordered by user impact:
 
 ---
 
-### C2. Loose Coupling Violations
+### ~~C2. Loose Coupling Violations~~ — RESOLVED
 
-**Philosophy:** "Cross-skill invocation uses natural language triggers. No hard references, no `Skill(skill="specific:name")` calls between skills." (PHILOSOPHY.md:178)
-
-**Violations found:**
-
-| File | Line | Hard Reference |
-|------|------|----------------|
-| soul/SKILL.md | 139-148 | `Skill(skill="hope:intent")`, `Skill(skill="hope:shape")`, `Skill(skill="hope:loop")`, `Skill(skill="hope:consult")` |
-| intent/SKILL.md | 96-98 | `Skill(skill="hope:shape")`, `Skill(skill="hope:consult")`, `Skill(skill="hope:loop")` |
-| shape/SKILL.md | 43-48 | `Skill(skill="hope:consult", args="panel on [goal]...")` |
-| commands/full.md | 23-54 | All 5 skills via explicit `Skill()` calls |
-
-**Only forge does it correctly** (forge/SKILL.md:74-79): uses natural language `"Panel review of this agent design..."` to trigger consult.
-
-**Why it matters:**
-- Hard references break if the target skill isn't installed or changes name
-- They bypass the description-matching system that Claude uses for skill selection
-- They create invisible coupling — removing consult would break soul, intent, and shape
-
-**Recommendation:** Replace hard `Skill()` calls in skills with natural language action directives. Example: soul's `Skill(skill="hope:intent")` → `"Clarify intent: turn this rough idea into a testable work order."` Commands (user-facing entry points) may keep explicit `Skill()` calls since they serve as orchestrators.
-
-**Feasibility:** Pure content change. Natural language triggers work through Claude's description matching (~50-80% reliability). But this is the designed mechanism — hard Skill() calls from skills aren't architecturally better since they still go through Claude's tool selection, and they create the coupling the philosophy explicitly forbids.
+**Decision (2026-02-15):** Loose coupling rule removed from project. Natural language triggers are ~50% reliable for skill auto-triggering. Explicit `Skill()` calls are the correct, reliable mechanism. Rule removed from CLAUDE.md, PHILOSOPHY.md, and statechart. Forge updated to use explicit calls.
 
 ---
 
@@ -319,7 +299,7 @@ Soul detects: Build, user lacks domain knowledge
 | # | Finding | Action | Scope | Blocked? |
 |---|---------|--------|-------|----------|
 | C1 | Missing generative consult mode | Add Explore mode to consult | consult/SKILL.md, statechart | No |
-| C2 | Loose coupling violations | Replace Skill() with natural language in skills | soul, intent, shape SKILL.md | No |
+| ~~C2~~ | ~~Loose coupling violations~~ | RESOLVED — rule removed, explicit Skill() is correct | — | Done |
 | C3 | Output not scaled to sizing | Add sizing-aware output templates | intent, shape SKILL.md | No |
 | C4 | Bond teams have no memory | Connect bond → forge for recurring roles | bond/SKILL.md | No |
 | H1 | Double consultation | Update statechart, make post-shape consult optional | statechart, full.md | No |

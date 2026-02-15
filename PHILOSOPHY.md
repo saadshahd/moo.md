@@ -161,35 +161,33 @@ By stage, what to do when progress stalls.
 4. **No rigid frameworks** — Adapt to context. If a step doesn't apply, skip it.
 5. **No thinking replacement** — Help think better, never decide for the user.
 6. **No feature chasing** — If it doesn't serve thinking quality, it's scope creep.
-7. **No hard dependencies on other skills** — Prime and trigger naturally, never import.
-8. **No cargo cult process** — Every step must have a reason, not just ritual.
+7. **No cargo cult process** — Every step must have a reason, not just ritual.
 9. **No recall-based assertions for verifiable facts** — If a tool can check it (grep, read, glob, WebSearch, WebFetch), recall is not acceptable evidence.
 10. **Default to less. Expand on request.** — Every response starts at minimum disclosure: what was done, verification status, and what decision comes next. More detail flows on request or when verification is assumption-only. Never push complexity the human didn't pull.
 
 ---
 
-## Priming & Loose Coupling
+## Priming
 
 Moo primes two things in every conversation:
 
 - **Context** — Clear intent, shaped approach, engagement level
 - **Behavior** — Verify before claiming done, consult experts on non-trivial decisions, check assumptions
 
-Cross-skill invocation uses natural language triggers ("brainstorm", "debug systematically", "what would an expert say"). No hard references, no `Skill(skill="specific:name")` calls between skills.
-
-If the user has a matching skill installed, the trigger fires it. If not, moo handles it with its own capabilities. Nothing breaks either way.
+Skills invoke each other via `Skill(skill="hope:...")` calls. This is the reliable path — Claude's description matching alone is ~50% reliable for auto-triggering.
 
 ---
 
 ## Expert System
 
-**hope** — single plugin, 6 skills:
+**hope** — single plugin, 7 skills:
 - **soul** = session strategy + thinking framework
 - **intent** = clarify WHAT
 - **shape** = decide HOW (consult-driven)
-- **bond** = compose WHO (agent team design)
 - **loop** = execute + verify + complete
-- **consult** = expert simulation (42+ profiles)
+- **consult** = expert simulation (74 profiles, 5 modes: single/panel/explore/review/unblock)
+- **bond** = compose WHO (agent team design)
+- **search** = code search (sg/rg) reference
 
 Profiles are curated, not accumulated — each must be grounded in documented positions (3+ primary sources) and serve a distinct perspective not covered by existing profiles. Retire profiles that lack documentation depth or consistently fail to earn selection. Invocation is context-driven (domain signals in the conversation select relevant experts). No hardcoded hierarchy between experts.
 
@@ -205,5 +203,4 @@ Rules for skill authors, derived from principles above.
 - Self-contained: works without external files
 - Skills must respect the state machine map (know where they fit)
 - Skills must not create persistent state
-- Skills must use natural language triggers for cross-skill invocation
 - Every step in a skill process must have a completion marker ("done when...")
