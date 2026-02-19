@@ -170,6 +170,9 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 6. **Loose coupling** — Natural language triggers between skills. No hard imports. If a skill isn't installed, nothing breaks.
 7. **Boundaries over aspirations** — Define forbidden states before ideal states. Negative constraints survive ambiguity.
 8. **Co-located constraints** — Embed rules in the artifact that crosses the boundary. Separate context vanishes.
+9. **Holdout criteria separation** — Keep `criteria[]` (build) and `holdout[]` (validation) disjoint.
+10. **Satisfaction before done** — Non-trivial completion must include satisfaction score, confidence, and basis.
+11. **Pyramid summaries by default** — Non-trivial responses use L1 answer, L2 reasons, L3 evidence.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -184,6 +187,9 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 - [ ] Does this build something Claude will do natively? → Don't compete with the platform
 - [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts)? → Every mechanism must trace to an outcome
 - [ ] Does this assert verifiable facts from memory? → Retrieved over recalled
+- [ ] Are `criteria[]` and `holdout[]` disjoint? → No criteria leakage
+- [ ] Does non-trivial completion include satisfaction + confidence + basis? → No assumption-only done claims
+- [ ] Does non-trivial output use the 3-layer pyramid (answer/reasons/evidence)? → Minimize evaluation burden
 
 ### Statechart (Canonical Reference)
 
@@ -195,9 +201,11 @@ See `PHILOSOPHY.md` for full beliefs, principles (stance + why), and constraints
 
 When compacting conversation history, always preserve:
 - The `[SESSION] Type: X | Engagement: Y | Horizon: Z | Feasible: W` marker
-- Active criteria, mustNot constraints, horizon, and feasibility axis + bound from shape
+- Active criteria, holdout criteria, mustNot constraints, horizon, and feasibility axis + bound from shape
 - Current loop progress (wave number, items completed)
 - Failed approaches and what they ruled out
+- Latest satisfaction tuple (`score/confidence/basis/gate`)
+- Latest pyramid L1 answer
 
 ## Anti-Patterns
 

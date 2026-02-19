@@ -139,7 +139,9 @@ stateDiagram-v2
   state "spec_scoring\nre-score or use intent score\nroute by fit score" as spec_scoring
   state "shape_approval\nYes / Edit / Cancel" as shape_approval
   state "decompose\natomic work items\n[LOOP] announcement" as decompose
-  state "wave_execution\nidentify ready → spawn subagents\n→ collect → scope review → log" as wave_exec
+  state "wave_execution\nspawn generators (criteria+mustNot)\n→ collect → log" as wave_exec
+  state "holdout_verify\nindependent evaluator\nscores holdout[] items" as holdout_verify
+  state satisfaction_gate <<choice>>
   state "stall_detection\nno progress on wave" as stall
   state "expert_review\nthorough panel vs spec + mustNot\nBLOCKER / WARNING / SUGGESTION" as expert_review
   state "verify_gate\nthorough tier → post-work gate" as verify_gate
@@ -154,8 +156,14 @@ stateDiagram-v2
   shape_approval --> [*] : Cancel
 
   decompose --> wave_exec
-  wave_exec --> wave_exec : next wave
-  wave_exec --> expert_review : all items done
+  wave_exec --> holdout_verify : wave items done
+  holdout_verify --> satisfaction_gate : scores computed
+
+  satisfaction_gate --> expert_review : ≥ 85
+  satisfaction_gate --> wave_exec : 60–84 (iterate)
+  satisfaction_gate --> stall : < 60 (reshape consideration)
+
+  wave_exec --> wave_exec : next wave (within iteration)
 
   wave_exec --> stall : no progress
   stall --> wave_exec : consult unblock
@@ -180,6 +188,10 @@ stateDiagram-v2
 
   wave_exec --> [*] : mustNot violated (hard stop)
 ```
+
+**Holdout verification:** After each wave, an independent verification subagent scores holdout[] items (PASS/WEAK/PARTIAL/FAIL) and computes satisfaction. Generator subagents never see holdout[].
+
+**Satisfaction gating:** ≥85 proceeds to expert review. 60–84 iterates (advisory for standard risk, blocking for critical). <60 triggers reshape consideration. Advisory = user can override; blocking = must iterate.
 
 **Circuit breakers:** max iterations (user-configured) and budget exceeded (user-configured) pause for user decision. mustNot violated (from shape output) is a hard stop — these are inviolable constraints.
 
@@ -435,7 +447,7 @@ Every cycle has a break condition:
 - **Intent is sacred** — never changes without user consent
 - **Shape changes must be communicated** — user always knows when approach shifts
 - **Gates advise, never prevent** — user owns their work
-- **Compaction preserve list:** [SESSION] marker (including Horizon + Feasible), criteria, mustNot, horizon, feasibility axis + bound, wave number, key decisions
+- **Compaction preserve list:** Pyramid L1 (marker + satisfaction), L2 (decisions + eliminations), L3 (criteria, holdout + scores, mustNot, work items, [LEARN] insights)
 
 ---
 
@@ -445,7 +457,7 @@ Every cycle has a break condition:
 | -------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | user_need → clarifying           | intent        | acknowledge, clarify, score_spec, echo_check, refine, emit_brief                                                                                                                                                          |
 | clear_intent → session_execution | shape         | extract, expert_consultation, synthesize, output_shape                                                                                                                                                                    |
-| session_execution                | loop          | spec_scoring, shape_approval, decompose, wave_execution, stall_detection, expert_review, verify_gate, review_feedback, cancel, circuit_breaker, paused                                                                    |
+| session_execution                | loop          | spec_scoring, shape_approval, decompose, wave_execution, holdout_verify, satisfaction_gate, stall_detection, expert_review, verify_gate, review_feedback, cancel, circuit_breaker, paused                                  |
 | (any stage)                      | consult       | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
 | (parallel, always)               | soul          | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer                                                                                                                                              |
 | shape → loop (team path)         | bond          | assess, design, confirm_create                                                                                                                                                                                            |

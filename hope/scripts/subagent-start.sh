@@ -19,8 +19,8 @@ Verification gates:
 | code review      | Weak  |
 | assumption       | Block |
 
-If conversation compacts, preserve: [SESSION] marker, criteria[], mustNot[],
-current work item, verification status.'
+If conversation compacts, preserve: [SESSION] marker, criteria[], holdout[],
+mustNot[], current work item, satisfaction score.'
 
 CONTEXT="$PRIMER"
 
@@ -47,15 +47,30 @@ if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
     }
 
     CRITERIA=$(extract_block "criteria[]" 12)
+    HOLDOUT=$(extract_block "holdout[]" 12)
     MUSTNOT=$(extract_block "mustNot[]" 12)
     ACCEPTANCE=$(extract_block "ACCEPTANCE" 15)
     STOP=$(extract_block "STOP CONDITIONS" 8)
+
+    PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty')
+    IS_HOLDOUT_VERIFY=false
+    if echo "$PROMPT" | rg -q 'HOLDOUT-VERIFY' 2>/dev/null; then
+      IS_HOLDOUT_VERIFY=true
+    fi
 
     NL=$'\n'
     STATE=""
     [[ -n "$SESSION" ]] && STATE="${STATE}${NL}${SESSION}"
     [[ -n "$OBJECTIVE" ]] && STATE="${STATE}${NL}${OBJECTIVE}"
-    [[ -n "$CRITERIA" ]] && STATE="${STATE}${NL}${CRITERIA}"
+
+    if [[ "$IS_HOLDOUT_VERIFY" == "true" ]]; then
+      # Verification subagent: sees holdout + mustNot, NOT criteria
+      [[ -n "$HOLDOUT" ]] && STATE="${STATE}${NL}${HOLDOUT}"
+    else
+      # Generation subagent: sees criteria + mustNot, NOT holdout
+      [[ -n "$CRITERIA" ]] && STATE="${STATE}${NL}${CRITERIA}"
+    fi
+
     [[ -n "$MUSTNOT" ]] && STATE="${STATE}${NL}${MUSTNOT}"
     [[ -n "$ACCEPTANCE" ]] && STATE="${STATE}${NL}${ACCEPTANCE}"
     [[ -n "$STOP" ]] && STATE="${STATE}${NL}${STOP}"

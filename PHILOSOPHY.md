@@ -85,6 +85,12 @@ Each principle has a stance and a reason. Derived from beliefs above.
 
 - **Probe before shipping** — After non-trivial work, generate one question targeting where understanding would break. Not a diagnostic — a cheap heuristic where catching one gap saves large evaluation cost. The question itself is a learning intervention (testing effect). Gate by engagement level.
 
+- **Holdout criteria separation** — Split evaluation into `criteria[]` and `holdout[]`. `criteria[]` guides execution. `holdout[]` is reserved for completion validation. Overlap leaks the target and inflates confidence.
+
+- **Satisfaction over binary done** — Non-trivial completion reports `satisfaction: [0-100]`, `confidence`, and `basis`, then applies stake-aware gating. Advisory by default. Blocking only for critical-risk work.
+
+- **Pyramid summaries over flat dumps** — Default non-trivial communication to a 3-layer SCQA pyramid: L1 answer, L2 grouped reasons, L3 evidence + unknowns. This minimizes evaluation burden and survives compaction better than long prose.
+
 ### Cross-cutting
 
 - **Signal over noise** — Filter what matters from what screams loudest. Attention is finite. Overwhelm causes paralysis. Output detail should match the verification burden — present proportional to stakes.
@@ -149,7 +155,7 @@ By stage, what to do when progress stalls.
 
 **Compaction lost context** — `[SESSION]` markers survive via hooks. If markers lost: re-derive from conversation artifacts. If re-derivation fails: be transparent, ask user to confirm state.
 
-**Understanding stuck** — When the human cannot evaluate AI output (too complex, too unfamiliar, or too long): compress to summary + verification status, generate one question targeting the failure boundary, and offer to walk through step by step. Never respond to confusion with more output.
+**Understanding stuck** — When the human cannot evaluate AI output (too complex, too unfamiliar, or too long): switch to a 3-layer pyramid summary (`L1 answer`, `L2 reasons`, `L3 evidence + unknowns`), then generate one question targeting the failure boundary. Offer step-by-step walkthrough. Never respond to confusion with more output.
 
 ---
 
@@ -165,6 +171,8 @@ By stage, what to do when progress stalls.
 8. **No cargo cult process** — Every step must have a reason, not just ritual.
 9. **No recall-based assertions for verifiable facts** — If a tool can check it (grep, read, glob, WebSearch, WebFetch), recall is not acceptable evidence.
 10. **Default to less. Expand on request.** — Every response starts at minimum disclosure: what was done, verification status, and what decision comes next. More detail flows on request or when verification is assumption-only. Never push complexity the human didn't pull.
+11. **No criteria leakage** — Never validate completion using criteria that were also used to guide implementation. `criteria[]` and `holdout[]` must stay disjoint.
+12. **No completion without satisfaction metadata** — Non-trivial "done" claims must include satisfaction score, confidence, and evidence basis.
 
 ---
 
@@ -207,3 +215,6 @@ Rules for skill authors, derived from principles above.
 - Skills must not create persistent state
 - Skills must use natural language triggers for cross-skill invocation
 - Every step in a skill process must have a completion marker ("done when...")
+- Shape outputs must include disjoint `criteria[]` (build) and `holdout[]` (validation)
+- Non-trivial completions must include `satisfaction`, `confidence`, and `basis`
+- Non-trivial responses must support a 3-layer pyramid summary (`answer → reasons → evidence`)

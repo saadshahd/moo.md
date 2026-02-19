@@ -22,17 +22,17 @@ not from scratch.
    block until verified.
 4. **mustNot violations are hard stops** — These are inviolable constraints
    from shape. When violated, stop immediately and surface to user.
-5. **Subagents inherit context** — Every spawned task receives the session
-   marker, criteria[], mustNot[], and intent ACCEPTANCE criteria. Retrieve
-   facts with tools before asserting from memory.
+5. **Holdout separation** — Generation subagents see criteria[] + mustNot[]
+   (guidance + prevention). holdout[] is reserved for an independent
+   verification subagent. The generator never sees the holdout set.
 6. **Surface what the wave revealed** — Every wave ends with
    `[LEARN] [one insight ≤15w about the problem domain, not the process]`.
 
 ## Process
 
 1. **Accept brief + shape** — Scan for intent brief (ACCEPTANCE/STOP
-   criteria) and shape output (criteria[]/mustNot[]/shape). If missing,
-   clarify before proceeding.
+   criteria) and shape output (criteria[]/holdout[]/mustNot[]/shape). If
+   missing, clarify before proceeding.
 
 2. **Decompose** — Break into 5-21 atomic work items. Each passes the
    "one sentence without and" test. Every criteria[] entry maps to ≥1
@@ -52,31 +52,44 @@ not from scratch.
 3. **Execute in waves** — A wave = items with no unresolved dependencies.
    Within a wave: reversible before irreversible.
 
-   Spawn per ready item:
-   `Task(prompt="[session + criteria + mustNot + ACCEPTANCE criteria] [work item] Verify against ACCEPTANCE and STOP conditions.", subagent_type="general-purpose")`
+   Spawn per ready item (generator sees criteria + mustNot, NOT holdout):
+   `Task(prompt="[session + criteria + mustNot + ACCEPTANCE.constraints]
+   [work item]", subagent_type="general-purpose")`
+
+   After wave completes, spawn holdout verification (independent evaluator):
+   `Task(prompt="[HOLDOUT-VERIFY] [holdout[] + mustNot[]]
+   Evaluate work output. Per holdout item, score:
+   PASS(1.0) / WEAK(0.7) / PARTIAL(0.3) / FAIL(0.0).
+   Report satisfaction, confidence, basis. Do not fix.",
+   subagent_type="general-purpose")`
 
    Wave report:
-   - `[WAVE {N}]` header, per item: `{done ≤10w} | Verify: {PASS/FAIL}`
-   - Risk-ordered: highest-impact item first.
-   - Footer: `Done: {n} | Carry: {n} | Stall: {n}` — must equal total
+   - `[WAVE {N}] satisfaction: {0-100} | confidence: {high/med/low} | basis: {execution/observation/inspection}`
+   - Per holdout item: `{item}: {score} {verdict} — {evidence}`
+   - Footer: `Done: {n} | Carry: {n} | Stall: {n}`
    - `[LEARN] What this wave revealed: [one insight ≤15w]`
-   - Carry = verification weaker than execution output — retry next wave.
-     Carry items include: what was tried, why it failed, what it eliminated.
+   - Carry = WEAK (evidence quality) or PARTIAL/FAIL (incomplete).
      Context travels WITH the retry prompt (co-located, not referenced).
    - Stall = no progress — diagnose from output, revise remaining items
 
-4. **Review** — When all items complete, get expert review against spec
-   and mustNot constraints. Findings: BLOCKER (must fix) / WARNING /
+   Satisfaction gating (advisory by default, blocking for critical risk):
+
+   | Satisfaction | Standard risk | Critical risk |
+   | ------------ | ------------- | ------------- |
+   | ≥ 85         | → review      | → review      |
+   | 60–84        | advisory      | blocking      |
+   | < 60         | advisory      | blocking      |
+
+4. **Review** — When satisfaction ≥ threshold, get expert review against
+   spec and mustNot constraints. Findings: BLOCKER (must fix) / WARNING /
    SUGGESTION. BLOCKERs create new work items, return to waves.
 
-5. **Verify + present** — Run thorough verification. Final report structure:
-   - OUTCOME: 1 sentence — what changed + whether it works
+5. **Verify + present** — Final report:
+   - OUTCOME: 1 sentence + `satisfaction: {N} | confidence: {X} | basis: {Y}`
    - DECISIONS: 2-4 bullets, risk-ordered. Each states impact, not just
-     action. Fails: "Updated package.json." Passes: "Pinned lodash@4.17.21
-     — resolves CVE-2021-23337."
-   - EVIDENCE: per criterion, cite the command + output that proves it.
-     Unverified items listed with reason.
-   - DETAILS: grouped by concern (not edit order), available on request.
+     action.
+   - EVIDENCE: per holdout item, score + command/output that proves it.
+   - DETAILS: grouped by concern, available on request.
 
    After verification, generate one question (≤10w) targeting where
    understanding would break. Gate: Autonomous=skip, Collaborative/Guided=emit.

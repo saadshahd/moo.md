@@ -22,12 +22,15 @@ The right approach, not a generic assessment.
    and conventions before consulting experts. Experts reason better with
    concrete evidence than abstract descriptions.
 4. **Criteria must be boolean, mustNots must be inviolable** — criteria[]
-   items are pass/fail. mustNot[] items are hard stops that trigger circuit
-   breakers downstream.
-5. **Expert insights drive mode selection** — The collaboration mode comes
+   and holdout[] items are pass/fail. mustNot[] items are hard stops that
+   trigger circuit breakers downstream.
+5. **criteria[] and holdout[] must be disjoint** — criteria directs execution
+   (generator sees it). holdout evaluates completion (generator never sees
+   it). Overlap leaks the target and inflates confidence.
+6. **Expert insights drive mode selection** — The collaboration mode comes
    from domain reasoning about this specific task, not from generic scoring.
    Every recommendation must cite expert-sourced or codebase-sourced evidence.
-6. **Default to Tool-Review when uncertain** — Safest middle ground.
+7. **Default to Tool-Review when uncertain** — Safest middle ground.
    Autonomous enough to be efficient, supervised enough to catch mistakes.
 
 ## Process
@@ -66,10 +69,13 @@ The right approach, not a generic assessment.
    - **Safety check:** if experts recommended Tool but findings include
      high-risk or irreversible elements → elevate to Tool-Review minimum
    - **Default when uncertain:** Tool-Review
-   - `criteria[]` — boolean pass/fail items drawn from expert findings
-     and ACCEPTANCE criteria
+   - `criteria[]` — boolean pass/fail items that GUIDE execution (generator
+     sees these). Drawn from expert findings and ACCEPTANCE criteria.
+   - `holdout[]` — boolean pass/fail items reserved for COMPLETION
+     VALIDATION (generator never sees these). Drawn from expert findings.
+     Must be disjoint from criteria[].
    - `mustNot[]` — ≥2 inviolable constraints from expert-identified
-     hard boundaries
+     hard boundaries (generator sees these as hard stops)
    - `Disposable: yes/no` — yes when experts flag this as prototype
      territory (high ambiguity + no precedent)
    - `→ Start: [first atomic action ≤15w that produces a visible artifact]`

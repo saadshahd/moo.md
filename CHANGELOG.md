@@ -11,6 +11,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.9.0] - 2026-02-19
+
+### Added
+- feat(hope/shape): `holdout[]` output block — disjoint evaluation criteria hidden from generator
+- feat(hope/loop): Satisfaction scoring — holdout verification with score/confidence/basis per wave
+- feat(hope/loop): Holdout separation — generation subagents see criteria[]+mustNot[], verification sees holdout[]
+- feat(hope): Pyramid summaries — 3-level SCQA compaction (L1 answer, L2 reasons, L3 evidence)
+- feat(hope/soul): Satisfaction gate in verification table
+- feat(hope/hooks): Holdout-aware SubagentStart injection (criteria vs holdout routing)
+- docs: Hard constraints #11 (no criteria leakage) and #12 (no completion without satisfaction metadata)
+- docs: Principles — holdout separation, satisfaction over binary, pyramid over flat dumps
+- docs: Statechart — holdout_verify + satisfaction_gate states in loop detail
+
+---
+
 ## [hope@3.8.1] - 2026-02-14
 
 ### Changed
