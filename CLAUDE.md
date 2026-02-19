@@ -8,12 +8,14 @@ moo — mind on output. Stay present with AI.
 
 ```
 moo.md/
-├── hope/                    # Single plugin: 8 skills, 9 commands, hooks
+├── hope/                    # Single plugin: 10 skills, 9 commands, hooks
 │   ├── skills/
 │   │   ├── soul/            # Session strategy + thinking framework
 │   │   ├── intent/          # Clarify WHAT
 │   │   ├── shape/           # Decide HOW (consult-driven)
 │   │   ├── loop/            # Execute + verify + complete
+│   │   ├── verify/          # Fast parallel pre-PR verification
+│   │   ├── observe/         # Codebase health + architectural drift
 │   │   ├── consult/         # Expert simulation (74 profiles)
 │   │   ├── bond/            # Team composition (agent teams)
 │   │   ├── forge/           # Persistent agent creation
@@ -40,8 +42,8 @@ Plugin discovery uses `.claude-plugin/marketplace.json` at repo root.
 ## Skill Pipeline
 
 ```
-intent (clarify WHAT) → shape (decide HOW) → bond (compose WHO) → loop (execute + verify) → consult (expert guidance)
-                                               forge (create AGENT) ─┘
+intent (clarify WHAT) → shape (decide HOW) → bond (compose WHO) → loop (execute) → verify (pre-PR gate) → consult (expert guidance)
+                                               forge (create AGENT) ─┘                  observe (health, on-demand) ─┘
 ```
 
 Session strategy (in soul) auto-detects type (Build/Debug/Plan/Reflect) and asks engagement level (Autonomous/Collaborative/Guided). The `[SESSION]` marker persists through compaction.

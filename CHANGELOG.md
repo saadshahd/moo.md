@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat(hope/verify): Fast parallel pre-PR verification — 4 specialist agents (correctness, security, performance, standards) with SHIP/FIX/BLOCK gate decision
+- feat(hope/observe): Codebase health skill — 5 parallel assessors (type safety, pattern compliance, test coverage, dependencies, dead code), health card output
+- chore: Enhanced Stop hook with structured auto-memory nudge (Decisions, Patterns, Eliminations, Metrics)
+- docs: Statechart §4b (verify) and §4c (observe) with state diagrams and skill-to-state mapping
+
 ---
 
 ## [hope@3.9.0] - 2026-02-19

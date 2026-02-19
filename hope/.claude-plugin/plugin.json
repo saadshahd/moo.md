@@ -1,8 +1,8 @@
 {
   "name": "hope",
-  "version": "3.9.0",
-  "description": "Clarify intent, shape approach, execute with verification, consult experts, compose teams, forge agents. Session strategy with 8 skills.",
-  "keywords": ["intent", "shape", "loop", "consult", "bond", "forge", "search", "session", "verification", "expert", "panel", "team", "agent"],
+  "version": "3.10.0",
+  "description": "Clarify intent, shape approach, execute with verification, verify before PR, observe codebase health, consult experts, compose teams, forge agents. Session strategy with 10 skills.",
+  "keywords": ["intent", "shape", "loop", "verify", "observe", "consult", "bond", "forge", "search", "session", "verification", "expert", "panel", "team", "agent"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

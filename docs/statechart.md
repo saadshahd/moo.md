@@ -20,6 +20,8 @@ stateDiagram-v2
   state "intent (clarification)" as intent
   state "shape (approach selection)" as shape
   state "loop (execution)" as loop
+  state "verify (pre-PR quality gate)" as verify
+  state "observe (codebase health)" as observe
   state "consult (expert system)" as consult
 
   route --> intent : all session types
@@ -32,9 +34,15 @@ stateDiagram-v2
   consult --> loop : Build / Debug
   consult --> completed : Plan / Reflect (output delivered)
 
-  loop --> completed : user satisfied
+  loop --> verify : work complete, pre-PR check
+  loop --> completed : user satisfied (skip verify)
+  verify --> completed : SHIP gate
+  verify --> loop : BLOCK gate (remediation items)
   completed --> [*]
   completed --> user_need : feedback yields new work
+
+  observe --> observe : re-run after fixes
+  observe --> shape : health informs new task
 
   soul --> intent : CLARIFY (spec < 5)
   soul --> shape : EXPLORE (fit < 15)
@@ -200,6 +208,93 @@ stateDiagram-v2
 - Autonomous (Tool shape): milestones only
 - Collaborative (Tool-Review): checkpoint at major decisions
 - Guided (Colleague): iterate each step together
+
+---
+
+## 4b. Verify Detail
+
+```mermaid
+stateDiagram-v2
+  [*] --> tier1
+
+  state "Tier 1 — Pipeline Integrity" as tier1 {
+    state "alignment\nOBJECTIVE + ACCEPTANCE" as alignment
+    state "criteria_check\ncriteria[] satisfaction" as criteria_check
+    state "constraints\nmustNot[] violations" as constraints
+    state "holdout_check\nindependent holdout[] eval" as holdout_check
+  }
+
+  state tier1_gate <<choice>>
+  state "Tier 2 — External Quality" as tier2 {
+    state "correctness\ntypes, tests, logic" as correctness
+    state "security\ninjection, auth, secrets" as security
+    state "performance\nN+1, bundles, renders" as performance
+    state "standards\nCLAUDE.md, patterns, a11y" as standards
+  }
+
+  state "aggregate\nboth tiers → gate decision" as aggregate
+  state gate_check <<choice>>
+  state "report\nverification card" as report
+
+  tier1 --> tier1_gate
+  tier1_gate --> tier2 : PASS
+  tier1_gate --> aggregate : BLOCK (skip tier 2)
+
+  tier2 --> aggregate
+
+  aggregate --> gate_check
+  gate_check --> report : SHIP / FIX / BLOCK
+
+  report --> [*]
+```
+
+**Two-tier design:** Tier 1 checks pipeline integrity (OBJECTIVE, ACCEPTANCE, criteria[], mustNot[], holdout[]). Tier 2 checks external quality (correctness, security, performance, standards). Tier 1 gates Tier 2.
+
+**Holdout enforcement:** Tier 1 holdout agent sees holdout[] + mustNot[] only (NOT criteria[]) — same separation as loop.
+
+**Gate logic:** Any BLOCKER (either tier) = BLOCK. WARNINGs only = FIX. Clean = SHIP. Score: 100 - (BLOCKERs×25 + WARNINGs×5 + SUGGESTIONs×1).
+
+**No-pipeline fallback:** If no pipeline artifacts in conversation, skip Tier 1, run Tier 2 only.
+
+---
+
+## 4c. Observe Detail
+
+```mermaid
+stateDiagram-v2
+  [*] --> orient
+
+  state "orient\nread CLAUDE.md, scan structure\ndetermine scope" as orient
+  state "spawn_assessors\n5 parallel agents" as spawn
+  state "types\nany, missing types, assertions" as types
+  state "patterns\nconventions vs drift" as patterns
+  state "tests\ncoverage gaps, untested paths" as tests
+  state "deps\noutdated, unused, advisories" as deps
+  state "dead\nunused exports, orphaned files" as dead
+  state "aggregate\nper-dimension status + score" as aggregate
+  state "health_card\n5-dimension report" as health_card
+
+  orient --> spawn
+
+  spawn --> types
+  spawn --> patterns
+  spawn --> tests
+  spawn --> deps
+  spawn --> dead
+
+  types --> aggregate
+  patterns --> aggregate
+  tests --> aggregate
+  deps --> aggregate
+  dead --> aggregate
+
+  aggregate --> health_card
+  health_card --> [*]
+```
+
+**Baseline:** The codebase itself — dominant patterns and CLAUDE.md conventions define healthy. No external spec required.
+
+**Scoring:** Health = 100 - (BLOCKERs×20 + WARNINGs×5 + SUGGESTIONs×1). Per dimension: OK / WARNING / BLOCKER.
 
 ---
 
@@ -458,6 +553,8 @@ Every cycle has a break condition:
 | user_need → clarifying           | intent        | acknowledge, clarify, score_spec, echo_check, refine, emit_brief                                                                                                                                                          |
 | clear_intent → session_execution | shape         | extract, expert_consultation, synthesize, output_shape                                                                                                                                                                    |
 | session_execution                | loop          | spec_scoring, shape_approval, decompose, wave_execution, holdout_verify, satisfaction_gate, stall_detection, expert_review, verify_gate, review_feedback, cancel, circuit_breaker, paused                                  |
+| loop → completed (pre-PR)        | verify        | scope, spawn_specialists (correctness, security, performance, standards), aggregate, gate_check, report                                                                                                                   |
+| (on-demand, any time)            | observe       | orient, spawn_assessors (types, patterns, tests, deps, dead), aggregate, health_card                                                                                                                                      |
 | (any stage)                      | consult       | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
 | (parallel, always)               | soul          | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer                                                                                                                                              |
 | shape → loop (team path)         | bond          | assess, design, confirm_create                                                                                                                                                                                            |

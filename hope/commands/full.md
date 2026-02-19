@@ -1,5 +1,5 @@
 ---
-description: Run the complete hope pipeline — session setup, intent clarification, shape selection, expert validation, and execution in strict sequence
+description: Run the complete hope pipeline — session setup, intent, shape, consult, loop, and verify in strict sequence
 ---
 
 # /hope:full
@@ -53,3 +53,17 @@ Route by session type:
 
 - **Build / Debug:** run the loop skill now: Skill(skill="hope:loop")
 - **Plan:** present shaped output + consult synthesis to user. Pipeline complete.
+
+## Stage 7 — Verify (Build / Debug only)
+
+After loop completes, run pre-PR verification:
+
+Skill(skill="hope:verify")
+
+STOP. Wait for verification card. 4 parallel specialists assess
+external quality: correctness, security, performance, standards.
+
+Gate decision determines next step:
+- **SHIP** → create PR
+- **FIX** → user reviews warnings, then PR
+- **BLOCK** → fix blockers (re-enter loop if needed), then re-verify
