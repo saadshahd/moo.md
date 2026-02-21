@@ -9,6 +9,10 @@
 ## Ideas
 
 ## Decisions
+- [x] Memory as thinking principle — belief 6, soul principle 8, action directive (2026-02-21)
+  - No Stop hook — embed guidance in system prompt, not gate exit
+  - MEMORY.md self-reference reinforces per-project
+  - Project Stop hook slimmed to roadmap-only
 - [x] verify + observe skills — parallel pre-flight verification + codebase health assessment (2026-02-19)
   - Research: Factory.ai Agent Readiness (8 axes), StrongDM Software Factory (scenario testing), Anthropic 2026 Trends
   - verify: 4 parallel specialists (correctness, security, performance, standards) → SHIP/FIX/BLOCK gate

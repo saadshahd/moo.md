@@ -47,6 +47,10 @@ A debugging session needs different thinking than a greenfield build. A user who
 
 When AI generation cost approaches zero, human evaluation becomes the dominant cost. Output that is cheap to produce but expensive to verify creates a net negative. The system must optimize for evaluation burden — not just reasoning quality. Cognitive energy is depletable within a session, and the interaction's pace works against recovery.
 
+### 6. Memory has asymmetric costs
+
+A wrong memory misleads — it makes a future session confidently wrong instead of uncertain. A missing memory triggers investigation — the session discovers what it needs. The cost of stale knowledge compounds silently because nothing flags it. The cost of missing knowledge surfaces immediately because tools exist to find it. Memory systems must bias toward forgetting.
+
 ---
 
 ## Principles
@@ -90,6 +94,12 @@ Each principle has a stance and a reason. Derived from beliefs above.
 - **Satisfaction over binary done** — Non-trivial completion reports `satisfaction: [0-100]`, `confidence`, and `basis`, then applies stake-aware gating. Advisory by default. Blocking only for critical-risk work.
 
 - **Pyramid summaries over flat dumps** — Default non-trivial communication to a 3-layer SCQA pyramid: L1 answer, L2 grouped reasons, L3 evidence + unknowns. This minimizes evaluation burden and survives compaction better than long prose.
+
+### From belief 6: Memory has asymmetric costs
+
+- **Durable over recent** — Remember what survives a rewrite. Decisions, confirmed patterns, and eliminations are durable. Counts, current implementations, and session-local metrics are not. Temporal facts anchor to the condition that makes them true — not the date.
+
+- **Delete before add** — Before recording new memory, check if existing entries are now wrong. Stale entries that go uncorrected compound silently. An entry that was once true is more dangerous than one that was never written.
 
 ### Cross-cutting
 

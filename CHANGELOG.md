@@ -7,13 +7,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [hope@3.10.1] - 2026-02-21
 
 ### Added
 - feat(hope/verify): Fast parallel pre-PR verification — 4 specialist agents (correctness, security, performance, standards) with SHIP/FIX/BLOCK gate decision
 - feat(hope/observe): Codebase health skill — 5 parallel assessors (type safety, pattern compliance, test coverage, dependencies, dead code), health card output
-- chore: Enhanced Stop hook with structured auto-memory nudge (Decisions, Patterns, Eliminations, Metrics)
+- feat(hope/soul): Principle 8 "Durable over recent" — memory quality as thinking habit, not session-end ritual
+- docs: Belief 6 "Memory has asymmetric costs" + derived principles (durable over recent, delete before add)
 - docs: Statechart §4b (verify) and §4c (observe) with state diagrams and skill-to-state mapping
+
+### Changed
+- refactor: Project Stop hook slimmed to roadmap-only — memory guidance moved to soul principle + MEMORY.md self-reference
+
+### Removed
+- chore: Removed structured auto-memory nudge from Stop hook (replaced by soul principle 8)
 
 ---
 
