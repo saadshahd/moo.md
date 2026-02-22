@@ -26,13 +26,16 @@ not from scratch.
    (guidance + prevention). holdout[] is reserved for an independent
    verification subagent. The generator never sees the holdout set.
 6. **Surface what the wave revealed** — Every wave ends with
-   `[LEARN] [one insight ≤15w about the problem domain, not the process]`.
+   `[LEARN] [one domain insight the wave revealed ≤15w, not the process]`.
 
 ## Process
 
 1. **Accept brief + shape** — Scan for intent brief (ACCEPTANCE/STOP
    criteria) and shape output (criteria[]/holdout[]/mustNot[]/shape). If
-   missing, clarify before proceeding.
+   missing, clarify before proceeding. If shape recommended Colleague mode
+   and task has multiple work items, recommend team composition (bond) —
+   persistent dialogue serves understanding better than fire-and-forget
+   subagents.
 
 2. **Decompose** — Break into 5-21 atomic work items. Each passes the
    "one sentence without and" test. Every criteria[] entry maps to ≥1
@@ -71,6 +74,9 @@ not from scratch.
    - Carry = WEAK (evidence quality) or PARTIAL/FAIL (incomplete).
      Context travels WITH the retry prompt (co-located, not referenced).
    - Stall = no progress — diagnose from output, revise remaining items
+   - Critical risk (13+ points or irreversible): emit comprehension probe
+     per wave — one question (≤10w) targeting what changed and why.
+     Standard/Trivial: probe at completion only (step 5).
 
    Satisfaction gating (advisory by default, blocking for critical risk):
 

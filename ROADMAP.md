@@ -9,6 +9,13 @@
 ## Ideas
 
 ## Decisions
+- [x] Deep philosophy audit — skills vs PHILOSOPHY.md structural alignment (2026-02-22)
+  - Finding: beliefs 7/9/10 (understanding, authorship, peace of mind) least mechanized
+  - Artifact quality rigorously protected; human comprehension had no structural enforcement
+  - 10 findings: 3 contradictions, 3 missing embodiments, 4 superficial compliance
+  - Fixes: 54 lines across 6 files — modify existing mechanisms, no new abstractions
+  - Meta: subagents = context infrastructure (not delegation); team mode = understanding channel
+  - Meta: can't enforce "user decides" by deciding for them — surface info, let user choose
 - [x] Literary philosophy audit — beliefs 7-8, presence/friction/ownership principles (2026-02-22)
   - Sources: "One Flew Over the Context Window" blog, Pirsig (Zen/Motorcycle), Crawford (Shop Class)
   - Convergence: understanding forms through engagement, not review; ownership has irreducible cost

@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@3.11.0] - 2026-02-22
+
 ### Added
 - docs: Belief 7 "Understanding is the product, not the artifact" — mental models matter more than PRs
 - docs: Belief 8 "Every artifact is a liability" — ownership cost doesn't approach zero with generation cost
@@ -19,13 +23,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - docs: Principle "Authorship over review" — litmus test for honest delegation vs liability-holding
 - docs: Principle "Calm before more" — stop producing when attention fragments
 - docs: Hard constraint 13 "No ownership without understanding" — parallel sessions create unownable output
-- docs: Gumption-aware unstuck strategy — anxiety/ego/impatience/boredom as psychological traps distinct from technical blocks
-- docs: Philosophy audit check for ownership-understanding gap
-- docs: Anti-pattern for parallel agent sessions exceeding attention span
-- docs: Philosophy audit checks for velocity-vs-comprehension and friction-that-teaches
-- docs: Anti-patterns for output volume optimization and understanding-friction automation
+- docs: Gumption-aware unstuck strategy — anxiety/ego/impatience/boredom as psychological traps
+- docs: Philosophy audit checks for ownership, velocity-vs-comprehension, friction-that-teaches
+- docs: Anti-patterns for parallel agent sessions, output volume optimization, understanding-friction automation
 
 ### Changed
+- feat(hope/soul): Overwhelm detection in every-turn check — rapid thin responses, scope escalation triggers pause
+- feat(hope/soul): Bidirectional ceremony scaling — compress when interaction burden exceeds comprehension benefit
+- feat(hope/shape): Domain familiarity signal in safety check — surfaces Colleague mode for unfamiliar domains
+- feat(hope/bond): Shape mode input for fitness — Colleague mode biases toward Team for persistent dialogue
+- feat(hope/bond): Engagement-aware team cap — >3 teammates for Collaborative/Guided triggers reduction
+- feat(hope/loop): Colleague mode handoff — recommends bond for multi-item Colleague tasks
+- feat(hope/loop): Stakes-scaled comprehension probe — per-wave for Critical, completion-only otherwise
+- fix(hope/loop): Clarify [LEARN] semantics — "domain insight the wave revealed" not ambiguous "insight"
+- fix(hope/scripts): subagent-start warns on partial pipeline state extraction instead of silent failure
+- fix(hope/scripts): exit-plan-gate surfaces missing artifacts when max denial cap overrides
 - docs: Belief 5 expanded — cognitive energy as medium for care/understanding, not just fuel to manage
 - docs: "Automatic over remembered" principle caveated — automate mechanics, not understanding
 - docs: Mission expanded from 3 to 4 outcomes

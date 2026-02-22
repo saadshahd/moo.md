@@ -78,6 +78,19 @@ if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
     if [[ -n "$STATE" ]]; then
       CONTEXT="${CONTEXT}${NL}${NL}Pipeline state:${STATE}"
     fi
+
+    # Warn when transcript exists but key pipeline state is missing
+    MISSING=""
+    [[ -z "$SESSION" ]] && MISSING="${MISSING}SESSION "
+    if [[ "$IS_HOLDOUT_VERIFY" == "true" ]]; then
+      [[ -z "$HOLDOUT" ]] && MISSING="${MISSING}holdout[] "
+    else
+      [[ -z "$CRITERIA" ]] && MISSING="${MISSING}criteria[] "
+    fi
+    [[ -z "$MUSTNOT" ]] && MISSING="${MISSING}mustNot[] "
+    if [[ -n "$MISSING" ]]; then
+      CONTEXT="${CONTEXT}${NL}${NL}Warning: Pipeline state extraction partial — missing: ${MISSING%. }. Subagent operating with primer only for those fields."
+    fi
   fi
 fi
 

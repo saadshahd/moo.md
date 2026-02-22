@@ -67,7 +67,11 @@ The right approach, not a generic assessment.
    - **Recommended mode** — Colleague / Tool-Review / Tool with cited
      reasoning from expert findings
    - **Safety check:** if experts recommended Tool but findings include
-     high-risk or irreversible elements → elevate to Tool-Review minimum
+     high-risk or irreversible elements → elevate to Tool-Review minimum.
+     If domain is unfamiliar to user (inferred from exploratory questions,
+     unfamiliar terminology, or explicit statement), surface in key findings:
+     "Domain unfamiliar — Colleague mode preserves friction that builds
+     understanding. Delegating here means reviewing what you cannot verify."
    - **Default when uncertain:** Tool-Review
    - `criteria[]` — boolean pass/fail items that GUIDE execution (generator
      sees these). Drawn from expert findings and ACCEPTANCE criteria.

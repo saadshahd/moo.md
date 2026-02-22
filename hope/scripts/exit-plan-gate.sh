@@ -44,7 +44,26 @@ has_artifact() {
 
 # --- Max denial cap: prevent infinite loops ---
 DENY_COUNT=$(rg -c 'DENY_CHAIN_GATE:' "$TRANSCRIPT" 2>/dev/null || echo "0")
-[[ "$DENY_COUNT" -ge 3 ]] && exit 0
+if [[ "$DENY_COUNT" -ge 3 ]]; then
+  MISSING_LIST=""
+  has_artifact 'OBJECTIVE:' || MISSING_LIST="${MISSING_LIST}OBJECTIVE "
+  has_artifact 'ACCEPTANCE' || MISSING_LIST="${MISSING_LIST}ACCEPTANCE "
+  has_artifact 'criteria\[\]' || MISSING_LIST="${MISSING_LIST}criteria[] "
+  has_artifact 'mustNot\[\]' || MISSING_LIST="${MISSING_LIST}mustNot[] "
+  if [[ -n "$MISSING_LIST" ]]; then
+    WARN="PLAN_GATE_OVERRIDE: Max denials reached. Missing artifacts: ${MISSING_LIST%. }. Proceeding without full pipeline coverage."
+    ESCAPED_WARN=$(escape_for_json "$WARN")
+    cat <<EOF
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "additionalContext": "${ESCAPED_WARN}"
+  }
+}
+EOF
+  fi
+  exit 0
+fi
 
 # --- Parse [SESSION] marker from assistant messages ---
 SESSION=$(jq -r '

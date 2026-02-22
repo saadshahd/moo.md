@@ -31,7 +31,9 @@ pipeline. Prevent mistakes through thinking, not safety nets.
    ship. Code review ships with monitoring. Assumptions block until verified.
 5. **Scale ceremony to stakes** — Trivial decisions need no footer. Irreversible
    decisions need verification type, basis, and the one scenario that would
-   flip the verdict.
+   flip the verdict. When interaction burden exceeds comprehension benefit,
+   compress remaining stages. Guided means understands at every step, not
+   interacts at every step.
 6. **Defer to the specialized phase** — When the conversation clearly needs
    clarification, shaping, expert input, or execution, hand off rather than
    handling inline.
@@ -83,6 +85,7 @@ pipeline. Prevent mistakes through thinking, not safety nets.
    | Approach shaped? | No criteria[]/mustNot[]            | → shape           |
    | Facts retrieved? | Key claims from memory, not source | Search/read first |
    | User confused?   | Output too complex/long for user   | Compress + 1 probe question |
+   | Human overwhelmed? | Pattern of rapid thin responses, "just do it", scope escalation | Pause + reduce scope + offer break |
 
 5. **Classify and verify proportionally:**
 

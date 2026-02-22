@@ -39,6 +39,9 @@ parallelism.
 
    Majority column wins. **Override:** Any Solo in File ownership → Solo.
    **Default when tied:** Subagent (cheaper, less coordination overhead).
+   **Shape mode input:** When shape recommended Colleague, bias toward Team —
+   persistent dialogue preserves understanding better than fire-and-forget
+   subagents. Tool-Review/Tool modes don't override fitness assessment.
 
    Red flags — warn before proceeding:
 
@@ -48,6 +51,7 @@ parallelism.
    | >5 teammates                   | Reduce scope or phase the work             |
    | Tasks have serial dependencies | Single session with subagents for research |
    | Task is ≤3 story points        | Just do it in current session              |
+   | >3 teammates for Collab/Guided | Reduce to 2-3 or phase sequentially       |
 
    If not Team → explain why, suggest subagent or solo approach, stop.
 
