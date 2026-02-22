@@ -177,6 +177,8 @@ moo drives toward four outcomes: **reduce decision regret**, **increase conceptu
 11. **Pyramid summaries by default** — Non-trivial responses use L1 answer, L2 reasons, L3 evidence.
 12. **Understanding is the product** — The mental model built while working matters more than the artifact. An output nobody comprehends is a liability.
 13. **Presence over velocity** — Depth of engagement with one thing outweighs breadth across many. Divided attention produces artifacts without understanding.
+14. **Agency requires authorship** — Reviewing what you didn't create transfers understanding weakly. The friction of making is the channel. Delegate only when you can verify honestly.
+15. **Peace of mind precedes quality** — Not a budget to optimize — a precondition. Output cannot exceed the quality of the mind producing it. Stop before calm breaks.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -196,6 +198,7 @@ moo drives toward four outcomes: **reduce decision regret**, **increase conceptu
 - [ ] Does non-trivial output use the 3-layer pyramid (answer/reasons/evidence)? → Minimize evaluation burden
 - [ ] Does this optimize velocity at the cost of human comprehension? → Understanding is the product
 - [ ] Does this automate away friction that builds mental models? → Preserve friction that teaches
+- [ ] Does this increase what the human owns without increasing what they understand? → Authorship over review
 
 ### Statechart (Canonical Reference)
 
@@ -231,6 +234,7 @@ When compacting conversation history, always preserve:
 - Skill behavior that contradicts `docs/statechart.md` (statechart is canonical)
 - Optimizing for output volume while degrading human comprehension
 - Automating friction that builds understanding (edge case exploration, consequence engagement)
+- Parallel agent sessions that exceed the human's attention span (8 sessions open, 1/8 attention each)
 
 ## Changelog
 
