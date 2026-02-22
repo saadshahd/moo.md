@@ -9,6 +9,13 @@
 ## Ideas
 
 ## Decisions
+- [x] Literary philosophy audit — beliefs 7-8, presence/friction/ownership principles (2026-02-22)
+  - Sources: "One Flew Over the Context Window" blog, Pirsig (Zen/Motorcycle), Crawford (Shop Class)
+  - Convergence: understanding forms through engagement, not review; ownership has irreducible cost
+  - New beliefs: understanding-as-product (#7), artifact-as-liability (#8)
+  - New principles: presence over velocity, friction when it teaches, own before producing more
+  - New unstuck type: gumption traps (anxiety/ego/impatience/boredom)
+  - Mission expanded 3→4 outcomes; "automatic over remembered" caveated
 - [x] Memory as thinking principle — belief 6, soul principle 8, action directive (2026-02-21)
   - No Stop hook — embed guidance in system prompt, not gate exit
   - MEMORY.md self-reference reinforces per-project
