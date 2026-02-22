@@ -9,6 +9,12 @@
 ## Ideas
 
 ## Decisions
+- [x] Deep philosophy audit — 20 findings, 6 categories (2026-02-22)
+  - 3 hard contradictions: Skill() calls vs loose coupling, enforcement vs advisory gates, no framework provenance
+  - Critical drift: beliefs 7-10 have zero skill implementation (authorship, ownership, pace, peace)
+  - 4 statechart misalignments: loop terminal vs verify transition, satisfaction <60, marker format, full→bond
+  - 3 stale docs: PHILOSOPHY.md (6→10 skills, 42→74 profiles), marketplace.json (8→10 skills)
+  - Priority: resolve coupling tension, implement beliefs 7-10 in soul/loop/bond, align gate semantics
 - [x] Literary philosophy audit — beliefs 7-8, presence/friction/ownership principles (2026-02-22)
   - Sources: "One Flew Over the Context Window" blog, Pirsig (Zen/Motorcycle), Crawford (Shop Class)
   - Convergence: understanding forms through engagement, not review; ownership has irreducible cost
