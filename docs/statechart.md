@@ -448,8 +448,9 @@ stateDiagram-v2
   check_marker --> marker_check
 
   state "detect_type\nBuild / Debug / Plan / Reflect" as detect_type
+  state "zone_assess\nNovelty / Reasoning depth / Freshness\nHighest dimension wins" as zone_assess
   state "ask_engagement\nAutonomous / Collaborative / Guided\n+ Horizon (Tactical / Strategic / Existential)\n(once per session)" as ask_engagement
-  state "silent_audit\n5-check gate: spec, fit, shape, verification, user confused" as audit
+  state "silent_audit\n6-check gate: spec, fit, shape, verification, zone 3, user confused" as audit
   state "quality_footer\nverdict + verification + risk\n(proportional to decision type)" as footer
 
   state check_marker : check [SESSION] marker
@@ -457,8 +458,9 @@ stateDiagram-v2
   marker_check --> detect_type : no marker
   marker_check --> audit : marker exists
 
-  detect_type --> ask_engagement : non-trivial
-  detect_type --> audit : trivial (default Guided)
+  detect_type --> zone_assess : non-trivial
+  detect_type --> audit : trivial (default Guided, Zone 1)
+  zone_assess --> ask_engagement
   ask_engagement --> audit
 
   state audit_result <<choice>>
@@ -476,7 +478,7 @@ stateDiagram-v2
   explore_interrupt --> [*] : hand-off to shape
 ```
 
-**Session marker:** `[SESSION] Type: Build | Engagement: Collaborative | Horizon: Strategic | Feasible: time (2h)` — emitted after strategy set, maintained through conversation, preserved on compaction. Horizon defaults: Build/Plan → Strategic, Debug → Tactical, Reflect → Existential. Feasibility defaults: Build → solo, Debug → time, Plan/Reflect → none.
+**Session marker:** `[SESSION] Type: Build | Engagement: Collaborative | Horizon: Strategic | Feasible: time (2h) | Zone: 2 (freshness)` — emitted after strategy set, maintained through conversation, preserved on compaction. Horizon defaults: Build/Plan → Strategic, Debug → Tactical, Reflect → Existential. Feasibility defaults: Build → solo, Debug → time, Plan/Reflect → none. Zone 1 omits the dimension parenthetical.
 
 **Compaction resilience:** If marker lost, re-derive from conversation artifacts. If re-derivation fails, ask user. Be transparent about gaps.
 
@@ -556,6 +558,6 @@ Every cycle has a break condition:
 | loop → completed (pre-PR)        | verify        | scope, spawn_specialists (correctness, security, performance, standards), aggregate, gate_check, report                                                                                                                   |
 | (on-demand, any time)            | observe       | orient, spawn_assessors (types, patterns, tests, deps, dead), aggregate, health_card                                                                                                                                      |
 | (any stage)                      | consult       | load_blocklist, detect_mode — single: detect_expert, load_profile, assess_coverage, generate/refuse — panel: select_experts, debate, surface_tensions, synthesize — unblock: parse_blocker, diagnose, recommend, escalate |
-| (parallel, always)               | soul          | hook_fires, check_marker, detect_type, ask_engagement, audit, quality_footer                                                                                                                                              |
+| (parallel, always)               | soul          | hook_fires, check_marker, detect_type, zone_assess, ask_engagement, audit, quality_footer                                                                                                                                 |
 | shape → loop (team path)         | bond          | assess, design, confirm_create                                                                                                                                                                                            |
 | (standalone entry point)         | forge         | gather, discover, review, confirm, emit                                                                                                                                                                                   |

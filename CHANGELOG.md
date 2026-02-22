@@ -28,6 +28,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.12.0] - 2026-02-22
+
+### Added
+- feat(hope): cognitive risk zones in soul — 3 dimensions (novelty, reasoning depth, freshness), 3 zones cascading to shape/loop
+
+---
+
 ## [hope@3.11.0] - 2026-02-22
 
 ### Added

@@ -11,6 +11,13 @@
   - Deferred: standalone CLI with minimal wrapping value as a skill
 
 ## Decisions
+- [x] Cognitive risk zones — 3rd classification axis in soul (2026-02-22)
+  - Research: models don't self-diagnose; extended thinking hurts on high-complexity tasks
+  - 3 dimensions: novelty, reasoning depth, freshness. Highest wins → Zone 1/2/3
+  - Zone 1 = zero overhead. Zone 3 = decompose regardless of sizing, retrieval-first, min Collaborative
+  - Cascades: shape adds retrieval criteria/mustNot, loop decomposes + retrieval per item
+  - Key insight: decomposition reduces constraints per sub-problem to Zone 1-2 where reasoning works
+  - Orthogonal to sizing (scope) and risk tier (blast radius) — cognitive risk is a distinct axis
 - [x] Kit skills redesign — flows over CLI docs (2026-02-22)
   - Rewrite: browser (161→132), portless (132→106), debug (141→125) — less lines, more judgment
   - Structure: Role + Rules (invariants) + Decision Tables (when) + Flows (how) + Anti-patterns

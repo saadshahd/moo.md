@@ -42,6 +42,10 @@ not from scratch.
    item. Mark dependencies between items. If Disposable=yes from shape:
    keep items ≤3, expect to discard.
 
+   Zone 3 override: decompose regardless of item count. Each item gets
+   retrieval (search/read) before generation. Carry includes "retrieved
+   vs assumed" in failure context.
+
    When decomposition requires codebase understanding (multi-module,
    unfamiliar codebase, 8+ items expected), spawn an Explore agent:
    Task(prompt="[session + criteria + mustNot] Analyze the codebase for
