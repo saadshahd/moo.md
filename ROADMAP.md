@@ -7,11 +7,24 @@
   - Note: ledger skill deferred — Claude Code native memory covers basic recall, MCP server targets real gaps
 
 ## Ideas
-- kit first skills — browser automation, structured debugging (dev3000-style), stable environments (portless-style)
-  - Research: vercel-labs/agent-browser, vercel-labs/dev3000, vercel-labs/portless
-  - Common thread: make dev primitives machine-readable and deterministic for agentic workflows
+- opensrc skill for kit — context enrichment via dependency source code (vercel-labs/opensrc)
+  - Deferred: standalone CLI with minimal wrapping value as a skill
 
 ## Decisions
+- [x] Kit skills redesign — flows over CLI docs (2026-02-22)
+  - Rewrite: browser (161→132), portless (132→106), debug (141→125) — less lines, more judgment
+  - Structure: Role + Rules (invariants) + Decision Tables (when) + Flows (how) + Anti-patterns
+  - Commands inline within flows only — no standalone reference tables
+  - Pattern follows hope:loop (Role + Principles + Flow) and hope:search (decision tables)
+  - 18 command syntax errors from initial grounding now irrelevant — commands embedded in context
+- [x] Kit first skills — browser, portless, debug (2026-02-22)
+  - Research: vercel-labs/agent-browser (14.9K★, v0.13.0), portless (2K★, v0.4.1), dev3000 (970★, canary)
+  - opensrc deferred: standalone CLI, minimal wrapping value
+  - No hooks: "fail loud, recover quiet" — let commands fail visibly, no preventive ceremony
+  - No dev-env meta-skill: composition emerges from good interfaces, not orchestration layers
+  - No plugin.json update yet — skills land first, version bump on release
+  - Grounding: each skill adapted from source repo SKILL.md/CLI, verified against actual command parser
+  - 18 command syntax errors caught in code review — source verification essential for reference cards
 - [x] Philosophy hierarchy + kit plugin scaffold (2026-02-22)
   - Root PHILOSOPHY.md → minimal (identity + mission only, 32 lines from 271)
   - hope/PHILOSOPHY.md created — all 10 beliefs, 16 principles, 13 constraints, statechart, unstuck
