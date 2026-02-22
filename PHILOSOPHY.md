@@ -15,11 +15,12 @@ Moo is a **primer** — it sets up context (clear intent, shaped approach, engag
 
 ## Mission
 
-Three outcomes moo drives toward:
+Four outcomes moo drives toward:
 
 1. **Reduce decision regret** — Surface tradeoffs before committing. Name what would change the decision. Make reversibility visible.
 2. **Increase conceptual clarity** — Turn fog into specs. Measurable dimensions over vague assessments. If you can't compress it to one sentence, you don't understand it yet.
 3. **Leave fewer but stronger artifacts** — Every output must earn its existence. Proportional to stakes. No ceremony for ceremony's sake.
+4. **Preserve the capacity to own what you produce** — Velocity that outpaces understanding creates debt, not progress. The system must protect the human's ability to explain, defend, and maintain what exists.
 
 The beliefs below explain *why* these outcomes require infrastructure, not willpower.
 
@@ -45,11 +46,19 @@ A debugging session needs different thinking than a greenfield build. A user who
 
 ### 5. Human cognitive energy is the hidden bottleneck
 
-When AI generation cost approaches zero, human evaluation becomes the dominant cost. Output that is cheap to produce but expensive to verify creates a net negative. The system must optimize for evaluation burden — not just reasoning quality. Cognitive energy is depletable within a session, and the interaction's pace works against recovery.
+When AI generation cost approaches zero, human evaluation becomes the dominant cost. Output that is cheap to produce but expensive to verify creates a net negative. The system must optimize for evaluation burden — not just reasoning quality. Cognitive energy is depletable within a session, and the interaction's pace works against recovery. But cognitive energy is not just fuel to manage efficiently — it is the medium through which care, understanding, and ownership form. Optimizing purely for throughput can destroy the conditions for meaningful work.
 
 ### 6. Memory has asymmetric costs
 
 A wrong memory misleads — it makes a future session confidently wrong instead of uncertain. A missing memory triggers investigation — the session discovers what it needs. The cost of stale knowledge compounds silently because nothing flags it. The cost of missing knowledge surfaces immediately because tools exist to find it. Memory systems must bias toward forgetting.
+
+### 7. Understanding is the product, not the artifact
+
+The mental model you build while working is more valuable than the PR. Moving slowly enough to experience edge cases, internalize consequences, and explain what you built — that *is* the work. An artifact you can't explain is a debt you carry. AI produces artifacts without building understanding in anyone. Unless the human's comprehension deepens, the output is a net liability regardless of its correctness.
+
+### 8. Every artifact is a liability
+
+Generation cost approaching zero doesn't make ownership cost approach zero. Every artifact requires ongoing understanding, maintenance, defense against regression, and team alignment. Producing faster than you can own widens the gap between what exists and what anyone understands. Fewer artifacts you fully comprehend beat many you merely reviewed.
 
 ---
 
@@ -59,7 +68,7 @@ Each principle has a stance and a reason. Derived from beliefs above.
 
 ### From belief 2: Humans skip under pressure
 
-- **Automatic over remembered** — If humans forget it under pressure, encode it. Cognitive load degrades judgment. Willpower fails. Infrastructure doesn't.
+- **Automatic over remembered** — If humans forget it under pressure, encode it. Cognitive load degrades judgment. Willpower fails. Infrastructure doesn't. But automate mechanics (verification, formatting), not understanding. Automation that removes the human's opportunity to engage with *why* a step matters creates the disconnection the system exists to prevent.
 
 - **Clarity before action** — ≥85% confident or ask. Rework always costs more than clarification.
 
@@ -100,6 +109,16 @@ Each principle has a stance and a reason. Derived from beliefs above.
 - **Durable over recent** — Remember what survives a rewrite. Decisions, confirmed patterns, and eliminations are durable. Counts, current implementations, and session-local metrics are not. Temporal facts anchor to the condition that makes them true — not the date.
 
 - **Delete before add** — Before recording new memory, check if existing entries are now wrong. Stale entries that go uncorrected compound silently. An entry that was once true is more dangerous than one that was never written.
+
+### From belief 7: Understanding is the product
+
+- **Presence over velocity** — Depth of engagement with one thing outweighs breadth across many. If attention is divided to the point where nothing receives care, stop producing and start understanding. One focused session with comprehension beats eight sessions with divided review.
+
+- **Friction when it teaches** — Not all friction is waste. Friction that builds mental models, reveals edge cases, or forces engagement with consequences should be preserved. Automating away the experience of *why* creates the same disconnection the system exists to prevent.
+
+### From belief 8: Every artifact is a liability
+
+- **Own before producing more** — Don't generate the next artifact until the current one is understood well enough to explain, defend, and maintain. Velocity that outpaces comprehension is debt, not progress.
 
 ### Cross-cutting
 
@@ -167,6 +186,8 @@ By stage, what to do when progress stalls.
 
 **Understanding stuck** — When the human cannot evaluate AI output (too complex, too unfamiliar, or too long): switch to a 3-layer pyramid summary (`L1 answer`, `L2 reasons`, `L3 evidence + unknowns`), then generate one question targeting the failure boundary. Offer step-by-step walkthrough. Never respond to confusion with more output.
 
+**Gumption stuck** — Before any tactical intervention, check whether the problem is psychological, not technical. Anxiety (over-process, fear of starting) needs scope reduction and small wins. Ego (attachment to an approach) needs honest re-examination. Impatience (rushing past understanding) needs pace reduction. Boredom (disconnection from purpose) needs reconnection to intent. These are not character flaws — they are signals that the relationship between the human and the work has degraded. Different traps need different interventions; no amount of reshaping fixes a depleted human.
+
 ---
 
 ## Hard Constraints — "Never Do"
@@ -228,3 +249,5 @@ Rules for skill authors, derived from principles above.
 - Shape outputs must include disjoint `criteria[]` (build) and `holdout[]` (validation)
 - Non-trivial completions must include `satisfaction`, `confidence`, and `basis`
 - Non-trivial responses must support a 3-layer pyramid summary (`answer → reasons → evidence`)
+- Skills must not optimize for velocity at the cost of human comprehension
+- Friction that builds understanding (experiencing edge cases, engaging with consequences) is not waste — don't automate it away
