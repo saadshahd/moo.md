@@ -9,9 +9,16 @@
     {
       "name": "hope",
       "source": "./hope",
-      "description": "Clarify intent, shape approach, compose teams, execute with verification, consult experts. Session strategy with 8 skills.",
+      "description": "Clarify intent, shape approach, compose teams, execute with verification, consult experts. Session strategy with 10 skills.",
       "category": "core",
       "keywords": ["intent", "shape", "loop", "consult", "bond", "forge", "search", "session", "verification", "expert", "team"]
+    },
+    {
+      "name": "kit",
+      "source": "./kit",
+      "description": "Tactical tooling — capability amplifiers for browser automation, structured debugging, stable environments.",
+      "category": "tools",
+      "keywords": ["tools", "automation", "browser", "debugging", "environment"]
     }
   ]
 }

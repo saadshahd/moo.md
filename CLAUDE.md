@@ -8,7 +8,8 @@ moo — mind on output. Stay present with AI.
 
 ```
 moo.md/
-├── hope/                    # Single plugin: 10 skills, 9 commands, hooks
+├── hope/                    # Pipeline plugin: 10 skills, 9 commands, hooks
+│   ├── PHILOSOPHY.md        # hope beliefs, principles, constraints
 │   ├── skills/
 │   │   ├── soul/            # Session strategy + thinking framework
 │   │   ├── intent/          # Clarify WHAT
@@ -23,6 +24,10 @@ moo.md/
 │   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, forge, full
 │   ├── hooks/               # SessionStart + SubagentStart + PreToolUse + PreCompact
 │   └── scripts/             # Per-turn session strategy injector
+├── kit/                     # Tooling plugin: capability amplifiers (scaffold)
+│   ├── PHILOSOPHY.md        # kit beliefs, principles, constraints
+│   ├── .claude-plugin/plugin.json
+│   └── skills/              # (empty — skills coming)
 ├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs
 └── .github/hooks/           # Git hooks (pre-push validates skills)
@@ -160,25 +165,11 @@ Use DOT for non-linear decision flows. Claude follows DOT structure more reliabl
 
 ## Philosophy (Enforce These)
 
-Core beliefs — every change to this project must align:
+moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every change to this project must serve at least one.
 
-moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every belief and principle below serves at least one.
-
-1. **Thinking = prevention** — Better thinking prevents mistakes. They're inseparable. Don't add safety nets separate from the thinking process.
-2. **Encode what humans forget** — If it matters under pressure, encode it in skills/hooks. Not docs. Not willpower. But automate mechanics, not understanding.
-3. **Perspectives prevent blindness** — Solo thinking has systematic blind spots. Seek multiple expert lenses.
-4. **Adapt to context** — Never force one workflow. Respect session type and engagement level.
-5. **Primer over tool** — moo instills thinking habits, not just processes. Context AND behavior persist.
-6. **Loose coupling** — Natural language triggers between skills. No hard imports. If a skill isn't installed, nothing breaks.
-7. **Boundaries over aspirations** — Define forbidden states before ideal states. Negative constraints survive ambiguity.
-8. **Co-located constraints** — Embed rules in the artifact that crosses the boundary. Separate context vanishes.
-9. **Holdout criteria separation** — Keep `criteria[]` (build) and `holdout[]` (validation) disjoint.
-10. **Satisfaction before done** — Non-trivial completion must include satisfaction score, confidence, and basis.
-11. **Pyramid summaries by default** — Non-trivial responses use L1 answer, L2 reasons, L3 evidence.
-12. **Understanding is the product** — The mental model built while working matters more than the artifact. An output nobody comprehends is a liability.
-13. **Presence over velocity** — Depth of engagement with one thing outweighs breadth across many. Divided attention produces artifacts without understanding.
-14. **Agency requires authorship** — Reviewing what you didn't create transfers understanding weakly. The friction of making is the channel. Delegate only when you can verify honestly.
-15. **Peace of mind precedes quality** — Not a budget to optimize — a precondition. Output cannot exceed the quality of the mind producing it. Stop before calm breaks.
+See `PHILOSOPHY.md` for core identity and mission.
+See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints.
+See `kit/PHILOSOPHY.md` for kit beliefs, principles, and constraints.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -192,19 +183,12 @@ moo drives toward four outcomes: **reduce decision regret**, **increase conceptu
 - [ ] Does this create coupling that breaks if a skill is missing? → Loose coupling required
 - [ ] Does this build something Claude will do natively? → Don't compete with the platform
 - [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts / ownership capacity)? → Every mechanism must trace to an outcome
-- [ ] Does this assert verifiable facts from memory? → Retrieved over recalled
-- [ ] Are `criteria[]` and `holdout[]` disjoint? → No criteria leakage
-- [ ] Does non-trivial completion include satisfaction + confidence + basis? → No assumption-only done claims
-- [ ] Does non-trivial output use the 3-layer pyramid (answer/reasons/evidence)? → Minimize evaluation burden
-- [ ] Does this optimize velocity at the cost of human comprehension? → Understanding is the product
-- [ ] Does this automate away friction that builds mental models? → Preserve friction that teaches
-- [ ] Does this increase what the human owns without increasing what they understand? → Authorship over review
+
+See `<plugin>/PHILOSOPHY.md` for plugin-specific audit items.
 
 ### Statechart (Canonical Reference)
 
-See `docs/statechart.md` for the full hierarchical state machine. This is the single source of truth for plugin flow. When adding or modifying skills, verify alignment with the statechart. When the statechart changes, update affected skills.
-
-See `PHILOSOPHY.md` for full beliefs, principles (stance + why), and constraints.
+See `docs/statechart.md` for hope's pipeline state machine. This is the single source of truth for hope's skill flow. When adding or modifying hope skills, verify alignment with the statechart.
 
 ## Compact Instructions
 
@@ -254,4 +238,6 @@ Track all changes in `CHANGELOG.md` at repo root.
 
 **IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.
 
-See `PHILOSOPHY.md` for core principles.
+See `PHILOSOPHY.md` for core identity and mission.
+See `hope/PHILOSOPHY.md` for hope pipeline philosophy.
+See `kit/PHILOSOPHY.md` for kit tooling philosophy.

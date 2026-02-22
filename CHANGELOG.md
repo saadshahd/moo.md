@@ -9,6 +9,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat(kit): scaffold plugin — tactical tooling philosophy, plugin.json, marketplace registration
+- docs(kit): PHILOSOPHY.md with 5 beliefs, 6 principles, 5 constraints
+- docs(hope): PHILOSOPHY.md — extracted from root, hope-specific beliefs/principles/constraints/statechart
+
+### Changed
+- refactor: philosophy hierarchy — root PHILOSOPHY.md minimal (identity + mission), plugin-specific philosophy in hope/ and kit/
+- docs(root): CLAUDE.md philosophy section references plugin philosophies instead of inline beliefs
+- docs(root): CLAUDE.md structure includes kit plugin
+- docs(root): PHILOSOPHY.md slimmed from 271 to ~30 lines
+- chore: marketplace.json registers kit, updates hope description to 10 skills
+- chore: pre-push hook validates both hope/ and kit/ plugin directories
+
 ---
 
 ## [hope@3.11.0] - 2026-02-22

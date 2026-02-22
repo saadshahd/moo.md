@@ -7,8 +7,17 @@
   - Note: ledger skill deferred — Claude Code native memory covers basic recall, MCP server targets real gaps
 
 ## Ideas
+- kit first skills — browser automation, structured debugging (dev3000-style), stable environments (portless-style)
+  - Research: vercel-labs/agent-browser, vercel-labs/dev3000, vercel-labs/portless
+  - Common thread: make dev primitives machine-readable and deterministic for agentic workflows
 
 ## Decisions
+- [x] Philosophy hierarchy + kit plugin scaffold (2026-02-22)
+  - Root PHILOSOPHY.md → minimal (identity + mission only, 32 lines from 271)
+  - hope/PHILOSOPHY.md created — all 10 beliefs, 16 principles, 13 constraints, statechart, unstuck
+  - kit plugin scaffolded — 5 beliefs (invisible, composable, AI-native, speed+awareness, env=infra)
+  - CLAUDE.md inline beliefs replaced with plugin philosophy references
+  - User chose: truly minimal root (no shared belief layer), structured-but-flexible plugin format
 - [x] Deep philosophy audit — skills vs PHILOSOPHY.md structural alignment (2026-02-22)
   - Finding: beliefs 7/9/10 (understanding, authorship, peace of mind) least mechanized
   - Artifact quality rigorously protected; human comprehension had no structural enforcement
