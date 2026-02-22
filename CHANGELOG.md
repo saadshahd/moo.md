@@ -7,6 +7,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added
+- docs: Belief 7 "Understanding is the product, not the artifact" — mental models matter more than PRs
+- docs: Belief 8 "Every artifact is a liability" — ownership cost doesn't approach zero with generation cost
+- docs: Mission outcome 4 "Preserve the capacity to own what you produce"
+- docs: Principles "Presence over velocity", "Friction when it teaches", "Own before producing more"
+- docs: Gumption-aware unstuck strategy — anxiety/ego/impatience/boredom as psychological traps distinct from technical blocks
+- docs: Philosophy audit checks for velocity-vs-comprehension and friction-that-teaches
+- docs: Anti-patterns for output volume optimization and understanding-friction automation
+
+### Changed
+- docs: Belief 5 expanded — cognitive energy as medium for care/understanding, not just fuel to manage
+- docs: "Automatic over remembered" principle caveated — automate mechanics, not understanding
+- docs: Mission expanded from 3 to 4 outcomes
+- docs: CLAUDE.md philosophy beliefs expanded from 11 to 13
+
+---
+
 ## [hope@3.10.1] - 2026-02-21
 
 ### Added

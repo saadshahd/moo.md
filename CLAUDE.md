@@ -162,10 +162,10 @@ Use DOT for non-linear decision flows. Claude follows DOT structure more reliabl
 
 Core beliefs — every change to this project must align:
 
-moo drives toward three outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**. Every belief and principle below serves at least one.
+moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every belief and principle below serves at least one.
 
 1. **Thinking = prevention** — Better thinking prevents mistakes. They're inseparable. Don't add safety nets separate from the thinking process.
-2. **Encode what humans forget** — If it matters under pressure, encode it in skills/hooks. Not docs. Not willpower.
+2. **Encode what humans forget** — If it matters under pressure, encode it in skills/hooks. Not docs. Not willpower. But automate mechanics, not understanding.
 3. **Perspectives prevent blindness** — Solo thinking has systematic blind spots. Seek multiple expert lenses.
 4. **Adapt to context** — Never force one workflow. Respect session type and engagement level.
 5. **Primer over tool** — moo instills thinking habits, not just processes. Context AND behavior persist.
@@ -175,6 +175,8 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 9. **Holdout criteria separation** — Keep `criteria[]` (build) and `holdout[]` (validation) disjoint.
 10. **Satisfaction before done** — Non-trivial completion must include satisfaction score, confidence, and basis.
 11. **Pyramid summaries by default** — Non-trivial responses use L1 answer, L2 reasons, L3 evidence.
+12. **Understanding is the product** — The mental model built while working matters more than the artifact. An output nobody comprehends is a liability.
+13. **Presence over velocity** — Depth of engagement with one thing outweighs breadth across many. Divided attention produces artifacts without understanding.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -187,11 +189,13 @@ moo drives toward three outcomes: **reduce decision regret**, **increase concept
 - [ ] Does this hardcode references to specific skills? → Natural language triggers only
 - [ ] Does this create coupling that breaks if a skill is missing? → Loose coupling required
 - [ ] Does this build something Claude will do natively? → Don't compete with the platform
-- [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts)? → Every mechanism must trace to an outcome
+- [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts / ownership capacity)? → Every mechanism must trace to an outcome
 - [ ] Does this assert verifiable facts from memory? → Retrieved over recalled
 - [ ] Are `criteria[]` and `holdout[]` disjoint? → No criteria leakage
 - [ ] Does non-trivial completion include satisfaction + confidence + basis? → No assumption-only done claims
 - [ ] Does non-trivial output use the 3-layer pyramid (answer/reasons/evidence)? → Minimize evaluation burden
+- [ ] Does this optimize velocity at the cost of human comprehension? → Understanding is the product
+- [ ] Does this automate away friction that builds mental models? → Preserve friction that teaches
 
 ### Statechart (Canonical Reference)
 
@@ -225,6 +229,8 @@ When compacting conversation history, always preserve:
 - Building features Claude Code will ship natively (task management, memory, tool orchestration)
 - Cargo cult process steps (ritual without reason)
 - Skill behavior that contradicts `docs/statechart.md` (statechart is canonical)
+- Optimizing for output volume while degrading human comprehension
+- Automating friction that builds understanding (edge case exploration, consequence engagement)
 
 ## Changelog
 
