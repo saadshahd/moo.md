@@ -16,16 +16,10 @@
   - New principles: presence over velocity, friction when it teaches, own before producing more
   - New unstuck type: gumption traps (anxiety/ego/impatience/boredom)
   - Mission expanded 3→4 outcomes; "automatic over remembered" caveated
-- [ ] Phase 2 gap analysis — 8 proposed additions evaluated, 3 redundant, 5 genuine (2026-02-22)
+- [x] Phase 2 gap analysis — beliefs 9-10, constraint 13, authorship principle (2026-02-22)
   - Three-text triangulation: shared thesis = "Quality requires contact with reality + coherent authorship"
   - Redundant: belief 5 update (already covered), pace-over-velocity (= presence-over-velocity), 2nd audit item
-  - Genuine gaps identified:
-    - Authorship/review distinction — reviewing ≠ creating; no current text names this mechanism
-    - Peace of mind as precondition — reframes cognitive energy from "budget" to "binary state"
-    - Parallel ownership constraint — understanding test, not workflow prescription
-    - "Authorship over review" principle — litmus: reverse-engineering stranger's intent = liability
-    - Audit item: ownership-understanding gap check
-  - Decision: draft tightened versions as beliefs 9-10, constraint 13, 1 principle, 1 audit item
+  - Implemented: belief 9 (agency/authorship), belief 10 (peace of mind), constraint 13, 2 principles, 1 audit item
 - [x] Memory as thinking principle — belief 6, soul principle 8, action directive (2026-02-21)
   - No Stop hook — embed guidance in system prompt, not gate exit
   - MEMORY.md self-reference reinforces per-project

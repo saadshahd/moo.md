@@ -60,6 +60,14 @@ The mental model you build while working is more valuable than the PR. Moving sl
 
 Generation cost approaching zero doesn't make ownership cost approach zero. Every artifact requires ongoing understanding, maintenance, defense against regression, and team alignment. Producing faster than you can own widens the gap between what exists and what anyone understands. Fewer artifacts you fully comprehend beat many you merely reviewed.
 
+### 9. Agency requires authorship
+
+Reviewing an artifact you didn't create is a fundamentally different cognitive act than creating it. Creation builds the mental model; review checks someone else's. When AI generates and you approve, understanding transfers weakly — you learn what was done, not why it had to be done that way. The friction of making something yourself is the channel through which understanding transfers. Remove the friction and you remove the channel. Delegate execution only when you understand the domain well enough to verify honestly.
+
+### 10. Peace of mind precedes quality
+
+Quality of output cannot exceed quality of mind. Peace of mind is not a resource to budget — it is a precondition that either exists or doesn't. A system that generates more work than the human can hold with calm attention is a net negative regardless of output quality. Velocity that destroys the capacity for quiet attention destroys the capacity for good judgment. Stop before you can't think clearly.
+
 ---
 
 ## Principles
@@ -119,6 +127,14 @@ Each principle has a stance and a reason. Derived from beliefs above.
 ### From belief 8: Every artifact is a liability
 
 - **Own before producing more** — Don't generate the next artifact until the current one is understood well enough to explain, defend, and maintain. Velocity that outpaces comprehension is debt, not progress.
+
+### From belief 9: Agency requires authorship
+
+- **Authorship over review** — The human learns by making, not by approving. Delegate execution when you understand the domain well enough to verify honestly. If reviewing AI output feels like reverse-engineering a stranger's intent, you're not the author — you're a liability holder. Stay close enough to the work that your mental model evolves with it.
+
+### From belief 10: Peace of mind precedes quality
+
+- **Calm before more** — When attention fragments or anxiety rises, stop producing. No amount of output compensates for degraded judgment. Reduce scope, close threads, return to one thing held with care. The system must never generate more work than the human can hold with quiet attention.
 
 ### Cross-cutting
 
@@ -204,6 +220,7 @@ By stage, what to do when progress stalls.
 10. **Default to less. Expand on request.** — Every response starts at minimum disclosure: what was done, verification status, and what decision comes next. More detail flows on request or when verification is assumption-only. Never push complexity the human didn't pull.
 11. **No criteria leakage** — Never validate completion using criteria that were also used to guide implementation. `criteria[]` and `holdout[]` must stay disjoint.
 12. **No completion without satisfaction metadata** — Non-trivial "done" claims must include satisfaction score, confidence, and evidence basis.
+13. **No ownership without understanding** — If you can't describe what changed and why without reading the diff, you don't own it. Multiple concurrent agent sessions create ownership the human can't hold. Each demands high-energy context recovery. One focused stream by default; expand only when understanding keeps pace.
 
 ---
 

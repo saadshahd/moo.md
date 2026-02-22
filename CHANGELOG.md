@@ -12,9 +12,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - docs: Belief 7 "Understanding is the product, not the artifact" — mental models matter more than PRs
 - docs: Belief 8 "Every artifact is a liability" — ownership cost doesn't approach zero with generation cost
+- docs: Belief 9 "Agency requires authorship" — reviewing ≠ creating; friction of making is the transfer channel
+- docs: Belief 10 "Peace of mind precedes quality" — not a budget, a precondition for judgment
 - docs: Mission outcome 4 "Preserve the capacity to own what you produce"
 - docs: Principles "Presence over velocity", "Friction when it teaches", "Own before producing more"
+- docs: Principle "Authorship over review" — litmus test for honest delegation vs liability-holding
+- docs: Principle "Calm before more" — stop producing when attention fragments
+- docs: Hard constraint 13 "No ownership without understanding" — parallel sessions create unownable output
 - docs: Gumption-aware unstuck strategy — anxiety/ego/impatience/boredom as psychological traps distinct from technical blocks
+- docs: Philosophy audit check for ownership-understanding gap
+- docs: Anti-pattern for parallel agent sessions exceeding attention span
 - docs: Philosophy audit checks for velocity-vs-comprehension and friction-that-teaches
 - docs: Anti-patterns for output volume optimization and understanding-friction automation
 
@@ -22,7 +29,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - docs: Belief 5 expanded — cognitive energy as medium for care/understanding, not just fuel to manage
 - docs: "Automatic over remembered" principle caveated — automate mechanics, not understanding
 - docs: Mission expanded from 3 to 4 outcomes
-- docs: CLAUDE.md philosophy beliefs expanded from 11 to 13
+- docs: CLAUDE.md philosophy beliefs expanded from 13 to 15
 
 ---
 
