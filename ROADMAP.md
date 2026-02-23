@@ -11,6 +11,13 @@
   - Deferred: standalone CLI with minimal wrapping value as a skill
 
 ## Decisions
+- [x] Kit SessionStart hook — environment discovery for compaction resilience (2026-02-23)
+  - Session e5e7bc18: agent wasted turns rediscovering d3k + portless after context loss
+  - Root cause: kit had zero hooks — env state only in conversation memory
+  - Fix: SessionStart hook discovers `portless list` routes + `d3k cdp-port` on every session event
+  - Outputs `<kit-environment>` tag with ready-to-use commands (snapshot, screenshot, errors)
+  - No-op when tools not installed or nothing running — clean `{}`
+  - Philosophy: discovers ephemeral system state, not persistent state. Stateless between invocations.
 - [x] Cognitive risk zones — 3rd classification axis in soul (2026-02-22)
   - Research: models don't self-diagnose; extended thinking hurts on high-complexity tasks
   - 3 dimensions: novelty, reasoning depth, freshness. Highest wins → Zone 1/2/3
@@ -33,7 +40,7 @@
 - [x] Kit first skills — browser, portless, watch (2026-02-22)
   - Research: vercel-labs/agent-browser (14.9K★, v0.13.0), portless (2K★, v0.4.1), dev3000 (970★, canary)
   - opensrc deferred: standalone CLI, minimal wrapping value
-  - No hooks: "fail loud, recover quiet" — let commands fail visibly, no preventive ceremony
+  - SessionStart hook added later (2026-02-23) — environment discovery, not preventive ceremony
   - No dev-env meta-skill: composition emerges from good interfaces, not orchestration layers
   - No plugin.json update yet — skills land first, version bump on release
   - Grounding: each skill adapted from source repo SKILL.md/CLI, verified against actual command parser

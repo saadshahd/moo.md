@@ -24,10 +24,12 @@ moo.md/
 │   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, forge, full
 │   ├── hooks/               # SessionStart + SubagentStart + PreToolUse + PreCompact
 │   └── scripts/             # Per-turn session strategy injector
-├── kit/                     # Tooling plugin: capability amplifiers (scaffold)
+├── kit/                     # Tooling plugin: capability amplifiers
 │   ├── PHILOSOPHY.md        # kit beliefs, principles, constraints
 │   ├── .claude-plugin/plugin.json
-│   └── skills/              # (empty — skills coming)
+│   ├── hooks/               # SessionStart (environment discovery)
+│   ├── scripts/             # Hook scripts
+│   └── skills/              # browser, portless, watch
 ├── prompts/                 # Standalone prompt library
 ├── docs/                    # User docs
 └── .github/hooks/           # Git hooks (pre-push validates skills)
@@ -73,13 +75,14 @@ See [docs/dev/local-development.md](docs/dev/local-development.md) for full work
 
 Hooks use `async: true` only when intentional — async output arrives on the **next** turn, not the current one.
 
-| Hook | Sync/Async | Why |
-|------|-----------|-----|
-| SessionStart | **Sync** | Soul content must be available on turn 1 |
-| SubagentStart | **Sync** (prompt) | Subagents need criteria before executing |
-| PreToolUse:Bash | **Sync** | Denies `grep` — enforces rg/sg usage |
-| PreToolUse:ExitPlanMode | **Sync** | Sequential deny chain: pipeline artifacts → coverage verification, max 3 denials |
-| PreCompact | **Sync** (prompt) | Must extract state before compaction runs |
+| Plugin | Hook | Sync/Async | Why |
+|--------|------|-----------|-----|
+| hope | SessionStart | **Sync** | Soul content must be available on turn 1 |
+| kit | SessionStart | **Sync** | Discovers running portless routes + d3k instances |
+| hope | SubagentStart | **Sync** (prompt) | Subagents need criteria before executing |
+| hope | PreToolUse:Bash | **Sync** | Denies `grep` — enforces rg/sg usage |
+| hope | PreToolUse:ExitPlanMode | **Sync** | Sequential deny chain: pipeline artifacts → coverage verification, max 3 denials |
+| hope | PreCompact | **Sync** (prompt) | Must extract state before compaction runs |
 
 **Project-level hooks** (in `.claude/settings.json`, not shipped with plugin):
 

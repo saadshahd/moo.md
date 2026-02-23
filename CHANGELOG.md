@@ -10,6 +10,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- feat(kit): SessionStart hook — discovers running portless routes and d3k instances, injects as `<kit-environment>` context on startup/resume/clear/compact
 - feat(kit): browser skill — agent-browser adaptation for headless browser automation (snapshot-ref-interact cycle, diff-based verification, session management)
 - feat(kit): portless skill — stable named .localhost URLs for dev servers (proxy management, framework detection, HTTPS)
 - feat(kit): watch skill — dev3000 monitored development (unified timeline, CDP browser monitoring, auto-composition with portless)
