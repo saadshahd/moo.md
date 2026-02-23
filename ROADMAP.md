@@ -18,13 +18,19 @@
   - Cascades: shape adds retrieval criteria/mustNot, loop decomposes + retrieval per item
   - Key insight: decomposition reduces constraints per sub-problem to Zone 1-2 where reasoning works
   - Orthogonal to sizing (scope) and risk tier (blast radius) — cognitive risk is a distinct axis
+- [x] Kit debug → watch rename + auto-composition (2026-02-23)
+  - Session audit: /debug collision with Claude Code built-in, passive composition docs, d3k CLI gaps
+  - Renamed to `watch` — triggers on "watch", "monitor", "d3k", avoids namespace collision
+  - Startup directive: active composition (portless + d3k + CDP browser), not passive reference
+  - Inspect flow: read page state via d3k CDP bridge when user asks "what went wrong"
+  - Fixed: long-form flags (--context, --type) to avoid -c collision with --command
 - [x] Kit skills redesign — flows over CLI docs (2026-02-22)
-  - Rewrite: browser (161→132), portless (132→106), debug (141→125) — less lines, more judgment
+  - Rewrite: browser (161→132), portless (132→106), watch (141→130) — less lines, more judgment
   - Structure: Role + Rules (invariants) + Decision Tables (when) + Flows (how) + Anti-patterns
   - Commands inline within flows only — no standalone reference tables
   - Pattern follows hope:loop (Role + Principles + Flow) and hope:search (decision tables)
   - 18 command syntax errors from initial grounding now irrelevant — commands embedded in context
-- [x] Kit first skills — browser, portless, debug (2026-02-22)
+- [x] Kit first skills — browser, portless, watch (2026-02-22)
   - Research: vercel-labs/agent-browser (14.9K★, v0.13.0), portless (2K★, v0.4.1), dev3000 (970★, canary)
   - opensrc deferred: standalone CLI, minimal wrapping value
   - No hooks: "fail loud, recover quiet" — let commands fail visibly, no preventive ceremony

@@ -101,6 +101,6 @@ Stale routes auto-clean when the owning process PID dies. WebSocket proxying (HM
 ## Composition
 
 - **With browser:** `agent-browser open "http://myapp.localhost:1355"` — stable URL across all sessions and restarts
-- **With debug:** d3k wraps the dev command, portless wraps the name — `portless myapp d3k next dev` for monitored development with stable URLs
+- **With watch:** d3k wraps the dev command, portless wraps the name — `portless myapp d3k -c "bun run dev" --no-tui --no-skills --no-agent` for monitored development with stable URLs
 - **With hope:loop:** consistent URLs across wave iterations — port changes between restarts don't break automation
 - **With agents:** any agent can `portless list` to discover running services without knowing ports

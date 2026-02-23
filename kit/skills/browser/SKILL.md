@@ -118,7 +118,7 @@ Locator type first, then value, then action. Defaults to `click` if no action sp
 ## Composition
 
 - **With portless:** use `myapp.localhost:1355` URLs — stable across restarts, no port guessing
-- **With debug:** d3k monitors server + browser while agent-browser interacts — full context alongside automation via `d3k agent-browser --cdp $(d3k cdp-port)`
+- **With watch:** d3k monitors server + browser while agent-browser interacts — full context alongside automation via `d3k agent-browser --cdp $(d3k cdp-port)`
 - **With hope:loop:** browser diff output as verification evidence in wave reports
 - **With hope:verify:** screenshot diffs for visual regression assertions in pre-PR checks
 

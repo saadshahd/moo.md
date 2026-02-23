@@ -12,12 +12,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 - feat(kit): browser skill — agent-browser adaptation for headless browser automation (snapshot-ref-interact cycle, diff-based verification, session management)
 - feat(kit): portless skill — stable named .localhost URLs for dev servers (proxy management, framework detection, HTTPS)
-- feat(kit): debug skill — dev3000 structured debugging (unified timeline, CDP monitoring, screenshot workflow)
+- feat(kit): watch skill — dev3000 monitored development (unified timeline, CDP browser monitoring, auto-composition with portless)
 - feat(kit): scaffold plugin — tactical tooling philosophy, plugin.json, marketplace registration
 - docs(kit): PHILOSOPHY.md with 5 beliefs, 6 principles, 5 constraints
 - docs(hope): PHILOSOPHY.md — extracted from root, hope-specific beliefs/principles/constraints/statechart
 
 ### Changed
+- refactor(kit): rename debug → watch — avoids /debug collision with Claude Code built-in, adds Startup directive (auto-composes portless + d3k with CDP browser), Inspect flow for reading page state
 - refactor(kit): skills redesign — flows over CLI docs; Role + Rules + Decision Tables + Flows replace command reference tables
 - refactor: philosophy hierarchy — root PHILOSOPHY.md minimal (identity + mission), plugin-specific philosophy in hope/ and kit/
 - docs(root): CLAUDE.md philosophy section references plugin philosophies instead of inline beliefs

@@ -1,8 +1,8 @@
 {
   "name": "kit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tactical tooling — capability amplifiers that make Claude faster, more informed, more capable.",
-  "keywords": ["tools", "automation", "browser", "debugging", "environment"],
+  "keywords": ["tools", "automation", "browser", "monitoring", "environment"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"
