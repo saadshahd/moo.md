@@ -36,9 +36,19 @@ EOF
   exit 0
 }
 
+# --- Extract assistant text for artifact checks ---
+# Searches assistant output only — not loaded skill definitions, tool results, or system content.
+ASSISTANT_TEXT=$(jq -r '
+  select(.type == "assistant") |
+  .message.content |
+  if type == "array" then [.[] | select(.type == "text") | .text] | join("\n")
+  elif type == "string" then .
+  else "" end
+' "$TRANSCRIPT" 2>/dev/null || true)
+
 has_artifact() {
   local count
-  count=$(rg -c "$1" "$TRANSCRIPT" 2>/dev/null || echo "0")
+  count=$(echo "$ASSISTANT_TEXT" | rg -c "$1" 2>/dev/null || echo "0")
   [[ "$count" != "0" ]]
 }
 
@@ -65,14 +75,8 @@ EOF
   exit 0
 fi
 
-# --- Parse [SESSION] marker from assistant messages ---
-SESSION=$(jq -r '
-  select(.type == "assistant") |
-  .message.content |
-  if type == "array" then [.[] | select(.type == "text") | .text] | join("\n")
-  elif type == "string" then .
-  else "" end
-' "$TRANSCRIPT" 2>/dev/null | rg -o '\[SESSION\].*' 2>/dev/null | tail -1 || true)
+# --- Parse [SESSION] marker from assistant text (reuses ASSISTANT_TEXT) ---
+SESSION=$(echo "$ASSISTANT_TEXT" | rg -o '\[SESSION\].*' 2>/dev/null | tail -1 || true)
 
 [[ -z "$SESSION" ]] && exit 0
 

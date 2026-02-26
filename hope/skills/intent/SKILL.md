@@ -36,6 +36,11 @@ with vague ones.
    Pre-populate matching fields and mark `[USER-PROVIDED]`. Focus questions
    on gaps, not fields already answered.
 
+   **Structured input present?** When task arrives with existing proposal,
+   design, specs, task lists, or OBJECTIVE/ACCEPTANCE blocks: extract and
+   validate — do not re-clarify. Score (step 2). If ≥ 8, emit brief
+   directly from existing materials.
+
    | Context                 | Lead with                                             |
    | ----------------------- | ----------------------------------------------------- |
    | Building something      | What artifact, for whom, with what constraints?       |

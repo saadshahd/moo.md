@@ -11,6 +11,14 @@
   - Deferred: standalone CLI with minimal wrapping value as a skill
 
 ## Decisions
+- [x] Exit-plan-gate false positive + pipeline alignment (2026-02-26)
+  - Source: ui-ir planning session — gate passed artifacts it shouldn't have (0 in assistant text, 1 in full JSONL)
+  - Critical: `has_artifact()` searched entire JSONL including loaded skill definitions — bypassed deny chain
+  - Fix: extract assistant text once with jq, search that instead of raw transcript
+  - full.md: plan mode awareness (stages produce artifacts, execution defers), completion signals per stage
+  - intent: structured input fast-path — pre-existing proposals/specs skip re-clarification
+  - Marker: `Pipeline:` + `Zone:` format canonicalized across full.md, CLAUDE.md, statechart, PreCompact
+  - Key insight: hook scripts searching transcripts must scope to assistant text — skill content pollutes matching
 - [x] Pipeline friction fixes — output discipline, quiet consult, plan self-containment (2026-02-26)
   - Source: two ui-ir sessions exposed ~60% output waste, 3 ExitPlanMode rejections, stripped skill refs
   - SubagentStart primer: +3 lines (synthesize, no openers, skill fidelity) — waste originates in subagents
@@ -77,10 +85,7 @@
   - Three-text triangulation: shared thesis = "Quality requires contact with reality + coherent authorship"
   - Redundant: belief 5 update (already covered), pace-over-velocity (= presence-over-velocity), 2nd audit item
   - Implemented: belief 9 (agency/authorship), belief 10 (peace of mind), constraint 13, 2 principles, 1 audit item
-- [x] Memory as thinking principle — belief 6, soul principle 8, action directive (2026-02-21)
-  - No Stop hook — embed guidance in system prompt, not gate exit
-  - MEMORY.md self-reference reinforces per-project
-  - Project Stop hook slimmed to roadmap-only
+- [x] Memory as thinking principle — belief 6, soul principle 8, no Stop hook (2026-02-21)
 - [x] verify + observe skills — parallel pre-flight verification + codebase health assessment (2026-02-19)
   - Research: Factory.ai Agent Readiness (8 axes), StrongDM Software Factory (scenario testing), Anthropic 2026 Trends
   - verify: 4 parallel specialists (correctness, security, performance, standards) → SHIP/FIX/BLOCK gate
@@ -89,9 +94,6 @@
 - [x] Factory-inspired verification — holdout separation, satisfaction scoring, pyramids (2026-02-19)
   - StrongDM Software Factory research → 3 adapted concepts, 2 new constraints, 3 new principles
   - criteria[] guides, holdout[] evaluates, mustNot[] prevents — disjoint by design
-- [x] Roadmap surfacing via hooks — SessionStart, PostToolUse guard, Stop nudge (2026-02-14)
-- [x] Stop hook: command over prompt — deterministic bash avoids haiku JSON failures (2026-02-14)
-- [x] PR #21 research distillation — 2 new principles, 1 belief deepening, no new beliefs (2026-02-14)
-- [x] Consult output: concern-oriented over expert-oriented, prohibitions over templates (2026-02-14)
+- [x] Foundation batch — roadmap hooks, stop hook (cmd>prompt), PR#21 distillation, consult output (2026-02-14)
 
 ## Parked

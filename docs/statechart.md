@@ -478,7 +478,7 @@ stateDiagram-v2
   explore_interrupt --> [*] : hand-off to shape
 ```
 
-**Session marker:** `[SESSION] Type: Build | Engagement: Collaborative | Horizon: Strategic | Feasible: time (2h) | Zone: 2 (freshness)` — emitted after strategy set, maintained through conversation, preserved on compaction. Horizon defaults: Build/Plan → Strategic, Debug → Tactical, Reflect → Existential. Feasibility defaults: Build → solo, Debug → time, Plan/Reflect → none. Zone 1 omits the dimension parenthetical.
+**Session marker:** `[SESSION] Pipeline: intent → shape → loop | Engagement: Collaborative | Horizon: Strategic | Feasible: time (2h) | Zone: 2 (freshness)` — emitted after strategy set, maintained through conversation, preserved on compaction. Horizon defaults: Build/Plan → Strategic, Debug → Tactical, Reflect → Existential. Feasibility defaults: Build → solo, Debug → time, Plan/Reflect → none. Zone 1 omits the dimension parenthetical.
 
 **Compaction resilience:** If marker lost, re-derive from conversation artifacts. If re-derivation fails, ask user. Be transparent about gaps.
 

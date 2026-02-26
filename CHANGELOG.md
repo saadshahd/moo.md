@@ -30,6 +30,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.12.3] - 2026-02-26
+
+### Fixed
+- fix(hope): exit-plan-gate `has_artifact()` false positives — searched entire JSONL (skill definitions, tool results) instead of assistant output only; pipeline artifact checks now extract assistant text first
+- fix(hope): full.md session marker — `Type:` → `Pipeline:` format with Zone, matches soul canonical template
+
+### Changed
+- feat(hope): full.md plan mode awareness — stages produce structured artifacts in conversation, execution defers to post-approval
+- feat(hope): full.md pre-structured input — recognizes existing proposals/designs/tasks, routes to intent validation not re-clarification
+- feat(hope): full.md completion signals — each stage names its output contract (`OBJECTIVE:` + `ACCEPTANCE`, `criteria[]` + `mustNot[]`, SHIP/FIX/BLOCK)
+- feat(hope): intent structured input fast-path — scores pre-existing specs, emits brief directly when ≥ 8
+- docs: session marker format aligned across CLAUDE.md, statechart.md, full.md, soul, PreCompact hook
+
+---
+
 ## [hope@3.12.2] - 2026-02-26
 
 ### Changed

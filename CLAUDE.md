@@ -196,7 +196,7 @@ See `docs/statechart.md` for hope's pipeline state machine. This is the single s
 ## Compact Instructions
 
 When compacting conversation history, always preserve:
-- The `[SESSION] Type: X | Engagement: Y | Horizon: Z | Feasible: W` marker
+- The `[SESSION] Pipeline: [phases] | Engagement: [level] | Horizon: [horizon] | Feasible: [axis] ([bound]) | Zone: [1-3]` marker
 - Active criteria, holdout criteria, mustNot constraints, horizon, and feasibility axis + bound from shape
 - Current loop progress (wave number, items completed)
 - Failed approaches and what they ruled out

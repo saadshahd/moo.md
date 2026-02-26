@@ -6,6 +6,10 @@ description: Run the complete hope pipeline — session setup, intent, shape, co
 
 ORCHESTRATE. Execute each stage below in strict order. Do not skip or combine stages. Each stage MUST complete before starting the next.
 
+**Plan mode?** Pipeline still runs — stages produce structured artifacts
+(OBJECTIVE, criteria[], mustNot[]) in conversation. The plan file captures
+the execution protocol. Stages 6-7 defer to post-approval.
+
 **Task:** $0
 
 ---
@@ -14,21 +18,24 @@ ORCHESTRATE. Execute each stage below in strict order. Do not skip or combine st
 
 Ask the user: "How would you like to work? Autonomous / Collaborative [default] / Guided? Horizon: Tactical / Strategic [default]?"
 
-STOP. Wait for user response. After they answer, detect session type from the task (Build/Debug/Plan/Reflect) and emit:
+STOP. Wait for user response. After they answer, detect session type from the task (Build/Debug/Plan/Reflect), assess cognitive zone, and emit:
 
-`[SESSION] Type: X | Engagement: Y | Horizon: Z | Feasible: W`
+`[SESSION] Pipeline: [phases] | Engagement: [level] | Horizon: [horizon] | Feasible: [axis] ([bound]) | Zone: [1-3] ([dimension])`
 
 ## Stage 2 — Intent
 
+If task already has structured spec (proposal, design, tasks, OBJECTIVE):
+pass to intent for validation, not re-clarification.
+
 Run the intent skill now: Skill(skill="hope:intent", args="$0")
 
-STOP. Do not proceed until intent completes with OBJECTIVE/ACCEPTANCE/STOP.
+Complete when assistant output contains: `OBJECTIVE:` + `ACCEPTANCE` bullets.
 
 ## Stage 3 — Shape or Consult
 
 Route by session type:
 - **Build / Debug / Plan:** run the shape skill now: Skill(skill="hope:shape")
-  STOP. Wait for criteria[]/mustNot[] output.
+  Complete when assistant output contains: `criteria[]` + `mustNot[]`.
 - **Reflect:** skip to Stage 4.
 
 ## Stage 4 — Expert Validation (optional)
@@ -47,6 +54,7 @@ Route by session type:
 ## Stage 5 — Team Building
 
 - Run the bond skill now: Skill(skill="hope:bond")
+- Complete when: bond blueprint approved or solo path confirmed.
 - If bond created a team → pipeline complete. Team executes independently.
 
 ## Execution Readiness
@@ -70,7 +78,7 @@ Skill(skill="hope:verify")
 STOP. Wait for verification card. 4 parallel specialists assess
 external quality: correctness, security, performance, standards.
 
-Gate decision determines next step:
+Complete when verification card emitted. Gate decision determines next step:
 - **SHIP** → create PR
 - **FIX** → user reviews warnings, then PR
 - **BLOCK** → fix blockers (re-enter loop if needed), then re-verify
