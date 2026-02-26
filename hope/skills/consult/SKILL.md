@@ -73,6 +73,9 @@ Productive disagreement over comfortable consensus.
    "expand". Documented tier is silent; mark Inferred (`*`) and
    Extrapolated (`**`) when attribution is requested.
 
+   `[EXTRACT]-only` modifier: emit `[EXTRACT]` line + severity-tagged
+   one-liner per BLOCKER only. Full findings on "detail".
+
    **Single:**
    - `[EXTRACT] [≤15w]`
    - `→ Try: [action ≤15w] — verify: [result ≤10w]`

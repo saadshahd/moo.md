@@ -114,6 +114,18 @@ if [[ "$HAS_SHAPE" == "true" ]]; then
     deny "DENY_CHAIN_GATE: Shape output missing mustNot[] block. Emit mustNot[] (≥2 inviolable constraints) alongside criteria[] before exiting plan mode."
 fi
 
+# --- Self-containment: Plan sessions must be execution protocols ---
+if [[ "$HAS_SHAPE" == "true" ]]; then
+  SESSION_TYPE=$(echo "$SESSION" | rg -o 'Type:\s*\w+' 2>/dev/null | sed 's/Type:[[:space:]]*//' || true)
+  if [[ "$SESSION_TYPE" == "Plan" ]]; then
+    HAS_SKILL_REFS=$(rg -c 'Skill(skill=' "$TRANSCRIPT" 2>/dev/null || echo "0")
+    if [[ "$HAS_SKILL_REFS" == "0" ]]; then
+      has_artifact 'trivial\|single.*action' || \
+        deny "DENY_CHAIN_GATE: PLAN_SELF_CONTAINED: Plan output must be an execution protocol. Include Skill() invocations for deferred actions so a fresh session can execute without knowing the pipeline. If genuinely trivial, state that explicitly."
+    fi
+  fi
+fi
+
 # --- Final gate: coverage verification ---
 has_artifact 'PLAN_COVERAGE_GATE:' && exit 0
 

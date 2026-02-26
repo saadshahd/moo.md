@@ -49,6 +49,13 @@ Route by session type:
 - Run the bond skill now: Skill(skill="hope:bond")
 - If bond created a team → pipeline complete. Team executes independently.
 
+## Execution Readiness
+
+For Build / Debug sessions building web apps:
+- If portless services or d3k monitoring are active, start monitored dev: Skill(skill="kit:watch")
+- Include Skill(skill="kit:browser") in verification steps
+- For team paths: embed these skill invocations in teammate prompts
+
 ## Stage 6 — Execute (solo path only)
 
 - **Build / Debug:** run the loop skill now: Skill(skill="hope:loop")

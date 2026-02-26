@@ -11,6 +11,14 @@
   - Deferred: standalone CLI with minimal wrapping value as a skill
 
 ## Decisions
+- [x] Pipeline friction fixes — output discipline, quiet consult, plan self-containment (2026-02-26)
+  - Source: two ui-ir sessions exposed ~60% output waste, 3 ExitPlanMode rejections, stripped skill refs
+  - SubagentStart primer: +3 lines (synthesize, no openers, skill fidelity) — waste originates in subagents
+  - Shape: `[EXTRACT]-only` consult mode (BLOCKERs only, full on "detail"), plan handoff as execution protocol
+  - Consult: `[EXTRACT]-only` mode for pipeline callers — data-gathering step, not presentation
+  - Exit-plan-gate: self-containment check — Plan sessions without Skill() refs denied (trivial escape valve)
+  - hope:full: kit:watch nudge before execution — scoped to full only, conditional on portless/d3k active
+  - Key insight: executing agents treat skill refs as suggestions unless plans read as protocols
 - [x] Kit SessionStart hook — environment discovery for compaction resilience (2026-02-23)
   - Session e5e7bc18: agent wasted turns rediscovering d3k + portless after context loss
   - Root cause: kit had zero hooks — env state only in conversation memory

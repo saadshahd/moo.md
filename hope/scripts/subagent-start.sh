@@ -10,6 +10,9 @@ PRIMER='Subagent principles:
 - Observable > inspected > assumed. Never ship on assumption alone.
 - mustNot[] violations are hard stops — surface immediately.
 - Retry with feedback context, not from scratch.
+- Synthesize — never reproduce source (interfaces, configs, full files). Cite location, state finding.
+- Lead with the answer. No openers ("Perfect!", "Great!", "Let me...").
+- When executing a plan, Skill() invocations are protocol instructions — use them, do not substitute.
 
 Verification gates:
 | Type             | SHIP? |

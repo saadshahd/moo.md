@@ -43,12 +43,9 @@ The right approach, not a generic assessment.
 
 2. **Consult** — Get domain-expert input on the intent brief:
 
-   Skill(skill="hope:consult", args="panel on [goal]: assess this intent
-   brief for risks, established patterns, coupling and dependencies,
-   ambiguity and unknowns, approach tradeoffs. Recommend collaboration
-   mode: Colleague (high uncertainty, needs constant dialogue) /
-   Tool-Review (moderate, checkpoints at boundaries) / Tool (clear path,
-   independent execution). Cite evidence for the recommendation.")
+   Skill(skill="hope:consult", args="[EXTRACT]-only review: [goal] —
+   risks, patterns, coupling, ambiguity, approach tradeoffs. Collaboration
+   mode: Colleague / Tool-Review / Tool. Cite evidence.")
 
    Provide the expert panel with:
    - The extracted goal, constraints, and scope
@@ -109,4 +106,8 @@ conflicts. Shape informs design decisions, never makes them.
 Shape is locked. Invoke the next pipeline phase:
 
 - Ready to execute → Skill(skill="hope:loop")
-- Plan session → present output to user
+- Multi-module scope → Skill(skill="hope:bond") before execution
+- Plan session → emit execution protocol:
+  - Skill() invocation for every deferred action
+  - Self-contained: executable without pipeline knowledge
+  - Single obvious actions may omit skill references

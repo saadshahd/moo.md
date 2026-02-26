@@ -30,6 +30,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.12.2] - 2026-02-26
+
+### Changed
+- fix(hope): subagent output discipline — synthesize over reproduce, no openers, skill invocations are protocol
+- fix(hope): shape quiet consult — `[EXTRACT]-only` review mode, no full panel output during shaping
+- fix(hope): shape plan handoff — emit execution protocol with Skill() invocations, self-contained plans
+- feat(hope): consult `[EXTRACT]-only` modifier — BLOCKERs only, full findings on "detail"
+- feat(hope): exit-plan-gate self-containment check — Plan sessions without Skill() refs denied
+- feat(hope): full command kit:watch nudge — monitored dev before execution when portless/d3k active
+
+---
+
 ## [hope@3.12.1] - 2026-02-26
 
 ### Changed
