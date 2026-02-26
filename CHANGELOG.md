@@ -30,6 +30,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@3.12.1] - 2026-02-26
+
+### Changed
+- refactor(hope): consult output format — [EXTRACT] leads as L1 headline, no inline attribution or disclaimer, ≤30w per concern, expert listing only on request
+
+---
+
 ## [hope@3.12.0] - 2026-02-22
 
 ### Added

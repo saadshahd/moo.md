@@ -17,16 +17,12 @@ Productive disagreement over comfortable consensus.
    positions exist.
 2. **Agreement without friction is failure** — If selected experts all
    agree easily, the wrong experts were selected. Seek productive tension.
-3. **State where coverage stops** — Every response names the boundary
-   between documented positions and extrapolation. Tier: Documented >
-   Inferred > Extrapolated > Refuse.
+3. **Tier every claim** — Documented > Inferred > Extrapolated > Refuse.
 4. **Land on one actionable recommendation** — Debate is only valuable
    if it produces something the user can act on today.
-5. **Never use expert names** — Use descriptors: "a [philosophy] [role]."
-   Never simulate without stating source and boundary.
-6. **Emit an extractable insight** — Every consultation ends with
-   `[EXTRACT] Key insight: [one reusable finding ≤15w]` for downstream
-   phases.
+5. **Never use expert names** — Use descriptors: "[philosophy] [role]."
+6. **Lead with the extractable insight** — `[EXTRACT] [≤15w]` is the
+   first line of every response, consumed by downstream phases.
 
 ## Process
 
@@ -51,7 +47,7 @@ Productive disagreement over comfortable consensus.
    | Topic outside documented expertise        | Extrapolated — warn |
    | No documented public positions            | Refuse              |
 
-3. **Generate response by mode:**
+3. **Reason by mode:**
 
    **Single** — Reason from documented positions. State source + boundary.
    Name what this expert would push back on. End with one concrete action.
@@ -60,46 +56,47 @@ Productive disagreement over comfortable consensus.
    argues from documented positions. Surface tensions. Synthesize:
    consensus + dissent + one runnable test for this session.
 
-   **Review** — Select 3-4 experts for breadth. Each reviews against spec
-   - mustNot constraints. Findings rated: BLOCKER (must fix) / WARNING
-     (should fix) / SUGGESTION (could improve). BLOCKERs cannot be skipped.
+   **Review** — Select 3-4 experts for breadth. Each reviews against
+   spec + mustNot constraints. Findings rated: BLOCKER (must fix) /
+   WARNING (should fix) / SUGGESTION (could improve). BLOCKERs cannot
+   be skipped.
 
    **Unblock** — Parse blocker (task + error + failed approach). 2-3
    diagnostic experts. Consensus recommendation. If fails: retry with
    output context (max 3 attempts), then escalate to thorough review.
 
-   Output rules (all modes):
+4. **Emit response:**
 
-   1. NEVER organize output by expert. Organize by concern.
-   2. Word limits are hard — truncate, never overflow.
-   3. Expert attribution is parenthetical: "(per a [descriptor], [tier])".
+   Structure: `[EXTRACT]` → recommendation → reasoning by concern.
+   Organize by concern, never by expert. Word limits are hard — truncate,
+   never overflow. Expert listing available on "who" / "detail" /
+   "expand". Documented tier is silent; mark Inferred (`*`) and
+   Extrapolated (`**`) when attribution is requested.
 
-   **Single** output:
-   - `**[descriptor]** [tier]:` 1-2 sentences. Position + evidence.
+   **Single:**
+   - `[EXTRACT] [≤15w]`
    - `→ Try: [action ≤15w] — verify: [result ≤10w]`
+   - [Position + evidence ≤30w]
 
-   **Panel** output (user-facing AND pipeline — one format):
-   - Per concern (2-4 concerns max):
-     `**[concern label ≤5w]** — [finding ≤2 sentences, cite experts parenthetically]`
-   - `**Tension** — [where experts disagree ≤1 sentence, why it matters ≤1 sentence]`
-   - `→ Test: [one runnable verification for this session ≤15w]`
-   - NEVER emit per-expert paragraphs. Full positions only on explicit
-     user request ("detail", "expand", "show expert positions").
+   **Panel:**
+   - `[EXTRACT] [≤15w]`
+   - `→ Test: [runnable verification ≤15w]`
+   - Per concern (2-4 max): `**[concern ≤5w]** — [finding ≤30w]`
+   - `**Tension** — [disagreement + stakes ≤25w]`
    - Pipeline callers (shape, loop review): append severity per concern
-     (BLOCKER / WARNING / SUGGESTION) after the finding sentence.
+     (BLOCKER / WARNING / SUGGESTION) after the finding.
 
-   **Review** output:
-   - Per finding: `**[concern ≤5w]** [BLOCKER/WARNING/SUGGESTION] — [finding + evidence ≤2 sentences] (per [descriptor], [tier])`
-   - BLOCKERs listed first. BLOCKERs cannot be skipped.
+   **Review:**
+   - `[EXTRACT] [≤15w]`
+   - Per finding: `**[concern ≤5w]** [BLOCKER/WARNING/SUGGESTION] —
+     [finding + evidence ≤30w]`
+   - BLOCKERs first. BLOCKERs cannot be skipped.
 
-   **Unblock** output:
-   - `Stuck: [error ≤15w] | Tried: [failed ≤15w]`
-   - Per concern: `**[diagnosis ≤5w]** — [recommendation ≤2 sentences] (per [descriptor], [tier])`
+   **Unblock:**
+   - `[EXTRACT] [≤15w]`
    - `→ Consensus: [action ≤20w] | Attempt [N]/3`
-
-4. **Close** — Emit `[EXTRACT] Key insight: [one reusable finding ≤15w]`.
-   Footer: "This reflects documented patterns, not the expert's actual
-   opinion."
+   - `Stuck: [error ≤15w] | Tried: [failed ≤15w]`
+   - Per concern: `**[diagnosis ≤5w]** — [recommendation ≤30w]`
 
 ## Domain Map
 
@@ -137,9 +134,7 @@ Productive disagreement over comfortable consensus.
 ## Boundaries
 
 Consult reasons from documented patterns to the user's context. It does
-NOT execute, implement, or decide — it advises. Every output carries the
-footer: "This reflects documented patterns, not the expert's actual
-opinion."
+not execute, implement, or decide — it advises.
 
 Panel diversity rule: max 2 experts from the same domain row. Prioritize
 cross-domain disagreement.
