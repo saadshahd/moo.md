@@ -19,6 +19,11 @@
   - Key finding: compaction > summarization; structured summaries beat freeform; file-system-as-memory underrated
   - 35-min performance wall confirmed across agents — memory architecture is the primary lever
   - Forgetting is a feature (decay/pruning needed, not just accumulation)
+  - Practical eval (2026-02-27): tested MCP servers against moo's existing memory stack
+  - Official @modelcontextprotocol/server-memory: local knowledge graph, zero infra, best starting point
+  - Mem0 self-hosted: vector search (semantic recall), heavier setup but fills cross-session gap
+  - Finding: moo's PreCompact hooks + soul P8 already cover ~80% — MCP server targets semantic recall gap
+  - Decision: start with official server-memory, upgrade to vector search if keyword matching insufficient
   - See: docs/analysis/ai-memory-solutions.md
 
 ## Ideas
