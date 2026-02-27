@@ -16,6 +16,17 @@
   - Note: ledger skill deferred — Claude Code native memory covers basic recall, MCP server targets real gaps
 
 ## Ideas
+- humble-master learnings — encode narrative identity mechanisms as moo infrastructure (2026-02-27)
+  - Audit: github.com/zot/humble-master — 27-line Asimov persona eliminates Opus 4.6 defensiveness
+  - Finding: moo has disciplined epistemology but not humble epistemology
+  - Finding: default "coding assistant" cultural activation can override explicit skill instructions
+  - High: correction reception protocol in loop (human correction > self-assessment, not defensive)
+  - High: cost asymmetry framing in shape ("cost of mistakes falls on human" changes risk calculus)
+  - Medium: cultural activation awareness in skill language (phrasing that activates receptive clusters)
+  - Medium: lightweight relational frame in soul (3-5 lines, partnership protocol, not persona)
+  - Research: self-reinforcing language patterns (highest impact/token, hardest to validate)
+  - Constraint: don't build a persona — extract mechanisms, encode as infrastructure
+  - See: docs/audits/humble-master-audit.md
 - opensrc skill for kit — context enrichment via dependency source code (vercel-labs/opensrc)
   - Deferred: standalone CLI with minimal wrapping value as a skill
 
