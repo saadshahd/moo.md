@@ -14,6 +14,12 @@
   - 3-layer: storage (Qdrant/LanceDB) + memory intelligence (custom ranking) + hooks
   - Valence tagging, configurable scoring formula, session ingestion pipeline
   - Note: ledger skill deferred — Claude Code native memory covers basic recall, MCP server targets real gaps
+  - Research survey completed (2026-02-27): landscape of memory solutions for agentic coding
+  - Leading platforms: Mem0 (vector+graph SaaS), Zep (temporal knowledge graph), Letta/MemGPT (OS-inspired)
+  - Key finding: compaction > summarization; structured summaries beat freeform; file-system-as-memory underrated
+  - 35-min performance wall confirmed across agents — memory architecture is the primary lever
+  - Forgetting is a feature (decay/pruning needed, not just accumulation)
+  - See: docs/analysis/ai-memory-solutions.md
 
 ## Ideas
 - opensrc skill for kit — context enrichment via dependency source code (vercel-labs/opensrc)
