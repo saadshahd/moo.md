@@ -10,23 +10,45 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- feat(hope): v4.0.0 — ground-up rewrite, 10 skills / ~1380 lines → 4 skills / 147 lines
+- feat(hope): full command — pipeline entrypoint with session awareness (engagement level, type detection)
+- feat(hope): "prior art first" principle — search before creating, reframe over replicate
+- feat(hope): humble-master integration — correction reception, cost asymmetry, advise/disclose/teach as principles
+- docs: search reference moved from hope skill to docs/search-reference.md
 - feat(kit): SessionStart hook — discovers running portless routes and d3k instances, injects as `<kit-environment>` context on startup/resume/clear/compact
 - feat(kit): browser skill — agent-browser adaptation for headless browser automation (snapshot-ref-interact cycle, diff-based verification, session management)
 - feat(kit): portless skill — stable named .localhost URLs for dev servers (proxy management, framework detection, HTTPS)
 - feat(kit): watch skill — dev3000 monitored development (unified timeline, CDP browser monitoring, auto-composition with portless)
 - feat(kit): scaffold plugin — tactical tooling philosophy, plugin.json, marketplace registration
 - docs(kit): PHILOSOPHY.md with 5 beliefs, 6 principles, 5 constraints
-- docs(hope): PHILOSOPHY.md — extracted from root, hope-specific beliefs/principles/constraints/statechart
 
 ### Changed
+- refactor(hope): PHILOSOPHY.md rewrite — manifesto tone, 275 → 92 lines, compressed beliefs + principles + constraints
+- refactor(hope): intent rewrite — 104 → 22 lines, no scoring/MCQ/adversarial protocols
+- refactor(hope): shape rewrite — 114 → 23 lines, no criteria[]/holdout[]/mustNot[] arrays
+- refactor(hope): consult rewrite — 150 → 67 lines, no [EXTRACT]-only/severity/coverage tiers
+- refactor(hope): bond rewrite — 113 → 35 lines, absorbs forge responsibility, no 4-dimension scoring
+- refactor(hope): all hooks removed — exit-plan-gate, SubagentStart, SessionStart, grep-deny, PreCompact
+- refactor(hope): full command rewrite — references 5-skill pipeline, no factory metaphors
+- docs: statechart.md simplified to match 5-skill pipeline
+- docs: CLAUDE.md updated — structure, pipeline, hooks, compact instructions, audit
+- docs: root PHILOSOPHY.md updated to reflect v4 identity
 - refactor(kit): rename debug → watch — avoids /debug collision with Claude Code built-in, adds Startup directive (auto-composes portless + d3k with CDP browser), Inspect flow for reading page state
 - refactor(kit): skills redesign — flows over CLI docs; Role + Rules + Decision Tables + Flows replace command reference tables
 - refactor: philosophy hierarchy — root PHILOSOPHY.md minimal (identity + mission), plugin-specific philosophy in hope/ and kit/
-- docs(root): CLAUDE.md philosophy section references plugin philosophies instead of inline beliefs
-- docs(root): CLAUDE.md structure includes kit plugin
-- docs(root): PHILOSOPHY.md slimmed from 271 to ~30 lines
-- chore: marketplace.json registers kit, updates hope description to 10 skills
+- chore: marketplace.json registers kit, updates hope description
 - chore: pre-push hook validates both hope/ and kit/ plugin directories
+
+### Removed
+- **BREAKING** feat(hope): removed loop skill — Claude Code handles execution natively
+- **BREAKING** feat(hope): removed soul skill — session awareness folded into full
+- **BREAKING** feat(hope): removed verify skill — trust Claude's native code review
+- **BREAKING** feat(hope): removed observe skill — codebase health not hope's job
+- **BREAKING** feat(hope): removed forge skill — absorbed by bond
+- **BREAKING** feat(hope): removed search skill — moved to docs/search-reference.md
+- **BREAKING** feat(hope): removed forge command
+- feat(hope): removed all hooks and scripts — SessionStart, SubagentStart, PreToolUse:Bash, PreToolUse:ExitPlanMode, PreCompact
+- feat(hope): removed all factory metaphors — criteria[], holdout[], mustNot[], satisfaction tuples, waves, zones, DOT digraphs
 
 ---
 

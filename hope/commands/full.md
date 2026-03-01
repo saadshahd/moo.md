@@ -1,84 +1,37 @@
 ---
-description: Run the complete hope pipeline — session setup, intent, shape, consult, loop, and verify in strict sequence
+description: Run the complete hope pipeline — session setup, intent, shape, consult, bond
 ---
 
 # /hope:full
 
-ORCHESTRATE. Execute each stage below in strict order. Do not skip or combine stages. Each stage MUST complete before starting the next.
-
-**Plan mode?** Pipeline still runs — stages produce structured artifacts
-(OBJECTIVE, criteria[], mustNot[]) in conversation. The plan file captures
-the execution protocol. Stages 6-7 defer to post-approval.
+ORCHESTRATE. Run the hope pipeline end-to-end.
 
 **Task:** $0
 
----
+## Session Setup
 
-## Stage 1 — Session
+Ask: "How would you like to work? Autonomous / Collaborative [default] / Guided?"
 
-Ask the user: "How would you like to work? Autonomous / Collaborative [default] / Guided? Horizon: Tactical / Strategic [default]?"
+Detect session type from the task: Build, Debug, Plan, or Reflect. Emit:
 
-STOP. Wait for user response. After they answer, detect session type from the task (Build/Debug/Plan/Reflect), assess cognitive zone, and emit:
+`[SESSION] Pipeline: [phases] | Engagement: [level]`
 
-`[SESSION] Pipeline: [phases] | Engagement: [level] | Horizon: [horizon] | Feasible: [axis] ([bound]) | Zone: [1-3] ([dimension])`
+## Pipeline
 
-## Stage 2 — Intent
+1. **Intent** — Clarify WHAT. If the task arrives with structured input (proposal, specs, task list), validate rather than re-clarify. Complete when you have a clear objective and acceptance criteria.
 
-If task already has structured spec (proposal, design, tasks, OBJECTIVE):
-pass to intent for validation, not re-clarification.
+2. **Shape** — Decide HOW. Get expert perspectives on the approach. Skip for Reflect sessions or trivially clear tasks. Complete when you have a concrete approach and first step.
 
-Run the intent skill now: Skill(skill="hope:intent", args="$0")
+3. **Consult** (optional) — Shape already includes consultation. This is an additional review pass if the user wants a second opinion. For Reflect sessions, consult is the primary stage.
 
-Complete when assistant output contains: `OBJECTIVE:` + `ACCEPTANCE` bullets.
+4. **Bond** (when needed) — If the task spans multiple modules and warrants parallel agents, design and create a team.
 
-## Stage 3 — Shape or Consult
+5. **Execute** — For solo paths, proceed with the shaped approach.
 
-Route by session type:
-- **Build / Debug / Plan:** run the shape skill now: Skill(skill="hope:shape")
-  Complete when assistant output contains: `criteria[]` + `mustNot[]`.
-- **Reflect:** skip to Stage 4.
+## Engagement Levels
 
-## Stage 4 — Expert Validation (optional)
+- **Autonomous** — Minimal check-ins. Proceed unless blocked.
+- **Collaborative** — Confirm at each stage. Share reasoning.
+- **Guided** — Explain each decision. Offer options at every step.
 
-Shape already includes domain-expert consultation. This stage is an optional
-second-opinion review pass.
-
-Route by session type:
-
-- **Build / Debug / Plan:** ask the user if they want additional expert
-  validation. If yes: Skill(skill="hope:consult", args="review shaped approach against spec")
-  STOP. Wait for review findings.
-- **Reflect:** run the consult skill now: Skill(skill="hope:consult", args="reflect on intent brief")
-  Present output. Pipeline complete.
-
-## Stage 5 — Team Building
-
-- Run the bond skill now: Skill(skill="hope:bond")
-- Complete when: bond blueprint approved or solo path confirmed.
-- If bond created a team → pipeline complete. Team executes independently.
-
-## Execution Readiness
-
-For Build / Debug sessions building web apps:
-- If portless services or d3k monitoring are active, start monitored dev: Skill(skill="kit:watch")
-- Include Skill(skill="kit:browser") in verification steps
-- For team paths: embed these skill invocations in teammate prompts
-
-## Stage 6 — Execute (solo path only)
-
-- **Build / Debug:** run the loop skill now: Skill(skill="hope:loop")
-- **Plan:** present shaped output + consult synthesis to user. Pipeline complete.
-
-## Stage 7 — Verify (Build / Debug only)
-
-After loop completes, run pre-PR verification:
-
-Skill(skill="hope:verify")
-
-STOP. Wait for verification card. 4 parallel specialists assess
-external quality: correctness, security, performance, standards.
-
-Complete when verification card emitted. Gate decision determines next step:
-- **SHIP** → create PR
-- **FIX** → user reviews warnings, then PR
-- **BLOCK** → fix blockers (re-enter loop if needed), then re-verify
+The pipeline is a map, not a rail. Skip stages that don't apply. Come back to earlier stages if the task reveals new information.

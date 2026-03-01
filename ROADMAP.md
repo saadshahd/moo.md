@@ -1,36 +1,23 @@
 # Roadmap
 
 ## Active
-- OpenSpec integration — compose hope thinking layer with OpenSpec artifact layer (2026-02-27)
-  - Deep audit: OpenSpec (Fission-AI/OpenSpec) vs hope (v3.12.3), 4 overlap areas identified
-  - Finding: hope = thinking quality, OpenSpec = durable artifacts. Different layers, compose naturally.
-  - Overlaps: intent↔proposal, shape↔design, loop↔tasks, verify↔verify (complementary)
-  - No hope deletions — output formats change, not processes. 14 unique hope capabilities preserved.
-  - Phase 1: install alongside, manual composition. Phase 2: intent→proposal, loop↔tasks, shape→design.
-  - Phase 3: soul gains OpenSpec awareness, verify chains, archive routing.
-  - Philosophy update needed: "no persistent state" → "no hidden state; user-owned spec artifacts OK"
-  - See: docs/openspec-integration-audit.md
 - Agentic coding memory system — custom MCP server with feelings-guided retrieval (2026-02-18)
   - 3-layer: storage (Qdrant/LanceDB) + memory intelligence (custom ranking) + hooks
   - Valence tagging, configurable scoring formula, session ingestion pipeline
   - Note: ledger skill deferred — Claude Code native memory covers basic recall, MCP server targets real gaps
 
 ## Ideas
-- humble-master learnings — encode narrative identity mechanisms as moo infrastructure (2026-02-27)
-  - Audit: github.com/zot/humble-master — 27-line Asimov persona eliminates Opus 4.6 defensiveness
-  - Finding: moo has disciplined epistemology but not humble epistemology
-  - Finding: default "coding assistant" cultural activation can override explicit skill instructions
-  - High: correction reception protocol in loop (human correction > self-assessment, not defensive)
-  - High: cost asymmetry framing in shape ("cost of mistakes falls on human" changes risk calculus)
-  - Medium: cultural activation awareness in skill language (phrasing that activates receptive clusters)
-  - Medium: lightweight relational frame in soul (3-5 lines, partnership protocol, not persona)
-  - Research: self-reinforcing language patterns (highest impact/token, hardest to validate)
-  - Constraint: don't build a persona — extract mechanisms, encode as infrastructure
-  - See: docs/audits/humble-master-audit.md
 - opensrc skill for kit — context enrichment via dependency source code (vercel-labs/opensrc)
   - Deferred: standalone CLI with minimal wrapping value as a skill
 
 ## Decisions
+- [x] hope v4 rewrite complete — 10 skills / ~1380 lines → 4 skills / 147 lines (2026-03-01)
+  - Removed: loop, soul, verify, observe, forge, search
+  - Rewrote: intent (22L), shape (23L), consult (67L), bond (35L). Full is command-only.
+  - Philosophy: manifesto tone (92L), humble-master integration, "prior art first" principle
+  - Hooks: all removed (SessionStart, SubagentStart, PreToolUse, PreCompact)
+  - No factory metaphors: criteria[], holdout[], mustNot[], satisfaction, waves, zones eliminated
+  - See: openspec/changes/hope-v4-rewrite/
 - [x] Exit-plan-gate false positive + pipeline alignment (2026-02-26)
   - Source: ui-ir planning session — gate passed artifacts it shouldn't have (0 in assistant text, 1 in full JSONL)
   - Critical: `has_artifact()` searched entire JSONL including loaded skill definitions — bypassed deny chain

@@ -1,20 +1,17 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Project: moo.md — mind on output. Thinking infrastructure for AI work.
+  Stack: Claude Code plugins (SKILL.md, hooks.json, plugin.json). No runtime code — all prompt engineering.
+  Plugins: hope (thinking pipeline), kit (tooling), openspec (artifacts), claude-mem (memory)
+  Conventions: conventional commits, kebab-case files, ≤200 lines per SKILL.md, manifesto tone
+  Domain: AI-assisted software development — quality of thinking over quantity of output
+  Philosophy: reduce decision regret, increase conceptual clarity, fewer but stronger artifacts, preserve ownership capacity
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Focus on "why" not "how" — implementation belongs in design.md
+    - Mark breaking changes with **BREAKING**
+  tasks:
+    - Each task completable in one session
+    - Order by dependency (what must be done first)

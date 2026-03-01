@@ -2,101 +2,7 @@
 
 ## What This Is
 
-moo — mind on output. Stay present with AI.
-
-## Structure
-
-```
-moo.md/
-├── hope/                    # Pipeline plugin: 10 skills, 9 commands, hooks
-│   ├── PHILOSOPHY.md        # hope beliefs, principles, constraints
-│   ├── skills/
-│   │   ├── soul/            # Session strategy + thinking framework
-│   │   ├── intent/          # Clarify WHAT
-│   │   ├── shape/           # Decide HOW (consult-driven)
-│   │   ├── loop/            # Execute + verify + complete
-│   │   ├── verify/          # Fast parallel pre-PR verification
-│   │   ├── observe/         # Codebase health + architectural drift
-│   │   ├── consult/         # Expert simulation (74 profiles)
-│   │   ├── bond/            # Team composition (agent teams)
-│   │   ├── forge/           # Persistent agent creation
-│   │   └── search/          # Code search (sg/rg) reference
-│   ├── commands/            # panel, summon, block, unblock, blocked, intent, bond, forge, full
-│   ├── hooks/               # SessionStart + SubagentStart + PreToolUse + PreCompact
-│   └── scripts/             # Per-turn session strategy injector
-├── kit/                     # Tooling plugin: capability amplifiers
-│   ├── PHILOSOPHY.md        # kit beliefs, principles, constraints
-│   ├── .claude-plugin/plugin.json
-│   ├── hooks/               # SessionStart (environment discovery)
-│   ├── scripts/             # Hook scripts
-│   └── skills/              # browser, portless, watch
-├── prompts/                 # Standalone prompt library
-├── docs/                    # User docs
-└── .github/hooks/           # Git hooks (pre-push validates skills)
-```
-
-Plugin follows:
-
-```
-hope/
-├── .claude-plugin/plugin.json    # name, version, description, keywords, author
-├── skills/<name>/SKILL.md
-└── skills/<name>/[data files]    # profiles/ — flat alongside SKILL.md
-```
-
-Plugin discovery uses `.claude-plugin/marketplace.json` at repo root.
-
-## Skill Pipeline
-
-```
-intent (clarify WHAT) → shape (decide HOW) → bond (compose WHO) → loop (execute) → verify (pre-PR gate) → consult (expert guidance)
-                                               forge (create AGENT) ─┘                  observe (health, on-demand) ─┘
-```
-
-Session strategy (in soul) auto-detects type (Build/Debug/Plan/Reflect) and asks engagement level (Autonomous/Collaborative/Guided). The `[SESSION]` marker persists through compaction.
-
-## Local Testing
-
-```bash
-# Dev mode — loads directly from source, restart to pick up changes:
-claude --plugin-dir ./moo.md
-
-# If hope is installed from marketplace, disable it first to avoid duplicates:
-/plugin disable hope@moo.md
-
-# Pre-release verification — tests the packaged user experience:
-/plugin marketplace add ./moo.md
-/plugin install hope@moo.md
-```
-
-See [docs/dev/local-development.md](docs/dev/local-development.md) for full workflow.
-
-## Hooks Architecture
-
-Hooks use `async: true` only when intentional — async output arrives on the **next** turn, not the current one.
-
-| Plugin | Hook | Sync/Async | Why |
-|--------|------|-----------|-----|
-| hope | SessionStart | **Sync** | Soul content must be available on turn 1 |
-| kit | SessionStart | **Sync** | Discovers running portless routes + d3k instances |
-| hope | SubagentStart | **Sync** (prompt) | Subagents need criteria before executing |
-| hope | PreToolUse:Bash | **Sync** | Denies `grep` — enforces rg/sg usage |
-| hope | PreToolUse:ExitPlanMode | **Sync** | Sequential deny chain: pipeline artifacts → coverage verification, max 3 denials |
-| hope | PreCompact | **Sync** (prompt) | Must extract state before compaction runs |
-
-**Project-level hooks** (in `.claude/settings.json`, not shipped with plugin):
-
-| Hook | Why |
-|------|-----|
-| PreToolUse:Write | Blocks writes to `references/` directories |
-| PostToolUse:Write/Edit | Warns when SKILL.md exceeds 200 lines |
-
-**Key learnings:**
-- `additionalContext` appears as `<system-reminder>` tags — visible to Claude, silent to user
-- Hook context is appended after user message (no prepend mechanism exists)
-- Action directives ("invoke X now") outperform evaluation checklists ("before responding, evaluate...")
-- Plugin hooks may silently discard output for marketplace installs (#12151, #16538) — `--plugin-dir` works reliably
-- Hooks are snapshotted at startup; restart to pick up changes
+moo — mind on output. Stay present with AI. a Claude code plugin to help humans think clearly
 
 ## Conventions
 
@@ -150,22 +56,6 @@ tools: Read, Glob, Grep, Bash
 - No vague terminology; pick one term per concept
 - Use forward slashes only (`/`), never backslashes
 
-### DOT Notation (Graphviz)
-
-Use DOT for non-linear decision flows. Claude follows DOT structure more reliably than prose.
-
-**When to use:** Multi-path decisions, loops, branching workflows.
-**When NOT to use:** Linear steps (use numbered lists).
-**Exception:** `docs/statechart.md` uses Mermaid `stateDiagram-v2` — better fit for hierarchical state machines with composite states, parallel regions, and choice pseudostates. Skills continue using DOT for inline decision flows.
-
-**Keep structural only:**
-- Node labels (the text)
-- Edge connections (the arrows)
-- Edge labels (conditions)
-- `rankdir=TB` or `rankdir=LR` (flow direction)
-
-**Strip visual attributes:** `fillcolor`, `style`, `shape` — LLMs can't render these.
-
 ## Philosophy (Enforce These)
 
 moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every change to this project must serve at least one.
@@ -176,32 +66,13 @@ See `kit/PHILOSOPHY.md` for kit beliefs, principles, and constraints.
 
 ### Philosophy Audit (Before Committing Changes)
 
-- [ ] Does this add complexity without justification? → Simplicity wins conflicts
-- [ ] Does this introduce persistent state? → Conversation is the only state
-- [ ] Are exit criteria machine-verifiable? → No ambiguous "works correctly"
-- [ ] Could an existing skill/framework handle this? → Proven over invented
-- [ ] Does this encode something humans forget, or duplicate what they'd remember? → Automatic over remembered
-- [ ] Was this investigated before implemented? → Never combine find + fix
-- [ ] Does this hardcode references to specific skills? → Natural language triggers only
-- [ ] Does this create coupling that breaks if a skill is missing? → Loose coupling required
-- [ ] Does this build something Claude will do natively? → Don't compete with the platform
-- [ ] Does this serve at least one aim (regret reduction / conceptual clarity / fewer artifacts / ownership capacity)? → Every mechanism must trace to an outcome
+- [ ] Does this add complexity without justification?
+- [ ] Does this introduce persistent state?
+- [ ] Could an existing skill handle this?
+- [ ] Does this build something Claude does natively?
+- [ ] Does this serve at least one aim: reduce regret / increase clarity / fewer artifacts / preserve ownership?
 
 See `<plugin>/PHILOSOPHY.md` for plugin-specific audit items.
-
-### Statechart (Canonical Reference)
-
-See `docs/statechart.md` for hope's pipeline state machine. This is the single source of truth for hope's skill flow. When adding or modifying hope skills, verify alignment with the statechart.
-
-## Compact Instructions
-
-When compacting conversation history, always preserve:
-- The `[SESSION] Pipeline: [phases] | Engagement: [level] | Horizon: [horizon] | Feasible: [axis] ([bound]) | Zone: [1-3]` marker
-- Active criteria, holdout criteria, mustNot constraints, horizon, and feasibility axis + bound from shape
-- Current loop progress (wave number, items completed)
-- Failed approaches and what they ruled out
-- Latest satisfaction tuple (`score/confidence/basis/gate`)
-- Latest pyramid L1 answer
 
 ## Anti-Patterns
 
@@ -218,7 +89,6 @@ When compacting conversation history, always preserve:
 - Task management APIs in skills (TaskCreate/TaskList/TaskUpdate)
 - Building features Claude Code will ship natively (task management, memory, tool orchestration)
 - Cargo cult process steps (ritual without reason)
-- Skill behavior that contradicts `docs/statechart.md` (statechart is canonical)
 - Optimizing for output volume while degrading human comprehension
 - Automating friction that builds understanding (edge case exploration, consequence engagement)
 - Parallel agent sessions that exceed the human's attention span (8 sessions open, 1/8 attention each)
