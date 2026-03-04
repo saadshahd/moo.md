@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@4.0.1, kit@0.2.1] - 2026-03-04
+
 ### Added
 - feat(hope): v4.0.0 — ground-up rewrite, 10 skills / ~1380 lines → 4 skills / 147 lines
 - feat(hope): full command — pipeline entrypoint with session awareness (engagement level, type detection)
