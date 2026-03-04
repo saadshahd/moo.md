@@ -23,6 +23,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - docs(kit): PHILOSOPHY.md with 5 beliefs, 6 principles, 5 constraints
 
 ### Changed
+- refactor(openspec): sync thinking-discipline spec with intent/shape rewrites — grounded briefs, assumption transparency, proportional scaling, dimension-by-dimension shaping, domain-aware depth, cross-dimension integration
 - refactor(hope): PHILOSOPHY.md rewrite — manifesto tone, 275 → 92 lines, compressed beliefs + principles + constraints
 - refactor(hope): intent rewrite — 104 → 22 lines, no scoring/MCQ/adversarial protocols
 - refactor(hope): shape rewrite — 114 → 23 lines, no criteria[]/holdout[]/mustNot[] arrays
