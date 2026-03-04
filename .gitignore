@@ -10,3 +10,6 @@ dist/
 
 # Local
 *.local.md
+
+# Eval workspaces
+workspace/
