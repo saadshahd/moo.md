@@ -1,0 +1,54 @@
+{
+  "skill_name": "intent",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Make the homepage better.",
+      "expected_output": "A structured brief with OBJECTIVE, NON-GOALS, CONSTRAINTS, ACCEPTANCE, STOP CONDITIONS, and RECOMMENDED PRACTICES sections. All 6 workflow steps followed in order. AskUserQuestion used for gap-closing, echo confirmation, assumption review, and recommended practices cherry-pick.",
+      "files": [],
+      "expectations": [
+        "Step 1 (Understand) restates the vague input in 1-2 sentences",
+        "Step 2 (Close gaps) uses AskUserQuestion for questions, not plain text",
+        "Step 2 runs at least 2 rounds of questions before moving to Echo",
+        "Step 2 lists remaining unknowns after each round as visible text",
+        "Step 2 includes a 'what should this NOT do' question across rounds",
+        "Step 3 (Echo) compresses to one sentence of 20 words or fewer",
+        "Step 3 presents Lock/Edit/Risks options via AskUserQuestion",
+        "Step 4 (Assumptions) presents assumptions via AskUserQuestion with Accept + alternatives",
+        "Step 5 (Recommended practices) uses multiSelect AskUserQuestion for cherry-picking",
+        "Step 6 (Brief) contains all 6 sections: OBJECTIVE, NON-GOALS, CONSTRAINTS, ACCEPTANCE, STOP CONDITIONS, RECOMMENDED PRACTICES",
+        "Acceptance criteria contain ONLY items from user answers or approved assumptions/practices — no invented details",
+        "No unmarked invented thresholds (like Lighthouse scores or CLS values) appear in acceptance criteria"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Build a REST API for user management. Here's what I need: CRUD operations for users (create, read, update, delete), JWT authentication, PostgreSQL database, rate limiting on all endpoints. Must handle 1000 concurrent users. No GraphQL, no WebSocket, no admin panel.",
+      "expected_output": "A structured brief that recognizes structured input and reduces clarification. Should extract and validate rather than re-clarify from scratch. Brief should ground most criteria in the explicit requirements provided.",
+      "files": [],
+      "expectations": [
+        "Step 1 (Understand) recognizes this as structured input and extracts requirements",
+        "Step 2 (Close gaps) asks fewer questions than eval 1 — structured input reduces unknowns",
+        "Step 2 does NOT re-ask about things already stated (CRUD, JWT, PostgreSQL, rate limiting, 1000 concurrent, no GraphQL/WebSocket/admin)",
+        "Step 3 (Echo) reflects the stated requirements accurately in the summary sentence",
+        "Step 4 (Assumptions) surfaces only genuinely unstated details — not things the user already specified",
+        "Step 6 (Brief) NON-GOALS include GraphQL, WebSocket, and admin panel (user stated these)",
+        "Acceptance criteria include the 1000 concurrent users requirement (user stated this)",
+        "Brief does not re-clarify requirements that were already explicit in the prompt"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I know exactly what I want — add a dark mode toggle to the settings page. React, Tailwind, persist to localStorage. That's it, just do it.",
+      "expected_output": "Respects the 'I know what I want' boundary. Proceeds without clarification rounds. May still produce a brief but should not force the user through 6 steps of clarification they explicitly declined.",
+      "files": [],
+      "expectations": [
+        "Recognizes 'I know what I want' signal from the Boundaries section",
+        "Does NOT run multiple rounds of clarification questions",
+        "Does NOT force the user through the full 6-step workflow against their stated preference",
+        "If a brief is produced, it reflects exactly what the user stated — dark mode toggle, React, Tailwind, localStorage",
+        "Does not invent requirements the user didn't ask for (like accessibility, testing, responsive design)"
+      ]
+    }
+  ]
+}
