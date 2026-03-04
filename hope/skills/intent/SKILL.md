@@ -38,13 +38,15 @@ If there are zero assumptions, skip to step 5.
 
 ### Step 5: Recommended practices
 
+If the task is straightforward with clear precedent, skip to step 6.
+
 Present best practices, thresholds, and standards the agent would add beyond what the user stated. Each with a one-line rationale explaining why it matters.
 
 Use AskUserQuestion (multiSelect) so the user can cherry-pick which to promote into acceptance criteria. Selected items become acceptance criteria in the brief. Unselected items stay in a "Recommended Practices" section as suggestions.
 
 ### Step 6: Emit brief
 
-Only after steps 4 and 5 are complete. The core brief contains only what came from the user or was approved in steps 4-5.
+Only after steps 4 and 5 are complete. The core brief contains only what came from the user or was approved in steps 4-5. Scale sections to task stakes — a small fix doesn't need 5 non-goals.
 
 Structure:
 - OBJECTIVE (1 line)

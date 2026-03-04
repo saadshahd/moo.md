@@ -12,7 +12,7 @@
         "Step 2 runs at least 2 rounds of questions before moving to Echo",
         "Step 2 lists remaining unknowns after each round as visible text",
         "Step 2 includes a 'what should this NOT do' question across rounds",
-        "Step 3 (Echo) compresses to one sentence of 20 words or fewer",
+        "Step 3 (Echo) compresses to one sentence of 35 words or fewer",
         "Step 3 presents Lock/Edit/Risks options via AskUserQuestion",
         "Step 4 (Assumptions) presents assumptions via AskUserQuestion with Accept + alternatives",
         "Step 5 (Recommended practices) uses multiSelect AskUserQuestion for cherry-picking",
@@ -48,6 +48,20 @@
         "Does NOT force the user through the full 6-step workflow against their stated preference",
         "If a brief is produced, it reflects exactly what the user stated — dark mode toggle, React, Tailwind, localStorage",
         "Does not invent requirements the user didn't ask for (like accessibility, testing, responsive design)"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Add a loading spinner to the submit button while the form is submitting. React, use the existing Spinner component from our design system.",
+      "expected_output": "A proportionally small brief for a straightforward task. Step 5 (Recommended practices) should be skipped because the task has clear precedent. Brief sections should be scaled down — fewer non-goals and stop conditions than a complex task.",
+      "files": [],
+      "expectations": [
+        "Step 1 (Understand) restates the task accurately in 1-2 sentences",
+        "Step 2 (Close gaps) asks fewer questions than eval 1 — the task is specific with clear scope",
+        "Step 5 (Recommended practices) is skipped or explicitly noted as unnecessary for this straightforward task",
+        "Step 6 (Brief) is proportionally small — not all sections need 3-5 items for a simple task",
+        "Brief does not invent requirements beyond what the user stated (no accessibility audits, animation specs, or testing frameworks unless asked)",
+        "NON-GOALS and STOP CONDITIONS are concise — scaled to task stakes, not padded to fill a template"
       ]
     }
   ]
