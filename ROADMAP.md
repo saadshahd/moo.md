@@ -6,6 +6,15 @@
   - Valence tagging, configurable scoring formula, session ingestion pipeline
   - Note: ledger skill deferred — Claude Code native memory covers basic recall, MCP server targets real gaps
 
+## Next
+- Shape skill eval testing + calibration
+  - Run evals against real user sessions — compare skill output quality with/without shape
+  - Report results: does the structured workflow (dimensions, expert consult, pre-mortem) produce better implementation decisions than unguided shaping?
+  - Known gaps from eval iterations:
+    - Type 2 lighter treatment never fires — skill gives all dimensions equal depth regardless of reversibility
+    - Single-dimension collapse (SKILL.md line 8) never triggers — skill finds multiple dimensions in every prompt tested
+  - Decision pending: fix in SKILL.md or accept as behavior (user testing will inform)
+
 ## Ideas
 - opensrc skill for kit — context enrichment via dependency source code (vercel-labs/opensrc)
   - Deferred: standalone CLI with minimal wrapping value as a skill

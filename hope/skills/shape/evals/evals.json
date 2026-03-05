@@ -1,0 +1,79 @@
+{
+  "skill_name": "shape",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Shape this intent brief:\n\nOBJECTIVE: Build a real-time notification system for our SaaS platform (React frontend, Node.js backend, PostgreSQL). Users need in-app notifications, email digests, and webhook integrations for third-party tools.\n\nNON-GOALS: Mobile push notifications, SMS alerts, notification analytics dashboard.\n\nCONSTRAINTS: Must work with existing auth system (JWT). Max 50ms latency for in-app notifications. Budget for third-party services capped at $200/month.\n\nACCEPTANCE: Notifications delivered within 50ms in-app. Email digests batch and send daily. Webhook retry with exponential backoff. User preferences respected per channel.",
+      "expected_output": "Full 5-step shape workflow. Multiple HOW dimensions identified (architecture, data model, delivery mechanism, testing at minimum). Expert consultation for irreversible dimensions. Integration step checks cross-dimension tensions and runs pre-mortem. Final shape document emitted with all required sections including semantic checksum and first step.",
+      "files": [],
+      "expectations": [
+        "Step 1 (Extract) identifies at least 3 shaping dimensions from the brief",
+        "Step 1 searches the codebase for existing patterns and prior art before presenting findings",
+        "Step 1 addresses dichotomy of control — identifies what's within the user's control vs externalities",
+        "Step 2 (Scope) classifies domain type and reversibility — stated as brief lines, not asked unless ambiguous",
+        "Step 3 (Shape loop) consults expert perspectives for at least the Type 1 (irreversible) dimensions",
+        "Step 3 presents distinct approach options with tradeoffs for each dimension",
+        "Step 3 gives lighter treatment to Type 2 (reversible) dimensions than Type 1 — fewer options, less analysis, or skipping expert consult",
+        "Step 4 (Integrate) checks cross-dimension tensions between chosen approaches",
+        "Step 4 runs a pre-mortem — imagines the shaped solution failed 6 months later",
+        "Step 4 lists second-order effects — what each choice prevents in 6-12 months",
+        "Step 5 (Emit) produces a shape document with sections: Approach, Codebase findings, Resolved tensions, Risks, First step",
+        "Step 5 shape document includes a semantic checksum — one sentence explaining why the shape exists",
+        "Step 5 First step section names one atomic action that produces a visible artifact",
+        "No reasoning technique names appear in the shape document output (no 'inversion', 'Musashi', 'obstacle-as-path', 'dichotomy of control')"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Shape this: Our Express.js API returns errors inconsistently — some endpoints throw, some return { error }, some use HTTP status codes only. We want to standardize on a single error response format. The API has about 40 endpoints across 3 route files.",
+      "expected_output": "Recognizes this as a single-dimension task (error format choice) and collapses to Step 1 → Step 5. Does not force the user through full dimension selection and integration checks for a straightforward standardization decision.",
+      "files": [],
+      "expectations": [
+        "Recognizes this as a single-dimension task and collapses the workflow (Step 1 → Step 5)",
+        "Does NOT present a multiSelect dimension picker — the single dimension is self-evident",
+        "Does NOT run a full integration step with cross-dimension tensions (only one dimension exists)",
+        "Does NOT ask the user about domain type or reversibility for this low-stakes task",
+        "Still searches for existing error handling patterns or prior art (codebase, docs, or web)",
+        "Still presents implementation choices with distinct approaches and tradeoffs (e.g., RFC 7807 vs custom format vs GraphQL-style errors)",
+        "Shape document is proportionally brief — not padded to fill a full multi-dimension template",
+        "Shape document includes a First step section with one atomic action"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Shape this intent brief:\n\nOBJECTIVE: Integrate Stripe payment processing into our e-commerce platform. Handle subscriptions (monthly/annual), one-time purchases, refunds, and failed payment recovery. Must be PCI-DSS compliant.\n\nNON-GOALS: Cryptocurrency payments, invoice generation, multi-currency support.\n\nCONSTRAINTS: Stripe as sole payment processor. All card data handled by Stripe.js — no server-side card handling. Must pass PCI SAQ-A compliance. Existing user model has no payment fields.\n\nACCEPTANCE: Subscriptions created and billed correctly. Failed payments retried 3 times over 7 days. Refunds processed within 24 hours. No raw card data touches our servers.",
+      "expected_output": "Infers high-stakes domain (financial, compliance). Applies deeper analysis per dimension. Checks that broken states can't be expressed in types. Failure paths identified and addressed. Second-order effects analysis is substantive. Pre-mortem catches adoption and integration risks specific to payment systems.",
+      "files": [],
+      "expectations": [
+        "Step 2 (Scope) infers high-stakes domain type — states classification as a brief line without asking",
+        "Dimensions include data model and security/compliance at minimum",
+        "Step 3 applies deeper analysis for high-stakes dimensions (not exploratory-light treatment)",
+        "Step 3 reasoning checks that broken payment states can't be expressed in types (e.g., partial charge without order)",
+        "Step 3 identifies failure paths (failed charges, declined cards, webhook failures) and addresses how they're handled — not silently swallowed",
+        "Step 4 second-order effects analysis is substantive — names specific futures closed off by choices",
+        "Step 4 pre-mortem identifies payment-specific risks (not generic software risks)",
+        "Shape document Risks section addresses compliance and financial integrity concerns",
+        "Expert consultation includes Stripe-specific technical content (not just generic architecture advice with payment-themed role names)",
+        "Shape document includes a semantic checksum — one sentence explaining why the shape exists",
+        "Shape document First step section names one atomic action that produces a visible artifact"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Shape this: We need to add real-time collaborative editing to our document editor. The backend team is migrating from REST to gRPC but the timeline is TBD — could be 2 weeks or 2 months. The infrastructure team controls the WebSocket gateway and we need their approval to add new channels. Our PM wants this shipped in 3 weeks but the design team hasn't finalized the cursor/presence UI yet.",
+      "expected_output": "Identifies mixed control boundaries. Separates externalities (gRPC migration timeline, WebSocket gateway approval, design team deliverables) from shapeable decisions. Documents external dependencies as constraints, not choices to be shaped.",
+      "files": [],
+      "expectations": [
+        "Step 1 (Extract) addresses dichotomy of control — identifies what the user can actually decide vs external dependencies",
+        "Identifies externalities: gRPC migration timeline, WebSocket gateway approval, design team UI deliverables",
+        "Externalities are documented as constraints, NOT presented as dimensions to shape",
+        "Shapeable dimensions focus only on what the user controls (e.g., CRDT vs OT algorithm, local state model, conflict resolution strategy)",
+        "Does not shape the WebSocket gateway decision (owned by infrastructure team)",
+        "Does not make visual design decisions for cursor/presence UI (colors, sizes, animations, layout) — owned by design team",
+        "Step 4 pre-mortem considers what happens if external dependencies slip or change",
+        "Shape document separates 'what we decided' from 'what we depend on'",
+        "Shape document includes a First step section with one atomic action"
+      ]
+    }
+  ]
+}
