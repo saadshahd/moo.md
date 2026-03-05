@@ -9,7 +9,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@4.0.3] - 2026-03-05
+
+### Added
+- feat(hope): bond skill rewrite — 6-step interactive workflow (Assess → Choose mode → Design roles → Surface coupling → Present blueprint → Create)
+- feat(hope): bond AskUserQuestion integration — Minto pyramid detail panels for fitness choice, coupling resolution, and blueprint presentation
+- feat(hope): bond output evals — 5 test cases covering diagnosed problems (assessment leak, text walls, coupling, plan mode, blueprint presentation)
+
+### Fixed
+- fix(hope): bond assessment leak — strengthened Step 1 to explicitly prohibit headers, bullet points, and labeled sections before Step 2
+
 ### Changed
+- refactor(hope): bond fitness assessment now interactive — user chooses team/solo/subagent via AskUserQuestion, not unilateral declaration
+- refactor(hope): bond coupling check surfaced explicitly — dedicated Step 4 with merge/coordinate/redesign options
+- refactor(hope): bond description to third-person style
 - docs(openspec): sync expert-consultation spec with consult rewrite — 4 requirements → 8 requirements (invisible attribution, interactive Minto presentation, minimal text discipline, four-step workflow)
 
 ---

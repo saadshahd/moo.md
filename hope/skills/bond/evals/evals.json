@@ -1,0 +1,84 @@
+{
+  "skill_name": "bond",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add eval infrastructure to all 5 hope skills (intent, shape, consult, bond, full). Each skill needs: 3 scenario evals with expected behavior assertions, a shared eval runner that works across all skills, and a summary reporter.",
+      "expected_output": "Team recommended — multi-module scope with independent workstreams per skill. Step 2 presents team/solo/subagent choice via AskUserQuestion. Step 5 presents blueprint with roles as multiSelect AskUserQuestion. Coupling surfaced for shared eval runner.",
+      "files": [],
+      "expectations": [
+        "No assessment reasoning output before Step 2 — no 'Assessment:' headers, no bullet lists of criteria, no labeled sections analyzing the task",
+        "Step 2 presents team/solo/subagent via AskUserQuestion with detail panels — not a text wall",
+        "Team is marked as (Recommended) in Step 2 options",
+        "Detail panels use ALL CAPS headers, dashes for bullets, ~50 char lines — no markdown formatting",
+        "One bold sentence before each AskUserQuestion — not zero text, not a paragraph",
+        "No intent/shape questions asked (eval count, runner type, implementation details) — only team composition questions",
+        "Coupling between shared runner and per-skill evals is surfaced in Step 4 — not dismissed in one line",
+        "Step 5 blueprint presents roles via multiSelect AskUserQuestion for review — not single-select where user picks one role",
+        "Step 5 follows role review with a separate AskUserQuestion for Approve/Adjust/Cancel"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Rewrite the bond skill description to be more trigger-focused.",
+      "expected_output": "Solo recommended — single file, trivial scope, under 3 story points. Step 2 presents solo as recommended. Fast exit after user confirms. No team design steps.",
+      "files": [],
+      "expectations": [
+        "No assessment reasoning output before Step 2 — no headers, bullet points, or labeled sections analyzing scope",
+        "Step 2 presents solo/team/subagent via AskUserQuestion — solo is marked (Recommended)",
+        "Solo detail panel mentions single file and low story points",
+        "One bold sentence before AskUserQuestion — not a paragraph explaining why teams aren't needed",
+        "If user picks Solo, one sentence stating the approach — then done. No Steps 3-6",
+        "No team blueprint generated for a trivial task"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Build a full-stack dashboard: React frontend with charts, Express API with auth middleware, PostgreSQL migrations, and Playwright e2e tests. The API auth middleware validates JWTs used by the frontend charts component.",
+      "expected_output": "Team recommended with coupling — frontend and API share auth contract. Step 4 fires to surface JWT coupling between frontend and API roles. User chooses merge/coordinate/redesign.",
+      "files": [],
+      "expectations": [
+        "No assessment reasoning output before Step 2 — no headers, bullet points, or labeled sections",
+        "Step 2 presents team as recommended via AskUserQuestion",
+        "Step 3 identifies coupling: frontend charts consume JWTs that API auth middleware validates — shared contract",
+        "Step 4 fires — one bold sentence naming the JWT/auth coupling",
+        "Step 4 presents merge/coordinate/redesign options via AskUserQuestion with detail panels",
+        "Coupling not dismissed silently — user decides how to handle it",
+        "If coordinate: detail panel explains handoff mechanism (API defines JWT schema first, frontend consumes)",
+        "Step 5 blueprint reflects the coupling resolution the user chose",
+        "Step 5 presents roles via multiSelect AskUserQuestion, then separate Approve/Adjust/Cancel question"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I need a team to refactor our monorepo: extract the shared utils package, migrate the CLI from commander to clap, rewrite the docs site from Jekyll to Astro, and update all CI pipelines. The utils package is imported by both CLI and docs site.",
+      "expected_output": "Team recommended. Assessment is silent — first user-visible output is Step 2 bold sentence + AskUserQuestion. No 'Assessment (internal):' or similar leaked text. Coupling surfaced for shared utils dependency.",
+      "files": [],
+      "expectations": [
+        "First user-visible output is a bold sentence followed by AskUserQuestion — nothing before it",
+        "No text containing 'assessment', 'internal', 'evaluation', or 'analysis' appears before the Step 2 AskUserQuestion",
+        "No bullet points listing independence criteria, file overlap checks, or story point estimates before Step 2",
+        "No section headers (##, ###, or bold-colon patterns like '**X:**') appear before the Step 2 AskUserQuestion",
+        "Step 2 AskUserQuestion has three options with detail panels using ALL CAPS headers and dashes",
+        "Coupling between utils package and CLI/docs roles is surfaced in Step 4",
+        "Step 4 presents merge/coordinate/redesign for the utils dependency",
+        "Role names are responsibility-specific (not 'Agent 1' or 'Worker A')"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Set up a team for this task. I'm in plan mode. We need to build a Stripe integration: webhook handler, subscription management UI, and billing admin dashboard.",
+      "expected_output": "Team recommended. When user approves blueprint, Step 6 writes full team spec (roles, files, models, tasks, spawn order) to the plan file instead of creating agents immediately.",
+      "files": [],
+      "expectations": [
+        "No assessment reasoning output before Step 2",
+        "Step 2 presents team as recommended via AskUserQuestion",
+        "Step 5 presents roles via multiSelect, then separate Approve/Adjust/Cancel",
+        "Step 6 detects plan mode and writes team spec to plan file — not TeamCreate",
+        "Plan file contains role names, owned files, model assignments, task summaries, and spawn order",
+        "States that creation will happen after plan approval — does not spawn agents",
+        "No TeamCreate or Agent tool calls made during plan mode"
+      ]
+    }
+  ]
+}
