@@ -2,17 +2,17 @@
 
 # moo
 
-Claude answers fast. moo makes it answer right.
+Stop building the wrong thing. Think first, build once.
 
 ---
 
 Before moo:
 
-> "This should work" → debug → rebuild → debug again
+> "Build a settings page" → starts coding → wrong pattern → rebuilds → ships something nobody asked for
 
 After moo:
 
-> Think → verify → build once
+> "Build a settings page" → clarifies what matters → shapes the approach → builds with confidence
 
 ---
 
@@ -23,45 +23,14 @@ After moo:
 /plugin install hope@moo.md
 ```
 
-Then:
+You say: `/hope:full build a settings page` and moo:
 
-```
-plan building a markdown-to-PDF CLI
-```
-
-Claude will:
-
-- Ask before building
-- Search before writing
-- Verify before claiming done
-
----
-
-## Skills
-
-| Skill | Purpose |
-|-------|---------|
-| `hope:intent` | Clarify vague requests into iron-clad specs |
-| `hope:shape` | Bridge WHAT to HOW — select implementation approach |
-| `hope:consult` | Expert simulation — 74 curated profiles |
-
-> [Documentation](docs/) · [Issues](https://github.com/saadshahd/moo.md/issues)
+- clarifies intent — What settings? Who sees them? What should this NOT do?
+- shapes design — 2 approaches with tradeoffs. You pick before writing code.
+- consults experts — Surfaces what you'd miss. One actionable next step.
 
 ---
 
 ## Gratitude
 
 [Nate B. Jones](https://www.natebjones.com/) · [Superpowers](https://github.com/obra/superpowers) · [Farnam Street](https://fs.blog/blog/)
-
----
-
-| Verdict    | 🟢 SHIP                         |
-| ---------- | -------------------------------- |
-| Verified   | execution output                 |
-| Basis      | ran tests + type-check           |
-| Unverified | [what wasn't — how to test]      |
-| Reversible | 2A · 3pt                         |
-| Alt        | [alternative approach]           |
-| Risk       | [key assumption]                 |
-
-_Every response ends with evidence, not hope._
