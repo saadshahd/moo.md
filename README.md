@@ -41,11 +41,9 @@ Claude will:
 
 | Skill | Purpose |
 |-------|---------|
-| `hope:soul` | Session strategy + thinking framework (auto-applied) |
 | `hope:intent` | Clarify vague requests into iron-clad specs |
-| `hope:shape` | Bridge WHAT to HOW — select collaboration shape |
-| `hope:loop` | Autonomous iteration with wave-based execution |
-| `hope:consult` | Expert simulation — 42 curated profiles |
+| `hope:shape` | Bridge WHAT to HOW — select implementation approach |
+| `hope:consult` | Expert simulation — 74 curated profiles |
 
 > [Documentation](docs/) · [Issues](https://github.com/saadshahd/moo.md/issues)
 

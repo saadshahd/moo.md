@@ -18,10 +18,6 @@ Claude will:
 3. List what could go wrong before starting
 4. State confidence with evidence, not hope
 
-## What's running
-
-The `hope:soul` skill audits every response and manages session strategy. You don't see the checklist. You see better answers.
-
 ## Next
 
-- [hope](plugins/hope.md) — 5 skills: soul, intent, shape, loop, consult
+- [hope](plugins/hope.md) — 3 skills: intent, shape, consult
