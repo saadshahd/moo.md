@@ -11,6 +11,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@4.0.2] - 2026-03-05
+
+### Added
+- feat(hope): consult skill rewrite — 4-step interactive workflow (Route → Reason → Present → Land)
+- feat(hope): consult AskUserQuestion integration — Minto pyramid detail panels with WHY IT MATTERS + TRADEOFF
+- feat(hope): consult per-mode behavior — Single, Panel, Review, Unblock with distinct depth and output shape
+- feat(hope): consult output evals — 4 test cases grounded in observed session failures
+
+### Changed
+- refactor(hope): consult expert attribution now fully internal — user sees suggestions and why, never expert names or sources
+- refactor(hope): consult presentation rules — one bold sentence framing before/after AskUserQuestion, no text walls
+
+---
+
 ## [hope@4.0.1, kit@0.2.1] - 2026-03-04
 
 ### Added
