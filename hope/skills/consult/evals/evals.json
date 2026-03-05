@@ -1,0 +1,75 @@
+{
+  "skill_name": "consult",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "What would a React expert say about our decision to use Redux for a simple todo app with 3 screens?",
+      "expected_output": "Single mode — one expert from React/Frontend domain. Focused perspective that pushes back on Redux for a simple app. One bold framing sentence, then AskUserQuestion with detail panels. No expert names in output.",
+      "files": [],
+      "expectations": [
+        "Infers Single mode from 'what would [expert] say' signal",
+        "Selects expert from React / Frontend / TS / JS domain row in domain map",
+        "Reads the selected expert's profile from profiles/ before reasoning",
+        "One bold sentence framing the core insight appears before the AskUserQuestion — not zero text, not a paragraph",
+        "Presents via AskUserQuestion — not plain text output",
+        "Detail panels use only WHY IT MATTERS and TRADEOFF sections with ALL CAPS headers — no SUGGESTION, BLIND SPOT, POSITIONS, TENSION, or CONCERN headers",
+        "Detail panels are max 10 lines each with ~40 char lines",
+        "No expert names appear anywhere in user-facing output (labels, descriptions, detail panels, bold sentence)",
+        "Options include a 'Go deeper' option",
+        "Pushes back on Redux for a simple 3-screen app if the expert's documented positions would challenge it"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Panel: We're choosing between a monolith and microservices for a new B2B SaaS product. Team of 4 devs, launching in 3 months, expecting 100 initial users growing to 10K over a year.",
+      "expected_output": "Panel mode — 2-4 experts from different domains. Productive disagreement over monolith vs microservices. One bold framing sentence, then multiple concerns as AskUserQuestion options organized by decision dimension.",
+      "files": [],
+      "expectations": [
+        "Infers Panel mode from 'Panel' keyword",
+        "Selects 2-4 experts from different domain rows (max 2 from same row)",
+        "Reads each selected expert's profile from profiles/ before reasoning",
+        "Experts disagree on the core question — if all experts agree easily, the wrong experts were selected",
+        "One bold sentence framing the core tension appears before the AskUserQuestion",
+        "Presents multiple concerns as AskUserQuestion options (not one monolithic answer)",
+        "Detail panels use only WHY IT MATTERS and TRADEOFF sections — no forbidden headers (POSITIONS, TENSION, CONCERN)",
+        "No expert names appear anywhere in user-facing output",
+        "Options include a 'Go deeper' option",
+        "Concerns organized by decision dimension, not by expert — no 'Expert A thinks X' framing"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Review our API design against best practices: REST endpoints for a task management system. We have GET/POST/PUT/DELETE for /tasks, nested /tasks/:id/comments, JWT auth, no rate limiting, no pagination, returns 200 for everything.",
+      "expected_output": "Review mode — 3-4 experts for breadth sweep. One bold framing sentence, then coverage concerns as AskUserQuestion options. Identifies specific gaps (rate limiting, pagination, status codes). Breadth over depth.",
+      "files": [],
+      "expectations": [
+        "Infers Review mode from 'Review' keyword and 'against best practices' signal",
+        "Selects 3-4 experts crossing relevant domains (REST/APIs, Architecture, Security at minimum)",
+        "Reads each selected expert's profile from profiles/ before reasoning",
+        "One bold sentence framing the overall assessment appears before the AskUserQuestion",
+        "Identifies missing rate limiting, missing pagination, and incorrect status codes as specific concerns",
+        "Detail panels use only WHY IT MATTERS and TRADEOFF sections — no forbidden headers",
+        "No expert names appear anywhere in user-facing output",
+        "Options include a 'Go deeper' option",
+        "Breadth over depth — surfaces multiple concerns rather than deep-diving one"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I'm stuck on a race condition in our checkout flow. Orders sometimes get created twice when users double-click the submit button. I've tried disabling the button on click but it still happens. The problem is intermittent — maybe 1 in 50 submissions.",
+      "expected_output": "Unblock mode — 2-3 diagnostic experts. One bold sentence reframing the problem, then ranked next steps as AskUserQuestion options. Root cause diagnosis: server-side idempotency, not client-side button disable.",
+      "files": [],
+      "expectations": [
+        "Infers Unblock mode from 'stuck on' signal and repeated failure description",
+        "Selects 2-3 experts from relevant diagnostic domains",
+        "Reads each selected expert's profile from profiles/ before reasoning",
+        "One bold sentence reframing the problem appears before the AskUserQuestion — shifts from client-side to server-side framing",
+        "Presents ranked next steps as AskUserQuestion options (not a text dump)",
+        "Detail panels use only WHY IT MATTERS and TRADEOFF sections — no forbidden headers",
+        "No expert names appear anywhere in user-facing output",
+        "Options include a 'Go deeper' option",
+        "Next steps are actionable and specific (not generic advice like 'add error handling')"
+      ]
+    }
+  ]
+}
