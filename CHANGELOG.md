@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat(hope): distill agent — principled post-implementation audit with persistent project-scoped memory
+
 ---
 
 ## [hope@4.0.3] - 2026-03-05
