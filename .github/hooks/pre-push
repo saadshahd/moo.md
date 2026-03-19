@@ -2,7 +2,7 @@
 set -e
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-PLUGIN_DIRS=("hope" "kit")
+PLUGIN_DIRS=("hope")
 
 CHANGED_PLUGINS=()
 for plugin in "${PLUGIN_DIRS[@]}"; do

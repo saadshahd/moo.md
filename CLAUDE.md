@@ -62,7 +62,6 @@ moo drives toward four outcomes: **reduce decision regret**, **increase conceptu
 
 See `PHILOSOPHY.md` for core identity and mission.
 See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints.
-See `kit/PHILOSOPHY.md` for kit beliefs, principles, and constraints.
 
 ### Philosophy Audit (Before Committing Changes)
 
@@ -113,4 +112,3 @@ Track all changes in `CHANGELOG.md` at repo root.
 
 See `PHILOSOPHY.md` for core identity and mission.
 See `hope/PHILOSOPHY.md` for hope pipeline philosophy.
-See `kit/PHILOSOPHY.md` for kit tooling philosophy.

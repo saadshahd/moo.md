@@ -9,8 +9,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@4.2.0] - 2026-03-19
+
 ### Added
 - feat(hope): distill agent — principled post-implementation audit with persistent project-scoped memory
+
+### Removed
+- **BREAKING** removed(kit): entire kit plugin removed — browser, portless, watch skills and SessionStart hook
 
 ---
 
@@ -46,7 +53,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [hope@4.0.1, kit@0.2.1] - 2026-03-04
+## [hope@4.0.1] - 2026-03-04
 
 ### Added
 - feat(hope): v4.0.0 — ground-up rewrite, 10 skills / ~1380 lines → 4 skills / 147 lines
@@ -54,12 +61,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hope): "prior art first" principle — search before creating, reframe over replicate
 - feat(hope): humble-master integration — correction reception, cost asymmetry, advise/disclose/teach as principles
 - docs: search reference moved from hope skill to docs/search-reference.md
-- feat(kit): SessionStart hook — discovers running portless routes and d3k instances, injects as `<kit-environment>` context on startup/resume/clear/compact
-- feat(kit): browser skill — agent-browser adaptation for headless browser automation (snapshot-ref-interact cycle, diff-based verification, session management)
-- feat(kit): portless skill — stable named .localhost URLs for dev servers (proxy management, framework detection, HTTPS)
-- feat(kit): watch skill — dev3000 monitored development (unified timeline, CDP browser monitoring, auto-composition with portless)
-- feat(kit): scaffold plugin — tactical tooling philosophy, plugin.json, marketplace registration
-- docs(kit): PHILOSOPHY.md with 5 beliefs, 6 principles, 5 constraints
 
 ### Changed
 - refactor(openspec): sync thinking-discipline spec with intent/shape rewrites — grounded briefs, assumption transparency, proportional scaling, dimension-by-dimension shaping, domain-aware depth, cross-dimension integration
@@ -73,11 +74,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - docs: statechart.md simplified to match 5-skill pipeline
 - docs: CLAUDE.md updated — structure, pipeline, hooks, compact instructions, audit
 - docs: root PHILOSOPHY.md updated to reflect v4 identity
-- refactor(kit): rename debug → watch — avoids /debug collision with Claude Code built-in, adds Startup directive (auto-composes portless + d3k with CDP browser), Inspect flow for reading page state
-- refactor(kit): skills redesign — flows over CLI docs; Role + Rules + Decision Tables + Flows replace command reference tables
-- refactor: philosophy hierarchy — root PHILOSOPHY.md minimal (identity + mission), plugin-specific philosophy in hope/ and kit/
-- chore: marketplace.json registers kit, updates hope description
-- chore: pre-push hook validates both hope/ and kit/ plugin directories
+- refactor: philosophy hierarchy — root PHILOSOPHY.md minimal (identity + mission), plugin-specific philosophy in hope/
+- chore: pre-push hook validates hope/ plugin directory
 
 ### Removed
 - **BREAKING** feat(hope): removed loop skill — Claude Code handles execution natively
@@ -115,7 +113,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - fix(hope): shape plan handoff — emit execution protocol with Skill() invocations, self-contained plans
 - feat(hope): consult `[EXTRACT]-only` modifier — BLOCKERs only, full findings on "detail"
 - feat(hope): exit-plan-gate self-containment check — Plan sessions without Skill() refs denied
-- feat(hope): full command kit:watch nudge — monitored dev before execution when portless/d3k active
 
 ---
 

@@ -4,7 +4,7 @@ hope v3.12.3 is a 10-skill pipeline plugin for Claude Code (~1380 lines). It gre
 
 The v0.0.1 hope was a single file that read like sticky notes from a senior dev. The philosophy was the implementation. v4 recovers that.
 
-Stack composition model: hope (thinking quality) + OpenSpec (durable artifacts) + kit (tooling) + claude-mem (memory). Each plugin owns one layer. No overlap.
+Stack composition model: hope (thinking quality) + OpenSpec (durable artifacts) + claude-mem (memory). Each plugin owns one layer. No overlap.
 
 ## Goals / Non-Goals
 

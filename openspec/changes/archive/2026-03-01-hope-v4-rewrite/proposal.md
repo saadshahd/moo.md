@@ -21,7 +21,7 @@ hope v3.12.3 grew from a philosophy primer into a behavioral specification engin
 - **New core principle**: prior art first — search before creating, reframe over replicate.
 - **Hook simplification** — remove exit-plan-gate complexity, simplify PreCompact. Hooks that exist should be trivial to understand.
 - **No factory metaphors**: no criteria[], mustNot[], holdout[], satisfaction tuples, waves, zones, DOT graphs anywhere.
-- **Stack model**: hope (thinking) + OpenSpec (artifacts) + kit (tooling) + claude-mem (memory). Each plugin owns one layer.
+- **Stack model**: hope (thinking) + OpenSpec (artifacts) + claude-mem (memory). Each plugin owns one layer.
 
 ## Capabilities
 
@@ -45,4 +45,3 @@ hope v3.12.3 grew from a philosophy primer into a behavioral specification engin
 - **Hooks**: Remove exit-plan-gate PreToolUse hook logic. Simplify PreCompact. SessionStart stays.
 - **OpenSpec composition**: hope primes "propose a spec" naturally; OpenSpec picks up if installed. No hard coupling.
 - **Marketplace**: Users on v3.x will need to update. Breaking change requires major version bump.
-- **kit plugin**: No changes. Continues as independent tooling layer.

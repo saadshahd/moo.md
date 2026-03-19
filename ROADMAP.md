@@ -15,10 +15,6 @@
     - Single-dimension collapse (SKILL.md line 8) never triggers — skill finds multiple dimensions in every prompt tested
   - Decision pending: fix in SKILL.md or accept as behavior (user testing will inform)
 
-## Ideas
-- opensrc skill for kit — context enrichment via dependency source code (vercel-labs/opensrc)
-  - Deferred: standalone CLI with minimal wrapping value as a skill
-
 ## Decisions
 - [x] hope v4 rewrite complete — 10 skills / ~1380 lines → 4 skills / 147 lines (2026-03-01)
   - Removed: loop, soul, verify, observe, forge, search
@@ -41,15 +37,7 @@
   - Shape: `[EXTRACT]-only` consult mode (BLOCKERs only, full on "detail"), plan handoff as execution protocol
   - Consult: `[EXTRACT]-only` mode for pipeline callers — data-gathering step, not presentation
   - Exit-plan-gate: self-containment check — Plan sessions without Skill() refs denied (trivial escape valve)
-  - hope:full: kit:watch nudge before execution — scoped to full only, conditional on portless/d3k active
   - Key insight: executing agents treat skill refs as suggestions unless plans read as protocols
-- [x] Kit SessionStart hook — environment discovery for compaction resilience (2026-02-23)
-  - Session e5e7bc18: agent wasted turns rediscovering d3k + portless after context loss
-  - Root cause: kit had zero hooks — env state only in conversation memory
-  - Fix: SessionStart hook discovers `portless list` routes + `d3k cdp-port` on every session event
-  - Outputs `<kit-environment>` tag with ready-to-use commands (snapshot, screenshot, errors)
-  - No-op when tools not installed or nothing running — clean `{}`
-  - Philosophy: discovers ephemeral system state, not persistent state. Stateless between invocations.
 - [x] Cognitive risk zones — 3rd classification axis in soul (2026-02-22)
   - Research: models don't self-diagnose; extended thinking hurts on high-complexity tasks
   - 3 dimensions: novelty, reasoning depth, freshness. Highest wins → Zone 1/2/3
@@ -57,14 +45,7 @@
   - Cascades: shape adds retrieval criteria/mustNot, loop decomposes + retrieval per item
   - Key insight: decomposition reduces constraints per sub-problem to Zone 1-2 where reasoning works
   - Orthogonal to sizing (scope) and risk tier (blast radius) — cognitive risk is a distinct axis
-- [x] Kit debug → watch rename + auto-composition (2026-02-23)
-  - Session audit: /debug collision with Claude Code built-in, passive composition docs, d3k CLI gaps
-  - Renamed to `watch` — triggers on "watch", "monitor", "d3k", avoids namespace collision
-  - Startup directive: active composition (portless + d3k + CDP browser), not passive reference
-  - Inspect flow: read page state via d3k CDP bridge when user asks "what went wrong"
-  - Fixed: long-form flags (--context, --type) to avoid -c collision with --command
-- [x] Kit skills redesign — flows over CLI docs, browser/portless/watch (2026-02-22)
-- [x] Philosophy hierarchy + kit scaffold + deep audit + literary audit (2026-02-22)
+- [x] Philosophy hierarchy + deep audit + literary audit (2026-02-22)
   - 10 beliefs, 16 principles, 13 constraints mechanized; beliefs 7-10 from literary sources
   - Key: understanding-as-product, artifact-as-liability, presence over velocity, friction when it teaches
 - [x] Phase 2 gap analysis — beliefs 9-10, constraint 13, authorship principle (2026-02-22)

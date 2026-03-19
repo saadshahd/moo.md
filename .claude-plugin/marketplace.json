@@ -12,13 +12,6 @@
       "description": "Thinking discipline for AI work. Clarify intent, shape approach, consult experts, compose teams.",
       "category": "core",
       "keywords": ["intent", "shape", "consult", "bond", "full", "expert", "panel", "team", "pipeline"]
-    },
-    {
-      "name": "kit",
-      "source": "./kit",
-      "description": "Tactical tooling — capability amplifiers for browser automation, structured debugging, stable environments.",
-      "category": "tools",
-      "keywords": ["tools", "automation", "browser", "debugging", "environment"]
     }
   ]
 }

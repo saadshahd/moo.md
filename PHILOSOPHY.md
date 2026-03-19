@@ -29,4 +29,3 @@ Four outcomes moo drives toward:
 Each plugin defines its own beliefs, principles, and constraints that serve the mission above.
 
 - **hope** — Thinking discipline: intent clarification, approach shaping, expert consultation, team composition. See `hope/PHILOSOPHY.md`.
-- **kit** — Tactical tooling: capability amplifiers for speed, awareness, and AI-native workflows. See `kit/PHILOSOPHY.md`.
