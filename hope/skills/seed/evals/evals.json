@@ -1,0 +1,55 @@
+{
+  "skill_name": "seed",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Seed a CLAUDE.md for this project.",
+      "context": "TypeScript + React + Next.js project with date-fns, zod, tailwindcss. Has Jest tests.",
+      "expected_output": "A CLAUDE.md file under 50 lines with situation-keyed rules, no named principles, anti-examples for restraint rules.",
+      "files": [],
+      "expectations": [
+        "Step 1 detects TypeScript, React, Next.js, Jest, and key dependencies without asking the user",
+        "Step 2 presents rule categories via AskUserQuestion with multiSelect",
+        "Step 2 options are tuned to detected stack (mentions npm, React patterns)",
+        "Step 3 asks focused tuning questions per selected category, not open-ended",
+        "Step 4 generates rules starting with 'When [situation]:' not named principles",
+        "Step 4 output contains zero principle names (no 'Musashi', 'razor', 'Library over custom', 'Atomic over gradual')",
+        "Step 4 output is under 50 lines",
+        "Step 4 includes anti-examples for restraint rules (contains 'Do NOT' or 'Never')",
+        "Step 4 includes ordering language ('BEFORE', 'Then and only then') in response format if selected",
+        "Step 5 presents final output for approval via AskUserQuestion",
+        "No explanations of why rules exist in the generated CLAUDE.md"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create project rules for my Python FastAPI backend.",
+      "context": "Python + FastAPI + SQLAlchemy + pytest. No existing CLAUDE.md.",
+      "expected_output": "A CLAUDE.md with Python-specific rules, pip package preference, pytest conventions.",
+      "files": [],
+      "expectations": [
+        "Step 1 detects Python, FastAPI, SQLAlchemy, pytest without asking",
+        "Library preference rule mentions pip packages, not npm",
+        "Style section references Python idioms, not TypeScript",
+        "Output sizing examples use Python task types (endpoint, model, migration) if selected",
+        "Generated file is under 50 lines",
+        "Rules use 'When [situation]:' format, not named principles"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Seed CLAUDE.md — I only want response format and library preference, nothing else.",
+      "context": "Go project with go.mod.",
+      "expected_output": "A minimal CLAUDE.md with only 2 selected sections plus Style, under 20 lines.",
+      "files": [],
+      "expectations": [
+        "Respects user's category selection — only response format and library preference generated",
+        "Does not add unrequested categories (no code review, no uncertainty protocol, no atomic changes, no output sizing)",
+        "Library preference mentions Go modules, not npm/pip",
+        "File is under 20 lines",
+        "Still includes Style section (always included per Step 4)",
+        "Rules use situation-keyed format, no named principles"
+      ]
+    }
+  ]
+}

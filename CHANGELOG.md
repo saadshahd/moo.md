@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@4.3.0] - 2026-03-22
+
+### Added
+- feat(hope): seed skill — generates project-level CLAUDE.md from stack detection and user-selected rule categories, situation-keyed rules only (no named principles)
+
+---
+
 ## [hope@4.2.0] - 2026-03-19
 
 ### Added
