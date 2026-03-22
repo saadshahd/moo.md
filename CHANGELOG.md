@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat(hope): proof transcript in README — real pipeline session from "make the homepage better" to precise spec
+
 ---
 
 ## [hope@4.3.0] - 2026-03-22
