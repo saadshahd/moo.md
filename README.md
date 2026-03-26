@@ -3,7 +3,8 @@
 # hope @ moo.md
 
 Why does this exist? Why introduce theatrical friction?
-Because YOU the human -> end up being the world model. The LLM powered agentic coder is just your hands with muscle memory.
+
+Because **YOU** the human -> end up being the world model. The LLM powered agentic coder is just your hands with tiny muscle memory.
 
 ---
 
