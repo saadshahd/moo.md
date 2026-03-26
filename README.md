@@ -1,8 +1,9 @@
 <img src="assets/cover-rounded.png" alt="moo.md - Stay present with AI" width="100%">
 
-# moo
+# hope @ moo.md
 
-Stop building the wrong thing. Think first, build once.
+Why does this exist? Why introduce theatrical friction?
+Because YOU the human -> end up being the world model. The LLM powered agentic coder is just your hands with muscle memory.
 
 ---
 
