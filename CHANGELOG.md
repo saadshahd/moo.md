@@ -9,9 +9,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@4.3.1] - 2026-03-28
+
+### Fixed
+- fix(hope): shape skill description — concrete trigger-only description with specific outputs (architecture choices, technology selection, design patterns), explicit hope:intent distinction, 8 trigger phrases
+- fix(hope): shape skill — trim decorative prose, enforce prior art gate as hard Step 1 requirement with tool calls, remove duplicate from reasoning toolkit
+- fix(hope): intent skill description — added timing anchor ("before planning or building") and output spec ("Produces a brief with scope, acceptance criteria, and stop conditions")
+- fix(hope): consult skill description — concrete output spec (expert panels, documented positions, anonymous recommendations grouped by concern) and clearer trigger context
+
 ### Added
 - feat(hope): proof transcript in README — real pipeline session from "make the homepage better" to precise spec
-- fix(hope): intent skill description — added timing anchor ("before planning or building") and output spec ("Produces a brief with scope, acceptance criteria, and stop conditions") to improve discovery specificity and reduce overlap with planning skills
 
 ---
 
