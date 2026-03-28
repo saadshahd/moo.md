@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 - feat(hope): proof transcript in README — real pipeline session from "make the homepage better" to precise spec
+- fix(hope): intent skill description — added timing anchor ("before planning or building") and output spec ("Produces a brief with scope, acceptance criteria, and stop conditions") to improve discovery specificity and reduce overlap with planning skills
 
 ---
 
