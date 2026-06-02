@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- docs: THE-COST.md — candid note on AI dependency as a dose (not discipline) problem; the risk is intrinsic and kept from compounding by staying legible, bounded, and non-total
+
 ---
 
 ## [hope@4.3.1] - 2026-03-28
