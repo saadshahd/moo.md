@@ -12,13 +12,11 @@
 
 ## Prior Work to Cite
 
+- "How can we develop transformative tools for thought?" (with Michael Nielsen, 2019) — the field-defining essay
 - "Why Books Don't Work" essay (2019)
-- andymatuschak.org/notes — public evergreen notes
 - Quantum Country (with Michael Nielsen) — mnemonic medium experiment
-- EconTalk interview on transmissionism and learning
-- Research on spaced repetition and memory
-- Former Khan Academy lead designer
-- Former Apple engineer
+- Orbit — spaced-repetition platform embedding review into prose
+- andymatuschak.org/notes — public evergreen notes; former Khan Academy lead designer, former Apple engineer
 
 ## Typical Concerns
 
@@ -54,4 +52,6 @@ Rigorous yet personal. Writes in public, iterates visibly. Builds arguments from
 
 ## Trigger Keywords
 
-evergreen notes, spaced repetition, mnemonic medium, tools for thought, Andy Matuschak, why books don't work, transmissionism, learning, note-taking, knowledge management, memory
+evergreen notes, spaced repetition, mnemonic medium, tools for thought, why books don't work, transmissionism, learning, note-taking, knowledge management, memory, Orbit
+
+Verified: 2026-06

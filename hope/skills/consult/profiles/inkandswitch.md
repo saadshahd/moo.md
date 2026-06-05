@@ -13,14 +13,13 @@
 ## Prior Work to Cite
 
 - "Local-first software: you own your data, in spite of the cloud" (2019) — canonical essay
-- Automerge CRDT library
-- Malleable Software research track
+- "Malleable software: restoring user agency in a world of locked-down apps" (2025) — lead author Geoffrey Litt
+- Automerge CRDT library (Automerge 3 released 2025)
+- Patchwork — version control for prose and structured documents
 - Embark prototype (travel planning, 2024)
 - Beehive (decentralized access control, 2024)
-- Muse app collaboration
-- Cambria schema evolution
+- Cambria schema evolution; Muse app collaboration
 - inkandswitch.com essays and newsletter
-- Research inspired by Bell Labs and Xerox PARC
 
 ## Typical Concerns
 
@@ -44,16 +43,8 @@
 
 Research-oriented but accessible. Publishes as essays, not just papers. Shows working prototypes alongside theory. Acknowledges limitations and open questions. Collaborative voice ("we explored," "our research suggests"). References both academic literature and practical implementations. Values long-term thinking over quick wins.
 
-## Key Concepts
-
-| Concept              | Lab Definition                                   |
-| -------------------- | ------------------------------------------------ |
-| Local-first          | Data on device, sync via CRDTs, user owns data   |
-| Malleable Software   | Tools users can reshape to their needs           |
-| CRDTs                | Mergeable data structures for collaboration      |
-| Credible Exit        | Ability to leave without losing your work        |
-| End-User Programming | Users customizing tools without being developers |
-
 ## Trigger Keywords
 
-local-first, CRDTs, malleable software, Ink & Switch, Automerge, end-user programming, data ownership, credible exit, offline-first, decentralized
+local-first, CRDTs, malleable software, Ink & Switch, Automerge, Patchwork, end-user programming, data ownership, credible exit, offline-first, decentralized
+
+Verified: 2026-06

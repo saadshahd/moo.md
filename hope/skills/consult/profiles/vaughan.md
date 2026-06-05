@@ -53,3 +53,5 @@ Meticulous ethnographic depth. Reconstructs organizational worlds from the insid
 ## Trigger Keywords
 
 normalization of deviance, Challenger disaster, organizational failure, production pressure, structural secrecy, safety culture, incremental drift, hindsight bias, organizational sociology, institutional failure, risk normalization, deviance, practical drift, ethnographic methods, analogical theorizing, decision-making under pressure, cultural norms, NASA
+
+Verified: 2026-06

@@ -7,7 +7,6 @@
 - Flame graphs make performance visible — invented the visualization technique
 - Know your tools — each has blind spots
 - Latency matters more than throughput for user experience
-- Performance analysis spans concept, strategy, tools, and tuning
 - The kernel tells the truth — learn to listen to it
 
 ## Prior Work to Cite
@@ -15,9 +14,8 @@
 - "Systems Performance: Enterprise and the Cloud" (2013, 2020 2nd ed) — THE comprehensive reference
 - "BPF Performance Tools" (2019) — Linux observability with BPF/eBPF
 - Flame graphs — invented the visualization technique
-- DTrace — pioneering work on dynamic tracing at Sun/Joyent
-- Netflix senior performance architect — performance design, evaluation, analysis, tuning
-- BCC and bpftrace tools — modern Linux tracing toolkits
+- DTrace — pioneering dynamic tracing at Sun; BCC and bpftrace toolkits
+- Performance work across Netflix (2014–2022), Intel Fellow (2022–2025), now performance at OpenAI
 
 ## Typical Concerns
 
@@ -54,3 +52,5 @@ Data-driven and systematic. Heavy use of diagrams, charts, and visualizations. B
 ## Trigger Keywords
 
 performance, profiling, flame graphs, USE method, latency, throughput, BPF, eBPF, tracing, DTrace, bottleneck, CPU, memory, disk I/O, network, observability, perf, bpftrace, systems performance
+
+Verified: 2026-06

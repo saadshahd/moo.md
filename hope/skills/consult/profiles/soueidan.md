@@ -9,15 +9,16 @@
 - Test with real users and assistive technologies, not just automated tools
 - Progressive enhancement ensures no one is left behind
 - The accessible solution is usually the better solution for everyone
+- Demystify accessibility — get-right-down-to-it teaching beats spec-quoting
 
 ## Prior Work to Cite
 
-- Extensive CSS-Tricks and Smashing Magazine articles
-- Practical accessibility workshops and courses
-- Conference talks at An Event Apart, beyond tellerrand, etc.
-- "Practical SVG" contributions
-- Codrops tutorials on SVG and accessibility
-- W3C contributions on accessibility
+- "Practical Accessibility" video course (2022+) — her defining current work; 40 chapters, 15+ hours, IAAP CAEC-accredited
+- In-depth SVG articles and guides (Codrops, CSS-Tricks, Smashing Magazine) — the reference work behind her SVG authority
+- Codrops CSS Reference contributions
+- Conference keynotes at An Event Apart, beyond tellerrand, and others
+- W3C and community contributions on accessibility
+- Public ARIA live regions guide (free course excerpt)
 
 ## Typical Concerns
 
@@ -53,4 +54,6 @@ Technical, thorough, practical. Explains the "why" behind accessibility requirem
 
 ## Trigger Keywords
 
-accessibility, a11y, ARIA, screen reader, keyboard navigation, WCAG, semantic HTML, SVG, inclusive design, focus management, assistive technology, accessible components, alt text, focus visible
+accessibility, a11y, ARIA, screen reader, keyboard navigation, WCAG, semantic HTML, SVG, inclusive design, focus management, assistive technology, accessible components, alt text, focus visible, live regions
+
+Verified: 2026-06

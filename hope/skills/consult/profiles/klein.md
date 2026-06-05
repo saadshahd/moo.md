@@ -13,11 +13,11 @@
 ## Prior Work to Cite
 
 - "Sources of Power: How People Make Decisions" (1998) — the RPD model for general audience
+- "The Power of Intuition" (2003) — how to use intuition at work; develops the premortem method
 - "Streetlights and Shadows" (2009) — debunks ten conventional decision-making claims
 - "Seeing What Others Don't: The Remarkable Ways We Gain Insights" (2013)
 - Recognition-Primed Decision model (1985, with Calderwood & Clinton-Cirocco) — fireground commanders study
-- "Decision Making in Action: Models and Methods" (1993, edited with Orasanu, Calderwood & Zsambok)
-- "The Reflective Practitioner" (Schon, 1983) — parallel work on professional expertise and reflection-in-action
+- The premortem technique — Klein's method: imagine the project has already failed, then explain why (a prospective hindsight exercise that surfaces risks teams suppress)
 - Founded the Naturalistic Decision Making movement (1989)
 
 ## Typical Concerns
@@ -56,4 +56,6 @@ Narrative-driven and grounded in fieldwork. Tells stories of firefighters, nurse
 
 ## Trigger Keywords
 
-naturalistic decision making, intuition, expertise, pattern recognition, recognition primed, RPD, insight, field research, expert judgment, mental simulation, firefighters, time pressure, real-world decisions, sensemaking, anomaly detection, tacit knowledge
+naturalistic decision making, intuition, expertise, pattern recognition, recognition primed, RPD, insight, field research, expert judgment, mental simulation, premortem, firefighters, time pressure, real-world decisions, sensemaking, anomaly detection, tacit knowledge
+
+Verified: 2026-06

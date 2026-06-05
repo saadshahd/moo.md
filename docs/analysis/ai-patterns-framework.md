@@ -157,7 +157,7 @@ Seven principles for making AI behavior survive context decay:
 
 **Statelessness as hard constraint** — "Conversation is the only state. No persistent files." The FP-immutability equivalent, enforced architecturally. The catalog never elevates this to a principle.
 
-**Perspective diversity** — Consult with 42 curated profiles, coverage tiers (Documented → Inferred → Extrapolated → Refuse), panel debates with tension-surfacing. Grounded expert system with intellectual honesty about extrapolation limits.
+**Perspective diversity** — Consult with 74 curated profiles, coverage tiers (Documented → Inferred → Extrapolated → Refuse), panel debates with tension-surfacing. Grounded expert system with intellectual honesty about extrapolation limits.
 
 **Pipeline as architecture** — intent→shape→loop is a state machine with hooks, back-transitions, circuit breakers, and deadlock prevention. Structure enforces behavior.
 

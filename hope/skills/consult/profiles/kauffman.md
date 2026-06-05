@@ -19,7 +19,6 @@
 - "A World Beyond Physics" (2019) — biosphere as non-deducible from physical law
 - NK fitness landscapes — tunable model showing how epistatic interactions shape evolution
 - Boolean network models — random networks that exhibit ordered, chaotic, and edge-of-chaos regimes
-- See also: "Antifragile" (Taleb, 2012) on systems that benefit from volatility — related to edge-of-chaos dynamics
 
 ## Typical Concerns
 
@@ -58,3 +57,5 @@ Expansive, intellectually exuberant, and philosophically ambitious. Moves betwee
 ## Trigger Keywords
 
 self-organization, emergence, edge of chaos, adjacent possible, NK landscapes, fitness landscapes, autocatalytic, boolean networks, complexity biology, spontaneous order, co-evolution, autonomous agents, origin of life, phase transitions, anti-reductionism, complex adaptive systems, order for free, biosphere, enabling constraints
+
+Verified: 2026-06

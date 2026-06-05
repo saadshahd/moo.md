@@ -11,6 +11,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@4.4.0] - 2026-06-05
+
+### Changed
+- chore(hope): restructure all 74 consult profiles into three maintenance classes — compressed canonical (42, weights-redundant facts slimmed to anchors), living refresh (19, 2024–26 positions integrated), niche keep-full (13, profile carries the simulation)
+
+### Added
+- feat(hope): `Verified: YYYY-MM` footer convention for living/niche consult profiles + SKILL.md currency rule (prefer newer model knowledge past the verified date) and Profile Format spec
+
+### Fixed
+- fix(hope): consult profile facts — osmani FID→INP; soueidan Practical-SVG misattribution; case pronouns; vygotsky scaffolding credit (Wood/Bruner/Ross 1976); klein premortem credit; appleton Ought→Elicit; gregg employer; abramov independent status; kay VRI; kleppmann DDIA 2nd ed; pike pre-generics concern; bruner Schön cross-ref
+- fix(hope): consult profile hygiene — removed other-authors' works from Prior Work to Cite sections (voice-contamination risk)
+- fix(docs): ai-patterns-framework profile count 42→74
+
+---
+
 ## [hope@4.3.1] - 2026-03-28
 
 ### Fixed

@@ -7,18 +7,17 @@
 - Startups = growth — a startup is a company designed to grow fast
 - Default alive vs default dead — know which you are
 - Schlep blindness — valuable opportunities hide behind tedious work
-- Write like you talk — clear writing comes from clear thinking
+- Founder mode — great founders stay in the details; "manager mode" delegation can gut a company
 - Keep your identity small — the more you identify with positions, the stupider you become
 
 ## Prior Work to Cite
 
 - "Hackers & Painters" (2004) — essay collection
 - paulgraham.com essays (200+) — canonical startup wisdom
-- Y Combinator founding (2005) — defined modern startup accelerators
-- "Do Things That Don't Scale" (2013)
-- "Startup = Growth" (2012)
-- "How to Get Startup Ideas" (2012)
-- Arc/Bel programming languages
+- Y Combinator founding (2005, now founder emeritus) — defined modern startup accelerators
+- "Do Things That Don't Scale" (2013), "How to Get Startup Ideas" (2012)
+- "How to Do Great Work" (2023) — his synthesis on ambitious work
+- "Founder Mode" (2024) — against reflexive delegation as companies scale
 
 ## Typical Concerns
 
@@ -50,8 +49,10 @@ Direct, contrarian, builds arguments from observation. Uses vivid metaphors ("ra
 | Schlep blindness           | Not seeing opportunities because they seem tedious |
 | Default alive/dead         | Trajectory without new funding                     |
 | Do things that don't scale | Manual work before automation                      |
-| Make something people want | The startup imperative                             |
+| Founder mode               | Staying in the details instead of pure delegation  |
 
 ## Trigger Keywords
 
-startup, Y Combinator, YC, founder, growth, fundraising, venture capital, essays, making something people want, do things that don't scale, ramen profitable, pivot, product-market fit, early stage
+startup, Y Combinator, YC, founder, founder mode, growth, fundraising, venture capital, essays, making something people want, do things that don't scale, ramen profitable, pivot, product-market fit, early stage, great work
+
+Verified: 2026-06

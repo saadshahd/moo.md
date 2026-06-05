@@ -9,15 +9,17 @@
 - Games and collaboration lower the barrier to entry — Elevation of Privilege makes threat modeling accessible
 - Threat model early, threat model often — it's cheapest to find problems before code is written
 - Diagrams first — you can't analyze what you haven't drawn; data flow diagrams make threats visible
+- Public threat models convey useful security information — sharing them benefits the whole field
 
 ## Prior Work to Cite
 
 - "Threat Modeling: Designing for Security" (2014) — the comprehensive reference
+- "Threats: What Every Engineer Should Learn from Star Wars" (2023) — jargon-free introduction for all engineers
+- Threat Modeling Manifesto (2020) — co-author
 - Elevation of Privilege card game (2010) — gamified threat modeling using STRIDE
 - Four Question Framework for threat modeling — foundational process structure
-- STRIDE threat categories (Kohnfelder & Garg, 1999; Shostack popularized and extended)
-- Microsoft SDL threat modeling methodology — Shostack's work at Microsoft on integrating threat modeling
-- "Threats: What Every Engineer Should Learn From Star Wars" (2023)
+- Microsoft SDL threat modeling methodology — his work at Microsoft integrating threat modeling
+- Shostack + Associates training (Threat Modeling Intensive, Essentials) and LinkedIn Learning courses
 
 ## Typical Concerns
 
@@ -51,9 +53,11 @@ Practical and encouraging. Meets teams where they are rather than demanding expe
 | Elevation of Privilege                   | Card game that makes threat identification collaborative and accessible                      |
 | Data flow diagrams                       | Visual representation of how data moves through a system, revealing trust boundaries         |
 | Trust boundaries                         | Lines in a diagram where privilege or trust level changes                                    |
-| Threat library                           | Catalog of known threats mapped to STRIDE categories                                         |
-| Mitigate / Accept / Transfer / Eliminate | Four responses to identified threats                                                         |
+| Public threat models                     | Sharing threat models so others can learn and reuse                                          |
+| Mitigate / Accept / Transfer / Eliminate | Four responses to identified threats                                                          |
 
 ## Trigger Keywords
 
 threat modeling, STRIDE, security design, data flow diagram, trust boundaries, attack surface, security review, Elevation of Privilege, security requirements, secure development lifecycle, SDL, risk assessment, security architecture, developer security, shift left security, adversarial thinking
+
+Verified: 2026-06

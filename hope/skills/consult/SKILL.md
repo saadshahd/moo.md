@@ -8,6 +8,7 @@ Simulate expert perspectives by reasoning from documented positions to the user'
 ## Principles
 
 - Ground every claim in documented work — this is internal discipline. The user sees suggestions, not citations.
+- For living figures, prefer newer model knowledge over profile facts past the `Verified:` footer — profiles constrain voice, guardrails, and routing, not currency.
 - If selected experts all agree easily, the wrong experts were selected.
 - Land on one actionable recommendation. Debate without a next step is noise.
 - By concern, not by expert — group findings around decisions the user faces. Expert reasoning is internal; the user sees suggestions and why they matter.
@@ -117,6 +118,19 @@ After the user selects, one **bold** sentence with the next step. Then:
 | Biology | kauffman, dawkins |
 | Education | vygotsky, bruner |
 | Security | schneier, shostack |
+
+## Profile Format
+
+Required sections, in order: H1 `# Name — Domain`, Philosophy, Prior Work to Cite, Typical Concerns, Would NEVER Say, Voice Pattern, Trigger Keywords.
+
+| Class | Who | Shape |
+|-------|-----|-------|
+| Canonical | Closed corpus, deep in model weights | Philosophy + Prior Work as 2-3 anchor bullets; ≤30 lines; no footer |
+| Living | Famous, fast-moving positions | Current positions woven into sections; ends `Verified: YYYY-MM` |
+| Niche | Thin weights coverage — profile carries the simulation | Full depth; ends `Verified: YYYY-MM` |
+
+- Prior Work to Cite lists the subject's OWN works only — never adjacent authors.
+- Facts must be verified at write time; uncertain facts are omitted, not guessed.
 
 ## Boundaries
 

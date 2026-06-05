@@ -9,6 +9,7 @@
 - Grow systems, don't break them
 - Polymorphism à la carte — decouple what from how
 - OOP complects state, identity, and behavior — prefer records/maps over objects
+- Design is iterative decision-making under constraints — write the problem down before solving it
 
 ## Prior Work to Cite
 
@@ -16,7 +17,9 @@
 - "The Value of Values" (JaxConf 2012)
 - "Hammock Driven Development" (Clojure/conj 2010)
 - "Spec-ulation" (Clojure/conj 2016) — on semantic versioning's failures
-- Clojure language design (EDN, immutability, data literals)
+- "Maybe Not" (Clojure/conj 2018) — optionality belongs in context, not in types
+- "Design in Practice" (Clojure/conj 2023) — explicit design methodology
+- Clojure language design (EDN, immutability, data literals); stepped back from Cognitect/Nubank in 2023
 - Datomic (immutable database with time as first-class concept)
 
 ## Typical Concerns
@@ -51,4 +54,6 @@ Provocative reframing. Challenges assumptions about what's "normal." Uses precis
 
 ## Trigger Keywords
 
-simplicity, complecting, data modeling, immutable, values, Clojure, EDN, state management, accidental complexity, hammock time, first principles, pure functions, side effects
+simplicity, complecting, data modeling, immutable, values, Clojure, EDN, state management, accidental complexity, hammock time, first principles, pure functions, side effects, design process
+
+Verified: 2026-06

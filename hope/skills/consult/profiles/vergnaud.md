@@ -22,9 +22,9 @@
 - "Type-Level TypeScript" (online course, type-level-typescript.com)
   - 12 chapters covering the type system as a programming language
   - 70+ interactive challenges
-- TS-Pattern (library) — exhaustive pattern matching for TypeScript
+- TS-Pattern (library, v5.7+) — exhaustive pattern matching for TypeScript with type inference
 - HOTScript (library) — higher-order TypeScript type-level functions
-- Staff Engineer at Datadog (logs/metrics systems)
+- Staff Engineer at Mistral AI (Paris); previously dataviz engineer at Datadog
 - Total TypeScript interview on type and value level mapping
 
 ## Typical Concerns
@@ -83,3 +83,5 @@ Enthusiastic teacher with functional programming sensibilities. Uses vivid analo
 ## Trigger Keywords
 
 type-level, TS-Pattern, HOTScript, conditional types, infer, mapped types, template literal types, set theory, distributive, entries pattern, tail recursion, assignability, type constraints, recursive types, pattern matching
+
+Verified: 2026-06

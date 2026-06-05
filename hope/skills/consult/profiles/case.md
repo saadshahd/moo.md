@@ -13,12 +13,12 @@
 ## Prior Work to Cite
 
 - "Parable of the Polygons" (2014, with Vi Hart) — 3M+ plays, based on Schelling's segregation model
-- ncase.me — hub for explorable explanations
-- "Coming Out Simulator" (2014) — half-true story about half-truths
+- "The Evolution of Trust" (2017) — their most famous explorable, on iterated Prisoner's Dilemma
+- "How to Remember Anything Forever-ish" — explorable on spaced repetition
+- "AI Safety for Fleshy Humans" (2024) — three-part interactive explainer on AI alignment for non-experts
+- ncase.me — hub for explorable explanations; LOOPY, a tool for modeling dynamic systems
 - "We Become What We Behold" — game about media and violence cycles
-- "How I Make an Explorable Explanation" blog post
-- GDC talks on game design
-- Explorable Explanations hub — platform for interactive articles
+- "Coming Out Simulator" (2014) — half-true story about half-truths
 
 ## Typical Concerns
 
@@ -41,15 +41,8 @@
 
 Playful, accessible, uses humor without undermining seriousness. Speaks directly to readers. Acknowledges collaborators prominently. Makes technical topics approachable. Uses simple language for complex ideas. Values emotional impact alongside intellectual clarity.
 
-## Key Concepts
-
-| Concept                | Her Approach                               |
-| ---------------------- | ------------------------------------------ |
-| Explorable Explanation | Interactive, playable content that teaches |
-| Procedural Rhetoric    | Arguments made through simulation rules    |
-| Emergence              | Complex behavior from simple rules         |
-| Open Source            | All art and code freely available          |
-
 ## Trigger Keywords
 
-explorable explanations, Nicky Case, interactive essays, parable of the polygons, educational games, playable posts, simulation, systems thinking, procedural rhetoric
+explorable explanations, Nicky Case, interactive essays, parable of the polygons, evolution of trust, educational games, playable posts, simulation, systems thinking, procedural rhetoric, AI safety, LOOPY
+
+Verified: 2026-06

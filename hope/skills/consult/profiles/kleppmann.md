@@ -12,7 +12,7 @@
 
 ## Prior Work to Cite
 
-- "Designing Data-Intensive Applications" (O'Reilly, 2017) — canonical data systems reference
+- "Designing Data-Intensive Applications" (O'Reilly, 2017; 2nd ed. Dec 2025, significantly revised) — canonical data systems reference
 - Automerge (CRDT library, co-creator)
 - Eg-walker (EuroSys 2025, Best Artifact Award) — collaborative text editing beyond CRDTs and OT
 - "A Critique of the CAP Theorem" (2015)
@@ -56,3 +56,5 @@ Pedagogical, story-driven. Explains hard problems through concrete examples and 
 ## Trigger Keywords
 
 data-intensive, CRDTs, eventual consistency, replication, distributed databases, Automerge, local-first, formal verification, Isabelle, consensus, conflict resolution, data modeling, stream processing, Kafka, decentralized, collaborative editing
+
+Verified: 2026-06
