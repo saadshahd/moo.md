@@ -11,6 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@4.5.0] - 2026-06-07
+
+### Added
+- feat(hope): workflow steerability hook — deny-once PreToolUse latch on the Workflow tool delivers a six-row review protocol (fan-out, verification depth, output caps, coverage & assumptions, concurrency reality, narration) at first Workflow use per session; outcomes recorded in `meta.decisions`, latch keyed by session in tmp (`hooks/hooks.json`, `hooks/steer.sh`, `hooks/steer.md`)
+
+---
+
 ## [hope@4.4.0] - 2026-06-05
 
 ### Changed
