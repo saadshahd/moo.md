@@ -1,9 +1,9 @@
 ---
 name: bond
-description: Assesses team fitness and composes agent teams. Use when "set up a team", "team for this", "should I use agents", "design a team", "how many agents", "agent team".
+description: Assesses orchestration fitness and authors execution workflows. Use when "should I use agents", "parallelize this", "fan out", "orchestrate this", "team for this", "how many agents".
 ---
 
-Assess whether a task benefits from parallel agents. Most tasks are better solo. A team only pays off with genuine independence across modules.
+Assess whether a task benefits from parallel fan-out. Most tasks are better solo. A workflow only pays off with genuine independence across modules.
 
 ## Presentation
 
@@ -16,92 +16,72 @@ Assess whether a task benefits from parallel agents. Most tasks are better solo.
 ### Step 1: Assess
 
 Read the task scope. Evaluate internally:
-- Can workers operate without each other's output?
+- Can workstreams run without each other's output?
 - Do they touch different files?
 - Is scope multi-module (8+ story points)?
 
 Search the codebase to identify module boundaries and file ownership zones.
 
-If any answer is no on file independence, fitness = solo. If scope is 3 or fewer story points, fitness = solo. Otherwise, fitness = team.
+If any answer is no on file independence, fitness = solo. If scope is 3 or fewer story points, fitness = solo. Otherwise, fitness = workflow.
 
 Do not output assessment reasoning in any form — no headers, no bullet points, no labeled sections. Go straight to Step 2.
 
 ### Step 2: Choose mode
 
-**One bold sentence stating your assessment**, then AskUserQuestion with three options:
+**One bold sentence stating your assessment**, then AskUserQuestion with two options:
 
-- **Team (Recommended)** or **Solo (Recommended)** — whichever fitness determined. Label the recommended option. Description = one-line why.
-  - Detail panel: module count, story point estimate, file independence summary
-- **Solo** or **Team** — the non-recommended alternative.
+- **Workflow (Recommended)** or **Solo (Recommended)** — whichever fitness determined. Label the recommended option. Description = one-line why.
+  - Detail panel: workstream count, story point estimate, file independence summary
+- **Solo** or **Workflow** — the non-recommended alternative.
   - Detail panel: what you gain and pay choosing this over the recommendation
-- **Subagents** — sequential delegation, no parallelism.
-  - Detail panel: when this fits (dependent steps, shared files, lower complexity)
 
-If user picks Solo or Subagents, state the approach in one sentence. Done.
+If user picks Solo, state the approach in one sentence. Done.
 
-If user picks Team, proceed to Step 3.
+If user picks Workflow, proceed to Step 3.
 
-### Step 3: Design roles
+### Step 3: Design workstreams
 
 Identify 2-5 independent workstreams from the task. For each:
-- Role name by responsibility (never generic)
-- Owned files (no overlap between roles)
-- Model: Opus for architecture/review, Sonnet for implementation, Haiku for research
-- Task summary (1-2 lines)
+- Name by responsibility (never generic)
+- Owned files (no overlap between workstreams)
+- Stage shape: what each item passes through (find → transform → verify), where verification happens
 
-Run coupling check internally: for each role pair, "if A changes X, does B break?" Merge roles where yes.
+Run coupling check internally: for each pair, "if A changes X, does B break?" Merge workstreams where yes.
 
-If coupling remains after merging, proceed to Step 4 before presenting. Otherwise skip to Step 5.
+If shared files remain after merging, plan worktree isolation for those agents — or drop to solo if isolation costs more than parallelism gains.
 
-### Step 4: Surface coupling
+### Step 4: Present blueprint
 
-**One bold sentence naming the coupling.** Then AskUserQuestion:
+**One bold sentence: "N workstreams, zero file overlap."** Then present workstreams via AskUserQuestion (multiSelect) so the user reviews all at once:
 
-- **Merge [Role A + Role B]** — combine into one role.
-  - Detail panel: shared files, why merging prevents conflicts
-- **Coordinate** — keep separate with explicit handoff point.
-  - Detail panel: handoff mechanism, sequencing, risk of drift
-- **Redesign boundaries** — return to Step 3 with different file splits.
-
-Repeat for each coupling pair. Then proceed to Step 5.
-
-### Step 5: Present blueprint
-
-**One bold sentence: "N roles, M workstreams, zero file overlap."** Then present roles via AskUserQuestion (multiSelect) so the user reviews all roles at once:
-
-- Label: role name
+- Label: workstream name
 - Description: owned files (short path list)
 - Detail panel:
 
 ```
-MODEL: [opus/sonnet/haiku]
-
 OWNS:
   - path/to/files
 
 TASK:
-  - what this role builds
+  - what this workstream produces
 
-DEPENDS ON:
-  - nothing / [specific handoff]
+VERIFIED BY:
+  - stage or check that confirms it
 ```
 
 After user reviews, present a separate AskUserQuestion:
-- **Approve and create** — proceed to Step 6
-- **Adjust a role** — modify, then re-present
-- **Cancel** — exit without creating
+- **Approve and author** — proceed to Step 5
+- **Adjust a workstream** — modify, then re-present
+- **Cancel** — exit without authoring
 
-### Step 6: Create
+### Step 5: Author
 
-If plan mode is active: write the team spec to the plan file — role names, owned files, models, tasks, spawn order, and sequencing constraints. State that creation will happen after plan approval. Done.
+If plan mode is active: write the orchestration spec to the plan file — workstreams, owned files, stage shape, verification plan. State that the workflow runs after plan approval. Done.
 
-If not in plan mode:
-1. Create team with TeamCreate
-2. Spawn each role as an Agent with scope, owned files, and task from blueprint
-3. Use persistent agent files when a role matches an existing agent
+If not in plan mode: author the Workflow script from the blueprint and run it. Record steering choices in `meta.decisions`. The steer hook's review protocol governs fan-out, verification depth, and output caps — answer it, don't bypass it. If the protocol isn't in context (latch consumed earlier, then compacted away), read `hooks/steer.md` at the hope plugin root before authoring.
 
-No output beyond confirmation that agents are running.
+No output beyond confirmation that the workflow is running.
 
 ## Boundaries
 
-User approves before any team is created. Bond assesses and recommends; user decides mode, roles, and boundaries. Bond asks only bond questions — scope, requirements, and approach belong to intent and shape.
+User approves before any workflow runs. Bond assesses and recommends; user decides mode and boundaries. Bond asks only bond questions — scope, requirements, and approach belong to intent and shape. Workflows are the only parallel mechanism — never TeamCreate or agent teams.

@@ -36,15 +36,22 @@ Detect mode from the user's prompt — explicit keyword or inferred from context
 
 ### Step 1: Route
 
-Infer mode and select experts from the domain map. Read each selected profile from `profiles/`. No text output — go straight to Step 2.
+Infer mode and select experts from the domain map. No text output — go straight to Step 2.
 
 - Match experts using domain map below
 - Check blocklist (`~/.claude/counsel-blocklist.json`)
 - Max 2 from same domain row — diversity requires crossing domains
+- Single mode: read the selected profile from `profiles/`. 2+ experts: collect absolute profile paths only — the engine's agents read them, never the main conversation.
 
 ### Step 2: Reason
 
-Each expert argues from their documented positions applied to the user's context. Distill into anonymous suggestions. No text output — go straight to Step 3.
+**2+ experts** — run the bundled engine; do not simulate experts in-conversation:
+
+`Workflow(scriptPath: "<this skill's directory>/consult.mjs", args: { question, context, mode, profiles: [{ name, path }] })` — paths absolute. All steering decisions are pre-answered in the script's `meta.decisions` (`by: 'author'`); if the steer hook denies the first call, state its rows from that meta and re-invoke — never re-ask the user. Each expert returns capped concerns plus a `dissent` field.
+
+**Single expert** — simulate inline from the profile as before.
+
+Distill returned positions into anonymous suggestions — tensions between experts (compare `dissent` fields) are the valuable output. No text output — go straight to Step 3.
 
 **Per mode:**
 - **Single** — One perspective, pushback, limits.

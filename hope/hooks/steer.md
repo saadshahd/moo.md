@@ -30,6 +30,6 @@ export const meta = {
 }
 ```
 
-A workflow script without `meta.decisions` is evidence the review was skipped.
+`by` is `'user'` (asked this session), `'default'` (stated as visible default this session), or `'author'` (baked into a bundled/saved script when it was written). A script without `meta.decisions` is evidence the review was skipped. For a script that arrives with decisions baked (`by: 'author'`), state the rows briefly and proceed — do not re-ask.
 
 Narration rules: every parallel stage logs a completion counter ("4/8 done; running: x, y"). Declare serialized stages as serial — never imply parallelism that shared state defeats.

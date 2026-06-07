@@ -11,6 +11,19 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@5.0.0] - 2026-06-07
+
+### Added
+- feat(hope): consult workflow engine — bundled `consult.mjs` runs 2-4 expert simulations as parallel word-capped sonnet agents via Workflow scriptPath; profiles read by sub-agents (never main context); all six steering decisions baked in `meta.decisions` with `by: 'author'`; synthesis stays in the main loop per consult's presentation rules
+
+### Changed
+- feat(hope): consult SKILL.md Steps 1-2 route 2+ expert modes through the bundled engine; single-expert mode unchanged
+- feat(hope): steer.md provenance vocabulary extended — `by: 'user'|'default'|'author'`; author-baked scripts state rows and proceed without re-asking
+- feat(hope): full.md pipeline state as lookup — closed state enum (`intent|shape|consult|bond|execute|done|abandoned`) + 15-row transition table with skips encoded as transitions; handoff message (Closed/Opens/You + full marker) at every transition; blocked intent→bond asks a gate question instead of warning; pre-bond checkpoint restates shape's constraint via AskUserQuestion (Collaborative/Guided only)
+- feat(hope)!: bond retargeted from agent teams to Workflow orchestration — modes reduced to Solo/Workflow, role design replaced by workstream design with verification stages, TeamCreate removed; authored workflows record `meta.decisions` and answer the steer review protocol, falling back to reading `hooks/steer.md` when the deny-once latch was consumed and the protocol compacted away
+
+---
+
 ## [hope@4.5.0] - 2026-06-07
 
 ### Added
