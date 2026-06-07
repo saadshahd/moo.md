@@ -45,8 +45,11 @@ Identify 2-5 independent workstreams from the task. For each:
 - Name by responsibility (never generic)
 - Owned files (no overlap between workstreams)
 - Stage shape: what each item passes through (find → transform → verify), where verification happens
+- Verification shape: one review round, fixer self-verifies. One reviewer with both lenses — a spec+quality pair re-reading the same files doubles cold-start cost
 
 Run coupling check internally: for each pair, "if A changes X, does B break?" Merge workstreams where yes.
+
+Estimate wall time as the longest chain (critical path), never agent count — chained impl → review → fix stages dominate; width cannot shorten a serial chain.
 
 If shared files remain after merging, plan worktree isolation for those agents — or drop to solo if isolation costs more than parallelism gains.
 

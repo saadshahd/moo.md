@@ -7,10 +7,10 @@ Before authoring any workflow script — this one and every later one — put a 
 | Row | Decide | Failure it prevents |
 |-----|--------|---------------------|
 | 1. Fan-out | width × model × rough token cost | uncapped opus runs: 10–62 min vs 1.6 min capped |
-| 2. Verification depth | none / single-vote / adversarial panel | 1.4M tokens across a 3-run spiral for 1 kept finding |
+| 2. Verification depth | none / single-vote / adversarial panel; fix loops cap at 1 round — any round 2 re-verifies round 1's pinned issues, never hunts new ones | 1.4M tokens across a 3-run spiral for 1 kept finding; 0/3 review loops converged — unpinned rounds found new issues every pass, costing more wall time than implementation |
 | 3. Output caps | word-capped schemas on every agent | "fluff" complaints, unbounded synthesis |
 | 4. Coverage & assumptions | exclusions, top-N truncation, "already known" sets — confirm with the user, never invent | invented exclusion lists silently narrowing scope |
-| 5. Concurrency reality | effective parallelism (shared resources serialize), barrier/straggler risk, honest wall-time | an "8-agent" run that was 97% sequential; 40% of wall time idle on one straggler |
+| 5. Concurrency reality | effective parallelism (shared resources serialize), barrier/straggler risk, honest wall-time | an "8-agent" run that was 97% sequential; a 22-agent run at 1.42× — serial review chains, not width, set the wall |
 | 6. Narration | log() plan — completion counters on every parallel stage | 1 log per 21 min; silent runs get killed |
 
 Threshold:

@@ -11,6 +11,15 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@5.1.0] - 2026-06-07
+
+### Changed
+
+- feat(hope): steer.md review protocol hardened from live run evidence — row 2 caps fix loops at 1 round (round 2 re-verifies pinned issues only; 0/3 unpinned loops converged), row 5 adds critical-path evidence (22-agent run at 1.42× parallelism)
+- feat(hope): bond Step 3 gains verification-shape default (one reviewer, both lenses, fixer self-verifies) and critical-path wall-time estimation rule
+
+---
+
 ## [hope@5.0.0] - 2026-06-07
 
 ### Added
