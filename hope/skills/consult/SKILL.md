@@ -15,51 +15,63 @@ Simulate expert perspectives by reasoning from documented positions to the user'
 
 ## Presentation
 
-These rules govern how consult communicates across all modes.
+These rules govern how consult communicates across all goals.
 
 - **Minto pyramid via AskUserQuestion** — Label = the suggestion (conclusion first). Description = why it matters (always visible). Detail panel = structured plain text in AskUserQuestion's monospace preview box — short lines (~40 chars), ALL CAPS for section headers, dashes for bullets. No markdown formatting (renders as literal text, not rich text).
-- **Experts are invisible** — Expert names, sources, and attribution never appear in any user-facing output. Not in text, labels, descriptions, or detail panels. Never "Fowler says" or "Hickey argues." The user sees suggestions and why they matter.
+- **Experts are invisible in findings** — In Step 5/6 output, expert names, sources, and attribution never appear. Not in text, labels, descriptions, or detail panels. Never "Fowler says" or "Hickey argues." The user sees suggestions and why they matter. **Sole exception:** goal-pick (Step 2) and confirm (Step 3) show candidate names so the user can shape the panel — names never cross into findings.
 - **Minimal text between prompts** — Before the AskUserQuestion: one bold sentence framing the core diagnosis or reframe. After the user answers: one bold sentence with the next step. Nothing else. Use markdown **bold** for the key insight. No paragraphs, no per-expert reasoning, no multi-line explanations.
 
-## Modes
+## Goals
 
-Detect mode from the user's prompt — explicit keyword or inferred from context.
+The user picks a goal; the goal projects a panel from the routed pool. One row per goal — lookup, never inference:
 
-| Signal | Mode | Experts | Depth |
-|--------|------|---------|-------|
-| Named expert, keyword match | Single | 1 | Focused — one perspective, pushback, limits |
-| "Panel", "debate", tradeoffs | Panel | 2-4 | Debate — find tensions, surface disagreements |
-| "Review", "check against spec" | Review | 3-4 | Breadth — coverage sweep, gap identification |
-| "Stuck on", repeated failure | Unblock | 2-3 | Diagnostic — root cause, reframe, next step |
+| Goal | Count | Diversity | Mode |
+|------|-------|-----------|------|
+| depth-novelty | 2-3 | same + adjacent domain | panel |
+| coverage | 3-4 | cross-domain | review |
+| speed | 1 | n/a (single) | single |
+| unblock | 2-3 | cross-lens | unblock |
+| validate | 3-4 | cross-domain | review |
+
+`Mode` is the string passed to the engine. `Count`/`Diversity` shape the projection and render in the goal-pick preview.
 
 ## Workflow
 
-### Step 1: Route
+### Step 1: Route the pool
 
-Infer mode and select experts from the domain map. No text output — go straight to Step 2.
+Domain-match the question into a pool — over-fetch to ~6-8 candidates so every goal has reshuffle slack. The pool is a fact about the question: fixed once, re-routed only if the question changes. No text output — go straight to Step 2.
 
-- Match experts using domain map below
-- Check blocklist (`~/.claude/counsel-blocklist.json`)
+- Match using the domain map below; check blocklist (`~/.claude/counsel-blocklist.json`)
 - Max 2 from same domain row — diversity requires crossing domains
-- Single mode: read the selected profile from `profiles/`. 2+ experts: collect absolute profile paths only — the engine's agents read them, never the main conversation.
+- Collect absolute profile paths — the engine's agents read them, never the main conversation
 
-### Step 2: Reason
+### Step 2: Pick goal
+
+One AskUserQuestion: the 5 goals as options. Each goal's detail panel previews the panel it would project from the pool — `Count`, `Diversity`, and the **candidate expert names**. Names are visible here and in Step 3 only; they never reach findings.
+
+Projection: apply the goal's `Count` + `Diversity` to the pool → candidate panel.
+
+### Step 3: Confirm panel
+
+Show the projected panel via AskUserQuestion (names visible). Three options, each one predictable action — never a single ambiguous "regenerate":
+
+- **Accept** — proceed to Step 4
+- **Reshuffle within pool** — re-project from the unused pool candidates (over-fetch guarantees `pool > count`)
+- **Change goal** — re-enter Step 2
+
+No per-expert editing.
+
+### Step 4: Reason
 
 **2+ experts** — run the bundled engine; do not simulate experts in-conversation:
 
-`Workflow(scriptPath: "<this skill's directory>/consult.mjs", args: { question, context, mode, profiles: [{ name, path }] })` — paths absolute. All steering decisions are pre-answered in the script's `meta.decisions` (`by: 'author'`); if the steer hook denies the first call, state its rows from that meta and re-invoke — never re-ask the user. Each expert returns capped concerns plus a `dissent` field.
+`Workflow(scriptPath: "<this skill's directory>/consult.mjs", args: { question, context, mode, profiles: [{ name, path }] })` — paths absolute, `mode` from the goal's row. All steering decisions are pre-answered in the script's `meta.decisions` (`by: 'author'`); if the steer hook denies the first call, state its rows from that meta and re-invoke — never re-ask the user. Each expert returns capped concerns plus a `dissent` field.
 
-**Single expert** — simulate inline from the profile as before.
+**Single expert** (speed goal) — simulate inline from the profile.
 
-Distill returned positions into anonymous suggestions — tensions between experts (compare `dissent` fields) are the valuable output. No text output — go straight to Step 3.
+Distill returned positions into anonymous suggestions — tensions between experts (compare `dissent` fields) are the valuable output. Experts go invisible from here on. No text output — go straight to Step 5.
 
-**Per mode:**
-- **Single** — One perspective, pushback, limits.
-- **Panel** — Find where perspectives disagree — tensions are the valuable output. If everyone agrees, swap someone from an adjacent domain.
-- **Review** — Sweep each domain. What's covered, missing, risky. Breadth over depth.
-- **Unblock** — Diagnose from multiple lenses. Root cause, wrong assumption, reframe.
-
-### Step 3: Present
+### Step 5: Present
 
 One bold sentence framing the core diagnosis or reframe, then immediately present one AskUserQuestion. Concerns as options.
 
@@ -84,13 +96,13 @@ Forbidden in detail panels: POSITIONS, TENSION, CONCERN headers. These sections 
 
 Always include a "Go deeper" option (no detail panel needed).
 
-### Step 4: Land
+### Step 6: Land
 
 After the user selects, one **bold** sentence with the next step. Then:
 
 - **Satisfied** — Done. No recap.
-- **Go deeper** — Return to Step 2 with narrower focus. Present via AskUserQuestion again.
-- **Different perspective** — Swap an expert, return to Step 2.
+- **Go deeper** — Return to Step 4 with narrower focus. Present via AskUserQuestion again.
+- **Different perspective** — Return to Step 3 to reshuffle or change goal, then re-reason.
 - **Challenge** — Counterargument via AskUserQuestion.
 
 ## Domain Map

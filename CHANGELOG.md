@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@5.2.0] - 2026-06-07
+
+### Changed
+
+- feat(hope): consult routing is now goal-driven — silent mode auto-selection replaced by a user-picked goal (`depth-novelty`, `coverage`, `speed`, `unblock`, `validate`) encoded as a lookup table (Count/Diversity/Mode). New flow: route the question into an over-fetched ~6-8 candidate pool once (Step 1), pick a goal that projects a panel previewing candidate names (Step 2), confirm via Accept / Reshuffle within pool / Change goal (Step 3), then reason (Step 4). Expert names are visible in goal-pick and confirm previews but stay invisible in findings; `consult.mjs` engine and profiles unchanged
+
+---
+
 ## [hope@5.1.0] - 2026-06-07
 
 ### Changed
