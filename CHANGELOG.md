@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@5.3.0] - 2026-06-10
+
+### Added
+
+- feat(hope): `/hope:delegate` skill — user-invoked soft lock for DELEGATOR mode. The session becomes a pure router: routes all work (anything touching files, shell, web, or code) to subagents/workflows, calls only orchestration + clarification tools itself, and refuses to do work directly. Three blocks — CONTRACT (work test, allowed-tool category, per-turn self-check, trivial-turn carve-out, user-override), DISPATCH (parallel-by-default, durable self-contained prompts, Workflow-first for 2+ agents, clean-slate default over fork), VERIFY (every delegation pairs a verify-agent returning GO/NOGO + REASON, not an evidence dump). Prompt-only by design — `disable-model-invocation: true`, no hooks or persistent state; resets on compaction and is re-invoked
+
+---
+
 ## [hope@5.2.0] - 2026-06-07
 
 ### Changed
