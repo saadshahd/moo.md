@@ -1,6 +1,6 @@
 ---
 name: consult
-description: Simulates expert panels, compares documented positions across thought leaders, and synthesizes anonymous recommendations grouped by concern. Invoke when facing design tradeoffs, architecture decisions, repeated failure modes, or domain questions where multiple perspectives would reduce decision regret. Triggers on: expert names, "panel", "debate", "what would [X] say", "stuck on", style requests.
+description: Use when facing design tradeoffs, architecture decisions, repeated failure modes, or domain questions where multiple perspectives would reduce decision regret. Triggers on: expert names, "panel", "debate", "what would [X] say", "stuck on", style requests.
 ---
 
 Simulate expert perspectives by reasoning from documented positions to the user's context. Productive disagreement over comfortable consensus.
@@ -8,7 +8,6 @@ Simulate expert perspectives by reasoning from documented positions to the user'
 ## Principles
 
 - Ground every claim in documented work — this is internal discipline.
-- For living figures, prefer newer model knowledge over profile facts past the `Verified:` footer — profiles constrain voice, guardrails, and routing, not currency.
 - If selected experts all agree easily, the wrong experts were selected.
 - Land on one actionable recommendation. Debate without a next step is noise.
 - By concern, not by expert — group findings around decisions the user faces.
@@ -28,11 +27,10 @@ The user picks a goal; the goal projects a panel from the routed pool. One row p
 |------|-------|-----------|------|
 | depth-novelty | 2-3 | same + adjacent domain | panel |
 | coverage | 3-4 | cross-domain | review |
-| speed | 1 | n/a (single) | single |
 | unblock | 2-3 | cross-lens | unblock |
-| validate | 3-4 | cross-domain | review |
+| validate | 3-4 | cross-domain | refute |
 
-`Mode` shapes the reasoning instruction in Step 4. `Count`/`Diversity` shape the projection and render in the goal-pick preview.
+`Mode` shapes the reasoning instruction in Step 4 — `refute` means experts attack the user's chosen position to find where it breaks, not survey alternatives. `Count`/`Diversity` shape the projection and render in the goal-pick preview.
 
 ## Workflow
 
@@ -43,10 +41,11 @@ Domain-match the question into a pool — over-fetch to ~6-8 candidates so every
 - Match using the domain map below
 - Max 2 from same domain row — diversity requires crossing domains
 - Collect absolute profile paths — Step 4's agents read them, never the main conversation
+- No domain match → tell the user no profile covers the question, then offer an in-weights panel: relevant experts simulated purely from model knowledge. If accepted, run the same workflow with expert names in place of profile paths.
 
 ### Step 2: Pick goal
 
-One AskUserQuestion: the 5 goals as options. Each goal's detail panel previews the panel it would project from the pool — `Count`, `Diversity`, and the **candidate expert names**. Names are visible here and in Step 3 only; they never reach findings.
+One AskUserQuestion: the 4 goals as options. Each goal's detail panel previews the panel it would project from the pool — `Count`, `Diversity`, and the **candidate expert names**.
 
 Projection: apply the goal's `Count` + `Diversity` to the pool → candidate panel.
 
@@ -62,17 +61,15 @@ No per-expert editing.
 
 ### Step 4: Reason
 
-**2+ experts** — fan out one Agent per profile, all launched in a single message so they run in parallel. Profiles are read by the agents, never the main conversation.
+Fan out one Agent per profile, all launched in a single message so they run in parallel.
 
 Each agent's prompt: read the profile at its absolute path; simulate the expert by arguing from documented positions applied to the question, respecting the "Would NEVER Say" guardrails; for living figures prefer newer model knowledge past the `Verified:` date; apply the goal's `Mode`. Return at most 3 concerns — each one line per field: concern, suggestion, why, gain, pay — plus one `dissent` line stating where this expert pushes back against the likely consensus. Terse, no preamble; the response is data for synthesis, not prose.
 
-**Single expert** (speed goal) — simulate inline from the profile.
-
-Distill returned positions into anonymous suggestions — tensions between experts (compare dissent lines) are the valuable output. Experts go invisible from here on. No text output — go straight to Step 5.
+Distill returned positions into anonymous suggestions — tensions between experts (compare dissent lines) are the valuable output. No text output — go straight to Step 5.
 
 ### Step 5: Present
 
-One bold sentence framing the core diagnosis or reframe, then immediately present one AskUserQuestion. Concerns as options.
+Present one AskUserQuestion (framing per Presentation rules). Concerns as options.
 
 **For each concern (max 10 lines per detail panel):**
 - Label: the suggestion (conclusion first)
@@ -97,7 +94,7 @@ Always include a "Go deeper" option (no detail panel needed).
 
 ### Step 6: Land
 
-After the user selects, one **bold** sentence with the next step. Then:
+After the user selects (framing per Presentation rules):
 
 - **Satisfied** — Done. No recap.
 - **Go deeper** — Return to Step 4 with narrower focus. Present via AskUserQuestion again.
@@ -106,7 +103,7 @@ After the user selects, one **bold** sentence with the next step. Then:
 
 ## Domain Map
 
-74 profiles in `profiles/`. Route by domain:
+Profiles live in `profiles/`. Route by domain:
 
 | Domain | Profiles |
 |--------|----------|
@@ -125,16 +122,16 @@ After the user selects, one **bold** sentence with the next step. Then:
 | State Machines | khorshid |
 | AI / LLMs | willison |
 | Tools for Thought | matuschak, appleton, victor, case, papert, kay, inkandswitch, brander, litt, kleppmann |
-| Psychology | kahneman, klein, fogg, norman |
+| Decisions / Behavior | kahneman, klein, fogg, norman |
 | Systems Thinking | meadows, deming, snowden |
 | Strategy | boyd, goldratt, rumelt |
 | Communication | tufte, orwell, minto |
-| Anthropology | geertz, jacobs, scott |
-| Economics | goodhart, ostrom, simon |
-| Philosophy | popper, kuhn, wittgenstein |
-| Sociology | perrow, vaughan, reason |
-| Biology | kauffman, dawkins |
-| Education | vygotsky, bruner |
+| Legibility / Emergent Order | geertz, jacobs, scott |
+| Incentives / Metrics / Commons | goodhart, ostrom, simon |
+| Epistemology / Language | popper, kuhn, wittgenstein |
+| Organizational Failure / Safety | perrow, vaughan, reason |
+| Evolution / Complexity | kauffman, dawkins |
+| Learning | vygotsky, bruner |
 | Security | schneier, shostack |
 
 ## Boundaries

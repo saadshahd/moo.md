@@ -7,6 +7,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- feat(hope): consult domain map labels renamed from academic disciplines to question-shaped routing keys (Psychology → Decisions / Behavior, Sociology → Organizational Failure / Safety, Anthropology → Legibility / Emergent Order, Economics → Incentives / Metrics / Commons, Philosophy → Epistemology / Language, Biology → Evolution / Complexity, Education → Learning) — labels now describe the questions that route there, matching the software rows
+- feat(hope): consult `validate` goal differentiated from `coverage` via new `refute` mode — experts attack the user's chosen position to find where it breaks, instead of surveying alternatives (the two rows were behaviorally identical)
+- feat(hope): consult description rewritten trigger-only per the DESCRIPTION TRAP rule — process summary dropped so Claude reads the workflow instead of improvising from the summary
+- feat(hope): consult no-match fallback — when no profile domain matches the question, say so and offer an in-weights panel (experts simulated from model knowledge, no profiles)
+- chore(hope): consult dedup — hardcoded "74 profiles" count dropped (rots silently as profiles change), Verified-footer rule collapsed to its point of use in Step 4, presentation-rule repeats in Steps 2/4/5/6 collapsed to the canonical Presentation section
+
+### Removed
+
+- feat(hope)!: consult `speed` goal and the inline single-expert path removed — goal-pick now offers 4 goals, fitting AskUserQuestion's 4-option cap (5 options previously forced a silent drop); profiles are now read exclusively by Step 4 agents
+
+---
+
 ## [hope@6.0.0] - 2026-06-11
 
 ### Added
