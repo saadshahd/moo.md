@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+TARGETS="hope/skills/intent/SKILL.md hope/skills/shape/SKILL.md"
+
+before=$(git diff -- $TARGETS)
+bun run sync
+after=$(git diff -- $TARGETS)
+
+if [ "$before" != "$after" ]; then
+  echo "card spec drifted — commit the sync result"
+  exit 1
+fi

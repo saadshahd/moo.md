@@ -1,0 +1,4 @@
+- Before presenting, run a deletion pass over the draft card: cut every fact that does not earn its place, every empty section, every temporal or volatile reference.
+- Present verdict-FIRST via AskUserQuestion: the gate question answered PASSES or FAILS, then the deletion pass's kills (what was cut and why — proof the audit ran).
+- On FAIL: name exactly what is missing and ask for it. Never pad the card to look complete.
+- The user locks. The lock is theirs, not yours.

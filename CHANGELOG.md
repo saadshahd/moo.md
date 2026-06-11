@@ -7,23 +7,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
-
----
-
 ## [hope@6.0.0] - 2026-06-11
+
+### Added
+
+- feat(hope): canonical card spec (hope/skills/card.md) inlined into intent and shape via markdown-magic sync (bun run sync) with a pre-push drift guard
+
+### Changed
+
+- feat(hope): decision-prompt mechanics and gate-audit procedure extracted to synced fragments (prompts.md, gate.md) alongside the card spec
+- feat(hope): intent and shape redefined around a handoff protocol — each stage is an input requirement plus one gate question (agent audits, user locks); output templates replaced by self-contained handoff cards (checksum-first, temporal-free, concept-only, deletion-pass audited)
+- feat(hope): shape auto-gathers retrievable answers and surfaces only non-obvious decisions — every prompt offers 2 candidates plus uniform escape hatches (gather facts / hear tradeoffs); mandatory consult-per-dimension and the automatic prior-art gate removed
+- feat(hope): /hope:full rewritten as pure pipeline wiring — cards are the handoff medium between stages
+- feat(hope): consult SKILL.md leaned 156 → 142 lines — "experts invisible" rule deduplicated to its one enforceable statement in Presentation, detail-panel format rules merged into Step 5 where they're used, profile-authoring Profile Format section dropped (runtime only reads profiles)
 
 ### Removed
 
+- feat(hope)!: hope:seed deleted — CLAUDE.md generation is out of scope for the pipeline (breaking, hope@6.0.0)
 - feat(hope)!: expert blocklist removed — `/hope:block`, `/hope:blocked`, `/hope:unblock` commands, the blocklist check in consult routing, and the `~/.claude/counsel-blocklist.json` state file are gone; no replacement mechanism
 - feat(hope)!: skill-duplicating commands removed — `/hope:intent`, `/hope:bond`, `/hope:panel`, `/hope:summon` deleted; skills are directly invocable, so the wrappers added nothing. `/hope:full` survives as the only command (pipeline state machine with no skill counterpart)
 - feat(hope)!: `consult.mjs` workflow engine deleted four days after shipping — the args contract (`{ question, profiles }` as a real JSON object) proved fragile in live runs, and its `meta.decisions` block existed only to pre-answer hope's own steer hook. Step 4 now fans out one Agent per profile in a single message (parallelism and profile context-isolation preserved); word caps moved from schema enforcement to prompt instructions; synthesis stays in the main loop
 - chore(hope): stale consult `evals/evals.json` deleted — expectations tested the pre-5.2.0 mode-inference flow
 - chore: `openspec/` directory and `docs/` tree deleted — specs described pre-v4 behavior and docs described pre-5.0 bond/commands; CHANGELOG and git history are the record
-
-### Changed
-
-- feat(hope): consult SKILL.md leaned 156 → 142 lines — "experts invisible" rule deduplicated to its one enforceable statement in Presentation, detail-panel format rules merged into Step 5 where they're used, profile-authoring Profile Format section dropped (runtime only reads profiles)
 
 ---
 

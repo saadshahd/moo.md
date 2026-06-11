@@ -1,120 +1,66 @@
 ---
 name: shape
-description: Resolves technical HOW decisions — architecture choices, technology selection, and design patterns — from a defined spec or intent. Distinct from hope:intent (which clarifies WHAT to build): shape starts when the goal is clear but the technical path is not. Use when: needing an implementation roadmap, choosing between architectural approaches, or resolving design trade-offs before coding. Triggers on: "shape this", "architecture for X", "how should I build", "system design", "technical approach", "design this", "which pattern", "implementation plan".
+description: Resolves technical HOW decisions — architecture choices, technology selection, and design patterns. Use shape when the intent is clear but the technical path is not. Triggers on "shape this", "architecture for X", "how should I build", "which pattern", "technical approach".
 ---
 
-Decide HOW before building. Shape works dimension by dimension — each aspect that needs a HOW decision gets expert-informed choices the user selects from.
+Decide HOW before building.
 
-For tasks with 1 dimension and an obvious approach, collapse to Step 1 → Step 5.
+## Contract
+
+- **INPUT** — a locked intent card or an equivalent spec: the goal is clear, the technical path is not.
+- **GATE** — "Is the shape complete and implementable?" — agent audits, user locks.
+- **OUTPUT** — a handoff card (spec below).
+
+<!-- doc-gen FILE src=../card.md -->
+## The card
+
+The pipeline's handoff artifact. One admission rule: durable facts only.
+
+- **Checksum first** — open with one sentence: what this is, why it exists. Everything after is facts.
+- **Vocabulary, not template** — sections (non-goals, acceptance, constraints, ...) appear only when the session produced them. No empty scaffolding, ever.
+- **Stranger test** — every fact must be understandable with zero session context.
+- **No temporal information** — no session narrative, no relative time ("currently", "for now"). Phrase decisions timelessly: "X over Y: reason". Absolute dates only when the fact IS a deadline.
+- **No volatile references** — concepts only. No file paths, function names, or line numbers; the next stage does its own retrieval.
+- **No provenance markup** — provenance was visible live in the session, not encoded in the artifact.
+- **Size by deletion, not cap** — a deletion pass in the gate audit governs length: every fact earns its place. Never a numeric limit.
+- **Storage-agnostic** — emit in conversation. Persisting it is the user's call.
+<!-- end-doc-gen -->
 
 ## Presentation
 
-- **Minto pyramid via AskUserQuestion** — Label = recommendation (conclusion first). Description = one-line tradeoff (always visible). Detail panel = structured plain text in AskUserQuestion's monospace preview box — short lines (~50 chars), ALL CAPS for section headers, dashes for bullets, ASCII tables for structure. No markdown formatting (renders as literal text, not rich text). The choice prompt IS the presentation — no text walls before it.
-- **Batch independent choices** — Non-conflicting dimensions go into a single AskUserQuestion (up to 4 questions per call). Only separate dimensions where one choice constrains another.
-- **Techniques are internal** — Apply reasoning techniques in your thinking. Present the insights they produce in plain language. Never name techniques (inversion, Musashi, obstacle-as-path, etc.) in user-facing output.
-- **Infer, state, ask only if ambiguous** — Classify domain type, reversibility, and expert selection yourself. State your classification as a brief line. Only prompt via AskUserQuestion when genuinely unclear.
-- **Brief scannable output** — Bullets over paragraphs. Findings in 1-2 lines each. No text walls between prompts.
+- **Minto pyramid via AskUserQuestion** — Label = recommendation (conclusion first). Description = one-line tradeoff (always visible). Detail panel = structured plain text in AskUserQuestion's monospace preview box — short lines (~50 chars), ALL CAPS section headers, dashes for bullets. No markdown formatting (renders as literal text).
+- **Batch independent choices** — non-conflicting dimensions go into a single AskUserQuestion (up to 4 questions per call). Separate only where one choice constrains another.
+- **Techniques are internal** — apply reasoning techniques in your thinking; present the insights they produce in plain language. Never name techniques in user-facing output.
+- **Brief scannable output** — bullets over paragraphs, findings in 1-2 lines each, no text walls between prompts.
 
-## Workflow
+## The work loop
 
-### Step 1: Extract
+1. **Extract** — pull the HOW dimensions from the input: architecture, data model, API design, testing, deployment — whatever the spec actually opens.
+2. **Resolve per dimension** — auto-gather when the answer is retrievable with certainty; only non-obvious judgment calls reach the user via decision prompts (mechanics below).
+3. **Consult** — fires ONLY when the user picks "Hear tradeoffs": invoke the hope:consult skill with the decision question.
+4. **Tension check** — if resolved choices genuinely conflict, surface the tension as one more decision prompt.
+5. **Gate** — run the gate audit (below).
 
-Parse the intent brief (or user's spec). Identify:
-- Goal and constraints
-- Shaping dimensions — aspects needing HOW decisions (architecture, data model, API design, testing, deployment, etc.)
+## Decision prompts
 
-**Prior art gate** — Do not proceed to Step 2 until this is done with tool calls:
-1. Grep/Glob the codebase for existing implementations relevant to each dimension
-2. WebSearch / WebFetch for how others have solved this outside the codebase
+<!-- doc-gen FILE src=../prompts.md -->
+- Auto-gather when the answer is retrievable with certainty: cheap local reads, docs, web research, parallel subagents. Return with decisions, not raw findings. Never ask the user something research already made obvious — that is a named stop condition.
+- Only non-obvious judgment calls reach the user. Every such AskUserQuestion: exactly 2 candidate answers + 2 uniform escape hatches — "Gather facts" (research/explore) and "Hear tradeoffs" (consult experts). Hatches are first-class options, never hidden behind Other.
+- Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
+- Presentation rule: EVERYTHING the user needs to answer lives inside the question UI — question text, descriptions, previews. Never in prose before the tool call (the dialog hides it).
+<!-- end-doc-gen -->
 
-Reasoning about what probably exists is not prior art search. Document findings as 5-10 brief bullets. Empty findings ("nothing found") must be stated explicitly.
+## The gate
 
-**Dichotomy of control** — Ask via AskUserQuestion: what's actually within the user's control? Scope the shaping to match their timeline and accountability. Work that depends on other teams, external approvals, or infrastructure they can't change should be documented as externalities, not shaped as if the user can decide them.
+"Is the shape complete and implementable?" — agent audits, user locks.
 
-Run the entry audit internally — do not output to user:
-- [ ] Spec drives behavior? (not extracted from existing code — extracting spec from implementation codifies bugs)
-- [ ] Constraints are declarative? (invariants and valid outcome spaces, not procedural instructions)
-- [ ] Verification criteria defined? ("How will I know this is right?" is a design question, not a testing question)
-- [ ] Scope within user's control? (externalities identified and separated)
-
-Only surface failures via AskUserQuestion. If all checks pass, proceed silently. A spec that can't be verified isn't a spec.
-
-Present findings and proposed dimensions as brief scannable bullets.
-
-### Step 2: Scope
-
-Infer the domain type — high-stakes (security, financial, compliance) or exploratory (prototypes, spikes). State your classification as a brief line. High-stakes domains get deeper analysis per dimension. Exploratory domains get lighter treatment. Only ask via AskUserQuestion if genuinely ambiguous.
-
-Present dimensions to the user via AskUserQuestion (multiSelect): "Which aspects matter for this task?"
-
-Not every task needs every dimension. The user decides.
-
-Infer reversibility per scoped dimension: Type 2 (reversible — move fast) or Type 1 (irreversible — deep analysis). State classifications as a brief line. Only ask if ambiguous. This sets the depth of shaping per dimension.
-
-### Step 3: Shape loop
-
-For each scoped dimension:
-
-1. **Consult experts** — Invoke the consult skill via the Skill tool for expert perspectives on this dimension. Frame the prompt so consult produces distinct approaches, not a single recommendation:
-
-   `Skill: hope:consult, args: "Panel: For [dimension] in [context], what are 2-3 distinct approaches? Surface where experts disagree — I need choices with tradeoffs, not consensus."`
-
-   Take consult's output and reshape it into AskUserQuestion choices (see step 3 below). State who was consulted in a brief line.
-
-2. **Reason through** — Apply relevant techniques internally based on domain type and dimension. These are your reasoning toolkit — use them, present the insights they produce in plain language:
-   - Identify failure modes, make broken states unrepresentable — what remains is the solution space. (high-stakes or irreversible dimensions)
-   - Question complexity cost — can this be deleted instead of built? Is this earning its complexity? (always)
-   - Ask how constraints improve the design, not just limit it. (when constraints feel blocking)
-   - Check that broken states can't be expressed in types — if they can, the design is incomplete. (high-stakes domains)
-   - Check that failure paths are first-class typed values, not escape hatches that break composition. (API and data dimensions)
-   - Check that structure follows user journeys, not technical layers. (architecture dimensions)
-
-3. **Present choices** — Use AskUserQuestion with detail panels. Each option:
-   - Label: the approach name, mark recommended with "(Recommended)"
-   - Description: one-line tradeoff
-   - Detail panel (monospace preview): what you'd build, why the expert favors it (grounded in their work), what you gain and pay, when it shines vs. breaks — plain text, short lines, ALL CAPS headers
-   - Always include an "Explore further" option
-
-Batch non-conflicting dimensions into a single AskUserQuestion. Separate dimensions where one choice constrains another.
-
-If "Explore further," regenerate choices with deeper analysis. If user reframes the dimension itself, restart expert selection. User can add new dimensions mid-loop if experts surface something unconsidered.
-
-### Step 4: Integrate
-
-After all dimensions are resolved:
-
-**Cross-dimension tension check** — Two good individual choices can conflict when combined.
-
-**Pre-mortem** — Distinct from per-dimension failure analysis. Imagine the shaped solution shipped and failed six months later. Why? This catches adoption, timing, political, and integration failures that per-dimension analysis misses. Consider at minimum: will users discover this feature? Can it be used without a mouse? What happens during concurrent operations (e.g., user interacts while system is streaming)? What's the maintenance burden when adjacent code changes?
-
-**Second-order effects** — For each dimension choice, explicitly ask: "what does this prevent us from doing in 6-12 months?" List the closed-off futures as visible text. This analysis is not optional — every choice closes doors. The question is whether those doors matter.
-
-Present tensions, pre-mortem risks, and second-order effects as one AskUserQuestion with detail panels showing each scenario. Include:
-- **Lock it in** — proceed to emit
-- **Revisit a dimension** — return to shape loop for a specific aspect
-- **Explore further** — deeper analysis before deciding
-
-If after genuine analysis there are truly no tensions, no risks, and no closed-off futures worth surfacing — state that briefly and proceed to Step 5.
-
-### Step 5: Emit
-
-Run the exit audit internally — do not output to user:
-- [ ] Shape discovered, not imposed? (emerged from constraints, not justified backwards from a solution)
-- [ ] Laws → Transformations → Compositions order? (axioms first, then structure-preserving transforms, then context-varying compositions)
-- [ ] Inversion of control applied? (data drives computation, composition drives architecture, properties drive correctness)
-- [ ] Fits in one head? (one person can hold the entire shape in working memory — hard gate, not preference)
-
-Only surface failures. If all checks pass, proceed silently.
-
-Compress the shape to one sentence explaining why it exists — the semantic checksum. If you can't, the shape isn't clear yet. Revise before emitting.
-
-Produce the shape document:
-- **Approach** — The concrete how per dimension, with rationale
-- **Codebase findings** — What exists, what the approach builds on
-- **Resolved tensions** — Where perspectives disagreed and how the user resolved it
-- **Risks** — What could go wrong, especially irreversible changes
-- **First step** — One atomic action that produces a visible artifact
+<!-- doc-gen FILE src=../gate.md -->
+- Before presenting, run a deletion pass over the draft card: cut every fact that does not earn its place, every empty section, every temporal or volatile reference.
+- Present verdict-FIRST via AskUserQuestion: the gate question answered PASSES or FAILS, then the deletion pass's kills (what was cut and why — proof the audit ran).
+- On FAIL: name exactly what is missing and ask for it. Never pad the card to look complete.
+- The user locks. The lock is theirs, not yours.
+<!-- end-doc-gen -->
 
 ## Boundaries
 
-Shape surfaces expert-informed choices; user owns architecture. Expert options are advice, not prescriptions. When uncertain about risk, bias toward more human involvement. When interpretations diverge, present options — never pick for the user.
+Shape surfaces choices; the user owns architecture. When uncertain about risk, bias toward more human involvement.
