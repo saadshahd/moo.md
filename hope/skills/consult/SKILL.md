@@ -107,30 +107,54 @@ Profiles live in `profiles/`. Route by domain:
 
 | Domain | Profiles |
 |--------|----------|
-| React / Frontend / TS / JS | abramov, osmani, perry, wathan, vergnaud, simpson |
+| React / State | abramov |
+| CSS / Styling | wathan |
+| Design Systems | frost |
+| Web Animation | perry |
+| TypeScript (type-level) | vergnaud |
+| JavaScript | simpson, osmani |
 | Go / Systems | pike, cox |
 | Distributed Systems | lamport, kleppmann, helland |
+| Formal Methods / Verification | lamport, kleppmann |
+| Concurrency | pike, armstrong, lamport |
 | Python | hettinger |
 | Performance | gregg, osmani, muratori |
-| Architecture / TDD / DDD | fowler, martin, alexander, feathers, beck, freeman, evans, newman, vernon, dhh, hughes |
+| Architecture / Patterns | fowler, martin, alexander |
+| TDD / Testing | beck, freeman, hughes |
+| DDD | evans, vernon |
+| Event Sourcing / CQRS | young |
+| Legacy / Refactoring | feathers, fowler |
+| Microservices | newman |
+| Rails / Monolith | dhh |
 | DevOps / Observability | hightower, majors, humble, forsgren |
-| REST / APIs | fielding, bloch |
-| Product / Design / Leadership | cagan, jobs, norman, frost, zhuo |
+| REST / HTTP | fielding |
+| API / Library Design | bloch |
+| Product Management | cagan, jobs |
+| UX / Design Psychology | norman |
+| Design Leadership | zhuo |
 | Startups | graham, dhh |
 | Databases / Data Evolution | pavlo, helland, sadalage, young, kleppmann |
 | Reliability / Stability | nygard, armstrong, cook |
 | Team / Org Design | skelton-pais, forsgren, zhuo |
 | Accessibility | soueidan |
-| FP / Simplicity | hickey, milewski |
+| Simplicity / Data-Oriented | hickey |
+| Category Theory / FP | milewski |
+| FP in JS (pragmatic) | simpson |
 | State Machines | khorshid |
-| AI / LLMs | willison, karpathy, huyen, cherny |
-| Tools for Thought | matuschak, appleton, victor, case, papert, kay, inkandswitch, brander, litt, kleppmann |
-| Decisions / Behavior | kahneman, klein, fogg, norman |
+| AI / LLMs | willison, karpathy, huyen, cherny, osmani |
+| Note Systems / Memory | matuschak |
+| Interactive Explanation | victor, case |
+| Malleable / End-User SW | inkandswitch, litt, kleppmann |
+| Knowledge Gardens | appleton, brander |
+| Computing Visionaries | kay, papert |
+| Decisions / Behavior | kahneman, klein, fogg, norman, simon |
 | Systems Thinking | meadows, deming, snowden |
-| Strategy | boyd, goldratt, rumelt |
-| Communication | tufte, orwell, minto |
+| Quality / Management | deming |
+| Strategy | boyd, rumelt, goldratt |
+| Constraints / Flow | goldratt |
+| Communication | tufte, orwell, minto, jobs |
 | Legibility / Emergent Order | geertz, jacobs, scott |
-| Incentives / Metrics / Commons | goodhart, ostrom, simon |
+| Incentives / Metrics / Commons | goodhart, ostrom |
 | Epistemology / Language | popper, kuhn, wittgenstein |
 | Organizational Failure / Safety | perrow, vaughan, reason, cook |
 | Evolution / Complexity | kauffman, dawkins |
