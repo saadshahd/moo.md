@@ -1,6 +1,6 @@
 ---
 name: consult
-description: Use when facing design tradeoffs, architecture decisions, repeated failure modes, or domain questions where multiple perspectives would reduce decision regret. Triggers on: expert names, "panel", "debate", "what would [X] say", "stuck on", style requests.
+description: Use when facing design tradeoffs, architecture decisions, repeated failure modes, or domain questions where multiple perspectives would reduce decision regret. Triggers on expert names, "panel", "debate", "what would [X] say", "stuck on", style requests.
 ---
 
 Simulate expert perspectives by reasoning from documented positions to the user's context. Productive disagreement over comfortable consensus.
@@ -108,19 +108,22 @@ Profiles live in `profiles/`. Route by domain:
 | Domain | Profiles |
 |--------|----------|
 | React / Frontend / TS / JS | abramov, osmani, perry, wathan, vergnaud, simpson |
-| Go / Systems | pike |
-| Distributed Systems | lamport, kleppmann |
+| Go / Systems | pike, cox |
+| Distributed Systems | lamport, kleppmann, helland |
 | Python | hettinger |
-| Performance | gregg, osmani |
-| Architecture / TDD / DDD | fowler, martin, alexander, feathers, beck, freeman, evans, newman, vernon |
-| DevOps / Observability | hightower, majors, humble |
-| REST / APIs | fielding |
+| Performance | gregg, osmani, muratori |
+| Architecture / TDD / DDD | fowler, martin, alexander, feathers, beck, freeman, evans, newman, vernon, dhh, hughes |
+| DevOps / Observability | hightower, majors, humble, forsgren |
+| REST / APIs | fielding, bloch |
 | Product / Design / Leadership | cagan, jobs, norman, frost, zhuo |
-| Startups | graham |
+| Startups | graham, dhh |
+| Databases / Data Evolution | pavlo, helland, sadalage, young, kleppmann |
+| Reliability / Stability | nygard, armstrong, cook |
+| Team / Org Design | skelton-pais, forsgren, zhuo |
 | Accessibility | soueidan |
 | FP / Simplicity | hickey, milewski |
 | State Machines | khorshid |
-| AI / LLMs | willison |
+| AI / LLMs | willison, karpathy, huyen, cherny |
 | Tools for Thought | matuschak, appleton, victor, case, papert, kay, inkandswitch, brander, litt, kleppmann |
 | Decisions / Behavior | kahneman, klein, fogg, norman |
 | Systems Thinking | meadows, deming, snowden |
@@ -129,7 +132,7 @@ Profiles live in `profiles/`. Route by domain:
 | Legibility / Emergent Order | geertz, jacobs, scott |
 | Incentives / Metrics / Commons | goodhart, ostrom, simon |
 | Epistemology / Language | popper, kuhn, wittgenstein |
-| Organizational Failure / Safety | perrow, vaughan, reason |
+| Organizational Failure / Safety | perrow, vaughan, reason, cook |
 | Evolution / Complexity | kauffman, dawkins |
 | Learning | vygotsky, bruner |
 | Security | schneier, shostack |

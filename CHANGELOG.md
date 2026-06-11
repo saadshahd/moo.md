@@ -9,6 +9,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- feat(hope): 17 new consult profiles — tension foils (dhh, muratori), AI/LLMs depth (karpathy, huyen, cherny), data evolution & migrations (helland, sadalage, young, pavlo), production reliability (nygard, armstrong, cook), and depth pairings (bloch, cox, skelton-pais, forsgren, hughes); living experts web-researched and accuracy-verified, dead experts minimal from model knowledge
+- feat(hope): consult domain map — new rows Databases / Data Evolution, Reliability / Stability, Team / Org Design; thin rows paired (Go / Systems, REST / APIs, AI / LLMs, Startups no longer single-profile)
+
 ### Changed
 
 - feat(hope): consult domain map labels renamed from academic disciplines to question-shaped routing keys (Psychology → Decisions / Behavior, Sociology → Organizational Failure / Safety, Anthropology → Legibility / Emergent Order, Economics → Incentives / Metrics / Commons, Philosophy → Epistemology / Language, Biology → Evolution / Complexity, Education → Learning) — labels now describe the questions that route there, matching the software rows
