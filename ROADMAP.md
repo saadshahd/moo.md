@@ -22,7 +22,6 @@
   - Philosophy: manifesto tone (92L), humble-master integration, "prior art first" principle
   - Hooks: all removed (SessionStart, SubagentStart, PreToolUse, PreCompact)
   - No factory metaphors: criteria[], holdout[], mustNot[], satisfaction, waves, zones eliminated
-  - See: openspec/changes/hope-v4-rewrite/
 - [x] Exit-plan-gate false positive + pipeline alignment (2026-02-26)
   - Source: ui-ir planning session — gate passed artifacts it shouldn't have (0 in assistant text, 1 in full JSONL)
   - Critical: `has_artifact()` searched entire JSONL including loaded skill definitions — bypassed deny chain

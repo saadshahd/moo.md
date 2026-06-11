@@ -7,17 +7,16 @@ Simulate expert perspectives by reasoning from documented positions to the user'
 
 ## Principles
 
-- Ground every claim in documented work — this is internal discipline. The user sees suggestions, not citations.
+- Ground every claim in documented work — this is internal discipline.
 - For living figures, prefer newer model knowledge over profile facts past the `Verified:` footer — profiles constrain voice, guardrails, and routing, not currency.
 - If selected experts all agree easily, the wrong experts were selected.
 - Land on one actionable recommendation. Debate without a next step is noise.
-- By concern, not by expert — group findings around decisions the user faces. Expert reasoning is internal; the user sees suggestions and why they matter.
+- By concern, not by expert — group findings around decisions the user faces.
 
 ## Presentation
 
 These rules govern how consult communicates across all goals.
 
-- **Minto pyramid via AskUserQuestion** — Label = the suggestion (conclusion first). Description = why it matters (always visible). Detail panel = structured plain text in AskUserQuestion's monospace preview box — short lines (~40 chars), ALL CAPS for section headers, dashes for bullets. No markdown formatting (renders as literal text, not rich text).
 - **Experts are invisible in findings** — In Step 5/6 output, expert names, sources, and attribution never appear. Not in text, labels, descriptions, or detail panels. Never "Fowler says" or "Hickey argues." The user sees suggestions and why they matter. **Sole exception:** goal-pick (Step 2) and confirm (Step 3) show candidate names so the user can shape the panel — names never cross into findings.
 - **Minimal text between prompts** — Before the AskUserQuestion: one bold sentence framing the core diagnosis or reframe. After the user answers: one bold sentence with the next step. Nothing else. Use markdown **bold** for the key insight. No paragraphs, no per-expert reasoning, no multi-line explanations.
 
@@ -33,7 +32,7 @@ The user picks a goal; the goal projects a panel from the routed pool. One row p
 | unblock | 2-3 | cross-lens | unblock |
 | validate | 3-4 | cross-domain | review |
 
-`Mode` is the string passed to the engine. `Count`/`Diversity` shape the projection and render in the goal-pick preview.
+`Mode` shapes the reasoning instruction in Step 4. `Count`/`Diversity` shape the projection and render in the goal-pick preview.
 
 ## Workflow
 
@@ -41,9 +40,9 @@ The user picks a goal; the goal projects a panel from the routed pool. One row p
 
 Domain-match the question into a pool — over-fetch to ~6-8 candidates so every goal has reshuffle slack. The pool is a fact about the question: fixed once, re-routed only if the question changes. No text output — go straight to Step 2.
 
-- Match using the domain map below; check blocklist (`~/.claude/counsel-blocklist.json`)
+- Match using the domain map below
 - Max 2 from same domain row — diversity requires crossing domains
-- Collect absolute profile paths — the engine's agents read them, never the main conversation
+- Collect absolute profile paths — Step 4's agents read them, never the main conversation
 
 ### Step 2: Pick goal
 
@@ -63,13 +62,13 @@ No per-expert editing.
 
 ### Step 4: Reason
 
-**2+ experts** — run the bundled engine; do not simulate experts in-conversation:
+**2+ experts** — fan out one Agent per profile, all launched in a single message so they run in parallel. Profiles are read by the agents, never the main conversation.
 
-`Workflow(scriptPath: "<this skill's directory>/consult.mjs", args: { question, context, mode, profiles: [{ name, path }] })` — paths absolute, `mode` from the goal's row. All steering decisions are pre-answered in the script's `meta.decisions` (`by: 'author'`); if the steer hook denies the first call, state its rows from that meta and re-invoke — never re-ask the user. Each expert returns capped concerns plus a `dissent` field.
+Each agent's prompt: read the profile at its absolute path; simulate the expert by arguing from documented positions applied to the question, respecting the "Would NEVER Say" guardrails; for living figures prefer newer model knowledge past the `Verified:` date; apply the goal's `Mode`. Return at most 3 concerns — each one line per field: concern, suggestion, why, gain, pay — plus one `dissent` line stating where this expert pushes back against the likely consensus. Terse, no preamble; the response is data for synthesis, not prose.
 
 **Single expert** (speed goal) — simulate inline from the profile.
 
-Distill returned positions into anonymous suggestions — tensions between experts (compare `dissent` fields) are the valuable output. Experts go invisible from here on. No text output — go straight to Step 5.
+Distill returned positions into anonymous suggestions — tensions between experts (compare dissent lines) are the valuable output. Experts go invisible from here on. No text output — go straight to Step 5.
 
 ### Step 5: Present
 
@@ -78,7 +77,7 @@ One bold sentence framing the core diagnosis or reframe, then immediately presen
 **For each concern (max 10 lines per detail panel):**
 - Label: the suggestion (conclusion first)
 - Description: why it matters (one line)
-- Detail panel — ONLY these sections, ~40 chars per line:
+- Detail panel — plain text in the monospace preview box; markdown renders literally. ONLY these sections, ~40 chars per line:
 
 ```
 WHY IT MATTERS:
@@ -137,19 +136,6 @@ After the user selects, one **bold** sentence with the next step. Then:
 | Biology | kauffman, dawkins |
 | Education | vygotsky, bruner |
 | Security | schneier, shostack |
-
-## Profile Format
-
-Required sections, in order: H1 `# Name — Domain`, Philosophy, Prior Work to Cite, Typical Concerns, Would NEVER Say, Voice Pattern, Trigger Keywords.
-
-| Class | Who | Shape |
-|-------|-----|-------|
-| Canonical | Closed corpus, deep in model weights | Philosophy + Prior Work as 2-3 anchor bullets; ≤30 lines; no footer |
-| Living | Famous, fast-moving positions | Current positions woven into sections; ends `Verified: YYYY-MM` |
-| Niche | Thin weights coverage — profile carries the simulation | Full depth; ends `Verified: YYYY-MM` |
-
-- Prior Work to Cite lists the subject's OWN works only — never adjacent authors.
-- Facts must be verified at write time; uncertain facts are omitted, not guessed.
 
 ## Boundaries
 

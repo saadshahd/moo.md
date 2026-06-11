@@ -11,6 +11,22 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [hope@6.0.0] - 2026-06-11
+
+### Removed
+
+- feat(hope)!: expert blocklist removed — `/hope:block`, `/hope:blocked`, `/hope:unblock` commands, the blocklist check in consult routing, and the `~/.claude/counsel-blocklist.json` state file are gone; no replacement mechanism
+- feat(hope)!: skill-duplicating commands removed — `/hope:intent`, `/hope:bond`, `/hope:panel`, `/hope:summon` deleted; skills are directly invocable, so the wrappers added nothing. `/hope:full` survives as the only command (pipeline state machine with no skill counterpart)
+- feat(hope)!: `consult.mjs` workflow engine deleted four days after shipping — the args contract (`{ question, profiles }` as a real JSON object) proved fragile in live runs, and its `meta.decisions` block existed only to pre-answer hope's own steer hook. Step 4 now fans out one Agent per profile in a single message (parallelism and profile context-isolation preserved); word caps moved from schema enforcement to prompt instructions; synthesis stays in the main loop
+- chore(hope): stale consult `evals/evals.json` deleted — expectations tested the pre-5.2.0 mode-inference flow
+- chore: `openspec/` directory and `docs/` tree deleted — specs described pre-v4 behavior and docs described pre-5.0 bond/commands; CHANGELOG and git history are the record
+
+### Changed
+
+- feat(hope): consult SKILL.md leaned 156 → 142 lines — "experts invisible" rule deduplicated to its one enforceable statement in Presentation, detail-panel format rules merged into Step 5 where they're used, profile-authoring Profile Format section dropped (runtime only reads profiles)
+
+---
+
 ## [hope@5.3.0] - 2026-06-10
 
 ### Added
