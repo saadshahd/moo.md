@@ -3,7 +3,7 @@
 # hope @ moo.md
 
 > "Ownership without comprehension is just a signature."
-> from [The Engineer's Anxiety at the Penalty Kick](essays/the-engineers-anxiety/README.md)
+> from [The Engineer's Anxiety at the Penalty Kick](https://saadshahd.github.io/blog/the-engineers-anxiety-at-the-penalty-kick/)
 
 Why introduce friction? Because **YOU** the human end up being the world model. The LLM powered agentic coder is just your hands with tiny muscle memory.
 
