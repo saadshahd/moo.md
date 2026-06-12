@@ -36,7 +36,3 @@ Agents grow the codebase faster than they grow your understanding of it, and the
 ```
 
 Run the whole loop with `/hope:full <your seed>`, or stage by stage with `/hope:intent` and `/hope:shape`. Tomorrow, `/hope:own`.
-
-## Gratitude
-
-[Nate B. Jones](https://www.natebjones.com/) · [Superpowers](https://github.com/obra/superpowers) · [Farnam Street](https://fs.blog/blog/)
