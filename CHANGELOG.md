@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [hope@7.0.0] - 2026-06-12
+
 ### Added
 
 - feat(hope): hope:own — debrief skill with spaced ledger of the human's understanding (SKILL.md + ledger schema + ranking jq filter); persistent-state constraint narrowed to work/pipeline state with four-qualifier carve-out
