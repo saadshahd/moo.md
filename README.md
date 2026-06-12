@@ -28,6 +28,8 @@ A raw seed, an echoed sentence, a tradeoff you chose on the record. That is the 
 
 Agents grow the codebase faster than they grow your understanding of it, and the gap is the part you are accountable for. **own** is daily retrieval practice against that gap. It probes you on the concepts you shipped, spaced so questions arrive around the time you would forget them. A short conversation, four questions, no score.
 
+The agent hands you artifacts and walks away. What it never carries between sessions is what own trains. The problem is named in [One Flew Over the Context Window](https://saadshahd.github.io/blog/one-flew-over-the-context-window/).
+
 ## Try it
 
 ```bash
