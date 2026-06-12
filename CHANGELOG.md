@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- feat(hope): hope:own — debrief skill with spaced ledger of the human's understanding (SKILL.md + ledger schema + ranking jq filter); persistent-state constraint narrowed to work/pipeline state with four-qualifier carve-out
 - feat(hope): 17 new consult profiles — tension foils (dhh, muratori), AI/LLMs depth (karpathy, huyen, cherny), data evolution & migrations (helland, sadalage, young, pavlo), production reliability (nygard, armstrong, cook), and depth pairings (bloch, cox, skelton-pais, forsgren, hughes); living experts web-researched and accuracy-verified, dead experts minimal from model knowledge
 - feat(hope): consult domain map — new rows Databases / Data Evolution, Reliability / Stability, Team / Org Design; thin rows paired (Go / Systems, REST / APIs, AI / LLMs, Startups no longer single-profile)
 

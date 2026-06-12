@@ -64,7 +64,7 @@ Peace of mind precedes quality. Velocity that destroys quiet attention destroys 
 
 ## Hard Constraints
 
-No persistent state — conversation markers only.
+No persistent work/pipeline state — conversation markers only. Exception: state that (1) describes the human's understanding, (2) is user-owned, (3) lives outside the repo, (4) is never surfaced.
 No building what Claude does natively — compete on thinking quality.
 No hard dependencies between skills — prime naturally, never import.
 No rigid frameworks — skip steps that don't apply.
