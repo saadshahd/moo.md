@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- docs(essays): The Engineer's Anxiety at the Penalty Kick — why comprehension erodes under agentic decision volume and why the practice behind hope:own has to be deliberate
+
 ---
 
 ## [hope@7.0.0] - 2026-06-12
