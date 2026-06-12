@@ -11,17 +11,18 @@ Why introduce friction? Because **YOU** the human end up being the world model. 
 
 Every piece of work starts as a raw **seed**, the rough thing you typed. **intent** turns the seed into a confirmed statement of what you actually want. **shape** turns that intent into a chosen approach before any code exists.
 
-Each stage runs as interactive prompts. Short questions, concrete options, you pick. The stages keep you driving without getting overwhelmed.
+Every decision inside a stage is deliberately surfaced to you as a prompt with concrete options, a few at a time so you keep driving without getting overwhelmed. The model could fill these in on its own. It asks because the decision lands on you, and you need to know what you are carrying and living with.
 
 ```
 you:  /hope:intent make the homepage better
 moo:  Echo: "Rewrite homepage copy: value prop above the fold,
       signup in first viewport, targeting 5% conversion." Confirm?
-moo:  Assumption. Signup fields: A) email-only  B) email + company
+moo:  Assumption. Signup fields: A) email-only, less friction
+      B) email + company, better leads
 you:  A
 ```
 
-A raw seed, an echoed sentence, a forced choice. That is the whole mechanism.
+A raw seed, an echoed sentence, a tradeoff you chose on the record. That is the whole mechanism.
 
 ## Daily: /own
 
