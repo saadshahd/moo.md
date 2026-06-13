@@ -9,13 +9,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@8.0.0] - 2026-06-13
+
 ### Added
 
+- feat(hope): hope:target — post-shape pipeline skill that converts a locked shape into a runnable success contract before unsupervised execution; the contract holds a mechanical observable, the literal verify command, a dry-run baseline, regression guards, and each closed cheat (`cheat: … / closed by: …`); inline red-team enumerates cheap false-pass paths and closes each with a proven fence (holdout, capacity cap, feedback-resolution cut, memorization probe); a guard violation voids the score outright; a human-only pre-flight (disposable key with provider-side spend cap, babysit cycle one) and a patch-on-cheat boundary (fix the target not the worker, resume from the last honest checkpoint); the contract is a runnable success condition for any unsupervised loop, harness-agnostic by design — target supplies the un-gameable observer and demands the verify command's real output in view, so a transcript-only evaluator cannot be fooled by a prose claim that a check ran; target defines the contract, not the loop that runs it. Distills the essence of LFD loss-function design (un-gameable target) and autoresearch:plan (mechanical, dry-run-validated metric) as hope's "boundaries over aspirations" applied to the no-human-in-the-loop case; ships a flat `cheat-museum.md` data file — a catalog of 13 known specification-gaming archetypes and their fences that the red-team runs before hunting task-specific cheats. LFD's harness machinery (score/lint/probe scripts, LOG.md) is deliberately excluded — generated tooling and persistent run-state violate hope's no-persistent-state constraint; its instruments survive as contract vocabulary, not generated files
 - docs(essays): The Engineer's Anxiety at the Penalty Kick — why comprehension erodes under agentic decision volume and why the practice behind hope:own has to be deliberate
 
 ### Changed
 
+- feat(hope): pipeline state enum is now `intent | shape | target | execute | done | abandoned` (bond → target); full.md transitions rewired so shape → target fires only when execution is unsupervised. Orchestration is no longer a pipeline stage — delegation lives in the user-invoked hope:delegate mode
 - docs: README rewritten as a three-layer map (the loop / delegate mode / own); seed elevated to the honest origin, own cadence corrected to weekly (Monday), delegate and positioning-vs-build-tooling added; three illustrations referenced
+
+### Removed
+
+- **BREAKING** feat(hope): hope:bond removed — its orchestration-fitness role migrated to hope:delegate (a session mode), and its place in the pipeline is taken by hope:target
 
 ---
 

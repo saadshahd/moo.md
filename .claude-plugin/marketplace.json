@@ -9,9 +9,9 @@
     {
       "name": "hope",
       "source": "./hope",
-      "description": "Thinking discipline for AI work. Clarify intent, shape approach, consult experts, compose teams.",
+      "description": "Thinking discipline for AI work. Clarify intent, shape approach, consult experts, guard unsupervised work.",
       "category": "core",
-      "keywords": ["intent", "shape", "consult", "bond", "full", "expert", "panel", "team", "pipeline"]
+      "keywords": ["intent", "shape", "consult", "target", "full", "expert", "panel", "delegate", "pipeline"]
     }
   ]
 }
