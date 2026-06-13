@@ -7,7 +7,7 @@
 
 Why introduce friction? Because **YOU** the human end up being the world model. The agent is just your hands with tiny muscle memory.
 
-moo does not build. It does not author your code, rules, or taste. It is orthogonal to build tooling like [superpowers](https://github.com/obra/superpowers). You hand-write your `taste.md` and your `CLAUDE.md`. moo keeps you owning what matters and gets out of the way.
+moo does not build. It does not author your code, rules, or taste. It works alongside build tooling like [superpowers](https://github.com/obra/superpowers). You hand-write your own rules and taste. moo keeps you owning what matters and gets out of the way.
 
 One idea runs through all three layers: **never delegate a decision.**
 
@@ -17,7 +17,7 @@ The loop is pure decision work. You drive it slowly, in your own context.
 
 Every piece of work starts as a raw **seed**, the rough thing you typed. It is the one artifact that is fully yours.
 
-**intent** and **shape** do not make the seed more honest. They make it explicit and specified. Each surfaces a decision as a prompt with concrete options, a few at a time, and you answer. Every added detail stays yours because you chose it. intent turns the seed into a confirmed statement of what you want. shape turns that into a chosen approach before any code exists.
+**intent** and **shape** do not make the seed more honest. They make it explicit and specified. Each surfaces a decision as an interactive question, every choice previewed, a few at a time, and you answer. Every added detail stays yours because you chose it. intent turns the seed into a confirmed statement of what you want. shape turns that into a chosen approach before any code exists.
 
 The result is a card that hands off outside your context window.
 
@@ -47,7 +47,7 @@ What the agent never carries between sessions is what own trains. The problem is
 
 | What erodes ownership              | Layer          | Guard                              |
 | ---------------------------------- | -------------- | ---------------------------------- |
-| AI fills in your decisions         | intent + shape | surfaced as prompts you answer     |
+| AI fills in your decisions         | intent + shape | interactive questions, each choice previewed |
 | compaction mutates your context    | delegate       | doing stays out, deciding stays in |
 | code grows faster than understanding | own          | spaced recall on Mondays           |
 
