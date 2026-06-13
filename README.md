@@ -11,7 +11,9 @@ One idea runs through all three layers: **never delegate a decision.**
 /plugin install hope@moo.md
 ```
 
-Run the whole loop with `/hope:full <your seed>`, or stage by stage with `/hope:intent` and `/hope:shape`. On Monday, `/hope:own`.
+- Run the whole loop with `/hope:full <your seed>`, or stages `/hope:intent` and `/hope:shape` hands you a lean card.
+- For what we used to be work always `/hope:delegate <your prefrence cost/speed>`
+- On Monday, `/hope:own <focus area>` pulls you back in.
 
 ## A loop
 
@@ -45,7 +47,7 @@ What the agent never carries between sessions is what own trains. The problem is
 
 ![own](assets/own.png)
 
-## Map
+## Overview
 
 | The trap                                 | Layer                          | Guard                                        |
 | ---------------------------------------- | ------------------------------ | -------------------------------------------- |
