@@ -1,10 +1,6 @@
-<img src="assets/cover-rounded.png" alt="moo.md - Stay present with AI" width="100%">
+Why introduce friction? Because **YOU** the human end up being the world model. The agent is just your hands.
 
-# hope @ moo.md
-
-Why introduce friction? Because **YOU** the human end up being the world model. The agent is just your hands with tiny muscle memory.
-
-moo does not build. It does not author your code, rules, or taste. It works alongside build tooling like [superpowers](https://github.com/obra/superpowers). You hand-write your own rules — your `CLAUDE.md`, your taste. moo keeps you owning what matters and gets out of the way.
+**moo/hope** doesn't build, and doesn't author your code, rules, or taste. It works alongside build tooling like [superpowers](https://github.com/obra/superpowers).
 
 One idea runs through all three layers: **never delegate a decision.**
 
@@ -25,7 +21,7 @@ Every piece of work starts as a raw **seed**, the rough thing you typed. It is t
 
 **intent** and **shape** do not make the seed more honest. They make it explicit and specified. Each surfaces a decision as an interactive question, every choice previewed, a few at a time, and you answer. Every added detail stays yours because you chose it. intent turns the seed into a confirmed statement of what you want. shape turns that into a chosen approach before any code exists.
 
-The result is a card that hands off outside your context window.
+The outcome is a card you carry comfortably outside the context window.
 
 ![The loop](assets/loop.png)
 
@@ -49,9 +45,9 @@ What the agent never carries between sessions is what own trains. The problem is
 
 ![own](assets/own.png)
 
-## What each layer guards
+## Map
 
-| What erodes ownership                    | Layer                          | Guard                                        |
+| The trap                                 | Layer                          | Guard                                        |
 | ---------------------------------------- | ------------------------------ | -------------------------------------------- |
 | AI fills in your decisions               | `/hope:intent` & `/hope:shape` | interactive questions, each choice previewed |
 | compaction mutates & drifts your context | `/hope:delegate`               | doing stays out, deciding stays in           |
