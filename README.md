@@ -2,14 +2,20 @@
 
 # hope @ moo.md
 
-> "Ownership without comprehension is just a signature."
-> from [The Engineer's Anxiety at the Penalty Kick](https://saadshahd.github.io/blog/the-engineers-anxiety-at-the-penalty-kick/)
-
 Why introduce friction? Because **YOU** the human end up being the world model. The agent is just your hands with tiny muscle memory.
 
-moo does not build. It does not author your code, rules, or taste. It works alongside build tooling like [superpowers](https://github.com/obra/superpowers). You hand-write your own rules and taste. moo keeps you owning what matters and gets out of the way.
+moo does not build. It does not author your code, rules, or taste. It works alongside build tooling like [superpowers](https://github.com/obra/superpowers). You hand-write your own rules — your `CLAUDE.md`, your taste. moo keeps you owning what matters and gets out of the way.
 
 One idea runs through all three layers: **never delegate a decision.**
+
+## Try it
+
+```bash
+/plugin marketplace add saadshahd/moo.md
+/plugin install hope@moo.md
+```
+
+Run the whole loop with `/hope:full <your seed>`, or stage by stage with `/hope:intent` and `/hope:shape`. On Monday, `/hope:own`.
 
 ## A loop
 
@@ -51,11 +57,7 @@ What the agent never carries between sessions is what own trains. The problem is
 | compaction mutates your context    | delegate       | doing stays out, deciding stays in |
 | code grows faster than understanding | own          | spaced recall on Mondays           |
 
-## Try it
+## Reading
 
-```bash
-/plugin marketplace add saadshahd/moo.md
-/plugin install hope@moo.md
-```
-
-Run the whole loop with `/hope:full <your seed>`, or stage by stage with `/hope:intent` and `/hope:shape`. On Monday, `/hope:own`.
+- [The Engineer's Anxiety at the Penalty Kick](https://saadshahd.github.io/blog/the-engineers-anxiety-at-the-penalty-kick/) — "Ownership without comprehension is just a signature."
+- [One Flew Over the Context Window](https://saadshahd.github.io/blog/one-flew-over-the-context-window/) — what the agent never carries between sessions.
