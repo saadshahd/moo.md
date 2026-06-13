@@ -53,9 +53,9 @@ What the agent never carries between sessions is what own trains. The problem is
 
 | What erodes ownership              | Layer          | Guard                              |
 | ---------------------------------- | -------------- | ---------------------------------- |
-| AI fills in your decisions         | /intent & /shape | interactive questions, each choice previewed |
-| compaction mutates & drifts your context | delegate  | doing stays out, deciding stays in |
-| code grows faster than understanding | own          | spaced recall keeps understanding current |
+| AI fills in your decisions         | /hope:intent & /hope:shape | interactive questions, each choice previewed |
+| compaction mutates & drifts your context | /hope:delegate  | doing stays out, deciding stays in |
+| code grows faster than understanding | /hope:own          | spaced recall keeps understanding current |
 
 ## Reading
 
