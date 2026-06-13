@@ -15,7 +15,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- docs: README rewritten around the vision — seed → intent → shape per task, /own daily; essay linked as epigraph, 70-line worked example replaced with a 5-line trace, interactive stages called out
+- docs: README rewritten as a three-layer map (the loop / delegate mode / own); seed elevated to the honest origin, own cadence corrected to weekly (Monday), delegate and positioning-vs-build-tooling added; three illustrations referenced
 
 ---
 
