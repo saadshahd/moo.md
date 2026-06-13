@@ -11,7 +11,7 @@ One idea runs through all three layers: **never delegate a decision.**
 /plugin install hope@moo.md
 ```
 
-- Run the whole loop with `/hope:full <your seed>`, or stages `/hope:intent` and `/hope:shape` hands you a lean card.
+- Run the whole loop with `/hope:full <your seed>`, or stages `/hope:intent <your seed>` and `/hope:shape <your intent>` hands you a lean card.
 - For what we used to be work always `/hope:delegate <your prefrence cost/speed>`
 - On Monday, `/hope:own <focus area>` pulls you back in.
 
