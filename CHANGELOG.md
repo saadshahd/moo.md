@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- feat(hope): card admission rule reframed from "durable facts only" to "carry only what the next stage can't cheaply re-derive from the code in front of it" — a **recoverability test** replaces the blanket durability rule. Cheap local-code facts are re-read by the next stage, never carried (storing them is wasteful and rots); two kinds survive instead: decisions (underdetermined by code — only the human's goal settles them) and hard-won external facts (dependency/third-party behavior whose ground truth lives outside the codebase and cost steering to establish). Adds **carry-forward last**: the costly residue the human won't re-read — decisions and their reasons, paths ruled out, hard-won external facts — closes the card, captured when the stage locks so the next stage skips the work that produced them. Keeps moo out of the memory/storage business: the harness owns memory, code stays ground truth; the card only carries what code can't give the next session back cheaply
+
 ## [hope@8.0.0] - 2026-06-13
 
 ### Added
