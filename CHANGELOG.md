@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- feat(hope): auto-memory discipline + collection triggers — a SessionStart hook primes every session with a tight admission test (`hope/skills/memory.md`) governing what Claude commits to its native auto-memory: add an entry only if it passes every test — re-derivable (code can't cheaply re-tell it), timeless ("X over Y: reason", never present-tense), safe-if-wrong (rationale/convention, not live state/findings/paths), and not-already-known (edit a contradicted entry in place, never append a conflict); bias toward omission because a gap is recoverable but a wrong memory misleads silently. The discipline is competing on thinking quality, not building a store — Claude's native auto-memory remains the only store, moo holds no persistent state. Adds three low-noise collection triggers (`hope/hooks/memory-nudge.sh`) that nudge capture at high-signal moments and defer the write decision to the discipline: **correction** (UserPromptSubmit, gated on correction phrasing — moo's "Correction is signal") , **decision** (Stop, gated on decision keywords in the turn transcript, throttled to once / 10 min), and **research findings** (SubagentStop, matcher-filtered to Explore/Plan). All hooks are non-blocking and fail open; SessionStart re-injection covers compaction. PreCompact/SessionEnd cannot prompt Claude (no context injection) and are deliberately not used
+
 ## [hope@8.1.0] - 2026-06-19
 
 ### Changed
