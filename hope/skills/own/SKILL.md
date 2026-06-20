@@ -16,7 +16,7 @@ Probe the human's understanding of their own codebase so they keep the capacity 
 ## Invisibility (load-bearing)
 
 - Never surface due dates, streaks, mastery labels, or any interval-derived signal. The moment one leaks, the schedule stops measuring forgetting and starts manufacturing performance — and reverts to a fixed staleness window.
-- k, interval, priority, assisted/owned status: scheduling internals, model-facing only.
+- k, interval, priority, assisted/owned status, the `authored` seed outcome: scheduling internals, model-facing only. Never surface "you wrote this at return time."
 
 ## Ledger
 
@@ -42,6 +42,7 @@ Rules:
 - Probe question text is stored verbatim — the audit trail that each re-probe is a genuine transformation, never a rephrase.
 - Concept name + one-line description only — no volatile code references. A concept that can't be re-located from its description has a bad description.
 - Concepts are named in the project's language. Fresh extractions fuzzy-match existing entries (tombstones included); a match reuses the canonical entry.
+- Authored events (outcome `authored`) are written at delegate-return time, not by a debrief — they seed a concept with the re-answerable prompt the human wrote. The first debrief probe of an authored concept transforms that prompt (`transformedFrom` = the authored event's id). Authoring never counts as a pass, so it never promotes a concept to owned.
 
 ### Merges
 
@@ -62,7 +63,7 @@ Derive the slug, apply the adoption rule — announce any adoption move. Cold st
 Characterize-first, budget-scoped — scoped by the question budget, never the repo:
 
 1. Re-verify the sampled ledger concepts against current code: present / changed / gone. A "changed" verdict is recorded as an event (it resets the schedule — prior passes no longer attest to current code). Can't find it → ask the user; never silently record gone.
-2. Then look for new work.
+2. Then look for new work — concepts not already in the ledger. Authored concepts already sit in the ledger; a fresh extraction fuzzy-matches the existing authored entry rather than creating a duplicate.
 
 **Diff hint** — `git diff <last-debrief-commit>..HEAD` is a locator hint only, trusted iff BOTH: (a) the last debrief's commit exists, (b) it is an ancestor of HEAD. Either check fails → drop the hint, say so, proceed ledger-only. The hint may speed the survey; it never decides a verdict.
 

@@ -9,6 +9,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@8.2.0] - 2026-06-20
+
+### Added
+
+- feat(hope): inline ownership at the moment of return — /delegate gains a RETURN act that fires when a verified delegation reports GO and the diff embodies a decision (recoverability test; mechanical diffs skip silently). The human authors a re-answerable prompt (question→answer, not a description — recall builds the model, a summary read once does not), Decision lens by default ("what did this decide / what path did it rule out") with an invariant/boundary/failure lens offered only for structural or core-domain diffs. The prompt appends to the existing /own ledger as a new `authored` event (mechanical jq, atomic write, distinct delegate-origin id) — no new store, reusing own's persistent-state carve-out. /own re-probes authored concepts via transformation instead of inventing generic questions, so the spaced ritual stops being abstract; authoring never counts as a pass, so it never promotes a concept to owned (authoring ≠ owning). Closes the gap where delegated work returned faster than the human could own it: the moment work returns becomes the moment it is claimed
+- feat(hope): return.sh PostToolUse hook (matcher `Agent|Workflow`) — a reinforcement-only nudge injecting one suppressed line that reminds the router to run the RETURN act before surfacing a verified return; a hook cannot author or capture (it only injects additionalContext), so it reinforces the skill instruction, never replaces it; fails open
+
+### Changed
+
+- feat(hope): own ledger schema gains an `authored` outcome (seed prompt, no grade); rank.jq folds it to a k=0 no-op via the existing else branch (documentation-only change) so an authored concept schedules like new work but never promotes to owned; own SKILL.md — survey treats authored concepts as already-in-ledger (fuzzy-match folds duplicates), the first probe transforms the authored prompt, and the invisibility rule extends to the `authored` outcome
+- feat(hope): delegate router contract carves out the single mechanical ledger append that records an authored return; DISPATCH now scopes each delegation to return a reviewable unit (a wall of output can be neither verified nor claimed)
+
 ## [hope@8.1.0] - 2026-06-19
 
 ### Changed

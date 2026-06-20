@@ -14,6 +14,9 @@
 # k: ordered fold over events. +1 per pass, -1 per fail clamped at 0
 # (halve the interval, never reset), reset to 0 on a "changed" verdict
 # (code moved out from under the concept; prior passes no longer attest).
+# An "authored" seed event hits the else branch: no-op (k unchanged), so a
+# freshly authored concept sits at k=0 / assisted with a real lastProbe — it
+# schedules like new work but never counts as a pass, so it never promotes.
 def k_fold:
   reduce .events[] as $e (0;
     if   $e.outcome == "pass"    then . + 1
