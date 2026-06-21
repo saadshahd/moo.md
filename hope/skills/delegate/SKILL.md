@@ -30,6 +30,20 @@ Construct prompts for speed, correctness, and efficiency.
 
 **Clean slate is the default.** Spawn a fresh subagent_type for almost all work. Fork (no subagent_type) only in the rare case the agent genuinely needs your accumulated context to do the job.
 
+### Loop dispatch
+
+When shape's card names an iterative loop, route to the runner that already implements it — never hand-roll the loop body.
+
+| Loop shape | Runner |
+| --- | --- |
+| Grounded metric loop, unattended | autoresearch + a target contract |
+| Deterministic fan-out or multi-stage | the Workflow tool |
+| Parallel independent subagents | superpowers:dispatching-parallel-agents |
+| Multi-source research + verify | deep-research |
+| Supervised single-artifact refine | inline — no runner |
+
+No runner fits → the loop is novel; shape it explicitly before dispatch.
+
 ## VERIFY
 
 You did not watch the work happen — an agent's summary is what it INTENDED, not what it did.

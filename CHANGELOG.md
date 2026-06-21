@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@8.3.0] - 2026-06-21
+
+### Added
+
+- feat(hope): loop awareness across shape + delegate — shape gains a Loop selection dimension (resolve an iterative loop on three axes: verifier locus, plan mutability, termination — with the reliability rules that no ungrounded loop runs on a correctness task, a revised plan carries a budget cap, and judgment-delegated stops always get a hard-cap backstop); delegate gains a Loop dispatch map routing each loop shape to the existing runner (autoresearch + a target contract for unattended metric loops, the Workflow tool for deterministic fan-out, superpowers:dispatching-parallel-agents for parallel subagents, deep-research for multi-source sweeps, inline for supervised refine). No new command or loop engine — the capability rides the existing intent → shape → target → execute pipeline; the gap was a shared vocabulary, not a missing tool. target unchanged (it already operationalizes the reliability law: an un-gameable, mechanical, budget-bounded success contract)
+
 ### Removed
 
 - chore: deep repo cleanup — deleted abandoned openspec tooling (4 `openspec-*` skills + 4 `opsx` commands; the `openspec/` workflow was removed long ago), the dead duplicate `.github/hooks/pre-push` (never ran — `core.hooksPath=.githooks`), the broken dev commands `/document` and `/generate` (depended on the deleted wordsmith plugin and a removed `soul` skill), the dormant `tessl` MCP wiring (`tessl.json`, `.mcp.json`, the disabled-server entry) plus its unused `p-limit` dependency, and the orphaned local copy of the engineer's-anxiety essay (the published blog stays linked from README)

@@ -37,11 +37,23 @@ The pipeline's handoff artifact. One admission rule: carry only what the next st
 
 ## The work loop
 
-1. **Extract** — pull the HOW dimensions from the input: architecture, data model, API design, testing, deployment — whatever the spec actually opens.
+1. **Extract** — pull the HOW dimensions from the input: architecture, data model, API design, testing, deployment — whatever the spec actually opens. When the work iterates, *which loop* is one such dimension (see Loop selection).
 2. **Resolve per dimension** — auto-gather when the answer is retrievable with certainty; only non-obvious judgment calls reach the user via decision prompts (mechanics below).
 3. **Consult** — fires ONLY when the user picks "Hear tradeoffs": invoke the hope:consult skill with the decision question.
 4. **Tension check** — if resolved choices genuinely conflict, surface the tension as one more decision prompt.
 5. **Gate** — run the gate audit (below).
+
+## Loop selection
+
+When the work iterates — an agent loop, a refinement cycle, an unbabysat run — "which loop" is a HOW dimension. Resolve it on three axes; the card carries the chosen loop and its termination rule.
+
+| Axis | Question | Reliability rule |
+| --- | --- | --- |
+| Verifier locus | Does "better" come from outside the model — tests, tool result, metric, separate judge — or only the model itself? | No external signal → never loop on a correctness task; it degrades. Take best-of-N first attempts instead. |
+| Plan mutability | Plan fixed once, or revised as reality diverges? | A revised plan must carry a budget cap, or it never converges. |
+| Termination | Budget cap, signal-gated, fixed-round, or judgment-delegated? | Judgment-delegated (an LLM decides "done") is the silent non-convergence source — always back it with a hard cap. |
+
+Unsupervised loops pass through target; every loop dispatches through delegate.
 
 ## Decision prompts
 
