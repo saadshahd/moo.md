@@ -1,8 +1,0 @@
-{
-  "name": "moo.md",
-  "dependencies": {
-    "tessl/npm-p-limit": {
-      "version": "7.1.0"
-    }
-  }
-}

@@ -71,7 +71,7 @@ See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints.
 - [ ] Does this build something Claude does natively?
 - [ ] Does this serve at least one aim: reduce regret / increase clarity / fewer artifacts / preserve ownership?
 
-See `<plugin>/PHILOSOPHY.md` for plugin-specific audit items.
+See `hope/PHILOSOPHY.md` "Hard Constraints" for plugin-specific audit items.
 
 ## Anti-Patterns
 
@@ -107,7 +107,7 @@ Track all changes in `CHANGELOG.md` at repo root.
 - Move unreleased items to new version section
 - Update version in affected plugin.json files
 - Tag the release
-- Run `bun run sync` and verify a clean git diff on `hope/skills/intent/SKILL.md` and `hope/skills/shape/SKILL.md`
+- Run `bun run sync` and verify a clean git diff on `hope/skills/intent/SKILL.md`, `hope/skills/shape/SKILL.md`, and `hope/skills/target/SKILL.md`
 - One-time setup: `git config core.hooksPath .githooks`
 
 **IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.

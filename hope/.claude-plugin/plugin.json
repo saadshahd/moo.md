@@ -2,7 +2,7 @@
   "name": "hope",
   "version": "8.2.0",
   "description": "Thinking discipline for AI work. Clarify intent, shape approach, consult experts, guard unsupervised work, audit against principles.",
-  "keywords": ["intent", "shape", "consult", "target", "distill", "expert", "workflow", "audit"],
+  "keywords": ["intent", "shape", "consult", "target", "delegate", "own", "distill", "pipeline", "expert"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"

@@ -5,7 +5,7 @@
 moo — mind on output. Thinking infrastructure for AI work.
 
 Three layers:
-- **Structure** — Pipeline that turns vague intent into shaped approach (intent → shape → execute)
+- **Structure** — Pipeline that turns vague intent into shaped approach (intent → shape → target → execute)
 - **Discipline** — Habits encoded as infrastructure: clarify, consult, check assumptions
 - **Perspective** — Multiple expert lenses on every non-trivial decision
 
@@ -28,4 +28,4 @@ Four outcomes moo drives toward:
 
 Each plugin defines its own beliefs, principles, and constraints that serve the mission above.
 
-- **hope** — Thinking discipline: intent clarification, approach shaping, expert consultation, team composition. See `hope/PHILOSOPHY.md`.
+- **hope** — Thinking discipline: intent clarification, approach shaping, expert consultation, guarded delegation, ownership retrieval. See `hope/PHILOSOPHY.md`.

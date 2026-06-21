@@ -80,13 +80,3 @@ Default to less, expand on request.
 hope primes context (clear intent, shaped approach, engagement level) and behavior (verify before claiming done, consult on non-trivial decisions, check assumptions).
 
 Cross-skill invocation uses natural language triggers. No hard references. If the user has a matching skill, it fires. If not, hope handles it. Nothing breaks either way.
-
----
-
-## Audit (Before Committing Changes)
-
-- Does this add complexity without justification?
-- Does this introduce persistent state?
-- Could an existing skill handle this?
-- Does this build something Claude does natively?
-- Does this serve at least one aim: reduce regret / increase clarity / fewer artifacts / preserve ownership?

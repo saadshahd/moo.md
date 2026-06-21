@@ -9,6 +9,20 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+
+- chore: deep repo cleanup — deleted abandoned openspec tooling (4 `openspec-*` skills + 4 `opsx` commands; the `openspec/` workflow was removed long ago), the dead duplicate `.github/hooks/pre-push` (never ran — `core.hooksPath=.githooks`), the broken dev commands `/document` and `/generate` (depended on the deleted wordsmith plugin and a removed `soul` skill), the dormant `tessl` MCP wiring (`tessl.json`, `.mcp.json`, the disabled-server entry) plus its unused `p-limit` dependency, and the orphaned local copy of the engineer's-anxiety essay (the published blog stays linked from README)
+
+### Changed
+
+- chore: ROADMAP rewritten to forward-looking only — the decision log that duplicated CHANGELOG was removed; Active/Next reconciled to shipped 8.2.0 reality
+- docs(hope): root PHILOSOPHY pipeline corrected to `intent → shape → target → execute` and the dead "team composition" phrasing dropped; README factual fixes (`/hope:delegate` takes no cost/speed arg; `own` has no fixed-day schedule); `plugin.json` + `marketplace.json` keywords reconciled to the real skill surface
+- chore(hope): `hope/PHILOSOPHY.md` no longer duplicates CLAUDE.md's commit-audit checklist — CLAUDE.md now points at the plugin's Hard Constraints
+
+### Fixed
+
+- fix: active pre-push hook now checks `hope/skills/target/SKILL.md` for doc-gen drift (previously only intent + shape, so target drift passed silently); CLAUDE.md release note updated to match
+
 ## [hope@8.2.0] - 2026-06-20
 
 ### Added

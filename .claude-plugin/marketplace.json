@@ -11,7 +11,7 @@
       "source": "./hope",
       "description": "Thinking discipline for AI work. Clarify intent, shape approach, consult experts, guard unsupervised work.",
       "category": "core",
-      "keywords": ["intent", "shape", "consult", "target", "full", "expert", "panel", "delegate", "pipeline"]
+      "keywords": ["intent", "shape", "consult", "target", "delegate", "own", "distill", "pipeline", "expert"]
     }
   ]
 }

@@ -13,3 +13,6 @@ dist/
 
 # Eval workspaces
 workspace/
+
+# Riptide artifacts (cloud-synced)
+.humanlayer/tasks/

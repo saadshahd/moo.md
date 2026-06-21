@@ -2,9 +2,6 @@
   "scripts": {
     "sync": "md-magic --files hope/skills/intent/SKILL.md hope/skills/shape/SKILL.md hope/skills/target/SKILL.md --open doc-gen --close end-doc-gen"
   },
-  "dependencies": {
-    "p-limit": "^7.2.0"
-  },
   "devDependencies": {
     "markdown-magic": "^4.9.0"
   }

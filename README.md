@@ -11,9 +11,9 @@ One idea runs through all three layers: **never delegate a decision.**
 /plugin install hope@moo.md
 ```
 
-- Run the whole loop with `/hope:full <your seed>`, or stages `/hope:intent <your seed>` and `/hope:shape <your intent>` hands you a lean card.
-- For what we used to be work always `/hope:delegate <your prefrence cost/speed>`
-- On Monday, `/hope:own <focus area>` pulls you back in.
+- Run the whole loop with `/hope:full <your seed>`, or run the stages directly: `/hope:intent <your seed>` then `/hope:shape <your intent>`, each handing you a lean card.
+- For work you used to do by hand, `/hope:delegate` routes it to agents while you keep every decision.
+- Periodically, `/hope:own <focus area>` pulls you back in.
 
 ## A loop
 
@@ -39,7 +39,7 @@ This is also what stops compaction from silently rewriting your context. The ver
 
 ## A routine
 
-**own** is retrieval practice. It runs on Monday, spaced, so questions arrive around the time you would forget.
+**own** is retrieval practice. You run it spaced over time, so questions arrive around the time you would forget.
 
 Agents grow the codebase faster than they grow your understanding of it. That gap is the part you are accountable for. own closes it. It probes you on the concepts you shipped. A short conversation, four questions, no score.
 
