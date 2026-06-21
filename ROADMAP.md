@@ -16,6 +16,13 @@
   - Decision pending: fix in SKILL.md or accept as behavior (user testing will inform)
 
 ## Decisions
+- [x] Inline ownership at the moment of return — /delegate RETURN act + own `authored` ledger event (2026-06-20)
+  - Gap (session research + user interview): delegated work returns faster than the human can own it; /own was skipped and "abstract, not grounded"; /delegate verify was the heaviest tax — all three resolve at one point, the verified return
+  - Fold comprehension into /delegate's verified-GO return, gated by the recoverability test — only decision-bearing diffs probe, mechanical diffs skip (the "lighter than /own, not heavier" guard)
+  - Human authors a re-answerable prompt (Decision lens default, DDD invariant/boundary lens opt-in for structural diffs) → appended to the existing own ledger as an `authored` event; /own re-probes it later via transformation
+  - Consult panel insight (matuschak/vygotsky/evans): framing is second-order — a description authored once builds no durable memory; the artifact must be a re-answerable prompt on a schedule. A diff IS a decision, so the Decision lens fits the unit; DDD vocabulary stamped on every diff manufactures false language (the DDD advocate argued against defaulting to it)
+  - Constraints held: authoring ≠ owning (authored events never promote to owned); reuses own's carve-out, no new store; never gates or blocks the merge; moo surfaces the decision, never authors the code
+  - Reinforcement hook (return.sh) is the one piece reintroducing hook machinery v4 shed — kept minimal (one suppressed nudge on Agent|Workflow returns), reinforcement-only because a hook cannot author or capture, only inject context
 - [x] hope v4 rewrite complete — 10 skills / ~1380 lines → 4 skills / 147 lines (2026-03-01)
   - Removed: loop, soul, verify, observe, forge, search
   - Rewrote: intent (22L), shape (23L), consult (67L), bond (35L). Full is command-only.
