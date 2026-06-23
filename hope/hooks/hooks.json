@@ -52,17 +52,6 @@
           }
         ]
       }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "Explore|Plan",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/memory-nudge.sh"
-          }
-        ]
-      }
     ]
   }
 }

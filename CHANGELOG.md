@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@8.3.1] - 2026-06-23
+
+### Fixed
+
+- fix(hope): memory nudges are no longer invasive — removed the SubagentStop trigger that nudged read-only Explore/Plan agents to write MEMORY.md (impossible for a read-only agent, it derailed them into a "I can't write" loop that lost their findings), and the surviving Stop/UserPromptSubmit nudges now mandate silent background operation: Claude says nothing about memory unless it actually writes a file, then one concise line only. The admission discipline (`memory.md`) is unchanged; the capture timing and heuristics are unchanged — only the read-only derail and the per-turn memory chatter are gone
+
 ## [hope@8.3.0] - 2026-06-21
 
 ### Added
