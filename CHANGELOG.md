@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@8.3.3] - 2026-06-24
+
+### Changed
+
+- fix(hope): the memory writer dedupes against the index instead of duplicating. The 8.3.2 live test confirmed the off-thread writer works, but it created a *duplicate* memory file because the index entry it checked was lossy — a `claude-code-schedulers.md` slug silently held headless-writer flags, so the "Already known?" check couldn't see the overlap. Root cause was the index, not the writer. Added a **Naming & indexing** rule to the auto-memory discipline (`skills/memory.md`): one file = one specific claim; the slug and its MEMORY.md one-liner must state the body's FULL scope so "Already known?" is decidable from the index alone; before adding, scan for a slug/scope that already owns the topic and edit it in place. `memory-write.sh`'s writer prompt now follows suit — scan the index, edit an existing file in place when its slug/scope covers the fact, create a new file only when none owns the topic, and widen the one-liner to the full scope. The discipline binds every writer (foreground and headless), not just the detached one
+
 ## [hope@8.3.2] - 2026-06-24
 
 ### Changed

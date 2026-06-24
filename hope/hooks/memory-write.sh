@@ -49,7 +49,7 @@ memdir="$HOME/.claude/projects/$slug/memory"
 slicefile="${TMPDIR:-/tmp}/hope-mem-slice-$session"
 printf '%s' "$slice" > "$slicefile"
 
-prompt=$(printf 'You are moo'\''s detached memory writer — a background session, not addressing a human. Read the auto-memory discipline at %s and follow it exactly. Read the recent conversation slice at %s (most relevant at the end). If and ONLY if a durable fact qualifies under the discipline, update the index at %s/MEMORY.md and write or edit the matching memory file under %s/. If nothing qualifies, write nothing at all. Operate silently — produce no commentary.' \
+prompt=$(printf 'You are moo'\''s detached memory writer — a background session, not addressing a human. Read the auto-memory discipline at %s and follow it exactly, including its naming & indexing rule. Read the recent conversation slice at %s (most relevant at the end). If and ONLY if a durable fact qualifies, record it under %s/: first scan the index %s/MEMORY.md; if an existing entry'\''s slug or scope already covers the fact, READ that file and edit it IN PLACE; create a new file only when none owns the topic. Keep each slug specific to one claim, and widen its index one-liner to state the full scope. If nothing qualifies, write nothing at all. Operate silently — produce no commentary.' \
   "$discipline" "$slicefile" "$memdir" "$memdir")
 
 # --no-session-persistence: the writer is a background janitor — it must not save a transcript
