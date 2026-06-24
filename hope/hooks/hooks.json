@@ -48,7 +48,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/memory-nudge.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/memory-write.sh",
+            "async": true
           }
         ]
       }

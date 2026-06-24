@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@8.3.2] - 2026-06-24
+
+### Changed
+
+- fix(hope): Stop-time memory capture moved off the main thread. Previously the Stop hook injected an `additionalContext` nudge, which Claude Code delivers as a system reminder on the next request — forcing another turn instead of letting the session end (the nudge "blocked the thread" even after 8.3.1 made it silent). Now a new `memory-write.sh` runs as an `async` Stop hook: it extracts a focused slice of recent user/assistant dialogue (tool noise stripped), gates on the same decision-signal heuristic, and hands the slice to a detached headless `claude -p` that applies the auto-memory discipline and updates MEMORY.md silently in the background. The foreground turn ends clean — no context injection, no re-engagement. The writer runs `claude -p --no-session-persistence --settings '{"disableAllHooks":true}' --dangerously-skip-permissions --allowed-tools Read Edit Write -- "$prompt"`: `--no-session-persistence` keeps the background janitor out of the resume list and off disk; `disableAllHooks` prevents the writer's own Stop from re-firing the hook (a fork bomb — chosen over `--bare`, which requires an API key and is unusable on a Claude Max/Pro subscription); `--dangerously-skip-permissions` is required because MEMORY.md lives under the protected `~/.claude/` path, which no other permission mode auto-approves headless; and `--allowed-tools` is variadic so its values are space-separated with a `--` terminator (the comma form swallows the prompt). `memory-nudge.sh` is trimmed to its in-context `UserPromptSubmit` correction capture only — corrections stay in-context where the foreground holds full conversational nuance; only the thread-blocking Stop path moved off-thread
+
 ## [hope@8.3.1] - 2026-06-23
 
 ### Fixed
