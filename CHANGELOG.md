@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.4.1] - 2026-06-25
+
+### Changed
+
+- fix(hope): trim the **slop-awareness nudge** stderr message to its load-bearing core. Cut `(advisory — does not block)` (restated intent, and contradicted the harness-fixed `Stop hook blocking error` prefix the hook can't suppress), shortened `break a loaded preference (leave it better than before)` to `violate a preference` (the "leave it better" bar still lives in the judge prompt where it's load-bearing), and dropped the trailing `Decide whether to fix now or leave it…` line. The nudge body is now just a header plus the judge's findings. Behavior unchanged.
+
 ## [hope@9.4.0] - 2026-06-25
 
 ### Added

@@ -74,8 +74,7 @@ printf '%s' "$finding" | head -n1 | grep -q '^CLEAN' && exit 0
 # Finding → wake Claude with an advisory nudge on stderr (exit 2). Advisory only: it names the
 # violation and explicitly does not block.
 {
-  echo "Slop-awareness nudge (advisory — does not block). A file you touched this turn may break a loaded preference (leave it better than before):"
+  echo "Slop-awareness nudge. A file you touched this turn may violate a preference:"
   printf '%s\n' "$finding"
-  echo "Decide whether to fix now or leave it; ignore if this is a false positive."
 } >&2
 exit 2
