@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.4.0] - 2026-06-25
+
+### Added
+
+- feat(hope): a taste-blind **slop-awareness nudge** — one `asyncRewake` hook (`slop-nudge.sh`) on `Stop` and `SubagentStop`. When the current chunk touched code, it uses the transcript only to *select* which files were edited (Edit/Write/MultiEdit since the last stop, tracked by a per-transcript line offset so prior stops are never re-judged) and hands those file paths to an off-record headless `claude -p`. The judge reads each touched file **live and in full** — never frozen transcript fragments — and flags violations anywhere in the file (the bar is "leave each touched file better than before," not just grading the diff). Its own discovered CLAUDE.md / TASTE.md *are* the preferences — hope ships zero taste rules. A clear violation wakes the main thread with an advisory on stderr (exit 2); a clean, no-edit, or pure-deletion turn stays silent (exit 0). Advisory only: never blocks, never gates, persists nothing. Recursion-guarded (`disableAllHooks`), read-only (`Read Grep Glob` + `bypassPermissions`), fails open. Closes the during-flow review gap the consult panel diagnosed — the harness verified correctness and forks but never the taste/graspability band.
+
 ## [hope@9.3.1] - 2026-06-25
 
 ### Changed
