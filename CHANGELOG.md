@@ -9,6 +9,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.2.0] - 2026-06-25
+
+### Changed
+
+- feat(hope): `consult` becomes a user-invoked mentor instead of a pipeline-routed panel. Value reframed from producing a recommendation to surfacing expert knowledge — names and their actual reasoning are now VISIBLE in findings (inverts the prior "experts invisible" / "minimal text between prompts" rules), and the "land on one actionable recommendation" convergence pressure is dropped. Two modes: MENTOR (one lens, deep) is the un-forced default, PANEL (multi-perspective) is opt-in. The 4-goal table is demoted — goals (depth-novelty / coverage / unblock) survive only to set count + diversity and no longer hardcode a reasoning mode. Refute lifts out of the goal table into one orthogonal opt-in flag, never default; it absorbs the old `validate` goal, which without its refute mode was an exact count/diversity duplicate of `coverage`.
+- feat(hope): `shape` owns interactive design directly. A new "Prime taste" step loads the user's known taste (CLAUDE.md / TASTE.md / a prior card, eliciting when unclear); at a non-obvious call shape projects 3 options through that taste and co-designs them, instead of routing to consult.
+- feat(hope): the shared decision-prompt contract (intent / shape / target / freeze) is now 3 candidate answers + 1 escape hatch ("Gather facts"), changed from 2 candidates + 2 hatches.
+
+### Removed
+
+- feat(hope): the "Hear tradeoffs" → consult escape hatch is removed from the shared `prompts.md` partial (and thus from intent / shape / target / freeze) and from shape's work loop. No pipeline stage routes to consult automatically; it is reached by name, `/hope:consult`, or its triggers.
+
 ## [hope@9.1.0] - 2026-06-25
 
 ### Added

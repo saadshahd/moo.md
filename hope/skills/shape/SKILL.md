@@ -37,9 +37,9 @@ The pipeline's handoff artifact. One admission rule: carry only what the next st
 
 ## The work loop
 
-1. **Extract** — pull the HOW dimensions from the input: architecture, data model, API design, testing, deployment — whatever the spec actually opens. When the work iterates, *which loop* is one such dimension (see Loop selection).
-2. **Resolve per dimension** — auto-gather when the answer is retrievable with certainty; only non-obvious judgment calls reach the user via decision prompts (mechanics below).
-3. **Consult** — fires ONLY when the user picks "Hear tradeoffs": invoke the hope:consult skill with the decision question.
+1. **Prime taste** — load the user's known taste from CLAUDE.md / TASTE.md / a prior card before projecting any option. Elicit when it is unclear or absent — bias to ask rather than guess.
+2. **Extract** — pull the HOW dimensions from the input: architecture, data model, API design, testing, deployment — whatever the spec actually opens. When the work iterates, *which loop* is one such dimension (see Loop selection).
+3. **Resolve per dimension** — auto-gather when the answer is retrievable with certainty. At a non-obvious call, project 3 options through the primed taste, scoped to the task, then sketch and co-design them with the user via decision prompts (mechanics below).
 4. **Tension check** — if resolved choices genuinely conflict, surface the tension as one more decision prompt.
 5. **Gate** — run the gate audit (below).
 
@@ -59,7 +59,7 @@ Unsupervised loops pass through target; every loop dispatches through delegate.
 
 <!-- doc-gen FILE src=../prompts.md -->
 - Auto-gather when the answer is retrievable with certainty: cheap local reads, docs, web research, parallel subagents. Return with decisions, not raw findings. Never ask the user something research already made obvious — that is a named stop condition.
-- Only non-obvious judgment calls reach the user. Every such AskUserQuestion: exactly 2 candidate answers + 2 uniform escape hatches — "Gather facts" (research/explore) and "Hear tradeoffs" (consult experts). Hatches are first-class options, never hidden behind Other.
+- Only non-obvious judgment calls reach the user. Every such AskUserQuestion: exactly 3 candidate answers + 1 uniform escape hatch — "Gather facts" (research/explore). The hatch is a first-class option, never hidden behind Other.
 - Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
 - Presentation rule: EVERYTHING the user needs to answer lives inside the question UI — question text, descriptions, previews. Never in prose before the tool call (the dialog hides it).
 <!-- end-doc-gen -->
