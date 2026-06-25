@@ -13,7 +13,8 @@ One idea runs through all three layers: **never delegate a decision.**
 
 - Run the whole loop with `/hope:full <your seed>`, or run the stages directly: `/hope:intent <your seed>` then `/hope:shape <your intent>`, each handing you a lean card.
 - For work you used to do by hand, `/hope:delegate` routes it to agents while you keep every decision.
-- Periodically, `/hope:own <focus area>` pulls you back in.
+- When work depends on live external state, `/hope:freeze` snapshots it as fact (never memory) before a stage builds on it.
+- At session wind-down, `/hope:over` hands the load-bearing decisions back so you keep owning what shipped.
 
 ## A loop
 
@@ -39,13 +40,13 @@ This is also what stops compaction from silently rewriting your context. The ver
 
 ## A routine
 
-**own** is retrieval practice. You run it spaced over time, so questions arrive around the time you would forget.
+**over** is the session-end handover. You run it as a session winds down, so the decisions you made leave with you and not with the agent.
 
-Agents grow the codebase faster than they grow your understanding of it. That gap is the part you are accountable for. own closes it. It probes you on the concepts you shipped. A short conversation, four questions, no score.
+Agents grow the codebase faster than they grow your understanding of it. That gap is the part you are accountable for. over closes it. It reads the session, finds what was load-bearing, and hands each decision back as one forward question — you rebuild the reasoning, it confirms once. A short conversation, no score.
 
-What the agent never carries between sessions is what own trains. The problem is named in [One Flew Over the Context Window](https://saadshahd.github.io/blog/one-flew-over-the-context-window/).
+What the agent never carries between sessions is what over hands back. The problem is named in [One Flew Over the Context Window](https://saadshahd.github.io/blog/one-flew-over-the-context-window/).
 
-![own](assets/own.png)
+![over](assets/over.png)
 
 ## Overview
 
@@ -53,7 +54,8 @@ What the agent never carries between sessions is what own trains. The problem is
 | ---------------------------------------- | ------------------------------ | -------------------------------------------- |
 | AI fills in your decisions               | `/hope:intent` & `/hope:shape` | interactive questions, each choice previewed |
 | compaction mutates & drifts your context | `/hope:delegate`               | doing stays out, deciding stays in           |
-| code grows faster than understanding     | `/hope:own`                    | spaced recall keeps understanding current    |
+| stale or remembered external state       | `/hope:freeze`                 | snapshot facts, never infer                  |
+| code grows faster than understanding     | `/hope:over`                   | session-end handover keeps you owning it     |
 
 ## Reading
 
