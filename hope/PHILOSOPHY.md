@@ -18,7 +18,13 @@ Human cognitive energy is the hidden bottleneck. Output cheap to produce but exp
 
 Memory has asymmetric costs. Wrong memory misleads silently; missing memory triggers investigation.
 
+Facts append, beliefs derive. What happened is immutable — append, never edit; the belief is a derived view over the facts. Don't complect the log with the index.
+
 Understanding is the product, not the artifact. The mental model you build while working matters more than the PR.
+
+Comprehension needs a value, not a place. A place mutates under you; only a held snapshot lives in a head — so externalize what you understand before the window compacts it.
+
+Aim the agent at values, not just code. Its native power is collapsing many moving places — services, logs, files — into one held snapshot; code is just more places.
 
 Every artifact is a liability. Producing faster than you can own widens the gap between what exists and what anyone understands.
 
@@ -64,7 +70,7 @@ Peace of mind precedes quality. Velocity that destroys quiet attention destroys 
 
 ## Hard Constraints
 
-No persistent work/pipeline state — conversation markers only. Exception: state that (1) describes the human's understanding, (2) is user-owned, (3) lives outside the repo, (4) is never surfaced.
+No persistent work/pipeline state — conversation markers only.
 No building what Claude does natively — compete on thinking quality.
 No hard dependencies between skills — prime naturally, never import.
 No rigid frameworks — skip steps that don't apply.

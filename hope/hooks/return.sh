@@ -9,7 +9,7 @@ cat <<'JSON'
   "suppressOutput": true,
   "hookSpecificOutput": {
     "hookEventName": "PostToolUse",
-    "additionalContext": "Verified subagent work returned. If this diff embodies a decision (recoverability test), run the RETURN act before surfacing — have the human author a re-answerable prompt and append it to the own ledger as an authored event. Mechanical diffs skip."
+    "additionalContext": "Verified subagent work returned. Run the handover test before surfacing: probe ONLY if it carries a load-bearing decision AND the work diverged from what was asked (inverted/exceeded it, or the human doesn't hold the model). If several qualify, probe just the highest-blast-radius one — one forward question built from the work + the human's own words, they answer, you reframe once. Nothing stored. Quiet by default; most returns skip."
   }
 }
 JSON

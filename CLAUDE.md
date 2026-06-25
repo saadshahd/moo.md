@@ -84,7 +84,7 @@ See `hope/PHILOSOPHY.md` "Hard Constraints" for plugin-specific audit items.
 - Inline examples longer than 5 lines
 - Navigation/catalog sections in skills (tool indexes, skill tables)
 - Skills over 200 lines
-- Persistent work/pipeline state files (.jsonl, workflow-state.json) — exception: state that (1) describes the human's understanding, (2) is user-owned, (3) lives outside the repo, (4) is never surfaced
+- Persistent work/pipeline state files (.jsonl, workflow-state.json)
 - Task management APIs in skills (TaskCreate/TaskList/TaskUpdate)
 - Building features Claude Code will ship natively (task management, memory, tool orchestration)
 - Cargo cult process steps (ritual without reason)
