@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.3.0] - 2026-06-25
+
 ### Changed
 
 - feat(hope): `delegate` makes subagents **fork-surfacers, not fork-resolvers**. Every work prompt now instructs the agent to halt at a tie-break passing the recoverability test (≥2 compiling paths, only the human's goal settles it) and return the fork unresolved, rather than choose and have the choice verified after the fact. Where the fork surfaces follows the loop — live halt for supervised single-artifact work, returned-unresolved at RETURN for parallel fan-out — and is gated by the task's `rigor` (`throwaway` self-resolves, `high-stakes` always surfaces). RETURN reframed from a decision-harvest to a net (confirm no fork was silently auto-resolved). The paired verify-agent gains a structural NOGO: work that resolved a recoverability-test fork without surfacing it fails verify even when the code works — turning the fork-surfacer rule from soft prompt instruction into a gated observer (catches a router that dropped the rule from the prompt). Relocates theory-building to decision-time (the fork) instead of review-time, per Naur's *Programming as Theory Building* — closing the gap the abandoned `own`/post-hoc-quiz stage could never close.
