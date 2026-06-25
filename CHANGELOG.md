@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- fix(hope): `over` is reframed from a session-end net to an in-flow handover — hand each load-bearing decision back the moment it lands, never banked to a wind-down ritual. Removed the "Session-end handover" prose intro and every session-end reference (description triggers, the gate, multiplicity); the load-bearing handover test, the single forward probe, the multi-decision sweep, and the stateless/invisibility mechanics are unchanged. The shared `handover.md` partial drops "the human rebuilds" for "the human reasons it into their own model" — a mental model is built by reasoning in the new mind, not reconstructed as an artifact — and the change propagates via doc-gen to both `over` and `delegate` RETURN.
+
 ## [hope@9.3.0] - 2026-06-25
 
 ### Changed
