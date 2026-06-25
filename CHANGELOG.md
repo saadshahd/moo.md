@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.1.0] - 2026-06-25
+
+### Added
+
+- feat(hope): add `freeze` skill — on-demand factual snapshot of external system state for pipeline grounding. Stateless: freezes the moving cross-boundary state a specific system + work order depends on (services, databases, queues, third parties, live logs) into one immutable snapshot value, emitted in conversation, re-run to refresh. Consumer is the agent stages (intent/shape/delegate/builder), not the human's memory. Observed-or-gap, never inference: inference only builds the source map (WHICH facts matter); a fact's VALUE is observed live by a read-only acquisition agent or hand-retrieved by the human, else it becomes an explicit OPEN gap — never fabricated. Acquisition is delegation-shaped (router folds read-only agent returns, READ-ONLY is a hard guard). Two-part output — OBSERVED facts `{ source, claim, where-it-lives, as-of, observed-by }` + OPEN gaps `{ required-fact, why-needed, where-to-look, how-to-retrieve }`; the derived map is a view (facts append, beliefs derive). Human-gated convergence loop (observe → surface gaps → hand-retrieve → re-fold → recheck), so it does NOT pass through `target`. On-demand from any stage, not a mandatory pre-intent stage; repo-local work skips it. Complements `over` (world→pipeline grounding vs output→human handoff), never folded together. Joins the `sync --files` list (embeds the `prompts.md` partial).
+
+### Removed
+
+- chore(hope): remove the `distill` agent (`hope/agents/distill.md`). A post-implementation principles audit (Musashi / Library / Fail-Loud / State-Hygiene / Atomic / Observer) that carried `memory: project` — persistent project-scoped agent state the value-not-place stateless direction (9.0.0) no longer permits. Redundant on two fronts: the principle checks now live as the context-projected taste layer, and post-change auditing is covered by `delegate`'s VERIFY pairing and the build-time handover probe. Already dropped from the `plugin.json` / `marketplace.json` discovery keywords.
+
 ## [hope@9.0.0] - 2026-06-25
 
 ### Added

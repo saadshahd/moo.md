@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "sync": "md-magic --files hope/skills/intent/SKILL.md hope/skills/shape/SKILL.md hope/skills/target/SKILL.md hope/skills/delegate/SKILL.md hope/skills/over/SKILL.md --open doc-gen --close end-doc-gen"
+    "sync": "md-magic --files hope/skills/intent/SKILL.md hope/skills/shape/SKILL.md hope/skills/target/SKILL.md hope/skills/delegate/SKILL.md hope/skills/over/SKILL.md hope/skills/freeze/SKILL.md --open doc-gen --close end-doc-gen"
   },
   "devDependencies": {
     "markdown-magic": "^4.9.0"
