@@ -30,6 +30,19 @@ Construct prompts for speed, correctness, and efficiency.
 
 **Clean slate is the default.** Spawn a fresh subagent_type for almost all work. Fork (no subagent_type) only in the rare case the agent genuinely needs your accumulated context to do the job.
 
+### Fork-surfacers, not fork-resolvers
+
+The theory is built when the human breaks a tie — so the break must reach the human, never arrive as a choice already made and verified. Every work prompt carries one rule: at a tie-break passing the recoverability test (≥2 compiling paths, only the human's goal — not a retrievable fact — settles it), the agent does NOT choose. It returns the fork (the paths, the tradeoff) and halts. Below the test, it decides and proceeds.
+
+Where the fork surfaces follows the loop:
+
+| Loop | Fork surfaces |
+| --- | --- |
+| Supervised single-artifact | Live — agent halts at the fork, human authors the tie-break, agent resumes |
+| Parallel fan-out / workflow | At RETURN — agents return forks unresolved, human authors before the next pass |
+
+Gate by the task's rigor: `throwaway` lets the agent resolve its own forks; `high-stakes` always surfaces.
+
 ### Loop dispatch
 
 When shape's card names an iterative loop, route to the runner that already implements it — never hand-roll the loop body.
@@ -67,11 +80,13 @@ You did not watch the work happen — an agent's summary is what it INTENDED, no
 
 - **Every work delegation pairs a verify-agent.** No delegation ships unverified.
 - **The verifier returns a verdict, not a dump:** GO or NOGO + one-line REASON grounded in what it observed (tests, command exit, behavior). Keep the evidence in the agent; surface only the verdict.
+- **Fork check — one NOGO is structural, not behavioral.** If the work resolved a tie-break passing the recoverability test without surfacing it, that is a NOGO even when the code works — the human never authored the decision. This catches a prompt that dropped the fork-surfacer rule: working code that buried a human's choice still fails verify.
 
 ## RETURN
 
 Verified work returns to you, not past you. When a delegation reports GO, run the handover test (The handover, below) before surfacing — the moment work returns is the moment the human claims it.
 
+- **A net, not a harvest.** Forks were surfaced at dispatch, so RETURN confirms none was silently auto-resolved — it does not re-litigate decisions the human already authored. Silence here means the net caught nothing, not that nothing mattered.
 - **Quiet by default — diverged only.** At this boundary a handover also requires divergence: probe only when the work inverted or went beyond what the human framed, or the human plainly does not hold the model. Work that matches the request, handed to a human already holding it, gets silence — silence is the trust signal. Most returns are silent.
 - **One handover at a time.** When several load-bearing decisions return together, probe only the single highest-blast-radius, least-reversible one. Never one probe per decision.
 - **You stay the router.** Authorship is the human's, never delegated to a subagent.
