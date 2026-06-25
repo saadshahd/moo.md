@@ -40,11 +40,11 @@ This is also what stops compaction from silently rewriting your context. The ver
 
 ## A routine
 
-**over** is the session-end handover. You run it as a session winds down, so the decisions you made leave with you and not with the agent.
+**over** hands a decision back the moment it lands — in-flow, as soon as the work is done, never banked to the end. The agents that did the work are short-lived; what they carried vanishes with them, so the decision has to come back to you right away.
 
-Agents grow the codebase faster than they grow your understanding of it. That gap is the part you are accountable for. over closes it. It reads the session, finds what was load-bearing, and hands each decision back as one forward question — you rebuild the reasoning, it confirms once. A short conversation, no score.
+Agents grow the codebase faster than they grow your understanding of it. That gap is the part you are accountable for. over closes it. It finds what was load-bearing and hands each decision back as one forward question — you reason it into your own mental model, it confirms once. A short conversation, no score.
 
-What the agent never carries between sessions is what over hands back. The problem is named in [One Flew Over the Context Window](https://saadshahd.github.io/blog/one-flew-over-the-context-window/).
+What the agent never carries is what over hands back. The problem is named in [One Flew Over the Context Window](https://saadshahd.github.io/blog/one-flew-over-the-context-window/).
 
 ![over](assets/over.png)
 
@@ -55,7 +55,7 @@ What the agent never carries between sessions is what over hands back. The probl
 | AI fills in your decisions               | `/hope:intent` & `/hope:shape` | interactive questions, each choice previewed |
 | compaction mutates & drifts your context | `/hope:delegate`               | doing stays out, deciding stays in           |
 | stale or remembered external state       | `/hope:freeze`                 | snapshot facts, never infer                  |
-| code grows faster than understanding     | `/hope:over`                   | session-end handover keeps you owning it     |
+| code grows faster than understanding     | `/hope:over`                   | hand each decision back in-flow, you reason it into your own model |
 
 ## Reading
 
