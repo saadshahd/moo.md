@@ -14,7 +14,7 @@ One idea runs through all three layers: **never delegate a decision.**
 - Run the whole loop with `/hope:full <your seed>`, or run the stages directly: `/hope:intent <your seed>` then `/hope:shape <your intent>`, each handing you a lean card.
 - For work you used to do by hand, `/hope:delegate` routes it to agents while you keep every decision.
 - When work depends on live external state, `/hope:freeze` snapshots it as fact (never memory) before a stage builds on it.
-- At session wind-down, `/hope:over` hands the load-bearing decisions back so you keep owning what shipped.
+- As the work lands, `/hope:over` hands each load-bearing decision back so you reason it into your own model.
 
 ## A loop
 
@@ -28,6 +28,14 @@ The outcome is a card you carry comfortably outside the context window.
 
 ![The loop](assets/loop.png)
 
+## An anchor
+
+**freeze** anchors the work to what is observed, not what you remember. When a stage depends on state that lives outside the repo — a service, a database, a queue, live logs — that state keeps moving, and memory of it goes stale the moment you look away.
+
+freeze snaps the slice your work touches into one immutable value: every fact observed live or named as an open gap, never inferred. The stages decide against a fact, not a guess. It is the ground the other three stand on — and repo-local work skips it.
+
+![freeze](assets/freeze.png)
+
 ## A mode
 
 **delegate** is the line between deciding and doing.
@@ -38,13 +46,13 @@ This is also what stops compaction from silently rewriting your context. The ver
 
 ![Deciding stays, doing leaves](assets/delegate.png)
 
-## A routine
+## A discipline
 
 **over** hands a decision back the moment it lands — in-flow, as soon as the work is done, never banked to the end. The agents that did the work are short-lived; what they carried vanishes with them, so the decision has to come back to you right away.
 
 Agents grow the codebase faster than they grow your understanding of it. That gap is the part you are accountable for. over closes it. It finds what was load-bearing and hands each decision back as one forward question — you reason it into your own mental model, it confirms once. A short conversation, no score.
 
-What the agent never carries is what over hands back. The problem is named in [One Flew Over the Context Window](https://saadshahd.github.io/blog/one-flew-over-the-context-window/).
+What the agent never carries is what over hands back.
 
 ![over](assets/over.png)
 
