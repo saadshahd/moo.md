@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.4.2] - 2026-06-26
+
+### Fixed
+
+- fix(hope): harden the **memory writer's create-branch** against duplicate files. The writer's inline prompt restated the create rule more loosely than the canonical discipline (`memory.md`) — "create a new file only when none owns the topic" — leaving dedup to a fuzzy semantic match that mis-fires when a slug under- or over-states its scope (the real `schedulers`-file duplicate). The branch now gates on a coverage proof decidable from the index alone (open-and-edit when coverage is plausible, never a parallel file) and requires every new slug and its one-line index entry to be self-describing and scope-complete. Tightens recognition-based idempotency by making the dedup key faithful; no new machinery.
+
 ## [hope@9.4.1] - 2026-06-25
 
 ### Changed
