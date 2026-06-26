@@ -73,6 +73,13 @@ See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints.
 
 See `hope/PHILOSOPHY.md` "Hard Constraints" for plugin-specific audit items.
 
+### Model-Judgment Boundaries (Enforce These)
+
+A skill or hook that leans on a model's judgment (a judge, a generated artifact, an LLM check) has a correctness **rate**, not a guarantee. Its failure mode is a confident, valid-shaped wrong answer no enumerable error case names.
+
+- NEVER claim such a boundary "works" from a single run, or model its failures as a finite set you've "handled."
+- DO fence it with a deterministic check where one exists, and measure its pass-rate on a labeled set before trusting it (`seed`'s eval workspace IS this; a `slop-nudge`-style judge NEEDS it).
+
 ## Anti-Patterns
 
 - Generic names (`*Manager`, `*Helper`, `*Utils`)
