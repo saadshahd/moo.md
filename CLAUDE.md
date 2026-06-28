@@ -2,7 +2,7 @@
 
 ## What This Is
 
-moo — mind on output. Stay present with AI. a Claude code plugin to help humans think clearly
+moo — *mind on output*. A Claude Code plugin that helps humans stay present and think clearly while working with AI.
 
 ## Conventions
 
@@ -21,23 +21,11 @@ description: Single line. Trigger condition + what it does. Max 1024 chars.
 
 **DESCRIPTION TRAP WARNING:** Skill descriptions must be **trigger-only**. If descriptions contain process summaries or workflow steps, Claude follows the short description instead of reading the detailed flowchart/instructions. Keep descriptions focused on "Use when X" patterns only.
 
-**Agents:**
-
-```yaml
----
-description: Single line. What it does and when to use it.
-tools: Read, Glob, Grep, Bash
----
-```
-
-**WARNING:** Never use multi-line YAML blocks (`|` or `>`). Claude Code truncates them, breaking auto-triggering.
-
-**Performance posture:** Agents must declare speed or thoroughness. Ambiguity defaults to thoroughness.
+**YAML WARNING:** Never use multi-line YAML blocks (`|` or `>`) in frontmatter. Claude Code truncates them, breaking auto-triggering.
 
 ### File Naming
 
 - Skills: `skills/<skill-name>/SKILL.md` (kebab-case)
-- Agents: `agents/<role>.md` (e.g., `explorer.md`, `delve.md`)
 
 ### File Limits
 
@@ -48,6 +36,8 @@ tools: Read, Glob, Grep, Bash
 - Decision tables > prose explanations
 - No inline code examples > 5 lines
 - No navigation/catalog sections in skills
+
+> **Enforcement:** these limits are discipline-only — no script checks them. The repo's one mechanical doc gate is the sync-drift guard (see Changelog → When releasing).
 
 ### Token Efficiency
 
@@ -114,10 +104,8 @@ Track all changes in `CHANGELOG.md` at repo root.
 - Move unreleased items to new version section
 - Update version in affected plugin.json files
 - Tag the release
-- Run `bun run sync` and verify a clean git diff on `hope/skills/intent/SKILL.md`, `hope/skills/shape/SKILL.md`, and `hope/skills/target/SKILL.md`
+- Run `bun run sync` and verify a clean git diff on every doc-gen consumer SKILL.md. The `sync` script's `--files` list in `package.json` is the source of truth (currently intent, shape, target, delegate, over, freeze) — read it; don't trust a hand-copied list here.
+- The sync-drift guard (`.githooks/pre-push`) is the only mechanical check, and it runs **only** when `core.hooksPath=.githooks`. Verify with `git config core.hooksPath` before trusting it.
 - One-time setup: `git config core.hooksPath .githooks`
 
 **IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.
-
-See `PHILOSOPHY.md` for core identity and mission.
-See `hope/PHILOSOPHY.md` for hope pipeline philosophy.
