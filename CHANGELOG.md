@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.5.0] - 2026-06-28
+
+### Changed
+
+- feat(hope): **delegate routes by steerability, not agent count.** The old `Workflow-first for 2+ agents` rule is overturned — a running Workflow takes no mid-run user input (only pause/stop/restart via `/workflows`), while a subagent accepts live `SendMessage` and `Esc`, so exploration and drift-prone work must not be locked behind a detached runner. `DISPATCH` now leads with a two-row `task nature → runner` table (explore / speed / unknown-shape → steerable subagents; repetitive + many-pass + low-drift → detached Workflow). The loop-dispatch row that routed "deterministic fan-out **or** multi-stage" to Workflow splits in two, sending one-shot multi-stage / exploration to parallel subagents and reserving Workflow for repetitive retried fan-out. Adds a **resume-or-create** precedence above the clean-slate rule: continue an already-spawned agent (`SendMessage`) when its accumulated context is the value, spawn anew when the work is independent or needs isolation. Criterion-only — no platform-steerability prose in the skill.
+
 ## [hope@9.4.2] - 2026-06-26
 
 ### Fixed

@@ -24,11 +24,18 @@ Construct prompts for speed, correctness, and efficiency.
 
 - **Parallel by default.** Independent tasks go out as parallel agent calls in ONE message. Never serialize work that has no dependency.
 - **Self-contained prompts.** A fresh agent starts blind. Carry the value across the boundary: what to achieve, the constraints, why it matters, what is out of scope. The prompt is a Card — same discipline as a pipeline handoff (The Card, below).
-- **Workflow-first for 2+ agents.** Any multi-agent work runs through a Workflow, not loose agent calls.
+- **Subagents-first — route by steerability, not agent count.** A running subagent takes live redirection; a Workflow does not. Pick the runner by the task's nature:
+
+  | Task nature | Runner |
+  | --- | --- |
+  | Explore / speed / unknown shape | Subagents (steerable) |
+  | Repetitive + many-pass + low-drift | Workflow (detached) |
 
 - **Return reviewable units.** Scope each delegation so its diff comes back small enough to read and own — a wall of output can be neither verified nor claimed. Width and output caps serve reviewability, not just cost.
 
-**Clean slate is the default.** Spawn a fresh subagent_type for almost all work. Fork (no subagent_type) only in the rare case the agent genuinely needs your accumulated context to do the job.
+**Resume or create — decide first.** Continue an already-spawned agent (SendMessage) when ITS accumulated context is the value: fix-ups to its own work, iterating its artifact, answering about what it did. Spawn anew when the work is independent or needs clean-slate isolation. Resume is the named exception, not a token-saving reflex.
+
+**Clean slate is the default — when creating.** Spawn a fresh subagent_type for almost all work. Fork (no subagent_type) only in the rare case the agent genuinely needs your accumulated context to do the job.
 
 ### Fork-surfacers, not fork-resolvers
 
@@ -50,7 +57,8 @@ When shape's card names an iterative loop, route to the runner that already impl
 | Loop shape | Runner |
 | --- | --- |
 | Grounded metric loop, unattended | autoresearch + a target contract |
-| Deterministic fan-out or multi-stage | the Workflow tool |
+| Repetitive fan-out, retried (many-pass + low-drift) | the Workflow tool |
+| One-shot multi-stage / exploration | superpowers:dispatching-parallel-agents |
 | Parallel independent subagents | superpowers:dispatching-parallel-agents |
 | Multi-source research + verify | deep-research |
 | Supervised single-artifact refine | inline — no runner |
