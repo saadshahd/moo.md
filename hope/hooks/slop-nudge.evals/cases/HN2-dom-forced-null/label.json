@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "drag/use-drag-reorder.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "Absence: null in types",
+  "note": "useRef/useState initial + EventTarget force null at the platform boundary. The null rule targets domain types, not DOM-forced ones. Contrast C01/C05."
+}

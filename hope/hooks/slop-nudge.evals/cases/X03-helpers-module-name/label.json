@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "drag/helpers.ts"
+  ],
+  "category": "cross-file",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Placement and duplication: module names describe a domain concept, never a code-organization role; helpers/utils/shared disallowed",
+  "must_mention": [
+    "helpers"
+  ],
+  "note": "UNCONFIRMED. drag/helpers.ts holds genuine drag concepts (readData, sameSlotAs, resolveDropIndex). Should be a domain-named module."
+}

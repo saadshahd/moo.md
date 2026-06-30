@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "machine/editor-machine.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "architecture: reaching for a state machine without a trigger",
+  "note": "Editor modes (idle/selecting/editing/inserting/carrying) are a guarded, asymmetric, many-call-site single-axis transition \u2014 the NAMED trigger the rule allows for escalating to a transition machine. Discriminator: only a violation if the guards turn out trivial."
+}

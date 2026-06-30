@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "selection/use-action-handler.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Data flow: object/Map lookups for static mappings, never switch when keys known at compile time",
+  "must_mention": [
+    "switch",
+    "action.tag"
+  ],
+  "note": "UNCONFIRMED. switch over a closed discriminated tag. Discriminator: a case carries a guard + payload, so a pure Record map isn't a 1:1 swap."
+}

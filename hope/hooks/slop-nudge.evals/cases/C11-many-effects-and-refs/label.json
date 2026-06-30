@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "DensityStrip.tsx"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Hooks: a component with 2+ useEffects is a code-review blocker; raw useRef is plumbing to extract into named hooks",
+  "must_mention": [
+    "useeffect",
+    "useref"
+  ],
+  "note": "UNCONFIRMED. 3 useEffects + 11 raw refs in one component. Discriminator: canvas/rAF renderer where refs are partly unavoidable \u2014 tests whether the 'canvas excuse' overrides the 2+-effects blocker."
+}

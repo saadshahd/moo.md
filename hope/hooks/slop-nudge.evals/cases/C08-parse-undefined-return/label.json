@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "NavBar.tsx"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Absence: fallible operations return Result, not T | undefined; absence checks use truthiness not === undefined",
+  "must_mention": [
+    "undefined",
+    "parsetimecode"
+  ],
+  "note": "UNCONFIRMED. parseTimecode returns number | undefined; caller does === undefined. Carries a sanctioned HM-signature comment, so partly careful."
+}

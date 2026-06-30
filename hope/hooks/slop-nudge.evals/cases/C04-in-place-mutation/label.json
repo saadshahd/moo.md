@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "layout/tiles.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Pure-update dataflow: updates return a NEW tree, NEVER mutate in place; data flow never imperative-loop accumulation",
+  "must_mention": [
+    "mutat",
+    "band",
+    "in place"
+  ],
+  "note": "UNCONFIRMED. Nested imperative loops mutate m.band in place (m.band = {...}; m.band.start = ...). Strongest data-flow violation in the corpus."
+}

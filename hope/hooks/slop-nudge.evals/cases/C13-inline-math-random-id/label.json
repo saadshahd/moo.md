@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "insert/use-insert.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Architecture: dependency-at-the-edges \u2014 no inline Math.random(); inject Ids.next() from the root",
+  "must_mention": [
+    "math.random",
+    "random"
+  ],
+  "note": "UNCONFIRMED. Inline Math.random() mints an id mid-logic \u2014 near-verbatim match to the rule's WRONG example. Should be an injected Ids surface."
+}

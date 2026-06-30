@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "drag/drop-indicator.tsx"
+  ],
+  "category": "cross-file",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "cross-file: DropTarget type duplicated",
+  "note": "DropTarget is IMPORTED from the shared layout module, not redefined. Correct sharing \u2014 contrast X02 where the functions ARE re-implemented."
+}

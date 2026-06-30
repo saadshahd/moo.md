@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "layout/tiles.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Data flow: construct data structures in single expressions; never build arrays with imperative loops and push",
+  "must_mention": [
+    "push",
+    "grouped"
+  ],
+  "note": "UNCONFIRMED. for + push + Map.set group-by, reducible to one expression, inside an otherwise pristine FP file."
+}

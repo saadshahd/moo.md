@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "layout/destinations.ts"
+  ],
+  "category": "cross-file",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Absence: never use null. Type modeling: discriminated unions not flat fields for distinct states",
+  "must_mention": [
+    "null",
+    "destination"
+  ],
+  "note": "UNCONFIRMED. Destination uses null for parentId/slotKey; comment 'both null means root' = a hidden discriminated union. Discriminator: mirrors lib move() contract, partly defensible."
+}

@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "prop-editor/field-shell.tsx",
+    "prop-editor/puck-fields.tsx"
+  ],
+  "category": "cross-file",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Placement and duplication: SEARCH for existing equivalents; a duplicated concept is a defect, extract it",
+  "must_mention": [
+    "selectdisplay"
+  ],
+  "note": "UNCONFIRMED. Byte-for-byte identical export in two sibling files; one should own it, the other import."
+}

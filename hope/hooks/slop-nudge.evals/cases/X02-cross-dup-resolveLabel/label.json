@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "drag/drop-zone-label.tsx",
+    "layout/destinations.ts"
+  ],
+  "category": "cross-file",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Placement and duplication: a duplicated concept is a defect; place code where it would be FOUND (shared boundary)",
+  "must_mention": [
+    "resolvelabel",
+    "resolvecontainerid"
+  ],
+  "note": "UNCONFIRMED. resolveLabel + resolveContainerId near-identical in drag/drop-zone-label.tsx and layout/destinations.ts. Discriminator: which is survivor vs stale."
+}

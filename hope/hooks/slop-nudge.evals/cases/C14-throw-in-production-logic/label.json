@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "layout/destinations.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Error handling: NEVER throw; define the error out or surface as Result",
+  "must_mention": [
+    "throw",
+    "besidedestination"
+  ],
+  "note": "UNCONFIRMED. besideDestination throws on a missing parent in production logic. Rule wants the failure defined out, masked, or surfaced as Result."
+}

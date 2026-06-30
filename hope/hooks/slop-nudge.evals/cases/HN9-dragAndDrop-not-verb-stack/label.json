@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "drag.e2e.ts"
+  ],
+  "category": "naming",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "naming: verb-stacking (dragAndDrop)",
+  "note": "'drag-and-drop' is a single named domain concept, not two stacked verbs (validateAndSave). Not a verb-stacking violation."
+}

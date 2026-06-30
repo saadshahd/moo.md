@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "layout/destinations.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Absence: fallible operations return Result/optional, not T | null",
+  "must_mention": [
+    "resolvelabel",
+    "null"
+  ],
+  "note": "UNCONFIRMED. resolveLabel returns string | null for an absent label; should be optional or Result. Distinct from DOM-forced null."
+}

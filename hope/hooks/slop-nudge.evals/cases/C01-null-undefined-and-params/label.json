@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "drag/resolve-indicator.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Absence: never null, never T|undefined. Function design: 3+ params take a single object param",
+  "must_mention": [
+    "isblocked",
+    "undefined"
+  ],
+  "note": "UNCONFIRMED. isBlocked stacks `string | null | undefined` AND 4 bare primitives. resolve-indicator.ts line ~225."
+}

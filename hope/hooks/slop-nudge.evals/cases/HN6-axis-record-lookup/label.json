@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "layout/tiles.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "Reaching for runtime machinery: data-as-spec interpreter for a closed choice",
+  "note": "AXIS_GEOMETRY is the RIGHT pattern: a typed Record keyed by a closed union, member-blind lookup \u2014 the rule's prescribed alternative to a switch. Not over-engineering."
+}

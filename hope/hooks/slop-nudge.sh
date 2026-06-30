@@ -56,15 +56,10 @@ live=$(printf '%s\n' "$files" | while IFS= read -r f; do [ -n "$f" ] && [ -f "$f
 # (and pure-deletion turns) never spawn the judge.
 [ -z "$live" ] && exit 0
 
-prompt=$(printf 'You are moo'\''s off-record slop-awareness judge — a background check, not addressing a human. Your loaded instructions (the CLAUDE.md / TASTE.md hierarchy and any conventions discovered in this directory) are the ONLY preferences you judge against; you ship no taste of your own. These files were touched this turn:\n%s\nRead each one IN FULL — it is the live, current code, so judge what it actually says now, not any earlier version. Flag any violation that PLAINLY breaks a preference EXPLICITLY present in your loaded instructions — duplication of something that already exists, a banned pattern, a broken naming or structure rule — ANYWHERE in these files, not only the lines that changed: a touched file should be left better than before, so a pre-existing violation in it counts too. Be conservative: flag only clear, nameable violations; when in doubt, stay silent. If nothing qualifies, print exactly CLEAN and nothing else. Otherwise print up to 5 lines, most important first, each formatted "- <file>: <the violated preference> — <what to look at>". No preamble, no commentary.' \
-  "$live")
-
-# Read-only tools only; --allowed-tools is variadic so values are space-separated and `--`
-# terminates the flag. bypassPermissions prevents a no-TTY prompt from hanging (the allowlist
-# already bars writes). disableAllHooks is the recursion guard. Errors go to a per-transcript
-# log, never /dev/null, so a silent breakage stays diagnosable off-thread.
-finding=$(claude -p --no-session-persistence --settings '{"disableAllHooks":true}' \
-  --permission-mode bypassPermissions --allowed-tools Read Grep Glob -- "$prompt" \
+# The verdict logic lives in judge.sh — the single source shared with the eval harness. We feed
+# it the live file list and capture its finding; its stderr goes to a per-transcript log, never
+# /dev/null, so a silent breakage stays diagnosable off-thread.
+finding=$(printf '%s\n' "$live" | "$(dirname "$0")/judge.sh" \
   2>"${TMPDIR:-/tmp}/hope-slop-judge-$tpkey.log")
 
 # Clean (empty or the CLEAN sentinel) → silent exit 0, no wake, no forced turn.

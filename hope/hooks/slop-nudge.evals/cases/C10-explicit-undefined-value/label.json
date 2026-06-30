@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "possession.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Absence: never write undefined as an explicit value; omit the field",
+  "must_mention": [
+    "undefined",
+    "open"
+  ],
+  "note": "UNCONFIRMED. Type correctly uses open?: Open, but values write `open: undefined` explicitly (3 sites) instead of omitting the field \u2014 the precise thing the rule bans."
+}

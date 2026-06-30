@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.6.0] - 2026-07-01
+
+### Added
+
+- test(hope): **labeled pass-rate harness for the slop-awareness judge**, reseeded from real violations (`hope/hooks/slop-nudge.evals/`). The judge is a model-judgment boundary — a correctness rate, not a guarantee — so per the Model-Judgment rule its rate must be measured on a labeled set before it is trusted. The initial synthetic seed was retracted as low-signal (a 6/6 non-result with no discriminating power), and the corpus was reseeded with 29 cases mined from real Claude Code transcripts across two projects (19 violation candidates + 10 hard negatives that test over-firing). Each case scores deterministically against a copy of the user's real TASTE.md — verdict match plus a planted-anchor keyword check; no second model scores anything. Labels are provisional (UNCONFIRMED) pending user confirmation, so no pass-rate is asserted yet.
+
+### Changed
+
+- feat(hope): the **slop-awareness judge is now a repo-aware cross-file reviewer**, not a single-file linter — without carrying any taste of its own. The prompt gains exactly one method over the 9.4.x original: it must not rule on a file from its own contents alone — it reads the file live and in full, then explores the repo (Grep/Glob/Read for related code, existing equivalents, owner/sibling modules, call sites) so a violation visible only ACROSS files is caught, not just a single-file one. Every finding must anchor to a concrete path the judge actually opened. Critically, the prompt enumerates **zero** specific rules: it defers entirely to the discovered CLAUDE.md / TASTE.md for WHICH preferences to apply, rather than re-listing DRY / placement / naming / architecture — re-encoding those would duplicate the taste and rot when TASTE.md changes. The conservative bar (clear, nameable, anchored violations only; CLEAN when unsure) and the STDIN→STDOUT contract are unchanged. The judge runs with **full tool access by design** (`bypassPermissions`, no `--allowed-tools` fence) so it can explore however it needs; it is held to review-and-report by the prompt, not by a tool allowlist.
+- refactor(hope): **extract the slop-awareness judge into `hooks/judge.sh`** — one source shared by the live `slop-nudge.sh` hook and the eval harness, so the eval tests the judge that actually runs rather than a copy that drifts. Prompt and exit behavior byte-identical.
+
 ## [hope@9.5.0] - 2026-06-28
 
 ### Changed

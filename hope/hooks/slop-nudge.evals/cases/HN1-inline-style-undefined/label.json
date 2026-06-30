@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "Layout.tsx"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "Absence: explicit undefined value",
+  "note": "`: undefined` is the idiomatic React inline-style omission ('do not set this CSS property'), not a domain value. Correct in context."
+}

@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "drag.e2e.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "Error handling: NEVER throw",
+  "note": "Throwing in a Playwright e2e test to fail fast on an impossible precondition is conventional; tests are throwaway-rigor. Contrast C14 (throw in production logic)."
+}

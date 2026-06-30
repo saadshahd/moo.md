@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "hooks.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "Hooks: 2+ useEffect blocker",
+  "note": "The 2 effects live inside a NAMED intent hook (useTimelineKeyboard), the compliant direction \u2014 not raw in a component. Tests the boundary of the rule."
+}

@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "drag/resolve-indicator.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Absence: fallible/absent returns Result/optional not T|null; absence checks use truthiness not === null",
+  "must_mention": [
+    "number | null",
+    "=== null",
+    "null"
+  ],
+  "note": "UNCONFIRMED. number | null + === null. Discriminator: index 0 valid so truthiness would break \u2014 null arguably justified here."
+}

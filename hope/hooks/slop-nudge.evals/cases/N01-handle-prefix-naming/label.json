@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "NavBar.tsx"
+  ],
+  "category": "naming",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Naming: a function's name describes what it DOES not where it's USED; bare verbs (zoomIn not handleZoomIn)",
+  "must_mention": [
+    "handlezoom",
+    "handlesearch",
+    "handletimecode"
+  ],
+  "note": "UNCONFIRMED. handleZoomIn/handleZoomOut/handleSearchSelect/handleTimecodeSubmit name the event, not the action. Discriminator: React handleX idiom is widespread; tests bare-verb rule vs convention."
+}

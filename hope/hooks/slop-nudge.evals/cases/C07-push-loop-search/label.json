@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "NavBar.tsx"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Data flow: chained methods over imperative push loops",
+  "must_mention": [
+    "push",
+    "searchhits"
+  ],
+  "note": "UNCONFIRMED. Nested for + push. Discriminator: early >= MAX_RESULTS return is a genuine laziness a flatMap().slice() would lose \u2014 pits no-push vs lazy-over-eager."
+}

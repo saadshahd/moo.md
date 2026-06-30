@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "history/use-history.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Architecture: pure logic NEVER logs internally; dependency-at-the-edges \u2014 no inline Date.now()",
+  "must_mention": [
+    "date.now",
+    "log",
+    "console"
+  ],
+  "note": "UNCONFIRMED. Debug logging (with a bespoke lookup built only to log) inside the history-push handler, plus inline Date.now() as a timestamp. Reads as debug cruft left in."
+}

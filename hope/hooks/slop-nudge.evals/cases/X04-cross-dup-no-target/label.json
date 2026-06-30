@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "files": [
+    "drag/no-target-marker.tsx",
+    "carry/no-target-flash.tsx"
+  ],
+  "category": "cross-file",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "suspected_rule": "Placement and duplication: used by 2+ domains -> move to nearest common ancestor, never re-implement per feature",
+  "must_mention": [
+    "no-target",
+    "no target"
+  ],
+  "note": "UNCONFIRMED. NoTargetMarker reimplemented in drag/no-target-marker.tsx and carry/no-target-flash.tsx. Discriminator: confirm real visual/behavioral overlap vs two distinct affordances."
+}

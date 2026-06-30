@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "drag/resolve-drop.ts"
+  ],
+  "category": "architecture",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "architecture: Result-everywhere over-threading",
+  "note": "Result is confined to the boundary where the caller genuinely branches on failure \u2014 not threaded through every signature. Matches the user's RELAXED result rule. NOTE: original candidate spanned run.ts/result.ts (sport-events, off-disk) too; this fixture uses the on-disk resolve-drop.ts as the representative on-disk witness."
+}

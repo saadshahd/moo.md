@@ -1,0 +1,10 @@
+{
+  "verdict": "CLEAN",
+  "files": [
+    "carry/use-carry.ts"
+  ],
+  "category": "local",
+  "status": "UNCONFIRMED \u2014 user-correctable",
+  "looks_like": "Error handling: NEVER use try/catch",
+  "note": "Exactly decision-order step 2 (mask at lowest layer, return a normal value) for a storage failure the caller can't act on. Arguably rule-COMPLIANT masking. Strong discriminator."
+}
