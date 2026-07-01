@@ -51,7 +51,7 @@ for cdir in "$here"/cases/*/; do
 
   # Predicted verdict: empty or the CLEAN sentinel on line 1 => CLEAN, else VIOLATION.
   pred=VIOLATION
-  { [ -z "$finding" ] || printf '%s' "$finding" | head -n1 | grep -q '^CLEAN'; } && pred=CLEAN
+  { [ -z "$finding" ] || printf '%s' "$finding" | head -n1 | grep -q '^CLEAN$'; } && pred=CLEAN
 
   outcome=""
   if [ "$verdict" = CLEAN ]; then

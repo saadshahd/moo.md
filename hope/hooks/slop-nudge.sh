@@ -64,7 +64,7 @@ finding=$(printf '%s\n' "$live" | "$(dirname "$0")/judge.sh" \
 
 # Clean (empty or the CLEAN sentinel) → silent exit 0, no wake, no forced turn.
 [ -z "$finding" ] && exit 0
-printf '%s' "$finding" | head -n1 | grep -q '^CLEAN' && exit 0
+printf '%s' "$finding" | head -n1 | grep -q '^CLEAN$' && exit 0
 
 # Finding → wake Claude with an advisory nudge on stderr (exit 2). Advisory only: it names the
 # violation and explicitly does not block.

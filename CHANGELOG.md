@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.6.1] - 2026-07-01
+
+### Fixed
+
+- fix(hope): harden the **slop-judge CLEAN sentinel** against model preamble. The 9.6.0 judge sometimes prefixed its findings with a sentence beginning "CLEAN…" ("CLEAN check complete — ..."), and both the live hook and the eval runner gated on `head -n1 | grep -q '^CLEAN'` — a prefix match — so that preamble satisfied the CLEAN gate and the hook exited 0, **silently swallowing a real violation**. Tightened to a whole-line match (`^CLEAN$`) in `slop-nudge.sh` and the eval runner, and reinforced the judge's no-preamble output contract so its first line is either exactly `CLEAN` or the first finding — never a sentence that starts with the word CLEAN. Found by the 9.6.0 real-corpus eval (recall 14/14 on the cases that ran; this bug had mis-scored 7 true catches as CLEAN).
+
 ## [hope@9.6.0] - 2026-07-01
 
 ### Added
