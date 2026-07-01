@@ -49,6 +49,14 @@ for cdir in "$here"/cases/*/; do
   finding=$(cd "$sandbox" && printf '%s' "$list" | "$judge" 2>/dev/null || true)
   rm -rf "$sandbox"
 
+  # A session-limit reply is NOT a verdict. Scoring it as VIOLATION fabricates results
+  # (a truncated run once mis-scored as 7/19). Abort loudly the moment one appears.
+  if printf '%s' "$finding" | grep -qi 'session limit'; then
+    printf '\n!!! ABORT: judge hit a SESSION LIMIT on case %s — run truncated, NOT scored.\n' "$id" >&2
+    printf '!!! Judge reply was:\n%s\n' "$finding" >&2
+    exit 1
+  fi
+
   # Predicted verdict: empty or the CLEAN sentinel on line 1 => CLEAN, else VIOLATION.
   pred=VIOLATION
   { [ -z "$finding" ] || printf '%s' "$finding" | head -n1 | grep -q '^CLEAN$'; } && pred=CLEAN

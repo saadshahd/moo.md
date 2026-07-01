@@ -85,8 +85,8 @@ Decision order — apply in sequence; reach the next step only when the current 
 
 ### Absence and optionality · [always]
 
-* Never use `null` — not in types, not as a value.
-* Never write `undefined` as an explicit value or type union member (`T | undefined`). Use optional properties (`field?: T`) for structural optionality and optional chaining (`?.`) for access.
+* Never use `null` — not in types, not as a value. **[react]** The sole exception: where a framework or DOM contract forces it — a React ref (`useRef<T>(null)`), DOM-element state (`useState<T | null>(null)`), or an external value whose ground-truth type is nullable. Forced null is not a choice; use it.
+* Never write `undefined` as an explicit value or type union member (`T | undefined`). Use optional properties (`field?: T`) for structural optionality and optional chaining (`?.`) for access. **[react]** Exception: where an API treats `undefined` as 'omit this' and conditional key-omission reads worse — an inline-style value (`gridColumn: on ? v : undefined`), a pass-through optional prop — an explicit `: undefined` is the idiomatic omission.
 * Fallible operations return `Result<T, E>`, not `T | null` or `T | undefined`.
 * Absence checks use truthiness only: `if (!x)` not `if (x === null)`, `if (x === undefined)`, or `if (x == null)`.
 

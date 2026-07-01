@@ -9,6 +9,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.7.1] - 2026-07-01
+
+### Changed
+
+- change(hope): the **slop-awareness judge now fires on `Stop` only, not `SubagentStop`.** The judge is a repo-exploring cross-file reviewer (Grep/Glob/Read across the tree) — expensive by design — and running it after every subagent return multiplied that cost per turn. It now runs once at the main-session `Stop`. Trade-off: files edited solely by a subagent are judged at the next main-session `Stop`, not the moment the subagent returns.
+- test(hope): **eval harness hardened.** The runner now aborts loudly the moment a judge invocation hits a session limit — a truncated reply is no longer mis-scored as a verdict (one such reply had once been counted as 7/19 results). The fixture rubric was refreshed to track the current `TASTE.md`, including the `[react]` `null`/`undefined` exceptions (forced `null` at framework/DOM contracts; explicit `: undefined` as idiomatic key-omission).
+
 ## [hope@9.7.0] - 2026-07-01
 
 ### Removed
