@@ -9,6 +9,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.7.0] - 2026-07-01
+
+### Removed
+
+- remove(hope): the **`memory-nudge.sh` hook** and its `UserPromptSubmit` binding. It was a second, *foreground* memory writer that raced the async Stop writer: on correction turns the main thread would go read `MEMORY.md`, find the background writer had already captured the lesson, and narrate redundant housekeeping ("already corrected — nothing for me to fix"). The two writers' gates overlapped precisely on decision-heavy correction turns, so the collision fired constantly during memory-curation work.
+
+### Changed
+
+- change(hope): **correction capture moves fully off-thread.** With `memory-nudge.sh` gone, corrections are captured only by the detached `memory-write.sh`. Its spawn gate gained the *discriminating* subset of the old nudge regex (`revert|undo|misunderstood|that's wrong|not what i|stop doing|corrected`) so correction turns still spawn a writer — deliberately NOT the noisy words (`actually|no|instead`), which flood on ordinary prose and would gut the gate's job as a cheap pre-filter.
+- change(hope): **`memory-write.sh` throttle → lock.** Replaced the 10-min-per-session time throttle with a `mkdir`-based lock on the memory dir (flock is absent on macOS). The throttle was a blunt mutex whose only real job was stopping two detached writers from clobbering `MEMORY.md` — but it also silently dropped clustered corrections made inside the same 10-min window. The lock serializes writers (wait-not-skip, steals a lock older than 2 min so a dead writer can't deadlock the next, gives up after ~60s), so concurrent writes can't corrupt the index and no clustered correction is dropped.
+- change(hope): **`memory-prime.sh` reframed.** SessionStart no longer injects the full curation/naming/indexing discipline into the foreground (the writer reads that directly); it now injects a short "co-author the memory — surface durable lessons in your reasoning, don't manage the files, don't narrate housekeeping" framing. Keeps the human-facing ownership signal while removing the instruction that bred the mid-task curate-the-files detour.
+
 ## [hope@9.6.1] - 2026-07-01
 
 ### Fixed
