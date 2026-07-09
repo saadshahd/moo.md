@@ -1,0 +1,60 @@
+{
+  "name": "@adaptive-ui/api",
+  "version": "1.0.0",
+  "description": "Fastify API service for adaptive UI ecosystem",
+  "main": "dist/app.js",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm exec tsx watch src/app.ts",
+    "build": "pnpm exec tsc",
+    "start": "node dist/app.js",
+    "test": "pnpm exec vitest",
+    "test:watch": "pnpm exec vitest --watch",
+    "type-check": "pnpm exec tsc --noEmit",
+    "lint": "pnpm exec eslint src --ext .ts",
+    "lint:fix": "pnpm exec eslint src --ext .ts --fix",
+    "clean": "rm -rf dist",
+    "prestart": "pnpm run build"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/websocket": "^8.3.1",
+    "@fastify/cors": "^8.4.0",
+    "@fastify/rate-limit": "^8.1.0",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/autoload": "^5.8.0",
+    "@clickhouse/client": "^0.2.5",
+    "ioredis": "^5.3.2",
+    "posthog-node": "^3.6.3",
+    "@growthbook/growthbook": "^0.33.0",
+    "ajv": "^8.12.0",
+    "@sinclair/typebox": "^0.31.28",
+    "pino": "^8.16.1",
+    "pino-pretty": "^10.2.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.7",
+    "typescript": "^5.2.2",
+    "tsx": "^3.14.0",
+    "@typescript-eslint/eslint-plugin": "^6.9.0",
+    "@typescript-eslint/parser": "^6.9.0",
+    "eslint": "^8.52.0",
+    "vitest": "^0.34.6",
+    "@vitest/ui": "^0.34.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "fastify",
+    "typescript",
+    "api",
+    "adaptive-ui",
+    "clickhouse",
+    "redis",
+    "websocket"
+  ],
+  "author": "Adaptive UI Team",
+  "license": "MIT"
+}

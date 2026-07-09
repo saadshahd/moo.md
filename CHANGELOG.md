@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- feat(sound): new `sound` plugin (0.1.0, pre-release) — 105-rule taste corpus (`sound/corpus/`), `sound:setup` skill (probe stack by usage evidence → user confirms tags → cherry-pick by when-tag → tune paths globs → provenance stamp `sound: <rule>@<version> body:<sha8>`; re-runs re-probe, diverged bodies fail loud), and a deterministic eval harness (`sound/evals/`: 9 real-repo fixtures — 6 local, 3 public incl. dead-dep and stripe-webhook specimens — scored by set-comparison with tree-derived canary paths; runner hard-refuses any model above haiku/sonnet). Not yet on the marketplace; TASTE.md cutover deliberately deferred until setup is proven live.
+
 ## [hope@9.7.1] - 2026-07-01
 
 ### Changed

@@ -1,0 +1,10 @@
+{
+  "name": "sound",
+  "version": "0.1.0",
+  "description": "Code taste as installable rules. Probe a repo's stack, confirm, and scaffold .claude/rules/ from a 105-rule corpus with repo-tuned paths and provenance stamps.",
+  "keywords": ["taste", "rules", "corpus", "setup", "scaffold"],
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
+}

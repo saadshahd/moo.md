@@ -1,0 +1,9 @@
+{
+  "tags": ["react"],
+  "globs": {
+    "default": "**/*.js",
+    "test": "**/*.{test,spec}.js",
+    "react": "**/*.js"
+  },
+  "notes": "react: repo is plain React 15 (React.createClass) with JSX embedded directly in .js files — no .jsx/.tsx extension is used anywhere in the tree (verified via tree.txt), so both the default and react globs are widened from the corpus's {ts,tsx}/{tsx,jsx} defaults down to plain .js to actually match source. NOT distributed: the sole remote boundary is src/services/HNService.js, which only performs Firebase Realtime Database reads (.once('value', ...) and ref hand-off for reactfire's live-bind, consumed read-only in src/StoryListItem.js and others) — zero .set(/.push(/.update(/.remove( calls anywhere in the repo (grepped via GitHub code search scoped to insin/react-hn). The one 'write' in the codebase, src/utils/storage.js's window.localStorage assignment, is client-local persistence, not a remote party — included specifically to make that distinction visible rather than assumed. NOT db: no database client/ORM/schema anywhere; Firebase here is consumed purely as a read-only public data source, not owned storage. test glob: repo has zero test files (grepped tree.txt for *.test.*/*.spec.*/__tests__, zero hits, and no test-runner devDependency in package.json) so the .js-widened test glob is a best-guess extension match, unverified against a real convention — same caveat pattern as fullstack-next-db's test-glob note."
+}

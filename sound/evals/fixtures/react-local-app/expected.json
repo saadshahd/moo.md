@@ -1,0 +1,9 @@
+{
+  "tags": ["react"],
+  "globs": {
+    "default": "**/*.{ts,tsx}",
+    "test": "**/*.test.ts",
+    "react": "**/*.tsx"
+  },
+  "notes": "react fires: tsconfig.json sets jsx:'react-jsx', package.json depends on react/react-dom, and 6 real .tsx files exist with genuine JSX usage (src/main.tsx, src/ui/app.tsx, src/ui/StartButton.tsx, src/ui/TraitEditor.tsx, src/ui/SeedDisplay.tsx, src/viewport/canvas/index.tsx) -- not a dep-without-usage case. No db evidence anywhere (no ORM/client import, no schema/migration files). No distributed evidence: the two fetch() call sites (src/main.tsx, src/io/mods/index.ts) both hit same-origin static JSON assets ('/data/biomes.json', '/data/world_params.json') read-only at page load -- this is local asset loading, not a remote party whose state the app durably changes, so per the distributed tag definition (side-effectful remote boundary) it does not fire. No websocket/queue/payment/messaging/webhook code found. test glob tuned from corpus default '**/*.{test,spec}.{ts,tsx}' to '**/*.test.ts' because vitest.config.ts explicitly scopes 'include: [\"test/**/*.test.ts\"]' and excludes 'test/determinism-browser/**' from the vitest run -- the repo's one .spec.ts file (test/determinism-browser/hash.spec.ts) is a Playwright browser test (testMatch: '**/*.spec.ts' in playwright.config.ts, uses @playwright/test not vitest), a distinct tool with its own convention; both still end in .ts not .tsx so no tsx widening needed. react glob tuned from corpus default '**/*.{tsx,jsx}' to '**/*.tsx' -- repo has zero .jsx files (every JSX file is TypeScript)."
+}

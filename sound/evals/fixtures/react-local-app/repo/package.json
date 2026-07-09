@@ -1,0 +1,58 @@
+{
+  "name": "worldbox",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "oxlint": "oxlint src",
+    "typecheck": "tsc --build",
+    "depcruise": "depcruise src --config .depcruiserc.cjs"
+  },
+  "dependencies": {
+    "@pixi/react": "^8",
+    "@use-gesture/react": "^10.3.1",
+    "bitecs": "^0.3",
+    "comlink": "^4",
+    "jotai": "^2",
+    "lz-string": "^1.5",
+    "neverthrow": "^8",
+    "ngraph.graph": "^20.1.2",
+    "ngraph.path": "^1.6.1",
+    "pixi-viewport": "^6.0.3",
+    "pixi.js": "^8",
+    "pure-rand": "^6",
+    "react": "^19",
+    "react-dom": "^19",
+    "remeda": "^2.33.7",
+    "valibot": "^1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1",
+    "@playwright/test": "^1",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8",
+    "@vitejs/plugin-react": "^4",
+    "dependency-cruiser": "^16",
+    "eslint": "^9",
+    "eslint-plugin-boundaries": "^5",
+    "eslint-plugin-react-compiler": "19.1.0-rc.2",
+    "fast-check": "^3",
+    "jiti": "^2.6.1",
+    "oxlint": "^0.3",
+    "typescript": "^5.5",
+    "vite": "^6",
+    "vitest": "^2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

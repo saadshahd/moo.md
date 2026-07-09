@@ -1,0 +1,8 @@
+{
+  "tags": [],
+  "globs": {
+    "default": "**/*.{ts,js}",
+    "test": "**/*.{test,spec}.ts"
+  },
+  "notes": "react tag deliberately absent: ink@^4.4.1 + react@^18.2.0 sit in dependencies but zero .tsx/.jsx files exist and zero react/ink imports anywhere in source — the actual UI is readline/chalk/boxen (src/ui/simple-terminal-ui.ts). Trap: the string 'react' DOES appear in source, only inside template literals (foundation-client.ts demo code-gen output) and a content-sniffing predicate (language-detector.ts) — neither is usage. db absent: no db client, schema, or migrations. distributed absent: no network SDK at all — foundation-client generates code locally (mock of on-device Apple Foundation Models); dead deps blessed/blessed-contrib/terminal-kit are also unused. default glob widened to .js for the root demo-ui.js script (marginal: one file; flag for human review). test glob is the corpus default narrowed to .ts — repo has NO test files (tsconfig excludes **/*.test.ts but none exist; scripts/test.sh only), so this class is unexercised; flag for human review. react glob left at corpus default — moot since the react tag does not fire. REVIEW EDIT: removed react glob key — react not in tags, so no react-class rules install (convention: default+test always, react iff react tag fires)."
+}

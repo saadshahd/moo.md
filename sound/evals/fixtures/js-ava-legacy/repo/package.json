@@ -1,0 +1,148 @@
+{
+  "name": "@statsbomb/rule-engine",
+  "description": "Domain rule engine with Business Readable DSL",
+  "version": "1.3.31",
+  "author": "Saad Shahd <dev.saad.shahd@arqamfc.com>",
+  "ava": {
+    "failFast": true,
+    "verbose": true
+  },
+  "browser": "dist/index.umd.js",
+  "bugs": {
+    "url": "https://github.com/statsbomb/rule-engine/issues",
+    "email": "dev.saad.shahd@arqamfc.com"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "contributors": [
+    "Saad Shahd <dev.saad.shahd@arqamfc.com>"
+  ],
+  "dependencies": {
+    "camelcase": "^6.0.0",
+    "decamelize": "^3.2.0",
+    "memoizee": "^0.4.14",
+    "ohm-js": "~0.14.0",
+    "ramda": "~0.27.0",
+    "rxjs": "^6.5.5"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "latest",
+    "@commitlint/config-conventional": "latest",
+    "@rollup/plugin-commonjs": "latest",
+    "@rollup/plugin-json": "latest",
+    "@rollup/plugin-node-resolve": "latest",
+    "ava": "latest",
+    "codecov": "latest",
+    "cross-env": "latest",
+    "eslint": "latest",
+    "eslint-config-prettier": "latest",
+    "eslint-config-xo": "latest",
+    "eslint-plugin-prettier": "latest",
+    "eslint-plugin-ramda": "latest",
+    "fixpack": "latest",
+    "husky": "latest",
+    "lint-staged": "latest",
+    "np": "latest",
+    "nyc": "latest",
+    "prettier": "latest",
+    "remark-cli": "latest",
+    "remark-preset-github": "latest",
+    "rollup": "latest",
+    "rollup-plugin-string": "latest",
+    "xo": "latest"
+  },
+  "engines": {
+    "node": ">=11.12"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "homepage": "https://github.com/statsbomb/rule-engine",
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged && npm test",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  },
+  "keywords": [
+    "chain",
+    "compiler",
+    "entry",
+    "rules",
+    "validator"
+  ],
+  "license": "MIT",
+  "lint-staged": {
+    "*.js": [
+      "xo --fix"
+    ],
+    "*.md": [
+      "remark . -qo"
+    ],
+    "package.json": [
+      "fixpack"
+    ]
+  },
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "np": {
+    "yarn": false,
+    "yolo": false,
+    "publish": true
+  },
+  "nyc": {
+    "check-coverage": true,
+    "lines": 80,
+    "functions": 80,
+    "branches": 80,
+    "reporter": [
+      "lcov",
+      "html",
+      "text"
+    ]
+  },
+  "prettier": {
+    "singleQuote": true,
+    "bracketSpacing": true,
+    "trailingComma": "none"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "remarkConfig": {
+    "plugins": [
+      "preset-github"
+    ]
+  },
+  "repository": "git://github.com/statsbomb/rule-engine.git",
+  "scripts": {
+    "ava": "cross-env NODE_ENV=test ava",
+    "ava:watch": "npm run ava -- --watch",
+    "build": "rollup -c",
+    "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
+    "dev": "rollup -c -w",
+    "lint": "xo && remark . -qo",
+    "nyc": "cross-env NODE_ENV=test nyc ava",
+    "preava": "npm run build",
+    "release": "np",
+    "test": "npm run lint && npm run ava",
+    "test-coverage": "npm run lint && npm run nyc"
+  },
+  "xo": {
+    "prettier": true,
+    "space": true,
+    "extends": [
+      "xo"
+    ],
+    "rules": {
+      "unicorn/string-content": "off",
+      "unicorn/prevent-abbreviations": "off",
+      "import/extensions": "off",
+      "import/no-anonymous-default-export": "off"
+    }
+  }
+}

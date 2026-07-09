@@ -1,0 +1,67 @@
+{
+  "name": "@codesieve/core",
+  "version": "0.1.0-alpha",
+  "description": "Find why your tests flake in 30 seconds. Deterministic test debugger using state machines.",
+  "keywords": [
+    "testing",
+    "debugging",
+    "flaky-tests",
+    "state-machine",
+    "playwright",
+    "test-automation",
+    "deterministic"
+  ],
+  "homepage": "https://github.com/anthropics/codesieve",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/codesieve.git",
+    "directory": "packages/core"
+  },
+  "bugs": "https://github.com/anthropics/codesieve/issues",
+  "author": "saadshahd <dev.saad.shahd@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./jsx-runtime": {
+      "import": "./dist/jsx-runtime/index.js",
+      "types": "./dist/jsx-runtime/index.d.ts"
+    },
+    "./effects/adapters": {
+      "import": "./dist/effects/adapters/index.js",
+      "types": "./dist/effects/adapters/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:performance": "tsc -p tsconfig.performance.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "benchmark": "tsx tests/performance/run-benchmarks.ts all",
+    "benchmark:quick": "tsx tests/performance/run-benchmarks.ts all --quick",
+    "benchmark:analysis": "tsx tests/performance/run-benchmarks.ts analysis",
+    "benchmark:instrumentation": "tsx tests/performance/run-benchmarks.ts instrumentation",
+    "benchmark:memory": "tsx tests/performance/run-benchmarks.ts memory",
+    "benchmark:ci": "tsx tests/performance/run-benchmarks.ts all && node --expose-gc dist/tests/performance/ci-performance.js",
+    "benchmark:setup": "tsx tests/performance/run-benchmarks.ts all --install-playwright",
+    "dashboard:generate": "tsx tests/performance/run-benchmarks.ts all && node dist/tests/performance/dashboard.js generate"
+  },
+  "dependencies": {
+    "@dagrejs/graphlib": "^2.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/graphlib": "^2.1.12",
+    "@types/node": "^20.0.0",
+    "fast-check": "^3.15.0",
+    "playwright": "^1.55.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  }
+}

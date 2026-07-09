@@ -1,0 +1,34 @@
+{
+  "name": "codesieve",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --recursive run build",
+    "test": "pnpm --recursive run test",
+    "test:property": "pnpm --filter=@codesieve/core run test:property",
+    "test:watch": "pnpm --recursive run test:watch",
+    "dev": "pnpm --recursive run dev",
+    "clean": "pnpm --recursive exec rm -rf dist node_modules",
+    "playground:dev": "pnpm --filter @codesieve/playground dev",
+    "demo:simple": "npx tsx packages/playground/examples/simple-demo.ts",
+    "demo:fragments": "npx tsx packages/playground/examples/fragment-demo.ts",
+    "demo:flaky": "npx tsx packages/playground/examples/flaky-test-demo.ts"
+  },
+  "keywords": [
+    "model-based-testing",
+    "state-machines",
+    "property-based-testing",
+    "jsx",
+    "typescript"
+  ],
+  "devDependencies": {
+    "@types/graphlib": "^2.1.12",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "fast-check": "^3.15.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "vitest": "^1.2.0"
+  }
+}

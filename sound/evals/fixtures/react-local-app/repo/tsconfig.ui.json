@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "composite": true, "noEmit": false, "emitDeclarationOnly": true, "declaration": true, "outDir": ".cache/ui" },
+  "include": ["src/ui", "src/main.tsx"],
+  "references": [
+    { "path": "./tsconfig.primitives.json" },
+    { "path": "./tsconfig.io.json" },
+    { "path": "./tsconfig.worker.json" },
+    { "path": "./tsconfig.viewport.json" }
+  ]
+}

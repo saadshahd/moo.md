@@ -1,0 +1,9 @@
+{
+  "tags": ["react"],
+  "globs": {
+    "default": "**/*.{ts,tsx}",
+    "test": "**/*.{test,spec}.{ts,tsx}",
+    "react": "packages/playground/**/*.{tsx,jsx}"
+  },
+  "notes": "RELABELED from tags=[] during fixture review: tree.txt (declared ground truth) lists 14 real .tsx files in packages/playground (App.tsx, main.tsx, graph-visualizer.tsx...) with genuine react+react-dom+reactflow deps in playground's package.json — real JSX UI usage, so react fires, monorepo-scoped to playground. The original label curated this evidence away, contradicting the visible tree. Remaining discriminations this fixture tests: (1) react glob must be SCOPED to packages/playground, not repo-wide — packages/core is a pure TS library; (2) core's custom non-React JSX runtime (esbuild jsxImportSource './jsx-runtime', state-machine DSL in .ts files) must NOT widen the react scope to core — UI is the operative word; (3) no db, no distributed anywhere (verified: no ORM/client, no payment/queue/webhook/messaging side effects). Test convention: packages/core/tests/**/*.test.ts — corpus default glob already matches; kept unchanged."
+}
