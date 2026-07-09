@@ -1,9 +1,39 @@
 {
-  "tags": ["react"],
+  "tags": [
+    "react"
+  ],
   "globs": {
     "default": "**/*.{ts,tsx}",
     "test": "**/*.test.ts",
     "react": "**/*.tsx"
   },
-  "notes": "react fires: tsconfig.json sets jsx:'react-jsx', package.json depends on react/react-dom, and 6 real .tsx files exist with genuine JSX usage (src/main.tsx, src/ui/app.tsx, src/ui/StartButton.tsx, src/ui/TraitEditor.tsx, src/ui/SeedDisplay.tsx, src/viewport/canvas/index.tsx) -- not a dep-without-usage case. No db evidence anywhere (no ORM/client import, no schema/migration files). No distributed evidence: the two fetch() call sites (src/main.tsx, src/io/mods/index.ts) both hit same-origin static JSON assets ('/data/biomes.json', '/data/world_params.json') read-only at page load -- this is local asset loading, not a remote party whose state the app durably changes, so per the distributed tag definition (side-effectful remote boundary) it does not fire. No websocket/queue/payment/messaging/webhook code found. test glob tuned from corpus default '**/*.{test,spec}.{ts,tsx}' to '**/*.test.ts' because vitest.config.ts explicitly scopes 'include: [\"test/**/*.test.ts\"]' and excludes 'test/determinism-browser/**' from the vitest run -- the repo's one .spec.ts file (test/determinism-browser/hash.spec.ts) is a Playwright browser test (testMatch: '**/*.spec.ts' in playwright.config.ts, uses @playwright/test not vitest), a distinct tool with its own convention; both still end in .ts not .tsx so no tsx widening needed. react glob tuned from corpus default '**/*.{tsx,jsx}' to '**/*.tsx' -- repo has zero .jsx files (every JSX file is TypeScript)."
+  "notes": "react fires: tsconfig.json sets jsx:'react-jsx', package.json depends on react/react-dom, and 6 real .tsx files exist with genuine JSX usage (src/main.tsx, src/ui/app.tsx, src/ui/StartButton.tsx, src/ui/TraitEditor.tsx, src/ui/SeedDisplay.tsx, src/viewport/canvas/index.tsx) -- not a dep-without-usage case. No db evidence anywhere (no ORM/client import, no schema/migration files). No distributed evidence: the two fetch() call sites (src/main.tsx, src/io/mods/index.ts) both hit same-origin static JSON assets ('/data/biomes.json', '/data/world_params.json') read-only at page load -- this is local asset loading, not a remote party whose state the app durably changes, so per the distributed tag definition (side-effectful remote boundary) it does not fire. No websocket/queue/payment/messaging/webhook code found. test glob tuned from corpus default '**/*.{test,spec}.{ts,tsx}' to '**/*.test.ts' because vitest.config.ts explicitly scopes 'include: [\"test/**/*.test.ts\"]' and excludes 'test/determinism-browser/**' from the vitest run -- the repo's one .spec.ts file (test/determinism-browser/hash.spec.ts) is a Playwright browser test (testMatch: '**/*.spec.ts' in playwright.config.ts, uses @playwright/test not vitest), a distinct tool with its own convention; both still end in .ts not .tsx so no tsx widening needed. react glob tuned from corpus default '**/*.{tsx,jsx}' to '**/*.tsx' -- repo has zero .jsx files (every JSX file is TypeScript).",
+  "rules": {
+    "must_install": [
+      "parse-dont-validate-at-every-untyped-boundary",
+      "effect-is-a-named-intent",
+      "derive-dont-sync",
+      "no-behavioral-boolean-props",
+      "discriminated-union-over-flag-bag"
+    ],
+    "must_not_install": [
+      "command-vs-fact-when-reconciled-elsewhere",
+      "push-work-to-the-database",
+      "idempotent-handler-by-dedup-key",
+      "remote-call-has-a-third-outcome",
+      "external-call-timeout"
+    ]
+  },
+  "rules_notes": {
+    "parse-dont-validate-at-every-untyped-boundary": "+ src/io/mods/index.ts — fetch -> res.json() run through valibot safeParse into typed Biome/WorldParams",
+    "effect-is-a-named-intent": "+ src/ui/use-simulation.ts — custom hook holds 3 raw useEffects plus useRefs bridging to the worker",
+    "derive-dont-sync": "+ src/ui/use-simulation.ts — useEffect+useState pairs whose bodies call set* — sync-vs-derive askable",
+    "no-behavioral-boolean-props": "+ src/ui/StartButton.tsx — real component props types; WorldCanvas receives a running boolean",
+    "discriminated-union-over-flag-bag": "+ src/io/mods/index.ts — tagged union LoadError {tag:'fetch_error'}|{tag:'parse_error'} present",
+    "command-vs-fact-when-reconciled-elsewhere": "- all state locally-authoritative and synchronous; no remote ack gap",
+    "push-work-to-the-database": "- no database anywhere — no ORM/client, no schema/migrations",
+    "idempotent-handler-by-dedup-key": "- no redelivery-capable handlers; only same-origin static-asset reads",
+    "remote-call-has-a-third-outcome": "- only fetches are same-origin static JSON reads; no stateful remote party",
+    "external-call-timeout": "- no outbound external service/DB/queue calls; local static assets only"
+  }
 }

@@ -4,9 +4,12 @@
 // Compares proposal against <fixture-dir>/expected.json:
 //   tags  — exact set equality (reported per-tag)
 //   globs — per expected key: exact string OR same matched file-set over repo/tree.txt
-// (the pathless pair is a Phase-5 mechanical constant, deliberately NOT proposed or scored)
-import { readFileSync, existsSync } from "fs";
-import { join } from "path";
+//   rules — three-class labels: every must_install present, no must_not_install present,
+//           all proposed names exist in the corpus, every citation path exists in tree.txt.
+//           Unlabeled rules are don't-care by design (104-way exact labels are unlabelable).
+import { readFileSync, readdirSync, existsSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
 const [fixtureDir, proposalFile] = process.argv.slice(2);
 if (!fixtureDir || !proposalFile) {
@@ -31,9 +34,11 @@ if (!proposal) {
   process.exit(1);
 }
 
+// Both tree paths and proposal citations must normalize identically for pathSet.has() to hold.
+const relPath = (p) => p.trim().replace(/^\.\//, "");
 const treeFile = join(fixtureDir, "repo", "tree.txt");
 const paths = existsSync(treeFile)
-  ? readFileSync(treeFile, "utf8").split("\n").map((l) => l.trim().replace(/^\.\//, "")).filter(Boolean)
+  ? readFileSync(treeFile, "utf8").split("\n").map(relPath).filter(Boolean)
   : [];
 
 const setEq = (a, b) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
@@ -61,6 +66,43 @@ const gotGlobs = proposal.globs ?? {};
 
 const tagsMatch = setEq(expTags, gotTags);
 
+// Rule-set checks (three-class: must_install / must_not_install / don't-care).
+const corpusDir = join(dirname(fileURLToPath(import.meta.url)), "..", "corpus");
+const corpusNames = new Set(readdirSync(corpusDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3)));
+const expRules = expected.rules ?? {};
+const gotRules = (proposal.rules ?? []).filter((r) => r && typeof r.name === "string");
+const gotNames = new Set(gotRules.map((r) => r.name.replace(/\.md$/, "")));
+// Citation universe = tree.txt ∪ files actually present under repo/ — tree.txt is
+// head-400-truncated at mining time, so an included excerpt file can be absent from it.
+const repoDir = join(fixtureDir, "repo");
+const included = readdirSync(repoDir, { recursive: true })
+  .map(String).map((p) => p.split("\\").join("/")).filter((p) => p !== "tree.txt");
+const pathSet = new Set([...paths, ...included]);
+const citeOk = (c) => typeof c === "string" && pathSet.has(relPath(c.replace(/:\d+.*$/, "")));
+
+const ruleChecks = !expected.rules ? [] : [
+  ...(expRules.must_install ?? []).map((name) => ({
+    name: `rule:+${name}`,
+    pass: gotNames.has(name),
+    detail: gotNames.has(name) ? "installed" : "MISSING from install set",
+  })),
+  ...(expRules.must_not_install ?? []).map((name) => ({
+    name: `rule:-${name}`,
+    pass: !gotNames.has(name),
+    detail: gotNames.has(name) ? "INSTALLED but repo shows no surface for it" : "correctly excluded",
+  })),
+  {
+    name: "rule:names",
+    pass: [...gotNames].every((n) => corpusNames.has(n)),
+    detail: `unknown rule names: [${[...gotNames].filter((n) => !corpusNames.has(n))}]`,
+  },
+  {
+    name: "rule:cites",
+    pass: paths.length === 0 || gotRules.every((r) => citeOk(r.cite)),
+    detail: `citations not in tree: [${gotRules.filter((r) => !citeOk(r.cite)).map((r) => `${r.name}→${r.cite}`).slice(0, 5)}]`,
+  },
+];
+
 const checks = [
   {
     name: "tags",
@@ -86,6 +128,7 @@ const checks = [
           : `spurious glob key "${key}": "${gotGlobs[key]}"`,
       };
     }),
+  ...ruleChecks,
 ];
 
 const passed = checks.filter((c) => c.pass).length;

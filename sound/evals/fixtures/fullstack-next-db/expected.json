@@ -1,9 +1,47 @@
 {
-  "tags": ["react", "db", "distributed"],
+  "tags": [
+    "react",
+    "db",
+    "distributed"
+  ],
   "globs": {
     "default": "**/*.{ts,tsx}",
     "test": "**/*.{test,spec}.{ts,tsx}",
     "react": "**/*.{tsx,jsx}"
   },
-  "notes": "db: neo4j-driver is used directly (raw Cypher via driver.session().run(...)) in src/app/api/auth/[...nextauth]/route.ts and src/app/api/families/settings/route.ts — owned db access, not a hosted-API consumer. distributed: next-auth's EmailProvider is configured in src/app/api/auth/[...nextauth]/route.ts with an SMTP transport (host/port/auth/from) — this is next-auth's built-in nodemailer-backed transport (nodemailer is a direct package.json dependency and next-auth's EmailProvider requires it at runtime to send magic-link email), a side-effectful remote boundary (sends real email) even though the file has no literal `import nodemailer`. No separate file imports nodemailer directly — grepped the whole web/ tree, found none — so route.ts stands as the sole representative source for both neo4j-driver and the nodemailer-backed distributed boundary; not fabricated, this is genuinely how the repo wires it. react: .tsx components present throughout (SignInForm.tsx uses react-hook-form + next-auth/react client SDK). No test files exist in the repo (grepped for *.test.*/*.spec.*, zero matches) so the test glob is left at corpus default, unverified against real convention. tsconfig has no explicit jsx extension beyond .tsx/.ts (allowJs true, jsx: preserve) so default glob unwidened."
+  "notes": "db: neo4j-driver is used directly (raw Cypher via driver.session().run(...)) in src/app/api/auth/[...nextauth]/route.ts and src/app/api/families/settings/route.ts — owned db access, not a hosted-API consumer. distributed: next-auth's EmailProvider is configured in src/app/api/auth/[...nextauth]/route.ts with an SMTP transport (host/port/auth/from) — this is next-auth's built-in nodemailer-backed transport (nodemailer is a direct package.json dependency and next-auth's EmailProvider requires it at runtime to send magic-link email), a side-effectful remote boundary (sends real email) even though the file has no literal `import nodemailer`. No separate file imports nodemailer directly — grepped the whole web/ tree, found none — so route.ts stands as the sole representative source for both neo4j-driver and the nodemailer-backed distributed boundary; not fabricated, this is genuinely how the repo wires it. react: .tsx components present throughout (SignInForm.tsx uses react-hook-form + next-auth/react client SDK). No test files exist in the repo (grepped for *.test.*/*.spec.*, zero matches) so the test glob is left at corpus default, unverified against real convention. tsconfig has no explicit jsx extension beyond .tsx/.ts (allowJs true, jsx: preserve) so default glob unwidened.",
+  "rules": {
+    "must_install": [
+      "dependency-at-the-edges",
+      "integration-point-isolation",
+      "external-call-timeout",
+      "remote-call-has-a-third-outcome",
+      "parse-dont-validate-at-every-untyped-boundary",
+      "external-contract-not-internal-schema"
+    ],
+    "must_not_install": [
+      "mood-names-commands-facts",
+      "stale-message-is-dropped-by-version",
+      "no-shared-mutable-state-across-workers",
+      "per-unit-crash-isolation",
+      "idempotent-handler-by-dedup-key",
+      "restart-policy-as-data",
+      "accountants-dont-use-erasers"
+    ]
+  },
+  "rules_notes": {
+    "dependency-at-the-edges": "+ src/app/api/families/settings/route.ts — new Date() in business code and raw process.env.NEO4J_* at the driver call site, outside a composition root",
+    "integration-point-isolation": "+ src/app/api/families/settings/route.ts — neo4j.driver(...) instantiated here AND in the nextauth route — same client from two modules",
+    "external-call-timeout": "+ src/app/api/families/settings/route.ts — driver.session().run(...) network calls carry no timeout/deadline",
+    "remote-call-has-a-third-outcome": "+ src/app/api/families/settings/route.ts — await session.run returns FamilySettings | null — no distinct timed-out/no-response arm",
+    "parse-dont-validate-at-every-untyped-boundary": "+ src/app/api/families/settings/route.ts — JSON.parse(settingsNode.familyValues) and request.json() feed typed FamilySettings with no parse step",
+    "external-contract-not-internal-schema": "+ src/app/api/families/settings/route.ts — handlers NextResponse.json(settings) serialize the internal persistence type straight to the HTTP boundary",
+    "mood-names-commands-facts": "- no event bus, message queue, or command/event tag vocabulary anywhere",
+    "stale-message-is-dropped-by-version": "- no subscription/stream/socket handler writing received state",
+    "no-shared-mutable-state-across-workers": "- no worker/job execution model; no cross-worker shared mutable binding",
+    "per-unit-crash-isolation": "- no batch/loop over independent units — only per-request route handlers",
+    "idempotent-handler-by-dedup-key": "- no redelivery-capable delivery layer; writes are synchronous request-scoped handlers",
+    "restart-policy-as-data": "- no external queue/supervisor, no retry-counter/backoff logic",
+    "accountants-dont-use-erasers": "- only mutable User/FamilySettings nodes; no ledger/journal/append-only fact store"
+  }
 }

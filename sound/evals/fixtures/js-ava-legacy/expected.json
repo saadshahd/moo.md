@@ -4,5 +4,37 @@
     "default": "**/*.js",
     "test": "test/**/*.js"
   },
-  "notes": "Pure JS repo, zero .ts/.tsx anywhere (verified: find -iname '*.ts' -o -iname '*.tsx' returns nothing) -- default glob MUST widen from corpus default '**/*.{ts,tsx}' to '**/*.js' or every always-tag rule installs against zero matching files. GLOB TUNING is the point of this fixture: test files carry NO '.test.' or '.spec.' suffix at all (test/validator.js, test/fields.js, test/chain/start.js, etc.) -- the corpus default test glob '**/*.{test,spec}.{ts,tsx}' matches nothing here, not even after extension-widening to .js, because the suffix convention itself is absent. The repo's real convention is purely directory-based: every real test lives under test/ (confirmed via package.json 'ava' field having no custom 'files' glob, so AVA's own default test-file discovery -- files under test/ -- is what actually runs; also cross-checked scripts.ava = 'cross-env NODE_ENV=test ava' with no path args). Tuned test glob is 'test/**/*.js', a directory-scope substitution, not a suffix-widening. No react (no jsx/tsx, no react dep). No db (no ORM/client import, no schema files -- this is a pure rule-compiler/validator library, ohm-js grammar + ramda + rxjs, all in-memory). No distributed evidence (no fetch/http/websocket/queue/payment/messaging code in src/ or helpers/)."
+  "notes": "Pure JS repo, zero .ts/.tsx anywhere (verified: find -iname '*.ts' -o -iname '*.tsx' returns nothing) -- default glob MUST widen from corpus default '**/*.{ts,tsx}' to '**/*.js' or every always-tag rule installs against zero matching files. GLOB TUNING is the point of this fixture: test files carry NO '.test.' or '.spec.' suffix at all (test/validator.js, test/fields.js, test/chain/start.js, etc.) -- the corpus default test glob '**/*.{test,spec}.{ts,tsx}' matches nothing here, not even after extension-widening to .js, because the suffix convention itself is absent. The repo's real convention is purely directory-based: every real test lives under test/ (confirmed via package.json 'ava' field having no custom 'files' glob, so AVA's own default test-file discovery -- files under test/ -- is what actually runs; also cross-checked scripts.ava = 'cross-env NODE_ENV=test ava' with no path args). Tuned test glob is 'test/**/*.js', a directory-scope substitution, not a suffix-widening. No react (no jsx/tsx, no react dep). No db (no ORM/client import, no schema files -- this is a pure rule-compiler/validator library, ohm-js grammar + ramda + rxjs, all in-memory). No distributed evidence (no fetch/http/websocket/queue/payment/messaging code in src/ or helpers/).",
+  "rules": {
+    "must_install": [
+      "rules-as-data-over-scattered-conditionals",
+      "lookup-table-over-conditional-chain",
+      "exhaustiveness-is-a-compile-error-not-a-runtime-throw",
+      "data-as-spec-earns-its-trigger",
+      "one-behavior-per-test",
+      "test-observable-behavior-not-structure"
+    ],
+    "must_not_install": [
+      "as-cast-requires-a-named-justification",
+      "static-domain-tables-use-as-const-satisfies",
+      "generics-only-for-a-real-relationship-between-inputs-and-output",
+      "branded-primitives-for-domain-ids",
+      "mood-names-commands-facts",
+      "set-prefix-means-caller-supplied-write"
+    ]
+  },
+  "rules_notes": {
+    "rules-as-data-over-scattered-conditionals": "+ src/data/card-rules.js — policy as declarative rule tables walked by one evaluator",
+    "lookup-table-over-conditional-chain": "+ src/validator.js — _validate dispatches on fixed key set via large switch(ast.type)",
+    "exhaustiveness-is-a-compile-error-not-a-runtime-throw": "+ src/validator.js — tag-switch guarded only by default: throw new Error('unknow ast type')",
+    "data-as-spec-earns-its-trigger": "+ src/validator.js — member-blind interpreter over a tagged AST corpus",
+    "one-behavior-per-test": "+ test/validator.js — real AVA test blocks; one asserts over two distinct fixtures",
+    "test-observable-behavior-not-structure": "+ test/validator.js — AVA tests assert against the public export surface",
+    "as-cast-requires-a-named-justification": "- pure JS, zero .ts — no cast surface can exist",
+    "static-domain-tables-use-as-const-satisfies": "- no TypeScript; card-rules.js is a plain JS literal",
+    "generics-only-for-a-real-relationship-between-inputs-and-output": "- pure-JS repo has no type parameters",
+    "branded-primitives-for-domain-ids": "- zero TS — branding surface cannot exist",
+    "mood-names-commands-facts": "- input event data objects but no emitted/named commands or facts",
+    "set-prefix-means-caller-supplied-write": "- API is all getType/validator/is/compile — no setter surface at all"
+  }
 }

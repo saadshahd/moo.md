@@ -9,8 +9,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [sound@0.0.2] - 2026-07-09
+
 ### Changed
 
+- change(sound): `sound:setup` selection redesigned from tag-wide dump to per-rule evidence — a rule installs iff the repo shows the SUBJECT-SURFACE it governs (cited file path, `Not-when:` veto; when-tags demoted to candidacy pre-filter); installed WRONG/RIGHT examples are rewritten in the project's own domain (prose stays corpus-verbatim); example tuning runs only after Confirm, gated by three mechanical checks (syntax-valid TS, de-genericized, repo-grounded); re-run reconciliation compares PROSE ONLY (tuned examples differ by design, user-owned once written). Publisher-side evidence alone now suffices for the `distributed` tag. Eval harness scores selection via three-class labels (`must_install` / `must_not_install` / don't-care) plus corpus-name and citation-exists checks — all deterministic.
 - change(sound): `sound:setup` writes installed rules with `paths`-only frontmatter — `when:` and `source:` dropped (selection metadata, not runtime signal; the corpus keeps them).
 
 ### Fixed

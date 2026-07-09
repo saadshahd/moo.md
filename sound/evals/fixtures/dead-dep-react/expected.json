@@ -4,5 +4,31 @@
     "default": "**/*.ts",
     "test": "**/*.{test,spec}.ts"
   },
-  "notes": "react tag deliberately absent: ink@^4.4.1 + react@^18.2.0 sit in dependencies but zero .tsx/.jsx files exist and zero react/ink imports anywhere in source \u2014 the actual UI is readline/chalk/boxen (src/ui/simple-terminal-ui.ts). Trap: the string 'react' DOES appear in source, only inside template literals (foundation-client.ts demo code-gen output) and a content-sniffing predicate (language-detector.ts) \u2014 neither is usage. db absent: no db client, schema, or migrations. distributed absent: no network SDK at all \u2014 foundation-client generates code locally (mock of on-device Apple Foundation Models); dead deps blessed/blessed-contrib/terminal-kit are also unused. default glob NOT widened to .js: the only .js file is the root demo-ui.js scaffold script, below the skill's SUBSTANTIVE-source bar (labeler ruling 2026-07-09). test glob is the corpus default narrowed to .ts \u2014 repo has NO test files (tsconfig excludes **/*.test.ts but none exist; scripts/test.sh only), so this class is unexercised (labeler-confirmed convention: corpus suffix default, extensions matched to source). react glob left at corpus default \u2014 moot since the react tag does not fire. REVIEW EDIT: removed react glob key \u2014 react not in tags, so no react-class rules install (convention: default+test always, react iff react tag fires)."
+  "notes": "react tag deliberately absent: ink@^4.4.1 + react@^18.2.0 sit in dependencies but zero .tsx/.jsx files exist and zero react/ink imports anywhere in source — the actual UI is readline/chalk/boxen (src/ui/simple-terminal-ui.ts). Trap: the string 'react' DOES appear in source, only inside template literals (foundation-client.ts demo code-gen output) and a content-sniffing predicate (language-detector.ts) — neither is usage. db absent: no db client, schema, or migrations. distributed absent: no network SDK at all — foundation-client generates code locally (mock of on-device Apple Foundation Models); dead deps blessed/blessed-contrib/terminal-kit are also unused. default glob NOT widened to .js: the only .js file is the root demo-ui.js scaffold script, below the skill's SUBSTANTIVE-source bar (labeler ruling 2026-07-09). test glob is the corpus default narrowed to .ts — repo has NO test files (tsconfig excludes **/*.test.ts but none exist; scripts/test.sh only), so this class is unexercised (labeler-confirmed convention: corpus suffix default, extensions matched to source). react glob left at corpus default — moot since the react tag does not fire. REVIEW EDIT: removed react glob key — react not in tags, so no react-class rules install (convention: default+test always, react iff react tag fires).",
+  "rules": {
+    "must_install": [
+      "predicate-names-ask-a-question",
+      "error-handling-two-regimes",
+      "static-domain-tables-use-as-const-satisfies",
+      "lookup-table-over-conditional-chain",
+      "comment-must-name-a-consequence",
+      "tests-are-the-first-caller",
+      "one-behavior-per-test",
+      "red-green-refactor-is-a-commit-shape"
+    ],
+    "must_not_install": [
+      "mood-names-commands-facts"
+    ]
+  },
+  "rules_notes": {
+    "predicate-names-ask-a-question": "+ src/api/foundation-client.ts — checkAppleIntelligenceAvailability(): boolean is a check*-named predicate",
+    "error-handling-two-regimes": "+ src/ui/simple-terminal-ui.ts — mainLoop while(true) with catch-log-continue — boundary/catch subject present",
+    "static-domain-tables-use-as-const-satisfies": "+ src/utils/language-detector.ts — SUPPORTED_LANGUAGES fixed domain table with type annotation instead of as-const-satisfies",
+    "lookup-table-over-conditional-chain": "+ src/utils/language-detector.ts — suggestLanguage if-chain maps compile-time-known keys to canonical values",
+    "comment-must-name-a-consequence": "+ src/utils/language-detector.ts — WHAT-narrating inline comments restating the code",
+    "mood-names-commands-facts": "- CLI has no events, commands, or message-type tags",
+    "tests-are-the-first-caller": "+ src/utils/language-detector.ts — testable pure logic exists; test rules key off code under test, not test-file presence (labeler ruling 2026-07-09)",
+    "one-behavior-per-test": "+ src/utils/language-detector.ts — testable pure logic exists; test rules key off code under test, not test-file presence (labeler ruling 2026-07-09)",
+    "red-green-refactor-is-a-commit-shape": "+ src/utils/language-detector.ts — testable pure logic exists; test rules key off code under test, not test-file presence (labeler ruling 2026-07-09)"
+  }
 }
