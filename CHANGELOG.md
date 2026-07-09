@@ -13,6 +13,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - change(sound): `sound:setup` writes installed rules with `paths`-only frontmatter — `when:` and `source:` dropped (selection metadata, not runtime signal; the corpus keeps them).
 
+### Fixed
+
+- fix(sound): monorepo scoping hardened after a live install left `distributed` rules repo-wide — scoped is now the DEFAULT for kind-tagged globs in workspace repos (incidental cross-package references don't unscope), Phase 5 gained the explicit rule→glob-class assignment, and tag negatives now require use-site evidence (a client's config/wrapper file alone never clears a dep). Verified 3/3 stable on the monorepo fixture.
+- fix(sound): `static-domain-tables-use-as-const-satisfies` no longer claims a `Record<Union, Shape>` annotation misses typo'd keys (it catches them) — the rule now stands on value widening: the annotation loses literal types, `satisfies` keeps them.
+
 ### Removed
 
 - remove(sound): `alias-imports-to-encode-origin` rule dropped from the corpus (104 rules).

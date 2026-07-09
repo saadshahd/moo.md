@@ -13,7 +13,7 @@ Corpus location: `../../corpus/` relative to this SKILL.md. If it is missing or 
 
 Goal: decide which kind-tags apply. `always` rules install everywhere; the decision is over `react`, `db`, `distributed`.
 
-**Usage evidence decides — manifest presence only tells you where to look.** A dep can be dead weight, hoisted, or tooling-only. For every manifest hint, verify in source before proposing the tag.
+**Usage evidence decides — manifest presence only tells you where to look.** A dep can be dead weight, hoisted, or tooling-only. For every manifest hint, verify in source before proposing the tag. Negatives need the same rigor: a client's config/wrapper file alone never clears a dep — search the client's USE sites (`.publish(`, `.send(`, `.create(`…) across the repo before ruling a tag out; a cache-shaped wrapper can still be published through elsewhere.
 
 Method: read every `package.json` (root + workspaces) and workspace markers (`pnpm-workspace.yaml`, `turbo.json`) → hypothesis list. Then verify each hypothesis against source. While there, also record: source extensions actually written (`.ts`/`.tsx`/`.js`/`.jsx`/`.mts`), the real test-file convention — read the test RUNNER'S config (vitest/jest include patterns, ava files) when one exists, since it's authoritative over filename guessing and settles which suffixes belong to unit tests vs e2e — and which workspace package each piece of evidence lives in.
 
@@ -33,7 +33,7 @@ Principle: **a rule's glob must be able to fire before its Detect moment.** `.cl
 
 1. **Extensions** — repo writes SUBSTANTIVE source in `.js`/`.jsx`/`.mts` too? Widen `{ts,tsx}` to match. Tooling config files alone (`tailwind.config.js`, `eslint.config.js`…) do NOT widen — the rules target code the team writes, not scaffolding. Pure-TS repos keep corpus defaults. The react-class glob covers JSX-BEARING extensions ONLY: `{tsx,jsx}` (or `.js` where the repo writes JSX inside `.js`) — never `.ts`. WRONG: `frontend/**/*.{ts,tsx}`. RIGHT: `frontend/**/*.{tsx,jsx}`.
 2. **Test convention** — replace the `**/*.{test,spec}.{ts,tsx}` class with the repo's real convention, expressed as the SUFFIX pattern alone, repo-wide (`**/*.test.ts`) — do NOT directory-scope it just because tests happen to sit in one dir (rule 4 applies here too). Directory-scope only when the convention has no suffix at all (ava-style bare `test/**/*.js`) or the suffix would match real non-test files. Include only the suffix arms the repo's unit tests actually use: if `.spec.ts` files exist but belong to a different runner (Playwright e2e), they stay OUT of the test class.
-3. **Monorepo scoping (kind-tagged rules only)** — if a tag's evidence lives entirely in specific packages, scope that tag's rules to them (`apps/web/**/*.{tsx,jsx}`). `always` rules stay repo-wide.
+3. **Monorepo scoping (kind-tagged rules only)** — in a workspace repo, SCOPED is the default: scope each tag's glob to the packages carrying that tag's evidence (`apps/web/**/*.{tsx,jsx}`). Leave it repo-wide only when the evidence genuinely spans most packages — incidental references elsewhere (a type reused by the frontend, an import in a script) do NOT unscope. WRONG: distributed evidence in one app, glob `**/*.{ts,js}`. RIGHT: `apps/worker/**/*.ts`. `always` rules stay repo-wide.
 4. **No other narrowing** — never tighten to `src/**` in single-package repos. Unmatched `paths` files cost nothing; narrowing only buys miss-risk.
 5. **Pathless pair** — `red-green-refactor-is-a-commit-shape` and `tidy-or-behavior-never-both` Detect on COMMIT shape, which no edit-glob reaches: strip their `paths` key entirely so they load at launch.
 
@@ -54,6 +54,8 @@ Present to the user, compactly: the extracted facts (each with its file evidence
 ## Phase 5 — Write
 
 For each selected rule, write `.claude/rules/<rule-name>.md`: body from the corpus; frontmatter = the tuned `paths` line ONLY — no `when:`, no `source:`. The pathless pair gets no frontmatter at all. No marker, manifest, or hash.
+
+Which glob each rule gets — by its corpus glob class, never ad hoc: rules shipping the test class → tuned `test`; react-tagged rules → tuned `react`; other kind-tagged rules → their tag's scoped glob when one exists, else `default`; `always` rules → `default`; a multi-kind rule → all of its tags' globs.
 
 ## Re-runs (reconcile, never overwrite)
 
