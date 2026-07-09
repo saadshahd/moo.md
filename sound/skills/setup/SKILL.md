@@ -53,7 +53,7 @@ Present to the user, compactly: the extracted facts (each with its file evidence
 
 ## Phase 5 — Write
 
-For each selected rule, write `.claude/rules/<rule-name>.md`: body from the corpus; frontmatter = tuned `paths` (or none for the pathless pair) plus the original `when:` and `source:`. No marker, manifest, or hash.
+For each selected rule, write `.claude/rules/<rule-name>.md`: body from the corpus; frontmatter = the tuned `paths` line ONLY — no `when:`, no `source:`. The pathless pair gets no frontmatter at all. No marker, manifest, or hash.
 
 ## Re-runs (reconcile, never overwrite)
 

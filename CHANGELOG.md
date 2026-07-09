@@ -7,11 +7,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- change(sound): `sound:setup` writes installed rules with `paths`-only frontmatter — `when:` and `source:` dropped (selection metadata, not runtime signal; the corpus keeps them).
+
+### Removed
+
+- remove(sound): `alias-imports-to-encode-origin` rule dropped from the corpus (104 rules).
+
 ## [sound@0.0.1] - 2026-07-09
 
 ### Added
 
-- feat(sound): new `sound` plugin — 105-rule taste corpus (`sound/corpus/`), `sound:setup` skill (probe stack by usage evidence → user confirms tags → cherry-pick by when-tag → tune paths globs → write; installed files are user-owned — no stamp/manifest, re-runs re-probe and reconcile against existing files via diff-and-ask, never silent overwrite), and a deterministic eval harness (`sound/evals/`: 9 real-repo fixtures — 6 local, 3 public incl. dead-dep and stripe-webhook specimens — scored by set-comparison with tree-derived canary paths; runner hard-refuses any model above haiku/sonnet). Not yet on the marketplace; TASTE.md cutover deliberately deferred until setup is proven live.
+- feat(sound): new `sound` plugin — 105-rule taste corpus (`sound/corpus/`), `sound:setup` skill (probe stack by usage evidence → user confirms tags → cherry-pick by when-tag → tune paths globs → write; installed files are user-owned — no stamp/manifest, re-runs re-probe and reconcile against existing files via diff-and-ask, never silent overwrite), and a deterministic eval harness (`sound/evals/`: 9 real-repo fixtures — 6 local, 3 public incl. dead-dep and stripe-webhook specimens — scored by set-comparison with tree-derived canary paths; runner hard-refuses any model above haiku/sonnet). Published to the moo marketplace; TASTE.md cutover deliberately deferred until setup is proven live.
 
 ## [hope@9.7.1] - 2026-07-01
 
