@@ -15,7 +15,7 @@
 - `services/api/tsconfig.json` — verbatim.
 - `services/api/src/config/database.ts` — verbatim, 121 lines. `@clickhouse/client`'s `createClient(...)` — owned analytics DB evidence.
 - `services/api/src/config/redis.ts` — verbatim, 140 lines. ioredis client + a `RedisService` wrapper (get/set/del/incr/hset) — included to show this is plain-cache-shaped on its own; the pub/sub evidence lives in event.service.ts, not here.
-- `services/api/src/services/event.service.ts` — TRUNCATED to first 150 lines of 604, with a `// [trimmed]` tail marker naming what was cut. Shows ClickHouse insert + `this.publishEvent(...)` (Redis publish) called from `processUIEvent`/`processPerformanceMetric`/`processABTestResult` — this is the file that actually justifies the `distributed` tag.
+- `services/api/src/services/event.service.ts` — first 150 lines of 604 PLUS two verbatim excerpts (source lines 392–398 `publishRealtimeEvent` and 531–539 `publishEvent`, both calling `this.redis.publish(...)`), each gap marked with `// [trimmed]`. Shows ClickHouse insert + the actual Redis pub/sub fan-out — this is the file that justifies the `distributed` tag. (Excerpts added 2026-07-09 after an eval run proved the original trim left the tag's evidence as narration in a comment rather than code — the model correctly refused to fire on it.)
 
 ## Trimming notes
 

@@ -37,6 +37,8 @@ sound/evals/fixtures/<fixture-name>/
   - `test` — rules shipping `**/*.{test,spec}.{ts,tsx}` (match the repo's real test convention)
   - `react` — rules shipping `**/*.{tsx,jsx}` (monorepo: scope to evidence-bearing package, e.g. `apps/web/**/*.{tsx,jsx}`)
   - Kind-tagged rules in monorepos may additionally scope `default`-class globs per tag; if so add a key per tag (e.g. `"db": "services/api/**/*.ts"`).
+  - Repo has ZERO test files → `test` keeps the corpus suffix default with extensions matched to the repo's real source extensions (`**/*.{test,spec}.ts` when no .tsx exists, `**/*.{test,spec}.js` for pure-JS). Unverifiable against a real convention by definition; note it. (Labeler-confirmed convention, 2026-07-09.)
+  - Extension widening follows the skill's SUBSTANTIVE-source bar: a lone demo/scaffold script does not widen `default` (labeler-confirmed on dead-dep-react's single root demo-ui.js, 2026-07-09).
 - The expected installed rule SET is NOT listed — the scorer derives it from corpus frontmatter + `tags` (when-tag filter), plus the constant pathless pair (`red-green-refactor-is-a-commit-shape`, `tidy-or-behavior-never-both`).
 
 ## Tag definitions (label against THESE, not intuition)

@@ -148,4 +148,23 @@ export class EventService {
     return resultId;
   }
 
-// [trimmed — 604 lines total in source, showing first 150: processUIEvent/processPerformanceMetric/processABTestResult, each pattern is ClickHouse insert + this.publishEvent(...) to Redis]
+// [trimmed — 604 lines total in source; lines 151–394 and 398–530 omitted. Below: two verbatim excerpts (source lines 392–398 and 531–539)]
+
+  /**
+   * Publish real-time event for WebSocket distribution
+   */
+  async publishRealtimeEvent(message: WebSocketMessage): Promise<void> {
+    await this.redis.publish(this.realtimeChannel, JSON.stringify(message));
+  }
+
+  private async publishEvent(eventType: string, event: any): Promise<void> {
+    const message = {
+      type: eventType,
+      data: event,
+      timestamp: new Date().toISOString(),
+    };
+
+    await this.redis.publish("events", JSON.stringify(message));
+  }
+
+// [trimmed — remainder omitted]
