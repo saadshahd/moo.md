@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-Inline comments are a smell: if a line needs explaining, rename, extract, or restructure until it doesn't. Block comments are acceptable only where the code cannot be made self-describing — a regulatory constraint, a non-obvious performance decision, a workaround for an external bug — and they explain WHY, never WHAT. A `//` comment survives only when omitting it would let a future editor silently break a non-obvious constraint, so it MUST name a consequence or an external-system mapping. A comment that paraphrases the line it sits on is deleted.
+Inline comments are a smell: if a line needs explaining, rename, extract, or restructure until it doesn't. Block comments are acceptable only where the code cannot be made self-describing — a regulatory constraint, a non-obvious performance decision, a workaround for an external bug — and they explain WHY, never WHAT. A `//` comment survives only when omitting it would let a future editor silently break a non-obvious constraint, so it MUST name a consequence or an external-system mapping.
 WRONG:
 ```ts
 // increment the counter

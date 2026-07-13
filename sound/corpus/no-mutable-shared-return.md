@@ -17,4 +17,4 @@ const ordersFor = (userId: string): readonly Order[] => Object.freeze([...(cache
 ```
 _Avoid_: returning a live reference into internal state (a `Map`, an array field, a class instance) without a defensive copy; a return type that omits `readonly` on a value the caller has no business mutating.
 Detect: a function returning a reference type without `readonly`/`Readonly<T>` where the underlying value is also held internally (a cache, a singleton, a closure variable) — a caller mutation would leak back.
-Not-when: the value is freshly constructed per call from primitives with no shared internal storage — there's nothing to leak, and `readonly` would be theatre.
+Not-when: the value is freshly constructed per call from primitives with no shared internal storage — there's nothing to leak.

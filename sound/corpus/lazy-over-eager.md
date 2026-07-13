@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-Don't compute, fetch, or transform a value until it's needed. Eager evaluation hides cost — it runs work the caller may never use — and couples timing to structure, so a value's computation happens because of where the code sits rather than when the value is required.
+Don't compute, fetch, or transform a value until it's needed — eager evaluation couples a value's computation to where the code sits rather than when the value is required.
 WRONG:
 ```ts
 const summary = buildExpensiveSummary(order); // always runs

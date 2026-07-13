@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-Give a sub-flow its own reducer addressed only by typed messages ONLY when its lifecycle is independent of the parent — it runs as concurrent instances, survives a parent transition, or self-resets. When it earns that, the parent only SENDS messages and READS a published view; it NEVER reaches into the child's internals. A mode the parent merely steps through over shared data stays nested state — wrapping it in messages is ceremony.
+Give a sub-flow its own reducer addressed only by typed messages ONLY when its lifecycle is independent of the parent — it runs as concurrent instances, survives a parent transition, or self-resets. When it earns that, the parent only SENDS messages and READS a published view; it NEVER reaches into the child's internals. A mode the parent merely steps through over shared data stays nested state.
 WRONG:
 ```ts
 // a wizard the parent walks through, over shared data, dressed up as an actor

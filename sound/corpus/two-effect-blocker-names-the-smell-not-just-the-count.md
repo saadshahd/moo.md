@@ -4,7 +4,7 @@ when: react
 source: Abramov
 ---
 when: [react] · tier: standard · check: judgeable
-A component flagged for effect overuse is fixed by classifying each effect: an *escape hatch* (synchronizing with an external system — keep it, extract to a named hook) or an *event-in-disguise* (logic reacting to a state flag a handler just set — move it into that handler, not an effect reacting to the state the handler set).
+A component flagged for effect overuse is fixed by classifying each effect: an *escape hatch* (synchronizing with an external system — keep it, extract to a named hook) or an *event-in-disguise* (logic reacting to a state flag a handler just set — move it into that handler).
 WRONG:
 ```tsx
 useEffect(() => {

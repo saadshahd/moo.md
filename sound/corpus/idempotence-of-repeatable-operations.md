@@ -4,7 +4,7 @@ when: always
 source: Hughes
 ---
 when: [always] · tier: standard · check: deterministic
-Any operation documented or named as safe-to-repeat (normalize, sort, dedupe, sanitize, upsert) must satisfy `f(f(x)) === f(x)` for generated `x` — applying it twice is provably identical to applying it once.
+Any operation documented or named as safe-to-repeat (normalize, sort, dedupe, sanitize, upsert) must satisfy `f(f(x)) === f(x)` for generated `x`.
 WRONG:
 ```ts
 test('normalizes whitespace', () => {

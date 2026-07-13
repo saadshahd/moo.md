@@ -4,7 +4,7 @@ when: db, distributed
 source: Nygard
 ---
 when: [db, distributed] · tier: high-stakes · check: judgeable
-Any collection that can grow without bound (logs, caches, in-memory queues, retry buffers) must have an explicit eviction, cap, or TTL — "it'll be fine, we'll add cleanup later" is the growth-state default that ships.
+Any collection that can grow without bound (logs, caches, in-memory queues, retry buffers) must have an explicit eviction, cap, or TTL.
 WRONG:
 ```ts
 const failedJobs: Job[] = [] // pushed to forever, never trimmed

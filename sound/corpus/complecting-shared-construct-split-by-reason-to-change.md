@@ -4,7 +4,7 @@ when: always
 source: Hickey
 ---
 when: [always] · tier: standard · check: judgeable
-When two properties, fields, or branches of one construct change for different reasons, that construct is complected, not cohesive — split it into two things joined by an explicit relationship. The defect was never repeated text — it is a single construct forced to represent two concepts.
+When two properties, fields, or branches of one construct change for different reasons, that construct is complected, not cohesive — split it into two things joined by an explicit relationship.
 WRONG:
 ```ts
 type Order = { status: 'draft' | 'submitted'; discount: number; shippingZone: string }

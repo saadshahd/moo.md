@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: deterministic
-When the keys are known at compile time, map them with an object or `Map` lookup — never a `switch` or an `if/else` chain. A static mapping is data; expressing it as control flow buries the mapping inside branches a reader has to execute in their head.
+When the keys are known at compile time, map them with an object or `Map` lookup — never a `switch` or an `if/else` chain.
 WRONG:
 ```ts
 function label(status: OrderStatus) {

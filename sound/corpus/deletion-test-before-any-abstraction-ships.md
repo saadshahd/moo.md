@@ -4,7 +4,7 @@ when: always
 source: Hickey
 ---
 when: [always] · tier: standard · check: judgeable
-Before a module, wrapper, or interpreter is allowed to exist, ask what happens if you delete it: if the complexity it holds evaporates, it was a pass-through — cut it; if the complexity reappears at N call sites, it was load-bearing — keep it. Do nothing of no use: this deletion test replaces a feeling about which abstractions are unused with a mechanical check.
+Before a module, wrapper, or interpreter is allowed to exist, ask what happens if you delete it: if the complexity it holds evaporates, it was a pass-through — cut it; if the complexity reappears at N call sites, it was load-bearing — keep it.
 WRONG:
 ```ts
 // exists because "we might swap providers later"

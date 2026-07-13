@@ -20,6 +20,6 @@ export const Currency = { format } as const;
 import { Currency } from '@/currency';
 ```
 _Avoid_: a helper imported across bounded contexts from deep inside the one feature folder that first defined it; a domain concept parked in the UI/route module that happened to need it first.
-Detect: an export imported by files from 2+ sibling domains while it lives inside just one of them — it belongs at their common ancestor. Ask "where would someone who's never seen this look for it?"; if that's not where it sits, it's misplaced.
+Detect: an export imported by files from 2+ sibling domains while it lives inside just one of them — it belongs at their common ancestor.
 Not-when: the code genuinely serves exactly one domain and no other consumer exists — leave it there; don't hoist speculatively toward reuse that hasn't arrived.
 Cross-ref: feature-envy-misplacement — the smell that says a function sits in the wrong module; colocate-then-lift-on-second-consumer — the react-state instance; no-role-named-modules — the grab-bag ban itself.

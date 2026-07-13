@@ -21,4 +21,4 @@ function refund(orderId: OrderId, customerId: CustomerId) { /* ... */ }
 ```
 _Avoid_: function signatures with 2+ adjacent parameters typed as plain `string` or `number` that represent different domain identities.
 Detect: two or more identifiers of the same primitive type appearing as sibling fields or sibling parameters, where swapping their positions would still type-check.
-Not-when: a value that's a bare primitive everywhere it's used and never adjacent to a same-typed sibling — e.g. a single free-text `notes: string` field. Don't brand primitives that never risk positional confusion; that's ceremony without a payoff.
+Not-when: a value that's a bare primitive everywhere it's used and never adjacent to a same-typed sibling — e.g. a single free-text `notes: string` field.

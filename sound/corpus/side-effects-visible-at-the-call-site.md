@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-Side effects live at the edges and are visible at the call site — no decorators, no implicit middleware, no silent mutations. If a function logs, that's a side effect and it belongs to the caller, not the function: pure business-logic functions NEVER call a logger internally. When something happens, it's visible where it's triggered.
+Side effects live at the edges and are visible at the call site — no decorators, no implicit middleware, no silent mutations. If a function logs, that's a side effect and it belongs to the caller, not the function: pure business-logic functions NEVER call a logger internally.
 WRONG:
 ```ts
 function computeTotal(order: Order): number {

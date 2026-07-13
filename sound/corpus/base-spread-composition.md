@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-When 2+ shaped values share a non-trivial core, define the core ONCE and build each variant by spreading it and adding only its delta; type the result as `Base & Delta`. Never copy the shared fields across variant literals — copies drift the moment one side changes and the other is forgotten.
+When 2+ shaped values share a non-trivial core, define the core ONCE and build each variant by spreading it and adding only its delta; type the result as `Base & Delta`. Never copy the shared fields across variant literals.
 WRONG:
 ```ts
 const a = { id, createdAt, ownerId, region, kind: 'a', extra };

@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- sound: trimmed aphorism-tail restatements from 31 corpus rules (token reduction, zero enforcement change — frontmatter, header lines, section labels, carves, Detect/Not-when conditions all byte-preserved).
+
 ## [sound@0.0.2] - 2026-07-09
 
 ### Changed

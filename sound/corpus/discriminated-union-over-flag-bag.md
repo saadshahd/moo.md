@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-Model mutually-exclusive domain states as a discriminated union tagged by a discriminant field (`status`, `type`, `kind`, `tag`), where each variant carries only the data valid in that state. Never represent distinct states as one flat type with optional fields you cross your fingers over. Independent axes that genuinely co-occur stay as separate fields — don't fuse them into one tag just to look tidy.
+Model mutually-exclusive domain states as a discriminated union tagged by a discriminant field (`status`, `type`, `kind`, `tag`), where each variant carries only the data valid in that state. Never represent distinct states as one flat type with optional fields.
 WRONG:
 ```ts
 type Request = { loading: boolean; data?: Response; error?: Error };

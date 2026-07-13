@@ -4,7 +4,7 @@ when: db, distributed
 source: Hickey
 ---
 when: [db, distributed] · tier: standard · check: deterministic
-A value that is read in one place and written in another over time is a **place**, and a place needs a story for who wrote it last and when — model it explicitly instead of trusting the variable to hold the truth. A shared place invites two writers to complect "what changed" with "when it changed," so the truth of who wrote last must be modeled explicitly, not inferred from the binding.
+A value that is read in one place and written in another over time is a **place**, and a place needs a story for who wrote it last and when — model it explicitly instead of trusting the variable to hold the truth.
 WRONG:
 ```ts
 let cache = {}

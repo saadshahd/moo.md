@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-A draft or in-flight entity gets its own domain noun (`draftOrder`, `beingMadeMove`), never the committed type plus an `isEditing` flag. An entity mid-mutation is a distinct state, not a decorated copy of the committed one.
+A draft or in-flight entity gets its own domain noun (`draftOrder`, `beingMadeMove`), never the committed type plus an `isEditing` flag.
 WRONG:
 ```ts
 type Order = { id: string; total: number; isEditing?: boolean };

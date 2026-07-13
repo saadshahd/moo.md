@@ -20,7 +20,7 @@ RIGHT:
 const Order = {
   place: (data: DraftOrder): Result<Order, OrderInvariantViolation> => /* the one seam */ ...
 }
-// place :: DraftOrder => Result<Order, OrderInvariantViolation>  (status starts "pending", always)
+// (status starts "pending", always)
 ```
 _Avoid_: exported classes with public multi-arg constructors (3+ positional params) callable from outside their own module; exported object-literal constructors for an aggregate; `{ ...order, status: X }` spread from outside the aggregate's module; booleans or nulls threaded through construction to represent a state the type should already know.
 Detect: `new <PascalCase>(` call sites outside the type's own module; constructors/object literals with 3+ positional or unlabeled fields; an aggregate-shaped value built or mutated via object literal / spread in a module that doesn't own that type; the same invariant check re-appearing at 2+ call sites.

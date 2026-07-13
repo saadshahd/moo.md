@@ -4,7 +4,7 @@ when: db
 source: house
 ---
 when: [db] · tier: standard · check: judgeable
-Push filtering, sorting, and pagination to the database. Never fetch all rows and filter, sort, or slice in application memory — the app's pagination contract is a lie if it fetches everything first. This is correctness, not optimization: an in-memory `slice` reports a page count and cursor that don't match what the store actually holds.
+Push filtering, sorting, and pagination to the database. Never fetch all rows and filter, sort, or slice in application memory. This is correctness, not optimization: an in-memory `slice` reports a page count and cursor that don't match what the store actually holds.
 WRONG:
 ```ts
 const all = await db.select().from(orders);
