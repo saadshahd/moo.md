@@ -18,5 +18,5 @@ type Order =
 ```
 _Avoid_: a single mutable boolean/field standing for both "I asked" and "it's confirmed" when confirmation comes from elsewhere; pending/confirmed machinery bolted onto state that's authoritative right here.
 Detect: a field written optimistically before a remote acknowledgement, with no distinct state for the in-flight request — the intent and the fact have been fused. Ask whether the truth is decided here or reconciled elsewhere; only the latter earns the three-state split.
-Not-when: the state is locally authoritative and synchronous with nothing to reconcile — a plain value is correct; the temporal split would be ceremony.
+Not-when: the state is locally authoritative and synchronous with nothing to reconcile — a plain value is correct.
 Cross-ref: mood-names-commands-facts — the naming surface of this split; pure-decide-emits-facts — the handler shape at an aggregate.

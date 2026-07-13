@@ -4,7 +4,7 @@ when: distributed
 source: Lamport
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
-The property that must NEVER be violated is written once as a pure predicate over state, named, and asserted at the boundary where state changes — before the mechanism that maintains it is coded. If you cannot express the invariant as a function, you have not specified the system.
+The property that must NEVER be violated is written once as a pure predicate over state, named, and asserted at the boundary where state changes — before the mechanism that maintains it is coded.
 WRONG:
 ```ts
 // "a seat is never double-booked" — enforced by reading the booking code and trusting it

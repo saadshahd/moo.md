@@ -4,7 +4,7 @@ when: react
 source: house
 ---
 when: [react] · tier: standard · check: judgeable
-Raw `useEffect` and `useRef` in a component are low-level plumbing that almost always stand for a higher declarative concept — a subscription, a debounce, a media query, a previous value, an intersection observer. Extract them into named hooks that describe INTENT (`useMediaQuery`, `usePrevious`, `useOnClickOutside`) so the component reads as a description of behavior, not an implementation of it. A component with 2+ `useEffect`s is a code-review blocker: each effect is either a custom hook waiting to be named or a sign the component has too many responsibilities.
+Raw `useEffect` and `useRef` in a component are low-level plumbing that almost always stand for a higher declarative concept — a subscription, a debounce, a media query, a previous value, an intersection observer. Extract them into named hooks that describe INTENT (`useMediaQuery`, `usePrevious`, `useOnClickOutside`). A component with 2+ `useEffect`s is a code-review blocker.
 WRONG:
 ```tsx
 useEffect(() => {

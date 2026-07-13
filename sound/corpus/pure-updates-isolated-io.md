@@ -4,7 +4,7 @@ when: always
 source: house
 ---
 when: [always] · tier: standard · check: judgeable
-The invariant is universal: an update to a shared state tree returns a NEW tree — never mutate in place — and the IO that triggered it lives at the edge, never threaded into the update. The named-optic/lens MECHANISM is project-idiom-gated: where optics are already the house style, reach for a named optic at nested or multi-field updates; where they are not, plain spread updates satisfy the same invariant. Never impose optics on a project that doesn't already use them.
+The invariant is universal: an update to a shared state tree returns a NEW tree — never mutate in place — and the IO that triggered it lives at the edge, never threaded into the update. The named-optic/lens MECHANISM is project-idiom-gated: where optics are already the house style, reach for a named optic at nested or multi-field updates; where they are not, plain spread updates satisfy the same invariant.
 WRONG:
 ```ts
 async function markDone(state: Tree, id: string) {

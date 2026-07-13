@@ -20,5 +20,5 @@ const reading = withRetry(fetchReading);
 const parse = pipe(tokenize, buildOrder);
 ```
 _Avoid_: a comment that restates the code beneath it in English; a WHAT-narration of a loop, assignment, or call; step-by-step narration of a function body.
-Detect: read each comment against its line — if the line's identifiers already say what the comment says, delete it. A surviving comment must point at something the code cannot show: a law, an external system's behavior, a consequence of removal. The sole sanctioned inline exception is a Hindley-Milner type signature over an argument-free point-free binding, documenting SHAPE only.
+Detect: read each comment against its line — if the line's identifiers already say what the comment says, delete it. The sole sanctioned inline exception is a Hindley-Milner type signature over an argument-free point-free binding, documenting SHAPE only.
 Not-when: the comment encodes a genuine external constraint (regulation, a documented upstream bug, a measured performance tradeoff) that the code cannot express on its own — keep it, and make it name the WHY.
