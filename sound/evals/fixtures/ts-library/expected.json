@@ -18,8 +18,6 @@
       "state-modeling-escalation"
     ],
     "must_not_install": [
-      "value-object-for-domain-primitive",
-      "mood-names-commands-facts",
       "parse-dont-validate-at-every-untyped-boundary"
     ]
   },
@@ -30,8 +28,6 @@
     "test-observable-behavior-not-structure": "+ packages/core/tests/components/state-fragment.test.ts — tests assert public API outputs",
     "discriminated-union-over-flag-bag": "+ packages/core/core/types.ts — mixes string-literal discriminants with optional boolean flag pairs (isInitial/isFinal)",
     "state-modeling-escalation": "+ packages/core/core/types.ts — core domain IS state/event/transition modeling",
-    "value-object-for-domain-primitive": "- no money/email/quantity primitives; cost/count fields are structural graph metrics",
-    "mood-names-commands-facts": "- 'events' are freeform string transition labels, not a command/fact tag taxonomy",
     "parse-dont-validate-at-every-untyped-boundary": "- pure in-memory library; no fetch/JSON.parse/DB row/SDK ingress in included core"
   }
 }

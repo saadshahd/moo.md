@@ -18,7 +18,8 @@
       "integration-point-isolation",
       "push-work-to-the-database",
       "parse-dont-validate-at-every-untyped-boundary",
-      "no-behavioral-boolean-props"
+      "no-behavioral-boolean-props",
+      "stale-message-is-dropped-by-version"
     ],
     "must_not_install": [
       "no-shared-mutable-state-across-workers",
@@ -26,8 +27,7 @@
       "restart-policy-as-data",
       "per-unit-crash-isolation",
       "bulkhead-resource-partitioning",
-      "actor-isolation-only-for-independent-lifecycle",
-      "stale-message-is-dropped-by-version"
+      "actor-isolation-only-for-independent-lifecycle"
     ]
   },
   "rules_notes": {
@@ -44,6 +44,6 @@
     "per-unit-crash-isolation": "- no batch loop over independent units; webhook handles one event per request",
     "bulkhead-resource-partitioning": "- no connection/thread/concurrency pools constructed",
     "actor-isolation-only-for-independent-lifecycle": "- no reducers/actors/message-addressed sub-flows",
-    "stale-message-is-dropped-by-version": "- no ordered stream/socket/subscription handler; request/response webhook only"
+    "stale-message-is-dropped-by-version": "+ app/api/webhooks/route.ts — Stripe delivers webhooks out of order; handler writes subscription state from event payloads (labeler ruling 2026-07-10, flipped from must_not)"
   }
 }

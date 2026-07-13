@@ -31,7 +31,11 @@ sound/evals/fixtures/<fixture-name>/
     "must_install": ["command-vs-fact-when-reconciled-elsewhere"],
     "must_not_install": ["mood-names-commands-facts"]
   },
-  "notes": "one line per non-obvious label decision, including WHY each rules label"
+  "notes": "one line per non-obvious tag/glob decision",
+  "rules_notes": {
+    "command-vs-fact-when-reconciled-elsewhere": "+ path/file.ts — one-line WHY citing the surface",
+    "mood-names-commands-facts": "- WHY the repo shows no surface / Not-when veto"
+  }
 }
 ```
 
@@ -44,18 +48,18 @@ sound/evals/fixtures/<fixture-name>/
   - Repo has ZERO test files → `test` keeps the corpus suffix default with extensions matched to the repo's real source extensions (`**/*.{test,spec}.ts` when no .tsx exists, `**/*.{test,spec}.js` for pure-JS). Unverifiable against a real convention by definition; note it. (Labeler-confirmed convention, 2026-07-09.)
   - Extension widening follows the skill's SUBSTANTIVE-source bar: a lone demo/scaffold script does not widen `default` (labeler-confirmed on dead-dep-react's single root demo-ui.js, 2026-07-09).
 - `rules`: THREE-CLASS labels — the when-tag filter is only candidacy; selection is per-rule subject-surface judgment, and these labels fence its rate:
-  - `must_install` — rules the fixture's code plainly earns (its reason for existing). Each needs a citable surface in the included files; note WHY.
+  - `must_install` — rules the fixture's code plainly earns (its reason for existing). Each needs a citable surface in the included files; note WHY in `rules_notes`.
   - `must_not_install` — the grab-bag rules the fixture exists to exclude (subject absent from the repo, or `Not-when:` vetoes). These carry the discriminating power.
   - Everything unlabeled is DON'T-CARE by design — never attempt 104-way exact labels; label only rules where this fixture discriminates (aim 5–15 total).
   - Universal-subject rules (naming, transformation shape, comments) pass trivially everywhere — labeling them `must_not_install` is almost always a label bug.
   - Test-scoped rules key off the CODE UNDER TEST, not test-file presence (labeler-confirmed 2026-07-09): zero test files does NOT justify `must_not_install` for general testing rules when testable logic exists; shape-specific test rules (roundtrip, generators) still need their shape.
-  - The scorer additionally checks (no labels needed): every proposed rule name exists in the corpus; every citation path exists in `tree.txt`.
+  - TS-prescription rules (casts, branded types, `satisfies`, compile-time exhaustiveness) are `must_not_install` in pure-JS repos — a prescription the repo cannot follow (labeler-confirmed 2026-07-10).
+  - Out-of-order-capable event delivery (Stripe webhooks) IS an ordering-hazard surface for stale-message rules, distinct from idempotency (labeler-confirmed 2026-07-10).
+  - The scorer additionally checks (no labels needed): every proposed rule name exists in the corpus; every citation path exists in `tree.txt` ∪ the fixture's included `repo/` files (tree.txt is head-400-truncated, so an included excerpt file may be absent from it).
 
 ## Tag definitions (label against THESE, not intuition)
 
-- `react`: repo actually writes React/JSX UI (usage evidence: .tsx/.jsx files, JSX in .js). Dep-without-usage does NOT fire.
-- `db`: repo owns database access (client/ORM usage in source, schema/migration files). A hosted-API-only consumer does not fire.
-- `distributed`: any SIDE-EFFECTFUL remote boundary — the repo makes a remote party durably change state (payments, email/SMS, queue publish, webhook-confirmed flows, bot messaging) or spans reconciling processes. READ-ONLY consumption of remote APIs does NOT fire. Publisher-side evidence alone SUFFICES (labeler-confirmed 2026-07-09): a real `.publish()` fires the tag even when no in-repo consumer exists — consumers usually live outside the repo, and the corpus's distributed rules govern the publisher's shape.
+The single source is the Phase 1 tag table in `../skills/setup/SKILL.md` — label against it verbatim (it carries the fire/does-NOT-fire columns, the publisher-side-suffices clause, and the framework-wrapped-senders carve). Never restate it here; when it moves, labels re-audit against the new table.
 
 ## Provenance rules
 

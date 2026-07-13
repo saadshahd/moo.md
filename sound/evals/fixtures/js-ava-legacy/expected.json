@@ -9,7 +9,6 @@
     "must_install": [
       "rules-as-data-over-scattered-conditionals",
       "lookup-table-over-conditional-chain",
-      "exhaustiveness-is-a-compile-error-not-a-runtime-throw",
       "data-as-spec-earns-its-trigger",
       "one-behavior-per-test",
       "test-observable-behavior-not-structure"
@@ -20,13 +19,14 @@
       "generics-only-for-a-real-relationship-between-inputs-and-output",
       "branded-primitives-for-domain-ids",
       "mood-names-commands-facts",
-      "set-prefix-means-caller-supplied-write"
+      "set-prefix-means-caller-supplied-write",
+      "exhaustiveness-is-a-compile-error-not-a-runtime-throw"
     ]
   },
   "rules_notes": {
     "rules-as-data-over-scattered-conditionals": "+ src/data/card-rules.js — policy as declarative rule tables walked by one evaluator",
     "lookup-table-over-conditional-chain": "+ src/validator.js — _validate dispatches on fixed key set via large switch(ast.type)",
-    "exhaustiveness-is-a-compile-error-not-a-runtime-throw": "+ src/validator.js — tag-switch guarded only by default: throw new Error('unknow ast type')",
+    "exhaustiveness-is-a-compile-error-not-a-runtime-throw": "- RIGHT shape requires TS; TS-prescription rules never install in pure JS (labeler ruling 2026-07-10)",
     "data-as-spec-earns-its-trigger": "+ src/validator.js — member-blind interpreter over a tagged AST corpus",
     "one-behavior-per-test": "+ test/validator.js — real AVA test blocks; one asserts over two distinct fixtures",
     "test-observable-behavior-not-structure": "+ test/validator.js — AVA tests assert against the public export surface",
