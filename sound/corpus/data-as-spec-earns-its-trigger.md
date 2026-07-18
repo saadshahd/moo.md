@@ -24,4 +24,4 @@ const handlers: Record<Member['tag'], Handler> = { a, b };
 _Avoid_: a `switch`-driven interpreter over a fixed, low-variance case set; a member-blind engine installed for a member set that isn't actually growing.
 Detect: an interpreter/handler-map abstraction whose tag set is closed and small — ask whether the set genuinely keeps growing AND each member brings its own behavior; if not both, collapse it to variant props or a plain typed map.
 Not-when: the member set truly is open and behavior-carrying (a plugin registry, a rule corpus) — then the union + tag-keyed `Record` is correct precisely because it makes a forgotten member a compile error.
-Cross-ref: static-domain-tables-use-as-const-satisfies — the typing of the Record; exhaustiveness-is-a-compile-error-not-a-runtime-throw — the compile-error guarantee; speculative-generality-guard — the smell of installing this before the trigger.
+Cross-ref: static-domain-tables-use-as-const-satisfies — the typing of the Record; exhaustiveness-is-a-compile-error-not-a-runtime-throw — the compile-error guarantee; abstraction-earns-existence — the smell of installing this before the trigger.

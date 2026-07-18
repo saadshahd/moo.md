@@ -13,10 +13,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - feat(hunch): new experimental plugin — a grab bag staging ground for skills and plugin features; cheap to enter, honest to exit (every release each experiment graduates into hope/sound or dies, judgment-leaning ones only with a measured pass-rate). Registered in marketplace.json under category `experimental`.
 - feat(hunch): `catch` skill — trimmed and reframed port of [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) (120 → 37 lines). The ADHD lens generalized to its universal core: every premise (finite working memory, knowing≠doing, start friction, time blindness, invisible progress) is a human constraint that agent-mediated work amplifies. Same rules; premise rewritten for any human supervising agents, estimates denominated in the reader's time, description reduced to trigger-only per the description-trap rule.
+- sound: `abstraction-earns-existence` (merge of the delete-vs-date ladder: speculative-generality-guard + seam-earns-existence-at-second-adapter + deletion-test-before-any-abstraction-ships) and `independent-awaits-run-together` (gap-fill rule, admitted by #169's mechanism-C propensity measurement — the one shape a capable model reproduces unprompted) corpus rules.
 
 ### Changed
 
+- sound: corpus-evolution cutover (#167) — 106 → 102 corpus rules via 4 merges, 1 split, 2 regates. 5 amendments: eliminate-mask domain-sanctioned-vs-fabricated discriminator, as-cast widened to all checker-silencing (any / @ts-ignore / @ts-expect-error / widening), comment change-narration clause, test owned-seam + tautological-mock clause, and the cross-boundary-facts × integration-point-isolation observability reconciliation (adapter owns observability). `chained-transformations` merged into `single-expression-construction` (standard, absolutism softened, human-adjudicated). Ledgers reconciled: enforcement-taxonomy 24/72/6, skill-partition 43 default (+2 opt-in), digest-membership 2/20/51.
 - sound: trimmed aphorism-tail restatements from 31 corpus rules (token reduction, zero enforcement change — frontmatter, header lines, section labels, carves, Detect/Not-when conditions all byte-preserved).
+
+### Removed
+
+- sound: 6 corpus rules folded by #167 merges — `speculative-generality-guard`, `seam-earns-existence-at-second-adapter`, `deletion-test-before-any-abstraction-ships` (→ abstraction-earns-existence); `chained-transformations-over-imperative-accumulation` (→ single-expression-construction); `two-effect-blocker-names-the-smell-not-just-the-count` (→ effect-is-a-named-intent); `tests-are-the-first-caller` (→ red-green-refactor-is-a-commit-shape).
 
 ## [sound@0.0.2] - 2026-07-09
 

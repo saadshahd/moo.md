@@ -1,10 +1,12 @@
-# sound — enforcement taxonomy (all 106 corpus rules)
+# sound — enforcement taxonomy (all 102 corpus rules)
 
 > Keystone for map **sound: enforcement-split + lazy-load the judgeable core** (#144), ticket #145.
 > Partitions every `sound/corpus/*.md` rule into three enforcement classes, keyed off each rule's `Detect:` line.
 > Downstream consumers: digest-membership, `/sound:review` design, lint-layer design, lazy-delivery.
 
 > **2026-07-18 amendment (grugbrain gap analysis):** two rules added. `optimization-cites-a-measurement` → judgeable-at-write (uncited perf machinery is visible in resulting code). `removal-names-the-fences-reason` → process/commit-shape (the removed fence is invisible in the end state; its `Detect:` is diff-scoped, like characterize-before-refactor). Counts updated in place: 104 → 106.
+
+> **2026-07-18 cutover (#167 — corpus-evolution release):** 4 merges, 1 split, 2 regates, 1 gap-fill rule. Judgeable −4 (76 → 72): merge-away `speculative-generality-guard`+`seam-earns-existence-at-second-adapter`+`deletion-test-before-any-abstraction-ships` → **`abstraction-earns-existence`** (−2); merge-away `chained-transformations-over-imperative-accumulation` → `single-expression-construction` (−1); merge-away `two-effect-blocker-names-the-smell-not-just-the-count` → `effect-is-a-named-intent` (−1); **`concept-count-not-line-count` regated judgeable → process** (−1 judgeable / +1 process); add gap-fill **`independent-awaits-run-together`** (+1, admitted by #169 propensity measurement). Process net 0: `tests-are-the-first-caller` merged into `red-green-refactor-is-a-commit-shape` (−1) balances the concept-count regate (+1). Deterministic unchanged (`invariant-boundary-constructor` split its recheck-duplication WRONG out to `duplication-taxonomy-triage` but keeps its class). **Property-testing cluster (6: `roundtrip-encode-decode-is-a-law`, `idempotence-of-repeatable-operations`, `invariant-preservation-over-mutation`, `generators-are-domain-documentation`, `shrinking-must-survive-to-the-failure-message`, `model-based-against-a-reference-implementation`) marked evidence-gated** — delivered only where a property runner is present, wired at `sound:setup` Select by #155 (class is unchanged; this is a delivery gate). `near-identical-examples-signal-an-unextracted-property` stays ungated (gateway). Counts updated in place: 106 → **102**.
 
 ## Key finding — the existing `check:` field is a two-class conflation
 
@@ -20,9 +22,9 @@ Because `check:` is model-authored and unverified, **treat every against-seed ca
 | Class | Count | Downstream home |
 |---|---|---|
 | **deterministic** (per-edit) | 24 | lint layer — **leaves** the digest |
-| **judgeable-at-write** | 76 | the **only** class that feeds #65's digest + pull-on-demand bodies |
+| **judgeable-at-write** | 72 | the **only** class that feeds #65's digest + pull-on-demand bodies |
 | **process / commit-shape** | 6 | `/sound:review` |
-| total | **106** | |
+| total | **102** | |
 
 Against the `check:` seed: **+2** rules moved deterministic→process (red-green, tidy), **+3** judgeable→process (characterize, scratch-refactor, tests-are-first-caller), **+6** deterministic→judgeable (the concurrency/aliasing cluster + model-based), **+1** judgeable→deterministic (keys-are-identity). Net: seed-det 31→24, seed-judge 73→75, new process 5. *(That was the #145 reconciliation of the then-104 rules; the 2026-07-18 additions bring the table above to 76/6.)*
 
@@ -60,9 +62,10 @@ Deterministic-primary but bordered (linter surfaces candidates reliably; taste o
 - invariant-preservation-over-mutation
 - keys-are-identity-not-position  *(moved from seed `judgeable`)*
 
-## Class 2 — judgeable-at-write (76) → the digest + pull-on-demand bodies
+## Class 2 — judgeable-at-write (72) → the digest + pull-on-demand bodies
 
 - absence-as-terse-check
+- abstraction-earns-existence  *(merge of speculative-generality-guard + seam-earns-existence-at-second-adapter + deletion-test-before-any-abstraction-ships, #167)*
 - actor-isolation-only-for-independent-lifecycle
 - as-cast-requires-a-named-justification
 - atomicity-three-regimes
@@ -70,17 +73,14 @@ Deterministic-primary but bordered (linter surfaces candidates reliably; taste o
 - bounded-context-owns-its-type
 - bulkhead-resource-partitioning
 - caller-blind-function-names
-- chained-transformations-over-imperative-accumulation
 - colocate-then-lift-on-second-consumer
 - command-vs-fact-when-reconciled-elsewhere
 - comment-must-name-a-consequence
 - complecting-shared-construct-split-by-reason-to-change
-- concept-count-not-line-count
 - cross-boundary-data-is-an-immutable-past-snapshot
 - cross-boundary-facts-are-queryable
 - data-as-spec-earns-its-trigger
 - data-clump-to-parameter-object
-- deletion-test-before-any-abstraction-ships
 - derive-dont-sync
 - derived-store-is-a-rebuildable-projection
 - discriminated-union-over-flag-bag
@@ -97,6 +97,7 @@ Deterministic-primary but bordered (linter surfaces candidates reliably; taste o
 - generics-only-for-a-real-relationship-between-inputs-and-output
 - idempotent-handler-by-dedup-key
 - illegal-input-unrepresentable-not-validated
+- independent-awaits-run-together  *(gap-fill, admitted #169, added #167)*
 - integration-point-isolation
 - interface-is-the-full-contract
 - lazy-over-eager
@@ -122,21 +123,18 @@ Deterministic-primary but bordered (linter surfaces candidates reliably; taste o
 - restart-policy-as-data
 - rules-as-data-over-scattered-conditionals
 - safety-invariant-is-an-executable-predicate
-- seam-earns-existence-at-second-adapter
 - seam-is-not-a-v2-interface
 - sequential-dependency-encoded-in-return-type
 - serialized-data-outlives-its-writer
 - shortest-unambiguous-name
 - side-effects-visible-at-the-call-site
 - single-expression-construction
-- speculative-generality-guard
 - sprout-over-inline-growth
 - stale-message-is-dropped-by-version
 - state-modeling-escalation
 - steady-state-not-growth-state
 - surface-write-conflict-never-silently-lww
 - test-observable-behavior-not-structure
-- two-effect-blocker-names-the-smell-not-just-the-count
 - ubiquitous-language-one-term-one-concept
 
 ## Class 3 — process / commit-shape (6) → `/sound:review`
@@ -147,7 +145,7 @@ Each `Detect:`s over a diff/commit/history — invisible in any single edit's re
 - **red-green-refactor-is-a-commit-shape** — "git diff stat per commit — does a behavior-changing commit touch a `*.ts` without touching its paired test." Commit-scoped. *(seed deterministic — mechanically checkable, but on a commit)*
 - **removal-names-the-fences-reason** — "a diff removing or short-circuiting a delay, retry, guard, or special case where neither the diff, its comments, nor its description says what the removed code was protecting against." Diff-scoped by construction — the fence is gone from the end state. *(added 2026-07-18)*
 - **scratch-refactor-for-understanding** — "a shipped diff whose touched-file/line count is far larger than the stated bug/feature requires." Churn metric over a diff. *(seed judgeable)*
-- **tests-are-the-first-caller** — "in the commit history, whether test files … appear in the same commit … versus a later 'add tests' commit." History-scoped. *(seed judgeable)*
+- **concept-count-not-line-count** — a diff that claims "simplified"/"inlined" while the number of concepts a reader must hold is unchanged; the check reads a PR's simplification claim against the actual concept delta, not any single edit's end state. Diff-scoped. *(regated judgeable → process at #167)*
 - **tidy-or-behavior-never-both** — "per-commit diff — do the touched lines include both a rename/move and a line whose logic differs." Commit-scoped. *(seed deterministic — mechanically checkable, but on a commit)*
 
 ---
@@ -180,7 +178,7 @@ Rules where a linter catches the easy case and taste catches the rest. Primary c
 | model-based-against-a-reference-implementation | no sibling `model`/`oracle` file next to a stateful class | the *prescription* (this class NEEDS a model-based test) is heavy taste; **evidence-gated** (map Fog) |
 | sprout-over-inline-growth | "a diff that adds inline logic to an untested function" | diff-framed, but extract-or-inline reads off resulting code |
 | complecting-shared-construct-split-by-reason-to-change | last-N-commits cluster into two unrelated stories on one shape | commit-history is corroboration; the complected shape is visible at edit-time |
-| chained-transformations-over-imperative-accumulation · single-expression-construction | empty-array-then-`.push`-loop (a `prefer-map`-style AST hit) | whether the loop's side-effects/early-exits *permit* a chain is the taste |
+| single-expression-construction | empty-array-then-`.push`-loop (a `prefer-map`-style AST hit) | whether the loop's side-effects/early-exits *permit* a chain is the taste |
 
 ## Notes for downstream tickets
 

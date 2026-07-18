@@ -1,5 +1,5 @@
 ---
-paths: "**/*.{test,spec}.{ts,tsx}"
+paths: "**/*.{ts,tsx}"
 when: always
 source: Beck
 ---

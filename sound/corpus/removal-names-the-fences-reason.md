@@ -21,4 +21,4 @@ RIGHT:
 _Avoid_: commit or PR prose like "removed unnecessary/legacy/pointless X" with no record of what X was for; deleting a guard because no test fails — absence of a test is not absence of a purpose.
 Detect: a diff removing or short-circuiting a delay, retry, guard, or special case where neither the diff, its comments, nor its description says what the removed code was protecting against.
 Not-when: the code is provably dead (unreachable, flag retired, sole caller gone) — that is deletion-test territory, no archaeology owed; or the oddity was introduced within the same change-set being written.
-Cross-ref: deletion-test-before-any-abstraction-ships — the opposite blade: that ladder licenses removing the unused; this rule gates removing the used-but-unexplained. comment-must-name-a-consequence — the comment that, had it existed, would make this rule instant to satisfy.
+Cross-ref: abstraction-earns-existence — the opposite blade: that ladder licenses removing the unused; this rule gates removing the used-but-unexplained. comment-must-name-a-consequence — the comment that, had it existed, would make this rule instant to satisfy.

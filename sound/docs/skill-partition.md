@@ -6,15 +6,17 @@
 
 > **2026-07-18 amendment (grugbrain gap analysis + opt-in-gate reconciliation):** `optimization-cites-a-measurement` added to the judgeable class → enters this partition under **abstraction**. The scope derivation now also subtracts the 3 human-locked opt-in rules (#149/#153) that the original 47 silently delivered by default: **default-delivered = 45**, partitioned incl. opt-in = 48. Sibling `removal-names-the-fences-reason` is process/commit-shape → `/sound:review` (5 → 6), explicitly OUT here.
 
+> **2026-07-18 cutover (#167):** merges/regates reshape the partition. abstraction 11 → **8** (−`speculative-generality-guard`/`seam-earns-existence-at-second-adapter`/`deletion-test-before-any-abstraction-ships`, merged → +`abstraction-earns-existence`; −`concept-count-not-line-count`, regated to process/`/sound:review`). effects 8 → **9** (+`independent-awaits-run-together`, admitted #169). control-flow opt-in retired — `chained-transformations-over-imperative-accumulation` merged into `single-expression-construction` (standard), so opt-in 3 → **2** (`module-is-the-noun-functions-are-bare-verbs`, `base-spread-composition`). react surface-gated 4 → 3 (`two-effect-blocker…` merged into `effect-is-a-named-intent`), so surface-gated 28 → **27**. Property cluster (`generators-are-domain-documentation` + `near-identical-examples…` in the tests skill; `model-based`/`roundtrip`/`shrinking`/`invariant-preservation` elsewhere) marked **evidence-gated** — the tests skill's property rows emit only where a property runner is present (wired at setup Select, #155; `near-identical-examples` stays ungated as the gateway). Net: **43 default-delivered** (45 incl. opt-in).
+
 ## Scope — the 45 delivered rules (+3 opt-in)
 
 The topic-skills carry the **non-surface-gated judgeable-at-write** rules only:
 
-- Start: Class-2 judgeable-at-write = **76** (`enforcement-taxonomy.md`).
-- − **28 surface-gated** (react/db/distributed-tagged) → stay native `.claude/rules/` `paths`-rules.
-- − **3 opt-in** (`corpus-optin/`, human-locked #149/#153) — partitioned below for when they're wanted, but emitted **only** when explicitly named at setup, never by default.
+- Start: Class-2 judgeable-at-write = **72** (`enforcement-taxonomy.md`).
+- − **27 surface-gated** (react/db/distributed-tagged) → stay native `.claude/rules/` `paths`-rules.
+- − **2 opt-in** (`corpus-optin/`, human-locked #149/#153) — partitioned below for when they're wanted, but emitted **only** when explicitly named at setup, never by default.
 - The one `check:deterministic` core tenant (`branded-primitives-for-domain-ids`) is already in Class 1 → lint (#152), not here.
-- **= 45 default-delivered** (48 partitioned incl. opt-in).
+- **= 43 default-delivered** (45 partitioned incl. opt-in).
 
 Explicitly OUT (do not fold into these skills): the 24 deterministic rules (→ lint #152), the 6 process/commit-shape rules (→ `/sound:review` #151 — this is where a `git`/`review` skill would live, *not* here), the 28 surface-gated rules (→ `paths`-rules).
 
@@ -24,13 +26,13 @@ Explicitly OUT (do not fold into these skills): the 24 deterministic rules (→ 
 |---|---|---|
 | **naming** | naming a value, type, function, or module, or writing a comment | 5 (+1 opt-in) |
 | **types** | declaring a type or representing data — unions, absence, parsing untyped input, a function's contract | 9 |
-| **effects** | mutating state, performing IO, or writing code that can fail — and its commit atomicity | 8 |
-| **control-flow** | writing a loop, a compound conditional, or building a collection into shape | 4 (+1 opt-in) |
-| **abstraction** | extracting, generalizing, or deduplicating code — deciding whether an abstraction, seam, or optimization earns its place | 11 (+1 opt-in) |
+| **effects** | mutating state, performing IO, or writing code that can fail — and its commit atomicity | 9 |
+| **control-flow** | writing a loop, a compound conditional, or building a collection into shape | 4 |
+| **abstraction** | extracting, generalizing, or deduplicating code — deciding whether an abstraction, seam, or optimization earns its place | 8 (+1 opt-in) |
 | **placement** | deciding where code lives — module ownership, splitting by reason-to-change, policy vs mechanism, feature envy | 4 |
 | **tests** | writing or structuring a test, or reaching for property/generator-based testing | 4 |
 
-`structure` (15) was **split** into `abstraction` (11) + `placement` (4) — the human's call (#165), for sharper triggers at the two distinct refactor moments (should-this-exist vs where-does-it-belong). *(2026-07-18: `abstraction` stays 11 by default — `base-spread-composition` moved behind the opt-in gate, `optimization-cites-a-measurement` added.)* Accepted cost: one extra artifact and two triggers that can both fire at refactor time.
+`structure` (15) was **split** into `abstraction` (11) + `placement` (4) — the human's call (#165), for sharper triggers at the two distinct refactor moments (should-this-exist vs where-does-it-belong). *(2026-07-18: `abstraction` stays 11 by default — `base-spread-composition` moved behind the opt-in gate, `optimization-cites-a-measurement` added; the #167 cutover then brought abstraction to **8**.)* Accepted cost: one extra artifact and two triggers that can both fire at refactor time.
 
 ## Rule → skill
 
@@ -43,11 +45,11 @@ types:        absence-as-terse-check · as-cast-requires-a-named-justification �
 effects:      no-mutable-shared-return · pure-updates-isolated-io · side-effects-visible-at-the-call-site
               explicit-data-flow-at-the-call-site · actor-isolation-only-for-independent-lifecycle
               error-handling-two-regimes · eliminate-mask-then-surface · atomicity-three-regimes
+              independent-awaits-run-together
 control-flow: named-predicate-over-inline-conditions · rules-as-data-over-scattered-conditionals
-              chained-transformations-over-imperative-accumulation *(opt-in)* · single-expression-construction · lazy-over-eager
-abstraction:  speculative-generality-guard · sprout-over-inline-growth · deletion-test-before-any-abstraction-ships
-              duplication-taxonomy-triage · seam-earns-existence-at-second-adapter · seam-is-not-a-v2-interface
-              generics-only-for-a-real-relationship-between-inputs-and-output · concept-count-not-line-count
+              single-expression-construction · lazy-over-eager
+abstraction:  abstraction-earns-existence · sprout-over-inline-growth · duplication-taxonomy-triage
+              seam-is-not-a-v2-interface · generics-only-for-a-real-relationship-between-inputs-and-output
               data-clump-to-parameter-object · base-spread-composition *(opt-in)* · data-as-spec-earns-its-trigger
               optimization-cites-a-measurement
 placement:    place-code-where-it-would-be-found · feature-envy-misplacement
