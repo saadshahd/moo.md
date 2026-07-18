@@ -18,7 +18,6 @@
     "must_not_install": [
       "derive-dont-sync",
       "effect-is-a-named-intent",
-      "two-effect-blocker-names-the-smell-not-just-the-count",
       "mood-names-commands-facts",
       "command-vs-fact-when-reconciled-elsewhere",
       "branded-primitives-for-domain-ids",
@@ -32,7 +31,6 @@
     "colocate-then-lift-on-second-consumer": "+ src/Stories.js — component-local state plus lifted module-singleton stores — state-placement surface",
     "derive-dont-sync": "- React 15 createClass/mixins, zero hooks — no useEffect surface",
     "effect-is-a-named-intent": "- no hooks anywhere; the effect surface does not exist",
-    "two-effect-blocker-names-the-smell-not-just-the-count": "- no useEffect exists in this createClass codebase",
     "mood-names-commands-facts": "- read-only HN Firebase client has no event/command/message system",
     "command-vs-fact-when-reconciled-elsewhere": "- all remote traffic is read-only reads; no optimistic/pending write state",
     "branded-primitives-for-domain-ids": "- plain JavaScript, no TS type syntax",

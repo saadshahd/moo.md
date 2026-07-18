@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: types
 ---
 when: [always] · tier: standard · check: judgeable
 Model mutually-exclusive domain states as a discriminated union tagged by a discriminant field (`status`, `type`, `kind`, `tag`), where each variant carries only the data valid in that state. Never represent distinct states as one flat type with optional fields.

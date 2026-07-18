@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Fowler
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 A single duplicated concept (not just duplicated text) is a defect — the cost of extraction is always less than the cost of divergence. The duplicate is often a decision, not a string: the same domain predicate re-derived per call site, or an invariant re-checked at 2+ call sites instead of enforced once at its constructor.

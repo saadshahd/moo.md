@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 Reach for an inert tagged corpus plus one member-blind interpreter ONLY when the member set BOTH grows over time AND its members carry behavior — otherwise never. When you do, model it as a discriminated union paired with a `Record` keyed by the tag, so a missing member is a COMPILE error, not a runtime surprise. NEVER build an interpreter for a closed or low-variance choice — variant props or a typed map read clearer.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: control-flow
 ---
 when: [always] · tier: standard · check: judgeable
 Build derived data as a single expression — a chained transformation (`filter`/`map`/`reduce` or a `pipe()`) or one constructor call over a mapped source — rather than allocating an empty container and mutating it into shape in a loop. If the construction genuinely needs multiple statements, the intermediate value that forces them deserves its own name — extract it, then build the final structure from it in one expression.

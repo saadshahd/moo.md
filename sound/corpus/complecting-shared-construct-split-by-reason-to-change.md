@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Hickey
+topic: placement
 ---
 when: [always] · tier: standard · check: judgeable
 When two properties, fields, or branches of one construct change for different reasons, that construct is complected, not cohesive — split it into two things joined by an explicit relationship.

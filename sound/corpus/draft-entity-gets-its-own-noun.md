@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: naming
 ---
 when: [always] · tier: standard · check: judgeable
 A draft or in-flight entity gets its own domain noun (`draftOrder`, `beingMadeMove`), never the committed type plus an `isEditing` flag.

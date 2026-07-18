@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Beck
+topic: tests
 ---
 when: [always] · tier: standard · check: judgeable
 Each test names and proves exactly one behavior; multiple unrelated `expect` blocks in one `it` means it's actually several tests wearing a trenchcoat.

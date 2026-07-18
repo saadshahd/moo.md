@@ -5,9 +5,9 @@ description: Use when installing, refreshing, or re-tuning sound taste rules in 
 
 # sound:setup
 
-Scaffold a project's `.claude/rules/` from the sound corpus: probe the repo's stack, select ONLY the rules whose subject the repo's code actually shows — evidence-cited per rule, never a tag-wide dump — confirm with the user, then install with repo-tuned `paths` globs and examples rewritten in the project's own domain. Once written, the files belong to the user; re-runs reconcile against what exists (see Re-runs).
+Scaffold a project's taste rules from the sound corpus: probe the repo's stack, select ONLY the rules whose subject the repo's code actually shows — evidence-cited per rule, never a tag-wide dump — confirm with the user, then install with examples rewritten in the project's own domain. Judgeable rules land in a browsable `.claude/sound/<topic>/` map fronted by a one-line `sound-prime` nudge; surface-gated and deterministic rules stay `.claude/rules/` `paths`-rules (see Phase 6). Once written, the files belong to the user; re-runs reconcile against what exists (see Re-runs).
 
-Corpus location: `../../corpus/` relative to this SKILL.md. If it is missing or unreadable, STOP and say so — never install a partial set silently.
+Corpus location: `../../corpus/` relative to this SKILL.md (the default candidate universe). A sibling `../../corpus-optin/` holds opt-in rules excluded from candidacy unless the user names one at invocation (Phase 2). If `corpus/` is missing or unreadable, STOP and say so — never install a partial set silently.
 
 ## Phase 1 — Probe
 
@@ -25,7 +25,9 @@ Method: read every `package.json` (root + workspaces) and workspace markers (`pn
 
 ## Phase 2 — Select (per rule, evidence-cited)
 
-Candidates = every corpus rule whose `when:` is `always` or shares ANY tag with the Phase 1 tag set. Candidacy is where the tag filter's job ENDS.
+Candidates = every `corpus/` rule whose `when:` is `always` or shares ANY tag with the Phase 1 tag set. Candidacy is where the tag filter's job ENDS.
+
+**Opt-in gate (deterministic).** The candidate universe is `corpus/` ONLY. Rules in the sibling `corpus-optin/` are excluded by default; one enters candidacy solely when the user names it at invocation — then read that rule from `corpus-optin/`. This is directory-membership as the gate (zero-LLM), named by hand exactly like the pathless pair (Phase 3, rule 5). A default run never proposes an opt-in rule.
 
 A candidate installs iff the repo contains the SUBJECT-SURFACE the rule governs — code where the rule's `Detect:` question is askable — cited as ONE FILE path (never a directory, never a glob). The rule's `Not-when:` can veto. No citation, no install. An actual violation is NOT required (rules are prevention; they should arrive before the first sin) and its absence is never a veto. Existing COMPLIANCE is evidence FOR install, never a reason to skip — a repo already doing the RIGHT shape has the surface, and the rule guards every future edit of it.
 
@@ -60,7 +62,7 @@ Present to the user, compactly: the extracted facts (each with its file evidence
 {"facts": ["<evidence with file paths>"], "tags": ["react"], "globs": {"default": "**/*.{ts,tsx}", "test": "**/*.{test,spec}.{ts,tsx}", "react": "**/*.{tsx,jsx}"}, "rules": [{"name": "<corpus-rule-name>", "cite": "<repo file path>"}]}
 ```
 
-`tags` contains ONLY kind-tags from {react, db, distributed} — `always` is not a tag, it's the unconditional candidacy baseline; listing it is an error. `rules` lists ONLY the install set: every selected rule's corpus FILENAME (no `.md`) COPIED VERBATIM from the corpus listing — never reconstructed from memory; before emitting, verify every name matches an existing corpus file. `cite` is one FILE path that exists in the repo (no directories). Skips are not emitted. The pathless pair, when selected, appears in `rules` like any other.
+`tags` contains ONLY kind-tags from {react, db, distributed} — `always` is not a tag, it's the unconditional candidacy baseline; listing it is an error. `rules` lists ONLY the install set: every selected rule's corpus FILENAME (no `.md`) COPIED VERBATIM from the corpus listing — never reconstructed from memory; before emitting, verify every name matches an existing `corpus/` file (or a `corpus-optin/` file the user named). `cite` is one FILE path that exists in the repo (no directories). Skips are not emitted. The pathless pair, when selected, appears in `rules` like any other.
 
 `globs` keys: `default` and `test` always (they cover the `always` rules); `react` REQUIRED whenever the react tag fires (its rules ship a distinct glob class — omitting the key breaks them) and absent otherwise; plus one key per kind-tag ONLY when monorepo scoping makes its glob differ from `default` (e.g. `"db": "services/api/**/*.ts"`) — a per-tag key repeating the default glob is noise, and a single-package repo NEVER gets per-tag keys (nothing to scope; Phase 3 rule 3). WRONG: no workspace file, evidence under `src/` → `"db": "src/**/*.ts"` (that is directory narrowing, not package scoping). Every value is the TUNED glob.
 
@@ -76,13 +78,29 @@ Mechanical gates per tuned rule — any gate fails → keep the corpus example f
 
 ## Phase 6 — Write
 
-For each confirmed rule, write `.claude/rules/<rule-name>.md`: tuned body from Phase 5; frontmatter = the tuned `paths` line ONLY — no `when:`, no `source:`. The pathless pair gets no frontmatter at all. No marker, manifest, or hash.
+Each confirmed rule has ONE home, decided by its corpus `topic:` frontmatter. No marker, manifest, or hash in either home.
 
-Which glob each rule gets — by its corpus glob class, never ad hoc: rules shipping the test class → tuned `test`; react-tagged rules → tuned `react`; other kind-tagged rules → their tag's scoped glob when one exists, else `default`; `always` rules → `default`; a multi-kind rule → all of its tags' globs.
+**Prime-delivered (rule HAS a `topic:`)** — the judgeable taste rules. Write the Phase-5 tuned body to `.claude/sound/<topic>/<rule-name>.md` with NO frontmatter at all: a plain reference file. It lives outside `.claude/rules/`, so it never auto-loads — the agent pulls it only when it reads it. The `<topic>` folder is the corpus `topic:` value verbatim; the browsable `.claude/sound/` tree IS the map the `sound-prime` nudge points at.
+
+**Paths-delivered (rule has NO `topic:`)** — surface-gated, deterministic, and process rules. Write `.claude/rules/<rule-name>.md` as before: tuned body from Phase 5; frontmatter = the tuned `paths` line ONLY (no `when:`, no `source:`). The pathless pair gets no frontmatter. Which glob — by corpus glob class, never ad hoc: test-class rules → tuned `test`; react rules → tuned `react`; other kind-tagged rules → their tag's scoped glob when one exists, else `default`; `always` rules → `default`; a multi-kind rule → all its tags' globs.
+
+**The prime nudge.** If ANY prime-delivered rule was installed, write ONE `.claude/skills/sound-prime/SKILL.md` — a fixed, minimal skill that makes the agent aware the map exists. It does NOT enumerate rules or hardcode the map. Write it verbatim:
+
+```
+---
+name: sound-prime
+description: Use at the very start of any coding task, before writing or editing code.
+user-invocable: true
+---
+
+# sound-prime
+
+This project keeps a map of its taste rules under `.claude/sound/`, grouped into topic folders (`<topic>/<rule-name>.md`). At the start of a coding task, browse that tree once to learn which topics bear on the surfaces you are about to touch. As you write, Read the specific `<topic>/<rule-name>.md` when its situation comes up, and make sure the code you produce meets every rule that governs a surface you change.
+```
 
 ## Re-runs (reconcile, never overwrite)
 
-`.claude/rules/` may already hold files — from a previous setup, hand-written, or evolved past what setup wrote. Every existing file is user-owned; reconcile by reading, not bookkeeping. Installed examples are tuned BY DESIGN, so whole-body comparison is meaningless — compare PROSE ONLY: body minus fenced code blocks minus frontmatter, whitespace-normalized.
+`.claude/rules/` and `.claude/sound/` may already hold rule files — from a previous setup, hand-written, or evolved past what setup wrote. Every existing rule file in either home is user-owned; reconcile by reading, not bookkeeping. Installed examples are tuned BY DESIGN, so whole-body comparison is meaningless — compare PROSE ONLY: body minus fenced code blocks minus frontmatter, whitespace-normalized. The `.claude/skills/sound-prime/SKILL.md` nudge is the exception: it is DERIVED, carries no rule content to lose, and is overwritten verbatim each run — never reconciled.
 
 - **Existing file, no same-named corpus rule** → local taste. Leave untouched; mention only that it was preserved.
 - **Selected corpus rule, no existing file** → propose as an addition. This is how the install GROWS as the codebase evolves: every re-run re-derives tags and re-runs selection fresh — a surface that newly appeared makes its rules newly proposable. No memory of prior runs.

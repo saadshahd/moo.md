@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Fowler
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 The same group of primitives recurring together across 2+ signatures is a data clump — usually an unnamed domain concept, not just an ergonomics complaint. The trigger is not the parameter count on any one signature; it is the recurrence of the group across signatures.

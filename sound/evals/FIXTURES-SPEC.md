@@ -50,12 +50,13 @@ sound/evals/fixtures/<fixture-name>/
 - `rules`: THREE-CLASS labels — the when-tag filter is only candidacy; selection is per-rule subject-surface judgment, and these labels fence its rate:
   - `must_install` — rules the fixture's code plainly earns (its reason for existing). Each needs a citable surface in the included files; note WHY in `rules_notes`.
   - `must_not_install` — the grab-bag rules the fixture exists to exclude (subject absent from the repo, or `Not-when:` vetoes). These carry the discriminating power.
-  - Everything unlabeled is DON'T-CARE by design — never attempt 104-way exact labels; label only rules where this fixture discriminates (aim 5–15 total).
+  - Everything unlabeled is DON'T-CARE by design — never attempt full-corpus exact labels; label only rules where this fixture discriminates (aim 5–15 total).
   - Universal-subject rules (naming, transformation shape, comments) pass trivially everywhere — labeling them `must_not_install` is almost always a label bug.
   - Test-scoped rules key off the CODE UNDER TEST, not test-file presence (labeler-confirmed 2026-07-09): zero test files does NOT justify `must_not_install` for general testing rules when testable logic exists; shape-specific test rules (roundtrip, generators) still need their shape.
   - TS-prescription rules (casts, branded types, `satisfies`, compile-time exhaustiveness) are `must_not_install` in pure-JS repos — a prescription the repo cannot follow (labeler-confirmed 2026-07-10).
   - Out-of-order-capable event delivery (Stripe webhooks) IS an ordering-hazard surface for stale-message rules, distinct from idempotency (labeler-confirmed 2026-07-10).
-  - The scorer additionally checks (no labels needed): every proposed rule name exists in the corpus; every citation path exists in `tree.txt` ∪ the fixture's included `repo/` files (tree.txt is head-400-truncated, so an included excerpt file may be absent from it).
+  - The scorer additionally checks (no labels needed): every proposed rule name exists in `corpus/ ∪ corpus-optin/` (the two-universe name check, #153); no proposed rule lives in `corpus-optin/` unless this fixture declares it in `optin` (the fail-loud opt-in gate); every citation path exists in `tree.txt` ∪ the fixture's included `repo/` files (tree.txt is head-400-truncated, so an included excerpt file may be absent from it).
+- `optin` (optional, #153): rule names this fixture explicitly opts into from `corpus-optin/`. A fixture omitting it — the default — must NOT propose any opt-in rule; the scorer fails loud (`rule:optin`) if it does. Present only for fixtures that deliberately exercise an opt-in rule (none today).
 
 ## Tag definitions (label against THESE, not intuition)
 

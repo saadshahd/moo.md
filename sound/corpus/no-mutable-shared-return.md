@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Bloch
+topic: effects
 ---
 when: [always] · tier: standard · check: deterministic
 A module function that returns a structure a caller might hold onto returns an immutable value — never a shared mutable object another part of the system can still write through.

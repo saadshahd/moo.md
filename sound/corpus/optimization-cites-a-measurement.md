@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: grug + Knuth
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 Complexity added in performance's name must cite the measurement that motivated it — a profile, a benchmark, a production trace — in a comment or the surrounding diff. Uncited perf machinery is speculative generality on the performance axis: the machinery has arrived before its trigger fired.

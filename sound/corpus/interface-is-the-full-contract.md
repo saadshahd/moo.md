@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Bloch
+topic: types
 ---
 when: [always] · tier: standard · check: judgeable
 A function's signature must carry every fact a caller needs to use it correctly — not just a name that reads well, but preconditions, ordering constraints, every error mode, and any performance cliff a caller could hit by surprise.

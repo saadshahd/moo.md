@@ -4,11 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+source "$(dirname "$0")/model-guard.sh"
 MODEL="${1:-sonnet}"
-case "$MODEL" in
-  haiku|sonnet|claude-haiku-*|claude-sonnet-*) ;;
-  *) echo "REFUSED: evals run on haiku/sonnet only, never opus/fable (got: $MODEL)" >&2; exit 2 ;;
-esac
+assert_cheap_model "$MODEL"
 shift || true
 
 SKILL="$(cd ../skills/setup && pwd)/SKILL.md"

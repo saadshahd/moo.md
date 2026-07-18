@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Vergnaud
+topic: types
 ---
 when: [always] · tier: standard · check: judgeable
 Any move that silences the type checker — an `as` cast (excluding `as const`), `any`, `@ts-ignore`/`@ts-expect-error`, or widening a type to swallow a mismatch — is either erasing information the checker already proved wrong (a defect) or bridging a genuine gap it can't see across, which must be named at the silencing site.

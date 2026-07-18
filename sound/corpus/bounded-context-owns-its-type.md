@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Evans
+topic: types
 ---
 when: [always] · tier: standard · check: judgeable
 When two parts of the system use the same domain word for something that behaves differently in each, each side defines its own type for that word — never import one context's version of "Product"/"Order"/"User" into another context's domain logic.

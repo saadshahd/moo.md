@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Beck
+topic: tests
 ---
 when: [always] · tier: standard · check: judgeable
 A test asserts what the code does for a caller, never how it does it internally — if renaming a private helper breaks the test, the test is wrong, not the rename. Doubles belong only at a seam you own (your integration-point adapter over a paid API, a queue, the clock), never over your own internals or a third party's; and a test whose every assertion is derived from its own stubs verifies nothing — it asserts the mock, not the code.

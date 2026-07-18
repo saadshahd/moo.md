@@ -6,7 +6,7 @@
 //   globs — per expected key: exact string OR same matched file-set over repo/tree.txt
 //   rules — three-class labels: every must_install present, no must_not_install present,
 //           all proposed names exist in the corpus, every citation path exists in tree.txt.
-//           Unlabeled rules are don't-care by design (104-way exact labels are unlabelable).
+//           Unlabeled rules are don't-care by design (full-corpus exact labels are unlabelable).
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -67,8 +67,18 @@ const gotGlobs = proposal.globs ?? {};
 const tagsMatch = setEq(expTags, gotTags);
 
 // Rule-set checks (three-class: must_install / must_not_install / don't-care).
-const corpusDir = join(dirname(fileURLToPath(import.meta.url)), "..", "corpus");
-const corpusNames = new Set(readdirSync(corpusDir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3)));
+// Two-universe name check (#153): a name is VALID if it lives in the default
+// corpus/ OR the opt-in corpus-optin/, but an opt-in rule may only be PROPOSED
+// by a fixture that names it in expected.optin — the physical split IS the
+// default-install gate, so the scorer enforces it (fail loud, like the canary globs).
+const rulesRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const namesIn = (dir) => existsSync(dir)
+  ? new Set(readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3)))
+  : new Set();
+const corpusNames = namesIn(join(rulesRoot, "corpus"));
+const optinNames = namesIn(join(rulesRoot, "corpus-optin"));
+const validNames = new Set([...corpusNames, ...optinNames]);
+const fixtureOptin = new Set(expected.optin ?? []);
 const expRules = expected.rules ?? {};
 const gotRules = (proposal.rules ?? []).filter((r) => r && typeof r.name === "string");
 const gotNames = new Set(gotRules.map((r) => r.name.replace(/\.md$/, "")));
@@ -93,8 +103,13 @@ const ruleChecks = !expected.rules ? [] : [
   })),
   {
     name: "rule:names",
-    pass: [...gotNames].every((n) => corpusNames.has(n)),
-    detail: `unknown rule names: [${[...gotNames].filter((n) => !corpusNames.has(n))}]`,
+    pass: [...gotNames].every((n) => validNames.has(n)),
+    detail: `unknown rule names: [${[...gotNames].filter((n) => !validNames.has(n))}]`,
+  },
+  {
+    name: "rule:optin",
+    pass: [...gotNames].every((n) => !optinNames.has(n) || fixtureOptin.has(n)),
+    detail: `opt-in rules installed without opting in (expected.optin): [${[...gotNames].filter((n) => optinNames.has(n) && !fixtureOptin.has(n))}]`,
   },
   {
     name: "rule:cites",

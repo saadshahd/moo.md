@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Vergnaud
+topic: types
 ---
 when: [always] · tier: high-stakes · check: judgeable
 Data crossing an untyped boundary (HTTP body, DB row, env var, third-party SDK response, `JSON.parse`) must be parsed into the domain type at that boundary and never trusted via a type assertion further downstream.

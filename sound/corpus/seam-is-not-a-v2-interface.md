@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Feathers
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 A seam introduced to make code testable is an internal implementation detail with one call-site contract, not a second public interface living alongside the first — don't let "add a seam" become "add a v2 API and deprecate the v1 one."

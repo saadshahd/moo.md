@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Vergnaud
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 Introduce a type parameter only when it links two or more positions — an input's shape determines the output's shape, or two inputs must agree. If nothing downstream depends on the parameter, it's a design smell, not genericity.

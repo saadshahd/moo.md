@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Hughes
+topic: tests
 ---
 when: [always] · tier: standard · check: judgeable
 Three or more test cases in one `describe` block that differ only in the literal input/output values, not in the assertion shape, are one un-stated universal property wearing example-test clothing — extract the property and delete the examples it subsumes.

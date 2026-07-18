@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: control-flow
 ---
 when: [always] · tier: standard · check: judgeable
 Don't compute, fetch, or transform a value until it's needed — eager evaluation couples a value's computation to where the code sits rather than when the value is required.

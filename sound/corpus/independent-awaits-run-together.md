@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: effects
 ---
 when: [always] · tier: standard · check: judgeable
 Awaiting independent async operations one at a time in a loop pays their latencies in series for no reason — N round-trips become N sequential waits, and one rejection abandons the rest mid-flight. When an iteration's await does not depend on a previous iteration's result, run them together with `Promise.all` (or `allSettled` when partial success is the model).

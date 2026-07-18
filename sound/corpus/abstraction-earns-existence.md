@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Fowler + Feathers + Hickey
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 Reserved machinery — an interface, strategy, plugin point, port, or wrapper — must earn its existence against a named trigger, judged by one ladder in order: (1) COUNT — a second consumer or concrete adapter already exists (a test double counts as one) → it has earned its place; (2) DATED TRIGGER — the second member is named in scoped, scheduled work today → a deliberate seam, and the schedule is its license; (3) otherwise the DELETION TEST rules — delete it mentally: if the complexity evaporates it was a pass-through, cut it; if the complexity reappears at N call sites it was load-bearing, keep it. The defect is never the seam itself — it is the unscheduled one.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 When 2+ shaped values share a non-trivial core, define the core ONCE and build each variant by spreading it and adding only its delta; type the result as `Base & Delta`. Never copy the shared fields across variant literals.

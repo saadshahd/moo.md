@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: effects
 ---
 when: [always] · tier: standard · check: judgeable
 Side effects live at the edges and are visible at the call site — no decorators, no implicit middleware, no silent mutations. If a function logs, that's a side effect and it belongs to the caller, not the function: pure business-logic functions NEVER call a logger internally.

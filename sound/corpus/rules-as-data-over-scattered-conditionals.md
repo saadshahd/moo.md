@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: control-flow
 ---
 when: [always] · tier: standard · check: judgeable
 Express validation and policy as typed records interpreted by ONE engine — never scatter `if`-checks for a policy that has more than one rule. The policy must be inspectable as data, not reconstructed by reading code paths. Before writing a conditional chain for a policy, look for the declarative form.

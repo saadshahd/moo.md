@@ -12,7 +12,6 @@
       "static-domain-tables-use-as-const-satisfies",
       "lookup-table-over-conditional-chain",
       "comment-must-name-a-consequence",
-      "tests-are-the-first-caller",
       "one-behavior-per-test",
       "red-green-refactor-is-a-commit-shape"
     ],
@@ -27,7 +26,6 @@
     "lookup-table-over-conditional-chain": "+ src/utils/language-detector.ts — suggestLanguage if-chain maps compile-time-known keys to canonical values",
     "comment-must-name-a-consequence": "+ src/utils/language-detector.ts — WHAT-narrating inline comments restating the code",
     "mood-names-commands-facts": "- CLI has no events, commands, or message-type tags",
-    "tests-are-the-first-caller": "+ src/utils/language-detector.ts — testable pure logic exists; test rules key off code under test, not test-file presence (labeler ruling 2026-07-09)",
     "one-behavior-per-test": "+ src/utils/language-detector.ts — testable pure logic exists; test rules key off code under test, not test-file presence (labeler ruling 2026-07-09)",
     "red-green-refactor-is-a-commit-shape": "+ src/utils/language-detector.ts — testable pure logic exists; test rules key off code under test, not test-file presence (labeler ruling 2026-07-09)"
   }

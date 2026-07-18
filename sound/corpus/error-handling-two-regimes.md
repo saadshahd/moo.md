@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Armstrong, house
+topic: effects
 ---
 when: [always] · tier: standard · check: judgeable
 The eliminate → mask → surface ladder governs in-process logic for enumerable failures — there, no throw, no try/catch. At a unit boundary (worker loop top, job runner, composition root) an UNenumerated failure — a bug, a poisoned message, a violated invariant — must escape and kill the unit. It must never be converted to a Result that lets the loop keep running. The only legal catch lives at the boundary, and it must END in termination, dead-letter, or rethrow. Discriminating question: is the failure enumerable or not, and does the catch continue the loop?

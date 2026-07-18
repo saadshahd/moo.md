@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Feathers
+topic: abstraction
 ---
 when: [always] · tier: standard · check: judgeable
 When adding new behavior to an existing function that lacks tests or is already doing too much, write the new logic as a separate, independently-testable function/class called from the old one, rather than growing the old function's body inline.
