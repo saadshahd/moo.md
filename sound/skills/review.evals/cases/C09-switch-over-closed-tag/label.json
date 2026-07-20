@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "lookup-table-over-conditional-chain",
+  "base_files": [],
+  "diff_files": [
+    "selection/use-action-handler.ts"
+  ],
+  "must_mention": [
+    "switch",
+    "action.tag"
+  ],
+  "note": "Relabelled from slop-nudge C09-switch-over-closed-tag onto sound corpus rule 'lookup-table-over-conditional-chain' (human-confirmed, labeler of record)."
+}

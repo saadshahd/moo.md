@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "absence-as-terse-check",
+  "base_files": [],
+  "diff_files": [
+    "drag/resolve-indicator.ts"
+  ],
+  "must_mention": [
+    "number | null",
+    "=== null",
+    "null"
+  ],
+  "note": "Relabelled from slop-nudge C02-number-null-return onto sound corpus rule 'absence-as-terse-check' (human-confirmed, labeler of record)."
+}

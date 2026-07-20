@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "dependency-at-the-edges",
+  "base_files": [],
+  "diff_files": [
+    "insert/use-insert.ts"
+  ],
+  "must_mention": [
+    "math.random",
+    "random"
+  ],
+  "note": "Relabelled from slop-nudge C13-inline-math-random-id onto sound corpus rule 'dependency-at-the-edges' (human-confirmed, labeler of record)."
+}

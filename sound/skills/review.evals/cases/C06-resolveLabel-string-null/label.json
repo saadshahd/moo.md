@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "absence-as-terse-check",
+  "base_files": [],
+  "diff_files": [
+    "layout/destinations.ts"
+  ],
+  "must_mention": [
+    "resolvelabel",
+    "null"
+  ],
+  "note": "Relabelled from slop-nudge C06-resolveLabel-string-null onto sound corpus rule 'absence-as-terse-check' (human-confirmed, labeler of record)."
+}

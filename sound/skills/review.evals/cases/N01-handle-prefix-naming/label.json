@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "caller-blind-function-names",
+  "base_files": [],
+  "diff_files": [
+    "NavBar.tsx"
+  ],
+  "must_mention": [
+    "handlezoom",
+    "handlesearch",
+    "handletimecode"
+  ],
+  "note": "Relabelled from slop-nudge N01-handle-prefix-naming onto sound corpus rule 'caller-blind-function-names' (human-confirmed, labeler of record)."
+}

@@ -1,0 +1,13 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "Layout.tsx"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. Absence: explicit undefined value",
+  "forbidden_rules": [
+    "absence-as-terse-check"
+  ]
+}

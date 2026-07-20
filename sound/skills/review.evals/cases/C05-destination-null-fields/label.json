@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "discriminated-union-over-flag-bag",
+  "base_files": [],
+  "diff_files": [
+    "layout/destinations.ts"
+  ],
+  "must_mention": [
+    "null",
+    "destination"
+  ],
+  "note": "Relabelled from slop-nudge C05-destination-null-fields onto sound corpus rule 'discriminated-union-over-flag-bag' (human-confirmed, labeler of record)."
+}

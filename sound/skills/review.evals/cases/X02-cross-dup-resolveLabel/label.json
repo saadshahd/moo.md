@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "place-code-where-it-would-be-found",
+  "base_files": [
+    "layout/destinations.ts"
+  ],
+  "diff_files": [
+    "drag/drop-zone-label.tsx"
+  ],
+  "must_mention": [
+    "resolvelabel",
+    "resolvecontainerid"
+  ],
+  "note": "Cross-file dup: 'layout/destinations.ts' is the pre-existing owner (committed to HEAD); 'drag/drop-zone-label.tsx' is the added duplicate under review. review must Grep HEAD to find the owner and flag the dup."
+}

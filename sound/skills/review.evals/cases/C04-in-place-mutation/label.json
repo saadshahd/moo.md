@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "no-mutable-shared-return",
+  "base_files": [],
+  "diff_files": [
+    "layout/tiles.ts"
+  ],
+  "must_mention": [
+    "mutat",
+    "band",
+    "in place"
+  ],
+  "note": "Relabelled from slop-nudge C04-in-place-mutation onto sound corpus rule 'no-mutable-shared-return' (human-confirmed, labeler of record)."
+}

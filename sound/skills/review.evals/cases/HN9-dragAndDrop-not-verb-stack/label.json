@@ -1,0 +1,15 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "drag.e2e.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. naming: verb-stacking (dragAndDrop)",
+  "forbidden_rules": [
+    "caller-blind-function-names",
+    "shortest-unambiguous-name",
+    "ubiquitous-language-one-term-one-concept"
+  ]
+}

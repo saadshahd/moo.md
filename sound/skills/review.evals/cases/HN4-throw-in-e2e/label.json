@@ -1,0 +1,13 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "drag.e2e.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. Error handling: NEVER throw",
+  "forbidden_rules": [
+    "error-handling-two-regimes"
+  ]
+}

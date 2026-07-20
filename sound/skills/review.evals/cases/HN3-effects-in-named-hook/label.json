@@ -1,0 +1,11 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "hooks.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. Hooks: 2+ useEffect blocker",
+  "forbidden_rules": []
+}

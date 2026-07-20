@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "single-expression-construction",
+  "base_files": [],
+  "diff_files": [
+    "NavBar.tsx"
+  ],
+  "must_mention": [
+    "push",
+    "searchhits"
+  ],
+  "note": "Relabelled from slop-nudge C07-push-loop-search onto sound corpus rule 'single-expression-construction' (human-confirmed, labeler of record)."
+}

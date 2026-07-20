@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "duplication-taxonomy-triage",
+  "base_files": [
+    "prop-editor/field-shell.tsx"
+  ],
+  "diff_files": [
+    "prop-editor/puck-fields.tsx"
+  ],
+  "must_mention": [
+    "selectdisplay"
+  ],
+  "note": "Cross-file dup: 'prop-editor/field-shell.tsx' is the pre-existing owner (committed to HEAD); 'prop-editor/puck-fields.tsx' is the added duplicate under review. review must Grep HEAD to find the owner and flag the dup."
+}

@@ -1,0 +1,15 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "place-code-where-it-would-be-found",
+  "base_files": [
+    "carry/no-target-flash.tsx"
+  ],
+  "diff_files": [
+    "drag/no-target-marker.tsx"
+  ],
+  "must_mention": [
+    "no-target",
+    "no target"
+  ],
+  "note": "Cross-file dup: 'carry/no-target-flash.tsx' is the pre-existing owner (committed to HEAD); 'drag/no-target-marker.tsx' is the added duplicate under review. review must Grep HEAD to find the owner and flag the dup."
+}
