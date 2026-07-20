@@ -19,9 +19,9 @@ RIGHT:
 ```ts
 // removing this retry breaks the calibration cache — upstream returns 0 on cold start
 const reading = withRetry(fetchReading);
-// parse :: string => Result<Order, ParseError>
+// type: (raw: string) => Result<Order, ParseError>
 const parse = pipe(tokenize, buildOrder);
 ```
 _Avoid_: a comment that restates the code beneath it in English; a WHAT-narration of a loop, assignment, or call; step-by-step narration of a function body; a comment narrating the edit's history ("updated", "was", "now", "previously") instead of the code's present behavior.
-Detect: read each comment against its line — if the line's identifiers already say what the comment says, delete it. The sole sanctioned inline exception is a Hindley-Milner type signature over an argument-free point-free binding, documenting SHAPE only.
+Detect: read each comment against its line — if the line's identifiers already say what the comment says, delete it. The one sanctioned inline exception is a comment stating a type or shape the code cannot express on its own, documenting SHAPE only — never behavior.
 Not-when: the comment encodes a genuine external constraint (regulation, a documented upstream bug, a measured performance tradeoff) that the code cannot express on its own — keep it, and make it name the WHY.

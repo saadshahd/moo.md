@@ -5,7 +5,7 @@ source: house
 topic: naming
 ---
 when: [always] · tier: standard · check: deterministic
-Role suffixes live in the holder hierarchy — the folder or module — never the variable name. For a pure declarative record, `variableName === identityField === filename`, with NO role suffix tacked on: no `Config`, `Schema`, `Def`, `Spec`.
+Role suffixes live in the holder hierarchy — the folder or module — never the variable name. For a pure declarative record, `variableName === identityField === filename`, with no role suffix that merely restates the role its folder already declares.
 WRONG:
 ```ts
 // file: rules/overLimitConfig.ts
