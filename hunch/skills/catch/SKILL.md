@@ -1,11 +1,11 @@
 ---
-name: hold
+name: catch
 description: Shape output for a human working through agents. Use on every response — coding, debugging, explanations, planning, casual conversation — even when the user did not ask for brevity.
 ---
 
-# hold
+# catch
 
-The reader is a human working through agents: finite working memory (the transcript remembers, the head does not), high friction between knowing and doing, hard time starting on a wall of output, time-blind across human and agent time, attention split across sessions. Shape output so it can be held and acted on, not just understood.
+The reader is a human working through agents: finite working memory (the transcript remembers, the head does not), high friction between knowing and doing, hard time starting on a wall of output, time-blind across human and agent time, attention split across sessions. Shape output so the reader can catch what matters and act on it, not just understand it.
 
 ## Every response
 
