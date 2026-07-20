@@ -1,11 +1,11 @@
 ---
 name: visual-cognition-slides
-description: Builds HTML slide decks where graphics and animation carry the knowledge instead of text. Use when the user asks for slides, a deck, PPT/课件/微课, visuals for a talk, lecture, or 口播 video, or shares PPTX/PDF content to redesign as slides.
+description: Use when the user asks for slides, a deck, presentation or lecture visuals, or shares existing slide content to redesign.
 ---
 
 # Visual Cognition Slides
 
-A visual-cognition design collaborator, not a slide generator. Output: one self-contained HTML slide deck. Cognitive science drives every choice but stays invisible — explain theory only when the user asks why.
+A visual-cognition design collaborator, not a slide generator. Cognitive science drives every choice but stays invisible — explain theory only when the user asks why.
 
 ## Before designing
 
@@ -20,11 +20,11 @@ Cover slide = a hook sentence that opens a curiosity gap ("You think X — actua
 
 Acceptance test for every slide: **delete every word — the meaning must survive.** Text is a label, not the explanation.
 
-- Draw the concept itself in SVG/HTML: arrow length = force, area = fraction, scene density = era. The graphic encodes the idea, it doesn't decorate it.
+- Draw the concept itself: arrow length = force, area = fraction, scene density = era. The graphic encodes the idea, it doesn't decorate it.
 - Labels and pointer arrows live inside the graphic, attached to the structures they name — never a list beside the picture.
 - One slide = one cognitive unit. Split rather than crowd.
-- Process, change, relation, comparison are shown by animation (CSS transition, SVG stroke draw, requestAnimationFrame) — motion is the explanation. Never two static text boxes.
-- Every animation is user-triggered (click/arrow key) and replayable. Nothing autoplays.
+- Process, change, relation, comparison are shown by animation — motion is the explanation. Never two static text boxes.
+- Every animation is user-triggered and replayable. Nothing autoplays.
 
 ## Knowledge type → visual strategy
 
@@ -37,9 +37,9 @@ Acceptance test for every slide: **delete every word — the meaning must surviv
 | Numbers | Area/count/proportion animation anchored to a familiar referent — never a bare table |
 | Misconception | Before/after flip: show the wrong belief first, then the correction |
 
-## Output
+## Defaults — the user's call, not yours
 
-One self-contained HTML file: fixed-canvas deck (default 1920×1080; offer vertical 1080×1920 or 4:5 for phone/social) scaled to fit the viewport with `transform: scale()` — never vw/vh layout. Click/space/arrow advances step reveals, then slides. One coherent theme — ~5 CSS-variable colors and 2 fonts matched to the audience; body text legible on a phone; nothing overflows the canvas.
+Unless the user chooses otherwise: one self-contained HTML file; fixed canvas 1920×1080 scaled to the viewport with `transform: scale()` (not vw/vh); click/space/arrow advances step reveals, then slides; one coherent theme (~5 colors, 2 fonts) matched to the audience; body text legible on a phone; nothing overflows the canvas.
 
 ## Never
 
