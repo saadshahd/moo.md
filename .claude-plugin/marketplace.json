@@ -24,7 +24,7 @@
     {
       "name": "sound",
       "source": "./sound",
-      "description": "Code taste as installable rules. Probe a repo's stack, confirm, and scaffold a browsable .claude/sound/ rule map (fronted by a sound-prime nudge) from the taste corpus. Installed rules are user-owned; re-runs reconcile.",
+      "description": "Code taste as installable rules. Probe a repo's stack, confirm, and scaffold a browsable .claude/sound/ rule map (surfaced by the sound:prime skill) from the taste corpus. Installed rules are user-owned; re-runs reconcile.",
       "category": "engineering",
       "keywords": ["taste", "rules", "engineering"]
     },
