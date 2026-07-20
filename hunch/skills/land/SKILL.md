@@ -1,6 +1,6 @@
 ---
 name: land
-description: Use when the user wants knowledge delivered to an audience — slides, a deck, a diagram, an explainer, teaching or talk material — or shares existing content that isn't getting through.
+description: Use when the user wants knowledge delivered to an audience — slides, a deck, a diagram, an explainer for others, teaching or talk material — or shares existing content that isn't getting through.
 ---
 
 # Land
