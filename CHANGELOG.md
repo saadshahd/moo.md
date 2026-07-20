@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- feat(moo): `i-have-adhd` skill — trimmed port of [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) (120 → 34 lines); keeps the causal frame (working memory, start friction, time blindness, dopamine) plus per-response rules, overrides, and the send check; description reduced to trigger-only per the description-trap rule.
+
 ### Changed
 
 - sound: trimmed aphorism-tail restatements from 31 corpus rules (token reduction, zero enforcement change — frontmatter, header lines, section labels, carves, Detect/Not-when conditions all byte-preserved).
