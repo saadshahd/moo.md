@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Nygard
+topic: integration
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 Wrap every external dependency (a different team's service, a third-party API, anything you don't deploy) in one typed adapter that owns its own timeout, retry policy, circuit breaker, AND the structured observability of the boundary (the attempt/result logs or trace) — call sites depend on the adapter's interface, never the transport client directly.

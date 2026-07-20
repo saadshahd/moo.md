@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Armstrong
+topic: messaging
 ---
 when: [distributed] · tier: standard · check: judgeable
 Retry/backoff/dead-letter behavior for a queue job is declared as data consumed by the queue's own supervisor, never as a hand-rolled retry loop with an internal try/catch. The job body lets an unenumerated failure escape to the supervisor — that escape is legal precisely because it is the unit-boundary crash of error-handling-two-regimes, ending in the queue's redelivery / dead-letter, not a catch that continues.

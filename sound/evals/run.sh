@@ -22,7 +22,7 @@ for fx in "${FIXTURES[@]}"; do
   [ -d "$repo" ] || { echo "SKIP $fx (no repo/)"; continue; }
   out="$RUN_DIR/$fx.json"
   echo "== $fx ($MODEL)"
-  printf '%s' "Read the skill file at $SKILL. Execute it in PROPOSE-ONLY mode against the repository at $repo (this is a trimmed skeleton: tree.txt lists the real repo's full file listing — treat it as ground truth for which files exist; the included source files are real excerpts). Run Phases 1-3 (probe, select, tune paths); run the selection INLINE, no subagents. Output ONLY the propose-only JSON object, nothing else." \
+  printf '%s' "Read the skill file at $SKILL. Execute it in PROPOSE-ONLY mode against the repository at $repo (this is a trimmed skeleton: tree.txt lists the real repo's full file listing — treat it as ground truth for which files exist; the included source files are real excerpts). Run Phases 1-3 (probe, select, confirm); run the selection INLINE, no subagents. Output ONLY the propose-only JSON object, nothing else." \
     > "$RUN_DIR/$fx.prompt"
   ok=0
   for attempt in 1 2 3; do

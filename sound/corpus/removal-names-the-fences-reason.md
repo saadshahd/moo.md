@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: grug + Chesterton
+topic: commit-shape
 ---
 when: [always] · tier: standard · check: judgeable
 Working code whose purpose is not obvious — a sleep, a retry, a re-check, a special case — is load-bearing until shown otherwise. A diff that deletes or bypasses such an oddity must name the reason it existed (recovered from blame, tests, or its author) and why that reason no longer holds — or state that the reason was searched for and not found.

@@ -2,6 +2,7 @@
 paths: "**/*.{tsx,jsx}"
 when: react
 source: house
+topic: effects
 ---
 when: [react] · tier: standard · check: judgeable
 Raw `useEffect` and `useRef` in a component are low-level plumbing that almost always stand for a higher declarative concept — a subscription, a debounce, a media query, a previous value, an intersection observer. A component with 2+ `useEffect`s is a code-review blocker; fix it by classifying each effect. An *escape hatch* (synchronizing with an external system) is real — extract it into a named hook that describes INTENT (`useMediaQuery`, `usePrevious`, `useOnClickOutside`). An *event-in-disguise* (logic reacting to a state flag a handler just set) is not an effect at all — move it into that handler.

@@ -2,6 +2,7 @@
 paths: "**/*.{tsx,jsx}"
 when: react
 source: Abramov
+topic: placement
 ---
 when: [react] · tier: standard · check: judgeable
 State starts in the component that owns the interaction; lift it only when a second component genuinely needs to read or drive it — never lift preemptively "in case it's needed later."

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Vergnaud
+topic: types
 ---
 when: [always] · tier: standard · check: deterministic
 A domain identifier or measured quantity that participates in more than one entity's shape must be a branded nominal type, never a bare `string`/`number`.

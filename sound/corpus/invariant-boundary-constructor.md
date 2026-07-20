@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Evans + Vernon
+topic: types
 ---
 when: [always] · tier: standard · check: deterministic
 A type that enforces a domain rule/invariant is built and mutated through exactly ONE named factory per type that states the rule — never a raw constructor, object literal, or spread from outside its own module, and the invariant is never re-checked ad hoc at each call site.

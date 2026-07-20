@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Helland
+topic: integration
 ---
 when: [distributed] · tier: standard · check: judgeable
 Data received from another service is a versioned snapshot from the past — store it immutably with the version/timestamp it arrived under, and treat a decision made on it as possibly-stale; never mutate a foreign record in place or read it back as if it were live truth.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Armstrong
+topic: resilience
 ---
 when: [distributed] · tier: high-stakes · check: deterministic
 One job or request failing must never take down or corrupt the processing of any other concurrently in-flight job or request — isolate at the unit-of-work boundary, not by wrapping deeper business logic in defensive checks.

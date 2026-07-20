@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Vernon
+topic: messaging
 ---
 when: [distributed] · tier: standard · check: judgeable
 A command handler is a pure `decide` function — `(state, command) -> Result<Fact[], E>` — that never persists, logs, or mutates in place. A separate edge function applies the emitted facts and does the IO.

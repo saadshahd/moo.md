@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Beck
+topic: commit-shape
 ---
 when: [always] · tier: standard · check: deterministic
 A single commit either restructures code with no behavior change, or changes behavior with no structural cleanup riding along — never both, because a failing test after a mixed commit can't tell you which change broke it.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Lamport
+topic: messaging
 ---
 when: [distributed] · tier: standard · check: judgeable
 A handler never assumes messages arrive in send order. It carries the sender's sequence/version and ignores any update older than the state it already holds.

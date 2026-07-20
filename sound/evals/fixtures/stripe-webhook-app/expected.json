@@ -4,11 +4,6 @@
     "db",
     "distributed"
   ],
-  "globs": {
-    "default": "**/*.{ts,tsx}",
-    "test": "**/*.{test,spec}.{ts,tsx}",
-    "react": "**/*.{tsx,jsx}"
-  },
   "notes": "distributed: app/api/webhooks/route.ts is a Stripe webhook handler verifying stripe.webhooks.constructEvent signatures and reconciling subscription/product/price state from Stripe's async event stream (server + Stripe + user's browser are three reconciling parties over time). utils/stripe/server.ts's checkoutWithStripe() calls stripe.checkout.sessions.create(...) and createStripePortal() calls stripe.billingPortal.sessions.create(...) — both durably create real remote Stripe objects (a Checkout Session, a Billing Portal session), not read-only lookups. This is the canonical side-effectful-remote-boundary pair (charge/subscription creation + webhook confirmation) the distributed tag targets. db: utils/supabase/queries.ts and utils/supabase/server.ts show owned Postgres access via Supabase (direct .from(table).select(...) queries, not a generic hosted-API consumer), corroborated by schema.sql's full table/RLS definitions and by the webhook route writing subscription/product/price rows on every relevant Stripe event. react: components/ui/AccountForms/CustomerPortalForm.tsx is a 'use client' component using useState/useRouter and rendering JSX; app/account/page.tsx is the server component that feeds it. No workspace/monorepo structure (single package.json at repo root, no pnpm-workspace.yaml or turbo.json) so glob values are left at corpus defaults unscoped. Repo has zero test files (grepped tree.txt for *.test.*/*.spec.*/__tests__, zero hits, and no test runner in package.json devDependencies) so the test glob is left at the corpus's {ts,tsx} default, unverified against a real convention — same caveat pattern as fullstack-next-db. Repo is archived (Vercel stopped actively maintaining it) but was chosen anyway as the canonical, highest-star (7722), MIT-licensed public specimen of the Stripe-webhook-plus-Prisma/Supabase pattern the fixture spec calls for; nothing about being archived changes the correctness of the tag evidence in the files included.",
   "rules": {
     "must_install": [

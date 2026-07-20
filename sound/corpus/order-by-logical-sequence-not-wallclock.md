@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Lamport + Kleppmann
+topic: messaging
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 Ordering, causality, and "which write wins" across nodes are decided by a logical sequence (per-source counter / version / vector clock), never by comparing wall-clock timestamps — clocks on different machines skew, jump, and run backwards.

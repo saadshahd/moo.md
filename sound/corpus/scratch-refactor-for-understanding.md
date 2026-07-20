@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Feathers
+topic: commit-shape
 ---
 when: [always] · tier: throwaway · check: judgeable
 When you don't yet understand unfamiliar code well enough to change it safely, do a throwaway refactor purely to build understanding — extract, rename, restructure freely — then discard it and make the real change from a position of clarity, never keeping the exploratory version as the shipped diff.

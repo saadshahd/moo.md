@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Beck
+topic: commit-shape
 ---
 when: [always] · tier: standard · check: deterministic
 TDD isn't a personal ritual you attest to — it leaves a fingerprint in the diff: the test written first (so its shape pressures the interface — a function awkward to call from a test will be awkward to call from production), the test file and the source file for one behavior change landing together, and the test asserting the new behavior, not just re-describing the new code.

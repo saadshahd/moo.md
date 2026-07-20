@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Kleppmann
+topic: consistency
 ---
 when: [distributed] · tier: standard · check: judgeable
 A cache, search index, or denormalized table is a projection of an authoritative source, not a second source of truth — every write flows to the source first, and the projection MUST be droppable and rebuildable from it.

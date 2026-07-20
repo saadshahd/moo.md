@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Helland
+topic: consistency
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 A single write is atomic only within one entity (one aggregate, one unique id, one machine); never span two services or two aggregates in one transaction, distributed lock, or 2PC — cross-entity effects go out as an idempotent message and reconcile by compensation.

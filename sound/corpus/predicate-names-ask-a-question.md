@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: naming
 ---
 when: [always] · tier: standard · check: deterministic
 Boolean-returning names answer a yes/no question: `is*` / `was*` / `should*` / `does*`. Now-vs-then pairs differ by tense only — `isX` is current state, `wasX` is prior state. Ban `validate` and `check` as predicate names; they hide the question the boolean answers.

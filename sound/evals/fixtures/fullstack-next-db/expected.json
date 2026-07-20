@@ -4,11 +4,6 @@
     "db",
     "distributed"
   ],
-  "globs": {
-    "default": "**/*.{ts,tsx}",
-    "test": "**/*.{test,spec}.{ts,tsx}",
-    "react": "**/*.{tsx,jsx}"
-  },
   "notes": "db: neo4j-driver is used directly (raw Cypher via driver.session().run(...)) in src/app/api/auth/[...nextauth]/route.ts and src/app/api/families/settings/route.ts — owned db access, not a hosted-API consumer. distributed: next-auth's EmailProvider is configured in src/app/api/auth/[...nextauth]/route.ts with an SMTP transport (host/port/auth/from) — this is next-auth's built-in nodemailer-backed transport (nodemailer is a direct package.json dependency and next-auth's EmailProvider requires it at runtime to send magic-link email), a side-effectful remote boundary (sends real email) even though the file has no literal `import nodemailer`. No separate file imports nodemailer directly — grepped the whole web/ tree, found none — so route.ts stands as the sole representative source for both neo4j-driver and the nodemailer-backed distributed boundary; not fabricated, this is genuinely how the repo wires it. react: .tsx components present throughout (SignInForm.tsx uses react-hook-form + next-auth/react client SDK). No test files exist in the repo (grepped for *.test.*/*.spec.*, zero matches) so the test glob is left at corpus default, unverified against real convention. tsconfig has no explicit jsx extension beyond .tsx/.ts (allowJs true, jsx: preserve) so default glob unwidened.",
   "rules": {
     "must_install": [

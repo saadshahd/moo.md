@@ -3,7 +3,6 @@
 // Usage: bun score.mjs <fixture-dir> <proposal-json-file>
 // Compares proposal against <fixture-dir>/expected.json:
 //   tags  — exact set equality (reported per-tag)
-//   globs — per expected key: exact string OR same matched file-set over repo/tree.txt
 //   rules — three-class labels: every must_install present, no must_not_install present,
 //           all proposed names exist in the corpus, every citation path exists in tree.txt.
 //           Unlabeled rules are don't-care by design (full-corpus exact labels are unlabelable).
@@ -43,26 +42,8 @@ const paths = existsSync(treeFile)
 
 const setEq = (a, b) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
-// Glob equivalence is decided over the real tree PLUS canary paths derived from it
-// (every observed dir × every observed basename-suffix). Without canaries, a scoped
-// glob and an unscoped one are indistinguishable whenever the real files happen to
-// all live inside the scope — the canaries make scoping load-bearing while still
-// absorbing cosmetic variants (brace order, extension arms no file ever uses).
-const dirs = [...new Set(paths.map((p) => p.split("/").slice(0, -1).join("/")).filter(Boolean))];
-const exts = [...new Set(paths.map((p) => {
-  const base = p.split("/").pop();
-  const dot = base.indexOf(".");
-  return dot > 0 ? base.slice(dot + 1) : "";
-}).filter(Boolean))];
-const universe = [...paths, ...dirs.flatMap((d) => exts.map((e) => `${d}/__canary__.${e}`))];
-
-const matchSet = (glob) => universe.filter((p) => new Bun.Glob(glob).match(p)).sort().join("\n");
-const globEq = (a, b) => a === b || (paths.length > 0 && matchSet(a) === matchSet(b));
-
 const expTags = expected.tags ?? [];
 const gotTags = proposal.tags ?? [];
-const expGlobs = expected.globs ?? {};
-const gotGlobs = proposal.globs ?? {};
 
 const tagsMatch = setEq(expTags, gotTags);
 
@@ -126,23 +107,6 @@ const checks = [
       (tagsMatch ? "" :
         ` | missing: [${expTags.filter((t) => !gotTags.includes(t))}] spurious: [${gotTags.filter((t) => !expTags.includes(t))}]`),
   },
-  ...Object.entries(expGlobs).map(([key, expGlob]) => ({
-    name: `glob:${key}`,
-    pass: typeof gotGlobs[key] === "string" && globEq(expGlob, gotGlobs[key]),
-    detail: `expected "${expGlob}" got "${gotGlobs[key] ?? "∅"}"`,
-  })),
-  ...Object.keys(gotGlobs)
-    .filter((key) => !(key in expGlobs))
-    .map((key) => {
-      const redundant = typeof expGlobs.default === "string" && globEq(gotGlobs[key], expGlobs.default);
-      return {
-        name: `glob:${key}`,
-        pass: redundant,
-        detail: redundant
-          ? `redundant key "${key}" (≡ default class) — harmless at install`
-          : `spurious glob key "${key}": "${gotGlobs[key]}"`,
-      };
-    }),
   ...ruleChecks,
 ];
 

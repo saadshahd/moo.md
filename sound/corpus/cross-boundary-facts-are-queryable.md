@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: house
+topic: integration
 ---
 when: [distributed] · tier: standard · check: judgeable
 When state spans processes, services, or third parties, make it observable at runtime — tracing, or structured logs — emitted INSIDE the one adapter that owns the boundary (integration-point-isolation), so it can be re-derived on demand. Never depend on holding distributed state in your head, or in a static note that goes stale the moment the system moves.

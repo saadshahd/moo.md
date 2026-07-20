@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Lamport
+topic: resilience
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 A call that crosses a process boundary resolves to `ok | failed | unknown` — never a two-way `ok | failed`. A timeout means the request may have been applied; the caller must be able to branch on "don't know."

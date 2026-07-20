@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Helland
+topic: integration
 ---
 when: [distributed] · tier: standard · check: deterministic
 What crosses a boundary is an explicit, versioned contract with a descriptive (self-describing) schema — never your internal relational/ORM entity leaked directly; consumers branch on the stated version rather than assuming the sender's "now" shape.

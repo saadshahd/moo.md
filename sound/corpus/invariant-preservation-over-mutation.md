@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: db
 source: Hughes
+topic: tests
 ---
 when: [db] · tier: high-stakes · check: deterministic
 Any function that transforms a collection or aggregate under a stated invariant (sorted order, uniqueness, total balance, non-negative quantity) must be tested by asserting the invariant holds on the *output*, for all generated inputs — not by checking one example transformation.

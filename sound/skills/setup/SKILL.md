@@ -1,11 +1,11 @@
 ---
 name: setup
-description: Use when installing, refreshing, or re-tuning sound taste rules in a project. Triggers on "sound setup", "install taste rules", "scaffold .claude/rules", "set up sound here", starting work in a repo with no .claude/rules/, or a taste-not-defined nudge. Also use to re-run after a stack change (new framework, new package in a monorepo).
+description: Use when installing, refreshing, or re-tuning sound taste rules in a project. Triggers on "sound setup", "install taste rules", "scaffold .claude/sound", "set up sound here", starting work in a repo with no .claude/sound/, or a taste-not-defined nudge. Also use to re-run after a stack change (new framework, new package in a monorepo).
 ---
 
 # sound:setup
 
-Scaffold a project's taste rules from the sound corpus: probe the repo's stack, select ONLY the rules whose subject the repo's code actually shows — evidence-cited per rule, never a tag-wide dump — confirm with the user, then install with examples rewritten in the project's own domain. Judgeable rules land in a browsable `.claude/sound/<topic>/` map fronted by a one-line `sound-prime` nudge; surface-gated and deterministic rules stay `.claude/rules/` `paths`-rules (see Phase 6). Once written, the files belong to the user; re-runs reconcile against what exists (see Re-runs).
+Scaffold a project's taste rules from the sound corpus: probe the repo's stack, select ONLY the rules whose subject the repo's code actually shows — evidence-cited per rule, never a tag-wide dump — confirm with the user, then install with examples rewritten in the project's own domain. Every selected rule lands as a plain reference file in a browsable `.claude/sound/<topic>/` map, fronted by a one-line `sound-prime` nudge. Once written, the files belong to the user; re-runs reconcile against what exists (see Re-runs).
 
 Corpus location: `../../corpus/` relative to this SKILL.md (the default candidate universe). A sibling `../../corpus-optin/` holds opt-in rules excluded from candidacy unless the user names one at invocation (Phase 2). If `corpus/` is missing or unreadable, STOP and say so — never install a partial set silently.
 
@@ -15,7 +15,7 @@ Goal: decide which kind-tags apply. Tags are a PRE-FILTER for Phase 2 candidacy,
 
 **Usage evidence decides — manifest presence only tells you where to look.** A dep can be dead weight, hoisted, or tooling-only. For every manifest hint, verify in source before proposing the tag. Negatives need the same rigor: a client's config/wrapper file alone never clears a dep — search the client's USE sites (`.publish(`, `.send(`, `.create(`…) across the repo before ruling a tag out; a cache-shaped wrapper can still be published through elsewhere.
 
-Method: read every `package.json` (root + workspaces) and workspace markers (`pnpm-workspace.yaml`, `turbo.json`) → hypothesis list. Then verify each hypothesis against source. While there, also record: source extensions actually written (`.ts`/`.tsx`/`.js`/`.jsx`/`.mts`), the real test-file convention — read the test RUNNER'S config (vitest/jest include patterns, ava files) when one exists, since it's authoritative over filename guessing and settles which suffixes belong to unit tests vs e2e — and which workspace package each piece of evidence lives in.
+Method: read every `package.json` (root + workspaces) and workspace markers (`pnpm-workspace.yaml`, `turbo.json`) → hypothesis list, then verify each hypothesis against source. While there, note whether the repo is TypeScript, pure-JS, or neither — that decides the TS-only rule veto (Phase 2) and the no-JS/TS abort (Failure modes).
 
 | Tag | Fires on (verified usage) | Does NOT fire on |
 |---|---|---|
@@ -27,7 +27,7 @@ Method: read every `package.json` (root + workspaces) and workspace markers (`pn
 
 Candidates = every `corpus/` rule whose `when:` is `always` or shares ANY tag with the Phase 1 tag set. Candidacy is where the tag filter's job ENDS.
 
-**Opt-in gate (deterministic).** The candidate universe is `corpus/` ONLY. Rules in the sibling `corpus-optin/` are excluded by default; one enters candidacy solely when the user names it at invocation — then read that rule from `corpus-optin/`. This is directory-membership as the gate (zero-LLM), named by hand exactly like the pathless pair (Phase 3, rule 5). A default run never proposes an opt-in rule.
+**Opt-in gate (deterministic).** The candidate universe is `corpus/` ONLY. Rules in the sibling `corpus-optin/` are excluded by default; one enters candidacy solely when the user names it at invocation — then read that rule from `corpus-optin/`. This is directory-membership as the gate (zero-LLM): the user names the rule, nothing else admits it. A default run never proposes an opt-in rule.
 
 A candidate installs iff the repo contains the SUBJECT-SURFACE the rule governs — code where the rule's `Detect:` question is askable — cited as ONE FILE path (never a directory, never a glob). The rule's `Not-when:` can veto. No citation, no install. An actual violation is NOT required (rules are prevention; they should arrive before the first sin) and its absence is never a veto. Existing COMPLIANCE is evidence FOR install, never a reason to skip — a repo already doing the RIGHT shape has the surface, and the rule guards every future edit of it.
 
@@ -37,36 +37,24 @@ A fired tag earns NOTHING by itself — each rule's OWN Detect question must be 
 - Universal-subject rule (its subject is "any code": naming, transformation shape, comments, function design): passes trivially — cite any substantive source file. Never manufacture deeper evidence for these.
 - A rule whose RIGHT shape requires TypeScript (casts, branded types, `satisfies`, compile-time exhaustiveness) never installs in a pure-JS repo — a prescription the repo cannot follow is dead weight.
 - `always`-tagged does NOT mean universal-subject: command/event-naming, intent-vs-fact temporal splits, and ledger rules are always-CANDIDATES but subject-bearing — they need their surface (a named event/message vocabulary, state reconciled elsewhere, an append-only store). A repo with no events does not get the event-naming rule.
-- Test-scoped rule: its subject-surface is the CODE UNDER TEST, never test-file presence — a zero-test repo with testable logic still earns the general testing rules (cite the testable code; the test glob fires the moment the first test file is written). WRONG: "no test files → skip one-behavior-per-test". RIGHT: pure logic in `src/parser.ts`, zero tests → install it, cite `src/parser.ts`. Test rules with a more specific shape (roundtrip laws need encode/decode pairs; property generators need domain invariants) still need THAT shape cited.
+- Test-scoped rule: its subject-surface is the CODE UNDER TEST, never test-file presence — a zero-test repo with testable logic still earns the general testing rules (cite the testable code). WRONG: "no test files → skip one-behavior-per-test". RIGHT: pure logic in `src/parser.ts`, zero tests → install it, cite `src/parser.ts`. Test rules with a more specific shape (roundtrip laws need encode/decode pairs; property generators need domain invariants) still need THAT shape cited.
 - Every rejected candidate gets a one-line reason (surfaced at Confirm); rejection reasons are how the user audits the judgment.
 
 Method — this analysis is DEEP by design; spend the tokens: partition the candidates into batches of rules that would look at the same code (seed the grouping with when-tags and each rule's subject; batch composition is a means, not a contract). Dispatch one subagent per batch with its rules' full text and repo access; each returns per-rule `install + citation` or `skip + reason`. In propose-only mode the selection may run inline instead — the output set is what's judged, not the mechanism.
 
-## Phase 3 — Tune paths
+## Phase 3 — Confirm (never skip, never auto-install)
 
-Principle: **a rule's glob must be able to fire before its Detect moment.** `.claude/rules/` has two loading modes — `paths:` files inject on Read/Edit of a matching file; pathless files load at session launch. A glob that can never match this repo's files is a silently-dead rule; a glob that only matches files edited AFTER the violation moment is worse.
-
-1. **Extensions** — repo writes SUBSTANTIVE source in `.js`/`.jsx`/`.mts` too? Widen `{ts,tsx}` to match. Tooling config files alone (`tailwind.config.js`, `eslint.config.js`…) do NOT widen — the rules target code the team writes, not scaffolding. Pure-TS repos keep corpus defaults. The react-class glob covers JSX-BEARING extensions ONLY: `{tsx,jsx}` (or `.js` where the repo writes JSX inside `.js`) — never `.ts`. WRONG: `frontend/**/*.{ts,tsx}`. RIGHT: `frontend/**/*.{tsx,jsx}`.
-2. **Test convention** — replace the `**/*.{test,spec}.{ts,tsx}` class with the repo's real convention, expressed as the SUFFIX pattern alone, repo-wide (`**/*.test.ts`) — do NOT directory-scope it just because tests happen to sit in one dir (rule 4 applies here too). Directory-scope only when the convention has no suffix at all (ava-style bare `test/**/*.js`) or the suffix would match real non-test files. Include only the suffix arms the repo's unit tests actually use: if `.spec.ts` files exist but belong to a different runner (Playwright e2e), they stay OUT of the test class.
-3. **Monorepo scoping (kind-tagged rules only)** — scoping units are WORKSPACE PACKAGES (declared in `pnpm-workspace.yaml`/workspaces field), never directories; in a single-package repo there is nothing to scope — kind globs stay repo-wide and no per-tag glob keys exist (rule 4). In a workspace repo, SCOPED is the default: scope each tag's glob to the packages carrying that tag's evidence (`apps/web/**/*.{tsx,jsx}`). Leave it repo-wide only when the evidence genuinely spans most packages — incidental references elsewhere (a type reused by the frontend, an import in a script) do NOT unscope. WRONG: distributed evidence in one app of a workspace, glob `**/*.{ts,js}`. RIGHT: `apps/worker/**/*.ts`. `always` rules stay repo-wide.
-4. **No other narrowing** — never tighten to `src/**` in single-package repos. Unmatched `paths` files cost nothing; narrowing only buys miss-risk.
-5. **Pathless pair** — `red-green-refactor-is-a-commit-shape` and `tidy-or-behavior-never-both` Detect on COMMIT shape, which no edit-glob reaches: strip their `paths` key entirely so they load at launch. (They still pass through Phase 2 selection like any candidate.)
-
-## Phase 4 — Confirm (never skip, never auto-install)
-
-Present to the user, compactly: the extracted facts (each with its file evidence), the proposed tag set, the proposed rule set — each rule with its citation — the rejected candidates grouped with their one-line reasons, and the proposed glob tunings from Phase 3. Ask for confirmation or correction. The user's answer is the verdict — a corrected tag set or rule set replaces yours without argument; redo the affected phases with it. Only write after explicit confirmation. The user confirms the SET here; tuned example bodies are Phase 5–6 output they own afterward.
+Present to the user, compactly: the extracted facts (each with its file evidence), the proposed tag set, the proposed rule set — each rule shown as name + citation + its one-line statement (name-only is uninformed consent — the user must see what each rule requires before approving) — and the rejected candidates grouped with their one-line reasons. The statement is the rule body's opening mandate: the prose right after the `when: … · tier: … · check: …` metadata line — its first sentence, extended to the next sentence only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never the WRONG/RIGHT code, `_Avoid_`, or `Detect:`. Ask for confirmation or correction. The user's answer is the verdict — a corrected tag set or rule set replaces yours without argument; redo the affected phases with it. Only write after explicit confirmation. The user confirms the SET here; tuned example bodies are Phase 4–5 output they own afterward.
 
 **Propose-only mode:** when the invocation asks for a proposal only (evals, dry runs), emit exactly this JSON and stop — no confirmation, no tuning, no writes:
 
 ```json
-{"facts": ["<evidence with file paths>"], "tags": ["react"], "globs": {"default": "**/*.{ts,tsx}", "test": "**/*.{test,spec}.{ts,tsx}", "react": "**/*.{tsx,jsx}"}, "rules": [{"name": "<corpus-rule-name>", "cite": "<repo file path>"}]}
+{"facts": ["<evidence with file paths>"], "tags": ["react"], "rules": [{"name": "<corpus-rule-name>", "cite": "<repo file path>"}]}
 ```
 
-`tags` contains ONLY kind-tags from {react, db, distributed} — `always` is not a tag, it's the unconditional candidacy baseline; listing it is an error. `rules` lists ONLY the install set: every selected rule's corpus FILENAME (no `.md`) COPIED VERBATIM from the corpus listing — never reconstructed from memory; before emitting, verify every name matches an existing `corpus/` file (or a `corpus-optin/` file the user named). `cite` is one FILE path that exists in the repo (no directories). Skips are not emitted. The pathless pair, when selected, appears in `rules` like any other.
+`tags` contains ONLY kind-tags from {react, db, distributed} — `always` is not a tag, it's the unconditional candidacy baseline; listing it is an error. `rules` lists ONLY the install set: every selected rule's corpus FILENAME (no `.md`) COPIED VERBATIM from the corpus listing — never reconstructed from memory; before emitting, verify every name matches an existing `corpus/` file (or a `corpus-optin/` file the user named). `cite` is one FILE path that exists in the repo (no directories). Skips are not emitted.
 
-`globs` keys: `default` and `test` always (they cover the `always` rules); `react` REQUIRED whenever the react tag fires (its rules ship a distinct glob class — omitting the key breaks them) and absent otherwise; plus one key per kind-tag ONLY when monorepo scoping makes its glob differ from `default` (e.g. `"db": "services/api/**/*.ts"`) — a per-tag key repeating the default glob is noise, and a single-package repo NEVER gets per-tag keys (nothing to scope; Phase 3 rule 3). WRONG: no workspace file, evidence under `src/` → `"db": "src/**/*.ts"` (that is directory narrowing, not package scoping). Every value is the TUNED glob.
-
-## Phase 5 — Tune examples (confirmed set only)
+## Phase 4 — Tune examples (confirmed set only)
 
 Rewrite each confirmed rule's fenced WRONG/RIGHT code in the project's own domain — its real nouns, types, and naming style — as PLAUSIBLE project code, never a verbatim quote of an existing violation. ALL prose is byte-preserved: statement, `_Avoid_`, `Detect:`, `Not-when:`, `Cross-ref:` stay corpus-verbatim — the examples localize, the law does not. Batch the work across subagents as in Phase 2.
 
@@ -76,15 +64,11 @@ Mechanical gates per tuned rule — any gate fails → keep the corpus example f
 2. **De-genericized** — no stock corpus nouns (`Order`, `Invoice`, `OrderStatus`, `Payment`, `Cart`…) unless that noun greps in the repo's own source (then it IS the domain).
 3. **Grounded** — at least one identifier in the tuned example greps to a real identifier in the repo.
 
-## Phase 6 — Write
+## Phase 5 — Write
 
-Each confirmed rule has ONE home, decided by its corpus `topic:` frontmatter. No marker, manifest, or hash in either home.
+Write each confirmed rule's Phase-4 tuned body to `.claude/sound/<topic>/<rule-name>.md` with NO frontmatter at all: a plain reference file. The `<topic>` folder is the corpus `topic:` value verbatim. These files live outside `.claude/rules/`, so they never auto-load — the agent pulls one only when it reads it; the browsable `.claude/sound/` tree IS the map the `sound-prime` nudge points at. No marker, manifest, or hash anywhere.
 
-**Prime-delivered (rule HAS a `topic:`)** — the judgeable taste rules. Write the Phase-5 tuned body to `.claude/sound/<topic>/<rule-name>.md` with NO frontmatter at all: a plain reference file. It lives outside `.claude/rules/`, so it never auto-loads — the agent pulls it only when it reads it. The `<topic>` folder is the corpus `topic:` value verbatim; the browsable `.claude/sound/` tree IS the map the `sound-prime` nudge points at.
-
-**Paths-delivered (rule has NO `topic:`)** — surface-gated, deterministic, and process rules. Write `.claude/rules/<rule-name>.md` as before: tuned body from Phase 5; frontmatter = the tuned `paths` line ONLY (no `when:`, no `source:`). The pathless pair gets no frontmatter. Which glob — by corpus glob class, never ad hoc: test-class rules → tuned `test`; react rules → tuned `react`; other kind-tagged rules → their tag's scoped glob when one exists, else `default`; `always` rules → `default`; a multi-kind rule → all its tags' globs.
-
-**The prime nudge.** If ANY prime-delivered rule was installed, write ONE `.claude/skills/sound-prime/SKILL.md` — a fixed, minimal skill that makes the agent aware the map exists. It does NOT enumerate rules or hardcode the map. Write it verbatim:
+**The prime nudge.** Write ONE `.claude/skills/sound-prime/SKILL.md` — a fixed, minimal skill that makes the agent aware the map exists. It does NOT enumerate rules or hardcode the map. Write it verbatim:
 
 ```
 ---
@@ -95,16 +79,16 @@ user-invocable: true
 
 # sound-prime
 
-This project keeps a map of its taste rules under `.claude/sound/`, grouped into topic folders (`<topic>/<rule-name>.md`). At the start of a coding task, browse that tree once to learn which topics bear on the surfaces you are about to touch. As you write, Read the specific `<topic>/<rule-name>.md` when its situation comes up, and make sure the code you produce meets every rule that governs a surface you change.
+The project's taste rules live under `.claude/sound/`, grouped into topic folders (`<topic>/<rule-name>.md`). Before you write, browse the tree to see which topics bear on the surfaces you'll touch. Read a rule's file when its situation comes up, and make sure your code meets every rule that governs a surface you change.
 ```
 
 ## Re-runs (reconcile, never overwrite)
 
-`.claude/rules/` and `.claude/sound/` may already hold rule files — from a previous setup, hand-written, or evolved past what setup wrote. Every existing rule file in either home is user-owned; reconcile by reading, not bookkeeping. Installed examples are tuned BY DESIGN, so whole-body comparison is meaningless — compare PROSE ONLY: body minus fenced code blocks minus frontmatter, whitespace-normalized. The `.claude/skills/sound-prime/SKILL.md` nudge is the exception: it is DERIVED, carries no rule content to lose, and is overwritten verbatim each run — never reconciled.
+`.claude/sound/` may already hold rule files — from a previous setup, hand-written, or evolved past what setup wrote. Every existing rule file is user-owned; reconcile by reading, not bookkeeping. Installed examples are tuned BY DESIGN, so whole-body comparison is meaningless — compare PROSE ONLY: body minus any frontmatter minus fenced code blocks, whitespace-normalized. The `.claude/skills/sound-prime/SKILL.md` nudge is the exception: it is DERIVED, carries no rule content to lose, and is overwritten verbatim each run — never reconciled.
 
 - **Existing file, no same-named corpus rule** → local taste. Leave untouched; mention only that it was preserved.
 - **Selected corpus rule, no existing file** → propose as an addition. This is how the install GROWS as the codebase evolves: every re-run re-derives tags and re-runs selection fresh — a surface that newly appeared makes its rules newly proposable. No memory of prior runs.
-- **Both exist, prose identical** → in-sync. At most propose a `paths` re-tune if the repo changed. NEVER regenerate its examples — once written they are the user's, whether setup tuned them or the user edited them; re-tune examples only when the user explicitly asks.
+- **Both exist, prose identical** → in-sync. NEVER regenerate its examples — once written they are the user's, whether setup tuned them or the user edited them; re-tune examples only when the user explicitly asks.
 - **Both exist, prose differs** → the user evolved the rule or the corpus moved since install — you cannot tell which, so show the prose diff and ask: keep theirs, take the corpus version, or keep both (theirs renamed as a local rule). Never silently overwrite.
 
 Present the whole reconciliation as ONE compact proposal (additions / updates / preserved) and write only what the user confirms.

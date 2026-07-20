@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Nygard
+topic: resilience
 ---
 when: [distributed] · tier: high-stakes · check: deterministic
 Every call across a process boundary (HTTP, DB, queue, cache, RPC) carries an explicit timeout at the call site — never the transport default, never absent.

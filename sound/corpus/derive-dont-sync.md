@@ -2,6 +2,7 @@
 paths: "**/*.{tsx,jsx}"
 when: react
 source: Abramov
+topic: effects
 ---
 when: [react] · tier: standard · check: judgeable
 An effect exists only to synchronize a component with something outside React (network, DOM API, subscription, third-party widget). Never mirror a prop/state value into another `useState` via `useEffect`, and never use an effect to react to a state change and set more state — compute derived values inline during render.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Lamport + Kleppmann + Helland
+topic: messaging
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 Exactly-once delivery is a myth — the network gives at-least-once, so any effectful handler reachable across a process boundary (message, event, webhook, retriable RPC) MUST be idempotent, keyed by a caller-supplied id, so a redelivery is a no-op that returns the first outcome. The dedup key is persisted in the SAME atomic write as the effect, never held in memory and never as a separate read-then-write.

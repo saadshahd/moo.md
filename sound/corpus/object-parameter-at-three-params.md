@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: abstraction
 ---
 when: [always] · tier: standard · check: deterministic
 A function with 3+ parameters takes a single object parameter. Group related primitives into named domain concepts rather than a positional list the caller must remember the order of.

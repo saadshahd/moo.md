@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: naming
 ---
 when: [always] · tier: standard · check: deterministic
 Actions that recompute derived state do NOT share the `set*` prefix with direct writes. Name them by the computation — `computeTotals`, `deriveLineups` — never `setComputedTotals`. `set*` means a caller-supplied write; recomputation is a different act.

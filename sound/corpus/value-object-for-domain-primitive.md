@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Evans + Vernon
+topic: types
 ---
 when: [always] · tier: high-stakes · check: deterministic
 A primitive that carries a domain validation rule / invariant (money, email, quantity, percentage) is a named value object / branded type built by exactly one validated factory — never a bare `string`/`number` threaded through domain signatures on trust.
