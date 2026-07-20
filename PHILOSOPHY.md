@@ -29,3 +29,4 @@ Four outcomes moo drives toward:
 Each plugin defines its own beliefs, principles, and constraints that serve the mission above.
 
 - **hope** — Thinking discipline: intent clarification, approach shaping, expert consultation, guarded delegation, ownership retrieval. See `hope/PHILOSOPHY.md`.
+- **hunch** — Experimental staging ground. Cheap to enter, honest to exit: every experiment graduates into hope/sound or dies. See `hunch/PHILOSOPHY.md`.

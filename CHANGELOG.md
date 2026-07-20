@@ -11,7 +11,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- feat(moo): `i-have-adhd` skill — trimmed port of [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) (120 → 34 lines); keeps the causal frame (working memory, start friction, time blindness, dopamine) plus per-response rules, overrides, and the send check; description reduced to trigger-only per the description-trap rule.
+- feat(hunch): new experimental plugin — a grab bag staging ground for skills and plugin features; cheap to enter, honest to exit (every release each experiment graduates into hope/sound or dies, judgment-leaning ones only with a measured pass-rate). Registered in marketplace.json under category `experimental`.
+- feat(hunch): `hold` skill — trimmed and reframed port of [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) (120 → 37 lines). The ADHD lens generalized to its universal core: every premise (finite working memory, knowing≠doing, start friction, time blindness, invisible progress) is a human constraint that agent-mediated work amplifies. Same rules; premise rewritten for any human supervising agents, estimates denominated in the reader's time, description reduced to trigger-only per the description-trap rule.
 
 ### Changed
 
