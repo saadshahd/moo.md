@@ -17,16 +17,28 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - feat(hunch): one-line `HYPOTHESIS.md` per experiment (`catch`, `land`) — states what better looks like, the graduation criterion hunch's philosophy asks for at entry.
 - feat(hunch): `grasp` skill — the essence of Geoffrey Litt's `/explain-diff` skill drafts and his "Understanding is the new bottleneck" talk (July 2026), trimmed from two medium-specific variants (~35 lines each) to one ~30-line SKILL.md. The essence: understand to participate, not just verify; explore the surrounding system first; Background → Intuition → literate Code walkthrough → five-question quiz with per-answer feedback; the quiz is a speed regulator on a loop that runs faster than human understanding (feedback per question, never a score — consistent with `over`'s invisibility rule). Medium plumbing (Notion toggles, HTML file conventions) reduced to a one-line user-owned default. Ships with `HYPOTHESIS.md`.
 - feat(hunch): `toy` skill — micro-worlds, the same talk's second technique (Papert's Mathland; the Prolog time-scrub debugger; the website-port command center): build the smallest interactive world the human can inhabit to intuit a system — the human drives, the world shows, never automate the step being learned; disposable by default. The talk's third technique (shared team spaces) is deliberately excluded: it needs collaboration infrastructure a Claude Code plugin shouldn't rebuild. Ships with `HYPOTHESIS.md`.
+
 ### Changed
 
 - change(hunch): `land` description scopes its explainer trigger to "an explainer for others", so a solo code-change catch-up request routes to `grasp` alone instead of co-firing both skills — grasp shapes the content, land the audience delivery.
+
+## [hope@9.7.2] - 2026-07-20
+
+### Changed
+
 - change(hope): essence trim across all skills (intent, shape, target, freeze, delegate, over, consult) and shared fragments (card, gate, prompts, handover) — each reduced to the minimal prompt that still makes an agent apply its essence; every trim adversarially verified for zero load-bearing loss (567 → ~480 skill lines; delegate 111→86, consult 145→100, with delegate's two overlapping runner tables merged into one).
 - change(hope): `prompts.md` fragment reframed as a three-mode boundary — EXPLORE the accessible surface (retrievable answers are retrieved, never asked) / ELICIT the user (only judgment calls no surface can settle) / INTERVIEWING named as the anti-pattern (serial quizzing, generic checklists, asking what exploration could answer). `intent`'s work loop now closes gaps by exploring first and eliciting only what remains.
-- change(sound): essence trim of `setup` prose (every constraint kept, wording tightened) and `review`; `prime` already minimal. Corpus redundancy pass over all 102 rules: 11 trimmed where an `_Avoid_` clause or example duplicated its `Detect:` verbatim — the `_Avoid_` field itself always stays (it is the writer's ban list; `Detect:` is the reviewer's procedure — different consumers, so overlap is not redundancy) — `Detect:`/`Not-when:` semantics, vocabulary, frontmatter, and Cross-refs untouched on every rule (eval-fence anchors preserved).
+- change(hope): `freeze`'s acquisition rule made self-contained — the cross-skill "same as delegate" shorthand replaced with the constraint stated directly (spawn acquisition agents and fold their returns, never read external systems yourself).
 
 ### Removed
 
 - remove(hope): the Workflow steer hook (`steer.sh` + `steer.md` and its PreToolUse entry) — the deny-once review-protocol latch on the first Workflow call. The `return.sh` PostToolUse nudge stays.
+
+## [sound@0.0.4] - 2026-07-20
+
+### Changed
+
+- change(sound): essence trim of `setup` prose (every constraint kept, wording tightened) and `review`; `prime` already minimal. Corpus redundancy pass over all 102 rules: 11 trimmed where an `_Avoid_` clause or example duplicated its `Detect:` verbatim — the `_Avoid_` field itself always stays (it is the writer's ban list; `Detect:` is the reviewer's procedure — different consumers, so overlap is not redundancy) — `Detect:`/`Not-when:` semantics, vocabulary, frontmatter, and Cross-refs untouched on every rule (eval-fence anchors preserved).
 
 ## [sound@0.0.3] - 2026-07-20
 
