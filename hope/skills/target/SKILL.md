@@ -5,57 +5,58 @@ description: Define how unsupervised work will be judged before it runs. Use whe
 
 Define the observer before unsupervised work runs, so the cheapest way to pass is the real work.
 
-## Contract
-
 - **INPUT**: a spec for work that will run unsupervised.
 - **GATE**: "Is the observer mechanical AND un-gameable?" Agent audits, user locks.
-- **OUTPUT**: a success contract (spec below). Emit it in conversation.
+- **OUTPUT**: a success contract (spec below), emitted in conversation.
 
-## The success contract
+## Success contract
 
-Concrete and executable. Exact commands, values, and targets, not abstractions.
+Concrete and executable — exact commands, values, targets, not abstractions.
 
 - **Observable**: the single state or number that means done. One thing, not a dashboard.
-- **Verify command**: the literal command the run executes and surfaces in its output, exiting non-zero on crash. Require the real output, exit code and score line, in view. An unsupervised run can claim a check it never ran.
+- **Verify command**: the literal command the run executes and surfaces in its output — exit code and score line in view — exiting non-zero on crash. An unsupervised run can claim a check it never ran.
 - **Direction and target**: higher or lower is better, and the value that ends the work.
 - **Bound**: a turn or wall-clock cap that ends the loop even unmet (`… or stop after N turns`).
 - **Baseline**: the observable's value now, from one dry run. Proves the command fires.
-- **Guards**: what must keep passing while optimizing. Check before reading the observable. A violation voids the score and the kept change. It never just lowers the score.
-- **Cheats closed**: each cheap path to a false pass, paired with its structural closure. Format: `cheat: … / closed by: …`. Done when no listed cheat is cheaper than real work.
+- **Guards**: what must keep passing while optimizing. Check before reading the observable. A violation voids the score and the kept change — never just lowers the score.
+- **Cheats closed**: each cheap path to a false pass + its structural closure (`cheat: … / closed by: …`). Done when no listed cheat is cheaper than real work.
 
 ## Work loop
 
-1. **Extract target**: from the spec, name the single observable that means done.
-2. **Mechanize**: make it extractable, deterministic, fast. If success needs human judgment, it cannot be mechanized. Stop and say so.
-3. **Red-team**: start from the known-cheat catalog (`cheat-museum.md`), then hunt the cheats specific to this target. Close each with a fence: a holdout the run can't see, an artifact cap, a cut to feedback resolution, a perturbation probe that gauges memorization. Loop until nothing is cheaper than real work.
+1. **Extract**: from the spec, name the single observable that means done.
+2. **Mechanize**: make it extractable, deterministic, fast. If success needs human judgment, it cannot be mechanized — stop and say so.
+3. **Red-team**: start from the known-cheat catalog (`cheat-museum.md`), then hunt cheats specific to this target. Close each with a fence: a holdout the run can't see, an artifact cap, a cut to feedback resolution, a perturbation probe. Loop until no cheat is cheaper than real work.
 4. **Baseline**: dry-run the verify command once, record the value, confirm it exits clean. A command that will not run is a gate FAIL.
-5. **Gate**: run the gate audit below.
+5. **Gate**: audit below.
 
 ### Decision prompts
 
 <!-- doc-gen FILE src=../prompts.md -->
-- Auto-gather when the answer is retrievable with certainty: cheap local reads, docs, web research, parallel subagents. Return with decisions, not raw findings. Never ask the user something research already made obvious — that is a named stop condition.
-- Only non-obvious judgment calls reach the user. Every such AskUserQuestion: exactly 3 candidate answers + 1 uniform escape hatch — "Gather facts" (research/explore). The hatch is a first-class option, never hidden behind Other.
-- Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
-- Presentation rule: EVERYTHING the user needs to answer lives inside the question UI — question text, descriptions, previews. Never in prose before the tool call (the dialog hides it).
+Closing unknowns — three modes, one boundary:
+
+- **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
+- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion: exactly 3 concrete candidate answers + 1 uniform "Gather facts" escape hatch (first-class option, never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
+- **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
+
+Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
 <!-- end-doc-gen -->
 
-## The gate
+## Gate
 
-"Is the observer mechanical and un-gameable?" Agent audits, user locks.
-
-- Before presenting, run a deletion pass over the draft contract. Cut every cheat already closed by another, every guard that restates the observable, every line a command cannot check.
-- Present verdict first via AskUserQuestion: PASSES or FAILS, then the surviving cheats and how each is closed. Proof the adversary ran.
-- On FAIL, name what is unmechanical or un-closeable. If success cannot be defined, stop. The work is not ready to run unsupervised. If a cheat cannot be closed, bounce to the user. Never pad the contract to look safe.
+- Deletion pass over the draft first: cut every cheat already closed by another, every guard that restates the observable, every line a command cannot check.
+- Present verdict-FIRST via AskUserQuestion: PASSES or FAILS, then the surviving cheats and how each is closed — proof the adversary ran.
+- On FAIL, name what is unmechanical or un-closeable. If success cannot be defined, stop — the work is not ready to run unsupervised. If a cheat cannot be closed, bounce to the user. Never pad the contract to look safe.
 - The user locks. The lock is theirs, not yours.
 
 ## Pre-flight
 
-Two acts only the human can do before the loop runs unsupervised:
+Only the human can, before the loop runs unsupervised:
 
-- Issue a disposable API key with a provider-side spend cap. The contract bounds correctness. Only the key bounds cost.
-- Babysit cycle one. Watch what the run touches, confirm it uses the instruments the contract names, then leave.
+- Issue a disposable API key with a provider-side spend cap. The contract bounds correctness; only the key bounds cost.
+- Babysit cycle one: watch what the run touches, confirm it uses the instruments the contract names, then leave.
 
 ## Boundaries
 
-The human owns and locks the contract. The optimizer never defines its own success. When execution games the contract, fix the contract: widen the observable, add a guard, cap an artifact. Never fix the worker. A cheat is a bug in the target. Resume from the last honest checkpoint and revert what the cheat produced.
+- The human owns and locks the contract. The optimizer never defines its own success.
+- When execution games the contract, fix the contract — widen the observable, add a guard, cap an artifact. Never fix the worker. A cheat is a bug in the target.
+- Resume from the last honest checkpoint and revert what the cheat produced.

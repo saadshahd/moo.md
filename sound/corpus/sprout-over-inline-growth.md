@@ -22,6 +22,5 @@ function processOrder(order: Order) {
   order.total += GiftWrap.feeFor(order)  // sprouted, independently tested
 }
 ```
-_Avoid_: adding new conditionals/branches directly into an already-large, untested function body
 Detect: a diff that adds new logic as inline statements inside a pre-existing untested function, where that logic could instead be a standalone named unit called once
 Not-when: the existing function is already small and well-tested — then inline extension is fine and sprouting is ceremony; also not-when the new behavior is inseparable from the surrounding state (rare — justify explicitly)

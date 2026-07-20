@@ -10,8 +10,6 @@ WRONG:
 ```ts
 // increment the counter
 counter += 1;
-// loop over users and collect their ids
-const ids = users.map(u => u.id);
 // updated to also handle refunds (was charges-only)  ← narrates the change, not the code
 function process(tx: Tx) { /* ... */ }
 ```

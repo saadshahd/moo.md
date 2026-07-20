@@ -5,8 +5,6 @@ description: Use when reviewing a staged diff or a commit range for soundness ag
 
 # sound:review
 
-A deep soundness review of a diff.
-
 ## What to read
 
 - **No argument** → `git diff --cached`.

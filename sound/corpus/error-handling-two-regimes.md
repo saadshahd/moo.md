@@ -24,7 +24,7 @@ while (true) {
 }
 // supervision — queue redelivery, a process manager — is the recovery layer, not code
 ```
-_Avoid_: a catch that logs and continues the enclosing loop; a Result whose `E` includes failures no caller can act on; defensive catch-all that pretends nothing happened.
+_Avoid_: a catch that logs and continues the enclosing loop; defensive catch-all that pretends nothing happened.
 Detect: a catch block whose control flow continues the enclosing loop; a Result whose `E` includes failures no caller can act on.
 Not-when: enumerable in-process failures with a caller that can branch — those stay on the ladder, not the boundary.
 Cross-ref: eliminate-mask-then-surface — the in-process regime this bounds; per-unit-crash-isolation and restart-policy-as-data — the supervision layer that makes crashing clean safe.

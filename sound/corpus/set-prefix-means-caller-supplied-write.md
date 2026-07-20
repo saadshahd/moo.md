@@ -15,6 +15,5 @@ RIGHT:
 function computeTotals(lines: Line[]): Totals { return sum(lines); }
 // named by the computation; the caller applies the result
 ```
-_Avoid_: a `set*` name whose body derives its value from existing state rather than storing a value the caller passed in.
 Detect: a `set*` function that takes no value argument (or ignores it) and instead reads other state to compute what it writes — the `set` prefix is lying about a recomputation.
 Not-when: the function genuinely stores a caller-supplied value (`setName(name)`) — then `set*` is correct.

@@ -18,7 +18,6 @@ const isEligible = (user: User) =>
   user.status === 'active' && user.emailVerified && user.age >= 18;
 if (isEligible(user)) grantAccess();
 ```
-_Avoid_: a compound boolean of 2+ clauses inline in an `if`/`?:`; a predicate name that stacks its own conditions with `And`/`Or`.
 Detect: `&&`/`||` joining 2+ comparisons directly inside a conditional; or a boolean-returning name containing `And`/`Or` or a field name from its own body.
 Not-when: a single self-evident condition (`if (!user)`) — naming one truthiness check adds a hop without adding meaning.
 Cross-ref: duplication-taxonomy-triage — the same predicate re-derived across files is tier-three duplication.

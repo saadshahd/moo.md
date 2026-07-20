@@ -15,6 +15,6 @@ RIGHT:
 const saved = await Orders.put(doc)                 // authoritative source is written first
 await Projections.apply(saved)                      // index/cache derived; safe to drop+rebuild
 ```
-_Avoid_: writes that land only in a cache/index, a projection treated as authoritative, no rebuild path from source
+_Avoid_: no rebuild path from source
 Detect: a write path whose sole durable target is a derived store, or business logic reading a cache/index as ground truth with no authoritative source behind it
 Not-when: the store IS the system of record (no upstream source it projects from)

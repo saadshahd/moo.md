@@ -21,7 +21,7 @@ type Result<T, E> = { ok: true; value: T } | { ok: false; error: E }; // find or
 // connection-retry failure beneath is masked in the data layer and never appears here
 async function getUser(id: string): Promise<Result<User, NotFound | DbError>>
 ```
-_Avoid_: a `Result` on every parse/db/validate call regardless of whether the caller can act; an `E` arm listing a failure no caller branches on; a signature that throws instead of surfacing; a masked value that fabricates success for a real failure — returning `[]`/`0`/`null` because a call failed, not because the domain says the case is empty.
+_Avoid_: a `Result` on every parse/db/validate call regardless of whether the caller can act; a masked value that fabricates success for a real failure — returning `[]`/`0`/`null` because a call failed, not because the domain says the case is empty.
 Detect: a fallible function returning `Promise<T>` (not `Result`) that can throw; a `Result` whose `E` includes a failure the caller can't act on — it should have been eliminated (1) or masked (2); a `catch` or `?? default` that returns a plausible value for a genuine failure rather than a domain-defined absence.
 Not-when: a failure that must escape and kill the enclosing unit rather than reach a caller — see error-handling-two-regimes.
 Cross-ref: error-handling-two-regimes — what happens at the unit boundary when a failure is not enumerable; remote-call-has-a-third-outcome — the [distributed] carve where "unknown" cannot be defined out or masked.
