@@ -29,7 +29,3 @@ The reader is a human working through agents: finite working memory (the transcr
 ## Send check
 
 From the first line and last line alone, the reader must know what just happened and what to do next.
-
----
-
-Origin: reframed from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd). The ADHD lens found these constraints first; they hold for anyone supervising agents.
