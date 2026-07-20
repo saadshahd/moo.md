@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Lamport
+topic: consistency
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 The property that must NEVER be violated is written once as a pure predicate over state, named, and asserted at the boundary where state changes — before the mechanism that maintains it is coded.

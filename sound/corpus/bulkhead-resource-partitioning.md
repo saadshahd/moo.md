@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Nygard
+topic: resilience
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 Give each external dependency its own bounded resource pool (connections, concurrency limit, queue) — one saturated dependency must not starve capacity another dependency needs.

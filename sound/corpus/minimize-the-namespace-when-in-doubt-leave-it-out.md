@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Bloch
+topic: abstraction
 ---
 when: [always] · tier: standard · check: deterministic
 Export only what a caller currently needs from a module's namespace object — every export is a permanent promise, since removing one later is a breaking change for every caller, internal or external.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Fowler
+topic: placement
 ---
 when: [always] · tier: standard · check: judgeable
 A mechanism computes and returns; a policy decides whether, what, and where a side effect happens. Policy must never hide inside a helper the caller can't see through — the deciding, not merely the effecting, is what has to be visible at the call site.

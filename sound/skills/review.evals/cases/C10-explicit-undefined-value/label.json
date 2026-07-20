@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "absence-as-terse-check",
+  "base_files": [],
+  "diff_files": [
+    "possession.ts"
+  ],
+  "must_mention": [
+    "undefined",
+    "open"
+  ],
+  "note": "Relabelled from slop-nudge C10-explicit-undefined-value onto sound corpus rule 'absence-as-terse-check' (human-confirmed, labeler of record)."
+}

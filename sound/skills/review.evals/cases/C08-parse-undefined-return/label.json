@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "absence-as-terse-check",
+  "base_files": [],
+  "diff_files": [
+    "NavBar.tsx"
+  ],
+  "must_mention": [
+    "undefined",
+    "parsetimecode"
+  ],
+  "note": "Relabelled from slop-nudge C08-parse-undefined-return onto sound corpus rule 'absence-as-terse-check' (human-confirmed, labeler of record)."
+}

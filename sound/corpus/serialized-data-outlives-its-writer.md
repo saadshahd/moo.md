@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Kleppmann
+topic: integration
 ---
 when: [distributed] · tier: standard · check: judgeable
 Data on the wire or at rest is read by code older and newer than the code that wrote it — schema changes MUST be additive and tolerant: never remove or repurpose a field, never make a new field required, ignore unknown fields on read.

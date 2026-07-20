@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Vergnaud
+topic: types
 ---
 when: [always] · tier: standard · check: deterministic
 Every function that branches over a union's tag must be checked exhaustive by the type system — either a `Record<Tag, Handler>` (a missing key fails to compile) or a `default: assertNever(x)` arm typed to take `never` — never a `switch` with no default, and never a runtime `throw new Error('unhandled case')` as the only guard.

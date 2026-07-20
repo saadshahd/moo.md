@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Bloch
+topic: types
 ---
 when: [always] · tier: standard · check: judgeable
 Where the type system can make a wrong call impossible to construct, do that instead of accepting a wide type and validating it at runtime — a caller should not be able to compile a call that fails.

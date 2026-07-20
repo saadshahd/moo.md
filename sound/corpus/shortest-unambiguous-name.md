@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: naming
 ---
 when: [always] · tier: standard · check: judgeable
 Shorter is better until ambiguous. Stop at the first name that is unambiguous in its module scope — extra qualifiers past that point are noise.

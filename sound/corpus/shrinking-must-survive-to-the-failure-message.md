@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Hughes
+topic: tests
 ---
 when: [always] · tier: standard · check: deterministic
 When a property fails, the test output must show the shrunk minimal counterexample, not the first randomly-generated failing input — never disable shrinking or catch-and-summarize the failure in a way that discards it.

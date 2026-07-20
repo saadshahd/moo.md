@@ -1,9 +1,5 @@
 {
   "tags": [],
-  "globs": {
-    "default": "**/*.js",
-    "test": "test/**/*.js"
-  },
   "notes": "Pure JS repo, zero .ts/.tsx anywhere (verified: find -iname '*.ts' -o -iname '*.tsx' returns nothing) -- default glob MUST widen from corpus default '**/*.{ts,tsx}' to '**/*.js' or every always-tag rule installs against zero matching files. GLOB TUNING is the point of this fixture: test files carry NO '.test.' or '.spec.' suffix at all (test/validator.js, test/fields.js, test/chain/start.js, etc.) -- the corpus default test glob '**/*.{test,spec}.{ts,tsx}' matches nothing here, not even after extension-widening to .js, because the suffix convention itself is absent. The repo's real convention is purely directory-based: every real test lives under test/ (confirmed via package.json 'ava' field having no custom 'files' glob, so AVA's own default test-file discovery -- files under test/ -- is what actually runs; also cross-checked scripts.ava = 'cross-env NODE_ENV=test ava' with no path args). Tuned test glob is 'test/**/*.js', a directory-scope substitution, not a suffix-widening. No react (no jsx/tsx, no react dep). No db (no ORM/client import, no schema files -- this is a pure rule-compiler/validator library, ohm-js grammar + ramda + rxjs, all in-memory). No distributed evidence (no fetch/http/websocket/queue/payment/messaging code in src/ or helpers/).",
   "rules": {
     "must_install": [

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Vergnaud
+topic: types
 ---
 when: [always] · tier: standard · check: deterministic
 A fixed, compile-time-known lookup table (status → label, tier → limit, role → permissions) must be declared with `as const satisfies Record<Key, Shape>`, never typed by a separate `interface`/`type` annotation on the variable. Both forms check the keys; the annotation WIDENS every value — literal types are lost, and the table can no longer serve as a type source.

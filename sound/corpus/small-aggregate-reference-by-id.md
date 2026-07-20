@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: db
 source: Vernon
+topic: consistency
 ---
 when: [db] · tier: standard · check: deterministic
 An aggregate holds only what's inside its own consistency boundary; anything outside it is referenced by a branded ID, never embedded as another aggregate's full type.

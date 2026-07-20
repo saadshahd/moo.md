@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: effects
 ---
 when: [always] · tier: standard · check: deterministic
 Every source of impurity — nondeterminism (clock, random, id, network), storage, config, env, stateful singletons — has exactly ONE owning module behind a typed surface, wired once at the composition root. Call sites NEVER inline `new Date()`, `Date.now()`, `Math.random()`, `localStorage`, or `process.env`; no ambient globals. A pure function that needs the current time takes it as a parameter.

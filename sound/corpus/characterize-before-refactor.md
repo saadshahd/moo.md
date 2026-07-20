@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Feathers
+topic: commit-shape
 ---
 when: [always] · tier: standard · check: judgeable
 Before restructuring code that has no tests exercising its current behavior, write a characterization test that pins what it actually does now — not what it should do — then refactor under that test's protection.

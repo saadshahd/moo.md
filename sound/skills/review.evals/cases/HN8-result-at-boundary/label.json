@@ -1,0 +1,18 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "drag/resolve-drop.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. architecture: Result-everywhere over-threading",
+  "forbidden_anchor": [
+    "Result<",
+    "neverthrow"
+  ],
+  "forbidden_rules": [
+    "error-handling-two-regimes",
+    "remote-call-has-a-third-outcome"
+  ]
+}

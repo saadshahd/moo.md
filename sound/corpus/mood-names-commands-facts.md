@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: naming
 ---
 when: [always] · tier: standard · check: deterministic
 Name events and messages by grammatical mood. A command is a request that may be refused — name it imperative `VERB_NOUN` (`SUBMIT_ORDER`, `JOIN_ROOM`). A fact already happened and cannot be refused — name it past-participle `Noun-Verb` in PascalCase (`RoomJoined`, `PaymentCaptured`, `EventAdded`). Never a tense-neutral noun.

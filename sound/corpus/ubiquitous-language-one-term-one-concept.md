@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Evans
+topic: naming
 ---
 when: [always] · tier: standard · check: judgeable
 One domain concept gets exactly one name across code, types, tests, and commit messages — a synonym for an existing concept is a language defect, not a style choice.

@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Hughes
+topic: tests
 ---
 when: [always] · tier: standard · check: deterministic
 Any operation documented or named as safe-to-repeat (normalize, sort, dedupe, sanitize, upsert) must satisfy `f(f(x)) === f(x)` for generated `x`.

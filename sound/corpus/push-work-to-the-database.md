@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: db
 source: house
+topic: consistency
 ---
 when: [db] · tier: standard · check: judgeable
 Push filtering, sorting, and pagination to the database. Never fetch all rows and filter, sort, or slice in application memory. This is correctness, not optimization: an in-memory `slice` reports a page count and cursor that don't match what the store actually holds.

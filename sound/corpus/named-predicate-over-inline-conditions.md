@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: control-flow
 ---
 when: [always] · tier: standard · check: judgeable
 Extract a predicate of 2+ conditions into a named function. The name reveals intent (`isEligible`), not implementation (`hasActiveStatusAndVerifiedEmail`) — if the name just spells out the boolean expression, it documents nothing the code didn't already say.

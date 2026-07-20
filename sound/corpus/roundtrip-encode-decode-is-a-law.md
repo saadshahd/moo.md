@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Hughes
+topic: tests
 ---
 when: [always] · tier: standard · check: deterministic
 Any pair of encode/decode, serialize/parse, or save/load functions must satisfy `decode(encode(x)) === x` for all generated `x`, not just the fixtures you happened to write.

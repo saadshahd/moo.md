@@ -1,0 +1,13 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "error-handling-two-regimes",
+  "base_files": [],
+  "diff_files": [
+    "layout/destinations.ts"
+  ],
+  "must_mention": [
+    "throw",
+    "besidedestination"
+  ],
+  "note": "Relabelled from slop-nudge C14-throw-in-production-logic onto sound corpus rule 'error-handling-two-regimes' (human-confirmed, labeler of record)."
+}

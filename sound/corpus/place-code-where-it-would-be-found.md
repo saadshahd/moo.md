@@ -2,9 +2,10 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: placement
 ---
 when: [always] · tier: standard · check: judgeable
-Place code where it would be FOUND by someone who doesn't know it exists — next to the domain concept it serves, not next to the feature that first needed it. If a computation is used by 2+ domains, move it to the nearest common ancestor domain both consumers already belong to, never to a grab-bag. A module exposes only what its consumers need.
+Place code where it would be FOUND by someone who doesn't know it exists — next to the domain concept it serves, not next to the feature that first needed it. If a computation is used by 2+ domains, move it to the nearest common ancestor domain both consumers already belong to, never to a grab-bag.
 WRONG:
 ```ts
 // checkout/CheckoutPage.ts — first feature that needed currency formatting

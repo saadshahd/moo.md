@@ -1,0 +1,12 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "no-role-named-modules",
+  "base_files": [],
+  "diff_files": [
+    "drag/helpers.ts"
+  ],
+  "must_mention": [
+    "helpers"
+  ],
+  "note": "Relabelled from slop-nudge X03-helpers-module-name onto sound corpus rule 'no-role-named-modules' (human-confirmed, labeler of record)."
+}

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Bloch
+topic: types
 ---
 when: [distributed] · tier: standard · check: judgeable
 When one operation must happen before another is legal to call (init before use, open before write), encode that ordering in the types the first call returns — never in documentation or a runtime "not initialized" throw.

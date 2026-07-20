@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: naming
 ---
 when: [always] · tier: standard · check: judgeable
 A function's name describes what it DOES, not where it's USED, and makes sense without knowing the caller. If removing the call site makes the name nonsensical, the name is wrong.

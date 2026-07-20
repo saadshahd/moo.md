@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Hickey
+topic: commit-shape
 ---
 when: [always] · tier: standard · check: judgeable
 A diff only counts as simpler if the number of concepts a reader must hold at once drops; "fewer lines" and "fewer artifacts" are not the metric.

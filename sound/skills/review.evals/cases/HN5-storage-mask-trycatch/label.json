@@ -1,0 +1,20 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "carry/use-carry.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. Error handling: NEVER use try/catch",
+  "forbidden_anchor": [
+    "try/catch",
+    "catch {",
+    "swallow",
+    "mask"
+  ],
+  "forbidden_rules": [
+    "error-handling-two-regimes",
+    "eliminate-mask-then-surface"
+  ]
+}

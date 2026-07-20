@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: Fowler
+topic: placement
 ---
 when: [always] · tier: standard · check: judgeable
 A function that reads more fields from another module's domain object than it uses of its own state belongs in that other module — its field accesses tell you where it should live, so move it there.

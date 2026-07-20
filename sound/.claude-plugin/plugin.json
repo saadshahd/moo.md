@@ -1,7 +1,7 @@
 {
   "name": "sound",
-  "version": "0.0.2",
-  "description": "Code taste as installable rules. Probe a repo's stack, select only the rules its code shows a surface for (evidence-cited per rule), confirm, and scaffold .claude/rules/ with repo-tuned paths and project-tuned examples. Installed rules are user-owned; re-runs reconcile.",
+  "version": "0.0.4",
+  "description": "Code taste as installable rules. Probe a repo's stack, select only the rules its code shows a surface for (evidence-cited per rule), confirm, and scaffold a browsable .claude/sound/ rule map (surfaced by the sound:prime skill) with project-tuned examples. Installed rules are user-owned; re-runs reconcile.",
   "keywords": [
     "taste",
     "rules",

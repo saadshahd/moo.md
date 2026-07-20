@@ -2,6 +2,7 @@
 paths: "**/*.{tsx,jsx}"
 when: react
 source: Abramov
+topic: effects
 ---
 when: [react] · tier: standard · check: judgeable
 A list `key` must be a stable identifier of the item's identity across renders — never the array index, and never regenerated per render.

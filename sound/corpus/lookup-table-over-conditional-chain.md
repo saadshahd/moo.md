@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: control-flow
 ---
 when: [always] · tier: standard · check: deterministic
 When the keys are known at compile time, map them with an object or `Map` lookup — never a `switch` or an `if/else` chain.

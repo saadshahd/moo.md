@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Armstrong
+topic: consistency
 ---
 when: [distributed] · tier: high-stakes · check: deterministic
 Concurrent workers/handlers communicate only by passing immutable job payloads or published facts — never by reading or writing a shared in-process object, cache, or module-level variable.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: types
 ---
 when: [always] · tier: standard · check: judgeable
 Separate intent from fact ONLY when the outcome is reconciled elsewhere — a server, a queue, a peer — so the thing you intended and the thing that's confirmed live in different moments. Then model `request -> pending -> (confirmed | rejected)` as discriminated states. NEVER collapse an unconfirmed intent and a confirmed fact into one mutable field. Locally-authoritative synchronous state has no such gap — it stays a plain value; never add pending machinery to it.

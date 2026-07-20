@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: db, distributed
 source: Nygard
+topic: resilience
 ---
 when: [db, distributed] · tier: high-stakes · check: judgeable
 Any collection that can grow without bound (logs, caches, in-memory queues, retry buffers) must have an explicit eviction, cap, or TTL.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: naming
 ---
 when: [always] · tier: standard · check: deterministic
 Module and directory names describe a domain concept, never a code-organization role. `formatting`, `currency`, `validation` are fine — they name what the code is about. `shared`, `utils`, `helpers`, `common`, `lib` are disallowed — they name where the author filed it, so nobody can predict what's inside or where a new thing should go.

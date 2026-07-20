@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Helland
+topic: messaging
 ---
 when: [distributed] · tier: high-stakes · check: deterministic
 A recorded fact — a ledger line, an audit event, anything another party has already observed — is never edited or deleted in place; a correction is a new, appended reversing fact that references the original.

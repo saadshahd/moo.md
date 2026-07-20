@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: effects
 ---
 when: [always] · tier: standard · check: judgeable
 Data flow must be readable from the call site: a reader traces what happens to a value without jumping into implementations. If a value is derived, show the derivation where it's used; if a side effect happens, make it visible where it's triggered. No action-at-a-distance — nothing that mutates shared state or fires an effect from inside a call that looks pure.

@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Lamport
+topic: consistency
 ---
 when: [distributed] · tier: high-stakes · check: deterministic
 State that is rebuilt on more than one node from the same ordered inputs is a pure `fold(events)` — the reducer takes no clock, no random, no ambient read, so identical logs yield identical state on every replica.

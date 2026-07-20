@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Nygard
+topic: resilience
 ---
 when: [distributed] · tier: standard · check: judgeable
 If a dependency is degraded such that success is unlikely, reject immediately — don't queue the caller behind a doomed retry-with-backoff that ties up capacity.

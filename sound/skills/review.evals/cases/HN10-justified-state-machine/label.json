@@ -1,0 +1,19 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "machine/editor-machine.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. architecture: reaching for a state machine without a trigger",
+  "forbidden_anchor": [
+    "over-escalat",
+    "unjustified",
+    "doesn't need a state machine",
+    "useState instead"
+  ],
+  "forbidden_rules": [
+    "state-modeling-escalation"
+  ]
+}

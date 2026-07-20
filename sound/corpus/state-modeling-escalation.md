@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: always
 source: house
+topic: types
 ---
 when: [always] · tier: standard · check: judgeable
 A plain discriminated union of states is the resting state and usually the end of it. Escalate to an explicit `state -> event -> nextState` transition map ONLY when a guarded or asymmetric single-axis transition is referenced from many call sites — and even then an illegal transition is a no-op, NOT a throw. Reach for orthogonal-region machinery ONLY when there are 2+ genuinely independent concurrent axes with illegal combinations. Absent the named trigger, the union stands.

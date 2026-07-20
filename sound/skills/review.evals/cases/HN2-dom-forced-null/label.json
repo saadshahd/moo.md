@@ -1,0 +1,16 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "drag/use-drag-reorder.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. Absence: null in types",
+  "forbidden_anchor": [
+    "| null"
+  ],
+  "forbidden_rules": [
+    "absence-as-terse-check"
+  ]
+}

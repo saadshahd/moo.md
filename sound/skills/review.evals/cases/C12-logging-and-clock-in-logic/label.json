@@ -1,0 +1,14 @@
+{
+  "verdict": "VIOLATION",
+  "rule": "dependency-at-the-edges",
+  "base_files": [],
+  "diff_files": [
+    "history/use-history.ts"
+  ],
+  "must_mention": [
+    "date.now",
+    "log",
+    "console"
+  ],
+  "note": "Relabelled from slop-nudge C12-logging-and-clock-in-logic onto sound corpus rule 'dependency-at-the-edges' (human-confirmed, labeler of record)."
+}

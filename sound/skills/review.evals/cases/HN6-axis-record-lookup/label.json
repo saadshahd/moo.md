@@ -1,0 +1,22 @@
+{
+  "verdict": "CLEAN",
+  "rule": null,
+  "base_files": [],
+  "diff_files": [
+    "layout/tiles.ts"
+  ],
+  "must_mention": [],
+  "note": "HARD NEGATIVE — review must stay SILENT. Reaching for runtime machinery: data-as-spec interpreter for a closed choice",
+  "forbidden_anchor": [
+    "lookup-table-over-conditional-chain",
+    "rules-as-data",
+    "data-as-spec-earns",
+    "over-abstraction",
+    "over-engineered"
+  ],
+  "forbidden_rules": [
+    "lookup-table-over-conditional-chain",
+    "rules-as-data-over-scattered-conditionals",
+    "data-as-spec-earns-its-trigger"
+  ]
+}

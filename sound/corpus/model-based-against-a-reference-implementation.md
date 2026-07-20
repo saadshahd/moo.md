@@ -2,6 +2,7 @@
 paths: "**/*.{test,spec}.{ts,tsx}"
 when: distributed
 source: Hughes
+topic: tests
 ---
 when: [distributed] · tier: high-stakes · check: deterministic
 When the system under test has an optimized, stateful, or concurrent implementation (a cache, a queue, a CRDT merge), write a naive in-memory reference model with the same interface and assert the real implementation agrees with the model after every generated sequence of operations.

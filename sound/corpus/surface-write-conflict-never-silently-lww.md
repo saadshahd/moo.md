@@ -2,6 +2,7 @@
 paths: "**/*.{ts,tsx}"
 when: distributed
 source: Kleppmann
+topic: consistency
 ---
 when: [distributed] · tier: high-stakes · check: judgeable
 Concurrent writes to the same key with last-write-wins silently discard a user's data — detect concurrency with a version/etag and either reject the stale write as a typed error or merge; a dropped write is a data-loss bug, so fail loud.
