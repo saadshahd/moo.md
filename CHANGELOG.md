@@ -21,6 +21,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- change(hunch): `plain` evolved from Orwell-only to a two-part shape — the six rules stay as the spine, plus a sweep table of named defects later plain-style guides made detectable: zombie nouns (Williams; Sword via Pinker), buried doer (Williams — doer as subject, action as verb), negative form and abstract-where-concrete-exists (Strunk & White), hedging (Pinker), one-idea-per-sentence (federal plain language guidelines). Premise line added: Pinker's curse of knowledge, not word count, is why prose fails. The scope table is cut as duplication — its trigger rows restated the frontmatter description; only the technical-terms precision rule survives, as one sentence. HYPOTHESIS.md extended to cover the new sweeps.
 - change(hunch): `land` description scopes its explainer trigger to "an explainer for others", so a solo code-change catch-up request routes to `grasp` alone instead of co-firing both skills — grasp shapes the content, land the audience delivery.
 
 ## [hope@9.7.2] - 2026-07-20
