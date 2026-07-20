@@ -18,6 +18,7 @@ if (!user) return;                     // truthiness is the default question
 if (isEmpty(items)) return;            // one named predicate, defined ONCE in the codebase
 const name = payload.name ?? 'anon';   // absorb a foreign nullable at the boundary
 ```
+_Avoid_: inline null/undefined equality chains; length-comparison where a named emptiness predicate exists; Option-wrapper types in TS.
 Detect: grep for `=== null ||` / `=== undefined` chains and `.length === 0` at call sites; flag any `Option<` / `Maybe<` type declared in TS; the judgment is whether `0`/`false`/`''` are live domain values at that check site.
 Not-when: `0` / `false` / `''` are live domain values — then escalate to an explicit compare; a failure that carries a reason — then it's a `Result`, not absence; [react] an API that treats `undefined` as "omit this" (an inline-style value like `gridColumn: on ? v : undefined`, a pass-through optional prop) — an explicit `: undefined` is the idiomatic omission there.
 Cross-ref: parse-dont-validate-at-every-untyped-boundary — absorbing a foreign nullable type into your shape once at the boundary. The predicates exist ONCE in the codebase; whether their source is a library or local is a context judgment.
