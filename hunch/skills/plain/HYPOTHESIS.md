@@ -1,0 +1,1 @@
+With `plain` loaded, prose outputs pass an Orwell spot-check by default — no stock figure of speech, no long word where a short one does, no passive where active works — while code and technical terms come through untouched.
