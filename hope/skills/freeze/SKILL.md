@@ -29,14 +29,14 @@ A fact's value is OBSERVED or it is a GAP. No third path.
 ## Work loop
 
 1. **Scope** — from system + intent, infer the source map: the external facts this work order depends on. The only place inference runs.
-2. **Acquire** — fan out read-only acquisition agents in parallel, one observation per fact, live. The skill spawns and folds; it never does the reads itself.
+2. **Acquire** — fan out read-only acquisition agents in parallel, one observation per fact, live (rules below).
 3. **Fold** — each return → an OBSERVED fact; anything unobserved → an OPEN gap with retrieval instructions.
 4. **Gap-fill** — surface gaps for the human to hand-retrieve; re-fold; recheck. Human-gated, no metric, no unsupervised run — does NOT pass through target. Ends when gaps close or the human stops; a snapshot with named open gaps is a valid lock.
 5. **Gate** — audit below.
 
 ## Acquisition agents
 
-Router law (same as delegate): spawn and fold, never read external systems directly.
+Spawn acquisition agents and fold their returns — never read external systems yourself.
 
 - **READ-ONLY hard guard** — observe, never mutate. No write, no state-changing POST, no migration, no toggle. An agent that would mutate → stop; make it a gap for the human.
 - Independent facts go out as parallel agent calls in one message.
