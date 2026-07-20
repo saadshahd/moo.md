@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hunch@0.0.2] - 2026-07-20
+
 ### Added
 
 - feat(hunch): new experimental plugin — a grab bag staging ground for skills and plugin features; cheap to enter, honest to exit (every release each experiment graduates into hope/sound or dies, judgment-leaning ones only with a measured pass-rate). Registered in marketplace.json under category `experimental`.
