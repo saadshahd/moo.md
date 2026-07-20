@@ -13,6 +13,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - feat(hunch): new experimental plugin — a grab bag staging ground for skills and plugin features; cheap to enter, honest to exit (every release each experiment graduates into hope/sound or dies, judgment-leaning ones only with a measured pass-rate). Registered in marketplace.json under category `experimental`.
 - feat(hunch): `catch` skill — trimmed and reframed port of [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) (120 → 37 lines). The ADHD lens generalized to its universal core: every premise (finite working memory, knowing≠doing, start friction, time blindness, invisible progress) is a human constraint that agent-mediated work amplifies. Same rules; premise rewritten for any human supervising agents, estimates denominated in the reader's time, description reduced to trigger-only per the description-trap rule.
+- feat(skills): `visual-cognition-slides` — minimal trim of edu-ai-builders/visual-cognition-slides (7 files, ~4,700 lines → one 55-line SKILL.md). Keeps the essence: dual-coding law (delete every word, meaning survives), one cognitive unit per slide, knowledge-type → visual-strategy table, user-triggered animation, fixed-canvas self-contained HTML output. Drops regenerable scaffolding: 8 CSS themes, 2,100-line animation snippet library, scripted dialog trees, slide-sequence templates, converter scripts.
 
 ### Changed
 
