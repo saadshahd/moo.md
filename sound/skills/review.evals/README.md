@@ -41,9 +41,16 @@ graded against the global `TASTE.md`; here the anchor is the installed `.claude/
   equivalent in `base_files` and the added duplicate in `diff_files`, so review must Grep HEAD to
   find the owner and flag the dup — the real PR scenario.
 - `must_mention` — deterministic anchor keywords; a VIOLATION scores TP only if one appears.
-- `forbidden_rules` (hard negatives) — the corpus rule(s) whose citation would be an over-fire (the
-  look-alike this case is a negative for). Empty when no corpus rule covers the look-alike (HN3's
-  useEffect-count is the rule dropped as C11). Drives the honest specificity — see RESULTS.md.
+- `forbidden_anchor` (hard negatives) — the **pattern-specific** token(s) of the look-alike this
+  case is a negative for; citing one is an over-fire. This drives the honest specificity (*Not-when
+  respect*). Two kinds: **code tokens** where the look-alike IS an entity (`DropTarget`), **reason
+  tokens** where the entity is legitimately flaggable by other rules so only the Not-when's concern
+  counts (`over-abstraction`, not bare `AXIS_GEOMETRY`). Human is labeler of record (#172). Prefer
+  this over a rule *name*, which over-counts (review can cite the same rule for a different instance
+  — HN7). Even HN3, whose useEffect-count rule was dropped as C11, carries an anchor (`useEffect`)
+  and scores its real 0/3 over-fire. See RESULTS.md.
+- `forbidden_rules` (hard negatives) — provenance: the corpus rule(s) behind each look-alike.
+  `score.mjs` falls back to this only when a case carries no `forbidden_anchor`.
 
 One slop-nudge case was **dropped**: C11 (`2+ useEffects / raw useRef`) has no corpus rule — the
 react-hooks-count taste never made it into the sound corpus, so measuring recall on it measures

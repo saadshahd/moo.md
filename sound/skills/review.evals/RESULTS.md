@@ -9,7 +9,7 @@ here. Re-derive any time with `./run.sh` then `bun score.mjs runs/<stamp>`.
 |---|---|---|
 | **Recall** — caught the planted rule | **87%** (47/54) | trustworthy |
 | **Wrong-flag** — fired, but on the wrong rule | 7/54 | trustworthy |
-| **Not-when respect** — didn't cite the forbidden look-alike | **≥87%** (26/30 by rule-name proxy; true rate higher) | direction trustworthy, precise rate pending |
+| **Not-when respect** — didn't cite the forbidden look-alike | **90%** (27/30 by pattern-specific anchor) | trustworthy |
 | Strict silence — said nothing at all | 7% (2/30) | **invalid** — see below |
 
 ### Per-rule recall (VIOLATION cases)
@@ -40,7 +40,7 @@ genuine findings in the same real file. That competition is the honest shape of 
 a blind spot: read the `.out` files and the missed absence is usually there, just below more
 consequential findings.
 
-**Specificity took two refinements to measure honestly:**
+**Specificity took three refinements to measure honestly:**
 
 1. **Strict silence (7%) is invalid.** It counts *any* finding on a hard negative as a false alarm.
    But the ported hard-negatives are real agent code with many violations — "clean" only w.r.t. one
@@ -48,19 +48,32 @@ consequential findings.
    issues, so it is almost never silent. Verified by reading the findings (HN1/HN5/HN8): review
    flags different real rules, never the forbidden look-alike.
 
-2. **Not-when respect (≥87%) is the honest metric** — did review avoid citing the *specific*
-   forbidden look-alike (the Not-when the case is a negative for). 8 of 10 hard-negatives: 0/3
-   over-fire (perfect). The two apparent exceptions are mostly **proxy artifacts**: HN7 scores 3/3
-   "over-fire" only because its forbidden anchor is the rule *name* `duplication-taxonomy-triage`,
-   and review flagged a *different, correct* duplication in the file (`target.blocked && !altHeld`
-   repeated across two components), not the imported `DropTarget` type the case is a negative for.
-   So true specificity is higher than the 87% the rule-name proxy reports.
+2. **Not-when respect (90%) is the honest metric** — did review avoid citing the *specific*
+   forbidden look-alike (the Not-when the case is a negative for). **9 of 10 hard-negatives: 0/3
+   over-fire (perfect).** The lone failure is **HN3**: review reliably (3/3) tells the two focused
+   `useEffect`s in `useTimelineKeyboard` to merge into one — an unwanted suggestion (the effects
+   carry distinct deps `[onStep]`/`[onEscape]`; merging couples two independent concerns). That is
+   the one actionable specificity gap, not a blur across the set.
 
-## Honest residual / next refinement
+3. **Rule-name anchors over-count; pattern anchors fix it both ways (#172).** The earlier ≥87%
+   (26/30) was luck-of-cancellation. A rule *name* matches whenever review cites that rule for a
+   **different** instance: HN7 scored a false 3/3 "over-fire" (its old anchor was the name
+   `duplication-taxonomy-triage`, which fired on a real within-file dup — `target.blocked && !altHeld`
+   across two components — not the imported `DropTarget` the case is a negative for), while HN3's
+   empty list gave a free 3/3 "respected." **Pattern-specific anchors** (the look-alike's own token,
+   in each `label.json`'s `forbidden_anchor`) flip both: HN7 → 3/3 respected, HN3 → 0/3. Net precise
+   rate **27/30 = 90%**. Anchors come in two kinds — **code tokens** where the look-alike IS an
+   entity (`DropTarget`, `throw new Error`), **reason tokens** where the entity is legitimately
+   flaggable by *other* rules so only the Not-when's concern counts (AXIS_GEOMETRY's `as const`
+   typing nit, `dragAndDrop`'s duplication, and a desync bug citing `state-modeling-escalation`
+   *inside* the justified machine are all correctly RESPECTED). Human is labeler of record for each
+   anchor; `score.mjs` scores `respected` against `forbidden_anchor`, falling back to
+   `forbidden_rules` only when a case carries no anchor.
 
-Precise specificity needs **pattern-specific forbidden anchors** per hard negative (the look-alike's
-concrete token, like `must_mention` for violations), not rule names — because a whole-corpus review
-can legitimately cite the same rule for a different instance. Until then: recall is measured and
-trustworthy; specificity is directionally strong (review respects rule Not-whens) with a precise
-rate pending that labeling pass. `sound:review` ships **measured on recall, fenced on specificity**
-— the honest state, not a gap.
+## Refinement log
+
+- **#171** — recall measured (87%, trustworthy); specificity fenced (rule-name proxy, ≥87% directional).
+- **#172 (done)** — pattern-specific forbidden anchors labelled per hard negative; `score.mjs` scores
+  `respected` against `forbidden_anchor`; precise specificity **90% (27/30)**, with HN3 the lone
+  reliable over-fire. `sound:review` now ships **measured on both recall and specificity** — no
+  residual fence.

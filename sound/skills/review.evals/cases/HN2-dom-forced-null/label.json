@@ -7,6 +7,9 @@
   ],
   "must_mention": [],
   "note": "HARD NEGATIVE — review must stay SILENT. Absence: null in types",
+  "forbidden_anchor": [
+    "| null"
+  ],
   "forbidden_rules": [
     "absence-as-terse-check"
   ]

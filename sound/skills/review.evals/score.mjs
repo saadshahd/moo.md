@@ -10,6 +10,8 @@
 //   ERR   — non-answer (empty reply / "session limit" / "API Error"): EXCLUDED from every rate.
 //   CLEAN case:     pred CLEAN -> TN,  pred VIOLATION -> FP (false alarm)
 //   VIOLATION case: pred CLEAN -> FN,  pred VIOLATION -> TP if an anchor appears, else WRONG rule.
+// CLEAN "respected" (specificity) is scored against `forbidden_anchor` — pattern-specific look-alike
+// tokens, not rule names (rule names over-count: same rule, different instance). See below.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,11 +48,20 @@ const rows = outFiles.map((f) => {
   let outcome;
   // respected = the HONEST specificity: did review avoid citing the SPECIFIC forbidden look-alike
   // (the Not-when this case is a negative for)? A whole-corpus review legitimately flags a hard
-  // negative's OTHER real violations — that is NOT an over-fire. Only citing a forbidden rule is.
+  // negative's OTHER real violations — that is NOT an over-fire. Only citing the look-alike is.
+  // Scored against `forbidden_anchor` — pattern-specific tokens of the look-alike itself, NOT the
+  // rule name. A rule name over-counts: review can cite the same rule for a DIFFERENT instance in
+  // the file (HN7's `duplication-taxonomy-triage` fired on a real dup, not the imported DropTarget).
+  // Some anchors are code tokens (the look-alike IS an entity, e.g. `DropTarget`); others are
+  // reason tokens (the entity is legitimately flaggable by other rules, so only the Not-when's
+  // specific concern counts — AXIS_GEOMETRY, dragAndDrop, the justified machine). Falls back to
+  // `forbidden_rules` only if a case carries no anchor.
   let respected = null;
   if (verdict === "CLEAN") {
     outcome = pred === "CLEAN" ? "TN" : "FP";
-    respected = !anchors(label.forbidden_rules).some((r) => low.includes(r));
+    respected = !anchors(label.forbidden_anchor ?? label.forbidden_rules).some(
+      (r) => low.includes(r),
+    );
   } else if (pred === "CLEAN") {
     outcome = "FN";
   } else {

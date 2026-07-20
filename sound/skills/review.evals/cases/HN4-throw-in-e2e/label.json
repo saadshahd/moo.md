@@ -7,6 +7,10 @@
   ],
   "must_mention": [],
   "note": "HARD NEGATIVE — review must stay SILENT. Error handling: NEVER throw",
+  "forbidden_anchor": [
+    "throw new Error",
+    "Card not visible"
+  ],
   "forbidden_rules": [
     "error-handling-two-regimes"
   ]

@@ -7,6 +7,9 @@
   ],
   "must_mention": [],
   "note": "HARD NEGATIVE — review must stay SILENT. cross-file: DropTarget type duplicated",
+  "forbidden_anchor": [
+    "DropTarget"
+  ],
   "forbidden_rules": [
     "duplication-taxonomy-triage",
     "place-code-where-it-would-be-found"

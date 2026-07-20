@@ -7,6 +7,12 @@
   ],
   "must_mention": [],
   "note": "HARD NEGATIVE — review must stay SILENT. naming: verb-stacking (dragAndDrop)",
+  "forbidden_anchor": [
+    "verb-stack",
+    "caller-blind-function-names",
+    "shortest-unambiguous-name",
+    "rename"
+  ],
   "forbidden_rules": [
     "caller-blind-function-names",
     "shortest-unambiguous-name",

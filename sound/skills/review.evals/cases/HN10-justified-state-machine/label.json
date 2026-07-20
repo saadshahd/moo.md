@@ -7,6 +7,12 @@
   ],
   "must_mention": [],
   "note": "HARD NEGATIVE — review must stay SILENT. architecture: reaching for a state machine without a trigger",
+  "forbidden_anchor": [
+    "over-escalat",
+    "unjustified",
+    "doesn't need a state machine",
+    "useState instead"
+  ],
   "forbidden_rules": [
     "state-modeling-escalation"
   ]
