@@ -14,6 +14,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - docs: "Skill Design" section in CLAUDE.md — moo-specific authoring forks, minimal by a three-lens trim (token efficiency, duplication, instructiveness): one unit-choice table as the single decision surface (fragment / runtime data file / skill / user-only skill / hook / hunch experiment — behavior inlines at build, data references at runtime, invocation disabled only when the trigger lives in the human's head); composition via artifacts and priming — new pipeline stage only on a cognitive-mode change, chained through user-locked gates and the card.
 - docs: "Hook Design" section in CLAUDE.md — hook over skill only for must-run-every-time or off-thread behavior; reinforce and observe, never author or gate, always fail open; mode table (sync inject / `async` fire-and-forget / `asyncRewake` fire-and-maybe-wake) keyed to whether the foreground needs the result and when; recursion-guard + single-source-verdict rule for headless `claude -p` hooks.
 
+### Changed
+
+- change(hunch): `plain` gains a third section — "The caps", the checkable limits of ASD-STE100 Simplified Technical English (the aerospace maintenance-writing standard), motivated by field use where Orwell-only output still ran repetitive and long. Caps over taste: "cut what you can" ends in negotiation; a word count ends in a number. Sentence ≤20 words (instruction) / ≤25 (anything else), paragraph ≤6 sentences one topic, one action per instruction sentence, noun clusters ≤3, one term per concept (no synonym drift), plus a made-once rule for points (no restating in other words, no summary that repeats the body — an extension beyond the standard, targeting the LLM's signature repetition). The 900-word STE dictionary deliberately excluded: the technical-terms precision rule already governs word choice, and a skill must stay self-contained. The sweep's length trigger folds into the caps. HYPOTHESIS.md extended to cover the caps, synonym drift, and repeated points.
+- change(hunch): `bro` hardens "short sentences" to STE's 20-word cap and adds make-each-point-once — a deliberate divergence from the verbatim dmmulroy/skills source, for the same field failure: restatements survived the plain-language rewrite.
+
 ## [hunch@0.0.2] - 2026-07-20
 
 ### Added

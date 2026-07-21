@@ -25,10 +25,25 @@ The reader lacks your context — the curse of knowledge, not word count, is why
 | Negative form | State it positively | "not different" → "the same" |
 | Hedge — "somewhat", "fairly", "arguably", "should probably" | Cut it or commit | "should probably work" → "works" — or name when it fails |
 | Abstract where concrete exists | Name the thing | "the relevant file" → "`config.ts`" |
-| One sentence, two ideas (or 25+ words) | Split it | — |
+| One sentence, two ideas | Split it | — |
 
 Technical terms: swap in an everyday word only where precision survives; otherwise keep the term — rule 5 yields to rule 6.
 
+## The caps — ASD-STE100
+
+Simplified Technical English adds what Orwell leaves to judgment: hard limits. Caps over taste — "cut what you can" ends in negotiation; a word count ends in a number.
+
+| Cap | Limit |
+| --- | --- |
+| Sentence | 20 words for an instruction, 25 for anything else |
+| Paragraph | 6 sentences, one topic |
+| Instruction | one action per sentence |
+| Noun cluster | 3 nouns — break longer ones with "of"/"for" |
+| Term | one per concept — reuse the exact word, never a synonym |
+| Point | made once — no restating in other words, no summary that repeats the body |
+
+The 900-word STE dictionary stays out: the technical-terms rule above already governs word choice.
+
 ## Before delivering
 
-One sweep of the draft against the spine and the table. Rule 6 breaks every tie: clarity beats compliance.
+One sweep of the draft against the spine, the sweep, and the caps. Rule 6 breaks every tie: clarity beats compliance.

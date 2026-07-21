@@ -5,4 +5,4 @@ disable-model-invocation: true
 effort: low
 ---
 
-Restate your last message. Stop using jargon and speak coherently. State it more simply and concisely, like one human talking to another. Spell out or drop unexplained acronyms. Short sentences, active voice, verbs over "-tion" nouns. Keep the substance — simpler must not drop a caveat, number, or warning.
+Restate your last message. Stop using jargon and speak coherently. State it more simply and concisely, like one human talking to another. Spell out or drop unexplained acronyms. Sentences of 20 words or fewer, active voice, verbs over "-tion" nouns. Make each point once — cut every restatement and every summary that repeats the body. Keep the substance — simpler must not drop a caveat, number, or warning.
