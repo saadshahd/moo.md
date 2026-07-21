@@ -4,7 +4,6 @@ when: distributed
 source: Lamport
 topic: resilience
 ---
-when: [distributed] · tier: high-stakes · check: judgeable
 A call that crosses a process boundary resolves to `ok | failed | unknown` — never a two-way `ok | failed`. A timeout means the request may have been applied; the caller must be able to branch on "don't know."
 _Avoid_: a `Result<T, E>` two-arm union as the return type of a network/RPC/queue call; treating a timeout as a `failed` arm.
 Detect: a function that awaits a network/RPC/DB-over-network call and whose return type has no arm distinct from clean failure for "timed out / no response." At a remote boundary, "unknown" is a surfacing failure the caller genuinely must branch on — it cannot be defined out of existence or masked at a lower layer.

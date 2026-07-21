@@ -4,7 +4,6 @@ when: always
 source: Fowler
 topic: placement
 ---
-when: [always] · tier: standard · check: judgeable
 A mechanism computes and returns; a policy decides whether, what, and where a side effect happens. Policy must never hide inside a helper the caller can't see through — the deciding, not merely the effecting, is what has to be visible at the call site.
 _Avoid_: any helper named `logX`, `notifyX`, `recordX`, `handleX` that itself decides to call `logger`, `fetch`, or a queue publish internally.
 Detect: a function whose name is a verb implying a decision (`log`, `notify`, `record`, `save`, `alert`) but whose call site shows no logger, no client, no queue — the decision is one hop deeper than the reader can see.

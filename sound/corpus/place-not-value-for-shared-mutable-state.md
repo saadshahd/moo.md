@@ -4,7 +4,6 @@ when: db, distributed
 source: Hickey
 topic: consistency
 ---
-when: [db, distributed] · tier: standard · check: deterministic
 A value that is read in one place and written in another over time is a **place**, and a place needs a story for who wrote it last and when — model it explicitly instead of trusting the variable to hold the truth.
 _Avoid_: `let`/mutable module-level objects that outlive a single request or render.
 Detect: a mutable binding whose reads and writes are separated by an `await`, an event handler boundary, or a different file — the gap between write and read is where staleness lives.

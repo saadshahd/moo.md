@@ -4,7 +4,6 @@ when: distributed
 source: house
 topic: integration
 ---
-when: [distributed] · tier: standard · check: judgeable
 When state spans processes, services, or third parties, make it observable at runtime — tracing, or structured logs — emitted INSIDE the one adapter that owns the boundary (integration-point-isolation), so it can be re-derived on demand. Never depend on holding distributed state in your head, or in a static note that goes stale the moment the system moves.
 _Avoid_: reasoning about a cross-service outcome from memory or a comment; a boundary crossing with no trace/log carrying a correlation id and the observed result; observability left to each call site instead of owned by the boundary's adapter.
 Detect: the boundary crossing leaves no structured record anywhere — the owning adapter included — so nothing lets you re-derive what actually happened at that boundary later; a call site that logs while the adapter doesn't is one forgotten caller away from a hole.

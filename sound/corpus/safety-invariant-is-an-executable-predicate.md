@@ -4,7 +4,6 @@ when: distributed
 source: Lamport
 topic: consistency
 ---
-when: [distributed] · tier: high-stakes · check: judgeable
 The property that must NEVER be violated is written once as a pure predicate over state, named, and asserted at the boundary where state changes — before the mechanism that maintains it is coded.
 _Avoid_: a state-mutating boundary in a multi-writer/replicated context with no named predicate expressing what must always hold; correctness described only in comments or a doc.
 Detect: for load-bearing distributed state, whether a named `State => boolean` (or `=> Result`) invariant exists and is evaluated at the transition, versus the property living only in prose. This is the Lamport rule: separate the *what-must-hold* (safety) from the *how*, and make the what checkable. Distinguish it in naming from a liveness property (eventually-progresses) — the two are enforced differently and must not be conflated.

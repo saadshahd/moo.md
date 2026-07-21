@@ -4,7 +4,6 @@ when: always
 source: Evans
 topic: types
 ---
-when: [always] · tier: standard · check: judgeable
 When two parts of the system use the same domain word for something that behaves differently in each, each side defines its own type for that word — never import one context's version of "Product"/"Order"/"User" into another context's domain logic.
 _Avoid_: a domain module importing another domain module's entity type and reaching into fields that belong to the other context's concerns.
 Detect: trace imports of exported domain types across module/folder boundaries; flag a consumer that only uses a subset of an imported type's fields — that subset is the real type it needed.

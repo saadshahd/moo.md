@@ -4,7 +4,6 @@ when: distributed
 source: Helland
 topic: integration
 ---
-when: [distributed] · tier: standard · check: deterministic
 What crosses a boundary is an explicit, versioned contract with a descriptive (self-describing) schema — never your internal relational/ORM entity leaked directly; consumers branch on the stated version rather than assuming the sender's "now" shape.
 _Avoid_: returning an ORM/DB entity or `findRaw`/`.toJSON()` of an internal model straight from a handler; a cross-boundary message/DTO type with no `schema`/`version`/`type` version tag; consumers reading a foreign message with no version branch.
 Detect: an HTTP/queue handler serializing an internal persistence type without a mapping step; message/event type definitions lacking an explicit version discriminant; a consumer that destructures a foreign payload without checking its version.

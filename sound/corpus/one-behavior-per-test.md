@@ -4,7 +4,6 @@ when: always
 source: Beck
 topic: tests
 ---
-when: [always] · tier: standard · check: judgeable
 Each test names and proves exactly one behavior; multiple unrelated `expect` blocks in one `it` means it's actually several tests wearing a trenchcoat.
 _Avoid_: a test name that's a noun phrase ("order validation") instead of a claim; 3+ `expect`s covering different inputs in one `it`.
 Detect: an `it`/`test` block whose assertions reference more than one distinct input fixture, or whose title uses "and"/commas to join unrelated claims.

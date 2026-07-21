@@ -4,7 +4,6 @@ when: distributed
 source: Vernon
 topic: messaging
 ---
-when: [distributed] · tier: standard · check: judgeable
 A command handler is a pure `decide` function — `(state, command) -> Result<Fact[], E>` — that never persists, logs, or mutates in place. A separate edge function applies the emitted facts and does the IO.
 _Avoid_: a command handler that persists, logs, or mutates state in the same body that computes the domain decision.
 Detect: a command-handling function whose body both computes the domain change and calls persistence/IO/logging.

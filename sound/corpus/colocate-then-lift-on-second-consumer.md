@@ -4,7 +4,6 @@ when: react
 source: Abramov
 topic: placement
 ---
-when: [react] · tier: standard · check: judgeable
 State starts in the component that owns the interaction; lift it only when a second component genuinely needs to read or drive it — never lift preemptively "in case it's needed later."
 _Avoid_: single-consumer state placed in a parent, context provider, or global store "for future flexibility."
 Detect: for each piece of lifted state, count actual current call sites that read or write it — if the count is one, it's mis-colocated.

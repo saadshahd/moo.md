@@ -4,7 +4,6 @@ when: always
 source: house
 topic: effects
 ---
-when: [always] · tier: standard · check: judgeable
 Awaiting independent async operations one at a time in a loop pays their latencies in series for no reason — N round-trips become N sequential waits, and one rejection abandons the rest mid-flight. When an iteration's await does not depend on a previous iteration's result, run them together with `Promise.all` (or `allSettled` when partial success is the model).
 _Avoid_: `await` inside a plain `for`/`for...of`/`while` whose iterations don't feed each other; building a result array by pushing each awaited value in sequence when the source items are already in hand.
 Detect: a loop body containing `await` where the awaited call takes only the current item (no data dependency on a prior iteration) and no ordering side effect requires serialization — it collapses to `Promise.all(items.map(...))`. A `for await` over an async iterator is legitimate streaming, not this.

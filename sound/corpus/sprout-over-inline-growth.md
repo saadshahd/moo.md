@@ -4,7 +4,6 @@ when: always
 source: Feathers
 topic: abstraction
 ---
-when: [always] · tier: standard · check: judgeable
 When adding new behavior to an existing function that lacks tests or is already doing too much, write the new logic as a separate, independently-testable function/class called from the old one, rather than growing the old function's body inline.
 _Avoid_: adding new conditionals/branches directly into an already-large, untested function body
 Detect: a diff that adds new logic as inline statements inside a pre-existing untested function, where that logic could instead be a standalone named unit called once

@@ -4,7 +4,6 @@ when: always
 source: house
 topic: naming
 ---
-when: [always] · tier: standard · check: deterministic
 Module and directory names describe a domain concept, never a code-organization role. `formatting`, `currency`, `validation` are fine — they name what the code is about. `shared`, `utils`, `helpers`, `common`, `lib` are disallowed — they name where the author filed it, so nobody can predict what's inside or where a new thing should go.
 _Avoid_: any directory or barrel named `shared/`, `utils/`, `helpers/`, `common/`, or `lib/`; a grab-bag module that accretes unrelated functions because it had no domain to belong to.
 Detect: grep the tree for path segments `shared`, `utils`, `helpers`, `common`, `lib` — each is a role-named holder that should be renamed to the domain it actually serves, or split across the domains its contents belong to.

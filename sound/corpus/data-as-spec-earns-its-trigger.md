@@ -4,7 +4,6 @@ when: always
 source: house
 topic: abstraction
 ---
-when: [always] · tier: standard · check: judgeable
 Reach for an inert tagged corpus plus one member-blind interpreter ONLY when the member set BOTH grows over time AND its members carry behavior — otherwise never. When you do, model it as a discriminated union paired with a `Record` keyed by the tag, so a missing member is a COMPILE error, not a runtime surprise. NEVER build an interpreter for a closed or low-variance choice — variant props or a typed map read clearer.
 _Avoid_: a `switch`-driven interpreter over a fixed, low-variance case set; a member-blind engine installed for a member set that isn't actually growing.
 Detect: an interpreter/handler-map abstraction whose tag set is closed and small — ask whether the set genuinely keeps growing AND each member brings its own behavior; if not both, collapse it to variant props or a plain typed map.
