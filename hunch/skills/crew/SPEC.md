@@ -51,6 +51,23 @@ No existing tool covers the combination. Beads (`bd`): best-in-class task DAG + 
 - **Glob-prefix conflict detection**, over-approximate by intent: for advisory use, cheap false conflicts beat missed ones.
 - **Identity by env (`CREW_ID`)** over self-registration: whoever spawns an agent mints its node and hands it its name; "who am I" is answerable on the first tool call.
 
+## Scars borrowed from taskflow
+
+An eight-agent extraction swarm mined heggria/taskflow (a multi-agent DAG compiler/runtime for five coding-agent harnesses; 42 releases of accumulated edge cases) for transferable knowledge. What crew adopted:
+
+- **Fail-closed where identity or state is minted, fail-open where it only observes.** Taskflow's worst recurring bug was fail-open parsing (a genuine BLOCK verdict read as a pass). Crew: a corrupt or wrong-schema registry refuses loudly (corrupt ≠ missing — a silent reset would erase every lease and read as "all clear"); a missing identity refuses a lease; but conflict *reporting* stays fail-open.
+- **Structural corruption blocks; contention informs.** Their verifier splits hard errors (cycles, dangling refs, duplicate IDs) from warnings — the same advisory philosophy, with a floor. Crew: dependency edges that would close a cycle are refused; parents must resolve; everything else advises.
+- **Identity is minted, never scraped** — three of their five harnesses emit no usable session id, so identity must be injected at spawn. Independently validates `CREW_ID`.
+- **Liveness from explicit writes, never from process observation** — every harness needed a bespoke stream parser and each broke differently. Independently validates heartbeat-based liveness.
+- **Two liveness clocks**: heartbeat staleness catches dead owners (their leases stop conflicting), lease TTL is the wall-age backstop for alive-but-stuck ones. Crew had both before the swarm named the pattern; now it's a stance, not an accident.
+- **Reclaim ≠ redo**: an expired lease never implies the dead owner's work is safe to re-run — their partial side effects may exist. Carried as worker-protocol knowledge, not tooling.
+- **Advisory caps on machine-generated decomposition**: `add` warns past depth 6 or 100-node subtrees — runaway recursive decomposition is a real failure they capped; ours warns instead of rejecting.
+- **Atomic writes with collision-proof temp names** (pid + random), schema-version stamping, refused-not-guessed unknown versions.
+
+What crew deliberately rejects from taskflow: barrier/layer scheduling (a finished dependency should never wait on an unrelated slow sibling), a phase-type taxonomy (one node primitive; execution shape is the agent's business), a daemon or global scheduler (their own docs: "disk is authority"), blocking-lock steal machinery as the *coordination* surface, and cross-run caching (crew records coordination facts, never skips work on their basis).
+
+**Acknowledged tension (their C3):** taskflow is advisory *across* runs but strictly locked *within* its own state file — and crew is the same: advisory semantics between agents, a mutual-exclusion micro-lock (mkdir + atomic rename, stealable after 10s of holder silence) around registry writes themselves. Lost registry writes are not excused by the advisory philosophy; the selftest's racing-writers checks exist to hold that line. The 10-second steal window is the accepted residual risk: a live writer paused longer than that could be double-entered — tolerable for an ephemeral registry, and the claim log makes it visible if it ever happens.
+
 ## Beads exit-ramp
 
 If the hunch graduates beyond moo, migrate the DAG substrate to `bd` (verified in-container: atomic contested claims, depth-4 hierarchy, subtree-scoped ready-frontier, JSON everywhere) and keep only a thin lease sidecar cribbed from Agent Mail's reservation schema (`{agent, paths[], ttl, exclusive, reason}`). Not adopted now: 137 MB fast-churning binary, claims without expiry, parents claimable while children are open — wrong trade for a hunch that must stay throwaway-cheap.

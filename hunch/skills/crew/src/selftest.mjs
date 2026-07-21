@@ -66,6 +66,17 @@ export async function selftest() {
   const readyAfter = j(await crew(['ready'])).some(n => n.id === t2);
   check('blocked node hidden from ready until dependency done', !readyBefore && readyAfter);
 
+  // dependency cycles are refused, not stored
+  const cyc = await crew(['block', t1, '--on', t2]);
+  check('edge closing a dependency cycle refused', cyc.code === 2);
+
+  // corrupt registry fails closed — never silently resets to empty
+  const corruptDir = fs.mkdtempSync(path.join(os.tmpdir(), 'crew-selftest-'));
+  fs.writeFileSync(path.join(corruptDir, 'registry.json'), 'not json {');
+  const corrupt = await crew(['json'], { CREW_FILE: path.join(corruptDir, 'registry.json') });
+  check('corrupt registry refused loudly (exit 4)', corrupt.code === 4);
+  fs.rmSync(corruptDir, { recursive: true, force: true });
+
   // events log records refusals and grants
   const events = fs.readFileSync(path.join(dir, 'events.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
   check('claim log recorded grants and refusals', events.some(e => e.granted) && events.some(e => !e.granted));

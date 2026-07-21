@@ -38,12 +38,28 @@ export function withLock(fn) {
   try { return fn(); } finally { try { fs.rmdirSync(LOCKDIR); } catch {} }
 }
 
-export const load = () => {
-  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { return { nodes: {} }; }
-};
+// Corrupt is not missing: a missing file is an empty registry, but an
+// unparseable or wrong-schema file refuses loudly — never silently resets
+// (a reset would erase every live lease and read as "all clear").
+export const SCHEMA = 1;
+export function load() {
+  let raw;
+  try { raw = fs.readFileSync(FILE, 'utf8'); } catch { return { v: SCHEMA, nodes: {} }; }
+  let db;
+  try { db = JSON.parse(raw); } catch (e) {
+    console.error(`crew: registry unreadable at ${FILE} — refusing to guess (${e.message})`);
+    process.exit(4);
+  }
+  if ((db.v ?? SCHEMA) !== SCHEMA) {
+    console.error(`crew: registry schema v${db.v} unsupported (this CLI speaks v${SCHEMA})`);
+    process.exit(4);
+  }
+  return db;
+}
 
 export function save(db) {
-  const tmp = FILE + '.tmp.' + process.pid;
+  db.v = SCHEMA;
+  const tmp = `${FILE}.tmp.${process.pid}.${crypto.randomBytes(3).toString('hex')}`;
   fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
   fs.renameSync(tmp, FILE);
 }

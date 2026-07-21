@@ -37,7 +37,7 @@ Blocked-by edges hold a node out of \`ready\` until the named nodes are done.
 Any agent may add children under its own id — that is recursive decomposition.`,
     run(a) {
       const task = positionals(a)[0] || die(this.usage);
-      const id = withLock(() => {
+      const res = withLock(() => {
         const db = load();
         const parent = arg(a, '--parent', null);
         if (parent) reqNode(db, parent);
@@ -48,9 +48,14 @@ Any agent may add children under its own id — that is recursive decomposition.
           blockedBy: (arg(a, '--blocked-by', '') || '').split(',').filter(Boolean),
           claims: [], created: now(), heartbeat: 0,
         };
-        save(db); return nid;
+        save(db);
+        // advisory guardrail on machine-generated decomposition running away
+        const depth = nid.split('.').length, size = subtreeOf(nid.split('.')[0], db.nodes).length;
+        const warning = depth > 6 ? `depth ${depth} — is this decomposition still human-auditable?`
+          : size > 100 ? `subtree has ${size} nodes — is this decomposition still human-auditable?` : undefined;
+        return warning ? { id: nid, warning } : { id: nid };
       });
-      print({ id });
+      print(res);
     },
   },
 
@@ -194,11 +199,22 @@ Claiming marks you running. Every decision lands in events.jsonl beside the regi
 
   block: {
     usage: 'crew block ID --on ID',
-    summary: 'Add a dependency edge after the fact (discovered mid-flight).',
+    summary: 'Add a dependency edge after the fact (discovered mid-flight). Refuses cycles.',
     run(a) {
       const id = positionals(a)[0]; const on = arg(a, '--on') || die(this.usage);
       withLock(() => {
         const db = load(); const n = reqNode(db, id); reqNode(db, on);
+        // a cycle would hold every node on it out of `ready` forever
+        const reaches = (from, to) => {
+          const seen = new Set(); const stack = [from];
+          while (stack.length) {
+            const k = stack.pop();
+            if (k === to) return true;
+            if (!seen.has(k)) { seen.add(k); stack.push(...(db.nodes[k]?.blockedBy || [])); }
+          }
+          return false;
+        };
+        if (reaches(on, id)) die(`crew block: ${id} --on ${on} would close a dependency cycle`);
         n.blockedBy = [...new Set([...(n.blockedBy || []), on])]; save(db);
       });
       print({ ok: true });
