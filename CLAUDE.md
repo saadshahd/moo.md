@@ -54,11 +54,11 @@ Phrase design decisions as "X over Y: reason".
 
 | The new thing is... | Unit |
 |---|---|
-| A contract that must read identically in ≥2 skills | Fragment (`<plugin>/skills/*.md`, added to sync `--files`), doc-gen inlined — a referenced instruction is an instruction Claude may never read (compaction, skipped loads) |
-| Data selected per use (catalog, profile, corpus) | Runtime file — a skipped load degrades gracefully |
+| A contract that must read identically in ≥2 skills | Fragment (`<plugin>/skills/*.md`, added to sync `--files`) |
+| Data selected per use (catalog, profile, corpus) | Runtime file |
 | A trigger + procedure that stands alone | Skill |
-| A trigger only the human perceives — a mode they choose, or a failure the model can't judge (that its own message didn't land); observable session state stays model-invocable | Skill with `disable-model-invocation: true` — description = invocation summary, not trigger |
-| Behavior that must run every time, deterministically | Hook (see Hook Design) |
+| A trigger only the human perceives | Skill with `disable-model-invocation: true` — description = invocation summary, not trigger |
+| Behavior that must run every time, deterministically | Hook |
 | An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
 
 **Composition — artifacts and priming over imports:**
