@@ -99,7 +99,7 @@ See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints.
 
 See `hope/PHILOSOPHY.md` "Hard Constraints" for plugin-specific audit items.
 
-### Model-Judgment Boundaries (Enforce These)
+### Model-Judgment Boundaries
 
 A skill or hook that leans on a model's judgment (a judge, a generated artifact, an LLM check) has a correctness **rate**, not a guarantee. Its failure mode is a confident, valid-shaped wrong answer no enumerable error case names.
 
