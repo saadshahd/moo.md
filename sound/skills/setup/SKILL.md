@@ -7,7 +7,7 @@ description: Use when installing or refreshing sound taste rules in a project. T
 
 Scaffold a project's taste rules from the sound corpus: probe the stack, select ONLY rules whose subject the repo's code actually shows — evidence-cited per rule, never a tag-wide dump — confirm with the user, then install each confirmed rule's corpus prose verbatim. Each rule lands as a plain reference file in `.claude/sound/<topic>/` — the tree `sound:prime` points at. Written files belong to the user; re-runs reconcile (see Re-runs).
 
-Corpus: `../../corpus/` relative to this SKILL.md — the default candidate universe. Sibling `../../corpus-optin/` holds opt-in rules, excluded from candidacy unless the user names one at invocation (Phase 2). If `corpus/` is missing or unreadable, STOP and say so — never install a partial set silently.
+Corpus: `../../corpus/` relative to this SKILL.md — the default candidate universe, laid out as `<tag>/<topic>/<rule>.md`. The top directory is the rule's when-tag (`always`, `react`, `db`, `distributed`; a hyphenated directory like `db-distributed` carries every tag in its name), the next is its topic, and the file is the pure rule body — no frontmatter. Sibling `../../corpus-optin/` (same layout) holds opt-in rules, excluded from candidacy unless the user names one at invocation (Phase 2). If `corpus/` is missing or unreadable, STOP and say so — never install a partial set silently.
 
 ## Phase 1 — Probe
 
@@ -23,7 +23,7 @@ Decide which kind-tags apply — a PRE-FILTER for Phase 2 candidacy, not the sel
 
 ## Phase 2 — Select (per rule, evidence-cited)
 
-Candidates = every `corpus/` rule whose `when:` is `always` or shares ANY tag with the Phase 1 set.
+Candidates = every rule under `corpus/always/` plus every rule under a tag directory whose name contains ANY Phase 1 tag (`react/`, `db/`, `distributed/`; `db-distributed/` fires on either of its tags).
 
 **Opt-in gate (deterministic).** The candidate universe is `corpus/` ONLY. A `corpus-optin/` rule enters candidacy solely when the user names it at invocation — then read it from `corpus-optin/`. Directory membership is the gate; a default run never proposes an opt-in rule.
 
@@ -38,11 +38,11 @@ A fired tag earns NOTHING by itself — each rule's OWN Detect question must be 
 - Test-scoped rule: its subject is the CODE UNDER TEST, never test-file presence — a zero-test repo with testable logic still earns the general testing rules (cite the testable code). Test rules with a more specific shape (roundtrip laws need encode/decode pairs; property generators need domain invariants) still need THAT shape cited.
 - Every rejected candidate gets a one-line reason, surfaced at Confirm.
 
-Method — DEEP by design; spend the tokens. Partition candidates into batches of rules that look at the same code (seed with when-tags and each rule's subject), dispatch one subagent per batch with its rules' full text and repo access; each returns per-rule `install + citation` or `skip + reason`. Propose-only mode (below) may run inline — the output SET is what's judged, not the mechanism.
+Method — DEEP by design; spend the tokens. Partition candidates into batches of rules that look at the same code (seed with the corpus's tag/topic directories and each rule's subject), dispatch one subagent per batch with its rules' full text and repo access; each returns per-rule `install + citation` or `skip + reason`. Propose-only mode (below) may run inline — the output SET is what's judged, not the mechanism.
 
 ## Phase 3 — Confirm (never skip, never auto-install)
 
-Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons. The statement is the rule body's opening mandate: the first prose line after the frontmatter — its first sentence, extended to the next only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never `_Avoid_`, `Detect:`, or `Not-when:`. The user's answer is the verdict — a corrected set replaces yours without argument; redo the affected phases. Write only after explicit confirmation. The user confirms the SET here; the written files are theirs afterward.
+Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons. The statement is the rule's opening mandate: the file's first sentence, extended to the next only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never `_Avoid_`, `Detect:`, or `Not-when:`. The user's answer is the verdict — a corrected set replaces yours without argument; redo the affected phases. Write only after explicit confirmation. The user confirms the SET here; the written files are theirs afterward.
 
 **Propose-only mode:** when the invocation asks for a proposal only (evals, dry runs), emit exactly this JSON and stop — no confirmation, no writes:
 
@@ -54,11 +54,11 @@ Present compactly: the extracted facts (each with file evidence), the proposed t
 
 ## Phase 4 — Write
 
-Write each confirmed rule's corpus body — frontmatter stripped, prose verbatim, no additions — to `.claude/sound/<topic>/<rule-name>.md`, a plain reference file. `<topic>` is the corpus `topic:` value verbatim. These live OUTSIDE `.claude/rules/`, so they never auto-load; the browsable `.claude/sound/` tree IS the map `sound:prime` points at. No marker, manifest, or hash anywhere.
+Copy each confirmed rule's file verbatim — no additions — to `.claude/sound/<topic>/<rule-name>.md`, a plain reference file. `<topic>` is the rule's parent directory in the corpus. These live OUTSIDE `.claude/rules/`, so they never auto-load; the browsable `.claude/sound/` tree IS the map `sound:prime` points at. No marker, manifest, or hash anywhere.
 
 ## Re-runs (reconcile, never overwrite)
 
-Existing `.claude/sound/` files — prior setup, hand-written, or evolved — are user-owned; reconcile by reading, not bookkeeping. Older installs may carry project-tuned code examples and users may add their own snippets, so never compare whole bodies — compare PROSE ONLY: body minus frontmatter minus fenced code blocks, whitespace-normalized.
+Existing `.claude/sound/` files — prior setup, hand-written, or evolved — are user-owned; reconcile by reading, not bookkeeping. Older installs may carry project-tuned code examples and users may add their own snippets, so never compare whole bodies — compare PROSE ONLY: content minus any frontmatter and fenced code blocks, whitespace-normalized.
 
 - **Existing file, no same-named corpus rule** → local taste. Leave untouched; mention it was preserved.
 - **Selected corpus rule, no existing file** → propose as an addition. Every re-run re-derives tags and re-runs selection fresh — a newly-appeared surface makes its rules newly proposable. No memory of prior runs.

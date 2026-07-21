@@ -1,8 +1,8 @@
 #!/bin/sh
 # install-sound-tree.sh <target-repo-dir> [corpus-dir]
 # Install the FULL sound corpus into <target-repo>/.claude/sound/, topic-routed the
-# same way sound:setup emits it post-#170 collapse: corpus/<rule>.md -> .claude/sound/<topic>/<rule>.md,
-# keyed on each rule's own `topic:` frontmatter (the only field setup routes on).
+# same way sound:setup emits it: corpus/<tag>/<topic>/<rule>.md -> .claude/sound/<topic>/<rule>.md,
+# keyed on each rule's parent directory (the corpus carries no frontmatter).
 #
 # WHY full corpus, not a setup-selected subset: this harness measures sound:review's recall
 # GIVEN the bearing rule is present. Installing everything removes setup's selection as a
@@ -19,9 +19,9 @@ corpus="${2:-$here/../../corpus}"
 dest="$target/.claude/sound"
 rm -rf "$dest"
 count=0
-for f in "$corpus"/*.md; do
-  topic=$(sed -n 's/^topic:[[:space:]]*//p' "$f" | head -n1)
-  [ -n "$topic" ] || { echo "rule missing topic: $f" >&2; exit 1; }
+for f in $(find "$corpus" -name '*.md' | sort); do
+  topic=$(basename "$(dirname "$f")")
+  [ "$topic" != "$(basename "$corpus")" ] || { echo "rule not under a topic dir: $f" >&2; exit 1; }
   mkdir -p "$dest/$topic"
   cp "$f" "$dest/$topic/$(basename "$f")"
   count=$((count + 1))

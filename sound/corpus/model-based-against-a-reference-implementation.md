@@ -1,9 +1,0 @@
----
-when: distributed
-source: Hughes
-topic: tests
----
-When the system under test has an optimized, stateful, or concurrent implementation (a cache, a queue, a CRDT merge), write a naive in-memory reference model with the same interface and assert the real implementation agrees with the model after every generated sequence of operations.
-_Avoid_: a single fixed sequence of `.set`/`.get` calls as the entire spec for a stateful component.
-Detect: a `[distributed]`-tagged stateful class (cache, queue, replicated store) with tests but no sibling "model"/"reference"/"oracle" implementation in the test file, and no generated sequence of operations driving a comparison loop.
-Not-when: the component is a pure, stateless function — model-based testing is for state-sequence bugs; a pure function wants the roundtrip/idempotence/invariant laws instead, not a parallel model.

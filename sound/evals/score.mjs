@@ -54,7 +54,9 @@ const tagsMatch = setEq(expTags, gotTags);
 // default-install gate, so the scorer enforces it (fail loud, like the canary globs).
 const rulesRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const namesIn = (dir) => existsSync(dir)
-  ? new Set(readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3)))
+  ? new Set(readdirSync(dir, { recursive: true }).map(String)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => f.split("\\").join("/").split("/").pop().slice(0, -3)))
   : new Set();
 const corpusNames = namesIn(join(rulesRoot, "corpus"));
 const optinNames = namesIn(join(rulesRoot, "corpus-optin"));
