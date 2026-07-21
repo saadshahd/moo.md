@@ -1,3 +1,0 @@
-With `herd` coordinating delegation, independent work runs concurrently by default instead of serializing — the human's wall-clock drops without their ownership of the work degrading.
-
-Graduate when, across ≥10 real delegated sessions running ≥3 concurrent agents: zero lost updates and zero conflicts surfacing anywhere but the registry or the verify-net; advisory compliance ≥95% measured from `events.jsonl`; median wall-clock ≥2× better than sequential dispatch of the same work; and the handover probes still land — the human can say who did what and why. One corrupted merge herd should have caught, or a session where concurrency outran the human's grasp: kill or redesign.
