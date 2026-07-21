@@ -22,3 +22,4 @@ Coordinate concurrent agents through the `crew` CLI in this skill's directory.
 - Prefix every command with `CREW_FILE` and your `CREW_ID`.
 - `start` then `me` on entry. `claim` before any edit; on conflict, work an unclaimed part first and retry — never `--force`. `release` after each edit. Decompose big work under your own id with `add --parent`. `done` on exit.
 - Never edit outside your leases.
+- Spawning your own sub-agent? Mint it a node first and set the child's `CREW_ID` to that new id — env vars inherit, and a child acting under your identity corrupts ownership.
