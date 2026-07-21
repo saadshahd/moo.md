@@ -76,7 +76,7 @@ Mode = two questions: does the foreground need the result, and now?
 
 | Mode | When |
 |---|---|
-| Sync inject | Few lines of framing, computed instantly — never model work, never a detour-inducing manual |
+| Sync inject | Few lines of framing, computed instantly |
 | `async` — fire-and-forget | Side effect only; surfaces as a file change, never re-engages the thread |
 | `asyncRewake` — fire-and-maybe-wake | Off-thread check; exit 2 wakes Claude on a finding, exit 0 stays silent |
 
