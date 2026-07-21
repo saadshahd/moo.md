@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{tsx,jsx}"
 when: react
 source: Abramov
 topic: placement

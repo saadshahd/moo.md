@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{ts,tsx}"
 when: db, distributed
 source: Hickey
 topic: consistency

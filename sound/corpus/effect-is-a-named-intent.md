@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{tsx,jsx}"
 when: react
 source: house
 topic: effects

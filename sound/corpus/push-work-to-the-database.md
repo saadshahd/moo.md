@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{ts,tsx}"
 when: db
 source: house
 topic: consistency

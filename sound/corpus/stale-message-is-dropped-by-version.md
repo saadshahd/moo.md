@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{ts,tsx}"
 when: distributed
 source: Lamport
 topic: messaging

@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{ts,tsx}"
 when: always
 source: Evans
 topic: types

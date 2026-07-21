@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{test,spec}.{ts,tsx}"
 when: distributed
 source: Hughes
 topic: tests

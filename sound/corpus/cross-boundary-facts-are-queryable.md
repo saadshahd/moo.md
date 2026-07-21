@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{ts,tsx}"
 when: distributed
 source: house
 topic: integration

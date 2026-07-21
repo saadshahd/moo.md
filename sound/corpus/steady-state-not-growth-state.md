@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{ts,tsx}"
 when: db, distributed
 source: Nygard
 topic: resilience

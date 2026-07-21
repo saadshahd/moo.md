@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{ts,tsx}"
 when: always
 source: Fowler + Feathers + Hickey
 topic: abstraction

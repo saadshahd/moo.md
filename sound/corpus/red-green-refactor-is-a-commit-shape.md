@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{test,spec}.{ts,tsx}"
 when: always
 source: Beck
 topic: commit-shape

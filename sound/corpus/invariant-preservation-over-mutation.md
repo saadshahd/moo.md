@@ -1,5 +1,4 @@
 ---
-paths: "**/*.{test,spec}.{ts,tsx}"
 when: db
 source: Hughes
 topic: tests
