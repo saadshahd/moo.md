@@ -48,7 +48,7 @@ description: Single line. Trigger condition + what it does. Max 1024 chars.
 
 ### Skill Design (X over Y)
 
-Phrase design decisions the way the card does — "X over Y: reason". These rules govern authoring:
+Phrase design decisions as "X over Y: reason".
 
 **Unit choice:**
 
@@ -62,36 +62,35 @@ Phrase design decisions the way the card does — "X over Y: reason". These rule
 
 **Build-time include over runtime reference** — behavior inlines, data references:
 
-- doc-gen inline (build time) when content is shared behavior or contract: it must be byte-identical across consumers and resident in context — compaction and skipped reads kill references. Precedents: `card.md`, `gate.md`, `prompts.md`, `handover.md`.
-- Data file (runtime) when content is data selected per use — a catalog, profile, or corpus where entries load per invocation and a skipped load degrades gracefully. Works per-skill (`consult/profiles/`, `target/cheat-museum.md`) or plugin-wide (`sound/corpus/`).
-- Never reference behavior: a referenced instruction is an instruction Claude may never read.
+- Shared behavior or contract → doc-gen inline: a referenced instruction is an instruction Claude may never read (compaction, skipped loads).
+- Data selected per use (catalog, profile, corpus) → runtime file: a skipped load degrades gracefully.
 
 **Model-invocable over disabled** — disable only when the trigger lives in the human's head:
 
-- A mode the human chooses to enter (`delegate`) or a failure only the human perceives (`bro`: the model can't judge that its own message didn't land) → `disable-model-invocation: true`.
-- Observable in session state (vague request → `intent`; unsupervised run → `target`) → stays model-invocable.
-- On disabled skills the description is an invocation summary, not a trigger — the description trap doesn't apply.
+- A mode the human chooses to enter, or a failure only the human perceives (the model can't judge that its own message didn't land) → `disable-model-invocation: true`.
+- Trigger observable in session state → stays model-invocable.
+- Disabled skill's description = invocation summary, not trigger (description trap doesn't apply).
 
 **Composition — artifacts and priming over imports:**
 
-- Skills never reference each other. They compose through emitted artifacts (the card) and natural-language triggers; a missing neighbor skill breaks nothing.
+- Skills compose through emitted artifacts (the card) and natural-language triggers, never cross-references (hope/PHILOSOPHY.md Hard Constraints).
 - New pipeline stage when the cognitive mode changes (clarify WHAT ≠ decide HOW ≠ judge unsupervised work; find ≠ fix). One skill = one mode + one gate.
-- Chain mechanics: each stage ends in a gate the user locks; the card carries forward only what the next stage can't re-derive; the shared contract is a fragment doc-gen'd into every stage so each stays self-contained.
-- Two skills over one when triggers differ; a shared explanation the pair needs lives in CHANGELOG, not in either skill (`bro`/`plain` precedent).
+- Chain mechanics: each stage ends in a gate the user locks; the card carries only what the next stage can't re-derive; the shared contract is a fragment doc-gen'd into every stage.
+- Two skills over one when triggers differ; a shared explanation the pair needs lives in CHANGELOG, not in either skill.
 
 ### Hook Design
 
-Hook over skill only when the behavior must run every time (a skill's firing is probabilistic) or must run off-thread. Hooks reinforce and observe — they never author, capture, or gate. Always fail open: exit 0 with valid JSON on any error; a hook must never brick a tool or block a session.
+Hook over skill only when the behavior must run every time (a skill's firing is probabilistic) or must run off-thread. Hooks reinforce and observe — never author, capture, or gate. Always fail open: exit 0 with valid JSON on any error.
 
-Pick the mode by two questions — does the foreground need the result, and does it need it now?
+Mode = two questions: does the foreground need the result, and now?
 
-| Mode | When | Precedent |
-|---|---|---|
-| Sync inject | A few lines of framing or nudge, computed instantly — never model work, never a detour-inducing manual | `memory-prime.sh`, `return.sh` |
-| `async` — fire-and-forget | Side effect only; surfaces as an ordinary file change, never re-engages the thread | `memory-write.sh` |
-| `asyncRewake` — fire-and-maybe-wake | Off-thread check that interrupts only on a finding (exit 2 wakes Claude), silent otherwise (exit 0) | `slop-nudge.sh` |
+| Mode | When |
+|---|---|
+| Sync inject | Few lines of framing, computed instantly — never model work, never a detour-inducing manual |
+| `async` — fire-and-forget | Side effect only; surfaces as a file change, never re-engages the thread |
+| `asyncRewake` — fire-and-maybe-wake | Off-thread check; exit 2 wakes Claude on a finding, exit 0 stays silent |
 
-- A hook that spawns headless `claude -p` guards recursion (`--settings disableAllHooks`) and keeps its verdict logic in one file shared with its eval harness (`judge.sh`; see Model-Judgment Boundaries).
+- A hook that spawns headless `claude -p` guards recursion (`--settings disableAllHooks`) and keeps its verdict logic in one file shared with its eval harness (see Model-Judgment Boundaries).
 
 ## Philosophy (Enforce These)
 
