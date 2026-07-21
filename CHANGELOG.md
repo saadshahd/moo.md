@@ -9,6 +9,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- change(sound): corpus rules carry no code examples — every fenced WRONG/RIGHT block is removed from all 100 `corpus/` and 2 `corpus-optin/` rules, leaving each rule as pure instruction: statement (the mandate), `_Avoid_`, `Detect:`, `Not-when:`, `Cross-ref:`. Instruction over transcription: newer models follow the stated essence better than example pairs, and the examples were the one part of a rule that could contradict its prose. Dangling example references in prose fixed ("same WRONG" → "same anti-pattern" in the retry-loop cross-refs).
+- change(sound): `sound:setup` drops the example-tuning phase entirely — phases renumbered Probe → Select → Confirm → Write, and Write installs each confirmed rule's corpus prose verbatim (frontmatter stripped, no additions). The three tuning gates (syntax-valid TS, de-genericized, grounded) go with it. Re-run reconciliation still compares PROSE ONLY: older installs may carry project-tuned examples and users may add their own snippets — both are user-owned and never regenerated.
+
 ### Added
 
 - docs: "Skill Design" section in CLAUDE.md — moo-specific authoring forks, minimal by a three-lens trim (token efficiency, duplication, instructiveness): one unit-choice table as the single decision surface (fragment / runtime data file / skill / user-only skill / hook / hunch experiment — behavior inlines at build, data references at runtime, invocation disabled only when the trigger lives in the human's head); composition via artifacts and priming — new pipeline stage only on a cognitive-mode change, chained through user-locked gates and the card.

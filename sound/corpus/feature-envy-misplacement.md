@@ -6,20 +6,6 @@ topic: placement
 ---
 when: [always] · tier: standard · check: judgeable
 A function that reads more fields from another module's domain object than it uses of its own state belongs in that other module — its field accesses tell you where it should live, so move it there.
-WRONG:
-```ts
-// invoice-service.ts
-function isOverdue(invoice: Invoice, order: Order): boolean {
-  return order.dueDate < Date.now() && order.status !== 'paid' && order.customerId != null;
-}
-```
-RIGHT:
-```ts
-// order.ts — the logic moves to the domain it's envious of
-function isOverdue(order: Order, now: Date): boolean {
-  return order.dueDate < now.getTime() && order.status !== 'paid';
-}
-```
 _Avoid_: a function in module A whose body's field accesses are majority-owned by module B's type.
 Detect: count property accesses per source object inside a function body — if a foreign object's fields outnumber the function's own module's fields, that's envy; also watch for a function taking 2+ domain objects as params where only one is truly needed by the caller.
 Not-when: the function is an explicit adapter/mapper whose entire job is translating between two domains (e.g., a DTO mapper) — envy is expected there.

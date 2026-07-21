@@ -6,20 +6,6 @@ topic: effects
 ---
 when: [always] · tier: standard · check: judgeable
 Awaiting independent async operations one at a time in a loop pays their latencies in series for no reason — N round-trips become N sequential waits, and one rejection abandons the rest mid-flight. When an iteration's await does not depend on a previous iteration's result, run them together with `Promise.all` (or `allSettled` when partial success is the model).
-WRONG:
-```ts
-const ids: string[] = [];
-for (const event of events) {
-  const id = await processEvent(event); // each event is independent — this serializes N calls
-  ids.push(id);
-}
-return ids;
-```
-RIGHT:
-```ts
-return Promise.all(events.map((event) => processEvent(event)));
-// independent work runs concurrently; the returned array preserves input order
-```
 _Avoid_: `await` inside a plain `for`/`for...of`/`while` whose iterations don't feed each other; building a result array by pushing each awaited value in sequence when the source items are already in hand.
 Detect: a loop body containing `await` where the awaited call takes only the current item (no data dependency on a prior iteration) and no ordering side effect requires serialization — it collapses to `Promise.all(items.map(...))`. A `for await` over an async iterator is legitimate streaming, not this.
 Not-when: each step genuinely depends on the previous one's result (a true sequential pipeline), or the operations must be serialized to respect ordering, a rate limit, or a transactional boundary — then the serial await is correct.
