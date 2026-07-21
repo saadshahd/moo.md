@@ -1,0 +1,3 @@
+With `crew` coordinating concurrent delegated work, independent tasks run in parallel by default instead of serializing — the human's wall-clock drops without their ownership of the work degrading.
+
+Graduate when, across ≥10 real sessions running ≥3 concurrent agents: zero lost updates and zero conflicts surfacing anywhere but the registry or the verify-net; advisory compliance ≥95% measured from the claim log; median wall-clock ≥2× better than sequential dispatch of the same work; and the human can still say who did what and why. One corrupted merge crew should have caught, or a session where concurrency outran the human's grasp: kill or redesign.
