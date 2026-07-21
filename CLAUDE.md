@@ -80,7 +80,7 @@ Mode = two questions: does the foreground need the result, and now?
 | `async` — fire-and-forget | Side effect only; surfaces as a file change, never re-engages the thread |
 | `asyncRewake` — fire-and-maybe-wake | Off-thread check; exit 2 wakes Claude on a finding, exit 0 stays silent |
 
-- A hook that spawns headless `claude -p` runs it with `--no-session-persistence` (no session left behind), `--settings '{"disableAllHooks":true}'` (recursion guard), permissions pre-answered (`--permission-mode bypassPermissions` — no TTY, a prompt hangs it), tools scoped to the minimum (`--allowed-tools`), and keeps its verdict logic in one file shared with its eval harness (see Model-Judgment Boundaries).
+- A hook that spawns headless `claude -p` runs it with `--no-session-persistence`, `--settings '{"disableAllHooks":true}'` (recursion guard), `--permission-mode bypassPermissions` (no TTY — a prompt hangs it), and keeps its verdict logic in one file shared with its eval harness (see Model-Judgment Boundaries).
 
 ## Philosophy
 
