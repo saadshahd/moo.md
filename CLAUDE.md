@@ -139,7 +139,6 @@ Track all changes in `CHANGELOG.md` at repo root.
 
 - Move unreleased items to new version section
 - Update version in affected plugin.json files
-- Tag the release
 - Run `bun run sync` and verify a clean git diff on every doc-gen consumer SKILL.md. The `sync` script's `--files` list in `package.json` is the source of truth (currently intent, shape, target, delegate, over, freeze) — read it; don't trust a hand-copied list here.
 - The sync-drift guard (`.githooks/pre-push`) is the only mechanical check, and it runs **only** when `core.hooksPath=.githooks`. Verify with `git config core.hooksPath` before trusting it.
 - One-time setup: `git config core.hooksPath .githooks`
