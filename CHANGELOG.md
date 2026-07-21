@@ -11,7 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- docs: "Skill Design (X over Y)" section in CLAUDE.md — moo-specific authoring forks, minimal by a three-lens trim (token efficiency, duplication, instructiveness): one unit-choice table as the single decision surface (fragment / runtime data file / skill / user-only skill / hook / hunch experiment — behavior inlines at build, data references at runtime, invocation disabled only when the trigger lives in the human's head); composition via artifacts and priming — new pipeline stage only on a cognitive-mode change, chained through user-locked gates and the card.
+- docs: "Skill Design" section in CLAUDE.md — moo-specific authoring forks, minimal by a three-lens trim (token efficiency, duplication, instructiveness): one unit-choice table as the single decision surface (fragment / runtime data file / skill / user-only skill / hook / hunch experiment — behavior inlines at build, data references at runtime, invocation disabled only when the trigger lives in the human's head); composition via artifacts and priming — new pipeline stage only on a cognitive-mode change, chained through user-locked gates and the card.
 - docs: "Hook Design" section in CLAUDE.md — hook over skill only for must-run-every-time or off-thread behavior; reinforce and observe, never author or gate, always fail open; mode table (sync inject / `async` fire-and-forget / `asyncRewake` fire-and-maybe-wake) keyed to whether the foreground needs the result and when; recursion-guard + single-source-verdict rule for headless `claude -p` hooks.
 
 ## [hunch@0.0.2] - 2026-07-20

@@ -46,7 +46,7 @@ description: Single line. Trigger condition + what it does. Max 1024 chars.
 - No vague terminology; pick one term per concept
 - Use forward slashes only (`/`), never backslashes
 
-### Skill Design (X over Y)
+### Skill Design
 
 Phrase design decisions as "X over Y: reason".
 
@@ -80,9 +80,9 @@ Mode = two questions: does the foreground need the result, and now?
 | `async` — fire-and-forget | Side effect only; surfaces as a file change, never re-engages the thread |
 | `asyncRewake` — fire-and-maybe-wake | Off-thread check; exit 2 wakes Claude on a finding, exit 0 stays silent |
 
-- A hook that spawns headless `claude -p` guards recursion (`--settings disableAllHooks`) and keeps its verdict logic in one file shared with its eval harness (see Model-Judgment Boundaries).
+- A hook that spawns headless `claude -p` runs it with `--no-session-persistence` (no session left behind), `--settings '{"disableAllHooks":true}'` (recursion guard), permissions pre-answered (`--permission-mode bypassPermissions` — no TTY, a prompt hangs it), tools scoped to the minimum (`--allowed-tools`), and keeps its verdict logic in one file shared with its eval harness (see Model-Judgment Boundaries).
 
-## Philosophy (Enforce These)
+## Philosophy
 
 moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every change to this project must serve at least one.
 
