@@ -11,6 +11,9 @@ dist/
 # Local
 *.local.md
 
+# herd coordination state (ephemeral by contract)
+.herd/
+
 # Eval workspaces
 workspace/
 
