@@ -25,6 +25,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - docs: "Tag the release" dropped from CLAUDE.md's release checklist — tags serve neither the human nor the Claude plugin system, and recent releases (hope@9.7.2, sound@0.0.4, hunch@0.0.2) already shipped untagged without consequence. The changelog version sections and plugin.json are the release record.
 
+## [hunch@0.0.6] - 2026-07-22
+
+### Added
+
+- feat(hunch): crew — `claim <glob> --wait [--timeout SEC]` blocking mode (poll every 500ms until the lease frees or the timeout elapses, default 120s; on timeout refuse with `timedOut:true` and exit 3, the same code as a normal refusal; `--force` still wins and never waits; works for shared and exclusive claims; exactly one events.jsonl line per invocation, never one per poll). Non-wait refusals now carry a `hint` field pointing at `--wait` and warning against aliasing `node <path>` in a shell variable. Removes the need for agents to hand-roll fragile retry loops that can't tell exit 3 (real conflict) from exit 127 (command never ran). SKILL.md "Working" rules and selftest cases added.
+
+
 ## [hunch@0.0.5] - 2026-07-22
 
 ### Added

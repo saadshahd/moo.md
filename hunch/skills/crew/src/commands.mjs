@@ -139,31 +139,51 @@ check it on entry and before broadening your territory.`,
   },
 
   claim: {
-    usage: 'crew claim GLOB... [--id ID] [--ttl SECONDS] [--shared] [--force]',
-    summary: 'Take an advisory lease before editing. Exit 3 + owner details on conflict — you decide.',
+    usage: 'crew claim GLOB... [--id ID] [--ttl SECONDS] [--shared] [--wait [--timeout SEC]] [--force]',
+    summary: 'Take an advisory lease before editing. Exit 3 + owner details on conflict — you decide. --wait blocks until free.',
     detail: `Leases expire after --ttl (default 900s). Conflicts never block: the JSON names the
 owner and their lease so you can reorder your own work; --force records that you
 proceeded anyway (logged, and a verify pass should treat it as a violation).
+--wait re-checks every 500ms until the lease frees or --timeout seconds pass
+(default 120), then refuses with timedOut:true and exit 3; --force takes precedence
+and never waits. Use --wait instead of a hand-rolled retry loop — a shell loop
+cannot tell exit 3 (real conflict) from exit 127 (the command never ran).
 Same-lineage leases never conflict — a parent delegated that territory deliberately.
 Shared leases (--shared) coexist with each other but not with exclusive ones.
-Claiming marks you running. Every decision lands in events.jsonl beside the registry.`,
-    run(a) {
-      const flagVals = new Set([arg(a, '--id'), arg(a, '--ttl')]);
+Claiming marks you running. Every decision lands in events.jsonl beside the registry
+— exactly one event per invocation, the final outcome, never one per poll.`,
+    async run(a) {
+      const flagVals = new Set([arg(a, '--id'), arg(a, '--ttl'), arg(a, '--timeout')]);
       const globs = a.filter(v => !v.startsWith('--') && !flagVals.has(v));
       if (!globs.length) die(this.usage);
       const id = arg(a, '--id', ME) || die('crew claim: pass --id or set CREW_ID');
       const mode = has(a, '--shared') ? 'shared' : 'excl';
-      const res = withLock(() => {
+      const force = has(a, '--force');
+      // one lock-guarded attempt: re-check conflicts freshly, then grant or refuse.
+      // The lock is never held across a sleep — each poll re-acquires it.
+      const attempt = () => withLock(() => {
         const db = load(); const n = reqNode(db, id);
         const conflicts = conflictsFor(db, id, globs, mode);
-        if (conflicts.length && !has(a, '--force')) return { granted: false, conflicts };
+        if (conflicts.length && !force) return { granted: false, conflicts };
         n.claims = [...liveClaims(n), { paths: globs, mode, ttl: Number(arg(a, '--ttl', 900)), at: now() }];
         n.heartbeat = now();
         if (n.status === 'pending') n.status = 'running'; // claiming means working
         save(db);
         return { granted: true, forced: conflicts.length > 0, conflicts };
       });
-      logEvent({ id, globs, granted: res.granted, forced: !!res.forced });
+      let res = attempt();
+      if (has(a, '--wait') && !force && !res.granted) {
+        const deadline = Date.now() + Number(arg(a, '--timeout', 120)) * 1000;
+        while (!res.granted && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 500));
+          res = attempt();
+        }
+        if (!res.granted) res = { granted: false, timedOut: true, conflicts: res.conflicts };
+      }
+      if (!res.granted && !res.timedOut) {
+        res.hint = 'another agent holds this lease. Re-run with --wait to block until free, or work elsewhere and retry. Invoke crew inline (node <abs>/crew.mjs claim ...); do not alias "node <path>" in a shell variable — zsh will not word-split it.';
+      }
+      logEvent({ id, globs, granted: res.granted, forced: !!res.forced }); // one event per invocation
       print(res);
       process.exit(res.granted ? 0 : 3);
     },

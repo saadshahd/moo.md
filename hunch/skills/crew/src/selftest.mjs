@@ -58,6 +58,23 @@ export async function selftest() {
   const g4 = await crew(['claim', 'tmp/**'], { CREW_ID: b });
   check('expired lease no longer conflicts', g4.code === 0 && j(g4).granted);
 
+  // --wait: grants immediately on a free glob, exit 0
+  const w1 = await crew(['claim', 'waitfree/**', '--wait'], { CREW_ID: b });
+  check('--wait grants immediately when free', w1.code === 0 && j(w1).granted);
+
+  // --wait: a short timeout against a held exclusive lease refuses with timedOut + exit 3
+  await crew(['claim', 'waitbusy/**'], { CREW_ID: a });
+  const w2 = await crew(['claim', 'waitbusy/**', '--wait', '--timeout', '1'], { CREW_ID: b });
+  check('--wait times out with exit 3 + timedOut', w2.code === 3 && j(w2).timedOut === true);
+
+  // --wait: the waiter is granted once the holder releases (real release-then-grant race)
+  await crew(['claim', 'waitrelease/**'], { CREW_ID: a });
+  const waiter = crew(['claim', 'waitrelease/**', '--wait', '--timeout', '5'], { CREW_ID: b });
+  await new Promise(r => setTimeout(r, 900)); // let the waiter poll and refuse at least once
+  await crew(['release', 'waitrelease/**'], { CREW_ID: a });
+  const w3 = await waiter;
+  check('--wait grants after the holder releases', w3.code === 0 && j(w3).granted);
+
   // blocked-by: ready frontier respects edges until done clears them
   const t1 = j(await crew(['add', 'first', '--parent', root])).id;
   const t2 = j(await crew(['add', 'second', '--parent', root, '--blocked-by', t1])).id;

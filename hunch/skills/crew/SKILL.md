@@ -21,5 +21,7 @@ Coordinate concurrent agents through the `crew` CLI in this skill's directory.
 
 - Prefix every command with `CREW_FILE` and your `CREW_ID`.
 - `start` then `me` on entry. `claim` before any edit; on conflict, work an unclaimed part first and retry — never `--force`. `release` after each edit. Decompose big work under your own id with `add --parent`. `done` on exit.
+- To block on a contended file, use `claim <glob> --wait [--timeout SEC]` — never a hand-rolled `if ! claim; then sleep` loop (a shell loop cannot tell exit 3, a real conflict, from exit 127, a command that never ran).
+- Invoke crew inline on every call (`node <abs>/crew.mjs ...`). Never store `node <path>` in a shell variable and call `$VAR` — zsh will not word-split it, so the command never runs (exit 127).
 - Never edit outside your leases.
 - Spawning your own sub-agent? Mint it a node first and set the child's `CREW_ID` to that new id — env vars inherit, and a child acting under your identity corrupts ownership.
