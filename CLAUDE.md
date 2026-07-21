@@ -50,30 +50,20 @@ description: Single line. Trigger condition + what it does. Max 1024 chars.
 
 Phrase design decisions as "X over Y: reason".
 
-**Unit choice:**
+**Unit choice** — behavior inlines at build, data references at runtime; disable invocation only when the trigger lives in the human's head:
 
 | The new thing is... | Unit |
 |---|---|
-| A contract that must read identically in ≥2 skills | Fragment (`<plugin>/skills/*.md`, added to sync `--files`) |
+| A contract that must read identically in ≥2 skills | Fragment (`<plugin>/skills/*.md`, added to sync `--files`), doc-gen inlined — a referenced instruction is an instruction Claude may never read (compaction, skipped loads) |
+| Data selected per use (catalog, profile, corpus) | Runtime file — a skipped load degrades gracefully |
 | A trigger + procedure that stands alone | Skill |
-| Behavior that must run every time, deterministically | Hook |
-| A judgment call only the human can initiate | Skill with `disable-model-invocation: true` |
+| A trigger only the human perceives — a mode they choose, or a failure the model can't judge (that its own message didn't land); observable session state stays model-invocable | Skill with `disable-model-invocation: true` — description = invocation summary, not trigger |
+| Behavior that must run every time, deterministically | Hook (see Hook Design) |
 | An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
-
-**Build-time include over runtime reference** — behavior inlines, data references:
-
-- Shared behavior or contract → doc-gen inline: a referenced instruction is an instruction Claude may never read (compaction, skipped loads).
-- Data selected per use (catalog, profile, corpus) → runtime file: a skipped load degrades gracefully.
-
-**Model-invocable over disabled** — disable only when the trigger lives in the human's head:
-
-- A mode the human chooses to enter, or a failure only the human perceives (the model can't judge that its own message didn't land) → `disable-model-invocation: true`.
-- Trigger observable in session state → stays model-invocable.
-- Disabled skill's description = invocation summary, not trigger (description trap doesn't apply).
 
 **Composition — artifacts and priming over imports:**
 
-- Skills compose through emitted artifacts (the card) and natural-language triggers, never cross-references (hope/PHILOSOPHY.md Hard Constraints).
+- Skills compose through emitted artifacts (the card) and natural-language triggers, never cross-references.
 - New pipeline stage when the cognitive mode changes (clarify WHAT ≠ decide HOW ≠ judge unsupervised work; find ≠ fix). One skill = one mode + one gate.
 - Chain mechanics: each stage ends in a gate the user locks; the card carries only what the next stage can't re-derive; the shared contract is a fragment doc-gen'd into every stage.
 - Two skills over one when triggers differ; a shared explanation the pair needs lives in CHANGELOG, not in either skill.
