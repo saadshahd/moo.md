@@ -25,6 +25,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - docs: "Tag the release" dropped from CLAUDE.md's release checklist — tags serve neither the human nor the Claude plugin system, and recent releases (hope@9.7.2, sound@0.0.4, hunch@0.0.2) already shipped untagged without consequence. The changelog version sections and plugin.json are the release record.
 
+## [hunch@0.0.5] - 2026-07-22
+
+### Added
+
+- feat(hunch): `soloism` skill — the eager wake/reap lifecycle loop for concurrent soloterm subagents, the half crew lacks. Closes the outer-loop frictions the crew null-run surfaced: a child finishing wakes the orchestrator via `timer_fire_when_idle_any` (poll-only silence → one idle cycle), `close_process` reaps it on completion (leaked processes → zero live children at exit), and each completion dispatches whatever it unblocks without a barrier. Crew-blind by design — soloism names no coordination CLI and holds no dispatch policy (cap, frontier, ownership stay with crew's router); composition happens at the orchestrator, each skill contributing its half, neither importing the other. Stances: `_any` over `_all` (wake on first idle, never a barrier); idle ≠ done (idle only triggers a look — never reap on the raw idle transition); auto-advance, surface-don't-ask. Standalone on any parallel fan-out. Unproven — no live multi-agent run yet.
+
 ## [hunch@0.0.4] - 2026-07-21
 
 ### Added
