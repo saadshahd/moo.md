@@ -3,6 +3,11 @@
 The `runs/` dir is gitignored (per-run artifacts are not committed), so the rates of record live
 here. Re-derive any time with `./run.sh` then `bun score.mjs runs/<stamp>`.
 
+> **STALE — corpus rewritten since this run.** The run of record below measured the pre-2026-07-21
+> corpus (rules carried WRONG/RIGHT code examples and a metadata line). Every rule body has since
+> been trimmed to pure instruction, so these rates describe a different artifact; re-run before
+> trusting them for the current corpus (CLAUDE.md "Model-Judgment Boundaries").
+
 ## Run of record — 2026-07-20, sonnet, N=3 (84 runs, 0 excluded)
 
 | Metric | Rate | Trust |

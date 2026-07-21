@@ -51,7 +51,7 @@ const tagsMatch = setEq(expTags, gotTags);
 // Two-universe name check (#153): a name is VALID if it lives in the default
 // corpus/ OR the opt-in corpus-optin/, but an opt-in rule may only be PROPOSED
 // by a fixture that names it in expected.optin — the physical split IS the
-// default-install gate, so the scorer enforces it (fail loud, like the canary globs).
+// default-install gate, so the scorer enforces it (fail loud).
 const rulesRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const namesIn = (dir) => existsSync(dir)
   ? new Set(readdirSync(dir, { recursive: true }).map(String)

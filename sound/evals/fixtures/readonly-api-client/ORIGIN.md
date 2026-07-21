@@ -22,5 +22,5 @@
 
 - No file exceeded 150 lines, so no `// [trimmed]` truncation was needed.
 - No `tsconfig.json` — repo is plain JavaScript (`nwb.config.js` build tool, no TypeScript dependency in `package.json`), so none exists to include.
-- No test config file exists (no Jest/Mocha/Karma config in the tree or `package.json` devDependencies) — the repo genuinely has zero tests; see `expected.json` notes for how the `test` glob was tuned given this absence.
+- No test config file exists (no Jest/Mocha/Karma config in the tree or `package.json` devDependencies) — the repo genuinely has zero tests; noted in `expected.json`.
 - Did not include `nwb.config.js` (build tool config, not evidence for react/db/distributed tagging) or the icon/image assets under `public/img/` (60 binary files, zero evidence value).
