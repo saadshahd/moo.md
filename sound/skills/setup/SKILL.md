@@ -7,11 +7,11 @@ description: Use when installing or refreshing sound taste rules in a project. T
 
 Scaffold a project's taste rules from the sound corpus: probe the stack, select ONLY rules whose subject the repo's code actually shows — evidence-cited per rule, never a tag-wide dump — confirm with the user, then install each confirmed rule's corpus prose verbatim. Each rule lands as a plain reference file in `.claude/sound/<topic>/` — the tree `sound:prime` points at. Written files belong to the user; re-runs reconcile (see Re-runs).
 
-Corpus: `../../corpus/` relative to this SKILL.md — the default candidate universe, laid out as `<tag>/<topic>/<rule>.md`. The top directory is the rule's when-tag (`always`, `react`, `db`, `distributed`; a hyphenated directory like `db-distributed` carries every tag in its name), the next is its topic, and the file is the pure rule body — no frontmatter. Sibling `../../corpus-optin/` (same layout) holds opt-in rules, excluded from candidacy unless the user names one at invocation (Phase 2). If `corpus/` is missing or unreadable, STOP and say so — never install a partial set silently.
+Corpus: `../../corpus/` relative to this SKILL.md — the candidate universe, laid out as `<topic>/<rule>.md`: the directory is the rule's topic, the file is the pure rule body — no frontmatter, no metadata. Sibling `../../corpus-optin/` (same layout) holds opt-in rules, excluded from candidacy unless the user names one at invocation (Phase 2). If `corpus/` is missing or unreadable, STOP and say so — never install a partial set silently.
 
 ## Phase 1 — Probe
 
-Decide which kind-tags apply — a PRE-FILTER for Phase 2 candidacy, not the selection.
+Decide which kind-tags apply (`react`, `db`, `distributed`) — verified STACK FACTS that anchor Phase 2's per-rule judgment and are presented at Confirm, not a filter that earns any rule an install.
 
 **Usage decides; manifest presence only says where to look.** Verify every hint at its USE sites in source before proposing a tag — deps can be dead weight, hoisted, or tooling-only. Negatives need the same rigor: a client's config/wrapper file never clears a dep; search its use sites (`.publish(`, `.send(`, `.create(`…) before ruling a tag out. Read every `package.json` (root + workspaces) and workspace markers (`pnpm-workspace.yaml`, `turbo.json`) → hypotheses → verify each in source. Note TS / pure-JS / neither: it sets the TS-only veto (Phase 2) and the no-JS/TS abort (Failure modes).
 
@@ -23,7 +23,7 @@ Decide which kind-tags apply — a PRE-FILTER for Phase 2 candidacy, not the sel
 
 ## Phase 2 — Select (per rule, evidence-cited)
 
-Candidates = every rule under `corpus/always/` plus every rule under a tag directory whose name contains ANY Phase 1 tag (`react/`, `db/`, `distributed/`; `db-distributed/` fires on either of its tags).
+Candidates = the ENTIRE `corpus/`. There is no tag pre-filter — each rule's own subject-surface gate below is the selection; the Phase 1 facts are the evidence it judges against.
 
 **Opt-in gate (deterministic).** The candidate universe is `corpus/` ONLY. A `corpus-optin/` rule enters candidacy solely when the user names it at invocation — then read it from `corpus-optin/`. Directory membership is the gate; a default run never proposes an opt-in rule.
 
@@ -34,11 +34,11 @@ A fired tag earns NOTHING by itself — each rule's OWN Detect question must be 
 - Subject-bearing rule: `command-vs-fact-when-reconciled-elsewhere` installs iff the repo has async-reconciled state (a server ack, a queue, a webhook-confirmed flow) — cite the file. A repo that names no events does not get the event-naming rules.
 - Universal-subject rule (subject is "any code": naming, transformation shape, comments, function design): passes trivially — cite any substantive source file. Never manufacture deeper evidence.
 - A rule whose mandated shape requires TypeScript (casts, branded types, `satisfies`, compile-time exhaustiveness) never installs in a pure-JS repo.
-- `always` does NOT mean universal-subject: command/event-naming, intent-vs-fact splits, and ledger rules are always-CANDIDATES but subject-bearing — they need their surface (a named event vocabulary, state reconciled elsewhere, an append-only store).
+- Candidacy does NOT mean universal-subject: command/event-naming, intent-vs-fact splits, and ledger rules are candidates like everything else but subject-bearing — they need their surface (a named event vocabulary, state reconciled elsewhere, an append-only store).
 - Test-scoped rule: its subject is the CODE UNDER TEST, never test-file presence — a zero-test repo with testable logic still earns the general testing rules (cite the testable code). Test rules with a more specific shape (roundtrip laws need encode/decode pairs; property generators need domain invariants) still need THAT shape cited.
 - Every rejected candidate gets a one-line reason, surfaced at Confirm.
 
-Method — DEEP by design; spend the tokens. Partition candidates into batches of rules that look at the same code (seed with the corpus's tag/topic directories and each rule's subject), dispatch one subagent per batch with its rules' full text and repo access; each returns per-rule `install + citation` or `skip + reason`. Propose-only mode (below) may run inline — the output SET is what's judged, not the mechanism.
+Method — DEEP by design; spend the tokens. Partition candidates into batches of rules that look at the same code (seed with the corpus's topic directories and each rule's subject), dispatch one subagent per batch with its rules' full text and repo access; each returns per-rule `install + citation` or `skip + reason`. Propose-only mode (below) may run inline — the output SET is what's judged, not the mechanism.
 
 ## Phase 3 — Confirm (never skip, never auto-install)
 
@@ -50,7 +50,7 @@ Present compactly: the extracted facts (each with file evidence), the proposed t
 {"facts": ["<evidence with file paths>"], "tags": ["react"], "rules": [{"name": "<corpus-rule-name>", "cite": "<repo file path>"}]}
 ```
 
-`tags` contains ONLY kind-tags from {react, db, distributed} — `always` is not a tag, it's the unconditional candidacy baseline; listing it is an error. `rules` lists ONLY the install set: every selected rule's corpus FILENAME (no `.md`) COPIED VERBATIM from the corpus listing — never reconstructed from memory; before emitting, verify every name matches an existing `corpus/` file (or a `corpus-optin/` file the user named). `cite` is one FILE path that exists in the repo (no directories). Skips are not emitted.
+`tags` contains ONLY kind-tags from {react, db, distributed} — the Phase 1 stack facts, nothing else; listing anything else is an error. `rules` lists ONLY the install set: every selected rule's corpus FILENAME (no `.md`) COPIED VERBATIM from the corpus listing — never reconstructed from memory; before emitting, verify every name matches an existing `corpus/` file (or a `corpus-optin/` file the user named). `cite` is one FILE path that exists in the repo (no directories). Skips are not emitted.
 
 ## Phase 4 — Write
 
@@ -70,6 +70,6 @@ Present the whole reconciliation as ONE compact proposal (additions / updates / 
 ## Failure modes to keep loud
 
 - Corpus unreachable / rule file unparseable → stop before writing anything.
-- User declines all tags → Phase 2 still runs over the `always` candidates; say that's what happened.
+- User declines all tags → Phase 2 still runs over the full corpus; rules whose surface lives behind a declined tag are skipped with that reason. Say that's what happened.
 - Repo has no JS/TS at all → the corpus doesn't apply; say so and install nothing.
 - A selected rule with no citable evidence is a selection BUG — drop it and say so, never install on vibes.

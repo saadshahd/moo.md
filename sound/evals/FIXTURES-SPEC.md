@@ -34,8 +34,8 @@ sound/evals/fixtures/<fixture-name>/
 }
 ```
 
-- `tags`: subset of `react | db | distributed` (`always` is implicit, never listed).
-- `rules`: THREE-CLASS labels — the when-tag filter is only candidacy; selection is per-rule subject-surface judgment, and these labels fence its rate:
+- `tags`: subset of `react | db | distributed` — the Phase 1 stack facts, nothing else.
+- `rules`: THREE-CLASS labels — tags classify the stack; selection is per-rule subject-surface judgment, and these labels fence its rate:
   - `must_install` — rules the fixture's code plainly earns (its reason for existing). Each needs a citable surface in the included files; note WHY in `rules_notes`.
   - `must_not_install` — the grab-bag rules the fixture exists to exclude (subject absent from the repo, or `Not-when:` vetoes). These carry the discriminating power.
   - Everything unlabeled is DON'T-CARE by design — never attempt full-corpus exact labels; label only rules where this fixture discriminates (aim 5–15 total).

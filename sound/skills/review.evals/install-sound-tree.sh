@@ -1,7 +1,7 @@
 #!/bin/sh
 # install-sound-tree.sh <target-repo-dir> [corpus-dir]
 # Install the FULL sound corpus into <target-repo>/.claude/sound/, topic-routed the
-# same way sound:setup emits it: corpus/<tag>/<topic>/<rule>.md -> .claude/sound/<topic>/<rule>.md,
+# same way sound:setup emits it: corpus/<topic>/<rule>.md -> .claude/sound/<topic>/<rule>.md,
 # keyed on each rule's parent directory (the corpus carries no frontmatter).
 #
 # WHY full corpus, not a setup-selected subset: this harness measures sound:review's recall
