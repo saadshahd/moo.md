@@ -79,6 +79,20 @@ Phrase design decisions the way the card does — "X over Y: reason". These rule
 - Chain mechanics: each stage ends in a gate the user locks; the card carries forward only what the next stage can't re-derive; the shared contract is a fragment doc-gen'd into every stage so each stays self-contained.
 - Two skills over one when triggers differ; a shared explanation the pair needs lives in CHANGELOG, not in either skill (`bro`/`plain` precedent).
 
+### Hook Design
+
+Hook over skill only when the behavior must run every time (a skill's firing is probabilistic) or must run off-thread. Hooks reinforce and observe — they never author, capture, or gate. Always fail open: exit 0 with valid JSON on any error; a hook must never brick a tool or block a session.
+
+Pick the mode by two questions — does the foreground need the result, and does it need it now?
+
+| Mode | When | Precedent |
+|---|---|---|
+| Sync inject | A few lines of framing or nudge, computed instantly — never model work, never a detour-inducing manual | `memory-prime.sh`, `return.sh` |
+| `async` — fire-and-forget | Side effect only; surfaces as an ordinary file change, never re-engages the thread | `memory-write.sh` |
+| `asyncRewake` — fire-and-maybe-wake | Off-thread check that interrupts only on a finding (exit 2 wakes Claude), silent otherwise (exit 0) | `slop-nudge.sh` |
+
+- A hook that spawns headless `claude -p` guards recursion (`--settings disableAllHooks`) and keeps its verdict logic in one file shared with its eval harness (`judge.sh`; see Model-Judgment Boundaries).
+
 ## Philosophy (Enforce These)
 
 moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every change to this project must serve at least one.
