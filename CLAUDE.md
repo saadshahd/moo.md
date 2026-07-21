@@ -63,7 +63,7 @@ Phrase design decisions the way the card does — "X over Y: reason". These rule
 **Build-time include over runtime reference** — behavior inlines, data references:
 
 - doc-gen inline (build time) when content is shared behavior or contract: it must be byte-identical across consumers and resident in context — compaction and skipped reads kill references. Precedents: `card.md`, `gate.md`, `prompts.md`, `handover.md`.
-- Supporting file (runtime) when content is data selected per use — a catalog or profile set where one entry loads per invocation and a skipped load degrades gracefully. Precedents: `consult/profiles/`, `target/cheat-museum.md`.
+- Data file (runtime) when content is data selected per use — a catalog, profile, or corpus where entries load per invocation and a skipped load degrades gracefully. Works per-skill (`consult/profiles/`, `target/cheat-museum.md`) or plugin-wide (`sound/corpus/`).
 - Never reference behavior: a referenced instruction is an instruction Claude may never read.
 
 **Model-invocable over disabled** — disable only when the trigger lives in the human's head:
