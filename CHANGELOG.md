@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- docs: "Skill Design (X over Y)" section in CLAUDE.md — moo-specific authoring rules, each anchored to an existing precedent rather than generic skill guidance: a unit-choice table (fragment / skill / hook / user-only skill / hunch experiment); build-time include over runtime reference (behavior inlines via doc-gen because references die to compaction, data references as supporting files — `card.md` vs `consult/profiles/` precedents); model-invocable over disabled (disable only when the trigger lives in the human's head — `delegate`, `bro`); and composition via artifacts and priming over imports (new pipeline stage only on a cognitive-mode change, chaining through user-locked gates and the card, `bro`/`plain` precedent for where a pair's shared explanation lives).
+
 ## [hunch@0.0.2] - 2026-07-20
 
 ### Added

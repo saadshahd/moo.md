@@ -46,6 +46,39 @@ description: Single line. Trigger condition + what it does. Max 1024 chars.
 - No vague terminology; pick one term per concept
 - Use forward slashes only (`/`), never backslashes
 
+### Skill Design (X over Y)
+
+Phrase design decisions the way the card does — "X over Y: reason". These rules govern authoring:
+
+**Unit choice:**
+
+| The new thing is... | Unit |
+|---|---|
+| A contract that must read identically in ≥2 skills | Fragment (`<plugin>/skills/*.md`, added to sync `--files`) |
+| A trigger + procedure that stands alone | Skill |
+| Behavior that must run every time, deterministically | Hook |
+| A judgment call only the human can initiate | Skill with `disable-model-invocation: true` |
+| An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
+
+**Build-time include over runtime reference** — behavior inlines, data references:
+
+- doc-gen inline (build time) when content is shared behavior or contract: it must be byte-identical across consumers and resident in context — compaction and skipped reads kill references. Precedents: `card.md`, `gate.md`, `prompts.md`, `handover.md`.
+- Supporting file (runtime) when content is data selected per use — a catalog or profile set where one entry loads per invocation and a skipped load degrades gracefully. Precedents: `consult/profiles/`, `target/cheat-museum.md`.
+- Never reference behavior: a referenced instruction is an instruction Claude may never read.
+
+**Model-invocable over disabled** — disable only when the trigger lives in the human's head:
+
+- A mode the human chooses to enter (`delegate`) or a failure only the human perceives (`bro`: the model can't judge that its own message didn't land) → `disable-model-invocation: true`.
+- Observable in session state (vague request → `intent`; unsupervised run → `target`) → stays model-invocable.
+- On disabled skills the description is an invocation summary, not a trigger — the description trap doesn't apply.
+
+**Composition — artifacts and priming over imports:**
+
+- Skills never reference each other. They compose through emitted artifacts (the card) and natural-language triggers; a missing neighbor skill breaks nothing.
+- New pipeline stage when the cognitive mode changes (clarify WHAT ≠ decide HOW ≠ judge unsupervised work; find ≠ fix). One skill = one mode + one gate.
+- Chain mechanics: each stage ends in a gate the user locks; the card carries forward only what the next stage can't re-derive; the shared contract is a fragment doc-gen'd into every stage so each stays self-contained.
+- Two skills over one when triggers differ; a shared explanation the pair needs lives in CHANGELOG, not in either skill (`bro`/`plain` precedent).
+
 ## Philosophy (Enforce These)
 
 moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every change to this project must serve at least one.
