@@ -9,7 +9,7 @@
 - `package.json` — verbatim. Carries `react`, `react-dom`, `@pixi/react`, `pixi.js`, `jotai`, `neverthrow`, `valibot` dependencies; devDependencies include `vitest`, `@playwright/test`, `fast-check`.
 - `tsconfig.json` — verbatim. `"jsx": "react-jsx"` is the strongest single signal of real React usage.
 - `tsconfig.ui.json` — verbatim; one of several project-reference tsconfigs, this one scopes the UI slice.
-- `vitest.config.ts` — verbatim. `include: ["test/**/*.test.ts"]`, `exclude: ["test/determinism-browser/**"]` — the source of the test-glob tuning decision in `expected.json`.
+- `vitest.config.ts` — verbatim. `include: ["test/**/*.test.ts"]`, `exclude: ["test/determinism-browser/**"]` — documents the repo's real test convention.
 - `playwright.config.ts` — verbatim. `testMatch: "**/*.spec.ts"`, `testDir: "test"` — shows the repo runs two distinct test tools (vitest for `.test.ts`, Playwright for `.spec.ts`) inside the same `test/` tree.
 - `src/main.tsx` — verbatim (25 lines). Entry point; `createRoot`, `<StrictMode>`, and the same-origin `fetch("/data/biomes.json")` call examined for the distributed-tag decision.
 - `src/ui/app.tsx` — truncated to 150 lines + `// [trimmed]` (original 154 lines). Root React component.

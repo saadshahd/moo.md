@@ -22,16 +22,11 @@ sound/evals/fixtures/<fixture-name>/
 ```json
 {
   "tags": ["react", "db"],
-  "globs": {
-    "default": "**/*.{ts,tsx}",
-    "test": "**/*.{test,spec}.{ts,tsx}",
-    "react": "**/*.{tsx,jsx}"
-  },
   "rules": {
     "must_install": ["command-vs-fact-when-reconciled-elsewhere"],
     "must_not_install": ["mood-names-commands-facts"]
   },
-  "notes": "one line per non-obvious tag/glob decision",
+  "notes": "one line per non-obvious tag decision",
   "rules_notes": {
     "command-vs-fact-when-reconciled-elsewhere": "+ path/file.ts — one-line WHY citing the surface",
     "mood-names-commands-facts": "- WHY the repo shows no surface / Not-when veto"
@@ -39,15 +34,8 @@ sound/evals/fixtures/<fixture-name>/
 }
 ```
 
-- `tags`: subset of `react | db | distributed` (`always` is implicit, never listed).
-- `globs`: the TUNED value for each of the corpus's three glob classes, post path-tuning:
-  - `default` — rules shipping `**/*.{ts,tsx}` (widen extensions if repo writes .js/.jsx/.mts)
-  - `test` — rules shipping `**/*.{test,spec}.{ts,tsx}` (match the repo's real test convention)
-  - `react` — rules shipping `**/*.{tsx,jsx}` (monorepo: scope to evidence-bearing package, e.g. `apps/web/**/*.{tsx,jsx}`)
-  - Kind-tagged rules in monorepos may additionally scope `default`-class globs per tag; if so add a key per tag (e.g. `"db": "services/api/**/*.ts"`).
-  - Repo has ZERO test files → `test` keeps the corpus suffix default with extensions matched to the repo's real source extensions (`**/*.{test,spec}.ts` when no .tsx exists, `**/*.{test,spec}.js` for pure-JS). Unverifiable against a real convention by definition; note it. (Labeler-confirmed convention, 2026-07-09.)
-  - Extension widening follows the skill's SUBSTANTIVE-source bar: a lone demo/scaffold script does not widen `default` (labeler-confirmed on dead-dep-react's single root demo-ui.js, 2026-07-09).
-- `rules`: THREE-CLASS labels — the when-tag filter is only candidacy; selection is per-rule subject-surface judgment, and these labels fence its rate:
+- `tags`: subset of `react | db | distributed` — the Phase 1 stack facts, nothing else.
+- `rules`: THREE-CLASS labels — tags classify the stack; selection is per-rule subject-surface judgment, and these labels fence its rate:
   - `must_install` — rules the fixture's code plainly earns (its reason for existing). Each needs a citable surface in the included files; note WHY in `rules_notes`.
   - `must_not_install` — the grab-bag rules the fixture exists to exclude (subject absent from the repo, or `Not-when:` vetoes). These carry the discriminating power.
   - Everything unlabeled is DON'T-CARE by design — never attempt full-corpus exact labels; label only rules where this fixture discriminates (aim 5–15 total).

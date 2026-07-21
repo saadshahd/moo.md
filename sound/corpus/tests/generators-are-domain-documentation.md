@@ -1,0 +1,4 @@
+A named generator (`genValidOrder`, `genExpiredToken`) is the executable definition of a domain concept — write it once, colocate it with the domain type it generates, and reuse it across every property that needs "a valid order"; never inline an ad-hoc record generator per test that silently redefines what "valid" means.
+_Avoid_: two or more inline record-generator literals across test files describing the same domain type with different field constraints.
+Detect: grep test files for inline record/tuple generator construction of the same domain type in more than one file — that's the domain constraint drifting, not colocated.
+Not-when: the generator is genuinely local and single-use (a one-off malformed-input case for a single negative test) — promoting every generator to a shared module is its own overhead; only extract once a second consumer needs the same domain shape.
