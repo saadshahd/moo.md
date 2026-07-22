@@ -1,6 +1,6 @@
-With `soloism` driving the loop, a subagent finishing wakes the orchestrator within one idle cycle — its process reaped, the nodes it unblocked dispatched — so the human never polls, never hand-kills a stale subagent, and never watches a ready node sit idle behind a done one. soloism owns lifecycle; crew owns dependencies; neither imports the other.
+With `soloism` driving the loop, a subagent finishing wakes the orchestrator within one idle cycle — its process reaped, the nodes it unblocked dispatched — so the human never polls, never hand-kills a stale subagent, and never watches a ready node sit idle behind a done one. soloism owns the lifecycle loop; the dependency truth it acts on lives in the solo todos — written at decomposition (crew's discipline), kept current by this loop.
 
-Graduate when, across ≥8 real sessions running ≥3 concurrent subagents with at least one real dependency edge: zero live children survive loop exit (no leaks); zero subagents ever need a manual kill; every completion dispatches its freed dependents within one wake cycle with no barrier stall (a slow sibling never delays an unrelated ready node); and the human, from what soloism reports each wake, can still say who did what and why. Kill or redesign if eager dispatch ever outran the human's grasp, or an idle-but-not-done child was reaped and lost in-flight work.
+Graduate when, across ≥8 real sessions running ≥3 concurrent subagents with at least one real dependency edge: zero live workers survive loop exit (no leaks); zero subagents ever need a manual kill; every completion dispatches its freed dependents within one wake cycle with no barrier stall (a slow sibling never delays an unrelated ready node); and the human, from the live todos and scratchpad soloism keeps current, can still say who did what and why. Kill or redesign if eager dispatch ever outran the human's grasp, or an idle-but-not-done worker was reaped and lost in-flight work.
 
 ## Field notes
 
@@ -14,3 +14,7 @@ Two design stances locked at founding:
 - **Two signals, not one.** soloterm idle triggers a *look*; the child's completion is the authoritative reap-and-advance signal. Reaping on the raw idle transition would kill children merely waiting for input. This also retires the null-run's "watcher gated on 5/5 = silence" bug — soloism reacts per idle transition, never on a count.
 
 Unproven until the first live multi-agent run with a genuine dependency edge: nothing here has been measured, only reasoned. The standalone (no-crew) path and the eager crew-backed path both need real sessions before any rate is claimed.
+
+### 2026-07-22 — crew CLI retired; todos become the single dependency truth
+
+The founding note's crew machinery references (`../crew/src/commands.mjs`, "crew's router owns the frontier") describe a CLI retired the same day (see `../crew/HYPOTHESIS.md`, 2026-07-22). The split survives as discipline: crew decides lanes and blocked-by edges at decomposition and records them in the solo todos; soloism's loop keeps those todos current and dispatches from them. One dependency truth, no CLI between the two.
