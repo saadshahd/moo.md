@@ -25,6 +25,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - docs: "Tag the release" dropped from CLAUDE.md's release checklist — tags serve neither the human nor the Claude plugin system, and recent releases (hope@9.7.2, sound@0.0.4, hunch@0.0.2) already shipped untagged without consequence. The changelog version sections and plugin.json are the release record.
 
+## [hunch@0.0.7] - 2026-07-22
+
+### Changed
+
+- change(hunch): crew re-aimed from conflict-prevention to steering substrate. Two transcript autopsies (the availability-cards real-project battery + all 55 crew-lab sessions) located the cost in the lead's turn-based loop, not in file conflicts: crew was never invoked in the real session; both "spawn concurrent" asks were relayed to one serial builder (83 SendMessage vs 36 spawns); zero tool batching dataset-wide (`multi_tool_msgs = 0`; the builder spent 88% of its loop thinking between one-at-a-time tools); spawns dribbled one per model turn (mean gap 102s); the fleet idled through every one of 60 human questions; and `claim --wait` serialized crew's own v3 arm (overlap 1.09 vs naive 7.42). HYPOTHESIS.md thesis + graduation criteria rewritten around steering latency, legibility, and accountability — the wall-clock bet logged as resolved-against. SKILL.md rules updated: brief each worker narrowly — one lane, one ownership boundary, one expected handoff, never the whole problem (identical full-goal briefs cost naive ~10× redundant work in v3); dispatch the whole ready frontier in one message; fan out at the layer holding the decomposition, never relay "parallelize" downward; ask the human only over a running fleet, questions batched; workers batch independent tool calls; disjoint claims granted concurrently with `--wait` demoted to last resort; new "Human steering" section — feedback targets the worker directly, the lead is direction + integration, not a mailbox.
+
 ## [hunch@0.0.6] - 2026-07-22
 
 ### Added
