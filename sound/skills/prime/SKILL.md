@@ -9,3 +9,5 @@ user-invocable: true
 If the repo has no `.claude/sound/` directory, it carries no sound taste rules — do nothing.
 
 Otherwise: the project's taste rules live under `.claude/sound/`, grouped into topic folders (`<topic>/<rule-name>.md`). Before you write, browse the tree to see which topics bear on the surfaces you'll touch. Read a rule's file when its situation comes up, and make sure your code meets every rule that governs a surface you change.
+
+When two rules pull opposite ways on one surface, check each rule's Not-when and Cross-ref first — most conflicts are already carved there. Where none applies, the rule protecting correctness or debuggability outranks the one protecting style.

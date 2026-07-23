@@ -1,0 +1,4 @@
+A sensitive value (token, password, key, raw credential) is wrapped at the boundary it enters and unwrapped only where it is consumed — usually one adapter making the external call. It never appears in plaintext in an error's structured fields, a log or trace attribute, a snapshot, or a stringified payload.
+_Avoid_: a token/password/apiKey/secret carried as a bare string across layers; such a value interpolated into a log line, thrown error message, error field, or trace attribute.
+Detect: a field named for a credential (`token`, `password`, `apiKey`, `secret`, `authorization`) read into a log/trace/error payload; a credential typed as a bare `string` flowing more than one hop from its entry boundary to its use.
+Not-when: the value is at its designated use site (the adapter making the authenticated call) — that single unwrap is the point of use, not a leak.

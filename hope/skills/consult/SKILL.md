@@ -45,7 +45,8 @@ Profiles live in `profiles/`. Route by domain:
 | CSS / Styling | wathan |
 | Design Systems | frost |
 | Web Animation | perry |
-| TypeScript (type-level) | vergnaud |
+| TypeScript (type-level) | vergnaud, king |
+| Parse / Boundary Validation | king |
 | JavaScript | simpson, osmani |
 | Go / Systems | pike, cox |
 | Distributed Systems | lamport, kleppmann, helland |
@@ -53,7 +54,8 @@ Profiles live in `profiles/`. Route by domain:
 | Concurrency | pike, armstrong, lamport |
 | Python | hettinger |
 | Performance | gregg, osmani, muratori |
-| Architecture / Patterns | fowler, martin, alexander |
+| Architecture / Patterns | fowler, martin, alexander, ousterhout |
+| Software Design Philosophy | ousterhout |
 | TDD / Testing | beck, freeman, hughes |
 | DDD | evans, vernon |
 | Event Sourcing / CQRS | young |

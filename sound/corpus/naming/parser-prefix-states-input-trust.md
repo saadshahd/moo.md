@@ -1,0 +1,5 @@
+A value-producing function's prefix states its input's trust: `parse*` turns untrusted or less-structured input into a refined value (a `Result` when it can fail); `make*`/`create*` builds from already-typed pieces; `assert*` belongs only at a test or framework edge. A `validate*` that returns a refined value is mis-named — it parsed; name it `parse*`.
+_Avoid_: `validate*`/`check*` on a function returning a domain or refined value rather than a boolean; a `make*`/`create*` fed raw untrusted input that should have been `parse*`d first.
+Detect: a function returning a branded/domain type (not `boolean`) whose name starts `validate`/`check`; a `make*`/`create*` whose argument is an unparsed string, row, or JSON payload.
+Not-when: `validate*` returns a boolean — predicate-names-ask-a-question governs; an assertion at a test or framework boundary.
+Cross-ref: predicate-names-ask-a-question — the boolean half of the same contract; parse-dont-validate-at-every-untyped-boundary — the behavior this naming contract labels.

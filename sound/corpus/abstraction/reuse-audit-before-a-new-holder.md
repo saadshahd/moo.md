@@ -1,0 +1,5 @@
+Before creating a new adapter, service, or module for a capability, audit the existing holders: reuse one through a narrow dependency type, extend one when the new operation changes for the same reason, and create new only when reuse would force bad coupling. The tell of a skipped audit is a second holder for a capability already owned elsewhere.
+_Avoid_: a second client/adapter for a boundary an existing adapter already owns; a new service duplicating a capability reachable through a narrow view of an existing one.
+Detect: two modules owning the same external boundary or the same domain-persistence capability — a second client for one third-party system, two repositories over one aggregate root.
+Not-when: the new holder is a genuinely separate cohesive capability that changes for a different reason than the existing one.
+Cross-ref: integration-point-isolation — one adapter per external dependency; abstraction-earns-existence — the ladder a new holder must climb; duplication-taxonomy-triage — the duplicated-concept defect this prevents.

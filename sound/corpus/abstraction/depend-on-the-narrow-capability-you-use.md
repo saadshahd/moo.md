@@ -1,0 +1,5 @@
+A consumer depends on the smallest capability it actually calls, declared in its own language — never on a provider's whole surface or concrete type. One wide concrete implementation may satisfy many such narrow views; the dependency is the narrow one.
+_Avoid_: a function/class typed against a fat concrete client (a whole DB/SDK client) or a many-method interface when it calls only one or two of its methods; a dependency named in the provider's vocabulary rather than the operation's.
+Detect: a parameter or field typed as a concrete adapter or a wide interface where the body uses a strict subset of its members — the unused surface is coupling the consumer cannot need.
+Not-when: the consumer genuinely uses the whole surface, or a single throwaway call site where a bespoke narrow type costs more than the coupling it removes.
+Cross-ref: interface-is-the-full-contract — the complementary axis: the narrow contract still carries every fact; integration-point-isolation — the adapter that implements the narrow view; abstraction-earns-existence — whether the narrow type earns a name yet.
