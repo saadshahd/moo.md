@@ -16,31 +16,31 @@ Drive concurrent subagents through solo as one eager wake/reap loop. A worker's 
 
 - Spawn the whole wave in one message: `spawn_agent(agent_tool_id=N)` per ready task, all parallel tool calls. Record task ↔ pid from each result.
 - Brief the wave in the next message: `send_input(process_id=pid, input=<prompt>)` per worker, again all in one message, each prompt prepended with that worker's returned `agent_instructions`. A wave costs two turns — never two per worker.
-- Arm one wake over the live pids: `timer_fire_when_idle_any(processes=[pid…], max_wait_ms, body)`. `_any`, never `_all`. A pid already idle at arm time is ignored — the response names it (`already_idle`); run the wake step on it now.
-- Pack `body` with the live pids, the map, and "run the wake step".
+- Every brief ends with the notify contract: your `process_id` (from `whoami`) and the rule — write your handoff durably first (scratchpad or todo), then send exactly one `send_input(process_id=<lead>, input="<worker>: done|blocked — handoff at <where>")`. Notify on done or blocked only, never progress.
+- Arm one safety net over the wave: `timer_set(delay_ms=600000–1200000, body=<live pids + map + "net sweep">)`. Worker notifies are the wake channel; the net only catches a worker that died or went silent without notifying.
+- A worker whose environment has no solo MCP can't notify — watch it with `timer_fire_when_idle_any` instead, and expect no-op wakes: idle is edge-triggered and flaps on quiet stretches mid-task.
 
 ### 2. Wake
 
-Idle ≠ done — idle only means look.
-
-- `get_process_output(process_id=pid)` — every live pid, in one message. The timer body arrives verbatim; it doesn't say which worker went idle, and others may have gone idle since you armed. From each output decide:
-  - **finished** → step 3.
-  - **still working** → `send_input` the reply or nudge; re-arm (step 4).
+- A notify names its sender — wake narrow: `get_process_output` on that worker only; siblings keep running unswept.
+- A net fire means nobody notified — sweep: `get_process_output` every live pid, in one message.
+- A notify is a claim, the pane is the evidence — triage each output you read:
+  - **completed** — the handoff satisfies the brief → step 3.
+  - **exited** — stopped without satisfying it (context spent, errored, drifted off-brief) → capture what stands, redispatch the remainder as a fresh worker. Never merge exited as done.
+  - **still working** → `send_input` the reply or nudge if one is due; leave it running.
   - **stuck / errored** → `select_process(pid)` — put its terminal on the human's screen, don't describe it — and say what you need decided. Reap only once the decision no longer needs the live session.
 
 ### 3. Reap + advance
 
-- Capture the handoff before closing: pull the worker's deliverable and findings into the scratchpad or its todo first — closing stops and removes the process, and its session goes with it.
+- The notify says where the handoff lives — verify it is actually there and complete before closing; pull anything still only on the pane into the scratchpad. Closing stops and removes the process, and its session and scrollback go with it.
 - `close_process(process_id=pid)` once the handoff is captured and the worker no longer needs an interactive session. Keep any worker still producing useful work.
 - If the worker has descendants, inspect them before deciding whether to close the whole group — solo asks whether to close subagents too; answer from what you inspected, never by default.
 - Dispatch whatever this completion unblocks — back through step 1. Don't wait for siblings.
 - Move the task's todo and log any decision in the scratchpad (see State + reporting). Never pause for approval.
 
-### 4. Re-arm
+### 4. Re-net
 
-`timer_fire_when_idle_any` over the still-live pids. Repeat until none are live.
-
-Idle is edge-triggered with no minimum quiet time: a worker that goes output-quiet mid-task (long tool run, silent generation) flaps idle and fires the timer. If a wake produced no action — nothing finished, nothing needed a reply — don't re-arm the idle watch directly; re-arm through a cooldown (`timer_set(delay_ms=30000–60000, body="arm the idle watch over [pids]")`, then arm on that fire). Flapping then costs one wake per cooldown, not one per flap; a real completion waits at most the cooldown.
+Keep exactly one net live over the live pid set: when the set changes (new wave, reap) or a net fires, `timer_cancel` any pending net and `timer_set` a fresh one. Repeat until no pids are live.
 
 ## State + reporting
 

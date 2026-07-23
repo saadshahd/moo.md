@@ -8,7 +8,7 @@ Discipline for running concurrent agents in one working tree with a human steeri
 ## Dispatching (router)
 
 1. Decompose into lanes with disjoint scopes; record each lane and its blocked-by edges in the task tracker the human already observes. A task whose scope overlaps everything (sync, codegen, formatting) runs behind a blocking edge, never concurrently.
-2. Brief each worker narrowly: one lane, one ownership boundary, one expected handoff — never the whole problem. A prompt that restates the shared goal makes every worker rebuild the whole; a prompt that names its lane and its handoff makes each worker build its part once.
+2. Brief each worker narrowly: one lane, one ownership boundary, one expected handoff — never the whole problem. A prompt that restates the shared goal makes every worker rebuild the whole; a prompt that names its lane and its handoff makes each worker build its part once. The handoff must be a deliverable the worker itself can produce and verify while it runs — never a gate only the lead opens.
 3. Dispatch the whole ready frontier in ONE message — every spawn as a parallel tool call in the same turn, never one spawn per turn. When an edge clears, re-dispatch what it unblocked in the turn that observed it. Cap concurrency at 4–6 workers.
 4. Fan out at the layer that holds the decomposition: if you hold it, YOU spawn the workers. Never forward "parallelize this" to a running agent — relaying an instruction to a serial agent creates zero parallelism.
 5. Ask the human only over a running fleet: dispatch everything that doesn't depend on the answer first, then ask, batching up to 4 questions per call. Never hold an idle fleet on an open question.
@@ -20,7 +20,7 @@ Discipline for running concurrent agents in one working tree with a human steeri
 - Never edit outside your lane. If your task needs a file outside it, stop and report — don't take it.
 - Batch independent tool calls: when next steps don't depend on each other (several reads, greps, edits to different files), issue them all in one message — never one per turn.
 - Spawning your own sub-agent? Carve it a narrower sub-lane inside yours and name it in your handoff — ownership stays traceable through you.
-- End with a handoff: files you changed, what you learned, what you left undone.
+- End with a handoff — files you changed, what you learned, what you left undone — written where it survives your session (scratchpad, todo, or file), never terminal output alone.
 
 ## Human steering
 
