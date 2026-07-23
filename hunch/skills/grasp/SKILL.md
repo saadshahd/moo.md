@@ -9,7 +9,7 @@ The reader is not verifying — they're staying a participant. Understanding is 
 
 ## Before writing
 
-Explore the surrounding system, not just the diff.
+Explore the surrounding system, not just the diff. Where a change's rationale isn't evident from either, say so — never invent a why.
 
 ## Sections, in order
 

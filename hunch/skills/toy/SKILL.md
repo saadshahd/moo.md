@@ -12,7 +12,7 @@ To learn French, live in France. Build the smallest world the human can inhabit 
 - **The human drives; the world shows.** Never automate the step they're trying to learn — build the control panel, let them press run.
 - **State visible, time scrubbable.** Surface the hidden things: the stack, the queue, the coordinates, the intermediate value. Step forward, step back, scrub.
 - **Consequences immediate.** Every action re-renders its effect next to its cause.
-- **Real system when cheap, toy data when the real thing is heavy.**
+- **Real system when cheap, toy data when the real thing is heavy.** Unknown dynamics stay labeled approximate — never invented internals shown as real.
 - **Disposable by default.** Outside the repo, filename prefixed `YYYY-MM-DD-`. A world earns a commit only when it gets reused.
 
 ## What they're grasping → world shape

@@ -35,7 +35,7 @@ Form:
 
 1. **Prime taste** — load the user's taste from CLAUDE.md / TASTE.md / a prior card before projecting any option. Unclear or absent → ask, don't guess.
 2. **Extract** — pull the HOW dimensions the spec actually opens: architecture, data model, API design, testing, deployment. When the work iterates, *which loop* is one dimension (see Loop selection).
-3. **Resolve per dimension** — explore when retrievable with certainty. At a non-obvious call, project 3 options through the primed taste, scoped to the task, then co-design them with the user via decision prompts.
+3. **Resolve per dimension** — explore when retrievable with certainty. At a non-obvious call, project 3 options through the primed taste, scoped to the task, then co-design them with the user via decision prompts. Options must differ on a load-bearing dimension — data ownership, seam placement, coupling, or failure model — never one approach renamed; if only one real path exists, present it alone, not a padded three.
 4. **Tension check** — if resolved choices genuinely conflict, surface the tension as one more decision prompt.
 5. **Gate** — run the gate audit (below).
 
