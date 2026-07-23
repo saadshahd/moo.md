@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hunch@0.0.12] - 2026-07-23
+
+### Added
+
+- feat(hunch): `roster` skill — the stage before dispatch, born from the solo workflow-docs audit (four grasp workers over soloterm.com/api/v1/docs/workflows). Solo's orchestration docs are a prompt library the human memorizes ("interview me", "write the plan into a scratchpad", "create todos with blockers"); roster makes it a trigger + procedure: elicit only what the roster needs (skip when handed a solid plan, holes become board open-questions never assumptions), cut lanes/edges/acceptance/serial-rest, project onto the board (solo binding: scratchpad plan + todos pointing at sections; no-solo fallback: plan file + tracker), end at a human-locked gate. Scope carves: roster owns shape, dispatch owns scheduling (cap/waves/spawn); lane-disjointness deliberately restated at both points of use.
+
+### Changed
+
+- change(hunch): soloism absorbs the audit's gap findings as bindings-only sharpenings — `board.md` untouched, so nothing solo leaks into crew: scratchpad writes revision-guarded (`expected_revision`, `append_section` over rewrite, conflict = re-read and re-apply), handoff routing (terminal handoff = comment on the claimed todo; context/decisions/fleet map = scratchpad; todos point at sections, never duplicate), stale-lock rule (a lock dies with its owning process; `todo_complete` releases yours), spawn-by-fit (`agent_tool_id` from `list_agent_tools`, launchable installations only, any lab), integration broadcast in reap (wake workers whose lanes border a just-integrated change), and Exit closes the board (refresh scratchpad summary, honest todo statuses, final comment on anything a later agent may pick up). Stop-hook board nudge parked in HYPOTHESIS behind the existing escalation condition.
+
 ## [sound@0.0.5] - 2026-07-23
 
 ### Changed

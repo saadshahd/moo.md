@@ -12,7 +12,7 @@ Drive concurrent subagents through solo as a distributed loop: workers coordinat
 
 ## Bindings (for the worker contract below)
 
-**board** = solo todos (dependency truth: tasks, blockers, claims) + the scratchpad (fleet map, checkpoints, decisions); **claim** = `todo_lock`; **peer wake** = `send_input(process_id=<peer>, input=...)`. Successors are spawned with `spawn_agent(agent_tool_id=N)` — fork a checkpoint by adding `extra_args=["--resume", "<session-id>", "--fork-session"]` — then briefed with `send_input` next turn (prepend the spawn's returned `agent_instructions`; a spawn without a brief is a boot, not a dispatch). Workers hold these tools too.
+**board** = solo todos (dependency truth: tasks, blockers, claims) + the scratchpad (fleet map, checkpoints, decisions); todos point at scratchpad sections, never duplicate them. **claim** = `todo_lock` — a lock dies with its owning process, so an owner no longer running means stale, not owned; `todo_complete` releases yours. **peer wake** = `send_input(process_id=<peer>, input=...)`. Handoffs route by kind: the terminal handoff is a comment on the claimed todo; context, decisions, and the fleet map go to the scratchpad. The scratchpad is multi-writer — carry a fresh read's revision (`expected_revision`), prefer `scratchpad_append_section` to full rewrites; a conflict means re-read and re-apply, never overwrite. Successors are spawned with `spawn_agent(agent_tool_id=N)` — pick the tool from `list_agent_tools` by lane fit, launchable installations only, any lab — fork a checkpoint by adding `extra_args=["--resume", "<session-id>", "--fork-session"]` — then briefed with `send_input` next turn (prepend the spawn's returned `agent_instructions`; a spawn without a brief is a boot, not a dispatch). Workers hold these tools too.
 
 <!-- doc-gen FILE src=../board.md -->
 ## Worker contract (embed in every brief)
@@ -68,6 +68,7 @@ The board is the shared surface the human already watches — tasks, claims, che
 - `close_process(process_id=pid)` once the handoff is captured and the worker no longer needs an interactive session. Keep any worker still producing useful work.
 - If the worker has descendants, inspect them before deciding whether to close the whole group — solo asks whether to close subagents too; answer from what you inspected, never by default.
 - Dispatch only what no worker advanced — the board says which unblocked tasks are still unclaimed. Don't wait for siblings.
+- Integrating a lane changes the tree under still-running workers: wake each worker whose lane borders the changed files with one line on what moved.
 - Update the fleet map and log any decision in the scratchpad. Never pause for approval.
 
 ### 4. Re-net
@@ -85,4 +86,4 @@ The human observes through solo, not through your messages. The todos and scratc
 
 ## Exit
 
-Sweep the fleet map: `close_process` every still-live pid, `timer_cancel` every pending timer. Leave zero live workers. Checkpoints in the scratchpad remain valid after exit — a later session can still fork them.
+Sweep the fleet map: `close_process` every still-live pid, `timer_cancel` every pending timer. Leave zero live workers. Then close the board: refresh the scratchpad summary, set every todo status honestly, and leave a final comment on any todo a later agent may pick up. Checkpoints in the scratchpad remain valid after exit — a later session can still fork them.
