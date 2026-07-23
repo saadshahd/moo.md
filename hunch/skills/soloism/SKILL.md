@@ -40,6 +40,8 @@ Idle ≠ done — idle only means look.
 
 `timer_fire_when_idle_any` over the still-live pids. Repeat until none are live.
 
+Idle is edge-triggered with no minimum quiet time: a worker that goes output-quiet mid-task (long tool run, silent generation) flaps idle and fires the timer. If a wake produced no action — nothing finished, nothing needed a reply — don't re-arm the idle watch directly; re-arm through a cooldown (`timer_set(delay_ms=30000–60000, body="arm the idle watch over [pids]")`, then arm on that fire). Flapping then costs one wake per cooldown, not one per flap; a real completion waits at most the cooldown.
+
 ## State + reporting
 
 The human observes through solo, not through your messages. The scratchpad and todos are the live plan — the source of truth while work runs, never setup artifacts that drift once dispatch starts.
