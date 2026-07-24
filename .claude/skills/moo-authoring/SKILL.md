@@ -3,7 +3,7 @@ name: moo-authoring
 description: Use when adding or changing a skill, fragment, hook, or runtime file in this repo — including deciding which unit a new capability should be.
 ---
 
-Doctrine for authoring moo's own surfaces. Violations of everything here are visible in the diff, which is why it loads when you author rather than in every session. The facts whose violation is *silent* stay in `CLAUDE.md`.
+Doctrine for authoring moo's own surfaces.
 
 ## Frontmatter
 
