@@ -18,7 +18,9 @@ Solid = you can state the goal, constraints, verification, non-goals, and risky 
 - **Lanes** — disjoint scopes. A scope that overlaps everything (sync, codegen, formatting) is a lane behind a blocking edge, never a concurrent one.
 - **Edges** — blocked-by dependencies, explicit per lane, never implied in prose.
 - **Acceptance per lane** — one check the lane's handoff can be verified against.
-- **The serial rest** — what stays with the lead or the human: integration, anything whose next step depends directly on a result, edits too small to brief.
+- **Model per lane** — the tier each lane runs on: top tier only where the lane designs or adjudicates; polish, cleanup, mechanical execution, and standing seats run cheaper.
+- **The steward** — merge/verify, ticket triage for mid-flight discoveries, and fleet-burn watch are a standing lane, not lead work. Expect tickets to appear mid-flight; the roster names who absorbs them so the lead never does.
+- **The serial rest** — what stays with the lead or the human: gates, anything whose next step depends directly on a result, edits too small to brief.
 
 Concurrency cap, waves, and spawn mechanics belong to the dispatch stage — never in the roster.
 

@@ -9,6 +9,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hunch@0.0.13] - 2026-07-24
+
+### Changed
+
+- change(hunch): proj-9 crew-viewer autopsy (4-analyst evidence pass over the live board) unbundles the lead. The single lead seat multiplexed four jobs and its pane served two audiences — the failure behind three lead rotations, worker notifies clobbering the human's half-typed feedback, a killed 283k-token fork, and every mid-flight ticket routing through the lead. `board.md`: session id recorded in the worker's first board write (kills the reap-time echo round-trip), completion notifies target the **steward** (new standing merge/intake/burn-watch seat; degrades to the lead when none runs), out-of-lane discoveries become steward tickets, the human's feedback surface is agent-write-protected, per-lane model tiers on sub-spawns, fork guard replaces fork-by-default (fresh spawn briefed from the board is the default; fork only cache-warm ~<1h + light ~<100k tokens + same-lane), workers write their terminal handoff early when nearing compaction. `soloism`: seats section (lead = judgment + pager on top tier; steward = notify target, verify/merge/reap/net/triage/burn-sweep on a cheap model; feedback pane = the human's only typing surface, transcribes notes to board tickets), lease-TTL sizing and send_input's missing compose-deferral in bindings, gauge binding (own pane footer via `get_process_output`: context tokens, session/weekly %, model — `--model` pass-through needs a first-spawn footer check, never live-verified), standing-seat self-rotation at 160k context tokens (200k ceiling, fresh spawn never fork, never mid-merge), burn sweep on every net with pre-limit fleet quiesce (hold dispatches, re-arm past reset, page the human). `roster`: model-per-lane and steward rows join the cut; integration leaves the serial rest. `crew`: verification reassigned to the steward binding, human-surface write-protection, board-ticket feedback path.
+
 ## [hunch@0.0.12] - 2026-07-23
 
 ### Added
