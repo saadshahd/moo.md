@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop / SubagentStop: off-record slop-awareness judge. The transcript is used ONLY to select
+# Stop: off-record slop-awareness judge. The transcript is used ONLY to select
 # which files this chunk touched (Edit/Write/MultiEdit tool_use since the last stop); the judge
 # then reads those files LIVE and judges them in full against loaded preferences. Transcript =
 # selection, filesystem = truth — so frozen, possibly-superseded edit fragments are never judged,
@@ -12,9 +12,8 @@
 # exit 0 stays silent. Never blocks, never gates, persists nothing.
 #
 # Recursion guard: the judge runs with --settings disableAllHooks so its own Stop can never
-# re-fire this hook. Read-only allowlist + bypassPermissions so a no-TTY permission prompt can
-# never hang. Fails open at every step — a missing tool, file, or transcript must never stall a
-# session.
+# re-fire this hook. Fails open at every step — a missing tool, file, or transcript must never
+# stall a session.
 command -v jq >/dev/null 2>&1 || exit 0
 command -v claude >/dev/null 2>&1 || exit 0
 
@@ -22,12 +21,9 @@ input=$(cat)
 tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
 [ -f "$tp" ] || exit 0
 
-# Per-transcript offset marker, keyed by the transcript basename. SubagentStop is handed the MAIN
-# session transcript (not a separate subagent file), so Stop and SubagentStop on one session share
-# this single monotonic offset — cooperative, not conflicting: each stop judges only the lines
-# appended since the last, whichever event fired. Stores the line count already judged; the chunk
-# is everything after it. Advancing it every stop makes the judge idempotent — no prior stop is
-# ever re-judged.
+# Per-transcript offset marker, keyed by the transcript basename. Stores the line count already
+# judged; the chunk is everything after it. Advancing it every stop makes the judge idempotent
+# across successive Stops — no prior stop is ever re-judged.
 tpkey=$(basename "$tp" | sed 's/[^A-Za-z0-9]/_/g')
 marker="${TMPDIR:-/tmp}/hope-slop-$tpkey"
 offset=$(cat "$marker" 2>/dev/null)

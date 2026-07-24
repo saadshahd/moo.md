@@ -9,7 +9,7 @@ cat <<'JSON'
   "suppressOutput": true,
   "hookSpecificOutput": {
     "hookEventName": "PostToolUse",
-    "additionalContext": "Verified subagent work returned. Run the handover test before surfacing: probe ONLY if it carries a load-bearing decision AND the work diverged from what was asked (inverted/exceeded it, or the human doesn't hold the model). If several qualify, probe just the highest-blast-radius one — one forward question built from the work + the human's own words, they answer, you reframe once. Nothing stored. Quiet by default; most returns skip."
+    "additionalContext": "Subagent work returned. The moment work returns is the moment the human claims it — run hope's handover act before surfacing."
   }
 }
 JSON

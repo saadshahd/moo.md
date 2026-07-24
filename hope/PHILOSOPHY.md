@@ -36,9 +36,9 @@ Peace of mind precedes quality. Velocity that destroys quiet attention destroys 
 
 ## Principles
 
-**Clarity before action** — ≥85% confident or ask. Rework costs more than clarification.
+**Clarity before action** — when you would be guessing at what is wanted, ask. Rework costs more than clarification.
 
-**Investigation before implementation** — Never combine find + fix. Mixing cognitive modes degrades both.
+**Investigation before implementation** — keep find and fix apart wherever the fix carries a diagnosis; mixing cognitive modes degrades both.
 
 **Boundaries over aspirations** — Define what must NOT happen before what should. Negative constraints survive ambiguity.
 
@@ -70,11 +70,10 @@ Peace of mind precedes quality. Velocity that destroys quiet attention destroys 
 
 ## Hard Constraints
 
-No persistent work/pipeline state — conversation markers only.
-No building what Claude does natively — compete on thinking quality.
+moo's repo-wide anti-patterns apply here in full — see `CLAUDE.md`. hope adds:
+
 No hard dependencies between skills — prime naturally, never import.
 No rigid frameworks — skip steps that don't apply.
-No cargo cult process — every step must have a reason.
 No recall-based assertions — if a tool can check it, check it.
 No ownership without understanding — if you can't explain it, you don't own it.
 Default to less, expand on request.

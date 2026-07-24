@@ -3,8 +3,6 @@ name: toy
 description: Use when the user wants to understand a system by interacting with it themselves — asks for a debugger, visualizer, simulator, stepper, playground, or command center as an aid to their own understanding — or when reading and explanation haven't built intuition for how something behaves. Not for user-facing product features (a docs playground, a UI component, a customer demo).
 ---
 
-# toy
-
 To learn French, live in France. Build the smallest world the human can inhabit to intuit how the system works.
 
 ## Rules

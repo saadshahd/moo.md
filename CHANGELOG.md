@@ -9,6 +9,34 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [hope@9.7.4] - 2026-07-25
+
+### Changed
+
+- change(all): C5 context-engineering migration applied across every prompt surface — the nine-lane audit's change tables (Solo scratchpads 78–85), gated by the human. The article's diagnosis is over-constraint: co-loading surfaces that govern one decision with different answers, paid for on every session. Live contradictions removed, each verified in a real context window: `sound`'s "inline comments are a smell" against Claude Code's own always-loaded "match its comment density"; `memory-prime.sh`'s "do not read or edit them yourself" against native auto-memory's "write to it directly", both pointing at the same directory; `CLAUDE.md`'s `max 3 supporting files` against its own unit table, with 93 `consult` profiles on disk; `CLAUDE.md` L73's "hooks never author or capture" against the shipped `memory-write.sh` that does both.
+- change(hope): `return.sh` and `memory-write.sh` stop restating `handover.md` and `skills/memory.md` — hand-authored twins in `.sh` files that no guard can see and that had already drifted (`divergence OR not-holding` became `AND`). `return.sh` no longer asserts work is "verified" before any verify pass has run. `judge.sh` scales exploration to the preference at issue and reports every clear violation instead of capping at five. Lock-statement twins deleted from `target` and `freeze`; `gate.md` is the single authored copy. `shape`'s loop-selection table defers to `loop-selection.md`.
+- change(all): descriptions rewritten as trigger-only after verifying they are `always`-loaded, not loaded at selection — 17 of 19 sit byte-identical in every session of every consuming repo, making them the most expensive bytes moo ships. `crew` and `soloism` now name their substrates (`claude` subprocess vs solo MCP) so the selector can tell them apart.
+- change(root): `CLAUDE.md` 146 → 67 lines. Authoring doctrine moved to the `moo-authoring` project skill, which fires on the authoring situation; what stays resident is the set whose violation is silent (YAML truncation, fail-open hooks, what the guard cannot see). The `File Limits` block dies against two shipped counterexamples of deferral, and the duplication exception now names the compaction boundary that scopes it — which then caught `moo-authoring` restating that same exception's `disable-model-invocation` corollary, in the one situation where both files co-load.
+
+### Fixed
+
+- fix(repo): `.githooks/pre-push` derived its `TARGETS` from a hand-copied list of 5 against `package.json`'s 8 — `freeze`, `hunch/crew` and `hunch/soloism` were sync'd but never diffed, so drift in three consumers was silent. `TARGETS` now derives from the `--files` list itself.
+- fix(repo): `marketplace.json`'s `hope` and `sound` descriptions had silently fallen behind their `plugin.json` twins; `sound`'s omitted evidence-cited per-rule selection, its one distinguishing behavior. Nothing guards this pair — the sync-drift guard sees doc-gen'd `.md` blocks only.
+- fix(hope): three comments claimed a `SubagentStop` trigger that 9.7.1 removed — including three lines defending a race between two events, one of which does not exist.
+
+## [sound@0.0.6] - 2026-07-25
+
+### Changed
+
+- change(sound): corpus 107 → 106 rules. Four rewords (`no-behavioral-boolean-props` carves native HTML attributes so `disabled` stops being flagged; `comment-must-name-a-consequence` drops the global posture; `mood-names-commands-facts` gains the `Not-when:` for tense-neutral signals like `Heartbeat`; `effect-is-a-named-intent`'s carve reaches two differently-named external-system bridges), one rename (`object-parameter-at-three-params` → `object-parameter-over-positional-run`, whose slug asserted a threshold its own `Detect:` contradicts), and one merge (`draft-entity-gets-its-own-noun` folded into `discriminated-union-over-flag-bag` as the instance-level form). Cross-ref graph re-verified by slug-set intersection, zero dangling.
+- change(sound): `setup` defers its propose-only contract and its re-run reconciliation to `propose-only.md` and `re-runs.md`, read when that branch is taken — both were resident in every setup run to serve the minority that needed them. The `db` and `distributed` probe rows drop the vendor enumerations that had to grow with the ecosystem, keeping the discriminating question. `prime` re-browses when work reaches a surface it was not planned to touch; `review` scopes enhancements to the diff's kind instead of inviting one per change. `evals/run.sh` points at the extracted propose-only contract.
+
+## [hunch@0.0.14] - 2026-07-25
+
+### Changed
+
+- change(hunch): `board.md` absorbs the batching discriminator and the feedback-pane consequence clause from their hand-authored twins in `crew` and `soloism`. Quantifiers that failed on real cases become judgements: fleet concurrency sizes to steering capacity, the safety net sizes to the wave, the fork guard weighs re-ingest against re-derive, seats spawn on whether the lead would queue. `catch` and `plain` keep their postures and lose the caps that fought them — `plain`'s "Caps over taste" contradicted its own rule 6 fifteen lines later. `bro` becomes a mode the human switches on rather than a one-message restatement, keeping the guard that brevity must not drop a caveat, number, or warning. `land` drops the decorative-graphic bullet, which invoked "the acceptance test" while describing its inverse — the file defines that test once, as delete-every-word. `grasp`'s quiz sizes to the change, `roster` says why an interview cannot be batched, `toy` and the rest lose the `# name` headings the frontmatter already carries.
+
 ## [hunch@0.0.13] - 2026-07-24
 
 ### Changed

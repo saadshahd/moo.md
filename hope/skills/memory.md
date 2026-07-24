@@ -24,5 +24,5 @@ and breeds duplicate files (a "schedulers" file silently holding headless-writer
 - Before adding: scan the index for a slug or scope that already owns this topic. If one does,
   READ that file and edit it in place. Create a new file only when no existing scope covers it.
 
-Keep MEMORY.md lean, durable entries first — only its first ~25KB loads.
+Only the first ~25KB of MEMORY.md loads; entries past that cut are never read. Durable entries first.
 A locked intent or shape card's carry-forward already qualifies.

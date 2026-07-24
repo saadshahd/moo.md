@@ -1,6 +1,6 @@
 ---
 name: intent
-description: Turn rough ideas into clear work orders before planning or building. Use when request is vague like "add a button", "make it better", "fix the thing". Triggers on ambiguous or underspecified requests.
+description: Turn rough ideas into clear work orders before planning or building. Use on ambiguous or underspecified requests, including ones that sound specific but name no outcome.
 ---
 
 Clarify WHAT before building anything. Clarity over completeness — invented details are worse than gaps. Structured input (proposal, design, spec) gets validated, not re-clarified. Output: a handoff card (spec below).
@@ -19,7 +19,7 @@ Form:
 - Sections (non-goals, acceptance, constraints, ...) appear only when the session produced them. No empty scaffolding, ever.
 - Stranger test: every fact understandable with zero session context.
 - Timeless: no session narrative, no relative time ("currently", "for now"). Phrase decisions "X over Y: reason". Absolute dates only when the fact IS a deadline.
-- Concepts only: no file paths, function names, or line numbers — the next stage retrieves its own cheap local detail. No provenance markup.
+- Concepts over cheap local detail: the next stage retrieves file paths, function names, and line numbers for itself, so leave them out — unless the identifier IS the hard-won external fact, in which case name it. No provenance markup.
 - Carry-forward closes the card: decisions and reasons, paths ruled out, hard-won external facts — captured when the stage locks so the next stage skips the work that produced them.
 - Size by deletion pass in the gate audit, never a numeric cap.
 - Emit in conversation; persisting is the user's call. A complete card passes the stranger test, so a persisted card is a resume token — paste it into a new session and the stage resumes without re-asking.
@@ -29,14 +29,14 @@ Form:
 
 1. **Understand** — state what you heard in 1-2 sentences.
 2. **Close gaps** — unknowns are anything you would have to invent to write the card now. Explore the accessible surface first; elicit only the judgment calls that remain (mechanics below).
-3. **Probe the negative** — at least once, ask what this should NOT do.
+3. **Probe the negative** — where the input leaves it unstated, ask what this should NOT do.
 4. **Gate** — when nothing remains that you would otherwise invent, run the gate audit.
 
 <!-- doc-gen FILE src=../prompts.md -->
 Closing unknowns — three modes, one boundary:
 
 - **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
-- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion: exactly 3 concrete candidate answers + 1 uniform "Gather facts" escape hatch (first-class option, never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
+- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion carries as many concrete candidate answers as the decision genuinely has, plus a uniform "Gather facts" escape hatch as a first-class option (never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
 - **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
 
 Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.

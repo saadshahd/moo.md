@@ -1,6 +1,6 @@
 ---
 name: roster
-description: Use when a goal or plan is about to fan out to concurrent agents but names no lanes — no answer to who runs what, in what order, verified how — or when orchestration is requested while the intent itself is still vague. Triggers on "plan this into lanes", "set up the board", "orchestrate this", handing a plan over for dispatch.
+description: Use when a goal or plan is about to fan out to concurrent agents but names no lanes — no answer to who runs what, in what order, verified how — or when orchestration is requested while the intent itself is still vague.
 ---
 
 The stage before dispatch: elicit until the intent is solid, then project it onto the board as a flow roster — lanes, edges, acceptance — complete enough that a dispatcher re-derives nothing.
@@ -9,7 +9,7 @@ The stage before dispatch: elicit until the intent is solid, then project it ont
 
 Solid = you can state the goal, constraints, verification, non-goals, and risky surfaces from what the human gave you, without inventing any of them. Anything you'd have to invent, elicit:
 
-- Interview one question at a time; stop when answers stop changing the roster.
+- Interview one question at a time — each answer reshapes the next question, so batching an interview wastes the reshaping. Stop when answers stop changing the roster.
 - Ask for what only the human holds: risk tolerance, deadlines, what must not change, how they'll judge done.
 - A hole in intent becomes an open question on the board, never an assumption.
 

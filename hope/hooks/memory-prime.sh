@@ -6,6 +6,6 @@
 # files" detour; a short co-author framing keeps the ownership signal without the detour.
 # Fails open — an absent jq must never block a session.
 command -v jq >/dev/null 2>&1 || exit 0
-note='You co-author this project'\''s durable memory. When you reach a decision, a correction, or a hard-won fact worth keeping, state it plainly in your reasoning so it gets captured — that is your contribution to the memory. A background writer persists what qualifies and maintains the memory files; do not read or edit them yourself mid-task, and do not narrate memory housekeeping.'
+note='You co-author this project'\''s durable memory. When you reach a decision, a correction, or a hard-won fact worth keeping, state it plainly in your reasoning so it gets captured — that is your contribution to the memory. This project'\''s memory files have a dedicated writer: an off-thread background session persists what qualifies and maintains the index after the turn ends, so the curating happens without your attention and without narration.'
 jq -n --arg c "$note" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
 exit 0

@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use when installing or refreshing sound taste rules in a project. Triggers on "sound setup", "install taste rules", "scaffold .claude/sound", "set up sound here", starting work in a repo with no .claude/sound/, or a taste-not-defined nudge. Also use to re-run after a stack change (new framework, new package in a monorepo).
+description: Use when installing or refreshing sound taste rules in a project — an explicit "sound setup", starting work in a repo with no .claude/sound/, or a taste-not-defined nudge. Also use to re-run after a stack change (new framework, new package in a monorepo).
 ---
 
 # sound:setup
@@ -18,8 +18,8 @@ Decide which kind-tags apply (`react`, `db`, `distributed`) — verified STACK F
 | Tag | Fires on (verified usage) | Does NOT fire on |
 |---|---|---|
 | `react` | `.tsx`/`.jsx` files, JSX or react imports in real source | react in deps with zero usage; react-shaped tooling (ink absent too) |
-| `db` | db client/ORM imported in source (prisma, drizzle, pg, kysely, mongoose, neo4j, clickhouse, redis-as-store…); EMBEDDED dbs with owned DDL/schema (sqlite, node:sqlite, level); owned schema/migration files | consuming someone else's hosted API without owning storage |
-| `distributed` | any SIDE-EFFECTFUL remote boundary: payments (stripe), email/SMS (nodemailer, twilio — FRAMEWORK-WRAPPED senders count: an auth provider configured with an SMTP transport, e.g. next-auth EmailProvider, IS email-sending usage even with no direct nodemailer import), queue/broker publish (kafkajs, bullmq, amqplib, redis `.publish()`), webhook handlers, bot messaging SDKs, multiple owned services reconciling state. Publisher-side evidence alone is SUFFICIENT — the consumer usually lives outside the repo | READ-ONLY consumption of remote APIs (fetch-and-render); analytics beacons; redis as a plain same-process cache (get/set/del only) |
+| `db` | a db client or ORM imported in source, whichever one; `redis-as-store`; EMBEDDED dbs with owned DDL/schema (sqlite, node:sqlite, level — in-process still counts); owned schema/migration files | consuming someone else's hosted API without owning storage |
+| `distributed` | any SIDE-EFFECTFUL remote boundary: payments, email/SMS, queue/broker publish, webhook handlers, bot messaging SDKs, multiple owned services reconciling state. FRAMEWORK-WRAPPED senders count: an auth provider configured with an SMTP transport, e.g. next-auth EmailProvider, IS email-sending usage even with no direct nodemailer import. Publisher-side evidence alone is SUFFICIENT — the consumer usually lives outside the repo | READ-ONLY consumption of remote APIs (fetch-and-render); analytics beacons; redis as a plain same-process cache (get/set/del only) |
 
 ## Phase 2 — Select (per rule, evidence-cited)
 
@@ -38,34 +38,21 @@ A fired tag earns NOTHING by itself — each rule's OWN Detect question must be 
 - Test-scoped rule: its subject is the CODE UNDER TEST, never test-file presence — a zero-test repo with testable logic still earns the general testing rules (cite the testable code). Test rules with a more specific shape (roundtrip laws need encode/decode pairs; property generators need domain invariants) still need THAT shape cited.
 - Every rejected candidate gets a one-line reason, surfaced at Confirm.
 
-Method — DEEP by design; spend the tokens. Partition candidates into batches of rules that look at the same code (seed with the corpus's topic directories and each rule's subject), dispatch one subagent per batch with its rules' full text and repo access; each returns per-rule `install + citation` or `skip + reason`. Propose-only mode (below) may run inline — the output SET is what's judged, not the mechanism.
+Method — DEEP by design; spend the tokens. Every candidate rule is judged against its own full text and the real repo, returning per-rule `install + citation` or `skip + reason`. Batching rules that look at the same code across subagents buys parallelism on a large repo; a narrow surface is better served inline — the output SET is what's judged, not the mechanism.
 
 ## Phase 3 — Confirm (never skip, never auto-install)
 
 Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons. The statement is the rule's opening mandate: the file's first sentence, extended to the next only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never `_Avoid_`, `Detect:`, or `Not-when:`. The user's answer is the verdict — a corrected set replaces yours without argument; redo the affected phases. Write only after explicit confirmation. The user confirms the SET here; the written files are theirs afterward.
 
-**Propose-only mode:** when the invocation asks for a proposal only (evals, dry runs), emit exactly this JSON and stop — no confirmation, no writes:
-
-```json
-{"facts": ["<evidence with file paths>"], "tags": ["react"], "rules": [{"name": "<corpus-rule-name>", "cite": "<repo file path>"}]}
-```
-
-`tags` contains ONLY kind-tags from {react, db, distributed} — the Phase 1 stack facts, nothing else; listing anything else is an error. `rules` lists ONLY the install set: every selected rule's corpus FILENAME (no `.md`) COPIED VERBATIM from the corpus listing — never reconstructed from memory; before emitting, verify every name matches an existing `corpus/` file (or a `corpus-optin/` file the user named). `cite` is one FILE path that exists in the repo (no directories). Skips are not emitted.
+**Propose-only mode:** if the invocation asks for a proposal only (evals, dry runs), read `propose-only.md` and follow it instead of confirming or writing.
 
 ## Phase 4 — Write
 
 Copy each confirmed rule's file verbatim — no additions — to `.claude/sound/<topic>/<rule-name>.md`, a plain reference file. `<topic>` is the rule's parent directory in the corpus. These live OUTSIDE `.claude/rules/`, so they never auto-load; the browsable `.claude/sound/` tree IS the map `sound:prime` points at. No marker, manifest, or hash anywhere.
 
-## Re-runs (reconcile, never overwrite)
+## Re-runs
 
-Existing `.claude/sound/` files — prior setup, hand-written, or evolved — are user-owned; reconcile by reading, not bookkeeping. Older installs may carry project-tuned code examples and users may add their own snippets, so never compare whole bodies — compare PROSE ONLY: content minus any frontmatter and fenced code blocks, whitespace-normalized.
-
-- **Existing file, no same-named corpus rule** → local taste. Leave untouched; mention it was preserved.
-- **Selected corpus rule, no existing file** → propose as an addition. Every re-run re-derives tags and re-runs selection fresh — a newly-appeared surface makes its rules newly proposable. No memory of prior runs.
-- **Both exist, prose identical** → in-sync. Leave untouched — any local code snippets it carries are user-owned.
-- **Both exist, prose differs** → you cannot tell whether the user evolved it or the corpus moved; show the prose diff and ask: keep theirs, take the corpus version, or keep both (theirs renamed as a local rule). Never silently overwrite.
-
-Present the whole reconciliation as ONE compact proposal (additions / updates / preserved); write only what the user confirms.
+If `.claude/sound/` already exists, read `re-runs.md` before writing anything — existing files are user-owned and are reconciled, never overwritten.
 
 ## Failure modes to keep loud
 

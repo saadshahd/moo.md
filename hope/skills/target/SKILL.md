@@ -1,6 +1,6 @@
 ---
 name: target
-description: Define how unsupervised work will be judged before it runs. Use when execution is an autonomous loop or a long unbabysat agent run that optimizes toward a metric. Triggers on "autonomous loop", "let it run", "optimize until", "overnight run", "unsupervised", "set a goal".
+description: Define how unsupervised work will be judged before it runs. Use when execution is an autonomous loop or a long unbabysat agent run that optimizes toward a metric.
 ---
 
 Define the observer before unsupervised work runs, so the cheapest way to pass is the real work.
@@ -35,7 +35,7 @@ Concrete and executable — exact commands, values, targets, not abstractions.
 Closing unknowns — three modes, one boundary:
 
 - **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
-- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion: exactly 3 concrete candidate answers + 1 uniform "Gather facts" escape hatch (first-class option, never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
+- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion carries as many concrete candidate answers as the decision genuinely has, plus a uniform "Gather facts" escape hatch as a first-class option (never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
 - **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
 
 Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
@@ -46,7 +46,6 @@ Re-entry after a detour: if the detour made the answer obvious, state the decisi
 - Deletion pass over the draft first: cut every cheat already closed by another, every guard that restates the observable, every line a command cannot check.
 - Present verdict-FIRST via AskUserQuestion: PASSES or FAILS, then the surviving cheats and how each is closed — proof the adversary ran.
 - On FAIL, name what is unmechanical or un-closeable. If success cannot be defined, stop — the work is not ready to run unsupervised. If a cheat cannot be closed, bounce to the user. Never pad the contract to look safe.
-- The user locks. The lock is theirs, not yours.
 
 ## Pre-flight
 

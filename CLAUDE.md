@@ -6,98 +6,22 @@ moo — *mind on output*. A Claude Code plugin that helps humans stay present an
 
 ## Conventions
 
-### Frontmatter (Required)
+Authoring doctrine for this repo's own skills, fragments, hooks, and runtime files lives in the `moo-authoring` skill, which fires when you add or change one. What stays here is the set whose violation produces no error.
 
-**Skills:**
+**Description scope.** A skill's `description` carries the selection decision — what makes the skill fire — and its body carries the procedure. That is a placement rule, not a claim about how much a description can hold: the description is the only text present when the selection decision is made, and execution guidance either duplicates the body or loads in every session to serve a minority of them. A skill with `disable-model-invocation: true` is the exception the rule predicts: nothing selects it, so its description is an invocation summary for the human.
 
-```yaml
----
-name: kebab-case-name
-description: Single line. Trigger condition + what it does. Max 1024 chars.
----
-```
+**YAML.** Multi-line YAML blocks (`|`, `>`) in frontmatter are truncated by Claude Code, which silently breaks auto-triggering.
 
-> **Note:** Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
+**Hooks always fail open:** exit 0 with valid JSON on any error. A hook that fails closed silently disables itself for every future session.
 
-**DESCRIPTION TRAP WARNING:** Skill descriptions must be **trigger-only**. If descriptions contain process summaries or workflow steps, Claude follows the short description instead of reading the detailed flowchart/instructions. Keep descriptions focused on "Use when X" patterns only.
-
-**YAML WARNING:** Never use multi-line YAML blocks (`|` or `>`) in frontmatter. Claude Code truncates them, breaking auto-triggering.
-
-### File Naming
-
-- Skills: `skills/<skill-name>/SKILL.md` (kebab-case)
-
-### File Limits
-
-- SKILL.md: **200 lines max**
-- No `references/` directories — flat files alongside SKILL.md only when essential
-- Supporting files: max 3 per skill (data files like profiles, templates)
-- Self-contained: SKILL.md works without loading external files
-- Decision tables > prose explanations
-- No inline code examples > 5 lines
-- No navigation/catalog sections in skills
-
-> **Enforcement:** these limits are discipline-only — no script checks them. The repo's one mechanical doc gate is the sync-drift guard (see Changelog → When releasing).
-
-### Token Efficiency
-
-- Challenge every sentence: "Does Claude need this?"
-- Bullet points > paragraphs
-- No vague terminology; pick one term per concept
-- Use forward slashes only (`/`), never backslashes
-
-### Skill Design
-
-Phrase design decisions as "X over Y: reason".
-
-**Unit choice** — behavior inlines at build, data references at runtime; disable invocation only when the trigger lives in the human's head:
-
-| The new thing is... | Unit |
-|---|---|
-| A contract that must read identically in ≥2 skills | Fragment (`<plugin>/skills/*.md`, added to sync `--files`) |
-| Data selected per use (catalog, profile, corpus) | Runtime file |
-| A trigger + procedure that stands alone | Skill |
-| A trigger only the human perceives | Skill with `disable-model-invocation: true` — description = invocation summary, not trigger |
-| Behavior that must run every time, deterministically | Hook |
-| An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
-
-**Composition — artifacts and priming over imports:**
-
-- Skills compose through emitted artifacts (the card) and natural-language triggers, never cross-references.
-- New pipeline stage when the cognitive mode changes (clarify WHAT ≠ decide HOW ≠ judge unsupervised work; find ≠ fix). One skill = one mode + one gate.
-- Chain mechanics: each stage ends in a gate the user locks; the card carries only what the next stage can't re-derive; the shared contract is a fragment doc-gen'd into every stage.
-- Two skills over one when triggers differ; a shared explanation the pair needs lives in CHANGELOG, not in either skill.
-
-### Hook Design
-
-Hook over skill only when the behavior must run every time (a skill's firing is probabilistic) or must run off-thread. Hooks reinforce and observe — never author, capture, or gate. Always fail open: exit 0 with valid JSON on any error.
-
-Mode = two questions: does the foreground need the result, and now?
-
-| Mode | When |
-|---|---|
-| Sync inject | Few lines of framing, computed instantly |
-| `async` — fire-and-forget | Side effect only; surfaces as a file change, never re-engages the thread |
-| `asyncRewake` — fire-and-maybe-wake | Off-thread check; exit 2 wakes Claude on a finding, exit 0 stays silent |
-
-- A hook that spawns headless `claude -p` runs it with `--no-session-persistence`, `--settings '{"disableAllHooks":true}'` (recursion guard), `--permission-mode bypassPermissions` (no TTY — a prompt hangs it), and keeps its verdict logic in one file shared with its eval harness.
+> **Enforcement:** the sync-drift guard (`.githooks/pre-push`) is the repo's only mechanical doc gate, and it sees doc-gen'd `.md` blocks and nothing else — no shell file in this repo is checked by anything.
 
 ## Philosophy
 
 moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every change to this project must serve at least one.
 
 See `PHILOSOPHY.md` for core identity and mission.
-See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints.
-
-### Philosophy Audit (Before Committing Changes)
-
-- [ ] Does this add complexity without justification?
-- [ ] Does this introduce persistent state?
-- [ ] Could an existing skill handle this?
-- [ ] Does this build something Claude does natively?
-- [ ] Does this serve at least one aim: reduce regret / increase clarity / fewer artifacts / preserve ownership?
-
-See `hope/PHILOSOPHY.md` "Hard Constraints" for plugin-specific audit items.
+See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints — including "Hard Constraints" for plugin-specific audit items.
 
 ### Model-Judgment Boundaries
 
@@ -108,18 +32,15 @@ A skill or hook that leans on a model's judgment (a judge, a generated artifact,
 
 ## Anti-Patterns
 
-- Generic names (`*Manager`, `*Helper`, `*Utils`)
-- Reference chains or deep `references/` hierarchies
-- Time estimates instead of story points
-- Duplicating content across docs (link to single source) — **exception:** constraints that must survive compaction repeat at point of use
-- Windows paths or magic numbers in scripts
-- **Process details in skill descriptions** (causes Claude to skip flowcharts)
-- Inline examples longer than 5 lines
-- Navigation/catalog sections in skills (tool indexes, skill tables)
-- Skills over 200 lines
-- Persistent work/pipeline state files (.jsonl, workflow-state.json)
+- Reference chains — a file whose content is a pointer to another file. A parent naming children that load on their situation is the opposite, and is how deferral works.
+- No wall-clock estimates of the agent's own work.
+- Duplicating content across docs (link to single source) — **exception:** a constraint may repeat at point of use when the two copies are separated by a compaction boundary, i.e. a long-running agent whose early context will be summarized away. Two copies that co-load in one context window are duplication with no exception available.
+- Windows paths in scripts.
+- Inline examples that narrow the exploration space — a specimen of desired output rather than a case that fixes the meaning of a term or marks where a property stops holding.
+- Catalogs of what the harness already enumerates (tool indexes, skill tables) — not a parent routing to its own children.
+- Persistent work/pipeline state files (.jsonl, workflow-state.json) — conversation markers only
 - Task management APIs in skills (TaskCreate/TaskList/TaskUpdate)
-- Building features Claude Code will ship natively (task management, memory, tool orchestration)
+- Building features Claude Code will ship natively (task management, memory, tool orchestration) — compete on thinking quality
 - Cargo cult process steps (ritual without reason)
 - Optimizing for output volume while degrading human comprehension
 - Automating friction that builds understanding (edge case exploration, consequence engagement)
@@ -140,7 +61,7 @@ Track all changes in `CHANGELOG.md` at repo root.
 - Move unreleased items to new version section
 - Update version in affected plugin.json files
 - Run `bun run sync` and verify a clean git diff on every doc-gen consumer SKILL.md. The `sync` script's `--files` list in `package.json` is the source of truth — read it; don't trust a hand-copied list here.
-- The sync-drift guard (`.githooks/pre-push`) is the only mechanical check, and it runs **only** when `core.hooksPath=.githooks`. Verify with `git config core.hooksPath` before trusting it.
+- The sync-drift guard runs only when `core.hooksPath=.githooks` AND the hook file is executable. Verify the target, not the pointer: `[ -x .githooks/pre-push ]`. Its `TARGETS` is derived from `package.json`'s `--files`, so it covers every doc-gen consumer.
 - One-time setup: `git config core.hooksPath .githooks`
 
 **IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.

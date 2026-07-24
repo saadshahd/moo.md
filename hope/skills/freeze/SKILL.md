@@ -1,6 +1,6 @@
 ---
 name: freeze
-description: Use when a pipeline stage or the human meets facts that live outside the repo — a service, database, queue, third party, or live logs — and the work depends on their current state. Triggers on "what's the state of", "check prod", "is the service returning", "snapshot the data", external-system dependencies. Repo-local work skips it.
+description: Use when a pipeline stage or the human meets facts that live outside the repo — a service, database, queue, third party, or live logs — and the work depends on their current state. Repo-local work skips it.
 ---
 
 Freeze the moving cross-boundary state a system depends on into one immutable snapshot. Consumer: the agent stages (intent / shape / delegate / execute) — grounding, not narration.
@@ -16,9 +16,8 @@ Freeze the moving cross-boundary state a system depends on into one immutable sn
 A fact's value is OBSERVED or it is a GAP. No third path.
 
 - Inference builds the source map only — WHICH facts matter. It never produces a fact's value.
-- Observed = a read-only acquisition agent sees it live, or the human retrieves it by hand.
-- WRONG: infer a value from a config file, a stale doc, or "probably still X".
-- RIGHT: unreachable fact → OPEN gap with retrieval instructions, never a fabricated value.
+- Observed = a read-only acquisition agent sees it live, or the human retrieves it by hand. A fact with no `observed-by` is a GAP by construction — that field is what separates the two.
+- An unreachable fact becomes an OPEN gap with retrieval instructions, never a fabricated value.
 
 ## Snapshot shape
 
@@ -48,7 +47,7 @@ Spawn acquisition agents and fold their returns — never read external systems 
 Closing unknowns — three modes, one boundary:
 
 - **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
-- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion: exactly 3 concrete candidate answers + 1 uniform "Gather facts" escape hatch (first-class option, never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
+- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion carries as many concrete candidate answers as the decision genuinely has, plus a uniform "Gather facts" escape hatch as a first-class option (never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
 - **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
 
 Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
@@ -56,13 +55,10 @@ Re-entry after a detour: if the detour made the answer obvious, state the decisi
 
 ## The gate
 
-Agent audits, user locks.
-
 - **Factual pass** — every OBSERVED fact traces to an observation (agent return or human hand-retrieval). An inferred value is a defect: demote to OPEN gap or re-acquire.
 - **Completeness pass** — every source-map fact is OBSERVED or an OPEN gap. A silently absent required fact is the failure mode; name it as a gap.
 - Verdict-FIRST via AskUserQuestion: PASSES or FAILS, then observed count and open gaps — proof both passes ran.
 - On FAIL: name exactly which facts are inferred or missing. Never fabricate a value to close a gap.
-- The lock is the user's, not yours.
 
 ## Boundaries
 

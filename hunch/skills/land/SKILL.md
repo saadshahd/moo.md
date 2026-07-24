@@ -3,18 +3,16 @@ name: land
 description: Use when the user wants knowledge delivered to an audience — slides, a deck, a diagram, an explainer for others, teaching or talk material — or shares existing content that isn't getting through.
 ---
 
-# Land
-
 Deliver information the way minds absorb it. Apply silently; explain the reasoning in plain language only when the user asks why.
 
 ## Before designing
 
-Ask only what's missing, then confirm a 3–5 line brief (audience / goal / structure / hook) before generating:
+Ask only what's missing, then confirm the brief — audience and the one thing — before generating:
 
 1. **Audience** — sets language, analogies, assumed prior knowledge.
 2. **The one thing** — if they keep a single memory, action, or feeling, what is it? Everything serves it.
 
-Open with a hook that creates a curiosity gap ("You think X — actually Y"), never a topic title.
+Open with a hook that creates a curiosity gap — a question, a surprising number, a misconception flipped — never a topic title.
 
 ## Principles
 
@@ -40,8 +38,7 @@ When the deliverable is a deck and the user hasn't specified: one self-contained
 
 ## Never
 
-- Bullet-point lists as the design — every list becomes a layout, diagram, or step reveal.
+- Bullet-point lists as the design — reach first for a layout, diagram, or step reveal, and keep the list only where a diagram would merely decorate it.
 - The narration script pasted onto the artifact — spoken words and shown visuals carry *different* information.
-- Decorative icons or illustrations beside text — if deleting the graphic loses nothing, it failed the acceptance test.
 - Dark-gradient-plus-white-text "AI deck" aesthetic.
-- Infinite loops or `setInterval` animation bugs.
+- Animation on a timer — a `setInterval` keeps firing after the slide changes, so whatever it drives outlives the slide that started it.

@@ -11,7 +11,7 @@ Form:
 - Sections (non-goals, acceptance, constraints, ...) appear only when the session produced them. No empty scaffolding, ever.
 - Stranger test: every fact understandable with zero session context.
 - Timeless: no session narrative, no relative time ("currently", "for now"). Phrase decisions "X over Y: reason". Absolute dates only when the fact IS a deadline.
-- Concepts only: no file paths, function names, or line numbers — the next stage retrieves its own cheap local detail. No provenance markup.
+- Concepts over cheap local detail: the next stage retrieves file paths, function names, and line numbers for itself, so leave them out — unless the identifier IS the hard-won external fact, in which case name it. No provenance markup.
 - Carry-forward closes the card: decisions and reasons, paths ruled out, hard-won external facts — captured when the stage locks so the next stage skips the work that produced them.
 - Size by deletion pass in the gate audit, never a numeric cap.
 - Emit in conversation; persisting is the user's call. A complete card passes the stranger test, so a persisted card is a resume token — paste it into a new session and the stage resumes without re-asking.

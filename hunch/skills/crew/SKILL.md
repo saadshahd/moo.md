@@ -1,6 +1,6 @@
 ---
 name: crew
-description: Use when dispatching two or more concurrent subagents whose work could touch overlapping files, when concurrent delegated work needs a live answer to "who is running and what do they own", or when a human is observing and steering individual concurrent agents mid-flight.
+description: Use when dispatching two or more concurrent subagents as `claude` subprocesses via Bash, whose work could touch overlapping files, when concurrent delegated work needs a live answer to "who is running and what do they own", or when a human is observing and steering individual concurrent agents mid-flight.
 ---
 
 Discipline for running concurrent agents in one working tree with a human steering. Ownership is decided once, at decomposition; coordination after that runs worker-to-worker, with the lead reserved for the human's attention.
@@ -9,7 +9,7 @@ Discipline for running concurrent agents in one working tree with a human steeri
 
 1. Decompose into lanes with disjoint scopes; record each lane and its blocked-by edges on the board. A task whose scope overlaps everything (sync, codegen, formatting) runs behind a blocking edge, never concurrently.
 2. Brief each worker narrowly: one lane, one ownership boundary, one expected handoff — never the whole problem. Every brief embeds the worker contract below with crew's bindings.
-3. Dispatch the whole ready frontier in ONE message — every spawn as a parallel tool call in the same turn, never one spawn per turn. Cap concurrency at 4–6 workers. When an edge clears, the worker that cleared it advances the unblocked work itself (see contract); the lead re-dispatches only what no worker picked up, in the turn that observed it.
+3. Dispatch the whole ready frontier in ONE message — every spawn as a parallel tool call in the same turn, never one spawn per turn. Size the fleet to the human's steering capacity and the write-conflict surface — read-only lanes on disjoint files carry no conflict risk; concurrent writers in one tree get expensive fast. When an edge clears, the worker that cleared it advances the unblocked work itself (see contract); the lead re-dispatches only what no worker picked up, in the turn that observed it.
 4. Fan out at the layer that holds the decomposition: if you hold it, YOU spawn the workers. Never forward "parallelize this" to a running agent — relaying an instruction to a serial agent creates zero parallelism.
 5. Ask the human only over a running fleet: dispatch everything that doesn't depend on the answer first, then ask, batching up to 4 questions per call. Never hold an idle fleet on an open question.
 6. Handoff verification is the steward's duty: diff the lane's files against what the handoff claims. An edit outside any declared lane fails verification and goes back to its worker.
@@ -32,19 +32,19 @@ The board is the shared surface the human already watches — tasks, claims, che
 - Work you discover outside every lane (a bug, a gap, polish) → a ticket on the board for the steward, never a lane you invent or a message to the lead.
 - Spawning your own sub-agent → carve it a narrower claim inside yours, name it in your handoff, and pass the model its lane names — mechanical work never defaults to the top tier.
 - Completion notifies and handoff review go to the steward (the binding names it; no steward running → the lead). The lead is the human's pager: contact it only for ambiguity, a scope decision, blocked-on-human.
-- The human's feedback surface is theirs alone: no agent ever sends input into it. Reaching the human = a board flag plus the lead paging them.
-- Batch independent tool calls in one message — never one per turn.
+- The human's feedback surface is theirs alone: no agent ever sends input into it — colliding with a half-typed human sentence loses the sentence. Reaching the human = a board flag plus the lead paging them.
+- Batch independent tool calls in one message — never one per turn. Only a call that consumes another call's output waits for the next turn.
 
 ### Handoff (durable, never terminal output alone)
 
-- **Checkpoint** — your session id is on the board from your first write; once you've built context successors would want, add one line naming what it holds.
+- **Checkpoint** — once you've built context successors would want, add one line naming what it holds.
 - **Terminal handoff** — before you finish: files changed, what you learned, what's undone — complete enough for a cold successor. It must be a deliverable you produce and verify yourself while running, never a gate only the lead opens.
 - Watch your own gauge (the binding names it). Nearing compaction with the lane unfinished → write the terminal handoff now, then keep working: compaction eats what only your context holds.
 
 ### Context reuse (die freely, spawn fresh)
 
 - No worker lingers "in case": transcripts survive death; the board and terminal handoffs are the knowledge transfer — successors cold-start from them by default.
-- Fork a checkpoint only when all three hold: cache-warm (under ~1h old), light (under ~100k tokens), same lane's context. A stale or heavy fork re-ingests its whole transcript at full cost, and compaction can eat the successor's brief.
+- Fork a checkpoint when re-ingesting it costs less than re-deriving what it holds — weigh cache warmth, weight, and whether it carries this lane's context (roughly: an hour old, ~100k tokens). A stale or heavy fork re-ingests its whole transcript at full cost, and compaction can eat the successor's brief.
 - Checkpoints are immutable: fork (`--resume <session-id> --fork-session`), never plain `--resume` (it appends to the original transcript; two resumers collide on one file). Never `--continue` (latest-in-directory is a race in a shared tree).
 - Degradation: `$CLAUDE_CODE_SESSION_ID` unset → skip the checkpoint; a failed fork → cold start. Either way the terminal handoff carries the successor.
 <!-- end-doc-gen -->
@@ -53,5 +53,4 @@ The board is the shared surface the human already watches — tasks, claims, che
 
 - Surface the fleet to the human whenever it changes shape — who runs, what each owns, what's blocked — so they can aim feedback at a specific worker.
 - Feedback for one worker goes to that worker directly (its own session or input channel), never relayed through the lead: a relay adds two turn-queues between the human's sentence and the edit it steers.
-- Feedback about the work — bugs found, polish wanted, scope shifts — lands on the board as tickets through the human's own surface, and the steward triages them into lanes. The lead never becomes the intake queue.
-- The surface the human types into belongs to them: no worker notify, wake, or status line is ever sent into it. Colliding with a half-typed human sentence loses the sentence.
+- Feedback about the work — bugs found, polish wanted, scope shifts — lands on the board as tickets through the human's own surface, and the steward triages them into lanes.

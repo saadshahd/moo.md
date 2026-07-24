@@ -1,6 +1,6 @@
 ---
 name: over
-description: Use as load-bearing work lands, or when the user asks to debrief, hand off recent work, or check what they actually own versus what AI carried. Triggers on "debrief", "what do I own", "hand over", "hand it back", "over", and recently shipping a load-bearing decision the human has not reasoned through.
+description: Use as load-bearing work lands, or when the user asks to debrief, hand off recent work, or check what they actually own versus what AI carried. Skip decisions already handed over — a build-time probe counts as handed over.
 ---
 
 Hand a load-bearing decision back the moment it lands — in-flow, never banked.

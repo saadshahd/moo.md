@@ -1,7 +1,9 @@
 #!/bin/sh
 set -e
 
-TARGETS="hope/skills/intent/SKILL.md hope/skills/shape/SKILL.md hope/skills/target/SKILL.md hope/skills/delegate/SKILL.md hope/skills/over/SKILL.md"
+# Derived from package.json's sync --files list, so a new doc-gen consumer is covered the
+# moment it is added there. A hand-copied list silently stops guarding what it omits.
+TARGETS=$(node -e 'process.stdout.write(require("./package.json").scripts.sync.split("--files")[1].split("--open")[0].trim())')
 
 before=$(git diff -- $TARGETS)
 bun run sync

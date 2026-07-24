@@ -3,8 +3,6 @@ name: plain
 description: Use when writing prose a human will read — docs, READMEs, PR descriptions, commit messages, code comments, chat replies, explanations. Not for code, identifiers, API names, error strings, or established technical terms.
 ---
 
-# plain
-
 The reader lacks your context — the curse of knowledge, not word count, is why prose fails. Write as if orienting someone's gaze to a thing they haven't seen yet.
 
 ## The spine — Orwell, 1946
@@ -31,7 +29,7 @@ Technical terms: swap in an everyday word only where precision survives; otherwi
 
 ## The caps — ASD-STE100
 
-Simplified Technical English adds what Orwell leaves to judgment: hard limits. Caps over taste — "cut what you can" ends in negotiation; a word count ends in a number.
+Simplified Technical English calibrates what Orwell leaves to judgment. The numbers below are anchors for what "too long" usually looks like — concrete enough to self-assess against, and read alongside rule 6, not over it.
 
 | Cap | Limit |
 | --- | --- |

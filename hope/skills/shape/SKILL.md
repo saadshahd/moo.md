@@ -1,6 +1,6 @@
 ---
 name: shape
-description: Resolves technical HOW decisions when the intent is clear but the technical path is not — architecture, technology selection, design patterns. Triggers on "shape this", "architecture for X", "how should I build", "which pattern", "technical approach".
+description: Resolves technical HOW decisions when the intent is clear but the technical path is not — architecture, technology selection, design patterns.
 ---
 
 Decide HOW before building.
@@ -25,7 +25,7 @@ Form:
 - Sections (non-goals, acceptance, constraints, ...) appear only when the session produced them. No empty scaffolding, ever.
 - Stranger test: every fact understandable with zero session context.
 - Timeless: no session narrative, no relative time ("currently", "for now"). Phrase decisions "X over Y: reason". Absolute dates only when the fact IS a deadline.
-- Concepts only: no file paths, function names, or line numbers — the next stage retrieves its own cheap local detail. No provenance markup.
+- Concepts over cheap local detail: the next stage retrieves file paths, function names, and line numbers for itself, so leave them out — unless the identifier IS the hard-won external fact, in which case name it. No provenance markup.
 - Carry-forward closes the card: decisions and reasons, paths ruled out, hard-won external facts — captured when the stage locks so the next stage skips the work that produced them.
 - Size by deletion pass in the gate audit, never a numeric cap.
 - Emit in conversation; persisting is the user's call. A complete card passes the stranger test, so a persisted card is a resume token — paste it into a new session and the stage resumes without re-asking.
@@ -41,13 +41,7 @@ Form:
 
 ## Loop selection
 
-When the work iterates — an agent loop, a refinement cycle, an unbabysat run — "which loop" is a HOW dimension. Resolve it on three axes; the card carries the chosen loop and its termination rule.
-
-| Axis | Question | Reliability rule |
-| --- | --- | --- |
-| Verifier locus | Does "better" come from outside the model — tests, tool result, metric, separate judge — or only the model itself? | No external signal → never loop on a correctness task; it degrades. Take best-of-N first attempts instead. |
-| Plan mutability | Plan fixed once, or revised as reality diverges? | A revised plan must carry a budget cap, or it never converges. |
-| Termination | Budget cap, signal-gated, fixed-round, or judgment-delegated? | Judgment-delegated (an LLM decides "done") is the silent non-convergence source — always back it with a hard cap. |
+When the work iterates — an agent loop, a refinement cycle, an unbabysat run — "which loop" is a HOW dimension: read `loop-selection.md` and resolve it on the three axes there.
 
 Unsupervised loops pass through target; every loop dispatches through delegate.
 
@@ -57,7 +51,7 @@ Unsupervised loops pass through target; every loop dispatches through delegate.
 Closing unknowns — three modes, one boundary:
 
 - **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
-- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion: exactly 3 concrete candidate answers + 1 uniform "Gather facts" escape hatch (first-class option, never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
+- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion carries as many concrete candidate answers as the decision genuinely has, plus a uniform "Gather facts" escape hatch as a first-class option (never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
 - **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
 
 Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
@@ -66,7 +60,7 @@ Re-entry after a detour: if the detour made the answer obvious, state the decisi
 ## Presentation
 
 - Minto pyramid in AskUserQuestion: Label = recommendation, Description = one-line tradeoff, detail panel = plain text (short ~50-char lines, ALL CAPS headers, dash bullets — no markdown; it renders literally).
-- Batch independent choices in one call (up to 4 questions); separate only where one choice constrains another.
+- Batch independent choices in one call; separate only where one choice constrains another.
 - Techniques stay internal — present their insights in plain language, never name them. Bullets, 1-2 lines per finding, no text walls.
 
 ## The gate

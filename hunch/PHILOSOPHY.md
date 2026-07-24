@@ -20,4 +20,4 @@ A staging ground is not a destination. Anything that lives here forever is a hoa
 - **Exit is honest** — at every release, each experiment either graduates (into hope, sound, or its own plugin), stays with a stated reason, or dies.
 - **Judgment-leaning experiments graduate only with a measured pass-rate** — never from one good run.
 - **Version stays 0.x for the plugin's lifetime** — graduation is the only 1.0.
-- moo hard constraints still apply: no persistent state, no rebuilding what Claude does natively.
+- moo's repo-wide anti-patterns still apply (see `CLAUDE.md`).

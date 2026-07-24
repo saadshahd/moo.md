@@ -63,8 +63,8 @@ until mkdir "$lock" 2>/dev/null; do
 done
 trap 'rmdir "$lock" 2>/dev/null; rm -f "$slicefile" 2>/dev/null' EXIT
 
-prompt=$(printf 'You are moo'\''s detached memory writer — a background session, not addressing a human. Read the auto-memory discipline at %s and follow it exactly, including its naming & indexing rule. Read the recent conversation slice at %s (most relevant at the end). If and ONLY if a durable fact qualifies, record it under %s/: first scan the index %s/MEMORY.md; if an existing entry'\''s slug or scope already covers the fact, READ that file and edit it IN PLACE; create a new file ONLY after confirming from the index alone that no existing slug'\''s scope covers the fact — when coverage is plausible, open and edit that file instead, never a parallel one. Every slug and its one-line index entry MUST be self-describing and state the body'\''s full scope, so the next writer can decide ownership by skimming the index without opening the file. If nothing qualifies, write nothing at all. Operate silently — produce no commentary.' \
-  "$discipline" "$slicefile" "$memdir" "$memdir")
+prompt=$(printf 'You are moo'\''s detached memory writer — a background session, not addressing a human. Read the auto-memory discipline at %s and follow it exactly, including its naming & indexing rule. Read the recent conversation slice at %s (most relevant at the end). If and ONLY if a durable fact qualifies, record it under %s/ per that discipline. Operate silently — produce no commentary.' \
+  "$discipline" "$slicefile" "$memdir")
 
 # --no-session-persistence: the writer is a background janitor — it must not save a transcript
 #   or appear in the resume list (only honoured with --print).
