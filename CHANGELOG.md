@@ -11,6 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- docs(hope): `PHILOSOPHY.md` stated the no-recall constraint twice — **Retrieved over recalled** in Principles ("facts that can be looked up must be looked up. Exhaust tools before asking humans") and again bare in Hard Constraints. Checked whether the register mirrors Principles by design: only one of its five entries did, so it is not a deliberate second register. The bare copy goes; the one carrying the tools-before-humans escalation stays.
 - docs(hope): `PHILOSOPHY.md` stated the no-hard-dependencies constraint twice — bare in Hard Constraints (the audit register `CLAUDE.md` sends readers to) and again as "No hard references." in Priming. One file always co-loads with itself, so no compaction boundary was available to license it. Priming keeps the mechanism and its degradation payoff; the prohibition stays in the register.
 
 ## [hope@9.7.4] - 2026-07-25

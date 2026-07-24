@@ -74,7 +74,6 @@ moo's repo-wide anti-patterns apply here in full — see `CLAUDE.md`. hope adds:
 
 No hard dependencies between skills — prime naturally, never import.
 No rigid frameworks — skip steps that don't apply.
-No recall-based assertions — if a tool can check it, check it.
 No ownership without understanding — if you can't explain it, you don't own it.
 Default to less, expand on request.
 
