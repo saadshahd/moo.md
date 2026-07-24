@@ -84,4 +84,4 @@ Default to less, expand on request.
 
 hope primes context (clear intent, shaped approach, engagement level) and behavior (verify before claiming done, consult on non-trivial decisions, check assumptions).
 
-Cross-skill invocation uses natural language triggers. No hard references. If the user has a matching skill, it fires. If not, hope handles it. Nothing breaks either way.
+Cross-skill invocation uses natural language triggers. If the user has a matching skill, it fires. If not, hope handles it. Nothing breaks either way.

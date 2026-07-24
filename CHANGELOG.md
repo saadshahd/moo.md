@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- docs(hope): `PHILOSOPHY.md` stated the no-hard-dependencies constraint twice — bare in Hard Constraints (the audit register `CLAUDE.md` sends readers to) and again as "No hard references." in Priming. One file always co-loads with itself, so no compaction boundary was available to license it. Priming keeps the mechanism and its degradation payoff; the prohibition stays in the register.
+
 ## [hope@9.7.4] - 2026-07-25
 
 ### Changed
