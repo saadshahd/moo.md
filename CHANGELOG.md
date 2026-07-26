@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
+
 ## [sound@0.0.7] - 2026-07-25
 
 ### Added
