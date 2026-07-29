@@ -32,13 +32,15 @@ The board is the shared surface the human already watches — tasks, claims, che
 - Work you discover outside every lane (a bug, a gap, polish) → a ticket on the board for the steward, never a lane you invent or a message to the lead.
 - Spawning your own sub-agent → carve it a narrower claim inside yours, name it in your handoff, and pass the model its lane names — mechanical work never defaults to the top tier.
 - Completion notifies and handoff review go to the steward (the binding names it; no steward running → the lead). The lead is the human's pager: contact it only for ambiguity, a scope decision, blocked-on-human.
+- Your notify target no longer exists → the seat is vacant: notify the lead instead and report the vacancy as a fleet fact — absence of traffic is how a dead watcher stays unnoticed.
 - The human's feedback surface is theirs alone: no agent ever sends input into it — colliding with a half-typed human sentence loses the sentence. Reaching the human = a board flag plus the lead paging them.
 - Batch independent tool calls in one message — never one per turn. Only a call that consumes another call's output waits for the next turn.
+- A write can be refused inside an otherwise-successful batch, as a printed refusal rather than an error. Re-read what you just wrote before citing it — a summary is not evidence its inputs landed.
 
 ### Handoff (durable, never terminal output alone)
 
 - **Checkpoint** — once you've built context successors would want, add one line naming what it holds.
-- **Terminal handoff** — before you finish: files changed, what you learned, what's undone — complete enough for a cold successor. It must be a deliverable you produce and verify yourself while running, never a gate only the lead opens.
+- **Terminal handoff** — before you finish: files changed, what you learned, what's undone, and your lane's acceptance check with its observed result — complete enough for a cold successor. It must be a deliverable you produce and verify yourself while running, never a gate only the lead opens.
 - Watch your own gauge (the binding names it). Nearing compaction with the lane unfinished → write the terminal handoff now, then keep working: compaction eats what only your context holds.
 
 ### Context reuse (die freely, spawn fresh)
@@ -47,6 +49,13 @@ The board is the shared surface the human already watches — tasks, claims, che
 - Fork a checkpoint when re-ingesting it costs less than re-deriving what it holds — weigh cache warmth, weight, and whether it carries this lane's context (roughly: an hour old, ~100k tokens). A stale or heavy fork re-ingests its whole transcript at full cost, and compaction can eat the successor's brief.
 - Checkpoints are immutable: fork (`--resume <session-id> --fork-session`), never plain `--resume` (it appends to the original transcript; two resumers collide on one file). Never `--continue` (latest-in-directory is a race in a shared tree).
 - Degradation: `$CLAUDE_CODE_SESSION_ID` unset → skip the checkpoint; a failed fork → cold start. Either way the terminal handoff carries the successor.
+<!-- end-doc-gen -->
+
+<!-- doc-gen FILE src=../steward.md -->
+## Steward verification and redispatch
+
+- Re-run a handoff's acceptance check before merging its lane or relaying any claim from it — a handoff can meet every criterion of form and still carry a false claim. Name the clause that failed; on a mismatch with the worker's account, flag the discrepancy as unresolved rather than relaying either version.
+- A lane already redispatched fresh twice is a structural failure, not a transient one — stop redispatching and escalate to the lead. The count lives on the board, never in the seat's context: a rotated seat's memory resets silently; the board's doesn't.
 <!-- end-doc-gen -->
 
 ## Human steering

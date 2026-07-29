@@ -13,6 +13,21 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
 
+## [hunch@0.0.15] - 2026-07-30
+
+### Added
+
+- feat(hunch): restart intensity — a lane redispatched fresh twice is a structural failure, not a transient one: the steward stops redispatching and escalates to the lead. The count is board-held (`soloism` binds it to the lane's todo comment trail) because a rotating steward's in-context counter silently resets to unbounded retry. From the formal-coordination audit (solo scratchpad 86): the one supervision-tree idea most often omitted when the pattern is reimplemented — without it a persistent local fault stays local forever. Its sibling proposals were rejected with reasons recorded in `soloism/HYPOTHESIS.md`: trigger predicates (blockers already are declared trigger predicates, evaluated every steward pass) and retraction via reverse blocked-by traversal (blocked-by is scheduling truth, not consumption truth — parked until a live fleet actually retracts).
+
+### Changed
+
+- change(hunch): `board.md`'s terminal handoff now carries the lane's acceptance check with its observed result, and the steward re-runs that check before merging or relaying any claim from it. Both steward duties — the re-run and the restart bound above — must read identically in both dispatch skills, so they land as a new `steward.md` fragment doc-gen'd into `crew` and `soloism` rather than as the hand-authored twins 0.0.14 removed from these same files. Redirects the audit's shape-conformance proposal onto the live-proven gap: the board-audit fleet produced a handoff that was shape-perfect, met both acceptance criteria, and still asserted false repo state — conformance to a projected shape would have passed it. The lane's acceptance check is the deterministic fence; the steward's read is a rate.
+- change(hunch): descendant closure default flipped in `soloism` §3 — inspect, then close descendants with their worker; keeping one alive is the explicit act requiring a reason on the board. Amends the 2026-07-22 inspect-before-deciding directive, human-locked 2026-07-30; scope exit becomes the default rather than a per-reap judgment call.
+
+### Fixed
+
+- fix(hunch): four hazards validated across two live fleets existed only in boot briefs — patched for exactly one fleet each, and watcher-vacancy recurred on the very next fleet to prove it. Now skill text: nets nest one level per delegation (the lead backstops the steward's net and reads seat liveness at its own wakes — `soloism` §1); a rotation successor announces itself on the board, closes a still-running predecessor, and arms its own fresh net (`soloism` Rotation); the reap gate adds composer-clear — a pending human draft makes the pane read-only (`soloism` §3); and `board.md` gains the notify-target-vacancy report and the re-read-your-own-writes rule (a refused call prints a refusal inside an otherwise-successful batch; a summary is not evidence its inputs landed).
+
 ## [sound@0.0.7] - 2026-07-25
 
 ### Added

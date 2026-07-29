@@ -10,13 +10,15 @@ The board is the shared surface the human already watches — tasks, claims, che
 - Work you discover outside every lane (a bug, a gap, polish) → a ticket on the board for the steward, never a lane you invent or a message to the lead.
 - Spawning your own sub-agent → carve it a narrower claim inside yours, name it in your handoff, and pass the model its lane names — mechanical work never defaults to the top tier.
 - Completion notifies and handoff review go to the steward (the binding names it; no steward running → the lead). The lead is the human's pager: contact it only for ambiguity, a scope decision, blocked-on-human.
+- Your notify target no longer exists → the seat is vacant: notify the lead instead and report the vacancy as a fleet fact — absence of traffic is how a dead watcher stays unnoticed.
 - The human's feedback surface is theirs alone: no agent ever sends input into it — colliding with a half-typed human sentence loses the sentence. Reaching the human = a board flag plus the lead paging them.
 - Batch independent tool calls in one message — never one per turn. Only a call that consumes another call's output waits for the next turn.
+- A write can be refused inside an otherwise-successful batch, as a printed refusal rather than an error. Re-read what you just wrote before citing it — a summary is not evidence its inputs landed.
 
 ### Handoff (durable, never terminal output alone)
 
 - **Checkpoint** — once you've built context successors would want, add one line naming what it holds.
-- **Terminal handoff** — before you finish: files changed, what you learned, what's undone — complete enough for a cold successor. It must be a deliverable you produce and verify yourself while running, never a gate only the lead opens.
+- **Terminal handoff** — before you finish: files changed, what you learned, what's undone, and your lane's acceptance check with its observed result — complete enough for a cold successor. It must be a deliverable you produce and verify yourself while running, never a gate only the lead opens.
 - Watch your own gauge (the binding names it). Nearing compaction with the lane unfinished → write the terminal handoff now, then keep working: compaction eats what only your context holds.
 
 ### Context reuse (die freely, spawn fresh)

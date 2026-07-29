@@ -11,7 +11,7 @@ Drive concurrent subagents through solo as a distributed loop: workers coordinat
 
 ## Bindings (for the worker contract below)
 
-**board** = solo todos (dependency truth: tasks, blockers, claims) + the scratchpad (fleet map, checkpoints, decisions); todos point at scratchpad sections, never duplicate them. **claim** = `todo_lock` with `lease_ttl_seconds` sized to expected runtime (the 300s default lapses silently and reads as unclaimed) — a lock dies with its owning process, so an owner no longer running means stale, not owned; `todo_complete` releases yours. **peer wake** = `send_input(process_id=<peer>, input=...)` — never at the human's feedback pane, and know it lacks compose-deferral: it can clobber a half-typed draft in any pane the human is typing in. **steward** = the standing seat's solo pid, named in every brief as the notify target. **gauge** = `get_process_output` on your own `process_id` (from `whoami`): the pane footer carries context tokens, session/weekly usage %, and the model name. Handoffs route by kind: the terminal handoff is a comment on the claimed todo; context, decisions, and the fleet map go to the scratchpad. The scratchpad is multi-writer — carry a fresh read's revision (`expected_revision`), prefer `scratchpad_append_section` to full rewrites; a conflict means re-read and re-apply, never overwrite. **spawn** = `spawn_agent(agent_tool_id=N)` with the tool picked from `list_agent_tools`, the lane's model passed as `extra_args=["--model", "<model>"]`, and a checkpoint forked by adding `extra_args=["--resume", "<session-id>", "--fork-session"]`; it carries no first-message parameter, so the brief follows by `send_input`. Workers hold these tools too.
+**board** = solo todos (dependency truth: tasks, blockers, claims) + the scratchpad (fleet map, checkpoints, decisions); todos point at scratchpad sections, never duplicate them. **claim** = `todo_lock` with `lease_ttl_seconds` sized to expected runtime (the 300s default lapses silently and reads as unclaimed) — a lock dies with its owning process, so an owner no longer running means stale, not owned; `todo_complete` releases yours. **peer wake** = `send_input(process_id=<peer>, input=...)` — never at the human's feedback pane, and know it lacks compose-deferral: it can clobber a half-typed draft in any pane the human is typing in. **steward** = the standing seat's solo pid, named in every brief as the notify target. **gauge** = `get_process_output` on your own `process_id` (from `whoami`): the pane footer carries context tokens, session/weekly usage %, and the model name. Handoffs route by kind: the terminal handoff is a comment on the claimed todo; context, decisions, and the fleet map go to the scratchpad; a lane's redispatch count is its todo's comment trail. The scratchpad is multi-writer — carry a fresh read's revision (`expected_revision`), prefer `scratchpad_append_section` to full rewrites; a conflict means re-read and re-apply, never overwrite. **spawn** = `spawn_agent(agent_tool_id=N)` with the tool picked from `list_agent_tools`, the lane's model passed as `extra_args=["--model", "<model>"]`, and a checkpoint forked by adding `extra_args=["--resume", "<session-id>", "--fork-session"]`; it carries no first-message parameter, so the brief follows by `send_input`. Workers hold these tools too.
 
 <!-- doc-gen FILE src=../board.md -->
 ## Worker contract (embed in every brief)
@@ -26,13 +26,15 @@ The board is the shared surface the human already watches — tasks, claims, che
 - Work you discover outside every lane (a bug, a gap, polish) → a ticket on the board for the steward, never a lane you invent or a message to the lead.
 - Spawning your own sub-agent → carve it a narrower claim inside yours, name it in your handoff, and pass the model its lane names — mechanical work never defaults to the top tier.
 - Completion notifies and handoff review go to the steward (the binding names it; no steward running → the lead). The lead is the human's pager: contact it only for ambiguity, a scope decision, blocked-on-human.
+- Your notify target no longer exists → the seat is vacant: notify the lead instead and report the vacancy as a fleet fact — absence of traffic is how a dead watcher stays unnoticed.
 - The human's feedback surface is theirs alone: no agent ever sends input into it — colliding with a half-typed human sentence loses the sentence. Reaching the human = a board flag plus the lead paging them.
 - Batch independent tool calls in one message — never one per turn. Only a call that consumes another call's output waits for the next turn.
+- A write can be refused inside an otherwise-successful batch, as a printed refusal rather than an error. Re-read what you just wrote before citing it — a summary is not evidence its inputs landed.
 
 ### Handoff (durable, never terminal output alone)
 
 - **Checkpoint** — once you've built context successors would want, add one line naming what it holds.
-- **Terminal handoff** — before you finish: files changed, what you learned, what's undone — complete enough for a cold successor. It must be a deliverable you produce and verify yourself while running, never a gate only the lead opens.
+- **Terminal handoff** — before you finish: files changed, what you learned, what's undone, and your lane's acceptance check with its observed result — complete enough for a cold successor. It must be a deliverable you produce and verify yourself while running, never a gate only the lead opens.
 - Watch your own gauge (the binding names it). Nearing compaction with the lane unfinished → write the terminal handoff now, then keep working: compaction eats what only your context holds.
 
 ### Context reuse (die freely, spawn fresh)
@@ -61,6 +63,7 @@ Spawn no extra seats where the lead can hold both duties without work queueing b
 - Every brief = that worker's `agent_instructions` + its lane + its model + the worker contract with bindings + the steward's `process_id` for the notify and the lead's for the pager.
 - Notify contract in every brief: escalate to the lead only for human attention; after your terminal handoff and any advance you made, send exactly one informational `send_input(process_id=<steward>, input="<worker>: done|blocked — handoff at <where>, advanced <what>")`. Never progress chatter.
 - Arm one safety net over the wave: `timer_set(delay_ms=<sized to the wave's expected runtime>, body=<"net sweep — fleet map in scratchpad">)`. Notifies and escalations are the wake channel; the net only catches a worker that died or went silent without notifying. The steward owns the net after dispatch.
+- The lead keeps its own backstop net over the steward — nets nest one level per delegation, or a silent steward death disarms fleet crash-detection — and reads seat liveness (`list_processes`) at each of its own wakes, never inferring it from traffic.
 - A worker whose environment has no solo MCP can't notify or advance — watch it with `timer_fire_when_idle_any` instead, and expect no-op wakes: idle is edge-triggered and flaps on quiet stretches mid-task.
 
 ### 2. Wake (steward)
@@ -77,8 +80,8 @@ Spawn no extra seats where the lead can hold both duties without work queueing b
 ### 3. Reap + advance the remainder (steward)
 
 - Verify the handoff is durably where the notify says, complete enough for a cold successor; pull anything still only on the pane into the scratchpad. The worker's session id is on the board from its first write — verify it's there, never spend a turn asking for it. Closing stops and removes the process; a checkpointed transcript survives it.
-- `close_process(process_id=pid)` once the handoff is captured and the worker no longer needs an interactive session. Keep any worker still producing useful work.
-- If the worker has descendants, inspect them before deciding whether to close the whole group — solo asks whether to close subagents too; answer from what you inspected, never by default.
+- `close_process(process_id=pid)` once the handoff is captured, the pane holds no pending human draft (`get_process_output` first — a half-typed draft makes that pane read-only), and the worker no longer needs an interactive session. Keep any worker still producing useful work.
+- If the worker has descendants, inspect them, then close them with it — solo asks whether to close subagents too. Keeping one alive is the explicit act: it needs a reason written on the board, never a default.
 - Dispatch only what no worker advanced — the board says which unblocked tasks are still unclaimed. Don't wait for siblings.
 - Integrating a lane changes the tree under still-running workers: wake each worker whose lane borders the changed files with one line on what moved.
 - Update the fleet map and log any decision in the scratchpad. Bookkeeping never pauses for approval; the human's gates still hold.
@@ -88,9 +91,18 @@ Spawn no extra seats where the lead can hold both duties without work queueing b
 - Keep exactly one net live over the fleet: when the fleet map changes (new wave, reap, worker-spawned successor) or a net fires, `timer_cancel` any pending net and `timer_set` a fresh one. Repeat until the map is empty.
 - Each net sweep also reads every pane's footer (the gauge) and posts one fleet-burn line to the board: per-agent context tokens, session %, weekly %. Two flags escalate to the lead: a worker near compaction with no terminal handoff on the board, and session usage nearing its limit — then quiesce deliberately: hold dispatches, re-arm the net past the reset, page the human. A stalled fleet mid-protocol is the failure; a paused fleet is the plan.
 
+<!-- doc-gen FILE src=../steward.md -->
+## Steward verification and redispatch
+
+- Re-run a handoff's acceptance check before merging its lane or relaying any claim from it — a handoff can meet every criterion of form and still carry a false claim. Name the clause that failed; on a mismatch with the worker's account, flag the discrepancy as unresolved rather than relaying either version.
+- A lane already redispatched fresh twice is a structural failure, not a transient one — stop redispatching and escalate to the lead. The count lives on the board, never in the seat's context: a rotated seat's memory resets silently; the board's doesn't.
+<!-- end-doc-gen -->
+
 ## Rotation (standing seats)
 
 Standing seats check their own gauge at each natural pause — the steward after each reap, the lead at turn end. At 160k context tokens (hard ceiling 200k): write the rotation handoff on the board (repo state, live pids, timers, remaining flow), spawn a fresh successor on the same model — never fork it — repoint notify routes at the successor, then reap yourself. Never rotate mid-merge. The board is cold-start complete by contract; rotation is cheap, so rotate early.
+
+A successor's first acts: announce the rotation on the board — seat liveness needs a positive signal, not inference from traffic — close the predecessor if it still runs (a seat claim releases only with its owning process; no peer can unlock it), and arm its own fresh net (a fired timer is consumed, and a pending one dies with its owner).
 
 ## State + reporting
 
