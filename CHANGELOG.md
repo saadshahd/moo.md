@@ -18,6 +18,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
 
+## [hope@9.7.6] - 2026-08-03
+
+### Changed
+
+- change(hope): the slop-nudge hook says a thing once per session. 9.7.5 named the residual it did not fix — nothing bounded repeat fires against one file — and this closes it without a cap on either files or sessions, because a cap discards real findings to buy quiet. A repeat is the same rule against the same file: the key is those two, lowercased with parentheticals and a leading "no " stripped, so the judge rewording a rule between turns does not mint a new key for it. A different rule, or the same rule in another file, keys differently and still wakes; in a batch, repeats drop and the rest is delivered. Keys accumulate per transcript beside the offset marker.
+  The cause is structural, not a judge defect: each touched file is re-read whole every turn, so a file edited across several turns keeps yielding fresh, smaller instances of one rule already reported. The bar that makes that happen — leave each touched file better than before — is also what catches pre-existing rot, so it stays; only the second telling goes.
+  Keyed off the three real fires this rule produced against `slop-nudge.sh` while 9.7.5 was being written, not invented cases: all three collapse to one key, and the harness replays them plus a different-rule-same-file, a same-rule-other-file, a mixed batch, and unparseable judge output. A line yielding no key is treated as unseen, so the filter drops repeats and never findings.
+
 ## [hope@9.7.5] - 2026-08-03
 
 ### Changed

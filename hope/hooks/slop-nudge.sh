@@ -74,10 +74,31 @@ finding=$(printf '%s\n' "$live" | "$(dirname "$0")/judge.sh" \
 [ -z "$finding" ] && exit 0
 printf '%s' "$finding" | head -n1 | grep -q '^CLEAN$' && exit 0
 
+# Drop what this session already said. Each touched file is re-read whole every turn, so a file
+# edited across several turns keeps yielding fresh instances of one rule already reported — the
+# first is worth a wake, the fourth is the judge grinding. A repeat is the same rule against the
+# same file: the key is those two, lowercased with parentheticals and a leading "no " removed, so
+# the judge rewording a rule between turns does not mint a new key for it. A different rule, or the
+# same rule in another file, keys differently and still wakes. Keys accumulate per transcript
+# beside the offset marker. A line that yields no key is treated as unseen — this filter drops
+# repeats, never findings.
+seen="${TMPDIR:-/tmp}/hope-slop-seen-$tpkey"
+fresh=$(printf '%s\n' "$finding" | while IFS= read -r ln; do
+  key=$(printf '%s' "$ln" | sed -n 's/^- \([^:][^:]*\): \(.*\)$/\1|\2/p' | sed 's/—.*$//' \
+    | tr '[:upper:]' '[:lower:]' | sed 's/([^)]*)//g; s/|no /|/; s/[^a-z0-9|]//g')
+  [ -z "$key" ] && { printf '%s\n' "$ln"; continue; }
+  grep -qxF "$key" "$seen" 2>/dev/null && continue
+  printf '%s\n' "$key" >> "$seen" 2>/dev/null
+  printf '%s\n' "$ln"
+done)
+
+# Every finding was a repeat → stay silent. The violation is still there and still reported once.
+[ -z "$fresh" ] && exit 0
+
 # Finding → wake Claude with an advisory nudge on stderr (exit 2). Advisory only: it names the
 # violation and explicitly does not block.
 {
   echo "Slop-awareness nudge. A file you touched this turn may violate a preference:"
-  printf '%s\n' "$finding"
+  printf '%s\n' "$fresh"
 } >&2
 exit 2
