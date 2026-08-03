@@ -13,7 +13,7 @@ Drive concurrent subagents through solo as a distributed loop: workers coordinat
 
 **board** = solo todos (dependency truth: tasks, blockers, claims) + the scratchpad (fleet map, checkpoints, decisions); todos point at scratchpad sections, never duplicate them. **claim** = `todo_lock` with `lease_ttl_seconds` sized to expected runtime (the 300s default lapses silently and reads as unclaimed) — a lock dies with its owning process, so an owner no longer running means stale, not owned; `todo_complete` releases yours. **peer wake** = `send_input(process_id=<peer>, input=...)` — never at the human's feedback pane, and know it lacks compose-deferral: it can clobber a half-typed draft in any pane the human is typing in. **steward** = the standing seat's solo pid, named in every brief as the notify target. **gauge** = `get_process_output` on your own `process_id` (from `whoami`): the pane footer carries context tokens, session/weekly usage %, and the model name. Handoffs route by kind: the terminal handoff is a comment on the claimed todo; context, decisions, and the fleet map go to the scratchpad; a lane's redispatch count is its todo's comment trail. The scratchpad is multi-writer — carry a fresh read's revision (`expected_revision`), prefer `scratchpad_append_section` to full rewrites; a conflict means re-read and re-apply, never overwrite. **spawn** = `spawn_agent(agent_tool_id=N)` with the tool picked from `list_agent_tools`, the lane's model passed as `extra_args=["--model", "<model>"]`, and a checkpoint forked by adding `extra_args=["--resume", "<session-id>", "--fork-session"]`; it carries no first-message parameter, so the brief follows by `send_input`. Workers hold these tools too.
 
-<!-- doc-gen FILE src=../board.md -->
+<!-- f board -->
 ## Worker contract (embed in every brief)
 
 The board is the shared surface the human already watches — tasks, claims, checkpoints, handoffs.
@@ -43,7 +43,7 @@ The board is the shared surface the human already watches — tasks, claims, che
 - Fork a checkpoint when re-ingesting it costs less than re-deriving what it holds — weigh cache warmth, weight, and whether it carries this lane's context (roughly: an hour old, ~100k tokens). A stale or heavy fork re-ingests its whole transcript at full cost, and compaction can eat the successor's brief.
 - Checkpoints are immutable: fork (`--resume <session-id> --fork-session`), never plain `--resume` (it appends to the original transcript; two resumers collide on one file). Never `--continue` (latest-in-directory is a race in a shared tree).
 - Degradation: `$CLAUDE_CODE_SESSION_ID` unset → skip the checkpoint; a failed fork → cold start. Either way the terminal handoff carries the successor.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## The seats
 
@@ -91,12 +91,12 @@ Spawn no extra seats where the lead can hold both duties without work queueing b
 - Keep exactly one net live over the fleet: when the fleet map changes (new wave, reap, worker-spawned successor) or a net fires, `timer_cancel` any pending net and `timer_set` a fresh one. Repeat until the map is empty.
 - Each net sweep also reads every pane's footer (the gauge) and posts one fleet-burn line to the board: per-agent context tokens, session %, weekly %. Two flags escalate to the lead: a worker near compaction with no terminal handoff on the board, and session usage nearing its limit — then quiesce deliberately: hold dispatches, re-arm the net past the reset, page the human. A stalled fleet mid-protocol is the failure; a paused fleet is the plan.
 
-<!-- doc-gen FILE src=../steward.md -->
+<!-- f steward -->
 ## Steward verification and redispatch
 
 - Re-run a handoff's acceptance check before merging its lane or relaying any claim from it — a handoff can meet every criterion of form and still carry a false claim. Name the clause that failed; on a mismatch with the worker's account, flag the discrepancy as unresolved rather than relaying either version.
 - A lane already redispatched fresh twice is a structural failure, not a transient one — stop redispatching and escalate to the lead. The count lives on the board, never in the seat's context: a rotated seat's memory resets silently; the board's doesn't.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## Rotation (standing seats)
 

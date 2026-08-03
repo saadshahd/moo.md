@@ -9,6 +9,11 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- change(repo): shared fragments move to `<plugin>/_fragments/<name>.md` and are inlined by name alone — `<!-- f card -->` … `<!-- /f -->` replaces `<!-- doc-gen FILE src=../card.md -->` … `<!-- end-doc-gen -->` at all 15 sites across 8 skills. The measured saving is small and was not the reason: markers were 0.8–3.4% of a consumer's bytes and land near half that. What the move buys is that nothing is listed anymore. `md-magic --files <8 hand-typed paths>` becomes `node scripts/sync.js`, which discovers plugins by the presence of a `_fragments/` dir, registers one transform per fragment found, and applies it to every `SKILL.md` in that plugin; `.githooks/pre-push` takes its `TARGETS` from `sync.js --list` instead of parsing the `--files` string out of `package.json`. Adding a fragment or an include site now edits no list in either file — the recurring failure shape behind the guard's earlier coverage gap, removed rather than re-derived. Fragment scope is the plugin, so a skill naming another plugin's fragment fails rather than resolving.
+- change(repo): `sync` exits non-zero on an unresolved fragment name. markdown-magic reports a missing transform in a `errors` array and resolves its promise — the block is left holding stale content, which the drift guard passes because its before/after diffs match. The `--files` era shared this hole. Both paths verified live: a typo'd name and a cross-plugin reference each exit 1.
+
 ### Fixed
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.

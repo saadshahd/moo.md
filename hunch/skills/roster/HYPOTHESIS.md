@@ -11,5 +11,5 @@ Born from the four-doc audit of soloterm's workflow pages (grasps at `~/Desktop/
 Scope carves locked at founding:
 
 - **Roster owns shape; the dispatcher owns scheduling.** Lanes, edges, acceptance, serial-rest here; cap, waves, spawn mechanics stay in the dispatch stage. The lane-disjointness rule is deliberately restated in both places — a constraint repeated at point of use, not drift.
-- **Solo never leaks into tool-neutral surfaces.** The board projection names solo (scratchpad + todos) as one binding with a no-solo fallback; the shared worker contract (`../board.md`) is untouched by this skill's existence.
+- **Solo never leaks into tool-neutral surfaces.** The board projection names solo (scratchpad + todos) as one binding with a no-solo fallback; the shared worker contract (`../../_fragments/board.md`) is untouched by this skill's existence.
 - **No duplicate interview engine.** Intent extraction is gated: skip when handed a solid plan, elicit only what the roster needs. If live use shows it re-asking what hope:intent already answered, the kill condition above fires.

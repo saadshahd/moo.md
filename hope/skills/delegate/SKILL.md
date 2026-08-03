@@ -40,7 +40,7 @@ Every work prompt carries one rule: at a tie-break passing the recoverability te
 - Parallel fan-out / workflow: forks return unresolved; human authors before the next pass.
 - Rigor gate: `throwaway` → agent resolves its own forks; `high-stakes` → always surfaces.
 
-<!-- doc-gen FILE src=../card.md -->
+<!-- f card -->
 ## The card
 
 The pipeline's handoff artifact. One admission rule: carry only what the next stage can't cheaply re-derive from the code in front of it. Recoverability test: re-reading all the code later, could it land on the same choice for the same reason? Yes → never carry (cheap local facts always answer yes). Two kinds answer no:
@@ -58,7 +58,7 @@ Form:
 - Carry-forward closes the card: decisions and reasons, paths ruled out, hard-won external facts — captured when the stage locks so the next stage skips the work that produced them.
 - Size by deletion pass in the gate audit, never a numeric cap.
 - Emit in conversation; persisting is the user's call. A complete card passes the stranger test, so a persisted card is a resume token — paste it into a new session and the stage resumes without re-asking.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## VERIFY
 
@@ -77,7 +77,7 @@ On GO, run the handover test (below) before surfacing — the moment work return
 - **One handover per return.** Several load-bearing decisions in one delegation → probe only the single highest-blast-radius, least-reversible one. (An invoked `over` sweep is not bound by this — it may hand back several at once.)
 - **You stay the router** — authorship is the human's, never a subagent's.
 
-<!-- doc-gen FILE src=../handover.md -->
+<!-- f handover -->
 ## The handover
 
 When verified work carries a load-bearing decision, hand it over: the human reasons it into their own model; you confirm once.
@@ -86,4 +86,4 @@ When verified work carries a load-bearing decision, hand it over: the human reas
 - **One forward question, built from the work.** From the decision's novel move and the human's own words — never a fixed template. Aim forward: what they'd weigh when this pattern returns, or tell someone meeting this code in six months — not "was this right?".
 - **One reframe.** Reframe their answer through the decision's actual tradeoff — name the risk it accepted — and correct once. Not a yes/no stamp.
 - **Stateless.** Lives in the thread; nothing stored — no rule saved, no profile kept.
-<!-- end-doc-gen -->
+<!-- /f -->

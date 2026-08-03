@@ -11,7 +11,7 @@ Decide HOW before building.
 - **GATE** — "Is the shape complete and implementable?" — agent audits, user locks.
 - **OUTPUT** — a handoff card (spec below).
 
-<!-- doc-gen FILE src=../card.md -->
+<!-- f card -->
 ## The card
 
 The pipeline's handoff artifact. One admission rule: carry only what the next stage can't cheaply re-derive from the code in front of it. Recoverability test: re-reading all the code later, could it land on the same choice for the same reason? Yes → never carry (cheap local facts always answer yes). Two kinds answer no:
@@ -29,7 +29,7 @@ Form:
 - Carry-forward closes the card: decisions and reasons, paths ruled out, hard-won external facts — captured when the stage locks so the next stage skips the work that produced them.
 - Size by deletion pass in the gate audit, never a numeric cap.
 - Emit in conversation; persisting is the user's call. A complete card passes the stranger test, so a persisted card is a resume token — paste it into a new session and the stage resumes without re-asking.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## The work loop
 
@@ -47,7 +47,7 @@ Unsupervised loops pass through target; every loop dispatches through delegate.
 
 ## Decision prompts
 
-<!-- doc-gen FILE src=../prompts.md -->
+<!-- f prompts -->
 Closing unknowns — three modes, one boundary:
 
 - **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
@@ -55,7 +55,7 @@ Closing unknowns — three modes, one boundary:
 - **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
 
 Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## Presentation
 
@@ -65,13 +65,13 @@ Re-entry after a detour: if the detour made the answer obvious, state the decisi
 
 ## The gate
 
-<!-- doc-gen FILE src=../gate.md -->
+<!-- f gate -->
 - Before presenting, run a deletion pass over the draft card: cut every fact that does not earn its place, every empty section, every temporal or volatile reference.
 - Then a completeness pass: would the next stage have to re-ask the human anything this stage settled — a decision (the tie the human's goal broke), an option declined when offered, or a hard-won external fact? If yes, carry it with the reason code can't re-derive it. "The next stage doesn't re-ask" is the arbiter. Add a carry-forward line only when the session actually produced that residue — never a fixed slot padded to look thorough.
 - Present verdict-FIRST via AskUserQuestion: the gate question answered PASSES or FAILS, then the deletion pass's kills (what was cut and why) and the completeness pass's carries (what was kept and why code can't re-derive it).
 - On FAIL: name exactly what is missing and ask for it. Never pad the card to look complete.
 - The user locks. The lock is theirs, not yours.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## Boundaries
 

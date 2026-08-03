@@ -19,7 +19,7 @@ Discipline for running concurrent agents in one working tree with a human steeri
 
 Crew's bindings: **board** = the task tracker the human already watches plus durable handoff files; **claim** = your declared lane, recorded on the board at decomposition (the lane is the claim); **peer wake** = the worker's own input channel if it has one, else a board note it reads; **steward** = the lead until a dedicated merge/intake worker runs; **gauge** = the harness's own context indicator; **spawn** = a `claude` subprocess via Bash (`--model <model>` picks the lane's tier; `--resume <id> --fork-session` forks a checkpoint) — a spawn surface that can't resume cold-starts successors from the terminal handoff.
 
-<!-- doc-gen FILE src=../board.md -->
+<!-- f board -->
 ## Worker contract (embed in every brief)
 
 The board is the shared surface the human already watches — tasks, claims, checkpoints, handoffs.
@@ -49,14 +49,14 @@ The board is the shared surface the human already watches — tasks, claims, che
 - Fork a checkpoint when re-ingesting it costs less than re-deriving what it holds — weigh cache warmth, weight, and whether it carries this lane's context (roughly: an hour old, ~100k tokens). A stale or heavy fork re-ingests its whole transcript at full cost, and compaction can eat the successor's brief.
 - Checkpoints are immutable: fork (`--resume <session-id> --fork-session`), never plain `--resume` (it appends to the original transcript; two resumers collide on one file). Never `--continue` (latest-in-directory is a race in a shared tree).
 - Degradation: `$CLAUDE_CODE_SESSION_ID` unset → skip the checkpoint; a failed fork → cold start. Either way the terminal handoff carries the successor.
-<!-- end-doc-gen -->
+<!-- /f -->
 
-<!-- doc-gen FILE src=../steward.md -->
+<!-- f steward -->
 ## Steward verification and redispatch
 
 - Re-run a handoff's acceptance check before merging its lane or relaying any claim from it — a handoff can meet every criterion of form and still carry a false claim. Name the clause that failed; on a mismatch with the worker's account, flag the discrepancy as unresolved rather than relaying either version.
 - A lane already redispatched fresh twice is a structural failure, not a transient one — stop redispatching and escalate to the lead. The count lives on the board, never in the seat's context: a rotated seat's memory resets silently; the board's doesn't.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## Human steering
 

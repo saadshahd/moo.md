@@ -14,7 +14,7 @@ Authoring doctrine for this repo's own skills, fragments, hooks, and runtime fil
 
 **Hooks always fail open:** exit 0 with valid JSON on any error. A hook that fails closed silently disables itself for every future session.
 
-> **Enforcement:** the sync-drift guard (`.githooks/pre-push`) is the repo's only mechanical doc gate, and it sees doc-gen'd `.md` blocks and nothing else — no shell file in this repo is checked by anything.
+> **Enforcement:** the sync-drift guard (`.githooks/pre-push`) is the repo's only mechanical doc gate, and it sees inlined fragment blocks and nothing else — no shell file in this repo is checked by anything.
 
 ## Philosophy
 
@@ -60,8 +60,8 @@ Track all changes in `CHANGELOG.md` at repo root.
 
 - Move unreleased items to new version section
 - Update version in affected plugin.json files
-- Run `bun run sync` and verify a clean git diff on every doc-gen consumer SKILL.md. The `sync` script's `--files` list in `package.json` is the source of truth — read it; don't trust a hand-copied list here.
-- The sync-drift guard runs only when `core.hooksPath=.githooks` AND the hook file is executable. Verify the target, not the pointer: `[ -x .githooks/pre-push ]`. Its `TARGETS` is derived from `package.json`'s `--files`, so it covers every doc-gen consumer.
+- Run `bun run sync` and verify both a zero exit code and a clean git diff on every consumer SKILL.md. Consumers are discovered, not listed — `node scripts/sync.js --list` prints them; don't trust a hand-copied list here.
+- The sync-drift guard runs only when `core.hooksPath=.githooks` AND the hook file is executable. Verify the target, not the pointer: `[ -x .githooks/pre-push ]`. Its `TARGETS` comes from `sync.js --list`, so it covers every consumer without being told about one.
 - One-time setup: `git config core.hooksPath .githooks`
 
 **IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.

@@ -16,7 +16,7 @@ Run before anything else. Survey the work just done for decisions that pass the 
 
 An invoked sweep may hand back several at once (the build-time probe hands back one per delegation). Take them highest-blast-radius first, so attention lands on the biggest if the human stops early. Each is its own single teach-back.
 
-<!-- doc-gen FILE src=../handover.md -->
+<!-- f handover -->
 ## The handover
 
 When verified work carries a load-bearing decision, hand it over: the human reasons it into their own model; you confirm once.
@@ -25,7 +25,7 @@ When verified work carries a load-bearing decision, hand it over: the human reas
 - **One forward question, built from the work.** From the decision's novel move and the human's own words — never a fixed template. Aim forward: what they'd weigh when this pattern returns, or tell someone meeting this code in six months — not "was this right?".
 - **One reframe.** Reframe their answer through the decision's actual tradeoff — name the risk it accepted — and correct once. Not a yes/no stamp.
 - **Stateless.** Lives in the thread; nothing stored — no rule saved, no profile kept.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## Invisibility
 

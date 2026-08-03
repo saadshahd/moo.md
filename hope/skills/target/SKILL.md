@@ -31,7 +31,7 @@ Concrete and executable — exact commands, values, targets, not abstractions.
 
 ### Decision prompts
 
-<!-- doc-gen FILE src=../prompts.md -->
+<!-- f prompts -->
 Closing unknowns — three modes, one boundary:
 
 - **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
@@ -39,7 +39,7 @@ Closing unknowns — three modes, one boundary:
 - **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
 
 Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
-<!-- end-doc-gen -->
+<!-- /f -->
 
 ## Gate
 
