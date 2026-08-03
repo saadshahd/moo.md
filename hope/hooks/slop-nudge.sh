@@ -3,7 +3,8 @@
 # touched; judge.sh judges them and owns everything about how — its rubric, its flags, its bar.
 #
 # Registered asyncRewake — Claude Code never waits, so the foreground turn ends with no
-# interruption. The judge runs detached. Never gates, persists nothing.
+# interruption. The judge runs detached and never gates. What it writes is three per-transcript
+# markers under TMPDIR — a chunk offset, a stderr log, the keys already reported — never work state.
 #
 # Fails open at every step — a missing tool, file, or transcript must never stall a session.
 command -v jq >/dev/null 2>&1 || exit 0
@@ -64,9 +65,8 @@ done)
 # pure-deletion turns, and turns that only wrote scratch never spawn the judge.
 [ -z "$live" ] && exit 0
 
-# The verdict logic lives in judge.sh — the single source shared with the eval harness. We feed
-# it the live file list and capture its finding; its stderr goes to a per-transcript log, never
-# /dev/null, so a silent breakage stays diagnosable off-thread.
+# Feed the live file list in, capture the finding. judge.sh's stderr goes to a per-transcript log,
+# never /dev/null, so a silent breakage stays diagnosable off-thread.
 finding=$(printf '%s\n' "$live" | "$(dirname "$0")/judge.sh" \
   2>"${TMPDIR:-/tmp}/hope-slop-judge-$tpkey.log")
 
