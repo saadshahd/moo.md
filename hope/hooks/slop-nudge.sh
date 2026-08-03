@@ -1,19 +1,11 @@
 #!/bin/sh
-# Stop: off-record slop-awareness judge. The transcript is used ONLY to select
-# which files this chunk touched (Edit/Write/MultiEdit tool_use since the last stop); the judge
-# then reads those files LIVE and judges them in full against loaded preferences. Transcript =
-# selection, filesystem = truth — so frozen, possibly-superseded edit fragments are never judged,
-# and the bar is "leave each touched file better than before," not just "grade the diff."
-# A hooks-disabled headless `claude -p` loads its own CLAUDE.md / TASTE.md from the project —
-# those discovered instructions ARE the preferences it judges against. hope ships NO taste.
+# Stop: off-record slop-awareness judge. This file selects which repo-bound files the chunk
+# touched; judge.sh judges them and owns everything about how — its rubric, its flags, its bar.
 #
 # Registered asyncRewake — Claude Code never waits, so the foreground turn ends with no
-# interruption. The judge runs detached; exit 2 wakes Claude with an advisory nudge on stderr,
-# exit 0 stays silent. Never blocks, never gates, persists nothing.
+# interruption. The judge runs detached. Never gates, persists nothing.
 #
-# Recursion guard: the judge runs with --settings disableAllHooks so its own Stop can never
-# re-fire this hook. Fails open at every step — a missing tool, file, or transcript must never
-# stall a session.
+# Fails open at every step — a missing tool, file, or transcript must never stall a session.
 command -v jq >/dev/null 2>&1 || exit 0
 command -v claude >/dev/null 2>&1 || exit 0
 
@@ -45,11 +37,31 @@ files=$(tail -n +$((offset + 1)) "$tp" | jq -r '
 # Offset advances regardless of outcome — this chunk is now accounted for, judged or not.
 printf '%s' "$total" > "$marker" 2>/dev/null
 
-# Keep only paths that still exist live (a written-then-deleted file leaves no ghost to judge).
-live=$(printf '%s\n' "$files" | while IFS= read -r f; do [ -n "$f" ] && [ -f "$f" ] && printf '%s\n' "$f"; done)
+# Keep only paths that still exist live (a written-then-deleted file leaves no ghost to judge) and
+# that belong to version control. Taste and maintainability are properties of code that lives, or
+# is declared to live, in the repo; a charter, a handover note between agents, or a generated
+# one-off HTML file is none of those, and judging it is pure noise. `git status` answers all three
+# questions in one call per file: `!!` ignored, `??` untracked-and-unstaged, a non-zero exit means
+# no worktree contains it — each is out. Everything else (clean, modified, staged) is in, so
+# `git add` is what declares a brand-new file as repo-bound and admits it to the judge.
+# Absent git, the filter is skipped entirely rather than dropping every file — a filter that cannot
+# run must not silently disable the judge.
+gitfilter=0
+command -v git >/dev/null 2>&1 && gitfilter=1
+live=$(printf '%s\n' "$files" | while IFS= read -r f; do
+  [ -n "$f" ] && [ -f "$f" ] || continue
+  if [ "$gitfilter" = 1 ]; then
+    st=$(git -C "$(dirname "$f")" status --porcelain --ignored=matching -- "$f" 2>/dev/null) || continue
+    # Prefix tests, not `case`: bash 3.2 — /bin/sh on macOS, which the shebang selects — misparses a
+    # case pattern's `)` inside $( ) as the end of the substitution.
+    [ "${st#\?\?}" != "$st" ] && continue
+    [ "${st#!!}" != "$st" ] && continue
+  fi
+  printf '%s\n' "$f"
+done)
 
-# No live file touched this chunk → nothing to judge. The natural gate: pure Q&A / planning turns
-# (and pure-deletion turns) never spawn the judge.
+# Nothing survived selection → nothing to judge. The natural gate: pure Q&A / planning turns,
+# pure-deletion turns, and turns that only wrote scratch never spawn the judge.
 [ -z "$live" ] && exit 0
 
 # The verdict logic lives in judge.sh — the single source shared with the eval harness. We feed
