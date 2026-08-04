@@ -20,12 +20,19 @@ run staged to be measured.
 | --- | --- | --- |
 | 1 | of the lanes a run produced, how many produced work that was **kept** | kill at worse than **1 in 3** thrown away or redone |
 | 2a | burn — context, session and weekly, off the pane footer | **no threshold, deliberately** |
-| 2b | your turns spent getting the run split and spawned | kill at more than **5 turns, per run** |
+| 2b | your turns across the whole run — answering lanes that stop, and closing each one | kill at more than **5 turns, per run** |
 
-**Number 2b is per run, not averaged.** 5 was chosen as a doubling of the 2 rulings the seam
-surface measured in prototype — an allowance, not a budget to average down. A run costing 17 turns
-to fan out is the pull model failing on cost even if four other runs cost one turn each, and a mean
-would hide exactly that.
+**Number 2b is per run, not averaged.** A run costing 17 turns is the pull model failing on cost
+even if four other runs cost one turn each, and a mean would hide exactly that.
+
+**2b was re-scoped, and this is recorded so it reads as a change rather than a convenience.** It
+originally counted turns spent *getting the run split and spawned*, and 5 was a doubling of the 2
+rulings a prototype approval surface measured. That surface has since been removed — the skill
+decides the split and asks nothing — so those turns are now one: typing the command. Left as
+written, 2b could not fail. The number **5 is unchanged**; what it counts moved to where the cost
+actually landed, which is after spawn: answering lanes that stop, and closing every lane by hand.
+Anyone auditing this should treat a re-scoped threshold with suspicion and check that the new
+scope is where the work went.
 
 **2a has no threshold on purpose.** It is recorded to be looked at, not to be passed.
 
@@ -37,7 +44,7 @@ explained.
 - **The fog stop.** A lane that guesses where it should have stopped. No mechanical proxy exists
   and none is coming: for the reason in the section below, the behaviour has never been permitted to
   occur, so there is nothing to score a proxy against.
-- **Seam enforcement**, which the fog stop now carries alone. Scope growth was measured in **43% of
+- **Scope enforcement**, which the fog stop now carries alone. Scope growth was measured in **43% of
   runs that could have been split**. Unlike the fog stop, its failures land in the diff, so they are
   at least visible after the fact.
 - **Whether the contract has to arrive at spawn at all.** The plugin's entire reason to exist is

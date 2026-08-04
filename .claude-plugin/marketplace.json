@@ -26,21 +26,34 @@
       "source": "./sound",
       "description": "Code taste as installable rules. Probe a repo's stack, select only the rules its code shows a surface for (evidence-cited per rule), confirm, and scaffold a browsable .claude/sound/ rule map (surfaced by the sound:prime skill). Installed rules are user-owned; re-runs reconcile.",
       "category": "engineering",
-      "keywords": ["taste", "rules", "engineering"]
+      "keywords": [
+        "taste",
+        "rules",
+        "engineering"
+      ]
     },
     {
       "name": "soloflows",
       "source": "./soloflows",
-      "description": "Fan one goal across concurrent Solo lanes. You rule on the seams; each lane is spawned carrying them and a contract to stop when the work leaves what you agreed. Invoked only by you.",
+      "description": "Fan one goal across concurrent Solo lanes. It works out the split itself, spawns each lane with a contract to stop when work leaves its scope, and tells you in plain words what is running. Invoked only by you.",
       "category": "engineering",
-      "keywords": ["solo", "lanes", "seams", "concurrency"]
+      "keywords": [
+        "solo",
+        "lanes",
+        "scopes",
+        "concurrency"
+      ]
     },
     {
       "name": "hunch",
       "source": "./hunch",
       "description": "A grab bag of hunches — experimental skills and plugin features tried here before they earn a place in hope or sound. Everything graduates or dies.",
       "category": "experimental",
-      "keywords": ["experiments", "staging", "hunch"]
+      "keywords": [
+        "experiments",
+        "staging",
+        "hunch"
+      ]
     }
   ]
 }
