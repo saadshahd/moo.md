@@ -16,12 +16,18 @@ const ROOT = path.join(__dirname, '..')
 const OPEN = 'f'
 const CLOSE = '/f'
 
-/** Every plugin dir holding a `_fragments/` dir, with its fragments and its SKILL.md files. */
-function plugins() {
+const INCLUDE = /<!--\s*f\s+\S/
+
+function pluginDirs() {
   return fs
     .readdirSync(ROOT, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
     .map((e) => path.join(ROOT, e.name))
+}
+
+/** Every plugin dir holding a `_fragments/` dir, with its fragments and its SKILL.md files. */
+function plugins() {
+  return pluginDirs()
     .filter((dir) => fs.existsSync(path.join(dir, '_fragments')))
     .map((dir) => ({
       name: path.basename(dir),
@@ -48,6 +54,21 @@ function skillsIn(dir) {
     .filter((f) => fs.existsSync(f))
 }
 
+/**
+ * Include sites in a plugin that has no `_fragments/` dir. Such a plugin is filtered out of
+ * `plugins()` entirely, so its blocks are never parsed: no transform runs, `errors` stays empty,
+ * and the drift guard passes because nothing changed. Emptying a plugin's `_fragments/` therefore
+ * un-guards every skill in it silently — the same stale-content-past-the-guard shape as an unknown
+ * fragment name, one level up, and not reachable from the per-plugin loop below.
+ */
+function orphanedIncludes() {
+  return pluginDirs()
+    .filter((dir) => !fs.existsSync(path.join(dir, '_fragments')))
+    .flatMap((dir) =>
+      skillsIn(path.join(dir, 'skills')).filter((f) => INCLUDE.test(fs.readFileSync(f, 'utf8')))
+    )
+}
+
 async function main() {
   const found = plugins()
 
@@ -57,6 +78,13 @@ async function main() {
   }
 
   let failed = false
+  for (const f of orphanedIncludes()) {
+    failed = true
+    console.error(
+      `sync: ${path.relative(ROOT, f)}: fragment include, but its plugin has no _fragments/ dir`
+    )
+  }
+
   for (const plugin of found) {
     const names = Object.keys(plugin.fragments)
     const transforms = Object.fromEntries(names.map((n) => [n, () => plugin.fragments[n]]))

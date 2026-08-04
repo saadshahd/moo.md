@@ -14,5 +14,9 @@ dist/
 # Eval workspaces
 workspace/
 
+# Wayfinder maps and mined corpora — untracked by decision (22), ignored so
+# `git add .` cannot publish verbatim session text to a public repo
+.scratch/
+
 # Riptide artifacts (cloud-synced)
 .humanlayer/tasks/
