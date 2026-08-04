@@ -24,6 +24,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
 
+## [hunch@0.0.18] - 2026-08-05
+
+### Changed
+
+- change(hunch): `soloflow` rewritten by hand before its first real run. The split stage gains what it was assuming: explore the project, pin the goal to it, and — new — surface any reorganisation that would make delivering the goal concurrently cheaper, as before/after bullets, before fanning out. The record gains a `brief` section beside `shared`, so the goal itself has an address rather than riding inside the shared list. The lane contract gains a third stop condition, another lane overstepping into your scope, which the two existing conditions did not cover: they read the lane's own work, not an incursion into it.
+
+  Two locks from the design record are reversed, deliberately and by hand, and both should be read at the first run rather than defended here. **Step 4, "say what is running", is deleted** — the workflow now ends at spawn saying nothing, which is `21`'s *silent at both ends* taken further than `21` took it. **A lane now suggests terminating itself and the processes it spawned**, where the shipped contract said *"Do not close this process. It is closed from outside, once your work has been read."* That sentence was the residue of earned absence; with the watcher dead (`20 §2`) nothing produces absence, so the choice is the human closing every lane by hand or the lane asking. It asks — a suggestion, not a close, so the human still decides.
+
+### Fixed
+
+- fix(hunch): the lane contract sent every lane to a `breif` section. The record writes `brief`, so no lane could have found it — and the failure is a lane starting without the goal, which is `14 §3`'s loud-over-silent argument arriving as a typo rather than a design choice.
+
 ## [hunch@0.0.17] - 2026-08-04
 
 ### Added

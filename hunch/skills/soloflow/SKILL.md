@@ -1,65 +1,65 @@
 ---
 name: soloflow
-description: Fan one goal across concurrent Solo lanes. It works out the split itself, spawns each lane with a contract to stop when work leaves its scope, and tells you in plain words what is running.
+description: Grind on one goal concurrently in Soloterm workspace
 disable-model-invocation: true
 ---
 
-Decide the split yourself. Ask the human nothing.
+## Get up to speed, SILENTLY:
 
-## 1. Work out the split
+- Internalise the goal.
+- Explore the project context.
+- Pin the goal to the context.
+- Group the files the goal touches into SCOPES
+- Find what more than one scope touches: a file, a type, an ordering, a protocol, a function, etc.
+- Are there any organizational changes to make delivering the goal concurrently more efficient(speed, cost, maintainability)?
+  - Yes? surface them to the user in few sentences. as a bullet list of before vs after.
+  - No? proceed to the next step.
 
-Read the goal, then the repo. Group the files the goal touches into **scopes**, one per lane. Then
-find what more than one scope touches: a shared file, a type one defines and another uses, an
-ordering, a protocol.
+IF 1 group? say so plainly. Do not invent a second lane that doesn't satisfy the cost/ceremony/lane warming up.
 
-Compute what disk can settle. Judge the rest. Do not ask about either.
+## Record it
 
-**One group → say so and end.** Do not invent a second lane.
+- Pick a short `<slug>`.
+- One Solo scratchpad, `name` and `tags` both `<slug>` with Sections:
+  - `brief` — everything more than one lane must be aware of. minimal.
+  - `shared` — everything more than one lane must be aware of. minimal.
+  - `<slug>:<scope>` — one per lane, headed — its scope, and which shared things it owns.
 
-## 2. Write the record
+Every shared thing must be owned by exactly one lane. Others stop, wait or ask before changing it.
 
-Pick a short `<slug>`. One Solo scratchpad, `name` and `tags` both `<slug>`, off the repo working
-tree. Sections:
+## Lane contract
 
-- `shared` — everything more than one lane touches
-- one per lane, headed `<slug>:<scope>` — its scope, and which shared things it owns
-
-**Every shared thing is owned by exactly one lane.** The rest stop and ask before changing it.
-
-## 3. Spawn each lane
-
-One `spawn_agent` call per lane, carrying everything. Never call `send_input`.
-
-- `name`: `<slug>:<scope>`
-- `extra_args`: `--model <tier>`, and the contract below as the lane's first turn
-
-## 4. Say what is running
-
-Plain sentences. No table, no jargon, no rationale. What each lane is doing, what they share, and
-that they will stop before touching anything outside it. Then stop.
-
-## The contract
-
-Substitute `<slug>` and `<scope>`. Nothing else is ever sent to a lane.
+Substitute `<slug>` and `<scope>` with the lane actual values.
 
 ```markdown
-You are lane `<slug>:<scope>`, one of several working the same goal in parallel.
+You are `<slug>:<scope>`, one of several working the same goal in parallel.
 
-**The record** is Solo scratchpad `<slug>` (`solo scratchpads read --mode section`).
-Read section `<slug>:<scope>` — your scope, and the shared things you own — and the
-`shared` section. Read nothing else in it: other lanes' sections are not yours.
-Re-read both before every commit; they change while you work.
+The record: is soloterm scratchpad `<slug>` (`solo scratchpads read --mode section`).
 
-**Stop and ask, here in this pane, before you act** when either is true:
+- Read the goal `brief` section.
+- Read `<slug>:<scope>` section.
+- Read the `shared` section.
 
-- your work needs to touch anything outside your scope, or would change something
-  in the `shared` section that you do not own. Your own scope is yours; nothing else is.
-- you cannot close a question from what you have. A stop you did not need costs one
-  keystroke; a guess you should not have made costs this lane.
+Re-read the `shared` section before every commit; it changes while you work.
+
+Stop and ask, before you act when any is true:
+
+- you cannot close a question/ambiguity from what you have.
+- you need to change or suggest changing anything outside your scope.
+- another agent is overstepping your scope, and blocking you from running your plan successfully.
 
 When the answer changes something shared, append it to the `shared` section with the
 revision you read. If the write is rejected as a revision mismatch, another lane
 amended first: re-read, re-decide, write again.
 
-Do not close this process. It is closed from outside, once your work has been read.
+Once you think you are done, suggest using solo mcp to terminate all the processes you spawned including you that are no longer needed.
 ```
+
+## Spawn
+
+Prepare one `spawn_agent` per lane, with:
+
+- `name`: `<slug>:<scope>`
+- `extra_args`: `["--model", "<tier>", "<the lane contract, substituted>"]`
+
+Invoke parallel tool use.
