@@ -42,6 +42,14 @@ explained.
   runs that could have been split**. Unlike the fog stop, its failures land in the diff, so they are
   at least visible after the fact.
 
+- **Whether the contract has to arrive at spawn at all.** The plugin's entire reason to exist is
+  that a running lane refuses this contract later and an identical lane obeys it at spawn. That
+  pair was measured **once each — and on a different contract**, `confirm_self_close`, which has
+  since been deleted from the design. The stop-and-ask contract that actually ships has never been
+  retrofit-tested. If a running lane accepts it, typing the contract by hand is as good as this
+  plugin and the plugin should go. Cheapest possible check, and worth doing before the 5 runs:
+  hand one running lane the contract mid-flight and see.
+
 ## The risk this whole design sits on
 
 Every lane stopping is the product, and it has no precedent. One lane in 110 has ever stopped to

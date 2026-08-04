@@ -5,14 +5,21 @@ disable-model-invocation: true
 ---
 
 The human rules on the seams. Each lane is spawned carrying them and one contract: **stop and ask
-when the work leaves what was agreed.** A running lane refuses that contract if handed it later —
-correctly, as prompt injection — so it goes in at spawn or not at all. That timing is the whole
-product.
+when the work leaves what was agreed.**
 
-Hand-spawned lanes run past their scope instead, silently, surfacing at merge.
+The bet is that this contract only works if it arrives at spawn — that a running lane handed it
+later reads it as prompt injection and refuses. **That is a bet, not a property.** What was
+measured is one lane refusing a *different* contract (self-close, since deleted) and one lane
+obeying it at spawn: n=1 each, on text that no longer ships. The stop-and-ask contract has never
+been retrofit-tested. If it turns out a running lane accepts it, this plugin has no reason to
+exist — so read that as the first thing to disconfirm, not as its foundation.
+
+Hand-spawned lanes, carrying no such contract, run past their scope instead — measured at 43% of
+runs that could have been split, silently, surfacing at merge.
 
 **The bar for everything below is the number of rulings the human makes.** A step that catches more
-at the cost of more rulings is the wrong step. Five of the human's turns is the budget for a whole run.
+at the cost of more rulings is the wrong step. `soloflows/PROOF.md` owns the threshold; do not
+restate it here.
 
 ## 1. Scopes and couplings, from disk
 
@@ -99,16 +106,19 @@ re-read, re-decide, write again.
 Do not close this process. It is closed from outside, once your work has been read.
 ```
 
-Every clause is load-bearing and none is decoration:
+Why each clause is worded as it is. None of these is verified to work — they are reasoned choices
+about which failure is worse, and every one of them is a model's judgment with a rate nobody has
+measured:
 
 - **A pointer, not an inlined scope.** A lane that never re-reads a pointer cannot start —
   loud. One that never re-reads an inlined brief works happily against a superseded seam —
-  silent, and surfaces at merge.
-- **The cost-asymmetry sentence is the mechanism**, not encouragement. A bare permission line
-  states the permission but not which error is worse, leaving the model's own finish-the-task
-  bias to decide — and that bias runs toward not stopping.
-- **"Do not close this process"** is what keeps a finished lane readable. Nothing else produces
-  its absence, so a lane that closes itself vanishes before it has been read.
+  silent, and surfaces at merge. Chosen for the loud failure.
+- **The cost-asymmetry sentence, not a bare permission.** A permission line states the permission
+  but not which error is worse, leaving the model's own finish-the-task bias to decide — and that
+  bias runs toward not stopping. Whether naming the asymmetry actually moves it is untested.
+- **"Do not close this process"** is what keeps a finished lane readable: nothing else produces
+  its absence, so a lane that closes itself vanishes before it has been read. A lane that ignores
+  the line takes its own output with it, and nothing will report that it did.
 
 ## What the human does next, and it is not yours
 
