@@ -31,7 +31,7 @@
     {
       "name": "soloflows",
       "source": "./soloflows",
-      "description": "Fan one goal across concurrent Solo lanes. You rule on the seams; each lane is spawned carrying them and a contract to stop when the work leaves what you agreed — a contract a running lane cannot be given later. Invoked only by you.",
+      "description": "Fan one goal across concurrent Solo lanes. You rule on the seams; each lane is spawned carrying them and a contract to stop when the work leaves what you agreed. Invoked only by you.",
       "category": "engineering",
       "keywords": ["solo", "lanes", "seams", "concurrency"]
     },

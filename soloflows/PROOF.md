@@ -35,13 +35,11 @@ No number attaches to these. They are written here so that a failure is recognis
 explained.
 
 - **The fog stop.** A lane that guesses where it should have stopped. No mechanical proxy exists
-  and none is coming — the corpus cannot supply one, because in 110 spawned lanes across six weeks
-  exactly one ever stopped to ask, and that one was a probe. The behaviour has never been permitted
-  to occur, so there is nothing to score against.
+  and none is coming: for the reason in the section below, the behaviour has never been permitted to
+  occur, so there is nothing to score a proxy against.
 - **Seam enforcement**, which the fog stop now carries alone. Scope growth was measured in **43% of
   runs that could have been split**. Unlike the fog stop, its failures land in the diff, so they are
   at least visible after the fact.
-
 - **Whether the contract has to arrive at spawn at all.** The plugin's entire reason to exist is
   that a running lane refuses this contract later and an identical lane obeys it at spawn. That
   pair was measured **once each — and on a different contract**, `confirm_self_close`, which has
@@ -52,9 +50,12 @@ explained.
 
 ## The risk this whole design sits on
 
-Every lane stopping is the product, and it has no precedent. One lane in 110 has ever stopped to
-ask. Every real fan-out on record was briefed *"Autonomous — do not ask questions."* If the shipped
-plugin feels wrong, start here rather than with the mechanism.
+Every lane stopping is the product, and it has no precedent. **In 110 spawned lanes across six
+weeks, exactly one ever stopped to ask — and that one was a probe.** Every real fan-out on record
+was briefed *"Autonomous — do not ask questions."* The behaviour this plugin is built on has never
+been permitted to occur, so nothing in the record supports it or refutes it.
+
+If the shipped plugin feels wrong, start here rather than with the mechanism.
 
 ## Readings
 

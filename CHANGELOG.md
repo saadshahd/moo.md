@@ -34,6 +34,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
   The lane contract lives inline in the skill, not in a fragment. `soloflows` has exactly one skill, and this repo's own unit rule reserves a fragment for a contract that must read identically in **≥2** skills — at one consumer it is an abstraction whose only job is to be copied once. The plugin therefore has no `_fragments/` dir and is correctly absent from `sync --list`.
 
+  The install-facing descriptions in `plugin.json` and `marketplace.json` state the contract without asserting its timing. They originally read *"a contract a running lane cannot be given later"* — the plugin's central bet, phrased as a settled property, in the two surfaces a person reads before installing anything. The repo installs from the working tree, so that text ships the moment it is written; a claim being fenced in `PROOF.md` and unfenced on the marketplace register is the version that reaches someone else.
+
   Ships unproven and says so. `PROOF.md` carries the kill thresholds, written before the first run: worse than **1 in 3** lanes producing thrown-away work, or more than **5 of your turns per run**, over 5 real runs of ≥2 lanes each. Its central risk is named there rather than in the plugin — every lane stopping is the product, and in 110 spawned lanes across six weeks exactly one ever stopped to ask, which was a probe. No version is published while the proof period runs; the repo installs as a `source: directory` marketplace, so a working-tree version bump is the install.
 
 ## [hunch@0.0.16] - 2026-08-04
