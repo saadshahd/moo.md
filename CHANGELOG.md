@@ -24,6 +24,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
 
+## [soloflows@0.0.1] - 2026-08-04
+
+### Added
+
+- feat(soloflows): a new plugin — one slash-only skill, one contract fragment, `PROOF.md`. `/soloflows:run <goal>` proposes scopes and couplings from disk, asks only about the couplings disk cannot settle, writes one Solo scratchpad as the run's record, spawns each lane in a single call carrying the seams and the contract, and then prints nothing. What it buys is the contract's **timing**: a running lane refuses a contract handed to it later, correctly reading it as prompt injection, while an otherwise identical lane given the same contract at spawn obeys it. Hand-spawned lanes therefore run past their scope instead — measured at **43% of runs that could have been split**, silently, surfacing at merge.
+
+  Deliberately absent, each ruled rather than skipped: no watcher, no deterministic layer, no npm package, no drain surface, and no third lane state — `spinning` means working and `static` means *wants you* **or** *finished*, indistinguishably. Acceptance could not be written as a command up front for 54% of real work, so nothing machine-closes a lane; every lane is closed by hand, by looking. The skill is silent at both ends — no closing summary, no eligibility rate in its description — because a surface carries no self-rationale. It is slash-only (`disable-model-invocation`) on structural grounds: a plugin whose thesis is *the agent never decides when the human matters* cannot depend on the model deciding when to invoke it.
+
+  Ships unproven and says so. `PROOF.md` carries the kill thresholds, written before the first run: worse than **1 in 3** lanes producing thrown-away work, or more than **5 of your turns per run**, over 5 real runs of ≥2 lanes each. Its central risk is named there rather than in the plugin — every lane stopping is the product, and in 110 spawned lanes across six weeks exactly one ever stopped to ask, which was a probe. No version is published while the proof period runs; the repo installs as a `source: directory` marketplace, so a working-tree version bump is the install.
+
 ## [hunch@0.0.16] - 2026-08-04
 
 ### Removed

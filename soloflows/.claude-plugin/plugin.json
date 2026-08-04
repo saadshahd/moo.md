@@ -1,0 +1,15 @@
+{
+  "name": "soloflows",
+  "version": "0.0.1",
+  "description": "Fan one goal across concurrent Solo lanes. You rule on the seams; each lane is spawned carrying them and a contract to stop when the work leaves what you agreed — a contract a running lane cannot be given later. Invoked only by you.",
+  "keywords": [
+    "solo",
+    "lanes",
+    "seams",
+    "concurrency"
+  ],
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
+}
