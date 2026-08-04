@@ -1,5 +1,5 @@
 ---
-name: run
+name: soloflow
 description: Fan one goal across concurrent Solo lanes. It works out the split itself, spawns each lane with a contract to stop when work leaves its scope, and tells you in plain words what is running.
 disable-model-invocation: true
 ---

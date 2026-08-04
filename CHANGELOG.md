@@ -24,6 +24,18 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
 
+## [hunch@0.0.17] - 2026-08-04
+
+### Added
+
+- feat(hunch): `soloflow` — fan one goal across concurrent Solo lanes. It works out the split itself, spawns each lane in a single call carrying its scope and a contract to stop when work leaves it, and says in plain words what is running. Slash-only (`disable-model-invocation`) on structural grounds: a design whose thesis is *the agent never decides when the human matters* cannot depend on the model deciding when to invoke it. `HYPOTHESIS.md` carries graduate and kill conditions set before any run — kill at worse than 1 in 3 lanes producing thrown-away work, or more than 5 of the human's turns in a single run, over 5 real runs of ≥2 lanes each.
+
+### Removed
+
+- change(hunch): the `soloflows` plugin is gone, one version after it appeared, and its content is this `soloflow` skill. It shipped as a top-level plugin because ticket 09 ruled placement when the design still had a watcher, an npm package and a whole deterministic layer under it — all of which the pre-ship gate then killed. What was left was one slash-only skill that declares itself unproven and carries kill thresholds, which is the exact case this repo's unit rule sends to hunch (*"an unproven idea → hunch skill + `HYPOTHESIS.md`; graduates or dies"*) and which hunch's own description already covered verbatim.
+
+  09 never evaluated hunch — its options were own-plugin, a skill inside `hope`, or no unit at all — and the argument that ruled out `hope`, *a bet that can be killed must not ride inside something that cannot*, argues **for** hunch, which is pre-1.0 and where three skills were killed the same day. This does reverse the design's early *production, not experimental* lock, knowingly: that was ruled about a plugin that no longer exists. `PROOF.md` is folded into `HYPOTHESIS.md` rather than carried alongside it, ending two names for one concept.
+
 ## [soloflows@0.0.2] - 2026-08-04
 
 ### Changed
