@@ -11,7 +11,7 @@ human, or found by a search, after the code is gone.
 fragments removed in the same commit, and at things that were never in this repo — a `~/Desktop`
 working dir, a `soloterm.com` docs page, a memory file. Expect dead paths; that is the cost of
 keeping the text unedited, and editing them would make this a summary rather than a record. The
-table above is the part written to survive on its own.
+table below is the part written to survive on its own.
 
 ## Removed in 0.0.16 — the coordination cluster
 

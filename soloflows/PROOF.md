@@ -3,7 +3,11 @@
 What would kill `soloflows`, written down before the first run so that a bad result cannot be
 reinterpreted into a good one afterwards.
 
-This file holds `soloflows`' own readings only. No predecessor measurement enters it.
+**Readings below are `soloflows`' own runs only.** No predecessor measurement is ever recorded as a
+result here — hunch's record is hunch's, and lives in `hunch/GRADUATED.md`.
+
+Thresholds are a different matter and do cite prior measurement, because that is what set them.
+A number with no derivation is arbitrary, and one derived after the fact is not a threshold at all.
 
 ## Scale
 

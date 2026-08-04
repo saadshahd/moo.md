@@ -73,9 +73,9 @@ One `spawn_agent` call per lane. No second call, ever.
 Then stop. **Print nothing** — no roster, no summary, no count. Every fact such a message would
 carry is already on the tree, and the human chose the slug in step 3.
 
-<!-- f contract -->
-Substitute `<slug>` and `<scope>`; send it as the lane's first turn, at spawn. Nothing else
-is sent to a lane, ever.
+### The contract, verbatim
+
+Substitute `<slug>` and `<scope>`. Nothing else is ever sent to a lane.
 
 ```markdown
 You are lane `<slug>:<scope>`, one of several working the same goal in parallel.
@@ -109,7 +109,6 @@ Every clause is load-bearing and none is decoration:
   bias to decide — and that bias runs toward not stopping.
 - **"Do not close this process"** is what keeps a finished lane readable. Nothing else produces
   its absence, so a lane that closes itself vanishes before it has been read.
-<!-- /f -->
 
 ## What the human does next, and it is not yours
 
