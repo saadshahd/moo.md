@@ -75,7 +75,7 @@ The env must be up and ALL the goal surfaces are running:
 - is it a repl? a storybook? a server? a playground?
 - does it hot reload, does the user need to do anything you can't to keep observing progress?
 - cli? use Solo MCP for terminals
-- browser? use a named browser window you can control - with all the needed tabs in the same window.
+- browser? use a headed named browser window you can control - with all the needed tabs in the same window for the user to observe and interact with.
 
 The user MUST see progress ASAP and judge it internally against their expectations/mental-model.
 
