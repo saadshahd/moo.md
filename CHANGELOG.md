@@ -35,7 +35,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - change(hunch): `soloflow`'s browser surface must be **headed**, and is opened for the user to interact with rather than only to watch. A headless window satisfies "the surface is running" while showing the human nothing, which is the one thing the surface step exists to prevent; and a surface the user can only observe cannot be judged against a mental model that includes what happens when you click.
-- change(hunch): `soloflow`'s sections shorten to one word each — `Catch up`, `Gate`, `Mechanics`, `Record`, `Contract`, `Spawn`, `Surface`, `Pause`. The 0.0.19 entries below name `Surface progress` and `Pause and wait`; those are the same steps under their old headings.
+- change(hunch): `soloflow`'s headings shorten — `Get up to speed, SILENTLY:` → `Catch up, SILENTLY:`, `Record it` → `Record`, `Lane contract` → `Contract`, `Surface progress` → `Surface`, `Pause and wait` → `Pause`, alongside the new `Definitions`, `Gate` and `Mechanics`. The 0.0.19 entries below name the old headings; those are the same steps.
 
 ## [hunch@0.0.19] - 2026-08-05
 
