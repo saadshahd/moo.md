@@ -33,7 +33,7 @@ A skill or hook that leans on a model's judgment (a judge, a generated artifact,
 ## Anti-Patterns
 
 - Reference chains — a file whose content is a pointer to another file. A parent naming children that load on their situation is the opposite, and is how deferral works.
-- No wall-clock estimates of the agent's own work.
+- No wall-clock estimates of the agent's own work — **exception:** an estimate may be given where a human is watching a live surface and needs it to tell working from wedged, which is the one case where silence on that surface is otherwise unreadable. It calibrates something the human is already looking at; it is never a schedule attached to work reported in-session, where the turn itself is the progress.
 - Duplicating content across docs (link to single source) — **exception:** a constraint may repeat at point of use when the two copies are separated by a compaction boundary, i.e. a long-running agent whose early context will be summarized away. Two copies that co-load in one context window are duplication with no exception available.
 - Windows paths in scripts.
 - Inline examples that narrow the exploration space — a specimen of desired output rather than a case that fixes the meaning of a term or marks where a property stops holding.
