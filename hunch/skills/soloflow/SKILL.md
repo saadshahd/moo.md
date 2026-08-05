@@ -4,20 +4,48 @@ description: Grind on one goal concurrently in a Solo workspace
 disable-model-invocation: true
 ---
 
-## Get up to speed, SILENTLY:
+You are the orchestrator of one goal that will run across several agents concurrently in Solo.
+Your job is to find the fastest route through it without compromising cost or quality.
+
+## Definitions
+
+- you: elected leader, you have breadth and speed but lack facts and the user's ubiquitous language.
+- brief: the goal, minimally but clearly stated.
+- scope: what an agent owns and may change freely.
+- contract: what agents share and none may change alone. What makes something a contract? _a lane may not change this alone._
+- user: the goal owner, the work observer, their mental model comes out of the continuous journey.
+
+## Catch up, SILENTLY:
 
 - Internalise the goal.
 - Explore the project context.
 - Pin the goal to the context.
+- Extract the user mental model, if not already clear @references/mental-model.md.
 - Group the files the goal touches into SCOPES
 - Find what more than one scope touches: a file, a type, an ordering, a protocol, a function, etc.
 - Are there any organizational changes to make delivering the goal concurrently more efficient (speed, cost, maintainability)?
   - Yes? surface them to the user in few sentences. as a bullet list of before vs after.
   - No? proceed to the next step.
 
-IF 1 scope? say so plainly. A second lane must be worth its own warm-up and its own section in the record.
+## Gate
 
-## Record it
+- Warming an agent into a piece of work costs real money.
+- A cold start is tens of thousands of tokens before anything happens.
+- Reaching competence in a repo typically costs several dollars beyond it.
+- IF one scope only? say so and STOP.
+- A second lane must be worth its own warm-up and its own section in the record.
+
+## Mechanics
+
+Specify the mechanics of each lane. Possible primitives, not limited to:
+
+- Cost scales as context × turns, not context size only
+- Concurrent spawns miss the prompt cache
+- Each git worktree has a setup (installs, builds, tooling) cost you must satisfy.
+- `Edit` is a compare-and-swap, `Write` is a blind overwrite
+- Model tier is not free, plan wisely.
+
+## Record
 
 - Pick a short `<slug>`.
 - One Solo scratchpad, `name` and `tags` both `<slug>` with Sections:
@@ -27,7 +55,7 @@ IF 1 scope? say so plainly. A second lane must be worth its own warm-up and its 
 
 Every shared thing must be owned by exactly one lane. Others stop, wait or ask before changing it.
 
-## Lane contract
+## Contract
 
 Substitute `<slug>` and `<scope>` with the lane's actual values.
 
@@ -67,7 +95,7 @@ Invoke parallel tool use.
 You - the current elected lead - NEVER work a lane.
 A rejected spawn must be reported to the user and handled appropriately through suggestions of failure handling options.
 
-## Surface progress
+## Surface
 
 The env must be up and ALL the goal surfaces are running:
 
@@ -79,7 +107,7 @@ The env must be up and ALL the goal surfaces are running:
 
 The user MUST see progress ASAP and judge it internally against their expectations/mental-model.
 
-## Pause and wait
+## Pause
 
 Print, briefly:
 
