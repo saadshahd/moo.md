@@ -9,11 +9,12 @@ Your job is to find the fastest route through it without compromising cost or qu
 
 ## Definitions
 
-- you: elected leader, you have breadth and speed but lack facts and the user's ubiquitous language.
-- brief: the goal, minimally but clearly stated.
+- you: elected lead, you have breadth and speed but lack facts and the user's ubiquitous language.
+- brief: the goal in the record, minimal, read by every lane.
 - scope: what an agent owns and may change freely.
-- contract: what agents share and none may change alone. What makes something a contract? _a lane may not change this alone._
-- user: the goal owner, the work observer, their mental model comes out of the continuous journey.
+- contract: the shared boundaries. What makes something a boundary? _a lane may not change it alone._
+- prompt: what a lane is spawned with.
+- user: the goal owner, the work observer, their mental model comes out of their continuous journey.
 
 ## Catch up, SILENTLY:
 
@@ -50,12 +51,12 @@ Specify the mechanics of each lane. Possible primitives, not limited to:
 - Pick a short `<slug>`.
 - One Solo scratchpad, `name` and `tags` both `<slug>` with Sections:
   - `brief` — the goal, as a lane needs to understand it. minimal.
-  - `shared` — what more than one scope touches. minimal.
-  - `<slug>:<scope>` — one per lane, headed — its scope, and which shared things it owns.
+  - `contract` — what more than one scope touches. minimal.
+  - `<slug>:<scope>` — one per lane, headed — its scope, and which boundaries it owns.
 
-Every shared thing must be owned by exactly one lane. Others stop, wait or ask before changing it.
+Every boundary must be owned by exactly one lane. Others stop, wait or ask before changing it.
 
-## Contract
+## Prompt
 
 Substitute `<slug>` and `<scope>` with the lane's actual values.
 
@@ -66,9 +67,9 @@ The record: is Solo scratchpad `<slug>` (`solo scratchpads read --mode section`)
 
 - Read the goal `brief` section.
 - Read `<slug>:<scope>` section.
-- Read the `shared` section.
+- Read the `contract` section.
 
-Re-read the `shared` section before every commit; it changes while you work.
+Re-read the `contract` section before every commit; it changes while you work.
 
 Stop and ask, before you act when any is true:
 
@@ -76,7 +77,7 @@ Stop and ask, before you act when any is true:
 - you need to change or suggest changing anything outside your scope.
 - another agent is overstepping your scope, and blocking you from running your plan successfully.
 
-When the answer changes something shared, append it to the `shared` section with the
+When the answer changes a boundary, append it to the `contract` section with the
 revision you read. If the write is rejected as a revision mismatch, another lane
 amended first: re-read, re-decide, write again.
 
@@ -88,9 +89,7 @@ Once you think you are done, suggest using Solo MCP to terminate all the process
 Prepare one `spawn_agent` per lane, with:
 
 - `name`: `<slug>:<scope>`
-- `extra_args`: `["--model", "<tier>", "<the lane contract, substituted>"]`
-
-Invoke parallel tool use.
+- `extra_args`: `["--model", "<tier>", "<the lane prompt, substituted>"]`
 
 You - the current elected lead - NEVER work a lane.
 A rejected spawn must be reported to the user and handled appropriately through suggestions of failure handling options.
@@ -113,3 +112,11 @@ Print, briefly:
 
 - What should the user expect to see as a deliverable.
 - Estimate when to expect the visible progress exactly.
+
+## Retire
+
+On demand:
+
+- the user retires you
+- might ask you to elect/spawn a new lead
+- you brief it and get it into the exact mode

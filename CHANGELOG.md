@@ -25,6 +25,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
 
+## [hunch@0.1.0] - 2026-08-05
+
+### Added
+
+- feat(hunch): `soloflow` gains `Retire` — on demand the user retires the lead, and may ask it to elect and spawn its own successor, which the outgoing lead briefs and gets into the same mode before it goes. The lead was already described as *elected* with nothing anywhere saying by whom or how it ends; triggering the flow is the election, and this is its other half. The handover is a briefing, not only a document: the record shows what was decided, not what the lead was in the middle of.
+
+### Changed
+
+- change(hunch)!: `soloflow` splits the two concepts `contract` was carrying. **contract** now means only the shared boundaries, and the scratchpad section that held them takes the word — it was called `shared`, a second name for the same concept. One of them is a *boundary*, which is what a lane may not change alone. **prompt** takes the other meaning, what a lane is spawned with, so `## Contract` becomes `## Prompt` and Spawn passes `<the lane prompt, substituted>`. Before this, one name carried two concepts and one concept answered to two names, both inside the vocabulary section that exists to prevent exactly that. The rename carries into `HYPOTHESIS.md`, where the founding bet now reads *lanes that each carry one prompt*; its next clause becomes *the stop-and-ask rule only holds if it arrives at spawn*, since "the prompt holds" names the wrong thing.
+- change(hunch): `soloflow` drops `Invoke parallel tool use.` from `Spawn`. Batching independent tool calls is harness default, so the line bought nothing — and it sat next to the `Mechanics` note that concurrent spawns miss the prompt cache, which reads as a tension it is not: the cache miss is each spawned agent cold-starting its own session, and it happens however the calls are dispatched.
+
 ## [hunch@0.0.20] - 2026-08-05
 
 ### Added
