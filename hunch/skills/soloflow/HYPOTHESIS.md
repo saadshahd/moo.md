@@ -34,4 +34,16 @@ That second result is also why this skill asks the human nothing. The design had
 
 ### Readings
 
-_None yet — no run has happened._
+#### 2026-08-05 — run 1, four lanes planned, three spawned
+
+The first real run, and it did not reach the thresholds — it failed before them, on a mechanism nothing in the design had a path for. Three `spawn_agent` calls succeeded; the fourth returned `Over free tier limit — upgrade or reduce projects/processes`. **Capacity is N−1 and the design assumed N** — the lead is itself a process counting against the same cap, so a four-lane plan needs five slots, and the arithmetic only fails at spawn, after the scratchpad is written with four lane sections.
+
+The lead absorbed the unstaffed lane and worked it inline. It picked by *coupling* — the lane with zero file overlap — because coupling is what the skill trains the lead to think about. That criterion was the wrong one: least-coupled is not cheapest-in-context, and the absorbed lane put nine files across two packages into the arbiter's context exactly as three lanes were about to return `shared` appends for it to arbitrate. `Agent` was never weighed; the session prompt forbids it unprompted.
+
+Three readings, none of them about the bet itself:
+
+- **The lead had no stop-and-ask clause.** The lane contract has a good one; the orchestrator has none, so an unrecoverable environment constraint resolved in the lead's judgment and was announced after the decision rather than raised as a question.
+- **Absorption is invisible where an unstaffed section is not.** A lane parked in a written-but-unstaffed scratchpad section can be staffed by anyone later. A lane folded into the lead can not be seen at all.
+- **A pre-spawn capacity gate was written and then removed the same day.** The tier cap is not readable from `list_processes`, so the gate's cannot-tell branch fires on every run — `:31`'s ritual, rebuilt. The failure path after spawn carries it instead: report, never absorb.
+
+**Nothing here reads on the founding claim.** No lane stopped to ask, because the run never got far enough for one to; the retrofit test at `:33` is still uncosted and still the first thing to do.
