@@ -1,0 +1,14 @@
+{
+  "name": "bits",
+  "version": "0.0.1",
+  "description": "Minimal meta-prompting helpers — the lower-level skill set higher-level skills reuse.",
+  "keywords": [
+    "meta",
+    "compose",
+    "primitives"
+  ],
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
+}

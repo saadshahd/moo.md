@@ -33,6 +33,17 @@
       ]
     },
     {
+      "name": "bits",
+      "source": "./bits",
+      "description": "Minimal meta-prompting helpers — the lower-level skill set higher-level skills reuse.",
+      "category": "experimental",
+      "keywords": [
+        "meta",
+        "compose",
+        "primitives"
+      ]
+    },
+    {
       "name": "hunch",
       "source": "./hunch",
       "description": "A grab bag of hunches — experimental skills and plugin features tried here before they earn a place in hope or sound. Everything graduates or dies.",

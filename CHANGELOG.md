@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- feat(bits): new experimental plugin — minimal meta-prompting helpers, the lower-level skill set higher-level skills reuse. First skill: `compose` — the user hands over ingredient skills/moves plus an ask, and the agent becomes their selector for the conversation, firing each when its entry condition is met instead of relying on frontmatter auto-invocation (measured as a coin flip: 88.9% mean activation, 37% in the worst hook+passive cell). Each instruction traces to a measured finding: no per-turn selection gate (self-critique paradox, 98%→57%), a one-line fire marker whose mechanism is recency not memory (invoked skill text persists all session; decay is salience), a wrong-if check after each fire (prose skills' substitute for the honing signal executable-skill libraries have), amend-one-belief never re-derive (ACE's context collapse). Registered in the marketplace; unproven — proof harness comes later.
+
 ### Changed
 
 - change(repo): the no-wall-clock-estimates anti-pattern gains a carve. `hunch@0.0.19` shipped a `soloflow` lead that estimates when visible progress should appear, and the CHANGELOG called it a deliberate exception — but doctrine lives in `CLAUDE.md`, so the rule and the shipped skill contradicted each other in one tree with the resolution recorded only in a release note. The carve names the case that earns it: a human watching a live surface, where silence is otherwise unreadable and an estimate is what separates working from wedged. It closes the loophole it opens — an estimate calibrates a surface the human is already looking at, and is never a schedule attached to work reported in-session, where the turn itself is the progress.
