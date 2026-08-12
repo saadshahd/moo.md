@@ -1,0 +1,106 @@
+{
+  "move": "explain",
+  "cases": [
+    {
+      "id": "explain-pos-001",
+      "type": "positive",
+      "source": "mined",
+      "ref": "seeds.json#172",
+      "input": "tell me more about your \"Flink CEP\" surfacing\nI don't get soft coding\nI don't feel I learned anything\n\nI also still don't understand the category theory in this project and it's value",
+      "criteria": "The user says earlier explanations did not land ('I don't feel I learned anything') and names concepts they still don't understand. A correct response re-explains each named concept starting with one plain sentence stating what it is or why it matters here, takes a genuinely different and simpler angle rather than repeating the earlier explanation at more length, and avoids technical terms the user did not use unless immediately glossed. It does not push one long undifferentiated wall."
+    },
+    {
+      "id": "explain-pos-002",
+      "type": "positive",
+      "source": "mined",
+      "ref": "seeds.json#422",
+      "input": "what are these numbers and what are these conversations?",
+      "criteria": "The user asks what some numbers and conversations they are looking at mean, without including them. A correct response answers in plain language if the referent is determinable from what it has, or briefly says it needs to see them and asks in one short line. It does not speculate at length about what they might be, and it does not open with preamble or headings before saying anything useful."
+    },
+    {
+      "id": "explain-pos-003",
+      "type": "positive",
+      "source": "mined",
+      "ref": "seeds.json#441",
+      "input": "I don't get or understand the engine question",
+      "criteria": "The user says they do not understand a question they were previously asked (about an 'engine'). A correct response restates that question in one plain sentence with a genuinely different framing — not the same words repeated or merely expanded. If the original question is not available, it says so plainly and asks one short question to recover it rather than guessing at length. No technical terms the user has not used."
+    },
+    {
+      "id": "explain-pos-004",
+      "type": "positive",
+      "source": "mined",
+      "ref": "seeds.json#445",
+      "input": "learn soloterm inside out\nis it extendable?",
+      "criteria": "The user wants to learn a system named soloterm inside out and asks whether it is extendable. A correct response leads with a direct one-sentence plain answer (what soloterm is, or whether it is extendable) before any detail, then offers a small set of directions to go deeper or states what it will read to find out. The opening line has no unexplained jargon, and the response does not front-load an exhaustive dump."
+    },
+    {
+      "id": "explain-pos-005",
+      "type": "positive",
+      "source": "mined",
+      "ref": "seeds.json#446",
+      "input": "what are routines, how to try it out simple and self document what we can use from it before brainstorming what to do exactly",
+      "criteria": "The user asks what routines are, how to try one out simply, and wants understanding established before any brainstorming. A correct response states what routines are in one plain opening sentence, follows with a minimal concrete way to try one, and defers brainstorming — it does not slide into proposing uses, because the user explicitly gated that behind understanding. No unexplained jargon in the opening."
+    },
+    {
+      "id": "explain-pos-006",
+      "type": "positive",
+      "source": "mined",
+      "ref": "seeds.json#452",
+      "input": "I don't use  coast at all anymore\ntell me more about the 3rd idea",
+      "criteria": "The user says they no longer use one thing and asks to hear more about 'the 3rd idea' from an earlier list. A correct response goes deeper on that one item only, opening with substance in plain language — or, if the earlier list is not available, says so in one plain line and asks for it. It does not re-explain the whole list and does not speculate at length about what the idea might have been."
+    },
+    {
+      "id": "explain-pos-007",
+      "type": "positive",
+      "source": "mined",
+      "ref": "seeds.json#463",
+      "input": "also why the external field seem fully unstyled ?",
+      "criteria": "The user asks why an external field appears fully unstyled. A correct response leads with the most likely cause in one plain sentence, or one plain line naming exactly what it must look at to find the cause, followed by the check or fix. It does not open with a general lecture about styling systems, and any technical term in the opening is one the user used or is immediately glossed."
+    },
+    {
+      "id": "explain-neg-001",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#4",
+      "input": "agree, my issue is that the names I think ad not sure don't play in that game",
+      "criteria": "The user agrees with a point, then voices an unease they cannot pin down: the names they have in mind 'don't play in that game'. A correct response works to draw the unease out — offering concrete candidate names, contrasts, or examples the user can react to, one focused probe at a time. It does not lecture the user with an explanation of naming principles, and it does not plow ahead as if the ask were clear.",
+      "wrong_if": "explaining something settled when the user's actual problem is they cannot articulate what they hold — it should be drawn out, not lectured"
+    },
+    {
+      "id": "explain-neg-002",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#155",
+      "input": "using multiple agents using soloterm\nread the sound corpus fully, do you see gaps? I would like to learn about the gaps and what filling them adds as a value.\n\nthe corpus should cover software engineering practcies and evolve and enhance the agentic coding tools and models towards the best practicies rather than the most practices\n\nwhat can we do? let's use /grill-me \nto figure out the length, shape, intention and target from this long session with multiple agents using soloterm scratches,agents",
+      "criteria": "The user asks the agent to read a corpus fully, find gaps, and says they would like to learn about the gaps and what filling them adds, working it out together. A correct response starts the requested investigation and engages the user on goals interactively. It does not deliver an upfront general explainer about corpora, gap analysis, or software practice — the gaps do not exist yet and there is nothing settled to teach.",
+      "wrong_if": "the word 'learn' baits a lecture; the gaps must be found and drawn out, not explained"
+    },
+    {
+      "id": "explain-neg-003",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#449",
+      "input": "Open the demo in agent-browser and give me your own read on Almond before we decide its fate",
+      "criteria": "The user asks the agent to open a demo and give its own read on something named Almond before its fate is decided. A correct response forms and states the agent's own assessment — an opinion that bears on keep-or-kill. It does not respond with a neutral explanation of what Almond is or how it works while withholding judgment.",
+      "wrong_if": "a verdict request mistaken for an understanding request"
+    },
+    {
+      "id": "explain-neg-004",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#147",
+      "input": "In utils.ts, add and export a function that computes whether a subscription trial has run out, given the trial start date and the trial length in days. Write the code.",
+      "criteria": "The user asks for a specific exported function in utils.ts computing whether a subscription trial has run out, with the inputs stated. A correct response writes the code. It does not explain trial-expiry concepts, date math, or subscription models, and it does not ask questions — the request is fully specified.",
+      "wrong_if": "a plain, fully specified work request treated as a teaching moment"
+    },
+    {
+      "id": "explain-neg-005",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#37",
+      "input": "commit all work and give me online next session prompt",
+      "criteria": "The user says to commit all work and give a one-line prompt for the next session. A correct response commits (or states exactly what it is committing) and hands over one short prompt line. It does not explain git workflows or session management, and it does not produce long structured output where one line plus a brief confirmation was asked.",
+      "wrong_if": "plain work plus a minimal-output ask answered with an explainer"
+    }
+  ]
+}

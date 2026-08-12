@@ -1,0 +1,50 @@
+{
+  "move": "widen",
+  "cases": [
+    {
+      "id": "widen-neg-001",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#38",
+      "input": "one line prompt that I could reuse across all sessions to pickup and proceed the wayfinder map",
+      "criteria": "The user asks for a one-line prompt they could reuse across all sessions to pick up and proceed a specific map. A correct response is that one line, covering what resuming needs. It does not generalize into a broad rule or framework for session resumption — 'reusable' here means saying the same short prompt again, not inducing a wider rule.",
+      "wrong_if": "'reuse across all sessions' baits generalization; a closed workflow wants its shortest statement"
+    },
+    {
+      "id": "widen-neg-002",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#57",
+      "input": "I will drive the map, give me a prompt to start a next session that will use solot mcp agents to spawn agents to complete the map. give me the minimal prompt",
+      "criteria": "The user says they will drive the map and asks for the minimal prompt to start a next session that spawns agents to complete it. A correct response is that minimal prompt, nothing broader. It does not produce a general agent-spawning methodology or a widened rule set.",
+      "wrong_if": "a minimal-statement ask about a closed workflow"
+    },
+    {
+      "id": "widen-neg-003",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#594",
+      "input": "give me a one line summary of everything we decided",
+      "criteria": "The user asks for a one-line summary of everything decided. A correct response is the shortest faithful statement of those decisions. It does not induce general principles or rules from them — the set is closed and nothing unseen is coming.",
+      "wrong_if": "closed set; the ask is compression, not generalization"
+    },
+    {
+      "id": "widen-neg-004",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#208",
+      "input": "Apply statement + _Avoid_\nand also need t find a better detect",
+      "criteria": "The user says to apply the statement plus an Avoid clause, and notes the rule still needs a better 'detect'. A correct response tightens how the rule is detected — a more mechanical trigger anyone would apply the same way. It does not broaden what the rule covers; coverage is not the complaint, checkability is.",
+      "wrong_if": "checkability, not breadth"
+    },
+    {
+      "id": "widen-neg-005",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#257",
+      "input": "what is the crew hunch claim? what is the proper fixture that I could run crew on vs naive vs sequential where we identify crew real value and wins",
+      "criteria": "The user asks what the crew hunch claim is, and what proper fixture they could run crew on versus naive and sequential alternatives to identify its real value and wins. A correct response states the claim and designs a concrete, runnable fixture with comparable arms. It does not widen the claim into a general rule — the ask is to make one claim mechanically checkable.",
+      "wrong_if": "claim-to-fixture is a checkability move, not a breadth move"
+    }
+  ]
+}

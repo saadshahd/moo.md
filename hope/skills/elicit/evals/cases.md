@@ -2,7 +2,7 @@
 
 Source of truth: `.scratch/moves/seeds.json` (positives — the only approved source), `.scratch/moves/all-turns.jsonl` (negatives, by id). No fabricated cases.
 
-## Positives (8 — all organic seeds)
+## Positives (all organic seeds)
 
 | id | turn (verbatim source in seeds.json) | why it fires |
 |---|---|---|

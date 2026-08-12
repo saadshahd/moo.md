@@ -1,0 +1,50 @@
+{
+  "move": "clarify",
+  "cases": [
+    {
+      "id": "clarify-neg-001",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#4",
+      "input": "agree, my issue is that the names I think ad not sure don't play in that game",
+      "criteria": "The user agrees with a point, then voices an unease they cannot pin down: the names they have in mind 'don't play in that game'. A correct response recognizes a tidy either/or question cannot resolve this — the user cannot yet say what they hold — and draws it out with concrete candidates to react to. It does not present two packaged readings of the ask and demand a pick the user cannot make.",
+      "wrong_if": "no pick is possible; the user cannot say what they hold — a plain question would not have worked"
+    },
+    {
+      "id": "clarify-neg-002",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#401",
+      "input": "1- It should get the guard back I think. But I removed restate your last message because I want bro when it gets into the session to get claude into that breifity mode \n\n2- judge it again\n3- you act I don't have an opinion\nhandle the minor issues",
+      "criteria": "The user answers three points: the guard should come back (with a reason), 'judge it again', and 'you act I don't have an opinion / handle the minor issues'. A correct response acts — re-judges and handles the minor issues, reporting what it did. It does not bounce the decision back as options, readings, or interpretations to choose between; the user explicitly handed over the pick.",
+      "wrong_if": "the user refuses the pick; asking them to choose defies the turn"
+    },
+    {
+      "id": "clarify-neg-003",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#147",
+      "input": "In utils.ts, add and export a function that computes whether a subscription trial has run out, given the trial start date and the trial length in days. Write the code.",
+      "criteria": "The user asks for a specific exported function in utils.ts computing whether a subscription trial has run out, given the trial start date and length in days. A correct response writes the code without asking which interpretation is meant — the request has one reading.",
+      "wrong_if": "one reading; a clarifying question is noise"
+    },
+    {
+      "id": "clarify-neg-004",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#594",
+      "input": "give me a one line summary of everything we decided",
+      "criteria": "The user asks for a one-line summary of everything decided. A correct response gives the line. It does not ask what kind of summary or over what scope — the ask has one reading.",
+      "wrong_if": "unambiguous ask"
+    },
+    {
+      "id": "clarify-neg-005",
+      "type": "negative",
+      "source": "mined",
+      "ref": "all-turns.jsonl#604",
+      "input": "let's start a solo subagent using /soloflow where we will design the test cases of compose together in detail as I give you examples and scenerios and you also probe and elicite me till we clearify and extract all the real uses of compose",
+      "criteria": "The user wants to design test cases together in detail: they will give examples and scenarios, and the agent should probe and elicit them until all the real uses are extracted. A correct response begins that interactive session — probing with concrete prompts, one at a time. It does not stop to split the instruction into readings and request a pick; the instruction is clear: draw the user out.",
+      "wrong_if": "the word 'clearify' appears in the turn, but the move asked for is a draw-out, not a two-readings pick"
+    }
+  ]
+}
