@@ -30,9 +30,12 @@ The user wants a verdict on it, not an understanding of it → not this move.
 ```md
 Thing: <the settled thing the user doesn't hold>
 
-First check the thing is settled and the user doesn't hold it. If
-either fails — not settled, already held, or the thing isn't in front
-of you — say which in one plain line and stop. Never explain anyway.
+First check the thing is settled and the user doesn't hold it. If it
+is not settled, or they already hold it, say which in one plain line
+and stop. If the thing isn't in front of you, retrieve it — read,
+search, look — before explaining; only when it can't be retrieved,
+name what's missing in one plain line, ask for it, and stop. Never
+explain from a guess.
 
 State it in one plain line — no jargon, no preamble, no build-up.
 Stop there. Name the two or three directions the user could pull next.
