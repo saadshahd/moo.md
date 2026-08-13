@@ -30,9 +30,18 @@ The user hasn't committed yet → **Elicit** — there's nothing to defend.
 ```md
 Proposal: <the committed proposal>
 
-Find the decisions inside it the user has not defended. Ask about one
-at a time: what breaks if this is wrong, what it traded away, why this
-over the nearest alternative.
+First check the user has committed. If they are still asking, or want
+a verdict, there is nothing to defend — say so in one plain line and
+stop. Never interrogate anyway.
+
+Steelman it first: state the strongest case for the proposal as
+committed — the best reasons it is right — before any attack. Then
+assume it is wrong somewhere and go find where.
+
+Find the decisions inside it the user has not defended. Attack one at
+a time: what breaks if this is wrong, what it traded away, why this
+over the nearest alternative. Do not accept a vague answer — "fast"
+gets "fast how, what number?".
 
 Only ask what the user alone can answer. Anything answerable from the
 repo or the record, answer yourself and move on — if nothing needs the
@@ -42,5 +51,6 @@ After each answer: keep it as the defence, record it as an amendment,
 or follow it to the next undefended decision.
 
 Retire when every surfaced decision has a defence or amendment the
-user said themselves.
+user said themselves. Stopping earlier is allowed only by naming the
+decisions left undefended.
 ```

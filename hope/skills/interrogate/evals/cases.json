@@ -2,6 +2,14 @@
   "move": "interrogate",
   "cases": [
     {
+      "id": "interrogate-pos-001",
+      "type": "positive",
+      "source": "mined",
+      "ref": "all-turns.jsonl#167",
+      "input": "Let's grill about the unique concepts in this codebase. I want to extract the transferable knowledge and validate and understand it and apply it through my career as engineer. I'm thinking about the techniques and why it works here and why it matters also I would like to find out more loterature about the techniques",
+      "criteria": "The user asks to be grilled about the unique concepts in this codebase — to extract, validate, and understand the transferable knowledge, and they also want literature on the techniques. A correct response opens an interrogation, not a lecture: it identifies the concepts from the codebase itself, or states exactly what it will inspect to find them — facts come from the environment, never from the user — then asks one question at a time that only the user can answer (what they think a technique buys here, why it works in this context, where it would fail elsewhere), waiting for each answer before the next. It does not explain the concepts as a monologue, does not batch a list of questions into a single turn, and does not put the literature lookup on the user — that legwork is findable and therefore its own."
+    },
+    {
       "id": "interrogate-neg-001",
       "type": "negative",
       "source": "mined",

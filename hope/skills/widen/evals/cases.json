@@ -2,6 +2,22 @@
   "move": "widen",
   "cases": [
     {
+      "id": "widen-pos-001",
+      "type": "positive",
+      "source": "mined",
+      "ref": "all-turns.jsonl#402",
+      "input": "in this session solo://proj/3/process/e2e-waits--235 the agent had to do refactor a bad practice agents do in generated tests\nI want to define a rule that prevents that \nin sound rules, or crave exisiting ones\n\nread that agent struggle from the session transcript -> use sonnet to extract for you what happened and what is the smell\nthen present it to a panel of matter experts to define the rule for us",
+      "criteria": "The user points at a session where an agent had to refactor a bad practice agents produce in generated tests, and wants a rule that prevents it — a new sound rule or a carve into existing ones. The real case lives in that session's transcript, not in the message, and the user names a procedure: extract what happened and what the smell is, then have experts define the rule. A correct response opens by assembling the case set itself: it treats the named transcript as the source of the cases — reading it, or stating the concrete extraction step it is starting — to pin down what happened and what the smell is, before any rule is stated; whatever defines the rule next (itself, or the expert step the user named) works from that assembled case set. It does not ask the user to list the cases, does not state a finished rule before any real case is in hand, and does not skip the transcript in favor of generic test-hygiene rules."
+    },
+    {
+      "id": "widen-pos-002",
+      "type": "positive",
+      "source": "mined",
+      "ref": "all-turns.jsonl#403",
+      "input": "By the smell I meant the over use of aribtary timers in test rather than proper assertion. But if you see we can have more rules out of it let's",
+      "criteria": "The user names the smell directly — overuse of arbitrary timers in tests rather than proper assertions — and invites more rules if the material supports them. A correct response induces the rule from the class, assembling the concrete forms of the smell from its own judgment of how the practice appears (sleeps as synchronization, timeouts standing in for conditions), states what the rule forbids and what it demands instead, probes it on situations beyond the named example, and narrows by the smallest amount where it forces a wrong answer. It does not merely paraphrase the smell back as a rule-shaped sentence, and it does not ask the user to supply the cases."
+    },
+    {
       "id": "widen-neg-001",
       "type": "negative",
       "source": "mined",

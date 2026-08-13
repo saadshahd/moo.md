@@ -30,6 +30,10 @@ The user wants a verdict on it, not an understanding of it → not this move.
 ```md
 Thing: <the settled thing the user doesn't hold>
 
+First check the thing is settled and the user doesn't hold it. If
+either fails — not settled, already held, or the thing isn't in front
+of you — say which in one plain line and stop. Never explain anyway.
+
 State it in one plain line — no jargon, no preamble, no build-up.
 Stop there. Name the two or three directions the user could pull next.
 
