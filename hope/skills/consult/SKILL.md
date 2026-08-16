@@ -1,102 +1,35 @@
 ---
 name: consult
-description: Use when you want to learn how experts would think about a design tradeoff, architecture choice, repeated failure, or domain question — including when you are stuck rather than asking, or the question is one of style.
+description: Bring how named experts would think about the question
+when_to_use: the user wants expert thinking on a tradeoff, choice, or stuck problem — not a verdict
 ---
 
-Surface expert knowledge — names, reasoning, and the tensions between them visible — so the user learns and decides for themselves.
+Turn a question the user wants expert thinking on into named experts' reasoning, in their voices, with the disagreements left standing.
 
-- Ground every claim in documented work.
-- Show HOW each expert reasons, in their voice — attributed prose ("Fowler argues...", "Hickey would push back..."), scannable but never stripped to a verdict label.
-- A consult suspends the usual lead-with-one-recommendation posture: this skill exists to show reasoning, not to converge. Surface positions and let the tension stand. If everyone agrees easily, the wrong experts were selected.
+## Needs
 
-## Modes
+A question of judgment or taste — a tradeoff, a design choice, a repeated failure — where the user wants to learn how others think, not have the answer picked.
 
-MENTOR is the un-forced default; PANEL is opt-in.
+## Gives
 
-| Mode | Shape |
-|------|-------|
-| MENTOR | one expert, deep, reasoning in their own voice |
-| PANEL | 2-4 experts reasoning visibly; the tensions between them are the point |
+Two or three named experts' reasoning on the user's actual situation — each grounded in documented work, each in its own voice, disagreements named and left standing. The user decides; consult never does.
 
-**Refute is an orthogonal opt-in flag — never a mode, never the default.** When the user asks to be challenged, experts attack the chosen position to find where it breaks instead of surveying alternatives. Available on either mode.
+## Moves
 
-PANEL goal (optional; tunes only expert count + diversity, never reasoning posture; default depth-novelty):
+One job: put each expert's thinking in the user's head. That is **explain**, called by name once per expert — the settled thing is the expert's documented position, applied to the question at hand.
 
-| Goal | Count | Diversity |
-|------|-------|-----------|
-| depth-novelty | 2-3 | same + adjacent domain |
-| coverage | 3-4 | cross-domain |
-| unblock | 2-3 | cross-lens |
+- Pick the experts: read `profiles/` and match the question's domain; prefer two whose positions pull against each other. No profile fits → use experts the model knows well, named, and say the profile is missing.
+- Ground each take in the profile or documented work: reasoning in the expert's voice — "Fowler argues…", "Hickey would push back…" — never stripped to a verdict label.
+- Where they disagree, name the disagreement and both sides. If everyone agrees easily, the experts were picked wrong — swap one.
 
-## Workflow
+## Turns
 
-1. **Route** — domain-match the question to ~6-8 candidates via the Domain Map, spreading across rows so the panel carries distinct lenses — a genuinely single-domain question can draw them all from one row. Collect absolute profile paths — Step 3's agents read them, never the main conversation. Pool is fixed; re-route only if the question changes. No text output. No match → tell the user, then offer an in-weights panel: experts simulated from model knowledge, same workflow with names in place of paths.
-2. **Pick mode** — one AskUserQuestion: MENTOR (recommended) vs PANEL, each option showing the candidate expert name(s) it would draw; refute offered as an off-by-default add-on. Then confirm expert(s) by name: **Accept** / **Reshuffle** (unused pool candidates) / **Switch mode/goal**.
-3. **Reason** — fan out one Agent per expert, all in a single message (parallel). Each agent: read its profile at the absolute path; reason from documented positions applied to the user's context; respect "Would NEVER Say" guardrails; for living figures prefer newer model knowledge past the `Verified:` date; refute on → attack the user's position. Return the expert's actual argument (a few sentences), name attached; PANEL adds one `dissent` line vs the likely consensus.
-4. **Present** — each expert's reasoning as attributed prose; PANEL names each disagreement and both sides. Close with one AskUserQuestion — never a forced recommendation: **Go deeper** (narrow lens, re-run 3) / **Different perspective** (back to 2) / **Challenge it** (refute on, re-run 3) / **Done** (no recap).
+`open`
+- **Advances:** the user pulls — deeper on one expert, a different perspective, "who would disagree with this".
+- **Retires:** the user says done or starts deciding. No recap, no closing recommendation.
 
-## Domain Map
+## Wrong move if
 
-Profiles live in `profiles/`. Route by domain:
-
-| Domain | Profiles |
-|--------|----------|
-| React / State | abramov |
-| CSS / Styling | wathan |
-| Design Systems | frost |
-| Web Animation | perry |
-| TypeScript (type-level) | vergnaud, king |
-| Parse / Boundary Validation | king |
-| JavaScript | simpson, osmani |
-| Go / Systems | pike, cox |
-| Distributed Systems | lamport, kleppmann, helland |
-| Formal Methods / Verification | lamport, kleppmann |
-| Concurrency | pike, armstrong, lamport |
-| Python | hettinger |
-| Performance | gregg, osmani, muratori |
-| Architecture / Patterns | fowler, martin, alexander, ousterhout |
-| Software Design Philosophy | ousterhout |
-| TDD / Testing | beck, freeman, hughes |
-| DDD | evans, vernon |
-| Event Sourcing / CQRS | young |
-| Legacy / Refactoring | feathers, fowler |
-| Microservices | newman |
-| Rails / Monolith | dhh |
-| DevOps / Observability | hightower, majors, humble, forsgren |
-| REST / HTTP | fielding |
-| API / Library Design | bloch |
-| Product Management | cagan, jobs |
-| UX / Design Psychology | norman |
-| Design Leadership | zhuo |
-| Startups | graham, dhh |
-| Databases / Data Evolution | pavlo, helland, sadalage, young, kleppmann |
-| Reliability / Stability | nygard, armstrong, cook |
-| Team / Org Design | skelton-pais, forsgren, zhuo |
-| Accessibility | soueidan |
-| Simplicity / Data-Oriented | hickey |
-| Category Theory / FP | milewski |
-| FP in JS (pragmatic) | simpson |
-| State Machines | khorshid |
-| AI / LLMs | willison, karpathy, huyen, cherny, osmani |
-| Note Systems / Memory | matuschak |
-| Interactive Explanation | victor, case |
-| Malleable / End-User SW | inkandswitch, litt, kleppmann |
-| Knowledge Gardens | appleton, brander |
-| Computing Visionaries | kay, papert |
-| Decisions / Behavior | kahneman, klein, fogg, norman, simon |
-| Systems Thinking | meadows, deming, snowden |
-| Quality / Management | deming |
-| Strategy | boyd, rumelt, goldratt |
-| Constraints / Flow | goldratt |
-| Communication | tufte, orwell, minto, jobs |
-| Legibility / Emergent Order | geertz, jacobs, scott |
-| Incentives / Metrics / Commons | goodhart, ostrom |
-| Epistemology / Language | popper, kuhn, wittgenstein |
-| Organizational Failure / Safety | perrow, vaughan, reason, cook |
-| Evolution / Complexity | kauffman, dawkins |
-| Learning | vygotsky, bruner |
-| Security | schneier, shostack |
-
-## Boundary
-
-Consult surfaces knowledge — it does not execute or decide. The caller owns the decision; expert perspectives are understanding to learn from, not prescriptions to follow.
+The user wants a ruling on their own thing → **judge**.
+The user wants their committed choice attacked → **interrogate**.
+The question has one retrievable answer → retrieve it; no expert needed.

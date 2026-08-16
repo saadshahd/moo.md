@@ -1,49 +1,27 @@
 ---
-description: Run the complete hope pipeline — session setup, intent, shape, target, execute
+description: Run the full hope pipeline — intent, shape, target, freeze as needed — then execute
 ---
 
 # /hope:full
 
 **Task:** $0
 
-## Setup
+The pipeline is a graph over four composers plus the work itself. Each composer is its own skill — call it by name with the Skill tool; it routes its own moves and retires when the user locks. Say where you are at each hop, one line: `intent | shape | target | execute | done | stopped`.
 
-Ask once: "How would you like to work? Autonomous / Collaborative [default] / Guided?"
+## The graph
 
-Emit: `[PIPELINE] intent | Engagement: [level]`
+Start at the first line that is true:
 
-Re-emit at every transition. One of: `intent | shape | target | execute | done | abandoned`
+- The ask is rough, unspoken, or double-readable → **intent**.
+- The ask is confirmed but more than one way to build it remains → **shape**.
+- The ask is confirmed and the path is obvious → execute.
 
-## Stages
+Hops:
 
-Invoke each stage via the Skill tool. Each handoff stage emits a card — locked by the user — as the sole medium between stages.
-
-- **hope:intent** — clarifies WHAT. Card: objective + acceptance criteria.
-- **hope:shape** — decides HOW. Card: concrete approach + first step.
-- **hope:target** — defines the observer for unsupervised execution. Output: a runnable success contract. Fires only when execution is an autonomous loop or a long unbabysat run; supervised work skips it.
-- **execute** — run the shaped approach.
-
-## Transitions
-
-| From | To | When |
-| --- | --- | --- |
-| intent | shape | card locked (Build / Debug / Plan) |
-| intent | execute | task trivially clear — shape skipped |
-| shape | target | execution will be unsupervised — autonomous loop or unbabysat run, card locked |
-| shape | execute | supervised path — a human watches each step |
-| shape | intent | objective gap surfaced during shaping |
-| target | execute | success contract locked |
-| target | shape | success cannot be defined mechanically — approach gap |
-| execute | shape | approach breaks mid-implement |
-| execute | done | acceptance criteria met |
-| any non-terminal | abandoned | user aborts or task dissolves — say so, never silent |
-
-**Blocked: intent → target.** Nothing shaped means nothing to judge. Ask: "What approach would the run execute? Complete shape or state it now."
-
-**Pre-target (Collaborative / Guided):** Before invoking target, quote shape's decided constraint verbatim and confirm it still holds. Autonomous sessions skip this — the gate still locks with the user.
-
-## Engagement
-
-- **Autonomous** — proceed unless blocked; minimal check-ins.
-- **Collaborative** — confirm at each card lock; share reasoning.
-- **Guided** — explain each decision; offer options at every step.
+- **intent** retires → **shape**; or straight to execute when the path is obvious.
+- **shape** retires → execute when a human watches each step; → **target** when the work will run unwatched. The ask itself comes open mid-shape → back to **intent**.
+- **target** retires with the contract locked → execute. Success cannot be made mechanical → back to **shape**: the path, not the contract, is the problem.
+- Any stage meets facts that live outside the repo — a service, a database, a queue, live logs → **freeze**, then resume where it left off.
+- Execute: the path breaks mid-work → back to **shape**. The confirmed ask is met → done.
+- intent never hops straight to **target**: nothing decided means nothing to judge. Shape first, or the user states the path now.
+- The user stops, or the task dissolves → say so and stop. Never end silently.

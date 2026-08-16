@@ -6,7 +6,7 @@ moo — *mind on output*. A Claude Code plugin that helps humans stay present an
 
 ## Conventions
 
-Authoring doctrine for this repo's own skills, fragments, hooks, and runtime files lives in the `moo-authoring` skill, which fires when you add or change one. What stays here is the set whose violation produces no error.
+Authoring doctrine for this repo's own skills, hooks, and runtime files lives in the `moo-authoring` skill, which fires when you add or change one. What stays here is the set whose violation produces no error.
 
 **Description scope.** A skill's `description` carries the selection decision — what makes the skill fire — and its body carries the procedure. That is a placement rule, not a claim about how much a description can hold: the description is the only text present when the selection decision is made, and execution guidance either duplicates the body or loads in every session to serve a minority of them. A skill with `disable-model-invocation: true` is the exception the rule predicts: nothing selects it, so its description is an invocation summary for the human.
 
@@ -14,7 +14,7 @@ Authoring doctrine for this repo's own skills, fragments, hooks, and runtime fil
 
 **Hooks always fail open:** exit 0 with valid JSON on any error. A hook that fails closed silently disables itself for every future session.
 
-> **Enforcement:** the sync-drift guard (`.githooks/pre-push`) is the repo's only mechanical doc gate, and it sees inlined fragment blocks and nothing else — no shell file in this repo is checked by anything.
+> **Enforcement:** nothing here is mechanically checked — the repo has no doc gate, and no shell file in this repo is checked by anything.
 
 ## Philosophy
 
@@ -60,8 +60,5 @@ Track all changes in `CHANGELOG.md` at repo root.
 
 - Move unreleased items to new version section
 - Update version in affected plugin.json files
-- Run `bun run sync` and verify both a zero exit code and a clean git diff on every consumer SKILL.md. Consumers are discovered, not listed — `node scripts/sync.js --list` prints them; don't trust a hand-copied list here.
-- The sync-drift guard runs only when `core.hooksPath=.githooks` AND the hook file is executable. Verify the target, not the pointer: `[ -x .githooks/pre-push ]`. Its `TARGETS` comes from `sync.js --list`, so it covers every consumer without being told about one.
-- One-time setup: `git config core.hooksPath .githooks`
 
 **IMPORTANT:** Before any commit, check if CHANGELOG.md needs an entry. If the change is user-facing (new feature, fix, breaking change), add it.

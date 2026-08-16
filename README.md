@@ -12,9 +12,8 @@ One idea runs through all three layers: **never delegate a decision.**
 ```
 
 - Run the whole loop with `/hope:full <your seed>`, or run the stages directly: `/hope:intent <your seed>` then `/hope:shape <your intent>`, each handing you a lean card.
-- For work you used to do by hand, `/hope:delegate` routes it to agents while you keep every decision.
+- For work you used to do by hand, `/hope:router` routes it to agents while you keep every decision.
 - When work depends on live external state, `/hope:freeze` snapshots it as fact (never memory) before a stage builds on it.
-- As the work lands, `/hope:over` hands each load-bearing decision back so you reason it into your own model.
 
 ## A loop
 
@@ -38,32 +37,21 @@ freeze snaps the slice your work touches into one immutable value: every fact ob
 
 ## A mode
 
-**delegate** is the line between deciding and doing.
+**router** is the line between deciding and doing.
 
-You keep every decision. Each one is surfaced to you so you stay engaged. Only tactical, observable work fans out to agents: implement, test, verify, audit, explore.
+You keep every decision. The session spawns agents and verifies their output, doing no work itself — only tactical, observable work fans out: implement, test, verify, audit, explore.
 
 This is also what stops compaction from silently rewriting your context. The verbose doing never enters your main thread, so it can never quietly mutate what you decided.
 
-![Deciding stays, doing leaves](assets/delegate.png)
-
-## A discipline
-
-**over** hands a decision back the moment it lands — in-flow, as soon as the work is done, never banked to the end. The agents that did the work are short-lived; what they carried vanishes with them, so the decision has to come back to you right away.
-
-Agents grow the codebase faster than they grow your understanding of it. That gap is the part you are accountable for. over closes it. It finds what was load-bearing and hands each decision back as one forward question — you reason it into your own mental model, it confirms once. A short conversation, no score.
-
-What the agent never carries is what over hands back.
-
-![over](assets/over.png)
+![Deciding stays, doing leaves](assets/router.png)
 
 ## Overview
 
 | The trap                                 | Layer                          | Guard                                        |
 | ---------------------------------------- | ------------------------------ | -------------------------------------------- |
 | AI fills in your decisions               | `/hope:intent` & `/hope:shape` | interactive questions, each choice previewed |
-| compaction mutates & drifts your context | `/hope:delegate`               | doing stays out, deciding stays in           |
+| compaction mutates & drifts your context | `/hope:router`                 | doing stays out, deciding stays in           |
 | stale or remembered external state       | `/hope:freeze`                 | snapshot facts, never infer                  |
-| code grows faster than understanding     | `/hope:over`                   | hand each decision back in-flow, you reason it into your own model |
 
 ## Reading
 

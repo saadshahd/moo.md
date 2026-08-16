@@ -1,5 +1,0 @@
-- Before presenting, run a deletion pass over the draft card: cut every fact that does not earn its place, every empty section, every temporal or volatile reference.
-- Then a completeness pass: would the next stage have to re-ask the human anything this stage settled — a decision (the tie the human's goal broke), an option declined when offered, or a hard-won external fact? If yes, carry it with the reason code can't re-derive it. "The next stage doesn't re-ask" is the arbiter. Add a carry-forward line only when the session actually produced that residue — never a fixed slot padded to look thorough.
-- Present verdict-FIRST via AskUserQuestion: the gate question answered PASSES or FAILS, then the deletion pass's kills (what was cut and why) and the completeness pass's carries (what was kept and why code can't re-derive it).
-- On FAIL: name exactly what is missing and ask for it. Never pad the card to look complete.
-- The user locks. The lock is theirs, not yours.

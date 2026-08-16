@@ -1,78 +1,48 @@
 ---
 name: shape
-description: Resolves technical HOW decisions when the intent is clear but the technical path is not — architecture, technology selection, design patterns.
+description: Decide the technical path once the ask is clear
+when_to_use: the WHAT is confirmed but more than one way to build it remains — architecture, technology, design
 ---
 
-Decide HOW before building.
+## Extract
 
-## Contract
+From the conversation/context/user:
 
-- **INPUT** — locked intent card or equivalent spec: goal clear, technical path not.
-- **GATE** — "Is the shape complete and implementable?" — agent audits, user locks.
-- **OUTPUT** — a handoff card (spec below).
+- The **ask**, confirmed — intent's work order, or as good: the WHAT the user has already settled.
+- Its open **choices** — each place more than one way to build it remains, where the ways differ in what gets built.
 
-<!-- f card -->
-## The card
+## Gate
 
-The pipeline's handoff artifact. One admission rule: carry only what the next stage can't cheaply re-derive from the code in front of it. Recoverability test: re-reading all the code later, could it land on the same choice for the same reason? Yes → never carry (cheap local facts always answer yes). Two kinds answer no:
+Proceed only when: the ask is confirmed, and more than one way to build it remains that differs where it matters.
 
-- **Decision** — the code compiles either way; the human's goal, not any retrievable fact, broke the tie between viable paths. Carry the choice, its reason, and the paths declined (including options the human turned down when offered).
-- **Hard-won external fact** — dependency or third-party behavior whose ground truth lives outside this codebase and cost steering to pin down.
+Anything else, say which in one plain line — never decide a path anyway:
 
-Form:
+- The ask itself is still rough — starting would mean inventing what the user means → use **intent** skill.
+- Only one real way exists → nothing to decide; state it and proceed with the work.
 
-- Open with one sentence: what this is, why it exists. Everything after is facts.
-- Sections (non-goals, acceptance, constraints, ...) appear only when the session produced them. No empty scaffolding, ever.
-- Stranger test: every fact understandable with zero session context.
-- Timeless: no session narrative, no relative time ("currently", "for now"). Phrase decisions "X over Y: reason". Absolute dates only when the fact IS a deadline.
-- Concepts over cheap local detail: the next stage retrieves file paths, function names, and line numbers for itself, so leave them out — unless the identifier IS the hard-won external fact, in which case name it. No provenance markup.
-- Carry-forward closes the card: decisions and reasons, paths ruled out, hard-won external facts — captured when the stage locks so the next stage skips the work that produced them.
-- Size by deletion pass in the gate audit, never a numeric cap.
-- Emit in conversation; persisting is the user's call. A complete card passes the stranger test, so a persisted card is a resume token — paste it into a new session and the stage resumes without re-asking.
-<!-- /f -->
+## Route
 
-## The work loop
+Before routing any choice: retrieve what settles it without the user — their taste from CLAUDE.md and project rules, facts from the repo, docs, the web. Only choices that stay genuinely open after retrieval route to a skill.
 
-1. **Prime taste** — load the user's taste from CLAUDE.md / TASTE.md / a prior card before projecting any option. Unclear or absent → ask, don't guess.
-2. **Extract** — pull the HOW dimensions the spec actually opens: architecture, data model, API design, testing, deployment. When the work iterates, *which loop* is one dimension (see Loop selection).
-3. **Resolve per dimension** — explore when retrievable with certainty. At a non-obvious call, project 3 options through the primed taste, scoped to the task, then co-design them with the user via decision prompts. Options must differ on a load-bearing dimension — data ownership, seam placement, coupling, or failure model — never one approach renamed; if only one real path exists, present it alone, not a padded three.
-4. **Tension check** — if resolved choices genuinely conflict, surface the tension as one more decision prompt.
-5. **Gate** — run the gate audit (below).
+Route each open choice by what keeps it open, invoking the named skill with the Skill tool:
 
-## Loop selection
+- A claim about something that exists — a library fits, the schema holds, the current design bears the load → use **judge** skill.
+- The user can't choose from nothing — nothing exists to react to → use **draft** skill: the fewest versions that show a real fork, differing where it matters (who owns the data, where the seam sits, what fails how), never one approach renamed.
+- The user holds taste they can't yet state → use **elicit** skill.
+- Their stated preference reads two ways that would build different things → use **clarify** skill.
+- They're missing something already settled about the technology → use **explain** skill.
 
-When the work iterates — an agent loop, a refinement cycle, an unbabysat run — "which loop" is a HOW dimension: read `loop-selection.md` and resolve it on the three axes there.
+When the work iterates — an agent loop, a refinement cycle — which loop is itself one of the choices: read `loop-selection.md`.
 
-Unsupervised loops pass through target; every loop dispatches through delegate.
+Each decision re-enters the routing: a resolved choice can open the next one or conflict with an earlier one; a conflict is one more choice, surfaced to the user, never silently settled. Route again until every open choice has the user's decision or confirmation and none conflict.
 
-## Decision prompts
+## Output
 
-<!-- f prompts -->
-Closing unknowns — three modes, one boundary:
+The technical path is the result, decided: each choice resolved with its reason and what was turned down. The user owns the path.
 
-- **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
-- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion carries as many concrete candidate answers as the decision genuinely has, plus a uniform "Gather facts" escape hatch as a first-class option (never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
-- **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
+Then check what still stands open:
 
-Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
-<!-- /f -->
+- Nothing, and a human will watch each step of the work → proceed with the work.
+- The work will run without a human watching, optimizing toward something → use **target** skill before it runs.
 
-## Presentation
-
-- Minto pyramid in AskUserQuestion: Label = recommendation, Description = one-line tradeoff, detail panel = plain text (short ~50-char lines, ALL CAPS headers, dash bullets — no markdown; it renders literally).
-- Batch independent choices in one call; separate only where one choice constrains another.
-- Techniques stay internal — present their insights in plain language, never name them. Bullets, 1-2 lines per finding, no text walls.
-
-## The gate
-
-<!-- f gate -->
-- Before presenting, run a deletion pass over the draft card: cut every fact that does not earn its place, every empty section, every temporal or volatile reference.
-- Then a completeness pass: would the next stage have to re-ask the human anything this stage settled — a decision (the tie the human's goal broke), an option declined when offered, or a hard-won external fact? If yes, carry it with the reason code can't re-derive it. "The next stage doesn't re-ask" is the arbiter. Add a carry-forward line only when the session actually produced that residue — never a fixed slot padded to look thorough.
-- Present verdict-FIRST via AskUserQuestion: the gate question answered PASSES or FAILS, then the deletion pass's kills (what was cut and why) and the completeness pass's carries (what was kept and why code can't re-derive it).
-- On FAIL: name exactly what is missing and ask for it. Never pad the card to look complete.
-- The user locks. The lock is theirs, not yours.
-<!-- /f -->
-
-## Boundaries
-
-Shape surfaces choices; the user owns architecture. When uncertain about risk, bias toward more human involvement.
+The shaping is spent once the user owns the path — anything further runs under the branch picked here, never as another round of deciding the path.

@@ -1,8 +1,0 @@
-{
-  "scripts": {
-    "sync": "node scripts/sync.js"
-  },
-  "devDependencies": {
-    "markdown-magic": "^4.9.0"
-  }
-}

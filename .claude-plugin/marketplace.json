@@ -16,8 +16,8 @@
         "shape",
         "consult",
         "target",
-        "delegate",
-        "handover",
+        "router",
+        "judge",
         "freeze"
       ]
     },
@@ -30,17 +30,6 @@
         "taste",
         "rules",
         "engineering"
-      ]
-    },
-    {
-      "name": "bits",
-      "source": "./bits",
-      "description": "Minimal meta-prompting helpers — the lower-level skill set higher-level skills reuse.",
-      "category": "experimental",
-      "keywords": [
-        "meta",
-        "compose",
-        "primitives"
       ]
     },
     {

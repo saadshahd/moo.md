@@ -9,10 +9,6 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
-
-- feat(bits): new experimental plugin — minimal meta-prompting helpers, the lower-level skill set higher-level skills reuse. First skill: `compose` — the user hands over ingredient skills/moves plus an ask, and the agent becomes their selector for the conversation, firing each when its entry condition is met instead of relying on frontmatter auto-invocation (measured as a coin flip: 88.9% mean activation, 37% in the worst hook+passive cell). Each instruction traces to a measured finding: no per-turn selection gate (self-critique paradox, 98%→57%), a one-line fire marker whose mechanism is recency not memory (invoked skill text persists all session; decay is salience), a wrong-if check after each fire (prose skills' substitute for the honing signal executable-skill libraries have), amend-one-belief never re-derive (ACE's context collapse). Registered in the marketplace; unproven — proof harness comes later.
-
 ### Changed
 
 - change(repo): the no-wall-clock-estimates anti-pattern gains a carve. `hunch@0.0.19` shipped a `soloflow` lead that estimates when visible progress should appear, and the CHANGELOG called it a deliberate exception — but doctrine lives in `CLAUDE.md`, so the rule and the shipped skill contradicted each other in one tree with the resolution recorded only in a release note. The carve names the case that earns it: a human watching a live surface, where silence is otherwise unreadable and an estimate is what separates working from wedged. It closes the loophole it opens — an estimate calibrates a surface the human is already looking at, and is never a schedule attached to work reported in-session, where the turn itself is the progress.
@@ -23,11 +19,26 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- change(repo): the fragment-include system is retired with its last consumer — `hope/_fragments/`, `scripts/sync.js`, `.githooks/pre-push`, `package.json`, and `bun.lock` deleted. The hope 10.0.0 rewrite (below) made every skill body carry its content whole, so no site inlines a fragment anymore; machinery whose entire job was keeping inlined copies in sync guards nothing once there are no copies. The Unreleased entries above that hardened `sync` record work the retirement supersedes — kept, since both happened between releases.
 - change(repo): `ROADMAP.md` deleted. Its Active section read "nothing in flight" and it had not been touched since 2026-07-01 while three plugins shipped, so it recorded the absence of work rather than the work. Two deferred items go with it and are kept here so the deletion loses nothing: **an agentic memory MCP server** — external store, valence-tagged retrieval, configurable ranking, session ingestion — deferred once auto-memory shipped as hooks, revisit only if the hook layer proves insufficient; and **shape eval calibration** — evals exist at `hope/skills/{intent,shape}/evals`, and the open question is whether the structured shape workflow (dimensions, expert consult, pre-mortem) measurably beats unguided shaping when run against real sessions.
 
 ### Fixed
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
+
+## [hope@10.0.0] - 2026-08-17
+
+### Added
+
+- feat(hope)!: the moves layer ships as name-called skills — `anchor`, `clarify`, `draft`, `elicit`, `explain`, `interrogate`, `inversion`, `judge`, `provocation`, `reduce`, `reframe`, `router`, `shift`, `widen`. Each body is direct executor instruction, not a card about one: an Extract step that owns finding the skill's inputs, a gate in one form ("Anything else, say which in one plain line — never \<verb\> anyway"), the work steps with every refusal clamp stated where it binds, and an Output that hands the result back first and ends in a routing tail — would anything still unresolved change what gets built; nothing → return to the interrupted work, something → the sibling skill whose condition it meets — closed by a spent-clamp against the branch picked. Redirects carry the sibling's real boundary (explain = missing something already settled; elicit = holds what they can't yet say; clarify = words with two readings that would build different things; interrogate = committed but undefended; judge = a claim about something that exists needs a committed verdict), never a proxy. Outputs never claim what the procedure didn't verify: router names lifted-stance returns as unverified, widen claims soundness only on the cases and situations actually checked, shift and reframe carry a resists-verdict out rather than letting a failed restatement stand as movement. Creator vocabulary (`open`, "move", Advances/Retires) died with the card format.
+
+### Changed
+
+- change(hope)!: the composers — `intent`, `shape`, `target`, `freeze`, `consult`, `compose` — drop their card sections for the same executor form; every routing condition, re-entry rule, and clamp carried over (intent's ask-the-negative-once, shape's conflict-is-one-more-choice, target's disposable-key and cheat-is-a-contract-bug, freeze's observed-or-gap-no-third-kind, consult's no-recap-no-recommendation). `compose` lands in hope from the bits experiment, carrying its measured findings — fire-on-condition selection, the one-line `[compose]` fire marker (recency, not memory), the wrong-if check after each fire, amend-one-belief never re-derive — and the `bits` plugin is removed without ever having released.
+
+### Removed
+
+- change(hope)!: `delegate` skill removed; `router` re-derives its core as a stance — the session spawns agents and verifies their output, never doing the work itself. `hope/words.md` removed — a term defined only in a file that doesn't load with a skill is defined inline or replaced, so the shared vocabulary file had no consumer left. Per-skill eval workspaces (`evals/cases.json`, `evals/draft-SKILL.md`) removed with the draft format they tested.
 
 ## [hunch@0.1.0] - 2026-08-05
 

@@ -1,66 +1,38 @@
 ---
 name: freeze
-description: Use when a pipeline stage or the human meets facts that live outside the repo — a service, database, queue, third party, or live logs — and the work depends on their current state. Repo-local work skips it.
+description: Freeze outside-the-repo state into one snapshot
+when_to_use: the work depends on the current state of a service, database, queue, third party, or live logs
 ---
 
-Freeze the moving cross-boundary state a system depends on into one immutable snapshot. Consumer: the agent stages (intent / shape / delegate / execute) — grounding, not narration.
+## Extract
 
-## Contract
+From the conversation/context/user:
 
-- **INPUT** — a system to ground + the work order (intent). Doubly scoped: only the slice of the world this work order touches, never a general map.
-- **GATE** — "Is the snapshot factual and complete — every required fact observed, or an explicit gap?" Agent audits, user locks.
-- **OUTPUT** — a snapshot VALUE, emitted in conversation. Stateless: nothing persisted; re-run to refresh.
+- The **work** on the table, and the **slice** of outside state it depends on — which service, database, queue, third-party, or live-log facts it touches.
 
-## Observed-or-gap, never inference
+## Gate
 
-A fact's value is OBSERVED or it is a GAP. No third path.
+Proceed only when: the work depends on the current state of something outside the repo.
 
-- Inference builds the source map only — WHICH facts matter. It never produces a fact's value.
-- Observed = a read-only acquisition agent sees it live, or the human retrieves it by hand. A fact with no `observed-by` is a GAP by construction — that field is what separates the two.
-- An unreachable fact becomes an OPEN gap with retrieval instructions, never a fabricated value.
+Anything else, say which in one plain line — never snapshot anyway:
 
-## Snapshot shape
+- Every needed fact lives in the repo → read them where the work runs; no snapshot.
+- The outside system is to be changed, not read → that is the work itself, not its grounding; proceed with the work.
 
-- **OBSERVED facts** — each `{ source, claim, where-it-lives, as-of, observed-by }`.
-- **OPEN gaps** — each `{ required-fact, why-needed, where-to-look, how-to-retrieve }`.
-- Any map/belief over the facts is a VIEW, marked derived, never mixed into the observed set.
+## Observe
 
-## Work loop
+Build the snapshot, invoking each named skill with the Skill tool where its condition holds:
 
-1. **Scope** — from system + intent, infer the source map: the external facts this work order depends on. The only place inference runs.
-2. **Acquire** — fan out read-only acquisition agents in parallel, one observation per fact, live (rules below).
-3. **Fold** — each return → an OBSERVED fact; anything unobserved → an OPEN gap with retrieval instructions.
-4. **Gap-fill** — surface gaps for the human to hand-retrieve; re-fold; recheck. Human-gated, no metric, no unsupervised run — does NOT pass through target. Ends when gaps close or the human stops; a snapshot with named open gaps is a valid lock.
-5. **Gate** — audit below.
+- The slice reads two ways — which outside facts this work touches would build different snapshots → use **clarify** skill. Scope to the slice the work touches, never a general map.
+- Name the facts the work depends on. Naming which facts matter is the only place reasoning fills in — a fact's value never comes from reasoning.
+- Read each named fact live, read-only — look, never touch: no write, no state-changing call, no toggle. A fact unreachable, or one that reading would change → an open gap, with instructions for the human to retrieve it by hand.
+- Use **draft** skill on the snapshot: the observed facts and the open gaps, kept apart — each observed fact carrying what it says, where it lives, and when it was read; anything concluded over the facts marked as a conclusion, never mixed into the observed set.
+- The snapshot → use **judge** skill, on the claim: every named fact is observed or an explicit open gap, and no value was invented. An invented value demotes to a gap or gets re-observed.
 
-## Acquisition agents
+A hand-retrieved fact, a re-observation, or an amendment re-enters the snapshot, and the snapshot gets judged again. A fact's value is observed or it is a gap; there is no third kind.
 
-Spawn acquisition agents and fold their returns — never read external systems yourself.
+## Output
 
-- **READ-ONLY hard guard** — observe, never mutate. No write, no state-changing POST, no migration, no toggle. An agent that would mutate → stop; make it a gap for the human.
-- Independent facts go out as parallel agent calls in one message.
-- Each prompt self-contained: the one fact, where it lives, the read-only constraint.
+The snapshot is the result — one snapshot, in conversation, stateless: re-run the whole freezing to refresh it. It stands when judge's verdict stands and the user locks it, or when the user stops with gaps standing — a snapshot with named open gaps is a valid lock; its gaps are named as gaps, never claimed as observed.
 
-## Decision prompts
-
-<!-- f prompts -->
-Closing unknowns — three modes, one boundary:
-
-- **EXPLORE** the accessible surface: any answer retrievable with certainty (repo reads, docs, web, parallel subagents) is retrieved, never asked. Return with decisions, not raw findings.
-- **ELICIT** the user: only judgment calls no accessible surface can settle (their goal, taste, a tie between viable paths). Each AskUserQuestion carries as many concrete candidate answers as the decision genuinely has, plus a uniform "Gather facts" escape hatch as a first-class option (never hidden behind Other). Everything needed to answer lives inside the question UI — question text, descriptions, previews — never in prose before the tool call (the dialog hides it).
-- **INTERVIEWING** is the anti-pattern: serial quizzing, generic checklists, asking what exploration could answer.
-
-Re-entry after a detour: if the detour made the answer obvious, state the decision and proceed; otherwise re-ask the same question with the new evidence inside the prompt.
-<!-- /f -->
-
-## The gate
-
-- **Factual pass** — every OBSERVED fact traces to an observation (agent return or human hand-retrieval). An inferred value is a defect: demote to OPEN gap or re-acquire.
-- **Completeness pass** — every source-map fact is OBSERVED or an OPEN gap. A silently absent required fact is the failure mode; name it as a gap.
-- Verdict-FIRST via AskUserQuestion: PASSES or FAILS, then observed count and open gaps — proof both passes ran.
-- On FAIL: name exactly which facts are inferred or missing. Never fabricate a value to close a gap.
-
-## Boundaries
-
-- **On-demand, not mandatory** — any stage invokes freeze on outside-the-repo facts; repo-local work skips it.
-- **freeze vs over** — freeze is world→pipeline grounding (acquire external facts, feed the agent stages); over is output→human handoff. Complements, never folded together.
+Then return to the work the snapshot grounds. The freezing is spent once the snapshot stands — anything further re-enters as a re-observation or amendment, never as a second snapshot beside the first.
