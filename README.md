@@ -43,7 +43,7 @@ They land as ordinary files you own — flat, and without the plugin prefix, so 
 /hope:full <your seed>
 ```
 
-Or run the stages directly — `/hope:intent <your seed>`, then `/hope:shape <your intent>` — each handing you a lean card.
+Or run the stages directly — `/hope:intent <your seed>`, then `/hope:shape <your intent>`.
 
 ## A loop
 
@@ -51,9 +51,9 @@ The loop is pure decision work. You drive it slowly, in your own context.
 
 Every piece of work starts as a raw `<seed>`, the rough thing you fully typed. It is the one artifact that is fully yours.
 
-**/intent** and **/shape** do not make the seed more honest. They make it explicit and specified. Each surfaces a decision as an interactive question, every choice previewed, a few at a time, and you answer. Every added detail stays yours because you chose it. `/intent` turns the `<seed>` into a confirmed statement of what you want. `/shape` turns the `<intent card>` into a chosen approach before any code exists.
+**/intent** and **/shape** do not make the seed more honest. They make it explicit and specified. Each surfaces a decision as an interactive question, every choice previewed, a few at a time, and you answer. Every added detail stays yours because you chose it. `/intent` turns the `<seed>` into a confirmed statement of what you want. `/shape` turns that `<work order>` into a chosen approach before any code exists.
 
-The outcome is a card you carry comfortably outside the context window.
+The outcome is short enough to carry comfortably outside the context window.
 
 ![The loop](assets/loop.png)
 

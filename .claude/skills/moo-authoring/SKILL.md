@@ -50,7 +50,19 @@ Phrase design decisions as "X over Y: reason".
 
 - Skills compose by name: a composer names a move and invokes it with the Skill tool; a body never inlines another body.
 - New skill when the cognitive mode changes (clarify WHAT ≠ decide HOW ≠ judge unsupervised work; find ≠ fix). One skill = one mode + one gate.
-- Two skills over one when triggers differ; a shared explanation the pair needs lives in CHANGELOG, not in either skill.
+- Two skills over one when triggers differ; a shared explanation the pair needs lives in this file, which owns skill-design reasoning, not in either skill.
+- A body names a sibling in exactly two places: a refusal, and a route — wherever in the body those sit. There the name *is* the refusal's or the route's content, and a reader without it is stranded.
+- Ending over hand-off: a finished run states what is now settled and what is still open, in its own words. Naming who handles it next hardcodes the graph n², so one trigger change edits every sibling.
+
+**Output form — bound by what the skill hands back, never by one shared sentence.** Plain words is the only part that holds across all three:
+
+| The Output hands back | Bound it by |
+|---|---|
+| Something the agent restated in its own words | As short as it goes with nothing *the skill can't afford to drop* lost — name that thing, it differs per skill |
+| The user's own words — a record, an amended proposal | Preserving them. A compression clause here destroys the result |
+| A structure the reader navigates — verdict then evidence, a case set then a rule | Bounding each part where a reader would pad it, never the whole |
+
+A cap counted in lines is a compression budget on a handed-back artifact — replace it. A cap on one turn of a loop is pacing, and the rest arrives on the user's next pull — keep it.
 
 ## Hook Design
 
