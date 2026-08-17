@@ -25,4 +25,4 @@ and breeds duplicate files (a "schedulers" file silently holding headless-writer
   READ that file and edit it in place. Create a new file only when no existing scope covers it.
 
 Only the first ~25KB of MEMORY.md loads; entries past that cut are never read. Durable entries first.
-A locked intent or shape card's carry-forward already qualifies.
+A confirmed work order, or a decided technical path, already qualifies.

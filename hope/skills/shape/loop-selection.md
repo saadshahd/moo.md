@@ -1,6 +1,6 @@
 # Loop selection
 
-Read this when the work iterates — an agent loop, a refinement cycle, an unbabysat run. "Which loop" is a HOW dimension; resolve it on three axes. The card carries the chosen loop and its termination rule.
+Read this when the work iterates — an agent loop, a refinement cycle, an unbabysat run. "Which loop" is a HOW dimension; resolve it on three axes. The decided path carries the chosen loop and its termination rule.
 
 | Axis | Question | Reliability rule |
 | --- | --- | --- |

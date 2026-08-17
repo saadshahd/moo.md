@@ -28,6 +28,12 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - fix(sound): `tests/wait-on-a-bound-the-app-emits.md` carried the scheduler-step qualifier three times in a five-line rule. `Detect:` had dropped it — "step count" where the rule says scheduler-step — which lexically matches 16 `page.mouse.move(x, y, { steps: N })` sites, pointer interpolation that parameterises an input rather than standing in for a wait; restored there, since `Detect:` is the line applied verbatim. `_Avoid_:` then loses its copy: line 1 already rules a scheduler-step count admissible only where the test cites the app source scheduling it, and every other `_Avoid_` item is a lexical shape an agent can find, where "citing no app source" is a judgment it must make correctly.
 
+## [hope@10.0.3] - 2026-08-17
+
+### Fixed
+
+- fix(hope): `consult` converts to the executor form, and `compose` gains the `## Output` it was missing — the two skills `hope@10.0.0` named as converted but left short. `consult` was still whole in the retired card format (`## Needs`, `## Gives`, `## Moves`, `## Turns`, `## Wrong move if`, with `open`/`Advances:`/`Retires:`), the only file in `hope/skills/` that never took the rewrite, so a release note shipped in three versions described a conversion its own tree contradicted. Its content survives where the form puts it: the "needs" condition becomes the Gate, the three wrong-moves become the Gate's redirects, picking and voicing the experts split into their own sections, and the `Gives` clamp — the user decides, consult never does — lands in Output where the result is handed back. `compose` had the form's opening but ran off the end at `## Amend`, so nothing stated what composing hands back, what happens to a chosen skill whose condition never arrives, or when the composing is spent; its loop now names its own end and every exit lands in Output. Two prose files outside `hope/skills/*/SKILL.md` still spoke of cards as live artifacts and go with it: `memory.md` qualified a durable entry as "a locked intent or shape card's carry-forward", now a confirmed work order or a decided technical path, and `loop-selection.md` said "the card carries the chosen loop and its termination rule", now the decided path. All 20 hope skills are `Extract / Gate / <work> / Output`, every one ending in Output, and a sweep of `hope/` for the retired terms — card, `Advances:`, `Retires:`, `words.md`, wrong move, carry-forward — returns nothing outside the expert profiles.
+
 ## [hope@10.0.2] - 2026-08-17
 
 ### Changed
