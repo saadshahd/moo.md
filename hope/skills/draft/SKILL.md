@@ -1,7 +1,6 @@
 ---
 name: draft
-description: Build the thing the user can't specify, choices surfaced
-when_to_use: the user needs something to react to before they can choose
+description: Build the thing the user can't specify, choices surfaced. Use when the user needs something to react to before they can choose.
 ---
 
 ## Extract

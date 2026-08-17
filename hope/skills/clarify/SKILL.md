@@ -1,7 +1,6 @@
 ---
 name: clarify
-description: Turn words with two readings into one confirmed ask
-when_to_use: the user's words admit two readings that would build different things
+description: Turn words with two readings into one confirmed ask. Use when the user's words admit two readings that would build different things.
 ---
 
 ## Extract

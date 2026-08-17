@@ -1,7 +1,6 @@
 ---
 name: inversion
-description: Find the route to guaranteed failure, negate it
-when_to_use: a goal that keeps not being reached head-on
+description: Find the route to guaranteed failure, negate it. Use when a goal keeps not being reached head-on.
 ---
 
 ## Extract

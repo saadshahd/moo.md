@@ -1,7 +1,6 @@
 ---
 name: target
-description: Define how unsupervised work is judged before it runs
-when_to_use: work will run without a human watching, optimizing toward something
+description: Define how unsupervised work is judged before it runs. Use when work will run without a human watching, optimizing toward something.
 ---
 
 ## Extract

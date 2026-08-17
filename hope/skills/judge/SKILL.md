@@ -1,7 +1,6 @@
 ---
 name: judge
-description: One committed verdict on something that exists, cited
-when_to_use: something exists and a claim about it needs a verdict
+description: One committed verdict on something that exists, cited. Use when something exists and a claim about it needs a verdict.
 ---
 
 ## Extract

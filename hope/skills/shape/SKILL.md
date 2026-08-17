@@ -1,7 +1,6 @@
 ---
 name: shape
-description: Decide the technical path once the ask is clear
-when_to_use: the WHAT is confirmed but more than one way to build it remains — architecture, technology, design
+description: Decide the technical path once the ask is clear. Use when the WHAT is confirmed but more than one way to build it remains — architecture, technology, design.
 ---
 
 ## Extract

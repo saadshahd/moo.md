@@ -1,7 +1,6 @@
 ---
 name: elicit
-description: Draw out what the user holds but can't say
-when_to_use: the user knows something they cannot yet express
+description: Draw out what the user holds but can't say. Use when the user knows something they cannot yet express.
 ---
 
 ## Extract

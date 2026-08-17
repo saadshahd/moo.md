@@ -1,7 +1,6 @@
 ---
 name: shift
-description: Restate the problem in a distant domain's terms
-when_to_use: a problem circling inside its own vocabulary
+description: Restate the problem in a distant domain's terms. Use when a problem circles inside its own vocabulary.
 ---
 
 ## Extract

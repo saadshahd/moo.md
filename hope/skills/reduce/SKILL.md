@@ -1,7 +1,6 @@
 ---
 name: reduce
-description: Re-derive something written into the shortest version that still covers everything
-when_to_use: something already written should get shorter and nothing it covers can be lost
+description: Re-derive something written into the shortest version that still covers everything. Use when something already written should get shorter and nothing it covers can be lost.
 ---
 
 ## Extract

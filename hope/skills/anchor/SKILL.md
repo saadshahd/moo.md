@@ -1,7 +1,6 @@
 ---
 name: anchor
-description: Rewrite a rule so anyone applies it the same way
-when_to_use: a stated rule or claim takes the reader's judgment to apply
+description: Rewrite a rule so anyone applies it the same way. Use when a stated rule or claim takes the reader's judgment to apply.
 ---
 
 ## Extract

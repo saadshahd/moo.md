@@ -1,7 +1,6 @@
 ---
 name: widen
-description: Assemble cases from context, induce the widest sound rule
-when_to_use: a real case shows a class no rule yet decides, or a rule decides only the cases it came from
+description: Assemble cases from context, induce the widest sound rule. Use when a real case shows a class no rule yet decides, or a rule decides only the cases it came from.
 ---
 
 ## Extract

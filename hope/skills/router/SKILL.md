@@ -1,7 +1,6 @@
 ---
 name: router
-description: Spawn agents and verify their output — route work, never do it
-when_to_use: the work splits into pieces agents can carry and the session should route and check, not execute
+description: Spawn agents and verify their output — route work, never do it. Use when the work splits into pieces agents can carry and the session should route and check, not execute.
 ---
 
 ## Extract

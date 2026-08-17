@@ -1,6 +1,8 @@
 ---
 name: moo-authoring
 description: Use when adding or changing a skill, hook, or runtime file in this repo — including deciding which unit a new capability should be.
+metadata:
+  internal: true
 ---
 
 Doctrine for authoring moo's own surfaces.
@@ -8,6 +10,12 @@ Doctrine for authoring moo's own surfaces.
 ## Frontmatter
 
 A skill's frontmatter carries `name` and `description`; read any shipped `SKILL.md` for the current key set. The description is one line, and Claude Code caps it at 1024 characters.
+
+No `when_to_use`. Claude Code reads that key and renders it dash-joined onto the description, but every other agent copies `SKILL.md` verbatim and never reads it, so the text deciding when a skill fires would be invisible wherever it is installed outside Claude Code.
+
+A condition that follows what the skill does is marked `Use when <condition>.` — a finite clause, never a bare noun phrase or a bare dash. The key name was what marked the condition as a condition; in one string nothing else does, and an unmarked trailing clause reads as more of what the skill produces. A description may also open with the condition and stop there, where naming the capability would discriminate nothing.
+
+A skill that stays in this repo declares `metadata.internal: true`. The skills.sh installer walks the tree and offers every `SKILL.md` it finds; that flag is what it filters on.
 
 Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
 
@@ -36,6 +44,7 @@ Phrase design decisions as "X over Y: reason".
 | A trigger only the human perceives | Skill with `disable-model-invocation: true` |
 | Behavior that must run every time, deterministically | Hook |
 | An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
+| Doctrine for this repo's own surfaces | Repo-local skill in `.claude/skills/`; never ships |
 
 **Composition — name-calls, never imports:**
 

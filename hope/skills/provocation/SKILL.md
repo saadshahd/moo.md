@@ -1,7 +1,6 @@
 ---
 name: provocation
-description: Extract movement from a statement known to be false
-when_to_use: an obvious answer nobody can see past
+description: Extract movement from a statement known to be false. Use when nobody can see past an obvious answer.
 ---
 
 ## Extract

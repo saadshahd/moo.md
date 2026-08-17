@@ -1,7 +1,6 @@
 ---
 name: reframe
-description: Restate the problem off its forced framing
-when_to_use: a framing that feels forced — every option inside it loses
+description: Restate the problem off its forced framing. Use when a framing feels forced and every option inside it loses.
 ---
 
 ## Extract

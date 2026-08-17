@@ -1,7 +1,6 @@
 ---
 name: interrogate
-description: Make the user defend a proposal they committed to
-when_to_use: a proposal is committed but its decisions are undefended
+description: Make the user defend a proposal they committed to. Use when a proposal is committed but its decisions are undefended.
 ---
 
 ## Extract

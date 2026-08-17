@@ -1,7 +1,6 @@
 ---
 name: explain
-description: Put one settled thing in the user's head, plainly
-when_to_use: the user does not hold something already settled
+description: Put one settled thing in the user's head, plainly. Use when the user does not hold something already settled.
 ---
 
 ## Extract

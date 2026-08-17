@@ -1,7 +1,6 @@
 ---
 name: consult
-description: Bring how named experts would think about the question
-when_to_use: the user wants expert thinking on a tradeoff, choice, or stuck problem — not a verdict
+description: Bring how named experts would think about the question. Use when the user wants expert thinking on a tradeoff, choice, or stuck problem — not a verdict.
 ---
 
 Turn a question the user wants expert thinking on into named experts' reasoning, in their voices, with the disagreements left standing.

@@ -1,7 +1,6 @@
 ---
 name: compose
-description: Composes multiple skills
-when_to_use: the ask has multi aspects/domains or the user explicitly names multiple skills
+description: Plan the skills an ask needs, invoke each as its condition arrives. Use when the ask has multiple aspects that different skills carry, or the user named multiple skills.
 ---
 
 ## Extract

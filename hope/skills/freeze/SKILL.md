@@ -1,7 +1,6 @@
 ---
 name: freeze
-description: Freeze outside-the-repo state into one snapshot
-when_to_use: the work depends on the current state of a service, database, queue, third party, or live logs
+description: Freeze outside-the-repo state into one snapshot. Use when the work depends on the current state of a service, database, queue, third party, or live logs.
 ---
 
 ## Extract

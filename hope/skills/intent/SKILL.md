@@ -1,7 +1,6 @@
 ---
 name: intent
-description: Turn a rough ask into a clear work order
-when_to_use: the ask is rough, unspoken, or double-readable — before planning or building
+description: Turn a rough ask into a clear work order. Use when the ask is rough, unspoken, or double-readable — before planning or building.
 ---
 
 ## Extract
