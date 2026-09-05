@@ -31,7 +31,7 @@ Two ways in, two philosophies. The **[Claude Code plugin](https://code.claude.co
 npx skills@latest add saadshahd/moo.md
 ```
 
-Pick the skills you want and the agents to install them on.
+Pick the skills you want and the agents to install them on — but take `hope` whole if you take it at all: its skills call each other by name, and a missing one stops the skill that called it. `sound` and `hunch` have no such requirement.
 
 They land as ordinary files you own — flat, and without the plugin prefix, so `hope:intent` arrives as `intent` and `sound:review` as `review`. Watch for collisions with skills you already have.
 

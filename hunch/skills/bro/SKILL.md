@@ -1,7 +1,6 @@
 ---
 name: bro
 description: Drop the jargon and speak plainly, from this message on.
-disable-model-invocation: true
 effort: low
 ---
 

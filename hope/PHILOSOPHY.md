@@ -72,13 +72,7 @@ Peace of mind precedes quality. Velocity that destroys quiet attention destroys 
 
 moo's repo-wide anti-patterns apply here in full — see `CLAUDE.md`. hope adds:
 
-No hard dependencies between skills — prime naturally, never import.
+Install hope whole — a body invokes siblings by name; a missing one stops the body rather than degrading it.
 No rigid frameworks — skip steps that don't apply.
 No ownership without understanding — if you can't explain it, you don't own it.
 Default to less, expand on request.
-
----
-
-## Cross-Skill Invocation
-
-Cross-skill invocation uses natural language triggers. If the user has a matching skill, it fires. If not, hope handles it. Nothing breaks either way.
