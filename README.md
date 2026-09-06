@@ -4,7 +4,7 @@ Why introduce friction? Because **YOU** the human end up being the world model. 
 
 **moo/hope** doesn't build, and doesn't author your code, rules, or taste. It works alongside build tooling like [superpowers](https://github.com/obra/superpowers).
 
-One idea runs through all three layers: **never delegate a decision.**
+One idea runs through every layer: **never delegate a decision.**
 
 ## Installation (30-second setup)
 
@@ -20,7 +20,7 @@ Two ways in, two philosophies. The **[Claude Code plugin](https://code.claude.co
 /plugin install hope@moo.md
 ```
 
-`hope` is the decision loop, and the reason to be here. Two more layers ship from the same marketplace: `sound@moo.md`, code taste as installable rules, and `hunch@moo.md`, experiments that graduate or die.
+`hope` is the decision loop, and the reason to be here. More layers ship from the same marketplace: `hold@moo.md`, comprehension at your own pace, `sound@moo.md`, code taste as installable rules, and `hunch@moo.md`, experiments that graduate or die.
 
 </details>
 
@@ -31,7 +31,7 @@ Two ways in, two philosophies. The **[Claude Code plugin](https://code.claude.co
 npx skills@latest add saadshahd/moo.md
 ```
 
-Pick the skills you want and the agents to install them on — but take `hope` whole if you take it at all: its skills call each other by name, and a missing one stops the skill that called it. `sound` and `hunch` have no such requirement.
+Pick the skills you want and the agents to install them on — but take `hope` and `hold` whole if you take them at all: their skills call each other by name, and a missing one stops the skill that called it. `sound` and `hunch` have no such requirement.
 
 They land as ordinary files you own — flat, and without the plugin prefix, so `hope:intent` arrives as `intent` and `sound:review` as `review`. Watch for collisions with skills you already have.
 

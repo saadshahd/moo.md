@@ -29,5 +29,6 @@ Four outcomes moo drives toward:
 A plugin may define its own beliefs, principles, and constraints serving the mission above; `.claude-plugin/marketplace.json` is the register of what ships. What each one is for:
 
 - **hope** — Thinking discipline: intent clarification, approach shaping, expert consultation, guarded delegation, ownership retrieval. See `hope/PHILOSOPHY.md`.
-- **hunch** — Experimental staging ground. Cheap to enter, honest to exit: every experiment graduates into hope/sound or dies. See `hunch/PHILOSOPHY.md`.
+- **hold** — Comprehension at the human's pace: grasp a change, drive a behavior, land one thing in an audience, until they can say how it works with the agent out of the room. See `hold/PHILOSOPHY.md`.
+- **hunch** — Experimental staging ground. Cheap to enter, honest to exit: every experiment graduates or dies. See `hunch/PHILOSOPHY.md`.
 - **sound** — Code taste as installable rules: a corpus selected against a repo's real surfaces, delivered as user-owned reference files.
