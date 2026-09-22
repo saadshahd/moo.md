@@ -1,0 +1,537 @@
+import type { Register } from "claude-code";
+
+export type Card = {
+  intent?: string;
+  shape?: string;
+  facts?: string[];
+  questions?: { q: string; options: string[] }[];
+  skills?: { name: string; outcome: string }[];
+  watch?: { label: string; open: string; see?: string }[];
+};
+type Msg = {
+  role: string;
+  text: string;
+  toolUses?: { tool: string; input: Record<string, unknown> }[];
+};
+type Row = { id: string; label: string; done: boolean };
+
+export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
+{"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
+facts: bare claims. skills: the planned skills in order. watch: where a human looks, never agent state.
+The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
+const CARD_SKILLS = new Set([
+  "hope:intent",
+  "hope:shape",
+  "hope:clarify",
+  "hope:elicit",
+  "hope:draft",
+  "hope:compose",
+]);
+const CARD_RE = /```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
+const BOX_LINES = 6;
+const PANE = "tend";
+const CHIPS = ["intent", "shape", "facts", "questions", "skills", "watch"] as const;
+
+// ---- pure ----
+
+// Also hides a block still streaming in, before its closing fence.
+export function stripCards(text: string): string {
+  return text.replace(CARD_RE, "").replace(/```card[\s\S]*$/, "").trimEnd();
+}
+
+const str = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
+// An explicit [] stays: it clears an older block's list.
+const list = <T,>(v: unknown, keep: (x: any) => x is T): T[] | undefined =>
+  Array.isArray(v) ? v.filter(keep) : undefined;
+
+/** The model's JSON, keeping only well-formed parts, so a bad field can't break the band. */
+export function cleanCard(c: any): Card {
+  const card: Card = {
+    intent: str(c.intent) ? c.intent : undefined,
+    shape: str(c.shape) ? c.shape : undefined,
+    facts: list(c.facts, str),
+    questions: list(c.questions, (q): q is { q: string; options: string[] } =>
+      str(q?.q) && Array.isArray(q.options) && q.options.every(str),
+    ),
+    skills: list(c.skills, (k): k is { name: string; outcome: string } =>
+      str(k?.name) && str(k.outcome),
+    ),
+    watch: list(c.watch, (w): w is { label: string; open: string; see?: string } =>
+      str(w?.label) && str(w.open),
+    ),
+  };
+  for (const k of Object.keys(card) as (keyof Card)[])
+    if (card[k] === undefined) delete card[k];
+  return card;
+}
+
+/** Each key from the newest block that has it: a clarify card keeps compose's skills. */
+export function latestCard(msgs: Msg[]): Card {
+  const card: Card = {};
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role !== "assistant") continue;
+    for (const b of [...msgs[i].text.matchAll(CARD_RE)].reverse()) {
+      let c: unknown;
+      try {
+        c = JSON.parse(b[1]);
+      } catch {
+        continue;
+      }
+      if (!c || typeof c !== "object" || Array.isArray(c)) continue;
+      const clean = cleanCard(c);
+      for (const k of Object.keys(clean) as (keyof Card)[])
+        if (!(k in card)) (card as any)[k] = clean[k];
+    }
+  }
+  return card;
+}
+
+/** A plan may name `clarify` where the engine reports `hope:clarify`. */
+export function hasRun(ran: Set<string>, name: string): boolean {
+  return ran.has(name) || [...ran].some((r) => r.endsWith(`:${name}`));
+}
+
+/** The slash command a planned skill runs by, or undefined when none exists. */
+export function commandFor(names: string[], name: string): string | undefined {
+  return names.find((n) => n === name) ?? names.find((n) => n.endsWith(`:${name}`));
+}
+
+export function clip(text: string, max = 40): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+export function tablesToLists(md: string): string {
+  const out: string[] = [];
+  let head: string[] | null = null;
+  const cells = (l: string) =>
+    l
+      .trim()
+      .replace(/\\\|/g, "\0")
+      .replace(/^\||\|$/g, "")
+      .split("|")
+      .map((c) => c.trim().replace(/\0/g, "|"));
+  for (const l of md.split("\n")) {
+    if (!l.trim().startsWith("|")) {
+      head = null;
+      out.push(l);
+    } else if (/^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(l)) continue;
+    else if (!head) head = cells(l);
+    else {
+      const c = cells(l);
+      out.push(`- **${c[0]}**`);
+      for (let i = 1; i < c.length; i++)
+        out.push(`  - ${head[i] ?? ""}: ${c[i]}`);
+    }
+  }
+  return out.join("\n");
+}
+
+export function bareFact(f: string): string {
+  return f.replace(/^\s*(?:[\w-]+(?:\s+[\w-]+)?\s+confirmed|found|measured)\s*:\s*/i, "");
+}
+
+/** Items a card shows; 0 hides its chip. */
+export function cardCount(
+  c: Card,
+  name: string,
+  answered: Set<string>,
+): number {
+  if (name === "intent" || name === "shape") return c[name] ? 1 : 0;
+  if (name === "facts") return c.facts?.length ?? 0;
+  if (name === "questions")
+    return (c.questions ?? []).filter((q) => !answered.has(q.q)).length;
+  if (name === "skills") return c.skills?.length ?? 0;
+  if (name === "watch") return c.watch?.length ?? 0;
+  return 0;
+}
+
+// ---- state ----
+
+let card: Card = {};
+let rows: Row[] = [];
+let open: string | null = null;
+let paneItem: string | null = null;
+let lastPaneItem: string | null = null;
+const answered = new Set<string>();
+const ran = new Set<string>();
+// The plan moved this turn (new card, or a skill ran): only then suggest the next skill.
+let planMoved = false;
+let nextCmd: string | undefined;
+const paneText = new Map<string, string>();
+const paneHead = new Map<string, string>();
+let started = false;
+let sessionId = "";
+
+// ---- effects ----
+
+async function registerCommands($: any) {
+  await $.command.register({
+    name: "cards",
+    description: "Reopen the pane",
+    immediate: true,
+  });
+}
+
+async function readSession($: any) {
+  const msgs: Msg[] = await $.session.messages();
+  const next = latestCard(msgs);
+  if (JSON.stringify(next) !== JSON.stringify(card)) planMoved = true;
+  card = next;
+  $.ui.invalidate("ui.render");
+}
+
+// Finished agents drop out of $.agent.list(); the store keeps them until opened.
+async function readAgents($: any) {
+  const kept: Row[] = ((await $.store.get(`tend:${sessionId}`)) as Row[]) ?? [];
+  const opened: string[] = ((await $.store.get(`tend:${sessionId}:opened`)) as string[]) ?? [];
+  const listed: Row[] = ((await $.agent.list()) as any[])
+    .filter((a) => !a.parentId && a.type !== "teammate" && !opened.includes(a.id))
+    .map((a) => ({
+      id: a.id,
+      label: a.name ?? a.description,
+      done: a.status !== "running" && a.status !== "pending",
+    }));
+  const next = [
+    ...listed.map((l) => ({ ...kept.find((k) => k.id === l.id), ...l })),
+    ...kept
+      .filter((k) => !listed.some((l) => l.id === k.id))
+      .map((k) => ({ ...k, done: true })),
+  ];
+  if (JSON.stringify(next) === JSON.stringify(rows)) return;
+  rows = next;
+  await $.store.set(`tend:${sessionId}`, rows);
+  $.ui.invalidate("ui.render");
+}
+
+async function openAgent($: any, id: string) {
+  const r = rows.find((x) => x.id === id);
+  if (r?.done) {
+    const msgs: Msg[] = await $.session.messages({ agentId: id });
+    const last = [...msgs].reverse().find((m) => m.role === "assistant" && m.text.trim());
+    paneText.set(`agent:${id}`, last?.text ?? "_no result_");
+    paneHead.set(`agent:${id}`, r.label);
+    rows = rows.filter((x) => x.id !== id);
+    const opened: string[] = ((await $.store.get(`tend:${sessionId}:opened`)) as string[]) ?? [];
+    await $.store.set(`tend:${sessionId}:opened`, [...opened, id]);
+    await $.store.set(`tend:${sessionId}`, rows);
+  }
+  await showPane($, `agent:${id}`);
+}
+
+async function openTarget($: any, target: string) {
+  if (target.startsWith("pane:")) return showPane($, `file:${target.slice(5)}`);
+  if (/\.(md|markdown)$/i.test(target) && !target.includes("://"))
+    return showPane($, `file:${target}`);
+  const r = await $.process
+    .run(["open", target], { timeoutMs: 10000 })
+    .catch((err: unknown) => ({ exitCode: -1, stderr: String(err) }));
+  if (r.exitCode !== 0) $.ui.toast(`can't open ${target}`);
+}
+
+async function showPane($: any, item: string) {
+  paneItem = item;
+  lastPaneItem = item;
+  // Open before reading: an open answering the press is placed at any width.
+  const opened = $.ui.open({ id: PANE, title: "tend", focus: true, closeOnEscape: true });
+  if (item.startsWith("file:"))
+    await $.fs.read(item.slice(5)).then(
+      (t: any) => paneText.set(item, typeof t === "string" ? t : String(t?.text ?? "")),
+      (err: unknown) => paneText.set(item, `_${String(err)}_`),
+    );
+  $.ui.invalidate("ui.render");
+  const r = await opened;
+  if (!r.isPlaced) $.ui.toast(r.reason);
+}
+
+async function slash($: any, name: string): Promise<string | undefined> {
+  const names = ((await $.command.list()) as { name: string }[]).map((c) => c.name);
+  const cmd = commandFor(names, name);
+  return cmd && `/${cmd} `;
+}
+
+// A stem the user finishes and sends as their own words.
+async function fill($: any, text: string) {
+  const f = await $.prompt.fill({ text, mode: "insert" });
+  if (!f.isFilled) await $.prompt.suggest({ text });
+}
+
+function reset() {
+  card = {};
+  rows = [];
+  open = null;
+  paneItem = null;
+  lastPaneItem = null;
+  answered.clear();
+  ran.clear();
+  planMoved = false;
+  nextCmd = undefined;
+}
+
+// One line per item; clicking a line fills its stem.
+function cardBody($: any, el: any, name: string) {
+  const { Box, Text, Button } = el;
+  const line = (key: string, text: string, onPress: () => void) => (
+    <Box key={`l-${key}`}>
+      <Button
+        key={key}
+        plain
+        label={text}
+        hover={{ bold: true }}
+        onPress={onPress}
+      />
+    </Box>
+  );
+  const quiet = (key: string, label: string, onPress: () => void) => (
+    <Box key={`d-${key}`}>
+      <Button
+        key={key}
+        plain
+        dimColor
+        label={label}
+        hover={{ dimColor: false, bold: true }}
+        onPress={onPress}
+      />
+    </Box>
+  );
+  if (name === "intent" || name === "shape")
+    return line(name, card[name] ?? "", () => void fill($, `${name}: `));
+  if (name === "facts")
+    return (
+      <Box flexDirection="column">
+        {(card.facts ?? []).map((f, i) =>
+          line(`fact-${i}`, bareFact(f), () => void fill($, `fact ${i + 1}: `)),
+        )}
+      </Box>
+    );
+  if (name === "questions")
+    return (
+      <Box flexDirection="column">
+        {(card.questions ?? []).map((q, i) =>
+          answered.has(q.q) ? null : (
+            <Box key={`q-${i}`} flexDirection="row" gap={2}>
+              {line(`q-${i}`, q.q, () => void fill($, `q${i + 1}: `))}
+              {q.options.map((o, j) =>
+                quiet(`opt-${i}-${j}`, o, () => {
+                  answered.add(q.q);
+                  $.ui.invalidate("ui.render");
+                  void fill($, `q${i + 1}: ${o} — `);
+                }),
+              )}
+            </Box>
+          ),
+        )}
+      </Box>
+    );
+  if (name === "skills")
+    return (
+      <Box flexDirection="column">
+        {(card.skills ?? []).map((k, i) => (
+          <Box key={`sk-${i}`} flexDirection="row" gap={2}>
+            {line(`sk-${i}`, hasRun(ran, k.name) ? `${k.name} ✓` : k.name, async () => {
+              const cmd = await slash($, k.name);
+              cmd ? void fill($, cmd) : $.ui.toast(`no command ${k.name}`);
+            })}
+            <Text dimColor>{k.outcome}</Text>
+          </Box>
+        ))}
+      </Box>
+    );
+  if (name === "watch")
+    return (
+      <Box flexDirection="column">
+        {(card.watch ?? []).map((l, i) => (
+          <Box key={`watch-${i}`} flexDirection="row" gap={2}>
+            {line(`watch-${i}`, l.label, () => void openTarget($, l.open))}
+            {l.see ? <Text dimColor>{l.see}</Text> : null}
+            {quiet(`watch-q-${i}`, "?", () => void fill($, `watch ${i + 1}: `))}
+          </Box>
+        ))}
+      </Box>
+    );
+  return null;
+}
+
+export const register: Register = (on) => {
+  on("session.start", async ($, e, next) => {
+    const r = await next(e);
+    sessionId = await $.session.id();
+    await registerCommands($);
+    return r;
+  });
+
+  on("session.end", async ($, e, next) => {
+    if (e.reason === "clear") reset();
+    return next(e);
+  });
+
+  on("command.run", { command: "cards" }, async ($) => {
+    if (lastPaneItem) await showPane($, lastPaneItem);
+    else $.ui.toast("nothing to show");
+    return {};
+  });
+
+  on("skill.prompt", async ($, e, next) => {
+    const r = await next(e);
+    if (!e.agentId) {
+      ran.add(e.skill);
+      planMoved = true;
+    }
+    return CARD_SKILLS.has(e.skill)
+      ? { text: `${r.text}\n\n${CARD_FORMAT}` }
+      : r;
+  });
+
+  // The engine's own guess would replace the plan's next skill; the plan wins.
+  on("prompt.suggest", async ($, e, next) =>
+    e.origin.kind === "suggestion" && nextCmd ? next({ ...e, text: nextCmd }) : next(e),
+  );
+
+  on("turn.complete", async ($, e, next) => {
+    const r = await next(e);
+    if (e.agentId) await readAgents($);
+    else {
+      await readSession($);
+      const nextSkill = planMoved && card.skills?.find((k) => !hasRun(ran, k.name));
+      planMoved = false;
+      // A suggestion made while the turn is live never shows.
+      nextCmd = (nextSkill && (await slash($, nextSkill.name))) || undefined;
+      const cmd = nextCmd;
+      if (cmd) $.clock.after(1500, () => void $.prompt.suggest({ text: cmd }));
+    }
+    return r;
+  });
+
+  on("ui.close", async ($, e, next) => {
+    const r = await next(e);
+    if (e.id === PANE) {
+      paneItem = null;
+      $.ui.invalidate("ui.render");
+    }
+    return r;
+  });
+
+  // The card block is for the band; the model keeps it, the transcript doesn't show it.
+  on("ui.render", { component: "AssistantMessage" }, ($, e, next) => {
+    const text = stripCards(e.props.text);
+    if (text === e.props.text) return next(e);
+    if (!text.trim()) {
+      const { Box } = $.ui.resolve(e);
+      return <Box />;
+    }
+    return next({ ...e, props: { ...e.props, text } });
+  });
+
+  on("ui.render", { component: "AbovePrompt" }, ($, e, next) => {
+    if (e.props.hasSurvey) return next(e);
+    if (!started) {
+      started = true;
+      void (async () => {
+        sessionId = await $.session.id();
+        await registerCommands($);
+        await readSession($);
+        await readAgents($);
+        $.clock.every(2000, () => void readAgents($));
+      })();
+    }
+    const el = $.ui.resolve(e);
+    const { Box, Button, Text } = el;
+    const count = (name: string) => cardCount(card, name, answered);
+    const toggle = (name: string) => () => {
+      if (open !== name && count(name) > BOX_LINES) {
+        open = null;
+        void showPane($, `card:${name}`);
+      } else open = open === name ? null : name;
+      $.ui.invalidate("ui.render");
+    };
+    const chip = (name: string, label: string, onPress: () => void) => (
+      <Box key={`chip-${name}`}>
+        <Button
+          key={name}
+          label={open === name || paneItem === `card:${name}` ? `▾ ${label}` : label}
+          hover={{ bold: true, color: "cyan" }}
+          onPress={onPress}
+        />
+      </Box>
+    );
+    const shown = CHIPS.filter((n) => count(n) > 0);
+
+    const line1 = shown.length ? (
+      <Box flexDirection="row" gap={1}>
+        {shown.map((n) => chip(n, n, toggle(n)))}
+      </Box>
+    ) : null;
+
+    const line2 = rows.length ? (
+      <Box flexDirection="row" gap={2}>
+        {rows.map((r) => (
+          <Box key={`ag-${r.id}`} flexDirection="row">
+            <Box>
+              <Button
+                key={`agent-${r.id}`}
+                plain
+                dimColor
+                label={clip(r.label)}
+                hover={{ dimColor: false, bold: true }}
+                onPress={() => void openAgent($, r.id)}
+              />
+            </Box>
+            {r.done ? (
+              <Text color="green"> ✓</Text>
+            ) : (
+              <Text color="yellow"> ●</Text>
+            )}
+          </Box>
+        ))}
+      </Box>
+    ) : null;
+
+    if (!line1 && !line2) return <Box />;
+    const body = open && count(open) > 0 ? cardBody($, el, open) : null;
+    return (
+      <Box flexDirection="column" width={e.props.bodyColumns}>
+        {line1}
+        {line2}
+        {body ? (
+          <Box borderStyle="round" paddingX={1} flexDirection="column">
+            {body}
+          </Box>
+        ) : null}
+      </Box>
+    );
+  });
+
+  on("ui.render", { component: "Pane" }, ($, e, next) => {
+    if (e.requestId !== PANE) return next(e);
+    const el = $.ui.resolve(e);
+    const { Box, Text, Markdown } = el;
+    const item = paneItem ?? "";
+    const kind = item.slice(0, item.indexOf(":"));
+    const rest = item.slice(kind.length + 1);
+    const head =
+      kind === "agent"
+        ? (paneHead.get(item) ?? rows.find((r) => r.id === rest)?.label ?? "agent")
+        : kind === "card"
+          ? rest
+          : rest.split("/").pop();
+    const body =
+      kind === "card" ? (
+        cardBody($, el, rest)
+      ) : kind === "agent" && !paneText.has(item) ? (
+        <Text dimColor>running</Text>
+      ) : (
+        <Markdown
+          key="pane-md"
+          text={tablesToLists(paneText.get(item) ?? "")}
+          onLinkPress={(link) =>
+            void openTarget($, link.href.replace(/^file:\/\//, ""))
+          }
+        />
+      );
+    return (
+      <Box flexDirection="column" width={e.props.bodyColumns}>
+        <Text dimColor>{head}</Text>
+        {body}
+      </Box>
+    );
+  });
+};
