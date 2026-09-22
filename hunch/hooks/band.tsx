@@ -6,7 +6,11 @@ export type Item = {
   id: string;
   label: string;
   kind: "chip" | "line" | "quiet" | "note" | "agent";
-  mark?: "open" | "done" | "running";
+  /** Its card or pane is showing. */
+  open?: true;
+  state?: "done" | "running";
+  /** An agent already read: kept for reopening, drawn dim. */
+  read?: true;
 };
 export type Band = { chips: Item[]; body: Item[][]; agents: Item[] };
 export type Focus = { row: number; col: number };
@@ -31,7 +35,7 @@ export function move(f: Focus, rows: Item[][], key: string): Focus {
   const width = rows[row].length;
   // Stepping back to the chips lands on the open one.
   const opened =
-    row !== f.row ? rows[row].findIndex((i) => i.mark === "open") : -1;
+    row !== f.row ? rows[row].findIndex((i) => i.open) : -1;
   const col =
     opened >= 0
       ? opened
@@ -43,16 +47,24 @@ export function move(f: Focus, rows: Item[][], key: string): Focus {
   return { row, col };
 }
 
-const MARK_GLYPH: Record<string, string> = { done: " ✓", running: " ●" };
-const MARK_COLOR: Record<string, string> = {
-  done: "success",
-  running: "warning",
-};
+const GLYPH = { done: " ✓", running: " ●" };
+const GLYPH_COLOR = { done: "success", running: "warning" };
 
-const textOf = (i: Item) =>
-  i.kind === "chip"
-    ? `[ ${i.mark === "open" ? "▾ " : ""}${i.label} ]`
-    : `${i.label}${MARK_GLYPH[i.mark ?? ""] ?? ""}`;
+/** An item's text in its pieces: brackets for what acts like a button, a state glyph. */
+function pieces(i: Item) {
+  const button = i.kind === "chip" || i.kind === "agent";
+  return {
+    pre: button ? `[ ${i.open ? "▾ " : ""}` : "",
+    label: i.label,
+    glyph: i.state ? GLYPH[i.state] : "",
+    post: button ? " ]" : "",
+  };
+}
+
+const textOf = (i: Item) => {
+  const p = pieces(i);
+  return p.pre + p.label + p.glyph + p.post;
+};
 
 // The card body sits in a box only under chips (the pane shows it bare).
 const boxed = (b: Band) => b.chips.length > 0 && b.body.length > 0;
@@ -129,22 +141,24 @@ export default function BandView(band: Band, surface: any) {
   });
 
   // Colour carries state only, by theme key so it follows the user's theme:
-  // the open chip in the engine's own selection blue, ✓ and ● in their colours,
-  // the label beside them plain. Hover is the one sign that a word takes a click.
+  // what is open in the engine's selection blue, ✓ and ● in their colours.
+  // Brackets recede so the words stand; hover marks what takes a click.
   const draw = (c: Cell) => {
     const i = c.item;
+    const p = pieces(i);
     const style: Record<string, unknown> = {};
-    const glyph = MARK_GLYPH[i.mark ?? ""];
+    // A clipped cell draws as one run; its pieces no longer line up.
     style.children =
-      glyph && c.text.endsWith(glyph)
-        ? [
-            c.text.slice(0, -glyph.length),
-            Text({ key: "g", color: MARK_COLOR[i.mark!], children: glyph }),
-          ]
-        : c.text;
-    if (i.kind === "quiet" || i.kind === "note") style.dimColor = true;
-    if (i.mark === "open")
-      Object.assign(style, { bold: true, color: "suggestion" });
+      c.text !== textOf(i) || i.open
+        ? c.text
+        : [
+            p.pre && Text({ key: "pre", color: "subtle", children: p.pre }),
+            p.label,
+            p.glyph && Text({ key: "g", color: GLYPH_COLOR[i.state!], children: p.glyph }),
+            p.post && Text({ key: "post", color: "subtle", children: p.post }),
+          ].filter(Boolean);
+    if (i.kind === "quiet" || i.kind === "note" || i.read) style.dimColor = true;
+    if (i.open) Object.assign(style, { bold: true, color: "suggestion" });
     if (focusable(i)) style.hover = { color: "suggestion" };
     if (i.id === at) style.inverse = true;
     return Box({ key: `c-${i.id}`, children: [Text(style)] });

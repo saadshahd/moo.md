@@ -14,7 +14,7 @@ type Msg = {
   text: string;
   toolUses?: { tool: string; input: Record<string, unknown> }[];
 };
-export type Row = { id: string; label: string; done: boolean };
+export type Row = { id: string; label: string; type: string; done: boolean; read?: true };
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
 {"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
@@ -182,7 +182,7 @@ export function cardRows(
     );
   if (name === "skills")
     return (c.skills ?? []).map((k, i) => [
-      { ...line(`skill:${i}`, k.name), ...(hasRun(ran, k.name) ? { mark: "done" as const } : {}) },
+      { ...line(`skill:${i}`, k.name), ...(hasRun(ran, k.name) ? { state: "done" as const } : {}) },
       note(`skill-note:${i}`, k.outcome),
     ]);
   if (name === "watch")
@@ -209,14 +209,16 @@ export function bandModel(s: {
       label: chipLabel(s.card, n, s.answered, s.ran),
       kind: "chip",
       // Client props refuse undefined, so an unmarked chip has no key at all.
-      ...(s.open === n || s.paneItem === `card:${n}` ? { mark: "open" as const } : {}),
+      ...(s.open === n || s.paneItem === `card:${n}` ? { open: true as const } : {}),
     })),
     body: s.open && count(s.open) > 0 ? cardRows(s.card, s.open, s.answered, s.ran) : [],
     agents: s.rows.map((r) => ({
       id: `agent:${r.id}`,
       label: clip(r.label),
       kind: "agent",
-      mark: r.done ? "done" : "running",
+      state: r.done ? "done" : "running",
+      ...(r.read ? { read: true as const } : {}),
+      ...(s.paneItem === `agent:${r.id}` ? { open: true as const } : {}),
     })),
   };
 }
@@ -234,7 +236,8 @@ const ran = new Set<string>();
 let planMoved = false;
 let nextCmd: string | undefined;
 const paneText = new Map<string, string>();
-const paneHead = new Map<string, string>();
+// The agent a pane shows, kept past the row being cleared from the band.
+const paneAgent = new Map<string, Row>();
 // What each opened agent was asked: a wrong brief is the cheapest thing to catch.
 const briefs = new Map<string, string>();
 let started = false;
@@ -272,15 +275,17 @@ async function recall($: any) {
   for (const a of ((await $.store.get(`tend:${sessionId}:answered`)) as string[]) ?? []) answered.add(a);
 }
 
-// Finished agents drop out of $.agent.list(); the store keeps them until opened.
+// Finished agents drop out of $.agent.list(); the store keeps them. A read one stays,
+// dim, for reopening until the user's next prompt clears it.
 async function readAgents($: any) {
   const kept: Row[] = ((await $.store.get(`tend:${sessionId}`)) as Row[]) ?? [];
-  const opened: string[] = ((await $.store.get(`tend:${sessionId}:opened`)) as string[]) ?? [];
+  const cleared: string[] = ((await $.store.get(`tend:${sessionId}:cleared`)) as string[]) ?? [];
   const listed: Row[] = ((await $.agent.list()) as any[])
-    .filter((a) => !a.parentId && a.type !== "teammate" && !opened.includes(a.id))
+    .filter((a) => !a.parentId && a.type !== "teammate" && !cleared.includes(a.id))
     .map((a) => ({
       id: a.id,
       label: a.name ?? a.description,
+      type: a.type,
       done: a.status !== "running" && a.status !== "pending",
     }));
   const next = [
@@ -292,21 +297,37 @@ async function readAgents($: any) {
   if (JSON.stringify(next) === JSON.stringify(rows)) return;
   rows = next;
   await $.store.set(`tend:${sessionId}`, rows);
+  // A pane opened while its agent ran fills in when the agent finishes.
+  const shown = paneItem?.startsWith("agent:") ? paneItem.slice(6) : "";
+  if (rows.find((r) => r.id === shown)?.done && !paneText.has(paneItem!)) await loadAgent($, shown);
   $.ui.invalidate("ui.render");
 }
 
-async function openAgent($: any, id: string) {
-  const r = rows.find((x) => x.id === id);
+async function clearRead($: any) {
+  const read = rows.filter((r) => r.read).map((r) => r.id);
+  if (!read.length) return;
+  const cleared: string[] = ((await $.store.get(`tend:${sessionId}:cleared`)) as string[]) ?? [];
+  await $.store.set(`tend:${sessionId}:cleared`, [...cleared, ...read]);
+  rows = rows.filter((r) => !r.read);
+  await $.store.set(`tend:${sessionId}`, rows);
+  $.ui.invalidate("ui.render");
+}
+
+async function loadAgent($: any, id: string) {
   const msgs: Msg[] = await $.session.messages({ agentId: id });
   const ask = msgs.find((m) => m.role === "user" && m.text.trim());
   if (ask) briefs.set(`agent:${id}`, firstLine(ask.text));
-  if (r?.done) {
-    const last = [...msgs].reverse().find((m) => m.role === "assistant" && m.text.trim());
-    paneText.set(`agent:${id}`, last?.text ?? "_no result_");
-    paneHead.set(`agent:${id}`, r.label);
-    rows = rows.filter((x) => x.id !== id);
-    const opened: string[] = ((await $.store.get(`tend:${sessionId}:opened`)) as string[]) ?? [];
-    await $.store.set(`tend:${sessionId}:opened`, [...opened, id]);
+  if (!rows.find((r) => r.id === id)?.done) return;
+  const last = [...msgs].reverse().find((m) => m.role === "assistant" && m.text.trim());
+  paneText.set(`agent:${id}`, last?.text ?? "_no result_");
+}
+
+async function openAgent($: any, id: string) {
+  await loadAgent($, id);
+  const r = rows.find((x) => x.id === id);
+  if (r) paneAgent.set(`agent:${id}`, r);
+  if (r?.done && !r.read) {
+    r.read = true;
     await $.store.set(`tend:${sessionId}`, rows);
   }
   await showPane($, `agent:${id}`);
@@ -426,6 +447,12 @@ export const register: Register = (on) => {
   });
 
   // The engine's own guess would replace the plan's next skill; the plan wins.
+  // The user's own next prompt clears the agents already read.
+  on("prompt.submit", async ($, e, next) => {
+    if (e.origin?.kind === "composer") await clearRead($);
+    return next(e);
+  });
+
   on("prompt.suggest", async ($, e, next) =>
     e.origin.kind === "suggestion" && nextCmd ? next({ ...e, text: nextCmd }) : next(e),
   );
@@ -500,12 +527,19 @@ export const register: Register = (on) => {
     const item = paneItem ?? "";
     const kind = item.slice(0, item.indexOf(":"));
     const rest = item.slice(kind.length + 1);
+    const agent = rows.find((r) => r.id === rest) ?? paneAgent.get(item);
     const head =
-      kind === "agent"
-        ? (paneHead.get(item) ?? rows.find((r) => r.id === rest)?.label ?? "agent")
-        : kind === "card"
-          ? rest
-          : rest.split("/").pop();
+      kind === "agent" && agent ? (
+        <Box flexDirection="row" gap={2}>
+          <Text bold>
+            {agent.label}
+            <Text color={agent.done ? "success" : "warning"}>{agent.done ? " ✓" : " ●"}</Text>
+          </Text>
+          <Text dimColor>{agent.type ?? ""}</Text>
+        </Box>
+      ) : (
+        <Text dimColor>{kind === "card" ? rest : rest.split("/").pop()}</Text>
+      );
     const body =
       kind === "card" ? (
         <Client
@@ -527,8 +561,9 @@ export const register: Register = (on) => {
       );
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
-        <Text dimColor>{head}</Text>
-        {briefs.has(item) ? <Text dimColor wrap="truncate-end">asked: {briefs.get(item)}</Text> : <Box />}
+        {head}
+        {briefs.has(item) ? <Text dimColor wrap="truncate-end">asked  {briefs.get(item)}</Text> : <Box />}
+        <Text> </Text>
         {body}
       </Box>
     );

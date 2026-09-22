@@ -77,7 +77,7 @@ test("a skill counts as run with or without its plugin prefix", async () => {
 
 test("a run skill is marked done, its label left bare", async () => {
   const [[run]] = cardRows({ skills: [{ name: "hope:judge", outcome: "v" }] } as any, "skills", new Set(), new Set(["hope:judge"]));
-  expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", mark: "done" });
+  expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", state: "done" });
 });
 test("a chip previews its card with one number", async () => {
   const c = {
@@ -132,7 +132,7 @@ describe("band", () => {
   });
   test("an open card marks its chip and fills the body", async () => {
     const b = model({ facts: ["a", "b"] }, "facts");
-    expect(b.chips[0].mark).toBe("open");
+    expect(b.chips[0].open).toBe(true);
     expect(b.body.map((r) => r[0].id)).toEqual(["probe:fact 1", "probe:fact 2"]);
   });
   test("no undefined anywhere: Client props refuse it", async () => {
@@ -142,10 +142,17 @@ describe("band", () => {
     expect(holes(b)).toBe(false);
   });
   test("agents line only with agents", async () => {
-    const b = model({}, null, [{ id: "a1", label: "count files", done: false }]);
+    const b = model({}, null, [{ id: "a1", label: "count files", type: "Explore", done: false }]);
     expect(b.agents).toEqual([
-      { id: "agent:a1", label: "count files", kind: "agent", mark: "running" },
+      { id: "agent:a1", label: "count files", kind: "agent", state: "running" },
     ]);
+  });
+  test("a read agent stays, dim; the one in the pane is open", async () => {
+    const b = bandModel({
+      card: {}, open: null, paneItem: "agent:a1", answered: new Set(), ran: new Set(),
+      rows: [{ id: "a1", label: "l", type: "Explore", done: true, read: true }],
+    });
+    expect(b.agents[0]).toEqual({ id: "agent:a1", label: "l", kind: "agent", state: "done", read: true, open: true });
   });
   test("a question row: the question, then its answers", async () => {
     const rows = cardRows(
