@@ -168,7 +168,7 @@ export function cardRows(
     );
   if (name === "skills")
     return (c.skills ?? []).map((k, i) => [
-      line(`skill:${i}`, hasRun(ran, k.name) ? `${k.name} ✓` : k.name),
+      { ...line(`skill:${i}`, k.name), ...(hasRun(ran, k.name) ? { mark: "done" as const } : {}) },
       note(`skill-note:${i}`, k.outcome),
     ]);
   if (name === "watch")

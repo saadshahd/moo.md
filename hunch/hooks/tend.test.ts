@@ -75,6 +75,10 @@ test("a skill counts as run with or without its plugin prefix", async () => {
   expect(hasRun(ran, "hope:judge")).toBe(false);
 });
 
+test("a run skill is marked done, its label left bare", async () => {
+  const [[run]] = cardRows({ skills: [{ name: "hope:judge", outcome: "v" }] } as any, "skills", new Set(), new Set(["hope:judge"]));
+  expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", mark: "done" });
+});
 test("a planned skill resolves to a real command, or none", async () => {
   const names = ["hope:clarify", "hope:judge", "clear"];
   expect(commandFor(names, "clarify")).toBe("hope:clarify");
