@@ -86,10 +86,12 @@ test("a chip previews its card with one number", async () => {
     questions: [{ q: "x", options: [] }, { q: "y", options: [] }],
     skills: [{ name: "hope:intent" }, { name: "hope:draft" }],
   } as any;
-  expect(chipLabel(c, "intent", new Set(), new Set())).toBe("intent");
-  expect(chipLabel(c, "facts", new Set(), new Set())).toBe("facts 2");
-  expect(chipLabel(c, "questions", new Set(["x"]), new Set())).toBe("questions 1");
-  expect(chipLabel(c, "skills", new Set(), new Set(["hope:intent"]))).toBe("skills 1/2");
+  const s = (answered: string[] = [], ran: string[] = []) =>
+    ({ card: c, answered: new Set(answered), ran: new Set(ran), rows: [], paneItem: null });
+  expect(chipLabel("intent", s())).toBe("intent");
+  expect(chipLabel("facts", s())).toBe("facts 2");
+  expect(chipLabel("questions", s(["x"]))).toBe("questions 1");
+  expect(chipLabel("skills", s([], ["hope:intent"]))).toBe("skills 1/2");
 });
 test("first line: the first non-empty one, trimmed", async () => {
   expect(firstLine("\n  find the parser \nmore")).toBe("find the parser");
@@ -261,29 +263,35 @@ describe("arrows", () => {
     { id: "a1", label: "count", done: true },
   ]);
   const rows = navRows(b);
-  test("rows: chips, then each card line", async () => {
+  test("rows as drawn: each card line, then the chips under them", async () => {
     expect(rows.map((r) => r.map((i) => i.id))).toEqual([
-      ["chip:intent", "chip:facts", "chip:agents"],
       ["probe:fact 1"],
       ["probe:fact 2"],
+      ["chip:intent", "chip:facts", "chip:agents"],
     ]);
   });
   test("left/right stay in the row; up/down change rows", async () => {
-    expect(move({ row: 0, col: 0 }, rows, "right")).toEqual({ row: 0, col: 1 });
-    expect(move({ row: 0, col: 2 }, rows, "right")).toEqual({ row: 0, col: 2 });
-    expect(move({ row: 0, col: 1 }, rows, "down")).toEqual({ row: 1, col: 0 });
-    expect(move({ row: 2, col: 0 }, rows, "down")).toEqual({ row: 2, col: 0 });
-    expect(move({ row: 1, col: 0 }, rows, "up")).toEqual({ row: 0, col: 1 }); // back on the open chip
+    expect(move({ row: 2, col: 0 }, rows, "right")).toEqual({ row: 2, col: 1 });
+    expect(move({ row: 2, col: 2 }, rows, "right")).toEqual({ row: 2, col: 2 });
+    expect(move({ row: 2, col: 1 }, rows, "up")).toEqual({ row: 1, col: 0 });
+    expect(move({ row: 0, col: 0 }, rows, "up")).toEqual({ row: 0, col: 0 });
+    expect(move({ row: 1, col: 0 }, rows, "down")).toEqual({ row: 2, col: 1 }); // back on the open chip
   });
-  test("a click lands on the item drawn there", async () => {
+  test("a click lands on the item drawn there; the chips sit under the box", async () => {
     const cells = layout(b, 80);
-    expect(cells.map((l) => l.y)).toEqual([0, 2, 3]); // the box's top border takes row 1
-    // chips row: "[ intent ] [ ▾ facts ]"; box top border at y=1; first fact at y=2, x=2
-    expect(hit(cells, 3, 0)?.id).toBe("chip:intent");
-    expect(hit(cells, 12, 0)?.id).toBe("chip:facts");
-    expect(hit(cells, 2, 2)?.id).toBe("probe:fact 1");
-    expect(hit(cells, 2, 3)?.id).toBe("probe:fact 2");
-    expect(hit(cells, 40, 2)).toBeUndefined();
+    expect(cells.map((l) => l.y)).toEqual([1, 2, 4]); // the box's borders take rows 0 and 3
+    // box top border at y=0; facts at y=1, 2, x=2; chips row "[ intent ] [ ▴ facts ]" at y=4
+    expect(hit(cells, 2, 1)?.id).toBe("probe:fact 1");
+    expect(hit(cells, 2, 2)?.id).toBe("probe:fact 2");
+    expect(hit(cells, 3, 4)?.id).toBe("chip:intent");
+    expect(hit(cells, 12, 4)?.id).toBe("chip:facts");
+    expect(hit(cells, 40, 1)).toBeUndefined();
+  });
+  test("the chips are the band's last line, open or closed: they never move under the pointer", async () => {
+    const closed = layout(model({ facts: ["a", "b"] }), 80);
+    const opened = layout(model({ facts: ["a", "b"] }, "facts"), 80);
+    expect(closed.at(-1)?.part).toBe("chips");
+    expect(opened.at(-1)?.part).toBe("chips");
   });
   test("a word wider than the box is the one thing clipped", async () => {
     const wide = model({ facts: ["x".repeat(100)] }, "facts");
@@ -296,6 +304,6 @@ describe("arrows", () => {
       { skills: [{ name: "hope:judge", outcome: "verdict" }] },
       "skills",
     );
-    expect(navRows(skills)[1].map((i) => i.id)).toEqual(["skill:0"]);
+    expect(navRows(skills)[0].map((i) => i.id)).toEqual(["skill:0"]);
   });
 });

@@ -42,4 +42,4 @@ In control, 1–7, per round: first-timer 3 → 3 → 4, expert 3 → 4 → 5. R
 - A card stays in the band's box while it wraps to a few lines at the reading measure (`BOX_LINES`, `MEASURE`); longer, it opens in the pane.
 - Source files open in the editor (`code -g`), the rest with `open`.
 - Cut: a standing agents row (the user: "agents should exist as a pane only"); the full report inline (card-sized, plain); uppercase and coloured buttons (Norman, Wathan and Jev agreed: brackets are the sign, colour means state).
-- Open: the screen can move under a click while a turn streams (the engine's layout); a turn in flight still delays the first click on a running agent.
+- The band grows upward: a card opens above its chips, so the chips never move under the pointer (`▴` marks the open one). The transcript can still move above them while a turn streams.

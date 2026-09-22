@@ -24,7 +24,7 @@ export type Cell = { item: Item; text: string; x: number; y: number };
 const focusable = (i: Item) => i.kind !== "note" && i.kind !== "title";
 
 export function navRows(b: Band): Item[][] {
-  return [b.chips, ...b.body]
+  return [...b.body, b.chips]
     .map((r) => r.filter(focusable))
     .filter((r) => r.length);
 }
@@ -59,7 +59,7 @@ const GLYPH_COLOR = { done: "success", running: "warning" };
 function pieces(i: Item) {
   const button = i.kind === "chip" || i.id === "close";
   return {
-    pre: button ? `[ ${i.open ? "▾ " : ""}` : "",
+    pre: button ? `[ ${i.open ? "▴ " : ""}` : "",
     label: i.label,
     glyph: i.state ? GLYPH[i.state] : "",
     post: button ? " ]" : "",
@@ -71,7 +71,7 @@ const textOf = (i: Item) => {
   return p.pre + p.label + p.glyph + p.post;
 };
 
-// The card body sits in a box only under chips (the pane shows it bare).
+// The card body sits in a box only with chips (the pane shows it bare).
 const boxed = (b: Band) => b.chips.length > 0 && b.body.length > 0;
 
 export type Line = {
@@ -115,10 +115,12 @@ export function layout(b: Band, columns: number): Line[] {
     }
     lines.push({ part, gap, x0, y: y++, cells });
   };
-  if (b.chips.length) place("chips", b.chips, 0, 1);
+  // The card opens above its chips: the band grows upward from the prompt, so the chips
+  // stay put under the pointer while a card opens, closes or changes.
   if (box) y++; // the box's top border
   for (const r of b.body) place("body", r, box ? 2 : 0, 2, Math.min(columns, MEASURE));
   if (box) y++; // its bottom border
+  if (b.chips.length) place("chips", b.chips, 0, 1);
   return lines;
 }
 
@@ -227,7 +229,6 @@ export default function BandView(band: Band, surface: any) {
     });
   const body = lines.filter((l) => l.part === "body").map(row);
   const out = [
-    ...lines.filter((l) => l.part === "chips").map(row),
     ...(body.length
       ? [
           boxed(band)
@@ -243,6 +244,7 @@ export default function BandView(band: Band, surface: any) {
             : Box({ key: "body", flexDirection: "column", children: body }),
         ]
       : []),
+    ...lines.filter((l) => l.part === "chips").map(row),
     ...(band.doc
       ? [
           Box({

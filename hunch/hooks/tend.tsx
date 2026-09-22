@@ -142,11 +142,6 @@ export function bareFact(f: string): string {
   return f.replace(/^\s*(?:[\w-]+(?:\s+[\w-]+)?\s+confirmed|found|measured)\s*:\s*/i, "");
 }
 
-/** Items a card shows; 0 hides its chip. */
-export function cardCount(c: Card, name: string, answered: Set<string>): number {
-  return cardRows(c, name, answered, new Set()).length;
-}
-
 export function firstLine(text: string): string {
   return text.split("\n").find((l) => l.trim())?.trim() ?? "";
 }
@@ -248,13 +243,13 @@ export function isSourceFile(target: string): boolean {
 }
 
 /** A chip's label with the one number that previews its card: how many, or skills run of planned. */
-export function chipLabel(c: Card, name: string, answered: Set<string>, ran: Set<string>): string {
+export function chipLabel(name: string, s: Shown): string {
   if (name === "intent" || name === "shape") return name;
   if (name === "skills") {
-    const planned = c.skills ?? [];
-    return `skills ${planned.filter((k) => hasRun(ran, k.name)).length}/${planned.length}`;
+    const planned = s.card.skills ?? [];
+    return `skills ${planned.filter((k) => hasRun(s.ran, k.name)).length}/${planned.length}`;
   }
-  return `${name} ${cardCount(c, name, answered)}`;
+  return `${name} ${chipRows(name, s).length}`;
 }
 
 /** A card's lines; each inner list is one row the arrows move along. */
@@ -299,39 +294,39 @@ function agentItem(r: Row, paneItem: string | null): Item {
   };
 }
 
+/** What the band draws from. */
+export type Shown = { card: Card; answered: Set<string>; ran: Set<string>; rows: Row[]; paneItem: string | null };
+
+/** Chips whose rows only ever read in the pane: agents, a list then each one's card. */
+export const PANE_ONLY = new Set(["agents"]);
+
+/** The chip a pane item belongs to: a card's own, or agents for an agent's card or report. */
+export function paneChip(paneItem: string | null): string | undefined {
+  const [kind, ...rest] = (paneItem ?? "").split(":");
+  return kind === "card" ? rest.join(":") : kind === "agent" || kind === "report" ? "agents" : undefined;
+}
+
 /** The rows a chip opens: the card's, or the session's agents. */
-export function chipRows(
-  name: string,
-  s: { card: Card; answered: Set<string>; ran: Set<string>; rows: Row[]; paneItem: string | null },
-): Item[][] {
+export function chipRows(name: string, s: Shown): Item[][] {
   return name === "agents"
     ? s.rows.map((r) => [agentItem(r, s.paneItem)])
     : cardRows(s.card, name, s.answered, s.ran);
 }
 
-export function bandModel(s: {
-  card: Card;
-  open: string | null;
-  paneItem: string | null;
-  answered: Set<string>;
-  ran: Set<string>;
-  rows: Row[];
-}): Band {
-  const count = (n: string) => (n === "agents" ? s.rows.length : cardCount(s.card, n, s.answered));
+export function bandModel(s: Shown & { open: string | null }): Band {
+  const shown = CHIPS.filter((n) => chipRows(n, s).length > 0);
   return {
     doc: "",
-    chips: CHIPS.filter((n) => count(n) > 0).map((n) => ({
+    chips: shown.map((n) => ({
       id: `chip:${n}`,
-      label: n === "agents" ? `agents ${s.rows.length}` : chipLabel(s.card, n, s.answered, s.ran),
+      label: chipLabel(n, s),
       kind: "chip",
       // Client props refuse undefined, so an unmarked chip has no key at all.
-      ...(s.open === n || s.paneItem === `card:${n}` || (n === "agents" && s.paneItem?.startsWith("agent:"))
-        ? { open: true as const }
-        : {}),
+      ...(s.open === n || paneChip(s.paneItem) === n ? { open: true as const } : {}),
       // While any agent works, its chip says so.
       ...(n === "agents" && s.rows.some((r) => !r.done) ? { state: "running" as const } : {}),
     })),
-    body: s.open && count(s.open) > 0 ? chipRows(s.open, s) : [],
+    body: s.open && shown.includes(s.open as (typeof CHIPS)[number]) ? chipRows(s.open, s) : [],
   };
 }
 
@@ -441,9 +436,10 @@ async function readAgents($: any) {
   if (JSON.stringify(next) === JSON.stringify(rows)) return;
   rows = next;
   await $.store.set(`tend:${sessionId}`, rows);
-  // A pane opened on an agent, its card or its report, fills in when the agent finishes.
+  // A pane opened on an agent, its card or its report, reloads as the agent's rows change;
+  // loadAgent alone decides when there is a result to show.
   const shown = paneItem?.match(/^(?:agent|report):(.+)$/)?.[1] ?? "";
-  if (rows.find((r) => r.id === shown)?.done && !paneText.has(`agent:${shown}`)) await loadAgent($, shown);
+  if (shown && !paneText.has(`agent:${shown}`)) await loadAgent($, shown);
   $.ui.invalidate("ui.render");
 }
 
@@ -551,8 +547,7 @@ async function act($: any, id: string) {
     // A card that won't fit the box, too many lines or one too long, reads in the pane.
     const shown = { card, answered, ran, rows, paneItem };
     if (paneItem === `card:${arg}`) await $.ui.close({ id: PANE });
-    // Agents live in the pane only: their list, then each one's card.
-    else if (arg === "agents" || (open !== arg && !fitsBox(chipRows(arg, shown), bandColumns, BOX_LINES))) {
+    else if (PANE_ONLY.has(arg) || (open !== arg && !fitsBox(chipRows(arg, shown), bandColumns, BOX_LINES))) {
       open = null;
       await showPane($, `card:${arg}`);
     } else open = open === arg ? null : arg;
