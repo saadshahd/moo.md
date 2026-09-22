@@ -5,7 +5,7 @@
 export type Item = {
   id: string;
   label: string;
-  kind: "chip" | "line" | "quiet" | "note" | "agent" | "title";
+  kind: "chip" | "line" | "quiet" | "note" | "title";
   /** Its card or pane is showing. */
   open?: true;
   state?: "done" | "running";
@@ -13,7 +13,7 @@ export type Item = {
   read?: true;
 };
 /** `doc`: markdown read below the rows (the pane's result or file); "" for none. */
-export type Band = { chips: Item[]; body: Item[][]; agents: Item[]; doc: string };
+export type Band = { chips: Item[]; body: Item[][]; doc: string };
 
 /** The widest a card's line runs, in the band's box or the pane: past it, text is hard to read back. */
 export const MEASURE = 120;
@@ -24,7 +24,7 @@ export type Cell = { item: Item; text: string; x: number; y: number };
 const focusable = (i: Item) => i.kind !== "note" && i.kind !== "title";
 
 export function navRows(b: Band): Item[][] {
-  return [b.chips, ...b.body, b.agents]
+  return [b.chips, ...b.body]
     .map((r) => r.filter(focusable))
     .filter((r) => r.length);
 }
@@ -57,7 +57,7 @@ const GLYPH_COLOR = { done: "success", running: "warning" };
 
 /** An item's text in its pieces: brackets for what acts like a button, a state glyph. */
 function pieces(i: Item) {
-  const button = i.kind === "chip" || i.kind === "agent" || i.id === "close";
+  const button = i.kind === "chip" || i.id === "close";
   return {
     pre: button ? `[ ${i.open ? "▾ " : ""}` : "",
     label: i.label,
@@ -75,7 +75,7 @@ const textOf = (i: Item) => {
 const boxed = (b: Band) => b.chips.length > 0 && b.body.length > 0;
 
 export type Line = {
-  part: "chips" | "body" | "agents";
+  part: "chips" | "body";
   gap: number;
   /** Where the line's row starts; a run-on line's first cell sits further in. */
   x0: number;
@@ -119,7 +119,6 @@ export function layout(b: Band, columns: number): Line[] {
   if (box) y++; // the box's top border
   for (const r of b.body) place("body", r, box ? 2 : 0, 2, Math.min(columns, MEASURE));
   if (box) y++; // its bottom border
-  if (b.agents.length) place("agents", b.agents, 0, 2);
   return lines;
 }
 
@@ -146,7 +145,7 @@ export function wrap(text: string, width: number): string[] {
 
 /** Whether a card's rows, wrapped in the band's box, take at most `most` lines. The rest go to the pane. */
 export function fitsBox(rows: Item[][], columns: number, most: number): boolean {
-  return layout({ chips: [{ id: "", label: "", kind: "chip" }], body: rows, agents: [], doc: "" }, columns)
+  return layout({ chips: [{ id: "", label: "", kind: "chip" }], body: rows, doc: "" }, columns)
     .filter((l) => l.part === "body").length <= most;
 }
 
@@ -172,8 +171,12 @@ export default function BandView(band: Band, surface: any) {
   // Re-set each call so the listeners see these props; keys can outrun a redraw,
   // so each reads the focus afresh.
   surface.onKey((k: { key: string }) => {
-    // A typed character was meant for the prompt: send it there, and the keys follow.
-    if ([...k.key].length === 1) return surface.post({ type: k.key });
+    // A typed character was meant for the prompt: send it there, and the keys follow. Posts in
+    // one frame replace each other, so each carries all typed here; the hook fills what's new.
+    if ([...k.key].length === 1) {
+      surface.typed = (surface.typed ?? "") + k.key;
+      return surface.post({ type: surface.typed });
+    }
     const state: Focus = surface.state ?? { row: 0, col: 0 };
     const now = move(state, rows, "");
     if (["up", "down", "left", "right"].includes(k.key)) surface.setState({ ...move(now, rows, k.key), nav: true });
@@ -240,7 +243,6 @@ export default function BandView(band: Band, surface: any) {
             : Box({ key: "body", flexDirection: "column", children: body }),
         ]
       : []),
-    ...lines.filter((l) => l.part === "agents").map(row),
     ...(band.doc
       ? [
           Box({

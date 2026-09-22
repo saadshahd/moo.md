@@ -4,6 +4,8 @@ import { fitsBox, MEASURE, type Band, type Item } from "./band.tsx";
 export type Card = {
   intent?: string;
   shape?: string;
+  /** An agent's own one-line answer; the session's card has none. */
+  outcome?: string;
   facts?: string[];
   questions?: { q: string; options: string[] }[];
   skills?: { name: string; outcome: string }[];
@@ -14,14 +16,15 @@ type Msg = {
   text: string;
   toolUses?: { tool: string; input: Record<string, unknown> }[];
 };
+/** `read`: opened once, drawn dim in the agents list. */
 export type Row = { id: string; label: string; type: string; done: boolean; read?: true };
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
 {"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-facts: bare claims; one that settles a choice names what lost. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
+facts: what the user should carry forward — durable, plain, no file paths or change details; one that settles a choice names what lost. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
-export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","facts":["…"]}. intent: what you set out to do. facts: the bare claims your answer rests on.`;
+export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: what the user should carry forward — durable, in plain words, no file paths or tool steps.`;
 const CARD_SKILLS = new Set([
   "hope:intent",
   "hope:shape",
@@ -54,6 +57,7 @@ export function cleanCard(c: any): Card {
   const card: Card = {
     intent: str(c.intent) ? c.intent : undefined,
     shape: str(c.shape) ? c.shape : undefined,
+    outcome: str(c.outcome) ? c.outcome : undefined,
     facts: list(c.facts, str),
     questions: list(c.questions, (q): q is { q: string; options: string[] } =>
       str(q?.q) && Array.isArray(q.options) && q.options.every(str),
@@ -206,9 +210,17 @@ export function links(md: string): string[] {
     ...new Set(
       [...md.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)]
         .map((m) => m[1].replace(/^file:\/\//, ""))
-        .filter((h) => !h.startsWith("#")),
+        // A place: a url, a path, or a file name; never an anchor or a bare word like `url`.
+        .filter((h) => /^([a-z]+:\/\/|\/|\.{1,2}\/|~\/)/i.test(h) || /\.[a-z0-9]+$/i.test(h)),
     ),
   ];
+}
+
+/** A place as a person names it: a file by its name, a page by its site and path. */
+export function placeName(target: string): string {
+  const url = target.match(/^[a-z]+:\/\/(?:www\.)?([^/?#]+)([^?#]*)/i);
+  if (url) return `${url[1]}${url[2].length > 1 ? url[2].replace(/\/$/, "") : ""}`;
+  return target.split("/").pop() || target;
 }
 
 /** A link read in a file, as a place to open: relative ones sit beside the file. */
@@ -222,11 +234,11 @@ export function agentRows(v: AgentView, name: string, id: string): Item[][] {
   const note = (word: string): Item => ({ id: `note:${word}`, label: word.padEnd(9), kind: "note" });
   const section = (word: string, items: Item[]) => items.map((it, i) => [note(i ? "" : word), it]);
   const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
-  const outcome = v.returned || firstLine(v.body);
+  const outcome = v.card.outcome || v.returned || firstLine(v.body.replace(/^#.*$/gm, ""));
   return [
     ...section("intent", [line(`probe:${name} intent`, v.card.intent || v.asked)].filter((i) => i.label)),
     ...section("outcome", outcome ? [line(`probe:${name} outcome`, outcome)] : []),
-    ...section("watch", [...new Set([...v.footprint, ...links(v.body)])].map((f) => line(`open:${f}`, f))),
+    ...section("watch", [...new Set([...v.footprint, ...links(v.body)])].map((f) => line(`open:${f}`, placeName(f)))),
     ...section("facts", (v.card.facts ?? []).map((f, i) => line(`probe:${name} fact ${i + 1}`, `• ${bareFact(f)}`))),
     ...section("report", v.body ? [{ id: `report:${id}`, label: "read it all", kind: "quiet" as const }] : []),
   ];
@@ -283,11 +295,11 @@ export function cardRows(
   return [];
 }
 
-function agentItem(r: Row, kind: "agent" | "line", paneItem: string | null): Item {
+function agentItem(r: Row, paneItem: string | null): Item {
   return {
     id: `agent:${r.id}`,
     label: clip(r.label),
-    kind,
+    kind: "line",
     state: r.done ? "done" : "running",
     ...(r.read ? { read: true as const } : {}),
     ...(paneItem === `agent:${r.id}` ? { open: true as const } : {}),
@@ -300,7 +312,7 @@ export function chipRows(
   s: { card: Card; answered: Set<string>; ran: Set<string>; rows: Row[]; paneItem: string | null },
 ): Item[][] {
   return name === "agents"
-    ? s.rows.map((r) => [agentItem(r, "line", s.paneItem)])
+    ? s.rows.map((r) => [agentItem(r, s.paneItem)])
     : cardRows(s.card, name, s.answered, s.ran);
 }
 
@@ -320,11 +332,13 @@ export function bandModel(s: {
       label: n === "agents" ? `agents ${s.rows.length}` : chipLabel(s.card, n, s.answered, s.ran),
       kind: "chip",
       // Client props refuse undefined, so an unmarked chip has no key at all.
-      ...(s.open === n || s.paneItem === `card:${n}` ? { open: true as const } : {}),
+      ...(s.open === n || s.paneItem === `card:${n}` || (n === "agents" && s.paneItem?.startsWith("agent:"))
+        ? { open: true as const }
+        : {}),
+      // While any agent works, its chip says so.
+      ...(n === "agents" && s.rows.some((r) => !r.done) ? { state: "running" as const } : {}),
     })),
     body: s.open && count(s.open) > 0 ? chipRows(s.open, s) : [],
-    // Unread agents wait on their own row; every agent of the session stays under the chip.
-    agents: s.rows.filter((r) => !r.read).map((r) => agentItem(r, "agent", s.paneItem)),
   };
 }
 
@@ -352,6 +366,8 @@ let sessionId = "";
 // Bumped to hand the keys back to the prompt: the Client redraws under a new key.
 let fills = 0;
 let bandColumns = 80;
+// How much of each Client's typed text has reached the prompt, by the Client's key.
+const typedFrom = new Map<string, number>();
 
 // ---- effects ----
 
@@ -388,7 +404,6 @@ async function recall($: any) {
 
 // Finished agents drop out of $.agent.list(); the store keeps them for the session.
 async function readAgents($: any) {
-  const kept: Row[] = ((await $.store.get(`tend:${sessionId}`)) as Row[]) ?? [];
   const listed: Row[] = ((await $.agent.list()) as any[])
     .filter((a) => !a.parentId)
     .map((a) => ({
@@ -398,6 +413,9 @@ async function readAgents($: any) {
       // A teammate stays `running` while idle; its own turn ending is what says done.
       done: a.type === "teammate" ? idle.has(a.id) : a.status !== "running" && a.status !== "pending",
     }));
+  const stored = rows.length ? [] : (((await $.store.get(`tend:${sessionId}`)) as Row[]) ?? []);
+  // Memory first, read after every await: a flag set a moment ago by another hook stands.
+  const kept: Row[] = rows.length ? rows : stored;
   const next = [
     ...listed.map((l) => ({ ...kept.find((k) => k.id === l.id), ...l })),
     ...kept
@@ -420,14 +438,17 @@ async function loadAgent($: any, id: string) {
 }
 
 async function openAgent($: any, id: string) {
-  await loadAgent($, id);
   const r = rows.find((x) => x.id === id);
   if (r) paneAgent.set(`agent:${id}`, r);
+  // The pane answers the click at once; the agent's words fill in when read.
+  const shown = showPane($, `agent:${id}`);
+  await loadAgent($, id);
+  $.ui.invalidate("ui.render");
   if (r?.done && !r.read) {
     r.read = true;
     await $.store.set(`tend:${sessionId}`, rows);
   }
-  await showPane($, `agent:${id}`);
+  await shown;
 }
 
 async function openTarget($: any, target: string) {
@@ -499,7 +520,8 @@ async function act($: any, id: string) {
     // A card that won't fit the box, too many lines or one too long, reads in the pane.
     const shown = { card, answered, ran, rows, paneItem };
     if (paneItem === `card:${arg}`) await $.ui.close({ id: PANE });
-    else if (open !== arg && !fitsBox(chipRows(arg, shown), bandColumns, BOX_LINES)) {
+    // Agents live in the pane only: their list, then each one's card.
+    else if (arg === "agents" || (open !== arg && !fitsBox(chipRows(arg, shown), bandColumns, BOX_LINES))) {
       open = null;
       await showPane($, `card:${arg}`);
     } else open = open === arg ? null : arg;
@@ -572,6 +594,13 @@ export const register: Register = (on) => {
     return next(e);
   });
 
+  // The user's own prompt keeps a card already shown current: the model is asked for the keys this turn changes.
+  on("prompt.submit", async ($, e, next) => {
+    if (e.origin?.kind !== "composer") return next(e);
+    if (!Object.keys(card).length) return next(e);
+    return next({ ...e, context: [...(e.context ?? []), `Only if this turn settles or changes what the card holds:\n${CARD_FORMAT}`] });
+  });
+
   on("prompt.suggest", async ($, e, next) =>
     e.origin.kind === "suggestion" && nextCmd ? next({ ...e, text: nextCmd }) : next(e),
   );
@@ -615,6 +644,12 @@ export const register: Register = (on) => {
     return next({ ...e, props: { ...e.props, text } });
   });
 
+  // A teammate's message to the lead carries the card tend asked for; the row shows it without.
+  on("ui.render", { component: "UserMessage" }, ($, e, next) => {
+    const text = stripCards(e.props.text);
+    return text === e.props.text ? next(e) : next({ ...e, props: { ...e.props, text } });
+  });
+
   on("ui.render", { component: "AbovePrompt" }, ($, e, next) => {
     if (e.props.hasSurvey) return next(e);
     if (!started) {
@@ -631,7 +666,7 @@ export const register: Register = (on) => {
     const { Box, Client } = $.ui.resolve(e);
     bandColumns = e.props.bodyColumns;
     const band = bandModel({ card, open, paneItem, answered, ran, rows });
-    if (!band.chips.length && !band.agents.length) return <Box />;
+    if (!band.chips.length) return <Box />;
     return (
       <Box>
         <Client key={`band-${fills}`} module="./band.tsx" props={band} width={e.props.bodyColumns} />
@@ -641,12 +676,21 @@ export const register: Register = (on) => {
 
   on("ui.message", async ($, e, next) => {
     const data = e.data as { act?: unknown; type?: unknown; release?: unknown } | undefined;
+    const before = fills;
     if (typeof data?.act === "string") await act($, data.act);
-    if (typeof data?.type === "string") await typeThrough($, data.type);
-    if (data?.release === true) {
-      fills++;
-      $.ui.invalidate("ui.render");
+    if (typeof data?.type === "string") {
+      const done = typedFrom.get(e.element) ?? 0;
+      typedFrom.set(e.element, data.type.length);
+      if (data.type.length > done) await typeThrough($, data.type.slice(done));
     }
+    if (data?.release === true) fills++;
+    // A pane keeps the keys past its Client's redraw; reopening it hands them to the prompt.
+    if (fills !== before && e.component === "Pane" && paneItem) {
+      const item = paneItem;
+      await $.ui.close({ id: PANE });
+      await showPane($, item);
+    }
+    $.ui.invalidate("ui.render");
     return next(e);
   });
 
@@ -670,11 +714,11 @@ export const register: Register = (on) => {
               [
                 { id: "title", label: agent.label, kind: "title", state: agent.done ? "done" : "running" },
                 { id: "note:type", label: agent.type ?? "", kind: "note" },
+                { id: "chip:agents", label: "back", kind: "quiet" },
                 close,
               ],
               ...(view ? agentRows(view, agent.label, agent.id) : []),
             ],
-            agents: [],
             doc: "",
           }
         : kind === "report"
@@ -688,7 +732,6 @@ export const register: Register = (on) => {
                 close,
               ],
             ],
-            agents: [],
             doc: tablesToLists(paneText.get(`agent:${rest}`) ?? ""),
           }
         : {
@@ -699,10 +742,9 @@ export const register: Register = (on) => {
                 ? chipRows(rest, { card, answered, ran, rows, paneItem })
                 : links(paneText.get(item) ?? "").map((href) => fromFile(rest, href)).map((l, i) => [
                     { id: `note:links${i}`, label: (i ? "" : "links").padEnd(9), kind: "note" as const },
-                    { id: `open:${l}`, label: l, kind: "line" as const },
+                    { id: `open:${l}`, label: placeName(l), kind: "line" as const },
                   ])),
             ],
-            agents: [],
             doc: kind === "card" ? "" : tablesToLists(paneText.get(item) ?? ""),
           };
     return (

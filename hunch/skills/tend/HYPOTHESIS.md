@@ -29,3 +29,17 @@ Graduate when it stays on for 10 real sessions with no part turned off and the u
 - Kept: a chip carries one number (`facts 2`, `skills 1/2`); an agent's pane opens with what it was asked; a fact that settles a choice names what lost; watch says what should appear.
 - Cut: agent sparklines and tool traces (Claude Code's agent view shows the work; motion is a push), a replaced spinner word (the engine's), a turn scrubber (a hidden mode), guess-before-read (a gate), a "yours" chip (the user's words are already their turns), a status-line trail (always on, repeats the skills chip), no border (the user chose the border), next-skill-only (the user asked for every skill).
 - Cut: provenance on hover (lighting the reply a fact came from): it sends the user scrolling back, the one thing the graduate bar forbids.
+
+### 2026-09-22 — three rounds of simulated users (a first-timer, an expert) on real `/hope:compose` work
+
+In control, 1–7, per round: first-timer 3 → 3 → 4, expert 3 → 4 → 5. Re-reading an agent: first-timer ease 6 → 1 → 5.
+
+- Teammates are the agents compose starts; they stay `running` in `$.agent.list()`, so their own turn ending marks them done.
+- Agents live in the pane only: `[ agents N ● ]` opens their list, each one a card (intent, outcome, watch, facts), its full report one click further.
+- Every agent is asked to end on a card; facts are what the user carries forward, never paths or tool steps. Places read by name, open by path.
+- A card already shown stays current: each prompt of the user's asks the model for the keys that turn changed.
+- Keys: typing on the band or pane goes on to the prompt; Enter acts only after the arrows moved, else hands the keys back; a pane reopens without them.
+- A card fits the box while it wraps to 4 lines at 120 columns; longer, it opens in the pane.
+- Source files open in the editor (`code -g`), the rest with `open`.
+- Cut: a standing agents row (the user: "agents should exist as a pane only"); the full report inline (card-sized, plain); uppercase and coloured buttons (Norman, Wathan and Jev agreed: brackets are the sign, colour means state).
+- Open: the screen can move under a click while a turn streams (the engine's layout); a turn in flight still delays the first click on a running agent.
