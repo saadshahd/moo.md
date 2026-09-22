@@ -12,7 +12,8 @@ export type Item = {
   /** An agent already read: kept for reopening, drawn dim. */
   read?: true;
 };
-export type Band = { chips: Item[]; body: Item[][]; agents: Item[] };
+/** `wrap`: long lines wrap at words (the pane); else they clip (the band). */
+export type Band = { chips: Item[]; body: Item[][]; agents: Item[]; wrap: boolean };
 export type Focus = { row: number; col: number };
 export type Cell = { item: Item; text: string; x: number; y: number };
 
@@ -87,6 +88,11 @@ export function layout(b: Band, columns: number): Line[] {
     x0: number,
     gap: number,
   ) => {
+    if (b.wrap && items.length === 1) {
+      for (const text of wrap(textOf(items[0]), columns - x0))
+        lines.push({ part, gap, y, cells: [{ item: items[0], text, x: x0, y: y++ }] });
+      return;
+    }
     const cells: Cell[] = [];
     let x = x0;
     for (const item of items) {
@@ -107,6 +113,30 @@ export function layout(b: Band, columns: number): Line[] {
   return lines;
 }
 
+/** Words into lines of at most `width`; a list item's later lines hang under its text. */
+export function wrap(text: string, width: number): string[] {
+  const hang = text.startsWith("• ") ? "  " : "";
+  const out: string[] = [];
+  let cur = "";
+  for (const w of text.split(" ").filter(Boolean)) {
+    if (!cur) cur = (out.length ? hang : "") + w;
+    else if (cur.length + 1 + w.length <= width) cur += ` ${w}`;
+    else {
+      out.push(cur);
+      cur = hang + w;
+    }
+  }
+  if (cur) out.push(cur);
+  // A word wider than the line is the one thing still clipped.
+  return out.map((l) => (l.length > width ? `${l.slice(0, width - 1)}…` : l));
+}
+
+/** Whether rows fit the band's box: few enough, and none clipped. The rest go to the pane. */
+export function fitsBox(rows: Item[][], columns: number, most: number): boolean {
+  const width = (r: Item[]) => r.reduce((n, i) => n + textOf(i).length, 0) + 2 * (r.length - 1);
+  return rows.length <= most && rows.every((r) => width(r) <= columns - 4);
+}
+
 export function hit(lines: Line[], x: number, y: number): Item | undefined {
   return lines
     .find((l) => l.y === y)
@@ -118,7 +148,8 @@ export default function BandView(band: Band, surface: any) {
   const rows = navRows(band);
   const lines = layout(band, surface.columns || 200);
   const f = move(surface.state ?? { row: 0, col: 0 }, rows, "");
-  const at = rows[f.row]?.[f.col]?.id;
+  // Focus is drawn only once this instance has taken a click or a key.
+  const at = surface.state ? rows[f.row]?.[f.col]?.id : undefined;
 
   const choose = (item: Item) => {
     const r = rows.findIndex((row) => row.includes(item));
@@ -128,6 +159,8 @@ export default function BandView(band: Band, surface: any) {
   // Re-set each call so the listeners see these props; keys can outrun a redraw,
   // so each reads the focus afresh.
   surface.onKey((k: { key: string }) => {
+    // A typed character was meant for the prompt: send it there, and the keys follow.
+    if ([...k.key].length === 1) return surface.post({ type: k.key });
     const now = move(surface.state ?? { row: 0, col: 0 }, rows, "");
     if (k.key === "return") {
       const item = rows[now.row]?.[now.col];

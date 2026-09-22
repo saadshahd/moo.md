@@ -1,5 +1,5 @@
 import { describe, expect, test } from "claude-code/testing";
-import { hit, layout, move, navRows } from "./band.tsx";
+import { fitsBox, hit, layout, move, navRows, wrap } from "./band.tsx";
 import { bandModel, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
@@ -94,6 +94,25 @@ test("a chip previews its card with one number", async () => {
 test("an agent's brief is its first non-empty line", async () => {
   expect(firstLine("\n  find the parser \nmore")).toBe("find the parser");
 });
+test("a fact is a list item; in the pane it wraps under its bullet", async () => {
+  const [[f]] = cardRows({ facts: ["alpha beta gamma delta"] } as any, "facts", new Set(), new Set());
+  expect(f.label).toBe("• alpha beta gamma delta");
+  expect(wrap(f.label, 12)).toEqual(["• alpha beta", "  gamma", "  delta"]);
+});
+test("a card fits the box only when short and unclipped", async () => {
+  const rows = (n: number, len: number) =>
+    Array.from({ length: n }, (_, i) => [{ id: `l${i}`, label: "x".repeat(len), kind: "line" as const }]);
+  expect(fitsBox(rows(4, 10), 80, 4)).toBe(true);
+  expect(fitsBox(rows(5, 10), 80, 4)).toBe(false);
+  expect(fitsBox(rows(1, 90), 80, 4)).toBe(false);
+});
+test("the pane wraps a long line where the band clips it", async () => {
+  const body = [[{ id: "probe:intent", label: "word ".repeat(30).trim(), kind: "line" as const }]];
+  const pane = layout({ chips: [], body, agents: [], wrap: true }, 40);
+  expect(pane.length).toBeGreaterThan(1);
+  expect(pane.every((l) => l.cells[0].item.id === "probe:intent")).toBe(true);
+  expect(layout({ chips: [], body, agents: [], wrap: false }, 40).length).toBe(1);
+});
 test("a planned skill resolves to a real command, or none", async () => {
   const names = ["hope:clarify", "hope:judge", "clear"];
   expect(commandFor(names, "clarify")).toBe("hope:clarify");
@@ -124,7 +143,7 @@ const model = (card: object, open: string | null = null, rows: object[] = []) =>
 
 describe("band", () => {
   test("no card, no agents: nothing", async () => {
-    expect(model({})).toEqual({ chips: [], body: [], agents: [] });
+    expect(model({})).toEqual({ chips: [], body: [], agents: [], wrap: false });
   });
   test("card: only chips with content", async () => {
     const b = model({ intent: "x", questions: [{ q: "a?", options: ["y"] }] });

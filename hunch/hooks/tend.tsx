@@ -1,5 +1,5 @@
 import type { Register } from "claude-code";
-import type { Band, Item } from "./band.tsx";
+import { fitsBox, type Band, type Item } from "./band.tsx";
 
 export type Card = {
   intent?: string;
@@ -29,8 +29,10 @@ const CARD_SKILLS = new Set([
   "hope:compose",
 ]);
 const CARD_RE = /```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
-const BOX_LINES = 6;
+const BOX_LINES = 4;
 const PANE = "tend";
+// A pane line past this is hard to read back; wider panes keep the margin.
+const MEASURE = 100;
 const CHIPS = ["intent", "shape", "facts", "questions", "skills", "watch"] as const;
 
 // ---- pure ----
@@ -173,7 +175,7 @@ export function cardRows(
   if (name === "intent" || name === "shape")
     return c[name] ? [[line(`probe:${name}`, c[name]!)]] : [];
   if (name === "facts")
-    return (c.facts ?? []).map((f, i) => [line(`probe:fact ${i + 1}`, bareFact(f))]);
+    return (c.facts ?? []).map((f, i) => [line(`probe:fact ${i + 1}`, `• ${bareFact(f)}`)]);
   if (name === "questions")
     return (c.questions ?? []).flatMap((q, i) =>
       answered.has(q.q)
@@ -212,6 +214,7 @@ export function bandModel(s: {
       ...(s.open === n || s.paneItem === `card:${n}` ? { open: true as const } : {}),
     })),
     body: s.open && count(s.open) > 0 ? cardRows(s.card, s.open, s.answered, s.ran) : [],
+    wrap: false,
     agents: s.rows.map((r) => ({
       id: `agent:${r.id}`,
       label: clip(r.label),
@@ -238,12 +241,15 @@ let nextCmd: string | undefined;
 const paneText = new Map<string, string>();
 // The agent a pane shows, kept past the row being cleared from the band.
 const paneAgent = new Map<string, Row>();
+// Teammates whose last turn ended; a tool call of theirs starts them again.
+const idle = new Set<string>();
 // What each opened agent was asked: a wrong brief is the cheapest thing to catch.
 const briefs = new Map<string, string>();
 let started = false;
 let sessionId = "";
 // Bumped per fill: the Client redraws under a new key, handing the keys back to the prompt.
 let fills = 0;
+let bandColumns = 80;
 
 // ---- effects ----
 
@@ -263,16 +269,19 @@ async function readSession($: any) {
   $.ui.invalidate("ui.render");
 }
 
-// A reload wipes module memory; the store keeps which skills ran and which questions got answers.
+// A reload wipes module memory; the store keeps which skills ran, which questions got answers,
+// and which teammates sit idle.
 async function remember($: any) {
   sessionId ||= await $.session.id();
   await $.store.set(`tend:${sessionId}:ran`, [...ran]);
   await $.store.set(`tend:${sessionId}:answered`, [...answered]);
+  await $.store.set(`tend:${sessionId}:idle`, [...idle]);
 }
 
 async function recall($: any) {
   for (const r of ((await $.store.get(`tend:${sessionId}:ran`)) as string[]) ?? []) ran.add(r);
   for (const a of ((await $.store.get(`tend:${sessionId}:answered`)) as string[]) ?? []) answered.add(a);
+  for (const i of ((await $.store.get(`tend:${sessionId}:idle`)) as string[]) ?? []) idle.add(i);
 }
 
 // Finished agents drop out of $.agent.list(); the store keeps them. A read one stays,
@@ -281,12 +290,13 @@ async function readAgents($: any) {
   const kept: Row[] = ((await $.store.get(`tend:${sessionId}`)) as Row[]) ?? [];
   const cleared: string[] = ((await $.store.get(`tend:${sessionId}:cleared`)) as string[]) ?? [];
   const listed: Row[] = ((await $.agent.list()) as any[])
-    .filter((a) => !a.parentId && a.type !== "teammate" && !cleared.includes(a.id))
+    .filter((a) => !a.parentId && !cleared.includes(a.id))
     .map((a) => ({
       id: a.id,
       label: a.name ?? a.description,
       type: a.type,
-      done: a.status !== "running" && a.status !== "pending",
+      // A teammate stays `running` while idle; its own turn ending is what says done.
+      done: a.type === "teammate" ? idle.has(a.id) : a.status !== "running" && a.status !== "pending",
     }));
   const next = [
     ...listed.map((l) => ({ ...kept.find((k) => k.id === l.id), ...l })),
@@ -347,7 +357,8 @@ async function showPane($: any, item: string) {
   paneItem = item;
   lastPaneItem = item;
   // Open before reading: an open answering the press is placed at any width.
-  const opened = $.ui.open({ id: PANE, title: "tend", focus: true, closeOnEscape: true });
+  // Never takes the keys: they stay with the prompt; a click inside hands them over.
+  const opened = $.ui.open({ id: PANE, title: "tend", closeOnEscape: true });
   if (item.startsWith("file:"))
     await $.fs.read(item.slice(5)).then(
       (t: any) => paneText.set(item, typeof t === "string" ? t : String(t?.text ?? "")),
@@ -365,6 +376,12 @@ async function slash($: any, name: string): Promise<string | undefined> {
 }
 
 // A stem the user finishes and sends as their own words.
+async function typeThrough($: any, ch: string) {
+  const f = await $.prompt.fill({ text: ch, mode: "insert" });
+  if (f.isFilled) fills++;
+  $.ui.invalidate("ui.render");
+}
+
 async function fill($: any, text: string) {
   // A second press of the same line leaves the box as it is.
   const box = await $.prompt.read().catch(() => undefined);
@@ -391,7 +408,8 @@ async function act($: any, id: string) {
   const [kind, ...rest] = id.split(":");
   const arg = rest.join(":");
   if (kind === "chip") {
-    if (open !== arg && cardCount(card, arg, answered) > BOX_LINES) {
+    // A card that won't fit the box, too many lines or one too long, reads in the pane.
+    if (open !== arg && !fitsBox(cardRows(card, arg, answered, ran), bandColumns, BOX_LINES)) {
       open = null;
       await showPane($, `card:${arg}`);
     } else open = open === arg ? null : arg;
@@ -447,6 +465,16 @@ export const register: Register = (on) => {
   });
 
   // The engine's own guess would replace the plan's next skill; the plan wins.
+  on("tool.call", async ($, e, next) => {
+    const r = rows.find((x) => x.id === e.agentId);
+    if (e.agentId && (idle.delete(e.agentId) || r?.read)) {
+      if (r) delete r.read;
+      paneText.delete(`agent:${e.agentId}`);
+      void remember($).then(() => readAgents($));
+    }
+    return next(e);
+  });
+
   // The user's own next prompt clears the agents already read.
   on("prompt.submit", async ($, e, next) => {
     if (e.origin?.kind === "composer") await clearRead($);
@@ -459,7 +487,11 @@ export const register: Register = (on) => {
 
   on("turn.complete", async ($, e, next) => {
     const r = await next(e);
-    if (e.agentId) await readAgents($);
+    if (e.agentId) {
+      idle.add(e.agentId);
+      await remember($);
+      await readAgents($);
+    }
     else {
       await readSession($);
       const nextSkill = planMoved && card.skills?.find((k) => !hasRun(ran, k.name));
@@ -506,6 +538,7 @@ export const register: Register = (on) => {
       })();
     }
     const { Box, Client } = $.ui.resolve(e);
+    bandColumns = e.props.bodyColumns;
     const band = bandModel({ card, open, paneItem, answered, ran, rows });
     if (!band.chips.length && !band.agents.length) return <Box />;
     return (
@@ -516,8 +549,9 @@ export const register: Register = (on) => {
   });
 
   on("ui.message", async ($, e, next) => {
-    const act_ = (e.data as { act?: unknown } | undefined)?.act;
-    if (typeof act_ === "string") await act($, act_);
+    const data = e.data as { act?: unknown; type?: unknown } | undefined;
+    if (typeof data?.act === "string") await act($, data.act);
+    if (typeof data?.type === "string") await typeThrough($, data.type);
     return next(e);
   });
 
@@ -525,6 +559,7 @@ export const register: Register = (on) => {
     if (e.requestId !== PANE) return next(e);
     const { Box, Text, Markdown, Client } = $.ui.resolve(e);
     const item = paneItem ?? "";
+    const width = Math.min(e.props.bodyColumns, MEASURE);
     const kind = item.slice(0, item.indexOf(":"));
     const rest = item.slice(kind.length + 1);
     const agent = rows.find((r) => r.id === rest) ?? paneAgent.get(item);
@@ -545,8 +580,8 @@ export const register: Register = (on) => {
         <Client
           key={`pane-card-${fills}`}
           module="./band.tsx"
-          width={e.props.bodyColumns}
-          props={{ chips: [], body: cardRows(card, rest, answered, ran), agents: [] }}
+          width={width}
+          props={{ chips: [], body: cardRows(card, rest, answered, ran), agents: [], wrap: true }}
         />
       ) : kind === "agent" && !paneText.has(item) ? (
         <Text dimColor>running</Text>
@@ -560,7 +595,7 @@ export const register: Register = (on) => {
         />
       );
     return (
-      <Box flexDirection="column" width={e.props.bodyColumns}>
+      <Box flexDirection="column" width={width}>
         {head}
         {briefs.has(item) ? <Text dimColor wrap="truncate-end">asked  {briefs.get(item)}</Text> : <Box />}
         <Text> </Text>
