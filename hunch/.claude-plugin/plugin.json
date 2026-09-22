@@ -1,6 +1,6 @@
 {
   "name": "hunch",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "A grab bag of hunches — experimental skills and plugin features tried here before they earn a place in hope or sound. Everything graduates or dies. The tend mod needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.",
   "keywords": [
     "experiments",
