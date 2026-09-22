@@ -223,6 +223,8 @@ const paneText = new Map<string, string>();
 const paneHead = new Map<string, string>();
 let started = false;
 let sessionId = "";
+// Bumped per fill: the Client redraws under a new key, handing the keys back to the prompt.
+let fills = 0;
 
 // ---- effects ----
 
@@ -240,6 +242,18 @@ async function readSession($: any) {
   if (JSON.stringify(next) !== JSON.stringify(card)) planMoved = true;
   card = next;
   $.ui.invalidate("ui.render");
+}
+
+// A reload wipes module memory; the store keeps which skills ran and which questions got answers.
+async function remember($: any) {
+  sessionId ||= await $.session.id();
+  await $.store.set(`tend:${sessionId}:ran`, [...ran]);
+  await $.store.set(`tend:${sessionId}:answered`, [...answered]);
+}
+
+async function recall($: any) {
+  for (const r of ((await $.store.get(`tend:${sessionId}:ran`)) as string[]) ?? []) ran.add(r);
+  for (const a of ((await $.store.get(`tend:${sessionId}:answered`)) as string[]) ?? []) answered.add(a);
 }
 
 // Finished agents drop out of $.agent.list(); the store keeps them until opened.
@@ -317,7 +331,8 @@ async function fill($: any, text: string) {
   const box = await $.prompt.read().catch(() => undefined);
   if (typeof box?.text === "string" && box.text.trimEnd().endsWith(text.trimEnd())) return;
   const f = await $.prompt.fill({ text, mode: "insert" });
-  if (!f.isFilled) await $.prompt.suggest({ text });
+  if (f.isFilled) fills++;
+  else await $.prompt.suggest({ text });
 }
 
 function reset() {
@@ -347,6 +362,7 @@ async function act($: any, id: string) {
     const q = card.questions?.[i];
     if (q) {
       answered.add(q.q);
+      await remember($);
       await fill($, `q${i + 1}: ${q.options[j]} — `);
     }
   } else if (kind === "skill") {
@@ -384,6 +400,7 @@ export const register: Register = (on) => {
     if (!e.agentId) {
       ran.add(e.skill);
       planMoved = true;
+      await remember($);
     }
     return CARD_SKILLS.has(e.skill)
       ? { text: `${r.text}\n\n${CARD_FORMAT}` }
@@ -437,6 +454,7 @@ export const register: Register = (on) => {
       void (async () => {
         sessionId = await $.session.id();
         await registerCommands($);
+        await recall($);
         await readSession($);
         await readAgents($);
         $.clock.every(2000, () => void readAgents($));
@@ -447,7 +465,7 @@ export const register: Register = (on) => {
     if (!band.chips.length && !band.agents.length) return <Box />;
     return (
       <Box>
-        <Client key="band" module="./band.tsx" props={band} width={e.props.bodyColumns} />
+        <Client key={`band-${fills}`} module="./band.tsx" props={band} width={e.props.bodyColumns} />
       </Box>
     );
   });
@@ -473,7 +491,7 @@ export const register: Register = (on) => {
     const body =
       kind === "card" ? (
         <Client
-          key="pane-card"
+          key={`pane-card-${fills}`}
           module="./band.tsx"
           width={e.props.bodyColumns}
           props={{ chips: [], body: cardRows(card, rest, answered, ran), agents: [] }}
