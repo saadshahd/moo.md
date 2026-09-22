@@ -1,6 +1,6 @@
 With `tend` on, what the session settled and what its agents returned sit one click away above the prompt, and what goes back to the model goes in the user's own words.
 
-Graduate when it stays on for 10 real sessions with no part turned off and the user never scrolls back for something the band holds. Kill if he turns it off, or a chip hides something he needed.
+Graduate when it stays on for 10 real sessions with no part turned off and the user never scrolls back for something the band holds. Kill if the user turns it off, or a chip hides something they needed.
 
 ## Field notes
 
