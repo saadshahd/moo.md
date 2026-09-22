@@ -18,4 +18,5 @@ Graduate when it stays on for 10 real sessions with no part turned off and the u
 - Skills: compose's plan becomes a chip, a run skill gets ✓ (seen by `skill.prompt`), and the next unrun one is the Tab suggestion.
 - A card keeps each key from the newest block that has it, so clarify's card leaves compose's skills; `[]` clears a list.
 - The engine's own prompt guess lands after the plan's next skill and replaced it; a `prompt.suggest` hook now keeps the plan's.
+- Arrows: the engine's focus ring treats every arrow as next/previous, and a Button pressed inside a Client keeps keys from it. The band is a Client of plain text: clicks are hit-tested, left/right move along a row, up/down between rows. Keys reach it only after a click.
 - Teammates stay `running` in `$.agent.list()`, so they get no row.

@@ -1,31 +1,9 @@
-import { describe, expect, mock, test } from "claude-code/testing";
-import { bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
+import { describe, expect, test } from "claude-code/testing";
+import { hit, layout, move, navRows } from "./band.tsx";
+import { bandModel, cardRows, bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
-
-const BAND = {
-  plugin: "hunch",
-  surface: "terminal",
-  component: "AbovePrompt",
-  props: {
-    hasSurvey: false,
-    isWorking: false,
-    maxRows: 10,
-    bodyColumns: 80,
-    scroll: { offset: 0, bodyRows: 10 },
-    view: {},
-  },
-} as const;
-
-// The band reads the session through $; answer each read beneath the plugin.
-const session = (on: any, msgs: unknown[], agents: unknown[]) => {
-  on("session.id", () => ({ value: "s1" }));
-  on("command.register", () => ({ value: undefined }));
-  mock.store(on);
-  on("session.messages", () => ({ value: msgs }));
-  on("agent.list", () => ({ value: agents }));
-};
 
 describe("card parse", () => {
   test("good block", async () => {
@@ -115,42 +93,93 @@ test("fact source prefix stripped", async () => {
   expect(bareFact("Toggle only")).toBe("Toggle only");
 });
 
+const model = (card: object, open: string | null = null, rows: object[] = []) =>
+  bandModel({
+    card: card as any,
+    open,
+    paneItem: null,
+    answered: new Set(),
+    ran: new Set(),
+    rows: rows as any,
+  });
+
 describe("band", () => {
-  test("no card, no agents: no line", async ($, on) => {
-    session(on, [], []);
-    const ui = await $.ui.mount(BAND);
-    expect(await ui.findAll({ type: "Button" })).toEqual([]);
-    await ui.unmount();
+  test("no card, no agents: nothing", async () => {
+    expect(model({})).toEqual({ chips: [], body: [], agents: [] });
   });
-  test("card: only chips with content", async ($, on) => {
-    session(
-      on,
-      [said(block('{"intent":"x","questions":[{"q":"a?","options":["y"]}]}'))],
-      [],
-    );
-    const ui = await $.ui.mount(BAND);
-    expect(await ui.find({ key: "intent" })).toBeDefined();
-    expect(await ui.find({ key: "questions" })).toBeDefined();
-    expect(await ui.find({ key: "shape" })).toBeUndefined();
-    expect(await ui.find({ key: "facts" })).toBeUndefined();
-    expect(await ui.find({ key: "skills" })).toBeUndefined();
-    await ui.unmount();
+  test("card: only chips with content", async () => {
+    const b = model({ intent: "x", questions: [{ q: "a?", options: ["y"] }] });
+    expect(b.chips.map((c) => c.id)).toEqual(["chip:intent", "chip:questions"]);
   });
-  test("agents line only with agents", async ($, on) => {
-    session(
-      on,
-      [],
-      [
-        {
-          id: "a1",
-          description: "count files",
-          type: "general-purpose",
-          status: "running",
-        },
-      ],
+  test("an open card marks its chip and fills the body", async () => {
+    const b = model({ facts: ["a", "b"] }, "facts");
+    expect(b.chips[0].mark).toBe("open");
+    expect(b.body.map((r) => r[0].id)).toEqual(["probe:fact 1", "probe:fact 2"]);
+  });
+  test("no undefined anywhere: Client props refuse it", async () => {
+    const b = model({ intent: "x", facts: ["a"] }, "facts", [{ id: "a", label: "l", done: true }]);
+    const holes = (v: unknown): boolean =>
+      v === undefined || (typeof v === "object" && v !== null && Object.values(v).some(holes));
+    expect(holes(b)).toBe(false);
+  });
+  test("agents line only with agents", async () => {
+    const b = model({}, null, [{ id: "a1", label: "count files", done: false }]);
+    expect(b.agents).toEqual([
+      { id: "agent:a1", label: "count files", kind: "agent", mark: "running" },
+    ]);
+  });
+  test("a question row: the question, then its answers", async () => {
+    const rows = cardRows(
+      { questions: [{ q: "a?", options: ["x", "y"] }] },
+      "questions",
+      new Set(),
+      new Set(),
     );
-    const ui = await $.ui.mount(BAND);
-    expect((await ui.find({ key: "agent-a1" }))?.text).toContain("count files");
-    await ui.unmount();
+    expect(rows[0].map((i) => i.id)).toEqual(["probe:q1", "answer:0:0", "answer:0:1"]);
+  });
+});
+
+describe("arrows", () => {
+  const b = model({ facts: ["a", "b"], intent: "x" }, "facts", [
+    { id: "a1", label: "count", done: true },
+  ]);
+  const rows = navRows(b);
+  test("rows: chips, each card line, agents", async () => {
+    expect(rows.map((r) => r.map((i) => i.id))).toEqual([
+      ["chip:intent", "chip:facts"],
+      ["probe:fact 1"],
+      ["probe:fact 2"],
+      ["agent:a1"],
+    ]);
+  });
+  test("left/right stay in the row; up/down change rows", async () => {
+    expect(move({ row: 0, col: 0 }, rows, "right")).toEqual({ row: 0, col: 1 });
+    expect(move({ row: 0, col: 1 }, rows, "right")).toEqual({ row: 0, col: 1 });
+    expect(move({ row: 0, col: 1 }, rows, "down")).toEqual({ row: 1, col: 0 });
+    expect(move({ row: 3, col: 0 }, rows, "down")).toEqual({ row: 3, col: 0 });
+    expect(move({ row: 1, col: 0 }, rows, "up")).toEqual({ row: 0, col: 1 }); // back on the open chip
+  });
+  test("a click lands on the item drawn there", async () => {
+    const cells = layout(b, 80);
+    // chips row: "[ intent ] [ ▾ facts ]"; box top border at y=1; first fact at y=2, x=2
+    expect(hit(cells, 3, 0)?.id).toBe("chip:intent");
+    expect(hit(cells, 12, 0)?.id).toBe("chip:facts");
+    expect(hit(cells, 2, 2)?.id).toBe("probe:fact 1");
+    expect(hit(cells, 2, 3)?.id).toBe("probe:fact 2");
+    expect(hit(cells, 0, 5)?.id).toBe("agent:a1");
+    expect(hit(cells, 40, 2)).toBeUndefined();
+  });
+  test("a row wider than the band is clipped, never wrapped", async () => {
+    const wide = model({ facts: ["x".repeat(100)] }, "facts");
+    const cell = layout(wide, 40).find((c) => c.item.id === "probe:fact 1")!;
+    expect(cell.x + cell.text.length).toBeLessThanOrEqual(38);
+    expect(cell.text.endsWith("…")).toBe(true);
+  });
+  test("notes are read, never focused", async () => {
+    const skills = model(
+      { skills: [{ name: "hope:judge", outcome: "verdict" }] },
+      "skills",
+    );
+    expect(navRows(skills)[1].map((i) => i.id)).toEqual(["skill:0"]);
   });
 });

@@ -1,4 +1,5 @@
 import type { Register } from "claude-code";
+import type { Band, Item } from "./band.tsx";
 
 export type Card = {
   intent?: string;
@@ -13,7 +14,7 @@ type Msg = {
   text: string;
   toolUses?: { tool: string; input: Record<string, unknown> }[];
 };
-type Row = { id: string; label: string; done: boolean };
+export type Row = { id: string; label: string; done: boolean };
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
 {"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
@@ -145,6 +146,67 @@ export function cardCount(
   return 0;
 }
 
+/** A card's lines; each inner list is one row the arrows move along. */
+export function cardRows(
+  c: Card,
+  name: string,
+  answered: Set<string>,
+  ran: Set<string>,
+): Item[][] {
+  const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
+  const quiet = (id: string, label: string): Item => ({ id, label, kind: "quiet" });
+  const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
+  if (name === "intent" || name === "shape")
+    return c[name] ? [[line(`probe:${name}`, c[name]!)]] : [];
+  if (name === "facts")
+    return (c.facts ?? []).map((f, i) => [line(`probe:fact ${i + 1}`, bareFact(f))]);
+  if (name === "questions")
+    return (c.questions ?? []).flatMap((q, i) =>
+      answered.has(q.q)
+        ? []
+        : [[line(`probe:q${i + 1}`, q.q), ...q.options.map((o, j) => quiet(`answer:${i}:${j}`, o))]],
+    );
+  if (name === "skills")
+    return (c.skills ?? []).map((k, i) => [
+      line(`skill:${i}`, hasRun(ran, k.name) ? `${k.name} ✓` : k.name),
+      note(`skill-note:${i}`, k.outcome),
+    ]);
+  if (name === "watch")
+    return (c.watch ?? []).map((w, i) => [
+      line(`watch:${i}`, w.label),
+      ...(w.see ? [note(`watch-note:${i}`, w.see)] : []),
+      quiet(`probe:watch ${i + 1}`, "?"),
+    ]);
+  return [];
+}
+
+export function bandModel(s: {
+  card: Card;
+  open: string | null;
+  paneItem: string | null;
+  answered: Set<string>;
+  ran: Set<string>;
+  rows: Row[];
+}): Band {
+  const count = (n: string) => cardCount(s.card, n, s.answered);
+  return {
+    chips: CHIPS.filter((n) => count(n) > 0).map((n) => ({
+      id: `chip:${n}`,
+      label: n,
+      kind: "chip",
+      // Client props refuse undefined, so an unmarked chip has no key at all.
+      ...(s.open === n || s.paneItem === `card:${n}` ? { mark: "open" as const } : {}),
+    })),
+    body: s.open && count(s.open) > 0 ? cardRows(s.card, s.open, s.answered, s.ran) : [],
+    agents: s.rows.map((r) => ({
+      id: `agent:${r.id}`,
+      label: clip(r.label),
+      kind: "agent",
+      mark: r.done ? "done" : "running",
+    })),
+  };
+}
+
 // ---- state ----
 
 let card: Card = {};
@@ -251,6 +313,9 @@ async function slash($: any, name: string): Promise<string | undefined> {
 
 // A stem the user finishes and sends as their own words.
 async function fill($: any, text: string) {
+  // A second press of the same line leaves the box as it is.
+  const box = await $.prompt.read().catch(() => undefined);
+  if (typeof box?.text === "string" && box.text.trimEnd().endsWith(text.trimEnd())) return;
   const f = await $.prompt.fill({ text, mode: "insert" });
   if (!f.isFilled) await $.prompt.suggest({ text });
 }
@@ -267,88 +332,32 @@ function reset() {
   nextCmd = undefined;
 }
 
-// One line per item; clicking a line fills its stem.
-function cardBody($: any, el: any, name: string) {
-  const { Box, Text, Button } = el;
-  const line = (key: string, text: string, onPress: () => void) => (
-    <Box key={`l-${key}`}>
-      <Button
-        key={key}
-        plain
-        label={text}
-        hover={{ bold: true }}
-        onPress={onPress}
-      />
-    </Box>
-  );
-  const quiet = (key: string, label: string, onPress: () => void) => (
-    <Box key={`d-${key}`}>
-      <Button
-        key={key}
-        plain
-        dimColor
-        label={label}
-        hover={{ dimColor: false, bold: true }}
-        onPress={onPress}
-      />
-    </Box>
-  );
-  if (name === "intent" || name === "shape")
-    return line(name, card[name] ?? "", () => void fill($, `${name}: `));
-  if (name === "facts")
-    return (
-      <Box flexDirection="column">
-        {(card.facts ?? []).map((f, i) =>
-          line(`fact-${i}`, bareFact(f), () => void fill($, `fact ${i + 1}: `)),
-        )}
-      </Box>
-    );
-  if (name === "questions")
-    return (
-      <Box flexDirection="column">
-        {(card.questions ?? []).map((q, i) =>
-          answered.has(q.q) ? null : (
-            <Box key={`q-${i}`} flexDirection="row" gap={2}>
-              {line(`q-${i}`, q.q, () => void fill($, `q${i + 1}: `))}
-              {q.options.map((o, j) =>
-                quiet(`opt-${i}-${j}`, o, () => {
-                  answered.add(q.q);
-                  $.ui.invalidate("ui.render");
-                  void fill($, `q${i + 1}: ${o} — `);
-                }),
-              )}
-            </Box>
-          ),
-        )}
-      </Box>
-    );
-  if (name === "skills")
-    return (
-      <Box flexDirection="column">
-        {(card.skills ?? []).map((k, i) => (
-          <Box key={`sk-${i}`} flexDirection="row" gap={2}>
-            {line(`sk-${i}`, hasRun(ran, k.name) ? `${k.name} ✓` : k.name, async () => {
-              const cmd = await slash($, k.name);
-              cmd ? void fill($, cmd) : $.ui.toast(`no command ${k.name}`);
-            })}
-            <Text dimColor>{k.outcome}</Text>
-          </Box>
-        ))}
-      </Box>
-    );
-  if (name === "watch")
-    return (
-      <Box flexDirection="column">
-        {(card.watch ?? []).map((l, i) => (
-          <Box key={`watch-${i}`} flexDirection="row" gap={2}>
-            {line(`watch-${i}`, l.label, () => void openTarget($, l.open))}
-            {l.see ? <Text dimColor>{l.see}</Text> : null}
-            {quiet(`watch-q-${i}`, "?", () => void fill($, `watch ${i + 1}: `))}
-          </Box>
-        ))}
-      </Box>
-    );
-  return null;
+// What a press or Enter on a band or pane item does.
+async function act($: any, id: string) {
+  const [kind, ...rest] = id.split(":");
+  const arg = rest.join(":");
+  if (kind === "chip") {
+    if (open !== arg && cardCount(card, arg, answered) > BOX_LINES) {
+      open = null;
+      await showPane($, `card:${arg}`);
+    } else open = open === arg ? null : arg;
+  } else if (kind === "probe") await fill($, `${arg}: `);
+  else if (kind === "answer") {
+    const [i, j] = rest.map(Number);
+    const q = card.questions?.[i];
+    if (q) {
+      answered.add(q.q);
+      await fill($, `q${i + 1}: ${q.options[j]} — `);
+    }
+  } else if (kind === "skill") {
+    const k = card.skills?.[Number(arg)];
+    const cmd = k && (await slash($, k.name));
+    cmd ? await fill($, cmd) : $.ui.toast(`no command ${k?.name ?? ""}`);
+  } else if (kind === "watch") {
+    const w = card.watch?.[Number(arg)];
+    if (w) await openTarget($, w.open);
+  } else if (kind === "agent") await openAgent($, arg);
+  $.ui.invalidate("ui.render");
 }
 
 export const register: Register = (on) => {
@@ -433,77 +442,25 @@ export const register: Register = (on) => {
         $.clock.every(2000, () => void readAgents($));
       })();
     }
-    const el = $.ui.resolve(e);
-    const { Box, Button, Text } = el;
-    const count = (name: string) => cardCount(card, name, answered);
-    const toggle = (name: string) => () => {
-      if (open !== name && count(name) > BOX_LINES) {
-        open = null;
-        void showPane($, `card:${name}`);
-      } else open = open === name ? null : name;
-      $.ui.invalidate("ui.render");
-    };
-    const chip = (name: string, label: string, onPress: () => void) => (
-      <Box key={`chip-${name}`}>
-        <Button
-          key={name}
-          label={open === name || paneItem === `card:${name}` ? `▾ ${label}` : label}
-          hover={{ bold: true, color: "cyan" }}
-          onPress={onPress}
-        />
-      </Box>
-    );
-    const shown = CHIPS.filter((n) => count(n) > 0);
-
-    const line1 = shown.length ? (
-      <Box flexDirection="row" gap={1}>
-        {shown.map((n) => chip(n, n, toggle(n)))}
-      </Box>
-    ) : null;
-
-    const line2 = rows.length ? (
-      <Box flexDirection="row" gap={2}>
-        {rows.map((r) => (
-          <Box key={`ag-${r.id}`} flexDirection="row">
-            <Box>
-              <Button
-                key={`agent-${r.id}`}
-                plain
-                dimColor
-                label={clip(r.label)}
-                hover={{ dimColor: false, bold: true }}
-                onPress={() => void openAgent($, r.id)}
-              />
-            </Box>
-            {r.done ? (
-              <Text color="green"> ✓</Text>
-            ) : (
-              <Text color="yellow"> ●</Text>
-            )}
-          </Box>
-        ))}
-      </Box>
-    ) : null;
-
-    if (!line1 && !line2) return <Box />;
-    const body = open && count(open) > 0 ? cardBody($, el, open) : null;
+    const { Box, Client } = $.ui.resolve(e);
+    const band = bandModel({ card, open, paneItem, answered, ran, rows });
+    if (!band.chips.length && !band.agents.length) return <Box />;
     return (
-      <Box flexDirection="column" width={e.props.bodyColumns}>
-        {line1}
-        {line2}
-        {body ? (
-          <Box borderStyle="round" paddingX={1} flexDirection="column">
-            {body}
-          </Box>
-        ) : null}
+      <Box>
+        <Client key="band" module="./band.tsx" props={band} width={e.props.bodyColumns} />
       </Box>
     );
   });
 
+  on("ui.message", async ($, e, next) => {
+    const act_ = (e.data as { act?: unknown } | undefined)?.act;
+    if (typeof act_ === "string") await act($, act_);
+    return next(e);
+  });
+
   on("ui.render", { component: "Pane" }, ($, e, next) => {
     if (e.requestId !== PANE) return next(e);
-    const el = $.ui.resolve(e);
-    const { Box, Text, Markdown } = el;
+    const { Box, Text, Markdown, Client } = $.ui.resolve(e);
     const item = paneItem ?? "";
     const kind = item.slice(0, item.indexOf(":"));
     const rest = item.slice(kind.length + 1);
@@ -515,7 +472,12 @@ export const register: Register = (on) => {
           : rest.split("/").pop();
     const body =
       kind === "card" ? (
-        cardBody($, el, rest)
+        <Client
+          key="pane-card"
+          module="./band.tsx"
+          width={e.props.bodyColumns}
+          props={{ chips: [], body: cardRows(card, rest, answered, ran), agents: [] }}
+        />
       ) : kind === "agent" && !paneText.has(item) ? (
         <Text dimColor>running</Text>
       ) : (
