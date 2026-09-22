@@ -19,7 +19,7 @@ Graduate when it stays on for 10 real sessions with no part turned off and the u
 - A card keeps each key from the newest block that has it, so clarify's card leaves compose's skills; `[]` clears a list.
 - The engine's own prompt guess lands after the plan's next skill and replaced it; a `prompt.suggest` hook now keeps the plan's.
 - Arrows: the engine's focus ring treats every arrow as next/previous, and a Button pressed inside a Client keeps keys from it. The band is a Client of plain text: clicks are hit-tested, left/right move along a row, up/down between rows. Keys reach it only after a click.
-- Teammates stay `running` in `$.agent.list()`, so they get no row.
+- Teammates stay `running` in `$.agent.list()`; their own turn ending marks them done (see below).
 
 ### 2026-09-22 — colour, focus, and a design panel (Tufte, Victor, Matuschak, Appleton)
 
@@ -39,7 +39,7 @@ In control, 1–7, per round: first-timer 3 → 3 → 4, expert 3 → 4 → 5. R
 - Every agent is asked to end on a card; facts are what the user carries forward, never paths or tool steps. Places read by name, open by path.
 - A card already shown stays current: each prompt of the user's asks the model for the keys that turn changed.
 - Keys: typing on the band or pane goes on to the prompt; Enter acts only after the arrows moved, else hands the keys back; a pane reopens without them.
-- A card fits the box while it wraps to 4 lines at 120 columns; longer, it opens in the pane.
+- A card stays in the band's box while it wraps to a few lines at the reading measure (`BOX_LINES`, `MEASURE`); longer, it opens in the pane.
 - Source files open in the editor (`code -g`), the rest with `open`.
 - Cut: a standing agents row (the user: "agents should exist as a pane only"); the full report inline (card-sized, plain); uppercase and coloured buttons (Norman, Wathan and Jev agreed: brackets are the sign, colour means state).
 - Open: the screen can move under a click while a turn streams (the engine's layout); a turn in flight still delays the first click on a running agent.

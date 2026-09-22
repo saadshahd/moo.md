@@ -19,12 +19,15 @@ type Msg = {
 /** `read`: opened once, drawn dim in the agents list. */
 export type Row = { id: string; label: string; type: string; done: boolean; read?: true };
 
+// What a card's facts are, for the session and its agents alike.
+const FACTS = "what the user should carry forward — durable, in plain words, no file paths, tool steps or change details";
+
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
 {"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-facts: what the user should carry forward — durable, plain, no file paths or change details; one that settles a choice names what lost. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
+facts: ${FACTS}; one that settles a choice names what lost. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
-export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: what the user should carry forward — durable, in plain words, no file paths or tool steps.`;
+export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;
 const CARD_SKILLS = new Set([
   "hope:intent",
   "hope:shape",
@@ -140,18 +143,8 @@ export function bareFact(f: string): string {
 }
 
 /** Items a card shows; 0 hides its chip. */
-export function cardCount(
-  c: Card,
-  name: string,
-  answered: Set<string>,
-): number {
-  if (name === "intent" || name === "shape") return c[name] ? 1 : 0;
-  if (name === "facts") return c.facts?.length ?? 0;
-  if (name === "questions")
-    return (c.questions ?? []).filter((q) => !answered.has(q.q)).length;
-  if (name === "skills") return c.skills?.length ?? 0;
-  if (name === "watch") return c.watch?.length ?? 0;
-  return 0;
+export function cardCount(c: Card, name: string, answered: Set<string>): number {
+  return cardRows(c, name, answered, new Set()).length;
 }
 
 export function firstLine(text: string): string {
@@ -228,19 +221,22 @@ export function fromFile(file: string, href: string): string {
   return href.startsWith("/") || href.includes("://") ? href : `${file.slice(0, file.lastIndexOf("/") + 1)}${href}`;
 }
 
+const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
+const quiet = (id: string, label: string): Item => ({ id, label, kind: "quiet" });
+const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
+
 /** An agent's pane as a card: intent, outcome, where to look, the facts it rests on; the full
  * report one click further. */
 export function agentRows(v: AgentView, name: string, id: string): Item[][] {
-  const note = (word: string): Item => ({ id: `note:${word}`, label: word.padEnd(9), kind: "note" });
-  const section = (word: string, items: Item[]) => items.map((it, i) => [note(i ? "" : word), it]);
-  const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
+  const label = (word: string) => note(`note:${word}`, word.padEnd(9));
+  const section = (word: string, items: Item[]) => items.map((it, i) => [label(i ? "" : word), it]);
   const outcome = v.card.outcome || v.returned || firstLine(v.body.replace(/^#.*$/gm, ""));
   return [
     ...section("intent", [line(`probe:${name} intent`, v.card.intent || v.asked)].filter((i) => i.label)),
     ...section("outcome", outcome ? [line(`probe:${name} outcome`, outcome)] : []),
     ...section("watch", [...new Set([...v.footprint, ...links(v.body)])].map((f) => line(`open:${f}`, placeName(f)))),
     ...section("facts", (v.card.facts ?? []).map((f, i) => line(`probe:${name} fact ${i + 1}`, `• ${bareFact(f)}`))),
-    ...section("report", v.body ? [{ id: `report:${id}`, label: "read it all", kind: "quiet" as const }] : []),
+    ...section("report", v.body ? [quiet(`report:${id}`, "read it all")] : []),
   ];
 }
 
@@ -268,9 +264,6 @@ export function cardRows(
   answered: Set<string>,
   ran: Set<string>,
 ): Item[][] {
-  const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
-  const quiet = (id: string, label: string): Item => ({ id, label, kind: "quiet" });
-  const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
   if (name === "intent" || name === "shape")
     return c[name] ? [[line(`probe:${name}`, c[name]!)]] : [];
   if (name === "facts")
@@ -355,8 +348,13 @@ const ran = new Set<string>();
 let planMoved = false;
 let nextCmd: string | undefined;
 const paneText = new Map<string, string>();
-// The agent a pane shows, kept past a reload that empties the rows.
+// The agent a pane shows, kept past a reset that empties the rows while its pane stays open.
 const paneAgent = new Map<string, Row>();
+// Agents of a session this module no longer serves.
+const gone = new Set<string>();
+// Skills an agent called through the Skill tool, each awaiting its `skill.prompt`: that event
+// doesn't say whose loop it runs in, the tool call does.
+const agentSkills: string[] = [];
 // Teammates whose last turn ended; a tool call of theirs starts them again.
 const idle = new Set<string>();
 // What each opened agent was asked and returned: a wrong brief is the cheapest thing to catch.
@@ -389,16 +387,31 @@ async function readSession($: any) {
   $.ui.invalidate("ui.render");
 }
 
+/** Runs a detached step; a failure is shown, never swallowed, and never breaks the hook that started it. */
+function loud($: any, p: Promise<unknown>) {
+  p.catch((err: unknown) => $.ui.toast(`tend: ${err instanceof Error ? err.message : String(err)}`));
+}
+
+/** The session this module now serves. `/clear` and a resume raise no `session.start`, so the
+ * id is read at each use; a new one resets what the old session left in memory. */
+async function sid($: any): Promise<string> {
+  const id: string = await $.session.id();
+  if (sessionId && id !== sessionId) reset();
+  sessionId = id;
+  return id;
+}
+
 // A reload wipes module memory; the store keeps which skills ran, which questions got answers,
 // and which teammates sit idle.
 async function remember($: any) {
-  sessionId ||= await $.session.id();
+  await sid($);
   await $.store.set(`tend:${sessionId}:ran`, [...ran]);
   await $.store.set(`tend:${sessionId}:answered`, [...answered]);
   await $.store.set(`tend:${sessionId}:idle`, [...idle]);
 }
 
 async function recall($: any) {
+  await sid($);
   for (const r of ((await $.store.get(`tend:${sessionId}:ran`)) as string[]) ?? []) ran.add(r);
   for (const a of ((await $.store.get(`tend:${sessionId}:answered`)) as string[]) ?? []) answered.add(a);
   for (const i of ((await $.store.get(`tend:${sessionId}:idle`)) as string[]) ?? []) idle.add(i);
@@ -406,8 +419,9 @@ async function recall($: any) {
 
 // Finished agents drop out of $.agent.list(); the store keeps them for the session.
 async function readAgents($: any) {
+  await sid($);
   const listed: Row[] = ((await $.agent.list()) as any[])
-    .filter((a) => !a.parentId)
+    .filter((a) => !a.parentId && !gone.has(a.id))
     .map((a) => ({
       id: a.id,
       label: a.name ?? a.description,
@@ -427,9 +441,9 @@ async function readAgents($: any) {
   if (JSON.stringify(next) === JSON.stringify(rows)) return;
   rows = next;
   await $.store.set(`tend:${sessionId}`, rows);
-  // A pane opened while its agent ran fills in when the agent finishes.
-  const shown = paneItem?.startsWith("agent:") ? paneItem.slice(6) : "";
-  if (rows.find((r) => r.id === shown)?.done && !paneText.has(paneItem!)) await loadAgent($, shown);
+  // A pane opened on an agent, its card or its report, fills in when the agent finishes.
+  const shown = paneItem?.match(/^(?:agent|report):(.+)$/)?.[1] ?? "";
+  if (rows.find((r) => r.id === shown)?.done && !paneText.has(`agent:${shown}`)) await loadAgent($, shown);
   $.ui.invalidate("ui.render");
 }
 
@@ -445,11 +459,12 @@ async function openAgent($: any, id: string) {
   // The pane answers the click at once; the agent's words fill in when read.
   const shown = showPane($, `agent:${id}`);
   await loadAgent($, id);
-  $.ui.invalidate("ui.render");
-  if (r?.done && !r.read) {
-    r.read = true;
+  // Rows may have been swapped by a poll while this waited: mark the current one.
+  if (rows.some((x) => x.id === id && x.done && !x.read)) {
+    rows = rows.map((x) => (x.id === id ? { ...x, read: true as const } : x));
     await $.store.set(`tend:${sessionId}`, rows);
   }
+  $.ui.invalidate("ui.render");
   await shown;
 }
 
@@ -459,7 +474,7 @@ async function openTarget($: any, target: string) {
     return showPane($, `file:${target}`);
   const run = (argv: string[]) =>
     $.process.run(argv, { timeoutMs: 10000 }).catch((err: unknown) => ({ exitCode: -1, stderr: String(err) }));
-  // A source file opens in the editor Claude Code's ctrl+g uses; the rest by the system's default.
+  // A source file opens in VS Code (`code`), else by the system's default, as does everything else.
   const inEditor = isSourceFile(target) && (await run(["code", "-g", target])).exitCode === 0;
   if (!inEditor && (await run(["open", target])).exitCode !== 0) $.ui.toast(`can't open ${target}`);
 }
@@ -472,7 +487,7 @@ async function showPane($: any, item: string) {
   const opened = $.ui.open({ id: PANE, title: "tend", closeOnEscape: true });
   if (item.startsWith("file:"))
     await $.fs.read(item.slice(5)).then(
-      (t: any) => paneText.set(item, typeof t === "string" ? t : String(t?.text ?? "")),
+      (t: string) => paneText.set(item, t),
       (err: unknown) => paneText.set(item, `_${String(err)}_`),
     );
   $.ui.invalidate("ui.render");
@@ -494,7 +509,7 @@ async function typeThrough($: any, ch: string) {
 }
 
 async function fill($: any, text: string) {
-  const box: string = (await $.prompt.read().catch(() => undefined))?.text ?? "";
+  const box: string = (await $.prompt.read()).text;
   // A second press of the same line leaves the box as it is.
   if (box.trimEnd().endsWith(text.trimEnd())) return;
   // A stem left bare is swapped for the new one, never stacked: "intent: fact 2: " can't happen.
@@ -509,6 +524,8 @@ async function fill($: any, text: string) {
 }
 
 function reset() {
+  // The old session's agents can linger in `$.agent.list()`; they are never this session's.
+  for (const r of rows) gone.add(r.id);
   card = {};
   rows = [];
   open = null;
@@ -516,6 +533,12 @@ function reset() {
   lastPaneItem = null;
   answered.clear();
   ran.clear();
+  idle.clear();
+  views.clear();
+  paneText.clear();
+  typedFrom.clear();
+  agentSkills.length = 0;
+  lastStem = "";
   planMoved = false;
   nextCmd = undefined;
 }
@@ -537,11 +560,8 @@ async function act($: any, id: string) {
   else if (kind === "answer") {
     const [i, j] = rest.map(Number);
     const q = card.questions?.[i];
-    if (q) {
-      answered.add(q.q);
-      await remember($);
-      await fill($, `q${i + 1}: ${q.options[j]} — `);
-    }
+    // Answered once sent, not on the click: an abandoned answer leaves the question up.
+    if (q) await fill($, `q${i + 1}: ${q.options[j]} — `);
   } else if (kind === "skill") {
     const k = card.skills?.[Number(arg)];
     const cmd = k && (await slash($, k.name));
@@ -559,10 +579,10 @@ async function act($: any, id: string) {
 }
 
 export const register: Register = (on) => {
+  // A new or resumed session: memory left from another one is dropped.
   on("session.start", async ($, e, next) => {
     const r = await next(e);
-    sessionId = await $.session.id();
-    await registerCommands($);
+    await sid($);
     return r;
   });
 
@@ -577,34 +597,46 @@ export const register: Register = (on) => {
     return {};
   });
 
+  // A skill an agent runs is the agent's: it moves no plan and gets no card (AGENT_CARD asks its own).
   on("skill.prompt", async ($, e, next) => {
     const r = await next(e);
-    if (!e.agentId) {
-      ran.add(e.skill);
-      planMoved = true;
-      await remember($);
+    const theirs = agentSkills.indexOf(e.skill);
+    if (theirs >= 0) {
+      agentSkills.splice(theirs, 1);
+      return r;
     }
-    return CARD_SKILLS.has(e.skill)
-      ? { text: `${r.text}\n\n${CARD_FORMAT}` }
-      : r;
+    ran.add(e.skill);
+    planMoved = true;
+    await remember($);
+    return CARD_SKILLS.has(e.skill) ? { text: `${r.text}\n\n${CARD_FORMAT}` } : r;
   });
 
-  // The engine's own guess would replace the plan's next skill; the plan wins.
+  // Every agent the session starts is asked to end on a card; an agent at work again is running and unread.
   on("tool.call", async ($, e, next) => {
     if (!e.agentId && e.tool === "Agent" && typeof (e as any).prompt === "string")
       return next({ ...e, prompt: `${(e as any).prompt}\n\n${AGENT_CARD}` } as any);
-    const r = rows.find((x) => x.id === e.agentId);
-    if (e.agentId && (idle.delete(e.agentId) || r?.read)) {
-      if (r) delete r.read;
-      paneText.delete(`agent:${e.agentId}`);
-      void remember($).then(() => readAgents($));
+    if (!e.agentId) return next(e);
+    const skill = e.tool === "Skill" && (e as any).skill;
+    if (typeof skill === "string") agentSkills.push(skill);
+    const id = e.agentId;
+    if (idle.delete(id) || rows.some((x) => x.id === id && x.read)) {
+      rows = rows.map(({ read, ...x }) => (x.id === id || !read ? x : { ...x, read }));
+      paneText.delete(`agent:${id}`);
+      loud($, remember($).then(() => readAgents($)));
     }
     return next(e);
   });
 
   // The user's own prompt keeps a card already shown current: the model is asked for the keys this turn changes.
   on("prompt.submit", async ($, e, next) => {
-    if (e.origin?.kind !== "composer") return next(e);
+    if (e.origin.kind !== "composer") return next(e);
+    // A sent `q2: …` answers question 2.
+    const q = card.questions?.[Number(e.text.match(/^q(\d+):/)?.[1]) - 1];
+    if (q) {
+      answered.add(q.q);
+      await remember($);
+      $.ui.invalidate("ui.render");
+    }
     if (!Object.keys(card).length) return next(e);
     return next({ ...e, context: [...(e.context ?? []), `Only if this turn settles or changes what the card holds:\n${CARD_FORMAT}`] });
   });
@@ -627,7 +659,7 @@ export const register: Register = (on) => {
       // A suggestion made while the turn is live never shows.
       nextCmd = (nextSkill && (await slash($, nextSkill.name))) || undefined;
       const cmd = nextCmd;
-      if (cmd) $.clock.after(1500, () => void $.prompt.suggest({ text: cmd }));
+      if (cmd) $.clock.after(1500, () => loud($, $.prompt.suggest({ text: cmd })));
     }
     return r;
   });
@@ -662,16 +694,19 @@ export const register: Register = (on) => {
     if (e.props.hasSurvey) return next(e);
     if (!started) {
       started = true;
-      void (async () => {
-        sessionId = await $.session.id();
-        await registerCommands($);
+      // The poll starts first, so a failed step below (shown) never leaves the agents unread.
+      $.clock.every(2000, () => loud($, readAgents($)));
+      loud($, (async () => {
         await recall($);
+        await registerCommands($);
         await readSession($);
         await readAgents($);
-        $.clock.every(2000, () => void readAgents($));
-      })();
+      })());
     }
-    const { Box, Client } = $.ui.resolve(e);
+    const els = $.ui.resolve(e);
+    // Surfaces with no Client (mobile, the editor's panel) keep their own band.
+    if (!("Client" in els)) return next(e);
+    const { Box, Client } = els;
     bandColumns = e.props.bodyColumns;
     const band = bandModel({ card, open, paneItem, answered, ran, rows });
     if (!band.chips.length) return <Box />;
@@ -685,7 +720,8 @@ export const register: Register = (on) => {
   on("ui.message", async ($, e, next) => {
     const data = e.data as { act?: unknown; type?: unknown; release?: unknown } | undefined;
     const before = fills;
-    if (typeof data?.act === "string") await act($, data.act);
+    // A failed act is shown; the message still passes on (hooks fail open).
+    if (typeof data?.act === "string") await act($, data.act).catch((err) => $.ui.toast(`tend: ${err?.message ?? err}`));
     if (typeof data?.type === "string") {
       const done = typedFrom.get(e.element) ?? 0;
       typedFrom.set(e.element, data.type.length);
@@ -704,7 +740,9 @@ export const register: Register = (on) => {
 
   on("ui.render", { component: "Pane" }, ($, e, next) => {
     if (e.requestId !== PANE) return next(e);
-    const { Box, Client } = $.ui.resolve(e);
+    const els = $.ui.resolve(e);
+    if (!("Client" in els)) return next(e);
+    const { Box, Client } = els;
     const item = paneItem ?? "";
     const width = Math.min(e.props.bodyColumns, MEASURE);
     const inner = width - 2 * PAD;

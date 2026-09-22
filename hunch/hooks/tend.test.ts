@@ -91,7 +91,7 @@ test("a chip previews its card with one number", async () => {
   expect(chipLabel(c, "questions", new Set(["x"]), new Set())).toBe("questions 1");
   expect(chipLabel(c, "skills", new Set(), new Set(["hope:intent"]))).toBe("skills 1/2");
 });
-test("an agent's brief is its first non-empty line", async () => {
+test("first line: the first non-empty one, trimmed", async () => {
   expect(firstLine("\n  find the parser \nmore")).toBe("find the parser");
 });
 test("a fact is a list item; in the pane it wraps under its bullet", async () => {
