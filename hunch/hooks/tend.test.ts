@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import { hit, layout, move, navRows } from "./band.tsx";
-import { bandModel, cardRows, bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
+import { bandModel, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -78,6 +78,21 @@ test("a skill counts as run with or without its plugin prefix", async () => {
 test("a run skill is marked done, its label left bare", async () => {
   const [[run]] = cardRows({ skills: [{ name: "hope:judge", outcome: "v" }] } as any, "skills", new Set(), new Set(["hope:judge"]));
   expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", mark: "done" });
+});
+test("a chip previews its card with one number", async () => {
+  const c = {
+    intent: "i",
+    facts: ["a", "b"],
+    questions: [{ q: "x", options: [] }, { q: "y", options: [] }],
+    skills: [{ name: "hope:intent" }, { name: "hope:draft" }],
+  } as any;
+  expect(chipLabel(c, "intent", new Set(), new Set())).toBe("intent");
+  expect(chipLabel(c, "facts", new Set(), new Set())).toBe("facts 2");
+  expect(chipLabel(c, "questions", new Set(["x"]), new Set())).toBe("questions 1");
+  expect(chipLabel(c, "skills", new Set(), new Set(["hope:intent"]))).toBe("skills 1/2");
+});
+test("an agent's brief is its first non-empty line", async () => {
+  expect(firstLine("\n  find the parser \nmore")).toBe("find the parser");
 });
 test("a planned skill resolves to a real command, or none", async () => {
   const names = ["hope:clarify", "hope:judge", "clear"];

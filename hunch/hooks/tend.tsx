@@ -18,7 +18,7 @@ export type Row = { id: string; label: string; done: boolean };
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
 {"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-facts: bare claims. skills: the planned skills in order. watch: where a human looks, never agent state.
+facts: bare claims; one that settles a choice names what lost. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 const CARD_SKILLS = new Set([
   "hope:intent",
@@ -146,6 +146,20 @@ export function cardCount(
   return 0;
 }
 
+export function firstLine(text: string): string {
+  return text.split("\n").find((l) => l.trim())?.trim() ?? "";
+}
+
+/** A chip's label with the one number that previews its card: how many, or skills run of planned. */
+export function chipLabel(c: Card, name: string, answered: Set<string>, ran: Set<string>): string {
+  if (name === "intent" || name === "shape") return name;
+  if (name === "skills") {
+    const planned = c.skills ?? [];
+    return `skills ${planned.filter((k) => hasRun(ran, k.name)).length}/${planned.length}`;
+  }
+  return `${name} ${cardCount(c, name, answered)}`;
+}
+
 /** A card's lines; each inner list is one row the arrows move along. */
 export function cardRows(
   c: Card,
@@ -192,7 +206,7 @@ export function bandModel(s: {
   return {
     chips: CHIPS.filter((n) => count(n) > 0).map((n) => ({
       id: `chip:${n}`,
-      label: n,
+      label: chipLabel(s.card, n, s.answered, s.ran),
       kind: "chip",
       // Client props refuse undefined, so an unmarked chip has no key at all.
       ...(s.open === n || s.paneItem === `card:${n}` ? { mark: "open" as const } : {}),
@@ -221,6 +235,8 @@ let planMoved = false;
 let nextCmd: string | undefined;
 const paneText = new Map<string, string>();
 const paneHead = new Map<string, string>();
+// What each opened agent was asked: a wrong brief is the cheapest thing to catch.
+const briefs = new Map<string, string>();
 let started = false;
 let sessionId = "";
 // Bumped per fill: the Client redraws under a new key, handing the keys back to the prompt.
@@ -281,8 +297,10 @@ async function readAgents($: any) {
 
 async function openAgent($: any, id: string) {
   const r = rows.find((x) => x.id === id);
+  const msgs: Msg[] = await $.session.messages({ agentId: id });
+  const ask = msgs.find((m) => m.role === "user" && m.text.trim());
+  if (ask) briefs.set(`agent:${id}`, firstLine(ask.text));
   if (r?.done) {
-    const msgs: Msg[] = await $.session.messages({ agentId: id });
     const last = [...msgs].reverse().find((m) => m.role === "assistant" && m.text.trim());
     paneText.set(`agent:${id}`, last?.text ?? "_no result_");
     paneHead.set(`agent:${id}`, r.label);
@@ -510,6 +528,7 @@ export const register: Register = (on) => {
     return (
       <Box flexDirection="column" width={e.props.bodyColumns}>
         <Text dimColor>{head}</Text>
+        {briefs.has(item) ? <Text dimColor wrap="truncate-end">asked: {briefs.get(item)}</Text> : <Box />}
         {body}
       </Box>
     );

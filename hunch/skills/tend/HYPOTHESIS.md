@@ -20,3 +20,12 @@ Graduate when it stays on for 10 real sessions with no part turned off and the u
 - The engine's own prompt guess lands after the plan's next skill and replaced it; a `prompt.suggest` hook now keeps the plan's.
 - Arrows: the engine's focus ring treats every arrow as next/previous, and a Button pressed inside a Client keeps keys from it. The band is a Client of plain text: clicks are hit-tested, left/right move along a row, up/down between rows. Keys reach it only after a click.
 - Teammates stay `running` in `$.agent.list()`, so they get no row.
+
+### 2026-09-22 — colour, focus, and a design panel (Tufte, Victor, Matuschak, Appleton)
+
+- Colour carries state only, by theme key: the open chip blue, ✓ green, ● yellow; hover marks what takes a click.
+- No API hands the keys back to the prompt; after a fill the band redraws under a new key and the keys return.
+- Which skills ran and which questions got answers live in `$.store`: a reload wiped them.
+- Kept: a chip carries one number (`facts 2`, `skills 1/2`); an agent's pane opens with what it was asked; a fact that settles a choice names what lost; watch says what should appear.
+- Cut: agent sparklines and tool traces (Claude Code's agent view shows the work; motion is a push), a replaced spinner word (the engine's), a turn scrubber (a hidden mode), guess-before-read (a gate), a "yours" chip (his words are already his turns), a status-line trail (always on, repeats the skills chip), no border (he chose the border), next-skill-only (he asked for every skill).
+- Open: provenance on hover, lighting the reply a fact came from.
