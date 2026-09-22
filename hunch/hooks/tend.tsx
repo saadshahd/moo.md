@@ -366,6 +366,8 @@ let sessionId = "";
 // Bumped to hand the keys back to the prompt: the Client redraws under a new key.
 let fills = 0;
 let bandColumns = 80;
+// The stem last put in the box, to swap while it stands bare.
+let lastStem = "";
 // How much of each Client's typed text has reached the prompt, by the Client's key.
 const typedFrom = new Map<string, number>();
 
@@ -492,10 +494,16 @@ async function typeThrough($: any, ch: string) {
 }
 
 async function fill($: any, text: string) {
+  const box: string = (await $.prompt.read().catch(() => undefined))?.text ?? "";
   // A second press of the same line leaves the box as it is.
-  const box = await $.prompt.read().catch(() => undefined);
-  if (typeof box?.text === "string" && box.text.trimEnd().endsWith(text.trimEnd())) return;
-  const f = await $.prompt.fill({ text, mode: "insert" });
+  if (box.trimEnd().endsWith(text.trimEnd())) return;
+  // A stem left bare is swapped for the new one, never stacked: "intent: fact 2: " can't happen.
+  const bare = lastStem && box.endsWith(lastStem) ? box.slice(0, -lastStem.length) : undefined;
+  const f =
+    bare === undefined
+      ? await $.prompt.fill({ text, mode: "insert" })
+      : await $.prompt.fill({ text: bare + text, mode: "replace" });
+  lastStem = text;
   if (f.isFilled) fills++;
   else await $.prompt.suggest({ text });
 }
