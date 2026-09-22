@@ -161,6 +161,7 @@ describe("arrows", () => {
   });
   test("a click lands on the item drawn there", async () => {
     const cells = layout(b, 80);
+    expect(cells.map((l) => l.y)).toEqual([0, 2, 3, 5]); // borders take rows 1 and 4
     // chips row: "[ intent ] [ ▾ facts ]"; box top border at y=1; first fact at y=2, x=2
     expect(hit(cells, 3, 0)?.id).toBe("chip:intent");
     expect(hit(cells, 12, 0)?.id).toBe("chip:facts");
@@ -171,7 +172,7 @@ describe("arrows", () => {
   });
   test("a row wider than the band is clipped, never wrapped", async () => {
     const wide = model({ facts: ["x".repeat(100)] }, "facts");
-    const cell = layout(wide, 40).find((c) => c.item.id === "probe:fact 1")!;
+    const cell = layout(wide, 40).flatMap((l) => l.cells).find((c) => c.item.id === "probe:fact 1")!;
     expect(cell.x + cell.text.length).toBeLessThanOrEqual(38);
     expect(cell.text.endsWith("…")).toBe(true);
   });

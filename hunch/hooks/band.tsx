@@ -51,42 +51,47 @@ const textOf = (i: Item) =>
         ? `${i.label} ●`
         : i.label;
 
-/** Where every item sits, one screen row per item row, clipped to `columns`. */
-export function layout(b: Band, columns: number): Cell[] {
-  const cells: Cell[] = [];
-  const boxed = b.chips.length > 0 && b.body.length > 0;
-  const place = (items: Item[], y: number, x0: number, gap: number) => {
-    const end = columns - x0;
+// The card body sits in a box only under chips (the pane shows it bare).
+const boxed = (b: Band) => b.chips.length > 0 && b.body.length > 0;
+
+export type Line = { part: "chips" | "body" | "agents"; gap: number; y: number; cells: Cell[] };
+
+/** The one row plan: every line, where each item sits in it, clipped to `columns`. */
+export function layout(b: Band, columns: number): Line[] {
+  const box = boxed(b);
+  const lines: Line[] = [];
+  let y = 0;
+  const place = (part: Line["part"], items: Item[], x0: number, gap: number) => {
+    const cells: Cell[] = [];
     let x = x0;
     for (const item of items) {
-      const left = end - x;
+      const left = columns - x0 - x;
       if (left <= 1) break;
       const full = textOf(item);
       const text = full.length > left ? `${full.slice(0, left - 1)}…` : full;
       cells.push({ item, text, x, y });
       x += text.length + gap;
     }
+    lines.push({ part, gap, y: y++, cells });
   };
-  let y = 0;
-  if (b.chips.length) place(b.chips, y++, 0, 1);
-  if (b.body.length) {
-    if (boxed) y++;
-    for (const r of b.body) place(r, y++, boxed ? 2 : 0, 2);
-    if (boxed) y++;
-  }
-  if (b.agents.length) place(b.agents, y, 0, 2);
-  return cells;
+  if (b.chips.length) place("chips", b.chips, 0, 1);
+  if (box) y++; // the box's top border
+  for (const r of b.body) place("body", r, box ? 2 : 0, 2);
+  if (box) y++; // its bottom border
+  if (b.agents.length) place("agents", b.agents, 0, 2);
+  return lines;
 }
 
-export function hit(cells: Cell[], x: number, y: number): Item | undefined {
-  return cells.find((c) => c.y === y && x >= c.x && x < c.x + c.text.length)
-    ?.item;
+export function hit(lines: Line[], x: number, y: number): Item | undefined {
+  return lines
+    .find((l) => l.y === y)
+    ?.cells.find((c) => x >= c.x && x < c.x + c.text.length)?.item;
 }
 
 export default function BandView(band: Band, surface: any) {
   const { Box, Text } = surface.elements;
   const rows = navRows(band);
-  const cells = layout(band, surface.columns || 200);
+  const lines = layout(band, surface.columns || 200);
   const f = move(surface.state ?? { row: 0, col: 0 }, rows, "");
   const at = rows[f.row]?.[f.col]?.id;
 
@@ -106,7 +111,7 @@ export default function BandView(band: Band, surface: any) {
   });
   surface.onPointer((p: { type: string; x: number; y: number }) => {
     if (p.type !== "down") return;
-    const item = hit(cells, p.x, p.y);
+    const item = hit(lines, p.x, p.y);
     if (item && focusable(item)) choose(item);
   });
 
@@ -120,36 +125,19 @@ export default function BandView(band: Band, surface: any) {
     if (i.id === at) style.inverse = true;
     return Box({ key: `c-${i.id}`, children: [Text(style)] });
   };
-  const byRow = new Map<number, Cell[]>();
-  for (const c of cells) byRow.set(c.y, [...(byRow.get(c.y) ?? []), c]);
-  const line = (y: number, gap: number) =>
-    Box({
-      key: `y-${y}`,
-      flexDirection: "row",
-      gap,
-      children: (byRow.get(y) ?? []).map(draw),
-    });
-
-  const boxed = band.chips.length > 0 && band.body.length > 0;
-  const out = [];
-  let y = 0;
-  if (band.chips.length) out.push(line(y++, 1));
-  if (band.body.length) {
-    if (boxed) y++;
-    const body = band.body.map(() => line(y++, 2));
-    if (boxed) y++;
-    out.push(
-      boxed
-        ? Box({
-            key: "body",
-            borderStyle: "round",
-            paddingX: 1,
-            flexDirection: "column",
-            children: body,
-          })
-        : Box({ key: "body", flexDirection: "column", children: body }),
-    );
-  }
-  if (band.agents.length) out.push(line(y, 2));
+  const row = (l: Line) =>
+    Box({ key: `y-${l.y}`, flexDirection: "row", gap: l.gap, children: l.cells.map(draw) });
+  const body = lines.filter((l) => l.part === "body").map(row);
+  const out = [
+    ...lines.filter((l) => l.part === "chips").map(row),
+    ...(body.length
+      ? [
+          boxed(band)
+            ? Box({ key: "body", borderStyle: "round", paddingX: 1, flexDirection: "column", children: body })
+            : Box({ key: "body", flexDirection: "column", children: body }),
+        ]
+      : []),
+    ...lines.filter((l) => l.part === "agents").map(row),
+  ];
   return Box({ flexDirection: "column", children: out });
 }
