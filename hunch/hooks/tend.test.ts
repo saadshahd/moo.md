@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import { fitsBox, hit, layout, move, navRows, wrap } from "./band.tsx";
-import { bandModel, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
+import { agentRows, agentView, bandModel, fromFile, isSourceFile, links, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -99,19 +99,75 @@ test("a fact is a list item; in the pane it wraps under its bullet", async () =>
   expect(f.label).toBe("• alpha beta gamma delta");
   expect(wrap(f.label, 12)).toEqual(["• alpha beta", "  gamma", "  delta"]);
 });
-test("a card fits the box only when short and unclipped", async () => {
-  const rows = (n: number, len: number) =>
-    Array.from({ length: n }, (_, i) => [{ id: `l${i}`, label: "x".repeat(len), kind: "line" as const }]);
-  expect(fitsBox(rows(4, 10), 80, 4)).toBe(true);
-  expect(fitsBox(rows(5, 10), 80, 4)).toBe(false);
-  expect(fitsBox(rows(1, 90), 80, 4)).toBe(false);
+test("a card stays in the box while it wraps to at most 4 lines at the measure", async () => {
+  const rows = (n: number, words: number) =>
+    Array.from({ length: n }, (_, i) => [{ id: `l${i}`, label: "word ".repeat(words).trim(), kind: "line" as const }]);
+  expect(fitsBox(rows(4, 2), 200, 4)).toBe(true);
+  expect(fitsBox(rows(5, 2), 200, 4)).toBe(false);
+  expect(fitsBox(rows(1, 80), 200, 4)).toBe(true); // 400 chars: 4 lines at 116
+  expect(fitsBox(rows(1, 100), 200, 4)).toBe(false); // 500 chars: 5 lines
 });
-test("the pane wraps a long line where the band clips it", async () => {
-  const body = [[{ id: "probe:intent", label: "word ".repeat(30).trim(), kind: "line" as const }]];
-  const pane = layout({ chips: [], body, agents: [], wrap: true }, 40);
-  expect(pane.length).toBeGreaterThan(1);
-  expect(pane.every((l) => l.cells[0].item.id === "probe:intent")).toBe(true);
-  expect(layout({ chips: [], body, agents: [], wrap: false }, 40).length).toBe(1);
+test("a card line wraps at the measure; chips never wrap", async () => {
+  const body = [[{ id: "probe:intent", label: "word ".repeat(40).trim(), kind: "line" as const }]];
+  const lines = layout({ chips: [], body, agents: [] }, 300);
+  expect(lines.length).toBe(2);
+  expect(lines.every((l) => l.cells[0].text.length <= 120)).toBe(true);
+});
+test("a teammate's pane reads its summary and its SendMessage, never the wrapper", async () => {
+  const v = agentView([
+    { role: "user", text: '<teammate-message teammate_id="team-lead" summary="Read notes.md">\nRead the file and list syntax.\n</teammate-message>' },
+    { role: "assistant", text: "", toolUses: [{ tool: "SendMessage", input: { to: "team-lead", summary: "syntax listed", message: "1. headers" } }] },
+    { role: "assistant", text: "" },
+  ]);
+  expect(v).toMatchObject({ asked: "Read notes.md", returned: "syntax listed", body: "1. headers" });
+});
+test("a subagent's pane reads its first line and its last reply", async () => {
+  const v = agentView([
+    { role: "user", text: "\nFind the parser.\nMore." },
+    { role: "assistant", text: "It is in tend.tsx." },
+  ]);
+  expect(v).toMatchObject({ asked: "Find the parser.", returned: "", body: "It is in tend.tsx." });
+});
+test("an agent's pane reads like the session's card: intent, outcome, watch, facts", async () => {
+  const v = agentView([
+    { role: "user", text: "Count words." },
+    { role: "assistant", text: "", toolUses: [{ tool: "Write", input: { file_path: "/tmp/wc.py" } }, { tool: "Read", input: { file_path: "/tmp/a.md" } }] },
+    { role: "assistant", text: 'Done.\n\n```card\n{"intent":"count md words","facts":["wc counts markup"]}\n```\n' },
+  ]);
+  expect(v.body).toBe("Done.");
+  expect(v.footprint).toEqual(["/tmp/wc.py"]);
+  const rows = agentRows(v, "counter");
+  expect(rows.map((r) => r.map((i) => i.label.trim()))).toEqual([
+    ["intent", "count md words"],
+    ["watch", "/tmp/wc.py"],
+    ["facts", "• wc counts markup"],
+  ]);
+  expect(rows.map((r) => r[1].id)).toEqual(["probe:counter intent", "open:/tmp/wc.py", "probe:counter fact 1"]);
+});
+test("in the pane a row's last item runs on below itself, aligned", async () => {
+  const body = [[{ id: "n", label: "facts    ", kind: "note" as const }, { id: "f", label: "• " + "word ".repeat(12).trim(), kind: "line" as const }]];
+  const lines = layout({ chips: [], body, agents: [] }, 40);
+  expect(lines.length).toBeGreaterThan(1);
+  expect(lines.slice(1).every((l) => l.cells[0].x === lines[0].cells[1].x && l.cells[0].text.startsWith("  "))).toBe(true);
+});
+test("source files go to the editor; pages, pictures and urls do not", async () => {
+  expect(isSourceFile("/tmp/wc.py")).toBe(true);
+  expect(isSourceFile("/tmp/tend-lab/wordcount")).toBe(true);
+  expect(isSourceFile("/tmp/shot.png")).toBe(false);
+  expect(isSourceFile("https://x.dev/a.ts")).toBe(false);
+});
+test("an agent's pane shows its fullest report, not a closing line", async () => {
+  const v = agentView([
+    { role: "user", text: "Survey." },
+    { role: "assistant", text: "", toolUses: [{ tool: "SendMessage", input: { summary: "survey done", message: "a long report ".repeat(5) } }] },
+    { role: "assistant", text: "", toolUses: [{ tool: "SendMessage", input: { summary: "bye", message: "Task complete" } }] },
+  ]);
+  expect(v.returned).toBe("survey done");
+});
+test("a pane lists a doc's links to click, beside the file when relative", async () => {
+  expect(links("see [a](x.md), [b](https://y.dev) and [c](#top) and [a](x.md)")).toEqual(["x.md", "https://y.dev"]);
+  expect(fromFile("/r/docs/a.md", "x.md")).toBe("/r/docs/x.md");
+  expect(fromFile("/r/docs/a.md", "https://y.dev")).toBe("https://y.dev");
 });
 test("a planned skill resolves to a real command, or none", async () => {
   const names = ["hope:clarify", "hope:judge", "clear"];
@@ -143,7 +199,7 @@ const model = (card: object, open: string | null = null, rows: object[] = []) =>
 
 describe("band", () => {
   test("no card, no agents: nothing", async () => {
-    expect(model({})).toEqual({ chips: [], body: [], agents: [], wrap: false });
+    expect(model({})).toEqual({ doc: "", chips: [], body: [], agents: [] });
   });
   test("card: only chips with content", async () => {
     const b = model({ intent: "x", questions: [{ q: "a?", options: ["y"] }] });
@@ -166,12 +222,14 @@ describe("band", () => {
       { id: "agent:a1", label: "count files", kind: "agent", state: "running" },
     ]);
   });
-  test("a read agent stays, dim; the one in the pane is open", async () => {
+  test("a read agent leaves its row for the agents chip, where it stays dim", async () => {
     const b = bandModel({
-      card: {}, open: null, paneItem: "agent:a1", answered: new Set(), ran: new Set(),
+      card: {}, open: "agents", paneItem: "agent:a1", answered: new Set(), ran: new Set(),
       rows: [{ id: "a1", label: "l", type: "Explore", done: true, read: true }],
     });
-    expect(b.agents[0]).toEqual({ id: "agent:a1", label: "l", kind: "agent", state: "done", read: true, open: true });
+    expect(b.agents).toEqual([]);
+    expect(b.chips.map((c) => c.label)).toEqual(["agents 1"]);
+    expect(b.body).toEqual([[{ id: "agent:a1", label: "l", kind: "line", state: "done", read: true, open: true }]]);
   });
   test("a question row: the question, then its answers", async () => {
     const rows = cardRows(
@@ -191,7 +249,7 @@ describe("arrows", () => {
   const rows = navRows(b);
   test("rows: chips, each card line, agents", async () => {
     expect(rows.map((r) => r.map((i) => i.id))).toEqual([
-      ["chip:intent", "chip:facts"],
+      ["chip:intent", "chip:facts", "chip:agents"],
       ["probe:fact 1"],
       ["probe:fact 2"],
       ["agent:a1"],
@@ -199,7 +257,7 @@ describe("arrows", () => {
   });
   test("left/right stay in the row; up/down change rows", async () => {
     expect(move({ row: 0, col: 0 }, rows, "right")).toEqual({ row: 0, col: 1 });
-    expect(move({ row: 0, col: 1 }, rows, "right")).toEqual({ row: 0, col: 1 });
+    expect(move({ row: 0, col: 2 }, rows, "right")).toEqual({ row: 0, col: 2 });
     expect(move({ row: 0, col: 1 }, rows, "down")).toEqual({ row: 1, col: 0 });
     expect(move({ row: 3, col: 0 }, rows, "down")).toEqual({ row: 3, col: 0 });
     expect(move({ row: 1, col: 0 }, rows, "up")).toEqual({ row: 0, col: 1 }); // back on the open chip
@@ -215,7 +273,7 @@ describe("arrows", () => {
     expect(hit(cells, 0, 5)?.id).toBe("agent:a1");
     expect(hit(cells, 40, 2)).toBeUndefined();
   });
-  test("a row wider than the band is clipped, never wrapped", async () => {
+  test("a word wider than the box is the one thing clipped", async () => {
     const wide = model({ facts: ["x".repeat(100)] }, "facts");
     const cell = layout(wide, 40).flatMap((l) => l.cells).find((c) => c.item.id === "probe:fact 1")!;
     expect(cell.x + cell.text.length).toBeLessThanOrEqual(38);

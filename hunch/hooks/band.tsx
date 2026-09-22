@@ -5,19 +5,23 @@
 export type Item = {
   id: string;
   label: string;
-  kind: "chip" | "line" | "quiet" | "note" | "agent";
+  kind: "chip" | "line" | "quiet" | "note" | "agent" | "title";
   /** Its card or pane is showing. */
   open?: true;
   state?: "done" | "running";
   /** An agent already read: kept for reopening, drawn dim. */
   read?: true;
 };
-/** `wrap`: long lines wrap at words (the pane); else they clip (the band). */
-export type Band = { chips: Item[]; body: Item[][]; agents: Item[]; wrap: boolean };
-export type Focus = { row: number; col: number };
+/** `doc`: markdown read below the rows (the pane's result or file); "" for none. */
+export type Band = { chips: Item[]; body: Item[][]; agents: Item[]; doc: string };
+
+/** The widest a card's line runs, in the band's box or the pane: past it, text is hard to read back. */
+export const MEASURE = 120;
+/** `nav`: the arrows have moved it, so Enter acts here rather than meaning the prompt. */
+export type Focus = { row: number; col: number; nav?: true };
 export type Cell = { item: Item; text: string; x: number; y: number };
 
-const focusable = (i: Item) => i.kind !== "note";
+const focusable = (i: Item) => i.kind !== "note" && i.kind !== "title";
 
 export function navRows(b: Band): Item[][] {
   return [b.chips, ...b.body, b.agents]
@@ -53,7 +57,7 @@ const GLYPH_COLOR = { done: "success", running: "warning" };
 
 /** An item's text in its pieces: brackets for what acts like a button, a state glyph. */
 function pieces(i: Item) {
-  const button = i.kind === "chip" || i.kind === "agent";
+  const button = i.kind === "chip" || i.kind === "agent" || i.id === "close";
   return {
     pre: button ? `[ ${i.open ? "▾ " : ""}` : "",
     label: i.label,
@@ -73,11 +77,13 @@ const boxed = (b: Band) => b.chips.length > 0 && b.body.length > 0;
 export type Line = {
   part: "chips" | "body" | "agents";
   gap: number;
+  /** Where the line's row starts; a run-on line's first cell sits further in. */
+  x0: number;
   y: number;
   cells: Cell[];
 };
 
-/** The one row plan: every line, where each item sits in it, clipped to `columns`. */
+/** The one row plan: every line and where each item sits in it; a card line wraps at the measure. */
 export function layout(b: Band, columns: number): Line[] {
   const box = boxed(b);
   const lines: Line[] = [];
@@ -87,27 +93,31 @@ export function layout(b: Band, columns: number): Line[] {
     items: Item[],
     x0: number,
     gap: number,
+    width = columns,
   ) => {
-    if (b.wrap && items.length === 1) {
-      for (const text of wrap(textOf(items[0]), columns - x0))
-        lines.push({ part, gap, y, cells: [{ item: items[0], text, x: x0, y: y++ }] });
-      return;
-    }
     const cells: Cell[] = [];
     let x = x0;
-    for (const item of items) {
-      const left = columns - x0 - x;
+    for (const [n, item] of items.entries()) {
+      const left = width - x0 - x;
       if (left <= 1) break;
       const full = textOf(item);
+      // Wrapping, the row's last item runs on below itself, aligned at its column.
+      if (part === "body" && n === items.length - 1 && full.length > left) {
+        const [head, ...rest] = wrap(full, left);
+        cells.push({ item, text: head, x, y });
+        lines.push({ part, gap, x0, y: y++, cells });
+        for (const text of rest) lines.push({ part, gap, x0, y, cells: [{ item, text, x, y: y++ }] });
+        return;
+      }
       const text = full.length > left ? `${full.slice(0, left - 1)}…` : full;
       cells.push({ item, text, x, y });
       x += text.length + gap;
     }
-    lines.push({ part, gap, y: y++, cells });
+    lines.push({ part, gap, x0, y: y++, cells });
   };
   if (b.chips.length) place("chips", b.chips, 0, 1);
   if (box) y++; // the box's top border
-  for (const r of b.body) place("body", r, box ? 2 : 0, 2);
+  for (const r of b.body) place("body", r, box ? 2 : 0, 2, Math.min(columns, MEASURE));
   if (box) y++; // its bottom border
   if (b.agents.length) place("agents", b.agents, 0, 2);
   return lines;
@@ -118,7 +128,10 @@ export function wrap(text: string, width: number): string[] {
   const hang = text.startsWith("• ") ? "  " : "";
   const out: string[] = [];
   let cur = "";
-  for (const w of text.split(" ").filter(Boolean)) {
+  const words = text.split(" ").filter(Boolean);
+  // A bullet stays with its first word.
+  if (hang && words.length > 1) words.splice(0, 2, `• ${words[1]}`);
+  for (const w of words) {
     if (!cur) cur = (out.length ? hang : "") + w;
     else if (cur.length + 1 + w.length <= width) cur += ` ${w}`;
     else {
@@ -131,10 +144,10 @@ export function wrap(text: string, width: number): string[] {
   return out.map((l) => (l.length > width ? `${l.slice(0, width - 1)}…` : l));
 }
 
-/** Whether rows fit the band's box: few enough, and none clipped. The rest go to the pane. */
+/** Whether a card's rows, wrapped in the band's box, take at most `most` lines. The rest go to the pane. */
 export function fitsBox(rows: Item[][], columns: number, most: number): boolean {
-  const width = (r: Item[]) => r.reduce((n, i) => n + textOf(i).length, 0) + 2 * (r.length - 1);
-  return rows.length <= most && rows.every((r) => width(r) <= columns - 4);
+  return layout({ chips: [{ id: "", label: "", kind: "chip" }], body: rows, agents: [], doc: "" }, columns)
+    .filter((l) => l.part === "body").length <= most;
 }
 
 export function hit(lines: Line[], x: number, y: number): Item | undefined {
@@ -144,7 +157,7 @@ export function hit(lines: Line[], x: number, y: number): Item | undefined {
 }
 
 export default function BandView(band: Band, surface: any) {
-  const { Box, Text } = surface.elements;
+  const { Box, Text, Markdown } = surface.elements;
   const rows = navRows(band);
   const lines = layout(band, surface.columns || 200);
   const f = move(surface.state ?? { row: 0, col: 0 }, rows, "");
@@ -161,11 +174,15 @@ export default function BandView(band: Band, surface: any) {
   surface.onKey((k: { key: string }) => {
     // A typed character was meant for the prompt: send it there, and the keys follow.
     if ([...k.key].length === 1) return surface.post({ type: k.key });
-    const now = move(surface.state ?? { row: 0, col: 0 }, rows, "");
-    if (k.key === "return") {
+    const state: Focus = surface.state ?? { row: 0, col: 0 };
+    const now = move(state, rows, "");
+    if (["up", "down", "left", "right"].includes(k.key)) surface.setState({ ...move(now, rows, k.key), nav: true });
+    else if (k.key === "return" && state.nav) {
       const item = rows[now.row]?.[now.col];
       if (item) choose(item);
-    } else surface.setState(move(now, rows, k.key));
+    }
+    // Enter after a click, or Tab, meant the prompt: hand the keys back to it.
+    else if (k.key === "return" || k.key === "tab") surface.post({ release: true });
   });
   surface.onPointer((p: { type: string; x: number; y: number }) => {
     if (p.type !== "down") return;
@@ -192,6 +209,7 @@ export default function BandView(band: Band, surface: any) {
           ].filter(Boolean);
     if (i.kind === "quiet" || i.kind === "note" || i.read) style.dimColor = true;
     if (i.open) Object.assign(style, { bold: true, color: "suggestion" });
+    if (i.kind === "title") style.bold = true;
     if (focusable(i)) style.hover = { color: "suggestion" };
     if (i.id === at) style.inverse = true;
     return Box({ key: `c-${i.id}`, children: [Text(style)] });
@@ -200,6 +218,7 @@ export default function BandView(band: Band, surface: any) {
     Box({
       key: `y-${l.y}`,
       flexDirection: "row",
+      paddingLeft: (l.cells[0]?.x ?? l.x0) - l.x0,
       gap: l.gap,
       children: l.cells.map(draw),
     });
@@ -211,6 +230,7 @@ export default function BandView(band: Band, surface: any) {
           boxed(band)
             ? Box({
                 key: "body",
+                width: Math.min(surface.columns || 200, MEASURE),
                 borderStyle: "round",
                 borderColor: "subtle",
                 paddingX: 1,
@@ -221,6 +241,18 @@ export default function BandView(band: Band, surface: any) {
         ]
       : []),
     ...lines.filter((l) => l.part === "agents").map(row),
+    ...(band.doc
+      ? [
+          Box({
+            key: "doc",
+            marginTop: 1,
+            children: [
+              // A Client's Markdown takes no link handler: its links are listed as rows instead.
+              Markdown({ key: "md", text: band.doc }),
+            ],
+          }),
+        ]
+      : []),
   ];
   return Box({ flexDirection: "column", children: out });
 }
