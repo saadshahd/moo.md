@@ -30,38 +30,51 @@ export function move(f: Focus, rows: Item[][], key: string): Focus {
         : Math.min(f.row, rows.length - 1);
   const width = rows[row].length;
   // Stepping back to the chips lands on the open one.
-  const opened = row !== f.row ? rows[row].findIndex((i) => i.mark === "open") : -1;
+  const opened =
+    row !== f.row ? rows[row].findIndex((i) => i.mark === "open") : -1;
   const col =
     opened >= 0
       ? opened
       : key === "right"
-      ? Math.min(f.col + 1, width - 1)
-      : key === "left"
-        ? Math.max(f.col - 1, 0)
-        : Math.min(f.col, width - 1);
+        ? Math.min(f.col + 1, width - 1)
+        : key === "left"
+          ? Math.max(f.col - 1, 0)
+          : Math.min(f.col, width - 1);
   return { row, col };
 }
+
+const MARK_GLYPH: Record<string, string> = { done: " ✓", running: " ●" };
+const MARK_COLOR: Record<string, string> = {
+  done: "success",
+  running: "warning",
+};
 
 const textOf = (i: Item) =>
   i.kind === "chip"
     ? `[ ${i.mark === "open" ? "▾ " : ""}${i.label} ]`
-    : i.mark === "done"
-      ? `${i.label} ✓`
-      : i.mark === "running"
-        ? `${i.label} ●`
-        : i.label;
+    : `${i.label}${MARK_GLYPH[i.mark ?? ""] ?? ""}`;
 
 // The card body sits in a box only under chips (the pane shows it bare).
 const boxed = (b: Band) => b.chips.length > 0 && b.body.length > 0;
 
-export type Line = { part: "chips" | "body" | "agents"; gap: number; y: number; cells: Cell[] };
+export type Line = {
+  part: "chips" | "body" | "agents";
+  gap: number;
+  y: number;
+  cells: Cell[];
+};
 
 /** The one row plan: every line, where each item sits in it, clipped to `columns`. */
 export function layout(b: Band, columns: number): Line[] {
   const box = boxed(b);
   const lines: Line[] = [];
   let y = 0;
-  const place = (part: Line["part"], items: Item[], x0: number, gap: number) => {
+  const place = (
+    part: Line["part"],
+    items: Item[],
+    x0: number,
+    gap: number,
+  ) => {
     const cells: Cell[] = [];
     let x = x0;
     for (const item of items) {
@@ -115,25 +128,48 @@ export default function BandView(band: Band, surface: any) {
     if (item && focusable(item)) choose(item);
   });
 
+  // Colour carries state only, by theme key so it follows the user's theme:
+  // the open chip in the engine's own selection blue, ✓ and ● in their colours,
+  // the label beside them plain. Hover is the one sign that a word takes a click.
   const draw = (c: Cell) => {
     const i = c.item;
-    const style: Record<string, unknown> = { children: c.text };
+    const style: Record<string, unknown> = {};
+    const glyph = MARK_GLYPH[i.mark ?? ""];
+    style.children =
+      glyph && c.text.endsWith(glyph)
+        ? [
+            c.text.slice(0, -glyph.length),
+            Text({ key: "g", color: MARK_COLOR[i.mark!], children: glyph }),
+          ]
+        : c.text;
     if (i.kind === "quiet" || i.kind === "note") style.dimColor = true;
-    if (i.mark === "done") style.color = "green";
-    if (i.mark === "running") style.color = "yellow";
-    if (i.mark === "open") style.bold = true;
+    if (i.mark === "open")
+      Object.assign(style, { bold: true, color: "suggestion" });
+    if (focusable(i)) style.hover = { color: "suggestion" };
     if (i.id === at) style.inverse = true;
     return Box({ key: `c-${i.id}`, children: [Text(style)] });
   };
   const row = (l: Line) =>
-    Box({ key: `y-${l.y}`, flexDirection: "row", gap: l.gap, children: l.cells.map(draw) });
+    Box({
+      key: `y-${l.y}`,
+      flexDirection: "row",
+      gap: l.gap,
+      children: l.cells.map(draw),
+    });
   const body = lines.filter((l) => l.part === "body").map(row);
   const out = [
     ...lines.filter((l) => l.part === "chips").map(row),
     ...(body.length
       ? [
           boxed(band)
-            ? Box({ key: "body", borderStyle: "round", paddingX: 1, flexDirection: "column", children: body })
+            ? Box({
+                key: "body",
+                borderStyle: "round",
+                borderColor: "subtle",
+                paddingX: 1,
+                flexDirection: "column",
+                children: body,
+              })
             : Box({ key: "body", flexDirection: "column", children: body }),
         ]
       : []),
