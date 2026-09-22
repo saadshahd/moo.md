@@ -136,13 +136,15 @@ test("an agent's pane reads like the session's card: intent, outcome, watch, fac
   ]);
   expect(v.body).toBe("Done.");
   expect(v.footprint).toEqual(["/tmp/wc.py"]);
-  const rows = agentRows(v, "counter");
+  const rows = agentRows(v, "counter", "a1");
   expect(rows.map((r) => r.map((i) => i.label.trim()))).toEqual([
     ["intent", "count md words"],
+    ["outcome", "Done."],
     ["watch", "/tmp/wc.py"],
     ["facts", "• wc counts markup"],
+    ["report", "read it all"],
   ]);
-  expect(rows.map((r) => r[1].id)).toEqual(["probe:counter intent", "open:/tmp/wc.py", "probe:counter fact 1"]);
+  expect(rows.map((r) => r[1].id)).toEqual(["probe:counter intent", "probe:counter outcome", "open:/tmp/wc.py", "probe:counter fact 1", "report:a1"]);
 });
 test("in the pane a row's last item runs on below itself, aligned", async () => {
   const body = [[{ id: "n", label: "facts    ", kind: "note" as const }, { id: "f", label: "• " + "word ".repeat(12).trim(), kind: "line" as const }]];

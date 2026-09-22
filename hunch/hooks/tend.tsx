@@ -216,18 +216,19 @@ export function fromFile(file: string, href: string): string {
   return href.startsWith("/") || href.includes("://") ? href : `${file.slice(0, file.lastIndexOf("/") + 1)}${href}`;
 }
 
-/** An agent's pane as the session's card: intent, outcome, where to look, the facts it rests on. */
-export function agentRows(v: AgentView, name: string): Item[][] {
+/** An agent's pane as a card: intent, outcome, where to look, the facts it rests on; the full
+ * report one click further. */
+export function agentRows(v: AgentView, name: string, id: string): Item[][] {
   const note = (word: string): Item => ({ id: `note:${word}`, label: word.padEnd(9), kind: "note" });
   const section = (word: string, items: Item[]) => items.map((it, i) => [note(i ? "" : word), it]);
   const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
-  // With no summary of its own, the outcome is the result's first line: the doc below already opens on it.
-  const outcome = v.returned;
+  const outcome = v.returned || firstLine(v.body);
   return [
     ...section("intent", [line(`probe:${name} intent`, v.card.intent || v.asked)].filter((i) => i.label)),
     ...section("outcome", outcome ? [line(`probe:${name} outcome`, outcome)] : []),
     ...section("watch", [...new Set([...v.footprint, ...links(v.body)])].map((f) => line(`open:${f}`, f))),
     ...section("facts", (v.card.facts ?? []).map((f, i) => line(`probe:${name} fact ${i + 1}`, `• ${bareFact(f)}`))),
+    ...section("report", v.body ? [{ id: `report:${id}`, label: "read it all", kind: "quiet" as const }] : []),
   ];
 }
 
@@ -523,6 +524,7 @@ async function act($: any, id: string) {
     paneItem === id ? await $.ui.close({ id: PANE }) : await openAgent($, arg);
   else if (kind === "open") await openTarget($, arg);
   else if (kind === "close") await $.ui.close({ id: PANE });
+  else if (kind === "report") await showPane($, id);
   $.ui.invalidate("ui.render");
 }
 
@@ -670,10 +672,24 @@ export const register: Register = (on) => {
                 { id: "note:type", label: agent.type ?? "", kind: "note" },
                 close,
               ],
-              ...(view ? agentRows(view, agent.label) : []),
+              ...(view ? agentRows(view, agent.label, agent.id) : []),
             ],
             agents: [],
-            doc: paneText.has(item) ? tablesToLists(paneText.get(item)!) : "_running_",
+            doc: "",
+          }
+        : kind === "report"
+        ? {
+            chips: [],
+            body: [
+              [
+                { id: "title", label: paneAgent.get(`agent:${rest}`)?.label ?? "report", kind: "title" },
+                { id: "note:report", label: "report", kind: "note" },
+                { id: `agent:${rest}`, label: "back", kind: "quiet" },
+                close,
+              ],
+            ],
+            agents: [],
+            doc: tablesToLists(paneText.get(`agent:${rest}`) ?? ""),
           }
         : {
             chips: [],
