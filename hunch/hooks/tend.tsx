@@ -103,6 +103,11 @@ export function hasRun(ran: Set<string>, name: string): boolean {
   return ran.has(name) || [...ran].some((r) => r.endsWith(`:${name}`));
 }
 
+/** The command a prompt starts with: `/hope:intent x` gives `hope:intent`; a path like `/a/b.md` gives none. */
+export function slashName(text: string): string | undefined {
+  return text.match(/^\/([\w:-]+)(?:\s|$)/)?.[1];
+}
+
 /** The slash command a planned skill runs by, or undefined when none exists. */
 export function commandFor(names: string[], name: string): string | undefined {
   return names.find((n) => n === name) ?? names.find((n) => n.endsWith(`:${name}`));
@@ -347,9 +352,6 @@ const paneText = new Map<string, string>();
 const paneAgent = new Map<string, Row>();
 // Agents of a session this module no longer serves.
 const gone = new Set<string>();
-// Skills an agent called through the Skill tool, each awaiting its `skill.prompt`: that event
-// doesn't say whose loop it runs in, the tool call does.
-const agentSkills: string[] = [];
 // Teammates whose last turn ended; a tool call of theirs starts them again.
 const idle = new Set<string>();
 // What each opened agent was asked and returned: a wrong brief is the cheapest thing to catch.
@@ -491,10 +493,26 @@ async function showPane($: any, item: string) {
   if (!r.isPlaced) $.ui.toast(r.reason);
 }
 
-async function slash($: any, name: string): Promise<string | undefined> {
+async function command($: any, name: string): Promise<string | undefined> {
   const names = ((await $.command.list()) as { name: string }[]).map((c) => c.name);
-  const cmd = commandFor(names, name);
+  return commandFor(names, name);
+}
+
+async function slash($: any, name: string): Promise<string | undefined> {
+  const cmd = await command($, name);
   return cmd && `/${cmd} `;
+}
+
+// A skill the session itself runs moves the plan; a card skill is asked for its card. Called only
+// where the run is certain (its Skill tool call, a prompt that starts with its command), since
+// `skill.prompt` never reaches a user plugin where managed settings seat sec-default.
+async function skillRan($: any, name: string): Promise<string[]> {
+  const skill = await command($, name);
+  if (!skill) return [];
+  ran.add(skill);
+  planMoved = true;
+  await remember($);
+  return CARD_SKILLS.has(skill) ? [CARD_FORMAT] : [];
 }
 
 // A stem the user finishes and sends as their own words.
@@ -533,7 +551,6 @@ function reset() {
   views.clear();
   paneText.clear();
   typedFrom.clear();
-  agentSkills.length = 0;
   lastStem = "";
   planMoved = false;
   nextCmd = undefined;
@@ -592,27 +609,19 @@ export const register: Register = (on) => {
     return {};
   });
 
-  // A skill an agent runs is the agent's: it moves no plan and gets no card (AGENT_CARD asks its own).
-  on("skill.prompt", async ($, e, next) => {
-    const r = await next(e);
-    const theirs = agentSkills.indexOf(e.skill);
-    if (theirs >= 0) {
-      agentSkills.splice(theirs, 1);
-      return r;
-    }
-    ran.add(e.skill);
-    planMoved = true;
-    await remember($);
-    return CARD_SKILLS.has(e.skill) ? { text: `${r.text}\n\n${CARD_FORMAT}` } : r;
-  });
-
   // Every agent the session starts is asked to end on a card; an agent at work again is running and unread.
+  // A skill an agent runs is the agent's: it moves no plan and gets no card (AGENT_CARD asks its own).
   on("tool.call", async ($, e, next) => {
     if (!e.agentId && e.tool === "Agent" && typeof (e as any).prompt === "string")
       return next({ ...e, prompt: `${(e as any).prompt}\n\n${AGENT_CARD}` } as any);
+    const skill = (e as any).skill;
+    if (!e.agentId && e.tool === "Skill" && typeof skill === "string") {
+      const r = await next(e);
+      if (r.deny !== undefined) return r;
+      const asked = await skillRan($, skill);
+      return asked.length ? { ...r, context: [...(r.context ?? []), ...asked] } : r;
+    }
     if (!e.agentId) return next(e);
-    const skill = e.tool === "Skill" && (e as any).skill;
-    if (typeof skill === "string") agentSkills.push(skill);
     const id = e.agentId;
     if (idle.delete(id) || rows.some((x) => x.id === id && x.read)) {
       rows = rows.map(({ read, ...x }) => (x.id === id || !read ? x : { ...x, read }));
@@ -624,7 +633,12 @@ export const register: Register = (on) => {
 
   // The user's own prompt keeps a card already shown current: the model is asked for the keys this turn changes.
   on("prompt.submit", async ($, e, next) => {
-    if (e.origin.kind !== "composer") return next(e);
+    // A prompt that starts with a skill's command runs it, however the prompt arrived.
+    const name = slashName(e.text);
+    const asked = name ? await skillRan($, name) : [];
+    const withContext = (more: string[]) =>
+      more.length ? next({ ...e, context: [...(e.context ?? []), ...more] }) : next(e);
+    if (e.origin.kind !== "composer") return withContext(asked);
     // A sent `q2: …` answers question 2.
     const q = card.questions?.[Number(e.text.match(/^q(\d+):/)?.[1]) - 1];
     if (q) {
@@ -632,8 +646,8 @@ export const register: Register = (on) => {
       await remember($);
       $.ui.invalidate("ui.render");
     }
-    if (!Object.keys(card).length) return next(e);
-    return next({ ...e, context: [...(e.context ?? []), `Only if this turn settles or changes what the card holds:\n${CARD_FORMAT}`] });
+    if (asked.length || !Object.keys(card).length) return withContext(asked);
+    return withContext([`Only if this turn settles or changes what the card holds:\n${CARD_FORMAT}`]);
   });
 
   on("prompt.suggest", async ($, e, next) =>

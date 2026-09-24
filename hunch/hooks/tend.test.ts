@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import { fitsBox, hit, layout, move, navRows, wrap } from "./band.tsx";
-import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, latestCard, stripCards } from "./tend.tsx";
+import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, stripCards } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -190,6 +190,14 @@ test("a planned skill resolves to a real command, or none", async () => {
   expect(commandFor(names, "clarify")).toBe("hope:clarify");
   expect(commandFor(names, "hope:judge")).toBe("hope:judge");
   expect(commandFor(names, "nope")).toBeUndefined();
+});
+
+test("a prompt runs a command only when it starts with one", async () => {
+  expect(slashName("/hope:intent add retries")).toBe("hope:intent");
+  expect(slashName("/intent")).toBe("intent");
+  expect(slashName("/hope:intent.md is here")).toBeUndefined();
+  expect(slashName("/Users/me/notes.md")).toBeUndefined();
+  expect(slashName("run /hope:intent")).toBeUndefined();
 });
 
 test("long agent labels clipped", async () => {
