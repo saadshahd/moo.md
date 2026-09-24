@@ -188,6 +188,12 @@ export default function BandView(band: Band, surface: any) {
     }
     // Enter after a click, or Tab, meant the prompt: hand the keys back to it.
     else if (k.key === "return" || k.key === "tab") surface.post({ release: true });
+    // Esc past a focused button: drop the focus and close the pane through the same
+    // path as the pane's own close item, not a bespoke message.
+    else if (k.key === "escape") {
+      surface.setState({ ...now, nav: undefined });
+      surface.post({ act: "close" });
+    }
   });
   surface.onPointer((p: { type: string; x: number; y: number }) => {
     if (p.type !== "down") return;
