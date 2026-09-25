@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
-import { fitsBox, hit, layout, move, navRows, wrap } from "./band.tsx";
-import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, stripCards, unreadable } from "./tend.tsx";
+import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
+import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, stripCards, unreadable } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -77,7 +77,7 @@ test("a skill counts as run with or without its plugin prefix", async () => {
 
 test("a run skill is marked done, its label left bare", async () => {
   const [[run]] = cardRows({ skills: [{ name: "hope:judge", outcome: "v" }] } as any, "skills", new Set(), new Set(["hope:judge"]));
-  expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", state: "done" });
+  expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", state: "done", column: true });
 });
 test("a chip previews its card with one number", async () => {
   const c = {
@@ -101,19 +101,11 @@ test("a fact is a list item; in the pane it wraps under its bullet", async () =>
   expect(f.label).toBe("• alpha beta gamma delta");
   expect(wrap(f.label, 12)).toEqual(["• alpha beta", "  gamma", "  delta"]);
 });
-test("a card stays in the box while it wraps to at most 4 lines at the measure", async () => {
-  const rows = (n: number, words: number) =>
-    Array.from({ length: n }, (_, i) => [{ id: `l${i}`, label: "word ".repeat(words).trim(), kind: "line" as const }]);
-  expect(fitsBox(rows(4, 2), 200, 4)).toBe(true);
-  expect(fitsBox(rows(5, 2), 200, 4)).toBe(false);
-  expect(fitsBox(rows(1, 80), 200, 4)).toBe(true); // 400 chars: 4 lines at 116
-  expect(fitsBox(rows(1, 100), 200, 4)).toBe(false); // 500 chars: 5 lines
-});
 test("a card line wraps at the measure; chips never wrap", async () => {
   const body = [[{ id: "probe:intent", label: "word ".repeat(40).trim(), kind: "line" as const }]];
   const lines = layout({ chips: [], body, doc: "" }, 300);
-  expect(lines.length).toBe(2);
-  expect(lines.every((l) => l.cells[0].text.length <= 120)).toBe(true);
+  expect(lines.length).toBe(3);
+  expect(lines.every((l) => l.cells[0].text.length <= 76)).toBe(true);
 });
 test("a teammate's pane reads its summary and its SendMessage, never the wrapper", async () => {
   const v = agentView([
@@ -147,6 +139,52 @@ test("an agent's pane reads like the session's card: intent, outcome, watch, fac
     ["report", "read it all"],
   ]);
   expect(rows.map((r) => r[1].id)).toEqual(["probe:counter intent", "probe:counter outcome", "open:/tmp/wc.py", "probe:counter fact 1", "report:a1"]);
+});
+test("a fact reads as its claim, then the rest dim under it, a blank line between facts", async () => {
+  expect(factParts("Suno sings. ACE Studio lost because it has no Arabic.")).toEqual(["Suno sings.", "ACE Studio lost because it has no Arabic."]);
+  const rows = cardRows({ facts: ["Suno sings. ACE lost.", "One claim"] } as any, "facts", new Set(), new Set());
+  expect(rows.map((r) => r.map((i) => [i.label, i.kind, i.indent ?? 0]))).toEqual([
+    [["• Suno sings.", "line", 0]],
+    [["ACE lost.", "note", 2]],
+    [],
+    [["• One claim", "line", 0]],
+  ]);
+});
+test("questions are a list, each with its answers as a clickable list under it; long ones wrap, none cut", async () => {
+  const card = { questions: [
+    { q: "In your Suno account, is 8345526f a Voice or a Style Persona?", options: ["Voice", "Style Persona"] },
+    { q: "May each song folder commit its band code?", options: ["Yes, add it to CLAUDE.md", "No, keep it untracked"] },
+  ] };
+  const lines = layout({ chips: [], body: cardRows(card, "questions", new Set(), new Set()), doc: "" }, 40);
+  const text = lines.map((l) => " ".repeat(l.cells[0]?.x ?? 0) + l.cells.map((c) => c.text).join(""));
+  expect(text).toEqual([
+    "• In your Suno account, is 8345526f a",
+    "  Voice or a Style Persona?",
+    "  ◦ Voice",
+    "  ◦ Style Persona",
+    "",
+    "• May each song folder commit its band",
+    "  code?",
+    "  ◦ Yes, add it to CLAUDE.md",
+    "  ◦ No, keep it untracked",
+  ]);
+});
+test("a table's first column takes its widest cell; the next column wraps inside itself", async () => {
+  const card = { skills: [
+    { name: "hope:clarify", outcome: "reading A confirmed" },
+    { name: "mattpocock-skills:research", outcome: "three cited research files" },
+    { name: "hope:intent", outcome: "the audit of memory, CLAUDE.md and skills against the settled route" },
+  ] };
+  const lines = layout({ chips: [], body: cardRows(card, "skills", new Set(), new Set()), doc: "" }, 80);
+  const outcomeX = lines.map((l) => l.cells.at(-1)!.x);
+  expect(new Set(outcomeX).size).toBe(1);
+  expect(outcomeX[0]).toBe("mattpocock-skills:research".length + 2);
+  expect(lines.length).toBe(4);
+});
+test("an item that won't fit the rest of its line starts the next one", async () => {
+  const body: Item[][] = [[{ id: "a", label: "x".repeat(30), kind: "line" }, { id: "b", label: "y".repeat(20), kind: "quiet" }, { id: "c", label: "z", kind: "quiet" }]];
+  const lines = layout({ chips: [], body, doc: "" }, 40);
+  expect(lines.map((l) => l.cells.map((c) => c.text))).toEqual([["x".repeat(30)], ["y".repeat(20), "z"]]);
 });
 test("in the pane a row's last item runs on below itself, aligned", async () => {
   const body = [[{ id: "n", label: "facts    ", kind: "note" as const }, { id: "f", label: "• " + "word ".repeat(12).trim(), kind: "line" as const }]];
@@ -214,8 +252,7 @@ test("fact source prefix stripped", async () => {
 const model = (card: object, open: string | null = null, rows: object[] = []) =>
   bandModel({
     card: card as any,
-    open,
-    paneItem: null,
+    paneItem: open && `card:${open}`,
     answered: new Set(),
     ran: new Set(),
     rows: rows as any,
@@ -229,10 +266,10 @@ describe("band", () => {
     const b = model({ intent: "x", questions: [{ q: "a?", options: ["y"] }] });
     expect(b.chips.map((c) => c.id)).toEqual(["chip:intent", "chip:questions"]);
   });
-  test("an open card marks its chip and fills the body", async () => {
+  test("a card in the pane marks its chip; the band never opens it above the chips", async () => {
     const b = model({ facts: ["a", "b"] }, "facts");
     expect(b.chips[0].open).toBe(true);
-    expect(b.body.map((r) => r[0].id)).toEqual(["probe:fact 1", "probe:fact 2"]);
+    expect(b.body).toEqual([]);
   });
   test("no undefined anywhere: Client props refuse it", async () => {
     const b = model({ intent: "x", facts: ["a"] }, "facts", [{ id: "a", label: "l", done: true }]);
@@ -255,23 +292,37 @@ describe("band", () => {
     });
     expect(rows).toEqual([[{ id: "agent:a1", label: "l", kind: "line", state: "done", read: true, open: true }]]);
   });
-  test("a question row: the question, then its answers", async () => {
+  test("intent and shape read as padded paragraphs, one per sentence, a blank line apart", async () => {
+  const intent = "Fix the pane. Each card reads in it; nothing opens above the chips.";
+  const lines = layout({ chips: [], body: cardRows({ intent }, "intent", new Set(), new Set()), doc: "" }, 72);
+  expect(lines.map((l) => [l.cells[0].x, l.cells[0].text])).toEqual([
+    [2, "Fix the pane."],
+    [2, ""],
+    [2, "Each card reads in it;"],
+    [2, ""],
+    [2, "nothing opens above the chips."],
+  ]);
+  expect(new Set(lines.map((l) => l.cells[0].item.id))).toEqual(new Set(["probe:intent"]));
+});
+test("a question's rows: the question, then each answer", async () => {
     const rows = cardRows(
       { questions: [{ q: "a?", options: ["x", "y"] }] },
       "questions",
       new Set(),
       new Set(),
     );
-    expect(rows[0].map((i) => i.id)).toEqual(["probe:q1", "answer:0:0", "answer:0:1"]);
+    expect(rows.map((r) => r.map((i) => i.id))).toEqual([["probe:q1"], ["answer:0:0"], ["answer:0:1"]]);
   });
 });
 
 describe("arrows", () => {
-  const b = model({ facts: ["a", "b"], intent: "x" }, "facts", [
-    { id: "a1", label: "count", done: true },
-  ]);
+  // The facts pane over a row of chips: the arrows and clicks read any band the same way.
+  const b = {
+    ...model({ facts: ["a", "b"], intent: "x" }, "facts", [{ id: "a1", label: "count", done: true }]),
+    body: cardRows({ facts: ["a", "b"] }, "facts", new Set(), new Set()),
+  };
   const rows = navRows(b);
-  test("rows as drawn: each card line, then the chips under them", async () => {
+  test("rows as drawn: each card line, then the chips; a blank line is no stop", async () => {
     expect(rows.map((r) => r.map((i) => i.id))).toEqual([
       ["probe:fact 1"],
       ["probe:fact 2"],
@@ -285,34 +336,26 @@ describe("arrows", () => {
     expect(move({ row: 0, col: 0 }, rows, "up")).toEqual({ row: 0, col: 0 });
     expect(move({ row: 1, col: 0 }, rows, "down")).toEqual({ row: 2, col: 1 }); // back on the open chip
   });
-  test("a click lands on the item drawn there; the chips sit under the box", async () => {
+  test("a click lands on the item drawn there", async () => {
     const cells = layout(b, 80);
-    expect(cells.map((l) => l.y)).toEqual([1, 2, 4]); // the box's borders take rows 0 and 3
-    // box top border at y=0; facts at y=1, 2, x=2; chips row "[ intent ] [ ▴ facts ]" at y=4
-    expect(hit(cells, 2, 1)?.id).toBe("probe:fact 1");
-    expect(hit(cells, 2, 2)?.id).toBe("probe:fact 2");
-    expect(hit(cells, 3, 4)?.id).toBe("chip:intent");
-    expect(hit(cells, 12, 4)?.id).toBe("chip:facts");
-    expect(hit(cells, 40, 1)).toBeUndefined();
+    expect(cells.map((l) => l.y)).toEqual([0, 1, 2, 3]);
+    // facts at y=0 and 2 around the blank line; chips "[ intent ] [ ▴ facts ]" at y=3
+    expect(hit(cells, 0, 0)?.id).toBe("probe:fact 1");
+    expect(hit(cells, 0, 1)).toBeUndefined();
+    expect(hit(cells, 0, 2)?.id).toBe("probe:fact 2");
+    expect(hit(cells, 1, 3)?.id).toBe("chip:intent");
+    expect(hit(cells, 12, 3)?.id).toBe("chip:facts");
+    expect(hit(cells, 40, 0)).toBeUndefined();
   });
-  test("the chips are the band's last line, open or closed: they never move under the pointer", async () => {
-    const closed = layout(model({ facts: ["a", "b"] }), 80);
-    const opened = layout(model({ facts: ["a", "b"] }, "facts"), 80);
-    expect(closed.at(-1)?.part).toBe("chips");
-    expect(opened.at(-1)?.part).toBe("chips");
-  });
-  test("a word wider than the box is the one thing clipped", async () => {
-    const wide = model({ facts: ["x".repeat(100)] }, "facts");
+  test("a word wider than the line is the one thing clipped", async () => {
+    const wide = { chips: [], body: cardRows({ facts: ["x".repeat(100)] }, "facts", new Set(), new Set()), doc: "" };
     const cell = layout(wide, 40).flatMap((l) => l.cells).find((c) => c.item.id === "probe:fact 1")!;
-    expect(cell.x + cell.text.length).toBeLessThanOrEqual(38);
+    expect(cell.x + cell.text.length).toBeLessThanOrEqual(40);
     expect(cell.text.endsWith("…")).toBe(true);
   });
   test("notes are read, never focused", async () => {
-    const skills = model(
-      { skills: [{ name: "hope:judge", outcome: "verdict" }] },
-      "skills",
-    );
-    expect(navRows(skills)[0].map((i) => i.id)).toEqual(["skill:0"]);
+    const body = cardRows({ skills: [{ name: "hope:judge", outcome: "verdict" }] }, "skills", new Set(), new Set());
+    expect(navRows({ chips: [], body, doc: "" })[0].map((i) => i.id)).toEqual(["skill:0"]);
   });
 });
 

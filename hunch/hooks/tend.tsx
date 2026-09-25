@@ -1,5 +1,5 @@
 import type { Register } from "claude-code";
-import { fitsBox, MEASURE, type Band, type Item } from "./band.tsx";
+import { MEASURE, type Band, type Item } from "./band.tsx";
 
 export type Card = {
   intent?: string;
@@ -37,7 +37,6 @@ const CARD_SKILLS = new Set([
   "hope:compose",
 ]);
 const CARD_RE = /```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
-const BOX_LINES = 4;
 const PANE = "tend";
 
 const PAD = 2;
@@ -229,6 +228,21 @@ export function fromFile(file: string, href: string): string {
 const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
 const quiet = (id: string, label: string): Item => ({ id, label, kind: "quiet" });
 const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
+const under = (i: Item): Item => ({ ...i, indent: 2 });
+const column = (i: Item): Item => ({ ...i, column: true });
+// Entries a blank line apart, so each reads as one.
+const spaced = (entries: Item[][][]): Item[][] => entries.flatMap((e, i) => (i ? [[], ...e] : e));
+
+/** A text's sentences, a clause after a semicolon counting as one. */
+export function sentences(text: string): string[] {
+  return text.split(/(?<=[.!?])\s+(?=[A-Z])|(?<=;)\s+/);
+}
+
+/** A fact's first sentence, then the rest of it: the claim, then what lost and why. */
+export function factParts(f: string): [string, string] {
+  const [head, ...rest] = sentences(bareFact(f));
+  return [head, rest.join(" ")];
+}
 
 /** An agent's pane as a card: intent, outcome, where to look, the facts it rests on; the full
  * report one click further. */
@@ -259,6 +273,8 @@ export function chipLabel(name: string, s: Shown): string {
     const planned = s.card.skills ?? [];
     return `skills ${planned.filter((k) => hasRun(s.ran, k.name)).length}/${planned.length}`;
   }
+  if (name === "facts") return `facts ${s.card.facts?.length ?? 0}`;
+  if (name === "questions") return `questions ${(s.card.questions ?? []).filter((q) => !s.answered.has(q.q)).length}`;
   return `${name} ${chipRows(name, s).length}`;
 }
 
@@ -270,25 +286,33 @@ export function cardRows(
   ran: Set<string>,
 ): Item[][] {
   if (name === "intent" || name === "shape")
-    return c[name] ? [[line(`probe:${name}`, c[name]!)]] : [];
+    // Each sentence its own paragraph, set in from the pane's edge.
+    return c[name] ? [[under(line(`probe:${name}`, sentences(c[name]!).join("\n\n")))]] : [];
   if (name === "facts")
-    return (c.facts ?? []).map((f, i) => [line(`probe:fact ${i + 1}`, `• ${bareFact(f)}`)]);
+    return spaced(
+      (c.facts ?? []).map((f, i) => {
+        const [head, rest] = factParts(f);
+        return [[line(`probe:fact ${i + 1}`, `• ${head}`)], ...(rest ? [[under(note(`fact-note:${i}`, rest))]] : [])];
+      }),
+    );
   if (name === "questions")
-    return (c.questions ?? []).flatMap((q, i) =>
-      answered.has(q.q)
-        ? []
-        : [[line(`probe:q${i + 1}`, q.q), ...q.options.map((o, j) => quiet(`answer:${i}:${j}`, o))]],
+    return spaced(
+      (c.questions ?? []).flatMap((q, i) =>
+        answered.has(q.q)
+          ? []
+          : [[[line(`probe:q${i + 1}`, `• ${q.q}`)], ...q.options.map((o, j) => [under(line(`answer:${i}:${j}`, `◦ ${o}`))])]],
+      ),
     );
   if (name === "skills")
     return (c.skills ?? []).map((k, i) => [
-      { ...line(`skill:${i}`, k.name), ...(hasRun(ran, k.name) ? { state: "done" as const } : {}) },
+      column({ ...line(`skill:${i}`, k.name), ...(hasRun(ran, k.name) ? { state: "done" as const } : {}) }),
       note(`skill-note:${i}`, k.outcome),
     ]);
   if (name === "watch")
     return (c.watch ?? []).map((w, i) => [
-      line(`watch:${i}`, w.label),
-      ...(w.see ? [note(`watch-note:${i}`, w.see)] : []),
+      column(line(`watch:${i}`, w.label)),
       quiet(`probe:watch ${i + 1}`, "?"),
+      ...(w.see ? [note(`watch-note:${i}`, w.see)] : []),
     ]);
   return [];
 }
@@ -307,9 +331,6 @@ function agentItem(r: Row, paneItem: string | null): Item {
 /** What the band draws from. */
 export type Shown = { card: Card; answered: Set<string>; ran: Set<string>; rows: Row[]; paneItem: string | null };
 
-/** Chips whose rows only ever read in the pane: agents, a list then each one's card. */
-export const PANE_ONLY = new Set(["agents"]);
-
 /** The chip a pane item belongs to: a card's own, or agents for an agent's card or report. */
 export function paneChip(paneItem: string | null): string | undefined {
   const [kind, ...rest] = (paneItem ?? "").split(":");
@@ -323,7 +344,8 @@ export function chipRows(name: string, s: Shown): Item[][] {
     : cardRows(s.card, name, s.answered, s.ran);
 }
 
-export function bandModel(s: Shown & { open: string | null }): Band {
+/** The band is its chips alone: every card reads in the pane. */
+export function bandModel(s: Shown): Band {
   const shown = CHIPS.filter((n) => chipRows(n, s).length > 0);
   return {
     doc: "",
@@ -332,11 +354,11 @@ export function bandModel(s: Shown & { open: string | null }): Band {
       label: chipLabel(n, s),
       kind: "chip",
       // Client props refuse undefined, so an unmarked chip has no key at all.
-      ...(s.open === n || paneChip(s.paneItem) === n ? { open: true as const } : {}),
+      ...(paneChip(s.paneItem) === n ? { open: true as const } : {}),
       // While any agent works, its chip says so.
       ...(n === "agents" && s.rows.some((r) => !r.done) ? { state: "running" as const } : {}),
     })),
-    body: s.open && shown.includes(s.open as (typeof CHIPS)[number]) ? chipRows(s.open, s) : [],
+    body: [],
   };
 }
 
@@ -344,7 +366,6 @@ export function bandModel(s: Shown & { open: string | null }): Band {
 
 let card: Card = {};
 let rows: Row[] = [];
-let open: string | null = null;
 let paneItem: string | null = null;
 let lastPaneItem: string | null = null;
 const answered = new Set<string>();
@@ -365,7 +386,6 @@ let started = false;
 let sessionId = "";
 // Bumped to hand the keys back to the prompt: the Client redraws under a new key.
 let fills = 0;
-let bandColumns = 80;
 // The stem last put in the box, to swap while it stands bare.
 let lastStem = "";
 // How much of each Client's typed text has reached the prompt, by the Client's key.
@@ -547,7 +567,6 @@ function reset() {
   for (const r of rows) gone.add(r.id);
   card = {};
   rows = [];
-  open = null;
   paneItem = null;
   lastPaneItem = null;
   answered.clear();
@@ -566,13 +585,8 @@ async function act($: any, id: string) {
   const [kind, ...rest] = id.split(":");
   const arg = rest.join(":");
   if (kind === "chip") {
-    // A card that won't fit the box, too many lines or one too long, reads in the pane.
-    const shown = { card, answered, ran, rows, paneItem };
     if (paneItem === `card:${arg}`) await $.ui.close({ id: PANE });
-    else if (PANE_ONLY.has(arg) || (open !== arg && !fitsBox(chipRows(arg, shown), bandColumns, BOX_LINES))) {
-      open = null;
-      await showPane($, `card:${arg}`);
-    } else open = open === arg ? null : arg;
+    else await showPane($, `card:${arg}`);
   } else if (kind === "probe") await fill($, `${arg}: `);
   else if (kind === "answer") {
     const [i, j] = rest.map(Number);
@@ -721,8 +735,7 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    bandColumns = e.props.bodyColumns;
-    const band = bandModel({ card, open, paneItem, answered, ran, rows });
+    const band = bandModel({ card, paneItem, answered, ran, rows });
     if (!band.chips.length) return <Box />;
     return (
       <Box>
@@ -777,6 +790,7 @@ export const register: Register = (on) => {
                 { id: "chip:agents", label: "back", kind: "quiet" },
                 close,
               ],
+              [],
               ...(view ? agentRows(view, agent.label, agent.id) : []),
             ],
             doc: "",
@@ -798,6 +812,7 @@ export const register: Register = (on) => {
             chips: [],
             body: [
               [{ id: "title", label: kind === "card" ? rest : (rest.split("/").pop() ?? rest), kind: "title" }, close],
+              [],
               ...(kind === "card"
                 ? chipRows(rest, { card, answered, ran, rows, paneItem })
                 : links(paneText.get(item) ?? "").map((href) => fromFile(rest, href)).map((l, i) => [

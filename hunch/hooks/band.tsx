@@ -11,12 +11,16 @@ export type Item = {
   state?: "done" | "running";
   /** An agent already read: kept for reopening, drawn dim. */
   read?: true;
+  /** A row's first item sits this far in: an answer under its question. */
+  indent?: number;
+  /** A card's first column: every such cell takes the widest one's width, so the rows read as a table. */
+  column?: true;
 };
 /** `doc`: markdown read below the rows (the pane's result or file); "" for none. */
 export type Band = { chips: Item[]; body: Item[][]; doc: string };
 
-/** The widest a card's line runs, in the band's box or the pane: past it, text is hard to read back. */
-export const MEASURE = 120;
+/** The pane's width, padding included: its text runs about 72 characters, past which a line is hard to read back. */
+export const MEASURE = 76;
 /** `nav`: the arrows have moved it, so Enter acts here rather than meaning the prompt. */
 export type Focus = { row: number; col: number; nav?: true };
 export type Cell = { item: Item; text: string; x: number; y: number };
@@ -71,67 +75,76 @@ const textOf = (i: Item) => {
   return p.pre + p.label + p.glyph + p.post;
 };
 
-// The card body sits in a box only with chips (the pane shows it bare).
-const boxed = (b: Band) => b.chips.length > 0 && b.body.length > 0;
-
 export type Line = {
   part: "chips" | "body";
-  gap: number;
-  /** Where the line's row starts; a run-on line's first cell sits further in. */
-  x0: number;
   y: number;
   cells: Cell[];
 };
 
-/** The one row plan: every line and where each item sits in it; a card line wraps at the measure. */
+/** The one row plan: every line and where each item sits in it. In a card, an item that won't
+ * fit the rest of its line starts the next one, and one wider than a line wraps at its column. */
 export function layout(b: Band, columns: number): Line[] {
-  const box = boxed(b);
   const lines: Line[] = [];
   let y = 0;
   const place = (
     part: Line["part"],
     items: Item[],
-    x0: number,
     gap: number,
     width = columns,
+    column = 0,
   ) => {
-    const cells: Cell[] = [];
-    let x = x0;
+    const start = items[0]?.indent ?? 0;
+    let cells: Cell[] = [];
+    let x = start;
+    const end = () => {
+      lines.push({ part, y: y++, cells });
+      cells = [];
+      x = start;
+    };
+    // A table row keeps its columns: what follows the first wraps inside its own.
+    const flows = part === "body" && !(column && items[0]?.column);
     for (const [n, item] of items.entries()) {
-      const left = width - x0 - x;
-      if (left <= 1) break;
       const full = textOf(item);
+      if (flows && cells.length && full.length > width - x && full.length <= width - start) end();
+      const left = width - x;
+      if (left <= 1) break;
       // Wrapping, the row's last item runs on below itself, aligned at its column.
-      if (part === "body" && n === items.length - 1 && full.length > left) {
+      if (part === "body" && n === items.length - 1 && (full.length > left || full.includes("\n"))) {
+        const at = x;
         const [head, ...rest] = wrap(full, left);
         cells.push({ item, text: head, x, y });
-        lines.push({ part, gap, x0, y: y++, cells });
-        for (const text of rest) lines.push({ part, gap, x0, y, cells: [{ item, text, x, y: y++ }] });
+        end();
+        for (const text of rest) lines.push({ part, y, cells: [{ item, text, x: at, y: y++ }] });
         return;
       }
       const text = full.length > left ? `${full.slice(0, left - 1)}…` : full;
       cells.push({ item, text, x, y });
-      x += text.length + gap;
+      x += Math.max(text.length, item.column ? column : 0) + gap;
     }
-    lines.push({ part, gap, x0, y: y++, cells });
+    end();
   };
-  // The card opens above its chips: the band grows upward from the prompt, so the chips
-  // stay put under the pointer while a card opens, closes or changes.
-  if (box) y++; // the box's top border
-  for (const r of b.body) place("body", r, box ? 2 : 0, 2, Math.min(columns, MEASURE));
-  if (box) y++; // its bottom border
-  if (b.chips.length) place("chips", b.chips, 0, 1);
+  // A first column wider than half the line would squeeze the rest: its rows flow instead.
+  const measure = Math.min(columns, MEASURE);
+  const widest = Math.max(0, ...b.body.flat().filter((i) => i.column).map((i) => textOf(i).length));
+  const column = widest <= measure / 2 ? widest : 0;
+  for (const r of b.body) place("body", r, 2, measure, column);
+  if (b.chips.length) place("chips", b.chips, 1);
   return lines;
 }
 
-/** Words into lines of at most `width`; a list item's later lines hang under its text. */
+/** Words into lines of at most `width`; a list item's later lines hang under its text, and a
+ * blank line in the text stays a blank line. */
 export function wrap(text: string, width: number): string[] {
-  const hang = text.startsWith("• ") ? "  " : "";
+  return text.split("\n").flatMap((p) => (p.trim() ? wrapLine(p, width) : [""]));
+}
+
+function wrapLine(text: string, width: number): string[] {
+  const hang = /^[•◦] /.test(text) ? "  " : "";
   const out: string[] = [];
   let cur = "";
   const words = text.split(" ").filter(Boolean);
   // A bullet stays with its first word.
-  if (hang && words.length > 1) words.splice(0, 2, `• ${words[1]}`);
+  if (hang && words.length > 1) words.splice(0, 2, `${words[0]} ${words[1]}`);
   for (const w of words) {
     if (!cur) cur = (out.length ? hang : "") + w;
     else if (cur.length + 1 + w.length <= width) cur += ` ${w}`;
@@ -143,12 +156,6 @@ export function wrap(text: string, width: number): string[] {
   if (cur) out.push(cur);
   // A word wider than the line is the one thing still clipped.
   return out.map((l) => (l.length > width ? `${l.slice(0, width - 1)}…` : l));
-}
-
-/** Whether a card's rows, wrapped in the band's box, take at most `most` lines. The rest go to the pane. */
-export function fitsBox(rows: Item[][], columns: number, most: number): boolean {
-  return layout({ chips: [{ id: "", label: "", kind: "chip" }], body: rows, doc: "" }, columns)
-    .filter((l) => l.part === "body").length <= most;
 }
 
 export function hit(lines: Line[], x: number, y: number): Item | undefined {
@@ -204,7 +211,7 @@ export default function BandView(band: Band, surface: any) {
   // Colour carries state only, by theme key so it follows the user's theme:
   // what is open in the engine's selection blue, ✓ and ● in their colours.
   // Brackets recede so the words stand; hover marks what takes a click.
-  const draw = (c: Cell) => {
+  const draw = (c: Cell, marginLeft: number) => {
     const i = c.item;
     const p = pieces(i);
     const style: Record<string, unknown> = {};
@@ -223,32 +230,21 @@ export default function BandView(band: Band, surface: any) {
     if (i.kind === "title") style.bold = true;
     if (focusable(i)) style.hover = { color: "suggestion" };
     if (i.id === at) style.inverse = true;
-    return Box({ key: `c-${i.id}`, children: [Text(style)] });
+    return Box({ key: `c-${i.id}`, marginLeft, children: [Text(style)] });
   };
   const row = (l: Line) =>
     Box({
       key: `y-${l.y}`,
       flexDirection: "row",
-      paddingLeft: (l.cells[0]?.x ?? l.x0) - l.x0,
-      gap: l.gap,
-      children: l.cells.map(draw),
+      // A blank line holds its row, so what's drawn stays where a click is read.
+      height: 1,
+      // Each cell sits at its planned x: a column's padding is space, not text.
+      children: l.cells.map((c, n) => draw(c, c.x - (n ? l.cells[n - 1].x + l.cells[n - 1].text.length : 0))),
     });
   const body = lines.filter((l) => l.part === "body").map(row);
   const out = [
     ...(body.length
-      ? [
-          boxed(band)
-            ? Box({
-                key: "body",
-                width: Math.min(surface.columns || 200, MEASURE),
-                borderStyle: "round",
-                borderColor: "subtle",
-                paddingX: 1,
-                flexDirection: "column",
-                children: body,
-              })
-            : Box({ key: "body", flexDirection: "column", children: body }),
-        ]
+      ? [Box({ key: "body", flexDirection: "column", children: body })]
       : []),
     ...lines.filter((l) => l.part === "chips").map(row),
     ...(band.doc
