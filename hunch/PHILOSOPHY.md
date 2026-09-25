@@ -16,7 +16,7 @@ A staging ground is not a destination. Anything that lives here forever is a hoa
 
 ## Constraints
 
-- **Entry is cheap** — a rough SKILL.md and one line saying what better looks like. No eval required to try.
+- **Entry is cheap** — a rough SKILL.md plus a HYPOTHESIS.md that says what better looks like, when the experiment graduates, and what result kills it. No eval required to try.
 - **Exit is honest** — at every release, each experiment either graduates (into hope, sound, or its own plugin), stays with a stated reason, or dies.
 - **Judgment-leaning experiments graduate only with a measured pass-rate** — never from one good run.
 - **Version stays 0.x for the plugin's lifetime** — graduation is the only 1.0.
