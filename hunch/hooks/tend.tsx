@@ -216,6 +216,11 @@ export function placeName(target: string): string {
   return target.split("/").pop() || target;
 }
 
+/** What a pane shows for a file it could not read: a missing file is one not written yet. */
+export function unreadable(path: string, err: unknown): string {
+  return /\bENOENT\b/.test(String(err)) ? `_not written yet: ${path}_` : `_${String(err)}_`;
+}
+
 /** A link read in a file, as a place to open: relative ones sit beside the file. */
 export function fromFile(file: string, href: string): string {
   return href.startsWith("/") || href.includes("://") ? href : `${file.slice(0, file.lastIndexOf("/") + 1)}${href}`;
@@ -486,7 +491,7 @@ async function showPane($: any, item: string) {
   if (item.startsWith("file:"))
     await $.fs.read(item.slice(5)).then(
       (t: string) => paneText.set(item, t),
-      (err: unknown) => paneText.set(item, `_${String(err)}_`),
+      (err: unknown) => paneText.set(item, unreadable(item.slice(5), err)),
     );
   $.ui.invalidate("ui.render");
   const r = await opened;

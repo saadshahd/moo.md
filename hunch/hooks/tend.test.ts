@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import { fitsBox, hit, layout, move, navRows, wrap } from "./band.tsx";
-import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, stripCards } from "./tend.tsx";
+import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, stripCards, unreadable } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -313,5 +313,16 @@ describe("arrows", () => {
       "skills",
     );
     expect(navRows(skills)[0].map((i) => i.id)).toEqual(["skill:0"]);
+  });
+});
+
+describe("unreadable", () => {
+  test("a missing file reads as not written yet", async () => {
+    const err = "HooksError: hunch: $.fs.read(/a/b.md) failed: ENOENT";
+    expect(unreadable("/a/b.md", err)).toBe("_not written yet: /a/b.md_");
+  });
+  test("any other failure shows as it came", async () => {
+    const err = "HooksError: hunch: $.fs.read(/a/b.md) failed: EACCES";
+    expect(unreadable("/a/b.md", err)).toBe(`_${err}_`);
   });
 });
