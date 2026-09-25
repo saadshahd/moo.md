@@ -42,7 +42,7 @@ Phrase design decisions as "X over Y: reason".
 | Data selected per use (catalog, profile, corpus) | Runtime file |
 | A trigger + procedure that stands alone | Skill |
 | A trigger only the human perceives | Skill with `disable-model-invocation: true` |
-| Behavior that must run every time, deterministically | Hook |
+| Behavior that must run every time, deterministically | Function hook |
 | An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
 | Doctrine for this repo's own surfaces | Repo-local skill in `.claude/skills/`; never ships |
 
@@ -66,14 +66,14 @@ A cap counted in lines is a compression budget on a handed-back artifact — rep
 
 ## Hook Design
 
-Hooks run beside the thread, never in front of it — they never gate.
+Every hook is a function hook: it reaches the human with no model turn. The API is early access; `plugin-authoring` and `/plugin-types` are the reference for every event and call.
 
-Mode = two questions: does the foreground need the result, and now?
+- A hook never starts a turn the human didn't ask for: no wake, no `$.prompt.submit` of its own.
+- What a hook finds waits where the human looks next, the band above the prompt, and appears there only while it holds something. Detail unfolds on a press and folds back.
+- A hook hands to Claude only on the human's Enter: `$.prompt.fill` a sentence start they finish, with any bulk added as `prompt.submit` context.
+- Work longer than one dispatch runs unawaited, so the turn's end is never held.
+- State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files or module variables. A hot reload drops module variables.
+- A failure shows once, as a toast, and the event passes on.
+- One hooks module per plugin; a second part composes into it. A second registration on the same event and matcher in one plugin is dropped silently.
 
-| Mode | When |
-|---|---|
-| Sync inject | Few lines of framing, computed instantly |
-| `async` — fire-and-forget | Side effect only; surfaces as a file change, never re-engages the thread |
-| `asyncRewake` — fire-and-maybe-wake | Off-thread check; exit 2 wakes Claude on a finding, exit 0 stays silent |
-
-A hook that spawns headless `claude -p` copies its flag set from the two shipped hooks, where each flag is commented at the point of use (`hope/hooks/judge.sh`, `hope/hooks/memory-write.sh`), and keeps its verdict logic in one file shared with its eval harness.
+A hook that spawns headless `claude -p` copies its flag set from `hope/hooks/judge.sh`, where each flag is commented at the point of use.

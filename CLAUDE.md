@@ -12,7 +12,7 @@ Authoring doctrine for this repo's own skills, hooks, and runtime files lives in
 
 **YAML.** Multi-line YAML blocks (`|`, `>`) in frontmatter are truncated by Claude Code, which silently breaks auto-triggering.
 
-**Hooks always fail open:** exit 0 with valid JSON on any error. A hook that fails closed silently disables itself for every future session.
+**Hooks always fail open:** on any error, pass the event on and show the failure once. A hook that fails closed blocks what it wraps in every future session.
 
 > **Enforcement:** nothing here is mechanically checked — the repo has no doc gate, and no shell file in this repo is checked by anything.
 
@@ -28,7 +28,7 @@ See `hope/PHILOSOPHY.md` for hope beliefs, principles, and constraints — inclu
 A skill or hook that leans on a model's judgment (a judge, a generated artifact, an LLM check) has a correctness **rate**, not a guarantee. Its failure mode is a confident, valid-shaped wrong answer no enumerable error case names.
 
 - NEVER claim such a boundary "works" from a single run, or model its failures as a finite set you've "handled."
-- DO fence it with a deterministic check where one exists, and measure its pass-rate on a labeled set before trusting it (`seed`'s eval workspace IS this; a `slop-nudge`-style judge NEEDS it).
+- DO fence it with a deterministic check where one exists, and measure its pass-rate on a labeled set before trusting it (`seed`'s eval workspace IS this; a judge like `hope/hooks/judge.sh` NEEDS it).
 
 ## Anti-Patterns
 
