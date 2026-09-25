@@ -1,6 +1,6 @@
-import { describe, expect, test } from "claude-code/testing";
+import { describe, expect, mock, test } from "claude-code/testing";
 import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, stripCards, unreadable } from "./tend.tsx";
+import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -44,6 +44,12 @@ describe("card parse", () => {
   });
 });
 
+test("a card quoted in a reply is shown, and so is everything after it", async () => {
+  const reply = 'It said:\n> ```card\n> {"intent":"x"}\n> ```\n\nPart of this is stale.';
+  expect(stripCards(reply)).toBe(reply);
+  expect(latestCard([said(reply)])).toEqual({});
+});
+
 test("card block hidden, closed or still streaming", async () => {
   expect(stripCards(block('{"intent":"x"}'))).toBe("reply");
   expect(stripCards('reply\n```card\n{"intent":"x","fa')).toBe("reply");
@@ -76,7 +82,7 @@ test("a skill counts as run with or without its plugin prefix", async () => {
 });
 
 test("a run skill is marked done, its label left bare", async () => {
-  const [[run]] = cardRows({ skills: [{ name: "hope:judge", outcome: "v" }] } as any, "skills", new Set(), new Set(["hope:judge"]));
+  const [[run]] = cardRows({ skills: [{ name: "hope:judge", outcome: "v" }] } as any, "skills", new Set(["hope:judge"]));
   expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", state: "done", column: true });
 });
 test("a chip previews its card with one number", async () => {
@@ -86,18 +92,17 @@ test("a chip previews its card with one number", async () => {
     questions: [{ q: "x", options: [] }, { q: "y", options: [] }],
     skills: [{ name: "hope:intent" }, { name: "hope:draft" }],
   } as any;
-  const s = (answered: string[] = [], ran: string[] = []) =>
-    ({ card: c, answered: new Set(answered), ran: new Set(ran), rows: [], paneItem: null });
+  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null });
   expect(chipLabel("intent", s())).toBe("intent");
   expect(chipLabel("facts", s())).toBe("facts 2");
-  expect(chipLabel("questions", s(["x"]))).toBe("questions 1");
-  expect(chipLabel("skills", s([], ["hope:intent"]))).toBe("skills 1/2");
+  expect(chipLabel("questions", s())).toBe("questions 2");
+  expect(chipLabel("skills", s(["hope:intent"]))).toBe("skills 1/2");
 });
 test("first line: the first non-empty one, trimmed", async () => {
   expect(firstLine("\n  find the parser \nmore")).toBe("find the parser");
 });
 test("a fact is a list item; in the pane it wraps under its bullet", async () => {
-  const [[f]] = cardRows({ facts: ["alpha beta gamma delta"] } as any, "facts", new Set(), new Set());
+  const [[f]] = cardRows({ facts: ["alpha beta gamma delta"] } as any, "facts", new Set());
   expect(f.label).toBe("• alpha beta gamma delta");
   expect(wrap(f.label, 12)).toEqual(["• alpha beta", "  gamma", "  delta"]);
 });
@@ -142,7 +147,7 @@ test("an agent's pane reads like the session's card: intent, outcome, watch, fac
 });
 test("a fact reads as its claim, then the rest dim under it, a blank line between facts", async () => {
   expect(factParts("Suno sings. ACE Studio lost because it has no Arabic.")).toEqual(["Suno sings.", "ACE Studio lost because it has no Arabic."]);
-  const rows = cardRows({ facts: ["Suno sings. ACE lost.", "One claim"] } as any, "facts", new Set(), new Set());
+  const rows = cardRows({ facts: ["Suno sings. ACE lost.", "One claim"] } as any, "facts", new Set());
   expect(rows.map((r) => r.map((i) => [i.label, i.kind, i.indent ?? 0]))).toEqual([
     [["• Suno sings.", "line", 0]],
     [["ACE lost.", "note", 2]],
@@ -155,7 +160,7 @@ test("questions are a list, each with its answers as a clickable list under it; 
     { q: "In your Suno account, is 8345526f a Voice or a Style Persona?", options: ["Voice", "Style Persona"] },
     { q: "May each song folder commit its band code?", options: ["Yes, add it to CLAUDE.md", "No, keep it untracked"] },
   ] };
-  const lines = layout({ chips: [], body: cardRows(card, "questions", new Set(), new Set()), doc: "" }, 40);
+  const lines = layout({ chips: [], body: cardRows(card, "questions", new Set()), doc: "" }, 40);
   const text = lines.map((l) => " ".repeat(l.cells[0]?.x ?? 0) + l.cells.map((c) => c.text).join(""));
   expect(text).toEqual([
     "• In your Suno account, is 8345526f a",
@@ -175,7 +180,7 @@ test("a table's first column takes its widest cell; the next column wraps inside
     { name: "mattpocock-skills:research", outcome: "three cited research files" },
     { name: "hope:intent", outcome: "the audit of memory, CLAUDE.md and skills against the settled route" },
   ] };
-  const lines = layout({ chips: [], body: cardRows(card, "skills", new Set(), new Set()), doc: "" }, 80);
+  const lines = layout({ chips: [], body: cardRows(card, "skills", new Set()), doc: "" }, 80);
   const outcomeX = lines.map((l) => l.cells.at(-1)!.x);
   expect(new Set(outcomeX).size).toBe(1);
   expect(outcomeX[0]).toBe("mattpocock-skills:research".length + 2);
@@ -253,7 +258,6 @@ const model = (card: object, open: string | null = null, rows: object[] = []) =>
   bandModel({
     card: card as any,
     paneItem: open && `card:${open}`,
-    answered: new Set(),
     ran: new Set(),
     rows: rows as any,
   });
@@ -287,14 +291,14 @@ describe("band", () => {
   });
   test("the agents list: each agent, dim once read, the one shown marked open", async () => {
     const rows = chipRows("agents", {
-      card: {}, answered: new Set(), ran: new Set(), paneItem: "agent:a1",
+      card: {}, ran: new Set(), paneItem: "agent:a1",
       rows: [{ id: "a1", label: "l", type: "Explore", done: true, read: true }],
     });
     expect(rows).toEqual([[{ id: "agent:a1", label: "l", kind: "line", state: "done", read: true, open: true }]]);
   });
   test("intent and shape read as padded paragraphs, one per sentence, a blank line apart", async () => {
   const intent = "Fix the pane. Each card reads in it; nothing opens above the chips.";
-  const lines = layout({ chips: [], body: cardRows({ intent }, "intent", new Set(), new Set()), doc: "" }, 72);
+  const lines = layout({ chips: [], body: cardRows({ intent }, "intent", new Set()), doc: "" }, 72);
   expect(lines.map((l) => [l.cells[0].x, l.cells[0].text])).toEqual([
     [2, "Fix the pane."],
     [2, ""],
@@ -319,7 +323,7 @@ describe("arrows", () => {
   // The facts pane over a row of chips: the arrows and clicks read any band the same way.
   const b = {
     ...model({ facts: ["a", "b"], intent: "x" }, "facts", [{ id: "a1", label: "count", done: true }]),
-    body: cardRows({ facts: ["a", "b"] }, "facts", new Set(), new Set()),
+    body: cardRows({ facts: ["a", "b"] }, "facts", new Set()),
   };
   const rows = navRows(b);
   test("rows as drawn: each card line, then the chips; a blank line is no stop", async () => {
@@ -348,13 +352,13 @@ describe("arrows", () => {
     expect(hit(cells, 40, 0)).toBeUndefined();
   });
   test("a word wider than the line is the one thing clipped", async () => {
-    const wide = { chips: [], body: cardRows({ facts: ["x".repeat(100)] }, "facts", new Set(), new Set()), doc: "" };
+    const wide = { chips: [], body: cardRows({ facts: ["x".repeat(100)] }, "facts", new Set()), doc: "" };
     const cell = layout(wide, 40).flatMap((l) => l.cells).find((c) => c.item.id === "probe:fact 1")!;
     expect(cell.x + cell.text.length).toBeLessThanOrEqual(40);
     expect(cell.text.endsWith("…")).toBe(true);
   });
   test("notes are read, never focused", async () => {
-    const body = cardRows({ skills: [{ name: "hope:judge", outcome: "verdict" }] }, "skills", new Set(), new Set());
+    const body = cardRows({ skills: [{ name: "hope:judge", outcome: "verdict" }] }, "skills", new Set());
     expect(navRows({ chips: [], body, doc: "" })[0].map((i) => i.id)).toEqual(["skill:0"]);
   });
 });
@@ -368,4 +372,77 @@ describe("unreadable", () => {
     const err = "HooksError: hunch: $.fs.read(/a/b.md) failed: EACCES";
     expect(unreadable("/a/b.md", err)).toBe(`_${err}_`);
   });
+});
+
+describe("open questions", () => {
+  test("a line ending in ? is a question; code, the card and list markers are not", async () => {
+    const reply = "Done.\n- Ship it now?\n```ts\nconst a = b?\n```\nIs that right?\n" + block('{"intent":"x?"}');
+    expect(proseQuestions(reply, [])).toEqual(["Ship it now?", "Is that right?"]);
+  });
+  test("a quoted card hides nothing after it", async () => {
+    const reply = "It said:\n> ```card\n> {\"intent\":\"x\"}\n> ```\n\nShould the demo keep going?";
+    expect(proseQuestions(reply, [])).toEqual(["Should the demo keep going?"]);
+  });
+  test("one already a card question, or asked twice, is skipped", async () => {
+    expect(proseQuestions("Ship it?\nShip it?\nWhich one?", ["Which one?"])).toEqual(["Ship it?"]);
+  });
+  test("a turn leaves open its card's questions, else those open before, then its prose ones", async () => {
+    const before = [{ q: "Old?", options: ["y"] }];
+    expect(turnQuestions(block('{"questions":[{"q":"New?","options":["a"]}]}') + "Ship?", before)).toEqual([
+      { q: "New?", options: ["a"] },
+      { q: "Ship?", options: [] },
+    ]);
+    expect(turnQuestions("Old?\nShip?", before)).toEqual([...before, { q: "Ship?", options: [] }]);
+  });
+  test("the card shows the open questions, not its blocks' own; none kept yet leaves the blocks'", async () => {
+    const card = { intent: "i", questions: [{ q: "Stale?", options: [] }] };
+    expect(withOpen(card, [])).toEqual({ intent: "i" });
+    expect(withOpen(card, [{ q: "Now?", options: [] }])).toEqual({ intent: "i", questions: [{ q: "Now?", options: [] }] });
+    expect(withOpen(card, undefined)).toEqual(card);
+  });
+  test("a prose question joins the card, a repeat does not, and the next prompt closes them all", async ($, on) => {
+    mock.store(on);
+    on("session.id", () => ({ value: "s1" }));
+    const msgs = [said(block('{"intent":"i","questions":[{"q":"Which one?","options":["a"]}]}'))];
+    on("session.messages", () => ({ value: msgs }));
+    on("ui.invalidate", () => ({ value: undefined }));
+    on("turn.complete", (_, e) => ({ text: e.answer }));
+    on("prompt.submit", (_, e) => ({ text: e.text }));
+    on("session.compact", () => ({ messages: [{ role: "user" as const, text: "Summary.", toolUses: [] }] }));
+    const turn = (answer: string) =>
+      $.turn.complete({ answer, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    const replayed = async () =>
+      latestCard((await $.session.compact({ trigger: "manual", messages: msgs })).messages as any);
+    await turn("Which one?\nShip it now?");
+    await turn("Ship it now?");
+    expect((await replayed()).questions).toEqual([
+      { q: "Which one?", options: ["a"] },
+      { q: "Ship it now?", options: [] },
+    ]);
+    await $.prompt.submit({ text: "check it against main", origin: { kind: "composer" } } as any);
+    expect(await replayed()).toEqual({ intent: "i" });
+  });
+});
+
+test("a compaction ends on the whole card, word for word, open questions only", async ($, on) => {
+  const card = {
+    intent: "Land W7: the card survives compaction.",
+    shape: "Replay the card; never trust the summary.",
+    facts: ["The summary keeps what it chooses; the card keeps the rest."],
+    questions: [{ q: "Closed?", options: ["y"] }],
+  };
+  const open = [{ q: "Ship now?", options: ["yes", "no"] }, { q: "Which branch?", options: [] }];
+  mock.store(on, { "tend:s1:open": open });
+  on("session.id", () => ({ value: "s1" }));
+  const summary = { role: "user" as const, text: "Summary: we talked about tend.", toolUses: [] };
+  on("session.compact", () => ({ messages: [summary] }));
+  const { messages } = await $.session.compact({ trigger: "manual", messages: [said(block(JSON.stringify(card)))] });
+  expect(messages?.[0]).toEqual(summary);
+  expect(latestCard([messages![1] as any])).toEqual({ ...card, questions: open });
+  for (const s of [card.intent, card.shape, card.facts[0], ...open.map((q) => q.q)])
+    expect(messages![1].text.includes(JSON.stringify(s))).toBe(true);
+});
+
+test("an empty card adds nothing to a compaction", async () => {
+  expect(replayCard({})).toBeUndefined();
 });

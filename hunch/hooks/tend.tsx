@@ -1,13 +1,14 @@
 import type { Register } from "claude-code";
 import { MEASURE, type Band, type Item } from "./band.tsx";
 
+export type Question = { q: string; options: string[] };
 export type Card = {
   intent?: string;
   shape?: string;
   /** An agent's own one-line answer; the session's card has none. */
   outcome?: string;
   facts?: string[];
-  questions?: { q: string; options: string[] }[];
+  questions?: Question[];
   skills?: { name: string; outcome: string }[];
   watch?: { label: string; open: string; see?: string }[];
 };
@@ -24,7 +25,7 @@ const FACTS = "what the user should carry forward — durable, in plain words, n
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
 {"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-facts: ${FACTS}; one that settles a choice names what lost. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
+facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
 export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;
@@ -36,7 +37,8 @@ const CARD_SKILLS = new Set([
   "hope:draft",
   "hope:compose",
 ]);
-const CARD_RE = /```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
+// A card opens at a line's start: one quoted inside a reply (`> ```card`) is text, not a card.
+const CARD_RE = /(?<=^|\n)```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
 const PANE = "tend";
 
 const PAD = 2;
@@ -46,7 +48,7 @@ const CHIPS = ["intent", "shape", "facts", "questions", "skills", "watch", "agen
 
 // Also hides a block still streaming in, before its closing fence.
 export function stripCards(text: string): string {
-  return text.replace(CARD_RE, "").replace(/```card[\s\S]*$/, "").trimEnd();
+  return text.replace(CARD_RE, "").replace(/(?<=^|\n)```card[\s\S]*$/, "").trimEnd();
 }
 
 const str = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
@@ -61,7 +63,7 @@ export function cleanCard(c: any): Card {
     shape: str(c.shape) ? c.shape : undefined,
     outcome: str(c.outcome) ? c.outcome : undefined,
     facts: list(c.facts, str),
-    questions: list(c.questions, (q): q is { q: string; options: string[] } =>
+    questions: list(c.questions, (q): q is Question =>
       str(q?.q) && Array.isArray(q.options) && q.options.every(str),
     ),
     skills: list(c.skills, (k): k is { name: string; outcome: string } =>
@@ -95,6 +97,43 @@ export function latestCard(msgs: Msg[]): Card {
     }
   }
   return card;
+}
+
+/** Lines of a reply that ask something, outside code and the card: each ends with `?`,
+ * list markers dropped. None already in `known`, none twice. */
+export function proseQuestions(text: string, known: string[]): string[] {
+  const seen = new Set(known);
+  const out: string[] = [];
+  let fenced = false;
+  for (const raw of stripCards(text).split("\n")) {
+    if (raw.trim().startsWith("```")) fenced = !fenced;
+    const q = raw.trim().replace(/^(?:[-*+>]\s+|\d+[.)]\s+)+/, "");
+    if (fenced || !q.endsWith("?") || seen.has(q)) continue;
+    seen.add(q);
+    out.push(q);
+  }
+  return out;
+}
+
+/** The questions a turn leaves open: its reply's card's, else those already open, then the ones
+ * it asked in prose, with no options. */
+export function turnQuestions(answer: string, open: Question[]): Question[] {
+  const asked = latestCard([{ role: "assistant", text: answer }]).questions ?? open;
+  return [...asked, ...proseQuestions(answer, asked.map((q) => q.q)).map((q) => ({ q, options: [] }))];
+}
+
+/** The card with the questions still open in place of its blocks' own; `undefined` (a session from
+ * before open questions were kept) leaves the blocks' own. */
+export function withOpen(card: Card, open: Question[] | undefined): Card {
+  if (!open) return card;
+  const { questions: _, ...rest } = card;
+  return open.length ? { ...rest, questions: open } : rest;
+}
+
+/** The message a compaction ends on: the whole card, word for word. Undefined for an empty card. */
+export function replayCard(card: Card): string | undefined {
+  if (!Object.keys(card).length) return undefined;
+  return `The session card as it stood before this compaction, word for word:\n\`\`\`card\n${JSON.stringify(card)}\n\`\`\`\n`;
 }
 
 /** A plan may name `clarify` where the engine reports `hope:clarify`. */
@@ -274,17 +313,12 @@ export function chipLabel(name: string, s: Shown): string {
     return `skills ${planned.filter((k) => hasRun(s.ran, k.name)).length}/${planned.length}`;
   }
   if (name === "facts") return `facts ${s.card.facts?.length ?? 0}`;
-  if (name === "questions") return `questions ${(s.card.questions ?? []).filter((q) => !s.answered.has(q.q)).length}`;
+  if (name === "questions") return `questions ${s.card.questions?.length ?? 0}`;
   return `${name} ${chipRows(name, s).length}`;
 }
 
 /** A card's lines; each inner list is one row the arrows move along. */
-export function cardRows(
-  c: Card,
-  name: string,
-  answered: Set<string>,
-  ran: Set<string>,
-): Item[][] {
+export function cardRows(c: Card, name: string, ran: Set<string>): Item[][] {
   if (name === "intent" || name === "shape")
     // Each sentence its own paragraph, set in from the pane's edge.
     return c[name] ? [[under(line(`probe:${name}`, sentences(c[name]!).join("\n\n")))]] : [];
@@ -297,11 +331,10 @@ export function cardRows(
     );
   if (name === "questions")
     return spaced(
-      (c.questions ?? []).flatMap((q, i) =>
-        answered.has(q.q)
-          ? []
-          : [[[line(`probe:q${i + 1}`, `• ${q.q}`)], ...q.options.map((o, j) => [under(line(`answer:${i}:${j}`, `◦ ${o}`))])]],
-      ),
+      (c.questions ?? []).map((q, i) => [
+        [line(`probe:q${i + 1}`, `• ${q.q}`)],
+        ...q.options.map((o, j) => [under(line(`answer:${i}:${j}`, `◦ ${o}`))]),
+      ]),
     );
   if (name === "skills")
     return (c.skills ?? []).map((k, i) => [
@@ -329,7 +362,7 @@ function agentItem(r: Row, paneItem: string | null): Item {
 }
 
 /** What the band draws from. */
-export type Shown = { card: Card; answered: Set<string>; ran: Set<string>; rows: Row[]; paneItem: string | null };
+export type Shown = { card: Card; ran: Set<string>; rows: Row[]; paneItem: string | null };
 
 /** The chip a pane item belongs to: a card's own, or agents for an agent's card or report. */
 export function paneChip(paneItem: string | null): string | undefined {
@@ -341,7 +374,7 @@ export function paneChip(paneItem: string | null): string | undefined {
 export function chipRows(name: string, s: Shown): Item[][] {
   return name === "agents"
     ? s.rows.map((r) => [agentItem(r, s.paneItem)])
-    : cardRows(s.card, name, s.answered, s.ran);
+    : cardRows(s.card, name, s.ran);
 }
 
 /** The band is its chips alone: every card reads in the pane. */
@@ -368,7 +401,6 @@ let card: Card = {};
 let rows: Row[] = [];
 let paneItem: string | null = null;
 let lastPaneItem: string | null = null;
-const answered = new Set<string>();
 const ran = new Set<string>();
 // The plan moved this turn (new card, or a skill ran): only then suggest the next skill.
 let planMoved = false;
@@ -403,7 +435,7 @@ async function registerCommands($: any) {
 
 async function readSession($: any) {
   const msgs: Msg[] = await $.session.messages();
-  const next = latestCard(msgs);
+  const next = withOpen(latestCard(msgs), await storedOpen($));
   if (JSON.stringify(next) !== JSON.stringify(card)) planMoved = true;
   card = next;
   $.ui.invalidate("ui.render");
@@ -423,20 +455,31 @@ async function sid($: any): Promise<string> {
   return id;
 }
 
-// A reload wipes module memory; the store keeps which skills ran, which questions got answers,
-// and which teammates sit idle.
+// A reload wipes module memory; the store keeps which skills ran and which teammates sit idle.
 async function remember($: any) {
   await sid($);
   await $.store.set(`tend:${sessionId}:ran`, [...ran]);
-  await $.store.set(`tend:${sessionId}:answered`, [...answered]);
   await $.store.set(`tend:${sessionId}:idle`, [...idle]);
 }
 
 async function recall($: any) {
   await sid($);
   for (const r of ((await $.store.get(`tend:${sessionId}:ran`)) as string[]) ?? []) ran.add(r);
-  for (const a of ((await $.store.get(`tend:${sessionId}:answered`)) as string[]) ?? []) answered.add(a);
   for (const i of ((await $.store.get(`tend:${sessionId}:idle`)) as string[]) ?? []) idle.add(i);
+}
+
+// The questions still open: a card block holds only those its writer chose, and the user's
+// next prompt closes them all, however it answered them.
+async function storedOpen($: any): Promise<Question[] | undefined> {
+  await sid($);
+  return (await $.store.get(`tend:${sessionId}:open`)) as Question[] | undefined;
+}
+
+async function setOpen($: any, open: Question[]) {
+  await sid($);
+  await $.store.set(`tend:${sessionId}:open`, open);
+  card = withOpen(card, open);
+  $.ui.invalidate("ui.render");
 }
 
 // Finished agents drop out of $.agent.list(); the store keeps them for the session.
@@ -569,7 +612,6 @@ function reset() {
   rows = [];
   paneItem = null;
   lastPaneItem = null;
-  answered.clear();
   ran.clear();
   idle.clear();
   views.clear();
@@ -658,13 +700,8 @@ export const register: Register = (on) => {
     const withContext = (more: string[]) =>
       more.length ? next({ ...e, context: [...(e.context ?? []), ...more] }) : next(e);
     if (e.origin.kind !== "composer") return withContext(asked);
-    // A sent `q2: …` answers question 2.
-    const q = card.questions?.[Number(e.text.match(/^q(\d+):/)?.[1]) - 1];
-    if (q) {
-      answered.add(q.q);
-      await remember($);
-      $.ui.invalidate("ui.render");
-    }
+    // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
+    await setOpen($, []);
     if (asked.length || !Object.keys(card).length) return withContext(asked);
     return withContext([`Only if this turn settles or changes what the card holds:\n${CARD_FORMAT}`]);
   });
@@ -682,6 +719,7 @@ export const register: Register = (on) => {
     }
     else {
       await readSession($);
+      await setOpen($, turnQuestions(e.answer, card.questions ?? []));
       const nextSkill = planMoved && card.skills?.find((k) => !hasRun(ran, k.name));
       planMoved = false;
       // A suggestion made while the turn is live never shows.
@@ -690,6 +728,21 @@ export const register: Register = (on) => {
       if (cmd) $.clock.after(1500, () => loud($, $.prompt.suggest({ text: cmd })));
     }
     return r;
+  });
+
+  // A compaction keeps what its summary chose; the card it ends on keeps the rest whole.
+  // A reload re-raises session.start, a compaction never does, so the card rides the compaction itself.
+  on("session.compact", async ($, e, next) => {
+    const r = await next(e);
+    if (e.agentId || !r.messages) return r;
+    try {
+      await sid($);
+      const text = replayCard(withOpen(latestCard(e.messages as Msg[]), await storedOpen($)));
+      return text ? { ...r, messages: [...r.messages, { role: "assistant" as const, text, toolUses: [] }] } : r;
+    } catch (err) {
+      $.ui.toast(`tend: the card did not ride the compaction: ${err instanceof Error ? err.message : String(err)}`);
+      return r;
+    }
   });
 
   on("ui.close", async ($, e, next) => {
@@ -735,7 +788,7 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const band = bandModel({ card, paneItem, answered, ran, rows });
+    const band = bandModel({ card, paneItem, ran, rows });
     if (!band.chips.length) return <Box />;
     return (
       <Box>
@@ -814,7 +867,7 @@ export const register: Register = (on) => {
               [{ id: "title", label: kind === "card" ? rest : (rest.split("/").pop() ?? rest), kind: "title" }, close],
               [],
               ...(kind === "card"
-                ? chipRows(rest, { card, answered, ran, rows, paneItem })
+                ? chipRows(rest, { card, ran, rows, paneItem })
                 : links(paneText.get(item) ?? "").map((href) => fromFile(rest, href)).map((l, i) => [
                     { id: `note:links${i}`, label: (i ? "" : "links").padEnd(9), kind: "note" as const },
                     { id: `open:${l}`, label: placeName(l), kind: "line" as const },
