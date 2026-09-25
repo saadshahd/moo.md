@@ -9,7 +9,7 @@
     {
       "name": "hope",
       "source": "./hope",
-      "description": "Thinking discipline for AI work. Clarify intent, shape approach, consult experts, guard unsupervised work, hand work back so you own it.",
+      "description": "Thinking discipline for AI work. Clarify intent, shape approach, consult experts, guard unsupervised work, hand work back so you own it. The slop hook needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.",
       "category": "core",
       "keywords": [
         "intent",
