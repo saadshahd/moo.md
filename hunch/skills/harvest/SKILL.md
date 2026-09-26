@@ -1,53 +1,61 @@
 ---
 name: harvest
-description: Draft skills from the one procedure a session kept walking the agent through, split into reusable moves, each scored against no skill. Pass a session id to mine a past session instead of this one.
+description: Report where a session missed moo's standard — the agent asks only while stating intent and shape, then works on its own — as issues a builder can act on. Pass a session id to report on a past session instead of this one.
 disable-model-invocation: true
 ---
 
-## Read the session
+harvest captures and reports. It never drafts, builds or fixes a skill: builders do that from the report.
 
-The transcript is `~/.claude/projects/*/<id>.jsonl`, where `<id>` is `$ARGUMENTS` if given, else `${CLAUDE_SESSION_ID}`. No file matches → say which id failed and stop.
+## Read
 
-The user's turns are the `type == "user"` lines whose `message.content` is a string not opening with `<`. The assistant turns around them show what the user accepted.
+Run `${CLAUDE_SKILL_DIR}/scripts/read.sh <id>`, where `<id>` is `$ARGUMENTS` if given, else `${CLAUDE_SESSION_ID}`. It fails → show its error and stop.
 
-## Name the procedure
+Its output is the only source. A turn you cite is a numbered turn in it. It cuts long agent text; `read.sh <id> <turn>` prints one turn whole.
 
-A procedure is steps the user gave the agent that they would give again in another session: an order, a check, a place to look, a thing to never do. Name it in the user's words. None → say what came closest and why it fails, and stop.
+## Detect
 
-## Split it
+Read every file in `${CLAUDE_SKILL_DIR}/kinds/`. Each names one way a session misses the standard: its sign in the marked turns, what counts, what doesn't, the evidence it needs. Walk the turns once per kind and collect each flow that meets it with the evidence it asks for. A flow without that evidence is dropped, not guessed at — but first read whole every cut turn it cites.
 
-List its steps in the user's words and order, and sort each one:
+## Name the opportunity
 
-| The step | Becomes |
+For each flow, one of:
+
+| The flow shows | Opportunity |
 |---|---|
-| An installed skill already does it | A call to that skill by name |
-| No turn in the session shows it | A line in the composer |
-| Anything else | A move: its own skill and eval case |
+| An installed moo skill covers the need and failed, or did not fire | Improve that skill, named |
+| No installed moo skill covers it | A new skill |
+| Steps the user gave more than once | A reusable piece |
+
+State the need — what must happen, and when — never the unit that would carry it. Check the installed list `read.sh` prints before calling anything new: a need an installed skill covers is an improvement to it.
+
+## Value
+
+Name which of moo's four outcomes the fix serves: reduce decision regret, increase conceptual clarity, fewer but stronger artifacts, preserve the capacity to own what you produce. None → drop the flow.
 
 ## Draft
 
-1. `claude plugin init <procedure> --description "<one line>"` writes `~/.claude/skills/<procedure>/`. The name is taken → pick another; never `--force`.
-2. Delete the root `SKILL.md` and the `skills` key in `.claude-plugin/plugin.json`; with them, `plugin details` counts no skill and `evals/` loads as plugin parts.
-3. Write each move as `skills/<move>/SKILL.md`: its step as the user gave it, under a one-line `description` of the situation it fits.
-4. Write the composer as `skills/<procedure>/SKILL.md`: the steps in order, each a call by name or a line.
-5. Write one eval case per move, and one for the composer from the turn that started the procedure, under `evals/<case>/`:
-   - `prompt.md`: the turn as the user typed it, with `max_turns` and the `allowed_tools` it needs in its frontmatter.
-   - `graders/accepted.md`: `type: llm`, and the outcome the transcript shows the user accepted.
+One issue per flow, laid out as `${CLAUDE_SKILL_DIR}/issue.md`, into a file from `mktemp`. Quote the user only from `read.sh` turns. Put a placeholder where a repo, file, service, person or remote would go.
 
-## Score
+## Scrub
 
-1. `claude plugin eval <procedure> --trust-plugin --no-publish --json <draft>/evals/result.json`, with `--allow-tools` naming every gated tool (Bash, Write, Edit, WebFetch, `mcp__*`) a case lists. It runs each case with the draft and without it.
-2. A move that scores the same without the draft → fold it into the composer as a line; delete the move and its case.
-3. `claude plugin details <procedure>@skills-dir` gives the token cost.
+Run `${CLAUDE_SKILL_DIR}/scripts/scrub.sh <id> <draft>` on each draft. Exit 1 → replace each term it lists with a placeholder and run it again. Never show a draft that has not passed.
 
-A command fails → show its error and stop. Never hand back an unscored draft as scored.
+## Show
 
-## Hand back
+Every flow, ranked by the weight of its evidence: most turns cited and clearest sign first. For each, the draft in full and its file path. Then ask the reporter which to file.
 
-A row per move and for the composer: path, score with and without, difference. Then what folded into lines and why, what each case needed that the eval could not see, and the always-on token cost. End with: keep it, or `rm -rf ~/.claude/skills/<procedure>`.
+## File on yes
+
+Only the drafts the reporter says yes to, as shown:
+
+`tail -n +2 <draft> | gh issue create -R saadshahd/moo.md --label harvest --title "$(sed -n '1s/^Title: //p' <draft>)" --body-file -`
+
+The draft's first line is its title, so the body starts after it.
+
+Show each issue's URL. A draft changed after the yes goes back through Scrub and Show.
 
 Never:
 
-- Install a draft into moo.
-- Draft a second procedure in the same run.
-- Write an eval case, or a file it needs, that the session does not contain.
+- Propose a new unit where an installed one covers the need.
+- Write code or unit files.
+- File without the reporter's yes to the exact text.
