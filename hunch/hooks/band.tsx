@@ -158,6 +158,18 @@ function wrapLine(text: string, width: number): string[] {
   return out.map((l) => (l.length > width ? `${l.slice(0, width - 1)}…` : l));
 }
 
+/** Claude Code refuses a Markdown whose text runs past this many characters. */
+export const DOC_MAX = 10_000;
+const CUT = "\n\n_…the rest is past what the pane can draw_";
+
+/** The doc as the pane can draw it: past `DOC_MAX`, cut at the last whole line that fits. */
+export function drawable(doc: string): string {
+  if (doc.length <= DOC_MAX) return doc;
+  const head = doc.slice(0, DOC_MAX - CUT.length);
+  const line = head.lastIndexOf("\n");
+  return (line > 0 ? head.slice(0, line) : head) + CUT;
+}
+
 export function hit(lines: Line[], x: number, y: number): Item | undefined {
   return lines
     .find((l) => l.y === y)
@@ -254,7 +266,7 @@ export default function BandView(band: Band, surface: any) {
             marginTop: 1,
             children: [
               // A Client's Markdown takes no link handler: its links are listed as rows instead.
-              Markdown({ key: "md", text: band.doc }),
+              Markdown({ key: "md", text: drawable(band.doc) }),
             ],
           }),
         ]

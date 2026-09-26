@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from "claude-code/testing";
-import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
+import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
 import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
@@ -446,4 +446,17 @@ test("a compaction ends on the whole card, word for word, open questions only", 
 
 test("an empty card adds nothing to a compaction", async () => {
   expect(replayCard({})).toBeUndefined();
+});
+
+describe("pane doc", () => {
+  test("a doc past the Markdown limit is cut at a whole line and says so", async () => {
+    const doc = "line of forty characters, give or take.\n".repeat(600);
+    const out = drawable(doc);
+    expect(out.length).toBeLessThanOrEqual(DOC_MAX);
+    expect(out.endsWith("_…the rest is past what the pane can draw_")).toBe(true);
+    expect(out.split("\n\n_…")[0].endsWith("take.")).toBe(true);
+  });
+  test("a doc within the limit is drawn whole", async () => {
+    expect(drawable("short")).toBe("short");
+  });
 });
