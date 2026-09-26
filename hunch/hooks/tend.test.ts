@@ -92,7 +92,7 @@ test("a chip previews its card with one number", async () => {
     questions: [{ q: "x", options: [] }, { q: "y", options: [] }],
     skills: [{ name: "hope:intent" }, { name: "hope:draft" }],
   } as any;
-  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null });
+  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null, memory: [] });
   expect(chipLabel("intent", s())).toBe("intent");
   expect(chipLabel("facts", s())).toBe("facts 2");
   expect(chipLabel("questions", s())).toBe("questions 2");
@@ -260,6 +260,7 @@ const model = (card: object, open: string | null = null, rows: object[] = []) =>
     paneItem: open && `card:${open}`,
     ran: new Set(),
     rows: rows as any,
+    memory: [],
   });
 
 describe("band", () => {
@@ -291,7 +292,7 @@ describe("band", () => {
   });
   test("the agents list: each agent, dim once read, the one shown marked open", async () => {
     const rows = chipRows("agents", {
-      card: {}, ran: new Set(), paneItem: "agent:a1",
+      card: {}, ran: new Set(), paneItem: "agent:a1", memory: [],
       rows: [{ id: "a1", label: "l", type: "Explore", done: true, read: true }],
     });
     expect(rows).toEqual([[{ id: "agent:a1", label: "l", kind: "line", state: "done", read: true, open: true }]]);

@@ -1,0 +1,3 @@
+With the `memory` chip in tend's band, every file that steers Claude across sessions (its auto-memory, any CLAUDE.md or AGENTS.md, anything under the project's .claude/, the user's CLAUDE.md) sits one click away in two sections: the ones this session updated or added, and the ones it retrieved (loaded or read). Each one can be viewed in the pane, opened in the editor, or become a change request in the user's own words.
+
+Graduate when it stays on for 10 real sessions, the user opens the chip and acts on a file (views, edits, or asks for a change) in at least three of them, and no steering-file change turns up later that the chip never listed. Kill if the user ignores it across those sessions, or a steering file changed without appearing at the next stop.

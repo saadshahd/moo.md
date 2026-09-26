@@ -1,5 +1,6 @@
 import type { Register } from "claude-code";
 import { MEASURE, type Band, type Item } from "./band.tsx";
+import { changes, isSteering, isSteeringPath, memoryRows, places, retrieved, type Places, type Snapshot, type Steering } from "./memory.tsx";
 
 export type Question = { q: string; options: string[] };
 export type Card = {
@@ -42,7 +43,7 @@ const CARD_RE = /(?<=^|\n)```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
 const PANE = "tend";
 
 const PAD = 2;
-const CHIPS = ["intent", "shape", "facts", "questions", "skills", "watch", "agents"] as const;
+const CHIPS = ["intent", "shape", "facts", "questions", "skills", "watch", "memory", "agents"] as const;
 
 // ---- pure ----
 
@@ -314,6 +315,7 @@ export function chipLabel(name: string, s: Shown): string {
   }
   if (name === "facts") return `facts ${s.card.facts?.length ?? 0}`;
   if (name === "questions") return `questions ${s.card.questions?.length ?? 0}`;
+  if (name === "memory") return `memory ${s.memory.length}`;
   return `${name} ${chipRows(name, s).length}`;
 }
 
@@ -362,7 +364,7 @@ function agentItem(r: Row, paneItem: string | null): Item {
 }
 
 /** What the band draws from. */
-export type Shown = { card: Card; ran: Set<string>; rows: Row[]; paneItem: string | null };
+export type Shown = { card: Card; ran: Set<string>; rows: Row[]; paneItem: string | null; memory: Steering[] };
 
 /** The chip a pane item belongs to: a card's own, or agents for an agent's card or report. */
 export function paneChip(paneItem: string | null): string | undefined {
@@ -370,8 +372,9 @@ export function paneChip(paneItem: string | null): string | undefined {
   return kind === "card" ? rest.join(":") : kind === "agent" || kind === "report" ? "agents" : undefined;
 }
 
-/** The rows a chip opens: the card's, or the session's agents. */
+/** The rows a chip opens: the card's, the session's agents, or the steering files it updated and retrieved. */
 export function chipRows(name: string, s: Shown): Item[][] {
+  if (name === "memory") return memoryRows(s.memory);
   return name === "agents"
     ? s.rows.map((r) => [agentItem(r, s.paneItem)])
     : cardRows(s.card, name, s.ran);
@@ -399,6 +402,8 @@ export function bandModel(s: Shown): Band {
 
 let card: Card = {};
 let rows: Row[] = [];
+// The steering files this session updated since it started, then those it read or loaded.
+let memory: Steering[] = [];
 let paneItem: string | null = null;
 let lastPaneItem: string | null = null;
 const ran = new Set<string>();
@@ -466,6 +471,55 @@ async function recall($: any) {
   await sid($);
   for (const r of ((await $.store.get(`tend:${sessionId}:ran`)) as string[]) ?? []) ran.add(r);
   for (const i of ((await $.store.get(`tend:${sessionId}:idle`)) as string[]) ?? []) idle.add(i);
+  memory = ((await $.store.get(`tend:${sessionId}:memory`)) as Steering[]) ?? [];
+}
+
+async function snapshot($: any, p: Places): Promise<Snapshot> {
+  const listed = await $.process.run(
+    ["git", "ls-files", "-co", "--exclude-standard", "-z"],
+    { cwd: p.root },
+  );
+  // 128: not a git repository, so there are no project files to find this way.
+  if (listed.exitCode !== 0 && listed.exitCode !== 128)
+    throw new Error(`git ls-files: ${listed.stderr.trim()}`);
+  const project =
+    listed.exitCode === 0
+      ? (listed.stdout as string)
+          .split("\0")
+          .filter(isSteering)
+          .map((r) => `${p.root}/${r}`)
+      : [];
+  const saved = (await $.fs.exists(p.memory))
+    ? ((await $.fs.list(p.memory)) as { name: string; kind: string }[])
+        .filter((f) => f.kind === "file")
+        .map((f) => `${p.memory}/${f.name}`)
+    : [];
+  const candidates = [...saved, ...project, `${p.config}/CLAUDE.md`];
+  // A tracked file deleted from disk is still listed by git: only what exists is compared.
+  const paths = (await Promise.all(candidates.map(async (path) => ((await $.fs.exists(path)) ? [path] : [])))).flat();
+  const stats = await Promise.all(paths.map((path) => $.fs.stat(path)));
+  return Object.fromEntries(paths.map((path, i) => [path, stats[i].mtimeMs]));
+}
+
+// The first look at the steering files is the session's baseline; each stop compares against it,
+// and lists what the session read or loaded besides.
+async function readMemory($: any, transcriptPath: string) {
+  const p = places(transcriptPath, await $.session.root());
+  if (!p) return;
+  await sid($);
+  const base = (await $.store.get(`tend:${sessionId}:memory-base`)) as Snapshot | undefined;
+  const now = await snapshot($, p);
+  if (!base) await $.store.set(`tend:${sessionId}:memory-base`, now);
+  const updated = base ? changes(base, now, p) : [];
+  const usage = await $.session.usage({ breakdown: "summary" });
+  const loaded = ((usage.context.breakdown?.memoryFiles ?? []) as { path: string }[]).map((f) => f.path);
+  const read = ((await $.session.messages()) as Msg[])
+    .flatMap((m) => m.toolUses ?? [])
+    .flatMap((u) => (u.tool === "Read" && typeof u.input.file_path === "string" ? [u.input.file_path] : []))
+    .filter((path) => isSteeringPath(path, p));
+  memory = [...updated, ...retrieved([...loaded, ...read], updated, p)];
+  await $.store.set(`tend:${sessionId}:memory`, memory);
+  $.ui.invalidate("ui.render");
 }
 
 // The questions still open: a card block holds only those its writer chose, and the user's
@@ -538,11 +592,15 @@ async function openTarget($: any, target: string) {
   if (target.startsWith("pane:")) return showPane($, `file:${target.slice(5)}`);
   if (/\.(md|markdown)$/i.test(target) && !target.includes("://"))
     return showPane($, `file:${target}`);
+  return openOutside($, target, isSourceFile(target));
+}
+
+// In VS Code (`code`) when asked and it opens, else by the system's default.
+async function openOutside($: any, target: string, inEditor: boolean) {
   const run = (argv: string[]) =>
     $.process.run(argv, { timeoutMs: 10000 }).catch((err: unknown) => ({ exitCode: -1, stderr: String(err) }));
-  // A source file opens in VS Code (`code`), else by the system's default, as does everything else.
-  const inEditor = isSourceFile(target) && (await run(["code", "-g", target])).exitCode === 0;
-  if (!inEditor && (await run(["open", target])).exitCode !== 0) $.ui.toast(`can't open ${target}`);
+  const opened = inEditor && (await run(["code", "-g", target])).exitCode === 0;
+  if (!opened && (await run(["open", target])).exitCode !== 0) $.ui.toast(`can't open ${target}`);
 }
 
 async function showPane($: any, item: string) {
@@ -610,6 +668,7 @@ function reset() {
   for (const r of rows) gone.add(r.id);
   card = {};
   rows = [];
+  memory = [];
   paneItem = null;
   lastPaneItem = null;
   ran.clear();
@@ -646,6 +705,9 @@ async function act($: any, id: string) {
     // A second press on what the pane shows closes it.
     paneItem === id ? await $.ui.close({ id: PANE }) : await openAgent($, arg);
   else if (kind === "open") await openTarget($, arg);
+  else if (kind === "view") await showPane($, `file:${arg}`);
+  else if (kind === "edit") await openOutside($, arg, true);
+  else if (kind === "ask") await fill($, `change ${arg}: `);
   else if (kind === "close") await $.ui.close({ id: PANE });
   else if (kind === "report") await showPane($, id);
   $.ui.invalidate("ui.render");
@@ -661,6 +723,16 @@ export const register: Register = (on) => {
 
   on("session.end", async ($, e, next) => {
     if (e.reason === "clear") reset();
+    return next(e);
+  });
+
+  on("classic.SessionStart", async ($, e, next) => {
+    loud($, readMemory($, e.transcript_path));
+    return next(e);
+  });
+
+  on("classic.Stop", async ($, e, next) => {
+    await readMemory($, e.transcript_path).catch((err) => $.ui.toast(`tend: ${err?.message ?? err}`));
     return next(e);
   });
 
@@ -788,7 +860,7 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const band = bandModel({ card, paneItem, ran, rows });
+    const band = bandModel({ card, paneItem, ran, rows, memory });
     if (!band.chips.length) return <Box />;
     return (
       <Box>
@@ -864,10 +936,15 @@ export const register: Register = (on) => {
         : {
             chips: [],
             body: [
-              [{ id: "title", label: kind === "card" ? rest : (rest.split("/").pop() ?? rest), kind: "title" }, close],
+              [
+                { id: "title", label: kind === "card" ? rest : (rest.split("/").pop() ?? rest), kind: "title" },
+                // A steering file opened from the memory list goes back to it.
+                ...(memory.some((c) => c.path === rest) ? [{ id: "chip:memory", label: "back", kind: "quiet" as const }] : []),
+                close,
+              ],
               [],
               ...(kind === "card"
-                ? chipRows(rest, { card, ran, rows, paneItem })
+                ? chipRows(rest, { card, ran, rows, paneItem, memory })
                 : links(paneText.get(item) ?? "").map((href) => fromFile(rest, href)).map((l, i) => [
                     { id: `note:links${i}`, label: (i ? "" : "links").padEnd(9), kind: "note" as const },
                     { id: `open:${l}`, label: placeName(l), kind: "line" as const },
