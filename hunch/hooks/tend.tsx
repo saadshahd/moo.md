@@ -116,6 +116,18 @@ export function proseQuestions(text: string, known: string[]): string[] {
   return out;
 }
 
+/** The prompt with question `n`'s answer set to `pick`: its first `qn: <option>` already in `box`
+ * swapped, the rest of the box as it was; undefined when no answer to it is there yet. */
+export function swapAnswer(box: string, n: number, options: string[], pick: string): string | undefined {
+  const at = `q${n}: `;
+  const found = options
+    .map((o) => ({ from: box.indexOf(at + o), len: at.length + o.length }))
+    .filter((f) => f.from >= 0)
+    // Of two answers at one place, the longer: "yes, later" over "yes".
+    .sort((x, y) => x.from - y.from || y.len - x.len)[0];
+  return found && box.slice(0, found.from) + at + pick + box.slice(found.from + found.len);
+}
+
 /** The questions a turn leaves open: its reply's card's, else those already open, then the ones
  * it asked in prose, with no options. */
 export function turnQuestions(answer: string, open: Question[]): Question[] {
@@ -679,6 +691,16 @@ async function fill($: any, text: string) {
   else await $.prompt.suggest({ text });
 }
 
+// A second answer to a question takes the first one's place; the first is filled like any line,
+// but is an answer, not a bare stem: the next line joins it rather than replacing it.
+async function setAnswer($: any, n: number, options: string[], pick: string) {
+  const box: string = (await $.prompt.read()).text;
+  const swapped = swapAnswer(box, n, options, pick);
+  if (swapped === undefined) await fill($, `q${n}: ${pick} `);
+  else if (swapped !== box && (await $.prompt.fill({ text: swapped, mode: "replace" })).isFilled) fills++;
+  lastStem = "";
+}
+
 function reset() {
   // The old session's agents can linger in `$.agent.list()`; they are never this session's.
   for (const r of rows) gone.add(r.id);
@@ -709,7 +731,7 @@ async function act($: any, id: string) {
     const [i, j] = rest.map(Number);
     const q = card.questions?.[i];
     // Answered once sent, not on the click: an abandoned answer leaves the question up.
-    if (q) await fill($, `q${i + 1}: ${q.options[j]} — `);
+    if (q) await setAnswer($, i + 1, q.options, q.options[j]);
   } else if (kind === "skill") {
     const k = card.skills?.[Number(arg)];
     const cmd = k && (await slash($, k.name));

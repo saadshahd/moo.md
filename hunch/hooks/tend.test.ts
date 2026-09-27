@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -503,4 +503,44 @@ test("a store over its cap with no session list shrinks to the current session",
   await $.session.start({ source: "startup", cwd: "/p" } as any);
   expect([...store.keys()]).toEqual(["tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
+});
+
+test("a second answer to a question swaps the first in place; the rest of the prompt stays", async () => {
+  const opts = ["yes", "yes, later", "no"];
+  expect(swapAnswer("", 1, opts, "no")).toBeUndefined();
+  expect(swapAnswer("q2: yes ", 1, opts, "no")).toBeUndefined();
+  expect(swapAnswer("q1: yes because x\nq2: no ", 1, opts, "no")).toBe("q1: no because x\nq2: no ");
+  expect(swapAnswer("q1: yes, later q2: yes ", 1, opts, "no")).toBe("q1: no q2: yes ");
+  expect(swapAnswer("q1: no ", 1, opts, "no")).toBe("q1: no ");
+});
+
+test("clicking answers to two questions: each fills once, a changed one swaps in place", async ($, on) => {
+  mock.store(on);
+  on("session.id", () => ({ value: "s1" }));
+  const qs = [{ q: "Ship?", options: ["yes", "no"] }, { q: "Where?", options: ["main", "branch"] }];
+  on("session.messages", () => ({ value: [said(block(JSON.stringify({ intent: "i", questions: qs })))] }));
+  on("ui.invalidate", () => ({ value: undefined }));
+  on("turn.complete", (_, e) => ({ text: e.answer }));
+  let box = "";
+  on("prompt.read", () => ({ value: { text: box, cursor: box.length } }));
+  on("prompt.fill", (_, e) => {
+    box = e.mode === "replace" ? e.text : box + e.text;
+    return { isFilled: true };
+  });
+  await $.turn.complete({ answer: "ok", durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+  for (const surface of ["terminal", "desktop"] as const) {
+    box = "";
+    const band = await $.ui.mount({ plugin: "hunch", surface, component: "AbovePrompt", props: { bodyColumns: 80 } as any });
+    const click = (act: string) => band.post({ act });
+    await click("answer:0:0");
+    expect(box).toBe("q1: yes ");
+    await click("answer:1:0");
+    expect(box).toBe("q1: yes q2: main ");
+    await click("answer:0:1");
+    expect(box).toBe("q1: no q2: main ");
+    await click("answer:1:1");
+    expect(box).toBe("q1: no q2: branch ");
+    await click("answer:1:1");
+    expect(box).toBe("q1: no q2: branch ");
+  }
 });
