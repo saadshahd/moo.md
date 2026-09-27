@@ -455,9 +455,24 @@ function loud($: any, p: Promise<unknown>) {
  * id is read at each use; a new one resets what the old session left in memory. */
 async function sid($: any): Promise<string> {
   const id: string = await $.session.id();
-  if (sessionId && id !== sessionId) reset();
+  if (id === sessionId) return id;
+  if (sessionId) reset();
   sessionId = id;
+  await keepRecent($, id);
   return id;
+}
+
+// The store outlives every session and holds 4 MiB in all: only the latest sessions keep their keys.
+const KEPT_SESSIONS = 20;
+
+async function keepRecent($: any, id: string) {
+  const before = ((await $.store.get("tend:recent")) as string[] | undefined) ?? [];
+  const recent = [id, ...before.filter((s) => s !== id)].slice(0, KEPT_SESSIONS);
+  await $.store.set("tend:recent", recent);
+  const stale = ((await $.store.keys()) as string[]).filter(
+    (k) => k.startsWith("tend:") && k !== "tend:recent" && !recent.includes(k.split(":")[1]),
+  );
+  for (const k of stale) await $.store.delete(k);
 }
 
 // A reload wipes module memory; the store keeps which skills ran and which teammates sit idle.

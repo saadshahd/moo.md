@@ -460,3 +460,22 @@ describe("pane doc", () => {
     expect(drawable("short")).toBe("short");
   });
 });
+
+test("the store keeps only the latest sessions' keys", async ($, on) => {
+  const old = Array.from({ length: 25 }, (_, i) => `old${i}`);
+  const store = new Map<string, unknown>([
+    ...old.map((s): [string, unknown] => [`tend:${s}:memory-base`, {}]),
+    ["tend:recent", old],
+  ]);
+  on("store.get", (_, e) => ({ value: store.get(e.key) }));
+  on("store.set", (_, e) => (store.set(e.key, e.value), { value: undefined }));
+  on("store.delete", (_, e) => (store.delete(e.key), { value: undefined }));
+  on("store.keys", () => ({ value: [...store.keys()] }));
+  on("session.id", () => ({ value: "s1" }));
+  on("session.start", (_, e) => e);
+  await $.session.start({ source: "startup", cwd: "/p" } as any);
+  expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(
+    old.slice(0, 19).map((s) => `tend:${s}:memory-base`),
+  );
+  expect(store.get("tend:recent")).toEqual(["s1", ...old.slice(0, 19)]);
+});
