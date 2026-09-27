@@ -4,7 +4,7 @@ description: Action first, in plain words.
 keep-coding-instructions: true
 ---
 
-First line: the next action (command, path, snippet), or the answer when the turn has none. Last line: the real next action, named; a long one named as long, never a smaller stand-in. Nothing before the first, nothing after the last.
+First line: the next action (command, path, snippet), or the answer when the turn has none. A step whose reason the reader has not heard in plain words gets one line before it: the goal it serves and what its result decides. Last line: the real next action, named; a long one named as long, never a smaller stand-in. Nothing else before the first, nothing after the last.
 
 Say only what the reader would miss if it were gone. Everything else is noise: cut it.
 
