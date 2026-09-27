@@ -79,6 +79,10 @@ describe("parseFindings", () => {
     expect(parseFindings("CLEAN\n")).toEqual([]);
     expect(parseFindings("  \n")).toEqual([]);
   });
+  test("a bare - or + is a blank line of the change, not a finding", () => {
+    const found = parseFindings("a.ts:3 | r | gone.\n- x\n-\n- y\n+ x\n+\n");
+    expect(found.map((f) => [f.before, f.after])).toEqual([[["x", "", "y"], ["x", ""]]]);
+  });
   test("a header and its change lines make one finding", () => {
     expect(
       parseFindings("hope/hooks/judge.sh:15 | fail loud | A missing claude reads as clean.\n- || exit 0\n+ || exit 127\n"),

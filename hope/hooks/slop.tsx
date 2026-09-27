@@ -55,7 +55,7 @@ const HEADER = /^(.+?):(\d+) \| (.+?) \| (.+)$/;
 
 /** judge.sh's output as findings: none when it printed nothing or CLEAN first. A header
  * "<file>:<line> | <rule> | <claim>" starts a finding and the "- " / "+ " lines after it are its
- * change; any other line is a finding of its own text alone. */
+ * change, a bare "-" or "+" being a blank line of it; any other line is a finding of its own text alone. */
 export function parseFindings(stdout: string): Finding[] {
   const lines = stdout.split("\n").filter((l) => l.trim() !== "");
   if (lines.length === 0 || lines[0].trim() === "CLEAN") return [];
@@ -72,7 +72,7 @@ export function parseFindings(stdout: string): Finding[] {
         before: [],
         after: [],
       });
-    else if (last?.file && /^[-+] /.test(l))
+    else if (last?.file && /^[-+]( |$)/.test(l))
       (l[0] === "-" ? last.before : last.after).push(l.slice(2));
     else found.push({ rule: "", claim: l.trim(), before: [], after: [] });
   }

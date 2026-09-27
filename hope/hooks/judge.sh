@@ -24,6 +24,7 @@ prompt=$(printf 'You are a taste judge. The loaded CLAUDE.md / TASTE.md hierarch
 # Full tool access by design — NO --allowed-tools fence. The judge may use any tool for richer
 # exploration; it is held to review-and-report by the PROMPT, not by a tool allowlist. bypass-
 # Permissions prevents a no-TTY permission prompt from hanging. disableAllHooks is the recursion
-# guard so the judge's own Stop is inert. stderr flows to the caller's diagnostic log.
-claude -p --no-session-persistence --settings '{"disableAllHooks":true}' \
+# guard so the judge's own Stop is inert. The default output style keeps the person's style (a
+# closing "Next:" line, say) out of the findings. stderr flows to the caller's diagnostic log.
+claude -p --no-session-persistence --settings '{"disableAllHooks":true,"outputStyle":"default"}' \
   --permission-mode bypassPermissions -- "$prompt"
