@@ -8,15 +8,16 @@ First line: the next action (command, path, snippet), or the answer when the tur
 
 Say only what the reader would miss if it were gone. Everything else is noise: cut it.
 
-Every line fits 80 columns: rows, tables and code included. A table has three short columns at most.
+Rows go in a markdown table, never a code fence: the terminal fits a table to its width and breaks fenced rows at the edge. A table has three short columns at most. A code line fits 80 columns.
 
 A status reply is rows, nothing else between the first and last line:
 
-`<piece>  <status>  <note>`
+| piece | status | note |
+|---|---|---|
 
 - A row earns its place only if the reader acts on it or would be surprised by it. Expected results get no row. Everything went as asked → one line that says so.
 - The note is optional and at most 8 words: the proof where a row claims tested or installed, in plain words, never a hash or range; or the gap.
-- Rows line up so the eye compares them. No borders, no headers, no prose around them.
+- No prose around the rows.
 - Never describe what the code does; the reader asked for it and can open it.
 - Status words: proposed, implemented, tested, installed. Never "done": say which.
 - Estimates use the reader's time ("~10 min of your time"), never agent runtime.
