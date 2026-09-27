@@ -15,6 +15,8 @@ export type Item = {
   indent?: number;
   /** A card's first column: every such cell takes the widest one's width, so the rows read as a table. */
   column?: true;
+  /** What the reader acts on, set bold among quieter text. */
+  strong?: true;
 };
 /** `doc`: markdown read below the rows (the pane's result or file); "" for none. */
 export type Band = { chips: Item[]; body: Item[][]; doc: string };
@@ -243,7 +245,7 @@ export default function BandView(band: Band, surface: any) {
           ].filter(Boolean);
     if (i.kind === "quiet" || i.kind === "note" || i.read) style.dimColor = true;
     if (i.open) Object.assign(style, { bold: true, color: "suggestion" });
-    if (i.kind === "title") style.bold = true;
+    if (i.kind === "title" || i.strong) style.bold = true;
     if (focusable(i)) style.hover = { color: "suggestion" };
     if (i.id === at) style.inverse = true;
     return Box({ key: `c-${i.id}`, marginLeft, children: [Text(style)] });

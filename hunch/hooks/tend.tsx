@@ -3,6 +3,8 @@ import { MEASURE, type Band, type Item } from "./band.tsx";
 import { changes, isSteering, isSteeringPath, memoryRows, places, retrieved, type Places, type Snapshot, type Steering } from "./memory.tsx";
 
 export type Question = { q: string; options: string[] };
+/** One expert's idea to try; `test` pits it against the version that exists. */
+export type Idea = { by: string; idea: string; why?: string; test?: string };
 export type Card = {
   intent?: string;
   shape?: string;
@@ -10,6 +12,7 @@ export type Card = {
   outcome?: string;
   facts?: string[];
   questions?: Question[];
+  ideas?: Idea[];
   skills?: { name: string; outcome: string }[];
   watch?: { label: string; open: string; see?: string }[];
 };
@@ -30,20 +33,21 @@ facts: ${FACTS}; one that settles a choice names what lost. questions: every que
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
 export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;
-const CARD_SKILLS = new Set([
-  "hope:intent",
-  "hope:shape",
-  "hope:clarify",
-  "hope:elicit",
-  "hope:draft",
-  "hope:compose",
+// Asked of consult, so its ideas list in the band to pick from.
+export const IDEAS_FORMAT = `End your reply with a \`\`\`card JSON block of the ideas, and your yes/no as its one question:
+{"ideas":[{"by":"<expert>","idea":"…","why":"…","test":"…"}],"questions":[{"q":"…","options":["yes","no"]}]}
+test: only where this idea's win differs from the one the reply names for all. The question is the reply's last line, word for word. The user cites an idea by its 1-based position: \`idea 2: …\`.`;
+// The card each skill is asked for.
+const CARD_SKILLS = new Map([
+  ...["hope:intent", "hope:shape", "hope:clarify", "hope:elicit", "hope:draft", "hope:compose"].map((k) => [k, CARD_FORMAT] as const),
+  ["hope:consult", IDEAS_FORMAT],
 ]);
 // A card opens at a line's start: one quoted inside a reply (`> ```card`) is text, not a card.
 const CARD_RE = /(?<=^|\n)```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
 const PANE = "tend";
 
 const PAD = 2;
-const CHIPS = ["intent", "shape", "facts", "questions", "skills", "watch", "memory", "agents"] as const;
+const CHIPS = ["intent", "shape", "facts", "ideas", "questions", "skills", "watch", "memory", "agents"] as const;
 
 // ---- pure ----
 
@@ -66,6 +70,9 @@ export function cleanCard(c: any): Card {
     facts: list(c.facts, str),
     questions: list(c.questions, (q): q is Question =>
       str(q?.q) && Array.isArray(q.options) && q.options.every(str),
+    ),
+    ideas: list(c.ideas, (d): d is Idea =>
+      str(d?.by) && str(d.idea) && (d.why === undefined || str(d.why)) && (d.test === undefined || str(d.test)),
     ),
     skills: list(c.skills, (k): k is { name: string; outcome: string } =>
       str(k?.name) && str(k.outcome),
@@ -200,6 +207,43 @@ export function bareFact(f: string): string {
   return f.replace(/^\s*(?:[\w-]+(?:\s+[\w-]+)?\s+confirmed|found|measured)\s*:\s*/i, "");
 }
 
+/** A consult reply cut where its colours change: markdown as written, each idea's head, and the
+ * lines under it and the shared win, which recede. */
+export type Segment = { md: string } | { head: { lead: string; change: string; rest: string } } | { dim: string };
+
+export function ideaSegments(text: string): Segment[] {
+  const out: Segment[] = [];
+  let md: string[] = [];
+  let inList = false;
+  let listed = false;
+  const flush = () => {
+    if (md.join("\n").trim()) out.push({ md: md.join("\n") });
+    md = [];
+  };
+  const plain = (t: string) => t.replace(/\*\*?|`/g, "");
+  for (const l of text.split("\n")) {
+    const head = l.match(/^(\d+\.\s.*?)\*\*(.+?)\*\*(.*)$/);
+    if (head) {
+      flush();
+      inList = listed = true;
+      out.push({ head: { lead: plain(head[1]), change: plain(head[2]), rest: plain(head[3]) } });
+    } else if (inList && /^\s+\S/.test(l)) out.push({ dim: plain(l) });
+    // A blank line between ideas keeps them apart.
+    else if (inList && !l.trim()) out.push({ dim: "" });
+    // Past the ideas, all but the closing question recedes: the win, and any note the rules left out.
+    else if (listed && l.trim() && !l.trim().endsWith("?")) {
+      flush();
+      inList = false;
+      out.push({ dim: plain(l) });
+    } else {
+      if (l.trim()) inList = false;
+      md.push(l);
+    }
+  }
+  flush();
+  return out;
+}
+
 export function firstLine(text: string): string {
   return text.split("\n").find((l) => l.trim())?.trim() ?? "";
 }
@@ -330,6 +374,7 @@ export function chipLabel(name: string, s: Shown): string {
   }
   if (name === "facts") return `facts ${s.card.facts?.length ?? 0}`;
   if (name === "questions") return `questions ${s.card.questions?.length ?? 0}`;
+  if (name === "ideas") return `ideas ${s.card.ideas?.length ?? 0}`;
   if (name === "memory") return `memory ${s.memory.length}`;
   return `${name} ${chipRows(name, s).length}`;
 }
@@ -352,6 +397,17 @@ export function cardRows(c: Card, name: string, ran: Set<string>): Item[][] {
         // Only its answers take a click.
         [title(`question:${i}`, `• ${q.q}`)],
         ...q.options.map((o, j) => [under(line(`answer:${i}:${j}`, `◦ ${o}`))]),
+      ]),
+    );
+  if (name === "ideas")
+    // The experts' names one column, so the ideas line up to compare; the why and the test sit under.
+    // Only the idea is bold: the names and the reasons recede.
+    return spaced(
+      (c.ideas ?? []).map((d, i) => [
+        [column(note(`idea-by:${i}`, d.by)), { ...line(`probe:idea ${i + 1}`, d.idea), strong: true as const }],
+        ...[d.why, d.test && `A/B: ${d.test}`].flatMap((t, k) =>
+          t ? [[column(note(`idea-gap:${i}:${k}`, "")), note(`idea-note:${i}:${k}`, t)]] : [],
+        ),
       ]),
     );
   if (name === "skills")
@@ -670,7 +726,8 @@ async function skillRan($: any, name: string): Promise<string[]> {
   ran.add(skill);
   planMoved = true;
   await remember($);
-  return CARD_SKILLS.has(skill) ? [CARD_FORMAT] : [];
+  const format = CARD_SKILLS.get(skill);
+  return format ? [format] : [];
 }
 
 // A stem the user finishes and sends as their own words.
@@ -876,6 +933,29 @@ export const register: Register = (on) => {
     if (!text.trim()) {
       const { Box } = $.ui.resolve(e);
       return <Box />;
+    }
+    // A reply that ends on ideas draws them itself: the change stands out, the rest recedes.
+    if (latestCard([{ role: "assistant", text: e.props.text }]).ideas?.length) {
+      const { Box, Text, Markdown } = $.ui.resolve(e);
+      return (
+        <Box flexDirection="column">
+          {ideaSegments(text).map((g, i) =>
+            "md" in g ? (
+              <Markdown key={`md${i}`} text={g.md} />
+            ) : "head" in g ? (
+              <Text key={`h${i}`}>
+                {g.head.lead}
+                <Text bold>{g.head.change}</Text>
+                {g.head.rest}
+              </Text>
+            ) : (
+              <Text key={`d${i}`} dimColor>
+                {g.dim}
+              </Text>
+            ),
+          )}
+        </Box>
+      );
     }
     return next({ ...e, props: { ...e.props, text } });
   });

@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -546,4 +546,69 @@ test("clicking answers to two questions: each fills its own line once, a changed
     await click("answer:1:1");
     expect(box).toBe("q1: no \nq2: branch ");
   }
+});
+
+describe("ideas", () => {
+  const ideas = [
+    { by: "Tufte", idea: "one aligned row per file", why: "the eye compares what lines up", test: "now vs rows: wins if read once" },
+    { by: "Orwell", idea: "at most five lines" },
+  ];
+  test("an idea needs who and what; a bad why or test drops it", async () => {
+    expect(cleanCard({ ideas: [...ideas, { by: "X" }, { by: "Y", idea: "z", why: 3 }] }).ideas).toEqual(ideas);
+  });
+  test("the names are one column; only the ideas take a click; the why and test sit under the idea", async () => {
+    const body = cardRows({ ideas }, "ideas", new Set());
+    expect(navRows({ chips: [], body, doc: "" }).map((r) => r.map((i) => i.id))).toEqual([["probe:idea 1"], ["probe:idea 2"]]);
+    const lines = layout({ chips: [], body, doc: "" }, 72);
+    const x = (id: string) => lines.flatMap((l) => l.cells).find((c) => c.item.id === id)!.x;
+    expect(x("probe:idea 1")).toBe(x("probe:idea 2"));
+    expect(x("idea-note:0:0")).toBe(x("probe:idea 1"));
+    expect(x("idea-note:0:1")).toBe(x("probe:idea 1"));
+    expect(chipLabel("ideas", { card: { ideas }, ran: new Set(), rows: [], paneItem: null, memory: [] })).toBe("ideas 2");
+  });
+  test("consult is asked for its ideas as a card; another card skill for the session's", async ($, on) => {
+    mock.store(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("command.list", () => ({ value: [{ name: "hope:consult" }, { name: "hope:intent" }] as any }));
+    on("tool.call", () => ({ result: "ok" }) as any);
+    const asked = async (skill: string) => ((await $.tool.call({ tool: "Skill", skill } as any)) as any).context;
+    expect(await asked("hope:consult")).toEqual([IDEAS_FORMAT]);
+    expect(await asked("hope:intent")).not.toContain(IDEAS_FORMAT);
+  });
+  test("clicking an idea puts its stem in the prompt", async ($, on) => {
+    mock.store(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.messages", () => ({ value: [said(block(JSON.stringify({ ideas })))] }));
+    on("ui.invalidate", () => ({ value: undefined }));
+    on("turn.complete", (_, e) => ({ text: e.answer }));
+    let box = "";
+    on("prompt.read", () => ({ value: { text: box, cursor: box.length } }));
+    on("prompt.fill", (_, e) => {
+      box = e.mode === "replace" ? e.text : box + e.text;
+      return { isFilled: true };
+    });
+    await $.turn.complete({ answer: "ok", durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    for (const surface of ["terminal", "desktop"] as const) {
+      box = "";
+      const band = await $.ui.mount({ plugin: "hunch", surface, component: "AbovePrompt", props: { bodyColumns: 80 } as any });
+      await band.post({ act: "probe:idea 2" });
+      expect(box).toBe("idea 2: ");
+    }
+  });
+});
+
+test("a consult reply splits where its colours change", async () => {
+  const reply = "1. Mostafa — **open on the title**\n   *his hooks open on it*\n\n2. Wegz — **leave a line `open`**\n   *no side*\n   win: louder\n\nWin: you pick it blind.\nIdea 5 is measured instead.\nBuild all two?";
+  expect(ideaSegments(reply)).toEqual([
+    { head: { lead: "1. Mostafa — ", change: "open on the title", rest: "" } },
+    { dim: "   his hooks open on it" },
+    { dim: "" },
+    { head: { lead: "2. Wegz — ", change: "leave a line open", rest: "" } },
+    { dim: "   no side" },
+    { dim: "   win: louder" },
+    { dim: "" },
+    { dim: "Win: you pick it blind." },
+    { dim: "Idea 5 is measured instead." },
+    { md: "Build all two?" },
+  ]);
 });
