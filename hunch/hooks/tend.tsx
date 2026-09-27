@@ -985,8 +985,9 @@ export const register: Register = (on) => {
     const { Box, Client } = els;
     const band = bandModel({ card, paneItem, ran, rows, memory });
     if (!band.chips.length) return <Box />;
+    // A blank line parts the band from the reply above it, so the chips read as controls, not its last line.
     return (
-      <Box>
+      <Box marginTop={1}>
         <Client key={`band-${fills}`} module="./band.tsx" props={band} width={e.props.bodyColumns} />
       </Box>
     );
