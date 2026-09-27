@@ -90,6 +90,7 @@ function world(on: any, files: () => Record<string, number>): Map<string, unknow
   on("classic.SessionStart", () => ({}));
   on("classic.Stop", () => ({}));
   on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.root", () => ({ value: "/repo" }));
   on("ui.invalidate", () => ({ value: undefined }));
   on("session.usage", () => ({ value: { context: { window: 1, breakdown: { memoryFiles: [{ path: "/repo/CLAUDE.md", type: "Project", tokens: 1 }] } } } }));

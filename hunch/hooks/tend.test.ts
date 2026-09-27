@@ -407,6 +407,7 @@ describe("open questions", () => {
   test("a prose question joins the card, a repeat does not, and the next prompt closes them all", async ($, on) => {
     mock.store(on);
     on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
     const msgs = [said(block('{"intent":"i","questions":[{"q":"Which one?","options":["a"]}]}'))];
     on("session.messages", () => ({ value: msgs }));
     on("ui.invalidate", () => ({ value: undefined }));
@@ -438,6 +439,7 @@ test("a compaction ends on the whole card, word for word, open questions only", 
   const open = [{ q: "Ship now?", options: ["yes", "no"] }, { q: "Which branch?", options: [] }];
   mock.store(on, { "tend:s1:open": open });
   on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
   const summary = { role: "user" as const, text: "Summary: we talked about tend.", toolUses: [] };
   on("session.compact", () => ({ messages: [summary] }));
   const { messages } = await $.session.compact({ trigger: "manual", messages: [said(block(JSON.stringify(card)))] });
@@ -475,6 +477,7 @@ test("the store keeps only the latest sessions' keys", async ($, on) => {
   on("store.delete", (_, e) => (store.delete(e.key), { value: undefined }));
   on("store.keys", () => ({ value: [...store.keys()] }));
   on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
   expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(
@@ -502,10 +505,25 @@ test("a store over its cap with no session list shrinks to the current session",
   on("store.delete", (_, e) => (store.delete(e.key), { value: undefined }));
   on("store.keys", () => ({ value: [...store.keys()] }));
   on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
   expect([...store.keys()]).toEqual(["tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
+});
+
+test("a headless session keeps nothing, so it pushes no live session out", async ($, on) => {
+  const live = Array.from({ length: 20 }, (_, i) => `live${i}`);
+  const store = new Map<string, unknown>([["tend:recent", live]]);
+  on("store.get", (_, e) => ({ value: store.get(e.key) }));
+  on("store.set", (_, e) => (store.set(e.key, e.value), { value: undefined }));
+  on("store.delete", (_, e) => (store.delete(e.key), { value: undefined }));
+  on("store.keys", () => ({ value: [...store.keys()] }));
+  on("session.id", () => ({ value: "headless" }));
+  on("session.surfaces", () => ({ value: [] }));
+  on("session.start", (_, e) => e);
+  await $.session.start({ source: "startup", cwd: "/p" } as any);
+  expect(store.get("tend:recent")).toEqual(live);
 });
 
 test("a second answer to a question swaps the first in place; the rest of the prompt stays", async () => {
@@ -520,6 +538,7 @@ test("a second answer to a question swaps the first in place; the rest of the pr
 test("clicking answers to two questions: each fills its own line once, a changed one swaps in place", async ($, on) => {
   mock.store(on);
   on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
   const qs = [{ q: "Ship?", options: ["yes", "no"] }, { q: "Where?", options: ["main", "branch"] }];
   on("session.messages", () => ({ value: [said(block(JSON.stringify({ intent: "i", questions: qs })))] }));
   on("ui.invalidate", () => ({ value: undefined }));
@@ -569,6 +588,7 @@ describe("ideas", () => {
   test("consult is asked for its ideas as a card; another card skill for the session's", async ($, on) => {
     mock.store(on);
     on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
     on("command.list", () => ({ value: [{ name: "hope:consult" }, { name: "hope:intent" }] as any }));
     on("tool.call", () => ({ result: "ok" }) as any);
     const asked = async (skill: string) => ((await $.tool.call({ tool: "Skill", skill } as any)) as any).context;
@@ -578,6 +598,7 @@ describe("ideas", () => {
   test("clicking an idea puts its stem in the prompt", async ($, on) => {
     mock.store(on);
     on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
     on("session.messages", () => ({ value: [said(block(JSON.stringify({ ideas })))] }));
     on("ui.invalidate", () => ({ value: undefined }));
     on("turn.complete", (_, e) => ({ text: e.answer }));

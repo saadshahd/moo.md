@@ -530,8 +530,14 @@ async function sid($: any): Promise<string> {
   if (id === sessionId) return id;
   if (sessionId) reset();
   sessionId = id;
-  await keepRecent($, id);
+  if (!(await headless($))) await keepRecent($, id);
   return id;
+}
+
+/** A `-p` run or the SDK draws nowhere, so nobody sees what it would keep. Hooks spawn many:
+ * each one kept would push a live session out of the store. */
+async function headless($: any): Promise<boolean> {
+  return (await $.session.surfaces()).length === 0;
 }
 
 // The store outlives every session and holds 4 MiB in all: only the latest sessions keep their keys.
@@ -593,8 +599,9 @@ async function snapshot($: any, p: Places): Promise<Snapshot> {
 // and lists what the session read or loaded besides.
 async function readMemory($: any, transcriptPath: string) {
   const p = places(transcriptPath, await $.session.root());
-  if (!p) return;
-  await sid($);
+  if (!p || (await headless($))) return;
+  // Each stop moves the session to the front, so a long one outlives the sessions opened since.
+  await keepRecent($, await sid($));
   const base = (await $.store.get(`tend:${sessionId}:memory-base`)) as Snapshot | undefined;
   const now = await snapshot($, p);
   if (!base) await $.store.set(`tend:${sessionId}:memory-base`, now);
