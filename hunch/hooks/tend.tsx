@@ -468,11 +468,12 @@ const KEPT_SESSIONS = 20;
 async function keepRecent($: any, id: string) {
   const before = ((await $.store.get("tend:recent")) as string[] | undefined) ?? [];
   const recent = [id, ...before.filter((s) => s !== id)].slice(0, KEPT_SESSIONS);
-  await $.store.set("tend:recent", recent);
   const stale = ((await $.store.keys()) as string[]).filter(
     (k) => k.startsWith("tend:") && k !== "tend:recent" && !recent.includes(k.split(":")[1]),
   );
+  // Delete first: a store already over its cap refuses every set, the list's included.
   for (const k of stale) await $.store.delete(k);
+  await $.store.set("tend:recent", recent);
 }
 
 // A reload wipes module memory; the store keeps which skills ran and which teammates sit idle.

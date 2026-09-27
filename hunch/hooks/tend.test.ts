@@ -479,3 +479,28 @@ test("the store keeps only the latest sessions' keys", async ($, on) => {
   );
   expect(store.get("tend:recent")).toEqual(["s1", ...old.slice(0, 19)]);
 });
+
+test("a store over its cap with no session list shrinks to the current session", async ($, on) => {
+  const cap = 100;
+  const store = new Map<string, unknown>(
+    Array.from({ length: 10 }, (_, i): [string, unknown] => [`tend:old${i}:memory-base`, "x".repeat(20)]),
+  );
+  const size = () => JSON.stringify(Object.fromEntries(store)).length;
+  on("store.get", (_, e) => ({ value: store.get(e.key) }));
+  on("store.set", (_, e) => {
+    const was = store.get(e.key);
+    store.set(e.key, e.value);
+    if (size() > cap) {
+      was === undefined ? store.delete(e.key) : store.set(e.key, was);
+      throw new Error("$.store.set: over the limit");
+    }
+    return { value: undefined };
+  });
+  on("store.delete", (_, e) => (store.delete(e.key), { value: undefined }));
+  on("store.keys", () => ({ value: [...store.keys()] }));
+  on("session.id", () => ({ value: "s1" }));
+  on("session.start", (_, e) => e);
+  await $.session.start({ source: "startup", cwd: "/p" } as any);
+  expect([...store.keys()]).toEqual(["tend:recent"]);
+  expect(store.get("tend:recent")).toEqual(["s1"]);
+});
