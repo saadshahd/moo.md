@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -427,6 +427,24 @@ describe("open questions", () => {
     await $.prompt.submit({ text: "check it against main", origin: { kind: "composer" } } as any);
     expect(await replayed()).toEqual({ intent: "i" });
   });
+});
+
+test("an agent's return, report or notification, asks for one line or an empty card; a shell's return and the user's prompt do not", async ($, on) => {
+  mock.store(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.messages", () => ({ value: [] }));
+  on("agent.list", () => ({ value: [{ id: "a1", name: "scan", type: "Explore", status: "completed" }] }));
+  on("prompt.submit", (_, e) => ({ text: e.text, context: e.context }));
+  const note = (id: string) =>
+    $.prompt.submit({ text: `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n</task-notification>`, origin: { kind: "task-notification" } } as any);
+  expect(((await note("a1")) as any).context).toContain(AGENT_RETURN);
+  expect(((await note("b9")) as any).context ?? []).not.toContain(AGENT_RETURN);
+  const handback = await $.prompt.submit({ text: `Another Claude session sent a message: <agent-message from="a1"> [Subagent hand-back] 20 files.`, origin: { kind: "peer" } } as any);
+  expect((handback as any).context).toContain(AGENT_RETURN);
+  const own = await $.prompt.submit({ text: "go on", origin: { kind: "composer" } } as any);
+  expect((own as any).context ?? []).not.toContain(AGENT_RETURN);
+  // The reply it asks for draws nothing in the thread.
+  expect(stripCards("```card\n{}\n```")).toBe("");
 });
 
 test("a compaction ends on the whole card, word for word, open questions only", async ($, on) => {

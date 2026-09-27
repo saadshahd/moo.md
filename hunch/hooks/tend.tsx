@@ -33,6 +33,11 @@ facts: ${FACTS}; one that settles a choice names what lost. questions: every que
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
 export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;
+// Asked of the session when one of its agents returns: the result sits in the agents pane, not the thread.
+export const AGENT_RETURN = `The user did not send this agent's return; its result sits in their agents pane. Carry on any work it unblocks. Then, if the result changes what the user does next, tell them in one line. Otherwise your reply is only an empty card block:
+\`\`\`card
+{}
+\`\`\``;
 // Asked of consult, so its ideas list in the band to pick from.
 export const IDEAS_FORMAT = `End your reply with a \`\`\`card JSON block of the ideas, and your yes/no as its one question:
 {"ideas":[{"by":"<expert>","idea":"…","why":"…","test":"…"}],"questions":[{"q":"…","options":["yes","no"]}]}
@@ -878,6 +883,12 @@ export const register: Register = (on) => {
     const asked = name ? await skillRan($, name) : [];
     const withContext = (more: string[]) =>
       more.length ? next({ ...e, context: [...(e.context ?? []), ...more] }) : next(e);
+    // An agent's return arrives twice: its report as a peer's hand-back, then the task notification.
+    if (e.origin.kind === "task-notification" || e.origin.kind === "peer") {
+      const id = e.text.match(/<task-id>([^<]+)<\/task-id>|<agent-message from="([^"]+)"/)?.slice(1).find(Boolean);
+      const agent = !!id && (rows.some((r) => r.id === id) || ((await $.agent.list()) as any[]).some((a) => a.id === id));
+      return withContext(agent ? [...asked, AGENT_RETURN] : asked);
+    }
     if (e.origin.kind !== "composer") return withContext(asked);
     // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
     await setOpen($, []);
