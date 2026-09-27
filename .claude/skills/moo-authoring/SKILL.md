@@ -74,6 +74,7 @@ Every hook is a function hook: it reaches the human with no model turn. The API 
 - Work longer than one dispatch runs unawaited, so the turn's end is never held.
 - State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files or module variables. A hot reload drops module variables.
 - A failure shows once, as a toast, and the event passes on.
+- A pane or band is verified on events copied from real session transcripts, one per shape it renders; a synthetic event alone never verifies it.
 - One hooks module per plugin; a second part composes into it. A second registration on the same event and matcher in one plugin is dropped silently.
 
 A hook that spawns headless `claude -p` copies its flag set from `hope/hooks/judge.sh`, where each flag is commented at the point of use.
