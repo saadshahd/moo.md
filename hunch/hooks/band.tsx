@@ -176,6 +176,9 @@ export function hit(lines: Line[], x: number, y: number): Item | undefined {
     ?.cells.find((c) => x >= c.x && x < c.x + c.text.length)?.item;
 }
 
+// The surface is sealed, so what one instance has typed is kept here, by its surface.
+const typed = new WeakMap<object, string>();
+
 export default function BandView(band: Band, surface: any) {
   const { Box, Text, Markdown } = surface.elements;
   const rows = navRows(band);
@@ -195,8 +198,9 @@ export default function BandView(band: Band, surface: any) {
     // A typed character was meant for the prompt: send it there, and the keys follow. Posts in
     // one frame replace each other, so each carries all typed here; the hook fills what's new.
     if ([...k.key].length === 1) {
-      surface.typed = (surface.typed ?? "") + k.key;
-      return surface.post({ type: surface.typed });
+      const all = (typed.get(surface) ?? "") + k.key;
+      typed.set(surface, all);
+      return surface.post({ type: all });
     }
     const state: Focus = surface.state ?? { row: 0, col: 0 };
     const now = move(state, rows, "");
