@@ -128,10 +128,12 @@ export function swapAnswer(box: string, n: number, options: string[], pick: stri
   return found && box.slice(0, found.from) + at + pick + box.slice(found.from + found.len);
 }
 
-/** The questions a turn leaves open: its reply's card's, else those already open, then the ones
- * it asked in prose, with no options. */
+/** The questions a turn leaves open: its reply's card's when it lists any, since a card lists every
+ * open one; else those already open, then the ones it asked in prose, with no options. */
 export function turnQuestions(answer: string, open: Question[]): Question[] {
-  const asked = latestCard([{ role: "assistant", text: answer }]).questions ?? open;
+  const carded = latestCard([{ role: "assistant", text: answer }]).questions;
+  if (carded?.length) return carded;
+  const asked = carded ?? open;
   return [...asked, ...proseQuestions(answer, asked.map((q) => q.q)).map((q) => ({ q, options: [] }))];
 }
 
@@ -280,6 +282,7 @@ export function fromFile(file: string, href: string): string {
 const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
 const quiet = (id: string, label: string): Item => ({ id, label, kind: "quiet" });
 const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
+const title = (id: string, label: string): Item => ({ id, label, kind: "title" });
 const under = (i: Item): Item => ({ ...i, indent: 2 });
 const column = (i: Item): Item => ({ ...i, column: true });
 // Entries a blank line apart, so each reads as one.
@@ -346,7 +349,8 @@ export function cardRows(c: Card, name: string, ran: Set<string>): Item[][] {
   if (name === "questions")
     return spaced(
       (c.questions ?? []).map((q, i) => [
-        [line(`probe:q${i + 1}`, `• ${q.q}`)],
+        // Only its answers take a click.
+        [title(`question:${i}`, `• ${q.q}`)],
         ...q.options.map((o, j) => [under(line(`answer:${i}:${j}`, `◦ ${o}`))]),
       ]),
     );
@@ -691,12 +695,13 @@ async function fill($: any, text: string) {
   else await $.prompt.suggest({ text });
 }
 
-// A second answer to a question takes the first one's place; the first is filled like any line,
-// but is an answer, not a bare stem: the next line joins it rather than replacing it.
+// A second answer to a question takes the first one's place; the first starts its own line in
+// the box, and is an answer, not a bare stem: the next line joins it rather than replacing it.
 async function setAnswer($: any, n: number, options: string[], pick: string) {
   const box: string = (await $.prompt.read()).text;
   const swapped = swapAnswer(box, n, options, pick);
-  if (swapped === undefined) await fill($, `q${n}: ${pick} `);
+  const own = box.trim() && !box.endsWith("\n") ? "\n" : "";
+  if (swapped === undefined) await fill($, `${own}q${n}: ${pick} `);
   else if (swapped !== box && (await $.prompt.fill({ text: swapped, mode: "replace" })).isFilled) fills++;
   lastStem = "";
 }

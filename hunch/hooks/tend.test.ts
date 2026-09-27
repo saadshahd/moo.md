@@ -309,14 +309,16 @@ describe("band", () => {
   ]);
   expect(new Set(lines.map((l) => l.cells[0].item.id))).toEqual(new Set(["probe:intent"]));
 });
-test("a question's rows: the question, then each answer", async () => {
+test("a question's rows: the question, which takes no click, then each answer", async () => {
     const rows = cardRows(
       { questions: [{ q: "a?", options: ["x", "y"] }] },
       "questions",
       new Set(),
       new Set(),
     );
-    expect(rows.map((r) => r.map((i) => i.id))).toEqual([["probe:q1"], ["answer:0:0"], ["answer:0:1"]]);
+    expect(rows.map((r) => r.map((i) => i.id))).toEqual([["question:0"], ["answer:0:0"], ["answer:0:1"]]);
+    // A click reaches only what the arrows can stop on.
+    expect(navRows({ chips: [], body: rows, doc: "" }).map((r) => r.map((i) => i.id))).toEqual([["answer:0:0"], ["answer:0:1"]]);
   });
 });
 
@@ -387,12 +389,13 @@ describe("open questions", () => {
   test("one already a card question, or asked twice, is skipped", async () => {
     expect(proseQuestions("Ship it?\nShip it?\nWhich one?", ["Which one?"])).toEqual(["Ship it?"]);
   });
-  test("a turn leaves open its card's questions, else those open before, then its prose ones", async () => {
+  test("a turn leaves open its card's questions when it lists any; else those open before, then its prose ones", async () => {
     const before = [{ q: "Old?", options: ["y"] }];
-    expect(turnQuestions(block('{"questions":[{"q":"New?","options":["a"]}]}') + "Ship?", before)).toEqual([
+    // A card that lists questions lists them all: its prose, even a reworded copy, adds none.
+    expect(turnQuestions(block('{"questions":[{"q":"New?","options":["a"]}]}') + "**4. New, reworded.** What now?", before)).toEqual([
       { q: "New?", options: ["a"] },
-      { q: "Ship?", options: [] },
     ]);
+    expect(turnQuestions(block('{"questions":[]}') + "Ship?", before)).toEqual([{ q: "Ship?", options: [] }]);
     expect(turnQuestions("Old?\nShip?", before)).toEqual([...before, { q: "Ship?", options: [] }]);
   });
   test("the card shows the open questions, not its blocks' own; none kept yet leaves the blocks'", async () => {
@@ -514,7 +517,7 @@ test("a second answer to a question swaps the first in place; the rest of the pr
   expect(swapAnswer("q1: no ", 1, opts, "no")).toBe("q1: no ");
 });
 
-test("clicking answers to two questions: each fills once, a changed one swaps in place", async ($, on) => {
+test("clicking answers to two questions: each fills its own line once, a changed one swaps in place", async ($, on) => {
   mock.store(on);
   on("session.id", () => ({ value: "s1" }));
   const qs = [{ q: "Ship?", options: ["yes", "no"] }, { q: "Where?", options: ["main", "branch"] }];
@@ -535,12 +538,12 @@ test("clicking answers to two questions: each fills once, a changed one swaps in
     await click("answer:0:0");
     expect(box).toBe("q1: yes ");
     await click("answer:1:0");
-    expect(box).toBe("q1: yes q2: main ");
+    expect(box).toBe("q1: yes \nq2: main ");
     await click("answer:0:1");
-    expect(box).toBe("q1: no q2: main ");
+    expect(box).toBe("q1: no \nq2: main ");
     await click("answer:1:1");
-    expect(box).toBe("q1: no q2: branch ");
+    expect(box).toBe("q1: no \nq2: branch ");
     await click("answer:1:1");
-    expect(box).toBe("q1: no q2: branch ");
+    expect(box).toBe("q1: no \nq2: branch ");
   }
 });
