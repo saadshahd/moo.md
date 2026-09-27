@@ -40,7 +40,7 @@ Defects the rules only gesture at:
 | Negative form | State it positively | "not different" → "the same" |
 | Hedge — "somewhat", "fairly", "arguably", "should probably" | Cut it or commit | "should probably work" → "works", or name when it fails |
 | Abstract where concrete exists | Name the thing | "the relevant file" → "`config.ts`" |
-| Unexplained acronym | Spell it out, or drop it | "the CAS failed" → "the compare-and-swap failed" |
+| Unplaced name — one the reader didn't bring in: an acronym, a label you coined, or one from a subagent, another project, or memory | Say what it is and where it came from, or drop it for plain words | "the CAS failed" → "the compare-and-swap failed"; "the bench cards" → "the rule sheets that end your songs sessions" |
 | One sentence, two ideas | Split it | — |
 
 Caps, from Simplified Technical English:
