@@ -26,6 +26,6 @@ If narrowing has left the rule unable to give a definite answer in 10 situations
 
 ## Hand back
 
-Three things: the case set, one case per line; the rule; and the record — one line per situation listed with the answer the rule forces, one line per narrowing with the situation that forced it. The rule is claimed right on the set and the listed situations, checked; everything wider stays open.
+The rule, then one line per case and per listed situation, each with the answer the rule forces.
 
 Nothing unseen will ever meet the rule — something already written should get shorter and nothing it covers can be lost → use **reduce** skill.

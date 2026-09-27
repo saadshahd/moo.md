@@ -11,6 +11,6 @@ If what it must cover has moved since the text was written — cases now in hand
 
 Push the derived statement shorter, pass by pass. When a pass makes it stop covering something, it went too far — back off by the minimum that recovers it. The floor is where every remaining cut costs coverage; a clause that survives every pass is load-bearing.
 
-Hand back two things: the reduced statement, and the name of anything that refused to get shorter. The statement is claimed to cover the set it was derived from, checked — everything outside that set is open.
+Hand back the reduced statement alone.
 
 What it must cover can't be stated or recovered → every cut is blind. Something unseen will meet it — a class no rule yet decides, or a rule that decides only the cases it came from → use **widen** skill.

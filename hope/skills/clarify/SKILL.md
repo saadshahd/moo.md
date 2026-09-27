@@ -7,6 +7,6 @@ Name the readings apart, each ending in what it would build or do differently. A
 
 One exchange: readings out, pick back. If the user cannot pick, the words are not the problem — stop.
 
-Take the pick as the confirmed ask, restate it, and name what it leaves open. As short as it goes with nothing in the ask lost — plain words.
+Take the pick as the confirmed ask and restate it. As short as it goes with nothing in the ask lost.
 
 The ask is already concrete and the pull is to keep questioning its decisions → use **interrogate** skill. The user holds something no reading of their words captures → use **elicit** skill.

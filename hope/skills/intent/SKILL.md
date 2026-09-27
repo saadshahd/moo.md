@@ -14,6 +14,6 @@ Route each thing still left to invent by what it is, invoking the named skill wi
 
 Route again until nothing is left to invent. Where the input leaves it open, ask the negative once — what should this NOT do.
 
-State the work order: the ask, what it must NOT do where that surfaced, and what is still open. As short as it goes with nothing in the spec lost — plain words.
+Ask what is still open first, with AskUserQuestion. Then state the work order, naming no skill: the ask, and what it must NOT do where that surfaced. As short as it goes with nothing in the spec lost.
 
 The WHAT is confirmed and what's open is the technical path → use **shape** skill.

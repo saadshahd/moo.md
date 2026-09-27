@@ -46,7 +46,7 @@ One of the three is missing → say which and stop.
 
 ## In flight
 
-Stopped means the agent wants the user. Nothing arrives by message: a silent agent is unaccounted, not done, and an agent's account of itself is a claim, not the log.
+Stopped means the agent wants the user. Until one stops, say nothing. Nothing arrives by message: a silent agent is unaccounted, not done, and an agent's account of itself is a claim, not the log.
 
 ## Landing
 

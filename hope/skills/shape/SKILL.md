@@ -21,6 +21,6 @@ Each decision re-enters the routing: a resolved choice can open the next one or 
 
 ## The path
 
-State it: each choice resolved with its reason and what was turned down, and any choice still standing open. The user owns the path.
+Ask any choice still open first, with AskUserQuestion. Then state each resolved choice with its reason and what lost.
 
 The ask itself is still rough — starting would mean inventing what the user means → use **intent** skill.

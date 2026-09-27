@@ -15,6 +15,6 @@ The user drives it: each iteration is one pull from them — a follow-up questio
 - "I still don't get it" means the line was wrong — find a different plain line rather than adding words to the old one.
 - After each line, wait for the next pull.
 
-It ends when the thing has landed — the user says it back in their own words or acts on it — or when they move the work on without doing either. Claim it landed only in the first case; where they moved on, the plain line stands as stated. Name what the explaining leaves open.
+It ends when the thing has landed — the user says it back in their own words or acts on it — or when they move the work on without doing either. Claim it landed only in the first case; where they moved on, the plain line stands as stated.
 
 The user holds it and you're the one missing it → ask a direct question. The user holds it but cannot yet put it into words → use **elicit** skill. The user wants a verdict on it, not an understanding of it → use **judge** skill.
