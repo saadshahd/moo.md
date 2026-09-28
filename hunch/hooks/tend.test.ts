@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { prose, textKey, wantsShort, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -650,4 +650,56 @@ test("a consult reply splits where its colours change", async () => {
     { dim: "Idea 5 is measured instead." },
     { md: "Build all two?" },
   ]);
+});
+
+describe("short replies", () => {
+  const long = "word ".repeat(40);
+  test("prose leaves out tables and fenced code", async () => {
+    expect(prose("lead\n| a | b |\n|---|---|\n| 1 | 2 |\n```\ncode\n```\ntail")).toBe("lead\n\ntail");
+  });
+  test("only prose past two 80-column lines is shortened", async () => {
+    expect(wantsShort(long, "status?")).toBe(true);
+    expect(wantsShort("short line", "status?")).toBe(false);
+    expect(wantsShort(`| row |\n${"| x |\n".repeat(60)}`, "status?")).toBe(false);
+  });
+  test("a reply the user asked to be long stays long", async () => {
+    expect(wantsShort(long, "explain how it works")).toBe(false);
+    expect(wantsShort(long, "walk me through it")).toBe(false);
+  });
+  test("the key tells replies apart and repeats for the same one", async () => {
+    expect(textKey(long)).toBe(textKey(long));
+    expect(textKey(long)).not.toBe(textKey(long + "."));
+  });
+});
+
+// A real reply the user called a wall of text (a songs session, 2026-09-25), cut short.
+const WALL = "The last research agent is back. No tool can check sung Egyptian Arabic word by word yet, and no candidate has been tested on singing. The work order above still waits on your answer.\n\nThree chains are worth building:\n\n1. **Free chain.**\n   - It runs on this Mac.\n   - It pulls out the vocal and finds each word's timing.\n   - Then it compares the sounds a phonetic recogniser hears (ZIPA) against the sounds I write by hand from your Franco.\n   - It is the only one of the three that can hear g against j, or a glottal stop against q.\n2. **Azure pronunciation scorer.**\n   - It lists Egyptian Arabic and scores each word against the lyric.\n   - It needs the least building.\n   - It gives no sound-by-sound detail for Arabic, so it catches blurred or wrong words, not accent.\n   - It is paid per hour of audio.\n3. **Two speech-to-text tools agreeing.** This measures whether a word comes ac";
+
+test("a long reply is redrawn short once its turn ends, and /long shows it whole again", async ($, on) => {
+  mock.store(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("session.messages", () => ({ value: [{ role: "user", text: "we need to research avalable tools", toolUses: [] }, said(WALL)] }));
+  on("ui.invalidate", () => ({ value: undefined }));
+  on("ui.toast", () => ({ value: undefined }));
+  const asks: string[] = [];
+  on("model.complete", (_, e) => {
+    asks.push(e.prompt);
+    return { value: { isAnswered: true, text: "No tool checks sung words yet. Which chain do I build?", usage: {} } } as any;
+  });
+  let shown = "";
+  on("ui.render", (_, e) => {
+    shown = (e.props as any).text;
+    return { type: "Box", props: {} } as any;
+  });
+  on("turn.complete", (_, e) => ({ text: e.answer }));
+  await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+  expect(asks).toHaveLength(1);
+  expect(asks[0]).toContain(WALL);
+  const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
+  await reply.drawn();
+  expect(shown).toContain("Which chain do I build?");
+  await $.command.run({ command: "long", args: "" } as any);
+  await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
+  expect(shown).toContain("Three chains are worth building");
 });

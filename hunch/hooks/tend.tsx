@@ -61,6 +61,45 @@ export function stripCards(text: string): string {
   return text.replace(CARD_RE, "").replace(/(?<=^|\n)```card[\s\S]*$/, "").trimEnd();
 }
 
+// A reply with more prose than two 80-column lines is redrawn short; tables and code don't count.
+const PROSE_MAX = 160;
+
+/** The reply's prose: what is left once fenced code and table rows are out. */
+export function prose(text: string): string {
+  return text
+    .replace(/(?<=^|\n)```[\s\S]*?(\n```|$)/g, "")
+    .split("\n")
+    .filter((l) => !l.trimStart().startsWith("|"))
+    .join("\n")
+    .trim();
+}
+
+/** A reply to "explain" or "walk me through" is long because the user asked for long. */
+export function wantsShort(reply: string, prompt: string): boolean {
+  return prose(reply).length > PROSE_MAX && !/\bexplain\b|walk me through/i.test(prompt);
+}
+
+// What won the user's blind ranking of real replies: short, but never a fact cut they'd act on.
+export function shortAsk(reply: string): string {
+  return `Rewrite the reply below, which an agent sent to a user, as the shortest reply that still covers everything it must.
+It must cover: every decision it asks of the user, every result the user needs, and its next action.
+Derive the rewrite from that coverage, not by deleting sentences. Keep its first-line and last-line order, its tables and its code.
+Cut commit hashes, ids and dates unless the user must act on one.
+Never pack several facts into one line: give each fact the user would act on its own sentence or row, and keep it rather than cut it.
+Hand back the rewritten reply alone.
+
+<reply>
+${reply}
+</reply>`;
+}
+
+/** A short key for a reply's text, so the store holds its short form without the long one. */
+export function textKey(text: string): string {
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0;
+  return `${h.toString(36)}.${text.length}`;
+}
+
 const str = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
 // An explicit [] stays: it clears an older block's list.
 const list = <T,>(v: unknown, keep: (x: any) => x is T): T[] | undefined =>
@@ -504,6 +543,11 @@ let fills = 0;
 let lastStem = "";
 // How much of each Client's typed text has reached the prompt, by the Client's key.
 const typedFrom = new Map<string, number>();
+// Each long reply's short form, by textKey of the long one; `/long` shows the long ones again.
+const short = new Map<string, string>();
+let showLong = false;
+// The store keeps the latest short forms only: a session's replies would outgrow its share.
+const KEPT_SHORT = 40;
 
 // ---- effects ----
 
@@ -513,6 +557,21 @@ async function registerCommands($: any) {
     description: "Reopen the pane",
     immediate: true,
   });
+  await $.command.register({
+    name: "long",
+    description: "Show replies at full length, or short again",
+    immediate: true,
+  });
+}
+
+/** Redraws a long reply short once the turn ends: its long form already showed while it streamed. */
+async function shorten($: any, reply: string) {
+  const r = await $.model.complete({ model: "haiku", prompt: shortAsk(reply), maxTokens: 2048, timeoutMs: 60_000 });
+  if (!r.isAnswered) throw new Error(`the short reply failed: ${r.reason}`);
+  short.set(textKey(reply), r.text.trim());
+  const kept = [...short].slice(-KEPT_SHORT);
+  await $.store.set(`tend:${await sid($)}:short`, Object.fromEntries(kept));
+  $.ui.invalidate("ui.render");
 }
 
 async function readSession($: any) {
@@ -571,6 +630,8 @@ async function recall($: any) {
   for (const r of ((await $.store.get(`tend:${sessionId}:ran`)) as string[]) ?? []) ran.add(r);
   for (const i of ((await $.store.get(`tend:${sessionId}:idle`)) as string[]) ?? []) idle.add(i);
   memory = ((await $.store.get(`tend:${sessionId}:memory`)) as Steering[]) ?? [];
+  const kept = ((await $.store.get(`tend:${sessionId}:short`)) as Record<string, string>) ?? {};
+  for (const [k, v] of Object.entries(kept)) short.set(k, v);
 }
 
 async function snapshot($: any, p: Places): Promise<Snapshot> {
@@ -788,6 +849,7 @@ function reset() {
   views.clear();
   paneText.clear();
   typedFrom.clear();
+  short.clear();
   lastStem = "";
   planMoved = false;
   nextCmd = undefined;
@@ -846,6 +908,13 @@ export const register: Register = (on) => {
   on("classic.Stop", async ($, e, next) => {
     await readMemory($, e.transcript_path).catch((err) => $.ui.toast(`tend: ${err?.message ?? err}`));
     return next(e);
+  });
+
+  on("command.run", { command: "long" }, async ($) => {
+    showLong = !showLong;
+    $.ui.invalidate("ui.render");
+    $.ui.toast(showLong ? "replies at full length" : "long replies short again");
+    return {};
   });
 
   on("command.run", { command: "cards" }, async ($) => {
@@ -910,6 +979,9 @@ export const register: Register = (on) => {
     else {
       await readSession($);
       await setOpen($, turnQuestions(e.answer, card.questions ?? []));
+      const reply = stripCards(e.answer);
+      const asked = ((await $.session.messages()) as Msg[]).findLast((m) => m.role === "user")?.text ?? "";
+      if (!(await headless($)) && wantsShort(reply, asked)) loud($, shorten($, reply));
       const nextSkill = planMoved && card.skills?.find((k) => !hasRun(ran, k.name));
       planMoved = false;
       // A suggestion made while the turn is live never shows.
@@ -946,7 +1018,8 @@ export const register: Register = (on) => {
 
   // The card block is for the band; the model keeps it, the transcript doesn't show it.
   on("ui.render", { component: "AssistantMessage" }, ($, e, next) => {
-    const text = stripCards(e.props.text);
+    const stripped = stripCards(e.props.text);
+    const text = (!showLong && short.get(textKey(stripped))) || stripped;
     if (text === e.props.text) return next(e);
     if (!text.trim()) {
       const { Box } = $.ui.resolve(e);
