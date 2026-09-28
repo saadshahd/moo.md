@@ -1,6 +1,6 @@
 import type { Register } from "claude-code";
 import { MEASURE, type Band, type Item } from "./band.tsx";
-import { EDITS, MOVES, heldReason, saysGo, unquoted, userWords, type Said } from "./gate.tsx";
+import { EDITS, MOVES, SLOTS, heldReason, saysGo, unquoted, userWords, type Said } from "./gate.tsx";
 import { changes, isSteering, isSteeringPath, memoryRows, places, retrieved, type Places, type Snapshot, type Steering } from "./memory.tsx";
 
 export type Question = { q: string; options: string[] };
@@ -32,7 +32,7 @@ const FACTS = "what the user should carry forward — durable, in plain words, n
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
 {"intent":"…","shape":"…","said":{"goal":"…","done":"…"},"facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-said: the user's words copied exactly, never reworded: goal — what they want; done — how they will tell it worked. facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
+said: the user's words copied exactly, never reworded: goal — ${SLOTS.goal}; done — ${SLOTS.done}. facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
 export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;

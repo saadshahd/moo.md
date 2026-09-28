@@ -4,7 +4,7 @@
 /** The user's own words for what they want and how they will tell it worked. */
 export type Said = { goal?: string; done?: string };
 
-const SLOTS: Record<keyof Said, string> = {
+export const SLOTS: Record<keyof Said, string> = {
   goal: "what they want",
   done: "how they will tell it worked",
 };
