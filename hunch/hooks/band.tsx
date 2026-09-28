@@ -11,7 +11,7 @@ export type Item = {
   state?: "done" | "running";
   /** An agent already read: kept for reopening, drawn dim. */
   read?: true;
-  /** A row's first item sits this far in: an answer under its question. */
+  /** It sits this far past where it would start: an answer under its question. */
   indent?: number;
   /** One of a row's leading columns: each cell takes the width of the widest one in its place
    * across the card, so the rows read as a table. */
@@ -108,6 +108,7 @@ export function layout(b: Band, columns: number): Line[] {
     const flows = part === "body" && !(widths.length && items[0]?.column);
     for (const [n, item] of items.entries()) {
       const full = textOf(item);
+      if (n) x += item.indent ?? 0;
       if (flows && cells.length && full.length > width - x && full.length <= width - start) end();
       const left = width - x;
       if (left <= 1) break;

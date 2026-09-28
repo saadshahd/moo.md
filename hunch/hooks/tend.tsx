@@ -387,19 +387,36 @@ export function factParts(f: string): [string, string] {
   return [head, rest.join(" ")];
 }
 
+/** Facts as bullets a blank line apart: each claim, then what lost and why dim under it.
+ * `whose` names the probe: "" for the session's card, an agent's name and a space for its pane. */
+function factRows(facts: string[], whose: string): Item[][] {
+  return spaced(
+    facts.map((f, i) => {
+      const [head, rest] = factParts(f);
+      return [
+        [line(`probe:${whose}fact ${i + 1}`, `• ${head}`)],
+        ...(rest ? [[under(note(`fact-note:${whose}${i}`, rest))]] : []),
+      ];
+    }),
+  );
+}
+
 /** An agent's pane as a card: intent, outcome, where to look, the facts it rests on; the full
- * report one click further. */
+ * report one click further. Its sections sit a blank line apart, the labels one column. */
 export function agentRows(v: AgentView, name: string, id: string): Item[][] {
-  const label = (word: string) => note(`note:${word}`, word.padEnd(9));
-  const section = (word: string, items: Item[]) => items.map((it, i) => [label(i ? "" : word), it]);
+  const label = (word: string) => column(note(`note:${word}`, word));
+  const section = (word: string, rows: Item[][]) =>
+    rows.length ? [rows.map((r, i) => (r.length ? [label(i ? "" : word), ...r] : r))] : [];
   const outcome = v.card.outcome || v.returned || firstLine(v.body.replace(/^#.*$/gm, ""));
-  return [
-    ...section("intent", [line(`probe:${name} intent`, v.card.intent || v.asked)].filter((i) => i.label)),
-    ...section("outcome", outcome ? [line(`probe:${name} outcome`, outcome)] : []),
-    ...section("watch", [...new Set([...v.footprint, ...links(v.body)])].map((f) => line(`open:${f}`, placeName(f)))),
-    ...section("facts", (v.card.facts ?? []).map((f, i) => line(`probe:${name} fact ${i + 1}`, `• ${bareFact(f)}`))),
-    ...section("report", v.body ? [quiet(`report:${id}`, "read it all")] : []),
-  ];
+  const intent = v.card.intent || v.asked;
+  return spaced([
+    ...section("intent", intent ? [[line(`probe:${name} intent`, intent)]] : []),
+    // The answer is what the reader came for: it reads bold.
+    ...section("outcome", outcome ? [[{ ...line(`probe:${name} outcome`, outcome), strong: true as const }]] : []),
+    ...section("watch", [...new Set([...v.footprint, ...links(v.body)])].map((f) => [line(`open:${f}`, placeName(f))])),
+    ...section("facts", factRows(v.card.facts ?? [], `${name} `)),
+    ...section("report", v.body ? [[quiet(`report:${id}`, "read it all")]] : []),
+  ]);
 }
 
 const SOURCE_RE = /\.(tsx?|jsx?|mjs|cjs|json|py|rb|go|rs|java|kt|swift|c|h|cc|cpp|hpp|cs|sh|zsh|toml|ya?ml|css|scss|sql|lua|txt)$/i;
@@ -428,13 +445,7 @@ export function cardRows(c: Card, name: string, ran: Set<string>): Item[][] {
   if (name === "intent" || name === "shape")
     // Each sentence its own paragraph, set in from the pane's edge.
     return c[name] ? [[under(line(`probe:${name}`, sentences(c[name]!).join("\n\n")))]] : [];
-  if (name === "facts")
-    return spaced(
-      (c.facts ?? []).map((f, i) => {
-        const [head, rest] = factParts(f);
-        return [[line(`probe:fact ${i + 1}`, `• ${head}`)], ...(rest ? [[under(note(`fact-note:${i}`, rest))]] : [])];
-      }),
-    );
+  if (name === "facts") return factRows(c.facts ?? [], "");
   if (name === "questions")
     return spaced(
       (c.questions ?? []).map((q, i) => [

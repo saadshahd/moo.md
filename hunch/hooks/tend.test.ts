@@ -138,12 +138,16 @@ test("an agent's pane reads like the session's card: intent, outcome, watch, fac
   const rows = agentRows(v, "counter", "a1");
   expect(rows.map((r) => r.map((i) => i.label.trim()))).toEqual([
     ["intent", "count md words"],
+    [],
     ["outcome", "Done."],
+    [],
     ["watch", "wc.py"],
+    [],
     ["facts", "• wc counts markup"],
+    [],
     ["report", "read it all"],
   ]);
-  expect(rows.map((r) => r[1].id)).toEqual(["probe:counter intent", "probe:counter outcome", "open:/tmp/wc.py", "probe:counter fact 1", "report:a1"]);
+  expect(rows.filter((r) => r.length).map((r) => r[1].id)).toEqual(["probe:counter intent", "probe:counter outcome", "open:/tmp/wc.py", "probe:counter fact 1", "report:a1"]);
 });
 test("a fact reads as its claim, then the rest dim under it, a blank line between facts", async () => {
   expect(factParts("Suno sings. ACE Studio lost because it has no Arabic.")).toEqual(["Suno sings.", "ACE Studio lost because it has no Arabic."]);
@@ -219,9 +223,9 @@ test("a pane lists a doc's links to click, beside the file when relative", async
 test("an agent's outcome is its own one line, else its summary, else its first line of prose", async () => {
   const body = (text: string) => agentView([{ role: "user", text: "x" }, { role: "assistant", text }]);
   const own = body('# Findings\n\nwc overcounts.\n\n```card\n{"outcome":"use markdown-it"}\n```\n');
-  expect(agentRows(own, "a", "1").find((r) => r[0].label.trim() === "outcome")?.[1].label).toBe("use markdown-it");
+  expect(agentRows(own, "a", "1").find((r) => r[0]?.label.trim() === "outcome")?.[1].label).toBe("use markdown-it");
   const prose = body("# Findings\n\nwc overcounts.");
-  expect(agentRows(prose, "a", "1").find((r) => r[0].label.trim() === "outcome")?.[1].label).toBe("wc overcounts.");
+  expect(agentRows(prose, "a", "1").find((r) => r[0]?.label.trim() === "outcome")?.[1].label).toBe("wc overcounts.");
 });
 test("a place reads by its name, not its full path", async () => {
   expect(placeName("/tmp/tend-lab/expert/wordcount.py")).toBe("wordcount.py");
