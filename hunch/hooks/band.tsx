@@ -13,7 +13,8 @@ export type Item = {
   read?: true;
   /** A row's first item sits this far in: an answer under its question. */
   indent?: number;
-  /** A card's first column: every such cell takes the widest one's width, so the rows read as a table. */
+  /** One of a row's leading columns: each cell takes the width of the widest one in its place
+   * across the card, so the rows read as a table. */
   column?: true;
   /** What the reader acts on, set bold among quieter text. */
   strong?: true;
@@ -93,7 +94,7 @@ export function layout(b: Band, columns: number): Line[] {
     items: Item[],
     gap: number,
     width = columns,
-    column = 0,
+    widths: number[] = [],
   ) => {
     const start = items[0]?.indent ?? 0;
     let cells: Cell[] = [];
@@ -104,7 +105,7 @@ export function layout(b: Band, columns: number): Line[] {
       x = start;
     };
     // A table row keeps its columns: what follows the first wraps inside its own.
-    const flows = part === "body" && !(column && items[0]?.column);
+    const flows = part === "body" && !(widths.length && items[0]?.column);
     for (const [n, item] of items.entries()) {
       const full = textOf(item);
       if (flows && cells.length && full.length > width - x && full.length <= width - start) end();
@@ -121,15 +122,20 @@ export function layout(b: Band, columns: number): Line[] {
       }
       const text = full.length > left ? `${full.slice(0, left - 1)}…` : full;
       cells.push({ item, text, x, y });
-      x += Math.max(text.length, item.column ? column : 0) + gap;
+      x += Math.max(text.length, item.column ? (widths[n] ?? 0) : 0) + gap;
     }
     end();
   };
-  // A first column wider than half the line would squeeze the rest: its rows flow instead.
+  // Leading columns wider than half the line would squeeze the rest: their rows flow instead.
   const measure = Math.min(columns, MEASURE);
-  const widest = Math.max(0, ...b.body.flat().filter((i) => i.column).map((i) => textOf(i).length));
-  const column = widest <= measure / 2 ? widest : 0;
-  for (const r of b.body) place("body", r, 2, measure, column);
+  const widths: number[] = [];
+  for (const r of b.body) {
+    const lead = r.findIndex((i) => !i.column);
+    for (const [k, i] of r.slice(0, lead < 0 ? r.length : lead).entries())
+      widths[k] = Math.max(widths[k] ?? 0, textOf(i).length);
+  }
+  const table = widths.reduce((s, w) => s + w, 0) + 2 * Math.max(0, widths.length - 1) <= measure / 2;
+  for (const r of b.body) place("body", r, 2, measure, table ? widths : []);
   if (b.chips.length) place("chips", b.chips, 1);
   return lines;
 }

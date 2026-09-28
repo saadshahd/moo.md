@@ -90,29 +90,20 @@ export function retrieved(
     }));
 }
 
-/** One row a file: view it in the pane, open it in the editor, or ask Claude to change it. */
+/** One row a file, its state and actions in columns before it, so a long name never pushes them
+ * out of line: view it in the pane, open it in the editor, or ask Claude to change it. */
 function fileRow(f: Steering): Item[] {
   const gone = f.state === "deleted";
+  const blank = (id: string): Item => ({ id, label: "", kind: "note", column: true });
   return [
-    {
-      id: `${gone ? "note:mem" : "view"}:${f.path}`,
-      label: f.label,
-      kind: gone ? "note" : "line",
-      column: true,
-    },
-    ...(f.state === "retrieved"
-      ? []
-      : [
-          {
-            id: `note:mem-state:${f.path}`,
-            label: f.state,
-            kind: "note" as const,
-          },
-        ]),
-    ...(gone
-      ? []
-      : [{ id: `edit:${f.path}`, label: "edit", kind: "quiet" as const }]),
-    { id: `ask:${f.label}`, label: "ask", kind: "quiet" },
+    f.state === "retrieved"
+      ? blank(`note:mem-state:${f.path}`)
+      : { id: `note:mem-state:${f.path}`, label: f.state, kind: "note", column: true },
+    gone
+      ? blank(`note:mem-edit:${f.path}`)
+      : { id: `edit:${f.path}`, label: "edit", kind: "quiet", column: true },
+    { id: `ask:${f.label}`, label: "ask", kind: "quiet", column: true },
+    { id: `${gone ? "note:mem" : "view"}:${f.path}`, label: f.label, kind: gone ? "note" : "line" },
   ];
 }
 

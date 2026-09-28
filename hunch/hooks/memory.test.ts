@@ -1,4 +1,5 @@
 import { describe, expect, test } from "claude-code/testing";
+import { layout } from "./band.tsx";
 import { changes, isSteering, isSteeringPath, memoryRows, places, retrieved } from "./memory.tsx";
 
 const TRANSCRIPT = "/Users/u/.claude/projects/-repo/abc.jsonl";
@@ -67,16 +68,28 @@ describe("steering files", () => {
     ]);
     expect(rows.map((r) => r.map((i) => i.label))).toEqual([
       ["updated"],
-      ["CLAUDE.md", "changed", "edit", "ask"],
-      ["AGENTS.md", "deleted", "ask"],
+      ["changed", "edit", "ask", "CLAUDE.md"],
+      ["deleted", "", "ask", "AGENTS.md"],
       [],
       ["retrieved"],
-      ["memory/a.md", "edit", "ask"],
+      ["", "edit", "ask", "memory/a.md"],
     ]);
-    expect(rows[1].map((i) => i.id)).toEqual(["view:/repo/CLAUDE.md", "note:mem-state:/repo/CLAUDE.md", "edit:/repo/CLAUDE.md", "ask:CLAUDE.md"]);
+    expect(rows[1].map((i) => i.id)).toEqual(["note:mem-state:/repo/CLAUDE.md", "edit:/repo/CLAUDE.md", "ask:CLAUDE.md", "view:/repo/CLAUDE.md"]);
     expect(memoryRows([{ path: "/repo/CLAUDE.md", label: "CLAUDE.md", state: "retrieved" }])[0]).toEqual([
       { id: "note:mem-retrieved", label: "retrieved", kind: "note" },
     ]);
+  });
+  test("a long name leaves state, edit and ask in line on one line a row", async () => {
+    const f = (name: string, state: "new" | "changed" | "deleted" | "retrieved") => ({ path: `${P.memory}/${name}`, label: `memory/${name}`, state });
+    const body = memoryRows([
+      f("MEMORY.md", "changed"),
+      f("anchor-no-case-build-first-base-rate.md", "new"),
+      f("gone.md", "deleted"),
+      f("issue-51-walls-unmoved-by-rule-text.md", "retrieved"),
+    ]);
+    const rows = layout({ chips: [], body, doc: "" }, 80).filter((l) => l.cells.length > 1);
+    expect(rows.length).toBe(4);
+    for (const k of [1, 2, 3]) expect(new Set(rows.map((l) => l.cells[k]!.x)).size).toBe(1);
   });
 });
 
