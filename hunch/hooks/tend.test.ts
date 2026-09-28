@@ -681,6 +681,7 @@ const WALL = "The last research agent is back. No tool can check sung Egyptian A
 
 test("a long reply is redrawn short once its turn ends, and /long shows it whole again", async ($, on) => {
   mock.store(on);
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.messages", () => ({ value: [{ role: "user", text: "we need to research avalable tools", toolUses: [] }, said(WALL)] }));
@@ -698,6 +699,8 @@ test("a long reply is redrawn short once its turn ends, and /long shows it whole
   });
   on("turn.complete", (_, e) => ({ text: e.answer }));
   await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+  // The short form is asked for unawaited: the turn ends before it comes back.
+  await clock.settle();
   expect(asks).toHaveLength(1);
   expect(asks[0]).toContain(WALL);
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
