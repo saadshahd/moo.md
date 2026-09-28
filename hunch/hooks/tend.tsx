@@ -1,5 +1,6 @@
 import type { Register } from "claude-code";
 import { MEASURE, type Band, type Item } from "./band.tsx";
+import { EDITS, MOVES, heldReason, saysGo, unquoted, userWords, type Said } from "./gate.tsx";
 import { changes, isSteering, isSteeringPath, memoryRows, places, retrieved, type Places, type Snapshot, type Steering } from "./memory.tsx";
 
 export type Question = { q: string; options: string[] };
@@ -15,11 +16,13 @@ export type Card = {
   ideas?: Idea[];
   skills?: { name: string; outcome: string }[];
   watch?: { label: string; open: string; see?: string }[];
+  said?: Said;
 };
 type Msg = {
   role: string;
   text: string;
   toolUses?: { tool: string; input: Record<string, unknown> }[];
+  toolResults?: { text: string }[];
 };
 /** `read`: opened once, drawn dim in the agents list. */
 export type Row = { id: string; label: string; type: string; done: boolean; read?: true };
@@ -28,8 +31,8 @@ export type Row = { id: string; label: string; type: string; done: boolean; read
 const FACTS = "what the user should carry forward — durable, in plain words, no file paths, tool steps or change details";
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
-{"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
+{"intent":"…","shape":"…","said":{"goal":"…","done":"…"},"facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
+said: the user's words copied exactly, never reworded: goal — what they want; done — how they will tell it worked. facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
 export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;
@@ -124,6 +127,10 @@ export function cleanCard(c: any): Card {
     watch: list(c.watch, (w): w is { label: string; open: string; see?: string } =>
       str(w?.label) && str(w.open),
     ),
+    said:
+      c.said && typeof c.said === "object" && (str(c.said.goal) || str(c.said.done))
+        ? { ...(str(c.said.goal) ? { goal: c.said.goal } : {}), ...(str(c.said.done) ? { done: c.said.done } : {}) }
+        : undefined,
   };
   for (const k of Object.keys(card) as (keyof Card)[])
     if (card[k] === undefined) delete card[k];
@@ -708,6 +715,27 @@ async function setOpen($: any, open: Question[]) {
   $.ui.invalidate("ui.render");
 }
 
+// Armed from the message a move ran at, until an edit passes or the user says go.
+type Gate = { at: number } | "open";
+
+async function setGate($: any, gate: Gate) {
+  await sid($);
+  await $.store.set(`tend:${sessionId}:gate`, gate);
+}
+
+/** Why the edit waits, or undefined to let it through: the card written since the gate armed
+ * must quote the user's goal and done-check. */
+async function held($: any): Promise<string | undefined> {
+  await sid($);
+  const gate = (await $.store.get(`tend:${sessionId}:gate`)) as Gate | undefined;
+  if (!gate || gate === "open") return undefined;
+  const msgs = (await $.session.messages()) as Msg[];
+  const missing = unquoted(latestCard(msgs.slice(gate.at)).said, userWords(msgs));
+  if (missing.length) return heldReason(missing);
+  await setGate($, "open");
+  return undefined;
+}
+
 // Finished agents drop out of $.agent.list(); the store keeps them for the session.
 async function readAgents($: any) {
   await sid($);
@@ -810,6 +838,7 @@ async function skillRan($: any, name: string): Promise<string[]> {
   ran.add(skill);
   planMoved = true;
   await remember($);
+  if (MOVES.has(skill)) await setGate($, { at: ((await $.session.messages()) as Msg[]).length });
   const format = CARD_SKILLS.get(skill);
   return format ? [format] : [];
 }
@@ -946,6 +975,10 @@ export const register: Register = (on) => {
       const asked = await skillRan($, skill);
       return asked.length ? { ...r, context: [...(r.context ?? []), ...asked] } : r;
     }
+    if (!e.agentId && EDITS.has(e.tool)) {
+      const reason = await held($);
+      return reason ? { deny: reason } : next(e);
+    }
     if (!e.agentId) return next(e);
     const id = e.agentId;
     if (idle.delete(id) || rows.some((x) => x.id === id && x.read)) {
@@ -969,6 +1002,8 @@ export const register: Register = (on) => {
       const agent = !!id && (rows.some((r) => r.id === id) || ((await $.agent.list()) as any[]).some((a) => a.id === id));
       return withContext(agent ? [...asked, AGENT_RETURN] : asked);
     }
+    // The user's "go" starts the work as it stands, however the prompt arrived.
+    if (saysGo(e.text)) await setGate($, "open");
     if (e.origin.kind !== "composer") return withContext(asked);
     // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
     await setOpen($, []);
