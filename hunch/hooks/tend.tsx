@@ -582,10 +582,14 @@ async function registerCommands($: any) {
   });
 }
 
+// A rewrite that fills its token cap was cut off, and with it the reply's closing ask.
+const SHORT_CAP = 2048;
+
 /** Redraws a long reply short once the turn ends: its long form already showed while it streamed. */
 async function shorten($: any, reply: string) {
-  const r = await $.model.complete({ model: "haiku", prompt: shortAsk(reply), maxTokens: 2048, timeoutMs: 60_000 });
+  const r = await $.model.complete({ model: "haiku", prompt: shortAsk(reply), maxTokens: SHORT_CAP, timeoutMs: 60_000 });
   if (!r.isAnswered) throw new Error(`the short reply failed: ${r.reason}`);
+  if (r.usage.output_tokens >= SHORT_CAP) throw new Error("the short reply ran out of room, so the reply stays long");
   short.set(textKey(reply), r.text.trim());
   const kept = [...short].slice(-KEPT_SHORT);
   await $.store.set(`tend:${await sid($)}:short`, Object.fromEntries(kept));

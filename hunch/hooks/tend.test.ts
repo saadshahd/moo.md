@@ -710,3 +710,31 @@ test("a long reply is redrawn short once its turn ends, and /long shows it whole
   await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
   expect(shown).toContain("Three chains are worth building");
 });
+
+// Two real 7,000-character replies (a songs session, 2026-09-28) came back cut mid-table, their ask gone.
+test("a short form that fills its token cap is dropped, and the reply stays long", async ($, on) => {
+  mock.store(on);
+  const clock = mock.clock(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("session.messages", () => ({ value: [{ role: "user", text: "we need to research avalable tools", toolUses: [] }, said(WALL)] }));
+  on("ui.invalidate", () => ({ value: undefined }));
+  const toasts: unknown[] = [];
+  on("ui.toast", (_, e) => {
+    toasts.push(e);
+    return { value: undefined };
+  });
+  on("model.complete", () => ({ value: { isAnswered: true, text: "No tool checks sung words yet. | 40", usage: { output_tokens: 2048 } } }) as any);
+  let shown = "";
+  on("ui.render", (_, e) => {
+    shown = (e.props as any).text;
+    return { type: "Box", props: {} } as any;
+  });
+  on("turn.complete", (_, e) => ({ text: e.answer }));
+  await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+  await clock.settle();
+  expect(toasts).toHaveLength(1);
+  const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
+  await reply.drawn();
+  expect(shown).toContain("Three chains are worth building");
+});
