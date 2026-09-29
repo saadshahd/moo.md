@@ -1,11 +1,11 @@
 import type { Register } from "claude-code";
 import { update } from "claude-code";
-import type { Finding, Slop } from "../slop.d.ts";
+import type { Chosen, Finding, Mark, Slop } from "../slop.d.ts";
 
 // After a main-thread turn that edited repo-bound files, judge.sh judges them off the turn.
-// A `slop N` button waits above the prompt. It opens a pane listing every finding as the change
-// that fixes it, and the row turns into the fix-or-skip choice for one finding at a time: the row
-// already holds the keys, which a pane opened from it would not get. Nothing here starts a turn.
+// A `slop N` button waits above the prompt. It opens a pane showing one finding at a time as the
+// diff that fixes it, and the row turns into the accept, edit or reject choice for that finding: the
+// row already holds the keys, which a pane opened from it would not get. Nothing here starts a turn.
 
 const SLOP = { plugin: "hope", key: "slop" } as const;
 const PANE = "slop";
@@ -15,6 +15,7 @@ const EMPTY: Slop = {
   cursor: 0,
   marks: [],
   reviewing: false,
+  editing: false,
   chosen: [],
   seen: [],
   offset: 0,
@@ -55,7 +56,8 @@ const HEADER = /^(.+?):(\d+) \| (.+?) \| (.+)$/;
 
 /** judge.sh's output as findings: none when it printed nothing or CLEAN first. A header
  * "<file>:<line> | <rule> | <claim>" starts a finding and the "- " / "+ " lines after it are its
- * change, a bare "-" or "+" being a blank line of it; any other line is a finding of its own text alone. */
+ * change, a bare "-" or "+" being a blank line of it. Every other line after a header, a code fence
+ * say, belongs to that finding and is dropped; before any header, a line is a finding of its text alone. */
 export function parseFindings(stdout: string): Finding[] {
   const lines = stdout.split("\n").filter((l) => l.trim() !== "");
   if (lines.length === 0 || lines[0].trim() === "CLEAN") return [];
@@ -63,6 +65,7 @@ export function parseFindings(stdout: string): Finding[] {
   for (const l of lines) {
     const last = found.at(-1);
     const m = HEADER.exec(l.trim());
+    const d = /^\s*([-+])( |$)/.exec(l);
     if (m)
       found.push({
         file: m[1],
@@ -72,9 +75,10 @@ export function parseFindings(stdout: string): Finding[] {
         before: [],
         after: [],
       });
-    else if (last?.file && /^[-+]( |$)/.test(l))
-      (l[0] === "-" ? last.before : last.after).push(l.slice(2));
-    else found.push({ rule: "", claim: l.trim(), before: [], after: [] });
+    else if (!last?.file)
+      found.push({ rule: "", claim: l.trim(), before: [], after: [] });
+    else if (d)
+      (d[1] === "-" ? last.before : last.after).push(l.slice(d[0].length));
   }
   return found;
 }
@@ -111,40 +115,83 @@ export function isRepoBound(status: string): boolean {
   return !status.startsWith("??") && !status.startsWith("!!");
 }
 
+/** A finding carries a change when it names a file and lines to take out or put in. */
+export function hasChange(f: Finding): boolean {
+  return !!f.file && f.before.length + f.after.length > 0;
+}
+
+/** `text` with the finding's change made: its "-" lines, found at its line or else in one place
+ * anywhere, swapped for its "+" lines. Throws when they are in no place, or in several but its line. */
+export function applyChange(text: string, f: Finding): string {
+  const lines = text.split("\n");
+  const at = (f.line ?? 1) - 1;
+  const matches = (i: number) => f.before.every((b, j) => lines[i + j] === b);
+  const starts = matches(at) ? [at] : lines.map((_, i) => i).filter(matches);
+  if (starts.length !== 1)
+    throw new Error(
+      `${f.file}:${f.line}: the lines to replace are ${starts.length ? `in ${starts.length} places` : "not in the file"}`,
+    );
+  lines.splice(starts[0]!, f.before.length, ...f.after);
+  return lines.join("\n");
+}
+
+/** The finding's change as one unified-diff hunk. */
+export function hunk(f: Finding): string {
+  const line = f.line ?? 1;
+  return [
+    `@@ -${line},${f.before.length} +${line},${f.after.length} @@`,
+    ...f.before.map((l) => `-${l}`),
+    ...f.after.map((l) => `+${l}`),
+  ].join("\n");
+}
+
 /** The state after deciding the finding under the cursor. Past the last one, the review ends:
- * the fixes chosen wait for the hand-off and decided findings leave. A fixed finding's key is
- * forgotten, so the same rule broken there again shows again; a skipped one stays quiet. */
-export function decide(s: Slop, mark: "fix" | "skip"): Slop {
+ * the findings for Claude wait for the hand-off and decided findings leave. An accepted or edited
+ * finding's key is forgotten, so the same rule broken there again shows again; a rejected one
+ * stays quiet. An accepted finding goes to Claude only when it carries no change to write. */
+export function decide(s: Slop, mark: Mark): Slop {
   if (!s.findings[s.cursor]) return s;
   const marks = [...s.marks, mark];
   const cursor = s.cursor + 1;
-  if (cursor < s.findings.length) return { ...s, cursor, marks };
-  const fixed = s.findings.filter((_, i) => marks[i] === "fix");
-  const forget = new Set(fixed.map(findingKey));
+  if (cursor < s.findings.length)
+    return { ...s, cursor, marks, editing: false };
+  const decided = marks.map((m, i) => ({ m, finding: s.findings[i]! }));
+  const taken = decided.filter(({ m }) => m.kind !== "reject");
+  const forget = new Set(taken.map(({ finding }) => findingKey(finding)));
+  const chosen = decided.flatMap(({ m, finding }): Chosen[] => {
+    if (m.kind === "edit") return [{ finding, note: m.note }];
+    if (m.kind === "accept" && !hasChange(finding)) return [{ finding }];
+    return [];
+  });
   return {
     ...s,
     findings: [],
     cursor: 0,
     marks: [],
     reviewing: false,
-    chosen: [...s.chosen, ...fixed],
+    editing: false,
+    chosen: [...s.chosen, ...chosen],
     seen: s.seen.filter((k) => !forget.has(k)),
   };
 }
 
-/** How the chosen findings read to Claude: each located, with the change the judge suggested. */
-export function handoff(chosen: Finding[]): string {
+/** How the chosen findings read to Claude: each located, with the change the judge suggested and
+ * the person's words over it when they edited it. */
+export function handoff(chosen: Chosen[]): string {
   return [
     "Slop findings to fix:",
-    ...chosen.flatMap((f) =>
-      f.file
+    ...chosen.flatMap(({ finding: f, note }) => [
+      ...(f.file
         ? [
             `${f.file}:${f.line} — ${f.claim} (${f.rule})`,
             ...f.before.map((l) => `- ${l}`),
             ...f.after.map((l) => `+ ${l}`),
           ]
-        : [f.claim],
-    ),
+        : [f.claim]),
+      ...(note
+        ? [`The person's edit, which wins over the change above: ${note}`]
+        : []),
+    ]),
   ].join("\n");
 }
 
@@ -221,14 +268,27 @@ async function openReview($: any): Promise<void> {
   }
 }
 
-// The last decision ends the review: the pane closes, and when any fix was chosen the stem goes
-// in the prompt box for the person to finish.
-async function choose($: any, mark: "fix" | "skip"): Promise<void> {
+// The last decision ends the review: the pane closes, and when any finding waits for Claude the
+// stem goes in the prompt box for the person to finish.
+async function choose($: any, mark: Mark): Promise<void> {
   await change($, (s) => decide(s, mark));
   const s = await readSlop($);
   if (s.reviewing) return;
   await $.ui.close({ id: PANE });
   if (s.chosen.length) await $.prompt.fill({ text: FIX_STEM });
+}
+
+// A change the file no longer holds throws, and the finding stays under the cursor.
+async function accept($: any): Promise<void> {
+  const { findings, cursor } = await readSlop($);
+  const f = findings[cursor];
+  if (f && hasChange(f)) {
+    const path = f.file!.startsWith("/")
+      ? f.file!
+      : `${await $.session.root()}/${f.file}`;
+    await $.fs.write(path, applyChange(await $.fs.read(path), f));
+  }
+  await choose($, { kind: "accept" });
 }
 
 // A failure shows as a toast; the session goes on (hooks fail open).
@@ -259,24 +319,59 @@ export const register: Register = (on) => {
     if (e.props.hasSurvey) return below;
     const s = await readSlop($);
     if (s.findings.length === 0) return below;
-    const { Box, Text, Button } = $.ui.resolve(e);
+    const els = $.ui.resolve(e);
+    const { Box, Text, Button } = els;
+    // The mobile app draws no field, so there a finding offers no edit.
+    const Input = "Input" in els ? els.Input : undefined;
+    const count = (
+      <Text dimColor>{`slop ${s.cursor + 1} of ${s.findings.length}`}</Text>
+    );
     return (
       <Box flexDirection="column">
-        {s.reviewing ? (
+        {s.reviewing && s.editing && Input ? (
           <Box gap={1}>
-            <Text
-              dimColor
-            >{`slop ${s.cursor + 1} of ${s.findings.length}`}</Text>
-            <Button
-              key="slop-fix"
-              label="fix"
+            {count}
+            <Input
+              key="slop-note"
+              label="edit ›"
+              placeholder="what Claude should do instead; empty goes back"
+              submitLabel="keep for Claude"
               autoFocus
-              onPress={() => loud($, choose($, "fix"))}
+              onSubmit={(v: string) =>
+                loud(
+                  $,
+                  v.trim()
+                    ? choose($, { kind: "edit", note: v.trim() })
+                    : change($, (t) => ({ ...t, editing: false })),
+                )
+              }
             />
+          </Box>
+        ) : s.reviewing ? (
+          <Box gap={1}>
+            {count}
             <Button
-              key="slop-skip"
-              label="skip"
-              onPress={() => loud($, choose($, "skip"))}
+              key="slop-accept"
+              label="accept"
+              autoFocus
+              onPress={() => loud($, accept($))}
+            />
+            {Input ? (
+              <Button
+                key="slop-edit"
+                label="edit"
+                onPress={() =>
+                  loud(
+                    $,
+                    change($, (t) => ({ ...t, editing: true })),
+                  )
+                }
+              />
+            ) : null}
+            <Button
+              key="slop-reject"
+              label="reject"
+              onPress={() => loud($, choose($, { kind: "reject" }))}
             />
           </Box>
         ) : (
@@ -294,46 +389,28 @@ export const register: Register = (on) => {
   // Closing the pane ends the review; the undecided findings wait for the next one.
   on("ui.close", async ($, e, next) => {
     const r = await next(e);
-    if (e.id === PANE) await change($, (s) => ({ ...s, reviewing: false }));
+    if (e.id === PANE)
+      await change($, (s) => ({ ...s, reviewing: false, editing: false }));
     return r;
   });
 
-  // Every finding as the change that fixes it: the one asked about is marked, decided ones say how.
+  // The finding under the cursor, whole: where it is, what is wrong, and the diff that fixes it.
   on("ui.render", { component: "Pane" }, async ($, e, next) => {
     if (e.requestId !== PANE) return next(e);
     const s = await readSlop($);
-    const { Box, Text } = $.ui.resolve(e);
+    const f = s.findings[s.cursor];
+    const { Box, Text, Code } = $.ui.resolve(e);
+    if (!f) return <Text dimColor>no findings left</Text>;
     return (
       <Box flexDirection="column" paddingX={1} gap={1}>
-        {s.findings.map((f, i) => {
-          const mark = s.marks[i];
-          const here = i === s.cursor;
-          return (
-            <Box key={`slop-${i}`} flexDirection="column">
-              <Text bold={here} dimColor={!here}>
-                {`${here ? "›" : mark === "fix" ? "✓" : mark === "skip" ? "–" : " "} ${f.file ? `${f.file}:${f.line}` : f.claim}`}
-              </Text>
-              {f.file ? (
-                <Text dimColor wrap="wrap">{`  ${f.claim}`}</Text>
-              ) : null}
-              {f.before.map((l, j) => (
-                <Text
-                  key={`slop-${i}-b${j}`}
-                  color="red"
-                  wrap="truncate-end"
-                >{`  - ${l}`}</Text>
-              ))}
-              {f.after.map((l, j) => (
-                <Text
-                  key={`slop-${i}-a${j}`}
-                  color="green"
-                  wrap="truncate-end"
-                >{`  + ${l}`}</Text>
-              ))}
-              {f.rule ? <Text dimColor>{`  ${f.rule}`}</Text> : null}
-            </Box>
-          );
-        })}
+        <Text bold wrap="wrap">
+          {f.file ? `${f.file}:${f.line}` : f.claim}
+        </Text>
+        {f.file ? <Text wrap="wrap">{f.claim}</Text> : null}
+        {hasChange(f) ? (
+          <Code key="slop-diff" format="diff" path={f.file} source={hunk(f)} />
+        ) : null}
+        {f.rule ? <Text dimColor>{f.rule}</Text> : null}
       </Box>
     );
   });

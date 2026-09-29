@@ -1,11 +1,14 @@
 import { describe, expect, test } from "claude-code/testing";
+import type { On } from "claude-code";
 import {
   FIX_STEM,
   afterTurn,
+  applyChange,
   decide,
   findingKey,
   freshFindings,
   handoff,
+  hunk,
   isRepoBound,
   parseFindings,
   register,
@@ -97,6 +100,10 @@ describe("parseFindings", () => {
       ["b.ts", [], []],
     ]);
   });
+  test("a fence or stray line after a header stays in that finding", () => {
+    const found = parseFindings("a.ts:3 | r | gone.\n```diff\n- x\nnote\n  + y\n```\n");
+    expect(found.map((f) => [f.before, f.after])).toEqual([[["x"], ["y"]]]);
+  });
   test("a line in another shape keeps its text", () => {
     expect(parseFindings("something odd")).toEqual([{ rule: "", claim: "something odd", before: [], after: [] }]);
   });
@@ -132,30 +139,54 @@ describe("isRepoBound", () => {
   });
 });
 
+describe("applyChange", () => {
+  const f = F({ line: 2, before: ["b"], after: ["B", "B2"] });
+  test("swaps the - lines at the finding's line for the + lines", () => {
+    expect(applyChange("a\nb\nc", f)).toBe("a\nB\nB2\nc");
+  });
+  test("finds the - lines in one other place when the line is off", () => {
+    expect(applyChange("b\na\nc", f)).toBe("B\nB2\na\nc");
+  });
+  test("throws when the - lines are in no place or in several", () => {
+    expect(() => applyChange("a\nc", f)).toThrow("not in the file");
+    expect(() => applyChange("b\na\nb", F({ line: 2, before: ["b"] }))).toThrow("in 2 places");
+  });
+});
+
+describe("hunk", () => {
+  test("one unified-diff hunk from the finding's line", () => {
+    expect(hunk(F({ line: 3, before: ["x"], after: ["y", "z"] }))).toBe("@@ -3,1 +3,2 @@\n-x\n+y\n+z");
+  });
+});
+
 describe("decide", () => {
-  const a = F();
+  const a = F({ before: ["x"] });
   const b = F({ file: "b.ts" });
-  const s: Slop = { findings: [a, b], cursor: 0, marks: [], reviewing: true, chosen: [], seen: [], offset: 0 };
-  test("a decision before the last moves the cursor and keeps the mark", () => {
-    expect(decide(s, "fix")).toEqual({ ...s, cursor: 1, marks: ["fix"] });
+  const c = F({ file: "c.ts" });
+  const s: Slop = { findings: [a, b, c], cursor: 0, marks: [], reviewing: true, editing: false, chosen: [], seen: [], offset: 0 };
+  test("a decision before the last moves the cursor, keeps the mark and ends an edit", () => {
+    expect(decide({ ...s, editing: true }, { kind: "reject" })).toEqual({ ...s, cursor: 1, marks: [{ kind: "reject" }] });
   });
-  test("the last decision ends the review with the fixes chosen", () => {
-    expect(decide(decide(s, "skip"), "fix")).toEqual({ ...s, findings: [], cursor: 0, marks: [], reviewing: false, chosen: [b] });
+  test("the last decision ends the review: edited and change-less accepted findings go to Claude", () => {
+    const end = [{ kind: "accept" }, { kind: "edit", note: "n" }, { kind: "accept" }] as const;
+    expect(end.reduce(decide, s)).toEqual({ ...s, findings: [], reviewing: false, chosen: [{ finding: b, note: "n" }, { finding: c }] });
   });
-  test("a fixed finding's key is forgotten, a skipped one's kept", () => {
-    const seen = [findingKey(a)!, findingKey(b)!];
-    expect(decide(decide({ ...s, seen }, "skip"), "fix").seen).toEqual([findingKey(a)]);
+  test("an accepted or edited finding's key is forgotten, a rejected one's kept", () => {
+    const seen = [findingKey(a)!, findingKey(b)!, findingKey(c)!];
+    const end = [{ kind: "reject" }, { kind: "edit", note: "n" }, { kind: "accept" }] as const;
+    expect(end.reduce(decide, { ...s, seen }).seen).toEqual([findingKey(a)]);
   });
   test("with nothing under the cursor nothing changes", () => {
     const empty = { ...s, findings: [] };
-    expect(decide(empty, "fix")).toEqual(empty);
+    expect(decide(empty, { kind: "reject" })).toEqual(empty);
   });
 });
 
 describe("handoff", () => {
-  test("each finding located, with its suggested change", () => {
-    expect(handoff([F({ line: 3, before: ["x"], after: ["y"] }), { rule: "", claim: "odd", before: [], after: [] }])).toBe(
-      "Slop findings to fix:\na.ts:3 — c (rule)\n- x\n+ y\nodd",
+  test("each finding located, with its suggested change and the person's edit", () => {
+    const odd = { rule: "", claim: "odd", before: [], after: [] };
+    expect(handoff([{ finding: F({ line: 3, before: ["x"], after: ["y"] }), note: "keep x" }, { finding: odd }])).toBe(
+      "Slop findings to fix:\na.ts:3 — c (rule)\n- x\n+ y\nThe person's edit, which wins over the change above: keep x\nodd",
     );
   });
 });
@@ -282,13 +313,73 @@ describe("handing chosen findings to Claude", () => {
     expect((await h.submit("something else")).context).toBeUndefined();
 
     const s = (await h.slop())!;
-    await h.$.state.set({ plugin: "hope", key: "slop" }, decide({ ...s, reviewing: true }, "fix"));
+    await h.$.state.set({ plugin: "hope", key: "slop" }, decide({ ...s, reviewing: true }, { kind: "edit", note: "n" }));
     expect((await h.submit("unrelated prompt")).context).toBeUndefined();
 
     const sent = await h.submit(`${FIX_STEM}but keep the null check`);
     expect(sent.context).toEqual([
-      "Slop findings to fix:\n/r/a.ts:3 — wrong here. (rule)\n- old\n+ new",
+      "Slop findings to fix:\n/r/a.ts:3 — wrong here. (rule)\n- old\n+ new\nThe person's edit, which wins over the change above: n",
     ]);
     expect((await h.slop())?.chosen).toEqual([]);
   });
+});
+
+// ---- the review, drawn by the engine ----
+
+/** The engine's session state for hope's slop, held here: `now()` reads it. */
+function slopState(on: On, start: Slop) {
+  let cur = { value: start as unknown, version: 1 };
+  on("state.get", () => ({ value: cur }) as any);
+  on("state.set", (_: unknown, e: any) => {
+    if (e.ifVersion !== undefined && e.ifVersion !== cur.version) return { value: { isSet: false, version: cur.version } } as any;
+    cur = { value: e.value, version: cur.version + 1 };
+    return { value: { isSet: true, version: cur.version } } as any;
+  });
+  on("ui.close", () => ({ value: undefined }) as any);
+  on("ui.invalidate", () => ({ value: undefined }) as any);
+  on("prompt.fill", () => ({ value: { isFilled: true } }) as any);
+  on("ui.render", () => ({ type: "Box", props: {} }) as any);
+  return () => cur.value as Slop;
+}
+const waiting = (findings: Finding[]): Slop => ({ findings, cursor: 0, marks: [], reviewing: true, editing: false, chosen: [], seen: [], offset: 0 });
+const settle = () => new Promise((r) => setTimeout(r, 10));
+// The engine redraws on a state set; the state here is the test's, so the test redraws.
+
+test("the review: the pane draws the finding under the cursor as one whole diff", async ($, on) => {
+  slopState(on, waiting([F({ line: 3, before: ["x"], after: ["y"] }), F({ file: "b.ts" })]));
+  const pane = await $.ui.mount({ plugin: "hope", surface: "terminal", component: "Pane", props: {} as any, requestId: "slop" });
+  expect(await pane.findAll({ type: "Code" })).toHaveLength(1);
+  expect(await pane.find({ type: "Text", text: "b.ts:1" })).toBeUndefined();
+});
+
+test("the review: edit keeps the person's words for Claude; reject drops the last one", async ($, on) => {
+  const now = slopState(on, waiting([F(), F({ file: "b.ts" })]));
+  const row = await $.ui.mount({ plugin: "hope", surface: "terminal", component: "AbovePrompt", props: { hasSurvey: false } as any });
+  await row.press({ key: "slop-edit" });
+  await settle();
+  await row.redraw();
+  await row.input({ key: "slop-note", text: "keep it" });
+  await settle();
+  await row.redraw();
+  await row.press({ key: "slop-reject" });
+  await settle();
+  const s = now();
+  expect(s.chosen).toEqual([{ finding: F(), note: "keep it" }]);
+  expect(s.findings).toEqual([]);
+});
+
+test("the review: accept writes the change into the file and moves on", async ($, on) => {
+  const now = slopState(on, waiting([F({ line: 2, before: ["b"], after: ["B"] }), F({ file: "b.ts" })]));
+  const files: Record<string, string> = { "/r/a.ts": "a\nb\nc" };
+  on("session.root", () => ({ value: "/r" }) as any);
+  on("fs.read", (_: unknown, e: any) => ({ value: files[e.path] }) as any);
+  on("fs.write", (_: unknown, e: any) => {
+    files[e.path] = e.text;
+    return { value: undefined } as any;
+  });
+  const row = await $.ui.mount({ plugin: "hope", surface: "terminal", component: "AbovePrompt", props: { hasSurvey: false } as any });
+  await row.press({ key: "slop-accept" });
+  await settle();
+  expect(files["/r/a.ts"]).toBe("a\nB\nc");
+  expect(now().cursor).toBe(1);
 });
