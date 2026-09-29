@@ -5,7 +5,7 @@ description: Decide the technical path once the ask is clear. Use when the WHAT 
 
 ## Route
 
-Decide only among ways that differ where it matters. Look up what settles a choice without the user — their taste from CLAUDE.md and project rules, facts from the repo, docs, the web. Only choices that stay open after that route to a skill.
+Decide only among ways that differ where it matters. Look up what settles a choice without the user — their taste from CLAUDE.md and project rules, what their own accounts and plans already offer, facts from the repo, docs, the web. Only choices that stay open after that route to a skill.
 
 Route each open choice by what keeps it open, invoking the named skill with the Skill tool:
 
