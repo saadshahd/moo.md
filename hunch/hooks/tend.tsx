@@ -583,7 +583,7 @@ async function registerCommands($: any) {
 }
 
 // A rewrite that fills its token cap was cut off, and with it the reply's closing ask.
-const SHORT_CAP = 2048;
+export const SHORT_CAP = 2048;
 
 /** Redraws a long reply short once the turn ends: its long form already showed while it streamed. */
 async function shorten($: any, reply: string) {

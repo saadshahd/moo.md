@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { prose, textKey, wantsShort, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { prose, textKey, wantsShort, SHORT_CAP, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -317,7 +317,6 @@ test("a question's rows: the question, which takes no click, then each answer", 
     const rows = cardRows(
       { questions: [{ q: "a?", options: ["x", "y"] }] },
       "questions",
-      new Set(),
       new Set(),
     );
     expect(rows.map((r) => r.map((i) => i.id))).toEqual([["question:0"], ["answer:0:0"], ["answer:0:1"]]);
@@ -724,7 +723,7 @@ test("a short form that fills its token cap is dropped, and the reply stays long
     toasts.push(e);
     return { value: undefined };
   });
-  on("model.complete", () => ({ value: { isAnswered: true, text: "No tool checks sung words yet. | 40", usage: { output_tokens: 2048 } } }) as any);
+  on("model.complete", () => ({ value: { isAnswered: true, text: "No tool checks sung words yet. | 40", usage: { output_tokens: SHORT_CAP } } }) as any);
   let shown = "";
   on("ui.render", (_, e) => {
     shown = (e.props as any).text;
