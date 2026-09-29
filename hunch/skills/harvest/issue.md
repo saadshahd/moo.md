@@ -21,5 +21,5 @@ Title: `<kind>: <the need, in one line>`
 
 - kind: <kind>
 - turns: <N, N, N>
-- moo installed: <plugin version, …>
+- moo installed: <plugin version, …, each with read.sh's "(updated …, after this session began …)" note where it prints one>
 ```
