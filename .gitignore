@@ -20,3 +20,7 @@ workspace/
 
 # Riptide artifacts (cloud-synced)
 .humanlayer/tasks/
+
+# Claude Code writes these beside each plugin whose hooks module it loads;
+# they extend .claude-plugin/types/, which ignores itself
+/*/tsconfig.json
