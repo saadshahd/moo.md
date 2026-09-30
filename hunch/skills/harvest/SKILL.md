@@ -26,11 +26,11 @@ For each flow, one of:
 | No installed moo skill covers it | A new skill |
 | Steps the user gave more than once | A reusable piece |
 
-State the need — what must happen, and when — never the unit that would carry it. Check the installed list `read.sh` prints before calling anything new: a need an installed skill covers is an improvement to it.
+State the need — what must happen, and when — never the unit that would carry it. Check the installed list `read.sh` prints first.
 
 ## Value
 
-Name which of moo's four outcomes the fix serves: reduce decision regret, increase conceptual clarity, fewer but stronger artifacts, preserve the capacity to own what you produce. None → drop the flow.
+Name which of the four outcomes in `CLAUDE.md` the fix serves. None → drop the flow.
 
 ## Draft
 
@@ -54,8 +54,4 @@ The draft's first line is its title, so the body starts after it.
 
 Show each issue's URL. A draft changed after the yes goes back through Scrub and Show.
 
-Never:
-
-- Propose a new unit where an installed one covers the need.
-- Write code or unit files.
-- File without the reporter's yes to the exact text.
+Never file without the reporter's yes to the exact text.

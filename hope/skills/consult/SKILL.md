@@ -26,6 +26,6 @@ The change alone is bold: it is what the user acts on. The name stays plain, the
 
 ## Result
 
-The ideas, then the question alone on its last line: `Build all <N>?` Nothing else — no per-expert sections, no disagreement, no recap, no recommendation. Choosing is the user's.
+The ideas, then the question alone on its last line: `Build all <N>?` Nothing else, not even a recommendation: choosing is the user's.
 
 The question has one retrievable answer → retrieve it; stating a fact needs no expert. The user wants a verdict on something that exists → use **judge** skill. The user wants a proposal they already committed to attacked → use **interrogate** skill.
