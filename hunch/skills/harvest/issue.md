@@ -15,7 +15,7 @@ Title: `<kind>: <the need, in one line>`
 
 ## Value
 
-<Which of the four outcomes in `CLAUDE.md` this serves, and how the flow shows it.>
+<Which of moo's four outcomes this serves — reduce decision regret, increase conceptual clarity, fewer but stronger artifacts, preserve the capacity to own what you produce — and how the flow shows it.>
 
 ## Evidence
 
