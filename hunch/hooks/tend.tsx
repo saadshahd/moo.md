@@ -1012,7 +1012,7 @@ export const register: Register = (on) => {
     // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
     await setOpen($, []);
     if (asked.length || !Object.keys(card).length) return withContext(asked);
-    return withContext([`Only if this turn settles or changes what the card holds:\n${CARD_FORMAT}`]);
+    return withContext([`Only if this turn settles or changes what the card holds (the block may follow the last line, whatever the reply format says):\n${CARD_FORMAT}`]);
   });
 
   on("prompt.suggest", async ($, e, next) =>
