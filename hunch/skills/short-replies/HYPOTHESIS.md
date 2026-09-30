@@ -20,3 +20,8 @@ Graduate when it stays on for 10 real sessions, the user runs `/long` in at most
 - Both readers found 5 short forms that dropped something the user would act on. Two were one bug: a 7,000-character reply's rewrite filled its 2,048-token cap and stopped mid-table, losing the closing ask. A rewrite that fills its cap is now dropped, and the reply stays long. The other 3 dropped a reason, or the thing an ask pointed at.
 - Of 59 replies that asked the user to decide, the ask sat on the last line in 42, the first in 4, the middle in 8, and nowhere in the 2 cut ones.
 - `/long` leaves no trace in transcripts, so only the user can say how many sessions used it.
+
+### 2026-09-30 — the user's `/long` runs were checks
+
+- The user ran `/long` in 3 or more sessions, which misses the graduation bar. Most runs were to check that nothing was missing, not to get back a cut fact, so the kill bar isn't met either.
+- So far, the `/long` count measures trust, not loss. The redraw stays on, unchanged.
