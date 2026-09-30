@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { prose, textKey, wantsShort, SHORT_CAP, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -487,34 +487,12 @@ describe("pane doc", () => {
   });
 });
 
-test("the store keeps only the latest sessions' keys", async ($, on) => {
-  const old = Array.from({ length: 25 }, (_, i) => `old${i}`);
-  const store = new Map<string, unknown>([
-    ...old.map((s): [string, unknown] => [`tend:${s}:memory-base`, {}]),
-    ["tend:recent", old],
-  ]);
-  on("store.get", (_, e) => ({ value: store.get(e.key) }));
-  on("store.set", (_, e) => (store.set(e.key, e.value), { value: undefined }));
-  on("store.delete", (_, e) => (store.delete(e.key), { value: undefined }));
-  on("store.keys", () => ({ value: [...store.keys()] }));
-  on("session.id", () => ({ value: "s1" }));
-  on("session.surfaces", () => ({ value: ["terminal"] }));
-  on("session.start", (_, e) => e);
-  await $.session.start({ source: "startup", cwd: "/p" } as any);
-  expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(
-    old.slice(0, 19).map((s) => `tend:${s}:memory-base`),
-  );
-  expect(store.get("tend:recent")).toEqual(["s1", ...old.slice(0, 19)]);
-});
-
-test("a store over its cap with no session list shrinks to the current session", async ($, on) => {
-  const cap = 100;
-  const store = new Map<string, unknown>(
-    Array.from({ length: 10 }, (_, i): [string, unknown] => [`tend:old${i}:memory-base`, "x".repeat(20)]),
-  );
+/** A store that refuses a write taking its JSON past `cap` characters, as the engine's does past 4 MiB. */
+function cappedStore(on: any, cap: number, entries: [string, unknown][] = []): Map<string, unknown> {
+  const store = new Map<string, unknown>(entries);
   const size = () => JSON.stringify(Object.fromEntries(store)).length;
-  on("store.get", (_, e) => ({ value: store.get(e.key) }));
-  on("store.set", (_, e) => {
+  on("store.get", (_: any, e: any) => ({ value: store.get(e.key) }));
+  on("store.set", (_: any, e: any) => {
     const was = store.get(e.key);
     store.set(e.key, e.value);
     if (size() > cap) {
@@ -523,14 +501,71 @@ test("a store over its cap with no session list shrinks to the current session",
     }
     return { value: undefined };
   });
-  on("store.delete", (_, e) => (store.delete(e.key), { value: undefined }));
+  on("store.delete", (_: any, e: any) => (store.delete(e.key), { value: undefined }));
   on("store.keys", () => ({ value: [...store.keys()] }));
+  return store;
+}
+
+const MiB = 2 ** 20;
+// A session's steering-file snapshot of about `mib` MiB, the key that fills the store in a big repo.
+const snapshotOf = (s: string, mib: number): [string, unknown] => [`tend:${s}:memory-base`, "x".repeat(mib * MiB - 100)];
+
+test("a new session keeps the newest sessions that fit in 3 MiB, however many", async ($, on) => {
+  const old = Array.from({ length: 5 }, (_, i) => `old${i}`);
+  const store = cappedStore(on, 8 * MiB, [...old.map((s) => snapshotOf(s, 1)), ["tend:recent", old]]);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("session.start", (_, e) => e);
+  await $.session.start({ source: "startup", cwd: "/p" } as any);
+  expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(old.slice(0, 3).map((s) => snapshotOf(s, 1)[0]));
+  expect(store.get("tend:recent")).toEqual(["s1", ...old.slice(0, 3)]);
+});
+
+test("the live session keeps its keys past the budget; the older ones go", async ($, on) => {
+  const store = cappedStore(on, 8 * MiB, [snapshotOf("s1", 4), snapshotOf("old0", 0.5), ["tend:recent", ["old0", "s1"]]]);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("session.start", (_, e) => e);
+  await $.session.start({ source: "resume", cwd: "/p" } as any);
+  expect([...store.keys()]).toEqual([snapshotOf("s1", 4)[0], "tend:recent"]);
+  expect(store.get("tend:recent")).toEqual(["s1"]);
+});
+
+test("a store over its cap with no session list shrinks to the current session", async ($, on) => {
+  const store = cappedStore(
+    on,
+    100,
+    Array.from({ length: 10 }, (_, i): [string, unknown] => [`tend:old${i}:memory-base`, "x".repeat(20)]),
+  );
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
   expect([...store.keys()]).toEqual(["tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
+});
+
+// The work machine's store, full: the band showed only agents, since every write tend awaited threw first.
+test("a full store leaves the band its card and a card skill its ask; the refusal shows once", async ($, on) => {
+  cappedStore(on, 0);
+  mock.clock(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("session.messages", () => ({ value: [said(block('{"intent":"i","facts":["f"]}'))] }));
+  on("agent.list", () => ({ value: [] }));
+  on("command.list", () => ({ value: [{ name: "hope:intent" }] as any }));
+  on("command.register", () => ({ value: undefined }));
+  const toasts: unknown[] = [];
+  on("ui.toast", (_, e) => (toasts.push(e), { value: undefined }));
+  on("tool.call", () => ({ result: "ok" }) as any);
+  on("prompt.submit", (_, e) => ({ text: e.text, context: e.context }));
+  const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 80 } as any });
+  const chips = (((await band.find({ type: "Client" }))?.props.props as any)?.chips ?? []).map((c: any) => c.id);
+  expect(chips).toEqual(["chip:intent", "chip:facts"]);
+  expect(((await $.tool.call({ tool: "Skill", skill: "hope:intent" } as any)) as any).context).toContain(CARD_FORMAT);
+  const prompt = await $.prompt.submit({ text: "/hope:intent tidy it", origin: { kind: "composer" } } as any);
+  expect((prompt as any).context).toContain(CARD_FORMAT);
+  expect(toasts).toHaveLength(1);
 });
 
 test("a headless session keeps nothing, so it pushes no live session out", async ($, on) => {

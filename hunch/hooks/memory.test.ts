@@ -1,4 +1,4 @@
-import { describe, expect, test } from "claude-code/testing";
+import { describe, expect, mock, test } from "claude-code/testing";
 import { layout } from "./band.tsx";
 import { changes, isSteering, isSteeringPath, memoryRows, places, retrieved } from "./memory.tsx";
 
@@ -93,11 +93,16 @@ describe("steering files", () => {
   });
 });
 
-// The engine beneath tend: a git project and a memory folder (path → mtime), and a store.
-function world(on: any, files: () => Record<string, number>): Map<string, unknown> {
+// The engine beneath tend: a git project and a memory folder (path → mtime), and a store,
+// full when `full`: it refuses every write.
+function world(on: any, files: () => Record<string, number>, full = false): Map<string, unknown> {
   const store = new Map<string, unknown>();
   on("store.get", ($: any, e: any) => ({ value: store.get(e.key) }));
-  on("store.set", ($: any, e: any) => (store.set(e.key, e.value), { value: undefined }));
+  on("store.set", ($: any, e: any) => {
+    if (full) throw new Error("$.store.set: over the limit");
+    store.set(e.key, e.value);
+    return { value: undefined };
+  });
   on("store.delete", ($: any, e: any) => (store.delete(e.key), { value: undefined }));
   on("store.keys", () => ({ value: [...store.keys()] }));
   on("classic.SessionStart", () => ({}));
@@ -106,6 +111,8 @@ function world(on: any, files: () => Record<string, number>): Map<string, unknow
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.root", () => ({ value: "/repo" }));
   on("ui.invalidate", () => ({ value: undefined }));
+  on("ui.toast", () => ({ value: undefined }));
+  on("agent.list", () => ({ value: [] }));
   on("session.usage", () => ({ value: { context: { window: 1, breakdown: { memoryFiles: [{ path: "/repo/CLAUDE.md", type: "Project", tokens: 1 }] } } } }));
   on("session.messages", () => ({
     value: [{ role: "assistant", text: "", toolUses: [{ tool: "Read", input: { file_path: `${P.memory}/old.md` } }, { tool: "Read", input: { file_path: "/repo/src/a.ts" } }] }],
@@ -187,5 +194,16 @@ describe("at stop", () => {
       { path: `${P.memory}/old.md`, label: "memory/old.md", state: "retrieved" },
       { path: "/repo/CLAUDE.md", label: "CLAUDE.md", state: "retrieved" },
     ]);
+  });
+  test("a full store still lists them in the band", async ($, on) => {
+    world(on, () => ({ "/repo/CLAUDE.md": 1 }), true);
+    mock.clock(on);
+    await $.classic.Stop({
+      stop_hook_active: false,
+      transcript_path: TRANSCRIPT,
+    });
+    const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 80 } as any });
+    const chips = (((await band.find({ type: "Client" }))?.props.props as any)?.chips ?? []).map((c: any) => c.id);
+    expect(chips).toEqual(["chip:memory"]);
   });
 });

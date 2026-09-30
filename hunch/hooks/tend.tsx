@@ -538,6 +538,14 @@ let card: Card = {};
 let rows: Row[] = [];
 // The steering files this session updated since it started, then those it read or loaded.
 let memory: Steering[] = [];
+// The steering files as the session first saw them.
+let memoryBase: Snapshot | undefined;
+// The questions still open: a card block holds only those its writer chose, and the user's
+// next prompt closes them all, however it answered them.
+let open: Question[] | undefined;
+// Armed from the message a move ran at, until an edit passes or the user says go.
+type Gate = { at: number } | "open";
+let gate: Gate | undefined;
 let paneItem: string | null = null;
 let lastPaneItem: string | null = null;
 const ran = new Set<string>();
@@ -592,13 +600,14 @@ async function shorten($: any, reply: string) {
   if (r.usage.output_tokens >= SHORT_CAP) throw new Error("the short reply ran out of room, so the reply stays long");
   short.set(textKey(reply), r.text.trim());
   const kept = [...short].slice(-KEPT_SHORT);
-  await $.store.set(`tend:${await sid($)}:short`, Object.fromEntries(kept));
+  await save($, `tend:${await sid($)}:short`, Object.fromEntries(kept));
   $.ui.invalidate("ui.render");
 }
 
 async function readSession($: any) {
+  await sid($);
   const msgs: Msg[] = await $.session.messages();
-  const next = withOpen(latestCard(msgs), await storedOpen($));
+  const next = withOpen(latestCard(msgs), open);
   if (JSON.stringify(next) !== JSON.stringify(card)) planMoved = true;
   card = next;
   $.ui.invalidate("ui.render");
@@ -609,15 +618,36 @@ function loud($: any, p: Promise<unknown>) {
   p.catch((err: unknown) => $.ui.toast(`tend: ${err instanceof Error ? err.message : String(err)}`));
 }
 
+// What the store kept of the session, back in memory; sid sets it going.
+let loaded: Promise<unknown> = Promise.resolve();
+
 /** The session this module now serves. `/clear` and a resume raise no `session.start`, so the
- * id is read at each use; a new one resets what the old session left in memory. */
+ * id is read at each use; a new one resets what the old session left in memory and loads what
+ * the store kept of the new one. */
 async function sid($: any): Promise<string> {
   const id: string = await $.session.id();
-  if (id === sessionId) return id;
-  if (sessionId) reset();
-  sessionId = id;
-  if (!(await headless($))) await keepRecent($, id);
+  if (id !== sessionId) {
+    if (sessionId) reset();
+    sessionId = id;
+    loaded = load($, id).catch((err: unknown) =>
+      $.ui.toast(`tend: couldn't read this session's band back: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  }
+  await loaded;
   return id;
+}
+
+async function load($: any, id: string) {
+  if (!(await headless($))) await keepRecent($, id);
+  const get = (k: string) => $.store.get(`tend:${id}:${k}`);
+  for (const r of ((await get("ran")) as string[]) ?? []) ran.add(r);
+  for (const i of ((await get("idle")) as string[]) ?? []) idle.add(i);
+  for (const [k, v] of Object.entries(((await get("short")) as Record<string, string>) ?? {})) short.set(k, v);
+  memory = ((await get("memory")) as Steering[]) ?? [];
+  memoryBase = (await get("memory-base")) as Snapshot | undefined;
+  open = (await get("open")) as Question[] | undefined;
+  gate = (await get("gate")) as Gate | undefined;
+  rows = ((await $.store.get(`tend:${id}`)) as Row[]) ?? [];
 }
 
 /** A `-p` run or the SDK draws nowhere, so nobody sees what it would keep. Hooks spawn many:
@@ -626,34 +656,56 @@ async function headless($: any): Promise<boolean> {
   return (await $.session.surfaces()).length === 0;
 }
 
-// The store outlives every session and holds 4 MiB in all: only the latest sessions keep their keys.
-const KEPT_SESSIONS = 20;
+// tend draws from its own memory; the store only carries it past a reload or a resume. A write
+// the store refuses (it holds 4 MiB in all) is shown once, and the band goes on without it.
+let refused = false;
+
+async function save($: any, key: string, value: unknown) {
+  try {
+    await $.store.set(key, value);
+    refused = false;
+  } catch (err) {
+    if (!refused) $.ui.toast(`tend: couldn't save the band, so a reload or resume loses it: ${err instanceof Error ? err.message : String(err)}`);
+    refused = true;
+  }
+}
+
+/** The store's sessions, newest first, with this one moved to the front. */
+async function recent($: any, id: string): Promise<string[]> {
+  const before = ((await $.store.get("tend:recent")) as string[] | undefined) ?? [];
+  return [id, ...before.filter((s) => s !== id)];
+}
+
+// The store holds 4 MiB in all. A session starting keeps the newest sessions that fit in 3,
+// itself whatever its size: the last MiB is its room to grow.
+const KEPT_BYTES = 3 * 2 ** 20;
 
 async function keepRecent($: any, id: string) {
-  const before = ((await $.store.get("tend:recent")) as string[] | undefined) ?? [];
-  const recent = [id, ...before.filter((s) => s !== id)].slice(0, KEPT_SESSIONS);
-  const stale = ((await $.store.keys()) as string[]).filter(
-    (k) => k.startsWith("tend:") && k !== "tend:recent" && !recent.includes(k.split(":")[1]),
-  );
+  const order = await recent($, id);
+  const keys = ((await $.store.keys()) as string[]).filter((k) => k.startsWith("tend:") && k !== "tend:recent");
+  const values = await Promise.all(keys.map((k) => $.store.get(k)));
+  const bytes = new Map<string, number>();
+  keys.forEach((k, i) => {
+    const s = k.split(":")[1];
+    bytes.set(s, (bytes.get(s) ?? 0) + k.length + JSON.stringify(values[i] ?? null).length);
+  });
+  const kept = [id];
+  let used = bytes.get(id) ?? 0;
+  // A session with nothing stored has nothing to keep; a live one rejoins at its next stop.
+  for (const s of order.slice(1).filter((s) => bytes.has(s))) {
+    used += bytes.get(s)!;
+    if (used > KEPT_BYTES) break;
+    kept.push(s);
+  }
   // Delete first: a store already over its cap refuses every set, the list's included.
-  for (const k of stale) await $.store.delete(k);
-  await $.store.set("tend:recent", recent);
+  for (const k of keys.filter((k) => !kept.includes(k.split(":")[1]))) await $.store.delete(k);
+  await save($, "tend:recent", kept);
 }
 
-// A reload wipes module memory; the store keeps which skills ran and which teammates sit idle.
 async function remember($: any) {
   await sid($);
-  await $.store.set(`tend:${sessionId}:ran`, [...ran]);
-  await $.store.set(`tend:${sessionId}:idle`, [...idle]);
-}
-
-async function recall($: any) {
-  await sid($);
-  for (const r of ((await $.store.get(`tend:${sessionId}:ran`)) as string[]) ?? []) ran.add(r);
-  for (const i of ((await $.store.get(`tend:${sessionId}:idle`)) as string[]) ?? []) idle.add(i);
-  memory = ((await $.store.get(`tend:${sessionId}:memory`)) as Steering[]) ?? [];
-  const kept = ((await $.store.get(`tend:${sessionId}:short`)) as Record<string, string>) ?? {};
-  for (const [k, v] of Object.entries(kept)) short.set(k, v);
+  await save($, `tend:${sessionId}:ran`, [...ran]);
+  await save($, `tend:${sessionId}:idle`, [...idle]);
 }
 
 async function snapshot($: any, p: Places): Promise<Snapshot> {
@@ -689,10 +741,13 @@ async function readMemory($: any, transcriptPath: string) {
   const p = places(transcriptPath, await $.session.root());
   if (!p || (await headless($))) return;
   // Each stop moves the session to the front, so a long one outlives the sessions opened since.
-  await keepRecent($, await sid($));
-  const base = (await $.store.get(`tend:${sessionId}:memory-base`)) as Snapshot | undefined;
+  await save($, "tend:recent", await recent($, await sid($)));
+  const base = memoryBase;
   const now = await snapshot($, p);
-  if (!base) await $.store.set(`tend:${sessionId}:memory-base`, now);
+  if (!base) {
+    memoryBase = now;
+    await save($, `tend:${sessionId}:memory-base`, now);
+  }
   const updated = base ? changes(base, now, p) : [];
   const usage = await $.session.usage({ breakdown: "summary" });
   const loaded = ((usage.context.breakdown?.memoryFiles ?? []) as { path: string }[]).map((f) => f.path);
@@ -701,37 +756,28 @@ async function readMemory($: any, transcriptPath: string) {
     .flatMap((u) => (u.tool === "Read" && typeof u.input.file_path === "string" ? [u.input.file_path] : []))
     .filter((path) => isSteeringPath(path, p));
   memory = [...updated, ...retrieved([...loaded, ...read], updated, p)];
-  await $.store.set(`tend:${sessionId}:memory`, memory);
   $.ui.invalidate("ui.render");
+  await save($, `tend:${sessionId}:memory`, memory);
 }
 
-// The questions still open: a card block holds only those its writer chose, and the user's
-// next prompt closes them all, however it answered them.
-async function storedOpen($: any): Promise<Question[] | undefined> {
+async function setOpen($: any, questions: Question[]) {
   await sid($);
-  return (await $.store.get(`tend:${sessionId}:open`)) as Question[] | undefined;
-}
-
-async function setOpen($: any, open: Question[]) {
-  await sid($);
-  await $.store.set(`tend:${sessionId}:open`, open);
+  open = questions;
   card = withOpen(card, open);
   $.ui.invalidate("ui.render");
+  await save($, `tend:${sessionId}:open`, open);
 }
 
-// Armed from the message a move ran at, until an edit passes or the user says go.
-type Gate = { at: number } | "open";
-
-async function setGate($: any, gate: Gate) {
+async function setGate($: any, next: Gate) {
   await sid($);
-  await $.store.set(`tend:${sessionId}:gate`, gate);
+  gate = next;
+  await save($, `tend:${sessionId}:gate`, gate);
 }
 
 /** Why the edit waits, or undefined to let it through: the card written since the gate armed
  * must quote the user's goal and done-check. */
 async function held($: any): Promise<string | undefined> {
   await sid($);
-  const gate = (await $.store.get(`tend:${sessionId}:gate`)) as Gate | undefined;
   if (!gate || gate === "open") return undefined;
   const msgs = (await $.session.messages()) as Msg[];
   const missing = unquoted(latestCard(msgs.slice(gate.at)).said, userWords(msgs));
@@ -740,7 +786,7 @@ async function held($: any): Promise<string | undefined> {
   return undefined;
 }
 
-// Finished agents drop out of $.agent.list(); the store keeps them for the session.
+// Finished agents drop out of $.agent.list(); rows keep them for the session.
 async function readAgents($: any) {
   await sid($);
   const listed: Row[] = ((await $.agent.list()) as any[])
@@ -752,18 +798,16 @@ async function readAgents($: any) {
       // A teammate stays `running` while idle; its own turn ending is what says done.
       done: a.type === "teammate" ? idle.has(a.id) : a.status !== "running" && a.status !== "pending",
     }));
-  const stored = rows.length ? [] : (((await $.store.get(`tend:${sessionId}`)) as Row[]) ?? []);
-  // Memory first, read after every await: a flag set a moment ago by another hook stands.
-  const kept: Row[] = rows.length ? rows : stored;
+  // Read after every await: a flag set a moment ago by another hook stands.
   const next = [
-    ...listed.map((l) => ({ ...kept.find((k) => k.id === l.id), ...l })),
-    ...kept
+    ...listed.map((l) => ({ ...rows.find((k) => k.id === l.id), ...l })),
+    ...rows
       .filter((k) => !listed.some((l) => l.id === k.id))
       .map((k) => ({ ...k, done: true })),
   ];
   if (JSON.stringify(next) === JSON.stringify(rows)) return;
   rows = next;
-  await $.store.set(`tend:${sessionId}`, rows);
+  await save($, `tend:${sessionId}`, rows);
   // A pane opened on an agent, its card or its report, reloads as the agent's rows change;
   // loadAgent alone decides when there is a result to show.
   const shown = paneItem?.match(/^(?:agent|report):(.+)$/)?.[1] ?? "";
@@ -786,7 +830,7 @@ async function openAgent($: any, id: string) {
   // Rows may have been swapped by a poll while this waited: mark the current one.
   if (rows.some((x) => x.id === id && x.done && !x.read)) {
     rows = rows.map((x) => (x.id === id ? { ...x, read: true as const } : x));
-    await $.store.set(`tend:${sessionId}`, rows);
+    await save($, `tend:${sessionId}`, rows);
   }
   $.ui.invalidate("ui.render");
   await shown;
@@ -886,6 +930,9 @@ function reset() {
   card = {};
   rows = [];
   memory = [];
+  memoryBase = undefined;
+  open = undefined;
+  gate = undefined;
   paneItem = null;
   lastPaneItem = null;
   ran.clear();
@@ -1049,7 +1096,7 @@ export const register: Register = (on) => {
     if (e.agentId || !r.messages) return r;
     try {
       await sid($);
-      const text = replayCard(withOpen(latestCard(e.messages as Msg[]), await storedOpen($)));
+      const text = replayCard(withOpen(latestCard(e.messages as Msg[]), open));
       return text ? { ...r, messages: [...r.messages, { role: "assistant" as const, text, toolUses: [] }] } : r;
     } catch (err) {
       $.ui.toast(`tend: the card did not ride the compaction: ${err instanceof Error ? err.message : String(err)}`);
@@ -1114,7 +1161,6 @@ export const register: Register = (on) => {
       // The poll starts first, so a failed step below (shown) never leaves the agents unread.
       $.clock.every(2000, () => loud($, readAgents($)));
       loud($, (async () => {
-        await recall($);
         await registerCommands($);
         await readSession($);
         await readAgents($);
