@@ -16,9 +16,10 @@ export type Finding = {
 };
 
 /** The decision on one finding: accept writes its change to the file (or hands it to Claude when it
- * carries none), edit hands it to Claude with what the person wants instead, reject drops it. */
+ * wrote none: the finding carries no change, or the file no longer holds its "-" lines), edit hands
+ * it to Claude with what the person wants instead, reject drops it. */
 export type Mark =
-  | { kind: "accept" }
+  | { kind: "accept"; wrote: boolean }
   | { kind: "edit"; note: string }
   | { kind: "reject" };
 
@@ -38,6 +39,9 @@ export type Slop = {
   editing: boolean;
   /** Findings for Claude; the next submit that keeps the fix stem carries them. */
   chosen: Chosen[];
+  /** Findings whose change accept wrote into the file; the next submit that keeps the addressed
+   * line tells Claude about them. */
+  applied: Finding[];
   /** Keys of every finding or failure shown this session, so each shows once. */
   seen: string[];
   /** How many session messages were already scanned for touched files. */

@@ -17,6 +17,7 @@ const EMPTY: Slop = {
   reviewing: false,
   editing: false,
   chosen: [],
+  applied: [],
   seen: [],
   offset: 0,
 };
@@ -24,6 +25,9 @@ const EMPTY: Slop = {
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 export const FIX_STEM = "Fix the slop findings ";
+export const ADDRESSED = "Addressed slop findings";
+export const MOVED =
+  "the file changed since the judge read it; accept sends this to Claude";
 
 // ---- pure ----
 
@@ -94,20 +98,29 @@ export function findingKey(f: Finding): string | undefined {
     .replace(/[^a-z0-9|/._-]/g, "");
 }
 
-/** The findings not shown before, and the seen keys with theirs added. A keyless one always shows. */
-export function freshFindings(
-  found: Finding[],
-  seen: string[],
-): { fresh: Finding[]; seen: string[] } {
-  const known = new Set(seen);
-  const fresh = found.filter((f) => {
+/** The state with a judge run's findings added. One still waiting for a decision takes the run's
+ * newer change in its place; one shown before and decided stays out; a keyless one always shows. */
+export function addFindings(s: Slop, found: Finding[]): Slop {
+  const known = new Set(s.seen);
+  const waiting = new Map(
+    s.findings.flatMap((f, i) => {
+      const k = findingKey(f);
+      return k !== undefined && i >= s.cursor ? [[k, i] as const] : [];
+    }),
+  );
+  const findings = [...s.findings];
+  for (const f of found) {
     const k = findingKey(f);
-    if (k === undefined) return true;
-    if (known.has(k)) return false;
-    known.add(k);
-    return true;
-  });
-  return { fresh, seen: [...known] };
+    const i = k === undefined ? undefined : waiting.get(k);
+    if (i !== undefined) {
+      findings[i] = f;
+      waiting.delete(k!);
+    } else if (k === undefined || !known.has(k)) {
+      if (k !== undefined) known.add(k);
+      findings.push(f);
+    }
+  }
+  return { ...s, findings, seen: [...known] };
 }
 
 /** A git status line keeps a file when it is tracked: not untracked (??), not ignored (!!). */
@@ -121,16 +134,13 @@ export function hasChange(f: Finding): boolean {
 }
 
 /** `text` with the finding's change made: its "-" lines, found at its line or else in one place
- * anywhere, swapped for its "+" lines. Throws when they are in no place, or in several but its line. */
-export function applyChange(text: string, f: Finding): string {
+ * anywhere, swapped for its "+" lines. None when they are in no place, or in several but its line. */
+export function applyChange(text: string, f: Finding): string | undefined {
   const lines = text.split("\n");
   const at = (f.line ?? 1) - 1;
   const matches = (i: number) => f.before.every((b, j) => lines[i + j] === b);
   const starts = matches(at) ? [at] : lines.map((_, i) => i).filter(matches);
-  if (starts.length !== 1)
-    throw new Error(
-      `${f.file}:${f.line}: the lines to replace are ${starts.length ? `in ${starts.length} places` : "not in the file"}`,
-    );
+  if (starts.length !== 1) return undefined;
   lines.splice(starts[0]!, f.before.length, ...f.after);
   return lines.join("\n");
 }
@@ -148,7 +158,8 @@ export function hunk(f: Finding): string {
 /** The state after deciding the finding under the cursor. Past the last one, the review ends:
  * the findings for Claude wait for the hand-off and decided findings leave. An accepted or edited
  * finding's key is forgotten, so the same rule broken there again shows again; a rejected one
- * stays quiet. An accepted finding goes to Claude only when it carries no change to write. */
+ * stays quiet. An accepted finding goes to Claude as one to fix when accept wrote nothing, and as one
+ * the person fixed when it wrote its change. */
 export function decide(s: Slop, mark: Mark): Slop {
   if (!s.findings[s.cursor]) return s;
   const marks = [...s.marks, mark];
@@ -160,9 +171,12 @@ export function decide(s: Slop, mark: Mark): Slop {
   const forget = new Set(taken.map(({ finding }) => findingKey(finding)));
   const chosen = decided.flatMap(({ m, finding }): Chosen[] => {
     if (m.kind === "edit") return [{ finding, note: m.note }];
-    if (m.kind === "accept" && !hasChange(finding)) return [{ finding }];
+    if (m.kind === "accept" && !m.wrote) return [{ finding }];
     return [];
   });
+  const applied = decided.flatMap(({ m, finding }) =>
+    m.kind === "accept" && m.wrote ? [finding] : [],
+  );
   return {
     ...s,
     findings: [],
@@ -171,27 +185,49 @@ export function decide(s: Slop, mark: Mark): Slop {
     reviewing: false,
     editing: false,
     chosen: [...s.chosen, ...chosen],
+    applied: [...s.applied, ...applied],
     seen: s.seen.filter((k) => !forget.has(k)),
   };
 }
 
-/** How the chosen findings read to Claude: each located, with the change the judge suggested and
- * the person's words over it when they edited it. */
+/** `text` ending in the line that says slop findings were addressed, once. */
+export function addressed(text: string): string {
+  const t = text.trimEnd();
+  if (t.endsWith(ADDRESSED)) return t;
+  return t ? `${t}\n${ADDRESSED}` : ADDRESSED;
+}
+
+/** A finding as Claude reads it: located, with the change the judge suggested. */
+function located(f: Finding): string[] {
+  return f.file
+    ? [
+        `${f.file}:${f.line} — ${f.claim} (${f.rule})`,
+        ...f.before.map((l) => `- ${l}`),
+        ...f.after.map((l) => `+ ${l}`),
+      ]
+    : [f.claim];
+}
+
+/** How the chosen findings read to Claude: each located, with the person's words over the
+ * judge's change when they edited it. */
 export function handoff(chosen: Chosen[]): string {
   return [
     "Slop findings to fix:",
-    ...chosen.flatMap(({ finding: f, note }) => [
-      ...(f.file
-        ? [
-            `${f.file}:${f.line} — ${f.claim} (${f.rule})`,
-            ...f.before.map((l) => `- ${l}`),
-            ...f.after.map((l) => `+ ${l}`),
-          ]
-        : [f.claim]),
+    ...chosen.flatMap(({ finding, note }) => [
+      ...located(finding),
       ...(note
         ? [`The person's edit, which wins over the change above: ${note}`]
         : []),
     ]),
+  ].join("\n");
+}
+
+/** How the changes the person accepted into files read to Claude, with what to do about them. */
+export function appliedNote(applied: Finding[]): string {
+  return [
+    "After your last turn the person wrote these slop fixes into the files; they are not committed:",
+    ...applied.flatMap(located),
+    "Commit them the way you commit your own work here.",
   ].join("\n");
 }
 
@@ -245,10 +281,7 @@ async function judge($: any, files: string[]): Promise<void> {
   }
   const found = parseFindings(r.stdout);
   if (found.length === 0) return;
-  await change($, (s) => {
-    const { fresh, seen } = freshFindings(found, s.seen);
-    return { ...s, seen, findings: [...s.findings, ...fresh] };
-  });
+  await change($, (s) => addFindings(s, found));
 }
 
 export async function afterTurn($: any): Promise<void> {
@@ -269,26 +302,41 @@ async function openReview($: any): Promise<void> {
 }
 
 // The last decision ends the review: the pane closes, and when any finding waits for Claude the
-// stem goes in the prompt box for the person to finish.
+// stem goes in the prompt box for the person to finish. While a change accept wrote waits to reach
+// Claude, the box's last line says the findings were addressed, under the stem or the person's draft.
 async function choose($: any, mark: Mark): Promise<void> {
   await change($, (s) => decide(s, mark));
   const s = await readSlop($);
   if (s.reviewing) return;
   await $.ui.close({ id: PANE });
-  if (s.chosen.length) await $.prompt.fill({ text: FIX_STEM });
+  if (!s.chosen.length && !s.applied.length) return;
+  const text = s.chosen.length ? FIX_STEM : (await $.prompt.read()).text;
+  await $.prompt.fill({ text: s.applied.length ? addressed(text) : text });
 }
 
-// A change the file no longer holds throws, and the finding stays under the cursor.
+/** The finding's file with its change made, and where to write it. None when the finding carries no
+ * change, or the file changed since the judge read it: gone, or no longer holding its "-" lines in
+ * one place. */
+async function changed(
+  $: any,
+  f: Finding,
+): Promise<{ path: string; text: string } | undefined> {
+  if (!hasChange(f)) return undefined;
+  const path = f.file!.startsWith("/")
+    ? f.file!
+    : `${await $.session.root()}/${f.file}`;
+  if (!(await $.fs.exists(path))) return undefined;
+  const text = applyChange(await $.fs.read(path), f);
+  return text === undefined ? undefined : { path, text };
+}
+
+// A change the file no longer holds goes to Claude, who reads the file as it is now.
 async function accept($: any): Promise<void> {
   const { findings, cursor } = await readSlop($);
   const f = findings[cursor];
-  if (f && hasChange(f)) {
-    const path = f.file!.startsWith("/")
-      ? f.file!
-      : `${await $.session.root()}/${f.file}`;
-    await $.fs.write(path, applyChange(await $.fs.read(path), f));
-  }
-  await choose($, { kind: "accept" });
+  const done = f && (await changed($, f));
+  if (done) await $.fs.write(done.path, done.text);
+  await choose($, { kind: "accept", wrote: !!done });
 }
 
 // A failure shows as a toast; the session goes on (hooks fail open).
@@ -306,12 +354,26 @@ export const register: Register = (on) => {
     return r;
   });
 
-  // The chosen findings reach Claude only with the person's own sentence, on their Enter.
+  // The chosen findings reach Claude only with the person's own sentence, on their Enter; the
+  // changes accept wrote, only with a prompt that keeps the addressed line.
   on("prompt.submit", async ($, e, next) => {
     const s = await readSlop($);
-    if (!s.chosen.length || !e.text.startsWith(FIX_STEM.trim())) return next(e);
-    await change($, (t) => ({ ...t, chosen: [] }));
-    return next({ ...e, context: [...(e.context ?? []), handoff(s.chosen)] });
+    const fix = s.chosen.length > 0 && e.text.startsWith(FIX_STEM.trim());
+    const told = s.applied.length > 0 && e.text.includes(ADDRESSED);
+    if (!fix && !told) return next(e);
+    await change($, (t) => ({
+      ...t,
+      chosen: fix ? [] : t.chosen,
+      applied: told ? [] : t.applied,
+    }));
+    return next({
+      ...e,
+      context: [
+        ...(e.context ?? []),
+        ...(fix ? [handoff(s.chosen)] : []),
+        ...(told ? [appliedNote(s.applied)] : []),
+      ],
+    });
   });
 
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
@@ -394,13 +456,15 @@ export const register: Register = (on) => {
     return r;
   });
 
-  // The finding under the cursor, whole: where it is, what is wrong, and the diff that fixes it.
+  // The finding under the cursor, whole: where it is, what is wrong, and the diff that fixes it,
+  // or that the file moved under that diff since the judge read it.
   on("ui.render", { component: "Pane" }, async ($, e, next) => {
     if (e.requestId !== PANE) return next(e);
     const s = await readSlop($);
     const f = s.findings[s.cursor];
     const { Box, Text, Code } = $.ui.resolve(e);
     if (!f) return <Text dimColor>no findings left</Text>;
+    const moved = hasChange(f) && !(await changed($, f));
     return (
       <Box flexDirection="column" paddingX={1} gap={1}>
         <Text bold wrap="wrap">
@@ -410,6 +474,7 @@ export const register: Register = (on) => {
         {hasChange(f) ? (
           <Code key="slop-diff" format="diff" path={f.file} source={hunk(f)} />
         ) : null}
+        {moved ? <Text wrap="wrap">{MOVED}</Text> : null}
         {f.rule ? <Text dimColor>{f.rule}</Text> : null}
       </Box>
     );
