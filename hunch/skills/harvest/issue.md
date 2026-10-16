@@ -11,7 +11,7 @@ Title: `<kind>: <the need, in one line>`
 
 ## Opportunity
 
-<Improve `<plugin>:<skill>` | a new skill | a reusable piece.> <The need: what must happen, and when — never the unit that would carry it.>
+<A line `<plugin>:<skill>` had and lost: "<the line>" | Selection of `<plugin>:<skill>` | Improve `<plugin>:<skill>` | a new skill | a reusable piece.> <The need: what must happen, and when — never the unit that would carry it.>
 
 ## Value
 

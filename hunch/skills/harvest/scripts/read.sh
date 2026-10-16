@@ -72,7 +72,7 @@ fi
 echo "session $1"
 echo "cwd $(jq -r 'select(.cwd) | .cwd' "$transcript" | sort -u | paste -sd' ' -)"
 
-echo "installed moo plugins:"
+echo "installed moo plugins (a skill's text is at <at>/skills/<name>/SKILL.md):"
 plugins="$config/plugins/installed_plugins.json"
 # A plugin updated after the session began may not be the version the session ran.
 began=$(jq -rn '[inputs | .timestamp // empty] | min // ""' "$transcript")
@@ -82,7 +82,7 @@ if [ -f "$plugins" ]; then
   while IFS=$'\t' read -r p late; do
     skills=$(ls "$p/skills" 2>/dev/null | paste -sd' ' -)
     hooks=$(jq -c '.modules // (.hooks | keys) // empty' "$p/hooks/hooks.json" 2>/dev/null || true)
-    echo "  $(basename "$(dirname "$p")") $(basename "$p")$late  skills: ${skills:-none}  hooks: ${hooks:-none}"
+    echo "  $(basename "$(dirname "$p")") $(basename "$p")$late  skills: ${skills:-none}  hooks: ${hooks:-none}  at: $p"
   done
 else
   echo "  (no $plugins)"

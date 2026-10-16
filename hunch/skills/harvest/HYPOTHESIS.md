@@ -41,3 +41,9 @@ Graduate when builders act on 3 of the first 5 filed reports without asking the 
 - #59 cited "Fix the slop findings" three times as the user repeating a step. The slop pane had filled that text in after the user reviewed findings. The transcript marks it typed, like the user's own words; only the pane's `Slop findings to fix:` attachment tells them apart. One misread in 24 filed reports, caught by one grep while judging it, so `read.sh` does not mark it.
 - The same report listed hope 13.0.0, installed 39 minutes after the session began, while the pane behaved as the version before. `read.sh` now notes a plugin updated after the session began.
 - Open: that session loaded every moo skill from the repo checkout, not the versioned install. For skills, the version line does not name what ran.
+
+### 2026-10-16 — three skill rows; past issues take new cases
+
+- Of 26 filed reports, 15 closed not-planned. Most asked to improve a skill whose text already asked for the move (#52, #56, #57), or one that never loaded or lost to another (#36, #45, #55, #60). One row, "failed, or did not fire → improve it", sent both to a text change. It is now three rows: ran and said it (quote the line), never loaded (selection), ran and silent (improve). `read.sh` prints each plugin's path so the line can be quoted.
+- 18 close comments say when to reopen, and nothing read them: a second case would be filed fresh or missed. `past.sh` lists every harvest issue with those passages; a flow one already states becomes a comment on it, and reopens it when it meets the condition.
+- Source: Lalit Maganti, "How I Find Problems to Solve as a Staff Engineer": keep problems around until evidence piles up, and read an odd ask as the user missing the tool's idea, the tool hiding the path, or the tool needing to change.
