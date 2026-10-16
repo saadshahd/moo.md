@@ -11,9 +11,10 @@ Route each thing still left to invent by what it is, invoking the named skill wi
 - The user holds what they want but can't yet say it → use **elicit** skill.
 - The user is missing something already settled and can't ask past it → use **explain** skill.
 - The ask arrives committed, its decisions undefended → use **interrogate** skill.
+- The ask names a step or an artifact and leaves the outcome it serves unnamed — the same kind of task keeps coming, or the artifact exists to inform a decision → use **reframe** skill before asking what it is for.
 
 Route again until nothing is left to invent. Where the input leaves it open, ask the negative once — what should this NOT do.
 
-Ask what is still open first, with AskUserQuestion. Before rewriting the ask, use **deepen** skill on it. Then state the work order, naming no skill: the ask, the bar it must meet, and what it must NOT do where that surfaced. As short as it goes with nothing in the spec lost.
+Ask what is still open first, with AskUserQuestion. A restated ask is the user's to take: offer it beside the ask as given. Before rewriting the ask, use **deepen** skill on it. Then state the work order, naming no skill: the ask, the bar it must meet, and what it must NOT do where that surfaced. As short as it goes with nothing in the spec lost.
 
 The WHAT is confirmed and what's open is the technical path → use **shape** skill.
