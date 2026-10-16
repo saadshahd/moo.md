@@ -9,6 +9,7 @@ Run it until a case stops fitting, then back off by the minimum. What ships alwa
 | **Widen**    | weakest   | a rule that decides only the cases it came from  | the broadest rule still sound on them         | nothing unseen will ever meet it → **Compress**               |
 | **Compress** | shortest  | a closed set — nothing unseen is coming          | the shortest statement that covers it         | something unseen will meet it → **Widen**                     |
 | **Anchor**   | checkable | a rule that needs the reader's judgment to apply | the same rule, applied the same way by anyone | it decides fewer cases afterward → you narrowed, not anchored |
+| **Deepen**   | deepest   | an ask held to its asker's own bar               | the same ask at the bar its field sets        | it adds a deliverable → you grew the ask, not deepened it     |
 
 ## Widen
 
