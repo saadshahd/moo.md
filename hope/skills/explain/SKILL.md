@@ -1,20 +1,14 @@
 ---
 name: explain
-description: Put one settled thing in the user's head, plainly. Use when the user does not hold something already settled.
+description: Show one settled thing so the user holds it. Use when the user does not hold something already settled.
 ---
 
-Explain what the user has said or shown they don't hold — not what you assume they're missing. Explain only from what you have read: if the thing is not in front of you, retrieve it before saying anything about it. If it cannot be retrieved, name what's missing, ask the user for it, and wait.
+Explain only what the user has said or shown they don't hold, and only from what you have read: retrieve it first; if you can't, name what's missing, ask for it, and wait.
 
-State the thing in one plain line. When its parts nest, run in order or change, use a small tree, numbered steps or a diff instead. No jargon, no preamble, no build-up. Stop there. Name the two or three directions they could pull next, and wait.
+Answer in the fewest small views that make the key point, each under its own one-line caption, in the shape the parts already have: code that runs as a call tree of its function names, logic as pseudocode, UI as a component tree, files as a file tree, a change as a `diff` on that view, anything else as a tree, numbered steps or a table. Put each view but a table in a code fence tagged with its language — `diff`, `tsx`, `text` — so the terminal colors it. A line holds a name from the source, with a `# few words` comment at most. Mark undecided parts `[open]`. Then wait.
 
-## The loop
+Each pull — a question, a ruling, an "I still don't get it" — is answered the same way, on the pulled part alone. "I still don't get it" means the view was wrong: change the view, never add words.
 
-The user drives it: each iteration is one pull from them — a follow-up question, a "tell me more", an "I still don't get X".
-
-- Answer each pull with one plain line or small form first, depth only where pulled.
-- "I still don't get it" means the answer was wrong — find a different line or form rather than adding words to the old one.
-- After each answer, wait for the next pull.
-
-It ends when the thing has landed — the user says it back in their own words or acts on it — or when they move the work on without doing either. Claim it landed only in the first case; where they moved on, the answer stands as stated.
+It ends when the user says it back in their own words or acts on it — claim it landed only then — or moves on, where the answer stands as given.
 
 The user holds it and you're the one missing it → ask a direct question. The user holds it but cannot yet put it into words → use **elicit** skill. The user wants a verdict on it, not an understanding of it → use **judge** skill.
