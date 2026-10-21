@@ -42,13 +42,25 @@ Method — DEEP by design; spend the tokens. Every candidate rule is judged agai
 
 ## Phase 3 — Confirm (never skip, never auto-install)
 
-Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons. The statement is the rule's opening mandate: the file's first sentence, extended to the next only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never `_Avoid_`, `Detect:`, or `Not-when:`. The user's answer is the verdict — a corrected set replaces yours without argument; redo the affected phases. Write only after explicit confirmation. The user confirms the SET here; the written files are theirs afterward.
+Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons, plus the hook wiring change for each rule with a gate (Phase 4). The statement is the rule's opening mandate: the file's first sentence, extended to the next only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never `_Avoid_`, `Detect:`, or `Not-when:`. The user's answer is the verdict — a corrected set replaces yours without argument; redo the affected phases. Write only after explicit confirmation. The user confirms the SET here; the written files are theirs afterward.
 
 **Propose-only mode:** if the invocation asks for a proposal only (evals, dry runs), read `propose-only.md` and follow it instead of confirming or writing.
 
 ## Phase 4 — Write
 
 Copy each confirmed rule's file verbatim — no additions — to `.claude/sound/<topic>/<rule-name>.md`, a plain reference file. `<topic>` is the rule's parent directory in the corpus. These live OUTSIDE `.claude/rules/`, so they never auto-load; the browsable `.claude/sound/` tree IS the map `sound:prime` points at. No marker, manifest, or hash anywhere.
+
+A rule with a `<rule-name>.gate` beside it in the corpus installs that file too, verbatim and executable, and is wired as a pre-commit hook through the hook manager the repo already uses — never a new one. `<gate>` below is `.claude/sound/<topic>/<rule-name>.gate`, from the repo root.
+
+| Repo shows | Wire |
+|---|---|
+| `lefthook.yml` | `pre-commit: commands: <rule-name>: run: <gate>` |
+| `.pre-commit-config.yaml` | a `repo: local` hook: `id: <rule-name>`, `entry: <gate>`, `language: script`, `pass_filenames: false` |
+| `.husky/` | a `<gate>` line in `.husky/pre-commit` |
+| `core.hooksPath` set to another folder | a `<gate>` line in that folder's `pre-commit`; folder missing → say so, wire nothing |
+| none of these | a `<gate>` line in `.git/hooks/pre-commit`, created executable if absent |
+
+An entry already naming `<gate>` stays as it is. A declined wiring leaves the gate installed but unrun — say so.
 
 ## Re-runs
 

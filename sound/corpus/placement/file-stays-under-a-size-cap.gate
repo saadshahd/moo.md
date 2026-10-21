@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Pre-commit gate for file-stays-under-a-size-cap.md: blocks a staged file over
+# the cap that is new or grew. Run from the repo root. Exit 1 blocks the commit.
+set -Eeuo pipefail
+trap 'echo "size gate crashed at line $LINENO; commit allowed" >&2; exit 0' ERR
+
+cap=1000
+
+# Not written by hand: vendored path, lockfile, linguist attribute, binary, or
+# a generated-file header in the first 5 lines.
+generated() {
+  local path=$1 sha=$2 attrs head
+  case "/$path" in */node_modules/* | */vendor/*) return 0 ;; esac
+  case "${path##*/}" in
+    *.lock | *.lockb | *.lock.* | *-lock.* | npm-shrinkwrap.json | Package.resolved | go.sum) return 0 ;;
+  esac
+  attrs=$(git check-attr --cached linguist-generated linguist-vendored -- "$path")
+  case "$attrs" in *': set'* | *': true'*) return 0 ;; esac
+  case "$(git diff --cached --numstat -- "$path")" in -*) return 0 ;; esac
+  head=$(git cat-file blob "$sha" | head -n 5 || true)
+  grep -qE '@generated|Code generated .*DO NOT EDIT' <<<"$head"
+}
+
+over=''
+while IFS= read -r -d '' meta; do
+  read -r _ _ old new status <<<"${meta#:}"
+  IFS= read -r -d '' path
+  case $status in
+    R*) IFS= read -r -d '' path ;;
+    C*) IFS= read -r -d '' path; old=0 ;;
+  esac
+  size=$(git cat-file blob "$new" | wc -l)
+  [ "$size" -gt "$cap" ] || continue
+  if [ "${old//0/}" ]; then
+    was=$(git cat-file blob "$old" | wc -l)
+    [ "$size" -gt "$was" ] || continue
+    note="grew from $((was))"
+  else
+    note='new file'
+  fi
+  generated "$path" "$new" && continue
+  over+="  $path  $((size)) lines, $note"$'\n'
+done < <(git diff --cached --raw -z --no-abbrev -M --diff-filter=ACMR)
+
+[ -z "$over" ] && exit 0
+cat >&2 <<EOF
+Commit blocked: these files are over $cap lines and new or grown.
+$over
+Split each file by concept, in a commit of its own, before this change:
+1. Unstage this change. List what the file holds that changes for different reasons.
+2. Move each such part to its own file, named for what it holds.
+3. Point every caller at the new file; leave no re-export stub behind.
+4. Commit the split alone, then stage and commit this change again.
+Do not split by position (part1, part2), add a utils or helpers file,
+raise the cap, or skip this hook.
+Generated, vendored or a lock file? You judge: add "<path> linguist-generated"
+to .gitattributes in its own commit, and say in the message why it is not written by hand.
+EOF
+exit 1
