@@ -31,7 +31,9 @@ const AGENT = /<task-notification>|<agent-message /;
 /** What the user typed or picked: their messages, and their answers to AskUserQuestion. */
 export function userWords(msgs: Msg[]): string[] {
   return msgs.flatMap((m) => [
-    ...(m.role === "user" && m.text.trim() && !AGENT.test(m.text) ? [m.text] : []),
+    ...(m.role === "user" && m.text.trim() && !AGENT.test(m.text)
+      ? [m.text]
+      : []),
     ...(m.toolResults ?? []).map((r) => r.text).filter((t) => ANSWERED.test(t)),
   ]);
 }
@@ -60,7 +62,7 @@ export function unquoted(
 /** What the model reads when its edit is held. */
 export function heldReason(missing: (keyof Said)[]): string {
   const what = missing.map((k) => `${k} (${SLOTS[k]})`).join(" and ");
-  return `Held: the card has no ${what} in the user's own words. Ask the user, then write a \`\`\`card block whose "said" copies their words exactly, {"said":{"goal":"…","done":"…"}}, before editing again. The user can also say "go" to start without them.`;
+  return `Held: the card has no ${what} in the user's own words. Ask the user, then write a \`\`\`card block whose "said" copies their words exactly, {"said":{"goal":"…","done":"…"}}, before editing again. The user can also type "go" as their own message to start without them; a "go" picked from your question does not open it, so never offer one.`;
 }
 
 /** A prompt that tells the session to start as it stands. */

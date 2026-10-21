@@ -50,7 +50,7 @@ Stopped means the agent wants the user. Until one stops, say nothing. Nothing ar
 
 ## Landing
 
-The flight lands when the user has accounted for every detail of the destination by looking: done, deferred, or dropped. A detail without an account is a skip. A change the log does not explain is magic. Either → not landed; say which.
+The flight lands when the user has accounted for every detail of the destination by looking: done, deferred, or dropped. The user looks at every part merged into one tree, never at a part alone: parts that pass alone can break together. A detail without an account is a skip. A change the log does not explain is magic. Either → not landed; say which.
 
 ## Across sessions
 

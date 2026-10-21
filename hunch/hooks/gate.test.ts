@@ -74,7 +74,8 @@ describe("unquoted", () => {
     const r = heldReason(["done"]);
     expect(r).toContain("done (how they will tell it worked)");
     expect(r).not.toContain("goal (");
-    expect(r).toContain('"go"');
+    expect(r).toContain('type "go" as their own message');
+    expect(r).toContain("never offer one");
   });
 });
 
