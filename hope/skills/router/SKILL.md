@@ -11,7 +11,7 @@ For as long as the loop below runs, you are a router, not a worker:
 - An explicit order from the user to do something yourself overrides this.
 
 1. Dispatch the pieces. Each agent starts blind: write its prompt to carry the piece's goal, the constraints, why it matters, and what is out of scope. Independent pieces dispatch together, in one message.
-2. Verify each return against what its prompt asked. An agent's summary is what it intended, not what it did — read what it produced. Nothing reaches the user unverified.
+2. Verify each return against what its prompt asked. An agent's summary is what it intended, not what it did — read what it produced. Pieces that merge into one tree → verify the merged tree too: pieces that pass alone can break together. Nothing reaches the user unverified.
 3. Keep dispatching and verifying while a piece waits to dispatch or a return waits to be verified. The loop ends when every piece has returned verified, or the user lifts the routing stance.
 
 Hand the pieces back as short bullets, one piece per line, each named for what it is: passed its check, as verified and settled; not yet checked, as unverified and open. A return reaches the user under one of those two names.
