@@ -34,14 +34,14 @@ describe("card parse", () => {
       latestCard([said(block('{"facts":["a"]}')), said(block('{"facts":[]}'))]),
     ).toEqual({ facts: [] });
   });
-  test("complaints add up across blocks, oldest first", async () => {
+  test("suggestions add up across blocks, oldest first", async () => {
     expect(
       latestCard([
-        said(block('{"complain":["a"]}')),
+        said(block('{"suggestions":["a"]}')),
         said(block('{"intent":"x"}')),
-        said(block('{"complain":["b","c"]}')),
+        said(block('{"suggestions":["b","c"]}')),
       ]),
-    ).toEqual({ intent: "x", complain: ["a", "b", "c"] });
+    ).toEqual({ intent: "x", suggestions: ["a", "b", "c"] });
   });
   test("latest block wins", async () => {
     expect(
@@ -106,7 +106,7 @@ test("a chip previews its card with one number", async () => {
   expect(chipLabel("facts", s())).toBe("facts 2");
   expect(chipLabel("questions", s())).toBe("questions 2");
   expect(chipLabel("skills", s(["hope:intent"]))).toBe("skills 1/2");
-  expect(chipLabel("complain", { ...s(), card: { complain: ["a", "b"] } })).toBe("complain 2");
+  expect(chipLabel("suggestions", { ...s(), card: { suggestions: ["a", "b"] } })).toBe("suggestions 2");
 });
 test("first line: the first non-empty one, trimmed", async () => {
   expect(firstLine("\n  find the parser \nmore")).toBe("find the parser");
