@@ -12,6 +12,8 @@ export type Card = {
   /** An agent's own one-line answer; the session's card has none. */
   outcome?: string;
   facts?: string[];
+  /** What the agent kept to itself, from the complain skill. */
+  complain?: string[];
   questions?: Question[];
   ideas?: Idea[];
   skills?: { name: string; outcome: string }[];
@@ -55,7 +57,7 @@ const CARD_RE = /(?<=^|\n)```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
 const PANE = "tend";
 
 const PAD = 2;
-const CHIPS = ["intent", "shape", "facts", "ideas", "questions", "skills", "watch", "memory", "agents"] as const;
+const CHIPS = ["intent", "shape", "facts", "ideas", "questions", "complain", "skills", "watch", "memory", "agents"] as const;
 
 // ---- pure ----
 
@@ -115,6 +117,7 @@ export function cleanCard(c: any): Card {
     shape: str(c.shape) ? c.shape : undefined,
     outcome: str(c.outcome) ? c.outcome : undefined,
     facts: list(c.facts, str),
+    complain: list(c.complain, str),
     questions: list(c.questions, (q): q is Question =>
       str(q?.q) && Array.isArray(q.options) && q.options.every(str),
     ),
@@ -137,9 +140,11 @@ export function cleanCard(c: any): Card {
   return card;
 }
 
-/** Each key from the newest block that has it: a clarify card keeps compose's skills. */
+/** Each key from the newest block that has it: a clarify card keeps compose's skills.
+ * Complaints add up instead, oldest first: a later one never hides an earlier. */
 export function latestCard(msgs: Msg[]): Card {
   const card: Card = {};
+  const complain: string[] = [];
   for (let i = msgs.length - 1; i >= 0; i--) {
     if (msgs[i].role !== "assistant") continue;
     for (const b of [...msgs[i].text.matchAll(CARD_RE)].reverse()) {
@@ -151,10 +156,12 @@ export function latestCard(msgs: Msg[]): Card {
       }
       if (!c || typeof c !== "object" || Array.isArray(c)) continue;
       const clean = cleanCard(c);
+      complain.unshift(...(clean.complain ?? []));
       for (const k of Object.keys(clean) as (keyof Card)[])
-        if (!(k in card)) (card as any)[k] = clean[k];
+        if (k !== "complain" && !(k in card)) (card as any)[k] = clean[k];
     }
   }
+  if (complain.length) card.complain = complain;
   return card;
 }
 
@@ -443,6 +450,7 @@ export function chipLabel(name: string, s: Shown): string {
   if (name === "facts") return `facts ${s.card.facts?.length ?? 0}`;
   if (name === "questions") return `questions ${s.card.questions?.length ?? 0}`;
   if (name === "ideas") return `ideas ${s.card.ideas?.length ?? 0}`;
+  if (name === "complain") return `complain ${s.card.complain?.length ?? 0}`;
   if (name === "memory") return `memory ${s.memory.length}`;
   return `${name} ${chipRows(name, s).length}`;
 }
@@ -453,6 +461,8 @@ export function cardRows(c: Card, name: string, ran: Set<string>): Item[][] {
     // Each sentence its own paragraph, set in from the pane's edge.
     return c[name] ? [[under(line(`probe:${name}`, sentences(c[name]!).join("\n\n")))]] : [];
   if (name === "facts") return factRows(c.facts ?? [], "");
+  if (name === "complain")
+    return spaced((c.complain ?? []).map((t, i) => [[line(`probe:complaint ${i + 1}`, `• ${t}`)]]));
   if (name === "questions")
     return spaced(
       (c.questions ?? []).map((q, i) => [
