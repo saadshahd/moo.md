@@ -209,7 +209,7 @@ export function cleanCard(c: any): Card {
 }
 
 /** Each key from the newest block that has it: a clarify card keeps compose's skills.
- * Suggestions add up instead, oldest first: a later one never hides an earlier. */
+ * Suggestions add up instead, oldest first: a later one never hides an earlier, and a repeat shows once. */
 export function latestCard(msgs: Msg[]): Card {
   const card: Card = {};
   const suggestions: string[] = [];
@@ -229,7 +229,7 @@ export function latestCard(msgs: Msg[]): Card {
         if (k !== "suggestions" && !(k in card)) (card as any)[k] = clean[k];
     }
   }
-  if (suggestions.length) card.suggestions = suggestions;
+  if (suggestions.length) card.suggestions = [...new Set(suggestions)];
   return card;
 }
 

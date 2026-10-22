@@ -43,6 +43,14 @@ describe("card parse", () => {
       ]),
     ).toEqual({ intent: "x", suggestions: ["a", "b", "c"] });
   });
+  test("a repeated suggestion shows once", async () => {
+    expect(
+      latestCard([
+        said(block('{"suggestions":["a","b"]}')),
+        said(block('{"suggestions":["a","b","c"]}')),
+      ]),
+    ).toEqual({ suggestions: ["a", "b", "c"] });
+  });
   test("latest block wins", async () => {
     expect(
       latestCard([

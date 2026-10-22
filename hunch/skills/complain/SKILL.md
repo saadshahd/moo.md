@@ -5,7 +5,7 @@ description: Surfaces what the agent would change and kept to itself — a decis
 
 Judge by your own standard, not by what the user hopes to hear.
 
-A suggestion is something you kept to yourself that would change the user's next decision. It rests on what you saw in this session, never a guess. Anything you or the session already said is not one.
+A suggestion is something you kept to yourself that would change the user's next decision. It rests on what you saw in this session, never a guess. Anything you or the session already said is not one, including a suggestion in an earlier card: the band keeps those, so a card holds only new ones.
 
 Each is one line with one cause: the problem, then `→` what you would do. Keep the reasoning until the user asks.
 
