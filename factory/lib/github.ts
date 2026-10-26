@@ -27,6 +27,9 @@ export async function must(
 /** The branch a run claims for issue `n`; the first push of it wins the issue. */
 export const branchFor = (n: number) => `factory/${n}`;
 
+/** The session name of a run for issue `n` of `repo`; agent view lists runs by it. */
+export const runName = (repo: string, n: number) => `factory:${repo}#${n}`;
+
 export function issueOf(branch: string): number | null {
   const m = /^factory\/(\d+)$/.exec(branch.trim());
 

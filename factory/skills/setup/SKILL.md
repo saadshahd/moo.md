@@ -8,9 +8,13 @@ Set up the factory on the repo the session is in. The plugin root is two directo
 
 ## Refuse first
 Stop and say why, changing nothing, when any holds:
-- `ANTHROPIC_API_KEY` is set: it silently overrides the subscription.
+- `ANTHROPIC_API_KEY` is set in the shell, or `env.ANTHROPIC_API_KEY` or `apiKeyHelper` in `~/.claude/settings.json` or the repo's `.claude/settings.json` or `.claude/settings.local.json`: runs would bill the API, not the subscription.
+- `~/.claude/settings.json` lacks `"CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1"` under `env`, or enables no `factory@…` plugin: background runs would load no factory hooks. Say which line to add, or to install the plugin with `/plugin`.
 - The default branch requires no status check (`gh api repos/<repo>/rules/branches/<base>` has no `required_status_checks` rule, and branch protection names no check). Auto-merge would merge unchecked code.
 - `bun`, `gh`, `claude` or `wt` is missing from `PATH`.
+
+## The worker's packages
+The worker imports `@octokit/auth-app`, and a plugin installs without its packages. Run `bun install --production` in `<root>`.
 
 ## The factory's GitHub App
 Runs act on GitHub as the user's own App, never as the user, so a run can't approve its own plan. Skip this when `~/.config/factory/app.json` exists and `bun <root>/worker/cli.ts token`, run in the repo, prints a token.
@@ -28,6 +32,8 @@ Then write `~/.config/factory/app.json` as `{ "clientId": "<the App's Client ID>
 ## The rules file
 Write `.claude/factory.json` with the user; `<root>/lib/rules.ts` is its schema and `parseRules` must accept the result.
 
+Set `bot` to the `name` the `token` command prints (`<slug>[bot]`): only that login's factory comments count. Set `trusted` to the logins whose comments, labels and issue bodies count; leave it out to trust only the repo's owner. Never put the bot in `trusted`.
+
 1. Find where the project's taste lives: `CLAUDE.md`, `AGENTS.md`, and any taste or style file they name. These go in `taste`.
 2. List every rule those files state. Put each on one layer:
 
@@ -40,7 +46,7 @@ Write `.claude/factory.json` with the user; `<root>/lib/rules.ts` is its schema 
 
    Show the mapping as a table and let the user move rules before writing it.
 3. Ask for `atOnce` (runs at once on this Mac) and `waitsPerDay` (asks a day that may wait for them). Set `contextCap` to 300000 unless they name another.
-4. Write the file. The user commits it; the worker reads it from the main worktree.
+4. Write the file. The user commits and pushes it to the default branch: the worker and the run hooks read it from `origin`, never from a branch a run could edit.
 
 ## The repo
 - `gh label create factory --force --description "Picked up by the factory worker"`
@@ -50,7 +56,7 @@ Write `.claude/factory.json` with the user; `<root>/lib/rules.ts` is its schema 
 
 ## The worker
 Write `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`:
-- `ProgramArguments`: the absolute `bun`, `<root>/worker/worker.ts`, the repo's main worktree path.
+- `ProgramArguments`: the absolute `bun`, `<root>/worker/main.ts`, the repo's main worktree path.
 - `EnvironmentVariables.PATH`: the directories holding `bun`, `gh`, `claude`, `wt`, `git` and `caffeinate`, read from this shell.
 - `KeepAlive` true, `RunAtLoad` true.
 - `StandardOutPath` and `StandardErrorPath`: `~/Library/Logs/factory-<repo name>.log`.

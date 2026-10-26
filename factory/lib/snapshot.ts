@@ -93,6 +93,7 @@ const PrNode = z.object({
   number: z.int(),
   headRefName: z.string(),
   state: z.literal(["OPEN", "CLOSED", "MERGED"]),
+  closedAt: z.nullable(z.string()),
   commits: z.object({
     nodes: z.array(
       z.object({
@@ -106,7 +107,7 @@ const PrNode = z.object({
 });
 
 const PRS = `pageInfo { hasNextPage } nodes {
-  number headRefName state
+  number headRefName state closedAt
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
   comments(first: 100) { pageInfo { hasNextPage } nodes { ${COMMENT} } }
 }`;
@@ -198,6 +199,7 @@ export type Pr = {
   number: number;
   head: string;
   state: "OPEN" | "CLOSED" | "MERGED";
+  closedAt: string | null;
   /** The newest commit's combined check state, as GitHub names it, or null before any check. */
   checks: string | null;
   comments: Comment[];
@@ -222,6 +224,7 @@ const toPr = (p: z.infer<typeof PrNode>, cs: Comment[]): Pr => ({
   number: p.number,
   head: p.headRefName,
   state: p.state,
+  closedAt: p.closedAt,
   checks: p.commits.nodes[0]?.commit.statusCheckRollup?.state ?? null,
   comments: cs,
 });

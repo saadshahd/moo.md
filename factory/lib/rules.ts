@@ -1,4 +1,4 @@
-import type { Actors } from "./github.ts";
+import { must, type Actors, type Run } from "./github.ts";
 import * as z from "./vendor/zod-mini.js";
 
 export const RULES_PATH = ".claude/factory.json";
@@ -52,4 +52,15 @@ export function parseRules(json: string): Rules | { errors: string[] } {
 
 export function actorsOf(rules: Rules, repo: string): Actors {
   return { bot: rules.bot, trusted: rules.trusted ?? [repo.split("/")[0]!] };
+}
+
+/** The rules on origin's default branch, never a branch's copy: a run could edit its own. */
+export async function readRules(run: Run, cwd: string): Promise<Rules> {
+  const r = parseRules(
+    await must(run, ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`], { cwd }),
+  );
+
+  if ("errors" in r) throw new Error(r.errors.join("; "));
+
+  return r;
 }

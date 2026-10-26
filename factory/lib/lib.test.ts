@@ -5,6 +5,7 @@ import {
   render,
   total,
   WHY_MAX,
+  BODY_MAX,
   type Call,
   type FactoryComment,
   type Wait,
@@ -136,6 +137,11 @@ describe("formats", () => {
         why: "x".repeat(WHY_MAX + 1),
       }),
     ).toThrow();
+  });
+  test("a comment past GitHub's body limit is never posted", () => {
+    expect(() =>
+      render({ kind: "handoff", issue: 7, text: "x".repeat(BODY_MAX) }),
+    ).toThrow("over GitHub's 65536");
   });
   test("a call shows what it passed over; its why rides once, below", () => {
     const body = render(CALL);
