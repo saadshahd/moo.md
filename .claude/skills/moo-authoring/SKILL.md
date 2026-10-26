@@ -46,6 +46,8 @@ Phrase design decisions as "X over Y: reason".
 | An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
 | Doctrine for this repo's own surfaces | Repo-local skill in `.claude/skills/`; never ships |
 
+Base rate over build: before building any unit, count how often its target situation occurs in real session transcripts, and weigh each case by what the miss cost. A rare, cheap situation caps the value whatever the build's accuracy; a planted test prompt proves the mechanism, never the value.
+
 **Composition — name-calls, never imports:**
 
 - Skills compose by name: a composer names a move and invokes it with the Skill tool; a body never inlines another body.
