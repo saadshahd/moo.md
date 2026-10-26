@@ -146,6 +146,7 @@ const merged = (number: number, headRefName: string, cs: CommentNode[]) => ({
   number,
   headRefName,
   state: "MERGED",
+  closedAt: "2026-10-26T21:00:00Z",
   commits: { nodes: [] },
   comments: page(cs),
 });
