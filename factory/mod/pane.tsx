@@ -43,6 +43,14 @@ const picks = new Map<number, (string | undefined)[]>();
 // The questions whose "my own" field is open, as `<wait id>:<question index>`.
 const owning = new Set<string>();
 const planOpen = new Set<number>();
+
+// The button whose GitHub write is running; every other action waits until it ends.
+let busy: string | null = null;
+let reading: Promise<void> | null = null;
+let spinner: { cancel: () => void } | null = null;
+let frame = 0;
+const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const FRAME_MS = 80;
 let ticking: { cancel: () => void } | null = null;
 
 // A copy of hooks/run.ts's `runner`: the engine follows `$` past an import only into a function
@@ -52,14 +60,43 @@ function runner($: EngineInterface): Run {
     $.process.run(argv, { cwd: opts?.cwd, stdin: opts?.stdin, timeoutMs: 60_000 });
 }
 
-async function refresh($: EngineInterface): Promise<void> {
-  try {
-    read = await readRows($);
-  } catch (err) {
-    read = { kind: "failed", why: err instanceof Error ? err.message : String(err) };
+/** Reads GitHub once; a read already running is joined, never doubled. */
+function refresh($: EngineInterface): Promise<void> {
+  reading ??= (async () => {
+    spin($);
+
+    try {
+      read = await readRows($);
+    } catch (err) {
+      read = { kind: "failed", why: err instanceof Error ? err.message : String(err) };
+    }
+  })().finally(() => {
+    reading = null;
+    spin($);
+    $.ui.invalidate("ui.render");
+  });
+
+  return reading;
+}
+
+/** Turns the spinner on while a read or a write runs, and off when neither does. */
+function spin($: EngineInterface) {
+  if (busy === null && reading === null) {
+    spinner?.cancel();
+    spinner = null;
+
+    return;
   }
 
-  $.ui.invalidate("ui.render");
+  spinner ??= $.clock.every(FRAME_MS, () => {
+    frame = (frame + 1) % FRAMES.length;
+    $.ui.invalidate("ui.render");
+  });
+}
+
+/** Starts the minute's reads while the pane is open; a reload of the module drops the old timer. */
+function keepReading($: EngineInterface) {
+  ticking ??= $.clock.every(READ_EVERY_MS, () => void refresh($));
 }
 
 async function readRows($: EngineInterface): Promise<Read> {
@@ -93,9 +130,13 @@ async function readRows($: EngineInterface): Promise<Read> {
 /** Runs a press's GitHub write, says what failed, and reads again so the rows show the change. */
 async function act(
   $: EngineInterface,
+  key: string,
   write: (run: Run, repo: string) => Promise<void>,
 ) {
-  if (read.kind !== "read") return;
+  if (read.kind !== "read" || busy !== null) return;
+  busy = key;
+  spin($);
+  $.ui.invalidate("ui.render");
 
   try {
     await write(runner($), read.repo);
@@ -104,10 +145,13 @@ async function act(
   }
 
   await refresh($);
+  busy = null;
+  spin($);
+  $.ui.invalidate("ui.render");
 }
 
 async function undoCall($: EngineInterface, call: CallRow) {
-  await act($, async (run, repo) => {
+  await act($, `undo-${call.id}`, async (run, repo) => {
     // Safe to repeat, and first: listing by a label that does not exist yet fails.
     await must(run, [
       "gh",
@@ -166,7 +210,7 @@ async function note($: EngineInterface, row: StuckRow, text: string) {
   noting.delete(row.issue);
 
   if (text.trim() === "") return;
-  await act($, async (run, repo) => {
+  await act($, `note-${row.issue}`, async (run, repo) => {
     await must(run, [
       "gh",
       "issue",
@@ -181,7 +225,7 @@ async function note($: EngineInterface, row: StuckRow, text: string) {
 }
 
 /** Takes one question's answer; the answer comment goes up once every question has one. */
-async function answer($: EngineInterface, w: WaitRow, qi: number, value: string) {
+async function answer($: EngineInterface, w: WaitRow, qi: number, value: string, key: string) {
   owning.delete(`${w.id}:${qi}`);
 
   if (value.trim() === "") return redraw($, () => {});
@@ -193,7 +237,7 @@ async function answer($: EngineInterface, w: WaitRow, qi: number, value: string)
 
   if (answers.length < w.questions.length) return redraw($, () => {});
   picks.delete(w.id);
-  await act($, async (run, repo) => {
+  await act($, key, async (run, repo) => {
     // An answer from another machine, or github.com, may have landed since the last read.
     if (answerTo(await comments(run, repo, w.issue), w.id, w.questions.length)) {
       $.ui.toast(`factory: #${w.issue} was already answered`);
@@ -206,7 +250,7 @@ async function answer($: EngineInterface, w: WaitRow, qi: number, value: string)
 }
 
 async function retry($: EngineInterface, row: StuckRow) {
-  await act($, async (run, repo) => {
+  await act($, `retry-${row.issue}`, async (run, repo) => {
     await must(run, [
       "gh", "issue", "edit", String(row.issue), "--repo", repo, "--remove-label", STUCK_LABEL,
     ]);
@@ -226,8 +270,7 @@ function redraw($: EngineInterface, change: () => void) {
 
 async function show($: EngineInterface) {
   void refresh($);
-  ticking?.cancel();
-  ticking = $.clock.every(READ_EVERY_MS, () => void refresh($));
+  keepReading($);
 
   try {
     const r = await $.ui.open({
@@ -264,11 +307,21 @@ export const registerPane: Register = (on) => {
   on("ui.close", { id: PANE }, async ($, e, next) => {
     ticking?.cancel();
     ticking = null;
+    spinner?.cancel();
+    spinner = null;
 
     return next(e);
   });
 
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
+    // A reload of the module keeps the pane open but starts its state over, with nothing reading:
+    // the draw itself starts the read, after the draw ends.
+    if (ticking === null || (read.kind === "unread" && reading === null))
+      $.clock.after(0, () => {
+        keepReading($);
+
+        if (read.kind === "unread") void refresh($);
+      });
     const ui = $.ui.resolve(e);
     const { Box, Text } = ui;
     const width = Math.max(PANE_COLUMNS - 2, (e.viewport?.columns ?? 80) - 2);
@@ -280,7 +333,7 @@ export const registerPane: Register = (on) => {
             dimColor={read.kind !== "failed"}
             color={read.kind === "failed" ? "error" : undefined}
           >
-            {read.kind === "unread" ? "reading GitHub…" : read.why}
+            {read.kind === "unread" ? `${FRAMES[frame]} reading GitHub` : read.why}
           </Text>
         </Box>
       );
@@ -386,14 +439,16 @@ function pill(
   isMain = false,
 ) {
   const { Button, Text } = ui;
+  const isBusy = busy === key;
 
   return (
     <Button plain key={key} label={label} onPress={onPress}>
       <Text
         bold
+        dimColor={busy !== null && !isBusy}
         color={isMain ? "inverseText" : "suggestion"}
         backgroundColor={isMain ? "suggestion" : undefined}
-      >{` ${label} `}</Text>
+      >{isBusy ? ` ${FRAMES[frame]} ${label} ` : ` ${label} `}</Text>
     </Button>
   );
 }
@@ -486,7 +541,7 @@ function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: num
             ui,
             `opt-${w.id}-${qi}-${oi}`,
             o,
-            () => void answer($, w, qi, o),
+            () => void answer($, w, qi, o, `opt-${w.id}-${qi}-${oi}`),
             picked === undefined ? isApproval && o === APPROVE : picked === o,
           ),
         ),
@@ -506,7 +561,7 @@ function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: num
           placeholder="your answer"
           submitLabel="send"
           autoFocus
-          onSubmit={(v: string) => void answer($, w, qi, v)}
+          onSubmit={(v: string) => void answer($, w, qi, v, `own-${w.id}-${qi}`)}
         />
       )}
     </Box>
