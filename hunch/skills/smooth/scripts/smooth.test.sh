@@ -51,13 +51,17 @@ branch=smooth/$(date +%F)
 
 fails=0
 ok() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; fails=$((fails + 1)); fi; }
-run() { out=$("$here/smooth.sh" "$repo" 2>&1); code=$?; }
+run() { out=$("$here/smooth.sh" "${WINDOW:-day}" "$repo" 2>&1); code=$?; }
 
 counted=$("$here/count.sh" 1 "$repo")
 ok "count.sh finds the failed command"   'printf "%s" "$counted" | grep -q "failed commands  1 in 1 session"'
+ok "count.sh takes week as 7 days"       '[ "$("$here/count.sh" week "$repo")" = "$("$here/count.sh" 7 "$repo")" ]'
 
-run
-ok "one session: no fix, no branch"      '[ $code -eq 0 ] && printf "%s" "$out" | grep -q "no friction recurred" && ! git -C "$repo" rev-parse -q --verify "$branch" >/dev/null'
+WINDOW=fortnight run
+ok "unknown window fails loud"           '[ $code -ne 0 ] && printf "%s" "$out" | grep -q "day, week or month"'
+
+WINDOW=week run
+ok "one session: no fix, no branch"      '[ $code -eq 0 ] && printf "%s" "$out" | grep -q "no friction recurred across sessions in the last week" && ! git -C "$repo" rev-parse -q --verify "$branch" >/dev/null'
 
 session s2 "$proj/s2.jsonl"
 run
@@ -67,6 +71,7 @@ ok "fix sits on the smooth branch"       'git -C "$repo" show "$branch:CLAUDE.md
 ok ".claude/ staged back from _claude/"  'git -C "$repo" show "$branch:.claude/skills/ship/SKILL.md" | grep -q "make test" && ! git -C "$repo" ls-tree -r --name-only "$branch" | grep -q "^_claude/"'
 ok "a symlinked skill stays a symlink"  '[ "$(git -C "$repo" ls-tree "$branch" .claude/skills/alias | cut -c1-6)" = 120000 ]'
 ok "commit carries signal and count"     'git -C "$repo" log -1 --format=%B "$branch" | grep -q "^count: 2"'
+ok "commit carries the window"           'git -C "$repo" log -1 --format=%B "$branch" | grep -q "^window: day"'
 ok "checked-out branch untouched"        '! grep -q "make test" "$repo/CLAUDE.md" && [ -z "$(git -C "$repo" status --porcelain)" ]'
 ok "no worktree left"                    '[ "$(git -C "$repo" worktree list | wc -l)" -eq 1 ]'
 ok "output names review, keep, drop"     'printf "%s" "$out" | grep -q "review: git" && printf "%s" "$out" | grep -q "keep:" && printf "%s" "$out" | grep -q "drop:"'

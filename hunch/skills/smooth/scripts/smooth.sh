@@ -1,5 +1,6 @@
 #!/bin/bash
-# smooth.sh [project-dir] — count yesterday's executor friction in the project, have Sonnet make ONE fix
+# smooth.sh [day|week|month] [project-dir] — count the project's executor friction over that window
+# (default day), have Sonnet make ONE fix
 # for the friction that recurred across the most sessions, and leave it on a `smooth/<date>` branch:
 # in the repo, or in the memory folder's git when the fix is a memory note. Nothing lands on the
 # checked-out branch; the person keeps or drops it. Prints the trend of the last fix, the new fix,
@@ -7,7 +8,8 @@
 set -euo pipefail
 command -v claude >/dev/null 2>&1 || { echo "smooth: claude not on PATH" >&2; exit 127; }
 here=$(cd "$(dirname "$0")/.." && pwd)
-. "$here/scripts/project.sh" "${1:-.}"
+window="${1:-day}"
+. "$here/scripts/project.sh" "${2:-.}"
 branch="smooth/$(date +%F)"
 
 if git -C "$root" rev-parse -q --verify "refs/heads/$branch" >/dev/null ||
@@ -31,16 +33,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$here/scripts/count.sh" --json 1 "$root" > "$work/today.json"
+"$here/scripts/count.sh" --json "$window" "$root" > "$work/counted.json"
 
 t=$("$here/scripts/trend.sh" "$root")
 [ -z "$t" ] || echo "trend: $t"
 
 # The friction to fix: the group spread over the most sessions, at least two. Interrupts have no home in the project.
 jq '[.signals[] | select(.name != "interrupts") | . as $s | .groups[] | select(.sessions >= 2) | . + {signal: $s.name, home: $s.fix}]
-    | sort_by(-.sessions, -.n) | first // empty' "$work/today.json" > "$work/pick.json"
+    | sort_by(-.sessions, -.n) | first // empty' "$work/counted.json" > "$work/pick.json"
 if [ ! -s "$work/pick.json" ]; then
-  echo "smooth: no friction recurred across sessions in the last day; no fix"; exit 0
+  echo "smooth: no friction recurred across sessions in the last $window; no fix"; exit 0
 fi
 sig=$(jq -r .signal "$work/pick.json") grp=$(jq -r .g "$work/pick.json")
 n=$(jq -r .n "$work/pick.json") sessions=$(jq -r .sessions "$work/pick.json")
@@ -88,7 +90,8 @@ msg="smooth: $line
 
 signal: $sig
 group: $grp
-count: $n"
+count: $n
+window: $window"
 made=""
 for w in repo mem; do
   [ -d "$work/$w" ] || continue

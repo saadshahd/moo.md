@@ -1,5 +1,5 @@
 #!/bin/bash
-# count.sh [--json] [days] [project-dir] — executor friction in one project's sessions, counted without a model.
+# count.sh [--json] [days|day|week|month] [project-dir] — executor friction in one project's sessions, counted without a model.
 # A project is its git root; its sessions are every transcript whose cwd sits at or under that root,
 # worktrees and subagents included. Each signal prints its count, the sessions it spans, and its top groups.
 # --json: the same as one object; each group carries its session ids and up to 5 calls behind it.
@@ -9,7 +9,10 @@ command -v jq >/dev/null || { echo "count.sh: needs jq (brew install jq)" >&2; e
 json=false
 [ "${1:-}" = --json ] && { json=true; shift; }
 days="${1:-1}"
-case "$days" in (*[!0-9]*|'') echo "count.sh: days must be a number, got $days" >&2; exit 2 ;; esac
+case "$days" in
+  (day) days=1 ;; (week) days=7 ;; (month) days=30 ;;
+  (*[!0-9]*|'') echo "count.sh: days must be a number, day, week or month, got $days" >&2; exit 2 ;;
+esac
 . "$(dirname "$0")/project.sh" "${2:-.}"
 
 # Transcript folders are named after the cwd, so a prefix finds the root, its subfolders and its worktrees;
