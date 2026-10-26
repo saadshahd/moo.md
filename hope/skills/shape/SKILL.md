@@ -23,4 +23,6 @@ Each decision re-enters the routing: a resolved choice can open the next one or 
 
 Ask any choice still open first, with AskUserQuestion. Then state each resolved choice with its reason and what lost.
 
+The path is chosen and no target contract will judge it → use **inversion** skill on it; each negated line joins the path as a constraint.
+
 The ask itself is still rough — starting would mean inventing what the user means → use **intent** skill.

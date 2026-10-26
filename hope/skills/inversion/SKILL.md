@@ -11,4 +11,4 @@ This runs inside one turn — nothing waits on the user.
 
 The negated list is the route. Hand it back as short bullets, one imperative per line, and stop there: nothing else rides along.
 
-The goal hasn't been tried head-on yet → do the work. The failing is the execution, not the route → own it and fix it. A list of what could go wrong is what's wanted → give the list plainly; that list is itself the answer.
+The goal hasn't been tried head-on yet and no route is being chosen → do the work. The failing is the execution, not the route → own it and fix it. A list of what could go wrong is what's wanted → give the list plainly; that list is itself the answer.
