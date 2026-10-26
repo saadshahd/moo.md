@@ -6,7 +6,7 @@ import type {
 } from "claude-code";
 import { STUCK_LABEL, must, post, repoOf, type Actors, type Run } from "../lib/github.ts";
 import { runner } from "../hooks/session.ts";
-import { RULES_PATH, actorsOf, parseRules } from "../lib/rules.ts";
+import { RULES_PATH, actorsOf, readRules, type Rules } from "../lib/rules.ts";
 import { UNDO_LABEL, comments, readSnapshot, undone } from "../lib/snapshot.ts";
 import { APPROVE, answerFor, answerTo, isApproval } from "../lib/wait.ts";
 import {
@@ -99,21 +99,17 @@ async function readRows($: EngineInterface): Promise<Read> {
   const run = runner($);
   const cwd = await $.session.cwd();
 
-  /** From origin's default branch, as the run hooks read it, so a run can't add itself as trusted. */
-  const file = await run(
-    ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`],
-    { cwd },
-  );
+  let rules: Rules;
 
-  if (file.exitCode !== 0)
+  try {
+    rules = await readRules(run, cwd);
+  } catch (err) {
     return {
       kind: "none",
-      why: `no ${RULES_PATH} on origin/HEAD; /factory:setup writes it`,
+      why: `${err instanceof Error ? err.message : String(err)}; /factory:setup writes ${RULES_PATH}`,
     };
-  const rules = parseRules(file.stdout);
+  }
 
-  if ("errors" in rules)
-    return { kind: "failed", why: rules.errors.join("; ") };
   const repo = await repoOf(run, cwd);
   const actors = actorsOf(rules, repo);
 
