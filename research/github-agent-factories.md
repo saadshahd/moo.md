@@ -336,7 +336,7 @@ Two contracts: one ends the build, one judges the factory.
 | Part | Value |
 |---|---|
 | Observable | issues closed by a merged factory PR, out of 3 smoke issues |
-| Command | `gh issue list --repo <throwaway> --label smoke --state closed --json closedByPullRequestsReferences --jq '[.[] \| select(.closedByPullRequestsReferences \| length > 0)] \| length'` |
+| Command | `gh pr list --repo saadshahd/factory-smoke --state merged --json closingIssuesReferences,statusCheckRollup --jq '[.[] \| select(any(.statusCheckRollup[]; .name == "check" and .conclusion == "SUCCESS")) \| .closingIssuesReferences[].number] \| unique \| length'` |
 | Better / ends at | higher; 3 of 3 |
 | The smoke issues | written by you after the build, outside the repo; the build agent never sees them |
 | Each PR must also show, read by you in `/factory` | a plan comment with types, signatures, files and a seal; at least one call; its cost |
@@ -345,7 +345,7 @@ Two contracts: one ends the build, one judges the factory.
 | Cap | 3 smoke runs; then stop and report what failed |
 | Dry run today | 0 of 3: nothing exists. Free checks read now: no `ANTHROPIC_API_KEY`; `gh` at 5,000/hour; `claude agents --json` and `wt` v0.80 answer |
 | Fence: easy issues | each smoke issue needs a design choice: a new type and 2+ files |
-| Fence: merging past checks | the throwaway repo's ruleset requires the checks on main, so a merged PR passed them |
+| Fence: merging past checks | you can bypass the ruleset as admin, and the factory runs under your login, so the command counts only PRs whose `check` passed |
 | Fence: faked cost | the cost line must match the run's transcript token count |
 | Fence: narration | done means the command's own output in the transcript, never a claim |
 
