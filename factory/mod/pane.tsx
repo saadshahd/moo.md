@@ -4,14 +4,8 @@ import type {
   Register,
   RenderChildren,
 } from "claude-code";
-import {
-  STUCK_LABEL,
-  must,
-  post,
-  repoOf,
-  type Actors,
-  type Run,
-} from "../lib/github.ts";
+import { STUCK_LABEL, must, post, repoOf, type Actors, type Run } from "../lib/github.ts";
+import { runner } from "../hooks/session.ts";
 import { RULES_PATH, actorsOf, parseRules } from "../lib/rules.ts";
 import { UNDO_LABEL, comments, readSnapshot, undone } from "../lib/snapshot.ts";
 import { APPROVE, answerFor, answerTo, isApproval } from "../lib/wait.ts";
@@ -56,19 +50,6 @@ let frame = 0;
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const FRAME_MS = 80;
 let ticking: { cancel: () => void } | null = null;
-
-/**
- * A copy of `runner` in hooks/run.ts. The engine follows `$` past an import only into a
- * function declaration, and that one is an arrow (raised on #63).
- */
-function runner($: EngineInterface): Run {
-  return (argv, opts) =>
-    $.process.run(argv, {
-      cwd: opts?.cwd,
-      stdin: opts?.stdin,
-      timeoutMs: 60_000,
-    });
-}
 
 /** Reads GitHub once; a read already running is joined, never doubled. */
 function refresh($: EngineInterface): Promise<void> {
