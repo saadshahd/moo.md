@@ -24,7 +24,8 @@ const comment = (databaseId: number, c: FactoryComment) => ({
   body: render(c),
   url: `https://github.com/o/smoke/issues/${c.issue}#issuecomment-${databaseId}`,
   createdAt: "2026-10-26T20:00:00Z",
-  author: { login: "factory-bot" },
+  authorAssociation: "OWNER",
+  author: { login: "saadshahd" },
 });
 
 const SEAL = "ab12cd34".repeat(8);
@@ -69,6 +70,15 @@ const WAITING = [
       answers: null,
     }),
     comment(111, { kind: "answer", issue: 11, wait: 110, answers: ["yes"] }),
+  ]),
+  issue(12, "Answered by a stranger", [
+    comment(120, {
+      kind: "wait",
+      issue: 12,
+      questions: [{ question: "Rename it?", why: "the name is taken", options: ["yes", "no"] }],
+      answers: null,
+    }),
+    { ...comment(121, { kind: "answer", issue: 12, wait: 120, answers: ["yes"] }), authorAssociation: "NONE" },
   ]),
 ];
 
@@ -181,7 +191,8 @@ describe("rows", () => {
   test("a wait waits until an answer lands; one asking approval is a plan", () => {
     const r = rows(snapshot());
 
-    expect(r.questions.map((w) => w.id)).toEqual([90]);
+    // A stranger's answer leaves the wait open: only someone who can push may answer a run.
+    expect(r.questions.map((w) => w.id)).toEqual([90, 120]);
     expect(r.plans.map((w) => [w.id, w.plan])).toEqual([[101, "## Types\n\ntype RailItem = { id: string }"]]);
   });
 

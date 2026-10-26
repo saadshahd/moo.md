@@ -14,7 +14,7 @@ export const QUERY = `query($owner: String!, $name: String!) {
       nodes {
         number title url state
         labels(first: 20) { nodes { name } }
-        comments(last: 50) { nodes { databaseId body url createdAt author { login } } }
+        comments(last: 50) { nodes { databaseId body url createdAt authorAssociation author { login } } }
       }
     }
     undos: issues(labels: ["${UNDO_LABEL}"], first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -43,6 +43,7 @@ export type Snapshot = {
           body: string;
           url: string;
           createdAt: string;
+          authorAssociation: string;
           author: { login: string } | null;
         }>;
       }>;
@@ -135,11 +136,12 @@ export function rows(s: Snapshot): Rows {
       body: c.body,
       author: c.author?.login ?? "",
       createdAt: c.createdAt,
+      association: c.authorAssociation,
     }));
 
     const w = openWait(cs);
 
-    if (w === null || answerTo(cs, w.id, w.c.questions.length, () => true) !== null) return [];
+    if (w === null || answerTo(cs, w.id, w.c.questions.length) !== null) return [];
     const asksApproval = w.c.questions.some((q) => parseApprovalQuestion(q.question) !== null);
 
     return [
