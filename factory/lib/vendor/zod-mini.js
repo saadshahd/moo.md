@@ -519,14 +519,6 @@ var _encode = (_Err) => {
   return fn;
 };
 var encode = /* @__PURE__ */ _encode($ZodRealError);
-var _decode = (_Err) => {
-  const parse2 = _parse(_Err);
-  const fn = (schema, value, _ctx, _params) => {
-    return parse2(schema, value, _ctx, finalizeParams(fn, _params));
-  };
-  return fn;
-};
-var decode = /* @__PURE__ */ _decode($ZodRealError);
 var _safeDecode = (_Err) => (schema, value, _ctx) => {
   return _safeParse(_Err)(schema, value, _ctx);
 };
@@ -1795,7 +1787,6 @@ export {
   literal,
   int,
   encode,
-  decode,
   codec,
   boolean2 as boolean,
   array

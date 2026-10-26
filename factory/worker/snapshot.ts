@@ -27,7 +27,7 @@ import {
 } from "../lib/transcript.ts";
 import * as z from "../lib/vendor/zod-mini.js";
 import type { App } from "./app.ts";
-import type { Local, RunView, World } from "./decide.ts";
+import { SESSION_STATES, type Local, type RunView, type World } from "./decide.ts";
 import { run } from "./proc.ts";
 
 export type Ctx = {
@@ -51,7 +51,7 @@ const Session = z.union([
   sessionId: z.string(),
   name: z.optional(z.nullable(z.string())),
   startedAt: z.number(),
-  state: z.literal(["working", "blocked", "done", "stopped"]),
+  state: z.literal(SESSION_STATES),
 }),
 ]);
 

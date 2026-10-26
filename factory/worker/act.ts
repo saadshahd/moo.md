@@ -21,7 +21,7 @@ import { sessionFacts, worktrees, type Ctx } from "./snapshot.ts";
 
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
 
-const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
+export const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
 
 const pathOf = (w: World, n: number) =>
   w.local.find((l) => l.issue === n)?.path;
