@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import { parse, render, type FactoryComment } from "../lib/formats.ts";
-import { newestNote, register } from "./run.ts";
+import { newestNote, register, whyAsked } from "./run.ts";
 
 const RULES = JSON.stringify({
   atOnce: 1,
@@ -42,8 +42,11 @@ function harness(branch: string, startedAt = 0, rules = RULES) {
       cwd: async () => "/w",
       id: async () => "s1",
       usage: async () => ({ startedAt }),
+      // As a real turn reads at the ask: the text, then the call in a message of its own.
       messages: async () => [
+        { role: "user", text: "the prompt" },
         { role: "assistant", text: "Two stores fit; the choice sets the API." },
+        { role: "assistant", text: "", toolUses: [{ tool: "AskUserQuestion", input: {} }] },
       ],
     },
     store: {
@@ -293,5 +296,12 @@ describe("failures", () => {
     expect(h.toasts.length).toBeGreaterThan(0);
     expect(h.toasts[0]).toContain("not JSON");
     expect(h.said()).toEqual([]);
+  });
+});
+
+describe("why an ask is asked", () => {
+  test("the newest text this turn, never one from before the prompt", () => {
+    expect(whyAsked([{ role: "assistant", text: "old" }, { role: "user", text: "go" }, { role: "assistant", text: "" }])).toBe("");
+    expect(whyAsked([{ role: "assistant", text: "because" }, { role: "user", text: "", toolResults: [{}] }, { role: "assistant", text: "" }])).toBe("because");
   });
 });

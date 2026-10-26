@@ -68,6 +68,22 @@ function shown($: EngineInterface, err: Error | string): void {
   $.ui.toast(`factory: ${err instanceof Error ? err.message : err}`);
 }
 
+/**
+ * The newest text the agent wrote since the last prompt it was given: one API message comes back as
+ * several, and the one holding the AskUserQuestion call carries no text of its own.
+ */
+export function whyAsked(
+  ms: readonly { role: string; text?: string; toolResults?: readonly object[] }[],
+): string {
+  for (const m of [...ms].reverse()) {
+    if (m.role === "assistant" && (m.text ?? "").trim() !== "") return (m.text ?? "").trim();
+
+    if (m.role === "user" && (m.toolResults ?? []).length === 0) return "";
+  }
+
+  return "";
+}
+
 /** Today in UTC, the day the wait cap counts in. */
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -109,15 +125,15 @@ export const register: Register = (on) => {
 
     if (!fr) return next(e);
 
-    // Why it asks: what the run wrote in the message that asks, else the question's short label.
+    // Why it asks: what the run wrote this turn before asking, else the question's short label.
     const said = await $.session
       .messages()
-      .then((ms) => ms.filter((m) => m.role === "assistant").at(-1)?.text?.trim())
-      .catch(() => undefined);
+      .then((ms) => whyAsked(ms))
+      .catch(() => "");
 
     const questions = e.questions.map((q) => ({
       question: q.question,
-      why: said || q.header,
+      why: said === "" ? q.header : said,
       options: q.options.map((o) => o.label),
     }));
 
