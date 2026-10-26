@@ -1,5 +1,5 @@
 import type { EngineInterface, Register } from "claude-code";
-import { parseApprovalQuestion, type Plan } from "../lib/formats.ts";
+import { isFactory, parseApprovalQuestion, type Plan } from "../lib/formats.ts";
 import {
   comments,
   edit,
@@ -30,7 +30,8 @@ const NOTE_EVERY_MS = 60_000;
 
 type FactoryRun = { repo: string; issue: number; cwd: string; rules: Rules };
 
-const runner =
+/** A `Run` over the host's `$.process.run`, for the GitHub calls a hook makes. */
+export const runner =
   ($: EngineInterface): Run =>
   (argv, opts) =>
     $.process.run(argv, {
@@ -105,7 +106,7 @@ export function newestNote(
           c.id > afterId &&
           !answers.has(c.id) &&
           Date.parse(c.createdAt) > sinceMs &&
-          !c.body.startsWith("<!-- factory:"),
+          !isFactory(c.body),
       )
       .at(-1) ?? null
   );

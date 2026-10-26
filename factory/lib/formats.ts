@@ -18,6 +18,10 @@ export type Call = {
   issue: number;
   choice: string;
   picked: string;
+  /** The options it did not pick. */
+  others: string[];
+  /** Why it picked what it did. */
+  why: string;
   /** What reversing the call takes. */
   undo: string;
 };
@@ -120,7 +124,9 @@ function body(c: FactoryComment): string {
         c.approved === c.seal ? "approved" : "waiting for approval"
       }\n\n${c.text}`;
     case "call":
-      return `**Call** · ${c.choice}\n\nPicked: ${c.picked}\n\nTo undo: ${c.undo}`;
+      return `**Call** · ${c.choice}\n\nPicked: ${c.picked}${
+        c.others.length === 0 ? "" : ` (not ${c.others.join(", not ")})`
+      }\n\nWhy: ${c.why}\n\nTo undo: ${c.undo}`;
     case "wait":
       return c.questions
         .map(

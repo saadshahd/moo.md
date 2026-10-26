@@ -234,3 +234,29 @@ export async function prFrom(
 
   return out.trim() === "" ? null : Number(out.trim());
 }
+
+export const STUCK_LABEL = "factory:stuck";
+
+/** Marks issue `n` stuck: a comment saying why, and the label the picker skips. */
+export async function markStuck(
+  run: Run,
+  repo: string,
+  n: number,
+  reason: string,
+): Promise<void> {
+  await post(run, repo, n, { kind: "stuck", issue: n, reason });
+  await must(run, [
+    "gh",
+    "label",
+    "create",
+    STUCK_LABEL,
+    "--repo",
+    repo,
+    "--force",
+    "--color",
+    "B60205",
+    "--description",
+    "A factory run gave up; the comment says why",
+  ]);
+  await must(run, ["gh", "issue", "edit", String(n), "--repo", repo, "--add-label", STUCK_LABEL]);
+}

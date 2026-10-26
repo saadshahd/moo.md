@@ -2,7 +2,6 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "ignorePatterns": [
     ".claude-plugin/**",
-    "mod/**",
     "skills/**",
     "tools/oxlint/anti-slop/**",
     "node_modules/**"

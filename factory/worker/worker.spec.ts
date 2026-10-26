@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { parseApprovalQuestion } from "../lib/formats.ts";
+import { parseApprovalQuestion, render, type FactoryComment } from "../lib/formats.ts";
+import type { Comment } from "../lib/github.ts";
+import { crashesSinceRetry } from "./worker.ts";
 import { planGaps } from "../lib/plan.ts";
 import { seal } from "./cli.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
@@ -77,5 +79,18 @@ describe("seal", () => {
     );
     expect(seal("## Types\na")).not.toBe(seal("## Types\nb"));
     expect(planGaps("## Types\na")).toEqual(["Signatures", "Files"]);
+  });
+});
+
+describe("retry", () => {
+  const c = (id: number, f: FactoryComment): Comment => ({ id, body: render(f), author: "me", createdAt: "" });
+  const crash = (id: number) => c(id, { kind: "restart", issue: 7, reason: "crash", session: "s" });
+
+  test("removing the stuck label starts the crash count again", () => {
+    expect(crashesSinceRetry([crash(1), crash(2), crash(3)])).toBe(3);
+    expect(crashesSinceRetry([crash(1), crash(2), crash(3), c(4, { kind: "stuck", issue: 7, reason: "x" }), crash(5)])).toBe(1);
+  });
+  test("context restarts are not crashes", () => {
+    expect(crashesSinceRetry([c(1, { kind: "restart", issue: 7, reason: "context", session: "s" })])).toBe(0);
   });
 });

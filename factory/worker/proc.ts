@@ -2,7 +2,7 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Run } from "../lib/github.ts";
+import { must, type Run } from "../lib/github.ts";
 
 export const run: Run = async (argv, opts) => {
   const p = Bun.spawn([...argv], {
@@ -36,13 +36,10 @@ export type Session = {
 };
 
 export async function sessions(): Promise<Session[]> {
-  const r = await run(["claude", "agents", "--json", "--all"]);
-
-  if (r.exitCode !== 0)
-    throw new Error(`claude agents failed: ${r.stderr.trim()}`);
-
   // SAFETY: `claude agents --json` prints an array of sessions with at least Session's fields.
-  return JSON.parse(r.stdout) as Session[];
+  return JSON.parse(
+    await must(run, ["claude", "agents", "--json", "--all"]),
+  ) as Session[];
 }
 
 /** The session's transcript text, or "" when Claude Code has not written one yet. */

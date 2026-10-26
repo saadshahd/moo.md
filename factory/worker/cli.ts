@@ -6,12 +6,13 @@
 //   pr                                    open the PR on the approved plan, auto-merge on
 //   stuck "<reason>"                      mark the issue stuck and say why
 
-import { approvalQuestion, type Plan } from "../lib/formats.ts";
+import { approvalQuestion, parse, type Plan } from "../lib/formats.ts";
 import {
   branchFor,
   comments,
   issueOf,
   latest,
+  markStuck,
   must,
   openPrFiles,
   post,
@@ -26,8 +27,6 @@ import {
   planGaps,
 } from "../lib/plan.ts";
 import { run } from "./proc.ts";
-
-export const STUCK_LABEL = "factory:stuck";
 
 class Refusal extends Error {
   constructor(
@@ -116,11 +115,16 @@ async function call(cwd: string, args: string[]): Promise<string> {
   const choice = flag(args, "choice");
   const picked = flag(args, "picked");
   const undo = flag(args, "undo");
+  const why = flag(args, "why");
+
+  const others = args.flatMap((a, i) =>
+    args[i - 1] === "--other" && a.trim() !== "" ? [a.trim()] : [],
+  );
 
   const already = (await comments(run, w.repo, w.issue)).some((c) => {
-    const p = latest([c], "call");
+    const p = parse(c.body);
 
-    return p !== null && p.c.choice === choice && p.c.picked === picked;
+    return p?.kind === "call" && p.choice === choice && p.picked === picked;
   });
 
   if (already) return "call already posted";
@@ -129,6 +133,8 @@ async function call(cwd: string, args: string[]): Promise<string> {
     issue: w.issue,
     choice,
     picked,
+    others,
+    why,
     undo,
   });
 
@@ -230,30 +236,7 @@ async function stuck(cwd: string, args: string[]): Promise<string> {
   const reason = args.join(" ").trim();
 
   if (reason === "") throw new Refusal('stuck "<reason>" is required', 2);
-  await post(run, w.repo, w.issue, { kind: "stuck", issue: w.issue, reason });
-  await must(run, [
-    "gh",
-    "label",
-    "create",
-    STUCK_LABEL,
-    "--repo",
-    w.repo,
-    "--force",
-    "--color",
-    "B60205",
-    "--description",
-    "A factory run gave up; the comment says why",
-  ]);
-  await must(run, [
-    "gh",
-    "issue",
-    "edit",
-    String(w.issue),
-    "--repo",
-    w.repo,
-    "--add-label",
-    STUCK_LABEL,
-  ]);
+  await markStuck(run, w.repo, w.issue, reason);
 
   return "marked stuck";
 }

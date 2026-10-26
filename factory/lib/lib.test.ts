@@ -31,6 +31,8 @@ describe("formats", () => {
       issue: 7,
       choice: "where `--` lives",
       picked: "in a.ts -->",
+      others: ["in b.ts"],
+      why: "a.ts already parses",
       undo: "move it",
     },
     { kind: "wait", issue: 7, questions: [Q], answers: null },
@@ -58,6 +60,9 @@ describe("formats", () => {
     expect(parse("looks good to me")).toBe(null);
     expect(parse("<!-- factory:nope {} -->\nx")).toBe(null);
     expect(parse("<!-- factory:call {not json} -->\nx")).toBe(null);
+  });
+  test("a call shows what it passed over and why", () => {
+    expect(render(every[1]!)).toContain("Picked: in a.ts --> (not in b.ts)\n\nWhy: a.ts already parses");
   });
   test("a person reads the plan's state without the marker", () => {
     const body = render(every[0]!);

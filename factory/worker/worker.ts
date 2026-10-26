@@ -5,7 +5,7 @@
 
 import { hostname } from "node:os";
 import { join } from "node:path";
-import type { Cost, Wait } from "../lib/formats.ts";
+import { isFactory, type Cost, type Wait } from "../lib/formats.ts";
 import {
   branchFor,
   comments,
@@ -13,11 +13,13 @@ import {
   factoryComments,
   issueOf,
   latest,
+  markStuck,
   must,
   openPrFiles,
   post,
   prFrom,
   repoOf,
+  STUCK_LABEL,
   upsert,
   type Comment,
 } from "../lib/github.ts";
@@ -31,7 +33,6 @@ import {
   sum,
   usage,
 } from "../lib/transcript.ts";
-import { STUCK_LABEL } from "./cli.ts";
 import { run, sessions, transcript, type Session } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
 
@@ -128,7 +129,7 @@ async function start(ctx: Ctx, n: number, cwd: string): Promise<void> {
     title: issue.title,
     body: issue.body,
     notes: cs
-      .filter((c) => !c.body.startsWith("<!-- factory:"))
+      .filter((c) => !isFactory(c.body))
       .map((c) => ({ author: c.author, body: c.body })),
     plan: latest(cs, "plan")?.c ?? null,
     handoff: latest(cs, "handoff")?.c ?? null,
@@ -174,34 +175,6 @@ async function postCost(
   };
 
   await upsert(run, ctx.repo, pr, cost);
-}
-
-async function markStuck(ctx: Ctx, n: number, reason: string): Promise<void> {
-  await post(run, ctx.repo, n, { kind: "stuck", issue: n, reason });
-  await must(run, [
-    "gh",
-    "label",
-    "create",
-    STUCK_LABEL,
-    "--repo",
-    ctx.repo,
-    "--force",
-    "--color",
-    "B60205",
-    "--description",
-    "A factory run gave up; the comment says why",
-  ]);
-  await must(run, [
-    "gh",
-    "issue",
-    "edit",
-    String(n),
-    "--repo",
-    ctx.repo,
-    "--add-label",
-    STUCK_LABEL,
-  ]);
-  log(`#${n}: stuck: ${reason}`);
 }
 
 type Worktree = { branch: string; path: string };
@@ -353,16 +326,11 @@ async function watch(
   // Dead, or its turn ended with no PR: a crash. Go on from plan, branch and handoff, or give up.
   if (limited) return "free";
 
-  const crashes = factoryComments(cs).filter(
-    (x) => x.c.kind === "restart" && x.c.reason === "crash",
-  ).length;
+  const crashes = crashesSinceRetry(cs);
 
   if (current && crashes >= CRASHES_BEFORE_STUCK) {
-    await markStuck(
-      ctx,
-      n,
-      `the run died or ended without a PR ${crashes + 1} times`,
-    );
+    await markStuck(run, ctx.repo, n, `the run died or ended without a PR ${crashes + 1} times`);
+    log(`#${n}: stuck`);
     await stop(current);
 
     return "free";
@@ -380,9 +348,39 @@ async function watch(
   return "busy";
 }
 
+/** Crash restarts since the issue was last marked stuck: removing the stuck label is a retry, and
+ * it starts the count again. */
+export function crashesSinceRetry(cs: readonly Comment[]): number {
+  const fs = factoryComments(cs).map((x) => x.c);
+  const since = fs.findLastIndex((c) => c.kind === "stuck") + 1;
+
+  return fs
+    .slice(since)
+    .filter((c) => c.kind === "restart" && c.reason === "crash").length;
+}
+
+/** Whether this machine pushed the claim on issue `n`'s branch. */
+async function claimedHere(ctx: Ctx, n: number): Promise<boolean> {
+  const b = branchFor(n);
+  await must(run, ["git", "fetch", "origin", b], { cwd: ctx.dir });
+
+  const subjects = await must(
+    run,
+    ["git", "log", "FETCH_HEAD", "--format=%s", "--grep", `^factory: claim #${n} on `],
+    { cwd: ctx.dir },
+  );
+
+  return subjects.trim().split("\n").at(-1) === claimSubject(n);
+}
+
+const claimSubject = (n: number) => `factory: claim #${n} on ${hostname()}`;
+
 /** Open issues labelled for the factory that nobody claimed, no open issue blocks, and whose plan
  * (if one was posted before) touches no file an open PR changes; unfinished ones first. */
-async function candidates(ctx: Ctx): Promise<number[]> {
+async function candidates(
+  ctx: Ctx,
+  local: ReadonlySet<number>,
+): Promise<{ n: number; resume: boolean }[]> {
   // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
   const issues = JSON.parse(
     await must(run, [
@@ -416,14 +414,19 @@ async function candidates(ctx: Ctx): Promise<number[]> {
       }),
   );
 
-  // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
   const prFiles = [...(await openPrFiles(run, ctx.repo, "")).values()].flat();
 
-  const out: { n: number; planned: boolean }[] = [];
+  const out: { n: number; planned: boolean; resume: boolean }[] = [];
 
   for (const i of issues) {
-    if (claimed.has(i.number) || i.labels.some((l) => l.name === STUCK_LABEL))
+    if (local.has(i.number) || i.labels.some((l) => l.name === STUCK_LABEL))
       continue;
+
+    // A claimed branch with no run here goes on only if this machine claimed it: after a retry
+    // (the stuck label removed) or a worktree lost; another machine's claim stays theirs.
+    const resume = claimed.has(i.number);
+
+    if (resume && !(await claimedHere(ctx, i.number))) continue;
 
     const blockers = await must(run, [
       "gh",
@@ -437,12 +440,12 @@ async function candidates(ctx: Ctx): Promise<number[]> {
     const plan = latest(await comments(run, ctx.repo, i.number), "plan");
 
     if (plan && overlap(planFiles(plan.c.text), prFiles).length > 0) continue;
-    out.push({ n: i.number, planned: plan !== null });
+    out.push({ n: i.number, planned: plan !== null, resume });
   }
 
   return out
     .sort((a, b) => Number(b.planned) - Number(a.planned) || a.n - b.n)
-    .map((x) => x.n);
+    .map(({ n, resume }) => ({ n, resume }));
 }
 
 /** Pushes a claim commit to issue `n`'s branch; true when this push created it, so the issue is ours. */
@@ -465,7 +468,7 @@ async function claim(ctx: Ctx, n: number): Promise<boolean> {
         "-p",
         `origin/${ctx.base}`,
         "-m",
-        `factory: claim #${n} on ${hostname()}`,
+        claimSubject(n),
       ],
       { cwd: ctx.dir },
     )
@@ -536,11 +539,13 @@ async function tick(ctx: Ctx): Promise<void> {
     );
 
   let busy = 0;
+  const local = new Set<number>();
 
   for (const w of await worktrees(ctx)) {
     const n = issueOf(w.branch);
 
     if (n === null) continue;
+    local.add(n);
 
     try {
       if ((await watch(ctx, all, n, w.path, limited)) === "busy") busy++;
@@ -551,10 +556,10 @@ async function tick(ctx: Ctx): Promise<void> {
   }
 
   if (!limited)
-    for (const n of await candidates(ctx)) {
+    for (const { n, resume } of await candidates(ctx, local)) {
       if (busy >= ctx.rules.atOnce) break;
 
-      if (!(await claim(ctx, n))) {
+      if (!resume && !(await claim(ctx, n))) {
         log(`#${n}: another machine claimed it first`);
         continue;
       }

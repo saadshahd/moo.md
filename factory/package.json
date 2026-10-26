@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit -p worker && tsc --noEmit -p tsconfig.mod.json",
-    "lint": "oxlint hooks lib worker",
+    "typecheck": "test -f .claude-plugin/types/tsconfig.json || { echo \"factory: no engine types; open Claude Code with this plugin loaded and run /plugin-types\" >&2; exit 1; }; tsc --noEmit -p worker && tsc --noEmit -p tsconfig.mod.json",
+    "lint": "oxlint hooks lib worker mod",
     "test": "bun test && claude plugin test ."
   },
   "devDependencies": {
