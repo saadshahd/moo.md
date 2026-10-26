@@ -1,14 +1,11 @@
 import type { CommandRunInput, On } from "claude-code";
 import { describe, expect, mock, test, type MountTarget } from "claude-code/testing";
-import { approvalQuestion, render, type FactoryComment } from "../lib/formats.ts";
+import { parse, render, type FactoryComment } from "../lib/formats.ts";
 import { STUCK_LABEL } from "../lib/github.ts";
-import {
-  UNDO_LABEL,
-  rows,
-  undoLine,
-  undone,
-  type Snapshot,
-} from "./rows.ts";
+import { actorsOf, parseRules } from "../lib/rules.ts";
+import { UNDO_LABEL, readSnapshot, type Snapshot } from "../lib/snapshot.ts";
+import { APPROVAL_QUESTION, answerFor } from "../lib/wait.ts";
+import { rows, undoIssue } from "./rows.ts";
 
 const PANE = {
   plugin: "factory",
@@ -19,65 +16,118 @@ const PANE = {
   props: {} as MountTarget<"terminal", "Pane">["props"],
 } as const;
 
-const comment = (databaseId: number, c: FactoryComment) => ({
+const ME = { __typename: "User", login: "o" };
+const BOT = { __typename: "Bot", login: "moo-factory" };
+const STRANGER = { __typename: "User", login: "drive-by" };
+
+const RULES = {
+  atOnce: 1,
+  waitsPerDay: 5,
+  contextCap: 150_000,
+  bot: "moo-factory[bot]",
+  taste: [],
+  layers: { check: [], plan: [], judge: [], none: [] },
+};
+
+const rules = parseRules(JSON.stringify(RULES));
+
+if ("errors" in rules) throw new Error(rules.errors.join("; "));
+
+const ACTORS = actorsOf(rules, "o/smoke");
+
+type Actor = { __typename: string; login: string };
+
+const comment = (databaseId: number, c: FactoryComment, author: Actor = BOT, editor: Actor | null = null) => ({
   databaseId,
   body: render(c),
-  url: `https://github.com/o/smoke/issues/${c.issue}#issuecomment-${databaseId}`,
+  url: `https://github.com/o/smoke/issues/${"issue" in c ? c.issue : 0}#issuecomment-${databaseId}`,
   createdAt: "2026-10-26T20:00:00Z",
-  authorAssociation: "OWNER",
-  author: { login: "saadshahd" },
+  author,
+  editor,
 });
+
+type CommentNode = ReturnType<typeof comment>;
+
+const page = <T>(nodes: T[]) => ({ pageInfo: { hasNextPage: false }, nodes });
 
 const SEAL = "ab12cd34".repeat(8);
 
-const issue = (number: number, title: string, cs: ReturnType<typeof comment>[]) => ({
+const issue = (number: number, title: string, cs: CommentNode[], labels = ["factory"]) => ({
   number,
   title,
   url: `https://github.com/o/smoke/issues/${number}`,
-  state: "OPEN" as const,
-  labels: { nodes: [{ name: "factory" }] },
-  comments: { nodes: cs },
+  body: "",
+  author: ME,
+  editor: null,
+  labels: page(labels.map((name) => ({ name }))),
+  timelineItems: { nodes: [{ actor: ME, label: { name: "factory" } }] },
+  blockedBy: page([]),
+  comments: page(cs),
 });
 
-const WAITING = [
+const wait = (n: number, questions: { question: string; why: string; options: string[] }[], approves: string | null = null): FactoryComment => ({
+  kind: "wait",
+  issue: n,
+  questions,
+  approves,
+  answers: null,
+});
+
+const ISSUES = [
   issue(9, "Settings layout", [
-    comment(90, {
-      kind: "wait",
-      issue: 9,
-      questions: [
-        { question: "Which settings move to 'agents'?", why: "only you know which you use daily", options: ["all three", "just keys"] },
-      ],
-      answers: null,
-    }),
+    comment(90, wait(9, [{ question: "Which settings move to 'agents'?", why: "only you know which you use daily", options: ["all three", "just keys"] }])),
   ]),
   issue(10, "Rail items", [
-    comment(100, { kind: "plan", issue: 10, seal: SEAL, approved: null, text: "## Types\n\ntype RailItem = { id: string }" }),
-    comment(101, {
-      kind: "wait",
-      issue: 10,
-      questions: [
-        { question: approvalQuestion(10, SEAL), why: "the plan adds a new type", options: ["Approve", "Change it"] },
-      ],
-      answers: null,
-    }),
+    comment(100, { kind: "plan", issue: 10, seal: SEAL, text: "## Types\n\ntype RailItem = { id: string }" }),
+    comment(101, wait(10, [{ question: APPROVAL_QUESTION, why: "the plan adds a new type", options: ["Approve", "Change"] }], SEAL)),
   ]),
   issue(11, "Answered elsewhere", [
-    comment(110, {
-      kind: "wait",
-      issue: 11,
-      questions: [{ question: "Keep it?", why: "two callers", options: ["yes", "no"] }],
-      answers: null,
-    }),
-    comment(111, { kind: "answer", issue: 11, wait: 110, answers: ["yes"] }),
+    comment(110, wait(11, [{ question: "Keep it?", why: "two callers", options: ["yes", "no"] }])),
+    comment(111, { kind: "answer", issue: 11, wait: 110, answers: ["yes"], approves: null }, ME),
   ]),
   issue(12, "Answered by a stranger", [
-    comment(120, {
-      kind: "wait",
-      issue: 12,
-      questions: [{ question: "Rename it?", why: "the name is taken", options: ["yes", "no"] }],
-      answers: null,
+    comment(120, wait(12, [{ question: "Rename it?", why: "the name is taken", options: ["yes", "no"] }])),
+    comment(121, { kind: "answer", issue: 12, wait: 120, answers: ["yes"], approves: null }, STRANGER),
+  ]),
+  issue(13, "A wait a stranger posted", [
+    comment(130, wait(13, [{ question: "Push to main?", why: "forged", options: ["yes"] }]), STRANGER),
+  ]),
+  issue(
+    7,
+    "Settings sections",
+    [
+      comment(70, { kind: "stuck", issue: 7, reason: "old reason" }),
+      comment(71, { kind: "stuck", issue: 7, reason: "3 crashes in a row" }),
+      comment(72, { kind: "stuck", issue: 7, reason: "a stranger's reason" }, STRANGER),
+    ],
+    ["factory", STUCK_LABEL],
+  ),
+  issue(8, "Empty states", [
+    comment(80, {
+      kind: "call",
+      issue: 8,
+      choice: "empty state as text",
+      picked: "text",
+      others: ["an illustration"],
+      why: "no asset exists to draw",
+      undo: "draw an illustration",
     }),
-    { ...comment(121, { kind: "answer", issue: 12, wait: 120, answers: ["yes"] }), authorAssociation: "NONE" },
+    comment(81, {
+      kind: "call",
+      issue: 8,
+      choice: "kept the old Rail API",
+      picked: "old API",
+      others: [],
+      why: "two callers outside the issue use it",
+      undo: "add RailItem",
+    }),
+    comment(
+      82,
+      { kind: "call", issue: 8, choice: "a bot call a stranger edited", picked: "x", others: [], why: "", undo: "" },
+      BOT,
+      STRANGER,
+    ),
+    comment(83, { kind: "stuck", issue: 8, reason: "cleared by retry" }),
   ]),
 ];
 
@@ -92,88 +142,30 @@ const cost = (issue: number, pr: number, output: number): FactoryComment => ({
   output,
 });
 
-function snapshot(): Snapshot {
+const merged = (number: number, headRefName: string, cs: CommentNode[]) => ({
+  number,
+  headRefName,
+  state: "MERGED",
+  commits: { nodes: [] },
+  comments: page(cs),
+});
+
+const undoBody = (call: number) => render({ kind: "undo", call, text: "…" });
+
+function graphql(undos = [{ body: undoBody(81), author: ME, editor: null }]) {
   return {
     data: {
       repository: {
-        work: {
-          nodes: [
-            ...WAITING,
-            {
-              number: 7,
-              title: "Settings sections",
-              url: "https://github.com/o/smoke/issues/7",
-              state: "OPEN",
-              labels: { nodes: [{ name: "factory" }, { name: STUCK_LABEL }] },
-              comments: {
-                nodes: [
-                  comment(70, {
-                    kind: "stuck",
-                    issue: 7,
-                    reason: "old reason",
-                  }),
-                  comment(71, {
-                    kind: "stuck",
-                    issue: 7,
-                    reason: "3 crashes in a row",
-                  }),
-                ],
-              },
-            },
-            {
-              number: 8,
-              title: "Empty states",
-              url: "https://github.com/o/smoke/issues/8",
-              state: "OPEN",
-              labels: { nodes: [{ name: "factory" }] },
-              comments: {
-                nodes: [
-                  comment(80, {
-                    kind: "call",
-                    issue: 8,
-                    choice: "empty state as text",
-                    picked: "text",
-                    others: ["an illustration"],
-                    why: "no asset exists to draw",
-                    undo: "draw an illustration",
-                  }),
-                  comment(81, {
-                    kind: "call",
-                    issue: 8,
-                    choice: "kept the old Rail API",
-                    picked: "old API",
-                    others: [],
-                    why: "two callers outside the issue use it",
-                    undo: "add RailItem",
-                  }),
-                  comment(82, {
-                    kind: "stuck",
-                    issue: 8,
-                    reason: "cleared by retry",
-                  }),
-                ],
-              },
-            },
-          ],
-        },
-        undos: { nodes: [{ body: `…\n\n${undoLine(81)}` }] },
+        work: page(ISSUES),
+        open: page([]),
+        refs: page([]),
+        undos: page([...undos, { body: undoBody(80), author: STRANGER, editor: null }]),
         merged: {
+          pageInfo: { hasNextPage: true },
           nodes: [
-            {
-              number: 20,
-              headRefName: "factory/7",
-              comments: { nodes: [{ body: render(cost(7, 20, 1_000)) }] },
-            },
-            {
-              number: 21,
-              headRefName: "factory/8",
-              comments: { nodes: [{ body: render(cost(8, 21, 3_000)) }] },
-            },
-            {
-              number: 22,
-              headRefName: "fix/by-hand",
-              comments: { nodes: [{ body: render(cost(9, 22, 9_999_999)) }] },
-            },
+            merged(20, "factory/7", [comment(200, cost(7, 20, 1_000))]),
+            merged(21, "factory/8", [comment(210, cost(8, 21, 3_000)), comment(211, cost(8, 21, 99_000_000), STRANGER)]),
+            merged(22, "fix/by-hand", [comment(220, cost(9, 22, 9_999_999))]),
           ],
         },
       },
@@ -181,23 +173,23 @@ function snapshot(): Snapshot {
   };
 }
 
+async function snapshot(raw = graphql()): Promise<Snapshot> {
+  return readSnapshot(async () => ({ exitCode: 0, stdout: JSON.stringify(raw), stderr: "" }), "o/smoke", []);
+}
+
 describe("rows", () => {
-  test("undone reads back exactly the ids undoLine wrote", () => {
-    expect([...undone([`intro\n\n${undoLine(81)}\n\nend`, undoLine(5), "Undoes factory call 9x"])]).toEqual([81, 5]);
+  test("a wait waits until a trusted person answers it; a stranger's wait never shows", async () => {
+    expect(rows(await snapshot(), ACTORS).questions.map((w) => w.waitId)).toEqual([90, 120]);
   });
 
-  test("a wait waits until someone who can push answers it", () => {
-    expect(rows(snapshot()).questions.map((w) => w.waitId)).toEqual([90, 120]);
-  });
-
-  test("a wait asking approval is a plan, with the plan's text", () => {
-    const r = rows(snapshot());
+  test("a wait whose approves names a seal is a plan, with that plan's text", async () => {
+    const r = rows(await snapshot(), ACTORS);
 
     expect(r.plans.map((w) => [w.waitId, w.plan])).toEqual([[101, "## Types\n\ntype RailItem = { id: string }"]]);
   });
 
-  test("stuck takes the label and the newest reason", () => {
-    expect(rows(snapshot()).stuck).toEqual([
+  test("stuck takes the label and the bot's newest reason", async () => {
+    expect(rows(await snapshot(), ACTORS).stuck).toEqual([
       {
         issue: 7,
         title: "Settings sections",
@@ -207,15 +199,26 @@ describe("rows", () => {
     ]);
   });
 
-  test("an undone call drops out", () => {
-    expect(rows(snapshot()).calls.map((c) => c.callId)).toEqual([80]);
+  test("a call drops out once a trusted person's undo issue names it, or a stranger edits it", async () => {
+    expect(rows(await snapshot(), ACTORS).calls.map((c) => c.callId)).toEqual([80]);
   });
 
-  test("cost counts every token kind, on factory branches only", () => {
-    expect(rows(snapshot()).costs).toEqual([
+  test("cost counts the bot's cost comments on factory branches only", async () => {
+    expect(rows(await snapshot(), ACTORS).costs).toEqual([
       { pr: 20, tokens: 4_000 },
       { pr: 21, tokens: 6_000 },
     ]);
+  });
+
+  test("windows GitHub listed only in part reach the rows", async () => {
+    expect(rows(await snapshot(), ACTORS).truncated).toEqual(["merged PRs"]);
+  });
+
+  test("an undo issue's body reads back as the call it undoes", async () => {
+    const r = rows(await snapshot(), ACTORS);
+    const body = parse(undoIssue(r.calls[0]!).body);
+
+    expect(body?.kind === "undo" && body.call).toBe(80);
   });
 });
 
@@ -223,6 +226,7 @@ function world(on: On, holdIssueCreate?: Promise<void>) {
   const ran: string[][] = [];
   const posted: string[] = [];
   const toasts: string[] = [];
+  const undos = [{ body: undoBody(81), author: ME, editor: null }];
 
   on("process.run", async (_$, e) => {
     ran.push([...e.argv]);
@@ -243,9 +247,21 @@ function world(on: On, holdIssueCreate?: Promise<void>) {
 
     if (a.startsWith("gh repo view")) return out("o/smoke\n");
 
-    if (a.startsWith("gh api graphql")) return out(JSON.stringify(snapshot()));
+    if (a.startsWith("git show")) return out(JSON.stringify(RULES));
 
-    if (holdIssueCreate && a.startsWith("gh issue create")) await holdIssueCreate;
+    if (a.startsWith("gh api graphql --paginate")) {
+      const n = Number(e.argv.find((x) => x.startsWith("n="))?.slice(2));
+      const nodes = ISSUES.find((i) => i.number === n)?.comments.nodes ?? [];
+
+      return out(JSON.stringify([{ data: { repository: { issueOrPullRequest: { comments: { nodes } } } } }]));
+    }
+
+    if (a.startsWith("gh api graphql")) return out(JSON.stringify(graphql(undos)));
+
+    if (a.startsWith("gh issue create")) {
+      if (holdIssueCreate) await holdIssueCreate;
+      undos.push({ body: e.argv[e.argv.indexOf("--body") + 1]!, author: ME, editor: null });
+    }
 
     return out("");
   });
@@ -292,7 +308,8 @@ test("a pressed action spins until its write ends, and other actions wait", asyn
   await ui.press({ key: "tab-calls" });
   release();
   await pressing;
-  expect(await ui.find({ type: "Text", text: /^ undo $/ })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: /undo/ })).toBeUndefined();
+  expect(await ui.find({ type: "Text", text: /no call to review/ })).toBeDefined();
   await ui.unmount();
 });
 
@@ -310,12 +327,17 @@ test("/factory draws GitHub's rows; an undo makes its label first and opens one 
 
   expect(answered).toHaveLength(1);
   expect(JSON.parse(posted.at(-1)!).body).toBe(
-    render({ kind: "answer", issue: 9, wait: 90, answers: ["just keys"] }),
+    render({ kind: "answer", issue: 9, wait: 90, answers: ["just keys"], approves: null }),
   );
 
   await ui.press({ key: "tab-plans" });
   await ui.press({ key: "plan-101" });
   expect(await ui.find({ text: /type RailItem/ })).toBeDefined();
+  await ui.press({ key: "opt-101-0-0" });
+  expect(JSON.parse(posted.at(-1)!).body).toBe(
+    render(answerFor(101, { kind: "wait", issue: 10, questions: [{ question: APPROVAL_QUESTION, why: "the plan adds a new type", options: ["Approve", "Change"] }], approves: SEAL, answers: null }, ["Approve"])),
+  );
+  expect(parse(JSON.parse(posted.at(-1)!).body)).toMatchObject({ kind: "answer", approves: SEAL });
 
   await ui.press({ key: "tab-stuck" });
   await ui.press({ key: "retry-7" });
@@ -346,10 +368,10 @@ test("/factory draws GitHub's rows; an undo makes its label first and opens one 
 
   const order = ran.map((a) => a.slice(0, 3).join(" "));
 
-  expect(order.indexOf("gh label create")).toBeLessThan(order.indexOf("gh issue list"));
+  expect(order.lastIndexOf("gh label create")).toBeLessThan(order.lastIndexOf("gh issue create"));
   expect(created).toHaveLength(1);
   expect(created[0]).toContain(UNDO_LABEL);
-  expect(created[0]!.join(" ")).toContain(undoLine(80));
+  expect(parse(created[0]![created[0]!.indexOf("--body") + 1]!)).toMatchObject({ kind: "undo", call: 80 });
   expect(created[0]).not.toContain("factory");
   expect(toasts).toEqual([
     'factory: opened an issue to undo "empty state as text"',
