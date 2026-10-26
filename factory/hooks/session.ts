@@ -1,5 +1,5 @@
 import type { EngineInterface, ToolCallInput, ToolCallResult } from "claude-code";
-import { issueOf, must, repoOf, type Run } from "../lib/github.ts";
+import { issueOf, must, repoOf, runName, type Run } from "../lib/github.ts";
 import type { FactoryRun } from "./state.d.ts";
 
 /** A `tool.call` event for tool `T`. */
@@ -15,11 +15,6 @@ export function runner($: EngineInterface): Run {
       stdin: opts?.stdin,
       timeoutMs: 60_000,
     });
-}
-
-/** The name the worker gives issue `n`'s run with `claude --bg --name`. */
-function runName(repo: string, n: number): string {
-  return `factory-${repo.split("/")[1]}-${n}`;
 }
 
 /** `$` carries no session name, so the session finds its own among the ones `claude agents` lists. */
@@ -40,13 +35,16 @@ async function sessionName(
   return all.find((s) => s.sessionId === id)?.name ?? null;
 }
 
+/** A gh config folder that never exists, so gh finds no login of the user's in it. */
+export const ghConfigDir = (cwd: string) => `${cwd}/.factory/no-gh-login`;
+
 /**
  * Leaves gh and git with no GitHub login, so a run that has no bot token fails on GitHub rather
  * than acting as the user. `GH_CONFIG_DIR` alone is not enough: with no token in the environment,
  * gh falls back to the user's token in the macOS keychain, so `GH_TOKEN` holds a placeholder.
  */
 export async function withoutLogin($: EngineInterface, cwd: string): Promise<void> {
-  await $.env.set("GH_CONFIG_DIR", `${cwd}/.factory/no-gh-login`);
+  await $.env.set("GH_CONFIG_DIR", ghConfigDir(cwd));
   await $.env.set("GH_TOKEN", "factory-no-login");
   await $.env.set("GITHUB_TOKEN", undefined);
   await $.env.set("GIT_CONFIG_COUNT", "2");

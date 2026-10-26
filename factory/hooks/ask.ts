@@ -1,7 +1,9 @@
 import type { EngineInterface, ToolCallResult } from "claude-code";
-import { parseApprovalQuestion } from "../lib/formats.ts";
-import { must, post, type Run } from "../lib/github.ts";
-import { RULES_PATH, parseRules, type Rules } from "../lib/rules.ts";
+import { WHY_MAX } from "../lib/formats.ts";
+import { latest, must, post, type Run } from "../lib/github.ts";
+import { actorsOf, readRules } from "../lib/rules.ts";
+import { comments } from "../lib/snapshot.ts";
+import { isApproval } from "../lib/wait.ts";
 import { currentRun, runner, showOnce, type PassOn, type ToolCall } from "./session.ts";
 import type { FactoryRun } from "./state.d.ts";
 
@@ -35,20 +37,6 @@ export function localDay(at: Date): string {
   return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
 }
 
-/** From the default branch, never the run's own: a run could edit its branch's copy. */
-async function rulesOf(run: Run, cwd: string): Promise<Rules> {
-  const rules = parseRules(
-    await must(run, ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`], {
-      cwd,
-    }),
-  );
-
-  if ("errors" in rules)
-    throw new Error(`${RULES_PATH}: ${rules.errors.join("; ")}`);
-
-  return rules;
-}
-
 /**
  * Takes one of the day's waits for the repo, or answers false when they are used up. Every run of a
  * repo on this machine shares its git directory, and `mkdir` of a slot succeeds for one of them only.
@@ -76,32 +64,45 @@ async function takeWait(
   return false;
 }
 
-async function waitOnIssue($: EngineInterface, e: Ask, fr: FactoryRun): Promise<ToolCallResult> {
+/**
+ * Posts the ask as a wait on the issue. An approval names the seal of the plan the bot posted
+ * last, so the answer approves that plan and no later one.
+ */
+async function waitOnIssue(
+  $: EngineInterface,
+  e: Ask,
+  fr: FactoryRun,
+): Promise<ToolCallResult> {
   const run = runner($);
+  const rules = await readRules(run, fr.cwd);
   const said = whyAsked(await $.session.messages());
 
   const questions = e.questions.map((q) => ({
     question: q.question,
-    why: said === "" ? q.header : said,
+    why: (said === "" ? q.header : said).slice(0, WHY_MAX),
     options: q.options.map((o) => o.label),
   }));
 
   /** Approving a plan is the human's alone, so it always waits and never counts against the cap. */
-  const approval = questions.some((q) => parseApprovalQuestion(q.question));
+  const approval = questions.some(isApproval);
 
-  if (!approval) {
-    const { waitsPerDay } = await rulesOf(run, fr.cwd);
+  if (
+    !approval &&
+    !(await takeWait(run, fr, rules.waitsPerDay, localDay(new Date(await $.clock.now()))))
+  )
+    return {
+      deny: `Today's ${rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call with the factory's call command, and go on.`,
+    };
 
-    if (!(await takeWait(run, fr, waitsPerDay, localDay(new Date(await $.clock.now())))))
-      return {
-        deny: `Today's ${waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call with the factory's call command, and go on.`,
-      };
-  }
+  const plan = approval
+    ? latest(await comments(run, fr.repo, fr.issue), actorsOf(rules, fr.repo), "plan")
+    : null;
 
   await post(run, fr.repo, fr.issue, {
     kind: "wait",
     issue: fr.issue,
     questions,
+    approves: plan?.c.seal ?? null,
     answers: null,
   });
 
