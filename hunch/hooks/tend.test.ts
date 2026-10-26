@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { type Smooth, parseFixes, CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -109,7 +109,7 @@ test("a chip previews its card with one number", async () => {
     questions: [{ q: "x", options: [] }, { q: "y", options: [] }],
     skills: [{ name: "hope:intent" }, { name: "hope:draft" }],
   } as any;
-  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null });
+  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null, smooth: { fixes: [], trend: "" } });
   expect(chipLabel("intent", s())).toBe("intent");
   expect(chipLabel("facts", s())).toBe("facts 2");
   expect(chipLabel("questions", s())).toBe("questions 2");
@@ -276,15 +276,59 @@ test("fact source prefix stripped", async () => {
   expect(bareFact("Toggle only")).toBe("Toggle only");
 });
 
-const model = (card: object, open: string | null = null, rows: object[] = []) =>
+const model = (card: object, open: string | null = null, rows: object[] = [], smooth: Smooth = { fixes: [], trend: "" }) =>
   bandModel({
     card: card as any,
     paneItem: open && `card:${open}`,
     ran: new Set(),
     rows: rows as any,
+    smooth,
   });
 
 describe("band", () => {
+  // pending.sh's line for the first real fix, meta-harness, 2026-10-26.
+  const REAL = "/Users/u/.claude/projects/-Users-u-repos-meta-harness/memory\tsmooth/2026-10-26\tAgents will use `roundup-app/roundup`, single-quote `--jq` slices, and not retry on benign `gh` exit codes: `mem/reference_gh-pr-pitfalls.md`.\n";
+  test("smooth: a chip; the trend first, then each fix clipped, its branch beside it", async () => {
+    const fixes = parseFixes(REAL);
+    expect(fixes).toHaveLength(1);
+    expect(fixes[0]!.branch).toBe("smooth/2026-10-26");
+    const sm = { fixes, trend: "failed commands, gh pr: 5 → 0" };
+    expect(model({}, null, [], sm).chips.map((c) => c.label)).toEqual(["smooth 1"]);
+    const rows = chipRows("smooth", { card: {}, ran: new Set(), rows: [], paneItem: null, smooth: sm });
+    expect(rows.map((r) => r.map((i) => i.id))).toEqual([["smooth-trend"], ["smooth:0", "smooth-note:0"]]);
+    expect(rows[0]![0]!.label).toBe("since the last kept fix: failed commands, gh pr: 5 → 0");
+    expect(rows[1]![0]!.label.length).toBeLessThanOrEqual(60);
+  });
+  test("smooth with only a trend: a chip with no count", async () => {
+    expect(model({}, null, [], { fixes: [], trend: "x: 2 → 0" }).chips.map((c) => c.label)).toEqual(["smooth"]);
+  });
+  test("pending.sh lines that are not three fields are no fix", async () => {
+    expect(parseFixes("")).toEqual([]);
+    expect(parseFixes("/r\tsmooth/x\n/r\t\tfix\n")).toEqual([]);
+  });
+  test("clicking a fix puts keep-or-drop and its diff command in the prompt", async ($, on) => {
+    mock.store(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
+    on("session.messages", () => ({ value: [] }));
+    on("session.root", () => ({ value: "/r" }));
+    on("process.run", (_, e: any) => ({
+      value: { exitCode: 0, stdout: String(e.argv[0]).endsWith("pending.sh") ? REAL : "", stderr: "" },
+    }) as any);
+    on("ui.invalidate", () => ({ value: undefined }));
+    on("turn.complete", (_, e) => ({ text: e.answer }));
+    let box = "";
+    on("prompt.read", () => ({ value: { text: box, cursor: box.length } }));
+    on("prompt.fill", (_, e) => {
+      box = e.mode === "replace" ? e.text : box + e.text;
+      return { isFilled: true };
+    });
+    await $.turn.complete({ answer: "ok", durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 80 } as any });
+    await band.post({ act: "smooth:0" });
+    expect(box).toContain("keep or drop the smooth fix on smooth/2026-10-26 in /Users/u/.claude/projects/-Users-u-repos-meta-harness/memory");
+    expect(box).toContain("diff HEAD...smooth/2026-10-26");
+  });
   test("no card, no agents: nothing", async () => {
     expect(model({})).toEqual({ doc: "", chips: [], body: [] });
   });
@@ -313,7 +357,7 @@ describe("band", () => {
   });
   test("the agents list: each agent, dim once read, the one shown marked open", async () => {
     const rows = chipRows("agents", {
-      card: {}, ran: new Set(), paneItem: "agent:a1",
+      card: {}, ran: new Set(), paneItem: "agent:a1", smooth: { fixes: [], trend: "" },
       rows: [{ id: "a1", label: "l", type: "Explore", done: true, read: true }],
     });
     expect(rows).toEqual([[{ id: "agent:a1", label: "l", kind: "line", state: "done", read: true, open: true }]]);
@@ -656,7 +700,7 @@ describe("ideas", () => {
     expect(x("probe:idea 1")).toBe(x("probe:idea 2"));
     expect(x("idea-note:0:0")).toBe(x("probe:idea 1"));
     expect(x("idea-note:0:1")).toBe(x("probe:idea 1"));
-    expect(chipLabel("ideas", { card: { ideas }, ran: new Set(), rows: [], paneItem: null })).toBe("ideas 2");
+    expect(chipLabel("ideas", { card: { ideas }, ran: new Set(), rows: [], paneItem: null, smooth: { fixes: [], trend: "" } })).toBe("ideas 2");
   });
   test("consult is asked for its ideas as a card; another card skill for the session's", async ($, on) => {
     mock.store(on);
@@ -776,6 +820,8 @@ test("a short form that fills its token cap is dropped, and the reply stays long
     return { value: undefined };
   });
   on("model.complete", () => ({ value: { isAnswered: true, text: "No tool checks sung words yet. | 40", usage: { output_tokens: SHORT_CAP } } }) as any);
+  on("session.root", () => ({ value: "/r" }));
+  on("process.run", () => ({ value: { exitCode: 0, stdout: "", stderr: "" } }) as any);
   let shown = "";
   on("ui.render", (_, e) => {
     shown = (e.props as any).text;

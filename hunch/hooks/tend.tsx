@@ -23,6 +23,10 @@ type Msg = {
   toolUses?: { tool: string; input: Record<string, unknown> }[];
   toolResults?: { text: string }[];
 };
+/** A fix smooth left on a branch, waiting to be kept or dropped: `dir` is the repo or memory folder it sits in. */
+export type Fix = { dir: string; branch: string; line: string };
+/** What smooth has for the project: its waiting fixes, and how the friction behind the last kept one moved ("" for none). */
+export type Smooth = { fixes: Fix[]; trend: string };
 /** `read`: opened once, drawn dim in the agents list. */
 export type Row = {
   id: string;
@@ -77,6 +81,7 @@ const CHIPS = [
   "suggestions",
   "skills",
   "watch",
+  "smooth",
   "agents",
 ] as const;
 
@@ -582,6 +587,8 @@ export function chipLabel(name: string, s: Shown): string {
   if (name === "ideas") return `ideas ${s.card.ideas?.length ?? 0}`;
   if (name === "suggestions")
     return `suggestions ${s.card.suggestions?.length ?? 0}`;
+  if (name === "smooth")
+    return s.smooth.fixes.length ? `smooth ${s.smooth.fixes.length}` : "smooth";
   return `${name} ${chipRows(name, s).length}`;
 }
 
@@ -662,6 +669,7 @@ export type Shown = {
   ran: Set<string>;
   rows: Row[];
   paneItem: string | null;
+  smooth: Smooth;
 };
 
 /** The chip a pane item belongs to: a card's own, or agents for an agent's card or report. */
@@ -674,11 +682,34 @@ export function paneChip(paneItem: string | null): string | undefined {
       : undefined;
 }
 
-/** The rows a chip opens: the card's, or the session's agents. */
+/** The rows a chip opens: the card's, the session's agents, or smooth's trend and waiting fixes. */
 export function chipRows(name: string, s: Shown): Item[][] {
   return name === "agents"
     ? s.rows.map((r) => [agentItem(r, s.paneItem)])
-    : cardRows(s.card, name, s.ran);
+    : name === "smooth"
+      ? smoothRows(s.smooth)
+      : cardRows(s.card, name, s.ran);
+}
+
+/** The trend first, the one line that says whether the work got smoother; then each fix and its branch. */
+export function smoothRows(sm: Smooth): Item[][] {
+  return [
+    ...(sm.trend ? [[note("smooth-trend", `since the last kept fix: ${sm.trend}`)]] : []),
+    ...sm.fixes.map((f, i) => [
+      column(line(`smooth:${i}`, clip(f.line, 60))),
+      note(`smooth-note:${i}`, f.branch),
+    ]),
+  ];
+}
+
+/** smooth's pending.sh output: one fix per line, `<dir> TAB <branch> TAB <the fix>`. */
+export function parseFixes(stdout: string): Fix[] {
+  return stdout
+    .split("\n")
+    .map((l) => l.split("\t"))
+    .flatMap(([dir, branch, line, ...more]) =>
+      dir && branch && line && !more.length ? [{ dir, branch, line }] : [],
+    );
 }
 
 /** The band is its chips alone: every card reads in the pane. */
@@ -725,6 +756,8 @@ const idle = new Set<string>();
 const views = new Map<string, AgentView>();
 let started = false;
 let sessionId = "";
+// smooth's view of the project: fixes read at the session's start and after each turn, the trend at the start.
+let smooth: Smooth = { fixes: [], trend: "" };
 // Bumped to hand the keys back to the prompt: the Client redraws under a new key.
 let fills = 0;
 // The stem last put in the box, to swap while it stands bare.
@@ -778,6 +811,36 @@ async function readSession($: any) {
   const next = withOpen(latestCard(msgs), open);
   if (JSON.stringify(next) !== JSON.stringify(card)) planMoved = true;
   card = next;
+  $.ui.invalidate("ui.render");
+}
+
+/** One of smooth's scripts, run in the project; "" outside any repo, where the scripts exit 2. */
+async function smoothScript($: any, name: string): Promise<string> {
+  const r = await $.process.run(
+    [`${$.plugin.root}/skills/smooth/scripts/${name}`],
+    { cwd: await $.session.root() },
+  );
+  if (r.exitCode === 2) return "";
+  if (r.exitCode !== 0)
+    throw new Error(`smooth's ${name} failed: ${r.stderr.trim()}`);
+  return r.stdout;
+}
+
+// The last failure shown: a read every turn would otherwise repeat it every turn.
+let smoothError = "";
+async function readSmooth($: any, withTrend: boolean) {
+  try {
+    const fixes = parseFixes(await smoothScript($, "pending.sh"));
+    const trend = withTrend
+      ? (await smoothScript($, "trend.sh")).trim()
+      : smooth.trend;
+    smooth = { fixes, trend };
+    smoothError = "";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg !== smoothError) $.ui.toast(`tend: ${msg}`);
+    smoothError = msg;
+  }
   $.ui.invalidate("ui.render");
 }
 
@@ -1093,7 +1156,14 @@ async function act($: any, id: string) {
   } else if (kind === "agent")
     // A second press on what the pane shows closes it.
     paneItem === id ? await $.ui.close({ id: PANE }) : await openAgent($, arg);
-  else if (kind === "open") await openTarget($, arg);
+  else if (kind === "smooth") {
+    const f = smooth.fixes[Number(arg)];
+    if (f)
+      await fill(
+        $,
+        `keep or drop the smooth fix on ${f.branch} in ${f.dir} (git -C ${f.dir} diff HEAD...${f.branch}): `,
+      );
+  } else if (kind === "open") await openTarget($, arg);
   else if (kind === "close") await $.ui.close({ id: PANE });
   else if (kind === "report") await showPane($, id);
   $.ui.invalidate("ui.render");
@@ -1104,6 +1174,7 @@ export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     const r = await next(e);
     await sid($);
+    loud($, readSmooth($, true));
     return r;
   });
 
@@ -1209,6 +1280,7 @@ export const register: Register = (on) => {
       // Each turn moves the session to the front, so a long one outlives the sessions opened since.
       if (!(await headless($)))
         await save($, "tend:recent", await recent($, await sid($)));
+      loud($, readSmooth($, false));
       await readSession($);
       await setOpen($, turnQuestions(e.answer, card.questions ?? []));
       const reply = stripCards(e.answer);
@@ -1326,7 +1398,7 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const band = bandModel({ card, paneItem, ran, rows });
+    const band = bandModel({ card, paneItem, ran, rows, smooth });
     if (!band.chips.length) return <Box />;
     // A blank line parts the band from the reply above it, so the chips read as controls, not its last line.
     return (
@@ -1432,7 +1504,7 @@ export const register: Register = (on) => {
                 ],
                 [],
                 ...(kind === "card"
-                  ? chipRows(rest, { card, ran, rows, paneItem })
+                  ? chipRows(rest, { card, ran, rows, paneItem, smooth })
                   : links(paneText.get(item) ?? "")
                       .map((href) => fromFile(rest, href))
                       .map((l, i) => [
