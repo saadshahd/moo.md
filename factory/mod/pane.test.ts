@@ -6,6 +6,7 @@ import {
   UNDO_LABEL,
   rows,
   undoLine,
+  undone,
   type Snapshot,
 } from "./rows.ts";
 
@@ -173,6 +174,10 @@ function snapshot(): Snapshot {
 }
 
 describe("rows", () => {
+  test("undone reads back exactly the ids undoLine wrote", () => {
+    expect([...undone([`intro\n\n${undoLine(81)}\n\nend`, undoLine(5), "Undoes factory call 9x"])]).toEqual([81, 5]);
+  });
+
   test("a wait waits until an answer lands; one asking approval is a plan", () => {
     const r = rows(snapshot());
 

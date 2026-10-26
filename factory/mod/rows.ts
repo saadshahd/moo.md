@@ -96,11 +96,20 @@ export type Rows = {
   costs: CostRow[];
 };
 
-const UNDO_WORDS = "Undoes factory call";
-const UNDO_LINE = new RegExp(`${UNDO_WORDS} (\\d+)\\.`);
+/** The line an undo issue's body carries, with `id` where the call's id goes. */
+const undoFormat = (id: string) => `Undoes factory call ${id}.`;
 
 /** The line an undo issue's body carries, naming the call it reverses; UNDO_LINE reads it back. */
-export const undoLine = (callId: number) => `${UNDO_WORDS} ${callId}.`;
+export const undoLine = (callId: number) => undoFormat(String(callId));
+
+// undoFormat with its text escaped and the id's place opened for digits, so the two never drift.
+const ID = "\u0000";
+
+const UNDO_LINE = new RegExp(
+  undoFormat(ID)
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(ID, "(\\d+)"),
+);
 
 /** The call ids the undo issues in `bodies` reverse. */
 export function undone(bodies: readonly string[]): Set<number> {
