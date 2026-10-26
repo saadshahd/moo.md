@@ -7,6 +7,7 @@ import {
   latest,
   must,
   post,
+  trusted,
   repoOf,
   type Comment,
   type Run,
@@ -57,7 +58,10 @@ async function factoryRun($: EngineInterface): Promise<FactoryRun | null> {
     await $.store.set(key, repo);
   }
 
-  const rules = parseRules(await must(run, ["cat", RULES_PATH], { cwd }));
+  // From the default branch, never the run's own: a run could edit its branch's copy.
+  const rules = parseRules(
+    await must(run, ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`], { cwd }),
+  );
 
   if ("errors" in rules) throw new Error(rules.errors.join("; "));
 
@@ -106,6 +110,7 @@ export function newestNote(
           c.id > afterId &&
           !answers.has(c.id) &&
           Date.parse(c.createdAt) > sinceMs &&
+          trusted(c) &&
           !isFactory(c.body),
       )
       .at(-1) ?? null
@@ -145,7 +150,7 @@ export const register: Register = (on) => {
 
     if (!approval && used >= fr.rules.waitsPerDay)
       return {
-        deny: `Today's ${fr.rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call (factory call), and go on.`,
+        deny: `Today's ${fr.rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call with the factory's call command, and go on.`,
       };
 
     try {
@@ -156,10 +161,12 @@ export const register: Register = (on) => {
         answers: null,
       });
     } catch (err) {
-      // The question can't reach the issue, so it waits in the run's own question box instead.
-      shown($, err instanceof Error ? err : String(err));
+      // Nobody watches this run's question box, so a question that can't reach the issue stops it.
+      const why = err instanceof Error ? err.message : String(err);
 
-      return next(e);
+      return {
+        deny: `Your question could not be posted on issue #${fr.issue} (${why}). Mark the issue stuck with the factory's stuck command, giving that reason, and stop.`,
+      };
     }
 
     if (!approval) await $.store.set(key, used + 1);
@@ -172,7 +179,8 @@ export const register: Register = (on) => {
   on("tool.call", { tool: "Bash" }, async ($, e, next) => {
     const r = await next(e);
 
-    if (r.deny !== undefined || !isTestCommand(e.command))
+    // Only a failed run is cut: passing output may still hold words like "0 fail".
+    if (r.deny !== undefined || !r.isError || !isTestCommand(e.command))
       return r;
 
     try {

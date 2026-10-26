@@ -37,7 +37,14 @@ export type Comment = {
   body: string;
   author: string;
   createdAt: string;
+  /** The author's tie to the repo as GitHub reports it: OWNER, MEMBER, COLLABORATOR, NONE, … */
+  association: string;
 };
+
+/** Whether the comment's author may push to the repo, so it may steer or answer a run. */
+export function trusted(c: Comment): boolean {
+  return ["OWNER", "MEMBER", "COLLABORATOR"].includes(c.association);
+}
 
 /** Every comment on the issue, oldest first. */
 export async function comments(
@@ -51,7 +58,7 @@ export async function comments(
     "--paginate",
     `repos/${repo}/issues/${issue}/comments?per_page=100`,
     "--jq",
-    ".[] | {id, body, author: .user.login, createdAt: .created_at}",
+    ".[] | {id, body, author: .user.login, createdAt: .created_at, association: .author_association}",
   ]);
 
   // SAFETY: the --jq above emits exactly Comment's fields, one object per line.

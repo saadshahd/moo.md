@@ -83,9 +83,9 @@ describe("formats", () => {
   });
   test("latest finds the newest comment of a kind among people's comments", () => {
     const cs: Comment[] = [
-      { id: 1, body: render(every[2]!), author: "u", createdAt: "" },
-      { id: 2, body: "a note", author: "u", createdAt: "" },
-      { id: 3, body: render(every[3]!), author: "u", createdAt: "" },
+      { id: 1, body: render(every[2]!), author: "u", createdAt: "", association: "OWNER", },
+      { id: 2, body: "a note", author: "u", createdAt: "", association: "OWNER", },
+      { id: 3, body: render(every[3]!), author: "u", createdAt: "", association: "OWNER", },
     ];
 
     expect(latest(cs, "wait")).toEqual({ id: 3, c: every[3]! });
@@ -147,7 +147,7 @@ describe("transcript", () => {
 
     expect(pendingAsk(unanswered)).toBe(true);
   });
-  test("a limit refusal gives its reset time; a later report that isn't a refusal clears it", () => {
+  test("a limit refusal gives its reset time only while it is the session's last reply", () => {
     expect(rejectedUntil(LIMIT_REJECTED)).toBe(1791388800);
     expect(rejectedUntil(BG_RUN_DENIED_ASK)).toBe(null);
 
@@ -157,6 +157,7 @@ describe("transcript", () => {
     });
 
     expect(rejectedUntil(`${LIMIT_REJECTED}\n${allowed}`)).toBe(null);
+    expect(rejectedUntil(`${LIMIT_REJECTED}\n${BG_RUN_DENIED_ASK}`)).toBe(null);
   });
   test("a line cut off mid-write is skipped", () => {
     expect(usage(`${BG_RUN_DENIED_ASK}\n{"type":"assis`)).toEqual(
@@ -231,10 +232,10 @@ describe("wait", () => {
     body: render({ kind: "wait", issue: 7, questions: [Q], answers }),
     author: "bot",
     createdAt: "",
+    association: "OWNER",
   });
 
-  const note = (id: number, body: string, author = "you"): Comment => ({ id, body, author, createdAt: "" });
-  const all = () => true;
+  const note = (id: number, body: string, author = "you", association = "OWNER"): Comment => ({ id, body, author, createdAt: "", association });
 
   test("only the newest unanswered wait is open", () => {
     expect(openWait([wait(1, null)])?.id).toBe(1);
@@ -243,16 +244,16 @@ describe("wait", () => {
   });
   test("an answer comment naming the wait answers it, question by question", () => {
     const cs = [wait(1, null), note(2, render({ kind: "answer", issue: 7, wait: 1, answers: ["Array"] }))];
-    expect(answerTo(cs, 1, 1, all)).toEqual({ id: 2, author: "you", answers: ["Array"] });
+    expect(answerTo(cs, 1, 1)).toEqual({ id: 2, author: "you", answers: ["Array"] });
   });
   test("a plain comment answers every question with its text; one before the wait never does", () => {
     const cs = [note(1, "earlier"), wait(2, null), note(3, " Map \n")];
-    expect(answerTo(cs, 2, 2, all)).toEqual({ id: 3, author: "you", answers: ["Map", "Map"] });
+    expect(answerTo(cs, 2, 2)).toEqual({ id: 3, author: "you", answers: ["Map", "Map"] });
   });
   test("an answer from someone who can't push is passed over", () => {
-    const cs = [wait(1, null), note(2, "Array", "stranger"), note(3, "Map", "owner")];
-    expect(answerTo(cs, 1, 1, (l) => l === "owner")?.answers).toEqual(["Map"]);
-    expect(answerTo([wait(1, null), note(2, "x", "stranger")], 1, 1, (l) => l === "owner")).toBe(null);
+    const cs = [wait(1, null), note(2, "Array", "stranger", "NONE"), note(3, "Map", "owner")];
+    expect(answerTo(cs, 1, 1)?.answers).toEqual(["Map"]);
+    expect(answerTo([wait(1, null), note(2, "x", "stranger", "NONE")], 1, 1)).toBe(null);
   });
   test("Approve to the approval question approves its seal; anything else approves nothing", () => {
     const w = { kind: "wait" as const, issue: 7, questions: [Q, { question: "Approve plan 01234567 for #7?", why: "", options: ["Approve", "Change"] }], answers: null };

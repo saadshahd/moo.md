@@ -83,7 +83,7 @@ describe("seal", () => {
 });
 
 describe("retry", () => {
-  const c = (id: number, f: FactoryComment): Comment => ({ id, body: render(f), author: "me", createdAt: "" });
+  const c = (id: number, f: FactoryComment): Comment => ({ id, body: render(f), author: "me", createdAt: "", association: "OWNER" });
   const crash = (id: number) => c(id, { kind: "restart", issue: 7, reason: "crash", session: "s" });
 
   test("removing the stuck label starts the crash count again", () => {
