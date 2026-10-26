@@ -206,6 +206,10 @@ test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) =
     (a) => a.slice(0, 3).join(" ") === "gh issue create",
   );
 
+  const order = ran.map((a) => a.slice(0, 3).join(" "));
+
+  // The label exists before anything lists or uses it: a fresh repo has none.
+  expect(order.indexOf("gh label create")).toBeLessThan(order.indexOf("gh issue list"));
   expect(created).toHaveLength(1);
   expect(created[0]).toContain(UNDO_LABEL);
   expect(created[0]!.join(" ")).toContain(undoLine(80));
@@ -218,5 +222,6 @@ test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) =
   expect(
     await ui.find({ type: "Text", text: /2 PRs · avg 5k tokens/ }),
   ).toBeDefined();
+  expect(await ui.find({ type: "Text", text: /6,000/ })).toBeDefined();
   await ui.unmount();
 });

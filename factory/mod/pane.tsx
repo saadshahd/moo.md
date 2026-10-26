@@ -3,7 +3,6 @@ import { must, repoOf, type Run } from "../lib/github.ts";
 import { RULES_PATH } from "../lib/rules.ts";
 import {
   QUERY,
-  STUCK_LABEL,
   UNDO_LABEL,
   perPr,
   rows,
@@ -73,9 +72,9 @@ async function readRows($: EngineInterface): Promise<Read> {
     "graphql",
     "-f",
     `query=${QUERY}`,
-    "-F",
+    "-f",
     `owner=${owner}`,
-    "-F",
+    "-f",
     `name=${name}`,
   ]);
 
@@ -101,6 +100,21 @@ async function act(
 
 async function undoCall($: EngineInterface, call: CallRow) {
   await act($, async (run, repo) => {
+    // Safe to repeat, and first: listing by a label that does not exist yet fails.
+    await must(run, [
+      "gh",
+      "label",
+      "create",
+      UNDO_LABEL,
+      "--repo",
+      repo,
+      "--force",
+      "--color",
+      "5319E7",
+      "--description",
+      "Reverses a call a factory run made",
+    ]);
+
     // A second press, or another machine's, finds the first undo issue and opens none.
     const out = await must(run, [
       "gh",
@@ -121,19 +135,6 @@ async function undoCall($: EngineInterface, call: CallRow) {
     ]);
 
     if (undone(out.split("\n")).has(call.id)) return;
-    await must(run, [
-      "gh",
-      "label",
-      "create",
-      UNDO_LABEL,
-      "--repo",
-      repo,
-      "--force",
-      "--color",
-      "5319E7",
-      "--description",
-      "Reverses a call a factory run made",
-    ]);
     const { title, body } = undoIssue(call);
 
     await must(run, [
@@ -167,21 +168,6 @@ async function note($: EngineInterface, row: StuckRow, text: string) {
       repo,
       "--body",
       text,
-    ]);
-  });
-}
-
-async function retry($: EngineInterface, row: StuckRow) {
-  await act($, async (run, repo) => {
-    await must(run, [
-      "gh",
-      "issue",
-      "edit",
-      String(row.issue),
-      "--repo",
-      repo,
-      "--remove-label",
-      STUCK_LABEL,
     ]);
   });
 }
@@ -405,7 +391,6 @@ function stuckCards($: EngineInterface, ui: ElementTable, stuck: StuckRow[]) {
             isNoting ? noting.delete(s.issue) : noting.add(s.issue),
           ),
         ),
-        pill(ui, `retry-${s.issue}`, "retry", () => void retry($, s), true),
       ]),
       Input && isNoting && (
         <Input
@@ -458,7 +443,7 @@ function costCard(ui: ElementTable, r: Rows) {
               .repeat(Math.max(1, Math.round((c.tokens / top) * room)))
               .padEnd(room)}
           </Text>
-          <Text tabular>{tokens(c.tokens).padStart(6)}</Text>
+          <Text tabular>{c.tokens.toLocaleString("en-US").padStart(11)}</Text>
         </Box>
       ))}
     </Box>,
