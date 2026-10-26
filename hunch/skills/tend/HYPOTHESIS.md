@@ -27,7 +27,7 @@ Graduate when it stays on for 10 real sessions with no part turned off and the u
 - No API hands the keys back to the prompt; after a fill the band redraws under a new key and the keys return.
 - Which skills ran and which questions got answers live in `$.store`: a reload wiped them.
 - Kept: a chip carries one number (`facts 2`, `skills 1/2`); an agent's pane opens with what it was asked; a fact that settles a choice names what lost; watch says what should appear.
-- Cut: agent sparklines and tool traces (Claude Code's agent view shows the work; motion is a push), a replaced spinner word (the engine's), a turn scrubber (a hidden mode), guess-before-read (a gate), a "yours" chip (the user's words are already their turns), a status-line trail (always on, repeats the skills chip), no border (the user chose the border), next-skill-only (the user asked for every skill).
+- Cut: agent sparklines and tool traces (Claude Code's agent view shows the work; motion is a push), a replaced spinner word (the engine's), a turn scrubber (a hidden mode), guess-before-read (a gate), a "yours" chip (the user's words are already their turns), a status-line trail (always on, repeats the skills chip), no border (the user chose the border), next-skill-only (the user asked for every skill), a memory chip (the user almost never opened it), an edit held until the card quoted the user (the user always typed "go" past it).
 - Cut: provenance on hover (lighting the reply a fact came from): it sends the user scrolling back, the one thing the graduate bar forbids.
 
 ### 2026-09-22 — three rounds of simulated users (a first-timer, an expert) on real `/hope:compose` work

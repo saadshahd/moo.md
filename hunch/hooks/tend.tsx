@@ -1,26 +1,5 @@
 import type { Register } from "claude-code";
 import { MEASURE, type Band, type Item } from "./band.tsx";
-import {
-  EDITS,
-  MOVES,
-  SLOTS,
-  heldReason,
-  saysGo,
-  unquoted,
-  userWords,
-  type Said,
-} from "./gate.tsx";
-import {
-  changes,
-  isSteering,
-  isSteeringPath,
-  memoryRows,
-  places,
-  retrieved,
-  type Places,
-  type Snapshot,
-  type Steering,
-} from "./memory.tsx";
 
 export type Question = { q: string; options: string[] };
 /** One expert's idea to try; `test` pits it against the version that exists. */
@@ -37,7 +16,6 @@ export type Card = {
   ideas?: Idea[];
   skills?: { name: string; outcome: string }[];
   watch?: { label: string; open: string; see?: string }[];
-  said?: Said;
 };
 type Msg = {
   role: string;
@@ -59,8 +37,8 @@ const FACTS =
   "what the user should carry forward — durable, in plain words, no file paths, tool steps or change details";
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
-{"intent":"…","shape":"…","said":{"goal":"…","done":"…"},"facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-said: the user's words copied exactly, never reworded: goal — ${SLOTS.goal}; done — ${SLOTS.done}. facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
+{"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
+facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of every agent the session starts, so its pane reads like the session's card.
 export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;
@@ -99,7 +77,6 @@ const CHIPS = [
   "suggestions",
   "skills",
   "watch",
-  "memory",
   "agents",
 ] as const;
 
@@ -193,15 +170,6 @@ export function cleanCard(c: any): Card {
       (w): w is { label: string; open: string; see?: string } =>
         str(w?.label) && str(w.open),
     ),
-    said:
-      c.said &&
-      typeof c.said === "object" &&
-      (str(c.said.goal) || str(c.said.done))
-        ? {
-            ...(str(c.said.goal) ? { goal: c.said.goal } : {}),
-            ...(str(c.said.done) ? { done: c.said.done } : {}),
-          }
-        : undefined,
   };
   for (const k of Object.keys(card) as (keyof Card)[])
     if (card[k] === undefined) delete card[k];
@@ -614,7 +582,6 @@ export function chipLabel(name: string, s: Shown): string {
   if (name === "ideas") return `ideas ${s.card.ideas?.length ?? 0}`;
   if (name === "suggestions")
     return `suggestions ${s.card.suggestions?.length ?? 0}`;
-  if (name === "memory") return `memory ${s.memory.length}`;
   return `${name} ${chipRows(name, s).length}`;
 }
 
@@ -695,7 +662,6 @@ export type Shown = {
   ran: Set<string>;
   rows: Row[];
   paneItem: string | null;
-  memory: Steering[];
 };
 
 /** The chip a pane item belongs to: a card's own, or agents for an agent's card or report. */
@@ -708,9 +674,8 @@ export function paneChip(paneItem: string | null): string | undefined {
       : undefined;
 }
 
-/** The rows a chip opens: the card's, the session's agents, or the steering files it updated and retrieved. */
+/** The rows a chip opens: the card's, or the session's agents. */
 export function chipRows(name: string, s: Shown): Item[][] {
-  if (name === "memory") return memoryRows(s.memory);
   return name === "agents"
     ? s.rows.map((r) => [agentItem(r, s.paneItem)])
     : cardRows(s.card, name, s.ran);
@@ -740,16 +705,9 @@ export function bandModel(s: Shown): Band {
 
 let card: Card = {};
 let rows: Row[] = [];
-// The steering files this session updated since it started, then those it read or loaded.
-let memory: Steering[] = [];
-// The steering files as the session first saw them.
-let memoryBase: Snapshot | undefined;
 // The questions still open: a card block holds only those its writer chose, and the user's
 // next prompt closes them all, however it answered them.
 let open: Question[] | undefined;
-// Armed from the message a move ran at, until an edit passes or the user says go.
-type Gate = { at: number } | "open";
-let gate: Gate | undefined;
 let paneItem: string | null = null;
 let lastPaneItem: string | null = null;
 const ran = new Set<string>();
@@ -860,10 +818,7 @@ async function load($: any, id: string) {
     ((await get("short")) as Record<string, string>) ?? {},
   ))
     short.set(k, v);
-  memory = ((await get("memory")) as Steering[]) ?? [];
-  memoryBase = (await get("memory-base")) as Snapshot | undefined;
   open = (await get("open")) as Question[] | undefined;
-  gate = (await get("gate")) as Gate | undefined;
   rows = ((await $.store.get(`tend:${id}`)) as Row[]) ?? [];
 }
 
@@ -935,95 +890,12 @@ async function remember($: any) {
   await save($, `tend:${sessionId}:idle`, [...idle]);
 }
 
-async function snapshot($: any, p: Places): Promise<Snapshot> {
-  const listed = await $.process.run(
-    ["git", "ls-files", "-co", "--exclude-standard", "-z"],
-    { cwd: p.root },
-  );
-  // 128: not a git repository, so there are no project files to find this way.
-  if (listed.exitCode !== 0 && listed.exitCode !== 128)
-    throw new Error(`git ls-files: ${listed.stderr.trim()}`);
-  const project =
-    listed.exitCode === 0
-      ? (listed.stdout as string)
-          .split("\0")
-          .filter(isSteering)
-          .map((r) => `${p.root}/${r}`)
-      : [];
-  const saved = (await $.fs.exists(p.memory))
-    ? ((await $.fs.list(p.memory)) as { name: string; kind: string }[])
-        .filter((f) => f.kind === "file")
-        .map((f) => `${p.memory}/${f.name}`)
-    : [];
-  const candidates = [...saved, ...project, `${p.config}/CLAUDE.md`];
-  // A tracked file deleted from disk is still listed by git: only what exists is compared.
-  const paths = (
-    await Promise.all(
-      candidates.map(async (path) => ((await $.fs.exists(path)) ? [path] : [])),
-    )
-  ).flat();
-  const stats = await Promise.all(paths.map((path) => $.fs.stat(path)));
-  return Object.fromEntries(paths.map((path, i) => [path, stats[i].mtimeMs]));
-}
-
-// The first look at the steering files is the session's baseline; each stop compares against it,
-// and lists what the session read or loaded besides.
-async function readMemory($: any, transcriptPath: string) {
-  const p = places(transcriptPath, await $.session.root());
-  if (!p || (await headless($))) return;
-  // Each stop moves the session to the front, so a long one outlives the sessions opened since.
-  await save($, "tend:recent", await recent($, await sid($)));
-  const base = memoryBase;
-  const now = await snapshot($, p);
-  if (!base) {
-    memoryBase = now;
-    await save($, `tend:${sessionId}:memory-base`, now);
-  }
-  const updated = base ? changes(base, now, p) : [];
-  const usage = await $.session.usage({ breakdown: "summary" });
-  const loaded = (
-    (usage.context.breakdown?.memoryFiles ?? []) as { path: string }[]
-  ).map((f) => f.path);
-  const read = ((await $.session.messages()) as Msg[])
-    .flatMap((m) => m.toolUses ?? [])
-    .flatMap((u) =>
-      u.tool === "Read" && typeof u.input.file_path === "string"
-        ? [u.input.file_path]
-        : [],
-    )
-    .filter((path) => isSteeringPath(path, p));
-  memory = [...updated, ...retrieved([...loaded, ...read], updated, p)];
-  $.ui.invalidate("ui.render");
-  await save($, `tend:${sessionId}:memory`, memory);
-}
-
 async function setOpen($: any, questions: Question[]) {
   await sid($);
   open = questions;
   card = withOpen(card, open);
   $.ui.invalidate("ui.render");
   await save($, `tend:${sessionId}:open`, open);
-}
-
-async function setGate($: any, next: Gate) {
-  await sid($);
-  gate = next;
-  await save($, `tend:${sessionId}:gate`, gate);
-}
-
-/** Why the edit waits, or undefined to let it through: the card written since the gate armed
- * must quote the user's goal and done-check. */
-async function held($: any): Promise<string | undefined> {
-  await sid($);
-  if (!gate || gate === "open") return undefined;
-  const msgs = (await $.session.messages()) as Msg[];
-  const missing = unquoted(
-    latestCard(msgs.slice(gate.at)).said,
-    userWords(msgs),
-  );
-  if (missing.length) return heldReason(missing);
-  await setGate($, "open");
-  return undefined;
 }
 
 // Finished agents drop out of $.agent.list(); rows keep them for the session.
@@ -1135,8 +1007,6 @@ async function skillRan($: any, name: string): Promise<string[]> {
   ran.add(skill);
   planMoved = true;
   await remember($);
-  if (MOVES.has(skill))
-    await setGate($, { at: ((await $.session.messages()) as Msg[]).length });
   const format = CARD_SKILLS.get(skill);
   return format ? [format] : [];
 }
@@ -1186,10 +1056,7 @@ function reset() {
   for (const r of rows) gone.add(r.id);
   card = {};
   rows = [];
-  memory = [];
-  memoryBase = undefined;
   open = undefined;
-  gate = undefined;
   paneItem = null;
   lastPaneItem = null;
   ran.clear();
@@ -1227,9 +1094,6 @@ async function act($: any, id: string) {
     // A second press on what the pane shows closes it.
     paneItem === id ? await $.ui.close({ id: PANE }) : await openAgent($, arg);
   else if (kind === "open") await openTarget($, arg);
-  else if (kind === "view") await showPane($, `file:${arg}`);
-  else if (kind === "edit") await openOutside($, arg, true);
-  else if (kind === "ask") await fill($, `change ${arg}: `);
   else if (kind === "close") await $.ui.close({ id: PANE });
   else if (kind === "report") await showPane($, id);
   $.ui.invalidate("ui.render");
@@ -1245,18 +1109,6 @@ export const register: Register = (on) => {
 
   on("session.end", async ($, e, next) => {
     if (e.reason === "clear") reset();
-    return next(e);
-  });
-
-  on("classic.SessionStart", async ($, e, next) => {
-    loud($, readMemory($, e.transcript_path));
-    return next(e);
-  });
-
-  on("classic.Stop", async ($, e, next) => {
-    await readMemory($, e.transcript_path).catch((err) =>
-      $.ui.toast(`tend: ${err?.message ?? err}`),
-    );
     return next(e);
   });
 
@@ -1296,10 +1148,6 @@ export const register: Register = (on) => {
         ? { ...r, context: [...(r.context ?? []), ...asked] }
         : r;
     }
-    if (!e.agentId && EDITS.has(e.tool)) {
-      const reason = await held($);
-      return reason ? { deny: reason } : next(e);
-    }
     if (!e.agentId) return next(e);
     const id = e.agentId;
     if (idle.delete(id) || rows.some((x) => x.id === id && x.read)) {
@@ -1336,8 +1184,6 @@ export const register: Register = (on) => {
           ((await $.agent.list()) as any[]).some((a) => a.id === id));
       return withContext(agent ? [...asked, AGENT_RETURN] : asked);
     }
-    // The user's "go" starts the work as it stands, however the prompt arrived.
-    if (saysGo(e.text)) await setGate($, "open");
     if (e.origin.kind !== "composer") return withContext(asked);
     // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
     await setOpen($, []);
@@ -1360,6 +1206,9 @@ export const register: Register = (on) => {
       await remember($);
       await readAgents($);
     } else {
+      // Each turn moves the session to the front, so a long one outlives the sessions opened since.
+      if (!(await headless($)))
+        await save($, "tend:recent", await recent($, await sid($)));
       await readSession($);
       await setOpen($, turnQuestions(e.answer, card.questions ?? []));
       const reply = stripCards(e.answer);
@@ -1477,7 +1326,7 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const band = bandModel({ card, paneItem, ran, rows, memory });
+    const band = bandModel({ card, paneItem, ran, rows });
     if (!band.chips.length) return <Box />;
     // A blank line parts the band from the reply above it, so the chips read as controls, not its last line.
     return (
@@ -1579,21 +1428,11 @@ export const register: Register = (on) => {
                       kind === "card" ? rest : (rest.split("/").pop() ?? rest),
                     kind: "title",
                   },
-                  // A steering file opened from the memory list goes back to it.
-                  ...(memory.some((c) => c.path === rest)
-                    ? [
-                        {
-                          id: "chip:memory",
-                          label: "back",
-                          kind: "quiet" as const,
-                        },
-                      ]
-                    : []),
                   close,
                 ],
                 [],
                 ...(kind === "card"
-                  ? chipRows(rest, { card, ran, rows, paneItem, memory })
+                  ? chipRows(rest, { card, ran, rows, paneItem })
                   : links(paneText.get(item) ?? "")
                       .map((href) => fromFile(rest, href))
                       .map((l, i) => [

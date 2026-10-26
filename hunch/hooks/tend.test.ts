@@ -109,7 +109,7 @@ test("a chip previews its card with one number", async () => {
     questions: [{ q: "x", options: [] }, { q: "y", options: [] }],
     skills: [{ name: "hope:intent" }, { name: "hope:draft" }],
   } as any;
-  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null, memory: [] });
+  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null });
   expect(chipLabel("intent", s())).toBe("intent");
   expect(chipLabel("facts", s())).toBe("facts 2");
   expect(chipLabel("questions", s())).toBe("questions 2");
@@ -282,7 +282,6 @@ const model = (card: object, open: string | null = null, rows: object[] = []) =>
     paneItem: open && `card:${open}`,
     ran: new Set(),
     rows: rows as any,
-    memory: [],
   });
 
 describe("band", () => {
@@ -314,7 +313,7 @@ describe("band", () => {
   });
   test("the agents list: each agent, dim once read, the one shown marked open", async () => {
     const rows = chipRows("agents", {
-      card: {}, ran: new Set(), paneItem: "agent:a1", memory: [],
+      card: {}, ran: new Set(), paneItem: "agent:a1",
       rows: [{ id: "a1", label: "l", type: "Explore", done: true, read: true }],
     });
     expect(rows).toEqual([[{ id: "agent:a1", label: "l", kind: "line", state: "done", read: true, open: true }]]);
@@ -525,27 +524,27 @@ function cappedStore(on: any, cap: number, entries: [string, unknown][] = []): M
 }
 
 const MiB = 2 ** 20;
-// A session's steering-file snapshot of about `mib` MiB, the key that fills the store in a big repo.
-const snapshotOf = (s: string, mib: number): [string, unknown] => [`tend:${s}:memory-base`, "x".repeat(mib * MiB - 100)];
+// A session's shortened replies, about `mib` MiB of them.
+const savedOf = (s: string, mib: number): [string, unknown] => [`tend:${s}:short`, "x".repeat(mib * MiB - 100)];
 
 test("a new session keeps the newest sessions that fit in 3 MiB, however many", async ($, on) => {
   const old = Array.from({ length: 5 }, (_, i) => `old${i}`);
-  const store = cappedStore(on, 8 * MiB, [...old.map((s) => snapshotOf(s, 1)), ["tend:recent", old]]);
+  const store = cappedStore(on, 8 * MiB, [...old.map((s) => savedOf(s, 1)), ["tend:recent", old]]);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
-  expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(old.slice(0, 3).map((s) => snapshotOf(s, 1)[0]));
+  expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(old.slice(0, 3).map((s) => savedOf(s, 1)[0]));
   expect(store.get("tend:recent")).toEqual(["s1", ...old.slice(0, 3)]);
 });
 
 test("the live session keeps its keys past the budget; the older ones go", async ($, on) => {
-  const store = cappedStore(on, 8 * MiB, [snapshotOf("s1", 4), snapshotOf("old0", 0.5), ["tend:recent", ["old0", "s1"]]]);
+  const store = cappedStore(on, 8 * MiB, [savedOf("s1", 4), savedOf("old0", 0.5), ["tend:recent", ["old0", "s1"]]]);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "resume", cwd: "/p" } as any);
-  expect([...store.keys()]).toEqual([snapshotOf("s1", 4)[0], "tend:recent"]);
+  expect([...store.keys()]).toEqual([savedOf("s1", 4)[0], "tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
 });
 
@@ -553,7 +552,7 @@ test("a store over its cap with no session list shrinks to the current session",
   const store = cappedStore(
     on,
     100,
-    Array.from({ length: 10 }, (_, i): [string, unknown] => [`tend:old${i}:memory-base`, "x".repeat(20)]),
+    Array.from({ length: 10 }, (_, i): [string, unknown] => [`tend:old${i}:short`, "x".repeat(20)]),
   );
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
@@ -657,7 +656,7 @@ describe("ideas", () => {
     expect(x("probe:idea 1")).toBe(x("probe:idea 2"));
     expect(x("idea-note:0:0")).toBe(x("probe:idea 1"));
     expect(x("idea-note:0:1")).toBe(x("probe:idea 1"));
-    expect(chipLabel("ideas", { card: { ideas }, ran: new Set(), rows: [], paneItem: null, memory: [] })).toBe("ideas 2");
+    expect(chipLabel("ideas", { card: { ideas }, ran: new Set(), rows: [], paneItem: null })).toBe("ideas 2");
   });
   test("consult is asked for its ideas as a card; another card skill for the session's", async ($, on) => {
     mock.store(on);
