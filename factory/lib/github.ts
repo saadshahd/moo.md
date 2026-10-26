@@ -15,8 +15,10 @@ export async function must(
   opts?: { cwd?: string; stdin?: string },
 ): Promise<string> {
   const r = await run(argv, opts);
+
   if (r.exitCode !== 0)
     throw new Error(`${argv.slice(0, 3).join(" ")} failed: ${r.stderr.trim()}`);
+
   return r.stdout;
 }
 
@@ -26,6 +28,7 @@ export const branchFor = (n: number) => `factory/${n}`;
 /** The issue a factory branch is for, or null for any other branch. */
 export function issueOf(branch: string): number | null {
   const m = /^factory\/(\d+)$/.exec(branch.trim());
+
   return m ? Number(m[1]) : null;
 }
 
@@ -50,6 +53,8 @@ export async function comments(
     "--jq",
     ".[] | {id, body, author: .user.login, createdAt: .created_at}",
   ]);
+
+  // SAFETY: the --jq above emits exactly Comment's fields, one object per line.
   return out
     .split("\n")
     .filter((l) => l.trim() !== "")
@@ -62,6 +67,7 @@ export function factoryComments(
 ): { id: number; c: FactoryComment }[] {
   return cs.flatMap((x) => {
     const c = parse(x.body);
+
     return c ? [{ id: x.id, c }] : [];
   });
 }
@@ -71,11 +77,13 @@ export function latest<K extends Kind>(
   cs: readonly Comment[],
   kind: K,
 ): { id: number; c: Extract<FactoryComment, { kind: K }> } | null {
-  const found = factoryComments(cs).filter((x) => x.c.kind === kind);
   return (
-    (found.at(-1) as
-      { id: number; c: Extract<FactoryComment, { kind: K }> } | undefined) ??
-    null
+    factoryComments(cs)
+      .filter(
+        (x): x is { id: number; c: Extract<FactoryComment, { kind: K }> } =>
+          x.c.kind === kind,
+      )
+      .at(-1) ?? null
   );
 }
 
@@ -99,6 +107,7 @@ export async function post(
     ],
     { stdin: JSON.stringify({ body: render(c) }) },
   );
+
   return Number(out.trim());
 }
 
@@ -139,8 +148,10 @@ export async function upsert(
   const old = factoryComments(await comments(run, repo, n))
     .filter((x) => x.c.kind === c.kind && same(x.c))
     .at(-1);
+
   if (!old) return post(run, repo, n, c);
   await edit(run, repo, old.id, c);
+
   return old.id;
 }
 

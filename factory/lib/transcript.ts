@@ -9,10 +9,19 @@ export type Usage = {
   output: number;
 };
 
+type Block = {
+  type?: string;
+  name?: string;
+  id?: string;
+  tool_use_id?: string;
+};
+
 type Line = {
   type?: string;
   message?: {
     id?: string;
+    /** Content blocks; a user line's content may be a plain string instead. */
+    content?: string | Block[];
     usage?: {
       input_tokens?: number;
       cache_read_input_tokens?: number;
@@ -26,7 +35,9 @@ type Line = {
 function lines(jsonl: string): Line[] {
   return jsonl.split("\n").flatMap((l) => {
     if (l.trim() === "") return [];
+
     try {
+      // SAFETY: Line names every field optional, so any JSON object Claude Code wrote fits it.
       return [JSON.parse(l) as Line];
     } catch {
       return []; // a line cut off mid-write by a live session
@@ -37,9 +48,11 @@ function lines(jsonl: string): Line[] {
 /** Tokens the transcript's assistant messages spent, each message once. */
 export function usage(jsonl: string): Usage {
   const seen = new Map<string, Usage>();
+
   for (const l of lines(jsonl)) {
     const u = l.message?.usage;
     const id = l.message?.id;
+
     if (l.type !== "assistant" || !u || !id) continue;
     seen.set(id, {
       input: u.input_tokens ?? 0,
@@ -48,6 +61,7 @@ export function usage(jsonl: string): Usage {
       output: u.output_tokens ?? 0,
     });
   }
+
   return sum([...seen.values()]);
 }
 
@@ -68,6 +82,7 @@ export function contextSize(jsonl: string): number {
   const last = lines(jsonl)
     .filter((l) => l.type === "assistant" && l.message?.usage)
     .at(-1)?.message?.usage;
+
   return last
     ? (last.input_tokens ?? 0) +
         (last.cache_read_input_tokens ?? 0) +
@@ -79,24 +94,23 @@ export function contextSize(jsonl: string): number {
 export function pendingAsk(jsonl: string): boolean {
   const asked: string[] = [];
   const answered = new Set<string>();
-  for (const l of lines(jsonl) as {
-    type?: string;
-    message?: { content?: unknown };
-  }[]) {
-    const content = Array.isArray(l.message?.content) ? l.message.content : [];
-    for (const b of content as {
-      type?: string;
-      name?: string;
-      id?: string;
-      tool_use_id?: string;
-    }[]) {
+
+  for (const l of lines(jsonl)) {
+    const content = l.message?.content;
+
+    if (!Array.isArray(content)) continue;
+
+    for (const b of content) {
       if (b.type === "tool_use" && b.name === "AskUserQuestion" && b.id)
         asked.push(b.id);
+
       if (b.type === "tool_result" && b.tool_use_id)
         answered.add(b.tool_use_id);
     }
   }
+
   const last = asked.at(-1);
+
   return last !== undefined && !answered.has(last);
 }
 
@@ -109,7 +123,8 @@ export function rejectedUntil(jsonl: string): number | null {
   const q = lines(jsonl)
     .filter((l) => l.quotaLimits)
     .at(-1)?.quotaLimits;
-  return q?.status === "rejected" && typeof q.resetsAt === "number"
+
+  return q?.status === "rejected" && q.resetsAt !== undefined
     ? q.resetsAt
     : null;
 }

@@ -30,6 +30,7 @@ const base: RunInput = {
 describe("run prompt", () => {
   test("a first run gets the issue, the notes, the plan-layer rules and every factory command", () => {
     const p = runPrompt(base);
+
     for (const s of [
       "# Add due dates",
       "@you: keep it in one file",
@@ -38,6 +39,7 @@ describe("run prompt", () => {
       "hope:compose",
     ])
       expect(p).toContain(s);
+
     for (const cmd of ["plan", "call", "handoff", "pr", "stuck"])
       expect(p).toContain(`bun /f/worker/cli.ts ${cmd}`);
     expect(p).not.toContain("You are continuing");
@@ -46,6 +48,7 @@ describe("run prompt", () => {
     const q = /question "([^"]+)"/
       .exec(runPrompt(base))![1]!
       .replace("<seal>", "01234567");
+
     expect(parseApprovalQuestion(q)).toEqual({ issue: 7, seal8: "01234567" });
   });
   test("a restarted run goes on from the plan and the handoff", () => {
@@ -60,6 +63,7 @@ describe("run prompt", () => {
       },
       handoff: { kind: "handoff", issue: 7, text: "Left: the formatter" },
     });
+
     expect(p).toContain("You are continuing");
     expect(p).toContain("The plan (approved)");
     expect(p).toContain("Left: the formatter");

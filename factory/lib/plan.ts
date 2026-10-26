@@ -11,18 +11,23 @@ function sections(text: string): Map<string, string> {
   const out = new Map<string, string>();
   let name: string | null = null;
   let lines: string[] = [];
+
   const close = () => {
     if (name !== null) out.set(name, lines.join("\n").trim());
   };
+
   for (const line of text.split("\n")) {
     const m = /^##\s+(.+?)\s*$/.exec(line);
+
     if (m) {
       close();
       name = m[1]!;
       lines = [];
     } else lines.push(line);
   }
+
   close();
+
   return out;
 }
 
@@ -30,8 +35,10 @@ function sections(text: string): Map<string, string> {
 export function planGaps(text: string): string[] {
   const s = sections(text);
   const gaps: string[] = SECTIONS.filter((n) => !s.get(n));
+
   if (!gaps.includes("Files") && planFiles(text).length === 0)
     gaps.push("Files (no `- path` lines)");
+
   return gaps;
 }
 
@@ -46,5 +53,6 @@ export function planFiles(text: string): string[] {
 /** The paths both lists name. */
 export function overlap(a: readonly string[], b: readonly string[]): string[] {
   const set = new Set(b);
+
   return [...new Set(a)].filter((p) => set.has(p));
 }

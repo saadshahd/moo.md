@@ -16,32 +16,61 @@ export type Rules = {
   layers: { check: string[]; plan: string[]; judge: string[]; none: string[] };
 };
 
+/** Any value JSON.parse returns. */
+export type Json =
+  | null
+  | boolean
+  | number
+  | string
+  | Json[]
+  | { [key: string]: Json };
+
+const isWhole = (v: Json | undefined, min: number): v is number =>
+  Number.isInteger(v) && Number(v) >= min;
+
+const isString = (v: Json): v is string => typeof v === "string";
+
+const isStrings = (v: Json | undefined): v is string[] =>
+  Array.isArray(v) && v.every(isString);
+
+const isObject = (v: Json | undefined): v is { [key: string]: Json } =>
+  v !== null && typeof v === "object" && !Array.isArray(v);
+
 /** The rules `json` sets, or the reasons it can't be read as rules. */
 export function parseRules(json: string): Rules | { errors: string[] } {
-  let raw: unknown;
+  let raw: Json;
+
   try {
-    raw = JSON.parse(json);
+    // SAFETY: JSON.parse returns JSON values only, which is all Json describes.
+    raw = JSON.parse(json) as Json;
   } catch (e) {
-    return { errors: [`${RULES_PATH} is not JSON: ${(e as Error).message}`] };
+    return { errors: [`${RULES_PATH} is not JSON: ${String(e)}`] };
   }
-  const r = (raw ?? {}) as Record<string, unknown>;
-  const errors: string[] = [];
-  const count = (k: string) => {
-    const v = r[k];
-    if (typeof v !== "number" || !Number.isInteger(v) || v < 1)
-      errors.push(`${k} must be a whole number of 1 or more`);
-  };
-  const strings = (v: unknown, k: string) => {
-    if (!Array.isArray(v) || v.some((s) => typeof s !== "string"))
-      errors.push(`${k} must be a list of strings`);
-  };
-  count("atOnce");
-  if (typeof r.waitsPerDay !== "number" || r.waitsPerDay < 0)
-    errors.push("waitsPerDay must be 0 or more");
-  count("contextCap");
-  strings(r.taste, "taste");
-  const layers = (r.layers ?? {}) as Record<string, unknown>;
-  for (const k of ["check", "plan", "judge", "none"])
-    strings(layers[k], `layers.${k}`);
-  return errors.length > 0 ? { errors } : (raw as Rules);
+
+  const r = isObject(raw) ? raw : {};
+  const l = isObject(r.layers) ? r.layers : {};
+  const { atOnce, waitsPerDay, contextCap, taste } = r;
+  const { check, plan, judge, none } = l;
+
+  const errors = [
+    isWhole(atOnce, 1) ? "" : "atOnce must be a whole number of 1 or more",
+    isWhole(waitsPerDay, 0) ? "" : "waitsPerDay must be 0 or more",
+    isWhole(contextCap, 1) ? "" : "contextCap must be a whole number of 1 or more",
+    isStrings(taste) ? "" : "taste must be a list of strings",
+    isStrings(check) ? "" : "layers.check must be a list of strings",
+    isStrings(plan) ? "" : "layers.plan must be a list of strings",
+    isStrings(judge) ? "" : "layers.judge must be a list of strings",
+    isStrings(none) ? "" : "layers.none must be a list of strings",
+  ].filter((e) => e !== "");
+
+  return isWhole(atOnce, 1) &&
+    isWhole(waitsPerDay, 0) &&
+    isWhole(contextCap, 1) &&
+    isStrings(taste) &&
+    isStrings(check) &&
+    isStrings(plan) &&
+    isStrings(judge) &&
+    isStrings(none)
+    ? { atOnce, waitsPerDay, contextCap, taste, layers: { check, plan, judge, none } }
+    : { errors };
 }

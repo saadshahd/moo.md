@@ -29,6 +29,7 @@ const list = (xs: readonly string[]) =>
 
 export function runPrompt(i: RunInput): string {
   const f = i.cli;
+
   const resume =
     i.plan === null
       ? ""
@@ -44,6 +45,7 @@ ${i.plan.text}
 
 ${i.handoff?.text ?? "(none)"}
 `;
+
   return `You are a factory run for issue #${i.issue} in ${i.repo}. No one watches this session live.
 You are on branch factory/${i.issue}, which claims the issue. Work only here.
 

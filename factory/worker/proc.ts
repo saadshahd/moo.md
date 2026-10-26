@@ -14,11 +14,13 @@ export const run: Run = async (argv, opts) => {
     stdout: "pipe",
     stderr: "pipe",
   });
+
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(p.stdout).text(),
     new Response(p.stderr).text(),
     p.exited,
   ]);
+
   return { exitCode, stdout, stderr };
 };
 
@@ -35,17 +37,22 @@ export type Session = {
 
 export async function sessions(): Promise<Session[]> {
   const r = await run(["claude", "agents", "--json", "--all"]);
+
   if (r.exitCode !== 0)
     throw new Error(`claude agents failed: ${r.stderr.trim()}`);
+
+  // SAFETY: `claude agents --json` prints an array of sessions with at least Session's fields.
   return JSON.parse(r.stdout) as Session[];
 }
 
 /** The session's transcript text, or "" when Claude Code has not written one yet. */
 export async function transcript(sessionId: string): Promise<string> {
   const root = join(homedir(), ".claude", "projects");
+
   for await (const f of new Bun.Glob(`*/${sessionId}.jsonl`).scan({
     cwd: root,
   }))
     return Bun.file(join(root, f)).text();
+
   return "";
 }

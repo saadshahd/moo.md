@@ -80,7 +80,7 @@ const KINDS: readonly Kind[] = [
 const MARKER = /^<!-- factory:([a-z]+) (\{.*\}) -->\n?/;
 
 /** Fields that ride in the marker; long text rides in the body, so `--` in it never ends the marker. */
-function head(c: FactoryComment): Record<string, unknown> {
+function head(c: FactoryComment) {
   switch (c.kind) {
     case "plan":
       return { issue: c.issue, seal: c.seal, approved: c.approved };
@@ -88,6 +88,7 @@ function head(c: FactoryComment): Record<string, unknown> {
       return { issue: c.issue };
     default: {
       const { kind: _, ...rest } = c;
+
       return rest;
     }
   }
@@ -125,36 +126,46 @@ export function total(c: Cost): number {
 export function render(c: FactoryComment): string {
   // A `-->` inside a field would end the marker early; JSON escapes `>` so it can't.
   const json = JSON.stringify(head(c)).replace(/>/g, "\\u003e");
+
   return `<!-- factory:${c.kind} ${json} -->\n${body(c)}`;
 }
 
 /** The factory comment `text` holds, or null when it is anyone else's comment. */
 export function parse(text: string): FactoryComment | null {
   const m = MARKER.exec(text);
+
   if (!m) return null;
-  const kind = m[1] as Kind;
-  if (!KINDS.includes(kind)) return null;
-  let fields: Record<string, unknown>;
+  const kind = KINDS.find((k) => k === m[1]);
+
+  if (kind === undefined) return null;
+  let fields: ReturnType<typeof head>;
+
   try {
-    fields = JSON.parse(m[2]!);
+    // SAFETY: only render() writes a marker, and it writes head() of a comment of this kind.
+    fields = JSON.parse(m[2]!) as ReturnType<typeof head>;
   } catch {
     return null;
   }
+
   const rest = text.slice(m[0].length);
+
   switch (kind) {
     case "plan":
       return {
+        // SAFETY: a plan's marker holds head() of a plan: issue, seal, approved.
         ...(fields as Omit<Plan, "kind" | "text">),
         kind,
         text: rest.replace(/^\*\*Plan\*\*[^\n]*\n\n/, ""),
       };
     case "handoff":
       return {
+        // SAFETY: a handoff's marker holds head() of a handoff: its issue.
         ...(fields as Omit<Handoff, "kind" | "text">),
         kind,
         text: rest.replace(/^\*\*Handoff\*\*\n\n/, ""),
       };
     default:
+      // SAFETY: every other kind's marker holds all its fields but `kind`, which the marker names.
       return { ...fields, kind } as FactoryComment;
   }
 }
@@ -176,5 +187,6 @@ export function parseApprovalQuestion(
   q: string,
 ): { issue: number; seal8: string } | null {
   const m = /^Approve plan ([0-9a-f]{8}) for #(\d+)\?$/.exec(q.trim());
+
   return m ? { seal8: m[1]!, issue: Number(m[2]) } : null;
 }

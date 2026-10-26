@@ -22,13 +22,17 @@ export function isTestCommand(command: string): boolean {
  */
 export function cutToFailures(text: string): string {
   const lines = text.split("\n");
+
   if (lines.length <= KEEP_UNDER) return text;
   const keep = new Set<number>();
   lines.forEach((l, i) => {
     if (!FAILURE.test(l)) return;
+
     for (let j = i - AROUND; j <= i + AROUND; j++) keep.add(j);
   });
+
   if (keep.size === 0) return text;
+
   for (let j = lines.length - TAIL; j < lines.length; j++) keep.add(j);
   const out: string[] = [];
   let cut = 0;
@@ -39,5 +43,6 @@ export function cutToFailures(text: string): string {
       out.push(l);
     } else cut++;
   });
+
   return out.join("\n");
 }
