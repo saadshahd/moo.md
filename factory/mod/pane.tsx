@@ -195,7 +195,7 @@ async function answer($: EngineInterface, w: WaitRow, qi: number, value: string)
   picks.delete(w.id);
   await act($, async (run, repo) => {
     // An answer from another machine, or github.com, may have landed since the last read.
-    if (answerTo(await comments(run, repo, w.issue), w.id, w.questions.length, () => true)) {
+    if (answerTo(await comments(run, repo, w.issue), w.id, w.questions.length)) {
       $.ui.toast(`factory: #${w.issue} was already answered`);
 
       return;
