@@ -1,215 +1,288 @@
 /**
- * GitHub is the factory's only store. Each factory comment starts with a marker line
- * `<!-- factory:<kind> {json} -->` that carries its fields; the text under it is for a person.
+ * GitHub is the factory's only store. A factory comment is a marker line
+ * `<!-- factory:<kind> {json} -->`, a heading for a person, and for some kinds a blank line and
+ * long text. One codec per kind writes and reads it.
  */
 
-export type Plan = {
-  kind: "plan";
-  issue: number;
-  /** sha256 of the plan text, hex. */
-  seal: string;
-  /** The seal the human approved; the plan stands approved only while it equals `seal`. */
-  approved: string | null;
-  text: string;
-};
+import * as z from "./vendor/zod-mini.js";
 
-export type Call = {
-  kind: "call";
-  issue: number;
-  choice: string;
-  picked: string;
-  others: string[];
-  why: string;
+const Issue = z.int().check(z.minimum(1));
+const Id = z.int().check(z.minimum(1));
+const Tokens = z.int().check(z.minimum(0));
+const Seal = z.string().check(z.regex(/^[0-9a-f]{64}$/));
+
+/** A why rides once, in its comment's marker or text, and never past this length. */
+export const WHY_MAX = 2_000;
+const Why = z.string().check(z.maxLength(WHY_MAX));
+
+const Plan = z.object({
+  kind: z.literal("plan"),
+  issue: Issue,
+  /** sha256 of `text`, hex. */
+  seal: Seal,
+  text: z.string(),
+});
+
+export type Plan = z.infer<typeof Plan>;
+
+const Call = z.object({
+  kind: z.literal("call"),
+  issue: Issue,
+  choice: z.string(),
+  picked: z.string(),
+  others: z.array(z.string()),
+  why: Why,
   /** What reversing the call takes. */
-  undo: string;
-};
+  undo: z.string(),
+});
 
-export type Question = {
-  question: string;
-  why: string;
-  options: string[];
-};
+export type Call = z.infer<typeof Call>;
+
+const Question = z.object({
+  question: z.string(),
+  why: Why,
+  options: z.array(z.string()),
+});
+
+export type Question = z.infer<typeof Question>;
 
 /**
- * Questions a run asked the human, answered on the issue; the run waits with its turn ended until
- * `answers` is set, one per question.
+ * Questions a run asked the human, answered on the issue; the run waits with its turn ended.
+ * `approves` names the plan seal its approval question asks about. `answers` is the worker's
+ * record that the run got its answer, never itself an approval.
  */
-export type Wait = {
-  kind: "wait";
-  issue: number;
-  questions: Question[];
-  answers: string[] | null;
-};
+const Wait = z.object({
+  kind: z.literal("wait"),
+  issue: Issue,
+  questions: z.array(Question),
+  approves: z.nullable(Seal),
+  answers: z.nullable(z.array(z.string())),
+});
 
-export type Answer = {
-  kind: "answer";
-  issue: number;
-  wait: number;
-  answers: string[];
-};
+export type Wait = z.infer<typeof Wait>;
 
-export type Handoff = {
-  kind: "handoff";
-  issue: number;
-  text: string;
-};
+/** A trusted person's answer to a wait; `approves` is the seal it approves, if any. */
+const Answer = z.object({
+  kind: z.literal("answer"),
+  issue: Issue,
+  wait: Id,
+  answers: z.array(z.string()),
+  approves: z.nullable(Seal),
+});
+
+export type Answer = z.infer<typeof Answer>;
+
+const Handoff = z.object({
+  kind: z.literal("handoff"),
+  issue: Issue,
+  text: z.string(),
+});
+
+export type Handoff = z.infer<typeof Handoff>;
 
 /** Tokens a run spent, read from its transcripts, posted on its PR. */
-export type Cost = {
-  kind: "cost";
-  issue: number;
-  pr: number;
-  sessions: string[];
-  input: number;
-  cacheRead: number;
-  cacheWrite: number;
-  output: number;
-};
+const Cost = z.object({
+  kind: z.literal("cost"),
+  issue: Issue,
+  pr: Issue,
+  sessions: z.array(z.string()),
+  input: Tokens,
+  cacheRead: Tokens,
+  cacheWrite: Tokens,
+  output: Tokens,
+});
 
-export type Restart = {
-  kind: "restart";
-  issue: number;
-  reason: "crash" | "context";
-  session: string;
-};
+export type Cost = z.infer<typeof Cost>;
 
-export type Stuck = {
-  kind: "stuck";
-  issue: number;
-  reason: string;
-};
+const Restart = z.object({
+  kind: z.literal("restart"),
+  issue: Issue,
+  reason: z.literal(["crash", "context"]),
+  session: z.string(),
+});
+
+export type Restart = z.infer<typeof Restart>;
+
+const Stuck = z.object({
+  kind: z.literal("stuck"),
+  issue: Issue,
+  reason: z.string(),
+});
+
+export type Stuck = z.infer<typeof Stuck>;
+
+/** The body of an issue a person opened to reverse call comment `call`. */
+const Undo = z.object({
+  kind: z.literal("undo"),
+  call: Id,
+  text: z.string(),
+});
+
+export type Undo = z.infer<typeof Undo>;
 
 export type FactoryComment =
-  Plan | Call | Wait | Answer | Handoff | Cost | Restart | Stuck;
+  Plan | Call | Wait | Answer | Handoff | Cost | Restart | Stuck | Undo;
 
 export type Kind = FactoryComment["kind"];
 
-const KINDS: readonly Kind[] = [
-  "plan",
-  "call",
-  "wait",
-  "answer",
-  "handoff",
-  "cost",
-  "restart",
-  "stuck",
-];
+/** Who may write a kind: the factory's bot, or a person the rules file trusts. */
+export type Author = "bot" | "trusted";
+
+type TextField<C> = {
+  [K in Exclude<keyof C, "kind">]: C[K] extends string ? K : never;
+}[Exclude<keyof C, "kind">];
+
+type Spec = {
+  by: Author;
+  codec: z.ZodMiniType<FactoryComment, string>;
+};
 
 const MARKER = /^<!-- factory:([a-z]+) (\{.*\}) -->\n?/;
 
-/** Fields that ride in the marker; long text rides in the body, so `--` in it never ends the marker. */
-function head(c: FactoryComment) {
-  switch (c.kind) {
-    case "plan":
-      return { issue: c.issue, seal: c.seal, approved: c.approved };
-    case "handoff":
-      return { issue: c.issue };
-    default: {
-      const { kind: _, ...rest } = c;
+const lf = (s: string) => s.replace(/\r\n/g, "\n");
 
-      return rest;
-    }
+/** A heading is one paragraph, so the first blank line always ends it. */
+const paragraph = (s: string) => s.replace(/\n{2,}/g, "\n");
+
+function markerFields(body: string): object | null {
+  const m = MARKER.exec(body);
+
+  if (!m) return null;
+
+  try {
+    /** SAFETY: a JSON object; the kind's schema checks every field. */
+    return { ...(JSON.parse(m[2]!) as object), kind: m[1] };
+  } catch {
+    return null;
   }
 }
 
-function body(c: FactoryComment): string {
-  switch (c.kind) {
-    case "plan":
-      return `**Plan** · seal \`${c.seal.slice(0, 8)}\` · ${
-        c.approved === c.seal ? "approved" : "waiting for approval"
-      }\n\n${c.text}`;
-    case "call":
-      return `**Call** · ${c.choice}\n\nPicked: ${c.picked}${
+function textOf(body: string): string {
+  const rest = body.replace(MARKER, "");
+  const at = rest.indexOf("\n\n");
+
+  return at < 0 ? "" : rest.slice(at + 2);
+}
+
+function kind<C extends FactoryComment>(
+  schema: z.ZodMiniType<C, C>,
+  by: Author,
+  text: TextField<C> | null,
+  show: (c: C) => string,
+) {
+  const codec = z.codec(z.string(), schema, {
+    decode: (body) => {
+      const fields = markerFields(body);
+
+      /** SAFETY: unchecked here; the codec checks the result against `schema` next. */
+      return (fields === null || text === null
+        ? fields
+        : { ...fields, [text]: textOf(body) }) as C;
+    },
+    encode: (c) => {
+      const { kind: k, ...rest } = c;
+
+      const fields = Object.fromEntries(
+        Object.entries(rest).filter(([f]) => f !== text),
+      );
+
+      /** A `-->` inside a field would end the marker early; JSON escapes `>` so it can't. */
+      const json = JSON.stringify(fields).replace(/>/g, "\\u003e");
+      const head = `<!-- factory:${k} ${json} -->\n${paragraph(show(c))}`;
+
+      return text === null ? head : `${head}\n\n${String(c[text])}`;
+    },
+  });
+
+  return { by, codec };
+}
+
+const CODECS = {
+  plan: kind(
+    Plan,
+    "bot",
+    "text",
+    (c) => `**Plan** · seal \`${c.seal.slice(0, 8)}\``,
+  ),
+  call: kind(
+    Call,
+    "bot",
+    "why",
+    (c) =>
+      `**Call** · ${c.choice}\nPicked: ${c.picked}${
         c.others.length === 0 ? "" : ` (not ${c.others.join(", not ")})`
-      }\n\nWhy: ${c.why}\n\nTo undo: ${c.undo}`;
-    case "wait":
-      return c.questions
-        .map(
-          (q, i) =>
-            `**Waiting for you** · ${q.question}\n\nWhy: ${q.why}\n\nChoices: ${q.options.join(" · ")}${
-              c.answers === null ? "" : `\n\nAnswer: ${c.answers[i] ?? ""}`
-            }`,
-        )
-        .join("\n\n---\n\n");
-    case "answer":
-      return `**Answer** · ${c.answers.join(" · ")}`;
-    case "handoff":
-      return `**Handoff**\n\n${c.text}`;
-    case "cost":
-      return `**Cost** · ${total(c).toLocaleString("en-US")} tokens: ${c.input} input, ${c.cacheRead} cache read, ${c.cacheWrite} cache write, ${c.output} output, over ${c.sessions.length} session(s)`;
-    case "restart":
-      return `**Restarted** · ${c.reason === "crash" ? "the run died" : "its context passed the cap"}; a fresh session goes on from the plan, branch and handoff`;
-    case "stuck":
-      return `**Stuck** · ${c.reason}`;
-  }
-}
+      }\nTo undo: ${c.undo}`,
+  ),
+  wait: kind(Wait, "bot", null, (c) =>
+    c.questions
+      .map(
+        (q, i) =>
+          `**Waiting for you** · ${q.question}\nChoices: ${q.options.join(" · ")}${
+            c.answers === null ? "" : `\nAnswer: ${c.answers[i] ?? ""}`
+          }`,
+      )
+      .join("\n"),
+  ),
+  answer: kind(
+    Answer,
+    "trusted",
+    null,
+    (c) => `**Answer** · ${c.answers.join(" · ")}`,
+  ),
+  handoff: kind(Handoff, "bot", "text", () => "**Handoff**"),
+  cost: kind(
+    Cost,
+    "bot",
+    null,
+    (c) =>
+      `**Cost** · ${total(c).toLocaleString("en-US")} tokens: ${c.input} input, ${c.cacheRead} cache read, ${c.cacheWrite} cache write, ${c.output} output, over ${c.sessions.length} session(s)`,
+  ),
+  restart: kind(
+    Restart,
+    "bot",
+    null,
+    (c) =>
+      `**Restarted** · ${c.reason === "crash" ? "the run died" : "its context passed the cap"}; a fresh session goes on from the plan, branch and handoff`,
+  ),
+  stuck: kind(Stuck, "bot", null, (c) => `**Stuck** · ${c.reason}`),
+  undo: kind(
+    Undo,
+    "trusted",
+    "text",
+    (c) => `**Undo** · factory call ${c.call}`,
+  ),
+} satisfies {
+  [C in FactoryComment as C["kind"]]: {
+    by: Author;
+    codec: z.ZodMiniType<C, string>;
+  };
+};
+
+type Table = { [K in Kind]: Spec };
+
+const TABLE: Table = CODECS;
+const SPECS = new Map<string, Spec>(Object.entries(TABLE));
 
 export function total(c: Cost): number {
   return c.input + c.cacheRead + c.cacheWrite + c.output;
 }
 
+/** Throws when `c` breaks its kind's schema: a malformed comment is never posted. */
 export function render(c: FactoryComment): string {
-  /** A `-->` inside a field would end the marker early; JSON escapes `>` so it can't. */
-  const json = JSON.stringify(head(c)).replace(/>/g, "\\u003e");
-
-  return `<!-- factory:${c.kind} ${json} -->\n${body(c)}`;
+  return z.encode(TABLE[c.kind].codec, c);
 }
 
-export function parse(text: string): FactoryComment | null {
-  const m = MARKER.exec(text);
+/** The comment `body` holds, or null when it is no well-formed factory comment. */
+export function parse(body: string): FactoryComment | null {
+  const text = lf(body);
+  const spec = SPECS.get(MARKER.exec(text)?.[1] ?? "");
 
-  if (!m) return null;
-  const kind = KINDS.find((k) => k === m[1]);
+  if (spec === undefined) return null;
+  const r = z.safeDecode(spec.codec, text);
 
-  if (kind === undefined) return null;
-  let fields: ReturnType<typeof head>;
-
-  try {
-    /** SAFETY: only render() writes a marker, and it writes head() of a comment of this kind. */
-    fields = JSON.parse(m[2]!) as ReturnType<typeof head>;
-  } catch {
-    return null;
-  }
-
-  const rest = text.slice(m[0].length);
-
-  switch (kind) {
-    case "plan":
-      return {
-        /** SAFETY: a plan's marker holds head() of a plan: issue, seal, approved. */
-        ...(fields as Omit<Plan, "kind" | "text">),
-        kind,
-        text: rest.replace(/^\*\*Plan\*\*[^\n]*\n\n/, ""),
-      };
-    case "handoff":
-      return {
-        /** SAFETY: a handoff's marker holds head() of a handoff: its issue. */
-        ...(fields as Omit<Handoff, "kind" | "text">),
-        kind,
-        text: rest.replace(/^\*\*Handoff\*\*\n\n/, ""),
-      };
-    default:
-      /**
-       * SAFETY: every other kind's marker holds all its fields but `kind`, which the marker names.
-       */
-      return { ...fields, kind } as FactoryComment;
-  }
+  return r.success ? r.data : null;
 }
 
-export function isFactory(text: string): boolean {
-  return parse(text) !== null;
-}
-
-export function approvalQuestion(issue: number, seal: string): string {
-  return `Approve plan ${seal.slice(0, 8)} for #${issue}?`;
-}
-
-export const APPROVE = "Approve";
-
-export function parseApprovalQuestion(
-  q: string,
-): { issue: number; seal8: string } | null {
-  const m = /^Approve plan ([0-9a-f]{8}) for #(\d+)\?$/.exec(q.trim());
-
-  return m ? { seal8: m[1]!, issue: Number(m[2]) } : null;
+export function writer(kind: Kind): Author {
+  return TABLE[kind].by;
 }

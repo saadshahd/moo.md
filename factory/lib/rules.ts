@@ -1,72 +1,55 @@
+import type { Actors } from "./github.ts";
+import * as z from "./vendor/zod-mini.js";
 
 export const RULES_PATH = ".claude/factory.json";
 
-export type Rules = {
+const Rule = z.string().check(z.minLength(1));
+const Login = z.string().check(z.minLength(1));
+
+export const Rules = z.object({
   /** How many issues run at once on this machine. */
-  atOnce: number;
+  atOnce: z.int().check(z.minimum(1)),
   /** Asks a day that may wait for the human; past it, the run takes its own pick and posts a call. */
-  waitsPerDay: number;
+  waitsPerDay: z.int().check(z.minimum(0)),
   /** Once a run's context passes this many tokens, it restarts fresh from plan, branch and handoff. */
-  contextCap: number;
+  contextCap: z.int().check(z.minimum(1)),
+  /** The factory App's bot login, `<slug>[bot]`: the only author whose factory comments count. */
+  bot: Login.check(z.regex(/\[bot\]$/)),
+  /** Whose comments, labels and issue bodies count. Default: the repo's owner. Never the bot. */
+  trusted: z.optional(z.array(Login.check(z.regex(/^(?!.*\[bot\]$)/)))),
   /** Where the project's taste lives (its CLAUDE.md, a taste file), repo-relative. */
-  taste: string[];
+  taste: z.array(Rule),
   /** Each taste rule, by the layer that enforces it; `none` lists the rules no layer takes. */
-  layers: { check: string[]; plan: string[]; judge: string[]; none: string[] };
-};
+  layers: z.object({
+    check: z.array(Rule),
+    plan: z.array(Rule),
+    judge: z.array(Rule),
+    none: z.array(Rule),
+  }),
+});
 
-export type Json =
-  | null
-  | boolean
-  | number
-  | string
-  | Json[]
-  | { [key: string]: Json };
-
-const isWhole = (v: Json | undefined, min: number): v is number =>
-  Number.isInteger(v) && Number(v) >= min;
-
-const isString = (v: Json): v is string => typeof v === "string";
-
-const isStrings = (v: Json | undefined): v is string[] =>
-  Array.isArray(v) && v.every(isString);
-
-const isObject = (v: Json | undefined): v is { [key: string]: Json } =>
-  v !== null && typeof v === "object" && !Array.isArray(v);
+export type Rules = z.infer<typeof Rules>;
 
 export function parseRules(json: string): Rules | { errors: string[] } {
-  let raw: Json;
+  let raw: unknown;
 
   try {
-    /** SAFETY: JSON.parse returns JSON values only, which is all Json describes. */
-    raw = JSON.parse(json) as Json;
+    raw = JSON.parse(json);
   } catch (e) {
     return { errors: [`${RULES_PATH} is not JSON: ${String(e)}`] };
   }
 
-  const r = isObject(raw) ? raw : {};
-  const l = isObject(r.layers) ? r.layers : {};
-  const { atOnce, waitsPerDay, contextCap, taste } = r;
-  const { check, plan, judge, none } = l;
+  const r = z.safeParse(Rules, raw);
 
-  const errors = [
-    isWhole(atOnce, 1) ? "" : "atOnce must be a whole number of 1 or more",
-    isWhole(waitsPerDay, 0) ? "" : "waitsPerDay must be 0 or more",
-    isWhole(contextCap, 1) ? "" : "contextCap must be a whole number of 1 or more",
-    isStrings(taste) ? "" : "taste must be a list of strings",
-    isStrings(check) ? "" : "layers.check must be a list of strings",
-    isStrings(plan) ? "" : "layers.plan must be a list of strings",
-    isStrings(judge) ? "" : "layers.judge must be a list of strings",
-    isStrings(none) ? "" : "layers.none must be a list of strings",
-  ].filter((e) => e !== "");
+  return r.success
+    ? r.data
+    : {
+        errors: r.error.issues.map(
+          (i) => `${RULES_PATH} ${i.path.join(".") || "(root)"}: ${i.message}`,
+        ),
+      };
+}
 
-  return isWhole(atOnce, 1) &&
-    isWhole(waitsPerDay, 0) &&
-    isWhole(contextCap, 1) &&
-    isStrings(taste) &&
-    isStrings(check) &&
-    isStrings(plan) &&
-    isStrings(judge) &&
-    isStrings(none)
-    ? { atOnce, waitsPerDay, contextCap, taste, layers: { check, plan, judge, none } }
-    : { errors };
+export function actorsOf(rules: Rules, repo: string): Actors {
+  return { bot: rules.bot, trusted: rules.trusted ?? [repo.split("/")[0]!] };
 }

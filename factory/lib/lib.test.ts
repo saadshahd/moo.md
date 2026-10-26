@@ -1,48 +1,100 @@
 import { describe, expect, test } from "claude-code/testing";
+import { botEnv, needsRenew, RENEW_BEFORE_MS, type Bot } from "./bot.ts";
 import {
-  approvalQuestion,
   parse,
-  parseApprovalQuestion,
   render,
   total,
+  WHY_MAX,
+  type Call,
   type FactoryComment,
+  type Wait,
 } from "./formats.ts";
 import { BG_RUN_DENIED_ASK, LIMIT_REJECTED } from "./fixtures/transcripts.ts";
-import { issueOf, latest, type Comment } from "./github.ts";
+import {
+  factoryComments,
+  issueOf,
+  latest,
+  wroteIt,
+  type Actors,
+  type Comment,
+} from "./github.ts";
 import { cutToFailures, isTestCommand } from "./logs.ts";
-import { overlap, planFiles, planGaps } from "./plan.ts";
-import { answerIds, answerMessage, answerTo, approvedSeal, openWait } from "./wait.ts";
-import { parseRules } from "./rules.ts";
+import { overlap, planFiles, planGaps, planText } from "./plan.ts";
+import { actorsOf, parseRules } from "./rules.ts";
+import { undone, type Snapshot } from "./snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, usage } from "./transcript.ts";
+import {
+  APPROVAL_QUESTION,
+  answerFor,
+  answerMessage,
+  answerTo,
+  approved,
+  notes,
+  openWait,
+} from "./wait.ts";
 
-const Q = { question: "Which store?", why: "Both fit --> pick one", options: ["Map", "Array"] };
+const SEAL = "a".repeat(64);
+const BOT = "moo-factory[bot]";
+const ME = "owner";
+const A: Actors = { bot: BOT, trusted: [ME] };
+
+const Q = {
+  question: "Which store?",
+  why: "Both fit --> pick one",
+  options: ["Map", "Array"],
+};
+
+const APPROVAL = {
+  question: APPROVAL_QUESTION,
+  why: "the plan",
+  options: ["Approve", "Change"],
+};
+
+const comment = (
+  id: number,
+  body: string,
+  author: string | null = ME,
+  editor: string | null = null,
+): Comment => ({ id, body, author, editor, createdAt: "", url: `u${id}` });
+
+const bot = (id: number, c: FactoryComment) => comment(id, render(c), BOT);
+
+const wait = (questions = [Q], approves: string | null = null): Wait => ({
+  kind: "wait",
+  issue: 7,
+  questions,
+  approves,
+  answers: null,
+});
+
+const CALL: Call = {
+  kind: "call",
+  issue: 7,
+  choice: "where `--` lives",
+  picked: "in a.ts -->",
+  others: ["in b.ts"],
+  why: "a.ts already parses\n\nand b.ts does not",
+  undo: "move it",
+};
 
 describe("formats", () => {
   const every: FactoryComment[] = [
     {
       kind: "plan",
       issue: 7,
-      seal: "a".repeat(64),
-      approved: null,
+      seal: SEAL,
       text: "## Types\nT --> U\n\n## Files\n- a.ts",
     },
-    {
-      kind: "call",
-      issue: 7,
-      choice: "where `--` lives",
-      picked: "in a.ts -->",
-      others: ["in b.ts"],
-      why: "a.ts already parses",
-      undo: "move it",
-    },
-    { kind: "wait", issue: 7, questions: [Q], answers: null },
-    { kind: "wait", issue: 7, questions: [Q], answers: ["Map"] },
-    { kind: "handoff", issue: 7, text: "Done: a.\nLeft: b." },
+    CALL,
+    wait(),
+    { ...wait([Q, APPROVAL], SEAL), answers: ["Map", "Approve"] },
+    { kind: "answer", issue: 7, wait: 101, answers: ["Map"], approves: null },
+    { kind: "handoff", issue: 7, text: "Done: a.\n\nLeft: b." },
     {
       kind: "cost",
       issue: 7,
       pr: 9,
-      sessions: ["s1", "s2"],
+      sessions: ["s1"],
       input: 1,
       cacheRead: 2,
       cacheWrite: 3,
@@ -50,46 +102,96 @@ describe("formats", () => {
     },
     { kind: "restart", issue: 7, reason: "crash", session: "s1" },
     { kind: "stuck", issue: 7, reason: "two fixes failed" },
-    { kind: "answer", issue: 7, wait: 101, answers: ["Map"] },
+    { kind: "undo", call: 55, text: "Picked: x\n\nTo undo: y" },
   ];
 
-  test("every kind parses back to itself, `-->` in a field included", () => {
+  test("every kind parses back to itself, `-->` and blank lines in a field included", () => {
     for (const c of every) expect(parse(render(c))).toEqual(c);
   });
-  test("anyone else's comment is not a factory comment", () => {
+  test("a heading is one paragraph, so long text starts after the first blank line", () => {
+    const c = {
+      ...CALL,
+      choice: "a\n\nb",
+    };
+
+    expect(render(c)).not.toContain("a\n\nb");
+    expect(parse(render(c))).toEqual(c);
+  });
+  test("a browser edit's CRLF line endings read as LF", () => {
+    expect(parse(render(every[0]!).replace(/\n/g, "\r\n"))).toEqual(every[0]!);
+  });
+  test("a marker whose fields break its kind's schema is no factory comment", () => {
     expect(parse("looks good to me")).toBe(null);
     expect(parse("<!-- factory:nope {} -->\nx")).toBe(null);
     expect(parse("<!-- factory:call {not json} -->\nx")).toBe(null);
+    expect(parse('<!-- factory:call {"issue":5} -->\nx')).toBe(null);
+    expect(
+      parse(`<!-- factory:plan {"issue":5,"seal":"short"} -->\nx\n\ny`),
+    ).toBe(null);
   });
-  test("a call shows what it passed over and why", () => {
-    expect(render(every[1]!)).toContain("Picked: in a.ts --> (not in b.ts)\n\nWhy: a.ts already parses");
+  test("a why past the cap is never posted", () => {
+    expect(() =>
+      render({
+        ...CALL,
+        why: "x".repeat(WHY_MAX + 1),
+      }),
+    ).toThrow();
   });
-  test("a person reads the plan's state without the marker", () => {
-    const body = render(every[0]!);
-    expect(body.split("\n")[1]).toBe(
-      "**Plan** · seal `aaaaaaaa` · waiting for approval",
-    );
+  test("a call shows what it passed over; its why rides once, below", () => {
+    const body = render(CALL);
+    expect(body).toContain("Picked: in a.ts --> (not in b.ts)");
+    expect(body.split("a.ts already parses").length).toBe(2);
   });
   test("cost totals every kind of token", () => {
     expect(
-      total({ kind: "cost", issue: 7, pr: 9, sessions: [], input: 1, cacheRead: 2, cacheWrite: 3, output: 4 }),
+      total({
+        kind: "cost",
+        issue: 7,
+        pr: 9,
+        sessions: [],
+        input: 1,
+        cacheRead: 2,
+        cacheWrite: 3,
+        output: 4,
+      }),
     ).toBe(10);
   });
-  test("the approval question names its seal and issue, and nothing else parses as one", () => {
-    const q = approvalQuestion(42, "0123456789abcdef");
-    expect(q).toBe("Approve plan 01234567 for #42?");
-    expect(parseApprovalQuestion(q)).toEqual({ issue: 42, seal8: "01234567" });
-    expect(parseApprovalQuestion("Approve the plan?")).toBe(null);
+});
+
+describe("authors", () => {
+  const plan: FactoryComment = {
+    kind: "plan",
+    issue: 7,
+    seal: SEAL,
+    text: "x",
+  };
+
+  const answer: FactoryComment = {
+    kind: "answer",
+    issue: 7,
+    wait: 1,
+    answers: ["a"],
+    approves: null,
+  };
+
+  test("a comment counts only when written, and last edited, by the logins named", () => {
+    expect(wroteIt(comment(1, ""), [ME])).toBe(true);
+    expect(wroteIt(comment(1, "", ME, ME), [ME])).toBe(true);
+    expect(wroteIt(comment(1, "", ME, BOT), [ME])).toBe(false);
+    expect(wroteIt(comment(1, "", null), [ME])).toBe(false);
   });
-  test("latest finds the newest comment of a kind among people's comments", () => {
-    const cs: Comment[] = [
-      { id: 1, body: render(every[2]!), author: "u", createdAt: "", association: "OWNER", },
-      { id: 2, body: "a note", author: "u", createdAt: "", association: "OWNER", },
-      { id: 3, body: render(every[3]!), author: "u", createdAt: "", association: "OWNER", },
+  test("bot kinds count only from the bot, a person's kinds only from the trusted", () => {
+    const cs = [
+      comment(1, render(plan), ME),
+      comment(2, render(plan), "stranger"),
+      bot(3, plan),
+      bot(4, answer),
+      comment(5, render(answer), "stranger"),
+      comment(6, render(answer), ME),
     ];
 
-    expect(latest(cs, "wait")).toEqual({ id: 3, c: every[3]! });
-    expect(latest(cs, "plan")).toBe(null);
+    expect(factoryComments(cs, A).map((x) => x.id)).toEqual([3, 6]);
+    expect(latest(cs, A, "plan")?.id).toBe(3);
   });
 });
 
@@ -101,6 +203,105 @@ describe("branches", () => {
   });
 });
 
+describe("wait", () => {
+  const answerComment = (
+    id: number,
+    waitId: number,
+    answers: string[],
+    approves: string | null = null,
+    author = ME,
+  ) =>
+    comment(
+      id,
+      render({ kind: "answer", issue: 7, wait: waitId, answers, approves }),
+      author,
+    );
+
+  test("only the bot's newest unanswered wait is open", () => {
+    expect(openWait([bot(1, wait())], A)?.id).toBe(1);
+    expect(
+      openWait([bot(1, wait()), bot(2, { ...wait(), answers: ["Map"] })], A),
+    ).toBe(null);
+    expect(openWait([comment(1, render(wait()))], A)).toBe(null);
+  });
+  test("an answer comment naming the wait answers it, question by question", () => {
+    const cs = [bot(1, wait()), answerComment(2, 1, ["Array"])];
+    expect(answerTo(cs, A, { id: 1, c: wait() })).toEqual({
+      id: 2,
+      answers: ["Array"],
+      approves: null,
+    });
+  });
+  test("a plain comment answers a one-question wait; one before the wait never does", () => {
+    const cs = [comment(1, "earlier"), bot(2, wait()), comment(3, " Map \n")];
+    expect(answerTo(cs, A, { id: 2, c: wait() })).toEqual({
+      id: 3,
+      answers: ["Map"],
+      approves: null,
+    });
+  });
+  test("a plain comment answers no wait of several questions, and no approval", () => {
+    const two = wait([Q, Q]);
+    expect(
+      answerTo([bot(1, two), comment(2, "Map")], A, { id: 1, c: two }),
+    ).toBe(null);
+    const asks = wait([APPROVAL], SEAL);
+    expect(
+      answerTo([bot(1, asks), comment(2, "Approve")], A, { id: 1, c: asks }),
+    ).toBe(null);
+  });
+  test("an answer from a stranger, or one the bot edited, is passed over", () => {
+    const cs = [
+      bot(1, wait()),
+      comment(2, "Array", "stranger"),
+      comment(3, "Array", ME, BOT),
+      comment(4, "Map"),
+    ];
+
+    expect(answerTo(cs, A, { id: 1, c: wait() })?.answers).toEqual(["Map"]);
+  });
+  test("Approve on the approval question approves the wait's seal; anything else approves nothing", () => {
+    const w = wait([Q, APPROVAL], SEAL);
+    expect(answerFor(9, w, ["Map", " approve "]).approves).toBe(SEAL);
+    expect(answerFor(9, w, ["Map", "Change"]).approves).toBe(null);
+    expect(answerFor(9, wait(), ["Approve"]).approves).toBe(null);
+  });
+  test("a seal stands approved only by a trusted answer naming it", () => {
+    expect(approved([answerComment(2, 1, ["Approve"], SEAL)], A, SEAL)).toBe(
+      true,
+    );
+    expect(
+      approved([answerComment(2, 1, ["Approve"], SEAL, "stranger")], A, SEAL),
+    ).toBe(false);
+    expect(
+      approved([answerComment(2, 1, ["Approve"], SEAL)], A, "b".repeat(64)),
+    ).toBe(false);
+    expect(
+      approved(
+        [bot(2, { ...wait([APPROVAL], SEAL), answers: ["Approve"] })],
+        A,
+        SEAL,
+      ),
+    ).toBe(false);
+  });
+  test("the run reads each question with its answer", () => {
+    expect(answerMessage(wait(), ["Map"])).toContain(
+      "- Which store?\n  Answer: Map",
+    );
+  });
+  test("notes are trusted people's words that answer no wait", () => {
+    const cs = [
+      comment(1, "first"),
+      bot(2, wait()),
+      comment(3, "Map"),
+      comment(4, "later"),
+      comment(5, "hi", "stranger"),
+    ];
+
+    expect(notes(cs, A).map((c) => c.id)).toEqual([1, 4]);
+  });
+});
+
 describe("plan", () => {
   const full =
     "## Types\ntype A = 1\n\n## Signatures\nf(a: A): void\n\n## Files\n- `src/a.ts` — new\n- src/b.ts\n";
@@ -108,6 +309,7 @@ describe("plan", () => {
   test("a plan with every section filled passes", () => {
     expect(planGaps(full)).toEqual([]);
     expect(planFiles(full)).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(planGaps(full.replace(/\n/g, "\r\n"))).toEqual([]);
   });
   test("a missing or empty section is named", () => {
     expect(planGaps("## Types\nx\n\n## Signatures\n\n")).toEqual([
@@ -117,6 +319,9 @@ describe("plan", () => {
     expect(
       planGaps("## Types\nx\n## Signatures\ny\n## Files\nsome files"),
     ).toEqual(["Files (no `- path` lines)"]);
+  });
+  test("plan text drops CRLF and outer blank lines", () => {
+    expect(planText("\r\n## Types\r\nx\r\n\r\n")).toBe("## Types\nx");
   });
   test("overlap is the paths both name", () => {
     expect(overlap(["a", "b", "b"], ["b", "c"])).toEqual(["b"]);
@@ -184,6 +389,14 @@ describe("logs", () => {
     expect(out).toContain("1 fail");
     expect(out.length).toBeLessThan(40);
     expect(out[0]).toBe("… 97 passing lines cut by the factory …");
+    expect(out[8]).toBe("… 83 passing lines cut by the factory …");
+  });
+  test("a failure inside the tail is kept once", () => {
+    const lines = Array.from({ length: 100 }, (_, i) => `(pass) ${i}`);
+    lines[98] = "(fail) 98";
+    const out = cutToFailures(lines.join("\n")).split("\n");
+    expect(out.filter((l) => l === "(fail) 98").length).toBe(1);
+    expect(out.at(-1)).toBe("(pass) 99");
   });
   test("short output, or long output with no failure, stays whole", () => {
     expect(cutToFailures("a\nb")).toBe("a\nb");
@@ -197,6 +410,7 @@ describe("rules", () => {
     atOnce: 2,
     waitsPerDay: 5,
     contextCap: 400000,
+    bot: BOT,
     taste: ["CLAUDE.md"],
     layers: {
       check: ["tsc strict"],
@@ -206,65 +420,87 @@ describe("rules", () => {
     },
   };
 
-  test("a full rules file reads", () => {
-    expect(parseRules(JSON.stringify(good))).toEqual(good);
+  test("a full rules file reads; trust defaults to the repo's owner", () => {
+    const r = parseRules(JSON.stringify(good));
+    expect(r).toEqual(good);
+    expect("errors" in r ? null : actorsOf(r, "owner/app")).toEqual(A);
+    expect(
+      "errors" in r
+        ? null
+        : actorsOf({ ...r, trusted: ["x"] }, "owner/app").trusted,
+    ).toEqual(["x"]);
   });
   test("every wrong field is named", () => {
     const bad = parseRules(
       JSON.stringify({ ...good, atOnce: 0, layers: { check: [] } }),
     );
 
-    expect(bad).toEqual({
-      errors: [
-        "atOnce must be a whole number of 1 or more",
-        "layers.plan must be a list of strings",
-        "layers.judge must be a list of strings",
-        "layers.none must be a list of strings",
-      ],
-    });
+    expect(
+      "errors" in bad ? bad.errors.map((e) => e.split(":")[0]) : bad,
+    ).toEqual([
+      ".claude/factory.json atOnce",
+      ".claude/factory.json layers.plan",
+      ".claude/factory.json layers.judge",
+      ".claude/factory.json layers.none",
+    ]);
     expect("errors" in parseRules("{")).toBe(true);
+  });
+  test("the bot is a [bot] login, and never trusted", () => {
+    expect("errors" in parseRules(JSON.stringify({ ...good, bot: "me" }))).toBe(
+      true,
+    );
+    expect(
+      "errors" in parseRules(JSON.stringify({ ...good, trusted: [ME, BOT] })),
+    ).toBe(true);
+    expect(
+      "errors" in parseRules(JSON.stringify({ ...good, trusted: [ME] })),
+    ).toBe(false);
   });
 });
 
-describe("wait", () => {
-  const wait = (id: number, answers: string[] | null): Comment => ({
-    id,
-    body: render({ kind: "wait", issue: 7, questions: [Q], answers }),
-    author: "bot",
-    createdAt: "",
-    association: "OWNER",
-  });
+describe("bot", () => {
+  const b: Bot = {
+    token: "t",
+    expiresAt: "2026-10-26T12:00:00Z",
+    name: BOT,
+    email: "1+x@users.noreply.github.com",
+  };
 
-  const note = (id: number, body: string, author = "you", association = "OWNER"): Comment => ({ id, body, author, createdAt: "", association });
+  const at = Date.parse(b.expiresAt);
 
-  test("only the newest unanswered wait is open", () => {
-    expect(openWait([wait(1, null)])?.id).toBe(1);
-    expect(openWait([wait(1, null), wait(2, ["Map"])])).toBe(null);
-    expect(openWait([note(1, "hi")])).toBe(null);
+  test("a token renews once it is within the renew window, or when none is held", () => {
+    expect(needsRenew(null, at)).toBe(true);
+    expect(needsRenew(b, at - RENEW_BEFORE_MS - 1)).toBe(false);
+    expect(needsRenew(b, at - RENEW_BEFORE_MS + 1)).toBe(true);
   });
-  test("an answer comment naming the wait answers it, question by question", () => {
-    const cs = [wait(1, null), note(2, render({ kind: "answer", issue: 7, wait: 1, answers: ["Array"] }))];
-    expect(answerTo(cs, 1, 1)).toEqual({ id: 2, author: "you", answers: ["Array"] });
+  test("its environment points gh, git push and git commit at the bot", () => {
+    expect(botEnv(b)).toMatchObject({
+      GH_TOKEN: "t",
+      GIT_AUTHOR_NAME: BOT,
+      GIT_CONFIG_VALUE_1: "!gh auth git-credential",
+    });
   });
-  test("a plain comment answers every question with its text; one before the wait never does", () => {
-    const cs = [note(1, "earlier"), wait(2, null), note(3, " Map \n")];
-    expect(answerTo(cs, 2, 2)).toEqual({ id: 3, author: "you", answers: ["Map", "Map"] });
-  });
-  test("an answer from someone who can't push is passed over", () => {
-    const cs = [wait(1, null), note(2, "Array", "stranger", "NONE"), note(3, "Map", "owner")];
-    expect(answerTo(cs, 1, 1)?.answers).toEqual(["Map"]);
-    expect(answerTo([wait(1, null), note(2, "x", "stranger", "NONE")], 1, 1)).toBe(null);
-  });
-  test("Approve to the approval question approves its seal; anything else approves nothing", () => {
-    const w = { kind: "wait" as const, issue: 7, questions: [Q, { question: "Approve plan 01234567 for #7?", why: "", options: ["Approve", "Change"] }], answers: null };
-    expect(approvedSeal(w, ["Map", " approve "])).toBe("01234567");
-    expect(approvedSeal(w, ["Map", "Change"])).toBe(null);
-    expect(approvedSeal({ ...w, questions: [Q] }, ["Approve"])).toBe(null);
-  });
-  test("the run reads each question with its answer", () => {
-    expect(answerMessage({ kind: "wait", issue: 7, questions: [Q], answers: null }, ["Map"])).toContain("- Which store?\n  Answer: Map");
-  });
-  test("comments that answered a wait are known, so they never come back as notes", () => {
-    expect([...answerIds([wait(1, ["Map"]), note(2, "Map"), note(3, "later")])]).toEqual([2]);
+});
+
+describe("snapshot", () => {
+  test("a call is undone only by a trusted person's undo issue", () => {
+    const undo = (call: number) => render({ kind: "undo", call, text: "x" });
+
+    const s: Snapshot = {
+      issues: [],
+      open: [],
+      prs: new Map(),
+      claimed: new Set(),
+      merged: [],
+      truncated: [],
+      undos: [
+        { body: undo(1), author: ME, editor: null },
+        { body: undo(2), author: "stranger", editor: null },
+        { body: undo(3), author: ME, editor: BOT },
+        { body: "Undoes factory call 4.", author: ME, editor: null },
+      ],
+    };
+
+    expect([...undone(s, A)]).toEqual([1]);
   });
 });
