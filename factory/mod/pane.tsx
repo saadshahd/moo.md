@@ -6,6 +6,7 @@ import type {
 } from "claude-code";
 import { STUCK_LABEL, must, post, repoOf, type Actors, type Run } from "../lib/github.ts";
 import { runner } from "../hooks/session.ts";
+import { messageOf } from "../lib/errors.ts";
 import { RULES_PATH, actorsOf, readRules, type Rules } from "../lib/rules.ts";
 import { UNDO_LABEL, comments, readSnapshot, undone } from "../lib/snapshot.ts";
 import { APPROVE, answerFor, answerTo, isApproval } from "../lib/wait.ts";
@@ -61,7 +62,7 @@ function refresh($: EngineInterface): Promise<void> {
     } catch (err) {
       read = {
         kind: "failed",
-        why: err instanceof Error ? err.message : String(err),
+        why: messageOf(err),
       };
     }
   })().finally(() => {
@@ -106,7 +107,7 @@ async function readRows($: EngineInterface): Promise<Read> {
   } catch (err) {
     return {
       kind: "none",
-      why: `${err instanceof Error ? err.message : String(err)}; /factory:setup writes ${RULES_PATH}`,
+      why: `${messageOf(err)}; /factory:setup writes ${RULES_PATH}`,
     };
   }
 
@@ -134,7 +135,7 @@ async function act(
   try {
     await write(runner($), read.repo, read.actors);
   } catch (err) {
-    $.ui.toast(`factory: ${err instanceof Error ? err.message : String(err)}`);
+    $.ui.toast(`factory: ${messageOf(err)}`);
   }
 
   await refresh($);
@@ -274,7 +275,7 @@ async function show($: EngineInterface) {
 
     if (!r.isPlaced) $.ui.toast(`factory: ${r.reason}`);
   } catch (err) {
-    $.ui.toast(`factory: ${err instanceof Error ? err.message : String(err)}`);
+    $.ui.toast(`factory: ${messageOf(err)}`);
   }
 }
 
