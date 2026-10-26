@@ -3,6 +3,7 @@
  * and the newest handoff, so it goes on from written work, never from a saved conversation.
  */
 
+import { branchFor } from "../lib/github.ts";
 import { HANDOFF_PATH, PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
@@ -43,7 +44,7 @@ ${i.handoff ?? "(none)"}
 `;
 
   return `You are a factory run for issue #${i.issue} in ${i.repo}. No one watches this session live.
-You are on branch factory/${i.issue}, which claims the issue. Work only here.
+You are on branch ${branchFor(i.issue)}, which claims the issue. Work only here.
 
 ## The issue
 # ${i.title}
@@ -65,7 +66,7 @@ Use the hope:compose skill to plan which hope skills this issue needs and run ea
    Ask (AskUserQuestion) only when undoing the choice costs more than asking. In the same message, say in one or two sentences why you ask: the human reads it beside the choices.
    An ask goes to the issue: when the refusal says it is posted, end your turn at once; the answer arrives as your next message. If it says the waits are used up, take your recommended pick and post it as a call.
 5. Build against the approved plan. If the plan must change, edit ${PLAN_PATH}, post it again and ask again: a changed plan has a new seal, and only its own approval counts.
-6. Commit and push to factory/${i.issue} as you go. After each push write ${HANDOFF_PATH} (what is done, what is left, any step cut off) and run \`${u.handoff}\`.
+6. Commit and push to ${branchFor(i.issue)} as you go. After each push write ${HANDOFF_PATH} (what is done, what is left, any step cut off) and run \`${u.handoff}\`.
 7. When the project's checks pass locally, run \`${u.pr}\`. It opens the PR and turns on auto-merge. Then \`gh pr checks --watch --interval 60\`; on a failure, fix and push.
    Use hope:judge on the diff: does it meet the issue and these rules? ${list(i.rules.layers.judge)}
    Post the verdict as a PR comment. It is advice and never holds the merge.

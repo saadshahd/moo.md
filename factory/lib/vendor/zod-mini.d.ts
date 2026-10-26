@@ -8,7 +8,6 @@ export {
   array,
   boolean,
   codec,
-  decode,
   encode,
   int,
   literal,

@@ -21,7 +21,9 @@ import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
 
 export const CRASHES_BEFORE_STUCK = 3;
 
-export type SessionState = "working" | "blocked" | "done" | "stopped";
+export const SESSION_STATES = ["working", "blocked", "done", "stopped"] as const;
+
+export type SessionState = (typeof SESSION_STATES)[number];
 
 /** A run's session, with what its transcript says. */
 export type RunView = {
