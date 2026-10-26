@@ -13,7 +13,9 @@ const RULES = JSON.stringify({
 const SEAL = "0123456789abcdef".repeat(4);
 
 /** A fake host: one session in `branch`, the issue's comments held here as GitHub would. */
-function harness(branch: string, startedAt = 0, rules = RULES) {
+const BOT = JSON.stringify({ token: "ghs_bot", expiresAt: "2999-01-01T00:00:00Z", name: "moo-factory[bot]", email: "1+moo-factory[bot]@users.noreply.github.com" });
+
+function harness(branch: string, startedAt = 0, rules = RULES, token: string | null = BOT) {
   const handlers: { match?: { tool: string }; fn: (...a: any[]) => any }[] = [];
 
   const on = (...args: any[]) =>
@@ -37,8 +39,12 @@ function harness(branch: string, startedAt = 0, rules = RULES) {
 
   let nextId = 100;
   const toasts: string[] = [];
+  const env = new Map<string, string>();
+  let minted = 0;
 
   const $ = {
+    plugin: { name: "factory", root: "/f" },
+    env: { set: async (k: string, v: string) => void env.set(k, v) },
     session: {
       cwd: async () => "/w",
       id: async () => "s1",
@@ -60,6 +66,14 @@ function harness(branch: string, startedAt = 0, rules = RULES) {
         const ok = (stdout: string) => ({ exitCode: 0, stdout, stderr: "" });
 
         if (argv[0] === "git" && argv[1] === "show") return ok(rules);
+
+        if (argv[0] === "bun") {
+          minted++;
+
+          return token === null
+            ? { exitCode: 1, stdout: "", stderr: "the App isn't installed" }
+            : ok(token);
+        }
 
         if (argv[0] === "git") return ok(`${branch}\n`);
 
@@ -120,7 +134,7 @@ function harness(branch: string, startedAt = 0, rules = RULES) {
   const note = (body: string, createdAt: string, association = "OWNER") =>
     github.push({ id: nextId++, body, author: "you", createdAt, association });
 
-  return { fire, said, say, note, store, toasts };
+  return { fire, said, say, note, store, toasts, env, minted: () => minted };
 }
 
 const ask = (question: string) => ({
@@ -293,12 +307,10 @@ describe("logs", () => {
 });
 
 describe("failures", () => {
-  test("a broken rules file shows once and the ask goes on", async () => {
+  test("a broken rules file stops the run, naming the cause, and posts nothing", async () => {
     const h = harness("factory/7", 0, "{");
-    const r = await h.fire(ask("Which?"), answered("Which?", "A"));
-    expect(r.result.answers["Which?"]).toBe("A");
-    expect(h.toasts.length).toBeGreaterThan(0);
-    expect(h.toasts[0]).toContain("not JSON");
+    const r = await h.fire(ask("Which?"), never);
+    expect(r.deny).toContain("not JSON");
     expect(h.said()).toEqual([]);
   });
 });
@@ -323,5 +335,38 @@ describe("review fixes", () => {
     const r = await h.fire({ tool: "Bash", command: "bun test" }, () => ({ result: { stdout: out, stderr: "" }, text: out }));
     expect(r.deny).toBe(undefined);
     expect(r.text).toBe(out);
+  });
+});
+
+describe("bot", () => {
+  test("a factory run acts on GitHub as the bot, minting its token once while it is fresh", async () => {
+    const h = harness("factory/7");
+    await h.fire({ tool: "Read", file_path: "/w/a" }, () => ({ result: {} }));
+    await h.fire({ tool: "Read", file_path: "/w/a" }, () => ({ result: {} }));
+    expect(h.env.get("GH_TOKEN")).toBe("ghs_bot");
+    expect(h.env.get("GIT_AUTHOR_NAME")).toBe("moo-factory[bot]");
+    expect(h.env.get("GIT_CONFIG_VALUE_1")).toBe("!gh auth git-credential");
+    expect(h.minted()).toBe(1);
+  });
+  test("a token near expiry is renewed", async () => {
+    const h = harness("factory/7");
+    h.store.set("bot:o/r", JSON.stringify({ token: "old", expiresAt: new Date(Date.now() + 60_000).toISOString(), name: "b", email: "e" }));
+    await h.fire({ tool: "Read", file_path: "/w/a" }, () => ({ result: {} }));
+    expect(h.env.get("GH_TOKEN")).toBe("ghs_bot");
+  });
+  test("with no bot token the run is stopped, never left on the user's login", async () => {
+    const h = harness("factory/7", 0, RULES, null);
+    const r = await h.fire({ tool: "Bash", command: "gh pr list" }, never);
+    expect(r.deny).toContain("can't run this session");
+    expect(h.env.get("GH_TOKEN")).toBe(undefined);
+  });
+  test("outside a factory run nothing is minted", async () => {
+    const h = harness("main");
+    await h.fire({ tool: "Read", file_path: "/w/a" }, () => ({ result: {} }));
+    expect(h.minted()).toBe(0);
+  });
+  test("a bot's comment never steers the run, even with an owner's tie to the repo", () => {
+    const cs = [{ id: 2, body: "Approve", author: "moo-factory[bot]", createdAt: "2026-10-26T10:00:00Z", association: "OWNER" }];
+    expect(newestNote(cs, 0, 0)).toBe(null);
   });
 });

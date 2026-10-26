@@ -21,6 +21,8 @@ import {
   prFrom,
   repoOf,
   STUCK_LABEL,
+  botEnv,
+  type Bot,
   trusted,
   upsert,
   type Comment,
@@ -35,6 +37,7 @@ import {
   sum,
   usage,
 } from "../lib/transcript.ts";
+import { botFor, readApp, type App } from "./app.ts";
 import { run, sessions, transcript, type Session } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
 
@@ -44,6 +47,7 @@ const CRASHES_BEFORE_STUCK = 3;
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
 
 type Ctx = {
+  app: App;
   dir: string;
   repo: string;
   base: string;
@@ -527,7 +531,17 @@ function holdAwake(busy: boolean): void {
   }
 }
 
+let bot: Bot | null = null;
+
+/** Makes everything the worker starts act as the factory's bot, renewing the token near expiry. */
+async function asBot(ctx: Ctx): Promise<void> {
+  if (bot && Date.parse(bot.expiresAt) - Date.now() > 10 * 60_000) return;
+  bot = await botFor(ctx.app, ctx.repo);
+  Object.assign(process.env, botEnv(bot));
+}
+
 async function tick(ctx: Ctx): Promise<void> {
+  await asBot(ctx);
   const all = await sessions();
   const mine = all.filter((s) => s.name?.startsWith(ctx.prefix));
 
@@ -615,7 +629,19 @@ async function main(dir: string): Promise<void> {
     process.exit(1);
   }
 
+  // Refuse rather than fall back to the user's own login: a run acting as the user could approve itself.
+  let app: App;
+
+  try {
+    app = await readApp();
+    await botFor(app, repo);
+  } catch (err) {
+    console.error(`factory: the factory's GitHub App can't act on ${repo}: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+
   const ctx: Ctx = {
+    app,
     dir,
     repo,
     base,

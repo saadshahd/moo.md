@@ -12,6 +12,19 @@ Stop and say why, changing nothing, when any holds:
 - The default branch requires no status check (`gh api repos/<repo>/rules/branches/<base>` has no `required_status_checks` rule, and branch protection names no check). Auto-merge would merge unchecked code.
 - `bun`, `gh`, `claude` or `wt` is missing from `PATH`.
 
+## The factory's GitHub App
+Runs act on GitHub as the user's own App, never as the user, so a run can't approve its own plan. Skip this when `~/.config/factory/app.json` exists and `bun <root>/worker/cli.ts token`, run in the repo, prints a token.
+
+Only the user can create the App. Walk them through https://github.com/settings/apps/new:
+- Name: `Moo Factory <their handle>`. App names are unique across GitHub.
+- Homepage URL: any, such as the repo's.
+- Webhook: uncheck Active. The worker reads GitHub each minute, so no events are needed.
+- Repository permissions: Contents, Issues and Pull requests read and write; Checks read.
+- Installable only on their account. After creating it, generate a private key and save it as `~/.config/factory/app.pem` with mode 600.
+- Install it on this repo only.
+
+Then write `~/.config/factory/app.json` as `{ "clientId": "<the App's Client ID>", "key": "app.pem" }` and confirm `token` prints a token.
+
 ## The rules file
 Write `.claude/factory.json` with the user; `<root>/lib/rules.ts` is its schema and `parseRules` must accept the result.
 
