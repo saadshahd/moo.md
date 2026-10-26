@@ -1,8 +1,11 @@
 import type { ElementTable, EngineInterface, Register, RenderChildren } from "claude-code";
-import { must, repoOf, type Run } from "../lib/github.ts";
+import { APPROVE, parseApprovalQuestion } from "../lib/formats.ts";
+import { comments, must, post, repoOf, type Run } from "../lib/github.ts";
 import { RULES_PATH } from "../lib/rules.ts";
+import { answerTo } from "../lib/wait.ts";
 import {
   QUERY,
+  STUCK_LABEL,
   UNDO_LABEL,
   perPr,
   rows,
@@ -13,6 +16,7 @@ import {
   type Rows,
   type Snapshot,
   type StuckRow,
+  type WaitRow,
 } from "./rows.ts";
 
 // /factory: what a run needs from you, read from GitHub alone. Nothing reads GitHub until the
@@ -22,7 +26,7 @@ const PANE = "factory";
 const PANE_COLUMNS = 72;
 const READ_EVERY_MS = 60_000;
 
-type Tab = "stuck" | "calls" | "cost";
+type Tab = "questions" | "plans" | "stuck" | "calls" | "cost";
 
 type Read =
   | { kind: "unread" }
@@ -31,8 +35,15 @@ type Read =
   | { kind: "read"; repo: string; rows: Rows };
 
 let read: Read = { kind: "unread" };
-let tab: Tab = "stuck";
+let tab: Tab = "questions";
 const noting = new Set<number>();
+
+// Picks for a wait with several questions, by wait id, until the last one is picked.
+const picks = new Map<number, (string | undefined)[]>();
+
+// The questions whose "my own" field is open, as `<wait id>:<question index>`.
+const owning = new Set<string>();
+const planOpen = new Set<number>();
 let ticking: { cancel: () => void } | null = null;
 
 const runner =
@@ -172,6 +183,39 @@ async function note($: EngineInterface, row: StuckRow, text: string) {
   });
 }
 
+/** Takes one question's answer; the answer comment goes up once every question has one. */
+async function answer($: EngineInterface, w: WaitRow, qi: number, value: string) {
+  owning.delete(`${w.id}:${qi}`);
+
+  if (value.trim() === "") return redraw($, () => {});
+  const got = picks.get(w.id) ?? w.questions.map(() => undefined);
+
+  got[qi] = value.trim();
+  picks.set(w.id, got);
+  const answers = got.flatMap((a) => (a === undefined ? [] : [a]));
+
+  if (answers.length < w.questions.length) return redraw($, () => {});
+  picks.delete(w.id);
+  await act($, async (run, repo) => {
+    // An answer from another machine, or github.com, may have landed since the last read.
+    if (answerTo(await comments(run, repo, w.issue), w.id, w.questions.length, () => true)) {
+      $.ui.toast(`factory: #${w.issue} was already answered`);
+
+      return;
+    }
+
+    await post(run, repo, w.issue, { kind: "answer", issue: w.issue, wait: w.id, answers });
+  });
+}
+
+async function retry($: EngineInterface, row: StuckRow) {
+  await act($, async (run, repo) => {
+    await must(run, [
+      "gh", "issue", "edit", String(row.issue), "--repo", repo, "--remove-label", STUCK_LABEL,
+    ]);
+  });
+}
+
 async function openUrl($: EngineInterface, url: string) {
   const r = await $.process.run(["open", url]);
 
@@ -207,7 +251,7 @@ export const registerPane: Register = (on) => {
     await $.command.register({
       name: "factory",
       description:
-        "What the factory needs from you: stuck runs, calls, cost per merged PR",
+        "What the factory needs from you: questions, plans, stuck runs, calls, cost per merged PR",
       immediate: true,
     });
 
@@ -249,6 +293,8 @@ export const registerPane: Register = (on) => {
       <Box flexDirection="column" width={width} paddingX={1}>
         {tabBar($, ui, r)}
         <Text dimColor>{"─".repeat(width - 2)}</Text>
+        {tab === "questions" && waitCards($, ui, r.questions, "no question waits for you")}
+        {tab === "plans" && waitCards($, ui, r.plans, "no plan waits for you")}
         {tab === "stuck" && stuckCards($, ui, r.stuck)}
         {tab === "calls" && callCards($, ui, r.calls)}
         {tab === "cost" && costCard(ui, r)}
@@ -258,6 +304,8 @@ export const registerPane: Register = (on) => {
 };
 
 const TABS = [
+  { name: "questions", color: "claude" },
+  { name: "plans", color: "warning" },
   { name: "stuck", color: "error" },
   { name: "calls", color: "suggestion" },
 ] as const;
@@ -391,6 +439,7 @@ function stuckCards($: EngineInterface, ui: ElementTable, stuck: StuckRow[]) {
             isNoting ? noting.delete(s.issue) : noting.add(s.issue),
           ),
         ),
+        pill(ui, `retry-${s.issue}`, "retry", () => void retry($, s), true),
       ]),
       Input && isNoting && (
         <Input
@@ -403,6 +452,68 @@ function stuckCards($: EngineInterface, ui: ElementTable, stuck: StuckRow[]) {
       ),
     ]);
   });
+}
+
+function waitCards($: EngineInterface, ui: ElementTable, waits: WaitRow[], none: string) {
+  if (waits.length === 0) return empty(ui, none);
+
+  return waits.map((w) => {
+    const color = w.plan === null ? "claude" : "warning";
+
+    return card(ui, color, w.questions.map((q, qi) => questionBlock($, ui, w, qi, color)));
+  });
+}
+
+/** One question of a wait: what it asks, why, a button per choice, and room for your own words. */
+function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: number, color: string) {
+  const { Box, Text, Markdown } = ui;
+  const Input = "Input" in ui ? ui.Input : null;
+  const q = w.questions[qi]!;
+  const isApproval = parseApprovalQuestion(q.question) !== null;
+  const picked = picks.get(w.id)?.[qi];
+  const own = `${w.id}:${qi}`;
+  const isOwning = owning.has(own);
+  const isOpen = isApproval && planOpen.has(w.id);
+
+  return (
+    <Box flexDirection="column" marginTop={qi === 0 ? 0 : 1}>
+      {head(ui, isApproval ? `#${w.issue}  ${w.title}` : qi === 0 ? `#${w.issue}  ${q.question}` : q.question, color)}
+      <Text dimColor>{q.why}</Text>
+      {foot(ui, [
+        isApproval &&
+          pill(ui, `plan-${w.id}`, isOpen ? "▾ fold" : "▸ plan", () =>
+            redraw($, () => (isOpen ? planOpen.delete(w.id) : planOpen.add(w.id))),
+          ),
+        ...q.options.map((o, oi) =>
+          pill(
+            ui,
+            `opt-${w.id}-${qi}-${oi}`,
+            o,
+            () => void answer($, w, qi, o),
+            picked === undefined ? isApproval && o === APPROVE : picked === o,
+          ),
+        ),
+        Input &&
+          pill(ui, `own-${w.id}-${qi}`, isOwning ? "cancel" : "my own", () =>
+            redraw($, () => (isOwning ? owning.delete(own) : owning.add(own))),
+          ),
+      ])}
+      {isOpen && (
+        <Box marginTop={1}>
+          <Markdown text={w.plan ?? ""} />
+        </Box>
+      )}
+      {Input && isOwning && (
+        <Input
+          key={`own-text-${w.id}-${qi}`}
+          placeholder="your answer"
+          submitLabel="send"
+          autoFocus
+          onSubmit={(v: string) => void answer($, w, qi, v)}
+        />
+      )}
+    </Box>
+  );
 }
 
 function callCards($: EngineInterface, ui: ElementTable, calls: CallRow[]) {

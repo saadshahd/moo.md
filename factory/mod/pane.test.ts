@@ -1,6 +1,6 @@
 import type { CommandRunInput } from "claude-code";
 import { describe, expect, test, type MountTarget } from "claude-code/testing";
-import { render, type FactoryComment } from "../lib/formats.ts";
+import { approvalQuestion, render, type FactoryComment } from "../lib/formats.ts";
 import {
   STUCK_LABEL,
   UNDO_LABEL,
@@ -22,7 +22,54 @@ const comment = (databaseId: number, c: FactoryComment) => ({
   databaseId,
   body: render(c),
   url: `https://github.com/o/smoke/issues/${c.issue}#issuecomment-${databaseId}`,
+  createdAt: "2026-10-26T20:00:00Z",
+  author: { login: "factory-bot" },
 });
+
+const SEAL = "ab12cd34".repeat(8);
+
+const issue = (number: number, title: string, cs: ReturnType<typeof comment>[]) => ({
+  number,
+  title,
+  url: `https://github.com/o/smoke/issues/${number}`,
+  state: "OPEN" as const,
+  labels: { nodes: [{ name: "factory" }] },
+  comments: { nodes: cs },
+});
+
+/** One question waiting, one plan waiting, and one wait already answered on github.com. */
+const WAITING = [
+  issue(9, "Settings layout", [
+    comment(90, {
+      kind: "wait",
+      issue: 9,
+      questions: [
+        { question: "Which settings move to 'agents'?", why: "only you know which you use daily", options: ["all three", "just keys"] },
+      ],
+      answers: null,
+    }),
+  ]),
+  issue(10, "Rail items", [
+    comment(100, { kind: "plan", issue: 10, seal: SEAL, approved: null, text: "## Types\n\ntype RailItem = { id: string }" }),
+    comment(101, {
+      kind: "wait",
+      issue: 10,
+      questions: [
+        { question: approvalQuestion(10, SEAL), why: "the plan adds a new type", options: ["Approve", "Change it"] },
+      ],
+      answers: null,
+    }),
+  ]),
+  issue(11, "Answered elsewhere", [
+    comment(110, {
+      kind: "wait",
+      issue: 11,
+      questions: [{ question: "Keep it?", why: "two callers", options: ["yes", "no"] }],
+      answers: null,
+    }),
+    comment(111, { kind: "answer", issue: 11, wait: 110, answers: ["yes"] }),
+  ]),
+];
 
 const cost = (issue: number, pr: number, output: number): FactoryComment => ({
   kind: "cost",
@@ -42,6 +89,7 @@ function snapshot(): Snapshot {
       repository: {
         work: {
           nodes: [
+            ...WAITING,
             {
               number: 7,
               title: "Settings sections",
@@ -121,6 +169,13 @@ function snapshot(): Snapshot {
 }
 
 describe("rows", () => {
+  test("a wait waits until an answer lands; one asking approval is a plan", () => {
+    const r = rows(snapshot());
+
+    expect(r.questions.map((w) => w.id)).toEqual([90]);
+    expect(r.plans.map((w) => [w.id, w.plan])).toEqual([[101, "## Types\n\ntype RailItem = { id: string }"]]);
+  });
+
   test("stuck takes the label and the newest reason", () => {
     expect(rows(snapshot()).stuck).toEqual([
       {
@@ -146,9 +201,12 @@ describe("rows", () => {
 
 test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) => {
   const ran: string[][] = [];
+  const posted: string[] = [];
 
   on("process.run", async (_$, e) => {
     ran.push([...e.argv]);
+
+    if (e.init?.stdin) posted.push(e.init.stdin);
 
     const out = (stdout: string) => ({
       value: {
@@ -184,6 +242,23 @@ test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) =
   await $.command.run({ command: "factory", args: "" } as CommandRunInput);
 
   const ui = await $.ui.mount(PANE);
+
+  expect(await ui.find({ type: "Text", text: /move to 'agents'/ })).toBeDefined();
+  await ui.press({ key: "opt-90-0-1" });
+  const answered = ran.filter((a) => a.join(" ").includes("repos/o/smoke/issues/9/comments") && a.includes("--input"));
+
+  expect(answered).toHaveLength(1);
+  expect(JSON.parse(posted.at(-1)!).body).toBe(
+    render({ kind: "answer", issue: 9, wait: 90, answers: ["just keys"] }),
+  );
+
+  await ui.press({ key: "tab-plans" });
+  await ui.press({ key: "plan-101" });
+  expect(await ui.find({ text: /type RailItem/ })).toBeDefined();
+
+  await ui.press({ key: "tab-stuck" });
+  await ui.press({ key: "retry-7" });
+  expect(ran.some((a) => a.join(" ") === `gh issue edit 7 --repo o/smoke --remove-label ${STUCK_LABEL}`)).toBe(true);
 
   expect(
     await ui.find({ type: "Text", text: /3 crashes in a row/ }),

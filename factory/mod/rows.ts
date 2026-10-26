@@ -1,8 +1,9 @@
 // What /factory shows, read from GitHub alone: one GraphQL query per refresh, turned into rows.
 // Every machine running the factory sees the same rows, since none of them come from a local store.
 
-import { parse, total } from "../lib/formats.ts";
-import { issueOf } from "../lib/github.ts";
+import { latest, issueOf, type Comment } from "../lib/github.ts";
+import { parse, parseApprovalQuestion, total, type Question } from "../lib/formats.ts";
+import { answerTo, openWait } from "../lib/wait.ts";
 
 // A copy of worker/cli.ts's STUCK_LABEL: cli.ts spawns processes through Bun, which a hooks
 // module can't load. Raised on #63 to move the label into lib/.
@@ -17,7 +18,7 @@ export const QUERY = `query($owner: String!, $name: String!) {
       nodes {
         number title url state
         labels(first: 20) { nodes { name } }
-        comments(last: 50) { nodes { databaseId body url } }
+        comments(last: 50) { nodes { databaseId body url createdAt author { login } } }
       }
     }
     undos: issues(labels: ["${UNDO_LABEL}"], first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -41,7 +42,13 @@ export type Snapshot = {
         url: string;
         state: "OPEN" | "CLOSED";
         labels: Nodes<{ name: string }>;
-        comments: Nodes<{ databaseId: number; body: string; url: string }>;
+        comments: Nodes<{
+          databaseId: number;
+          body: string;
+          url: string;
+          createdAt: string;
+          author: { login: string } | null;
+        }>;
       }>;
       undos: Nodes<{ body: string }>;
       merged: Nodes<{
@@ -51,6 +58,17 @@ export type Snapshot = {
       }>;
     };
   };
+};
+
+/** An open wait: the run's questions on one issue, answered together by one answer comment. */
+export type WaitRow = {
+  /** The wait comment's id, which the answer names. */
+  id: number;
+  issue: number;
+  title: string;
+  questions: Question[];
+  /** The plan the wait asks to approve, or null for any other questions. */
+  plan: string | null;
 };
 
 export type StuckRow = {
@@ -72,16 +90,25 @@ export type CallRow = {
 
 export type CostRow = { pr: number; tokens: number };
 
-export type Rows = { stuck: StuckRow[]; calls: CallRow[]; costs: CostRow[] };
+export type Rows = {
+  questions: WaitRow[];
+  plans: WaitRow[];
+  stuck: StuckRow[];
+  calls: CallRow[];
+  costs: CostRow[];
+};
 
-/** The line an undo issue's body carries, naming the call it reverses. */
-export const undoLine = (callId: number) => `Undoes factory call ${callId}.`;
+const UNDO_WORDS = "Undoes factory call";
+const UNDO_LINE = new RegExp(`${UNDO_WORDS} (\\d+)\\.`);
+
+/** The line an undo issue's body carries, naming the call it reverses; UNDO_LINE reads it back. */
+export const undoLine = (callId: number) => `${UNDO_WORDS} ${callId}.`;
 
 /** The call ids the undo issues in `bodies` reverse. */
 export function undone(bodies: readonly string[]): Set<number> {
   return new Set(
     bodies.flatMap((b) => {
-      const m = /Undoes factory call (\d+)\./.exec(b);
+      const m = UNDO_LINE.exec(b);
 
       return m ? [Number(m[1])] : [];
     }),
@@ -91,6 +118,33 @@ export function undone(bodies: readonly string[]): Set<number> {
 export function rows(s: Snapshot): Rows {
   const { work, undos, merged } = s.data.repository;
   const reversed = undone(undos.nodes.map((u) => u.body));
+
+  // A wait stays listed until an answer lands, even before the worker writes it into the wait.
+  const waits = work.nodes.flatMap((i): WaitRow[] => {
+    if (i.state !== "OPEN") return [];
+
+    const cs: Comment[] = i.comments.nodes.map((c) => ({
+      id: c.databaseId,
+      body: c.body,
+      author: c.author?.login ?? "",
+      createdAt: c.createdAt,
+    }));
+
+    const w = openWait(cs);
+
+    if (w === null || answerTo(cs, w.id, w.c.questions.length, () => true) !== null) return [];
+    const asksApproval = w.c.questions.some((q) => parseApprovalQuestion(q.question) !== null);
+
+    return [
+      {
+        id: w.id,
+        issue: i.number,
+        title: i.title,
+        questions: w.c.questions,
+        plan: asksApproval ? (latest(cs, "plan")?.c.text ?? "") : null,
+      },
+    ];
+  });
 
   const stuck = work.nodes.flatMap((i) => {
     if (
@@ -144,7 +198,13 @@ export function rows(s: Snapshot): Rows {
       : [];
   });
 
-  return { stuck, calls, costs };
+  return {
+    questions: waits.filter((w) => w.plan === null),
+    plans: waits.filter((w) => w.plan !== null),
+    stuck,
+    calls,
+    costs,
+  };
 }
 
 /** The mean tokens per merged PR, or null before any factory PR merged with its cost. */
