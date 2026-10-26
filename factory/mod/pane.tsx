@@ -1,19 +1,21 @@
-import type { ElementTable, EngineInterface, Register, RenderChildren } from "claude-code";
-import { APPROVE, parseApprovalQuestion } from "../lib/formats.ts";
-import { STUCK_LABEL, comments, must, post, repoOf, type Run } from "../lib/github.ts";
-import { RULES_PATH } from "../lib/rules.ts";
-import { answerTo } from "../lib/wait.ts";
+import type {
+  ElementTable,
+  EngineInterface,
+  Register,
+  RenderChildren,
+} from "claude-code";
+import { STUCK_LABEL, must, post, repoOf, type Actors, type Run } from "../lib/github.ts";
+import { runner } from "../hooks/session.ts";
+import { RULES_PATH, actorsOf, readRules, type Rules } from "../lib/rules.ts";
+import { UNDO_LABEL, comments, readSnapshot, undone } from "../lib/snapshot.ts";
+import { APPROVE, answerFor, answerTo, isApproval } from "../lib/wait.ts";
 import {
-  QUERY,
-  UNDO_LABEL,
   perPr,
   rows,
   tokens,
   undoIssue,
-  undone,
   type CallRow,
   type Rows,
-  type Snapshot,
   type StuckRow,
   type WaitRow,
 } from "./rows.ts";
@@ -28,7 +30,7 @@ type Read =
   | { kind: "unread" }
   | { kind: "none"; why: string }
   | { kind: "failed"; why: string }
-  | { kind: "read"; repo: string; rows: Rows };
+  | { kind: "read"; repo: string; actors: Actors; rows: Rows };
 
 let read: Read = { kind: "unread" };
 let tab: Tab = "questions";
@@ -49,15 +51,6 @@ const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "
 const FRAME_MS = 80;
 let ticking: { cancel: () => void } | null = null;
 
-/**
- * A copy of `runner` in hooks/run.ts. The engine follows `$` past an import only into a
- * function declaration, and that one is an arrow (raised on #63).
- */
-function runner($: EngineInterface): Run {
-  return (argv, opts) =>
-    $.process.run(argv, { cwd: opts?.cwd, stdin: opts?.stdin, timeoutMs: 60_000 });
-}
-
 /** Reads GitHub once; a read already running is joined, never doubled. */
 function refresh($: EngineInterface): Promise<void> {
   reading ??= (async () => {
@@ -66,7 +59,10 @@ function refresh($: EngineInterface): Promise<void> {
     try {
       read = await readRows($);
     } catch (err) {
-      read = { kind: "failed", why: err instanceof Error ? err.message : String(err) };
+      read = {
+        kind: "failed",
+        why: err instanceof Error ? err.message : String(err),
+      };
     }
   })().finally(() => {
     reading = null;
@@ -103,34 +99,32 @@ async function readRows($: EngineInterface): Promise<Read> {
   const run = runner($);
   const cwd = await $.session.cwd();
 
-  if ((await run(["test", "-f", RULES_PATH], { cwd })).exitCode !== 0)
+  let rules: Rules;
+
+  try {
+    rules = await readRules(run, cwd);
+  } catch (err) {
     return {
       kind: "none",
-      why: `no ${RULES_PATH} here; /factory:setup writes it`,
+      why: `${err instanceof Error ? err.message : String(err)}; /factory:setup writes ${RULES_PATH}`,
     };
+  }
+
   const repo = await repoOf(run, cwd);
-  const [owner, name] = repo.split("/");
+  const actors = actorsOf(rules, repo);
 
-  const out = await must(run, [
-    "gh",
-    "api",
-    "graphql",
-    "-f",
-    `query=${QUERY}`,
-    "-f",
-    `owner=${owner}`,
-    "-f",
-    `name=${name}`,
-  ]);
-
-  /** SAFETY: gh prints GitHub's answer to QUERY, whose shape Snapshot spells out. */
-  return { kind: "read", repo, rows: rows(JSON.parse(out) as Snapshot) };
+  return {
+    kind: "read",
+    repo,
+    actors,
+    rows: rows(await readSnapshot(run, repo, []), actors),
+  };
 }
 
 async function act(
   $: EngineInterface,
   key: string,
-  write: (run: Run, repo: string) => Promise<void>,
+  write: (run: Run, repo: string, actors: Actors) => Promise<void>,
 ) {
   if (read.kind !== "read" || busy !== null) return;
   busy = key;
@@ -138,7 +132,7 @@ async function act(
   $.ui.invalidate("ui.render");
 
   try {
-    await write(runner($), read.repo);
+    await write(runner($), read.repo, read.actors);
   } catch (err) {
     $.ui.toast(`factory: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -150,8 +144,11 @@ async function act(
 }
 
 async function undoCall($: EngineInterface, call: CallRow) {
-  await act($, `undo-${call.callId}`, async (run, repo) => {
-    /** First, since `gh issue list --label` fails on a label the repo lacks. */
+  await act($, `undo-${call.callId}`, async (run, repo, actors) => {
+    /** A second press, or another machine's, finds the first undo issue and opens none. */
+    if (undone(await readSnapshot(run, repo, []), actors).has(call.callId))
+      return;
+    /** `gh issue create --label` fails on a label the repo lacks. */
     await must(run, [
       "gh",
       "label",
@@ -165,27 +162,6 @@ async function undoCall($: EngineInterface, call: CallRow) {
       "--description",
       "Reverses a call a factory run made",
     ]);
-
-    /** A second press, or another machine's, finds the first undo issue and opens none. */
-    const out = await must(run, [
-      "gh",
-      "issue",
-      "list",
-      "--repo",
-      repo,
-      "--label",
-      UNDO_LABEL,
-      "--state",
-      "all",
-      "--limit",
-      "200",
-      "--json",
-      "body",
-      "--jq",
-      ".[].body",
-    ]);
-
-    if (undone(out.split("\n")).has(call.callId)) return;
     const { title, body } = undoIssue(call);
 
     await must(run, [
@@ -223,34 +199,52 @@ async function note($: EngineInterface, row: StuckRow, text: string) {
   });
 }
 
-async function answer($: EngineInterface, w: WaitRow, qi: number, value: string, key: string) {
+async function answer(
+  $: EngineInterface,
+  w: WaitRow,
+  qi: number,
+  value: string,
+  key: string,
+) {
   owning.delete(`${w.waitId}:${qi}`);
 
   if (value.trim() === "") return redraw($, () => {});
-  const got = picks.get(w.waitId) ?? w.questions.map(() => undefined);
+  const got = picks.get(w.waitId) ?? w.wait.questions.map(() => undefined);
 
   got[qi] = value.trim();
   picks.set(w.waitId, got);
   const answers = got.flatMap((a) => (a === undefined ? [] : [a]));
 
-  if (answers.length < w.questions.length) return redraw($, () => {});
+  if (answers.length < w.wait.questions.length) return redraw($, () => {});
   picks.delete(w.waitId);
-  await act($, key, async (run, repo) => {
+  await act($, key, async (run, repo, actors) => {
     /** An answer from another machine, or github.com, may have landed since the last read. */
-    if (answerTo(await comments(run, repo, w.issue), w.waitId, w.questions.length)) {
+    if (
+      answerTo(await comments(run, repo, w.issue), actors, {
+        id: w.waitId,
+        c: w.wait,
+      })
+    ) {
       $.ui.toast(`factory: #${w.issue} was already answered`);
 
       return;
     }
 
-    await post(run, repo, w.issue, { kind: "answer", issue: w.issue, wait: w.waitId, answers });
+    await post(run, repo, w.issue, answerFor(w.waitId, w.wait, answers));
   });
 }
 
 async function retry($: EngineInterface, row: StuckRow) {
   await act($, `retry-${row.issue}`, async (run, repo) => {
     await must(run, [
-      "gh", "issue", "edit", String(row.issue), "--repo", repo, "--remove-label", STUCK_LABEL,
+      "gh",
+      "issue",
+      "edit",
+      String(row.issue),
+      "--repo",
+      repo,
+      "--remove-label",
+      STUCK_LABEL,
     ]);
   });
 }
@@ -333,7 +327,9 @@ export const registerPane: Register = (on) => {
             dimColor={read.kind !== "failed"}
             color={read.kind === "failed" ? "error" : undefined}
           >
-            {read.kind === "unread" ? `${FRAMES[frame]} reading GitHub` : read.why}
+            {read.kind === "unread"
+              ? `${FRAMES[frame]} reading GitHub`
+              : read.why}
           </Text>
         </Box>
       );
@@ -343,7 +339,11 @@ export const registerPane: Register = (on) => {
       <Box flexDirection="column" width={width} paddingX={1}>
         {tabBar($, ui, r)}
         <Text dimColor>{"─".repeat(width - 2)}</Text>
-        {tab === "questions" && waitCards($, ui, r.questions, "no question waits for you")}
+        {r.truncated.length > 0 && (
+          <Text color="warning">{`GitHub listed only part of: ${r.truncated.join(", ")}`}</Text>
+        )}
+        {tab === "questions" &&
+          waitCards($, ui, r.questions, "no question waits for you")}
         {tab === "plans" && waitCards($, ui, r.plans, "no plan waits for you")}
         {tab === "stuck" && stuckCards($, ui, r.stuck)}
         {tab === "calls" && callCards($, ui, r.calls)}
@@ -448,7 +448,9 @@ function pill(
         dimColor={busy !== null && !isBusy}
         color={isMain ? "inverseText" : "suggestion"}
         backgroundColor={isMain ? "suggestion" : undefined}
-      >{isBusy ? ` ${FRAMES[frame]} ${label} ` : ` ${label} `}</Text>
+      >
+        {isBusy ? ` ${FRAMES[frame]} ${label} ` : ` ${label} `}
+      </Text>
     </Button>
   );
 }
@@ -486,10 +488,10 @@ function stuckCards($: EngineInterface, ui: ElementTable, stuck: StuckRow[]) {
         pill(ui, `open-${s.issue}`, "open", () => void openUrl($, s.url)),
         Input &&
           pill(ui, `note-${s.issue}`, isNoting ? "cancel" : "note", () =>
-          redraw($, () =>
-            isNoting ? noting.delete(s.issue) : noting.add(s.issue),
+            redraw($, () =>
+              isNoting ? noting.delete(s.issue) : noting.add(s.issue),
+            ),
           ),
-        ),
         pill(ui, `retry-${s.issue}`, "retry", () => void retry($, s), true),
       ]),
       Input && isNoting && (
@@ -505,34 +507,59 @@ function stuckCards($: EngineInterface, ui: ElementTable, stuck: StuckRow[]) {
   });
 }
 
-function waitCards($: EngineInterface, ui: ElementTable, waits: WaitRow[], none: string) {
+function waitCards(
+  $: EngineInterface,
+  ui: ElementTable,
+  waits: WaitRow[],
+  none: string,
+) {
   if (waits.length === 0) return empty(ui, none);
 
   return waits.map((w) => {
     const color = w.plan === null ? "claude" : "warning";
 
-    return card(ui, color, w.questions.map((q, qi) => questionBlock($, ui, w, qi, color)));
+    return card(
+      ui,
+      color,
+      w.wait.questions.map((q, qi) => questionBlock($, ui, w, qi, color)),
+    );
   });
 }
 
-function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: number, color: string) {
+function questionBlock(
+  $: EngineInterface,
+  ui: ElementTable,
+  w: WaitRow,
+  qi: number,
+  color: string,
+) {
   const { Box, Text, Markdown } = ui;
   const Input = "Input" in ui ? ui.Input : null;
-  const q = w.questions[qi]!;
-  const isApproval = parseApprovalQuestion(q.question) !== null;
+  const q = w.wait.questions[qi]!;
+  const asksApproval = isApproval(q);
   const picked = picks.get(w.waitId)?.[qi];
   const own: QuestionKey = `${w.waitId}:${qi}`;
   const isOwning = owning.has(own);
-  const isOpen = isApproval && planOpen.has(w.waitId);
+  const isOpen = asksApproval && planOpen.has(w.waitId);
 
   return (
     <Box flexDirection="column" marginTop={qi === 0 ? 0 : 1}>
-      {head(ui, isApproval ? `#${w.issue}  ${w.title}` : qi === 0 ? `#${w.issue}  ${q.question}` : q.question, color)}
+      {head(
+        ui,
+        asksApproval
+          ? `#${w.issue}  ${w.title}`
+          : qi === 0
+            ? `#${w.issue}  ${q.question}`
+            : q.question,
+        color,
+      )}
       <Text dimColor>{q.why}</Text>
       {foot(ui, [
-        isApproval &&
+        asksApproval &&
           pill(ui, `plan-${w.waitId}`, isOpen ? "▾ fold" : "▸ plan", () =>
-            redraw($, () => (isOpen ? planOpen.delete(w.waitId) : planOpen.add(w.waitId))),
+            redraw($, () =>
+              isOpen ? planOpen.delete(w.waitId) : planOpen.add(w.waitId),
+            ),
           ),
         ...q.options.map((o, oi) =>
           pill(
@@ -540,12 +567,18 @@ function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: num
             `opt-${w.waitId}-${qi}-${oi}`,
             o,
             () => void answer($, w, qi, o, `opt-${w.waitId}-${qi}-${oi}`),
-            picked === undefined ? isApproval && o === APPROVE : picked === o,
+            picked === undefined ? asksApproval && o === APPROVE : picked === o,
           ),
         ),
         Input &&
-          pill(ui, `own-${w.waitId}-${qi}`, isOwning ? "cancel" : "my own", () =>
-            redraw($, () => (isOwning ? owning.delete(own) : owning.add(own))),
+          pill(
+            ui,
+            `own-${w.waitId}-${qi}`,
+            isOwning ? "cancel" : "my own",
+            () =>
+              redraw($, () =>
+                isOwning ? owning.delete(own) : owning.add(own),
+              ),
           ),
       ])}
       {isOpen && (
@@ -559,7 +592,9 @@ function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: num
           placeholder="your answer"
           submitLabel="send"
           autoFocus
-          onSubmit={(v: string) => void answer($, w, qi, v, `own-${w.waitId}-${qi}`)}
+          onSubmit={(v: string) =>
+            void answer($, w, qi, v, `own-${w.waitId}-${qi}`)
+          }
         />
       )}
     </Box>
@@ -587,7 +622,9 @@ function callCards($: EngineInterface, ui: ElementTable, calls: CallRow[]) {
           )}
         </Text>,
         <Text dimColor>{c.why}</Text>,
-        foot(ui, [pill(ui, `undo-${c.callId}`, "undo", () => void undoCall($, c))]),
+        foot(ui, [
+          pill(ui, `undo-${c.callId}`, "undo", () => void undoCall($, c)),
+        ]),
       ],
       `call-${c.callId}`,
     ),

@@ -1,64 +1,14 @@
-import { STUCK_LABEL, latest, issueOf, type Comment } from "../lib/github.ts";
-import { parse, parseApprovalQuestion, total, type Question } from "../lib/formats.ts";
+import { render, total, type Wait } from "../lib/formats.ts";
+import { STUCK_LABEL, factoryComments, issueOf, latest, type Actors } from "../lib/github.ts";
+import { undone, type Snapshot } from "../lib/snapshot.ts";
 import { answerTo, openWait } from "../lib/wait.ts";
-
-/** The label on an issue the pane opened to reverse a call; the worker never picks it up. */
-export const UNDO_LABEL = "factory:undo";
-
-/** Everything the pane shows, in one query: no machine's local state, so every machine agrees. */
-export const QUERY = `query($owner: String!, $name: String!) {
-  repository(owner: $owner, name: $name) {
-    work: issues(labels: ["factory"], first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      nodes {
-        number title url state
-        labels(first: 20) { nodes { name } }
-        comments(last: 50) { nodes { databaseId body url createdAt authorAssociation author { login } } }
-      }
-    }
-    undos: issues(labels: ["${UNDO_LABEL}"], first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
-      nodes { body }
-    }
-    merged: pullRequests(states: MERGED, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      nodes { number headRefName comments(last: 20) { nodes { body } } }
-    }
-  }
-}`;
-
-type Nodes<T> = { nodes: T[] };
-
-export type Snapshot = {
-  data: {
-    repository: {
-      work: Nodes<{
-        number: number;
-        title: string;
-        url: string;
-        state: "OPEN" | "CLOSED";
-        labels: Nodes<{ name: string }>;
-        comments: Nodes<{
-          databaseId: number;
-          body: string;
-          url: string;
-          createdAt: string;
-          authorAssociation: string;
-          author: { login: string } | null;
-        }>;
-      }>;
-      undos: Nodes<{ body: string }>;
-      merged: Nodes<{
-        number: number;
-        headRefName: string;
-        comments: Nodes<{ body: string }>;
-      }>;
-    };
-  };
-};
 
 export type WaitRow = {
   waitId: number;
   issue: number;
   title: string;
-  questions: Question[];
+  wait: Wait;
+  /** The text of the plan the wait asks approval for; null when it asks none. */
   plan: string | null;
 };
 
@@ -88,114 +38,75 @@ export type Rows = {
   stuck: StuckRow[];
   calls: CallRow[];
   costs: CostRow[];
+  /** What GitHub listed only in part, so the tabs may miss rows. */
+  truncated: string[];
 };
 
-const undoFormat = (id: string) => `Undoes factory call ${id}.`;
-
-export const undoLine = (callId: number) => undoFormat(String(callId));
-
-const ID = "\u0000";
-
-const UNDO_LINE = new RegExp(
-  undoFormat(ID)
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    .replace(ID, "(\\d+)"),
-);
-
-export function undone(bodies: readonly string[]): Set<number> {
-  return new Set(
-    bodies.flatMap((b) => {
-      const m = UNDO_LINE.exec(b);
-
-      return m ? [Number(m[1])] : [];
-    }),
-  );
-}
-
-export function rows(s: Snapshot): Rows {
-  const { work, undos, merged } = s.data.repository;
-  const reversed = undone(undos.nodes.map((u) => u.body));
+export function rows(s: Snapshot, a: Actors): Rows {
+  const reversed = undone(s, a);
 
   /** A wait stays listed until an answer lands, even before the worker writes it into the wait. */
-  const waits = work.nodes.flatMap((i): WaitRow[] => {
-    if (i.state !== "OPEN") return [];
+  const waits = s.issues.flatMap((i): WaitRow[] => {
+    const w = openWait(i.comments, a);
 
-    const cs: Comment[] = i.comments.nodes.map((c) => ({
-      id: c.databaseId,
-      body: c.body,
-      author: c.author?.login ?? "",
-      createdAt: c.createdAt,
-      association: c.authorAssociation,
-    }));
+    if (w === null || answerTo(i.comments, a, w) !== null) return [];
 
-    const w = openWait(cs);
-
-    if (w === null || answerTo(cs, w.id, w.c.questions.length) !== null) return [];
-    const asksApproval = w.c.questions.some((q) => parseApprovalQuestion(q.question) !== null);
+    const plan = factoryComments(i.comments, a).flatMap(({ c }) =>
+      c.kind === "plan" && c.seal === w.c.approves ? [c.text] : [],
+    );
 
     return [
       {
         waitId: w.id,
         issue: i.number,
         title: i.title,
-        questions: w.c.questions,
-        plan: asksApproval ? (latest(cs, "plan")?.c.text ?? "") : null,
+        wait: w.c,
+        plan:
+          w.c.approves === null
+            ? null
+            : (plan.at(-1) ?? `plan ${w.c.approves.slice(0, 8)} is not on this issue`),
       },
     ];
   });
 
-  const stuck = work.nodes.flatMap((i) => {
-    if (
-      i.state !== "OPEN" ||
-      !i.labels.nodes.some((l) => l.name === STUCK_LABEL)
-    )
-      return [];
-
-    const said = i.comments.nodes
-      .map((c) => parse(c.body))
-      .findLast((c) => c?.kind === "stuck");
-
-    return [
-      {
-        issue: i.number,
-        title: i.title,
-        url: i.url,
-        reason: said?.kind === "stuck" ? said.reason : "no reason posted",
-      },
-    ];
-  });
-
-  const calls = work.nodes.flatMap((i) =>
-    i.comments.nodes.flatMap((c) => {
-      const call = parse(c.body);
-
-      if (call?.kind !== "call" || reversed.has(c.databaseId)) return [];
-
-      return [
-        {
-          callId: c.databaseId,
-          issue: i.number,
-          url: c.url,
-          choice: call.choice,
-          picked: call.picked,
-          others: call.others,
-          why: call.why,
-          undo: call.undo,
-        },
-      ];
-    }),
+  const stuck = s.issues.flatMap((i) =>
+    i.labels.includes(STUCK_LABEL)
+      ? [
+          {
+            issue: i.number,
+            title: i.title,
+            url: i.url,
+            reason: latest(i.comments, a, "stuck")?.c.reason ?? "no reason posted",
+          },
+        ]
+      : [],
   );
 
-  const costs = merged.nodes.flatMap((pr) => {
-    if (issueOf(pr.headRefName) === null) return [];
+  const calls = s.issues.flatMap((i) => {
+    const urls = new Map(i.comments.map((c) => [c.id, c.url]));
 
-    const cost = pr.comments.nodes
-      .map((c) => parse(c.body))
-      .findLast((c) => c?.kind === "cost");
+    return factoryComments(i.comments, a).flatMap(({ id, c }) =>
+      c.kind === "call" && !reversed.has(id)
+        ? [
+            {
+              callId: id,
+              issue: i.number,
+              url: urls.get(id) ?? i.url,
+              choice: c.choice,
+              picked: c.picked,
+              others: c.others,
+              why: c.why,
+              undo: c.undo,
+            },
+          ]
+        : [],
+    );
+  });
 
-    return cost?.kind === "cost"
-      ? [{ pr: pr.number, tokens: total(cost) }]
-      : [];
+  const costs = s.merged.flatMap((pr) => {
+    const cost = issueOf(pr.head) === null ? null : latest(pr.comments, a, "cost");
+
+    return cost === null ? [] : [{ pr: pr.number, tokens: total(cost.c) }];
   });
 
   return {
@@ -204,6 +115,7 @@ export function rows(s: Snapshot): Rows {
     stuck,
     calls,
     costs,
+    truncated: s.truncated,
   };
 }
 
@@ -227,11 +139,14 @@ export type UndoIssue = { title: string; body: string };
 export function undoIssue(call: CallRow): UndoIssue {
   return {
     title: `Undo: ${call.choice}`,
-    body: [
-      `A factory run on #${call.issue} made this call without asking: ${call.url}`,
-      `Picked: ${call.picked}`,
-      `To undo: ${call.undo}`,
-      undoLine(call.callId),
-    ].join("\n\n"),
+    body: render({
+      kind: "undo",
+      call: call.callId,
+      text: [
+        `A factory run on #${call.issue} made this call without asking: ${call.url}`,
+        `Picked: ${call.picked}`,
+        `To undo: ${call.undo}`,
+      ].join("\n\n"),
+    }),
   };
 }
