@@ -1,0 +1,10 @@
+{
+  "name": "factory",
+  "version": "0.1.0",
+  "description": "A GitHub agent factory on your own Mac and subscription. Issues labelled factory become background Claude Code runs with hope; you see plans, calls, stuck runs and cost per merged PR in /factory. Needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.",
+  "keywords": ["factory", "issues", "background", "worker"],
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
+}

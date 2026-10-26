@@ -55,6 +55,18 @@
         "staging",
         "hunch"
       ]
+    },
+    {
+      "name": "factory",
+      "source": "./factory",
+      "description": "A GitHub agent factory on your own Mac and subscription. Issues labelled factory become background Claude Code runs with hope; you see plans, calls, stuck runs and cost per merged PR in /factory. Needs CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1.",
+      "category": "automation",
+      "keywords": [
+        "factory",
+        "issues",
+        "background",
+        "worker"
+      ]
     }
   ]
 }
