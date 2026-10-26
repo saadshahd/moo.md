@@ -24,7 +24,7 @@ function harness(branch: string, startedAt = 0, rules = RULES, token: string | n
       fn: args.at(-1),
     });
 
-  // SAFETY: the fake `on` takes every registration the module makes; options are unused.
+  /** SAFETY: the fake `on` takes every registration the module makes; options are unused. */
   register(on as any, {} as any);
 
   const store = new Map<string, string | number>();
@@ -49,7 +49,7 @@ function harness(branch: string, startedAt = 0, rules = RULES, token: string | n
       cwd: async () => "/w",
       id: async () => "s1",
       usage: async () => ({ startedAt }),
-      // As a real turn reads at the ask: the text, then the call in a message of its own.
+      /** As a real turn reads at the ask: the text, then the call in a message of its own. */
       messages: async () => [
         { role: "user", text: "the prompt" },
         { role: "assistant", text: "Two stores fit; the choice sets the API." },

@@ -1,5 +1,7 @@
-// The prompt a factory run starts from. A restarted run gets the same prompt plus the sealed plan
-// and the newest handoff, so it goes on from written work, never from a saved conversation.
+/**
+ * The prompt a factory run starts from. A restarted run gets the same prompt plus the sealed plan
+ * and the newest handoff, so it goes on from written work, never from a saved conversation.
+ */
 
 import {
   approvalQuestion,
@@ -15,12 +17,10 @@ export type RunInput = {
   issue: number;
   title: string;
   body: string;
-  /** Comments people wrote on the issue, oldest first. */
   notes: { author: string; body: string }[];
   plan: Plan | null;
   handoff: Handoff | null;
   rules: Rules;
-  /** The command that runs the factory CLI, e.g. `bun /…/factory/worker/cli.ts`. */
   cli: string;
 };
 

@@ -1,5 +1,3 @@
-// The one committed file in the target repo that sets how the factory behaves there.
-// `/factory:setup` writes it; the worker and the run hooks read it.
 
 export const RULES_PATH = ".claude/factory.json";
 
@@ -16,7 +14,6 @@ export type Rules = {
   layers: { check: string[]; plan: string[]; judge: string[]; none: string[] };
 };
 
-/** Any value JSON.parse returns. */
 export type Json =
   | null
   | boolean
@@ -36,12 +33,11 @@ const isStrings = (v: Json | undefined): v is string[] =>
 const isObject = (v: Json | undefined): v is { [key: string]: Json } =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 
-/** The rules `json` sets, or the reasons it can't be read as rules. */
 export function parseRules(json: string): Rules | { errors: string[] } {
   let raw: Json;
 
   try {
-    // SAFETY: JSON.parse returns JSON values only, which is all Json describes.
+    /** SAFETY: JSON.parse returns JSON values only, which is all Json describes. */
     raw = JSON.parse(json) as Json;
   } catch (e) {
     return { errors: [`${RULES_PATH} is not JSON: ${String(e)}`] };

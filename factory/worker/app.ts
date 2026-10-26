@@ -1,7 +1,9 @@
-// The factory's GitHub App: runs act on GitHub as its bot, never as the user, so GitHub can tell
-// a run's comment from the user's. Each user creates their own App; `/factory:setup` walks it.
-// `~/.config/factory/app.json` names it: `{ "clientId": "Iv23…", "key": "app.pem" }`, the key
-// path relative to that folder.
+/**
+ * The factory's GitHub App: runs act on GitHub as its bot, never as the user, so GitHub can tell
+ * a run's comment from the user's. Each user creates their own App; `/factory:setup` walks it.
+ * `~/.config/factory/app.json` names it: `{ "clientId": "Iv23…", "key": "app.pem" }`, the key
+ * path relative to that folder.
+ */
 
 import { createSign } from "node:crypto";
 import { homedir } from "node:os";
@@ -14,7 +16,6 @@ const API = "https://api.github.com";
 export type App = { clientId: string; pem: string };
 
 
-/** The App this machine's factory acts as; throws naming what is missing. */
 export async function readApp(): Promise<App> {
   const file = Bun.file(join(DIR, "app.json"));
 
@@ -23,7 +24,7 @@ export async function readApp(): Promise<App> {
       `no ${join(DIR, "app.json")}; run /factory:setup to create the factory's GitHub App`,
     );
 
-  // SAFETY: setup writes this file with exactly these two string fields.
+  /** SAFETY: setup writes this file with exactly these two string fields. */
   const { clientId, key } = (await file.json()) as {
     clientId: string;
     key: string;
@@ -39,11 +40,10 @@ export async function readApp(): Promise<App> {
 
 const b64url = (s: string | Buffer) => Buffer.from(s).toString("base64url");
 
-/** A 9-minute JWT that proves to GitHub this machine holds the App's private key. */
 export function appJwt(app: App, nowS = Math.floor(Date.now() / 1000)): string {
   const head = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
 
-  // Issued a minute early, so a clock running slightly fast is still accepted.
+  /** Issued a minute early, so a clock running slightly fast is still accepted. */
   const body = b64url(
     JSON.stringify({ iat: nowS - 60, exp: nowS + 540, iss: app.clientId }),
   );
@@ -73,20 +73,18 @@ async function github(
   return r;
 }
 
-/** A 1-hour token that acts as the App's bot on `repo` alone, with the bot's commit identity;
- * throws when the App isn't installed there. */
 export async function botFor(app: App, repo: string): Promise<Bot> {
   const jwt = appJwt(app);
-  // SAFETY: GitHub's app endpoint answers with the App's `slug`.
+  /** SAFETY: GitHub's app endpoint answers with the App's `slug`. */
   const { slug } = (await (await github("/app", jwt)).json()) as { slug: string };
-  // SAFETY: GitHub's installation endpoint answers with the installation's numeric `id`.
+  /** SAFETY: GitHub's installation endpoint answers with the installation's numeric `id`. */
   const { id } = (await (await github(`/repos/${repo}/installation`, jwt)).json()) as { id: number };
   const r = await github(`/app/installations/${id}/access_tokens`, jwt, "POST");
-  // SAFETY: GitHub's access-token endpoint answers with `token` and `expires_at`.
+  /** SAFETY: GitHub's access-token endpoint answers with `token` and `expires_at`. */
   const { token, expires_at } = (await r.json()) as { token: string; expires_at: string };
   const name = `${slug}[bot]`;
 
-  // SAFETY: GitHub's user endpoint answers with the bot user's numeric `id`.
+  /** SAFETY: GitHub's user endpoint answers with the bot user's numeric `id`. */
   const user = (await (await github(`/users/${encodeURIComponent(name)}`, token)).json()) as {
     id: number;
   };
