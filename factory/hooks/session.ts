@@ -45,7 +45,7 @@ async function sessionName(
  * than acting as the user. `GH_CONFIG_DIR` alone is not enough: with no token in the environment,
  * gh falls back to the user's token in the macOS keychain, so `GH_TOKEN` holds a placeholder.
  */
-async function withoutLogin($: EngineInterface, cwd: string): Promise<void> {
+export async function withoutLogin($: EngineInterface, cwd: string): Promise<void> {
   await $.env.set("GH_CONFIG_DIR", `${cwd}/.factory/no-gh-login`);
   await $.env.set("GH_TOKEN", "factory-no-login");
   await $.env.set("GITHUB_TOKEN", undefined);
@@ -59,8 +59,7 @@ async function withoutLogin($: EngineInterface, cwd: string): Promise<void> {
 /**
  * The factory run this session is, or null. A session is a run when it sits on a `factory/<n>`
  * branch and carries the name the worker gave that issue's run; a person's session in the same
- * worktree is not. A run, or a `factory/<n>` session that can't tell, loses the user's login
- * before any tool runs.
+ * worktree is not. A `factory/<n>` session that can't tell loses the user's login.
  */
 export async function currentRun(
   $: EngineInterface,
@@ -86,7 +85,6 @@ export async function currentRun(
     }
   }
 
-  if (found) await withoutLogin($, cwd);
   await $.state.set({ plugin: "factory", key: "run" }, found);
 
   return found;

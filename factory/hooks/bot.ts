@@ -1,6 +1,6 @@
 import type { Args, EngineInterface, Next, ToolCallResult } from "claude-code";
 import { botEnv, must, type Bot } from "../lib/github.ts";
-import { currentRun, runner, showOnce } from "./session.ts";
+import { currentRun, runner, showOnce, withoutLogin } from "./session.ts";
 import type { FactoryRun } from "./state.d.ts";
 
 const RENEW_BEFORE_MS = 10 * 60_000;
@@ -31,7 +31,8 @@ async function heldBot($: EngineInterface, fr: FactoryRun): Promise<Bot> {
 
 /**
  * Before any tool runs in a factory run, makes what it starts act on GitHub as the factory's bot.
- * With no token to be had, the tool still runs, with no GitHub login at all.
+ * The login is cleared first on every call, so with no token to be had the tool still runs, with
+ * no GitHub login at all.
  */
 export async function actAsBot(
   $: EngineInterface,
@@ -42,6 +43,7 @@ export async function actAsBot(
     const fr = await currentRun($);
 
     if (fr) {
+      await withoutLogin($, fr.cwd);
       const env = botEnv(await heldBot($, fr));
       /** `$.env.set` takes each name as a literal, so the names are spelled out. */
       await $.env.set("GH_TOKEN", env.GH_TOKEN);

@@ -209,6 +209,7 @@ function host($: Engine, on: any, fake: Fake = {}) {
     dirs,
     count: (cmd: string) => calls.filter((c) => c === cmd).length,
     mints: () => calls.filter((c) => c.startsWith("bun ")).length,
+    noToken: () => void (f.token = null),
     tick: (ms: number) => void (now += ms),
     tool: (result: () => any) => void (core = result),
     call: (e: ToolCallInput): Promise<any> => $.tool.call(e),
@@ -506,6 +507,20 @@ describe("bot", () => {
     h.tick(55 * 60_000);
     await h.call(read);
     expect(h.mints()).toBe(2);
+  });
+
+  test("a renewal that fails leaves no GitHub login, not the old token", async ($, on) => {
+    const h = host($, on);
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    h.env.clear();
+    h.noToken();
+    h.tick(55 * 60_000);
+    await h.call(read);
+    expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
+    expect(h.env.get("GH_CONFIG_DIR")).toBe("/w/.factory/no-gh-login");
+    expect(h.env.get("GIT_CONFIG_VALUE_0")).toBe("");
+    expect(h.env.get("GIT_CONFIG_VALUE_1")).toBe("!gh auth git-credential");
   });
 
   test("with no bot token the tool still runs, with no GitHub login, and the failure shows", async ($, on) => {
