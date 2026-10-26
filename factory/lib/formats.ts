@@ -97,7 +97,7 @@ export type Cost = z.infer<typeof Cost>;
 const Restart = z.object({
   kind: z.literal("restart"),
   issue: Issue,
-  reason: z.literal(["crash", "context"]),
+  reason: z.literal(["crash", "context", "checks"]),
   session: z.string(),
 });
 
@@ -197,6 +197,13 @@ function kind<C extends FactoryComment>(
   return { by, codec };
 }
 
+const RESTARTED = {
+  crash: "**Restarted** · the run died; a fresh session goes on from the plan, branch and handoff",
+  context:
+    "**Restarted** · its context passed the cap; a fresh session goes on from the plan, branch and handoff",
+  checks: "**Woken** · its PR's checks failed after it ended its turn",
+} satisfies { [R in Restart["reason"]]: string };
+
 const CODECS = {
   plan: kind(
     Plan,
@@ -241,8 +248,7 @@ const CODECS = {
     Restart,
     "bot",
     null,
-    (c) =>
-      `**Restarted** · ${c.reason === "crash" ? "the run died" : "its context passed the cap"}; a fresh session goes on from the plan, branch and handoff`,
+    (c) => RESTARTED[c.reason],
   ),
   stuck: kind(Stuck, "bot", null, (c) => `**Stuck** · ${c.reason}`),
   undo: kind(
@@ -267,9 +273,17 @@ export function total(c: Cost): number {
   return c.input + c.cacheRead + c.cacheWrite + c.output;
 }
 
-/** Throws when `c` breaks its kind's schema: a malformed comment is never posted. */
+/** GitHub refuses a comment body longer than this. */
+export const BODY_MAX = 65_536;
+
+/** Throws on a comment that breaks its kind's schema or GitHub's size limit, so none is posted. */
 export function render(c: FactoryComment): string {
-  return z.encode(TABLE[c.kind].codec, c);
+  const body = z.encode(TABLE[c.kind].codec, c);
+
+  if (body.length > BODY_MAX)
+    throw new Error(`a factory ${c.kind} comment of ${body.length} characters is over GitHub's ${BODY_MAX}`);
+
+  return body;
 }
 
 /** The comment `body` holds, or null when it is no well-formed factory comment. */

@@ -20,6 +20,7 @@ export {
   object,
   optional,
   parse,
+  record,
   regex,
   safeDecode,
   safeParse,
