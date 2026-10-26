@@ -10,7 +10,7 @@ import { must, repoOf } from "../lib/github.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
 import { apply } from "./act.ts";
 import { botFor, readApp } from "./app.ts";
-import { classify, decide, occupies } from "./decide.ts";
+import { classify, decide, occupies, trustedIssue } from "./decide.ts";
 import { refusals } from "./guard.ts";
 import { run } from "./proc.ts";
 import { readWorld, type Ctx } from "./snapshot.ts";
@@ -34,6 +34,9 @@ function holdAwake(busy: boolean): void {
 
 let bot: Bot | null = null;
 
+/** Untrusted issues already logged, so each is said once per worker run, not each minute. */
+const passedOver = new Set<number>();
+
 async function asBot(ctx: Ctx): Promise<void> {
   if (!needsRenew(bot, Date.now())) return;
   bot = await botFor(ctx.app, ctx.repo);
@@ -46,30 +49,31 @@ async function tick(ctx: Ctx): Promise<void> {
   const rules = await readRules(run, ctx.dir);
   const world = await readWorld(ctx, rules, actorsOf(rules, ctx.repo));
 
-  const groups = await Promise.all(
-    decide(world).map(async (actions) => {
-      for (const a of actions) {
-        try {
-          if (!(await apply(ctx, world, a))) {
-            log(`#${a.issue}: another machine claimed it first`);
+  /** One at a time: claims, fetches and `wt` all write the one repo's refs and locks. */
+  let started = false;
 
-            return false;
-          }
-        } catch (err) {
-          log(`#${a.issue}: ${a.kind} failed: ${err instanceof Error ? err.message : String(err)}`);
-
-          return false;
+  for (const actions of decide(world))
+    for (const a of actions) {
+      try {
+        if (!(await apply(ctx, world, a))) {
+          log(`#${a.issue}: another machine claimed it first`);
+          break;
         }
+
+        started ||= a.kind === "start" || a.kind === "wake";
+      } catch (err) {
+        log(`#${a.issue}: ${a.kind} failed: ${err instanceof Error ? err.message : String(err)}`);
+        break;
       }
+    }
 
-      return actions.some((a) => a.kind === "start" || a.kind === "wake");
-    }),
-  );
+  for (const i of world.gh.issues)
+    if (!trustedIssue(i, world.actors) && !passedOver.has(i.number)) {
+      passedOver.add(i.number);
+      log(`#${i.number}: passed over: labelled by ${i.labelledBy ?? "nobody seen"}, body by ${i.editor ?? i.author ?? "nobody"}; neither may be untrusted`);
+    }
 
-  holdAwake(
-    groups.some(Boolean) ||
-      world.local.some((l) => occupies(classify(l, world))),
-  );
+  holdAwake(started || world.local.some((l) => occupies(classify(l, world))));
 }
 
 async function machineId(): Promise<string> {

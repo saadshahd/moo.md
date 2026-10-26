@@ -144,7 +144,7 @@ async function claimedHere(ctx: Ctx, n: number): Promise<boolean> {
     [
       "git",
       "log",
-      `origin/${ctx.base}..FETCH_HEAD`,
+      `origin/${ctx.base}..origin/${branchFor(n)}`,
       "--format=%(trailers:key=Factory-Claim,valueonly)",
     ],
     { cwd: ctx.dir },
@@ -211,11 +211,10 @@ export async function readWorld(
       !i.labels.includes(STUCK_LABEL),
   );
 
-  const here = await Promise.all(
-    maybe.map(async (i) =>
-      (await claimedHere(ctx, i.number)) ? [i.number] : [],
-    ),
-  );
+  /** One at a time: each fetch writes the repo's refs. */
+  const here = new Set<number>();
+
+  for (const i of maybe) if (await claimedHere(ctx, i.number)) here.add(i.number);
 
   return {
     now: Date.now(),
@@ -223,6 +222,6 @@ export async function readWorld(
     actors,
     rules,
     local,
-    claimedHere: new Set(here.flat()),
+    claimedHere: here,
   };
 }

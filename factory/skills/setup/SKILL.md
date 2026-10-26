@@ -13,9 +13,6 @@ Stop and say why, changing nothing, when any holds:
 - The default branch requires no status check (`gh api repos/<repo>/rules/branches/<base>` has no `required_status_checks` rule, and branch protection names no check). Auto-merge would merge unchecked code.
 - `bun`, `gh`, `claude` or `wt` is missing from `PATH`.
 
-## The worker's packages
-The worker imports `@octokit/auth-app`, and a plugin installs without its packages. Run `bun install --production` in `<root>`.
-
 ## The factory's GitHub App
 Runs act on GitHub as the user's own App, never as the user, so a run can't approve its own plan. Skip this when `~/.config/factory/app.json` exists and `bun <root>/worker/cli.ts token`, run in the repo, prints a token.
 
