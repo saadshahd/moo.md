@@ -1,5 +1,5 @@
 import type { EngineInterface, Register } from "claude-code";
-import { APPROVE, parseApprovalQuestion, type Plan } from "../lib/formats.ts";
+import { parseApprovalQuestion, type Plan } from "../lib/formats.ts";
 import {
   comments,
   edit,
@@ -14,12 +14,14 @@ import {
 import { cutToFailures, isTestCommand } from "../lib/logs.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import { RULES_PATH, parseRules, type Rules } from "../lib/rules.ts";
+import { answerIds } from "../lib/wait.ts";
 
 // The hooks a factory run works under. A session is a factory run when its directory sits on a
 // claimed `factory/<n>` branch; in every other session each hook passes its event straight on.
-//   ask    AskUserQuestion waits for the human, posted on the issue, up to the daily cap; past
-//          it the run takes its own pick and posts a call. Until the hook is calibrated on past
-//          choices, no ask is judged by undo cost: under the cap, every ask waits.
+//   ask    AskUserQuestion never opens the run's question box: the questions, choices and why go
+//          to the issue, and the run ends its turn; the worker brings the answer back. Up to the
+//          daily cap every ask waits; past it the run takes its own pick and posts a call. A plan
+//          approval always waits. Until the hook passes 18 of 20 past choices, nothing judges undo cost.
 //   seal   an edit to the approved plan revokes its approval.
 //   logs   test output is cut to its failures before the agent reads it.
 //   notes  after a tool call, at most once a minute, the issue's newest human comment reaches the agent.
@@ -71,18 +73,21 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 /**
  * The newest comment a person wrote after comment `afterId` and after `sinceMs`, or null. What came
- * before the session started reached it in its prompt.
+ * before the session started reached it in its prompt, and an answer to a wait reached it as its
+ * next message.
  */
 export function newestNote(
   cs: readonly Comment[],
   afterId: number,
   sinceMs: number,
+  answers: ReadonlySet<number> = answerIds(cs),
 ): Comment | null {
   return (
     cs
       .filter(
         (c) =>
           c.id > afterId &&
+          !answers.has(c.id) &&
           Date.parse(c.createdAt) > sinceMs &&
           !c.body.startsWith("<!-- factory:"),
       )
@@ -103,74 +108,48 @@ export const register: Register = (on) => {
     }
 
     if (!fr) return next(e);
-    const run = runner($);
-    const { questions } = e;
-    const asked = questions.map((q) => q.question).join(" · ");
 
-    const approval = questions
-      .map((q) => parseApprovalQuestion(q.question))
-      .find((a) => a !== null);
+    // Why it asks: what the run wrote in the message that asks, else the question's short label.
+    const said = await $.session
+      .messages()
+      .then((ms) => ms.filter((m) => m.role === "assistant").at(-1)?.text?.trim())
+      .catch(() => undefined);
+
+    const questions = e.questions.map((q) => ({
+      question: q.question,
+      why: said || q.header,
+      options: q.options.map((o) => o.label),
+    }));
 
     // Approving a plan is the human's alone, so it always waits and never counts against the cap.
-    if (!approval) {
-      const key = `waits:${today()}`;
-      const used = Number((await $.store.get(key)) ?? 0);
+    const approval = questions.some((q) => parseApprovalQuestion(q.question));
+    const key = `waits:${today()}`;
+    const used = Number((await $.store.get(key)) ?? 0);
 
-      if (used >= fr.rules.waitsPerDay)
-        return {
-          deny: `Today's ${fr.rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call (factory call), and go on.`,
-        };
-      await $.store.set(key, used + 1);
-    }
-
-    let waitId: number | null = null;
+    if (!approval && used >= fr.rules.waitsPerDay)
+      return {
+        deny: `Today's ${fr.rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call (factory call), and go on.`,
+      };
 
     try {
-      waitId = await post(run, fr.repo, fr.issue, {
+      await post(runner($), fr.repo, fr.issue, {
         kind: "wait",
         issue: fr.issue,
-        question: asked,
-        answer: null,
+        questions,
+        answers: null,
       });
     } catch (err) {
+      // The question can't reach the issue, so it waits in the run's own question box instead.
       shown($, err instanceof Error ? err : String(err));
+
+      return next(e);
     }
 
-    const r = await next(e);
+    if (!approval) await $.store.set(key, used + 1);
 
-    if (r.deny !== undefined || r.isError) return r;
-
-    try {
-      const answers = questions.map(
-        (q) =>
-          Object.entries(r.result.answers ?? {}).find(
-            ([k]) => k === q.question,
-          )?.[1] ?? "(no answer read)",
-      );
-
-      if (waitId !== null)
-        await edit(run, fr.repo, waitId, {
-          kind: "wait",
-          issue: fr.issue,
-          question: asked,
-          answer: answers.join(" · "),
-        });
-      const i = questions.findIndex((q) => parseApprovalQuestion(q.question));
-
-      if (approval && answers[i] === APPROVE) {
-        const plan = latest(await comments(run, fr.repo, fr.issue), "plan");
-
-        if (plan && plan.c.seal.startsWith(approval.seal8))
-          await edit(run, fr.repo, plan.id, {
-            ...plan.c,
-            approved: plan.c.seal,
-          });
-      }
-    } catch (err) {
-      shown($, err instanceof Error ? err : String(err));
-    }
-
-    return r;
+    return {
+      deny: `Your question is posted on issue #${fr.issue}; the human answers it there. End your turn now: write nothing more and run no tool. The answer arrives as your next message.`,
+    };
   });
 
   on("tool.call", { tool: "Bash" }, async ($, e, next) => {

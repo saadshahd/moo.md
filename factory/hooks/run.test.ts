@@ -42,6 +42,9 @@ function harness(branch: string, startedAt = 0, rules = RULES) {
       cwd: async () => "/w",
       id: async () => "s1",
       usage: async () => ({ startedAt }),
+      messages: async () => [
+        { role: "assistant", text: "Two stores fit; the choice sets the API." },
+      ],
     },
     store: {
       get: async (k: string) => store.get(k),
@@ -116,7 +119,17 @@ function harness(branch: string, startedAt = 0, rules = RULES) {
 
 const ask = (question: string) => ({
   tool: "AskUserQuestion",
-  questions: [{ question, header: "Q", options: [], multiSelect: false }],
+  questions: [
+    {
+      question,
+      header: "Q",
+      options: [
+        { label: "Map", description: "keyed" },
+        { label: "Array", description: "ordered" },
+      ],
+      multiSelect: false,
+    },
+  ],
 });
 
 const answered = (question: string, answer: string) => () => ({
@@ -133,47 +146,39 @@ describe("outside a factory run", () => {
   });
 });
 
+const never = () => {
+  throw new Error("the ask must not reach the run's question box");
+};
+
 describe("ask", () => {
-  test("under the cap an ask waits, posted on the issue, then shows the answer", async () => {
+  test("an ask goes to the issue with its choices and why, and the run is told to end its turn", async () => {
     const h = harness("factory/7");
-    await h.fire(ask("Which?"), answered("Which?", "A"));
+    const r = await h.fire(ask("Which?"), never);
+    expect(r.deny).toContain("posted on issue #7");
     expect(h.said()).toEqual([
-      { kind: "wait", issue: 7, question: "Which?", answer: "A" },
+      {
+        kind: "wait",
+        issue: 7,
+        questions: [{ question: "Which?", why: "Two stores fit; the choice sets the API.", options: ["Map", "Array"] }],
+        answers: null,
+      },
     ]);
   });
   test("past the cap the run takes its own pick, and nothing waits", async () => {
     const h = harness("factory/7");
-    await h.fire(ask("One?"), answered("One?", "A"));
-
-    const r = await h.fire(ask("Two?"), () => {
-      throw new Error("the ask must not reach the human");
-    });
-
+    await h.fire(ask("One?"), never);
+    const r = await h.fire(ask("Two?"), never);
     expect(r.deny).toContain("post it as a call");
     expect(h.said().length).toBe(1);
   });
-  test("approving the plan always waits and seals the approval on the plan comment", async () => {
+  test("a plan approval always waits and never counts against the cap", async () => {
     const h = harness("factory/7");
-    h.say({ kind: "plan", issue: 7, seal: SEAL, approved: null, text: "p" });
-    await h.fire(ask("One?"), answered("One?", "A"));
     const q = "Approve plan 01234567 for #7?";
-    await h.fire(ask(q), answered(q, "Approve"));
-    expect(h.said().find((c) => c.kind === "plan")).toEqual({
-      kind: "plan",
-      issue: 7,
-      seal: SEAL,
-      approved: SEAL,
-      text: "p",
-    });
-  });
-  test("an approval for another seal approves nothing", async () => {
-    const h = harness("factory/7");
-    h.say({ kind: "plan", issue: 7, seal: SEAL, approved: null, text: "p" });
-    const q = "Approve plan ffffffff for #7?";
-    await h.fire(ask(q), answered(q, "Approve"));
-    expect(h.said().find((c) => c.kind === "plan")).toMatchObject({
-      approved: null,
-    });
+    await h.fire(ask(q), never);
+    await h.fire(ask(q), never);
+    const r = await h.fire(ask("One?"), never);
+    expect(r.deny).toContain("posted on issue #7");
+    expect(h.said().length).toBe(3);
   });
 });
 

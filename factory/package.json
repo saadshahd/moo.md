@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit -p worker && tsc --noEmit -p .",
+    "typecheck": "tsc --noEmit -p worker && tsc --noEmit -p tsconfig.mod.json",
     "lint": "oxlint hooks lib worker",
     "test": "bun test && claude plugin test ."
   },

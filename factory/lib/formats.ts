@@ -22,12 +22,30 @@ export type Call = {
   undo: string;
 };
 
-/** A question the run let through to the human; the run waits until `answer` is set. */
+/** One question a run asks, with the choices it offers and why it asks. */
+export type Question = {
+  question: string;
+  why: string;
+  options: string[];
+};
+
+/**
+ * Questions a run asked the human, answered on the issue; the run waits with its turn ended until
+ * `answers` is set, one per question.
+ */
 export type Wait = {
   kind: "wait";
   issue: number;
-  question: string;
-  answer: string | null;
+  questions: Question[];
+  answers: string[] | null;
+};
+
+/** The human's answers to the wait comment `wait`, one per question, posted from anywhere. */
+export type Answer = {
+  kind: "answer";
+  issue: number;
+  wait: number;
+  answers: string[];
 };
 
 /** What the next session needs to go on: what is left, and a step cut off mid-run. */
@@ -63,7 +81,7 @@ export type Stuck = {
 };
 
 export type FactoryComment =
-  Plan | Call | Wait | Handoff | Cost | Restart | Stuck;
+  Plan | Call | Wait | Answer | Handoff | Cost | Restart | Stuck;
 
 export type Kind = FactoryComment["kind"];
 
@@ -71,6 +89,7 @@ const KINDS: readonly Kind[] = [
   "plan",
   "call",
   "wait",
+  "answer",
   "handoff",
   "cost",
   "restart",
@@ -103,9 +122,16 @@ function body(c: FactoryComment): string {
     case "call":
       return `**Call** · ${c.choice}\n\nPicked: ${c.picked}\n\nTo undo: ${c.undo}`;
     case "wait":
-      return `**Waiting for you** · ${c.question}${
-        c.answer === null ? "" : `\n\nAnswer: ${c.answer}`
-      }`;
+      return c.questions
+        .map(
+          (q, i) =>
+            `**Waiting for you** · ${q.question}\n\nWhy: ${q.why}\n\nChoices: ${q.options.join(" · ")}${
+              c.answers === null ? "" : `\n\nAnswer: ${c.answers[i] ?? ""}`
+            }`,
+        )
+        .join("\n\n---\n\n");
+    case "answer":
+      return `**Answer** · ${c.answers.join(" · ")}`;
     case "handoff":
       return `**Handoff**\n\n${c.text}`;
     case "cost":

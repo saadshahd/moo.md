@@ -11,8 +11,11 @@ import { BG_RUN_DENIED_ASK, LIMIT_REJECTED } from "./fixtures/transcripts.ts";
 import { issueOf, latest, type Comment } from "./github.ts";
 import { cutToFailures, isTestCommand } from "./logs.ts";
 import { overlap, planFiles, planGaps } from "./plan.ts";
+import { answerIds, answerMessage, answerTo, approvedSeal, openWait } from "./wait.ts";
 import { parseRules } from "./rules.ts";
 import { contextSize, pendingAsk, rejectedUntil, usage } from "./transcript.ts";
+
+const Q = { question: "Which store?", why: "Both fit --> pick one", options: ["Map", "Array"] };
 
 describe("formats", () => {
   const every: FactoryComment[] = [
@@ -30,8 +33,8 @@ describe("formats", () => {
       picked: "in a.ts -->",
       undo: "move it",
     },
-    { kind: "wait", issue: 7, question: "Which?", answer: null },
-    { kind: "wait", issue: 7, question: "Which?", answer: "This one" },
+    { kind: "wait", issue: 7, questions: [Q], answers: null },
+    { kind: "wait", issue: 7, questions: [Q], answers: ["Map"] },
     { kind: "handoff", issue: 7, text: "Done: a.\nLeft: b." },
     {
       kind: "cost",
@@ -45,6 +48,7 @@ describe("formats", () => {
     },
     { kind: "restart", issue: 7, reason: "crash", session: "s1" },
     { kind: "stuck", issue: 7, reason: "two fixes failed" },
+    { kind: "answer", issue: 7, wait: 101, answers: ["Map"] },
   ];
 
   test("every kind parses back to itself, `-->` in a field included", () => {
@@ -213,5 +217,48 @@ describe("rules", () => {
       ],
     });
     expect("errors" in parseRules("{")).toBe(true);
+  });
+});
+
+describe("wait", () => {
+  const wait = (id: number, answers: string[] | null): Comment => ({
+    id,
+    body: render({ kind: "wait", issue: 7, questions: [Q], answers }),
+    author: "bot",
+    createdAt: "",
+  });
+
+  const note = (id: number, body: string, author = "you"): Comment => ({ id, body, author, createdAt: "" });
+  const all = () => true;
+
+  test("only the newest unanswered wait is open", () => {
+    expect(openWait([wait(1, null)])?.id).toBe(1);
+    expect(openWait([wait(1, null), wait(2, ["Map"])])).toBe(null);
+    expect(openWait([note(1, "hi")])).toBe(null);
+  });
+  test("an answer comment naming the wait answers it, question by question", () => {
+    const cs = [wait(1, null), note(2, render({ kind: "answer", issue: 7, wait: 1, answers: ["Array"] }))];
+    expect(answerTo(cs, 1, 1, all)).toEqual({ id: 2, author: "you", answers: ["Array"] });
+  });
+  test("a plain comment answers every question with its text; one before the wait never does", () => {
+    const cs = [note(1, "earlier"), wait(2, null), note(3, " Map \n")];
+    expect(answerTo(cs, 2, 2, all)).toEqual({ id: 3, author: "you", answers: ["Map", "Map"] });
+  });
+  test("an answer from someone who can't push is passed over", () => {
+    const cs = [wait(1, null), note(2, "Array", "stranger"), note(3, "Map", "owner")];
+    expect(answerTo(cs, 1, 1, (l) => l === "owner")?.answers).toEqual(["Map"]);
+    expect(answerTo([wait(1, null), note(2, "x", "stranger")], 1, 1, (l) => l === "owner")).toBe(null);
+  });
+  test("Approve to the approval question approves its seal; anything else approves nothing", () => {
+    const w = { kind: "wait" as const, issue: 7, questions: [Q, { question: "Approve plan 01234567 for #7?", why: "", options: ["Approve", "Change"] }], answers: null };
+    expect(approvedSeal(w, ["Map", " approve "])).toBe("01234567");
+    expect(approvedSeal(w, ["Map", "Change"])).toBe(null);
+    expect(approvedSeal({ ...w, questions: [Q] }, ["Approve"])).toBe(null);
+  });
+  test("the run reads each question with its answer", () => {
+    expect(answerMessage({ kind: "wait", issue: 7, questions: [Q], answers: null }, ["Map"])).toContain("- Which store?\n  Answer: Map");
+  });
+  test("comments that answered a wait are known, so they never come back as notes", () => {
+    expect([...answerIds([wait(1, ["Map"]), note(2, "Map"), note(3, "later")])]).toEqual([2]);
   });
 });

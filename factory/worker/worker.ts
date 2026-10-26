@@ -5,10 +5,11 @@
 
 import { hostname } from "node:os";
 import { join } from "node:path";
-import type { Cost } from "../lib/formats.ts";
+import type { Cost, Wait } from "../lib/formats.ts";
 import {
   branchFor,
   comments,
+  edit,
   factoryComments,
   issueOf,
   latest,
@@ -18,7 +19,9 @@ import {
   prFrom,
   repoOf,
   upsert,
+  type Comment,
 } from "../lib/github.ts";
+import { answerMessage, answerTo, approvedSeal, openWait } from "../lib/wait.ts";
 import { overlap, planFiles } from "../lib/plan.ts";
 import { RULES_PATH, parseRules, type Rules } from "../lib/rules.ts";
 import {
@@ -217,8 +220,61 @@ async function worktrees(ctx: Ctx): Promise<Worktree[]> {
 }
 
 async function stop(s: Session | undefined): Promise<void> {
-  if (s && (s.state === "working" || s.state === "blocked"))
-    await run(["claude", "stop", s.id]);
+  if (s && s.state !== "stopped") await run(["claude", "stop", s.id]);
+}
+
+const permissions = new Map<string, boolean>();
+
+/** Whether `login` may push to the repo, so their answer counts; asked of GitHub once per login. */
+function writers(ctx: Ctx, login: string): boolean {
+  return permissions.get(`${ctx.repo}:${login}`) ?? false;
+}
+
+/** Reads, for every author on the issue not yet known, whether they may push to the repo. */
+async function learnWriters(ctx: Ctx, cs: readonly Comment[]): Promise<void> {
+  for (const login of new Set(cs.map((c) => c.author))) {
+    const key = `${ctx.repo}:${login}`;
+
+    if (permissions.has(key)) continue;
+
+    const r = await run([
+      "gh",
+      "api",
+      `repos/${ctx.repo}/collaborators/${login}/permission`,
+      "--jq",
+      ".permission",
+    ]);
+
+    permissions.set(key, ["admin", "maintain", "write"].includes(r.stdout.trim()));
+  }
+}
+
+/**
+ * Records the answers on the wait (and the plan's approval, when they approve it), then wakes
+ * the waiting run with them as its next message.
+ */
+async function deliver(
+  ctx: Ctx,
+  cs: readonly Comment[],
+  wait: { id: number; c: Wait },
+  answers: string[],
+  current: Session,
+  path: string,
+): Promise<void> {
+  await edit(run, ctx.repo, wait.id, { ...wait.c, answers });
+  const seal8 = approvedSeal(wait.c, answers);
+  const plan = latest(cs, "plan");
+
+  if (seal8 !== null && plan && plan.c.seal.startsWith(seal8))
+    await edit(run, ctx.repo, plan.id, { ...plan.c, approved: plan.c.seal });
+  await stop(current);
+  // Without flags, `--resume` wakes the same session under its own id, name and options.
+  await must(
+    run,
+    ["claude", "--bg", "--resume", current.sessionId, answerMessage(wait.c, answers)],
+    { cwd: path },
+  );
+  log(`#${wait.c.issue}: answered; the run goes on`);
 }
 
 /** One issue this machine claimed: is its run alive, waiting, done, dead or over its context cap? */
@@ -266,6 +322,21 @@ async function watch(
   }
 
   if (pendingAsk(text)) return "busy";
+  const cs = await comments(run, ctx.repo, n);
+  const wait = openWait(cs);
+
+  // It asked on the issue and ended its turn: it waits until someone with write access answers.
+  if (wait && current) {
+    await learnWriters(ctx, cs);
+
+    const a = answerTo(cs, wait.id, wait.c.questions.length, (login) =>
+      writers(ctx, login),
+    );
+
+    if (a) await deliver(ctx, cs, wait, a.answers, current, path);
+
+    return "busy";
+  }
 
   if (pr !== null) {
     await stop(current);
@@ -274,7 +345,6 @@ async function watch(
   }
 
   // Its plan overlaps an open PR: `factory plan` sent it home. Keep the claim; go on after that PR.
-  const cs = await comments(run, ctx.repo, n);
   const plan = latest(cs, "plan");
   const theirs = [...(await openPrFiles(run, ctx.repo, branchFor(n))).values()].flat();
 
