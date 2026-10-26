@@ -13,7 +13,9 @@ import {
   issueOf,
   latest,
   must,
+  openPrFiles,
   post,
+  prFrom,
   repoOf,
   upsert,
 } from "../lib/github.ts";
@@ -231,6 +233,13 @@ async function watch(
   const runs = runsOf(all, ctx, n);
   const current = runs.at(-1);
   const stuck = issue.labels.some((l) => l.name === STUCK_LABEL);
+  const pr = await prFrom(run, ctx.repo, branchFor(n));
+  const text = current ? await transcript(current.sessionId) : "";
+
+  // A run that opened its PR is done once its turn ends, whatever state it ends in; a fast
+  // merge can close the issue before any tick saw the run stop.
+  if (pr !== null && current?.state !== "working" && !pendingAsk(text))
+    await postCost(ctx, n, pr, runs);
 
   if (issue.state !== "OPEN" || stuck) {
     await stop(current);
@@ -241,8 +250,6 @@ async function watch(
 
     return "free";
   }
-
-  const text = current ? await transcript(current.sessionId) : "";
 
   if (current?.state === "working") {
     if (contextSize(text) <= ctx.rules.contextCap) return "busy";
@@ -258,38 +265,25 @@ async function watch(
     return "busy";
   }
 
-  if (current?.state === "blocked") {
-    if (pendingAsk(text)) return "busy";
+  if (pendingAsk(text)) return "busy";
 
-    // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
-    const prs = JSON.parse(
-      await must(run, [
-        "gh",
-        "pr",
-        "list",
-        "--repo",
-        ctx.repo,
-        "--head",
-        branchFor(n),
-        "--state",
-        "all",
-        "--json",
-        "number",
-      ]),
-    ) as { number: number }[];
+  if (pr !== null) {
+    await stop(current);
 
-    if (prs[0]) {
-      await postCost(ctx, n, prs[0].number, runs);
-      await stop(current);
-
-      return "free";
-    }
+    return "free";
   }
+
+  // Its plan overlaps an open PR: `factory plan` sent it home. Keep the claim; go on after that PR.
+  const cs = await comments(run, ctx.repo, n);
+  const plan = latest(cs, "plan");
+  const theirs = [...(await openPrFiles(run, ctx.repo, branchFor(n))).values()].flat();
+
+  if (plan && overlap(planFiles(plan.c.text), theirs).length > 0) return "free";
 
   // Dead, or its turn ended with no PR: a crash. Go on from plan, branch and handoff, or give up.
   if (limited) return "free";
 
-  const crashes = factoryComments(await comments(run, ctx.repo, n)).filter(
+  const crashes = factoryComments(cs).filter(
     (x) => x.c.kind === "restart" && x.c.reason === "crash",
   ).length;
 
@@ -353,23 +347,7 @@ async function candidates(ctx: Ctx): Promise<number[]> {
   );
 
   // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
-  const prFiles = (
-    JSON.parse(
-      await must(run, [
-        "gh",
-        "pr",
-        "list",
-        "--repo",
-        ctx.repo,
-        "--state",
-        "open",
-        "--limit",
-        "100",
-        "--json",
-        "files",
-      ]),
-    ) as { files: { path: string }[] }[]
-  ).flatMap((p) => p.files.map((f) => f.path));
+  const prFiles = [...(await openPrFiles(run, ctx.repo, "")).values()].flat();
 
   const out: { n: number; planned: boolean }[] = [];
 

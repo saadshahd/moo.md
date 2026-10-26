@@ -135,22 +135,24 @@ export async function edit(
 }
 
 /**
- * Posts `c`, or edits the factory comment of its kind already on `n` that `same` matches, so a
- * rerun after a crash never posts twice.
+ * Posts `c`, or edits the newest factory comment of its kind already on `n` when it differs, so
+ * a rerun after a crash never posts twice.
  */
 export async function upsert(
   run: Run,
   repo: string,
   n: number,
   c: FactoryComment,
-  same: (old: FactoryComment) => boolean = () => true,
 ): Promise<number> {
-  const old = factoryComments(await comments(run, repo, n))
-    .filter((x) => x.c.kind === c.kind && same(x.c))
+  const body = render(c);
+
+  const old = (await comments(run, repo, n))
+    .filter((x) => parse(x.body)?.kind === c.kind)
     .at(-1);
 
   if (!old) return post(run, repo, n, c);
-  await edit(run, repo, old.id, c);
+
+  if (old.body !== body) await edit(run, repo, old.id, c);
 
   return old.id;
 }
@@ -172,4 +174,63 @@ export async function repoOf(run: Run, cwd: string): Promise<string> {
       { cwd },
     )
   ).trim();
+}
+
+/** The paths each open PR other than the one from `ownHead` changes, by PR number. */
+export async function openPrFiles(
+  run: Run,
+  repo: string,
+  ownHead: string,
+): Promise<Map<number, string[]>> {
+  const out = await must(run, [
+    "gh",
+    "pr",
+    "list",
+    "--repo",
+    repo,
+    "--state",
+    "open",
+    "--limit",
+    "100",
+    "--json",
+    "number,headRefName,files",
+  ]);
+
+  // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
+  const prs = JSON.parse(out) as {
+    number: number;
+    headRefName: string;
+    files: { path: string }[];
+  }[];
+
+  return new Map(
+    prs.flatMap((p) =>
+      p.headRefName === ownHead ? [] : [[p.number, p.files.map((f) => f.path)]],
+    ),
+  );
+}
+
+/** The number of the PR opened from `head`, open or merged or closed, or null when none was. */
+export async function prFrom(
+  run: Run,
+  repo: string,
+  head: string,
+): Promise<number | null> {
+  const out = await must(run, [
+    "gh",
+    "pr",
+    "list",
+    "--repo",
+    repo,
+    "--head",
+    head,
+    "--state",
+    "all",
+    "--json",
+    "number",
+    "--jq",
+    ".[0].number // empty",
+  ]);
+
+  return out.trim() === "" ? null : Number(out.trim());
 }

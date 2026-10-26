@@ -13,6 +13,7 @@ import {
   issueOf,
   latest,
   must,
+  openPrFiles,
   post,
   repoOf,
   upsert,
@@ -60,39 +61,6 @@ async function read(cwd: string, path: string): Promise<string> {
   return f.text();
 }
 
-/** The paths each open PR other than `ownHead` touches, by PR number. */
-async function openPrFiles(
-  repo: string,
-  ownHead: string,
-): Promise<Map<number, string[]>> {
-  const out = await must(run, [
-    "gh",
-    "pr",
-    "list",
-    "--repo",
-    repo,
-    "--state",
-    "open",
-    "--limit",
-    "100",
-    "--json",
-    "number,headRefName,files",
-  ]);
-
-  // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
-  const prs = JSON.parse(out) as {
-    number: number;
-    headRefName: string;
-    files: { path: string }[];
-  }[];
-
-  return new Map(
-    prs
-      .filter((p) => p.headRefName !== ownHead)
-      .map((p) => [p.number, p.files.map((f) => f.path)]),
-  );
-}
-
 function flag(args: string[], name: string): string {
   const i = args.indexOf(`--${name}`);
   const v = i >= 0 ? args[i + 1] : undefined;
@@ -115,7 +83,7 @@ async function plan(cwd: string): Promise<string> {
     );
   const files = planFiles(text);
 
-  for (const [pr, theirs] of await openPrFiles(w.repo, branchFor(w.issue))) {
+  for (const [pr, theirs] of await openPrFiles(run, w.repo, branchFor(w.issue))) {
     const both = overlap(files, theirs);
 
     if (both.length > 0)
@@ -183,6 +151,12 @@ async function pr(cwd: string): Promise<string> {
   if (!p || p.c.seal !== local)
     throw new Refusal(
       "the plan on the issue is not the plan in the worktree; run plan, then ask for approval",
+      4,
+    );
+
+  if (latest(await comments(run, w.repo, w.issue), "call") === null)
+    throw new Refusal(
+      "the issue has no call; post each choice you made without asking with `call` first",
       4,
     );
 
