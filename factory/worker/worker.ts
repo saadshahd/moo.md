@@ -1,7 +1,8 @@
 // The factory worker: one per machine per target repo, kept up by launchd.
 //   bun factory/worker/worker.ts <path to the target repo's main worktree>
 // Each minute it watches its runs, cleans up after closed issues, then picks and starts new runs
-// up to the rules' limit. All state lives in GitHub and in Claude Code's own session list.
+// up to the rules' limit. Run state lives in GitHub and Claude Code's session list; the run hooks
+// keep the day's wait count and the notes already passed on in their plugin store.
 
 import { hostname } from "node:os";
 import { join } from "node:path";
@@ -20,11 +21,12 @@ import {
   prFrom,
   repoOf,
   STUCK_LABEL,
+  trusted,
   upsert,
   type Comment,
 } from "../lib/github.ts";
 import { answerMessage, answerTo, approvedSeal, openWait } from "../lib/wait.ts";
-import { overlap, planFiles } from "../lib/plan.ts";
+import { PLAN_PATH, overlap, planFiles } from "../lib/plan.ts";
 import { RULES_PATH, parseRules, type Rules } from "../lib/rules.ts";
 import {
   contextSize,
@@ -80,8 +82,11 @@ async function refusals(
     ".contexts | length",
   ]);
 
-  const required =
-    Number(rules.stdout.trim() || 0) + Number(protection.stdout.trim() || 0);
+  // Each answers with a count only on success; a repo without classic protection gets a 404.
+  const count = (r: { exitCode: number; stdout: string }) =>
+    r.exitCode === 0 ? Number(r.stdout.trim()) || 0 : 0;
+
+  const required = count(rules) + count(protection);
 
   if (required === 0)
     out.push(
@@ -129,7 +134,7 @@ async function start(ctx: Ctx, n: number, cwd: string): Promise<void> {
     title: issue.title,
     body: issue.body,
     notes: cs
-      .filter((c) => !isFactory(c.body))
+      .filter((c) => trusted(c) && !isFactory(c.body))
       .map((c) => ({ author: c.author, body: c.body })),
     plan: latest(cs, "plan")?.c ?? null,
     handoff: latest(cs, "handoff")?.c ?? null,
@@ -196,35 +201,16 @@ async function stop(s: Session | undefined): Promise<void> {
   if (s && s.state !== "stopped") await run(["claude", "stop", s.id]);
 }
 
-const permissions = new Map<string, boolean>();
-
-/** Whether `login` may push to the repo, so their answer counts; asked of GitHub once per login. */
-function writers(ctx: Ctx, login: string): boolean {
-  return permissions.get(`${ctx.repo}:${login}`) ?? false;
-}
-
-/** Reads, for every author on the issue not yet known, whether they may push to the repo. */
-async function learnWriters(ctx: Ctx, cs: readonly Comment[]): Promise<void> {
-  for (const login of new Set(cs.map((c) => c.author))) {
-    const key = `${ctx.repo}:${login}`;
-
-    if (permissions.has(key)) continue;
-
-    const r = await run([
-      "gh",
-      "api",
-      `repos/${ctx.repo}/collaborators/${login}/permission`,
-      "--jq",
-      ".permission",
-    ]);
-
-    permissions.set(key, ["admin", "maintain", "write"].includes(r.stdout.trim()));
-  }
+/** Wakes a session whose turn ended with `message` as its next one. */
+async function wake(s: Session, path: string, message: string): Promise<void> {
+  await stop(s);
+  // Without flags, `--resume` wakes the same session under its own id, name and options.
+  await must(run, ["claude", "--bg", "--resume", s.sessionId, message], { cwd: path });
 }
 
 /**
- * Records the answers on the wait (and the plan's approval, when they approve it), then wakes
- * the waiting run with them as its next message.
+ * Approves the plan when the answers approve it, wakes the waiting run with the answers as its
+ * next message, then closes the wait.
  */
 async function deliver(
   ctx: Ctx,
@@ -234,19 +220,15 @@ async function deliver(
   current: Session,
   path: string,
 ): Promise<void> {
-  await edit(run, ctx.repo, wait.id, { ...wait.c, answers });
   const seal8 = approvedSeal(wait.c, answers);
   const plan = latest(cs, "plan");
 
+  // The approval lands before the run wakes, so its `pr` finds the plan approved.
   if (seal8 !== null && plan && plan.c.seal.startsWith(seal8))
     await edit(run, ctx.repo, plan.id, { ...plan.c, approved: plan.c.seal });
-  await stop(current);
-  // Without flags, `--resume` wakes the same session under its own id, name and options.
-  await must(
-    run,
-    ["claude", "--bg", "--resume", current.sessionId, answerMessage(wait.c, answers)],
-    { cwd: path },
-  );
+  await wake(current, path, answerMessage(wait.c, answers));
+  // Closed only once the run has the answer: a failed wake leaves the wait open for the next tick.
+  await edit(run, ctx.repo, wait.id, { ...wait.c, answers });
   log(`#${wait.c.issue}: answered; the run goes on`);
 }
 
@@ -265,13 +247,11 @@ async function watch(
   const pr = await prFrom(run, ctx.repo, branchFor(n));
   const text = current ? await transcript(current.sessionId) : "";
 
-  // A run that opened its PR is done once its turn ends, whatever state it ends in; a fast
-  // merge can close the issue before any tick saw the run stop.
-  if (pr !== null && current?.state !== "working" && !pendingAsk(text))
-    await postCost(ctx, n, pr, runs);
-
   if (issue.state !== "OPEN" || stuck) {
     await stop(current);
+
+    // A fast merge closes the issue while the run still watches its checks; its cost goes on anyway.
+    if (pr !== null) await postCost(ctx, n, pr, runs);
     await must(run, ["wt", "remove", branchFor(n), "--yes", "--force"], {
       cwd: ctx.dir,
     });
@@ -283,58 +263,80 @@ async function watch(
   if (current?.state === "working") {
     if (contextSize(text) <= ctx.rules.contextCap) return "busy";
     await stop(current);
+    await start(ctx, n, path);
     await post(run, ctx.repo, n, {
       kind: "restart",
       issue: n,
       reason: "context",
       session: current.sessionId,
     });
-    await start(ctx, n, path);
 
     return "busy";
   }
 
-  if (pendingAsk(text)) return "busy";
+  // Its turn ended. Nobody watches its own question box, so a question left there stops it.
+  if (current && pendingAsk(text)) {
+    await stop(current);
+    await markStuck(run, ctx.repo, n, "the run asked in its own question box, which nobody watches");
+
+    return "free";
+  }
+
+  if (pr !== null) {
+    await postCost(ctx, n, pr, runs);
+    await stop(current);
+
+    return "free";
+  }
+
   const cs = await comments(run, ctx.repo, n);
   const wait = openWait(cs);
 
-  // It asked on the issue and ended its turn: it waits until someone with write access answers.
+  // It asked on the issue: it waits until someone who may push answers.
   if (wait && current) {
-    await learnWriters(ctx, cs);
-
-    const a = answerTo(cs, wait.id, wait.c.questions.length, (login) =>
-      writers(ctx, login),
-    );
+    const a = answerTo(cs, wait.id, wait.c.questions.length);
 
     if (a) await deliver(ctx, cs, wait, a.answers, current, path);
 
     return "busy";
   }
 
-  if (pr !== null) {
-    await stop(current);
+  // Claude refused for a usage limit: the same session goes on once the limit resets.
+  const reset = rejectedUntil(text);
 
-    return "free";
+  if (current && reset !== null) {
+    if (reset * 1000 > Date.now()) return "free";
+    await wake(current, path, "Your usage limit has reset. Go on with the work.");
+    log(`#${n}: limit reset; the run goes on`);
+
+    return "busy";
   }
 
-  // Its plan overlaps an open PR: `factory plan` sent it home. Keep the claim; go on after that PR.
-  const plan = latest(cs, "plan");
+  // `factory plan` sends a run home when its plan overlaps an open PR; the claim waits for that PR.
+  const local = Bun.file(join(path, PLAN_PATH));
+
+  const planned = (await local.exists())
+    ? await local.text()
+    : (latest(cs, "plan")?.c.text ?? "");
+
   const theirs = [...(await openPrFiles(run, ctx.repo, branchFor(n))).values()].flat();
 
-  if (plan && overlap(planFiles(plan.c.text), theirs).length > 0) return "free";
+  if (overlap(planFiles(planned), theirs).length > 0) return "free";
 
   // Dead, or its turn ended with no PR: a crash. Go on from plan, branch and handoff, or give up.
   if (limited) return "free";
 
-  const crashes = crashesSinceRetry(cs);
+  const deaths = crashesSinceRetry(cs) + 1;
 
-  if (current && crashes >= CRASHES_BEFORE_STUCK) {
-    await markStuck(run, ctx.repo, n, `the run died or ended without a PR ${crashes + 1} times`);
-    log(`#${n}: stuck`);
+  if (current && deaths >= CRASHES_BEFORE_STUCK) {
     await stop(current);
+    await markStuck(run, ctx.repo, n, `the run died or ended without a PR ${deaths} times`);
+    log(`#${n}: stuck`);
 
     return "free";
   }
+
+  await start(ctx, n, path);
 
   if (current)
     await post(run, ctx.repo, n, {
@@ -343,7 +345,6 @@ async function watch(
       reason: "crash",
       session: current.sessionId,
     });
-  await start(ctx, n, path);
 
   return "busy";
 }
@@ -485,7 +486,8 @@ async function claim(ctx: Ctx, n: number): Promise<boolean> {
 
 async function worktreeFor(ctx: Ctx, n: number): Promise<string> {
   const b = branchFor(n);
-  await must(run, ["git", "fetch", "origin", `${b}:${b}`], { cwd: ctx.dir });
+  // The pushed branch is the run's state; a local copy left by a removed worktree yields to it.
+  await must(run, ["git", "fetch", "origin", `+${b}:${b}`], { cwd: ctx.dir });
   await must(run, ["wt", "switch", b, "--no-cd", "--yes"], { cwd: ctx.dir });
   const wt = (await worktrees(ctx)).find((w) => w.branch === b);
 
@@ -504,6 +506,11 @@ async function worktreeFor(ctx: Ctx, n: number): Promise<string> {
       exclude,
       `${had}${had.endsWith("\n") || had === "" ? "" : "\n"}.factory/\n`,
     );
+
+  // A retry goes on from the sealed plan: the file must be the posted text, byte for byte.
+  const plan = latest(await comments(run, ctx.repo, n), "plan");
+
+  if (plan) await Bun.write(join(wt.path, PLAN_PATH), plan.c.text);
 
   return wt.path;
 }
@@ -559,13 +566,17 @@ async function tick(ctx: Ctx): Promise<void> {
     for (const { n, resume } of await candidates(ctx, local)) {
       if (busy >= ctx.rules.atOnce) break;
 
-      if (!resume && !(await claim(ctx, n))) {
-        log(`#${n}: another machine claimed it first`);
-        continue;
-      }
+      try {
+        if (!resume && !(await claim(ctx, n))) {
+          log(`#${n}: another machine claimed it first`);
+          continue;
+        }
 
-      await start(ctx, n, await worktreeFor(ctx, n));
-      busy++;
+        await start(ctx, n, await worktreeFor(ctx, n));
+        busy++;
+      } catch (err) {
+        log(`#${n}: could not start: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
   holdAwake(busy > 0);
@@ -573,6 +584,9 @@ async function tick(ctx: Ctx): Promise<void> {
 
 async function main(dir: string): Promise<void> {
   const repo = await repoOf(run, dir);
+
+  // The run hooks read the rules from origin's default branch.
+  await must(run, ["git", "remote", "set-head", "origin", "--auto"], { cwd: dir });
 
   const base = (
     await must(run, [

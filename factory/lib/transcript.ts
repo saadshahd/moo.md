@@ -115,13 +115,13 @@ export function pendingAsk(jsonl: string): boolean {
 }
 
 /**
- * When Claude refused for a usage limit, the time it said the limit resets, in epoch seconds;
- * null when the transcript's last limit report is not a refusal. Claude writes the refusal as
+ * When the session's last reply was Claude refusing for a usage limit, the time it said the limit
+ * resets, in epoch seconds; null when anything else came last. Claude writes the refusal as
  * a synthetic assistant line with `quotaLimits: { status: "rejected", resetsAt }`.
  */
 export function rejectedUntil(jsonl: string): number | null {
   const q = lines(jsonl)
-    .filter((l) => l.quotaLimits)
+    .filter((l) => l.type === "assistant")
     .at(-1)?.quotaLimits;
 
   return q?.status === "rejected" && q.resetsAt !== undefined

@@ -2,7 +2,7 @@
 // whether it still waits and what the human answered.
 
 import { APPROVE, parse, parseApprovalQuestion, type Wait } from "./formats.ts";
-import { latest, type Comment } from "./github.ts";
+import { latest, trusted, type Comment } from "./github.ts";
 
 /** The newest wait comment no one has answered yet, or null. */
 export function openWait(
@@ -14,17 +14,16 @@ export function openWait(
 }
 
 /**
- * The first answer to wait comment `waitId` by someone `trusted`: an answer comment naming it, or
+ * The first answer to wait comment `waitId` by someone who may push to the repo: an answer comment naming it, or
  * a person's plain comment after it, which answers every question with its text.
  */
 export function answerTo(
   cs: readonly Comment[],
   waitId: number,
   questions: number,
-  trusted: (login: string) => boolean,
 ): { id: number; author: string; answers: string[] } | null {
   for (const c of cs) {
-    if (c.id <= waitId || !trusted(c.author)) continue;
+    if (c.id <= waitId || !trusted(c)) continue;
     const f = parse(c.body);
 
     if (f?.kind === "answer" && f.wait === waitId)
@@ -73,7 +72,7 @@ export function answerIds(cs: readonly Comment[]): Set<number> {
       const w = parse(c.body);
 
       if (w?.kind !== "wait" || w.answers === null) return [];
-      const a = answerTo(cs, c.id, w.questions.length, () => true);
+      const a = answerTo(cs, c.id, w.questions.length);
 
       return a ? [a.id] : [];
     }),
