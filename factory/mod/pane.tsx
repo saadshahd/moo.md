@@ -18,9 +18,6 @@ import {
   type WaitRow,
 } from "./rows.ts";
 
-// /factory: what a run needs from you, read from GitHub alone. Nothing reads GitHub until the
-// pane opens, since every factory run loads this module too; while open it reads once a minute.
-
 const PANE = "factory";
 const PANE_COLUMNS = 72;
 const READ_EVERY_MS = 60_000;
@@ -37,14 +34,13 @@ let read: Read = { kind: "unread" };
 let tab: Tab = "questions";
 const noting = new Set<number>();
 
-// Picks for a wait with several questions, by wait id, until the last one is picked.
 const picks = new Map<number, (string | undefined)[]>();
 
-// The questions whose "my own" field is open, as `<wait id>:<question index>`.
-const owning = new Set<string>();
+type QuestionKey = `${number}:${number}`;
+
+const owning = new Set<QuestionKey>();
 const planOpen = new Set<number>();
 
-// The button whose GitHub write is running; every other action waits until it ends.
 let busy: string | null = null;
 let reading: Promise<void> | null = null;
 let spinner: { cancel: () => void } | null = null;
@@ -53,8 +49,10 @@ const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "
 const FRAME_MS = 80;
 let ticking: { cancel: () => void } | null = null;
 
-// A copy of hooks/run.ts's `runner`: the engine follows `$` past an import only into a function
-// declaration, and that one is an arrow. Raised on #63.
+/**
+ * A copy of `runner` in hooks/run.ts. The engine follows `$` past an import only into a
+ * function declaration, and that one is an arrow (raised on #63).
+ */
 function runner($: EngineInterface): Run {
   return (argv, opts) =>
     $.process.run(argv, { cwd: opts?.cwd, stdin: opts?.stdin, timeoutMs: 60_000 });
@@ -79,7 +77,6 @@ function refresh($: EngineInterface): Promise<void> {
   return reading;
 }
 
-/** Turns the spinner on while a read or a write runs, and off when neither does. */
 function spin($: EngineInterface) {
   if (busy === null && reading === null) {
     spinner?.cancel();
@@ -94,7 +91,10 @@ function spin($: EngineInterface) {
   });
 }
 
-/** Starts the minute's reads while the pane is open; a reload of the module drops the old timer. */
+/**
+ * Reads start only once the pane opens, never at session start: every factory run loads this
+ * module too, and a timer in each would spend the user's GitHub calls.
+ */
 function keepReading($: EngineInterface) {
   ticking ??= $.clock.every(READ_EVERY_MS, () => void refresh($));
 }
@@ -123,11 +123,10 @@ async function readRows($: EngineInterface): Promise<Read> {
     `name=${name}`,
   ]);
 
-  // SAFETY: gh prints GitHub's answer to QUERY, whose shape Snapshot spells out.
+  /** SAFETY: gh prints GitHub's answer to QUERY, whose shape Snapshot spells out. */
   return { kind: "read", repo, rows: rows(JSON.parse(out) as Snapshot) };
 }
 
-/** Runs a press's GitHub write, says what failed, and reads again so the rows show the change. */
 async function act(
   $: EngineInterface,
   key: string,
@@ -151,8 +150,8 @@ async function act(
 }
 
 async function undoCall($: EngineInterface, call: CallRow) {
-  await act($, `undo-${call.id}`, async (run, repo) => {
-    // Safe to repeat, and first: listing by a label that does not exist yet fails.
+  await act($, `undo-${call.callId}`, async (run, repo) => {
+    /** First, since `gh issue list --label` fails on a label the repo lacks. */
     await must(run, [
       "gh",
       "label",
@@ -167,7 +166,7 @@ async function undoCall($: EngineInterface, call: CallRow) {
       "Reverses a call a factory run made",
     ]);
 
-    // A second press, or another machine's, finds the first undo issue and opens none.
+    /** A second press, or another machine's, finds the first undo issue and opens none. */
     const out = await must(run, [
       "gh",
       "issue",
@@ -186,7 +185,7 @@ async function undoCall($: EngineInterface, call: CallRow) {
       ".[].body",
     ]);
 
-    if (undone(out.split("\n")).has(call.id)) return;
+    if (undone(out.split("\n")).has(call.callId)) return;
     const { title, body } = undoIssue(call);
 
     await must(run, [
@@ -224,28 +223,27 @@ async function note($: EngineInterface, row: StuckRow, text: string) {
   });
 }
 
-/** Takes one question's answer; the answer comment goes up once every question has one. */
 async function answer($: EngineInterface, w: WaitRow, qi: number, value: string, key: string) {
-  owning.delete(`${w.id}:${qi}`);
+  owning.delete(`${w.waitId}:${qi}`);
 
   if (value.trim() === "") return redraw($, () => {});
-  const got = picks.get(w.id) ?? w.questions.map(() => undefined);
+  const got = picks.get(w.waitId) ?? w.questions.map(() => undefined);
 
   got[qi] = value.trim();
-  picks.set(w.id, got);
+  picks.set(w.waitId, got);
   const answers = got.flatMap((a) => (a === undefined ? [] : [a]));
 
   if (answers.length < w.questions.length) return redraw($, () => {});
-  picks.delete(w.id);
+  picks.delete(w.waitId);
   await act($, key, async (run, repo) => {
-    // An answer from another machine, or github.com, may have landed since the last read.
-    if (answerTo(await comments(run, repo, w.issue), w.id, w.questions.length)) {
+    /** An answer from another machine, or github.com, may have landed since the last read. */
+    if (answerTo(await comments(run, repo, w.issue), w.waitId, w.questions.length)) {
       $.ui.toast(`factory: #${w.issue} was already answered`);
 
       return;
     }
 
-    await post(run, repo, w.issue, { kind: "answer", issue: w.issue, wait: w.id, answers });
+    await post(run, repo, w.issue, { kind: "answer", issue: w.issue, wait: w.waitId, answers });
   });
 }
 
@@ -314,8 +312,10 @@ export const registerPane: Register = (on) => {
   });
 
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
-    // A reload of the module keeps the pane open but starts its state over, with nothing reading:
-    // the draw itself starts the read, after the draw ends.
+    /**
+     * A reload of the module keeps the pane open but starts its state over, with nothing
+     * reading. So the draw starts the read itself, once the draw ends.
+     */
     if (ticking === null || (read.kind === "unread" && reading === null))
       $.clock.after(0, () => {
         keepReading($);
@@ -430,7 +430,7 @@ function head(ui: ElementTable, title: string, color: string) {
   );
 }
 
-/** A button drawn as a word in colour, never in brackets; the main one filled. */
+/** Drawn plain, since the user rules out bracketed buttons. */
 function pill(
   ui: ElementTable,
   key: string,
@@ -453,7 +453,6 @@ function pill(
   );
 }
 
-/** A card's buttons, on the right, one row below what they act on. */
 function foot(ui: ElementTable, buttons: RenderChildren[]) {
   const { Box } = ui;
 
@@ -472,7 +471,7 @@ function empty(ui: ElementTable, text: string) {
 
 function stuckCards($: EngineInterface, ui: ElementTable, stuck: StuckRow[]) {
   const { Text } = ui;
-  // A surface with no text field gets no note button: the note goes on the issue on github.com.
+  /** A surface with no text field gets no note button; a note can still go on github.com. */
   const Input = "Input" in ui ? ui.Input : null;
 
   if (stuck.length === 0) return empty(ui, "no run is stuck");
@@ -516,16 +515,15 @@ function waitCards($: EngineInterface, ui: ElementTable, waits: WaitRow[], none:
   });
 }
 
-/** One question of a wait: what it asks, why, a button per choice, and room for your own words. */
 function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: number, color: string) {
   const { Box, Text, Markdown } = ui;
   const Input = "Input" in ui ? ui.Input : null;
   const q = w.questions[qi]!;
   const isApproval = parseApprovalQuestion(q.question) !== null;
-  const picked = picks.get(w.id)?.[qi];
-  const own = `${w.id}:${qi}`;
+  const picked = picks.get(w.waitId)?.[qi];
+  const own: QuestionKey = `${w.waitId}:${qi}`;
   const isOwning = owning.has(own);
-  const isOpen = isApproval && planOpen.has(w.id);
+  const isOpen = isApproval && planOpen.has(w.waitId);
 
   return (
     <Box flexDirection="column" marginTop={qi === 0 ? 0 : 1}>
@@ -533,20 +531,20 @@ function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: num
       <Text dimColor>{q.why}</Text>
       {foot(ui, [
         isApproval &&
-          pill(ui, `plan-${w.id}`, isOpen ? "▾ fold" : "▸ plan", () =>
-            redraw($, () => (isOpen ? planOpen.delete(w.id) : planOpen.add(w.id))),
+          pill(ui, `plan-${w.waitId}`, isOpen ? "▾ fold" : "▸ plan", () =>
+            redraw($, () => (isOpen ? planOpen.delete(w.waitId) : planOpen.add(w.waitId))),
           ),
         ...q.options.map((o, oi) =>
           pill(
             ui,
-            `opt-${w.id}-${qi}-${oi}`,
+            `opt-${w.waitId}-${qi}-${oi}`,
             o,
-            () => void answer($, w, qi, o, `opt-${w.id}-${qi}-${oi}`),
+            () => void answer($, w, qi, o, `opt-${w.waitId}-${qi}-${oi}`),
             picked === undefined ? isApproval && o === APPROVE : picked === o,
           ),
         ),
         Input &&
-          pill(ui, `own-${w.id}-${qi}`, isOwning ? "cancel" : "my own", () =>
+          pill(ui, `own-${w.waitId}-${qi}`, isOwning ? "cancel" : "my own", () =>
             redraw($, () => (isOwning ? owning.delete(own) : owning.add(own))),
           ),
       ])}
@@ -557,11 +555,11 @@ function questionBlock($: EngineInterface, ui: ElementTable, w: WaitRow, qi: num
       )}
       {Input && isOwning && (
         <Input
-          key={`own-text-${w.id}-${qi}`}
+          key={`own-text-${w.waitId}-${qi}`}
           placeholder="your answer"
           submitLabel="send"
           autoFocus
-          onSubmit={(v: string) => void answer($, w, qi, v, `own-${w.id}-${qi}`)}
+          onSubmit={(v: string) => void answer($, w, qi, v, `own-${w.waitId}-${qi}`)}
         />
       )}
     </Box>
@@ -589,9 +587,9 @@ function callCards($: EngineInterface, ui: ElementTable, calls: CallRow[]) {
           )}
         </Text>,
         <Text dimColor>{c.why}</Text>,
-        foot(ui, [pill(ui, `undo-${c.id}`, "undo", () => void undoCall($, c))]),
+        foot(ui, [pill(ui, `undo-${c.callId}`, "undo", () => void undoCall($, c))]),
       ],
-      `call-${c.id}`,
+      `call-${c.callId}`,
     ),
   );
 }
