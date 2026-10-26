@@ -1,10 +1,13 @@
-// What a factory run calls to write to GitHub, so every factory comment has one shape and is
-// posted once. Run inside the run's worktree: the branch names the issue.
-//   plan                                  check and seal .factory/plan.md, post it
-//   call --choice … --picked … --undo …   post a choice made without asking
-//   handoff                               post .factory/handoff.md for the next session
-//   pr                                    open the PR on the approved plan, auto-merge on
-//   stuck "<reason>"                      mark the issue stuck and say why
+/**
+ * What a factory run calls to write to GitHub, so every factory comment has one shape and is
+ * posted once. Run inside the run's worktree: the branch names the issue.
+ *   plan                                  check and seal .factory/plan.md, post it
+ *   call --choice … --picked … --undo …   post a choice made without asking
+ *   handoff                               post .factory/handoff.md for the next session
+ *   pr                                    open the PR on the approved plan, auto-merge on
+ *   stuck "<reason>"                      mark the issue stuck and say why
+ *   token                                 a fresh bot token for the run hooks
+ */
 
 import { approvalQuestion, parse, type Plan } from "../lib/formats.ts";
 import {
@@ -26,6 +29,7 @@ import {
   planFiles,
   planGaps,
 } from "../lib/plan.ts";
+import { botFor, readApp } from "./app.ts";
 import { run } from "./proc.ts";
 
 class Refusal extends Error {
@@ -170,7 +174,7 @@ async function pr(cwd: string): Promise<string> {
     throw new Refusal("the plan is not approved; ask for approval first", 4);
   const head = branchFor(w.issue);
 
-  // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
+  /** SAFETY: gh prints JSON with exactly the --json fields asked for, typed here. */
   const open = JSON.parse(
     await must(run, [
       "gh",
@@ -241,12 +245,17 @@ async function stuck(cwd: string, args: string[]): Promise<string> {
   return "marked stuck";
 }
 
+async function token(cwd: string): Promise<string> {
+  return JSON.stringify(await botFor(await readApp(), await repoOf(run, cwd)));
+}
+
 const COMMANDS = {
   plan,
   call,
   handoff,
   pr,
   stuck,
+  token,
 } satisfies Record<string, (cwd: string, args: string[]) => Promise<string>>;
 
 if (import.meta.main) {

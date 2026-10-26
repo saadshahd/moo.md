@@ -1,12 +1,13 @@
-// A plan is design-level: the types it adds or changes, the signatures, the files it touches.
-// A check decides that, never the agent: a plan missing any section is refused before it is posted.
+/**
+ * A plan is design-level: the types it adds or changes, the signatures, the files it touches.
+ * A check decides that, never the agent: a plan missing any section is refused before it is posted.
+ */
 
 export const PLAN_PATH = ".factory/plan.md";
 export const HANDOFF_PATH = ".factory/handoff.md";
 
 const SECTIONS = ["Types", "Signatures", "Files"] as const;
 
-/** The text under each `## <name>` heading, keyed by name. */
 function sections(text: string): Map<string, string> {
   const out = new Map<string, string>();
   let name: string | null = null;
@@ -31,7 +32,6 @@ function sections(text: string): Map<string, string> {
   return out;
 }
 
-/** The required sections the plan lacks or leaves empty, in order; empty when it passes. */
 export function planGaps(text: string): string[] {
   const s = sections(text);
   const gaps: string[] = SECTIONS.filter((n) => !s.get(n));
@@ -50,7 +50,6 @@ export function planFiles(text: string): string[] {
     .filter((p): p is string => p !== undefined);
 }
 
-/** The paths both lists name. */
 export function overlap(a: readonly string[], b: readonly string[]): string[] {
   const set = new Set(b);
 

@@ -1,5 +1,3 @@
-// GitHub reads and writes the run side shares, through `gh` on the user's own login.
-// Each takes the command runner it should use: the worker's spawns a process, a hook's is `$.process.run`.
 
 import { parse, render, type FactoryComment, type Kind } from "./formats.ts";
 
@@ -8,7 +6,6 @@ export type Run = (
   opts?: { cwd?: string; stdin?: string },
 ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 
-/** stdout of a command that must succeed; a failure throws with its stderr. */
 export async function must(
   run: Run,
   argv: readonly string[],
@@ -25,7 +22,6 @@ export async function must(
 /** The branch a run claims for issue `n`; the first push of it wins the issue. */
 export const branchFor = (n: number) => `factory/${n}`;
 
-/** The issue a factory branch is for, or null for any other branch. */
 export function issueOf(branch: string): number | null {
   const m = /^factory\/(\d+)$/.exec(branch.trim());
 
@@ -41,9 +37,14 @@ export type Comment = {
   association: string;
 };
 
-/** Whether the comment's author may push to the repo, so it may steer or answer a run. */
 export function trusted(c: Comment): boolean {
-  return ["OWNER", "MEMBER", "COLLABORATOR"].includes(c.association);
+  /**
+   * A bot is never trusted: the factory's runs post as its bot, and a run must not approve itself.
+   */
+  return (
+    !c.author.endsWith("[bot]") &&
+    ["OWNER", "MEMBER", "COLLABORATOR"].includes(c.association)
+  );
 }
 
 /** Every comment on the issue, oldest first. */
@@ -61,14 +62,13 @@ export async function comments(
     ".[] | {id, body, author: .user.login, createdAt: .created_at, association: .author_association}",
   ]);
 
-  // SAFETY: the --jq above emits exactly Comment's fields, one object per line.
+  /** SAFETY: the --jq above emits exactly Comment's fields, one object per line. */
   return out
     .split("\n")
     .filter((l) => l.trim() !== "")
     .map((l) => JSON.parse(l) as Comment);
 }
 
-/** The factory comments among `cs`, each with its GitHub id. */
 export function factoryComments(
   cs: readonly Comment[],
 ): { id: number; c: FactoryComment }[] {
@@ -79,7 +79,6 @@ export function factoryComments(
   });
 }
 
-/** The newest factory comment of `kind`, or null. */
 export function latest<K extends Kind>(
   cs: readonly Comment[],
   kind: K,
@@ -94,7 +93,6 @@ export function latest<K extends Kind>(
   );
 }
 
-/** Posts `c` on the issue or PR `n`, returning the new comment's id. */
 export async function post(
   run: Run,
   repo: string,
@@ -118,7 +116,6 @@ export async function post(
   return Number(out.trim());
 }
 
-/** Replaces comment `id`'s body with `c`. */
 export async function edit(
   run: Run,
   repo: string,
@@ -164,7 +161,6 @@ export async function upsert(
   return old.id;
 }
 
-/** `owner/name` of the repo `cwd` is in, as `gh` resolves it. */
 export async function repoOf(run: Run, cwd: string): Promise<string> {
   return (
     await must(
@@ -183,7 +179,6 @@ export async function repoOf(run: Run, cwd: string): Promise<string> {
   ).trim();
 }
 
-/** The paths each open PR other than the one from `ownHead` changes, by PR number. */
 export async function openPrFiles(
   run: Run,
   repo: string,
@@ -203,7 +198,7 @@ export async function openPrFiles(
     "number,headRefName,files",
   ]);
 
-  // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
+  /** SAFETY: gh prints JSON with exactly the --json fields asked for, typed here. */
   const prs = JSON.parse(out) as {
     number: number;
     headRefName: string;
@@ -217,7 +212,6 @@ export async function openPrFiles(
   );
 }
 
-/** The number of the PR opened from `head`, open or merged or closed, or null when none was. */
 export async function prFrom(
   run: Run,
   repo: string,
@@ -244,7 +238,6 @@ export async function prFrom(
 
 export const STUCK_LABEL = "factory:stuck";
 
-/** Marks issue `n` stuck: a comment saying why, and the label the picker skips. */
 export async function markStuck(
   run: Run,
   repo: string,
@@ -266,4 +259,26 @@ export async function markStuck(
     "A factory run gave up; the comment says why",
   ]);
   await must(run, ["gh", "issue", "edit", String(n), "--repo", repo, "--add-label", STUCK_LABEL]);
+}
+
+export type Bot = { token: string; expiresAt: string; name: string; email: string };
+
+/**
+ * Environment that makes `gh`, `git push` and `git commit` act as the factory's bot: `GH_TOKEN`
+ * for `gh`, a git credential helper that hands git the same token in place of the user's keychain
+ * login, and the bot as the commits' author.
+ */
+export function botEnv(bot: Bot) {
+  return {
+    GH_TOKEN: bot.token,
+    GIT_CONFIG_COUNT: "2",
+    GIT_CONFIG_KEY_0: "credential.helper",
+    GIT_CONFIG_VALUE_0: "",
+    GIT_CONFIG_KEY_1: "credential.helper",
+    GIT_CONFIG_VALUE_1: "!gh auth git-credential",
+    GIT_AUTHOR_NAME: bot.name,
+    GIT_AUTHOR_EMAIL: bot.email,
+    GIT_COMMITTER_NAME: bot.name,
+    GIT_COMMITTER_EMAIL: bot.email,
+  };
 }

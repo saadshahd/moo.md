@@ -1,4 +1,3 @@
-// The worker's view of the machine: commands, Claude Code's background sessions, their transcripts.
 
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -31,18 +30,17 @@ export type Session = {
   name: string | null;
   cwd: string;
   startedAt: number;
-  /** `working`, `blocked` (its turn ended, or it waits on an ask), `stopped`, … */
+  /** Seen: `working`; `blocked` or `done` once its turn ends; `stopped`. */
   state: string;
 };
 
 export async function sessions(): Promise<Session[]> {
-  // SAFETY: `claude agents --json` prints an array of sessions with at least Session's fields.
+  /** SAFETY: `claude agents --json` prints an array of sessions with at least Session's fields. */
   return JSON.parse(
     await must(run, ["claude", "agents", "--json", "--all"]),
   ) as Session[];
 }
 
-/** The session's transcript text, or "" when Claude Code has not written one yet. */
 export async function transcript(sessionId: string): Promise<string> {
   const root = join(homedir(), ".claude", "projects");
 

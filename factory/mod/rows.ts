@@ -1,6 +1,3 @@
-// What /factory shows, read from GitHub alone: one GraphQL query per refresh, turned into rows.
-// Every machine running the factory sees the same rows, since none of them come from a local store.
-
 import { STUCK_LABEL, latest, issueOf, type Comment } from "../lib/github.ts";
 import { parse, parseApprovalQuestion, total, type Question } from "../lib/formats.ts";
 import { answerTo, openWait } from "../lib/wait.ts";
@@ -8,6 +5,7 @@ import { answerTo, openWait } from "../lib/wait.ts";
 /** The label on an issue the pane opened to reverse a call; the worker never picks it up. */
 export const UNDO_LABEL = "factory:undo";
 
+/** Everything the pane shows, in one query: no machine's local state, so every machine agrees. */
 export const QUERY = `query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     work: issues(labels: ["factory"], first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
@@ -28,7 +26,6 @@ export const QUERY = `query($owner: String!, $name: String!) {
 
 type Nodes<T> = { nodes: T[] };
 
-/** The answer to QUERY, as `gh api graphql` prints it. */
 export type Snapshot = {
   data: {
     repository: {
@@ -57,14 +54,11 @@ export type Snapshot = {
   };
 };
 
-/** An open wait: the run's questions on one issue, answered together by one answer comment. */
 export type WaitRow = {
-  /** The wait comment's id, which the answer names. */
-  id: number;
+  waitId: number;
   issue: number;
   title: string;
   questions: Question[];
-  /** The plan the wait asks to approve, or null for any other questions. */
   plan: string | null;
 };
 
@@ -76,8 +70,7 @@ export type StuckRow = {
 };
 
 export type CallRow = {
-  /** The call comment's id, which its undo issue names. */
-  id: number;
+  callId: number;
   issue: number;
   url: string;
   choice: string;
@@ -97,13 +90,10 @@ export type Rows = {
   costs: CostRow[];
 };
 
-/** The line an undo issue's body carries, with `id` where the call's id goes. */
 const undoFormat = (id: string) => `Undoes factory call ${id}.`;
 
-/** The line an undo issue's body carries, naming the call it reverses; UNDO_LINE reads it back. */
 export const undoLine = (callId: number) => undoFormat(String(callId));
 
-// undoFormat with its text escaped and the id's place opened for digits, so the two never drift.
 const ID = "\u0000";
 
 const UNDO_LINE = new RegExp(
@@ -112,7 +102,6 @@ const UNDO_LINE = new RegExp(
     .replace(ID, "(\\d+)"),
 );
 
-/** The call ids the undo issues in `bodies` reverse. */
 export function undone(bodies: readonly string[]): Set<number> {
   return new Set(
     bodies.flatMap((b) => {
@@ -127,7 +116,7 @@ export function rows(s: Snapshot): Rows {
   const { work, undos, merged } = s.data.repository;
   const reversed = undone(undos.nodes.map((u) => u.body));
 
-  // A wait stays listed until an answer lands, even before the worker writes it into the wait.
+  /** A wait stays listed until an answer lands, even before the worker writes it into the wait. */
   const waits = work.nodes.flatMap((i): WaitRow[] => {
     if (i.state !== "OPEN") return [];
 
@@ -146,7 +135,7 @@ export function rows(s: Snapshot): Rows {
 
     return [
       {
-        id: w.id,
+        waitId: w.id,
         issue: i.number,
         title: i.title,
         questions: w.c.questions,
@@ -184,7 +173,7 @@ export function rows(s: Snapshot): Rows {
 
       return [
         {
-          id: c.databaseId,
+          callId: c.databaseId,
           issue: i.number,
           url: c.url,
           choice: call.choice,
@@ -218,7 +207,6 @@ export function rows(s: Snapshot): Rows {
   };
 }
 
-/** The mean tokens per merged PR, or null before any factory PR merged with its cost. */
 export function perPr(costs: readonly CostRow[]): number | null {
   if (costs.length === 0) return null;
 
@@ -236,7 +224,6 @@ export function tokens(n: number): string {
 
 export type UndoIssue = { title: string; body: string };
 
-/** The issue that reverses `call`: the worker skips it until the user labels it for the factory. */
 export function undoIssue(call: CallRow): UndoIssue {
   return {
     title: `Undo: ${call.choice}`,
@@ -244,7 +231,7 @@ export function undoIssue(call: CallRow): UndoIssue {
       `A factory run on #${call.issue} made this call without asking: ${call.url}`,
       `Picked: ${call.picked}`,
       `To undo: ${call.undo}`,
-      undoLine(call.id),
+      undoLine(call.callId),
     ].join("\n\n"),
   };
 }

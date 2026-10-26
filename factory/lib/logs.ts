@@ -1,5 +1,7 @@
-// Test output cut to its failures before the agent reads it, so a long run doesn't re-read
-// thousands of passing lines every turn.
+/**
+ * Test output cut to its failures before the agent reads it, so a long run doesn't re-read
+ * thousands of passing lines every turn.
+ */
 
 const TEST_COMMAND =
   /\b(?:(?:bun|npm|pnpm|yarn)\s+(?:run\s+)?test|vitest|jest|pytest|go\s+test|cargo\s+test)\b/;
@@ -11,15 +13,10 @@ const KEEP_UNDER = 80;
 const AROUND = 3;
 const TAIL = 15;
 
-/** Whether `command` runs a test suite. */
 export function isTestCommand(command: string): boolean {
   return TEST_COMMAND.test(command);
 }
 
-/**
- * `text` with only the lines near a failure and the closing summary, a count of what was cut in
- * their place; whole when it is short or has no failure to show.
- */
 export function cutToFailures(text: string): string {
   const lines = text.split("\n");
 

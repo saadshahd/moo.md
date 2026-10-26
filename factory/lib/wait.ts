@@ -1,10 +1,7 @@
-// A run that asks waits on its issue with its turn ended. These read, from the issue's comments,
-// whether it still waits and what the human answered.
 
 import { APPROVE, parse, parseApprovalQuestion, type Wait } from "./formats.ts";
 import { latest, trusted, type Comment } from "./github.ts";
 
-/** The newest wait comment no one has answered yet, or null. */
 export function openWait(
   cs: readonly Comment[],
 ): { id: number; c: Wait } | null {
@@ -14,8 +11,8 @@ export function openWait(
 }
 
 /**
- * The first answer to wait comment `waitId` by someone who may push to the repo: an answer comment naming it, or
- * a person's plain comment after it, which answers every question with its text.
+ * An answer comment naming the wait answers it question by question; a person's plain comment
+ * after the wait answers every question with its text.
  */
 export function answerTo(
   cs: readonly Comment[],
@@ -40,7 +37,6 @@ export function answerTo(
   return null;
 }
 
-/** The seal prefix the answers approve, or null when they approve no plan. */
 export function approvedSeal(
   w: Wait,
   answers: readonly string[],
@@ -56,7 +52,6 @@ export function approvedSeal(
     : null;
 }
 
-/** What the waiting run reads as its next message. */
 export function answerMessage(w: Wait, answers: readonly string[]): string {
   const lines = w.questions.map(
     (q, i) => `- ${q.question}\n  Answer: ${answers[i] ?? "(none)"}`,

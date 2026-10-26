@@ -1,5 +1,5 @@
-import type { CommandRunInput } from "claude-code";
-import { describe, expect, test, type MountTarget } from "claude-code/testing";
+import type { CommandRunInput, On } from "claude-code";
+import { describe, expect, mock, test, type MountTarget } from "claude-code/testing";
 import { approvalQuestion, render, type FactoryComment } from "../lib/formats.ts";
 import { STUCK_LABEL } from "../lib/github.ts";
 import {
@@ -15,7 +15,7 @@ const PANE = {
   surface: "terminal",
   component: "Pane",
   requestId: "factory",
-  // SAFETY: the pane draws from GitHub's rows and reads none of the engine's Pane props.
+  /** SAFETY: the pane draws from GitHub's rows and reads none of the engine's Pane props. */
   props: {} as MountTarget<"terminal", "Pane">["props"],
 } as const;
 
@@ -39,7 +39,6 @@ const issue = (number: number, title: string, cs: ReturnType<typeof comment>[]) 
   comments: { nodes: cs },
 });
 
-/** One question waiting, one plan waiting, and one wait already answered on github.com. */
 const WAITING = [
   issue(9, "Settings layout", [
     comment(90, {
@@ -93,7 +92,6 @@ const cost = (issue: number, pr: number, output: number): FactoryComment => ({
   output,
 });
 
-/** GitHub's answer for a repo with one stuck run, two calls (one undone) and two merged PRs. */
 function snapshot(): Snapshot {
   return {
     data: {
@@ -188,12 +186,14 @@ describe("rows", () => {
     expect([...undone([`intro\n\n${undoLine(81)}\n\nend`, undoLine(5), "Undoes factory call 9x"])]).toEqual([81, 5]);
   });
 
-  test("a wait waits until an answer lands; one asking approval is a plan", () => {
+  test("a wait waits until someone who can push answers it", () => {
+    expect(rows(snapshot()).questions.map((w) => w.waitId)).toEqual([90, 120]);
+  });
+
+  test("a wait asking approval is a plan, with the plan's text", () => {
     const r = rows(snapshot());
 
-    // A stranger's answer leaves the wait open: only someone who can push may answer a run.
-    expect(r.questions.map((w) => w.id)).toEqual([90, 120]);
-    expect(r.plans.map((w) => [w.id, w.plan])).toEqual([[101, "## Types\n\ntype RailItem = { id: string }"]]);
+    expect(r.plans.map((w) => [w.waitId, w.plan])).toEqual([[101, "## Types\n\ntype RailItem = { id: string }"]]);
   });
 
   test("stuck takes the label and the newest reason", () => {
@@ -208,7 +208,7 @@ describe("rows", () => {
   });
 
   test("an undone call drops out", () => {
-    expect(rows(snapshot()).calls.map((c) => c.id)).toEqual([80]);
+    expect(rows(snapshot()).calls.map((c) => c.callId)).toEqual([80]);
   });
 
   test("cost counts every token kind, on factory branches only", () => {
@@ -219,9 +219,10 @@ describe("rows", () => {
   });
 });
 
-test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) => {
+function world(on: On, holdIssueCreate?: Promise<void>) {
   const ran: string[][] = [];
   const posted: string[] = [];
+  const toasts: string[] = [];
 
   on("process.run", async (_$, e) => {
     ran.push([...e.argv]);
@@ -244,13 +245,12 @@ test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) =
 
     if (a.startsWith("gh api graphql")) return out(JSON.stringify(snapshot()));
 
+    if (holdIssueCreate && a.startsWith("gh issue create")) await holdIssueCreate;
+
     return out("");
   });
 
-  const toasts: string[] = [];
-
   on("session.cwd", async () => ({ value: "/work/smoke" }));
-  on("clock.every", async () => ({ value: undefined }));
   on("ui.open", async () => ({ value: { isPlaced: true } }));
   on("ui.toast", async (_$, e) => {
     toasts.push(e.text);
@@ -258,7 +258,48 @@ test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) =
     return { value: undefined };
   });
 
-  // SAFETY: the command reads neither who ran it nor how its answer shows.
+  return { ran, posted, toasts, clock: mock.clock(on) };
+}
+
+test("a module reload leaves the pane open; its next draw reads GitHub again", async ($, on) => {
+  const w = world(on);
+  const ui = await $.ui.mount(PANE);
+
+  expect(await ui.find({ type: "Text", text: /reading GitHub/ })).toBeDefined();
+  await w.clock.advance(1);
+  expect(await ui.find({ type: "Text", text: /move to 'agents'/ })).toBeDefined();
+  await ui.unmount();
+});
+
+test("a pressed action spins until its write ends, and other actions wait", async ($, on) => {
+  let release = () => {};
+  const w = world(on, new Promise<void>((r) => (release = r)));
+
+  /** SAFETY: the command reads neither who ran it nor how its answer shows. */
+  await $.command.run({ command: "factory", args: "" } as CommandRunInput);
+  const ui = await $.ui.mount(PANE);
+
+  await ui.press({ key: "tab-calls" });
+  const pressing = ui.press({ key: "undo-80" });
+
+  await w.clock.advance(1);
+  expect(await ui.find({ type: "Text", text: /⠋ undo/ })).toBeDefined();
+  await w.clock.advance(80);
+  expect(await ui.find({ type: "Text", text: /⠙ undo/ })).toBeDefined();
+  await ui.press({ key: "tab-stuck" });
+  await ui.press({ key: "retry-7" });
+  expect(w.ran.some((a) => a.slice(0, 3).join(" ") === "gh issue edit")).toBe(false);
+  await ui.press({ key: "tab-calls" });
+  release();
+  await pressing;
+  expect(await ui.find({ type: "Text", text: /^ undo $/ })).toBeDefined();
+  await ui.unmount();
+});
+
+test("/factory draws GitHub's rows; an undo makes its label first and opens one issue", async ($, on) => {
+  const { ran, posted, toasts } = world(on);
+
+  /** SAFETY: the command reads neither who ran it nor how its answer shows. */
   await $.command.run({ command: "factory", args: "" } as CommandRunInput);
 
   const ui = await $.ui.mount(PANE);
@@ -305,7 +346,6 @@ test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) =
 
   const order = ran.map((a) => a.slice(0, 3).join(" "));
 
-  // The label exists before anything lists or uses it: a fresh repo has none.
   expect(order.indexOf("gh label create")).toBeLessThan(order.indexOf("gh issue list"));
   expect(created).toHaveLength(1);
   expect(created[0]).toContain(UNDO_LABEL);

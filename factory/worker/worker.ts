@@ -1,8 +1,10 @@
-// The factory worker: one per machine per target repo, kept up by launchd.
-//   bun factory/worker/worker.ts <path to the target repo's main worktree>
-// Each minute it watches its runs, cleans up after closed issues, then picks and starts new runs
-// up to the rules' limit. Run state lives in GitHub and Claude Code's session list; the run hooks
-// keep the day's wait count and the notes already passed on in their plugin store.
+/**
+ * The factory worker: one per machine per target repo, kept up by launchd.
+ *   bun factory/worker/worker.ts <path to the target repo's main worktree>
+ * Each minute it watches its runs, cleans up after closed issues, then picks and starts new runs
+ * up to the rules' limit. Run state lives in GitHub and Claude Code's session list; the run hooks
+ * keep the day's wait count and the notes already passed on in their plugin store.
+ */
 
 import { hostname } from "node:os";
 import { join } from "node:path";
@@ -21,6 +23,8 @@ import {
   prFrom,
   repoOf,
   STUCK_LABEL,
+  botEnv,
+  type Bot,
   trusted,
   upsert,
   type Comment,
@@ -35,6 +39,7 @@ import {
   sum,
   usage,
 } from "../lib/transcript.ts";
+import { botFor, readApp, type App } from "./app.ts";
 import { run, sessions, transcript, type Session } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
 
@@ -44,6 +49,7 @@ const CRASHES_BEFORE_STUCK = 3;
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
 
 type Ctx = {
+  app: App;
   dir: string;
   repo: string;
   base: string;
@@ -53,7 +59,6 @@ type Ctx = {
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
 
-/** Every reason the worker must not start on `dir`, read once at start; empty when it may. */
 async function refusals(
   dir: string,
   repo: string,
@@ -82,7 +87,7 @@ async function refusals(
     ".contexts | length",
   ]);
 
-  // Each answers with a count only on success; a repo without classic protection gets a 404.
+  /** Each answers with a count only on success; a repo without classic protection gets a 404. */
   const count = (r: { exitCode: number; stdout: string }) =>
     r.exitCode === 0 ? Number(r.stdout.trim()) || 0 : 0;
 
@@ -96,14 +101,13 @@ async function refusals(
   return out;
 }
 
-/** The runs of issue `n`, oldest first: every session the worker started for it on this machine. */
 const runsOf = (all: Session[], ctx: Ctx, n: number) =>
   all
     .filter((s) => s.name === `${ctx.prefix}${n}`)
     .sort((a, b) => a.startedAt - b.startedAt);
 
 async function issueView(ctx: Ctx, n: number) {
-  // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
+  /** SAFETY: gh prints JSON with exactly the --json fields asked for, typed here. */
   return JSON.parse(
     await must(run, [
       "gh",
@@ -158,7 +162,6 @@ async function start(ctx: Ctx, n: number, cwd: string): Promise<void> {
   log(`#${n}: started in ${cwd}`);
 }
 
-/** Posts the cost of every run of `n` on its PR; the same comment is updated, never posted twice. */
 async function postCost(
   ctx: Ctx,
   n: number,
@@ -185,7 +188,9 @@ async function postCost(
 type Worktree = { branch: string; path: string };
 
 async function worktrees(ctx: Ctx): Promise<Worktree[]> {
-  // SAFETY: `wt list --format json` (schema 2) prints `items`, each with these fields when present.
+  /**
+   * SAFETY: `wt list --format json` (schema 2) prints `items`, each with these fields when present.
+   */
   const out = JSON.parse(
     await must(run, ["wt", "list", "--format", "json"], { cwd: ctx.dir }),
   ) as {
@@ -201,17 +206,12 @@ async function stop(s: Session | undefined): Promise<void> {
   if (s && s.state !== "stopped") await run(["claude", "stop", s.id]);
 }
 
-/** Wakes a session whose turn ended with `message` as its next one. */
 async function wake(s: Session, path: string, message: string): Promise<void> {
   await stop(s);
-  // Without flags, `--resume` wakes the same session under its own id, name and options.
+  /** Without flags, `--resume` wakes the same session under its own id, name and options. */
   await must(run, ["claude", "--bg", "--resume", s.sessionId, message], { cwd: path });
 }
 
-/**
- * Approves the plan when the answers approve it, wakes the waiting run with the answers as its
- * next message, then closes the wait.
- */
 async function deliver(
   ctx: Ctx,
   cs: readonly Comment[],
@@ -223,16 +223,17 @@ async function deliver(
   const seal8 = approvedSeal(wait.c, answers);
   const plan = latest(cs, "plan");
 
-  // The approval lands before the run wakes, so its `pr` finds the plan approved.
+  /** The approval lands before the run wakes, so its `pr` finds the plan approved. */
   if (seal8 !== null && plan && plan.c.seal.startsWith(seal8))
     await edit(run, ctx.repo, plan.id, { ...plan.c, approved: plan.c.seal });
   await wake(current, path, answerMessage(wait.c, answers));
-  // Closed only once the run has the answer: a failed wake leaves the wait open for the next tick.
+  /**
+   * Closed only once the run has the answer: a failed wake leaves the wait open for the next tick.
+   */
   await edit(run, ctx.repo, wait.id, { ...wait.c, answers });
   log(`#${wait.c.issue}: answered; the run goes on`);
 }
 
-/** One issue this machine claimed: is its run alive, waiting, done, dead or over its context cap? */
 async function watch(
   ctx: Ctx,
   all: Session[],
@@ -250,7 +251,9 @@ async function watch(
   if (issue.state !== "OPEN" || stuck) {
     await stop(current);
 
-    // A fast merge closes the issue while the run still watches its checks; its cost goes on anyway.
+    /**
+     * A fast merge closes the issue while the run still watches its checks; its cost goes on anyway.
+     */
     if (pr !== null) await postCost(ctx, n, pr, runs);
     await must(run, ["wt", "remove", branchFor(n), "--yes", "--force"], {
       cwd: ctx.dir,
@@ -274,7 +277,7 @@ async function watch(
     return "busy";
   }
 
-  // Its turn ended. Nobody watches its own question box, so a question left there stops it.
+  /** Its turn ended. Nobody watches its own question box, so a question left there stops it. */
   if (current && pendingAsk(text)) {
     await stop(current);
     await markStuck(run, ctx.repo, n, "the run asked in its own question box, which nobody watches");
@@ -292,7 +295,6 @@ async function watch(
   const cs = await comments(run, ctx.repo, n);
   const wait = openWait(cs);
 
-  // It asked on the issue: it waits until someone who may push answers.
   if (wait && current) {
     const a = answerTo(cs, wait.id, wait.c.questions.length);
 
@@ -301,7 +303,6 @@ async function watch(
     return "busy";
   }
 
-  // Claude refused for a usage limit: the same session goes on once the limit resets.
   const reset = rejectedUntil(text);
 
   if (current && reset !== null) {
@@ -312,7 +313,9 @@ async function watch(
     return "busy";
   }
 
-  // `factory plan` sends a run home when its plan overlaps an open PR; the claim waits for that PR.
+  /**
+   * `factory plan` sends a run home when its plan overlaps an open PR; the claim waits for that PR.
+   */
   const local = Bun.file(join(path, PLAN_PATH));
 
   const planned = (await local.exists())
@@ -323,7 +326,9 @@ async function watch(
 
   if (overlap(planFiles(planned), theirs).length > 0) return "free";
 
-  // Dead, or its turn ended with no PR: a crash. Go on from plan, branch and handoff, or give up.
+  /**
+   * Dead, or its turn ended with no PR: a crash. Go on from plan, branch and handoff, or give up.
+   */
   if (limited) return "free";
 
   const deaths = crashesSinceRetry(cs) + 1;
@@ -360,7 +365,6 @@ export function crashesSinceRetry(cs: readonly Comment[]): number {
     .filter((c) => c.kind === "restart" && c.reason === "crash").length;
 }
 
-/** Whether this machine pushed the claim on issue `n`'s branch. */
 async function claimedHere(ctx: Ctx, n: number): Promise<boolean> {
   const b = branchFor(n);
   await must(run, ["git", "fetch", "origin", b], { cwd: ctx.dir });
@@ -376,13 +380,11 @@ async function claimedHere(ctx: Ctx, n: number): Promise<boolean> {
 
 const claimSubject = (n: number) => `factory: claim #${n} on ${hostname()}`;
 
-/** Open issues labelled for the factory that nobody claimed, no open issue blocks, and whose plan
- * (if one was posted before) touches no file an open PR changes; unfinished ones first. */
 async function candidates(
   ctx: Ctx,
   local: ReadonlySet<number>,
 ): Promise<{ n: number; resume: boolean }[]> {
-  // SAFETY: gh prints JSON with exactly the --json fields asked for, typed here.
+  /** SAFETY: gh prints JSON with exactly the --json fields asked for, typed here. */
   const issues = JSON.parse(
     await must(run, [
       "gh",
@@ -423,8 +425,10 @@ async function candidates(
     if (local.has(i.number) || i.labels.some((l) => l.name === STUCK_LABEL))
       continue;
 
-    // A claimed branch with no run here goes on only if this machine claimed it: after a retry
-    // (the stuck label removed) or a worktree lost; another machine's claim stays theirs.
+    /**
+     * A claimed branch with no run here goes on only if this machine claimed it: after a retry
+     * (the stuck label removed) or a worktree lost; another machine's claim stays theirs.
+     */
     const resume = claimed.has(i.number);
 
     if (resume && !(await claimedHere(ctx, i.number))) continue;
@@ -449,7 +453,6 @@ async function candidates(
     .map(({ n, resume }) => ({ n, resume }));
 }
 
-/** Pushes a claim commit to issue `n`'s branch; true when this push created it, so the issue is ours. */
 async function claim(ctx: Ctx, n: number): Promise<boolean> {
   await must(run, ["git", "fetch", "origin", ctx.base], { cwd: ctx.dir });
 
@@ -475,7 +478,9 @@ async function claim(ctx: Ctx, n: number): Promise<boolean> {
     )
   ).trim();
 
-  // No force: if another machine pushed the branch first, this push is not a fast-forward and fails.
+  /**
+   * No force: if another machine pushed the branch first, this push is not a fast-forward and fails.
+   */
   const r = await run(
     ["git", "push", "origin", `${sha}:refs/heads/${branchFor(n)}`],
     { cwd: ctx.dir },
@@ -486,14 +491,14 @@ async function claim(ctx: Ctx, n: number): Promise<boolean> {
 
 async function worktreeFor(ctx: Ctx, n: number): Promise<string> {
   const b = branchFor(n);
-  // The pushed branch is the run's state; a local copy left by a removed worktree yields to it.
+  /** The pushed branch is the run's state; a local copy left by a removed worktree yields to it. */
   await must(run, ["git", "fetch", "origin", `+${b}:${b}`], { cwd: ctx.dir });
   await must(run, ["wt", "switch", b, "--no-cd", "--yes"], { cwd: ctx.dir });
   const wt = (await worktrees(ctx)).find((w) => w.branch === b);
 
   if (!wt) throw new Error(`wt made no worktree for ${b}`);
 
-  // The plan and handoff files live in the worktree but never in the repo.
+  /** The plan and handoff files live in the worktree but never in the repo. */
   const common = (
     await must(run, ["git", "rev-parse", "--git-common-dir"], { cwd: wt.path })
   ).trim();
@@ -507,7 +512,7 @@ async function worktreeFor(ctx: Ctx, n: number): Promise<string> {
       `${had}${had.endsWith("\n") || had === "" ? "" : "\n"}.factory/\n`,
     );
 
-  // A retry goes on from the sealed plan: the file must be the posted text, byte for byte.
+  /** A retry goes on from the sealed plan: the file must be the posted text, byte for byte. */
   const plan = latest(await comments(run, ctx.repo, n), "plan");
 
   if (plan) await Bun.write(join(wt.path, PLAN_PATH), plan.c.text);
@@ -517,7 +522,6 @@ async function worktreeFor(ctx: Ctx, n: number): Promise<string> {
 
 let awake: ReturnType<typeof Bun.spawn> | null = null;
 
-/** Holds the Mac awake while any run is busy, and lets it sleep when none is. */
 function holdAwake(busy: boolean): void {
   if (busy && !awake) awake = Bun.spawn(["caffeinate", "-i"]);
 
@@ -527,7 +531,16 @@ function holdAwake(busy: boolean): void {
   }
 }
 
+let bot: Bot | null = null;
+
+async function asBot(ctx: Ctx): Promise<void> {
+  if (bot && Date.parse(bot.expiresAt) - Date.now() > 10 * 60_000) return;
+  bot = await botFor(ctx.app, ctx.repo);
+  Object.assign(process.env, botEnv(bot));
+}
+
 async function tick(ctx: Ctx): Promise<void> {
+  await asBot(ctx);
   const all = await sessions();
   const mine = all.filter((s) => s.name?.startsWith(ctx.prefix));
 
@@ -558,7 +571,8 @@ async function tick(ctx: Ctx): Promise<void> {
       if ((await watch(ctx, all, n, w.path, limited)) === "busy") busy++;
     } catch (err) {
       log(`#${n}: ${err instanceof Error ? err.message : String(err)}`);
-      busy++; // unknown state takes a slot rather than risk a second run of it
+      /** An unknown state takes a slot rather than risk a second run of the issue. */
+      busy++;
     }
   }
 
@@ -585,7 +599,7 @@ async function tick(ctx: Ctx): Promise<void> {
 async function main(dir: string): Promise<void> {
   const repo = await repoOf(run, dir);
 
-  // The run hooks read the rules from origin's default branch.
+  /** The run hooks read the rules from origin's default branch. */
   await must(run, ["git", "remote", "set-head", "origin", "--auto"], { cwd: dir });
 
   const base = (
@@ -615,7 +629,21 @@ async function main(dir: string): Promise<void> {
     process.exit(1);
   }
 
+  /**
+   * Refuse rather than fall back to the user's own login: a run acting as the user could approve itself.
+   */
+  let app: App;
+
+  try {
+    app = await readApp();
+    await botFor(app, repo);
+  } catch (err) {
+    console.error(`factory: the factory's GitHub App can't act on ${repo}: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+
   const ctx: Ctx = {
+    app,
     dir,
     repo,
     base,

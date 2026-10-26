@@ -1,6 +1,7 @@
-// The comments a factory run leaves on GitHub, which is the factory's only store. Each starts
-// with a marker line `<!-- factory:<kind> {json} -->` that carries the fields; the text under it
-// is for a person on github.com. The pane reads rows from `parse`; the run side writes with `render`.
+/**
+ * GitHub is the factory's only store. Each factory comment starts with a marker line
+ * `<!-- factory:<kind> {json} -->` that carries its fields; the text under it is for a person.
+ */
 
 export type Plan = {
   kind: "plan";
@@ -12,21 +13,17 @@ export type Plan = {
   text: string;
 };
 
-/** A choice the run made without asking, which the human can reverse. */
 export type Call = {
   kind: "call";
   issue: number;
   choice: string;
   picked: string;
-  /** The options it did not pick. */
   others: string[];
-  /** Why it picked what it did. */
   why: string;
   /** What reversing the call takes. */
   undo: string;
 };
 
-/** One question a run asks, with the choices it offers and why it asks. */
 export type Question = {
   question: string;
   why: string;
@@ -44,7 +41,6 @@ export type Wait = {
   answers: string[] | null;
 };
 
-/** The human's answers to the wait comment `wait`, one per question, posted from anywhere. */
 export type Answer = {
   kind: "answer";
   issue: number;
@@ -52,7 +48,6 @@ export type Answer = {
   answers: string[];
 };
 
-/** What the next session needs to go on: what is left, and a step cut off mid-run. */
 export type Handoff = {
   kind: "handoff";
   issue: number;
@@ -149,20 +144,17 @@ function body(c: FactoryComment): string {
   }
 }
 
-/** Every token the run spent, of every kind. */
 export function total(c: Cost): number {
   return c.input + c.cacheRead + c.cacheWrite + c.output;
 }
 
-/** The comment body for `c`: its marker line, then the text a person reads. */
 export function render(c: FactoryComment): string {
-  // A `-->` inside a field would end the marker early; JSON escapes `>` so it can't.
+  /** A `-->` inside a field would end the marker early; JSON escapes `>` so it can't. */
   const json = JSON.stringify(head(c)).replace(/>/g, "\\u003e");
 
   return `<!-- factory:${c.kind} ${json} -->\n${body(c)}`;
 }
 
-/** The factory comment `text` holds, or null when it is anyone else's comment. */
 export function parse(text: string): FactoryComment | null {
   const m = MARKER.exec(text);
 
@@ -173,7 +165,7 @@ export function parse(text: string): FactoryComment | null {
   let fields: ReturnType<typeof head>;
 
   try {
-    // SAFETY: only render() writes a marker, and it writes head() of a comment of this kind.
+    /** SAFETY: only render() writes a marker, and it writes head() of a comment of this kind. */
     fields = JSON.parse(m[2]!) as ReturnType<typeof head>;
   } catch {
     return null;
@@ -184,37 +176,36 @@ export function parse(text: string): FactoryComment | null {
   switch (kind) {
     case "plan":
       return {
-        // SAFETY: a plan's marker holds head() of a plan: issue, seal, approved.
+        /** SAFETY: a plan's marker holds head() of a plan: issue, seal, approved. */
         ...(fields as Omit<Plan, "kind" | "text">),
         kind,
         text: rest.replace(/^\*\*Plan\*\*[^\n]*\n\n/, ""),
       };
     case "handoff":
       return {
-        // SAFETY: a handoff's marker holds head() of a handoff: its issue.
+        /** SAFETY: a handoff's marker holds head() of a handoff: its issue. */
         ...(fields as Omit<Handoff, "kind" | "text">),
         kind,
         text: rest.replace(/^\*\*Handoff\*\*\n\n/, ""),
       };
     default:
-      // SAFETY: every other kind's marker holds all its fields but `kind`, which the marker names.
+      /**
+       * SAFETY: every other kind's marker holds all its fields but `kind`, which the marker names.
+       */
       return { ...fields, kind } as FactoryComment;
   }
 }
 
-/** Whether `text` is a comment the factory wrote, of any kind. */
 export function isFactory(text: string): boolean {
   return parse(text) !== null;
 }
 
-/** The question a run asks to have its plan approved, naming the seal it asks about. */
 export function approvalQuestion(issue: number, seal: string): string {
   return `Approve plan ${seal.slice(0, 8)} for #${issue}?`;
 }
 
 export const APPROVE = "Approve";
 
-/** The seal prefix and issue an approval question names, or null for any other question. */
 export function parseApprovalQuestion(
   q: string,
 ): { issue: number; seal8: string } | null {

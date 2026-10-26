@@ -5,6 +5,8 @@ import {
   edit,
   issueOf,
   latest,
+  botEnv,
+  type Bot,
   must,
   post,
   trusted,
@@ -17,21 +19,15 @@ import { PLAN_PATH } from "../lib/plan.ts";
 import { RULES_PATH, parseRules, type Rules } from "../lib/rules.ts";
 import { answerIds } from "../lib/wait.ts";
 
-// The hooks a factory run works under. A session is a factory run when its directory sits on a
-// claimed `factory/<n>` branch; in every other session each hook passes its event straight on.
-//   ask    AskUserQuestion never opens the run's question box: the questions, choices and why go
-//          to the issue, and the run ends its turn; the worker brings the answer back. Up to the
-//          daily cap every ask waits; past it the run takes its own pick and posts a call. A plan
-//          approval always waits. Until the hook passes 18 of 20 past choices, nothing judges undo cost.
-//   seal   an edit to the approved plan revokes its approval.
-//   logs   test output is cut to its failures before the agent reads it.
-//   notes  after a tool call, at most once a minute, the issue's newest human comment reaches the agent.
+/**
+ * A session is a factory run when its directory sits on a claimed `factory/<n>` branch;
+ * in any other session every hook passes its event straight on.
+ */
 
 const NOTE_EVERY_MS = 60_000;
 
 type FactoryRun = { repo: string; issue: number; cwd: string; rules: Rules };
 
-/** A `Run` over the host's `$.process.run`, for the GitHub calls a hook makes. */
 export const runner =
   ($: EngineInterface): Run =>
   (argv, opts) =>
@@ -41,7 +37,6 @@ export const runner =
       timeoutMs: 60_000,
     });
 
-/** The factory run this session is, or null when it is any other session. */
 async function factoryRun($: EngineInterface): Promise<FactoryRun | null> {
   const run = runner($);
   const cwd = await $.session.cwd();
@@ -58,7 +53,7 @@ async function factoryRun($: EngineInterface): Promise<FactoryRun | null> {
     await $.store.set(key, repo);
   }
 
-  // From the default branch, never the run's own: a run could edit its branch's copy.
+  /** From the default branch, never the run's own: a run could edit its branch's copy. */
   const rules = parseRules(
     await must(run, ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`], { cwd }),
   );
@@ -68,7 +63,6 @@ async function factoryRun($: EngineInterface): Promise<FactoryRun | null> {
   return { repo, issue, cwd, rules };
 }
 
-/** Shows a failure once and lets the event go on: a hook never blocks what it wraps. */
 function shown($: EngineInterface, err: Error | string): void {
   $.ui.toast(`factory: ${err instanceof Error ? err.message : err}`);
 }
@@ -89,7 +83,53 @@ export function whyAsked(
   return "";
 }
 
-/** Today in UTC, the day the wait cap counts in. */
+/**
+ * The refusal for a tool call in a factory run the factory can't set up (its rules, its repo, its
+ * bot token). Going on would act as the user's own login, so the run is stopped instead.
+ */
+function cantRun(err: Error | string) {
+  return {
+    deny: `The factory can't run this session (${err instanceof Error ? err.message : err}). Stop now: end your turn without touching GitHub.`,
+  };
+}
+
+const RENEW_BEFORE_MS = 10 * 60_000;
+
+/**
+ * Makes everything the run starts from here on act on GitHub as the factory's bot, minting a new
+ * token when the held one is within ten minutes of expiring. Throws when no token can be had: a
+ * run that silently fell back to the user's own login could approve its own plan.
+ */
+async function asBot($: EngineInterface, fr: FactoryRun): Promise<void> {
+  const key = `bot:${fr.repo}`;
+  const held = await $.store.get(key);
+  /** SAFETY: only this function writes the key, with the token command's JSON output. */
+  let bot = held === undefined ? null : (JSON.parse(String(held)) as Bot);
+
+  if (bot === null || Date.parse(bot.expiresAt) - Date.now() < RENEW_BEFORE_MS) {
+    const out = await must(runner($), ["bun", `${$.plugin.root}/worker/cli.ts`, "token"], {
+      cwd: fr.cwd,
+    });
+
+    /** SAFETY: the token command prints a Bot as JSON, and nothing else. */
+    bot = JSON.parse(out) as Bot;
+    await $.store.set(key, out.trim());
+  }
+
+  const env = botEnv(bot);
+  /** `$.env.set` takes each name as a literal, so the names are spelled out. */
+  await $.env.set("GH_TOKEN", env.GH_TOKEN);
+  await $.env.set("GIT_CONFIG_COUNT", env.GIT_CONFIG_COUNT);
+  await $.env.set("GIT_CONFIG_KEY_0", env.GIT_CONFIG_KEY_0);
+  await $.env.set("GIT_CONFIG_VALUE_0", env.GIT_CONFIG_VALUE_0);
+  await $.env.set("GIT_CONFIG_KEY_1", env.GIT_CONFIG_KEY_1);
+  await $.env.set("GIT_CONFIG_VALUE_1", env.GIT_CONFIG_VALUE_1);
+  await $.env.set("GIT_AUTHOR_NAME", env.GIT_AUTHOR_NAME);
+  await $.env.set("GIT_AUTHOR_EMAIL", env.GIT_AUTHOR_EMAIL);
+  await $.env.set("GIT_COMMITTER_NAME", env.GIT_COMMITTER_NAME);
+  await $.env.set("GIT_COMMITTER_EMAIL", env.GIT_COMMITTER_EMAIL);
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
@@ -124,14 +164,17 @@ export const register: Register = (on) => {
     try {
       fr = await factoryRun($);
     } catch (err) {
-      shown($, err instanceof Error ? err : String(err));
-
-      return next(e);
+      return cantRun(err instanceof Error ? err : String(err));
     }
 
     if (!fr) return next(e);
 
-    // Why it asks: what the run wrote this turn before asking, else the question's short label.
+    try {
+      await asBot($, fr);
+    } catch (err) {
+      return cantRun(err instanceof Error ? err : String(err));
+    }
+
     const said = await $.session
       .messages()
       .then((ms) => whyAsked(ms))
@@ -143,7 +186,9 @@ export const register: Register = (on) => {
       options: q.options.map((o) => o.label),
     }));
 
-    // Approving a plan is the human's alone, so it always waits and never counts against the cap.
+    /**
+     * Approving a plan is the human's alone, so it always waits and never counts against the cap.
+     */
     const approval = questions.some((q) => parseApprovalQuestion(q.question));
     const key = `waits:${today()}`;
     const used = Number((await $.store.get(key)) ?? 0);
@@ -161,7 +206,9 @@ export const register: Register = (on) => {
         answers: null,
       });
     } catch (err) {
-      // Nobody watches this run's question box, so a question that can't reach the issue stops it.
+      /**
+       * Nobody watches this run's question box, so a question that can't reach the issue stops it.
+       */
       const why = err instanceof Error ? err.message : String(err);
 
       return {
@@ -179,7 +226,7 @@ export const register: Register = (on) => {
   on("tool.call", { tool: "Bash" }, async ($, e, next) => {
     const r = await next(e);
 
-    // Only a failed run is cut: passing output may still hold words like "0 fail".
+    /** Only a failed run is cut: passing output may still hold words like "0 fail". */
     if (r.deny !== undefined || !r.isError || !isTestCommand(e.command))
       return r;
 
@@ -187,8 +234,10 @@ export const register: Register = (on) => {
       if (!(await factoryRun($))) return r;
       const cut = cutToFailures(r.text ?? "");
 
-      // Output with a failure in it comes back cut; the model reads a deny returned after the
-      // tool ran as that tool's error result, and nothing the command did is undone.
+      /**
+       * Output with a failure in it comes back cut; the model reads a deny returned after the
+       * tool ran as that tool's error result, and nothing the command did is undone.
+       */
       return cut === (r.text ?? "") ? r : { deny: cut };
     } catch (err) {
       shown($, err instanceof Error ? err : String(err));
@@ -198,6 +247,15 @@ export const register: Register = (on) => {
   });
 
   on("tool.call", async ($, e, next) => {
+    /** Before the tool runs, so what it starts acts as the bot. */
+    try {
+      const fr = await factoryRun($);
+
+      if (fr) await asBot($, fr);
+    } catch (err) {
+      return cantRun(err instanceof Error ? err : String(err));
+    }
+
     const r = await next(e);
 
     if (r.deny !== undefined) return r;
@@ -236,7 +294,7 @@ export const register: Register = (on) => {
 
       if (now - Number((await $.store.get(atKey)) ?? 0) >= NOTE_EVERY_MS) {
         await $.store.set(atKey, now);
-        // Keyed by issue, not session: a restarted run never takes the same note twice.
+        /** Keyed by issue, not session: a restarted run never takes the same note twice. */
         const seenKey = `notes:seen:${fr.repo}#${fr.issue}`;
         const seen = Number((await $.store.get(seenKey)) ?? 0);
         const cs = await comments(run, fr.repo, fr.issue);
