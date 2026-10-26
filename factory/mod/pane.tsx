@@ -1,11 +1,10 @@
 import type { ElementTable, EngineInterface, Register, RenderChildren } from "claude-code";
 import { APPROVE, parseApprovalQuestion } from "../lib/formats.ts";
-import { comments, must, post, repoOf, type Run } from "../lib/github.ts";
+import { STUCK_LABEL, comments, must, post, repoOf, type Run } from "../lib/github.ts";
 import { RULES_PATH } from "../lib/rules.ts";
 import { answerTo } from "../lib/wait.ts";
 import {
   QUERY,
-  STUCK_LABEL,
   UNDO_LABEL,
   perPr,
   rows,
@@ -46,14 +45,12 @@ const owning = new Set<string>();
 const planOpen = new Set<number>();
 let ticking: { cancel: () => void } | null = null;
 
-const runner =
-  ($: EngineInterface): Run =>
-  (argv, opts) =>
-    $.process.run(argv, {
-      cwd: opts?.cwd,
-      stdin: opts?.stdin,
-      timeoutMs: 60_000,
-    });
+// A copy of hooks/run.ts's `runner`: the engine follows `$` past an import only into a function
+// declaration, and that one is an arrow. Raised on #63.
+function runner($: EngineInterface): Run {
+  return (argv, opts) =>
+    $.process.run(argv, { cwd: opts?.cwd, stdin: opts?.stdin, timeoutMs: 60_000 });
+}
 
 async function refresh($: EngineInterface): Promise<void> {
   try {
@@ -527,7 +524,16 @@ function callCards($: EngineInterface, ui: ElementTable, calls: CallRow[]) {
       "inactive",
       [
         head(ui, `#${c.issue}  ${c.choice}`, "suggestion"),
-        <Text>{c.picked}</Text>,
+        <Text>
+          {c.picked}
+          {c.others.length > 0 && <Text dimColor>{"  not "}</Text>}
+          {c.others.length > 0 && (
+            <Text strikethrough dimColor>
+              {c.others.join(", ")}
+            </Text>
+          )}
+        </Text>,
+        <Text dimColor>{c.why}</Text>,
         foot(ui, [pill(ui, `undo-${c.id}`, "undo", () => void undoCall($, c))]),
       ],
       `call-${c.id}`,

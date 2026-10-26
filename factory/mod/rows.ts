@@ -1,13 +1,9 @@
 // What /factory shows, read from GitHub alone: one GraphQL query per refresh, turned into rows.
 // Every machine running the factory sees the same rows, since none of them come from a local store.
 
-import { latest, issueOf, type Comment } from "../lib/github.ts";
+import { STUCK_LABEL, latest, issueOf, type Comment } from "../lib/github.ts";
 import { parse, parseApprovalQuestion, total, type Question } from "../lib/formats.ts";
 import { answerTo, openWait } from "../lib/wait.ts";
-
-// A copy of worker/cli.ts's STUCK_LABEL: cli.ts spawns processes through Bun, which a hooks
-// module can't load. Raised on #63 to move the label into lib/.
-export const STUCK_LABEL = "factory:stuck";
 
 /** The label on an issue the pane opened to reverse a call; the worker never picks it up. */
 export const UNDO_LABEL = "factory:undo";
@@ -85,6 +81,8 @@ export type CallRow = {
   url: string;
   choice: string;
   picked: string;
+  others: string[];
+  why: string;
   undo: string;
 };
 
@@ -180,6 +178,8 @@ export function rows(s: Snapshot): Rows {
           url: c.url,
           choice: call.choice,
           picked: call.picked,
+          others: call.others,
+          why: call.why,
           undo: call.undo,
         },
       ];

@@ -1,8 +1,8 @@
 import type { CommandRunInput } from "claude-code";
 import { describe, expect, test, type MountTarget } from "claude-code/testing";
 import { approvalQuestion, render, type FactoryComment } from "../lib/formats.ts";
+import { STUCK_LABEL } from "../lib/github.ts";
 import {
-  STUCK_LABEL,
   UNDO_LABEL,
   rows,
   undoLine,
@@ -123,7 +123,9 @@ function snapshot(): Snapshot {
                     kind: "call",
                     issue: 8,
                     choice: "empty state as text",
-                    picked: "text, since no asset exists",
+                    picked: "text",
+                    others: ["an illustration"],
+                    why: "no asset exists to draw",
                     undo: "draw an illustration",
                   }),
                   comment(81, {
@@ -131,6 +133,8 @@ function snapshot(): Snapshot {
                     issue: 8,
                     choice: "kept the old Rail API",
                     picked: "old API",
+                    others: [],
+                    why: "two callers outside the issue use it",
                     undo: "add RailItem",
                   }),
                   comment(82, {
@@ -271,6 +275,8 @@ test("/factory draws GitHub's rows and an undo opens one issue", async ($, on) =
   expect(
     await ui.find({ type: "Text", text: /empty state as text/ }),
   ).toBeDefined();
+  expect(await ui.find({ type: "Text", text: /^an illustration$/ })).toBeDefined();
+  expect(await ui.find({ type: "Text", text: /no asset exists to draw/ })).toBeDefined();
   expect(
     await ui.find({ type: "Text", text: /kept the old Rail API/ }),
   ).toBeUndefined();
