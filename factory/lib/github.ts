@@ -1,5 +1,10 @@
-
-import { parse, render, type FactoryComment, type Kind } from "./formats.ts";
+import {
+  parse,
+  render,
+  writer,
+  type FactoryComment,
+  type Kind,
+} from "./formats.ts";
 
 export type Run = (
   argv: readonly string[],
@@ -22,69 +27,68 @@ export async function must(
 /** The branch a run claims for issue `n`; the first push of it wins the issue. */
 export const branchFor = (n: number) => `factory/${n}`;
 
+/** The session name of a run for issue `n` of `repo`; agent view lists runs by it. */
+export const runName = (repo: string, n: number) => `factory:${repo}#${n}`;
+
 export function issueOf(branch: string): number | null {
   const m = /^factory\/(\d+)$/.exec(branch.trim());
 
   return m ? Number(m[1]) : null;
 }
 
+/** Logins in REST form: a bot is `<slug>[bot]`. `editor` is who last edited the body, if anyone. */
 export type Comment = {
   id: number;
   body: string;
-  author: string;
+  author: string | null;
+  editor: string | null;
   createdAt: string;
-  /** The author's tie to the repo as GitHub reports it: OWNER, MEMBER, COLLABORATOR, NONE, … */
-  association: string;
+  url: string;
 };
 
-export function trusted(c: Comment): boolean {
-  /**
-   * A bot is never trusted: the factory's runs post as its bot, and a run must not approve itself.
-   */
+/** The factory's bot, and the people whose words count. */
+export type Actors = { bot: string; trusted: readonly string[] };
+
+/**
+ * Written by one of `logins` and edited by nobody else. The bot can edit anyone's comment, so
+ * an edit by anyone outside `logins` voids the comment.
+ */
+export function wroteIt(
+  c: { author: string | null; editor: string | null },
+  logins: readonly string[],
+): boolean {
   return (
-    !c.author.endsWith("[bot]") &&
-    ["OWNER", "MEMBER", "COLLABORATOR"].includes(c.association)
+    c.author !== null &&
+    logins.includes(c.author) &&
+    (c.editor === null || logins.includes(c.editor))
   );
 }
 
-/** Every comment on the issue, oldest first. */
-export async function comments(
-  run: Run,
-  repo: string,
-  issue: number,
-): Promise<Comment[]> {
-  const out = await must(run, [
-    "gh",
-    "api",
-    "--paginate",
-    `repos/${repo}/issues/${issue}/comments?per_page=100`,
-    "--jq",
-    ".[] | {id, body, author: .user.login, createdAt: .created_at, association: .author_association}",
-  ]);
+export const fromBot = (c: Comment, a: Actors) => wroteIt(c, [a.bot]);
+export const fromTrusted = (c: Comment, a: Actors) => wroteIt(c, a.trusted);
 
-  /** SAFETY: the --jq above emits exactly Comment's fields, one object per line. */
-  return out
-    .split("\n")
-    .filter((l) => l.trim() !== "")
-    .map((l) => JSON.parse(l) as Comment);
-}
-
+/** The comments that are factory comments from the author their kind allows, oldest first. */
 export function factoryComments(
   cs: readonly Comment[],
+  a: Actors,
 ): { id: number; c: FactoryComment }[] {
   return cs.flatMap((x) => {
     const c = parse(x.body);
 
-    return c ? [{ id: x.id, c }] : [];
+    if (c === null) return [];
+    const ok = writer(c.kind) === "bot" ? fromBot(x, a) : fromTrusted(x, a);
+
+    return ok ? [{ id: x.id, c }] : [];
   });
 }
 
 export function latest<K extends Kind>(
   cs: readonly Comment[],
+  a: Actors,
   kind: K,
 ): { id: number; c: Extract<FactoryComment, { kind: K }> } | null {
   return (
-    factoryComments(cs)
+    factoryComments(cs, a)
       .filter(
         (x): x is { id: number; c: Extract<FactoryComment, { kind: K }> } =>
           x.c.kind === kind,
@@ -139,24 +143,22 @@ export async function edit(
 }
 
 /**
- * Posts `c`, or edits the newest factory comment of its kind already on `n` when it differs, so
- * a rerun after a crash never posts twice.
+ * Posts `c` on `n`, or edits the bot's newest comment of its kind among `existing` when it
+ * differs, so a rerun after a crash never posts twice.
  */
 export async function upsert(
   run: Run,
   repo: string,
   n: number,
   c: FactoryComment,
+  existing: readonly Comment[],
+  a: Actors,
 ): Promise<number> {
-  const body = render(c);
+  const old = latest(existing, a, c.kind);
 
-  const old = (await comments(run, repo, n))
-    .filter((x) => parse(x.body)?.kind === c.kind)
-    .at(-1);
+  if (old === null) return post(run, repo, n, c);
 
-  if (!old) return post(run, repo, n, c);
-
-  if (old.body !== body) await edit(run, repo, old.id, c);
+  if (render(old.c) !== render(c)) await edit(run, repo, old.id, c);
 
   return old.id;
 }
@@ -174,66 +176,11 @@ export async function repoOf(run: Run, cwd: string): Promise<string> {
         "--jq",
         ".nameWithOwner",
       ],
-      { cwd },
+      {
+        cwd,
+      },
     )
   ).trim();
-}
-
-export async function openPrFiles(
-  run: Run,
-  repo: string,
-  ownHead: string,
-): Promise<Map<number, string[]>> {
-  const out = await must(run, [
-    "gh",
-    "pr",
-    "list",
-    "--repo",
-    repo,
-    "--state",
-    "open",
-    "--limit",
-    "100",
-    "--json",
-    "number,headRefName,files",
-  ]);
-
-  /** SAFETY: gh prints JSON with exactly the --json fields asked for, typed here. */
-  const prs = JSON.parse(out) as {
-    number: number;
-    headRefName: string;
-    files: { path: string }[];
-  }[];
-
-  return new Map(
-    prs.flatMap((p) =>
-      p.headRefName === ownHead ? [] : [[p.number, p.files.map((f) => f.path)]],
-    ),
-  );
-}
-
-export async function prFrom(
-  run: Run,
-  repo: string,
-  head: string,
-): Promise<number | null> {
-  const out = await must(run, [
-    "gh",
-    "pr",
-    "list",
-    "--repo",
-    repo,
-    "--head",
-    head,
-    "--state",
-    "all",
-    "--json",
-    "number",
-    "--jq",
-    ".[0].number // empty",
-  ]);
-
-  return out.trim() === "" ? null : Number(out.trim());
 }
 
 export const STUCK_LABEL = "factory:stuck";
@@ -258,27 +205,14 @@ export async function markStuck(
     "--description",
     "A factory run gave up; the comment says why",
   ]);
-  await must(run, ["gh", "issue", "edit", String(n), "--repo", repo, "--add-label", STUCK_LABEL]);
-}
-
-export type Bot = { token: string; expiresAt: string; name: string; email: string };
-
-/**
- * Environment that makes `gh`, `git push` and `git commit` act as the factory's bot: `GH_TOKEN`
- * for `gh`, a git credential helper that hands git the same token in place of the user's keychain
- * login, and the bot as the commits' author.
- */
-export function botEnv(bot: Bot) {
-  return {
-    GH_TOKEN: bot.token,
-    GIT_CONFIG_COUNT: "2",
-    GIT_CONFIG_KEY_0: "credential.helper",
-    GIT_CONFIG_VALUE_0: "",
-    GIT_CONFIG_KEY_1: "credential.helper",
-    GIT_CONFIG_VALUE_1: "!gh auth git-credential",
-    GIT_AUTHOR_NAME: bot.name,
-    GIT_AUTHOR_EMAIL: bot.email,
-    GIT_COMMITTER_NAME: bot.name,
-    GIT_COMMITTER_EMAIL: bot.email,
-  };
+  await must(run, [
+    "gh",
+    "issue",
+    "edit",
+    String(n),
+    "--repo",
+    repo,
+    "--add-label",
+    STUCK_LABEL,
+  ]);
 }

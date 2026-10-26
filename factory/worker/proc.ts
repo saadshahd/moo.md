@@ -1,15 +1,9 @@
-
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { must, type Run } from "../lib/github.ts";
+import type { Run } from "../lib/github.ts";
 
 export const run: Run = async (argv, opts) => {
   const p = Bun.spawn([...argv], {
     cwd: opts?.cwd,
-    stdin:
-      opts?.stdin === undefined
-        ? "ignore"
-        : new TextEncoder().encode(opts.stdin),
+    stdin: opts?.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -22,32 +16,3 @@ export const run: Run = async (argv, opts) => {
 
   return { exitCode, stdout, stderr };
 };
-
-/** A Claude Code session as `claude agents --json --all` lists it. */
-export type Session = {
-  id: string;
-  sessionId: string;
-  name: string | null;
-  cwd: string;
-  startedAt: number;
-  /** Seen: `working`; `blocked` or `done` once its turn ends; `stopped`. */
-  state: string;
-};
-
-export async function sessions(): Promise<Session[]> {
-  /** SAFETY: `claude agents --json` prints an array of sessions with at least Session's fields. */
-  return JSON.parse(
-    await must(run, ["claude", "agents", "--json", "--all"]),
-  ) as Session[];
-}
-
-export async function transcript(sessionId: string): Promise<string> {
-  const root = join(homedir(), ".claude", "projects");
-
-  for await (const f of new Bun.Glob(`*/${sessionId}.jsonl`).scan({
-    cwd: root,
-  }))
-    return Bun.file(join(root, f)).text();
-
-  return "";
-}

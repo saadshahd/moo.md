@@ -1,55 +1,80 @@
+import { parse, type Answer, type Question, type Wait } from "./formats.ts";
+import { factoryComments, fromTrusted, latest, type Actors, type Comment } from "./github.ts";
 
-import { APPROVE, parse, parseApprovalQuestion, type Wait } from "./formats.ts";
-import { latest, trusted, type Comment } from "./github.ts";
+export const APPROVE = "Approve";
+
+/** The one question that asks for a plan's approval; the ask hook names its seal in `approves`. */
+export const APPROVAL_QUESTION = "Approve the plan posted on this issue?";
+
+export const isApproval = (q: Question) =>
+  q.question.trim() === APPROVAL_QUESTION;
 
 export function openWait(
   cs: readonly Comment[],
+  a: Actors,
 ): { id: number; c: Wait } | null {
-  const w = latest(cs, "wait");
+  const w = latest(cs, a, "wait");
 
   return w !== null && w.c.answers === null ? w : null;
 }
 
 /**
- * An answer comment naming the wait answers it question by question; a person's plain comment
- * after the wait answers every question with its text.
+ * The trusted answer to `wait`: an answer comment naming it, or a plain comment after it when
+ * the wait asks one question and that question is no approval. An approval needs an answer
+ * comment, so a passing remark never approves a plan.
  */
 export function answerTo(
   cs: readonly Comment[],
-  waitId: number,
-  questions: number,
-): { id: number; author: string; answers: string[] } | null {
+  a: Actors,
+  wait: { id: number; c: Wait },
+): { id: number; answers: string[]; approves: string | null } | null {
+  const plain =
+    wait.c.questions.length === 1 && !wait.c.questions.some(isApproval);
+
   for (const c of cs) {
-    if (c.id <= waitId || !trusted(c)) continue;
+    if (c.id <= wait.id || !fromTrusted(c, a)) continue;
     const f = parse(c.body);
 
-    if (f?.kind === "answer" && f.wait === waitId)
-      return { id: c.id, author: c.author, answers: f.answers };
+    if (f?.kind === "answer" && f.wait === wait.id)
+      return { id: c.id, answers: f.answers, approves: f.approves };
 
-    if (f === null)
-      return {
-        id: c.id,
-        author: c.author,
-        answers: Array.from({ length: questions }, () => c.body.trim()),
-      };
+    if (f === null && plain)
+      return { id: c.id, answers: [c.body.trim()], approves: null };
   }
 
   return null;
 }
 
-export function approvedSeal(
-  w: Wait,
-  answers: readonly string[],
-): string | null {
-  const i = w.questions.findIndex((q) => parseApprovalQuestion(q.question));
-  const q = w.questions[i];
-  const a = answers[i];
+/** The answer comment a person posts to `wait`; picking Approve on its approval question approves its seal. */
+export function answerFor(
+  waitId: number,
+  wait: Wait,
+  answers: string[],
+): Answer {
+  const i = wait.questions.findIndex(isApproval);
+  const picked = answers[i]?.trim().toLowerCase();
 
-  return q !== undefined &&
-    a !== undefined &&
-    a.trim().toLowerCase() === APPROVE.toLowerCase()
-    ? (parseApprovalQuestion(q.question)?.seal8 ?? null)
-    : null;
+  return {
+    kind: "answer",
+    issue: wait.issue,
+    wait: waitId,
+    answers,
+    approves: picked === APPROVE.toLowerCase() ? wait.approves : null,
+  };
+}
+
+/** Whether a trusted person's answer approved this exact seal. */
+export function approved(
+  cs: readonly Comment[],
+  a: Actors,
+  seal: string,
+): boolean {
+  return cs.some((c) => {
+    if (!fromTrusted(c, a)) return false;
+    const f = parse(c.body);
+
+    return f?.kind === "answer" && f.approves === seal;
+  });
 }
 
 export function answerMessage(w: Wait, answers: readonly string[]): string {
@@ -60,16 +85,21 @@ export function answerMessage(w: Wait, answers: readonly string[]): string {
   return `Your questions on issue #${w.issue} were answered:\n\n${lines.join("\n")}\n\nGo on with the work.`;
 }
 
-/** The ids of the comments that answered a wait: they reached the run as its answer, never as a note. */
-export function answerIds(cs: readonly Comment[]): Set<number> {
-  return new Set(
-    cs.flatMap((c) => {
-      const w = parse(c.body);
+/**
+ * What trusted people said on the issue that is no factory comment and no answer to a wait:
+ * an answer reaches the run as its next message, never as a note.
+ */
+export function notes(cs: readonly Comment[], a: Actors): Comment[] {
+  const answered = new Set(
+    factoryComments(cs, a).flatMap(({ id, c }) => {
+      if (c.kind !== "wait") return [];
+      const ans = answerTo(cs, a, { id, c });
 
-      if (w?.kind !== "wait" || w.answers === null) return [];
-      const a = answerTo(cs, c.id, w.questions.length);
-
-      return a ? [a.id] : [];
+      return ans ? [ans.id] : [];
     }),
+  );
+
+  return cs.filter(
+    (c) => fromTrusted(c, a) && parse(c.body) === null && !answered.has(c.id),
   );
 }
