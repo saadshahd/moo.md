@@ -5,6 +5,8 @@ import {
   edit,
   issueOf,
   latest,
+  botEnv,
+  type Bot,
   must,
   post,
   trusted,
@@ -89,6 +91,53 @@ export function whyAsked(
   return "";
 }
 
+/**
+ * The refusal for a tool call in a factory run the factory can't set up (its rules, its repo, its
+ * bot token). Going on would act as the user's own login, so the run is stopped instead.
+ */
+function cantRun(err: Error | string) {
+  return {
+    deny: `The factory can't run this session (${err instanceof Error ? err.message : err}). Stop now: end your turn without touching GitHub.`,
+  };
+}
+
+const RENEW_BEFORE_MS = 10 * 60_000;
+
+/**
+ * Makes everything the run starts from here on act on GitHub as the factory's bot, minting a new
+ * token when the held one is within ten minutes of expiring. Throws when no token can be had: a
+ * run that silently fell back to the user's own login could approve its own plan.
+ */
+async function asBot($: EngineInterface, fr: FactoryRun): Promise<void> {
+  const key = `bot:${fr.repo}`;
+  const held = await $.store.get(key);
+  // SAFETY: only this function writes the key, with the token command's JSON output.
+  let bot = held === undefined ? null : (JSON.parse(String(held)) as Bot);
+
+  if (bot === null || Date.parse(bot.expiresAt) - Date.now() < RENEW_BEFORE_MS) {
+    const out = await must(runner($), ["bun", `${$.plugin.root}/worker/cli.ts`, "token"], {
+      cwd: fr.cwd,
+    });
+
+    // SAFETY: the token command prints a Bot as JSON, and nothing else.
+    bot = JSON.parse(out) as Bot;
+    await $.store.set(key, out.trim());
+  }
+
+  const env = botEnv(bot);
+  // `$.env.set` takes each name as a literal, so the names are spelled out.
+  await $.env.set("GH_TOKEN", env.GH_TOKEN);
+  await $.env.set("GIT_CONFIG_COUNT", env.GIT_CONFIG_COUNT);
+  await $.env.set("GIT_CONFIG_KEY_0", env.GIT_CONFIG_KEY_0);
+  await $.env.set("GIT_CONFIG_VALUE_0", env.GIT_CONFIG_VALUE_0);
+  await $.env.set("GIT_CONFIG_KEY_1", env.GIT_CONFIG_KEY_1);
+  await $.env.set("GIT_CONFIG_VALUE_1", env.GIT_CONFIG_VALUE_1);
+  await $.env.set("GIT_AUTHOR_NAME", env.GIT_AUTHOR_NAME);
+  await $.env.set("GIT_AUTHOR_EMAIL", env.GIT_AUTHOR_EMAIL);
+  await $.env.set("GIT_COMMITTER_NAME", env.GIT_COMMITTER_NAME);
+  await $.env.set("GIT_COMMITTER_EMAIL", env.GIT_COMMITTER_EMAIL);
+}
+
 /** Today in UTC, the day the wait cap counts in. */
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -124,12 +173,16 @@ export const register: Register = (on) => {
     try {
       fr = await factoryRun($);
     } catch (err) {
-      shown($, err instanceof Error ? err : String(err));
-
-      return next(e);
+      return cantRun(err instanceof Error ? err : String(err));
     }
 
     if (!fr) return next(e);
+
+    try {
+      await asBot($, fr);
+    } catch (err) {
+      return cantRun(err instanceof Error ? err : String(err));
+    }
 
     // Why it asks: what the run wrote this turn before asking, else the question's short label.
     const said = await $.session
@@ -198,6 +251,15 @@ export const register: Register = (on) => {
   });
 
   on("tool.call", async ($, e, next) => {
+    // Before the tool runs, so what it starts acts as the bot.
+    try {
+      const fr = await factoryRun($);
+
+      if (fr) await asBot($, fr);
+    } catch (err) {
+      return cantRun(err instanceof Error ? err : String(err));
+    }
+
     const r = await next(e);
 
     if (r.deny !== undefined) return r;

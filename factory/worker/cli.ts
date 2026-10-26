@@ -5,6 +5,7 @@
 //   handoff                               post .factory/handoff.md for the next session
 //   pr                                    open the PR on the approved plan, auto-merge on
 //   stuck "<reason>"                      mark the issue stuck and say why
+//   token                                 a fresh bot token for the run hooks
 
 import { approvalQuestion, parse, type Plan } from "../lib/formats.ts";
 import {
@@ -26,6 +27,7 @@ import {
   planFiles,
   planGaps,
 } from "../lib/plan.ts";
+import { botFor, readApp } from "./app.ts";
 import { run } from "./proc.ts";
 
 class Refusal extends Error {
@@ -241,12 +243,18 @@ async function stuck(cwd: string, args: string[]): Promise<string> {
   return "marked stuck";
 }
 
+/** Prints a fresh bot token and identity as JSON, for the run hooks: `{ token, expiresAt, name, email }`. */
+async function token(cwd: string): Promise<string> {
+  return JSON.stringify(await botFor(await readApp(), await repoOf(run, cwd)));
+}
+
 const COMMANDS = {
   plan,
   call,
   handoff,
   pr,
   stuck,
+  token,
 } satisfies Record<string, (cwd: string, args: string[]) => Promise<string>>;
 
 if (import.meta.main) {
