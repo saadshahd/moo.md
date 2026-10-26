@@ -5,6 +5,7 @@
  * lives in GitHub and Claude Code's session list, never in a file of the worker's.
  */
 
+import { messageOf } from "../lib/errors.ts";
 import { botEnv, needsRenew, type Bot } from "../lib/bot.ts";
 import { must, repoOf } from "../lib/github.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
@@ -60,7 +61,7 @@ async function tick(ctx: Ctx): Promise<void> {
 
         started ||= a.kind === "start" || a.kind === "wake";
       } catch (err) {
-        log(`#${a.issue}: ${a.kind} failed: ${err instanceof Error ? err.message : String(err)}`);
+        log(`#${a.issue}: ${a.kind} failed: ${messageOf(err)}`);
         break;
       }
     }
@@ -128,7 +129,7 @@ async function main(dir: string): Promise<void> {
     try {
       await tick(ctx);
     } catch (err) {
-      log(`tick failed: ${err instanceof Error ? err.message : String(err)}`);
+      log(`tick failed: ${messageOf(err)}`);
     }
 
     await Bun.sleep(TICK_MS);
@@ -146,7 +147,7 @@ if (import.meta.main) {
   }
 
   await main(dir).catch((err: Error) => {
-    console.error(`factory: ${err instanceof Error ? err.message : String(err)}`);
+    console.error(`factory: ${messageOf(err)}`);
     process.exit(1);
   });
 }

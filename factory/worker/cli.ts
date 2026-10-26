@@ -5,6 +5,7 @@
  */
 
 import { parseArgs } from "node:util";
+import { messageOf } from "../lib/errors.ts";
 import { WHY_MAX, type Plan } from "../lib/formats.ts";
 import {
   branchFor,
@@ -318,7 +319,7 @@ if (import.meta.main)
     (msg) => console.log(msg),
     (err: Error) => {
       console.error(
-        `factory: ${err instanceof Error ? err.message : String(err)}`,
+        `factory: ${messageOf(err)}`,
       );
       process.exit(err instanceof Refusal ? err.code : 1);
     },
