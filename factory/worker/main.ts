@@ -100,7 +100,7 @@ async function main(dir: string): Promise<void> {
   await must(run, ["git", "fetch", "origin", base], { cwd: dir });
   const rules = await readRules(run, dir);
   const app = await readApp();
-  const no = await refusals(dir, repo, base, rules, app);
+  const no = await refusals(repo, base, rules, app);
 
   if (no.length > 0) {
     for (const r of no) console.error(`factory: ${r}`);

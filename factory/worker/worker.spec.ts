@@ -841,9 +841,12 @@ describe("a missing rules file says to run setup, not git's words", () => {
   });
 });
 
-describe("the worker refuses to start without a Claude login", () => {
-  test("claude auth status, logged in and out (2.1.x, 2026-10-27)", () => {
+describe("the worker starts on any Claude setup and refuses only without one", () => {
+  test("claude auth status: subscription, API key, apiKeyHelper, Bedrock, logged out (2.1.x, 2026-10-27)", () => {
     expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "claude.ai", "subscriptionType": "max"}', stderr: "" })).toBe("");
+    expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "api_key", "apiKeySource": "ANTHROPIC_API_KEY"}', stderr: "" })).toBe("");
+    expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "api_key_helper", "apiKeySource": "apiKeyHelper"}', stderr: "" })).toBe("");
+    expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "third_party", "apiProvider": "bedrock"}', stderr: "" })).toBe("");
     expect(loginRefusal({ stdout: '{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}', stderr: "" })).toContain("claude auth login");
     expect(loginRefusal({ stdout: "", stderr: "unknown command" })).toContain("unknown command");
   });
