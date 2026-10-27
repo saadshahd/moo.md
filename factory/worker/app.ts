@@ -21,7 +21,8 @@ export type App = ReturnType<typeof createAppAuth>;
 export async function readApp(): Promise<App> {
   const file = Bun.file(join(DIR, "app.json"));
 
-  if (!(await file.exists())) throw new Error(`no ${join(DIR, "app.json")}; run /factory:setup to create the factory's GitHub App`);
+  if (!(await file.exists()))
+    throw new Error(`no ${join(DIR, "app.json")}; run /factory:setup to create the factory's GitHub App`);
   const { clientId, key } = z.parse(AppFile, await file.json());
   const pem = Bun.file(join(DIR, key));
 

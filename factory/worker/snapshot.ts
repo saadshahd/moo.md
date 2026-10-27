@@ -111,7 +111,8 @@ async function claimedHere(ctx: Ctx, n: number): Promise<boolean> {
   await must(run, ["git", "fetch", "origin", branchFor(n)], { cwd: ctx.dir });
 
   const range = `origin/${ctx.base}..origin/${branchFor(n)}`;
-  const out = await must(run, ["git", "log", range, "--format=%(trailers:key=Factory-Claim,valueonly)"], { cwd: ctx.dir });
+  const trailer = "--format=%(trailers:key=Factory-Claim,valueonly)";
+  const out = await must(run, ["git", "log", range, trailer], { cwd: ctx.dir });
 
   return out.split("\n").some((l) => l.trim() === ctx.machine);
 }
@@ -146,7 +147,9 @@ export async function readWorld(ctx: Ctx, rules: Rules, actors: Actors): Promise
 
   const mine = new Set(local.map((l) => l.issue));
 
-  const maybe = gh.issues.filter((i) => gh.claimed.has(i.number) && !mine.has(i.number) && !i.labels.includes(STUCK_LABEL));
+  const maybe = gh.issues.filter(
+    (i) => gh.claimed.has(i.number) && !mine.has(i.number) && !i.labels.includes(STUCK_LABEL),
+  );
 
   /** One at a time: each fetch writes the repo's refs. */
   const here = new Set<number>();
