@@ -103,8 +103,12 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
 
       if (cwd === undefined) throw new Error(`#${n} has no worktree here`);
       await restarted(a.restart, a.run.sessionId);
-      /** Without flags, `--resume` wakes the same session under its own id, name and options. */
-      await run(["claude", "stop", a.run.id]);
+      /**
+       * After `claude stop`, `--resume` wakes the same session under its own id, name, flags and
+       * sandbox. Resumed while not stopped, it starts a new session with none of them, so a failed
+       * stop ends the wake here.
+       */
+      await must(run, ["claude", "stop", a.run.id]);
       await must(run, ["claude", "--bg", "--resume", a.run.sessionId, a.message], { cwd });
       log(`#${n}: woken`);
 
