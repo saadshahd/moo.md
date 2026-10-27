@@ -28,6 +28,23 @@ const SETTINGS = (dir: string) => [
   join(dir, ".claude", "settings.local.json"),
 ];
 
+const AuthStatus = z.object({ loggedIn: z.boolean() });
+
+/** `claude auth status` exits 1 when logged out, so its JSON, not its exit, decides. */
+export function loginRefusal(r: { stdout: string; stderr: string }): string {
+  let raw: unknown;
+
+  try {
+    raw = JSON.parse(r.stdout);
+  } catch {
+    return `\`claude auth status\` printed no status: ${r.stderr.trim() || r.stdout.trim()}`;
+  }
+
+  return z.parse(AuthStatus, raw).loggedIn
+    ? ""
+    : "Claude Code is not logged in on this machine, so no run could start. Run `claude auth login`.";
+}
+
 /** Each answers with a count only on success; a repo without classic protection gets a 404. */
 async function requiredChecks(repo: string, base: string): Promise<number> {
   const asks = [
@@ -66,6 +83,7 @@ export async function refusals(
   );
 
   return [
+    loginRefusal(await run(["claude", "auth", "status"])),
     process.env.ANTHROPIC_API_KEY
       ? "ANTHROPIC_API_KEY is set; it silently overrides your subscription. Unset it."
       : "",

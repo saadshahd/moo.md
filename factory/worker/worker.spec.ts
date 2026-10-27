@@ -22,15 +22,16 @@ import {
   type World,
 } from "./decide.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
-import { platformOf } from "./platform.ts";
+import { machineId, platformOf } from "./platform.ts";
+import { loginRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
-import { actorsOf } from "../lib/rules.ts";
+import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, runView, sessionsNamed } from "./snapshot.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { upsert, type Run } from "../lib/github.ts";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -777,30 +778,73 @@ describe("a worktree counts as this machine's run only when its branch carries t
 });
 
 describe("platform", () => {
-  test("macOS reads its id from ioreg and holds awake with caffeinate until the worker exits", () => {
+  const ran = (out: Record<string, { exitCode: number; stdout?: string }>): Run => async (argv) => {
+    const r = out[argv.join(" ")] ?? { exitCode: 1 };
+
+    return { exitCode: r.exitCode, stdout: r.stdout ?? "", stderr: r.exitCode === 0 ? "" : "No such file or directory" };
+  };
+
+  test("macOS reads its id from ioreg and holds awake with caffeinate until the worker exits", async () => {
     const mac = platformOf("darwin")!;
 
-    expect(mac.machineId.read('  "IOPlatformUUID" = "0A1B-2C3D"\n')).toBe("0A1B-2C3D");
-    expect(mac.awake(42)).toEqual(["caffeinate", "-i", "-w", "42"]);
+    expect(await machineId(ran({ "ioreg -rd1 -c IOPlatformExpertDevice": { exitCode: 0, stdout: '  "IOPlatformUUID" = "0A1B-2C3D"\n' } }), mac)).toBe("0A1B-2C3D");
+    expect(mac.awake?.(42)).toEqual(["caffeinate", "-i", "-w", "42"]);
   });
 
-  test("Linux reads /etc/machine-id and holds awake with systemd-inhibit until the worker exits", () => {
+  test("Linux reads /etc/machine-id, then dbus's copy, and never holds awake: polkit denies a user unit", async () => {
     const linux = platformOf("linux")!;
 
-    expect(linux.machineId.argv).toEqual(["cat", "/etc/machine-id"]);
-    expect(linux.machineId.read("3f9c0d\n")).toBe("3f9c0d");
-    expect(linux.machineId.read("\n")).toBeUndefined();
-    expect(linux.awake(42).slice(0, 1)).toEqual(["systemd-inhibit"]);
-    expect(linux.awake(42)).toContain("--pid=42");
+    expect(await machineId(ran({ "cat /etc/machine-id": { exitCode: 0, stdout: "3f9c0d\n" } }), linux)).toBe("3f9c0d");
+    expect(await machineId(ran({ "cat /var/lib/dbus/machine-id": { exitCode: 0, stdout: "77ab\n" } }), linux)).toBe("77ab");
+    expect(await machineId(ran({ "cat /etc/machine-id": { exitCode: 0, stdout: "\n" }, "cat /var/lib/dbus/machine-id": { exitCode: 0, stdout: "77ab\n" } }), linux)).toBe("77ab");
+    expect(linux.awake).toBeNull();
+  });
+
+  test("a machine with no id fails naming every source it tried", async () => {
+    const tried = machineId(ran({ "cat /etc/machine-id": { exitCode: 0, stdout: "\n" } }), platformOf("linux")!);
+
+    await expect(tried).rejects.toThrow("no machine id: `cat /etc/machine-id` printed no id; `cat /var/lib/dbus/machine-id` failed: No such file or directory");
   });
 
   test("any other platform has none, so the worker refuses to start", () => {
     expect(platformOf("win32")).toBeNull();
   });
 
-  test("this machine's id command prints an id", async () => {
-    const here = platformOf(process.platform)!;
+  test("this machine has an id", async () => {
+    expect(await machineId(run, platformOf(process.platform)!)).toBeTruthy();
+  });
+});
 
-    expect(here.machineId.read((await run(here.machineId.argv)).stdout)).toBeTruthy();
+describe("a missing rules file says to run setup, not git's words", () => {
+  test("absent, present, and malformed", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "factory-rules-"));
+    const git = (...a: string[]) => run(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir });
+    await git("init", "-q", "-b", "main");
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("update-ref", "refs/remotes/origin/main", "HEAD");
+    await git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+
+    await expect(readRules(run, dir)).rejects.toThrow(/^no \.claude\/factory\.json on origin\/main; run \/factory:setup$/);
+
+    await mkdir(join(dir, ".claude"));
+    await Bun.write(join(dir, RULES_PATH), JSON.stringify(SMOKE_RULES));
+    await git("add", RULES_PATH);
+    await git("commit", "-q", "-m", "rules");
+    await git("update-ref", "refs/remotes/origin/main", "HEAD");
+    expect(await readRules(run, dir)).toEqual(SMOKE_RULES);
+
+    await Bun.write(join(dir, RULES_PATH), "{");
+    await git("commit", "-q", "-am", "broken");
+    await git("update-ref", "refs/remotes/origin/main", "HEAD");
+    await expect(readRules(run, dir)).rejects.toThrow(/is not JSON/);
+    await rm(dir, { recursive: true });
+  });
+});
+
+describe("the worker refuses to start without a Claude login", () => {
+  test("claude auth status, logged in and out (2.1.x, 2026-10-27)", () => {
+    expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "claude.ai", "subscriptionType": "max"}', stderr: "" })).toBe("");
+    expect(loginRefusal({ stdout: '{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}', stderr: "" })).toContain("claude auth login");
+    expect(loginRefusal({ stdout: "", stderr: "unknown command" })).toContain("unknown command");
   });
 });

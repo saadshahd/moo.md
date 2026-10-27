@@ -13,7 +13,7 @@ import { apply, log } from "./act.ts";
 import { botFor, readApp } from "./app.ts";
 import { classify, decide, occupies, stateLine, trustedIssue } from "./decide.ts";
 import { refusals } from "./guard.ts";
-import { platformOf, type Platform } from "./platform.ts";
+import { machineId, platformOf, type Platform } from "./platform.ts";
 import { run } from "./proc.ts";
 import { readWorld, type Ctx } from "./snapshot.ts";
 
@@ -21,14 +21,11 @@ const TICK_MS = 60_000;
 
 let awake: ReturnType<typeof Bun.spawn> | null = null;
 
-/**
- * The hold ends with the worker's pid, so a crashed worker never holds the machine awake. A machine
- * without the hold's command (a Linux VM with no systemd) is never held.
- */
+/** The hold ends with the worker's pid, so a crashed worker never holds the machine awake. */
 function holdAwake(p: Platform, busy: boolean): void {
-  const argv = p.awake(process.pid);
+  if (p.awake === null) return;
 
-  if (busy && !awake && Bun.which(argv[0]!) !== null) awake = Bun.spawn(argv);
+  if (busy && !awake) awake = Bun.spawn(p.awake(process.pid));
 
   if (!busy && awake) {
     awake.kill();
@@ -89,14 +86,6 @@ async function tick(ctx: Ctx, p: Platform): Promise<void> {
   holdAwake(p, started || states.some(occupies));
 }
 
-async function machineId(p: Platform): Promise<string> {
-  const id = p.machineId.read(await must(run, p.machineId.argv));
-
-  if (id === undefined) throw new Error(`\`${p.machineId.argv.join(" ")}\` printed no machine id`);
-
-  return id;
-}
-
 async function main(dir: string): Promise<void> {
   const p = platformOf(process.platform);
 
@@ -118,11 +107,10 @@ async function main(dir: string): Promise<void> {
     process.exit(1);
   }
 
-  const ctx: Ctx = { app, dir, repo, base, machine: await machineId(p) };
+  const ctx: Ctx = { app, dir, repo, base, machine: await machineId(run, p) };
   log(`watching ${repo} (${base}), ${rules.atOnce} at once`);
-  const hold = p.awake(process.pid)[0]!;
 
-  if (Bun.which(hold) === null) log(`no ${hold} here, so busy runs never hold the machine awake`);
+  if (p.awake === null) log(`no keep-awake command for ${process.platform}, so busy runs never hold the machine awake`);
 
   for (;;) {
     try {

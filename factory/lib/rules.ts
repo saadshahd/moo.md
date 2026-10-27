@@ -53,9 +53,18 @@ export function actorsOf(rules: Rules, repo: string): Actors {
   return { bot: rules.bot, trusted: rules.trusted ?? [repo.split("/")[0]!] };
 }
 
+const HEAD = "refs/remotes/origin/HEAD";
+
 /** The rules on origin's default branch, never a branch's copy: a run could edit its own. */
 export async function readRules(run: Run, cwd: string): Promise<Rules> {
-  const r = parseRules(await must(run, ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`], { cwd }));
+  const json = await must(run, ["git", "show", `${HEAD}:${RULES_PATH}`], { cwd }).catch(async (err: Error) => {
+    if ((await must(run, ["git", "ls-tree", HEAD, "--", RULES_PATH], { cwd })) !== "") throw err;
+    const branch = (await must(run, ["git", "symbolic-ref", "--short", HEAD], { cwd })).trim();
+
+    throw new Error(`no ${RULES_PATH} on ${branch}; run /factory:setup`);
+  });
+
+  const r = parseRules(json);
 
   if ("errors" in r) throw new Error(r.errors.join("; "));
 
