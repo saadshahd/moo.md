@@ -4,26 +4,34 @@ import type {
   Register,
   RenderChildren,
 } from "claude-code";
-import { STUCK_LABEL, must, post, repoOf, type Actors, type Run } from "../lib/github.ts";
+import {
+  STUCK_LABEL,
+  must,
+  post,
+  repoOf,
+  type Actors,
+  type Run,
+} from "../lib/github.ts";
 import { runner } from "../hooks/session.ts";
 import { messageOf } from "../lib/errors.ts";
 import { RULES_PATH, actorsOf, readRules, type Rules } from "../lib/rules.ts";
 import { UNDO_LABEL, comments, readSnapshot, undone } from "../lib/snapshot.ts";
+import type { Question } from "../lib/formats.ts";
 import { APPROVE, answerFor, answerTo, isApproval } from "../lib/wait.ts";
 import {
-  perPr,
   rows,
   tokens,
   undoIssue,
   type CallRow,
   type Rows,
-  type StuckRow,
   type WaitRow,
 } from "./rows.ts";
 
 const PANE = "factory";
 const PANE_COLUMNS = 72;
 const READ_EVERY_MS = 60_000;
+const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const FRAME_MS = 80;
 
 type Tab = "questions" | "plans" | "stuck" | "calls" | "cost";
 
@@ -35,22 +43,22 @@ type Read =
 
 let read: Read = { kind: "unread" };
 let tab: Tab = "questions";
-const noting = new Set<number>();
 
+/** Keys of the toggle pills now open: a stuck note, a plan, an own answer. */
+const open = new Set<string>();
 const picks = new Map<number, (string | undefined)[]>();
-
-type QuestionKey = `${number}:${number}`;
-
-const owning = new Set<QuestionKey>();
-const planOpen = new Set<number>();
-
 let busy: string | null = null;
 let reading: Promise<void> | null = null;
 let spinner: { cancel: () => void } | null = null;
-let frame = 0;
-const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const FRAME_MS = 80;
 let ticking: { cancel: () => void } | null = null;
+let frame = 0;
+
+const draw = ($: EngineInterface) => $.ui.invalidate("ui.render");
+
+/** Runs `gh` with `words` split on spaces, then each of `args` whole. */
+async function gh(run: Run, words: string, ...args: string[]) {
+  await must(run, ["gh", ...words.split(" "), ...args]);
+}
 
 /** Reads GitHub once; a read already running is joined, never doubled. */
 function refresh($: EngineInterface): Promise<void> {
@@ -60,15 +68,12 @@ function refresh($: EngineInterface): Promise<void> {
     try {
       read = await readRows($);
     } catch (err) {
-      read = {
-        kind: "failed",
-        why: messageOf(err),
-      };
+      read = { kind: "failed", why: messageOf(err) };
     }
   })().finally(() => {
     reading = null;
     spin($);
-    $.ui.invalidate("ui.render");
+    draw($);
   });
 
   return reading;
@@ -84,7 +89,7 @@ function spin($: EngineInterface) {
 
   spinner ??= $.clock.every(FRAME_MS, () => {
     frame = (frame + 1) % FRAMES.length;
-    $.ui.invalidate("ui.render");
+    draw($);
   });
 }
 
@@ -122,15 +127,19 @@ async function readRows($: EngineInterface): Promise<Read> {
   };
 }
 
+function setBusy($: EngineInterface, key: string | null) {
+  busy = key;
+  spin($);
+  draw($);
+}
+
 async function act(
   $: EngineInterface,
   key: string,
   write: (run: Run, repo: string, actors: Actors) => Promise<void>,
 ) {
   if (read.kind !== "read" || busy !== null) return;
-  busy = key;
-  spin($);
-  $.ui.invalidate("ui.render");
+  setBusy($, key);
 
   try {
     await write(runner($), read.repo, read.actors);
@@ -139,64 +148,30 @@ async function act(
   }
 
   await refresh($);
-  busy = null;
-  spin($);
-  $.ui.invalidate("ui.render");
+  setBusy($, null);
 }
 
-async function undoCall($: EngineInterface, call: CallRow) {
-  await act($, `undo-${call.callId}`, async (run, repo, actors) => {
+function undoCall($: EngineInterface, call: CallRow) {
+  return act($, `undo-${call.callId}`, async (run, repo, actors) => {
     /** A second press, or another machine's, finds the first undo issue and opens none. */
     if (undone(await readSnapshot(run, repo, []), actors).has(call.callId))
       return;
-    /** `gh issue create --label` fails on a label the repo lacks. */
-    await must(run, [
-      "gh",
-      "label",
-      "create",
-      UNDO_LABEL,
-      "--repo",
-      repo,
-      "--force",
-      "--color",
-      "5319E7",
-      "--description",
-      "Reverses a call a factory run made",
-    ]);
     const { title, body } = undoIssue(call);
 
-    await must(run, [
-      "gh",
-      "issue",
-      "create",
-      "--repo",
-      repo,
-      "--title",
+    /** `gh issue create --label` fails on a label the repo lacks. */
+    await gh(
+      run,
+      `label create ${UNDO_LABEL} --repo ${repo} --force --color 5319E7 --description`,
+      "Reverses a call a factory run made",
+    );
+    await gh(
+      run,
+      `issue create --repo ${repo} --label ${UNDO_LABEL} --title`,
       title,
       "--body",
       body,
-      "--label",
-      UNDO_LABEL,
-    ]);
+    );
     $.ui.toast(`factory: opened an issue to undo "${call.choice}"`);
-  });
-}
-
-async function note($: EngineInterface, row: StuckRow, text: string) {
-  noting.delete(row.issue);
-
-  if (text.trim() === "") return;
-  await act($, `note-${row.issue}`, async (run, repo) => {
-    await must(run, [
-      "gh",
-      "issue",
-      "comment",
-      String(row.issue),
-      "--repo",
-      repo,
-      "--body",
-      text,
-    ]);
   });
 }
 
@@ -207,16 +182,17 @@ async function answer(
   value: string,
   key: string,
 ) {
-  owning.delete(`${w.waitId}:${qi}`);
+  open.delete(`own-${w.waitId}-${qi}`);
+  const v = value.trim();
 
-  if (value.trim() === "") return redraw($, () => {});
-  const got = picks.get(w.waitId) ?? w.wait.questions.map(() => undefined);
+  if (v === "") return draw($);
+  const got = picks.get(w.waitId) ?? [];
 
-  got[qi] = value.trim();
+  got[qi] = v;
   picks.set(w.waitId, got);
-  const answers = got.flatMap((a) => (a === undefined ? [] : [a]));
+  const answers = got.flatMap((a) => a ?? []);
 
-  if (answers.length < w.wait.questions.length) return redraw($, () => {});
+  if (answers.length < w.wait.questions.length) return draw($);
   picks.delete(w.waitId);
   await act($, key, async (run, repo, actors) => {
     /** An answer from another machine, or github.com, may have landed since the last read. */
@@ -235,30 +211,10 @@ async function answer(
   });
 }
 
-async function retry($: EngineInterface, row: StuckRow) {
-  await act($, `retry-${row.issue}`, async (run, repo) => {
-    await must(run, [
-      "gh",
-      "issue",
-      "edit",
-      String(row.issue),
-      "--repo",
-      repo,
-      "--remove-label",
-      STUCK_LABEL,
-    ]);
-  });
-}
-
 async function openUrl($: EngineInterface, url: string) {
   const r = await $.process.run(["open", url]);
 
   if (r.exitCode !== 0) $.ui.toast(`factory: can't open ${url}`);
-}
-
-function redraw($: EngineInterface, change: () => void) {
-  change();
-  $.ui.invalidate("ui.render");
 }
 
 async function show($: EngineInterface) {
@@ -321,9 +277,11 @@ export const registerPane: Register = (on) => {
     const { Box, Text } = ui;
     const width = Math.max(PANE_COLUMNS - 2, (e.viewport?.columns ?? 80) - 2);
 
-    if (read.kind !== "read")
-      return (
-        <Box flexDirection="column" width={width} paddingX={1}>
+    return (
+      <Box flexDirection="column" width={width} paddingX={1}>
+        {read.kind === "read" ? (
+          view($, ui, read.rows, width)
+        ) : (
           <Text
             dimColor={read.kind !== "failed"}
             color={read.kind === "failed" ? "error" : undefined}
@@ -332,23 +290,7 @@ export const registerPane: Register = (on) => {
               ? `${FRAMES[frame]} reading GitHub`
               : read.why}
           </Text>
-        </Box>
-      );
-    const r = read.rows;
-
-    return (
-      <Box flexDirection="column" width={width} paddingX={1}>
-        {tabBar($, ui, r)}
-        <Text dimColor>{"─".repeat(width - 2)}</Text>
-        {r.truncated.length > 0 && (
-          <Text color="warning">{`GitHub listed only part of: ${r.truncated.join(", ")}`}</Text>
         )}
-        {tab === "questions" &&
-          waitCards($, ui, r.questions, "no question waits for you")}
-        {tab === "plans" && waitCards($, ui, r.plans, "no plan waits for you")}
-        {tab === "stuck" && stuckCards($, ui, r.stuck)}
-        {tab === "calls" && callCards($, ui, r.calls)}
-        {tab === "cost" && costCard(ui, r)}
       </Box>
     );
   });
@@ -361,53 +303,34 @@ const TABS = [
   { name: "calls", color: "suggestion" },
 ] as const;
 
-function tabBar($: EngineInterface, ui: ElementTable, r: Rows) {
-  const { Box, Text, Button } = ui;
-  const avg = perPr(r.costs);
+function view($: EngineInterface, ui: ElementTable, r: Rows, width: number) {
+  const { Box, Text, Button, Markdown } = ui;
 
-  const tabButton = (name: Tab, color: string, unit: string, value: string) => {
-    const isOn = tab === name;
+  /** A surface with no text field gets no typed answer or note; those can still go on github.com. */
+  const Input = "Input" in ui ? ui.Input : null;
 
-    return (
-      <Button
-        plain
-        key={`tab-${name}`}
-        label={name}
-        onPress={() => redraw($, () => (tab = name))}
+  const tabButton = (name: Tab, color: string, label: string) => (
+    <Button
+      plain
+      key={`tab-${name}`}
+      label={name}
+      onPress={() => ((tab = name), draw($))}
+    >
+      <Text
+        bold={tab === name}
+        color={tab === name ? color : undefined}
+        dimColor={tab !== name}
       >
-        <Text bold={isOn} color={isOn ? color : undefined} dimColor={!isOn}>
-          {`${unit}(${value})`}
-        </Text>
-      </Button>
-    );
-  };
-
-  return (
-    <Box flexDirection="row" justifyContent="space-between" gap={4}>
-      <Box flexDirection="row" gap={3}>
-        {TABS.map((t) =>
-          tabButton(t.name, t.color, t.name, String(r[t.name].length)),
-        )}
-      </Box>
-      {tabButton(
-        "cost",
-        "success",
-        "tokens/PR",
-        avg === null ? "–" : tokens(avg),
-      )}
-    </Box>
+        {label}
+      </Text>
+    </Button>
   );
-}
 
-function card(
-  ui: ElementTable,
-  color: string,
-  children: RenderChildren[],
-  hoverKey?: string,
-) {
-  const { Box } = ui;
-
-  return (
+  const card = (
+    color: string,
+    children: RenderChildren[],
+    hoverKey?: string,
+  ) => (
     <Box
       key={hoverKey}
       hover={hoverKey ? { borderColor: "suggestion" } : undefined}
@@ -419,246 +342,233 @@ function card(
       {children}
     </Box>
   );
-}
 
-function head(ui: ElementTable, title: string, color: string) {
-  const { Text } = ui;
-
-  return (
+  const head = (title: string, color: string) => (
     <Text bold color={color} wrap="truncate-end">
       {title}
     </Text>
   );
-}
 
-/** Drawn plain, since the user rules out bracketed buttons. */
-function pill(
-  ui: ElementTable,
-  key: string,
-  label: string,
-  onPress: () => void,
-  isMain = false,
-) {
-  const { Button, Text } = ui;
-  const isBusy = busy === key;
-
-  return (
+  /** Drawn plain, since the user rules out bracketed buttons. */
+  const pill = (
+    key: string,
+    label: string,
+    onPress: () => void,
+    isMain = false,
+  ) => (
     <Button plain key={key} label={label} onPress={onPress}>
       <Text
         bold
-        dimColor={busy !== null && !isBusy}
+        dimColor={busy !== null && busy !== key}
         color={isMain ? "inverseText" : "suggestion"}
         backgroundColor={isMain ? "suggestion" : undefined}
       >
-        {isBusy ? ` ${FRAMES[frame]} ${label} ` : ` ${label} `}
+        {busy === key ? ` ${FRAMES[frame]} ${label} ` : ` ${label} `}
       </Text>
     </Button>
   );
-}
 
-function foot(ui: ElementTable, buttons: RenderChildren[]) {
-  const { Box } = ui;
+  const toggle = (key: string, shut: string, opened: string) =>
+    pill(key, open.has(key) ? opened : shut, () => {
+      if (!open.delete(key)) open.add(key);
+      draw($);
+    });
 
-  return (
+  const field = (
+    key: string,
+    placeholder: string,
+    onSubmit: (v: string) => void,
+  ) =>
+    Input &&
+    open.has(key) && (
+      <Input
+        key={`${key}-text`}
+        placeholder={placeholder}
+        submitLabel="send"
+        autoFocus
+        onSubmit={onSubmit}
+      />
+    );
+
+  const foot = (buttons: RenderChildren[]) => (
     <Box flexDirection="row" justifyContent="flex-end" gap={1} marginTop={1}>
       {buttons}
     </Box>
   );
-}
 
-function empty(ui: ElementTable, text: string) {
-  const { Text } = ui;
+  const empty = (text: string) =>
+    card("inactive", [<Text dimColor>{text}</Text>]);
 
-  return card(ui, "inactive", [<Text dimColor>{text}</Text>]);
-}
+  const question = (w: WaitRow, q: Question, qi: number, color: string) => {
+    const asksApproval = isApproval(q);
+    const picked = picks.get(w.waitId)?.[qi];
+    const own = `own-${w.waitId}-${qi}`;
 
-function stuckCards($: EngineInterface, ui: ElementTable, stuck: StuckRow[]) {
-  const { Text } = ui;
-  /** A surface with no text field gets no note button; a note can still go on github.com. */
-  const Input = "Input" in ui ? ui.Input : null;
+    return (
+      <Box flexDirection="column" marginTop={qi === 0 ? 0 : 1}>
+        {head(
+          asksApproval
+            ? `#${w.issue}  ${w.title}`
+            : qi === 0
+              ? `#${w.issue}  ${q.question}`
+              : q.question,
+          color,
+        )}
+        <Text dimColor>{q.why}</Text>
+        {foot([
+          asksApproval && toggle(`plan-${w.waitId}`, "▸ plan", "▾ fold"),
+          ...q.options.map((o, oi) => {
+            const key = `opt-${w.waitId}-${qi}-${oi}`;
 
-  if (stuck.length === 0) return empty(ui, "no run is stuck");
-
-  return stuck.map((s) => {
-    const isNoting = noting.has(s.issue);
-
-    return card(ui, "error", [
-      head(ui, `#${s.issue}  ${s.title}`, "error"),
-      <Text>{s.reason}</Text>,
-      foot(ui, [
-        pill(ui, `open-${s.issue}`, "open", () => void openUrl($, s.url)),
-        Input &&
-          pill(ui, `note-${s.issue}`, isNoting ? "cancel" : "note", () =>
-            redraw($, () =>
-              isNoting ? noting.delete(s.issue) : noting.add(s.issue),
-            ),
-          ),
-        pill(ui, `retry-${s.issue}`, "retry", () => void retry($, s), true),
-      ]),
-      Input && isNoting && (
-        <Input
-          key={`note-text-${s.issue}`}
-          placeholder="what the next run should do"
-          submitLabel="send"
-          autoFocus
-          onSubmit={(v: string) => void note($, s, v)}
-        />
-      ),
-    ]);
-  });
-}
-
-function waitCards(
-  $: EngineInterface,
-  ui: ElementTable,
-  waits: WaitRow[],
-  none: string,
-) {
-  if (waits.length === 0) return empty(ui, none);
-
-  return waits.map((w) => {
-    const color = w.plan === null ? "claude" : "warning";
-
-    return card(
-      ui,
-      color,
-      w.wait.questions.map((q, qi) => questionBlock($, ui, w, qi, color)),
+            return pill(
+              key,
+              o,
+              () => void answer($, w, qi, o, key),
+              picked === undefined
+                ? asksApproval && o === APPROVE
+                : picked === o,
+            );
+          }),
+          Input && toggle(own, "my own", "cancel"),
+        ])}
+        {asksApproval && open.has(`plan-${w.waitId}`) && (
+          <Box marginTop={1}>
+            <Markdown text={w.plan ?? ""} />
+          </Box>
+        )}
+        {field(own, "your answer", (v) => void answer($, w, qi, v, own))}
+      </Box>
     );
-  });
-}
+  };
 
-function questionBlock(
-  $: EngineInterface,
-  ui: ElementTable,
-  w: WaitRow,
-  qi: number,
-  color: string,
-) {
-  const { Box, Text, Markdown } = ui;
-  const Input = "Input" in ui ? ui.Input : null;
-  const q = w.wait.questions[qi]!;
-  const asksApproval = isApproval(q);
-  const picked = picks.get(w.waitId)?.[qi];
-  const own: QuestionKey = `${w.waitId}:${qi}`;
-  const isOwning = owning.has(own);
-  const isOpen = asksApproval && planOpen.has(w.waitId);
+  const waits = (ws: WaitRow[], none: string, color: string) =>
+    ws.length === 0
+      ? empty(none)
+      : ws.map((w) =>
+          card(
+            color,
+            w.wait.questions.map((q, qi) => question(w, q, qi, color)),
+          ),
+        );
 
-  return (
-    <Box flexDirection="column" marginTop={qi === 0 ? 0 : 1}>
-      {head(
-        ui,
-        asksApproval
-          ? `#${w.issue}  ${w.title}`
-          : qi === 0
-            ? `#${w.issue}  ${q.question}`
-            : q.question,
-        color,
-      )}
-      <Text dimColor>{q.why}</Text>
-      {foot(ui, [
-        asksApproval &&
-          pill(ui, `plan-${w.waitId}`, isOpen ? "▾ fold" : "▸ plan", () =>
-            redraw($, () =>
-              isOpen ? planOpen.delete(w.waitId) : planOpen.add(w.waitId),
+  const cards: Record<Tab, () => RenderChildren> = {
+    questions: () => waits(r.questions, "no question waits for you", "claude"),
+    plans: () => waits(r.plans, "no plan waits for you", "warning"),
+    stuck: () =>
+      r.stuck.length === 0
+        ? empty("no run is stuck")
+        : r.stuck.map((s) =>
+            card("error", [
+              head(`#${s.issue}  ${s.title}`, "error"),
+              <Text>{s.reason}</Text>,
+              foot([
+                pill(`open-${s.issue}`, "open", () => void openUrl($, s.url)),
+                Input && toggle(`note-${s.issue}`, "note", "cancel"),
+                pill(
+                  `retry-${s.issue}`,
+                  "retry",
+                  () =>
+                    void act($, `retry-${s.issue}`, (run, repo) =>
+                      gh(
+                        run,
+                        `issue edit ${s.issue} --repo ${repo} --remove-label ${STUCK_LABEL}`,
+                      ),
+                    ),
+                  true,
+                ),
+              ]),
+              field(
+                `note-${s.issue}`,
+                "what the next run should do",
+                (text) => {
+                  open.delete(`note-${s.issue}`);
+
+                  if (text.trim() === "") draw($);
+                  else
+                    void act($, `note-${s.issue}`, (run, repo) =>
+                      gh(
+                        run,
+                        `issue comment ${s.issue} --repo ${repo} --body`,
+                        text,
+                      ),
+                    );
+                },
+              ),
+            ]),
+          ),
+    calls: () =>
+      r.calls.length === 0
+        ? empty("no call to review")
+        : r.calls.map((c) =>
+            card(
+              "inactive",
+              [
+                head(`#${c.issue}  ${c.choice}`, "suggestion"),
+                <Text>
+                  {c.picked}
+                  {c.others.length > 0 && <Text dimColor>{"  not "}</Text>}
+                  {c.others.length > 0 && (
+                    <Text strikethrough dimColor>
+                      {c.others.join(", ")}
+                    </Text>
+                  )}
+                </Text>,
+                <Text dimColor>{c.why}</Text>,
+                foot([
+                  pill(`undo-${c.callId}`, "undo", () => void undoCall($, c)),
+                ]),
+              ],
+              `call-${c.callId}`,
             ),
           ),
-        ...q.options.map((o, oi) =>
-          pill(
-            ui,
-            `opt-${w.waitId}-${qi}-${oi}`,
-            o,
-            () => void answer($, w, qi, o, `opt-${w.waitId}-${qi}-${oi}`),
-            picked === undefined ? asksApproval && o === APPROVE : picked === o,
-          ),
-        ),
-        Input &&
-          pill(
-            ui,
-            `own-${w.waitId}-${qi}`,
-            isOwning ? "cancel" : "my own",
-            () =>
-              redraw($, () =>
-                isOwning ? owning.delete(own) : owning.add(own),
-              ),
-          ),
-      ])}
-      {isOpen && (
+    cost: () => {
+      if (r.avg === null) return empty("no factory PR has merged yet");
+      const top = Math.max(...r.costs.map((c) => c.tokens));
+      const room = 24;
+
+      return card("success", [
+        <Box marginBottom={1}>{head("tokens per merged PR", "success")}</Box>,
+        <Box flexDirection="column">
+          {r.costs.map((c) => (
+            <Box flexDirection="row" gap={2}>
+              <Text dimColor>{`#${c.pr}`.padEnd(6)}</Text>
+              <Text color="success">
+                {"█"
+                  .repeat(Math.max(1, Math.round((c.tokens / top) * room)))
+                  .padEnd(room)}
+              </Text>
+              <Text tabular>
+                {c.tokens.toLocaleString("en-US").padStart(11)}
+              </Text>
+            </Box>
+          ))}
+        </Box>,
         <Box marginTop={1}>
-          <Markdown text={w.plan ?? ""} />
-        </Box>
+          <Text
+            dimColor
+          >{`${r.costs.length} PRs · avg ${tokens(r.avg)} tokens`}</Text>
+        </Box>,
+      ]);
+    },
+  };
+
+  return [
+    <Box flexDirection="row" justifyContent="space-between" gap={4}>
+      <Box flexDirection="row" gap={3}>
+        {TABS.map((t) =>
+          tabButton(t.name, t.color, `${t.name}(${r[t.name].length})`),
+        )}
+      </Box>
+      {tabButton(
+        "cost",
+        "success",
+        `tokens/PR(${r.avg === null ? "–" : tokens(r.avg)})`,
       )}
-      {Input && isOwning && (
-        <Input
-          key={`own-text-${w.waitId}-${qi}`}
-          placeholder="your answer"
-          submitLabel="send"
-          autoFocus
-          onSubmit={(v: string) =>
-            void answer($, w, qi, v, `own-${w.waitId}-${qi}`)
-          }
-        />
-      )}
-    </Box>
-  );
-}
-
-function callCards($: EngineInterface, ui: ElementTable, calls: CallRow[]) {
-  const { Text } = ui;
-
-  if (calls.length === 0) return empty(ui, "no call to review");
-
-  return calls.map((c) =>
-    card(
-      ui,
-      "inactive",
-      [
-        head(ui, `#${c.issue}  ${c.choice}`, "suggestion"),
-        <Text>
-          {c.picked}
-          {c.others.length > 0 && <Text dimColor>{"  not "}</Text>}
-          {c.others.length > 0 && (
-            <Text strikethrough dimColor>
-              {c.others.join(", ")}
-            </Text>
-          )}
-        </Text>,
-        <Text dimColor>{c.why}</Text>,
-        foot(ui, [
-          pill(ui, `undo-${c.callId}`, "undo", () => void undoCall($, c)),
-        ]),
-      ],
-      `call-${c.callId}`,
+    </Box>,
+    <Text dimColor>{"─".repeat(width - 2)}</Text>,
+    r.truncated.length > 0 && (
+      <Text color="warning">{`GitHub listed only part of: ${r.truncated.join(", ")}`}</Text>
     ),
-  );
-}
-
-function costCard(ui: ElementTable, r: Rows) {
-  const { Box, Text } = ui;
-  const avg = perPr(r.costs);
-
-  if (avg === null) return empty(ui, "no factory PR has merged yet");
-  const top = Math.max(...r.costs.map((c) => c.tokens));
-  const room = 24;
-
-  return card(ui, "success", [
-    <Box marginBottom={1}>{head(ui, "tokens per merged PR", "success")}</Box>,
-    <Box flexDirection="column">
-      {r.costs.map((c) => (
-        <Box flexDirection="row" gap={2}>
-          <Text dimColor>{`#${c.pr}`.padEnd(6)}</Text>
-          <Text color="success">
-            {"█"
-              .repeat(Math.max(1, Math.round((c.tokens / top) * room)))
-              .padEnd(room)}
-          </Text>
-          <Text tabular>{c.tokens.toLocaleString("en-US").padStart(11)}</Text>
-        </Box>
-      ))}
-    </Box>,
-    <Box marginTop={1}>
-      <Text
-        dimColor
-      >{`${r.costs.length} PRs · avg ${tokens(avg)} tokens`}</Text>
-    </Box>,
-  ]);
+    cards[tab](),
+  ];
 }
