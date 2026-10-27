@@ -9,6 +9,7 @@ import { approved, notes } from "../lib/wait.ts";
 import type { Action, World } from "./decide.ts";
 import { run } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
+import { RUN_SETTINGS } from "./sandbox.ts";
 import { sessionFacts, worktrees, type Ctx } from "./snapshot.ts";
 
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
@@ -72,8 +73,8 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
     cli: CLI,
   });
 
-  const argv = ["claude", "--bg", "--name", runName(ctx.repo, n), "--permission-mode", "bypassPermissions", prompt];
-  await must(run, argv, { cwd });
+  const flags = ["--permission-mode", "bypassPermissions", "--settings", JSON.stringify(RUN_SETTINGS)];
+  await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...flags, prompt], { cwd });
 }
 
 /** Does one action; false when a claim was lost, so the issue's later actions are skipped. */
