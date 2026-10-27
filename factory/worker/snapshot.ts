@@ -38,8 +38,29 @@ const Session = z.union([
     name: z.optional(z.nullable(z.string())),
     startedAt: z.number(),
     state: z.literal(SESSION_STATES),
+    /** "input needed" while its own question box waits; its transcript holds the ask only once answered. */
+    waitingFor: z.optional(z.nullable(z.string())),
   }),
 ]);
+
+type Background = Extract<z.infer<typeof Session>, { kind: "background" }>;
+
+/** The background sessions named `name` in `claude agents --json` output, oldest first. */
+export function sessionsNamed(agentsJson: string, name: string): Background[] {
+  return z
+    .parse(z.array(Session), JSON.parse(agentsJson))
+    .flatMap((s) => (s.kind === "background" && s.name === name ? [s] : []))
+    .sort((a, b) => a.startedAt - b.startedAt);
+}
+
+export const runView = (s: Background, f: Facts): RunView => ({
+  id: s.id,
+  sessionId: s.sessionId,
+  state: s.state,
+  context: f.context,
+  pendingAsk: f.pendingAsk || s.waitingFor === "input needed",
+  rejectedUntil: f.rejectedUntil,
+});
 
 const WtList = z.object({
   items: z.array(
@@ -60,7 +81,7 @@ export async function worktrees(ctx: Ctx): Promise<{ issue: number; path: string
   });
 }
 
-type Facts = {
+export type Facts = {
   usage: Usage;
   context: number;
   pendingAsk: boolean;
@@ -121,24 +142,14 @@ export async function readWorld(ctx: Ctx, rules: Rules, actors: Actors): Promise
   const trees = await worktrees(ctx);
   const gh = await readSnapshot(run, ctx.repo, trees.map((t) => t.issue));
 
-  const all = z.parse(
-    z.array(Session),
-    JSON.parse(await must(run, ["claude", "agents", "--json", "--all"])),
-  ).flatMap((s) => (s.kind === "background" ? [s] : []));
+  const agents = await must(run, ["claude", "agents", "--json", "--all"]);
 
   const local = await Promise.all(
     trees.map(async (t): Promise<Local> => {
       const plan = Bun.file(join(t.path, PLAN_PATH));
 
       const runs = await Promise.all(
-        all
-          .filter((s) => s.name === runName(ctx.repo, t.issue))
-          .sort((a, b) => a.startedAt - b.startedAt)
-          .map(async (s): Promise<RunView> => {
-            const { context, pendingAsk, rejectedUntil } = await sessionFacts(s.sessionId);
-
-            return { id: s.id, sessionId: s.sessionId, state: s.state, context, pendingAsk, rejectedUntil };
-          }),
+        sessionsNamed(agents, runName(ctx.repo, t.issue)).map(async (s) => runView(s, await sessionFacts(s.sessionId))),
       );
 
       return { issue: t.issue, path: t.path, plan: (await plan.exists()) ? await plan.text() : null, runs };

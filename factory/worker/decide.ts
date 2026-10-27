@@ -239,7 +239,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     case "crashed":
       return s.deaths >= CRASHES_BEFORE_STUCK
         ? stuck(`the run died or ended without a PR ${s.deaths} times`)
-        : [start(current === undefined ? null : "crash")];
+        : [...stop, start(current === undefined ? null : "crash")];
   }
 }
 

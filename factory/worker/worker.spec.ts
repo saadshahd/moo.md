@@ -20,6 +20,11 @@ import {
   type World,
 } from "./decide.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
+import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
+import { actorsOf } from "../lib/rules.ts";
+import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
+import { run } from "./proc.ts";
+import { runView, sessionsNamed } from "./snapshot.ts";
 
 const BOT = "moo-factory[bot]";
 const ME = "owner";
@@ -433,10 +438,11 @@ describe("a local issue's state and actions", () => {
         .kind,
     ).toBe("crashed");
   });
-  test("a dead run restarts and says so; a fresh worktree starts without a restart", () => {
+  test("a dead run is stopped, then restarts and says so; a fresh worktree starts without a restart", () => {
     const gh = snapshot({ issues: [issue(7)] });
 
     expect(step(world(gh, [here(7, [session("done")])])).actions).toEqual([
+      { kind: "stop", issue: 7, run: session("done") },
       { kind: "start", issue: 7, restart: "crash", after: "sid-1" },
     ]);
     expect(step(world(gh, [here(7)])).actions).toEqual([
@@ -607,5 +613,59 @@ describe("seal", () => {
     );
     expect(seal("## Types\na")).not.toBe(seal("## Types\nb"));
     expect(planGaps("## Types\na")).toEqual(["Signatures", "Files"]);
+  });
+});
+
+describe("smoke run 1 (saadshahd/factory-smoke, 2026-10-27)", () => {
+  const actors = actorsOf(SMOKE_RULES, "saadshahd/factory-smoke");
+  const gh = snapshot({ issues: ISSUES, claimed: new Set([5, 6, 7]) });
+  const noFacts = { usage: usageOf(""), context: 0, pendingAsk: false, rejectedUntil: null };
+
+  const at = (agents: string, n: number): Local =>
+    here(n, sessionsNamed(agents, `factory:saadshahd/factory-smoke#${n}`).map((s) => runView(s, noFacts)));
+
+  const smoke = (l: Local): World => world(gh, [l], { actors, rules: SMOKE_RULES, claimedHere: new Set([5, 6, 7]) });
+
+  test("an open ask in the run's own box leaves no line in its transcript; the session list shows it", () => {
+    expect(pendingAsk(OPEN_ASK)).toBe(false);
+    expect(at(AGENTS_AT_TICK, 5).runs.map((r) => r.pendingAsk)).toEqual([true]);
+  });
+
+  test("#5 and #7, asking in their own box, are stopped and marked stuck, never restarted as crashes", () => {
+    for (const n of [5, 7]) {
+      const { state, actions } = step(smoke(at(AGENTS_AT_TICK, n)));
+
+      expect(state.kind).toBe("askedInBox");
+      expect(kinds(actions)).toEqual(["stop", "markStuck"]);
+      expect(actions[0]).toMatchObject({ run: { id: n === 5 ? "94637db3" : "167642fa" } });
+    }
+  });
+
+  test("#6, still working, is left alone", () => {
+    expect(step(smoke(at(AGENTS_AT_TICK, 6)))).toEqual({ state: { kind: "working" }, actions: [] });
+  });
+
+  test("the restarts the worker posted as the user count no deaths", () => {
+    for (const i of ISSUES) expect(deathsSinceRetry(i.comments, actors)).toBe(0);
+  });
+
+  test("a run that ended its turn asking for help is stopped before its restart", () => {
+    const { state, actions } = step(smoke(at(AGENTS_LATER, 5)));
+
+    expect(state).toEqual({ kind: "crashed", deaths: 1 });
+    expect(actions).toMatchObject([
+      { kind: "stop", run: { id: "0e462418" } },
+      { kind: "start", restart: "crash", after: "0e462418-b22d-4e15-a8ad-8d9676426c92" },
+    ]);
+  });
+});
+
+describe("proc", () => {
+  test("a child sees the environment as it is now, so the worker's commands act as the bot", async () => {
+    process.env.FACTORY_PROC_PROBE = "bot";
+    const r = await run(["sh", "-c", "echo $FACTORY_PROC_PROBE"]);
+    delete process.env.FACTORY_PROC_PROBE;
+
+    expect(r.stdout.trim()).toBe("bot");
   });
 });

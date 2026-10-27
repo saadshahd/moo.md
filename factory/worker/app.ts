@@ -5,7 +5,7 @@
  * path relative to that folder.
  */
 
-import { createAppAuth } from "@octokit/auth-app";
+import { createAppAuth } from "./vendor/auth-app.js";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Bot } from "../lib/bot.ts";
