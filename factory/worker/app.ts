@@ -11,7 +11,10 @@ import { join } from "node:path";
 import type { Bot } from "../lib/bot.ts";
 import * as z from "../lib/vendor/zod-mini.js";
 
-const DIR = join(homedir(), ".config", "factory");
+/** The App's folder, under the home folder. */
+export const APP_DIR = ".config/factory";
+
+const DIR = join(homedir(), APP_DIR);
 const API = "https://api.github.com";
 
 const AppFile = z.object({ clientId: z.string(), key: z.string() });
