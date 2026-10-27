@@ -16,7 +16,6 @@ Check each, then show the user every one that holds: what it would cause and the
 
 | Holds | Causes | Clears it |
 |---|---|---|
-| `~/.claude/settings.json` enables no `factory@…` plugin | runs load no factory hooks | `claude plugin install factory@<marketplace>` |
 | the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | auto-merge merges unchecked code | require a check the repo already runs; it has none → propose one |
 | `bun`, `gh` or `wt` is not on `PATH` | the worker can't start | `brew install bun gh worktrunk` |
 | the worker would run on Linux | the worker can't start: it calls macOS-only `ioreg` and `caffeinate` | nothing yet |
