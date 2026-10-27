@@ -3,8 +3,7 @@ import * as z from "./vendor/zod-mini.js";
 
 export const RULES_PATH = ".claude/factory.json";
 
-const Rule = z.string().check(z.minLength(1));
-const Login = z.string().check(z.minLength(1));
+const Text = z.string().check(z.minLength(1));
 
 export const Rules = z.object({
   /** How many issues run at once on this machine. */
@@ -14,17 +13,17 @@ export const Rules = z.object({
   /** Once a run's context passes this many tokens, it restarts fresh from plan, branch and handoff. */
   contextCap: z.int().check(z.minimum(1)),
   /** The factory App's bot login, `<slug>[bot]`: the only author whose factory comments count. */
-  bot: Login.check(z.regex(/\[bot\]$/)),
+  bot: Text.check(z.regex(/\[bot\]$/)),
   /** Whose comments, labels and issue bodies count. Default: the repo's owner. Never the bot. */
-  trusted: z.optional(z.array(Login.check(z.regex(/^(?!.*\[bot\]$)/)))),
+  trusted: z.optional(z.array(Text.check(z.regex(/^(?!.*\[bot\]$)/)))),
   /** Where the project's taste lives (its CLAUDE.md, a taste file), repo-relative. */
-  taste: z.array(Rule),
+  taste: z.array(Text),
   /** Each taste rule, by the layer that enforces it; `none` lists the rules no layer takes. */
   layers: z.object({
-    check: z.array(Rule),
-    plan: z.array(Rule),
-    judge: z.array(Rule),
-    none: z.array(Rule),
+    check: z.array(Text),
+    plan: z.array(Text),
+    judge: z.array(Text),
+    none: z.array(Text),
   }),
 });
 
@@ -44,9 +43,7 @@ export function parseRules(json: string): Rules | { errors: string[] } {
   return r.success
     ? r.data
     : {
-        errors: r.error.issues.map(
-          (i) => `${RULES_PATH} ${i.path.join(".") || "(root)"}: ${i.message}`,
-        ),
+        errors: r.error.issues.map((i) => `${RULES_PATH} ${i.path.join(".") || "(root)"}: ${i.message}`),
       };
 }
 
@@ -56,9 +53,7 @@ export function actorsOf(rules: Rules, repo: string): Actors {
 
 /** The rules on origin's default branch, never a branch's copy: a run could edit its own. */
 export async function readRules(run: Run, cwd: string): Promise<Rules> {
-  const r = parseRules(
-    await must(run, ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`], { cwd }),
-  );
+  const r = parseRules(await must(run, ["git", "show", `refs/remotes/origin/HEAD:${RULES_PATH}`], { cwd }));
 
   if ("errors" in r) throw new Error(r.errors.join("; "));
 

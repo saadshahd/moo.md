@@ -5,15 +5,7 @@
  */
 
 import { parse } from "./formats.ts";
-import {
-  branchFor,
-  wroteIt,
-  issueOf,
-  must,
-  type Actors,
-  type Comment,
-  type Run,
-} from "./github.ts";
+import { branchFor, wroteIt, issueOf, must, type Actors, type Comment, type Run } from "./github.ts";
 import * as z from "./vendor/zod-mini.js";
 
 export const LABEL = "factory";
@@ -21,9 +13,7 @@ export const LABEL = "factory";
 /** The label on an issue a person opened to reverse a call; the worker never picks it up. */
 export const UNDO_LABEL = "factory:undo";
 
-const Actor = z.nullable(
-  z.object({ __typename: z.string(), login: z.string() }),
-);
+const Actor = z.nullable(z.object({ __typename: z.string(), login: z.string() }));
 
 /** GraphQL names a bot by its slug; REST, git and the rules file say `<slug>[bot]`. */
 const login = (a: z.infer<typeof Actor>) =>
@@ -39,6 +29,8 @@ const CommentNode = z.object({
   author: Actor,
   editor: Actor,
 });
+
+const Comments = z.object({ pageInfo: Page, nodes: z.array(CommentNode) });
 
 const COMMENT =
   "databaseId body url createdAt author { __typename login } editor { __typename login }";
@@ -59,10 +51,7 @@ const IssueNode = z.object({
   body: z.string(),
   author: Actor,
   editor: Actor,
-  labels: z.object({
-    pageInfo: Page,
-    nodes: z.array(z.object({ name: z.string() })),
-  }),
+  labels: z.object({ pageInfo: Page, nodes: z.array(z.object({ name: z.string() })) }),
   timelineItems: z.object({
     nodes: z.array(
       z.object({
@@ -71,22 +60,14 @@ const IssueNode = z.object({
       }),
     ),
   }),
-  blockedBy: z.object({
-    pageInfo: Page,
-    nodes: z.array(z.object({ state: z.string() })),
-  }),
-  comments: z.object({ pageInfo: Page, nodes: z.array(CommentNode) }),
+  blockedBy: z.object({ pageInfo: Page, nodes: z.array(z.object({ state: z.string() })) }),
+  comments: Comments,
 });
 
 const OpenPrNode = z.object({
   number: z.int(),
   headRefName: z.string(),
-  files: z.nullable(
-    z.object({
-      pageInfo: Page,
-      nodes: z.array(z.object({ path: z.string() })),
-    }),
-  ),
+  files: z.nullable(z.object({ pageInfo: Page, nodes: z.array(z.object({ path: z.string() })) })),
 });
 
 const PrNode = z.object({
@@ -103,7 +84,7 @@ const PrNode = z.object({
       }),
     ),
   }),
-  comments: z.object({ pageInfo: Page, nodes: z.array(CommentNode) }),
+  comments: Comments,
 });
 
 const PRS = `pageInfo { hasNextPage } nodes {
@@ -112,35 +93,24 @@ const PRS = `pageInfo { hasNextPage } nodes {
   comments(first: 100) { pageInfo { hasNextPage } nodes { ${COMMENT} } }
 }`;
 
+const PrList = z.object({ pageInfo: Page, nodes: z.array(PrNode) });
+
 const Data = z.object({
   data: z.object({
     repository: z.object({
       work: z.object({ pageInfo: Page, nodes: z.array(IssueNode) }),
       open: z.object({ pageInfo: Page, nodes: z.array(OpenPrNode) }),
-      refs: z.object({
-        pageInfo: Page,
-        nodes: z.array(z.object({ name: z.string() })),
-      }),
-      undos: z.object({
-        pageInfo: Page,
-        nodes: z.array(
-          z.object({ body: z.string(), author: Actor, editor: Actor }),
-        ),
-      }),
-      merged: z.object({ pageInfo: Page, nodes: z.array(PrNode) }),
+      refs: z.object({ pageInfo: Page, nodes: z.array(z.object({ name: z.string() })) }),
+      undos: z.object({ pageInfo: Page, nodes: z.array(z.object({ body: z.string(), author: Actor, editor: Actor })) }),
+      merged: PrList,
     }),
   }),
 });
 
-const PrList = z.object({ pageInfo: Page, nodes: z.array(PrNode) });
-
 /** The query, with one PR lookup per issue this machine has a worktree for. */
 export function snapshotQuery(local: readonly number[]): string {
   const prs = local
-    .map(
-      (n) =>
-        `pr${n}: pullRequests(headRefName: "${branchFor(n)}", first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) { ${PRS} }`,
-    )
+    .map((n) => `pr${n}: pullRequests(headRefName: "${branchFor(n)}", first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) { ${PRS} }`)
     .join("\n");
 
   return `query($owner: String!, $name: String!) {
@@ -230,10 +200,7 @@ const toPr = (p: z.infer<typeof PrNode>, cs: Comment[]): Pr => ({
 });
 
 function whole(path: string, page: { hasNextPage: boolean }): void {
-  if (page.hasNextPage)
-    throw new Error(
-      `GitHub listed only part of ${path}; the factory reads it whole or not at all`,
-    );
+  if (page.hasNextPage) throw new Error(`GitHub listed only part of ${path}; the factory reads it whole or not at all`);
 }
 
 const CommentsPage = z.array(
@@ -248,69 +215,42 @@ const CommentsPage = z.array(
   }),
 );
 
-/** Every comment on issue or PR `n`, oldest first. */
-export async function comments(
-  run: Run,
-  repo: string,
-  n: number,
-): Promise<Comment[]> {
+async function graphql(run: Run, repo: string, query: string, ...more: string[]): Promise<string> {
   const [owner, name] = repo.split("/");
 
-  const out = await must(run, [
-    "gh",
-    "api",
-    "graphql",
-    "--paginate",
-    "--slurp",
-    "-F",
-    `owner=${owner}`,
-    "-F",
-    `name=${name}`,
-    "-F",
-    `n=${n}`,
-    "-f",
-    `query=query($owner: String!, $name: String!, $n: Int!, $endCursor: String) {
+  return must(run, ["gh", "api", "graphql", ...more, "-F", `owner=${owner}`, "-F", `name=${name}`, "-f", `query=${query}`]);
+}
+
+/** Every comment on issue or PR `n`, oldest first. */
+export async function comments(run: Run, repo: string, n: number): Promise<Comment[]> {
+  const page = `comments(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${COMMENT} } }`;
+
+  const out = await graphql(
+    run,
+    repo,
+    `query($owner: String!, $name: String!, $n: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) {
-    issueOrPullRequest(number: $n) {
-      ... on Issue { comments(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${COMMENT} } } }
-      ... on PullRequest { comments(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${COMMENT} } } }
-    }
+    issueOrPullRequest(number: $n) { ... on Issue { ${page} } ... on PullRequest { ${page} } }
   }
 }`,
-  ]);
+    "--paginate", "--slurp", "-F", `n=${n}`,
+  );
 
   return z
     .parse(CommentsPage, JSON.parse(out))
-    .flatMap((p) =>
-      p.data.repository.issueOrPullRequest.comments.nodes.map(toComment),
-    );
+    .flatMap((p) => p.data.repository.issueOrPullRequest.comments.nodes.map(toComment));
 }
 
-export async function readSnapshot(
-  run: Run,
-  repo: string,
-  local: readonly number[],
-): Promise<Snapshot> {
-  const [owner, name] = repo.split("/");
-
-  const raw: unknown = JSON.parse(
-    await must(run, [
-      "gh",
-      "api",
-      "graphql",
-      "-F",
-      `owner=${owner}`,
-      "-F",
-      `name=${name}`,
-      "-f",
-      `query=${snapshotQuery(local)}`,
-    ]),
-  );
-
+export async function readSnapshot(run: Run, repo: string, local: readonly number[]): Promise<Snapshot> {
+  const raw: unknown = JSON.parse(await graphql(run, repo, snapshotQuery(local)));
   const r = z.parse(Data, raw).data.repository;
   whole("the open factory issues", r.work.pageInfo);
   whole("the open PRs", r.open.pageInfo);
   whole("the factory branches", r.refs.pageInfo);
+
+  /** The first page of `n`'s comments when it holds them all, else every page. */
+  const commentsOf = async (n: number, page: z.infer<typeof Comments>) =>
+    page.pageInfo.hasNextPage ? comments(run, repo, n) : page.nodes.map(toComment);
 
   const issues = await Promise.all(
     r.work.nodes.map(async (i): Promise<Issue> => {
@@ -325,41 +265,20 @@ export async function readSnapshot(
         author: login(i.author),
         editor: login(i.editor),
         labels: i.labels.nodes.map((l) => l.name),
-        labelledBy: login(
-          i.timelineItems.nodes.findLast((e) => e.label?.name === LABEL)
-            ?.actor ?? null,
-        ),
+        labelledBy: login(i.timelineItems.nodes.findLast((e) => e.label?.name === LABEL)?.actor ?? null),
         blocked: i.blockedBy.nodes.some((b) => b.state === "OPEN"),
-        comments: i.comments.pageInfo.hasNextPage
-          ? await comments(run, repo, i.number)
-          : i.comments.nodes.map(toComment),
+        comments: await commentsOf(i.number, i.comments),
       };
     }),
   );
 
-  const prs = new Map(
-    await Promise.all(
-      local.flatMap((n) => {
-        const newest = z.parse(
-          z.object({ data: z.object({ repository: z.object({ [`pr${n}`]: PrList }) }) }),
-          raw,
-        ).data.repository[`pr${n}`]?.nodes[0];
+  const prs = await Promise.all(
+    local.map(async (n): Promise<[number, Pr][]> => {
+      const newest = z.parse(z.object({ data: z.object({ repository: z.object({ [`pr${n}`]: PrList }) }) }), raw).data
+        .repository[`pr${n}`]?.nodes[0];
 
-        if (newest === undefined) return [];
-
-        return [
-          (async (): Promise<[number, Pr]> => [
-            n,
-            toPr(
-              newest,
-              newest.comments.pageInfo.hasNextPage
-                ? await comments(run, repo, newest.number)
-                : newest.comments.nodes.map(toComment),
-            ),
-          ])(),
-        ];
-      }),
-    ),
+      return newest === undefined ? [] : [[n, toPr(newest, await commentsOf(newest.number, newest.comments))]];
+    }),
   );
 
   return {
@@ -367,25 +286,16 @@ export async function readSnapshot(
     open: r.open.nodes.map((p) => ({
       number: p.number,
       head: p.headRefName,
-      files:
-        p.files === null || p.files.pageInfo.hasNextPage
-          ? null
-          : p.files.nodes.map((f) => f.path),
+      files: p.files === null || p.files.pageInfo.hasNextPage ? null : p.files.nodes.map((f) => f.path),
     })),
-    prs,
+    prs: new Map(prs.flat()),
     claimed: new Set(r.refs.nodes.flatMap((ref) => issueOf(`${LABEL}/${ref.name}`) ?? [])),
-    undos: r.undos.nodes.map((u) => ({
-      body: u.body,
-      author: login(u.author),
-      editor: login(u.editor),
-    })),
+    undos: r.undos.nodes.map((u) => ({ body: u.body, author: login(u.author), editor: login(u.editor) })),
     merged: r.merged.nodes.map((p) => toPr(p, p.comments.nodes.map(toComment))),
     truncated: [
       ...(r.undos.pageInfo.hasNextPage ? ["undo issues"] : []),
       ...(r.merged.pageInfo.hasNextPage ? ["merged PRs"] : []),
-      ...r.merged.nodes.flatMap((p) =>
-        p.comments.pageInfo.hasNextPage ? [`PR #${p.number}'s comments`] : [],
-      ),
+      ...r.merged.nodes.flatMap((p) => (p.comments.pageInfo.hasNextPage ? [`PR #${p.number}'s comments`] : [])),
     ],
   };
 }

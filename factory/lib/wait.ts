@@ -6,13 +6,9 @@ export const APPROVE = "Approve";
 /** The one question that asks for a plan's approval; the ask hook names its seal in `approves`. */
 export const APPROVAL_QUESTION = "Approve the plan posted on this issue?";
 
-export const isApproval = (q: Question) =>
-  q.question.trim() === APPROVAL_QUESTION;
+export const isApproval = (q: Question) => q.question.trim() === APPROVAL_QUESTION;
 
-export function openWait(
-  cs: readonly Comment[],
-  a: Actors,
-): { id: number; c: Wait } | null {
+export function openWait(cs: readonly Comment[], a: Actors): { id: number; c: Wait } | null {
   const w = latest(cs, a, "wait");
 
   return w !== null && w.c.answers === null ? w : null;
@@ -28,8 +24,7 @@ export function answerTo(
   a: Actors,
   wait: { id: number; c: Wait },
 ): { id: number; answers: string[]; approves: string | null } | null {
-  const plain =
-    wait.c.questions.length === 1 && !wait.c.questions.some(isApproval);
+  const plain = wait.c.questions.length === 1 && !wait.c.questions.some(isApproval);
 
   for (const c of cs) {
     if (c.id <= wait.id || !fromTrusted(c, a)) continue;
@@ -46,11 +41,7 @@ export function answerTo(
 }
 
 /** The answer comment a person posts to `wait`; picking Approve on its approval question approves its seal. */
-export function answerFor(
-  waitId: number,
-  wait: Wait,
-  answers: string[],
-): Answer {
+export function answerFor(waitId: number, wait: Wait, answers: string[]): Answer {
   const i = wait.questions.findIndex(isApproval);
   const picked = answers[i]?.trim().toLowerCase();
 
@@ -64,23 +55,12 @@ export function answerFor(
 }
 
 /** Whether a trusted person's answer approved this exact seal. */
-export function approved(
-  cs: readonly Comment[],
-  a: Actors,
-  seal: string,
-): boolean {
-  return cs.some((c) => {
-    if (!fromTrusted(c, a)) return false;
-    const f = parse(c.body);
-
-    return f?.kind === "answer" && f.approves === seal;
-  });
+export function approved(cs: readonly Comment[], a: Actors, seal: string): boolean {
+  return factoryComments(cs, a).some(({ c }) => c.kind === "answer" && c.approves === seal);
 }
 
 export function answerMessage(w: Wait, answers: readonly string[]): string {
-  const lines = w.questions.map(
-    (q, i) => `- ${q.question}\n  Answer: ${answers[i] ?? "(none)"}`,
-  );
+  const lines = w.questions.map((q, i) => `- ${q.question}\n  Answer: ${answers[i] ?? "(none)"}`);
 
   return `Your questions on issue #${w.issue} were answered:\n\n${lines.join("\n")}\n\nGo on with the work.`;
 }
@@ -99,7 +79,5 @@ export function notes(cs: readonly Comment[], a: Actors): Comment[] {
     }),
   );
 
-  return cs.filter(
-    (c) => fromTrusted(c, a) && parse(c.body) === null && !answered.has(c.id),
-  );
+  return cs.filter((c) => fromTrusted(c, a) && parse(c.body) === null && !answered.has(c.id));
 }

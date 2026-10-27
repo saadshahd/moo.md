@@ -3,13 +3,16 @@
  * A check decides that, never the agent: a plan missing any section is refused before it is posted.
  */
 
+import { lf } from "./formats.ts";
+import type { OpenPr } from "./snapshot.ts";
+
 export const PLAN_PATH = ".factory/plan.md";
 export const HANDOFF_PATH = ".factory/handoff.md";
 
 const SECTIONS = ["Types", "Signatures", "Files"] as const;
 
 /** A plan as sealed and posted: line endings a browser edit may add are gone, ends trimmed. */
-export const planText = (text: string) => text.replace(/\r\n/g, "\n").trim();
+export const planText = (text: string) => lf(text).trim();
 
 function sections(text: string): Map<string, string> {
   return new Map(
@@ -35,21 +38,31 @@ export function planFiles(text: string): string[] {
 
 export function planGaps(text: string): string[] {
   const s = sections(text);
+  const gaps = SECTIONS.filter((section) => !s.get(section));
 
-  return [
-    ...SECTIONS.map((section) => ({
-      section,
-      ok: (s.get(section) ?? "") !== "",
-    })),
-    {
-      section: "Files (no `- path` lines)",
-      ok: !s.get("Files") || planFiles(text).length > 0,
-    },
-  ].flatMap(({ section, ok }) => (ok ? [] : [section]));
+  return s.get("Files") && planFiles(text).length === 0
+    ? [...gaps, "Files (no `- path` lines)"]
+    : gaps;
 }
 
 export function overlap(a: readonly string[], b: readonly string[]): string[] {
   const set = new Set(b);
 
   return [...new Set(a)].filter((p) => set.has(p));
+}
+
+/** The first open PR off branch `own` that changes any of `files`, and which; a PR too big to list its files changes all. */
+export function overlappingPr(
+  files: readonly string[],
+  open: readonly OpenPr[],
+  own: string,
+): { pr: number; files: string[] } | null {
+  for (const p of open) {
+    if (p.head === own) continue;
+    const both = p.files === null ? [...files] : overlap(files, p.files);
+
+    if (both.length > 0) return { pr: p.number, files: both };
+  }
+
+  return null;
 }
