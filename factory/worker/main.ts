@@ -11,7 +11,7 @@ import { must, repoOf } from "../lib/github.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
 import { apply, log } from "./act.ts";
 import { botFor, readApp } from "./app.ts";
-import { classify, decide, occupies, trustedIssue } from "./decide.ts";
+import { classify, decide, occupies, stateLine, trustedIssue } from "./decide.ts";
 import { refusals } from "./guard.ts";
 import { run } from "./proc.ts";
 import { readWorld, type Ctx } from "./snapshot.ts";
@@ -33,8 +33,14 @@ function holdAwake(busy: boolean): void {
 
 let bot: Bot | null = null;
 
-/** Untrusted issues already logged, so each is said once per worker run, not each minute. */
-const passedOver = new Set<number>();
+/** The last line logged per issue and topic, so each change is said once, not each minute. */
+const said = new Map<string, string>();
+
+function say(n: number, topic: "state" | "trust", line: string): void {
+  if (said.get(`${n} ${topic}`) === line) return;
+  said.set(`${n} ${topic}`, line);
+  log(`#${n}: ${line}`);
+}
 
 async function asBot(ctx: Ctx): Promise<void> {
   if (!needsRenew(bot, Date.now())) return;
@@ -47,6 +53,11 @@ async function tick(ctx: Ctx): Promise<void> {
   await must(run, ["git", "fetch", "origin", ctx.base], { cwd: ctx.dir });
   const rules = await readRules(run, ctx.dir);
   const world = await readWorld(ctx, rules, actorsOf(rules, ctx.repo));
+
+  const states = world.local.map((l) => classify(l, world));
+  world.local.forEach((l, i) => say(l.issue, "state", stateLine(states[i]!)));
+
+  for (const n of world.foreign) say(n, "state", "a factory worktree this machine never claimed; left alone");
 
   /** One at a time: claims, fetches and `wt` all write the one repo's refs and locks. */
   let started = false;
@@ -67,12 +78,10 @@ async function tick(ctx: Ctx): Promise<void> {
     }
 
   for (const i of world.gh.issues)
-    if (!trustedIssue(i, world.actors) && !passedOver.has(i.number)) {
-      passedOver.add(i.number);
-      log(`#${i.number}: passed over: labelled by ${i.labelledBy ?? "nobody seen"}, body by ${i.editor ?? i.author ?? "nobody"}; neither may be untrusted`);
-    }
+    if (!trustedIssue(i, world.actors))
+      say(i.number, "trust", `passed over: labelled by ${i.labelledBy ?? "nobody seen"}, body by ${i.editor ?? i.author ?? "nobody"}; neither may be untrusted`);
 
-  holdAwake(started || world.local.some((l) => occupies(classify(l, world))));
+  holdAwake(started || states.some(occupies));
 }
 
 async function machineId(): Promise<string> {

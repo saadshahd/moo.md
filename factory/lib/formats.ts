@@ -99,12 +99,15 @@ export type Restart = z.infer<typeof Restart>;
 
 const Stuck = z.object({ kind: z.literal("stuck"), issue: Issue, reason: z.string() });
 
+/** A person stopped session `session` with `claude stop`; the factory leaves it stopped. */
+const Stopped = z.object({ kind: z.literal("stopped"), issue: Issue, session: z.string() });
+
 /** The body of an issue a person opened to reverse call comment `call`. */
 const Undo = z.object({ kind: z.literal("undo"), call: Id, text: z.string() });
 
 export type FactoryComment = z.infer<
   typeof Plan | typeof Call | typeof Wait | typeof Answer | typeof Handoff | typeof Cost | typeof Restart
-  | typeof Stuck | typeof Undo
+  | typeof Stuck | typeof Stopped | typeof Undo
 >;
 
 export type Kind = FactoryComment["kind"];
@@ -218,6 +221,12 @@ const CODECS = {
   ),
   restart: kind(Restart, "bot", null, (c) => RESTARTED[c.reason]),
   stuck: kind(Stuck, "bot", null, (c) => `**Stuck** · ${c.reason}`),
+  stopped: kind(
+    Stopped,
+    "bot",
+    null,
+    (c) => `**Stopped** · by hand; the factory leaves it. Go on with \`claude --bg --resume ${c.session}\`, or close the issue`,
+  ),
   undo: kind(Undo, "trusted", "text", (c) => `**Undo** · factory call ${c.call}`),
 } satisfies { [C in FactoryComment as C["kind"]]: { by: Author; codec: z.ZodMiniType<C, string> } };
 

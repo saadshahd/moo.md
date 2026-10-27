@@ -50,6 +50,8 @@ export type World = {
   local: Local[];
   /** Claimed branches whose claim commit this machine pushed. */
   claimedHere: ReadonlySet<number>;
+  /** Issues with a `factory/<n>` worktree here that this machine never claimed: never acted on. */
+  foreign: readonly number[];
 };
 
 export type IssueState =
@@ -65,6 +67,8 @@ export type IssueState =
   | { kind: "limited"; until: number }
   | { kind: "limitReset" }
   | { kind: "held"; byPr: number }
+  /** A person ran `claude stop` on it; `posted` once the issue says so. */
+  | { kind: "stoppedByHand"; session: string; posted: boolean }
   | { kind: "crashed"; deaths: number };
 
 /** Which session an action stops or wakes: `claude stop` takes `id`, `--resume` takes `sessionId`. */
@@ -78,6 +82,7 @@ export type Action =
   | { kind: "closeWait"; issue: number; wait: { id: number; c: Wait }; answers: string[] }
   | { kind: "markStuck"; issue: number; reason: string }
   | { kind: "postCost"; issue: number; pr: number; sessions: string[] }
+  | { kind: "postStopped"; issue: number; session: string }
   | { kind: "removeWorktree"; issue: number };
 
 /** The states each state's actions can lead to; `gone` is a removed worktree. */
@@ -94,6 +99,7 @@ export const NEXT = {
   limited: ["limited"],
   limitReset: ["working"],
   held: ["held"],
+  stoppedByHand: ["stoppedByHand"],
   crashed: ["working", "ended"],
 } satisfies { [K in IssueState["kind"]]: readonly (IssueState["kind"] | "gone")[] };
 
@@ -163,6 +169,16 @@ export function classify(l: Local, w: World): IssueState {
       ? { kind: "checksFailed", pr: pr.number, deaths }
       : { kind: "prOpen", pr: pr.number };
 
+  /** The worker stops a run only to restart it, and names it in the restart it posts first. */
+  const fs = factoryComments(cs, w.actors).map((x) => x.c);
+
+  if (current?.state === "stopped" && !fs.some((c) => c.kind === "restart" && c.session === current.sessionId))
+    return {
+      kind: "stoppedByHand",
+      session: current.sessionId,
+      posted: fs.some((c) => c.kind === "stopped" && c.session === current.sessionId),
+    };
+
   if (current?.rejectedUntil != null)
     return current.rejectedUntil * 1000 > w.now
       ? { kind: "limited", until: current.rejectedUntil }
@@ -216,6 +232,8 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     case "limited":
     case "held":
       return [];
+    case "stoppedByHand":
+      return s.posted ? [] : [{ kind: "postStopped", issue: n, session: s.session }];
     case "askedInBox":
       return stuck("the run asked in its own question box, which nobody watches");
     case "waiting":
@@ -261,7 +279,42 @@ export function occupies(s: IssueState): boolean {
     case "prClosedUnmerged":
     case "limited":
     case "held":
+    case "stoppedByHand":
       return false;
+  }
+}
+
+/** The worker's log line for a state: it logs one each time an issue's line changes. */
+export function stateLine(s: IssueState): string {
+  switch (s.kind) {
+    case "ended":
+      return `ended: ${s.why}${s.pr === null ? "" : `, PR #${s.pr}`}`;
+    case "overCap":
+      return "its context passed the cap";
+    case "working":
+      return "working";
+    case "askedInBox":
+      return "asked in its own question box";
+    case "waiting":
+      return s.answers === null ? "waiting for an answer on the issue" : "answered on the issue";
+    case "prOpen":
+      return `PR #${s.pr} open`;
+    case "prMerged":
+      return `PR #${s.pr} merged`;
+    case "prClosedUnmerged":
+      return `PR #${s.pr} closed without merging`;
+    case "checksFailed":
+      return `checks failed on PR #${s.pr} (${s.deaths} of ${CRASHES_BEFORE_STUCK})`;
+    case "limited":
+      return `usage limit until ${new Date(s.until * 1000).toISOString()}`;
+    case "limitReset":
+      return "usage limit reset";
+    case "held":
+      return `held until PR #${s.byPr} merges`;
+    case "stoppedByHand":
+      return "stopped by hand";
+    case "crashed":
+      return `died or ended without a PR (${s.deaths} of ${CRASHES_BEFORE_STUCK})`;
   }
 }
 

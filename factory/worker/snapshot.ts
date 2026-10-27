@@ -127,19 +127,19 @@ export async function sessionFacts(sessionId: string): Promise<Facts> {
   };
 }
 
-/** The claim commit on `factory/<n>` carries this machine's id. */
-async function claimedHere(ctx: Ctx, n: number): Promise<boolean> {
-  await must(run, ["git", "fetch", "origin", branchFor(n)], { cwd: ctx.dir });
-
-  const range = `origin/${ctx.base}..origin/${branchFor(n)}`;
+/** Whether a commit on `ref` past the base is a claim this machine pushed; an unreadable ref is none. */
+export async function claimIn(ctx: Pick<Ctx, "base" | "machine">, cwd: string, ref: string): Promise<boolean> {
   const trailer = "--format=%(trailers:key=Factory-Claim,valueonly)";
-  const out = await must(run, ["git", "log", range, trailer], { cwd: ctx.dir });
+  const r = await run(["git", "log", `origin/${ctx.base}..${ref}`, trailer], { cwd });
 
-  return out.split("\n").some((l) => l.trim() === ctx.machine);
+  return r.exitCode === 0 && r.stdout.split("\n").some((l) => l.trim() === ctx.machine);
 }
 
 export async function readWorld(ctx: Ctx, rules: Rules, actors: Actors): Promise<World> {
-  const trees = await worktrees(ctx);
+  const all = await worktrees(ctx);
+  const claimed = await Promise.all(all.map((t) => claimIn(ctx, t.path, "HEAD")));
+  /** A `factory/<n>` worktree this machine never claimed is someone else's: the worker leaves it alone. */
+  const trees = all.filter((_, i) => claimed[i]);
   const gh = await readSnapshot(run, ctx.repo, trees.map((t) => t.issue));
 
   const agents = await must(run, ["claude", "agents", "--json", "--all"]);
@@ -165,7 +165,13 @@ export async function readWorld(ctx: Ctx, rules: Rules, actors: Actors): Promise
   /** One at a time: each fetch writes the repo's refs. */
   const here = new Set<number>();
 
-  for (const i of maybe) if (await claimedHere(ctx, i.number)) here.add(i.number);
+  for (const i of maybe) {
+    await must(run, ["git", "fetch", "origin", branchFor(i.number)], { cwd: ctx.dir });
 
-  return { now: Date.now(), gh, actors, rules, local, claimedHere: here };
+    if (await claimIn(ctx, ctx.dir, `origin/${branchFor(i.number)}`)) here.add(i.number);
+  }
+
+  const foreign = all.flatMap((t, i) => (claimed[i] ? [] : [t.issue]));
+
+  return { now: Date.now(), gh, actors, rules, local, claimedHere: here, foreign };
 }

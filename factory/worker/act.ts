@@ -2,7 +2,7 @@
 
 import { join, resolve } from "node:path";
 import { branchFor, edit, latest, markStuck, must, post, runName, upsert } from "../lib/github.ts";
-import type { Plan, Restart } from "../lib/formats.ts";
+import { total, type Plan, type Restart } from "../lib/formats.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import { sum } from "../lib/transcript.ts";
 import { approved, notes } from "../lib/wait.ts";
@@ -122,11 +122,17 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
     case "postCost": {
       const u = sum(await Promise.all(a.sessions.map(async (s) => (await sessionFacts(s)).usage)));
       const cost = { kind: "cost", issue: n, pr: a.pr, sessions: a.sessions, ...u } as const;
-      await upsert(run, ctx.repo, a.pr, cost, w.gh.prs.get(n)?.comments ?? [], w.actors);
+      const did = await upsert(run, ctx.repo, a.pr, cost, w.gh.prs.get(n)?.comments ?? [], w.actors);
+
+      if (did !== "unchanged") log(`#${n}: cost ${did} on PR #${a.pr}: ${total(cost).toLocaleString("en-US")} tokens`);
 
       return true;
     }
 
+    case "postStopped":
+      await post(run, ctx.repo, n, { kind: "stopped", issue: n, session: a.session });
+
+      return true;
     case "removeWorktree":
       await must(run, ["wt", "remove", branchFor(n), "--yes", "--force"], { cwd: ctx.dir });
       log(`#${n}: worktree removed`);

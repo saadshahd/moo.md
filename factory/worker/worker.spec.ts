@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { usage } from "../lib/commands.ts";
-import { render, type FactoryComment, type Wait } from "../lib/formats.ts";
+import { parse, render, type FactoryComment, type Wait } from "../lib/formats.ts";
 import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { planGaps } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
@@ -13,7 +13,9 @@ import {
   decide,
   deathsSinceRetry,
   NEXT,
+  occupies,
   pick,
+  stateLine,
   type Action,
   type Local,
   type RunView,
@@ -24,7 +26,12 @@ import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
 import { actorsOf } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
-import { runView, sessionsNamed } from "./snapshot.ts";
+import { claimIn, runView, sessionsNamed } from "./snapshot.ts";
+import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
+import { upsert, type Run } from "../lib/github.ts";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const BOT = "moo-factory[bot]";
 const ME = "owner";
@@ -124,6 +131,7 @@ const world = (
   rules: RULES,
   local,
   claimedHere: new Set(),
+  foreign: [],
   ...more,
 });
 
@@ -667,5 +675,102 @@ describe("proc", () => {
     delete process.env.FACTORY_PROC_PROBE;
 
     expect(r.stdout.trim()).toBe("bot");
+  });
+});
+
+describe("smoke run 2 (saadshahd/factory-smoke #5, 2026-10-27)", () => {
+  const actors = actorsOf(SMOKE_RULES, "saadshahd/factory-smoke");
+  const first = session("stopped", { id: "94637db3", sessionId: "94637db3-4da9-4b97-aa43-4088b6605e34" });
+  const second = session("stopped", { id: "0e462418", sessionId: "0e462418-b22d-4e15-a8ad-8d9676426c92" });
+  const third = session("working", { id: "3e793b54", sessionId: "3e793b54" });
+
+  /** GitHub holds the wait as the worker closed it; before the answer it was open. */
+  const reopened = (c: Comment): Comment => {
+    const f = parse(c.body);
+
+    return f?.kind === "wait" ? { ...c, body: render({ ...f, answers: null }) } : c;
+  };
+
+  const at = (t: string, runs: RunView[], more: Partial<Snapshot> = {}): World => {
+    const answered = t >= "2026-10-27T00:50:00Z";
+    const comments = ISSUE_5.filter((c) => c.createdAt <= t).map((c) => (answered ? c : reopened(c)));
+    const gh = snapshot({ issues: [{ ...ISSUES[0]!, comments }], claimed: new Set([5]), ...more });
+
+    return world(gh, [here(5, runs)], { actors, rules: SMOKE_RULES });
+  };
+
+  test("a run stopped by hand is its own state: posted once, never counted or restarted as a crash", () => {
+    const { state, actions } = step(at("2026-10-27T00:48:00Z", [first, second]));
+
+    expect(state).toEqual({ kind: "stoppedByHand", session: second.sessionId, posted: false });
+    expect(actions).toEqual([{ kind: "postStopped", issue: 5, session: second.sessionId }]);
+    expect(stateLine(state)).toBe("stopped by hand");
+    expect(occupies(state)).toBe(false);
+
+    const w = at("2026-10-27T00:48:00Z", [first, second]);
+    const stopped = posted({ kind: "stopped", issue: 5, session: second.sessionId });
+    const issue5 = w.gh.issues[0]!;
+    const again = { ...w, gh: { ...w.gh, issues: [{ ...issue5, comments: [...issue5.comments, stopped] }] } };
+
+    expect(step(again)).toEqual({
+      state: { kind: "stoppedByHand", session: second.sessionId, posted: true },
+      actions: [],
+    });
+  });
+
+  test("a run the worker stopped for a restart, whose start then failed, is still a crash", () => {
+    expect(classify(here(5, [first, second]), at("2026-10-27T00:48:11Z", [first, second])).kind).toBe("crashed");
+  });
+
+  test("the log gets one line per state the worker sees, PR opened and merged included", () => {
+    const pr8 = (state: Pr["state"]) => new Map([[5, pr(5, { number: 8, state, checks: "SUCCESS", comments: PR_8 })]]);
+
+    const story = [
+      at("2026-10-27T00:48:30Z", [first, second, { ...third, state: "blocked" }]),
+      at("2026-10-27T00:49:55Z", [first, second, { ...third, state: "blocked" }]),
+      at("2026-10-27T00:50:00Z", [first, second, third]),
+      at("2026-10-27T00:51:00Z", [first, second, { ...third, state: "done" }], { prs: pr8("OPEN") }),
+      at("2026-10-27T00:51:12Z", [first, second, { ...third, state: "stopped" }], { prs: pr8("MERGED") }),
+      world(snapshot({ prs: pr8("MERGED") }), [here(5, [first, second, third])], { actors }),
+    ];
+
+    expect(story.map((w) => stateLine(classify(w.local[0]!, w)))).toEqual([
+      "waiting for an answer on the issue",
+      "answered on the issue",
+      "working",
+      "PR #8 open",
+      "PR #8 merged",
+      "ended: closed, PR #8",
+    ]);
+  });
+});
+
+describe("upsert says what it did, so the log names a cost posted or changed", () => {
+  const cost: FactoryComment = { kind: "cost", issue: 5, pr: 8, sessions: ["s"], input: 1, cacheRead: 2, cacheWrite: 3, output: 4 };
+  const fake: Run = async (argv) => ({ exitCode: 0, stdout: argv.includes("PATCH") ? "" : "77", stderr: "" });
+
+  test("posted, edited, unchanged", async () => {
+    expect(await upsert(fake, "o/r", 8, cost, [], A)).toBe("posted");
+    expect(await upsert(fake, "o/r", 8, cost, [posted(cost)], A)).toBe("unchanged");
+    expect(await upsert(fake, "o/r", 8, { ...cost, issue: 6 }, [posted(cost)], A)).toBe("edited");
+  });
+});
+
+describe("a worktree counts as this machine's run only when its branch carries this machine's claim", () => {
+  test("its own claim, another machine's, none, and an unreadable ref", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "factory-claim-"));
+    const git = (...a: string[]) => run(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir });
+    await git("init", "-q", "-b", "main");
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("update-ref", "refs/remotes/origin/main", "HEAD");
+    const ctx = { dir, base: "main", machine: "MAC-A" } as const;
+
+    expect(await claimIn(ctx, dir, "HEAD")).toBe(false);
+    await git("commit", "-q", "--allow-empty", "-m", "factory: claim #9\n\nFactory-Claim: MAC-B");
+    expect(await claimIn(ctx, dir, "HEAD")).toBe(false);
+    await git("commit", "-q", "--allow-empty", "-m", "factory: claim #9\n\nFactory-Claim: MAC-A");
+    expect(await claimIn(ctx, dir, "HEAD")).toBe(true);
+    expect(await claimIn(ctx, dir, "refs/heads/nothing")).toBe(false);
+    await rm(dir, { recursive: true });
   });
 });

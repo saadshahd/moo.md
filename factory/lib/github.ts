@@ -91,7 +91,7 @@ export async function edit(run: Run, repo: string, id: number, c: FactoryComment
 
 /**
  * Posts `c` on `n`, or edits the bot's newest comment of its kind among `existing` when it
- * differs, so a rerun after a crash never posts twice.
+ * differs, so a rerun after a crash never posts twice. Says which it did.
  */
 export async function upsert(
   run: Run,
@@ -100,14 +100,19 @@ export async function upsert(
   c: FactoryComment,
   existing: readonly Comment[],
   a: Actors,
-): Promise<number> {
+): Promise<"posted" | "edited" | "unchanged"> {
   const old = latest(existing, a, c.kind);
 
-  if (old === null) return post(run, repo, n, c);
+  if (old === null) {
+    await post(run, repo, n, c);
 
-  if (render(old.c) !== render(c)) await edit(run, repo, old.id, c);
+    return "posted";
+  }
 
-  return old.id;
+  if (render(old.c) === render(c)) return "unchanged";
+  await edit(run, repo, old.id, c);
+
+  return "edited";
 }
 
 export async function repoOf(run: Run, cwd: string): Promise<string> {
