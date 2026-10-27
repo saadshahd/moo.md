@@ -60,6 +60,7 @@ ${resume}
 ${list(i.rules.layers.plan)}
 2. Run \`${u.plan}\`.
 3. Ask with AskUserQuestion: question "${APPROVAL_QUESTION}", options "${APPROVE}" and "Change". Build nothing before "${APPROVE}". On "Change", rework the plan and go to step 2.
+   Build what the approved plan says; to change it, edit the plan and go to step 2.
 4. Post each choice you make without asking: \`${u.call}\`, one --other per option you passed over.
    Ask only when undoing a choice costs more than asking, and say why in one or two sentences in the same message.
    An ask goes to the issue; the answer arrives as your next message.
