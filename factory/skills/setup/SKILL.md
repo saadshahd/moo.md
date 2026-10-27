@@ -6,14 +6,23 @@ disable-model-invocation: true
 
 Set up the factory on the repo the session is in. `<root>` is the plugin root, two directories above this skill's base directory. Its dependencies are bundled: never run `bun install`.
 
-## Refuse
+## What the user wants
 
-Change nothing and say which holds:
+Run **hope:intent** on what this setup is for: a trial or a worker that stays up, and who besides the owner is trusted. More than one way to meet it remains → **hope:shape**.
 
-- `ANTHROPIC_API_KEY` is set in the shell, or `env.ANTHROPIC_API_KEY` or `apiKeyHelper` is set in `~/.claude/settings.json`, `.claude/settings.json` or `.claude/settings.local.json`.
-- `~/.claude/settings.json` lacks `env.CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` `"1"`, or enables no `factory@…` plugin.
-- The default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one.
-- `bun`, `gh`, `claude` or `wt` is not on `PATH`.
+## What stands in the way
+
+Check each, then show the user every one that holds, with its fix. Apply a fix only once the user agrees; the user alone fixes their shell and installs tools or plugins. Write nothing past this stage while any holds.
+
+| Holds | Fix |
+|---|---|
+| `ANTHROPIC_API_KEY` in the shell | the user unsets it where their shell sets it |
+| `env.ANTHROPIC_API_KEY` or `apiKeyHelper` in `~/.claude/settings.json`, `.claude/settings.json` or `.claude/settings.local.json` | remove the key |
+| `~/.claude/settings.json` lacks `env.CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` `"1"` | add it |
+| `~/.claude/settings.json` enables no `factory@…` plugin | the user installs it with `/plugin` |
+| the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | require a check the repo already runs; it has none → propose one |
+| `bun`, `gh`, `claude` or `wt` is not on `PATH` | the user installs it |
+| the worker would run on Linux | none yet: the worker calls macOS-only `ioreg` and `caffeinate` |
 
 ## The GitHub App
 
@@ -35,7 +44,7 @@ bun -e "const r=(await import('<root>/lib/rules.ts')).parseRules(await Bun.file(
 ```
 
 - `bot`: the `name` that `token` prints.
-- `trusted`: ask; never the bot.
+- `trusted`: the logins intent named; never the bot.
 - `atOnce`, `waitsPerDay`: ask. `contextCap` 300000 unless they name another; `paneEverySeconds` only if they name one.
 - `taste`: `CLAUDE.md`, `AGENTS.md` and any taste file they name. Put every rule those files state on one layer:
 
@@ -58,7 +67,7 @@ Commit it on a branch and open a PR to the default branch.
 
 ## The worker
 
-Start only once `git fetch origin && git show origin/HEAD:.claude/factory.json` prints the rules: the worker reads them from there, and the PR must merge first. Ask: a foreground trial, `bun <root>/worker/main.ts <repo path>` in their terminal, or launchd. For launchd write `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`:
+Start only once `git fetch origin && git show origin/HEAD:.claude/factory.json` prints the rules: the worker reads them from there, and the PR must merge first. A trial runs `bun <root>/worker/main.ts <repo path>` in their terminal; a worker that stays up runs under launchd. For launchd write `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`:
 
 - `ProgramArguments`: the absolute `bun`, `<root>/worker/main.ts`, the repo's main worktree path.
 - `EnvironmentVariables.PATH`: the directories of `bun`, `gh`, `claude`, `wt`, `git` and `caffeinate` in this shell.
