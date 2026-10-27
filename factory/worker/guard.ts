@@ -31,14 +31,8 @@ const SETTINGS = (dir: string) => [
 /** Each answers with a count only on success; a repo without classic protection gets a 404. */
 async function requiredChecks(repo: string, base: string): Promise<number> {
   const asks = [
-    [
-      `repos/${repo}/rules/branches/${base}`,
-      '[.[] | select(.type == "required_status_checks")] | length',
-    ],
-    [
-      `repos/${repo}/branches/${base}/protection/required_status_checks`,
-      ".contexts | length",
-    ],
+    [`repos/${repo}/rules/branches/${base}`, '[.[] | select(.type == "required_status_checks")] | length'],
+    [`repos/${repo}/branches/${base}/protection/required_status_checks`, ".contexts | length"],
   ];
 
   const counts = await Promise.all(
@@ -59,9 +53,7 @@ export async function refusals(
   rules: Rules,
   app: App,
 ): Promise<string[]> {
-  const files = await Promise.all(
-    SETTINGS(dir).map(async (p) => ({ p, s: await settings(p) })),
-  );
+  const files = await Promise.all(SETTINGS(dir).map(async (p) => ({ p, s: await settings(p) })));
 
   const user = files[0]!.s;
 
@@ -70,8 +62,7 @@ export async function refusals(
       b.name === rules.bot
         ? ""
         : `the App acts as ${b.name}, but the rules file names ${rules.bot}`,
-    (err: Error) =>
-      `the factory's GitHub App can't act on ${repo}: ${err.message}`,
+    (err: Error) => `the factory's GitHub App can't act on ${repo}: ${err.message}`,
   );
 
   return [
@@ -79,19 +70,13 @@ export async function refusals(
       ? "ANTHROPIC_API_KEY is set; it silently overrides your subscription. Unset it."
       : "",
     ...files.flatMap(({ p, s }) => [
-      s.env?.ANTHROPIC_API_KEY
-        ? `${p} sets ANTHROPIC_API_KEY; runs would bill the API. Remove it.`
-        : "",
-      s.apiKeyHelper
-        ? `${p} sets apiKeyHelper; runs would bill the API. Remove it.`
-        : "",
+      s.env?.ANTHROPIC_API_KEY ? `${p} sets ANTHROPIC_API_KEY; runs would bill the API. Remove it.` : "",
+      s.apiKeyHelper ? `${p} sets apiKeyHelper; runs would bill the API. Remove it.` : "",
     ]),
     user.env?.CLAUDE_CODE_ENABLE_FUNCTION_HOOKS === "1"
       ? ""
       : 'runs load no factory hooks: set "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1" under env in ~/.claude/settings.json.',
-    Object.entries(user.enabledPlugins ?? {}).some(
-      ([k, on]) => on && k.startsWith("factory@"),
-    )
+    Object.entries(user.enabledPlugins ?? {}).some(([k, on]) => on && k.startsWith("factory@"))
       ? ""
       : "the factory plugin is not installed and enabled for your user, so runs load no factory hooks. Install it with /plugin.",
     (await requiredChecks(repo, base)) > 0

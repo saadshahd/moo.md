@@ -76,17 +76,10 @@ async function tick(ctx: Ctx): Promise<void> {
 }
 
 async function machineId(): Promise<string> {
-  const out = await must(run, [
-    "ioreg",
-    "-rd1",
-    "-c",
-    "IOPlatformExpertDevice",
-  ]);
-
+  const out = await must(run, ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"]);
   const id = /"IOPlatformUUID" = "([^"]+)"/.exec(out)?.[1];
 
-  if (id === undefined)
-    throw new Error("ioreg names no IOPlatformUUID for this Mac");
+  if (id === undefined) throw new Error("ioreg names no IOPlatformUUID for this Mac");
 
   return id;
 }
@@ -95,22 +88,9 @@ async function main(dir: string): Promise<void> {
   const repo = await repoOf(run, dir);
 
   /** The run hooks and the rules read origin's default branch. */
-  await must(run, ["git", "remote", "set-head", "origin", "--auto"], {
-    cwd: dir,
-  });
-
-  const base = (
-    await must(run, [
-      "gh",
-      "repo",
-      "view",
-      repo,
-      "--json",
-      "defaultBranchRef",
-      "--jq",
-      ".defaultBranchRef.name",
-    ])
-  ).trim();
+  await must(run, ["git", "remote", "set-head", "origin", "--auto"], { cwd: dir });
+  const argv = ["gh", "repo", "view", repo, "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name"];
+  const base = (await must(run, argv)).trim();
 
   await must(run, ["git", "fetch", "origin", base], { cwd: dir });
   const rules = await readRules(run, dir);
@@ -140,9 +120,7 @@ if (import.meta.main) {
   const dir = process.argv[2];
 
   if (!dir) {
-    console.error(
-      "usage: bun factory/worker/main.ts <path to the target repo>",
-    );
+    console.error("usage: bun factory/worker/main.ts <path to the target repo>");
     process.exit(2);
   }
 

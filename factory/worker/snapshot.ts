@@ -6,25 +6,11 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  branchFor,
-  issueOf,
-  must,
-  runName,
-  STUCK_LABEL,
-  type Actors,
-} from "../lib/github.ts";
+import { branchFor, issueOf, must, runName, STUCK_LABEL, type Actors } from "../lib/github.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { readSnapshot } from "../lib/snapshot.ts";
-import {
-  contextSize,
-  pendingAsk,
-  rejectedUntil,
-  sum,
-  usage,
-  type Usage,
-} from "../lib/transcript.ts";
+import { contextSize, pendingAsk, rejectedUntil, sum, usage, type Usage } from "../lib/transcript.ts";
 import * as z from "../lib/vendor/zod-mini.js";
 import type { App } from "./app.ts";
 import { SESSION_STATES, type Local, type RunView, type World } from "./decide.ts";
@@ -46,13 +32,13 @@ const PROJECTS = join(homedir(), ".claude", "projects");
 const Session = z.union([
   z.object({ kind: z.literal("interactive") }),
   z.object({
-  kind: z.literal("background"),
-  id: z.string(),
-  sessionId: z.string(),
-  name: z.optional(z.nullable(z.string())),
-  startedAt: z.number(),
-  state: z.literal(SESSION_STATES),
-}),
+    kind: z.literal("background"),
+    id: z.string(),
+    sessionId: z.string(),
+    name: z.optional(z.nullable(z.string())),
+    startedAt: z.number(),
+    state: z.literal(SESSION_STATES),
+  }),
 ]);
 
 const WtList = z.object({
@@ -64,22 +50,13 @@ const WtList = z.object({
   ),
 });
 
-export async function worktrees(
-  ctx: Ctx,
-): Promise<{ issue: number; path: string }[]> {
-  const out = z.parse(
-    WtList,
-    JSON.parse(
-      await must(run, ["wt", "list", "--format", "json"], { cwd: ctx.dir }),
-    ),
-  );
+export async function worktrees(ctx: Ctx): Promise<{ issue: number; path: string }[]> {
+  const out = z.parse(WtList, JSON.parse(await must(run, ["wt", "list", "--format", "json"], { cwd: ctx.dir })));
 
   return out.items.flatMap((i) => {
     const n = issueOf(i.branch ?? "");
 
-    return n === null || !i.worktree
-      ? []
-      : [{ issue: n, path: i.worktree.path }];
+    return n === null || !i.worktree ? [] : [{ issue: n, path: i.worktree.path }];
   });
 }
 
@@ -112,11 +89,7 @@ async function factsOf(path: string, mainline: boolean): Promise<Facts> {
   return facts;
 }
 
-async function glob(pattern: string): Promise<string[]> {
-  return Array.fromAsync(
-    new Bun.Glob(pattern).scan({ cwd: PROJECTS, absolute: true }),
-  );
-}
+const glob = (pattern: string) => Array.fromAsync(new Bun.Glob(pattern).scan({ cwd: PROJECTS, absolute: true }));
 
 /** A session's facts; its usage includes its subagents' transcripts. */
 export async function sessionFacts(sessionId: string): Promise<Facts> {
@@ -126,9 +99,7 @@ export async function sessionFacts(sessionId: string): Promise<Facts> {
   const theirs = await Promise.all(subs.map((p) => factsOf(p, false)));
 
   return {
-    usage: sum(
-      [own?.usage, ...theirs.map((f) => f.usage)].flatMap((u) => u ?? []),
-    ),
+    usage: sum([own?.usage, ...theirs.map((f) => f.usage)].flatMap((u) => u ?? [])),
     context: own?.context ?? 0,
     pendingAsk: own?.pendingAsk ?? false,
     rejectedUntil: own?.rejectedUntil ?? null,
@@ -139,32 +110,15 @@ export async function sessionFacts(sessionId: string): Promise<Facts> {
 async function claimedHere(ctx: Ctx, n: number): Promise<boolean> {
   await must(run, ["git", "fetch", "origin", branchFor(n)], { cwd: ctx.dir });
 
-  const out = await must(
-    run,
-    [
-      "git",
-      "log",
-      `origin/${ctx.base}..origin/${branchFor(n)}`,
-      "--format=%(trailers:key=Factory-Claim,valueonly)",
-    ],
-    { cwd: ctx.dir },
-  );
+  const range = `origin/${ctx.base}..origin/${branchFor(n)}`;
+  const out = await must(run, ["git", "log", range, "--format=%(trailers:key=Factory-Claim,valueonly)"], { cwd: ctx.dir });
 
   return out.split("\n").some((l) => l.trim() === ctx.machine);
 }
 
-export async function readWorld(
-  ctx: Ctx,
-  rules: Rules,
-  actors: Actors,
-): Promise<World> {
+export async function readWorld(ctx: Ctx, rules: Rules, actors: Actors): Promise<World> {
   const trees = await worktrees(ctx);
-
-  const gh = await readSnapshot(
-    run,
-    ctx.repo,
-    trees.map((t) => t.issue),
-  );
+  const gh = await readSnapshot(run, ctx.repo, trees.map((t) => t.issue));
 
   const all = z.parse(
     z.array(Session),
@@ -180,48 +134,24 @@ export async function readWorld(
           .filter((s) => s.name === runName(ctx.repo, t.issue))
           .sort((a, b) => a.startedAt - b.startedAt)
           .map(async (s): Promise<RunView> => {
-            const f = await sessionFacts(s.sessionId);
+            const { context, pendingAsk, rejectedUntil } = await sessionFacts(s.sessionId);
 
-            return {
-              id: s.id,
-              sessionId: s.sessionId,
-              state: s.state,
-              context: f.context,
-              pendingAsk: f.pendingAsk,
-              rejectedUntil: f.rejectedUntil,
-            };
+            return { id: s.id, sessionId: s.sessionId, state: s.state, context, pendingAsk, rejectedUntil };
           }),
       );
 
-      return {
-        issue: t.issue,
-        path: t.path,
-        plan: (await plan.exists()) ? await plan.text() : null,
-        runs,
-      };
+      return { issue: t.issue, path: t.path, plan: (await plan.exists()) ? await plan.text() : null, runs };
     }),
   );
 
   const mine = new Set(local.map((l) => l.issue));
 
-  const maybe = gh.issues.filter(
-    (i) =>
-      gh.claimed.has(i.number) &&
-      !mine.has(i.number) &&
-      !i.labels.includes(STUCK_LABEL),
-  );
+  const maybe = gh.issues.filter((i) => gh.claimed.has(i.number) && !mine.has(i.number) && !i.labels.includes(STUCK_LABEL));
 
   /** One at a time: each fetch writes the repo's refs. */
   const here = new Set<number>();
 
   for (const i of maybe) if (await claimedHere(ctx, i.number)) here.add(i.number);
 
-  return {
-    now: Date.now(),
-    gh,
-    actors,
-    rules,
-    local,
-    claimedHere: here,
-  };
+  return { now: Date.now(), gh, actors, rules, local, claimedHere: here };
 }

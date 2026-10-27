@@ -78,13 +78,15 @@ export function latest<K extends Kind>(cs: readonly Comment[], a: Actors, kind: 
 const asBody = (c: FactoryComment) => ({ stdin: JSON.stringify({ body: render(c) }) });
 
 export async function post(run: Run, repo: string, n: number, c: FactoryComment): Promise<number> {
-  const out = await must(run, ["gh", "api", `repos/${repo}/issues/${n}/comments`, "--input", "-", "--jq", ".id"], asBody(c));
+  const argv = ["gh", "api", `repos/${repo}/issues/${n}/comments`, "--input", "-", "--jq", ".id"];
+  const out = await must(run, argv, asBody(c));
 
   return Number(out.trim());
 }
 
 export async function edit(run: Run, repo: string, id: number, c: FactoryComment): Promise<void> {
-  await must(run, ["gh", "api", "-X", "PATCH", `repos/${repo}/issues/comments/${id}`, "--input", "-", "--silent"], asBody(c));
+  const argv = ["gh", "api", "-X", "PATCH", `repos/${repo}/issues/comments/${id}`, "--input", "-", "--silent"];
+  await must(run, argv, asBody(c));
 }
 
 /**

@@ -47,7 +47,6 @@ Set `bot` to the `name` the `token` command prints (`<slug>[bot]`): only that lo
 
 ## The repo
 - `gh label create factory --force --description "Picked up by the factory worker"`
-- `gh label create factory:stuck --force --color B60205 --description "A factory run gave up; the comment says why"`
 - `gh repo edit --enable-auto-merge`
 - `claude --bg` refuses a folder the user never trusted. If `claude` was never opened here, tell them to run `claude` in the repo once and accept the trust prompt.
 

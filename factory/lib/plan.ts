@@ -51,7 +51,10 @@ export function overlap(a: readonly string[], b: readonly string[]): string[] {
   return [...new Set(a)].filter((p) => set.has(p));
 }
 
-/** The first open PR off branch `own` that changes any of `files`, and which; a PR too big to list its files changes all. */
+/**
+ * The first open PR off branch `own` that changes any of `files`, and which ones. A PR too big
+ * to list its files changes them all.
+ */
 export function overlappingPr(
   files: readonly string[],
   open: readonly OpenPr[],

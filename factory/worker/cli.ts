@@ -8,25 +8,9 @@ import { parseArgs } from "node:util";
 import { messageOf } from "../lib/errors.ts";
 import { WHY_MAX, type Plan } from "../lib/formats.ts";
 import {
-  branchFor,
-  factoryComments,
-  issueOf,
-  latest,
-  markStuck,
-  must,
-  post,
-  repoOf,
-  upsert,
-  type Actors,
+  branchFor, factoryComments, issueOf, latest, markStuck, must, post, repoOf, upsert, type Actors,
 } from "../lib/github.ts";
-import {
-  HANDOFF_PATH,
-  PLAN_PATH,
-  overlap,
-  planFiles,
-  planGaps,
-  planText,
-} from "../lib/plan.ts";
+import { HANDOFF_PATH, PLAN_PATH, overlappingPr, planFiles, planGaps, planText } from "../lib/plan.ts";
 import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
 import { comments, LABEL, readSnapshot } from "../lib/snapshot.ts";
 import { approved, APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
@@ -49,26 +33,18 @@ export function seal(text: string): string {
 type Here = { cwd: string; issue: number; repo: string; actors: Actors };
 
 async function here(cwd: string): Promise<Here> {
-  const issue = issueOf(
-    await must(run, ["git", "branch", "--show-current"], { cwd }),
-  );
+  const issue = issueOf(await must(run, ["git", "branch", "--show-current"], { cwd }));
 
   if (issue === null) throw new Refusal("not on a factory/<n> branch", 2);
   const repo = await repoOf(run, cwd);
 
-  return {
-    cwd,
-    issue,
-    repo,
-    actors: actorsOf(await readRules(run, cwd), repo),
-  };
+  return { cwd, issue, repo, actors: actorsOf(await readRules(run, cwd), repo) };
 }
 
 async function read(cwd: string, path: string): Promise<string> {
   const f = Bun.file(`${cwd}/${path}`);
 
-  if (!(await f.exists()))
-    throw new Refusal(`${path} does not exist; write it first`, 2);
+  if (!(await f.exists())) throw new Refusal(`${path} does not exist; write it first`, 2);
 
   return f.text();
 }
@@ -77,24 +53,15 @@ async function plan(h: Here): Promise<string> {
   const text = planText(await read(h.cwd, PLAN_PATH));
   const gaps = planGaps(text);
 
-  if (gaps.length > 0)
-    throw new Refusal(
-      `the plan lacks: ${gaps.join(", ")}. Fill each and run plan again.`,
-      2,
-    );
-  const files = planFiles(text);
+  if (gaps.length > 0) throw new Refusal(`the plan lacks: ${gaps.join(", ")}. Fill each and run plan again.`, 2);
   const open = (await readSnapshot(run, h.repo, [])).open;
+  const hit = overlappingPr(planFiles(text), open, branchFor(h.issue));
 
-  for (const pr of open) {
-    if (pr.head === branchFor(h.issue)) continue;
-    const both = pr.files === null ? files : overlap(files, pr.files);
-
-    if (both.length > 0)
-      throw new Refusal(
-        `the plan touches ${both.join(", ")}, which open PR #${pr.number} also changes. Stop: the factory takes this issue again after #${pr.number} merges.`,
-        3,
-      );
-  }
+  if (hit !== null)
+    throw new Refusal(
+      `the plan touches ${hit.files.join(", ")}, which open PR #${hit.pr} also changes. Stop: the factory takes this issue again after #${hit.pr} merges.`,
+      3,
+    );
 
   const cs = await comments(run, h.repo, h.issue);
   const next: Plan = { kind: "plan", issue: h.issue, seal: seal(text), text };
@@ -131,11 +98,8 @@ async function call(h: Here, v: Flags): Promise<string> {
   const others = (v.other ?? []).flatMap((o) => (o.trim() === "" ? [] : [o.trim()]));
   const cs = await comments(run, h.repo, h.issue);
 
-  const already = factoryComments(cs, h.actors).some(
-    ({ c }) => c.kind === "call" && c.choice === choice && c.picked === picked,
-  );
-
-  if (already) return "call already posted";
+  if (factoryComments(cs, h.actors).some(({ c }) => c.kind === "call" && c.choice === choice && c.picked === picked))
+    return "call already posted";
   await post(run, h.repo, h.issue, { kind: "call", issue: h.issue, choice, picked, others, why, undo });
 
   return "call posted";
@@ -144,14 +108,7 @@ async function call(h: Here, v: Flags): Promise<string> {
 async function handoff(h: Here): Promise<string> {
   const text = (await read(h.cwd, HANDOFF_PATH)).trim();
   const cs = await comments(run, h.repo, h.issue);
-  await upsert(
-    run,
-    h.repo,
-    h.issue,
-    { kind: "handoff", issue: h.issue, text },
-    cs,
-    h.actors,
-  );
+  await upsert(run, h.repo, h.issue, { kind: "handoff", issue: h.issue, text }, cs, h.actors);
 
   return "handoff posted";
 }
@@ -162,120 +119,40 @@ async function pr(h: Here): Promise<string> {
   const local = seal(planText(await read(h.cwd, PLAN_PATH)));
 
   if (!p || p.c.seal !== local)
-    throw new Refusal(
-      "the plan on the issue is not the plan in the worktree; run plan, then ask for approval",
-      4,
-    );
+    throw new Refusal("the plan on the issue is not the plan in the worktree; run plan, then ask for approval", 4);
 
   if (latest(cs, h.actors, "call") === null)
-    throw new Refusal(
-      "the issue has no call; post each choice you made without asking with `call` first",
-      4,
-    );
+    throw new Refusal("the issue has no call; post each choice you made without asking with `call` first", 4);
 
-  if (!approved(cs, h.actors, p.c.seal))
-    throw new Refusal("the plan is not approved; ask for approval first", 4);
+  if (!approved(cs, h.actors, p.c.seal)) throw new Refusal("the plan is not approved; ask for approval first", 4);
   const head = branchFor(h.issue);
-
-  const base = (
-    await must(run, ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"], {
-      cwd: h.cwd,
-    })
-  ).trim();
-
-  const changed = await must(
-    run,
-    ["git", "diff", "--name-only", `${base}...HEAD`],
-    { cwd: h.cwd },
-  );
+  const sh = async (...argv: string[]) => (await must(run, argv, { cwd: h.cwd })).trim();
+  const base = await sh("git", "rev-parse", "--abbrev-ref", "origin/HEAD");
+  const changed = await sh("git", "diff", "--name-only", `${base}...HEAD`);
 
   if (changed.split("\n").includes(RULES_PATH))
-    throw new Refusal(
-      `the branch changes ${RULES_PATH}; only a person changes the factory's rules`,
-      4,
-    );
+    throw new Refusal(`the branch changes ${RULES_PATH}; only a person changes the factory's rules`, 4);
 
-  const open = (
-    await must(run, [
-      "gh",
-      "pr",
-      "list",
-      "--repo",
-      h.repo,
-      "--head",
-      head,
-      "--state",
-      "open",
-      "--json",
-      "url",
-      "--jq",
-      ".[0].url // empty",
-    ])
-  ).trim();
+  const open = await sh("gh", "pr", "list", "--repo", h.repo, "--head", head, "--state", "open",
+    "--json", "url", "--jq", ".[0].url // empty");
 
-  const issueTitle = (
-    await must(run, [
-      "gh",
-      "issue",
-      "view",
-      String(h.issue),
-      "--repo",
-      h.repo,
-      "--json",
-      "title",
-      "--jq",
-      ".title",
-    ])
-  ).trim();
+  const title = await sh("gh", "issue", "view", String(h.issue), "--repo", h.repo, "--json", "title", "--jq", ".title");
+  const body = `Closes #${h.issue}\n\nPlan: seal \`${p.c.seal.slice(0, 8)}\`, approved on #${h.issue}.`;
 
   const url =
     open !== ""
       ? open
-      : (
-          await must(
-            run,
-            [
-              "gh",
-              "pr",
-              "create",
-              "--repo",
-              h.repo,
-              "--head",
-              head,
-              "--label",
-              LABEL,
-              "--title",
-              issueTitle,
-              "--body",
-              `Closes #${h.issue}\n\nPlan: seal \`${p.c.seal.slice(0, 8)}\`, approved on #${h.issue}.`,
-            ],
-            { cwd: h.cwd },
-          )
-        ).trim();
+      : await sh("gh", "pr", "create", "--repo", h.repo, "--head", head, "--label", LABEL,
+          "--title", title, "--body", body);
 
-  await must(run, ["gh", "pr", "merge", url, "--auto", "--squash"], {
-    cwd: h.cwd,
-  });
+  await sh("gh", "pr", "merge", url, "--auto", "--squash");
 
   return `${url} open, auto-merge on`;
 }
 
-async function stuck(h: Here, reason: string): Promise<string> {
-  if (reason === "") throw new Refusal('stuck "<reason>" is required', 2);
-  await markStuck(run, h.repo, h.issue, reason);
-
-  return "marked stuck";
-}
-
-async function token(cwd: string): Promise<string> {
-  return JSON.stringify(await botFor(await readApp(), await repoOf(run, cwd)));
-}
-
 /** How the run's prompt shows each command. */
 export function usage(cli: string) {
-  const flags = Object.entries(CALL)
-    .map(([k, o]) => `--${k} "<${o.hint}>"`)
-    .join(" ");
+  const flags = Object.entries(CALL).map(([k, o]) => `--${k} "<${o.hint}>"`).join(" ");
 
   return {
     plan: `${cli} plan`,
@@ -294,23 +171,25 @@ async function main(argv: string[]): Promise<string> {
     case "plan":
       return plan(await here(cwd));
     case "call":
-      return call(
-        await here(cwd),
-        parseArgs({ args: rest, options: CALL, strict: true }).values,
-      );
+      return call(await here(cwd), parseArgs({ args: rest, options: CALL, strict: true }).values);
     case "handoff":
       return handoff(await here(cwd));
     case "pr":
       return pr(await here(cwd));
-    case "stuck":
-      return stuck(await here(cwd), rest.join(" ").trim());
+    case "stuck": {
+      const h = await here(cwd);
+      const reason = rest.join(" ").trim();
+
+      if (reason === "") throw new Refusal('stuck "<reason>" is required', 2);
+      await markStuck(run, h.repo, h.issue, reason);
+
+      return "marked stuck";
+    }
+
     case "token":
-      return token(cwd);
+      return JSON.stringify(await botFor(await readApp(), await repoOf(run, cwd)));
     default:
-      throw new Refusal(
-        `usage: factory <plan|call|handoff|pr|stuck|token> …`,
-        2,
-      );
+      throw new Refusal(`usage: factory <plan|call|handoff|pr|stuck|token> …`, 2);
   }
 }
 
@@ -318,9 +197,7 @@ if (import.meta.main)
   main(process.argv.slice(2)).then(
     (msg) => console.log(msg),
     (err: Error) => {
-      console.error(
-        `factory: ${messageOf(err)}`,
-      );
+      console.error(`factory: ${messageOf(err)}`);
       process.exit(err instanceof Refusal ? err.code : 1);
     },
   );

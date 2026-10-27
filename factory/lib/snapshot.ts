@@ -218,7 +218,8 @@ const CommentsPage = z.array(
 async function graphql(run: Run, repo: string, query: string, ...more: string[]): Promise<string> {
   const [owner, name] = repo.split("/");
 
-  return must(run, ["gh", "api", "graphql", ...more, "-F", `owner=${owner}`, "-F", `name=${name}`, "-f", `query=${query}`]);
+  return must(run, ["gh", "api", "graphql", ...more, "-F", `owner=${owner}`, "-F", `name=${name}`,
+    "-f", `query=${query}`]);
 }
 
 /** Every comment on issue or PR `n`, oldest first. */

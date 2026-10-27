@@ -103,7 +103,8 @@ const Stuck = z.object({ kind: z.literal("stuck"), issue: Issue, reason: z.strin
 const Undo = z.object({ kind: z.literal("undo"), call: Id, text: z.string() });
 
 export type FactoryComment = z.infer<
-  typeof Plan | typeof Call | typeof Wait | typeof Answer | typeof Handoff | typeof Cost | typeof Restart | typeof Stuck | typeof Undo
+  typeof Plan | typeof Call | typeof Wait | typeof Answer | typeof Handoff | typeof Cost | typeof Restart
+  | typeof Stuck | typeof Undo
 >;
 
 export type Kind = FactoryComment["kind"];

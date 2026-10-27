@@ -5,16 +5,9 @@
 
 import { parse, type Restart, type Wait } from "../lib/formats.ts";
 import {
-  branchFor,
-  factoryComments,
-  fromBot,
-  latest,
-  STUCK_LABEL,
-  wroteIt,
-  type Actors,
-  type Comment,
+  branchFor, factoryComments, fromBot, latest, STUCK_LABEL, wroteIt, type Actors, type Comment,
 } from "../lib/github.ts";
-import { overlap, planFiles } from "../lib/plan.ts";
+import { overlappingPr, planFiles } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import type { Issue, OpenPr, Pr, Snapshot } from "../lib/snapshot.ts";
 import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
@@ -74,39 +67,15 @@ export type IssueState =
   | { kind: "held"; byPr: number }
   | { kind: "crashed"; deaths: number };
 
-export type Candidate =
-  | { kind: "untrusted" }
-  | { kind: "blocked" }
-  | { kind: "overlapsOpenPr"; pr: number }
-  | { kind: "claimedElsewhere" }
-  | { kind: "claimable"; planned: boolean }
-  | { kind: "resumable"; planned: boolean };
-
 /** Which session an action stops or wakes: `claude stop` takes `id`, `--resume` takes `sessionId`. */
 export type RunId = Pick<RunView, "id" | "sessionId">;
 
 export type Action =
   | { kind: "claim"; issue: number }
-  | {
-      kind: "start";
-      issue: number;
-      restart: Restart["reason"] | null;
-      after: string | null;
-    }
+  | { kind: "start"; issue: number; restart: Restart["reason"] | null; after: string | null }
   | { kind: "stop"; issue: number; run: RunId }
-  | {
-      kind: "wake";
-      issue: number;
-      run: RunId;
-      message: string;
-      restart: "checks" | null;
-    }
-  | {
-      kind: "closeWait";
-      issue: number;
-      wait: { id: number; c: Wait };
-      answers: string[];
-    }
+  | { kind: "wake"; issue: number; run: RunId; message: string; restart: "checks" | null }
+  | { kind: "closeWait"; issue: number; wait: { id: number; c: Wait }; answers: string[] }
   | { kind: "markStuck"; issue: number; reason: string }
   | { kind: "postCost"; issue: number; pr: number; sessions: string[] }
   | { kind: "removeWorktree"; issue: number };
@@ -130,11 +99,7 @@ export const NEXT = {
 
 /** The issue was labelled by a trusted person, and its body written or last edited by one. */
 export function trustedIssue(i: Issue, a: Actors): boolean {
-  return (
-    i.labelledBy !== null &&
-    a.trusted.includes(i.labelledBy) &&
-    wroteIt(i, a.trusted)
-  );
+  return i.labelledBy !== null && a.trusted.includes(i.labelledBy) && wroteIt(i, a.trusted);
 }
 
 /**
@@ -145,44 +110,20 @@ export function deathsSinceRetry(cs: readonly Comment[], a: Actors): number {
   const fs = factoryComments(cs, a).map((x) => x.c);
   const since = fs.findLastIndex((c) => c.kind === "stuck") + 1;
 
-  return fs
-    .slice(since)
-    .filter((c) => c.kind === "restart" && c.reason !== "context").length;
+  return fs.slice(since).filter((c) => c.kind === "restart" && c.reason !== "context").length;
 }
 
 /** The issue's PR, unless it was closed unmerged before the issue was last marked stuck. */
-function livePr(
-  pr: Pr | undefined,
-  cs: readonly Comment[],
-  a: Actors,
-): Pr | null {
+function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | null {
   if (pr === undefined) return null;
-
-  const stuckAt =
-    cs.findLast((c) => fromBot(c, a) && parse(c.body)?.kind === "stuck")
-      ?.createdAt ?? "";
+  const stuckAt = cs.findLast((c) => fromBot(c, a) && parse(c.body)?.kind === "stuck")?.createdAt ?? "";
 
   return pr.state === "CLOSED" && (pr.closedAt ?? "") < stuckAt ? null : pr;
 }
 
 /** The first open PR, other than the issue's own, whose files overlap the plan's. */
-function overlapping(
-  plan: string,
-  open: readonly OpenPr[],
-  n: number,
-): number | null {
-  const files = planFiles(plan);
-
-  if (files.length === 0) return null;
-
-  return (
-    open.find(
-      (p) =>
-        p.head !== branchFor(n) &&
-        (p.files === null || overlap(files, p.files).length > 0),
-    )?.number ?? null
-  );
-}
+const overlapping = (plan: string, open: readonly OpenPr[], n: number) =>
+  overlappingPr(planFiles(plan), open, branchFor(n))?.pr ?? null;
 
 export function classify(l: Local, w: World): IssueState {
   const issue = w.gh.issues.find((i) => i.number === l.issue);
@@ -202,28 +143,20 @@ export function classify(l: Local, w: World): IssueState {
   const cs = issue.comments;
 
   if (current?.state === "working")
-    return current.context > w.rules.contextCap
-      ? { kind: "overCap" }
-      : { kind: "working" };
+    return current.context > w.rules.contextCap ? { kind: "overCap" } : { kind: "working" };
 
   if (current?.pendingAsk) return { kind: "askedInBox" };
   const wait = openWait(cs, w.actors);
 
   if (wait !== null && current !== undefined)
-    return {
-      kind: "waiting",
-      wait,
-      answers: answerTo(cs, w.actors, wait)?.answers ?? null,
-    };
+    return { kind: "waiting", wait, answers: answerTo(cs, w.actors, wait)?.answers ?? null };
   const pr = livePr(w.gh.prs.get(l.issue), cs, w.actors);
 
-  const deaths =
-    deathsSinceRetry(cs, w.actors) + (current === undefined ? 0 : 1);
+  const deaths = deathsSinceRetry(cs, w.actors) + (current === undefined ? 0 : 1);
 
   if (pr?.state === "MERGED") return { kind: "prMerged", pr: pr.number };
 
-  if (pr?.state === "CLOSED")
-    return { kind: "prClosedUnmerged", pr: pr.number };
+  if (pr?.state === "CLOSED") return { kind: "prClosedUnmerged", pr: pr.number };
 
   if (pr !== null)
     return pr.checks === "FAILURE" || pr.checks === "ERROR"
@@ -235,11 +168,7 @@ export function classify(l: Local, w: World): IssueState {
       ? { kind: "limited", until: current.rejectedUntil }
       : { kind: "limitReset" };
 
-  const byPr = overlapping(
-    l.plan ?? latest(cs, w.actors, "plan")?.c.text ?? "",
-    w.gh.open,
-    l.issue,
-  );
+  const byPr = overlapping(l.plan ?? latest(cs, w.actors, "plan")?.c.text ?? "", w.gh.open, l.issue);
 
   if (byPr !== null) return { kind: "held", byPr };
   const until = limitedUntil(w);
@@ -263,59 +192,38 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
   const current = l.runs.at(-1);
 
   const stop: Action[] =
-    current === undefined || current.state === "stopped"
-      ? []
-      : [{ kind: "stop", issue: n, run: current }];
+    current === undefined || current.state === "stopped" ? [] : [{ kind: "stop", issue: n, run: current }];
 
-  const cost = (pr: number): Action => ({
-    kind: "postCost",
+  const cost = (pr: number): Action => ({ kind: "postCost", issue: n, pr, sessions: l.runs.map((r) => r.sessionId) });
+  const stuck = (reason: string): Action[] => [...stop, { kind: "markStuck", issue: n, reason }];
+
+  const start = (restart: Restart["reason"] | null): Action => ({
+    kind: "start",
     issue: n,
-    pr,
-    sessions: l.runs.map((r) => r.sessionId),
+    restart,
+    after: current?.sessionId ?? null,
   });
 
-  const stuck = (reason: string): Action[] => [
-    ...stop,
-    { kind: "markStuck", issue: n, reason },
-  ];
+  const wake = (message: string, restart: "checks" | null = null): Action[] =>
+    current === undefined ? [] : [{ kind: "wake", issue: n, run: current, message, restart }];
 
   switch (s.kind) {
     case "ended":
-      return [
-        ...stop,
-        ...(s.pr === null ? [] : [cost(s.pr)]),
-        { kind: "removeWorktree", issue: n },
-      ];
+      return [...stop, ...(s.pr === null ? [] : [cost(s.pr)]), { kind: "removeWorktree", issue: n }];
     case "overCap":
-      return [
-        ...stop,
-        {
-          kind: "start",
-          issue: n,
-          restart: "context",
-          after: current?.sessionId ?? null,
-        },
-      ];
+      return [...stop, start("context")];
     case "working":
     case "limited":
     case "held":
       return [];
     case "askedInBox":
-      return stuck(
-        "the run asked in its own question box, which nobody watches",
-      );
+      return stuck("the run asked in its own question box, which nobody watches");
     case "waiting":
       return s.answers === null || current === undefined
         ? []
         : [
             { kind: "closeWait", issue: n, wait: s.wait, answers: s.answers },
-            {
-              kind: "wake",
-              issue: n,
-              run: current,
-              message: answerMessage(s.wait.c, s.answers),
-              restart: null,
-            },
+            ...wake(answerMessage(s.wait.c, s.answers)),
           ];
     case "prOpen":
     case "prMerged":
@@ -325,38 +233,13 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     case "checksFailed":
       return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
         ? stuck(`the checks on PR #${s.pr} failed ${s.deaths} times`)
-        : [
-            {
-              kind: "wake",
-              issue: n,
-              run: current,
-              message: `The checks on PR #${s.pr} failed. Read them with \`gh pr checks ${s.pr}\`, fix and push.`,
-              restart: "checks",
-            },
-          ];
+        : wake(`The checks on PR #${s.pr} failed. Read them with \`gh pr checks ${s.pr}\`, fix and push.`, "checks");
     case "limitReset":
-      return current === undefined
-        ? []
-        : [
-            {
-              kind: "wake",
-              issue: n,
-              run: current,
-              message: "Your usage limit has reset. Go on with the work.",
-              restart: null,
-            },
-          ];
+      return wake("Your usage limit has reset. Go on with the work.");
     case "crashed":
       return s.deaths >= CRASHES_BEFORE_STUCK
         ? stuck(`the run died or ended without a PR ${s.deaths} times`)
-        : [
-            {
-              kind: "start",
-              issue: n,
-              restart: current === undefined ? null : "crash",
-              after: current?.sessionId ?? null,
-            },
-          ];
+        : [start(current === undefined ? null : "crash")];
   }
 }
 
@@ -382,23 +265,17 @@ export function occupies(s: IssueState): boolean {
   }
 }
 
-export function candidate(i: Issue, w: World): Candidate {
-  if (!trustedIssue(i, w.actors)) return { kind: "untrusted" };
-
-  if (i.blocked) return { kind: "blocked" };
+/** Whether `i` may start here now: trusted, unblocked, clear of open PRs, and unclaimed or claimed by this machine. */
+function startable(i: Issue, w: World): { resume: boolean; planned: boolean } | null {
+  if (!trustedIssue(i, w.actors) || i.blocked) return null;
   const plan = latest(i.comments, w.actors, "plan");
 
-  const byPr =
-    plan === null ? null : overlapping(plan.c.text, w.gh.open, i.number);
+  if (plan !== null && overlapping(plan.c.text, w.gh.open, i.number) !== null) return null;
+  const planned = plan !== null;
 
-  if (byPr !== null) return { kind: "overlapsOpenPr", pr: byPr };
+  if (!w.gh.claimed.has(i.number)) return { resume: false, planned };
 
-  if (!w.gh.claimed.has(i.number))
-    return { kind: "claimable", planned: plan !== null };
-
-  return w.claimedHere.has(i.number)
-    ? { kind: "resumable", planned: plan !== null }
-    : { kind: "claimedElsewhere" };
+  return w.claimedHere.has(i.number) ? { resume: true, planned } : null;
 }
 
 /**
@@ -407,25 +284,16 @@ export function candidate(i: Issue, w: World): Candidate {
  */
 export function pick(w: World): { issue: number; resume: boolean }[] {
   const local = new Set(w.local.map((l) => l.issue));
-  const busy = w.local.filter((l) => occupies(classify(l, w))).length;
-  const free = w.rules.atOnce - busy;
+  const free = w.rules.atOnce - w.local.filter((l) => occupies(classify(l, w))).length;
 
   if (free <= 0 || limitedUntil(w) !== null) return [];
 
   return w.gh.issues
     .filter((i) => !local.has(i.number) && !i.labels.includes(STUCK_LABEL))
     .flatMap((i) => {
-      const c = candidate(i, w);
+      const c = startable(i, w);
 
-      return c.kind === "claimable" || c.kind === "resumable"
-        ? [
-            {
-              issue: i.number,
-              resume: c.kind === "resumable",
-              planned: c.planned,
-            },
-          ]
-        : [];
+      return c === null ? [] : [{ issue: i.number, ...c }];
     })
     .sort((a, b) => Number(b.planned) - Number(a.planned) || a.issue - b.issue)
     .slice(0, free)
