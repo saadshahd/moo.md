@@ -10,6 +10,11 @@ export type ToolCall<T extends string> = Extract<ToolCallInput, { tool: T }>;
 /** The `next` a `tool.call` hook passes its event on with. */
 export type PassOn<E> = (e: E) => Promise<ToolCallResult>;
 
+/** Where this plugin's `worker/cli.ts` sits. */
+export function cliPath($: EngineInterface): string {
+  return `${$.plugin.root}/worker/cli.ts`;
+}
+
 export function runner($: EngineInterface): Run {
   return (argv, opts) =>
     $.process.run(argv, {

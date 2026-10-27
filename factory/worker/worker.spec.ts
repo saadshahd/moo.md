@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { usage } from "../lib/commands.ts";
 import { render, type FactoryComment, type Wait } from "../lib/formats.ts";
 import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { planGaps } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import type { Issue, Pr, Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
-import { seal, usage } from "./cli.ts";
+import { seal } from "./cli.ts";
 import {
   actionsFor,
   classify,

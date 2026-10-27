@@ -2,7 +2,7 @@ import type { Args, EngineInterface, Next, ToolCallResult } from "claude-code";
 import { Bot, needsRenew } from "../lib/bot.ts";
 import { must } from "../lib/github.ts";
 import * as z from "../lib/vendor/zod-mini.js";
-import { inRun, runner, useLogin } from "./session.ts";
+import { cliPath, inRun, runner, useLogin } from "./session.ts";
 import type { FactoryRun } from "./state.d.ts";
 
 /**
@@ -14,13 +14,7 @@ async function heldBot($: EngineInterface, fr: FactoryRun): Promise<Bot> {
 
   if (held !== undefined && !needsRenew(held, await $.clock.now())) return held;
 
-  const out = await must(
-    runner($),
-    ["bun", `${$.plugin.root}/worker/cli.ts`, "token", fr.repo],
-    {
-      cwd: fr.cwd,
-    },
-  );
+  const out = await must(runner($), ["bun", cliPath($), "token", fr.repo], { cwd: fr.cwd });
 
   const bot = z.parse(Bot, JSON.parse(out));
   await $.state.set({ plugin: "factory", key: "bot" }, bot);

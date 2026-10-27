@@ -1,17 +1,18 @@
 import type { EngineInterface, ToolCallResult } from "claude-code";
+import { usage } from "../lib/commands.ts";
 import { latest } from "../lib/github.ts";
 import { PLAN_PATH, planText } from "../lib/plan.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
 import { comments } from "../lib/snapshot.ts";
 import { approved } from "../lib/wait.ts";
-import { inRun, runner, type PassOn, type ToolCall } from "./session.ts";
+import { cliPath, inRun, runner, type PassOn, type ToolCall } from "./session.ts";
 
 type FileEdit = ToolCall<"Edit" | "Write" | "NotebookEdit">;
 
 /**
  * After a file tool changes an approved plan, the agent hears that the approval no longer holds.
  * Nothing on GitHub changes: an approval names its plan's seal, and the changed plan has a new one.
- * An edit made through Bash slips past this; `factory pr` still compares the plan with its seal.
+ * An edit made through Bash slips past this; `cli.ts pr` still compares the plan with its seal.
  */
 export async function revokeEditedPlan<E extends FileEdit>(
   $: EngineInterface,
@@ -40,7 +41,7 @@ export async function revokeEditedPlan<E extends FileEdit>(
       ...r,
       context: [
         ...(r.context ?? []),
-        "You changed the approved plan, so its approval no longer holds. Post it again with `factory plan` and ask for approval before building on it.",
+        `You changed the approved plan, so its approval no longer holds. Post it again with \`${usage(`bun ${cliPath($)}`).plan}\` and ask for approval before building on it.`,
       ],
     };
   });

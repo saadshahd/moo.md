@@ -1,10 +1,11 @@
 import type { EngineInterface, ToolCallResult } from "claude-code";
+import { usage } from "../lib/commands.ts";
 import { WHY_MAX } from "../lib/formats.ts";
 import { latest, must, post, type Run } from "../lib/github.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
 import { comments } from "../lib/snapshot.ts";
 import { isApproval } from "../lib/wait.ts";
-import { inRun, runner, type PassOn, type ToolCall } from "./session.ts";
+import { cliPath, inRun, runner, type PassOn, type ToolCall } from "./session.ts";
 import type { FactoryRun } from "./state.d.ts";
 
 type Ask = ToolCall<"AskUserQuestion">;
@@ -94,7 +95,7 @@ export async function askOnIssue(
       !(await takeWait(run, fr, rules.waitsPerDay, localDay(new Date(await $.clock.now()))))
     )
       return {
-        deny: `Today's ${rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call with the factory's call command, and go on.`,
+        deny: `Today's ${rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call with \`${usage(`bun ${cliPath($)}`).call}\`, and go on.`,
       };
 
     const plan = approval

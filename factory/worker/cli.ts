@@ -1,11 +1,12 @@
 /**
  * What a factory run calls to write to GitHub, so every factory comment has one shape and is
- * posted once. Run inside the run's worktree: the branch names the issue. `usage` renders each
- * command for the run's prompt from the same options `parseArgs` reads.
+ * posted once. Run inside the run's worktree: the branch names the issue. `parseArgs` reads
+ * the `call` flags `usage` in `lib/commands.ts` shows the run.
  */
 
 import { parseArgs } from "node:util";
 import { messageOf } from "../lib/errors.ts";
+import { CALL } from "../lib/commands.ts";
 import { WHY_MAX, type Plan } from "../lib/formats.ts";
 import {
   branchFor, factoryComments, issueOf, latest, markStuck, must, post, repoOf, upsert, type Actors,
@@ -71,15 +72,6 @@ async function plan(h: Here): Promise<string> {
     ? `plan ${next.seal.slice(0, 8)} posted, unchanged and still approved`
     : `plan ${next.seal.slice(0, 8)} posted. Ask "${APPROVAL_QUESTION}" with the options "${APPROVE}" and "Change".`;
 }
-
-/** The `call` flags; `parseArgs` reads them and `usage` shows each with its hint. */
-const CALL = {
-  choice: { type: "string", hint: "what was open" },
-  picked: { type: "string", hint: "what you chose" },
-  other: { type: "string", multiple: true, hint: "an option you did not pick" },
-  why: { type: "string", hint: "why this one" },
-  undo: { type: "string", hint: "what reversing it takes" },
-} as const;
 
 type Flags = ReturnType<typeof parseArgs<{ options: typeof CALL; strict: true }>>["values"];
 
@@ -148,19 +140,6 @@ async function pr(h: Here): Promise<string> {
   await sh("gh", "pr", "merge", url, "--auto", "--squash");
 
   return `${url} open, auto-merge on`;
-}
-
-/** How the run's prompt shows each command. */
-export function usage(cli: string) {
-  const flags = Object.entries(CALL).map(([k, o]) => `--${k} "<${o.hint}>"`).join(" ");
-
-  return {
-    plan: `${cli} plan`,
-    call: `${cli} call ${flags}`,
-    handoff: `${cli} handoff`,
-    pr: `${cli} pr`,
-    stuck: `${cli} stuck "<the reason, in one line>"`,
-  };
 }
 
 async function main(argv: string[]): Promise<string> {

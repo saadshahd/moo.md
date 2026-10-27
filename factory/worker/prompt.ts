@@ -3,11 +3,11 @@
  * and the newest handoff, so it goes on from written work, never from a saved conversation.
  */
 
+import { usage } from "../lib/commands.ts";
 import { branchFor } from "../lib/github.ts";
 import { HANDOFF_PATH, PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
-import { usage } from "./cli.ts";
 
 export type RunInput = {
   repo: string;

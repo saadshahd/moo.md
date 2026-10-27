@@ -328,6 +328,7 @@ describe("ask", () => {
     await h.call(ask("One?"));
     const r: any = await h.call(ask("Two?"));
     expect(r.deny).toContain("post it as a call");
+    expect(r.deny).toMatch(/`bun \S+\/worker\/cli\.ts call --choice "<what was open>"/);
     expect(h.said().length).toBe(1);
   });
 
@@ -396,6 +397,7 @@ describe("seal", () => {
     h.tool(() => ({ result: {} }));
     const r: any = await h.call(editPlan);
     expect(r.context.join("\n")).toContain("approval no longer holds");
+    expect(r.context.join("\n")).toMatch(/`bun \S+\/worker\/cli\.ts plan`/);
   });
 
   test("an edit that leaves the approved text as it was says nothing", async ($, on) => {
