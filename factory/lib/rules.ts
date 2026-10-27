@@ -12,6 +12,8 @@ export const Rules = z.object({
   waitsPerDay: z.int().check(z.minimum(0)),
   /** Once a run's context passes this many tokens, it restarts fresh from plan, branch and handoff. */
   contextCap: z.int().check(z.minimum(1)),
+  /** How often the open `/factory` pane reads GitHub again, in seconds. Default 20. */
+  paneEverySeconds: z.optional(z.int().check(z.minimum(10))),
   /** The factory App's bot login, `<slug>[bot]`: the only author whose factory comments count. */
   bot: Text.check(z.regex(/\[bot\]$/)),
   /** Whose comments, labels and issue bodies count. Default: the repo's owner. Never the bot. */

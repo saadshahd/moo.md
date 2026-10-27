@@ -29,7 +29,7 @@ import {
 
 const PANE = "factory";
 const PANE_COLUMNS = 72;
-const READ_EVERY_MS = 60_000;
+const READ_EVERY_SECONDS = 20;
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const FRAME_MS = 80;
 
@@ -39,7 +39,7 @@ type Read =
   | { kind: "unread" }
   | { kind: "none"; why: string }
   | { kind: "failed"; why: string }
-  | { kind: "read"; repo: string; actors: Actors; rows: Rows };
+  | { kind: "read"; repo: string; actors: Actors; rows: Rows; everyMs: number };
 
 let read: Read = { kind: "unread" };
 let tab: Tab = "questions";
@@ -50,7 +50,7 @@ const picks = new Map<number, (string | undefined)[]>();
 let busy: string | null = null;
 let reading: Promise<void> | null = null;
 let spinner: { cancel: () => void } | null = null;
-let ticking: { cancel: () => void } | null = null;
+let ticking: { ms: number; timer: { cancel: () => void } } | null = null;
 let frame = 0;
 
 const draw = ($: EngineInterface) => $.ui.invalidate("ui.render");
@@ -72,6 +72,9 @@ function refresh($: EngineInterface): Promise<void> {
     }
   })().finally(() => {
     reading = null;
+
+    /** A changed `paneEverySeconds` takes hold at once; a closed pane stays without a timer. */
+    if (ticking !== null) keepReading($);
     spin($);
     draw($);
   });
@@ -98,7 +101,11 @@ function spin($: EngineInterface) {
  * module too, and a timer in each would spend the user's GitHub calls.
  */
 function keepReading($: EngineInterface) {
-  ticking ??= $.clock.every(READ_EVERY_MS, () => void refresh($));
+  const ms = read.kind === "read" ? read.everyMs : READ_EVERY_SECONDS * 1_000;
+
+  if (ticking?.ms === ms) return;
+  ticking?.timer.cancel();
+  ticking = { ms, timer: $.clock.every(ms, () => void refresh($)) };
 }
 
 async function readRows($: EngineInterface): Promise<Read> {
@@ -124,6 +131,7 @@ async function readRows($: EngineInterface): Promise<Read> {
     repo,
     actors,
     rows: rows(await readSnapshot(run, repo, []), actors),
+    everyMs: (rules.paneEverySeconds ?? READ_EVERY_SECONDS) * 1_000,
   };
 }
 
@@ -254,7 +262,7 @@ export const registerPane: Register = (on) => {
   });
 
   on("ui.close", { id: PANE }, async ($, e, next) => {
-    ticking?.cancel();
+    ticking?.timer.cancel();
     ticking = null;
     spinner?.cancel();
     spinner = null;
