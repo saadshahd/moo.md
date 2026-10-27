@@ -4,7 +4,7 @@ import { PLAN_PATH, planText } from "../lib/plan.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
 import { comments } from "../lib/snapshot.ts";
 import { approved } from "../lib/wait.ts";
-import { currentRun, runner, showOnce, type PassOn, type ToolCall } from "./session.ts";
+import { inRun, runner, type PassOn, type ToolCall } from "./session.ts";
 
 type FileEdit = ToolCall<"Edit" | "Write" | "NotebookEdit">;
 
@@ -23,10 +23,7 @@ export async function revokeEditedPlan<E extends FileEdit>(
 
   if (r.deny !== undefined || r.isError || !path.endsWith(PLAN_PATH)) return r;
 
-  try {
-    const fr = await currentRun($);
-
-    if (!fr) return r;
+  return inRun($, r, async (fr) => {
     const run = runner($);
     const actors = actorsOf(await readRules(run, fr.cwd), fr.repo);
     const cs = await comments(run, fr.repo, fr.issue);
@@ -46,9 +43,5 @@ export async function revokeEditedPlan<E extends FileEdit>(
         "You changed the approved plan, so its approval no longer holds. Post it again with `factory plan` and ask for approval before building on it.",
       ],
     };
-  } catch (err) {
-    await showOnce($, String(err));
-
-    return r;
-  }
+  });
 }

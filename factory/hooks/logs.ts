@@ -1,6 +1,6 @@
 import type { EngineInterface, ToolCallResult } from "claude-code";
 import { cutToFailures, isTestCommand } from "../lib/logs.ts";
-import { currentRun, showOnce, type PassOn, type ToolCall } from "./session.ts";
+import { inRun, type PassOn, type ToolCall } from "./session.ts";
 
 type Bash = ToolCall<"Bash">;
 
@@ -20,15 +20,10 @@ export async function cutFailedTests(
 
   if (r.deny !== undefined || !r.isError || !isTestCommand(e.command)) return r;
 
-  try {
-    if (!(await currentRun($))) return r;
+  return inRun($, r, async () => {
     const whole = r.text ?? "";
     const cut = cutToFailures(whole);
 
     return cut === whole ? r : { deny: cut };
-  } catch (err) {
-    await showOnce($, String(err));
-
-    return r;
-  }
+  });
 }
