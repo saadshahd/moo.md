@@ -31,7 +31,7 @@ bun -e "const r=(await import('<root>/lib/rules.ts')).parseRules(await Bun.file(
 
 - `bot`: the `name` that `token` prints.
 - `trusted`: ask; never the bot.
-- `atOnce`, `waitsPerDay`: ask. `contextCap` 300000 and `paneEverySeconds` 20, unless they name others.
+- `atOnce`, `waitsPerDay`: ask. `contextCap` 300000 unless they name another; `paneEverySeconds` only if they name one.
 - `taste`: `CLAUDE.md`, `AGENTS.md` and any taste file they name. Put every rule those files state on one layer:
 
   | Layer | A rule that |
