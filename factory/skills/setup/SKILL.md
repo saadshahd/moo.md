@@ -23,10 +23,15 @@ Done when `~/.config/factory/app.json` exists and `bun <root>/worker/cli.ts toke
 Write `~/.config/factory/app.json` as `{ "clientId": "<Client ID>", "key": "app.pem" }` and run `token` again.
 
 ## The rules file
-Write `.claude/factory.json` with the user, every field `<root>/lib/rules.ts` defines; `parseRules` must accept it.
+Write `.claude/factory.json` with the user, every field `<root>/lib/rules.ts` defines. This must print nothing:
+
+```sh
+bun -e "const r=(await import('<root>/lib/rules.ts')).parseRules(await Bun.file('.claude/factory.json').text()); if ('errors' in r) { console.error(r.errors.join('\n')); process.exit(1) }"
+```
+
 - `bot`: the `name` that `token` prints.
 - `trusted`: ask; never the bot.
-- `atOnce`, `waitsPerDay`, `paneEverySeconds`: ask. `contextCap`: 300000 unless they name another.
+- `atOnce`, `waitsPerDay`: ask. `contextCap` 300000 and `paneEverySeconds` 20, unless they name others.
 - `taste`: `CLAUDE.md`, `AGENTS.md` and any taste file they name. Put every rule those files state on one layer:
 
   | Layer | A rule that |
@@ -38,7 +43,7 @@ Write `.claude/factory.json` with the user, every field `<root>/lib/rules.ts` de
 
   A rule that reads two ways → **hope:clarify** before placing it. The user can't state their taste → **hope:elicit**. Show the mapping as a table and let the user move rules before writing it.
 
-Commit it on a branch and open a PR to the default branch. The worker reads the rules from `origin`, so it can't start until the PR merges.
+Commit it on a branch and open a PR to the default branch.
 
 ## The repo
 - `gh label create factory --force` and `gh label create factory:stuck --force`
@@ -46,7 +51,7 @@ Commit it on a branch and open a PR to the default branch. The worker reads the 
 - Unless `~/.claude.json` has `projects["<repo path>"].hasTrustDialogAccepted` true, the user runs `claude` in the repo once and accepts the trust prompt.
 
 ## The worker
-Ask: a foreground trial, `bun <root>/worker/main.ts <repo path>` in their terminal, or launchd. For launchd write `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`:
+Start only once `git fetch origin && git show origin/HEAD:.claude/factory.json` prints the rules: the worker reads them from there, and the PR must merge first. Ask: a foreground trial, `bun <root>/worker/main.ts <repo path>` in their terminal, or launchd. For launchd write `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`:
 - `ProgramArguments`: the absolute `bun`, `<root>/worker/main.ts`, the repo's main worktree path.
 - `EnvironmentVariables.PATH`: the directories of `bun`, `gh`, `claude`, `wt`, `git` and `caffeinate` in this shell.
 - `KeepAlive` and `RunAtLoad` true.
