@@ -223,7 +223,7 @@ describe("rows", () => {
   });
 });
 
-function world(on: On, holdIssueCreate?: Promise<void>) {
+function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: typeof RULES & { paneEverySeconds?: number } = RULES) {
   const ran: string[][] = [];
   const posted: string[] = [];
   const toasts: string[] = [];
@@ -248,7 +248,7 @@ function world(on: On, holdIssueCreate?: Promise<void>) {
 
     if (a.startsWith("gh repo view")) return out("o/smoke\n");
 
-    if (a.startsWith("git show")) return out(JSON.stringify(RULES));
+    if (a.startsWith("git show")) return out(JSON.stringify(rulesFile));
 
     if (a.startsWith("gh api graphql --paginate")) {
       const n = Number(e.argv.find((x) => x.startsWith("n="))?.slice(2));
@@ -384,4 +384,49 @@ test("/factory draws GitHub's rows; an undo makes its label first and opens one 
   ).toBeDefined();
   expect(await ui.find({ type: "Text", text: /6,000/ })).toBeDefined();
   await ui.unmount();
+});
+
+const snapshotReads = (ran: string[][]) =>
+  ran.filter((a) => a.slice(0, 3).join(" ") === "gh api graphql" && !a.includes("--paginate")).length;
+
+test("the open pane reads GitHub every 20 s by default, and again right after a press", async ($, on) => {
+  const w = world(on);
+
+  /** SAFETY: the command reads neither who ran it nor how its answer shows. */
+  await $.command.run({ command: "factory", args: "" } as CommandRunInput);
+  const ui = await $.ui.mount(PANE);
+
+  await w.clock.advance(1);
+  const first = snapshotReads(w.ran);
+
+  await w.clock.advance(19_000);
+  expect(snapshotReads(w.ran)).toBe(first);
+  await w.clock.advance(1_000);
+  expect(snapshotReads(w.ran)).toBe(first + 1);
+  await ui.press({ key: "tab-stuck" });
+  await ui.press({ key: "retry-7" });
+  expect(snapshotReads(w.ran)).toBe(first + 2);
+  await ui.unmount();
+});
+
+test("paneEverySeconds in the rules sets how often the pane reads GitHub", async ($, on) => {
+  const w = world(on, undefined, { ...RULES, paneEverySeconds: 30 });
+
+  /** SAFETY: the command reads neither who ran it nor how its answer shows. */
+  await $.command.run({ command: "factory", args: "" } as CommandRunInput);
+  const ui = await $.ui.mount(PANE);
+
+  await w.clock.advance(1);
+  const first = snapshotReads(w.ran);
+
+  await w.clock.advance(29_000);
+  expect(snapshotReads(w.ran)).toBe(first);
+  await w.clock.advance(1_000);
+  expect(snapshotReads(w.ran)).toBe(first + 1);
+  await ui.unmount();
+});
+
+test("the rules refuse a pane refresh under 10 s", () => {
+  expect("errors" in parseRules(JSON.stringify({ ...RULES, paneEverySeconds: 9 }))).toBe(true);
+  expect("errors" in parseRules(JSON.stringify({ ...RULES, paneEverySeconds: 10 }))).toBe(false);
 });
