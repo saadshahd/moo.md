@@ -12,17 +12,15 @@ Run **hope:intent** on what this setup is for: a trial or a worker that stays up
 
 ## What stands in the way
 
-Check each, then show the user every one that holds, with its fix. Apply a fix only once the user agrees; the user alone fixes their shell and installs tools or plugins. Write nothing past this stage while any holds.
+Check each, then show the user every one that holds: what it would cause and the command that clears it. Run a command once the user agrees. Write nothing past this stage while any holds.
 
-| Holds | Fix |
-|---|---|
-| `ANTHROPIC_API_KEY` in the shell | the user unsets it where their shell sets it |
-| `env.ANTHROPIC_API_KEY` or `apiKeyHelper` in `~/.claude/settings.json`, `.claude/settings.json` or `.claude/settings.local.json` | remove the key |
-| `~/.claude/settings.json` lacks `env.CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` `"1"` | add it |
-| `~/.claude/settings.json` enables no `factory@…` plugin | the user installs it with `/plugin` |
-| the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | require a check the repo already runs; it has none → propose one |
-| `bun`, `gh`, `claude` or `wt` is not on `PATH` | the user installs it |
-| the worker would run on Linux | none yet: the worker calls macOS-only `ioreg` and `caffeinate` |
+| Holds | Causes | Clears it |
+|---|---|---|
+| `ANTHROPIC_API_KEY` in the shell, or `env.ANTHROPIC_API_KEY` or `apiKeyHelper` in `~/.claude/settings.json`, `.claude/settings.json` or `.claude/settings.local.json` | runs bill the API, not the subscription | unset or remove it |
+| `~/.claude/settings.json` enables no `factory@…` plugin | runs load no factory hooks | `claude plugin install factory@<marketplace>` |
+| the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | auto-merge merges unchecked code | require a check the repo already runs; it has none → propose one |
+| `bun`, `gh` or `wt` is not on `PATH` | the worker can't start | `brew install bun gh worktrunk` |
+| the worker would run on Linux | the worker can't start: it calls macOS-only `ioreg` and `caffeinate` | nothing yet |
 
 ## The GitHub App
 
