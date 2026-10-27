@@ -4,7 +4,7 @@ import { latest, must, post, type Run } from "../lib/github.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
 import { comments } from "../lib/snapshot.ts";
 import { isApproval } from "../lib/wait.ts";
-import { currentRun, runner, showOnce, type PassOn, type ToolCall } from "./session.ts";
+import { inRun, runner, type PassOn, type ToolCall } from "./session.ts";
 import type { FactoryRun } from "./state.d.ts";
 
 type Ask = ToolCall<"AskUserQuestion">;
@@ -65,68 +65,54 @@ async function takeWait(
 }
 
 /**
- * Posts the ask as a wait on the issue. An approval names the seal of the plan the bot posted
- * last, so the answer approves that plan and no later one.
- */
-async function waitOnIssue(
-  $: EngineInterface,
-  e: Ask,
-  fr: FactoryRun,
-): Promise<ToolCallResult> {
-  const run = runner($);
-  const rules = await readRules(run, fr.cwd);
-  const said = whyAsked(await $.session.messages());
-
-  const questions = e.questions.map((q) => ({
-    question: q.question,
-    why: (said === "" ? q.header : said).slice(0, WHY_MAX),
-    options: q.options.map((o) => o.label),
-  }));
-
-  /** Approving a plan is the human's alone, so it always waits and never counts against the cap. */
-  const approval = questions.some(isApproval);
-
-  if (
-    !approval &&
-    !(await takeWait(run, fr, rules.waitsPerDay, localDay(new Date(await $.clock.now()))))
-  )
-    return {
-      deny: `Today's ${rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call with the factory's call command, and go on.`,
-    };
-
-  const plan = approval
-    ? latest(await comments(run, fr.repo, fr.issue), actorsOf(rules, fr.repo), "plan")
-    : null;
-
-  await post(run, fr.repo, fr.issue, {
-    kind: "wait",
-    issue: fr.issue,
-    questions,
-    approves: plan?.c.seal ?? null,
-    answers: null,
-  });
-
-  return {
-    deny: `Your question is posted on issue #${fr.issue}; the human answers it there. End your turn now: write nothing more and run no tool. The answer arrives as your next message.`,
-  };
-}
-
-/**
- * In a factory run, an ask goes to the issue and the run ends its turn until the answer comes. When
- * it can't, the ask goes on to the run's own question box, where agent view shows the run waiting.
+ * In a factory run, an ask goes to the issue as a wait and the run ends its turn until the answer
+ * comes. An approval names the seal of the plan the bot posted last, so the answer approves that
+ * plan and no later one. When it can't, the ask goes on to the run's own question box, where agent
+ * view shows the run waiting.
  */
 export async function askOnIssue(
   $: EngineInterface,
   e: Ask,
   next: PassOn<Ask>,
 ): Promise<ToolCallResult> {
-  try {
-    const fr = await currentRun($);
+  const posted = await inRun($, null, async (fr): Promise<ToolCallResult> => {
+    const run = runner($);
+    const rules = await readRules(run, fr.cwd);
+    const said = whyAsked(await $.session.messages());
 
-    if (fr) return await waitOnIssue($, e, fr);
-  } catch (err) {
-    await showOnce($, String(err));
-  }
+    const questions = e.questions.map((q) => ({
+      question: q.question,
+      why: (said === "" ? q.header : said).slice(0, WHY_MAX),
+      options: q.options.map((o) => o.label),
+    }));
 
-  return next(e);
+    /** Approving a plan is the human's alone, so it always waits and never counts against the cap. */
+    const approval = questions.some(isApproval);
+
+    if (
+      !approval &&
+      !(await takeWait(run, fr, rules.waitsPerDay, localDay(new Date(await $.clock.now()))))
+    )
+      return {
+        deny: `Today's ${rules.waitsPerDay} waits for the human are used up. Take your recommended pick, post it as a call with the factory's call command, and go on.`,
+      };
+
+    const plan = approval
+      ? latest(await comments(run, fr.repo, fr.issue), actorsOf(rules, fr.repo), "plan")
+      : null;
+
+    await post(run, fr.repo, fr.issue, {
+      kind: "wait",
+      issue: fr.issue,
+      questions,
+      approves: plan?.c.seal ?? null,
+      answers: null,
+    });
+
+    return {
+      deny: `Your question is posted on issue #${fr.issue}; the human answers it there. End your turn now: write nothing more and run no tool. The answer arrives as your next message.`,
+    };
+  });
+
+  return posted ?? next(e);
 }

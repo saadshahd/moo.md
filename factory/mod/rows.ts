@@ -1,5 +1,11 @@
-import { render, total, type Wait } from "../lib/formats.ts";
-import { STUCK_LABEL, factoryComments, issueOf, latest, type Actors } from "../lib/github.ts";
+import { render, total, type Call, type Wait } from "../lib/formats.ts";
+import {
+  STUCK_LABEL,
+  factoryComments,
+  issueOf,
+  latest,
+  type Actors,
+} from "../lib/github.ts";
 import { undone, type Snapshot } from "../lib/snapshot.ts";
 import { answerTo, openWait } from "../lib/wait.ts";
 
@@ -19,25 +25,16 @@ export type StuckRow = {
   reason: string;
 };
 
-export type CallRow = {
-  callId: number;
-  issue: number;
-  url: string;
-  choice: string;
-  picked: string;
-  others: string[];
-  why: string;
-  undo: string;
-};
-
-export type CostRow = { pr: number; tokens: number };
+export type CallRow = Call & { callId: number; url: string };
 
 export type Rows = {
   questions: WaitRow[];
   plans: WaitRow[];
   stuck: StuckRow[];
   calls: CallRow[];
-  costs: CostRow[];
+  costs: { pr: number; tokens: number }[];
+  /** Mean tokens per merged factory PR; null before the first. */
+  avg: number | null;
   /** What GitHub listed only in part, so the tabs may miss rows. */
   truncated: string[];
 };
@@ -64,7 +61,8 @@ export function rows(s: Snapshot, a: Actors): Rows {
         plan:
           w.c.approves === null
             ? null
-            : (plan.at(-1) ?? `plan ${w.c.approves.slice(0, 8)} is not on this issue`),
+            : (plan.at(-1) ??
+              `plan ${w.c.approves.slice(0, 8)} is not on this issue`),
       },
     ];
   });
@@ -76,7 +74,8 @@ export function rows(s: Snapshot, a: Actors): Rows {
             issue: i.number,
             title: i.title,
             url: i.url,
-            reason: latest(i.comments, a, "stuck")?.c.reason ?? "no reason posted",
+            reason:
+              latest(i.comments, a, "stuck")?.c.reason ?? "no reason posted",
           },
         ]
       : [],
@@ -87,24 +86,14 @@ export function rows(s: Snapshot, a: Actors): Rows {
 
     return factoryComments(i.comments, a).flatMap(({ id, c }) =>
       c.kind === "call" && !reversed.has(id)
-        ? [
-            {
-              callId: id,
-              issue: i.number,
-              url: urls.get(id) ?? i.url,
-              choice: c.choice,
-              picked: c.picked,
-              others: c.others,
-              why: c.why,
-              undo: c.undo,
-            },
-          ]
+        ? [{ ...c, callId: id, url: urls.get(id) ?? i.url }]
         : [],
     );
   });
 
   const costs = s.merged.flatMap((pr) => {
-    const cost = issueOf(pr.head) === null ? null : latest(pr.comments, a, "cost");
+    const cost =
+      issueOf(pr.head) === null ? null : latest(pr.comments, a, "cost");
 
     return cost === null ? [] : [{ pr: pr.number, tokens: total(cost.c) }];
   });
@@ -115,14 +104,12 @@ export function rows(s: Snapshot, a: Actors): Rows {
     stuck,
     calls,
     costs,
+    avg:
+      costs.length === 0
+        ? null
+        : costs.reduce((sum, c) => sum + c.tokens, 0) / costs.length,
     truncated: s.truncated,
   };
-}
-
-export function perPr(costs: readonly CostRow[]): number | null {
-  if (costs.length === 0) return null;
-
-  return costs.reduce((sum, c) => sum + c.tokens, 0) / costs.length;
 }
 
 /** A token count short enough for a tab: 950, 12k, 1.2M. */
@@ -134,9 +121,7 @@ export function tokens(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
-export type UndoIssue = { title: string; body: string };
-
-export function undoIssue(call: CallRow): UndoIssue {
+export function undoIssue(call: CallRow) {
   return {
     title: `Undo: ${call.choice}`,
     body: render({

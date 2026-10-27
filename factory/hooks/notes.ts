@@ -3,7 +3,7 @@ import type { Actors, Comment } from "../lib/github.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
 import { comments } from "../lib/snapshot.ts";
 import { notes } from "../lib/wait.ts";
-import { currentRun, runner, showOnce } from "./session.ts";
+import { inRun, runner } from "./session.ts";
 
 const NOTE_EVERY_MS = 60_000;
 
@@ -17,7 +17,9 @@ export function unseenNotes(
   afterId: number,
   sinceMs: number,
 ): Comment[] {
-  return notes(cs, a).filter((c) => c.id > afterId && Date.parse(c.createdAt) > sinceMs);
+  return notes(cs, a).filter(
+    (c) => c.id > afterId && Date.parse(c.createdAt) > sinceMs,
+  );
 }
 
 /** After a tool call in a factory run, at most once a minute: the issue's new notes reach the agent. */
@@ -27,13 +29,14 @@ export async function passNewNotes(
 ): Promise<ToolCallResult> {
   if (r.deny !== undefined) return r;
 
-  try {
-    const fr = await currentRun($);
+  return inRun($, r, async (fr) => {
     const { value: at = 0 } = await $.state.get({ plugin: "factory", key: "notesAt" });
+
     const now = await $.clock.now();
 
-    if (!fr || now - at < NOTE_EVERY_MS) return r;
+    if (now - at < NOTE_EVERY_MS) return r;
     await $.state.set({ plugin: "factory", key: "notesAt" }, now);
+
     /** Keyed by issue, not session: a restarted run never takes the same note twice. */
     const seenKey = `notes:seen:${fr.repo}#${fr.issue}`;
     const seen = Number((await $.store.get(seenKey)) ?? 0);
@@ -41,6 +44,7 @@ export async function passNewNotes(
     const run = runner($);
     const actors = actorsOf(await readRules(run, fr.cwd), fr.repo);
     const fresh = unseenNotes(await comments(run, fr.repo, fr.issue), actors, seen, startedAt);
+
     const last = fresh.at(-1);
 
     if (last === undefined) return r;
@@ -51,9 +55,5 @@ export async function passNewNotes(
     );
 
     return { ...r, context: [...(r.context ?? []), ...said] };
-  } catch (err) {
-    await showOnce($, String(err));
-
-    return r;
-  }
+  });
 }

@@ -1,11 +1,6 @@
-export type FactoryRun = { repo: string; issue: number; cwd: string };
+import type { Bot } from "../lib/bot.ts";
 
-export type FactoryBot = {
-  token: string;
-  expiresAt: string;
-  name: string;
-  email: string;
-};
+export type FactoryRun = { repo: string; issue: number; cwd: string };
 
 declare module "claude-code" {
   interface PluginState {
@@ -13,7 +8,7 @@ declare module "claude-code" {
       /** The run this session is, or null when it is no factory run; resolved once a session. */
       run: FactoryRun | null;
       /** Held in the session's memory only: a bot token never lands on disk. */
-      bot: FactoryBot;
+      bot: Bot;
       notesAt: number;
       shown: string[];
     };
