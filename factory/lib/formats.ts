@@ -72,13 +72,7 @@ const Answer = z.object({
 
 export type Answer = z.infer<typeof Answer>;
 
-const Handoff = z.object({
-  kind: z.literal("handoff"),
-  issue: Issue,
-  text: z.string(),
-});
-
-export type Handoff = z.infer<typeof Handoff>;
+const Handoff = z.object({ kind: z.literal("handoff"), issue: Issue, text: z.string() });
 
 /** Tokens a run spent, read from its transcripts, posted on its PR. */
 const Cost = z.object({
@@ -92,7 +86,7 @@ const Cost = z.object({
   output: Tokens,
 });
 
-export type Cost = z.infer<typeof Cost>;
+type Cost = z.infer<typeof Cost>;
 
 const Restart = z.object({
   kind: z.literal("restart"),
@@ -103,43 +97,30 @@ const Restart = z.object({
 
 export type Restart = z.infer<typeof Restart>;
 
-const Stuck = z.object({
-  kind: z.literal("stuck"),
-  issue: Issue,
-  reason: z.string(),
-});
-
-export type Stuck = z.infer<typeof Stuck>;
+const Stuck = z.object({ kind: z.literal("stuck"), issue: Issue, reason: z.string() });
 
 /** The body of an issue a person opened to reverse call comment `call`. */
-const Undo = z.object({
-  kind: z.literal("undo"),
-  call: Id,
-  text: z.string(),
-});
+const Undo = z.object({ kind: z.literal("undo"), call: Id, text: z.string() });
 
-export type Undo = z.infer<typeof Undo>;
-
-export type FactoryComment =
-  Plan | Call | Wait | Answer | Handoff | Cost | Restart | Stuck | Undo;
+export type FactoryComment = z.infer<
+  typeof Plan | typeof Call | typeof Wait | typeof Answer | typeof Handoff | typeof Cost | typeof Restart | typeof Stuck | typeof Undo
+>;
 
 export type Kind = FactoryComment["kind"];
 
 /** Who may write a kind: the factory's bot, or a person the rules file trusts. */
-export type Author = "bot" | "trusted";
+type Author = "bot" | "trusted";
 
 type TextField<C> = {
   [K in Exclude<keyof C, "kind">]: C[K] extends string ? K : never;
 }[Exclude<keyof C, "kind">];
 
-type Spec = {
-  by: Author;
-  codec: z.ZodMiniType<FactoryComment, string>;
-};
+type Spec = { by: Author; codec: z.ZodMiniType<FactoryComment, string> };
 
 const MARKER = /^<!-- factory:([a-z]+) (\{.*\}) -->\n?/;
 
-const lf = (s: string) => s.replace(/\r\n/g, "\n");
+/** Line endings as GitHub stores them, whatever a browser edit added. */
+export const lf = (s: string) => s.replace(/\r\n/g, "\n");
 
 /** A heading is one paragraph, so the first blank line always ends it. */
 const paragraph = (s: string) => s.replace(/\n{2,}/g, "\n");
@@ -205,12 +186,7 @@ const RESTARTED = {
 } satisfies { [R in Restart["reason"]]: string };
 
 const CODECS = {
-  plan: kind(
-    Plan,
-    "bot",
-    "text",
-    (c) => `**Plan** · seal \`${c.seal.slice(0, 8)}\``,
-  ),
+  plan: kind(Plan, "bot", "text", (c) => `**Plan** · seal \`${c.seal.slice(0, 8)}\``),
   call: kind(
     Call,
     "bot",
@@ -230,12 +206,7 @@ const CODECS = {
       )
       .join("\n"),
   ),
-  answer: kind(
-    Answer,
-    "trusted",
-    null,
-    (c) => `**Answer** · ${c.answers.join(" · ")}`,
-  ),
+  answer: kind(Answer, "trusted", null, (c) => `**Answer** · ${c.answers.join(" · ")}`),
   handoff: kind(Handoff, "bot", "text", () => "**Handoff**"),
   cost: kind(
     Cost,
@@ -244,25 +215,10 @@ const CODECS = {
     (c) =>
       `**Cost** · ${total(c).toLocaleString("en-US")} tokens: ${c.input} input, ${c.cacheRead} cache read, ${c.cacheWrite} cache write, ${c.output} output, over ${c.sessions.length} session(s)`,
   ),
-  restart: kind(
-    Restart,
-    "bot",
-    null,
-    (c) => RESTARTED[c.reason],
-  ),
+  restart: kind(Restart, "bot", null, (c) => RESTARTED[c.reason]),
   stuck: kind(Stuck, "bot", null, (c) => `**Stuck** · ${c.reason}`),
-  undo: kind(
-    Undo,
-    "trusted",
-    "text",
-    (c) => `**Undo** · factory call ${c.call}`,
-  ),
-} satisfies {
-  [C in FactoryComment as C["kind"]]: {
-    by: Author;
-    codec: z.ZodMiniType<C, string>;
-  };
-};
+  undo: kind(Undo, "trusted", "text", (c) => `**Undo** · factory call ${c.call}`),
+} satisfies { [C in FactoryComment as C["kind"]]: { by: Author; codec: z.ZodMiniType<C, string> } };
 
 type Table = { [K in Kind]: Spec };
 
@@ -297,6 +253,4 @@ export function parse(body: string): FactoryComment | null {
   return r.success ? r.data : null;
 }
 
-export function writer(kind: Kind): Author {
-  return TABLE[kind].by;
-}
+export const writer = (kind: Kind): Author => TABLE[kind].by;

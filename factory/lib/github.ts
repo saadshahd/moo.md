@@ -1,21 +1,11 @@
-import {
-  parse,
-  render,
-  writer,
-  type FactoryComment,
-  type Kind,
-} from "./formats.ts";
+import { parse, render, writer, type FactoryComment, type Kind } from "./formats.ts";
 
 export type Run = (
   argv: readonly string[],
   opts?: { cwd?: string; stdin?: string },
 ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 
-export async function must(
-  run: Run,
-  argv: readonly string[],
-  opts?: { cwd?: string; stdin?: string },
-): Promise<string> {
+export async function must(run: Run, argv: readonly string[], opts?: Parameters<Run>[1]): Promise<string> {
   const r = await run(argv, opts);
 
   if (r.exitCode !== 0)
@@ -68,10 +58,7 @@ export const fromBot = (c: Comment, a: Actors) => wroteIt(c, [a.bot]);
 export const fromTrusted = (c: Comment, a: Actors) => wroteIt(c, a.trusted);
 
 /** The comments that are factory comments from the author their kind allows, oldest first. */
-export function factoryComments(
-  cs: readonly Comment[],
-  a: Actors,
-): { id: number; c: FactoryComment }[] {
+export function factoryComments(cs: readonly Comment[], a: Actors): { id: number; c: FactoryComment }[] {
   return cs.flatMap((x) => {
     const c = parse(x.body);
 
@@ -82,64 +69,22 @@ export function factoryComments(
   });
 }
 
-export function latest<K extends Kind>(
-  cs: readonly Comment[],
-  a: Actors,
-  kind: K,
-): { id: number; c: Extract<FactoryComment, { kind: K }> } | null {
-  return (
-    factoryComments(cs, a)
-      .filter(
-        (x): x is { id: number; c: Extract<FactoryComment, { kind: K }> } =>
-          x.c.kind === kind,
-      )
-      .at(-1) ?? null
-  );
+type Of<K extends Kind> = { id: number; c: Extract<FactoryComment, { kind: K }> };
+
+export function latest<K extends Kind>(cs: readonly Comment[], a: Actors, kind: K): Of<K> | null {
+  return factoryComments(cs, a).findLast((x): x is Of<K> => x.c.kind === kind) ?? null;
 }
 
-export async function post(
-  run: Run,
-  repo: string,
-  n: number,
-  c: FactoryComment,
-): Promise<number> {
-  const out = await must(
-    run,
-    [
-      "gh",
-      "api",
-      `repos/${repo}/issues/${n}/comments`,
-      "--input",
-      "-",
-      "--jq",
-      ".id",
-    ],
-    { stdin: JSON.stringify({ body: render(c) }) },
-  );
+const asBody = (c: FactoryComment) => ({ stdin: JSON.stringify({ body: render(c) }) });
+
+export async function post(run: Run, repo: string, n: number, c: FactoryComment): Promise<number> {
+  const out = await must(run, ["gh", "api", `repos/${repo}/issues/${n}/comments`, "--input", "-", "--jq", ".id"], asBody(c));
 
   return Number(out.trim());
 }
 
-export async function edit(
-  run: Run,
-  repo: string,
-  id: number,
-  c: FactoryComment,
-): Promise<void> {
-  await must(
-    run,
-    [
-      "gh",
-      "api",
-      "-X",
-      "PATCH",
-      `repos/${repo}/issues/comments/${id}`,
-      "--input",
-      "-",
-      "--silent",
-    ],
-    { stdin: JSON.stringify({ body: render(c) }) },
-  );
+export async function edit(run: Run, repo: string, id: number, c: FactoryComment): Promise<void> {
+  await must(run, ["gh", "api", "-X", "PATCH", `repos/${repo}/issues/comments/${id}`, "--input", "-", "--silent"], asBody(c));
 }
 
 /**
@@ -164,55 +109,14 @@ export async function upsert(
 }
 
 export async function repoOf(run: Run, cwd: string): Promise<string> {
-  return (
-    await must(
-      run,
-      [
-        "gh",
-        "repo",
-        "view",
-        "--json",
-        "nameWithOwner",
-        "--jq",
-        ".nameWithOwner",
-      ],
-      {
-        cwd,
-      },
-    )
-  ).trim();
+  return (await must(run, ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], { cwd })).trim();
 }
 
 export const STUCK_LABEL = "factory:stuck";
 
-export async function markStuck(
-  run: Run,
-  repo: string,
-  n: number,
-  reason: string,
-): Promise<void> {
+export async function markStuck(run: Run, repo: string, n: number, reason: string): Promise<void> {
   await post(run, repo, n, { kind: "stuck", issue: n, reason });
-  await must(run, [
-    "gh",
-    "label",
-    "create",
-    STUCK_LABEL,
-    "--repo",
-    repo,
-    "--force",
-    "--color",
-    "B60205",
-    "--description",
-    "A factory run gave up; the comment says why",
-  ]);
-  await must(run, [
-    "gh",
-    "issue",
-    "edit",
-    String(n),
-    "--repo",
-    repo,
-    "--add-label",
-    STUCK_LABEL,
-  ]);
+  await must(run, ["gh", "label", "create", STUCK_LABEL, "--repo", repo, "--force",
+    "--color", "B60205", "--description", "A factory run gave up; the comment says why"]);
+  await must(run, ["gh", "issue", "edit", String(n), "--repo", repo, "--add-label", STUCK_LABEL]);
 }

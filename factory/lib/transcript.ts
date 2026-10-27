@@ -48,6 +48,13 @@ function lines(jsonl: string): Line[] {
   });
 }
 
+const toUsage = (u: NonNullable<NonNullable<Line["message"]>["usage"]>): Usage => ({
+  input: u.input_tokens ?? 0,
+  cacheRead: u.cache_read_input_tokens ?? 0,
+  cacheWrite: u.cache_creation_input_tokens ?? 0,
+  output: u.output_tokens ?? 0,
+});
+
 export function usage(jsonl: string): Usage {
   const seen = new Map<string, Usage>();
 
@@ -55,13 +62,7 @@ export function usage(jsonl: string): Usage {
     const u = l.message?.usage;
     const id = l.message?.id;
 
-    if (l.type !== "assistant" || !u || !id) continue;
-    seen.set(id, {
-      input: u.input_tokens ?? 0,
-      cacheRead: u.cache_read_input_tokens ?? 0,
-      cacheWrite: u.cache_creation_input_tokens ?? 0,
-      output: u.output_tokens ?? 0,
-    });
+    if (l.type === "assistant" && u && id) seen.set(id, toUsage(u));
   }
 
   return sum([...seen.values()]);
@@ -81,15 +82,10 @@ export function sum(us: readonly Usage[]): Usage {
 
 /** Tokens the newest assistant message read as context: what the next turn re-reads. */
 export function contextSize(jsonl: string): number {
-  const last = lines(jsonl)
-    .filter((l) => l.type === "assistant" && l.message?.usage)
-    .at(-1)?.message?.usage;
+  const last = lines(jsonl).findLast((l) => l.type === "assistant" && l.message?.usage)?.message?.usage;
+  const u = toUsage(last ?? {});
 
-  return last
-    ? (last.input_tokens ?? 0) +
-        (last.cache_read_input_tokens ?? 0) +
-        (last.cache_creation_input_tokens ?? 0)
-    : 0;
+  return u.input + u.cacheRead + u.cacheWrite;
 }
 
 export function pendingAsk(jsonl: string): boolean {
@@ -120,11 +116,7 @@ export function pendingAsk(jsonl: string): boolean {
  * `quotaLimits: { status: "rejected", resetsAt }`, the reset in epoch seconds.
  */
 export function rejectedUntil(jsonl: string): number | null {
-  const q = lines(jsonl)
-    .filter((l) => l.type === "assistant")
-    .at(-1)?.quotaLimits;
+  const q = lines(jsonl).findLast((l) => l.type === "assistant")?.quotaLimits;
 
-  return q?.status === "rejected" && q.resetsAt !== undefined
-    ? q.resetsAt
-    : null;
+  return q?.status === "rejected" && q.resetsAt !== undefined ? q.resetsAt : null;
 }
