@@ -18,6 +18,7 @@ Check each, then show the user every one that holds: what it would cause and the
 |---|---|---|
 | the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | auto-merge merges unchecked code | require a check the repo already runs; it has none → propose one |
 | `bun`, `gh` or `wt` is not on `PATH` | the worker can't start | `brew install bun gh worktrunk` |
+| Linux, and `bwrap` or `socat` is not on `PATH` | every run is sandboxed there, and its commands fail without them | `sudo apt install bubblewrap socat` |
 
 ## The GitHub App
 
