@@ -16,7 +16,6 @@ Check each, then show the user every one that holds: what it would cause and the
 
 | Holds | Causes | Clears it |
 |---|---|---|
-| `ANTHROPIC_API_KEY` in the shell, or `env.ANTHROPIC_API_KEY` or `apiKeyHelper` in `~/.claude/settings.json`, `.claude/settings.json` or `.claude/settings.local.json` | runs bill the API, not the subscription | unset or remove it |
 | `~/.claude/settings.json` enables no `factory@…` plugin | runs load no factory hooks | `claude plugin install factory@<marketplace>` |
 | the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | auto-merge merges unchecked code | require a check the repo already runs; it has none → propose one |
 | `bun`, `gh` or `wt` is not on `PATH` | the worker can't start | `brew install bun gh worktrunk` |
