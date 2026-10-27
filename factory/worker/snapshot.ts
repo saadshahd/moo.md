@@ -22,7 +22,7 @@ export type Ctx = {
   dir: string;
   repo: string;
   base: string;
-  /** This Mac's hardware UUID: its claim commits carry it. */
+  /** This machine's stable id (see platform.ts): its claim commits carry it. */
   machine: string;
 };
 

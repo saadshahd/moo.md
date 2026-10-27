@@ -22,6 +22,7 @@ import {
   type World,
 } from "./decide.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
+import { platformOf } from "./platform.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
 import { actorsOf } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
@@ -772,5 +773,34 @@ describe("a worktree counts as this machine's run only when its branch carries t
     expect(await claimIn(ctx, dir, "HEAD")).toBe(true);
     expect(await claimIn(ctx, dir, "refs/heads/nothing")).toBe(false);
     await rm(dir, { recursive: true });
+  });
+});
+
+describe("platform", () => {
+  test("macOS reads its id from ioreg and holds awake with caffeinate until the worker exits", () => {
+    const mac = platformOf("darwin")!;
+
+    expect(mac.machineId.read('  "IOPlatformUUID" = "0A1B-2C3D"\n')).toBe("0A1B-2C3D");
+    expect(mac.awake(42)).toEqual(["caffeinate", "-i", "-w", "42"]);
+  });
+
+  test("Linux reads /etc/machine-id and holds awake with systemd-inhibit until the worker exits", () => {
+    const linux = platformOf("linux")!;
+
+    expect(linux.machineId.argv).toEqual(["cat", "/etc/machine-id"]);
+    expect(linux.machineId.read("3f9c0d\n")).toBe("3f9c0d");
+    expect(linux.machineId.read("\n")).toBeUndefined();
+    expect(linux.awake(42).slice(0, 1)).toEqual(["systemd-inhibit"]);
+    expect(linux.awake(42)).toContain("--pid=42");
+  });
+
+  test("any other platform has none, so the worker refuses to start", () => {
+    expect(platformOf("win32")).toBeNull();
+  });
+
+  test("this machine's id command prints an id", async () => {
+    const here = platformOf(process.platform)!;
+
+    expect(here.machineId.read((await run(here.machineId.argv)).stdout)).toBeTruthy();
   });
 });
