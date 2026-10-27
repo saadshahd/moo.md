@@ -18,7 +18,6 @@ Check each, then show the user every one that holds: what it would cause and the
 |---|---|---|
 | the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | auto-merge merges unchecked code | require a check the repo already runs; it has none → propose one |
 | `bun`, `gh` or `wt` is not on `PATH` | the worker can't start | `brew install bun gh worktrunk` |
-| the worker would run on Linux | the worker can't start: it calls macOS-only `ioreg` and `caffeinate` | nothing yet |
 
 ## The GitHub App
 
@@ -63,14 +62,15 @@ Commit it on a branch and open a PR to the default branch.
 
 ## The worker
 
-Start only once `git fetch origin && git show origin/HEAD:.claude/factory.json` prints the rules: the worker reads them from there, and the PR must merge first. A trial runs `bun <root>/worker/main.ts <repo path>` in their terminal; a worker that stays up runs under launchd. For launchd write `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`:
+Start only once `git fetch origin && git show origin/HEAD:.claude/factory.json` prints the rules: the worker reads them from there, and the PR must merge first. A trial runs `bun <root>/worker/main.ts <repo path>` in their terminal. A worker that stays up runs that command with the absolute `bun` and the repo's main worktree path, restarts when it exits, starts at login, and gets a `PATH` of the directories of `bun`, `gh`, `claude`, `wt` and `git` in this shell:
 
-- `ProgramArguments`: the absolute `bun`, `<root>/worker/main.ts`, the repo's main worktree path.
-- `EnvironmentVariables.PATH`: the directories of `bun`, `gh`, `claude`, `wt`, `git` and `caffeinate` in this shell.
-- `KeepAlive` and `RunAtLoad` true.
-- `StandardOutPath` and `StandardErrorPath`: `~/Library/Logs/factory-<repo name>.log`.
+| | macOS: launchd | Linux: systemd user unit |
+|---|---|---|
+| File | `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`: `ProgramArguments`, `EnvironmentVariables.PATH` (plus `caffeinate`'s directory), `KeepAlive` and `RunAtLoad` true | `~/.config/systemd/user/factory-<repo name>.service`: `ExecStart`, `Environment=PATH=…`, `Restart=always`, `WantedBy=default.target` |
+| Load | `launchctl bootstrap gui/$(id -u) <plist>` | `systemctl --user enable --now factory-<repo name>`; `loginctl enable-linger` so it runs while logged out |
+| Log | `StandardOutPath` and `StandardErrorPath`: `~/Library/Logs/factory-<repo name>.log` | `journalctl --user -u factory-<repo name>` |
 
-Load it with `launchctl bootstrap gui/$(id -u) <plist>`. Either way, the first output says `watching <repo>`, or a `factory:` line names what it refused.
+Either way, the first output says `watching <repo>`, or a `factory:` line names what it refused.
 
 ## Done
 
