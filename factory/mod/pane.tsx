@@ -14,7 +14,7 @@ import {
 } from "../lib/github.ts";
 import { runner } from "../hooks/session.ts";
 import { messageOf } from "../lib/errors.ts";
-import { RULES_PATH, actorsOf, readRules, type Rules } from "../lib/rules.ts";
+import { actorsOf, readRules, type Rules } from "../lib/rules.ts";
 import { UNDO_LABEL, comments, readSnapshot, undone } from "../lib/snapshot.ts";
 import type { Question } from "../lib/formats.ts";
 import { APPROVE, answerFor, answerTo, isApproval } from "../lib/wait.ts";
@@ -117,10 +117,7 @@ async function readRows($: EngineInterface): Promise<Read> {
   try {
     rules = await readRules(run, cwd);
   } catch (err) {
-    return {
-      kind: "none",
-      why: `${messageOf(err)}; /factory:setup writes ${RULES_PATH}`,
-    };
+    return { kind: "none", why: messageOf(err) };
   }
 
   const repo = await repoOf(run, cwd);

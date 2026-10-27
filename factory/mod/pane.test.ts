@@ -259,7 +259,7 @@ describe("rows", () => {
   });
 });
 
-function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: typeof RULES & { paneEverySeconds?: number } = RULES) {
+function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: (typeof RULES & { paneEverySeconds?: number }) | null = RULES) {
   const ran: string[][] = [];
   const posted: string[] = [];
   const toasts: string[] = [];
@@ -270,11 +270,11 @@ function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: typeof RULES 
 
     if (e.init?.stdin) posted.push(e.init.stdin);
 
-    const out = (stdout: string) => ({
+    const out = (stdout: string, exitCode = 0, stderr = "") => ({
       value: {
-        exitCode: 0,
+        exitCode,
         stdout,
-        stderr: "",
+        stderr,
         isStdoutTruncated: false,
         isStderrTruncated: false,
       },
@@ -284,7 +284,12 @@ function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: typeof RULES 
 
     if (a.startsWith("gh repo view")) return out("o/smoke\n");
 
-    if (a.startsWith("git show")) return out(JSON.stringify(rulesFile));
+    if (a.startsWith("git show"))
+      return rulesFile === null
+        ? out("", 128, "fatal: path '.claude/factory.json' does not exist in 'refs/remotes/origin/HEAD'")
+        : out(JSON.stringify(rulesFile));
+
+    if (a.startsWith("git symbolic-ref")) return out("origin/main\n");
 
     if (a.startsWith("gh api graphql --paginate")) {
       const n = Number(e.argv.find((x) => x.startsWith("n="))?.slice(2));
@@ -465,4 +470,15 @@ test("paneEverySeconds in the rules sets how often the pane reads GitHub", async
 test("the rules refuse a pane refresh under 10 s", () => {
   expect("errors" in parseRules(JSON.stringify({ ...RULES, paneEverySeconds: 9 }))).toBe(true);
   expect("errors" in parseRules(JSON.stringify({ ...RULES, paneEverySeconds: 10 }))).toBe(false);
+});
+
+test("with no rules file on origin, the pane names setup once", async ($, on) => {
+  const w = world(on, undefined, null);
+  const ui = await $.ui.mount(PANE);
+
+  await w.clock.advance(1);
+  const shown = await ui.find({ type: "Text", text: /factory:setup/ });
+
+  expect(shown?.text).toBe("no .claude/factory.json on origin/main; run /factory:setup");
+  await ui.unmount();
 });
