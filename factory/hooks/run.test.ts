@@ -595,6 +595,22 @@ describe("bot", () => {
     expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
     expect(h.toasts[0]).toContain("the App isn't installed");
   });
+
+  test("a run with no bot token hears once that it has no login, and not to look for one", async ($, on) => {
+    const h = host($, on, { token: null });
+    h.tool(() => ({ result: {} }));
+    const first: any = await h.call(read);
+    const second: any = await h.call(read);
+    expect(first.context.join("\n")).toContain("Don't look for a token");
+    expect(second.context ?? []).not.toContain(first.context.at(-1));
+  });
+
+  test("a run whose token mints hears nothing about its login", async ($, on) => {
+    const h = host($, on);
+    h.tool(() => ({ result: {} }));
+    const r: any = await h.call(read);
+    expect((r.context ?? []).join("\n")).not.toContain("no GitHub login");
+  });
 });
 
 describe("why an ask is asked", () => {

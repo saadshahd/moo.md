@@ -24,21 +24,34 @@ async function heldBot($: EngineInterface, fr: FactoryRun): Promise<Bot> {
 
 /**
  * Before any tool runs in a factory run, makes what it starts act on GitHub as the factory's bot.
- * With no token to be had, the tool still runs with no GitHub login at all, never the user's.
+ * With no token to be had, the tool still runs with no GitHub login at all, never the user's, and
+ * the run hears once that it has none: a run told nothing goes looking for a token of its own.
  */
 export async function actAsBot(
   $: EngineInterface,
   e: Args<"tool.call">,
   next: Next<"tool.call">,
 ): Promise<ToolCallResult> {
+  let unminted = false;
+
   await inRun($, undefined, async (fr) => {
     try {
       await useLogin($, fr.cwd, await heldBot($, fr));
     } catch (err) {
+      unminted = true;
       await useLogin($, fr.cwd, null);
       throw err;
     }
   });
 
-  return next(e);
+  const r = await next(e);
+  const { value: hinted = false } = await $.state.get({ plugin: "factory", key: "hinted" });
+
+  if (!unminted || hinted || r.deny !== undefined) return r;
+  await $.state.set({ plugin: "factory", key: "hinted" }, true);
+
+  return { ...r, context: [...(r.context ?? []), NO_LOGIN_HINT] };
 }
+
+const NO_LOGIN_HINT =
+  "factory: this run has no GitHub login. Don't look for a token or the factory's key: GitHub steps fail until the human fixes it.";

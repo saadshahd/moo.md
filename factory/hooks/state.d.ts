@@ -9,6 +9,8 @@ declare module "claude-code" {
       run: FactoryRun | null;
       /** Held in the session's memory only: a bot token never lands on disk. */
       bot: Bot;
+      /** The run was told it has no GitHub login. */
+      hinted: boolean;
       notesAt: number;
       shown: string[];
     };
