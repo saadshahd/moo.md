@@ -65,19 +65,25 @@ export async function onBranch(path: string, n: number): Promise<void> {
 }
 
 /**
+ * Git with the repo's hooks off, for the worker's checkouts of a run's branch: the run may have
+ * rewritten a hooks folder the repo tracks, such as husky's, and the worker runs unsandboxed.
+ */
+const GIT_NO_HOOKS = ["git", "-c", "core.hooksPath=/dev/null"] as const;
+
+/**
  * The rules' worktree commands run as the worker's own children, from the main worktree, never
  * through a shell: a pool may record its caller as a lease's owner, and a shell exits at once.
  */
 async function lent(ctx: Pick<Ctx, "dir">, create: readonly string[], n: number): Promise<string> {
   const path = createdPath(await must(run, fill(create, "{name}", `factory-${n}`), { cwd: ctx.dir }), ctx.dir);
-  await must(run, ["git", "switch", branchFor(n)], { cwd: path });
+  await must(run, [...GIT_NO_HOOKS, "switch", branchFor(n)], { cwd: path });
 
   return path;
 }
 
 async function added(ctx: Pick<Ctx, "dir">, n: number): Promise<string> {
   const path = `${resolve(ctx.dir)}.factory-${n}`;
-  await must(run, ["git", "worktree", "add", path, branchFor(n)], { cwd: ctx.dir });
+  await must(run, [...GIT_NO_HOOKS, "worktree", "add", path, branchFor(n)], { cwd: ctx.dir });
 
   return path;
 }

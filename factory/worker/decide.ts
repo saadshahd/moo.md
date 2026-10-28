@@ -4,11 +4,11 @@
  */
 
 import { holder, parse, type FactoryComment, type HeldOn, type Wait } from "../lib/formats.ts";
-import { branchFor, factoryComments, fromBot, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
+import { branchFor, factoryComments, fromBot, issueOf, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { failed, heldOn, heldSince, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
 import { HANDOFF_PATH, planFiles } from "../lib/plan.ts";
-import type { Rules } from "../lib/rules.ts";
-import { LABEL, trustedIssue, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
+import { RULES_PATH, type Rules } from "../lib/rules.ts";
+import { LABEL, trustedIssue, type Issue, type OpenPr, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
 
 export const CRASHES_BEFORE_STUCK = 3;
@@ -58,6 +58,8 @@ export type World = {
 
 export type IssueState =
   | { kind: "ended"; why: "closed" | "stuck" | "untrusted"; pr: Pick<Pr, "number" | "state"> | null }
+  /** Its open PR changes the rules file, which only a person changes. */
+  | { kind: "rulesChanged"; pr: number }
   | { kind: "overCap" }
   | { kind: "working" }
   | { kind: "askedInBox" }
@@ -95,6 +97,21 @@ const CLOSES_PR = {
   stuck: null,
 } as const satisfies Record<Ended["why"], ((n: number) => string) | null>;
 
+const RULES_CHANGED = `This PR changes ${RULES_PATH}, and only a person changes the factory's rules, so the factory closed it.`;
+
+/**
+ * Whether open PR `p` changes the rules file. A PR changing more files than one page lists is
+ * left to the worker's check of who last changed the rules on the base.
+ */
+const changesRules = (p: OpenPr | undefined) => p?.files?.includes(RULES_PATH) ?? false;
+
+/** Why a listed issue is over for the factory, or null while it goes on. */
+function endedWhy(i: Issue, a: Actors): "stuck" | "untrusted" | null {
+  if (i.labels.includes(STUCK_LABEL)) return "stuck";
+
+  return trustedIssue(i, a) ? null : "untrusted";
+}
+
 /** Which session an action stops or wakes: `claude stop` takes `id`, `--resume` takes `sessionId`. */
 export type RunId = Pick<RunView, "id" | "sessionId">;
 
@@ -121,6 +138,7 @@ export type Action =
 /** The states each state's actions can lead to; `gone` is a removed worktree. */
 export const NEXT = {
   ended: ["gone"],
+  rulesChanged: ["ended"],
   overCap: ["working"],
   working: ["working"],
   askedInBox: ["ended"],
@@ -199,10 +217,12 @@ export function classify(l: Local, w: World): IssueState {
   };
 
   if (issue === undefined) return ended("closed");
+  const why = endedWhy(issue, w.actors);
 
-  if (issue.labels.includes(STUCK_LABEL)) return ended("stuck");
+  if (why !== null) return ended(why);
+  const own = w.gh.open.find((p) => p.number === w.gh.prs.get(l.issue)?.number);
 
-  if (!trustedIssue(issue, w.actors)) return ended("untrusted");
+  if (own !== undefined && changesRules(own)) return { kind: "rulesChanged", pr: own.number };
   const current = l.runs.at(-1);
   const cs = issue.comments;
 
@@ -334,6 +354,12 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
       return [...stop, ...(s.pr === null ? [] : [cost(s.pr.number)]), ...close, { kind: "removeWorktree", issue: n }];
     }
 
+    case "rulesChanged":
+      return [
+        ...stop,
+        { kind: "closePr", issue: n, pr: s.pr, reason: RULES_CHANGED },
+        { kind: "markStuck", issue: n, reason: `its PR #${s.pr} changed ${RULES_PATH}` },
+      ];
     case "overCap":
       return [...stop, start("context")];
     case "working":
@@ -407,6 +433,7 @@ export function occupies(s: IssueState): boolean {
     case "reviewed":
       return s.rounds < REVIEW_ROUNDS;
     case "ended":
+    case "rulesChanged":
     case "askedInBox":
     case "prOpen":
     case "prMerged":
@@ -424,6 +451,8 @@ export function stateLine(s: IssueState): string {
   switch (s.kind) {
     case "ended":
       return `ended: ${s.why}${s.pr === null ? "" : `, PR #${s.pr.number}`}`;
+    case "rulesChanged":
+      return `PR #${s.pr} changes ${RULES_PATH}`;
     case "overCap":
       return "its context passed the cap";
     case "working":
@@ -499,10 +528,31 @@ export function pick(w: World): { issue: number; resume: boolean }[] {
     .map(({ issue, resume }) => ({ issue, resume }));
 }
 
+/**
+ * The bot's open `factory/<n>` PRs with no worktree here that must close: one changing the rules
+ * file, or one whose issue was closed, unlabelled or lost its trust. A stuck issue's PR stays, as
+ * it does for a local issue. Each machine decides from GitHub alone, so any one of them closes it.
+ */
+export function prsToClose(w: World): Action[] {
+  const here = new Set([...w.local.map((l) => l.issue), ...w.foreign]);
+
+  return w.gh.open.flatMap((p): Action[] => {
+    const n = issueOf(p.head);
+
+    if (n === null || here.has(n) || p.author !== w.actors.bot) return [];
+    const issue = w.gh.issues.find((i) => i.number === n);
+    const why = issue === undefined ? "closed" : endedWhy(issue, w.actors);
+    const reason = changesRules(p) ? RULES_CHANGED : why === null ? null : CLOSES_PR[why]?.(n);
+
+    return reason == null ? [] : [{ kind: "closePr", issue: n, pr: p.number, reason }];
+  });
+}
+
 /** Every action this tick, grouped by issue: a group stops at its first failure. */
 export function decide(w: World): Action[][] {
   return [
     ...w.local.map((l) => actionsFor(classify(l, w), l)),
+    ...prsToClose(w).map((a) => [a]),
     ...pick(w).map(({ issue, resume }): Action[] => [
       ...(resume ? [] : [{ kind: "claim", issue } satisfies Action]),
       { kind: "start", issue, restart: null, after: null },

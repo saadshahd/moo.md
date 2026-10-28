@@ -8,7 +8,7 @@
 import { messageOf } from "../lib/errors.ts";
 import { botEnv, needsRenew, type Bot } from "../lib/bot.ts";
 import { must, repoOf } from "../lib/github.ts";
-import { actorsOf, readRules } from "../lib/rules.ts";
+import { actorsOf, readRules, rulesChangedBy, RULES_PATH } from "../lib/rules.ts";
 import { apply, log, say } from "./act.ts";
 import { botFor, readApp } from "./app.ts";
 import { trustedIssue } from "../lib/snapshot.ts";
@@ -36,16 +36,22 @@ function holdAwake(p: Platform, busy: boolean): void {
 
 let bot: Bot | null = null;
 
-async function asBot(ctx: Ctx): Promise<void> {
-  if (!needsRenew(bot, Date.now())) return;
+async function asBot(ctx: Ctx): Promise<Bot> {
+  if (bot !== null && !needsRenew(bot, Date.now())) return bot;
   bot = await botFor(ctx.app, ctx.repo);
   Object.assign(process.env, botEnv(bot));
+
+  return bot;
 }
 
 async function tick(ctx: Ctx, p: Platform): Promise<void> {
-  await asBot(ctx);
+  const me = await asBot(ctx);
   await must(run, ["git", "fetch", "origin", ctx.base], { cwd: ctx.dir });
   const rules = await readRules(run, ctx.dir);
+  const byBot = await rulesChangedBy(run, ctx.dir, ctx.repo, me.name);
+
+  if (byBot !== null)
+    throw new Error(`the newest change to ${RULES_PATH} on ${ctx.base} came from the bot's PR #${byBot}; revert it, or change the file in a PR of your own, and the worker goes on`);
   const world = await readWorld(ctx, rules, actorsOf(rules, ctx.repo));
 
   const states = world.local.map((l) => classify(l, world));

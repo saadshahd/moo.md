@@ -83,3 +83,19 @@ export async function readRules(run: Run, cwd: string): Promise<Rules> {
 
   return r;
 }
+
+const Pulls = z.array(z.object({ number: z.int(), user: z.nullable(z.object({ login: z.string() })) }));
+
+/**
+ * The PR `bot` opened that made the newest change to the rules on origin's default branch, or
+ * null when someone else's PR or push made it. A run holds the bot's token, so it can open and
+ * merge a PR of its own that no check of the worker's sees before the merge.
+ */
+export async function rulesChangedBy(run: Run, cwd: string, repo: string, bot: string): Promise<number | null> {
+  const sha = (await must(run, ["git", "log", "-1", "--format=%H", HEAD, "--", RULES_PATH], { cwd })).trim();
+
+  if (sha === "") return null;
+  const prs = z.parse(Pulls, JSON.parse(await must(run, ["gh", "api", `repos/${repo}/commits/${sha}/pulls`])));
+
+  return prs.find((p) => p.user?.login === bot)?.number ?? null;
+}

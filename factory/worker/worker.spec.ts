@@ -15,6 +15,7 @@ import {
   NEXT,
   occupies,
   pick,
+  prsToClose,
   stateLine,
   type Action,
   type Local,
@@ -25,7 +26,7 @@ import { runPrompt, type RunInput } from "./prompt.ts";
 import { machineId, platformOf } from "./platform.ts";
 import { checksReason, loginRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
-import { actorsOf, readRules, Rules, RULES_PATH } from "../lib/rules.ts";
+import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedBy } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
@@ -34,7 +35,7 @@ import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
 import { runSettings } from "./sandbox.ts";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -259,6 +260,7 @@ function after(
           gh: {
             ...next.gh,
             prs: new Map([...next.gh.prs].map(([i, p]): [number, Pr] => [i, p.number === a.pr ? { ...p, state: "CLOSED", closedAt: "2026-10-26T12:00:00Z" } : p])),
+            open: next.gh.open.filter((p) => p.number !== a.pr),
           },
         };
         break;
@@ -737,6 +739,51 @@ describe("killing an issue closes its PR", () => {
 
     await expect(closePr(armed.fake, "o/r", 57, "why")).rejects.toThrow("no auto-merge to disable");
     expect(armed.calls.map((c) => c[2])).toEqual(["merge", "view"]);
+  });
+});
+
+describe("only a person changes the factory's rules", () => {
+  const touching = (files: string[] | null, author = BOT) => ({ ...pr(7), author, files });
+
+  const at = (files: string[] | null, runs = [session("working")]) =>
+    world(snapshot({ issues: [issue(7)], prs: new Map([[7, pr(7)]]), open: [touching(files)] }), [here(7, runs)]);
+
+  test("a run's open PR that changes the rules file is closed and the issue marked stuck, the run stopped first, even mid-work", () => {
+    const { state, actions } = step(at(["src/a.ts", RULES_PATH]));
+
+    expect(state).toEqual({ kind: "rulesChanged", pr: 57 });
+    expect(occupies(state)).toBe(false);
+    expect(kinds(actions)).toEqual(["stop", "closePr", "markStuck"]);
+    expect(actions[1]).toMatchObject({ pr: 57, reason: expect.stringContaining(RULES_PATH) });
+  });
+  test("a PR leaving the rules file alone, or listing more files than one page, goes on", () => {
+    expect(step(at(["src/a.ts"])).state.kind).toBe("working");
+    expect(step(at(null)).state.kind).toBe("working");
+  });
+  test("the bot's PR with no worktree here closes when it changes the rules, whatever its issue says", () => {
+    const w = world(snapshot({ issues: [issue(7)], open: [touching([RULES_PATH])] }), []);
+
+    expect(prsToClose(w)).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining(RULES_PATH) }]);
+  });
+});
+
+describe("an issue that ends with no worktree here still closes its PR", () => {
+  const open = (author = BOT) => ({ ...pr(7), author, files: ["src/a.ts"] });
+  const at = (issues: Issue[], more: Partial<World> = {}, author = BOT) => prsToClose(world(snapshot({ issues, open: [open(author)] }), [], more));
+
+  test("closed, unlabelled or no longer trusted, its open PR closes, saying why", () => {
+    expect(at([])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]);
+    expect(at([issue(7, { editor: "stranger" })])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("does not trust") }]);
+  });
+  test("a stuck or live issue keeps its PR, as does a PR the bot never opened or one a worktree here watches", () => {
+    expect(at([issue(7, { labels: ["factory", STUCK_LABEL] })])).toEqual([]);
+    expect(at([issue(7)])).toEqual([]);
+    expect(at([], {}, ME)).toEqual([]);
+    expect(at([], { local: [here(7)] })).toEqual([]);
+    expect(at([], { foreign: [7] })).toEqual([]);
+  });
+  test("decide closes it in a group of its own", () => {
+    expect(decide(world(snapshot({ open: [open()] }), []))).toEqual([[expect.objectContaining({ kind: "closePr", pr: 57 })]]);
   });
 });
 
@@ -1373,6 +1420,34 @@ describe("worktrees from git or the repo's own commands", () => {
     await rm(root, { recursive: true });
   });
 
+  test("a hook a run's branch tracks never runs when the worker checks that branch out, by git or after a pool", async () => {
+    const { root, dir } = await claimedRepo();
+    const ran = join(root, "hook-ran");
+    await gitIn(dir, "switch", "-q", "-c", "factory/7");
+    await mkdir(join(dir, ".husky"));
+    await Bun.write(join(dir, ".husky", "post-checkout"), `#!/bin/sh\ntouch ${ran}\n`);
+    await chmod(join(dir, ".husky", "post-checkout"), 0o755);
+    await gitIn(dir, "add", ".husky");
+    await gitIn(dir, "commit", "-q", "-m", "a hook");
+    await gitIn(dir, "push", "-q", "-f", "origin", "factory/7");
+    await gitIn(dir, "switch", "-q", "main");
+    await gitIn(dir, "branch", "-q", "-D", "factory/7");
+    await gitIn(dir, "config", "core.hooksPath", ".husky");
+    const pool = join(root, "pool.ts");
+    await Bun.write(pool, POOL);
+    const rules: Rules = { ...RULES, worktree: { create: ["bun", pool, "acquire", "{name}"], release: ["bun", pool, "release", "{dir}"] } };
+
+    for (const r of [RULES, rules]) {
+      const path = await worktreeFor({ dir }, r, 7, null);
+
+      expect(await Bun.file(join(path, ".husky", "post-checkout")).exists()).toBe(true);
+      expect(await Bun.file(ran).exists()).toBe(false);
+      await gitIn(dir, "worktree", "remove", "--force", path);
+    }
+
+    await rm(root, { recursive: true });
+  });
+
   /** A pool that lends a detached worktree after a line of progress, and keeps every one it lent. */
   const POOL = `import { resolve } from "node:path";
 const [command, name] = process.argv.slice(2);
@@ -1435,6 +1510,37 @@ describe("platform", () => {
 
   test("this machine has an id", async () => {
     expect(await machineId(run, platformOf(process.platform)!)).toBeTruthy();
+  });
+});
+
+describe("rules the bot's own PR changed stop the worker", () => {
+  test("the newest commit to the rules file is asked for its PRs: the bot's names its PR, a person's or none is null", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "factory-rules-by-"));
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await git("init", "-q", "-b", "main");
+    await mkdir(join(dir, ".claude"));
+    await Bun.write(join(dir, RULES_PATH), "{}");
+    await git("add", RULES_PATH);
+    await git("commit", "-q", "-m", "rules");
+    const rules = (await git("rev-parse", "HEAD")).trim();
+    await git("commit", "-q", "--allow-empty", "-m", "later");
+    await git("update-ref", "refs/remotes/origin/main", "HEAD");
+    await git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+
+    const asked: string[] = [];
+
+    const github = (pulls: unknown[]): Run => async (argv, opts) => {
+      if (argv[0] === "git") return run(argv, opts);
+      asked.push(argv.at(-1) ?? "");
+
+      return { exitCode: 0, stdout: JSON.stringify(pulls), stderr: "" };
+    };
+
+    expect(await rulesChangedBy(github([{ number: 12, user: { login: BOT } }]), dir, "o/r", BOT)).toBe(12);
+    expect(await rulesChangedBy(github([{ number: 13, user: { login: ME } }]), dir, "o/r", BOT)).toBe(null);
+    expect(await rulesChangedBy(github([]), dir, "o/r", BOT)).toBe(null);
+    expect(asked).toEqual(Array(3).fill(`repos/o/r/commits/${rules}/pulls`));
+    await rm(dir, { recursive: true });
   });
 });
 
