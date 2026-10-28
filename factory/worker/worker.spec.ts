@@ -3,8 +3,7 @@ import { usage } from "../lib/commands.ts";
 import { parse, render, type FactoryComment, type Plan, type Wait } from "../lib/formats.ts";
 import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { PLAN_PATH, PR_PATH, planGaps } from "../lib/plan.ts";
-import type { Rules } from "../lib/rules.ts";
-import type { Check, Issue, Pr, Review, Snapshot } from "../lib/snapshot.ts";
+import { LABEL, UNDO_LABEL, type Check, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
 import { prBody, prCreate, prMerge, prText, seal } from "./cli.ts";
 import {
@@ -26,7 +25,7 @@ import { runPrompt, type RunInput } from "./prompt.ts";
 import { machineId, platformOf } from "./platform.ts";
 import { checksReason, loginRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
-import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
+import { actorsOf, readRules, Rules, RULES_PATH } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
@@ -1473,5 +1472,20 @@ describe("the worker starts on any Claude setup and refuses only without one", (
     expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "third_party", "apiProvider": "bedrock"}', stderr: "" })).toBe("");
     expect(loginRefusal({ stdout: '{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}', stderr: "" })).toContain("claude auth login");
     expect(loginRefusal({ stdout: "", stderr: "unknown command" })).toContain("unknown command");
+  });
+});
+
+describe("the setup skill", () => {
+  const skill = () => Bun.file(join(import.meta.dir, "..", "skills", "setup", "SKILL.md")).text();
+
+  test("creates every label the factory reads or writes", async () => {
+    const text = await skill();
+
+    for (const label of [LABEL, STUCK_LABEL, UNDO_LABEL]) expect(text).toContain(`gh label create ${label} --force`);
+  });
+  test("names every field of the rules file", async () => {
+    const text = await skill();
+
+    for (const key of Object.keys(Rules.shape)) expect(text).toMatch(new RegExp(`\`${key}[\`.]`));
   });
 });

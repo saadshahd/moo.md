@@ -1,6 +1,7 @@
 /**
  * The factory's GitHub App: runs act on GitHub as its bot, never as the user, so GitHub can tell
- * a run's comment from the user's. Each user creates their own App; `/factory:setup` walks it.
+ * a run's comment from the user's. A user creates it for their own repo; for an organization's,
+ * the organization's admins create one it owns. `/factory:setup` walks either.
  * `~/.config/factory/app.json` names it: `{ "clientId": "Iv23…", "key": "app.pem" }`, the key
  * path relative to that folder.
  */
@@ -25,7 +26,7 @@ export async function readApp(): Promise<App> {
   const file = Bun.file(join(DIR, "app.json"));
 
   if (!(await file.exists()))
-    throw new Error(`no ${join(DIR, "app.json")}; run /factory:setup to create the factory's GitHub App`);
+    throw new Error(`no ${join(DIR, "app.json")}; run /factory:setup to set up the factory's GitHub App`);
   const { clientId, key } = z.parse(AppFile, await file.json());
   const pem = Bun.file(join(DIR, key));
 
