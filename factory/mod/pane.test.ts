@@ -187,14 +187,32 @@ function graphql(
             merged(22, "fix/by-hand", [comment(220, cost(9, 22, 9_999_999))]),
           ],
         },
-        base: { name: "main", target: { oid: "m1", statusCheckRollup: { state: baseChecks } } },
+        base: {
+          name: "main",
+          target: { oid: "m1", statusCheckRollup: { contexts: page([{ __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: baseChecks }]) } },
+        },
       },
     },
   };
 }
 
+/** Any PR's newest commit as the second query reads it: the one check its PR requires, `test`, failed. */
+const REQUIRED = {
+  data: {
+    repository: {
+      pullRequest: {
+        commits: {
+          nodes: [{ commit: { statusCheckRollup: { contexts: page([{ __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE", isRequired: true }]) } } }],
+        },
+      },
+    },
+  },
+};
+
+const asksRequired = (argv: readonly string[]) => argv.some((a) => a.startsWith("query=") && a.includes("isRequired"));
+
 async function snapshot(raw = graphql()): Promise<Snapshot> {
-  return readSnapshot(async () => ({ exitCode: 0, stdout: JSON.stringify(raw), stderr: "" }), "o/smoke", []);
+  return readSnapshot(async (argv) => ({ exitCode: 0, stdout: JSON.stringify(asksRequired(argv) ? REQUIRED : raw), stderr: "" }), "o/smoke", []);
 }
 
 describe("rows", () => {
@@ -298,7 +316,7 @@ function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: (typeof RULES
       return out(JSON.stringify([{ data: { repository: { issueOrPullRequest: { comments: { nodes } } } } }]));
     }
 
-    if (a.startsWith("gh api graphql")) return out(JSON.stringify(graphql(undos)));
+    if (a.startsWith("gh api graphql")) return out(JSON.stringify(asksRequired(e.argv) ? REQUIRED : graphql(undos)));
 
     if (a.startsWith("gh issue create")) {
       if (holdIssueCreate) await holdIssueCreate;

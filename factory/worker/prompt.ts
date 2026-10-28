@@ -65,11 +65,11 @@ ${list(i.rules.layers.plan)}
    Ask only when undoing a choice costs more than asking, and say why in one or two sentences in the same message.
    An ask goes to the issue; the answer arrives as your next message.
 5. Commit and push as you go. After each push, write ${HANDOFF_PATH} (what is done, what is left, any step cut off) and run \`${u.handoff}\`.
-6. When the checks pass locally, run \`${u.pr}\`, then \`gh pr checks --watch --interval 60\`. On a failure, fix and push.
+6. When the checks pass locally, run \`${u.pr}\`.
 7. Post a verdict on the diff as a PR comment: does it meet the issue and these rules?
 ${list(i.rules.layers.judge)}
    The verdict never holds the merge.
 8. After 2 failed fixes of the same failure, run \`${u.stuck}\` and stop.
 
-End your turn once the PR's checks pass or after step 8.`;
+End your turn after step 7 or step 8, and never wait on the PR's checks: the worker wakes you when a required check fails, the PR conflicts with the base, or a review asks for changes.`;
 }

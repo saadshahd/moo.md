@@ -6,7 +6,7 @@
 import type { HeldOn } from "./formats.ts";
 import { branchFor, factoryComments, latest, STUCK_LABEL, type Actors, type Comment } from "./github.ts";
 import { overlap, overlappingPr, planFiles } from "./plan.ts";
-import { trustedIssue, type Issue, type Merge, type Snapshot } from "./snapshot.ts";
+import { combined, trustedIssue, type CheckState, type Issue, type Merge, type Snapshot } from "./snapshot.ts";
 
 export type Hold =
   | { kind: "pr"; pr: number; files: string[] }
@@ -19,7 +19,7 @@ export type PlanHold = Extract<Hold, { kind: "pr" | "plan" }>;
 
 type PrHold = Extract<Hold, { kind: "red" | "behind" | "conflict" }>;
 
-export const failed = (checks: string | null) => checks === "FAILURE" || checks === "ERROR";
+export const failed = (checks: CheckState | null) => checks === "FAILURE";
 
 /** The issue's posted plan, and when its comment was posted: an edited plan keeps that time. */
 export function postedPlan(i: Issue, a: Actors): { text: string; at: string } | null {
@@ -65,15 +65,19 @@ export function heldSince(cs: readonly Comment[], a: Actors): HeldOn | null {
   return c?.kind === "held" ? c.on : null;
 }
 
-/** What an open PR waits for before it can merge; GitHub's UNKNOWN is no answer yet, so nothing. */
+/**
+ * What an open PR waits for before it can merge; GitHub's UNKNOWN is no answer yet, so nothing.
+ * The base is red for it only where the base's newest commit fails a check the PR requires.
+ */
 export function prHold(p: Merge & { number: number }, base: Snapshot["base"]): PrHold | null {
   const at = { pr: p.number, base: base.name };
 
   if (p.mergeable === "CONFLICTING" || p.mergeState === "DIRTY") return { kind: "conflict", ...at };
 
   if (p.mergeState === "BEHIND") return { kind: "behind", ...at };
+  const red = combined(base.checks.filter((c) => p.required.includes(c.name)));
 
-  return failed(p.checks) && failed(base.checks) ? { kind: "red", ...at } : null;
+  return failed(p.checks) && failed(red) ? { kind: "red", ...at } : null;
 }
 
 /** What a trusted, unstuck issue waits for: its open PR's, else its posted plan's. */

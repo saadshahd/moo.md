@@ -18,11 +18,12 @@ import {
   wroteIt,
   type Actors,
   type Comment,
+  type Run,
 } from "./github.ts";
 import { cutToFailures, isTestCommand } from "./logs.ts";
 import { overlap, planFiles, planGaps, planText } from "./plan.ts";
 import { actorsOf, parseRules } from "./rules.ts";
-import { undone, type Snapshot } from "./snapshot.ts";
+import { readSnapshot, undone, type Snapshot } from "./snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, usage } from "./transcript.ts";
 import {
   APPROVAL_QUESTION,
@@ -529,7 +530,7 @@ describe("snapshot", () => {
       claimed: new Set(),
       merged: [],
       truncated: [],
-      base: { name: "main", sha: "m1", checks: null },
+      base: { name: "main", sha: "m1", checks: [] },
       undos: [
         { body: undo(1), author: ME, editor: null },
         { body: undo(2), author: "stranger", editor: null },
@@ -539,5 +540,86 @@ describe("snapshot", () => {
     };
 
     expect([...undone(s, A)]).toEqual([1]);
+  });
+});
+
+describe("required checks", () => {
+  const page = <T>(nodes: T[]) => ({ pageInfo: { hasNextPage: false }, nodes });
+  const rollup = (state: string | null) => ({ nodes: state === null ? [] : [{ commit: { statusCheckRollup: { state } } }] });
+  const merge = (state: string | null) => ({ mergeable: "MERGEABLE", mergeStateStatus: "BLOCKED", headRefOid: "h1", commits: rollup(state) });
+  const prNode = (number: number, head: string, state: string, checks: string | null) => ({ number, headRefName: head, state, closedAt: null, ...merge(checks), comments: page([]) });
+  const openNode = (number: number, head: string, checks: string | null) => ({ number, headRefName: head, ...merge(checks), files: page([]) });
+  const run = (name: string, status: string, conclusion: string | null, isRequired = true) => ({ __typename: "CheckRun", name, status, conclusion, isRequired });
+  const status = (context: string, state: string, isRequired = true) => ({ __typename: "StatusContext", context, state, isRequired });
+
+  type CheckNode = ReturnType<typeof run> | ReturnType<typeof status>;
+
+  /**
+   * GitHub, answering the snapshot query with local issue #7's PR #31 and the open PRs, and the
+   * second query with `required` as the PR's newest commit's checks. `asked` gets each PR read so.
+   */
+  function github(required: CheckNode[], open = [openNode(31, "factory/7", "FAILURE")], asked: number[] = []): Run {
+    const base = [run("test", "COMPLETED", "FAILURE"), run("ratchet", "COMPLETED", "FAILURE")];
+
+    const repository = {
+      work: page([]),
+      open: page(open),
+      refs: page([]),
+      undos: page([]),
+      merged: page([prNode(40, "factory/9", "MERGED", "FAILURE")]),
+      base: { name: "main", target: { oid: "m1", statusCheckRollup: { contexts: page(base) } } },
+      pr7: page([prNode(31, "factory/7", "OPEN", "FAILURE")]),
+    };
+
+    const contexts = { commits: { nodes: [{ commit: { statusCheckRollup: { contexts: page(required) } } }] } };
+
+    return async (argv) => {
+      if (!argv.some((a) => a.startsWith("query=") && a.includes("isRequired")))
+        return { exitCode: 0, stdout: JSON.stringify({ data: { repository } }), stderr: "" };
+      asked.push(Number(argv.find((a) => a.startsWith("n="))?.slice(2)));
+
+      return { exitCode: 0, stdout: JSON.stringify({ data: { repository: { pullRequest: contexts } } }), stderr: "" };
+    };
+  }
+
+  test("a factory PR's checks are the ones GitHub requires of it: a failure or a wait elsewhere is not its own", async () => {
+    const asked: number[] = [];
+
+    const open = [
+      openNode(31, "factory/7", "FAILURE"),
+      openNode(32, "factory/8", "SUCCESS"),
+      openNode(33, "fix/by-hand", "FAILURE"),
+      openNode(34, "factory/10", null),
+    ];
+
+    const required = [
+      run("test", "COMPLETED", "SUCCESS"),
+      run("ratchet", "COMPLETED", "FAILURE", false),
+      status("approvers", "PENDING"),
+      status("UI Tests", "PENDING", false),
+      run("sweep", "COMPLETED", "SKIPPED", false),
+    ];
+
+    const s = await readSnapshot(github(required, open, asked), "o/r", [7]);
+
+    expect(s.open.map((p) => [p.number, p.checks])).toEqual([[31, "PENDING"], [32, "SUCCESS"], [33, null], [34, null]]);
+    expect(s.open[0]?.required).toEqual(["test", "approvers"]);
+    expect(s.prs.get(7)).toMatchObject({ checks: "PENDING", required: ["test", "approvers"] });
+    expect(s.merged[0]?.checks).toBe(null);
+    expect(s.base.checks).toEqual([{ name: "test", state: "FAILURE" }, { name: "ratchet", state: "FAILURE" }]);
+    expect(asked).toEqual([31]);
+  });
+
+  test("any required failure fails; else any required wait is PENDING, never failed; else SUCCESS; none required is none", async () => {
+    const checks = async (...required: CheckNode[]) => (await readSnapshot(github(required), "o/r", [7])).prs.get(7)?.checks;
+
+    for (const conclusion of ["FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"])
+      expect(await checks(run("test", "COMPLETED", conclusion), status("approvers", "PENDING"))).toBe("FAILURE");
+
+    for (const state of ["FAILURE", "ERROR"]) expect(await checks(status("approvers", state))).toBe("FAILURE");
+    expect(await checks(run("test", "IN_PROGRESS", null), status("approvers", "SUCCESS"))).toBe("PENDING");
+    expect(await checks(status("approvers", "EXPECTED"))).toBe("PENDING");
+    expect(await checks(run("test", "COMPLETED", "NEUTRAL"), run("lint", "COMPLETED", "SKIPPED"))).toBe("SUCCESS");
+    expect(await checks(run("lint", "COMPLETED", "FAILURE", false))).toBe(null);
   });
 });

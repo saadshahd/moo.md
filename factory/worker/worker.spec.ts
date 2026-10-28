@@ -4,7 +4,7 @@ import { parse, render, type FactoryComment, type Plan, type Wait } from "../lib
 import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { PLAN_PATH, planGaps } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
-import type { Issue, Pr, Snapshot } from "../lib/snapshot.ts";
+import type { Check, Issue, Pr, Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
 import { seal } from "./cli.ts";
 import {
@@ -99,7 +99,7 @@ const snapshot = (more: Partial<Snapshot> = {}): Snapshot => ({
   undos: [],
   merged: [],
   truncated: [],
-  base: { name: "main", sha: "m1", checks: "SUCCESS" },
+  base: { name: "main", sha: "m1", checks: [] },
   ...more,
 });
 
@@ -148,6 +148,7 @@ const pr = (n: number, more: Partial<Pr> = {}): Pr => ({
   state: "OPEN",
   closedAt: null,
   checks: "PENDING",
+  required: [],
   mergeable: "MERGEABLE",
   mergeState: "BLOCKED",
   headSha: "h1",
@@ -575,19 +576,25 @@ describe("an open PR GitHub can't merge as it stands", () => {
   test("a wake to merge the base in is no death", () => {
     expect(deathsSinceRetry([conflictWake("m1"), crash()], A)).toBe(1);
   });
-  test("failed checks while the base's own newest commit is red hold the PR: no wake, no count", () => {
-    const failing = pr(7, { checks: "FAILURE" });
+  test("failed checks while the base's newest commit fails the same required checks hold the PR: no wake, no count", () => {
+    const failing = pr(7, { checks: "FAILURE", required: ["test"] });
 
-    const onBase = (checks: string) =>
+    const onBase = (...checks: Check[]) =>
       step(world(gh(failing, { base: { name: "main", sha: "m1", checks } }), [here(7, [session("stopped")])]));
 
-    const red = onBase("FAILURE");
+    const red = onBase({ name: "test", state: "FAILURE" });
 
     expect(red.state).toEqual({ kind: "held", on: { kind: "red", pr: 57, base: "main" }, posted: false });
     expect(red.actions).toEqual([]);
     expect(occupies(red.state)).toBe(false);
     expect(stateLine(red.state)).toBe("held: main is red, so PR #57's failed checks wait for it to go green");
-    expect(onBase("PENDING").state.kind).toBe("checksFailed");
+    expect(onBase({ name: "test", state: "PENDING" }).state.kind).toBe("checksFailed");
+    expect(onBase({ name: "lint", state: "FAILURE" }, { name: "test", state: "SUCCESS" }).state.kind).toBe("checksFailed");
+  });
+  test("a required check still waiting, on a person or a build, never fails the PR", () => {
+    const waiting = pr(7, { checks: "PENDING", required: ["test", "approvers"] });
+
+    expect(step(world(gh(waiting), [here(7, [session("stopped")])])).state.kind).toBe("prOpen");
   });
 });
 
@@ -846,9 +853,10 @@ describe("run prompt", () => {
     for (const cmd of Object.values(usage(base.cli))) expect(p).toContain(cmd);
     expect(p).not.toContain("You are continuing");
   });
-  test("it dictates the approval question the ask hook recognises, and watches checks once a minute", () => {
+  test("it dictates the approval question the ask hook recognises, and ends the turn after the PR, never watching its checks", () => {
     expect(p()).toContain(`question "${APPROVAL_QUESTION}"`);
-    expect(p()).toContain("gh pr checks --watch --interval 60");
+    expect(p()).not.toContain("gh pr checks --watch");
+    expect(p()).toContain("the worker wakes you when a required check fails, the PR conflicts with the base, or a review asks for changes");
 
     function p() {
       return runPrompt(base);

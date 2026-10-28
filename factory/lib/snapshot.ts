@@ -1,7 +1,9 @@
 /**
  * Everything the factory reads from GitHub in one GraphQL query: the open `factory` issues with
  * their comments, open PRs with their files, each local issue's PR, the claimed branches, undo
- * issues and recent merged PRs. Worker and pane read the same snapshot, so every machine agrees.
+ * issues, recent merged PRs and the base's checks. An open factory PR whose checks have not all
+ * passed costs one query more, for the ones GitHub requires. Worker and pane read the same
+ * snapshot, so every machine agrees.
  */
 
 import { parse } from "./formats.ts";
@@ -66,6 +68,54 @@ const IssueNode = z.object({
 
 const Rollup = z.nullable(z.object({ state: z.string() }));
 
+/** A check's outcome as the factory counts it: PENDING, however long it waits, never failed. */
+export type CheckState = "SUCCESS" | "PENDING" | "FAILURE";
+
+/** A check run or a commit status, by the name GitHub requires it under. */
+export type Check = { name: string; state: CheckState };
+
+const CHECK_RUN = { __typename: z.literal("CheckRun"), name: z.string(), status: z.string(), conclusion: z.nullable(z.string()) };
+
+const STATUS_STATES = ["EXPECTED", "ERROR", "FAILURE", "PENDING", "SUCCESS"] as const;
+
+const STATUS = { __typename: z.literal("StatusContext"), context: z.string(), state: z.literal(STATUS_STATES) };
+
+const CheckNode = z.union([z.object(CHECK_RUN), z.object(STATUS)]);
+
+const RequiredNode = z.union([
+  z.object({ ...CHECK_RUN, isRequired: z.boolean() }),
+  z.object({ ...STATUS, isRequired: z.boolean() }),
+]);
+
+const CHECK = "__typename ... on CheckRun { name status conclusion } ... on StatusContext { context state }";
+
+const BaseChecks = z.nullable(z.object({ contexts: z.object({ pageInfo: Page, nodes: z.array(CheckNode) }) }));
+
+/** Check run conclusions that fail; a run that finished any other way passed. */
+const FAILED_RUN = new Set(["FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
+
+const STATUS_STATE = {
+  EXPECTED: "PENDING",
+  ERROR: "FAILURE",
+  FAILURE: "FAILURE",
+  PENDING: "PENDING",
+  SUCCESS: "SUCCESS",
+} as const satisfies { [S in (typeof STATUS_STATES)[number]]: CheckState };
+
+function toCheck(c: z.infer<typeof CheckNode>): Check {
+  if (c.__typename === "StatusContext") return { name: c.context, state: STATUS_STATE[c.state] };
+
+  if (FAILED_RUN.has(c.conclusion ?? "")) return { name: c.name, state: "FAILURE" };
+
+  return { name: c.name, state: c.status === "COMPLETED" ? "SUCCESS" : "PENDING" };
+}
+
+const WORST_FIRST = ["FAILURE", "PENDING", "SUCCESS"] as const satisfies readonly CheckState[];
+
+/** The state of `checks` together: FAILURE once any failed, else PENDING while any waits, else SUCCESS; null for none. */
+export const combined = (checks: readonly Check[]): CheckState | null =>
+  WORST_FIRST.find((s) => checks.some((c) => c.state === s)) ?? null;
+
 const MERGE_FIELDS = {
   mergeable: z.literal(["MERGEABLE", "CONFLICTING", "UNKNOWN"]),
   mergeStateStatus: z.string(),
@@ -108,7 +158,7 @@ const Data = z.object({
       refs: z.object({ pageInfo: Page, nodes: z.array(z.object({ name: z.string() })) }),
       undos: z.object({ pageInfo: Page, nodes: z.array(z.object({ body: z.string(), author: Actor, editor: Actor })) }),
       merged: PrList,
-      base: z.object({ name: z.string(), target: z.object({ oid: z.string(), statusCheckRollup: z.optional(Rollup) }) }),
+      base: z.object({ name: z.string(), target: z.object({ oid: z.string(), statusCheckRollup: z.optional(BaseChecks) }) }),
     }),
   }),
 });
@@ -143,7 +193,9 @@ export function snapshotQuery(local: readonly number[]): string {
       pageInfo { hasNextPage }
       nodes { body author { __typename login } editor { __typename login } }
     }
-    base: defaultBranchRef { name target { ... on Commit { oid statusCheckRollup { state } } } }
+    base: defaultBranchRef {
+      name target { ... on Commit { oid statusCheckRollup { contexts(first: 100) { pageInfo { hasNextPage } nodes { ${CHECK} } } } } }
+    }
     merged: pullRequests(states: MERGED, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) { ${PRS} }
     ${prs}
   }
@@ -171,8 +223,14 @@ export type Merge = {
   /** `mergeStateStatus`: BEHIND, DIRTY, BLOCKED, CLEAN, UNKNOWN and the rest. */
   mergeState: string;
   headSha: string;
-  /** The newest commit's combined check state, as GitHub names it, or null before any check. */
-  checks: string | null;
+  /**
+   * The combined state of the checks GitHub requires for the PR, on its newest commit; null when
+   * it requires none, and for PRs whose checks the factory never reads: merged ones, closed ones
+   * and other people's.
+   */
+  checks: CheckState | null;
+  /** The names of those checks, read once any check on the PR has not passed. */
+  required: string[];
 };
 
 export type OpenPr = Merge & {
@@ -198,8 +256,8 @@ export type Snapshot = {
   claimed: Set<number>;
   undos: { body: string; author: string | null; editor: string | null }[];
   merged: Pr[];
-  /** The default branch, its newest commit, and that commit's combined check state. */
-  base: { name: string; sha: string; checks: string | null };
+  /** The default branch, its newest commit, and that commit's checks. */
+  base: { name: string; sha: string; checks: Check[] };
   /**
    * Windows that held more than they list: undo issues past the newest 100, merged PRs past the
    * newest 50, a merged PR's comments past its first 100. Every other connection is read whole.
@@ -207,15 +265,20 @@ export type Snapshot = {
   truncated: string[];
 };
 
-const merge = (p: z.infer<typeof MergeNode>): Merge => ({
+/** A PR's checks as the factory reads them; see `Merge`. */
+type Checked = Pick<Merge, "checks" | "required">;
+
+const UNREAD: Checked = { checks: null, required: [] };
+
+const merge = (p: z.infer<typeof MergeNode>, c: Checked): Merge => ({
   mergeable: p.mergeable,
   mergeState: p.mergeStateStatus,
   headSha: p.headRefOid,
-  checks: p.commits.nodes[0]?.commit.statusCheckRollup?.state ?? null,
+  ...c,
 });
 
-const toPr = (p: z.infer<typeof PrNode>, cs: Comment[]): Pr => ({
-  ...merge(p),
+const toPr = (p: z.infer<typeof PrNode>, cs: Comment[], c: Checked): Pr => ({
+  ...merge(p, c),
   number: p.number,
   head: p.headRefName,
   state: p.state,
@@ -266,12 +329,73 @@ export async function comments(run: Run, repo: string, n: number): Promise<Comme
     .flatMap((p) => p.data.repository.issueOrPullRequest.comments.nodes.map(toComment));
 }
 
+const RequiredData = z.object({
+  data: z.object({
+    repository: z.object({
+      pullRequest: z.object({
+        commits: z.object({
+          nodes: z.array(
+            z.object({
+              commit: z.object({
+                statusCheckRollup: z.nullable(z.object({ contexts: z.object({ pageInfo: Page, nodes: z.array(RequiredNode) }) })),
+              }),
+            }),
+          ),
+        }),
+      }),
+    }),
+  }),
+});
+
+const REQUIRED = `query($owner: String!, $name: String!, $n: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $n) {
+      commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) {
+        pageInfo { hasNextPage }
+        nodes { ${CHECK} ... on CheckRun { isRequired(pullRequestNumber: $n) } ... on StatusContext { isRequired(pullRequestNumber: $n) } }
+      } } } } }
+    }
+  }
+}`;
+
+/** The checks GitHub requires for PR `n`, on its newest commit: which ones takes the PR's number, so they can't ride in the snapshot's query. */
+async function requiredChecks(run: Run, repo: string, n: number): Promise<Check[]> {
+  const contexts = z.parse(RequiredData, JSON.parse(await graphql(run, repo, REQUIRED, "-F", `n=${n}`))).data.repository
+    .pullRequest.commits.nodes[0]?.commit.statusCheckRollup?.contexts;
+
+  if (contexts === undefined) return [];
+  whole(`PR #${n}'s checks`, contexts.pageInfo);
+
+  return contexts.nodes.flatMap((c) => (c.isRequired ? [toCheck(c)] : []));
+}
+
 export async function readSnapshot(run: Run, repo: string, local: readonly number[]): Promise<Snapshot> {
   const raw: unknown = JSON.parse(await graphql(run, repo, snapshotQuery(local)));
   const r = z.parse(Data, raw).data.repository;
   whole("the open factory issues", r.work.pageInfo);
   whole("the open PRs", r.open.pageInfo);
   whole("the factory branches", r.refs.pageInfo);
+  const baseChecks = r.base.target.statusCheckRollup?.contexts;
+
+  if (baseChecks !== undefined) whole(`${r.base.name}'s checks`, baseChecks.pageInfo);
+  const reads = new Map<number, Promise<Check[]>>();
+
+  /**
+   * An open factory PR's checks. A rollup of SUCCESS means every check passed and none means no
+   * check ran, so only a PR short of both has its required checks read, once however often listed.
+   */
+  const checksOf = async (p: z.infer<typeof MergeNode> & { number: number; headRefName: string }, open: boolean): Promise<Checked> => {
+    const rollup = p.commits.nodes[0]?.commit.statusCheckRollup?.state ?? null;
+
+    if (!open || issueOf(p.headRefName) === null || rollup === null) return UNREAD;
+
+    if (rollup === "SUCCESS") return { checks: "SUCCESS", required: [] };
+    const read = reads.get(p.number) ?? requiredChecks(run, repo, p.number);
+    reads.set(p.number, read);
+    const required = await read;
+
+    return { checks: combined(required), required: required.map((c) => c.name) };
+  };
 
   /** The first page of `n`'s comments when it holds them all, else every page. */
   const commentsOf = async (n: number, page: z.infer<typeof Comments>) =>
@@ -302,23 +426,30 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
       const newest = z.parse(z.object({ data: z.object({ repository: z.object({ [`pr${n}`]: PrList }) }) }), raw).data
         .repository[`pr${n}`]?.nodes[0];
 
-      return newest === undefined ? [] : [[n, toPr(newest, await commentsOf(newest.number, newest.comments))]];
+      if (newest === undefined) return [];
+      const cs = await commentsOf(newest.number, newest.comments);
+
+      return [[n, toPr(newest, cs, await checksOf(newest, newest.state === "OPEN"))]];
     }),
   );
 
-  return {
-    issues,
-    open: r.open.nodes.map((p) => ({
-      ...merge(p),
+  const open = await Promise.all(
+    r.open.nodes.map(async (p): Promise<OpenPr> => ({
+      ...merge(p, await checksOf(p, true)),
       number: p.number,
       head: p.headRefName,
       files: p.files === null || p.files.pageInfo.hasNextPage ? null : p.files.nodes.map((f) => f.path),
     })),
+  );
+
+  return {
+    issues,
+    open,
     prs: new Map(prs.flat()),
     claimed: new Set(r.refs.nodes.flatMap((ref) => issueOf(`${LABEL}/${ref.name}`) ?? [])),
     undos: r.undos.nodes.map((u) => ({ body: u.body, author: login(u.author), editor: login(u.editor) })),
-    merged: r.merged.nodes.map((p) => toPr(p, p.comments.nodes.map(toComment))),
-    base: { name: r.base.name, sha: r.base.target.oid, checks: r.base.target.statusCheckRollup?.state ?? null },
+    merged: r.merged.nodes.map((p) => toPr(p, p.comments.nodes.map(toComment), UNREAD)),
+    base: { name: r.base.name, sha: r.base.target.oid, checks: baseChecks?.nodes.map(toCheck) ?? [] },
     truncated: [
       ...(r.undos.pageInfo.hasNextPage ? ["undo issues"] : []),
       ...(r.merged.pageInfo.hasNextPage ? ["merged PRs"] : []),
