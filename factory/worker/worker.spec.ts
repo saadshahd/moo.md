@@ -4,7 +4,7 @@ import { parse, render, type FactoryComment, type Plan, type Wait } from "../lib
 import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { PLAN_PATH, PR_PATH, planGaps } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
-import type { Check, Issue, Pr, Snapshot } from "../lib/snapshot.ts";
+import type { Check, Issue, Pr, Review, Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
 import { prBody, prCreate, prMerge, prText, seal } from "./cli.ts";
 import {
@@ -153,6 +153,7 @@ const pr = (n: number, more: Partial<Pr> = {}): Pr => ({
   mergeState: "BLOCKED",
   headSha: "h1",
   comments: [],
+  reviews: [],
   ...more,
 });
 
@@ -595,6 +596,74 @@ describe("an open PR GitHub can't merge as it stands", () => {
     const waiting = pr(7, { checks: "PENDING", required: ["test", "approvers"] });
 
     expect(step(world(gh(waiting), [here(7, [session("stopped")])])).state.kind).toBe("prOpen");
+  });
+});
+
+describe("a review on an open PR", () => {
+  const review = (more: Partial<Review> = {}): Review => ({
+    id: 900,
+    state: "CHANGES_REQUESTED",
+    body: "Keep the old name.\nAnd say why.",
+    author: ME,
+    commit: "h1",
+    comments: [{ path: "src/a.ts", line: 3, body: "rename this back" }],
+    ...more,
+  });
+
+  const reviewWake = (id: number, createdAt?: string) =>
+    posted({ kind: "restart", issue: 7, reason: "review", session: "s", review: id }, createdAt);
+
+  const at = (reviews: Review[], comments: Comment[] = [], more: Partial<Pr> = {}) =>
+    world(snapshot({ issues: [issue(7, { comments })], prs: new Map([[7, pr(7, { reviews, ...more })]]) }), [here(7, [session("stopped")])]);
+
+  test("a trusted request for changes on the PR's head wakes the run with every word of it", () => {
+    const { state, actions } = step(at([review()]));
+
+    expect(state).toEqual({ kind: "reviewed", pr: 57, review: review(), rounds: 0 });
+    expect(occupies(state)).toBe(true);
+    expect(actions).toEqual([expect.objectContaining({ kind: "wake", restart: { reason: "review", review: 900 } })]);
+
+    const message = actions.flatMap((a) => (a.kind === "wake" ? [a.message] : [])).join("");
+
+    for (const s of [
+      "> Keep the old name.\n> And say why.",
+      "src/a.ts:3: rename this back",
+      "in the scope of issue #7",
+      ".factory/handoff.md",
+      "git merge origin/factory/7",
+      "never rebase or force-push",
+    ])
+      expect(message).toContain(s);
+    expect(message).toMatch(/push, then reply once on the PR .*with what changed and what was left\.$/);
+  });
+  test("a review on an older head, an approval, a stranger's, an empty one, or one already woken for never wakes it", () => {
+    for (const w of [
+      at([review({ commit: "h0" })]),
+      at([review({ state: "APPROVED" })]),
+      at([review({ author: "stranger" })]),
+      at([review({ state: "COMMENTED", body: " ", comments: [] })]),
+      at([review()], [reviewWake(900)]),
+    ])
+      expect(step(w).state.kind).toBe("prOpen");
+  });
+  test("a comment review counts; a wake before the last retry is forgotten", () => {
+    expect(step(at([review({ state: "COMMENTED", body: "" })])).state.kind).toBe("reviewed");
+
+    const retried = [reviewWake(900, "2026-10-26T09:00:00Z"), posted({ kind: "stuck", issue: 7, reason: "x" }, "2026-10-26T09:30:00Z")];
+
+    expect(step(at([review()], retried)).state).toMatchObject({ kind: "reviewed", rounds: 0 });
+  });
+  test("a third review round marks the issue stuck", () => {
+    const { state, actions } = step(at([review({ id: 903 })], [reviewWake(901), reviewWake(902)]));
+
+    expect(state).toMatchObject({ kind: "reviewed", rounds: 2 });
+    expect(occupies(state)).toBe(false);
+    expect(actions).toEqual([{ kind: "markStuck", issue: 7, reason: "PR #57 got a third review round" }]);
+  });
+  test("a conflict comes before a review; a review before an update from the base or failed checks", () => {
+    expect(step(at([review()], [], { mergeable: "CONFLICTING", mergeState: "DIRTY" })).state.kind).toBe("conflicting");
+    expect(step(at([review()], [], { mergeState: "BEHIND" })).state.kind).toBe("reviewed");
+    expect(step(at([review()], [], { checks: "FAILURE" })).state.kind).toBe("reviewed");
   });
 });
 

@@ -6,12 +6,15 @@
 import { holder, parse, type FactoryComment, type HeldOn, type Wait } from "../lib/formats.ts";
 import { branchFor, factoryComments, fromBot, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { failed, heldOn, heldSince, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
-import { planFiles } from "../lib/plan.ts";
+import { HANDOFF_PATH, planFiles } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
-import { trustedIssue, type Issue, type Pr, type Snapshot } from "../lib/snapshot.ts";
+import { trustedIssue, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
 
 export const CRASHES_BEFORE_STUCK = 3;
+
+/** Review wakes a run gets between retries; the next actionable review marks the issue stuck. */
+export const REVIEW_ROUNDS = 2;
 
 export const SESSION_STATES = ["working", "blocked", "done", "stopped"] as const;
 
@@ -67,6 +70,8 @@ export type IssueState =
   | { kind: "behind"; pr: number; head: string; base: string }
   /** `deaths` counts the wakes that left the PR conflicting while the base stayed at `baseSha`. */
   | { kind: "conflicting"; pr: number; base: string; baseSha: string; deaths: number }
+  /** A trusted review asks for changes on the PR's head; `rounds` counts review wakes since the last retry. */
+  | { kind: "reviewed"; pr: number; review: Review; rounds: number }
   | { kind: "limited"; until: number }
   | { kind: "limitReset" }
   /** `posted` once the issue records a plan hold for the current session. */
@@ -89,7 +94,7 @@ export type Action =
       issue: number;
       run: RunId;
       message: string;
-      restart: { reason: "checks" } | { reason: "conflict"; baseSha: string } | null;
+      restart: { reason: "checks" } | { reason: "conflict"; baseSha: string } | { reason: "review"; review: number } | null;
     }
   | { kind: "updateBranch"; issue: number; pr: number; head: string }
   | { kind: "postHeld"; issue: number; on: HeldOn }
@@ -112,6 +117,7 @@ export const NEXT = {
   checksFailed: ["working", "ended"],
   behind: ["behind"],
   conflicting: ["working", "ended"],
+  reviewed: ["working", "ended"],
   limited: ["limited"],
   limitReset: ["working"],
   held: ["held"],
@@ -135,6 +141,31 @@ export function deathsSinceRetry(cs: readonly Comment[], a: Actors): number {
 /** Wakes to merge the base in, since the last retry, that were for base commit `sha`. */
 const conflictWakes = (cs: readonly Comment[], a: Actors, sha: string) =>
   sinceRetry(cs, a).filter((c) => c.kind === "restart" && c.reason === "conflict" && c.baseSha === sha).length;
+
+/** The reviews woken for since the last retry, one per review wake. */
+const reviewWakes = (cs: readonly Comment[], a: Actors) =>
+  sinceRetry(cs, a).flatMap((c) => (c.kind === "restart" && c.reason === "review" ? [c.review] : []));
+
+/**
+ * The newest review the run should answer: a trusted person's, commenting or asking for changes
+ * (an approval stands, and a push would dismiss it), saying something, made on the PR's head so
+ * after the run's last push, and not woken for since the last retry.
+ */
+function actionableReview(pr: Pr, cs: readonly Comment[], a: Actors): Review | null {
+  const woken = new Set(reviewWakes(cs, a));
+
+  return (
+    pr.reviews.findLast(
+      (r) =>
+        r.author !== null &&
+        a.trusted.includes(r.author) &&
+        (r.state === "COMMENTED" || r.state === "CHANGES_REQUESTED") &&
+        (r.body.trim() !== "" || r.comments.length > 0) &&
+        r.commit === pr.headSha &&
+        !woken.has(r.id),
+    ) ?? null
+  );
+}
 
 /** The issue's PR, unless it was closed unmerged before the issue was last marked stuck. */
 function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | null {
@@ -181,15 +212,19 @@ export function classify(l: Local, w: World): IssueState {
     const hold = prHold(pr, w.gh.base);
     const stopped = current === undefined || current.state === "stopped";
 
+    if (hold?.kind === "conflict")
+      return {
+        kind: "conflicting",
+        pr: pr.number,
+        base: hold.base,
+        baseSha: w.gh.base.sha,
+        deaths: deathsSinceRetry(cs, w.actors) + conflictWakes(cs, w.actors, w.gh.base.sha),
+      };
+    const review = actionableReview(pr, cs, w.actors);
+
+    if (review !== null) return { kind: "reviewed", pr: pr.number, review, rounds: reviewWakes(cs, w.actors).length };
+
     switch (hold?.kind) {
-      case "conflict":
-        return {
-          kind: "conflicting",
-          pr: pr.number,
-          base: hold.base,
-          baseSha: w.gh.base.sha,
-          deaths: deathsSinceRetry(cs, w.actors) + conflictWakes(cs, w.actors, w.gh.base.sha),
-        };
       case "behind":
         return stopped ? { kind: "behind", pr: pr.number, head: pr.headSha, base: hold.base } : { kind: "prOpen", pr: pr.number };
       case "red":
@@ -236,6 +271,20 @@ export function limitedUntil(w: World): number | null {
     .filter((s) => s * 1000 > w.now);
 
   return ahead.length === 0 ? null : Math.max(...ahead);
+}
+
+/** The wake for a review: its words and inline comments, then what to fix and how to answer it. */
+function reviewMessage(n: number, s: Extract<IssueState, { kind: "reviewed" }>, catchUp: string): string {
+  const body = s.review.body.trim();
+  const inline = s.review.comments.map((c) => `${c.path}${c.line === null ? "" : `:${c.line}`}: ${c.body.trim()}`);
+
+  return [
+    `A review on PR #${s.pr} asks for changes.`,
+    ...(body === "" ? [] : [body.split("\n").map((line) => `> ${line}`).join("\n")]),
+    ...(inline.length === 0 ? [] : [`Inline comments:\n${inline.join("\n")}`]),
+    `${catchUp} Fix what is in the scope of issue #${n}, and list the rest as follow-ups in ${HANDOFF_PATH}.`,
+    `Then push, then reply once on the PR (\`gh pr comment ${s.pr}\`) with what changed and what was left.`,
+  ].join("\n\n");
 }
 
 export function actionsFor(s: IssueState, l: Local): Action[] {
@@ -297,6 +346,12 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
         : wake(`The checks on PR #${s.pr} failed. ${catchUp} Read them with \`gh pr checks ${s.pr}\`, fix and push.`, {
             reason: "checks",
           });
+    case "reviewed":
+      if (s.rounds >= REVIEW_ROUNDS) return stuck(`PR #${s.pr} got a third review round`);
+
+      return current === undefined
+        ? stuck(`a review on PR #${s.pr} asks for changes, and no session of its run is left to wake`)
+        : wake(reviewMessage(n, s, catchUp), { reason: "review", review: s.review.id });
     case "behind":
       return [cost(s.pr), { kind: "updateBranch", issue: n, pr: s.pr, head: s.head }];
     case "conflicting":
@@ -328,6 +383,8 @@ export function occupies(s: IssueState): boolean {
     case "conflicting":
     case "crashed":
       return s.deaths < CRASHES_BEFORE_STUCK;
+    case "reviewed":
+      return s.rounds < REVIEW_ROUNDS;
     case "ended":
     case "askedInBox":
     case "prOpen":
@@ -366,6 +423,8 @@ export function stateLine(s: IssueState): string {
       return holdLine({ kind: "behind", pr: s.pr, base: s.base });
     case "conflicting":
       return `${holdLine({ kind: "conflict", pr: s.pr, base: s.base })} (${s.deaths} of ${CRASHES_BEFORE_STUCK})`;
+    case "reviewed":
+      return `a review on PR #${s.pr} asks for changes (${s.rounds} of ${REVIEW_ROUNDS} review rounds used)`;
     case "limited":
       return `usage limit until ${new Date(s.until * 1000).toISOString()}`;
     case "limitReset":

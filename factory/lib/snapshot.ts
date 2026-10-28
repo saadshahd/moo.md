@@ -134,21 +134,42 @@ const OpenPrNode = z.object({
   files: z.nullable(z.object({ pageInfo: Page, nodes: z.array(z.object({ path: z.string() })) })),
 });
 
-const PrNode = z.object({
+const PR_FIELDS = {
   ...MERGE_FIELDS,
   number: z.int(),
   headRefName: z.string(),
   state: z.literal(["OPEN", "CLOSED", "MERGED"]),
   closedAt: z.nullable(z.string()),
   comments: Comments,
+};
+
+const PrNode = z.object(PR_FIELDS);
+
+const ReviewNode = z.object({
+  databaseId: z.int(),
+  state: z.string(),
+  body: z.string(),
+  author: Actor,
+  commit: z.nullable(z.object({ oid: z.string() })),
+  comments: z.object({
+    pageInfo: Page,
+    nodes: z.array(z.object({ path: z.string(), line: z.nullable(z.int()), originalLine: z.nullable(z.int()), body: z.string() })),
+  }),
 });
 
-const PRS = `pageInfo { hasNextPage } nodes {
-  number headRefName state closedAt ${MERGE}
-  comments(first: 100) { pageInfo { hasNextPage } nodes { ${COMMENT} } }
-}`;
+const LocalPrNode = z.object({ ...PR_FIELDS, reviews: z.object({ nodes: z.array(ReviewNode) }) });
+
+const PR = `number headRefName state closedAt ${MERGE}
+  comments(first: 100) { pageInfo { hasNextPage } nodes { ${COMMENT} } }`;
+
+const REVIEWS = `reviews(last: 20) { nodes {
+  databaseId state body author { __typename login } commit { oid }
+  comments(first: 50) { pageInfo { hasNextPage } nodes { path line originalLine body } }
+} }`;
 
 const PrList = z.object({ pageInfo: Page, nodes: z.array(PrNode) });
+
+const LocalPrList = z.object({ pageInfo: Page, nodes: z.array(LocalPrNode) });
 
 const Data = z.object({
   data: z.object({
@@ -166,7 +187,9 @@ const Data = z.object({
 /** The query, with one PR lookup per issue this machine has a worktree for. */
 export function snapshotQuery(local: readonly number[]): string {
   const prs = local
-    .map((n) => `pr${n}: pullRequests(headRefName: "${branchFor(n)}", first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) { ${PRS} }`)
+    .map((n) => `pr${n}: pullRequests(headRefName: "${branchFor(n)}", first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) {
+      pageInfo { hasNextPage } nodes { ${PR} ${REVIEWS} }
+    }`)
     .join("\n");
 
   return `query($owner: String!, $name: String!) {
@@ -196,7 +219,9 @@ export function snapshotQuery(local: readonly number[]): string {
     base: defaultBranchRef {
       name target { ... on Commit { oid statusCheckRollup { contexts(first: 100) { pageInfo { hasNextPage } nodes { ${CHECK} } } } } }
     }
-    merged: pullRequests(states: MERGED, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) { ${PRS} }
+    merged: pullRequests(states: MERGED, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      pageInfo { hasNextPage } nodes { ${PR} }
+    }
     ${prs}
   }
 }`;
@@ -240,12 +265,26 @@ export type OpenPr = Merge & {
   files: string[] | null;
 };
 
+/** A review on a PR. An inline comment's `line` is where it sits now, else where it sat when made. */
+export type Review = {
+  id: number;
+  /** COMMENTED, CHANGES_REQUESTED, APPROVED, DISMISSED or PENDING. */
+  state: string;
+  body: string;
+  author: string | null;
+  /** The commit it was made on; null once that commit is gone. */
+  commit: string | null;
+  comments: { path: string; line: number | null; body: string }[];
+};
+
 export type Pr = Merge & {
   number: number;
   head: string;
   state: "OPEN" | "CLOSED" | "MERGED";
   closedAt: string | null;
   comments: Comment[];
+  /** Its newest 20 reviews, oldest first. */
+  reviews: Review[];
 };
 
 export type Snapshot = {
@@ -255,7 +294,8 @@ export type Snapshot = {
   prs: Map<number, Pr>;
   claimed: Set<number>;
   undos: { body: string; author: string | null; editor: string | null }[];
-  merged: Pr[];
+  /** Read for their cost comments only: no reviews. */
+  merged: Omit<Pr, "reviews">[];
   /** The default branch, its newest commit, and that commit's checks. */
   base: { name: string; sha: string; checks: Check[] };
   /**
@@ -277,7 +317,7 @@ const merge = (p: z.infer<typeof MergeNode>, c: Checked): Merge => ({
   ...c,
 });
 
-const toPr = (p: z.infer<typeof PrNode>, cs: Comment[], c: Checked): Pr => ({
+const toPr = (p: z.infer<typeof PrNode>, cs: Comment[], c: Checked): Omit<Pr, "reviews"> => ({
   ...merge(p, c),
   number: p.number,
   head: p.headRefName,
@@ -288,6 +328,19 @@ const toPr = (p: z.infer<typeof PrNode>, cs: Comment[], c: Checked): Pr => ({
 
 function whole(path: string, page: { hasNextPage: boolean }): void {
   if (page.hasNextPage) throw new Error(`GitHub listed only part of ${path}; the factory reads it whole or not at all`);
+}
+
+function toReview(pr: number, r: z.infer<typeof ReviewNode>): Review {
+  whole(`review ${r.databaseId}'s comments on PR #${pr}`, r.comments.pageInfo);
+
+  return {
+    id: r.databaseId,
+    state: r.state,
+    body: r.body,
+    author: login(r.author),
+    commit: r.commit?.oid ?? null,
+    comments: r.comments.nodes.map((c) => ({ path: c.path, line: c.line ?? c.originalLine, body: c.body })),
+  };
 }
 
 const CommentsPage = z.array(
@@ -423,13 +476,14 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
 
   const prs = await Promise.all(
     local.map(async (n): Promise<[number, Pr][]> => {
-      const newest = z.parse(z.object({ data: z.object({ repository: z.object({ [`pr${n}`]: PrList }) }) }), raw).data
+      const newest = z.parse(z.object({ data: z.object({ repository: z.object({ [`pr${n}`]: LocalPrList }) }) }), raw).data
         .repository[`pr${n}`]?.nodes[0];
 
       if (newest === undefined) return [];
       const cs = await commentsOf(newest.number, newest.comments);
+      const reviews = newest.reviews.nodes.map((r) => toReview(newest.number, r));
 
-      return [[n, toPr(newest, cs, await checksOf(newest, newest.state === "OPEN"))]];
+      return [[n, { ...toPr(newest, cs, await checksOf(newest, newest.state === "OPEN")), reviews }]];
     }),
   );
 

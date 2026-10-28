@@ -170,7 +170,7 @@ async function updateBranch(ctx: Ctx, n: number, pr: number, head: string): Prom
 export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
   const n = a.issue;
 
-  const restarted = (r: Pick<Restart, "reason" | "baseSha"> | null, session: string | null) =>
+  const restarted = (r: Pick<Restart, "reason" | "baseSha" | "review"> | null, session: string | null) =>
     r === null || session === null ? null : post(run, ctx.repo, n, { kind: "restart", issue: n, session, ...r });
 
   switch (a.kind) {

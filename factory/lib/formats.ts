@@ -90,14 +90,16 @@ type Cost = z.infer<typeof Cost>;
 
 /**
  * A `conflict` wake names the base commit it was for: a run that leaves its PR conflicting while
- * the base stays there failed.
+ * the base stays there failed. A `review` wake names the review it was for, so no review wakes
+ * the run twice.
  */
 const Restart = z.object({
   kind: z.literal("restart"),
   issue: Issue,
-  reason: z.literal(["crash", "context", "checks", "conflict", "held"]),
+  reason: z.literal(["crash", "context", "checks", "conflict", "held", "review"]),
   session: z.string(),
   baseSha: z.optional(z.string()),
+  review: z.optional(Id),
 });
 
 export type Restart = z.infer<typeof Restart>;
@@ -206,6 +208,7 @@ const RESTARTED = {
   checks: "**Woken** · its PR's checks failed after it ended its turn",
   conflict: "**Woken** · its PR conflicts with the base branch; the run merges the base in",
   held: "**Restarted** · what held it is gone; a fresh session goes on from the plan, branch and handoff",
+  review: "**Woken** · a review on its PR asks for changes",
 } satisfies { [R in Restart["reason"]]: string };
 
 const CODECS = {

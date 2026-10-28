@@ -23,7 +23,7 @@ import {
 import { cutToFailures, isTestCommand } from "./logs.ts";
 import { overlap, planFiles, planGaps, planText } from "./plan.ts";
 import { actorsOf, parseRules } from "./rules.ts";
-import { readSnapshot, undone, type Snapshot } from "./snapshot.ts";
+import { readSnapshot, snapshotQuery, undone, type Snapshot } from "./snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, usage } from "./transcript.ts";
 import {
   APPROVAL_QUESTION,
@@ -562,7 +562,7 @@ describe("required checks", () => {
    * GitHub, answering the snapshot query with local issue #7's PR #31 and the open PRs, and the
    * second query with `required` as the PR's newest commit's checks. `asked` gets each PR read so.
    */
-  function github(required: CheckNode[], open = [openNode(31, "factory/7", "FAILURE")], asked: number[] = []): Run {
+  function github<R>(required: CheckNode[], open = [openNode(31, "factory/7", "FAILURE")], asked: number[] = [], reviews: R[] = []): Run {
     const base = [run("test", "COMPLETED", "FAILURE"), run("ratchet", "COMPLETED", "FAILURE")];
 
     const repository = {
@@ -572,7 +572,7 @@ describe("required checks", () => {
       undos: page([]),
       merged: page([prNode(40, "factory/9", "MERGED", "FAILURE")]),
       base: { name: "main", target: { oid: "m1", statusCheckRollup: { contexts: page(base) } } },
-      pr7: page([prNode(31, "factory/7", "OPEN", "FAILURE")]),
+      pr7: page([{ ...prNode(31, "factory/7", "OPEN", "FAILURE"), reviews: { nodes: reviews } }]),
     };
 
     const contexts = { commits: { nodes: [{ commit: { statusCheckRollup: { contexts: page(required) } } }] } };
@@ -625,5 +625,44 @@ describe("required checks", () => {
     expect(await checks(status("approvers", "EXPECTED"))).toBe("PENDING");
     expect(await checks(run("test", "COMPLETED", "NEUTRAL"), run("lint", "COMPLETED", "SKIPPED"))).toBe("SUCCESS");
     expect(await checks(run("lint", "COMPLETED", "FAILURE", false))).toBe(null);
+  });
+
+  const reviewNode = (more: { comments?: { pageInfo: { hasNextPage: boolean }; nodes: { path: string; line: number | null; originalLine: number | null; body: string }[] } } = {}) => ({
+    databaseId: 900,
+    state: "CHANGES_REQUESTED",
+    body: "Keep it.",
+    author: { __typename: "User", login: ME },
+    commit: { oid: "h1" },
+    comments: page([
+      { path: "a.ts", line: null, originalLine: 4, body: "here" },
+      { path: "b.ts", line: 9, originalLine: 2, body: "and here" },
+    ]),
+    ...more,
+  });
+
+  test("only a local issue's PR carries its reviews; an inline comment sits where it is now, else where it was made", async () => {
+    const s = await readSnapshot(github([], undefined, [], [reviewNode()]), "o/r", [7]);
+
+    expect(s.prs.get(7)?.reviews).toEqual([
+      {
+        id: 900,
+        state: "CHANGES_REQUESTED",
+        body: "Keep it.",
+        author: ME,
+        commit: "h1",
+        comments: [
+          { path: "a.ts", line: 4, body: "here" },
+          { path: "b.ts", line: 9, body: "and here" },
+        ],
+      },
+    ]);
+    expect(snapshotQuery([7]).match(/reviews\(last: 20\)/g)).toHaveLength(1);
+    expect(snapshotQuery([])).not.toContain("reviews(");
+  });
+
+  test("a review whose inline comments run past one page fails the read, never half read", async () => {
+    const more = { comments: { pageInfo: { hasNextPage: true }, nodes: [] } };
+
+    await expect(readSnapshot(github([], undefined, [], [reviewNode(more)]), "o/r", [7])).rejects.toThrow("GitHub listed only part of");
   });
 });
