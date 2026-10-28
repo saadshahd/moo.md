@@ -9,7 +9,7 @@ import { messageOf } from "../lib/errors.ts";
 import { botEnv, needsRenew, type Bot } from "../lib/bot.ts";
 import { must, repoOf } from "../lib/github.ts";
 import { actorsOf, readRules } from "../lib/rules.ts";
-import { apply, log } from "./act.ts";
+import { apply, log, say } from "./act.ts";
 import { botFor, readApp } from "./app.ts";
 import { trustedIssue } from "../lib/snapshot.ts";
 import { classify, decide, occupies, stateLine } from "./decide.ts";
@@ -36,15 +36,6 @@ function holdAwake(p: Platform, busy: boolean): void {
 
 let bot: Bot | null = null;
 
-/** The last line logged per issue and topic, so each change is said once, not each minute. */
-const said = new Map<string, string>();
-
-function say(n: number, topic: "state" | "trust", line: string): void {
-  if (said.get(`${n} ${topic}`) === line) return;
-  said.set(`${n} ${topic}`, line);
-  log(`#${n}: ${line}`);
-}
-
 async function asBot(ctx: Ctx): Promise<void> {
   if (!needsRenew(bot, Date.now())) return;
   bot = await botFor(ctx.app, ctx.repo);
@@ -62,7 +53,7 @@ async function tick(ctx: Ctx, p: Platform): Promise<void> {
 
   for (const n of world.foreign) say(n, "state", "a factory worktree this machine never claimed; left alone");
 
-  /** One at a time: claims, fetches and `wt` all write the one repo's refs and locks. */
+  /** One at a time: claims, fetches and worktree commands all write the one repo's refs and locks. */
   let started = false;
 
   for (const actions of decide(world))

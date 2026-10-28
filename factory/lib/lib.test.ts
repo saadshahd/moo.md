@@ -454,6 +454,12 @@ describe("rules", () => {
     ]);
     expect("errors" in parseRules("{")).toBe(true);
   });
+  test("worktrees may come from the repo's own commands, each a non-empty argv", () => {
+    const worktree = { create: ["node", "pool.ts", "acquire", "{name}"], release: ["node", "pool.ts", "release", "{dir}"] };
+
+    expect(parseRules(JSON.stringify({ ...good, worktree }))).toEqual({ ...good, worktree });
+    expect("errors" in parseRules(JSON.stringify({ ...good, worktree: { ...worktree, create: [] } }))).toBe(true);
+  });
   test("a run's sandbox may add the repo's own hosts and folders", () => {
     const sandbox = { domains: ["npm.example.com"], paths: ["~/Library/pnpm/store/v10"] };
 

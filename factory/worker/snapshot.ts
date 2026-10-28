@@ -62,23 +62,24 @@ export const runView = (s: Background, f: Facts): RunView => ({
   rejectedUntil: f.rejectedUntil,
 });
 
-const WtList = z.object({
-  items: z.array(
-    z.object({
-      branch: z.optional(z.nullable(z.string())),
-      worktree: z.optional(z.nullable(z.object({ path: z.string() }))),
-    }),
-  ),
-});
+/**
+ * The `factory/<n>` worktrees in `git worktree list --porcelain` output: a block per worktree,
+ * blank lines between, holding `worktree <path>`, then `branch refs/heads/<name>` or `detached`,
+ * and any of `bare`, `locked` and `prunable`. A prunable worktree's folder is gone, so it is none.
+ */
+export function factoryWorktrees(porcelain: string): { issue: number; path: string }[] {
+  return porcelain.split(/\n{2,}/).flatMap((block) => {
+    const lines = block.split("\n");
+    const path = lines.find((l) => l.startsWith("worktree "))?.slice("worktree ".length);
+    const n = issueOf(lines.find((l) => l.startsWith("branch refs/heads/"))?.slice("branch refs/heads/".length) ?? "");
+    const gone = lines.some((l) => l === "prunable" || l.startsWith("prunable "));
 
-export async function worktrees(ctx: Ctx): Promise<{ issue: number; path: string }[]> {
-  const out = z.parse(WtList, JSON.parse(await must(run, ["wt", "list", "--format", "json"], { cwd: ctx.dir })));
-
-  return out.items.flatMap((i) => {
-    const n = issueOf(i.branch ?? "");
-
-    return n === null || !i.worktree ? [] : [{ issue: n, path: i.worktree.path }];
+    return path === undefined || n === null || gone ? [] : [{ issue: n, path }];
   });
+}
+
+export async function worktrees(ctx: Pick<Ctx, "dir">): Promise<{ issue: number; path: string }[]> {
+  return factoryWorktrees(await must(run, ["git", "worktree", "list", "--porcelain"], { cwd: ctx.dir }));
 }
 
 export type Facts = {

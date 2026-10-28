@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { usage } from "../lib/commands.ts";
-import { parse, render, type FactoryComment, type Wait } from "../lib/formats.ts";
+import { parse, render, type FactoryComment, type Plan, type Wait } from "../lib/formats.ts";
 import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
-import { planGaps } from "../lib/plan.ts";
+import { PLAN_PATH, planGaps } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import type { Issue, Pr, Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
@@ -29,12 +29,13 @@ import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
 import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
-import { claimIn, runView, sessionsNamed } from "./snapshot.ts";
+import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
+import { createdPath, letGo, onBranch, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
-import { upsert, type Run } from "../lib/github.ts";
+import { must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
 import { runSettings } from "./sandbox.ts";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -121,7 +122,7 @@ const here = (
   plan: string | null = null,
 ): Local => ({
   issue: n,
-  path: `/wt/${n}`,
+  path: `/r.factory-${n}`,
   plan,
   runs,
 });
@@ -1069,6 +1070,122 @@ describe("a worktree counts as this machine's run only when its branch carries t
     expect(await claimIn(ctx, dir, "HEAD")).toBe(true);
     expect(await claimIn(ctx, dir, "refs/heads/nothing")).toBe(false);
     await rm(dir, { recursive: true });
+  });
+});
+
+describe("worktrees from git or the repo's own commands", () => {
+  /** As `git worktree list --porcelain` prints it, one block of each kind git writes. */
+  const LISTED = [
+    "worktree /r",
+    "HEAD 1111111111111111111111111111111111111111",
+    "branch refs/heads/main",
+    "",
+    "worktree /r.factory-5",
+    "HEAD 2222222222222222222222222222222222222222",
+    "branch refs/heads/factory/5",
+    "",
+    "worktree /envs/env 03",
+    "HEAD 3333333333333333333333333333333333333333",
+    "branch refs/heads/factory/12",
+    "locked held by the pool",
+    "",
+    "worktree /envs/env-04",
+    "HEAD 4444444444444444444444444444444444444444",
+    "branch refs/heads/worktree-factory-6",
+    "",
+    "worktree /tmp/review",
+    "HEAD 5555555555555555555555555555555555555555",
+    "detached",
+    "",
+    "worktree /r.factory-8",
+    "HEAD 6666666666666666666666666666666666666666",
+    "branch refs/heads/factory/8",
+    "prunable gitdir file points to non-existent location",
+    "",
+    "worktree /mirror.git",
+    "bare",
+    "",
+  ].join("\n");
+
+  test("only factory/<n> branches count, locked ones too; a detached, bare or prunable one never does", () => {
+    expect(factoryWorktrees(LISTED)).toEqual([
+      { issue: 5, path: "/r.factory-5" },
+      { issue: 12, path: "/envs/env 03" },
+    ]);
+    expect(factoryWorktrees("")).toEqual([]);
+  });
+
+  test("a create command's worktree is the last line it prints, from the main worktree when relative", () => {
+    expect(createdPath("syncing\n/envs/env-03\n\n", "/r")).toBe("/envs/env-03");
+    expect(createdPath("../envs/env-03\n", "/r")).toBe("/envs/env-03");
+    expect(() => createdPath(" \n", "/r")).toThrow("printed no worktree path");
+  });
+
+  test("a worktree another branch took is refused before anything goes on in it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "factory-branch-"));
+    const git = (...a: string[]) => run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...a], { cwd: dir });
+    await git("init", "-q", "-b", "factory/7");
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+
+    await onBranch(dir, 7);
+    await expect(onBranch(dir, 9)).rejects.toThrow("is on factory/7, not factory/9");
+    await git("switch", "-q", "--detach");
+    await expect(onBranch(dir, 7)).rejects.toThrow("is on no branch, not factory/7");
+    await rm(dir, { recursive: true });
+  });
+
+  /** A main worktree whose origin holds `main` and a claimed `factory/7`, as the worker finds its repo. */
+  async function claimedRepo() {
+    const root = await realpath(await mkdtemp(join(tmpdir(), "factory-worktree-")));
+    const dir = join(root, "r");
+    const git = (cwd: string, ...a: string[]) => must(run, ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...a], { cwd });
+    await git(root, "init", "-q", "--bare", "origin.git");
+    await git(root, "init", "-q", "-b", "main", "r");
+    await git(dir, "remote", "add", "origin", join(root, "origin.git"));
+    await git(dir, "commit", "-q", "--allow-empty", "-m", "claim");
+    await git(dir, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/factory/7");
+
+    return { root, dir };
+  }
+
+  test("with no commands of the repo's own, git adds the worktree beside the main one, and removes it", async () => {
+    const { root, dir } = await claimedRepo();
+    const plan: Plan = { kind: "plan", issue: 7, seal: SEAL, text: "## Files\n- a.ts" };
+    const path = await worktreeFor({ dir }, RULES, 7, plan);
+
+    expect(path).toBe(`${dir}.factory-7`);
+    expect(await worktrees({ dir })).toEqual([{ issue: 7, path }]);
+    expect(await Bun.file(join(path, PLAN_PATH)).text()).toBe(plan.text);
+    expect((await run(["git", "status", "--porcelain"], { cwd: path })).stdout).toBe("");
+    await letGo({ dir }, RULES, 7, path);
+    expect(await worktrees({ dir })).toEqual([]);
+    await rm(root, { recursive: true });
+  });
+
+  /** A pool that lends a detached worktree after a line of progress, and keeps every one it lent. */
+  const POOL = `import { resolve } from "node:path";
+const [command, name] = process.argv.slice(2);
+
+if (command === "acquire") {
+  const slot = resolve("../slots", name);
+  Bun.spawnSync(["git", "worktree", "add", "-q", "--detach", slot]);
+  console.log("warming the slot");
+  console.log(slot);
+} else console.log("retained");
+`;
+
+  test("a pool's worktree is moved onto the issue's branch, and one its release keeps stays listed", async () => {
+    const { root, dir } = await claimedRepo();
+    const pool = join(root, "pool.ts");
+    await Bun.write(pool, POOL);
+    const rules: Rules = { ...RULES, worktree: { create: ["bun", pool, "acquire", "{name}"], release: ["bun", pool, "release", "{dir}"] } };
+    const path = await worktreeFor({ dir }, rules, 7, null);
+
+    expect(path).toBe(join(root, "slots", "factory-7"));
+    expect(await worktrees({ dir })).toEqual([{ issue: 7, path }]);
+    await letGo({ dir }, rules, 7, path);
+    expect(await worktrees({ dir })).toEqual([{ issue: 7, path }]);
+    await rm(root, { recursive: true });
   });
 });
 

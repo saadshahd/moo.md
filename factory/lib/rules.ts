@@ -5,6 +5,9 @@ export const RULES_PATH = ".claude/factory.json";
 
 const Text = z.string().check(z.minLength(1));
 
+/** A command and its arguments, run with no shell. */
+const Argv = z.array(Text).check(z.minLength(1));
+
 export const Rules = z.object({
   /** How many issues run at once on this machine. */
   atOnce: z.int().check(z.minimum(1)),
@@ -29,6 +32,12 @@ export const Rules = z.object({
   }),
   /** What a run's sandbox adds for this repo: hosts it may reach, such as a registry, and folders it may write. */
   sandbox: z.optional(z.object({ domains: z.optional(z.array(Text)), paths: z.optional(z.array(Text)) })),
+  /**
+   * The repo's own commands that lend a run its worktree and take it back, such as a pool of warm
+   * ones. `create` gets `{name}` as `factory-<n>` and prints the worktree's path last; `release`
+   * gets that path as `{dir}`. Without them, git adds each worktree beside the main one.
+   */
+  worktree: z.optional(z.object({ create: Argv, release: Argv })),
 });
 
 export type Rules = z.infer<typeof Rules>;

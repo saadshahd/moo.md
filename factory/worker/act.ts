@@ -1,9 +1,10 @@
-/** The worker's one edge: each decided action, done on GitHub, git, wt or Claude Code. */
+/** The worker's one edge: each decided action, done on GitHub, git, the repo's worktree commands or Claude Code. */
 
 import { join, resolve } from "node:path";
 import { branchFor, edit, latest, markStuck, must, post, runName, upsert } from "../lib/github.ts";
 import { total, type Plan, type Restart } from "../lib/formats.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
+import type { Rules } from "../lib/rules.ts";
 import { sum } from "../lib/transcript.ts";
 import { approved, notes } from "../lib/wait.ts";
 import type { Action, World } from "./decide.ts";
@@ -15,6 +16,15 @@ import { sessionFacts, worktrees, type Ctx } from "./snapshot.ts";
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
 
 export const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
+
+/** The last line logged per issue and topic, so each change is said once, not each minute. */
+const said = new Map<string, string>();
+
+export function say(n: number, topic: "state" | "trust" | "worktree", line: string): void {
+  if (said.get(`${n} ${topic}`) === line) return;
+  said.set(`${n} ${topic}`, line);
+  log(`#${n}: ${line}`);
+}
 
 const pathOf = (w: World, n: number) => w.local.find((l) => l.issue === n)?.path;
 
@@ -31,14 +41,54 @@ async function claim(ctx: Ctx, n: number): Promise<boolean> {
   return r.exitCode === 0;
 }
 
-async function worktreeFor(ctx: Ctx, n: number, plan: Plan | null): Promise<string> {
+/** The worktree a create command lent: the last line it printed, from the main worktree when relative. */
+export function createdPath(stdout: string, dir: string): string {
+  const line = stdout.split("\n").findLast((l) => l.trim() !== "")?.trim();
+
+  if (line === undefined) throw new Error("the rules' worktree create command printed no worktree path");
+
+  return resolve(dir, line);
+}
+
+/** `argv` with `key` replaced by `value` wherever it stands. */
+const fill = (argv: readonly string[], key: string, value: string) => argv.map((a) => a.replaceAll(key, value));
+
+/**
+ * Throws unless the worktree at `path` is on issue `n`'s branch. After a worker restart, a pool
+ * may reset a slot whose lease ended and lend it to another session between the tick's read and
+ * this act; going on there would commit on that session's branch. The next tick reads again.
+ */
+export async function onBranch(path: string, n: number): Promise<void> {
+  const branch = (await must(run, ["git", "branch", "--show-current"], { cwd: path })).trim();
+
+  if (branch !== branchFor(n)) throw new Error(`${path} is on ${branch === "" ? "no branch" : branch}, not ${branchFor(n)}`);
+}
+
+/**
+ * The rules' worktree commands run as the worker's own children, from the main worktree, never
+ * through a shell: a pool may record its caller as a lease's owner, and a shell exits at once.
+ */
+async function lent(ctx: Pick<Ctx, "dir">, create: readonly string[], n: number): Promise<string> {
+  const path = createdPath(await must(run, fill(create, "{name}", `factory-${n}`), { cwd: ctx.dir }), ctx.dir);
+  await must(run, ["git", "switch", branchFor(n)], { cwd: path });
+
+  return path;
+}
+
+async function added(ctx: Pick<Ctx, "dir">, n: number): Promise<string> {
+  const path = `${resolve(ctx.dir)}.factory-${n}`;
+  await must(run, ["git", "worktree", "add", path, branchFor(n)], { cwd: ctx.dir });
+
+  return path;
+}
+
+/** Issue `n`'s worktree on its branch: one the rules' create command lends, else one git adds beside the main one. */
+export async function worktreeFor(ctx: Pick<Ctx, "dir">, rules: Rules, n: number, plan: Plan | null): Promise<string> {
   const b = branchFor(n);
   /** The pushed branch is the run's state; a local copy left by a removed worktree yields to it. */
   await must(run, ["git", "fetch", "origin", `+${b}:${b}`], { cwd: ctx.dir });
-  await must(run, ["wt", "switch", b, "--no-cd", "--yes"], { cwd: ctx.dir });
-  const path = (await worktrees(ctx)).find((t) => t.issue === n)?.path;
-
-  if (path === undefined) throw new Error(`wt made no worktree for ${b}`);
+  const path = rules.worktree === undefined ? await added(ctx, n) : await lent(ctx, rules.worktree.create, n);
+  await onBranch(path, n);
 
   /** The plan and handoff files live in the worktree but never in the repo. */
   const excludePath = await must(run, ["git", "rev-parse", "--git-path", "info/exclude"], { cwd: path });
@@ -54,6 +104,26 @@ async function worktreeFor(ctx: Ctx, n: number, plan: Plan | null): Promise<stri
   return path;
 }
 
+/**
+ * Gives issue `n`'s worktree back to the rules' release command, else git removes it, unsaved
+ * work and all. A release command may keep a worktree that holds unsaved work: it stays on the
+ * issue's branch and ends again each tick, so the kept line is said once.
+ */
+export async function letGo(ctx: Pick<Ctx, "dir">, rules: Rules, n: number, path: string): Promise<void> {
+  if (rules.worktree === undefined) {
+    await must(run, ["git", "worktree", "remove", "--force", path], { cwd: ctx.dir });
+    log(`#${n}: worktree removed`);
+
+    return;
+  }
+
+  const out = (await must(run, fill(rules.worktree.release, "{dir}", path), { cwd: ctx.dir })).trim();
+  const printed = out === "" ? "" : `: ${out}`;
+
+  if ((await worktrees(ctx)).some((t) => t.issue === n)) say(n, "worktree", `worktree kept by the release command${printed}`);
+  else log(`#${n}: worktree released${printed}`);
+}
+
 async function start(ctx: Ctx, w: World, n: number): Promise<void> {
   const issue = w.gh.issues.find((i) => i.number === n);
 
@@ -61,7 +131,7 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
   /** Read before the worktree is made, so rules that would open the App's key fail the start first. */
   const settings = runSettings(w.rules);
   const plan = latest(issue.comments, w.actors, "plan")?.c ?? null;
-  const cwd = pathOf(w, n) ?? (await worktreeFor(ctx, n, plan));
+  const cwd = pathOf(w, n) ?? (await worktreeFor(ctx, w.rules, n, plan));
 
   const prompt = runPrompt({
     repo: ctx.repo,
@@ -106,13 +176,19 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
   switch (a.kind) {
     case "claim":
       return claim(ctx, n);
-    case "start":
+    case "start": {
+      const here = pathOf(w, n);
+
+      /** Before the restart is posted, so a worktree lent to someone else costs no death. */
+      if (here !== undefined) await onBranch(here, n);
       /** The restart is posted first: a start that fails after it counts as a death, not a silent loop. */
       await restarted(a.restart === null ? null : { reason: a.restart }, a.after);
       await start(ctx, w, n);
       log(`#${n}: started${a.restart === null ? "" : ` (${a.restart})`}`);
 
       return true;
+    }
+
     case "stop":
       await must(run, ["claude", "stop", a.run.id]);
 
@@ -121,6 +197,7 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
       const cwd = pathOf(w, n);
 
       if (cwd === undefined) throw new Error(`#${n} has no worktree here`);
+      await onBranch(cwd, n);
       await restarted(a.restart, a.run.sessionId);
       /**
        * After `claude stop`, `--resume` wakes the same session under its own id, name, flags and
@@ -163,10 +240,13 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
       await post(run, ctx.repo, n, { kind: "stopped", issue: n, session: a.session });
 
       return true;
-    case "removeWorktree":
-      await must(run, ["wt", "remove", branchFor(n), "--yes", "--force"], { cwd: ctx.dir });
-      log(`#${n}: worktree removed`);
+    case "removeWorktree": {
+      const path = pathOf(w, n);
+
+      if (path === undefined) throw new Error(`#${n} has no worktree here`);
+      await letGo(ctx, w.rules, n, path);
 
       return true;
+    }
   }
 }
