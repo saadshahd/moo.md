@@ -8,7 +8,7 @@ import { branchFor, factoryComments, fromBot, STUCK_LABEL, type Actors, type Com
 import { failed, heldOn, heldSince, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
 import { HANDOFF_PATH, planFiles } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
-import { trustedIssue, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
+import { LABEL, trustedIssue, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
 
 export const CRASHES_BEFORE_STUCK = 3;
@@ -57,7 +57,7 @@ export type World = {
 };
 
 export type IssueState =
-  | { kind: "ended"; why: "closed" | "stuck" | "untrusted"; pr: number | null }
+  | { kind: "ended"; why: "closed" | "stuck" | "untrusted"; pr: Pick<Pr, "number" | "state"> | null }
   | { kind: "overCap" }
   | { kind: "working" }
   | { kind: "askedInBox" }
@@ -82,6 +82,19 @@ export type IssueState =
   | { kind: "stoppedByHand"; session: string; posted: boolean }
   | { kind: "crashed"; deaths: number };
 
+type Ended = Extract<IssueState, { kind: "ended" }>;
+
+/**
+ * The comment an ended issue's open PR closes with. A stuck issue keeps its PR: closed after the
+ * stuck comment, `livePr` would read it as closed since the retry, and the retry would mark the
+ * issue stuck again.
+ */
+const CLOSES_PR = {
+  closed: (n: number) => `Issue #${n} was closed or lost its ${LABEL} label, so the factory closed this PR.`,
+  untrusted: (n: number) => `Issue #${n} was labelled or edited by someone the factory does not trust, so the factory closed this PR.`,
+  stuck: null,
+} as const satisfies Record<Ended["why"], ((n: number) => string) | null>;
+
 /** Which session an action stops or wakes: `claude stop` takes `id`, `--resume` takes `sessionId`. */
 export type RunId = Pick<RunView, "id" | "sessionId">;
 
@@ -102,6 +115,7 @@ export type Action =
   | { kind: "markStuck"; issue: number; reason: string }
   | { kind: "postCost"; issue: number; pr: number; sessions: string[] }
   | { kind: "postStopped"; issue: number; session: string }
+  | { kind: "closePr"; issue: number; pr: number; reason: string }
   | { kind: "removeWorktree"; issue: number };
 
 /** The states each state's actions can lead to; `gone` is a removed worktree. */
@@ -178,11 +192,11 @@ function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | nul
 export function classify(l: Local, w: World): IssueState {
   const issue = w.gh.issues.find((i) => i.number === l.issue);
 
-  const ended = (why: "closed" | "stuck" | "untrusted"): IssueState => ({
-    kind: "ended",
-    why,
-    pr: w.gh.prs.get(l.issue)?.number ?? null,
-  });
+  const ended = (why: Ended["why"]): IssueState => {
+    const pr = w.gh.prs.get(l.issue);
+
+    return { kind: "ended", why, pr: pr === undefined ? null : { number: pr.number, state: pr.state } };
+  };
 
   if (issue === undefined) return ended("closed");
 
@@ -311,8 +325,15 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
   const catchUp = `First run \`git fetch origin\` and \`git merge origin/${branchFor(n)}\`: merge, never rebase or force-push.`;
 
   switch (s.kind) {
-    case "ended":
-      return [...stop, ...(s.pr === null ? [] : [cost(s.pr)]), { kind: "removeWorktree", issue: n }];
+    case "ended": {
+      const comment = CLOSES_PR[s.why];
+
+      const close: Action[] =
+        s.pr?.state === "OPEN" && comment !== null ? [{ kind: "closePr", issue: n, pr: s.pr.number, reason: comment(n) }] : [];
+
+      return [...stop, ...(s.pr === null ? [] : [cost(s.pr.number)]), ...close, { kind: "removeWorktree", issue: n }];
+    }
+
     case "overCap":
       return [...stop, start("context")];
     case "working":
@@ -402,7 +423,7 @@ export function occupies(s: IssueState): boolean {
 export function stateLine(s: IssueState): string {
   switch (s.kind) {
     case "ended":
-      return `ended: ${s.why}${s.pr === null ? "" : `, PR #${s.pr}`}`;
+      return `ended: ${s.why}${s.pr === null ? "" : `, PR #${s.pr.number}`}`;
     case "overCap":
       return "its context passed the cap";
     case "working":

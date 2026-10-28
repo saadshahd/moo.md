@@ -1,7 +1,7 @@
 /** The worker's one edge: each decided action, done on GitHub, git, the repo's worktree commands or Claude Code. */
 
 import { join, resolve } from "node:path";
-import { branchFor, edit, latest, markStuck, must, post, runName, upsert } from "../lib/github.ts";
+import { branchFor, closePr, edit, latest, markStuck, must, post, runName, upsert } from "../lib/github.ts";
 import { total, type Plan, type Restart } from "../lib/formats.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
@@ -238,6 +238,11 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
 
     case "postStopped":
       await post(run, ctx.repo, n, { kind: "stopped", issue: n, session: a.session });
+
+      return true;
+    case "closePr":
+      await closePr(run, ctx.repo, a.pr, a.reason);
+      log(`#${n}: PR #${a.pr} closed: ${a.reason}`);
 
       return true;
     case "removeWorktree": {

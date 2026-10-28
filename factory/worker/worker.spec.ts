@@ -32,7 +32,7 @@ import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
 import { createdPath, letGo, onBranch, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
-import { must, upsert, type Run } from "../lib/github.ts";
+import { closePr, must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
 import { runSettings } from "./sandbox.ts";
 import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
@@ -254,6 +254,15 @@ function after(
           },
         };
         break;
+      case "closePr":
+        next = {
+          ...next,
+          gh: {
+            ...next.gh,
+            prs: new Map([...next.gh.prs].map(([i, p]): [number, Pr] => [i, p.number === a.pr ? { ...p, state: "CLOSED", closedAt: "2026-10-26T12:00:00Z" } : p])),
+          },
+        };
+        break;
       case "postCost":
       case "claim":
       case "updateBranch":
@@ -299,7 +308,7 @@ describe("a local issue's state and actions", () => {
       ]),
     );
 
-    expect(state).toEqual({ kind: "ended", why: "closed", pr: 57 });
+    expect(state).toEqual({ kind: "ended", why: "closed", pr: { number: 57, state: "MERGED" } });
     expect(kinds(actions)).toEqual(["stop", "postCost", "removeWorktree"]);
   });
   test("a stuck label, or a body a stranger edited, ends it", () => {
@@ -664,6 +673,71 @@ describe("a review on an open PR", () => {
     expect(step(at([review()], [], { mergeable: "CONFLICTING", mergeState: "DIRTY" })).state.kind).toBe("conflicting");
     expect(step(at([review()], [], { mergeState: "BEHIND" })).state.kind).toBe("reviewed");
     expect(step(at([review()], [], { checks: "FAILURE" })).state.kind).toBe("reviewed");
+  });
+});
+
+describe("killing an issue closes its PR", () => {
+  const killed = {
+    closed: snapshot(),
+    untrusted: snapshot({ issues: [issue(7, { editor: "stranger" })] }),
+    stuck: snapshot({ issues: [issue(7, { labels: ["factory", STUCK_LABEL] })] }),
+  };
+
+  const end = (why: keyof typeof killed, p?: Pr) =>
+    step(world({ ...killed[why], prs: new Map(p === undefined ? [] : [[7, p]]) }, [here(7, [session("done")])]));
+
+  test("an issue closed or no longer trusted closes its open PR, after its cost and before its worktree goes", () => {
+    const reasons = (["closed", "untrusted"] as const).map((why) => {
+      const { state, actions } = end(why, pr(7));
+
+      expect(state).toEqual({ kind: "ended", why, pr: { number: 57, state: "OPEN" } });
+      expect(kinds(actions)).toEqual(["stop", "postCost", "closePr", "removeWorktree"]);
+      expect(actions[2]).toEqual({ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("Issue #7") });
+
+      return actions[2]?.kind === "closePr" ? actions[2].reason : "";
+    });
+
+    expect(new Set(reasons).size).toBe(2);
+  });
+  test("a stuck issue keeps its open PR, so removing the label retries from it", () => {
+    expect(kinds(end("stuck", pr(7)).actions)).toEqual(["stop", "postCost", "removeWorktree"]);
+  });
+  test("a merged PR, one closed already, or none has nothing to close", () => {
+    for (const why of ["closed", "untrusted", "stuck"] as const)
+      for (const p of [pr(7, { state: "MERGED" }), pr(7, { state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" }), undefined])
+        expect(kinds(end(why, p).actions)).not.toContain("closePr");
+  });
+  test("auto-merge goes off first; a PR that never had it armed still closes, one still armed does not", async () => {
+    const gh = (offFails: boolean, armed = false) => {
+      const calls: string[][] = [];
+
+      const fake: Run = async (argv) => {
+        calls.push([...argv]);
+        const failed = offFails && argv.includes("--disable-auto");
+
+        return { exitCode: failed ? 1 : 0, stdout: argv.includes("view") ? `${armed}\n` : "", stderr: failed ? "no auto-merge to disable" : "" };
+      };
+
+      return { fake, calls };
+    };
+
+    const plain = gh(false);
+    await closePr(plain.fake, "o/r", 57, "Issue #7 was closed.");
+
+    expect(plain.calls).toEqual([
+      ["gh", "pr", "merge", "57", "--repo", "o/r", "--disable-auto"],
+      ["gh", "pr", "close", "57", "--repo", "o/r", "--comment", "Issue #7 was closed."],
+    ]);
+
+    const unarmed = gh(true);
+    await closePr(unarmed.fake, "o/r", 57, "why");
+
+    expect(unarmed.calls.map((c) => c[2])).toEqual(["merge", "view", "close"]);
+
+    const armed = gh(true, true);
+
+    await expect(closePr(armed.fake, "o/r", 57, "why")).rejects.toThrow("no auto-merge to disable");
+    expect(armed.calls.map((c) => c[2])).toEqual(["merge", "view"]);
   });
 });
 

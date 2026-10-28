@@ -127,3 +127,22 @@ export async function markStuck(run: Run, repo: string, n: number, reason: strin
     "--color", "B60205", "--description", "A factory run gave up; the comment says why"]);
   await must(run, ["gh", "issue", "edit", String(n), "--repo", repo, "--add-label", STUCK_LABEL]);
 }
+
+/**
+ * Closes PR `pr` with one comment saying why. GitHub's docs don't say closing a PR turns its
+ * auto-merge off, so that goes first. Turning off what was never on may fail; that is no
+ * failure while GitHub reads the PR as unarmed.
+ */
+export async function closePr(run: Run, repo: string, pr: number, comment: string): Promise<void> {
+  const n = String(pr);
+  const off = await run(["gh", "pr", "merge", n, "--repo", repo, "--disable-auto"]);
+
+  if (off.exitCode !== 0) {
+    const armed = await must(run, ["gh", "pr", "view", n, "--repo", repo, "--json", "autoMergeRequest",
+      "--jq", ".autoMergeRequest != null"]);
+
+    if (armed.trim() !== "false") throw new Error(`gh pr merge --disable-auto failed: ${off.stderr.trim()}`);
+  }
+
+  await must(run, ["gh", "pr", "close", n, "--repo", repo, "--comment", comment]);
+}
