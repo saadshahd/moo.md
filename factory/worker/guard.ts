@@ -8,7 +8,6 @@ import { botFor, type App } from "./app.ts";
 import { run } from "./proc.ts";
 
 const Settings = z.object({
-  env: z.optional(z.record(z.string(), z.string())),
   enabledPlugins: z.optional(z.record(z.string(), z.boolean())),
 });
 
@@ -76,9 +75,6 @@ export async function refusals(
 
   return [
     loginRefusal(await run(["claude", "auth", "status"])),
-    user.env?.CLAUDE_CODE_ENABLE_FUNCTION_HOOKS === "1"
-      ? ""
-      : 'runs load no factory hooks: set "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1" under env in ~/.claude/settings.json.',
     Object.entries(user.enabledPlugins ?? {}).some(([k, on]) => on && k.startsWith("factory@"))
       ? ""
       : "the factory plugin is not installed and enabled for your user, so runs load no factory hooks. Install it with /plugin.",
