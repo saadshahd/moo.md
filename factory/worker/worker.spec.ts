@@ -10,6 +10,7 @@ import { seal } from "./cli.ts";
 import {
   actionsFor,
   classify,
+  CRASHES_BEFORE_STUCK,
   decide,
   deathsSinceRetry,
   NEXT,
@@ -23,7 +24,7 @@ import {
 } from "./decide.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
 import { machineId, platformOf } from "./platform.ts";
-import { loginRefusal } from "./guard.ts";
+import { checksRefusal, loginRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
 import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
@@ -95,6 +96,7 @@ const snapshot = (more: Partial<Snapshot> = {}): Snapshot => ({
   undos: [],
   merged: [],
   truncated: [],
+  base: { name: "main", checks: "SUCCESS" },
   ...more,
 });
 
@@ -143,6 +145,9 @@ const pr = (n: number, more: Partial<Pr> = {}): Pr => ({
   state: "OPEN",
   closedAt: null,
   checks: "PENDING",
+  mergeable: "MERGEABLE",
+  mergeState: "BLOCKED",
+  headSha: "h1",
   comments: [],
   ...more,
 });
@@ -246,6 +251,7 @@ function after(
         break;
       case "postCost":
       case "claim":
+      case "updateBranch":
         break;
     }
 
@@ -399,7 +405,7 @@ describe("a local issue's state and actions", () => {
       ]),
     );
 
-    expect(once.actions[0]).toMatchObject({ kind: "wake", restart: "checks" });
+    expect(once.actions[0]).toMatchObject({ kind: "wake", restart: { reason: "checks" } });
 
     const twice = [crash(), crash()];
 
@@ -437,12 +443,12 @@ describe("a local issue's state and actions", () => {
     const gh = (head: string) =>
       snapshot({
         issues: [issue(7)],
-        open: [{ number: 9, head, files: ["src/a.ts"] }],
+        open: [{ ...pr(3), number: 9, head, files: ["src/a.ts"] }],
       });
 
     expect(
       step(world(gh("factory/3"), [here(7, [session("done")], plan)])).state,
-    ).toEqual({ kind: "held", byPr: 9 });
+    ).toEqual({ kind: "held", on: { kind: "pr", pr: 9, files: ["src/a.ts"] } });
     expect(
       step(world(gh("factory/7"), [here(7, [session("done")], plan)])).state
         .kind,
@@ -480,6 +486,167 @@ describe("a local issue's state and actions", () => {
 
     expect(classify(w.local[0]!, w).kind).toBe("limited");
     expect(pick(w)).toEqual([]);
+  });
+});
+
+describe("an open PR GitHub can't merge as it stands", () => {
+  const gh = (p: Pr, more: Partial<Snapshot> = {}, comments: Comment[] = []) =>
+    snapshot({ issues: [issue(7, { comments })], prs: new Map([[7, p]]), ...more });
+
+  const conflictWake = (head: string) =>
+    posted({ kind: "restart", issue: 7, reason: "conflict", session: "s", head });
+
+  const dirty = pr(7, { mergeable: "CONFLICTING", mergeState: "DIRTY" });
+
+  test("behind its base with its run stopped, the worker updates the branch at the head it saw, with no model", () => {
+    const { state, actions } = step(world(gh(pr(7, { mergeState: "BEHIND" })), [here(7, [session("stopped")])]));
+
+    expect(state).toEqual({ kind: "behind", pr: 57, head: "h1", base: "main" });
+    expect(actions).toEqual([
+      { kind: "postCost", issue: 7, pr: 57, sessions: ["sid-1"] },
+      { kind: "updateBranch", issue: 7, pr: 57, head: "h1" },
+    ]);
+    expect(occupies(state)).toBe(false);
+    expect(stateLine(state)).toBe("PR #57 is behind main; the worker updates its branch");
+  });
+  test("behind with its run not yet stopped, the run is stopped first", () => {
+    const { state, actions } = step(world(gh(pr(7, { mergeState: "BEHIND" })), [here(7, [session("done")])]));
+
+    expect(state.kind).toBe("prOpen");
+    expect(kinds(actions)).toEqual(["postCost", "stop"]);
+  });
+  test("conflicting, the run is woken to merge the base in, and the wake records the head it was for", () => {
+    const { state, actions } = step(world(gh(dirty), [here(7, [session("done")])]));
+
+    expect(state).toEqual({ kind: "conflicting", pr: 57, head: "h1", base: "main", deaths: 0 });
+    expect(occupies(state)).toBe(true);
+    expect(stateLine(state)).toBe(`PR #57 conflicts with main; its run merges main in (0 of ${CRASHES_BEFORE_STUCK})`);
+    expect(actions).toEqual([expect.objectContaining({ kind: "wake", restart: { reason: "conflict", head: "h1" } })]);
+
+    const message = actions.flatMap((a) => (a.kind === "wake" ? [a.message] : [])).join("");
+
+    for (const s of ["git merge origin/main", "never rebase or force-push", "run the checks", "push"])
+      expect(message).toContain(s);
+  });
+  test("GitHub's DIRTY alone is a conflict too; UNKNOWN does nothing until GitHub works it out", () => {
+    const stopped = (p: Pr) => step(world(gh(p), [here(7, [session("stopped")])])).state.kind;
+
+    expect(stopped(pr(7, { mergeState: "DIRTY" }))).toBe("conflicting");
+    expect(stopped(pr(7, { mergeable: "UNKNOWN", mergeState: "UNKNOWN" }))).toBe("prOpen");
+  });
+  test("a fix fails only when the run ended and the PR still conflicts at the head it was woken for", () => {
+    const thrice = (head: string) =>
+      step(world(gh(dirty, {}, [conflictWake(head), conflictWake(head), conflictWake(head)]), [here(7, [session("done")])]));
+
+    const sameHead = thrice("h1");
+
+    expect(sameHead.state).toMatchObject({ kind: "conflicting", deaths: 3 });
+    expect(sameHead.actions).toEqual([
+      { kind: "stop", issue: 7, run: session("done") },
+      { kind: "markStuck", issue: 7, reason: "PR #57 still conflicts with main after its run was woken 3 times to merge main in" },
+    ]);
+
+    const newConflict = thrice("h0");
+
+    expect(newConflict.state).toMatchObject({ kind: "conflicting", deaths: 0 });
+    expect(kinds(newConflict.actions)).toEqual(["wake"]);
+  });
+  test("a wake to merge the base in is no death", () => {
+    expect(deathsSinceRetry([conflictWake("h1"), crash()], A)).toBe(1);
+  });
+  test("failed checks while the base's own newest commit is red hold the PR: no wake, no count", () => {
+    const failing = pr(7, { checks: "FAILURE" });
+    const onBase = (checks: string) => step(world(gh(failing, { base: { name: "main", checks } }), [here(7, [session("stopped")])]));
+    const red = onBase("FAILURE");
+
+    expect(red.state).toEqual({ kind: "held", on: { kind: "red", pr: 57, base: "main" } });
+    expect(red.actions).toEqual([]);
+    expect(occupies(red.state)).toBe(false);
+    expect(stateLine(red.state)).toBe("held: main is red, so PR #57's failed checks wait for it to go green");
+    expect(onBase("PENDING").state.kind).toBe("checksFailed");
+  });
+});
+
+describe("plans posted first hold later ones", () => {
+  const planned = (n: number, at: string) =>
+    posted({ kind: "plan", issue: n, seal: SEAL, text: "## Files\n- src/a.ts" }, at);
+
+  const both = (at4: string, at7: string) =>
+    snapshot({
+      issues: [issue(4, { comments: [planned(4, at4)] }), issue(7, { comments: [planned(7, at7)] })],
+    });
+
+  const gh = both("2026-10-26T09:00:00Z", "2026-10-26T10:00:00Z");
+
+  test("the later plan is held, saying which issue it waits for; the earlier goes on", () => {
+    const w = world(gh, [here(7, [session("done")]), here(4, [session("done")])]);
+    const later = classify(w.local[0]!, w);
+
+    expect(later).toEqual({ kind: "held", on: { kind: "plan", issue: 4, files: ["src/a.ts"] } });
+    expect(stateLine(later)).toBe("held until #4 merges or ends: its plan, posted first, also touches src/a.ts");
+    expect(classify(w.local[1]!, w).kind).toBe("crashed");
+    expect(step(world(gh, [here(7, [session("done")])])).actions).toEqual([]);
+  });
+  test("plans posted in the same second go by issue number, so two never hold each other", () => {
+    const at = "2026-10-26T09:00:00Z";
+    const w = world(both(at, at), [here(4, [session("done")]), here(7, [session("done")])]);
+
+    expect(w.local.map((l) => classify(l, w).kind)).toEqual(["crashed", "held"]);
+  });
+  test("a plan in the worktree not yet posted comes after every posted one", () => {
+    const first = issue(4, { comments: [planned(4, "2026-10-26T09:00:00Z")] });
+    const w = world(snapshot({ issues: [first, issue(7)] }), [here(7, [session("done")], "## Files\n- src/a.ts")]);
+
+    expect(classify(w.local[0]!, w)).toMatchObject({ kind: "held", on: { kind: "plan", issue: 4 } });
+  });
+  test("a stuck or untrusted earlier issue, or none, holds nothing", () => {
+    const at = "2026-10-26T09:00:00Z";
+    const seven = issue(7, { comments: [planned(7, "2026-10-26T10:00:00Z")] });
+    const alone = (others: Issue[]) => classify(here(7, [session("done")]), world(snapshot({ issues: [...others, seven] }), [])).kind;
+
+    expect(alone([issue(4, { comments: [planned(4, at)], labels: ["factory", STUCK_LABEL] })])).toBe("crashed");
+    expect(alone([issue(4, { comments: [planned(4, at)], labelledBy: "stranger" })])).toBe("crashed");
+    expect(alone([])).toBe("crashed");
+  });
+  test("an open PR holds before a plan does", () => {
+    const w = world({ ...gh, open: [{ ...pr(3), files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
+
+    expect(classify(w.local[0]!, w)).toEqual({ kind: "held", on: { kind: "pr", pr: 53, files: ["src/a.ts"] } });
+  });
+  test("a later plan is never started while the earlier issue is open", () => {
+    expect(pick(world(gh, []))).toEqual([{ issue: 4, resume: false }]);
+  });
+});
+
+describe("the base must require branches up to date", () => {
+  const ruleset = (strict: boolean, checks = 1) =>
+    JSON.stringify([
+      { type: "deletion" },
+      {
+        type: "required_status_checks",
+        parameters: {
+          strict_required_status_checks_policy: strict,
+          required_status_checks: Array.from({ length: checks }, () => ({ context: "test" })),
+        },
+      },
+    ]);
+
+  const protection = (strict: boolean) => JSON.stringify({ strict, contexts: ["test"], checks: [] });
+
+  test("a strict ruleset or strict protection passes", () => {
+    expect(checksRefusal("o/r", "main", [ruleset(true), null])).toBe("");
+    expect(checksRefusal("o/r", "main", [null, protection(true)])).toBe("");
+    expect(checksRefusal("o/r", "main", [ruleset(false), protection(true)])).toBe("");
+  });
+  test("checks required, but not up to date, refuses and says how to turn it on", () => {
+    const no = checksRefusal("o/r", "main", [ruleset(false), protection(false)]);
+
+    for (const s of ["up to date", "strict_required_status_checks_policy", "required_status_checks.strict"])
+      expect(no).toContain(s);
+  });
+  test("no check required refuses as before; a strict rule naming no check is no check", () => {
+    expect(checksRefusal("o/r", "main", [null, null])).toContain("requires no checks");
+    expect(checksRefusal("o/r", "main", [ruleset(true, 0), null])).toContain("requires no checks");
   });
 });
 
@@ -546,7 +713,7 @@ describe("picking new work", () => {
   test("an issue whose plan overlaps an open PR waits", () => {
     const gh = snapshot({
       issues: [issue(4, { comments: [plan] })],
-      open: [{ number: 9, head: "x", files: null }],
+      open: [{ ...pr(3), number: 9, head: "x", files: null }],
     });
 
     expect(pick(world(gh, []))).toEqual([]);

@@ -77,19 +77,36 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
   await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...flags, prompt], { cwd });
 }
 
+/**
+ * Merges the base into PR `pr`'s branch on GitHub, as the bot, only while its head is still
+ * `head`. A head that moved since the snapshot is GitHub's 422, and no failure: the next tick
+ * reads the new one.
+ */
+async function updateBranch(ctx: Ctx, n: number, pr: number, head: string): Promise<boolean> {
+  const r = await run(["gh", "api", "-X", "PUT", `repos/${ctx.repo}/pulls/${pr}/update-branch`,
+    "-f", `expected_head_sha=${head}`, "--silent"]);
+
+  if (r.exitCode === 0) log(`#${n}: PR #${pr} updated from ${ctx.base}`);
+  else if (r.stderr.includes("HTTP 422") && /expected head sha/i.test(r.stderr))
+    log(`#${n}: PR #${pr} moved past ${head.slice(0, 7)} before its update; the next tick reads it again`);
+  else throw new Error(`gh api update-branch failed: ${r.stderr.trim()}`);
+
+  return true;
+}
+
 /** Does one action; false when a claim was lost, so the issue's later actions are skipped. */
 export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
   const n = a.issue;
 
-  const restarted = (reason: Restart["reason"] | null, session: string | null) =>
-    reason === null || session === null ? null : post(run, ctx.repo, n, { kind: "restart", issue: n, reason, session });
+  const restarted = (r: Pick<Restart, "reason" | "head"> | null, session: string | null) =>
+    r === null || session === null ? null : post(run, ctx.repo, n, { kind: "restart", issue: n, session, ...r });
 
   switch (a.kind) {
     case "claim":
       return claim(ctx, n);
     case "start":
       /** The restart is posted first: a start that fails after it counts as a death, not a silent loop. */
-      await restarted(a.restart, a.after);
+      await restarted(a.restart === null ? null : { reason: a.restart }, a.after);
       await start(ctx, w, n);
       log(`#${n}: started${a.restart === null ? "" : ` (${a.restart})`}`);
 
@@ -115,6 +132,8 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
       return true;
     }
 
+    case "updateBranch":
+      return updateBranch(ctx, n, a.pr, a.head);
     case "closeWait":
       await edit(run, ctx.repo, a.wait.id, { ...a.wait.c, answers: a.answers });
 

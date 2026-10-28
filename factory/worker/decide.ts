@@ -3,13 +3,12 @@
  * takes, and which waiting issues to start. Pure: `apply` in act.ts is the only edge.
  */
 
-import { parse, type Restart, type Wait } from "../lib/formats.ts";
-import {
-  branchFor, factoryComments, fromBot, latest, STUCK_LABEL, wroteIt, type Actors, type Comment,
-} from "../lib/github.ts";
-import { overlappingPr, planFiles } from "../lib/plan.ts";
+import { parse, type FactoryComment, type Wait } from "../lib/formats.ts";
+import { factoryComments, fromBot, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
+import { failed, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
+import { planFiles } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
-import type { Issue, OpenPr, Pr, Snapshot } from "../lib/snapshot.ts";
+import { trustedIssue, type Issue, type Pr, type Snapshot } from "../lib/snapshot.ts";
 import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
 
 export const CRASHES_BEFORE_STUCK = 3;
@@ -64,9 +63,13 @@ export type IssueState =
   | { kind: "prMerged"; pr: number }
   | { kind: "prClosedUnmerged"; pr: number }
   | { kind: "checksFailed"; pr: number; deaths: number }
+  /** The worker updates the branch itself, at the head it saw. */
+  | { kind: "behind"; pr: number; head: string; base: string }
+  /** `deaths` counts the wakes that left the PR conflicting at this same head. */
+  | { kind: "conflicting"; pr: number; head: string; base: string; deaths: number }
   | { kind: "limited"; until: number }
   | { kind: "limitReset" }
-  | { kind: "held"; byPr: number }
+  | { kind: "held"; on: Extract<Hold, { kind: "pr" | "plan" | "red" }> }
   /** A person ran `claude stop` on it; `posted` once the issue says so. */
   | { kind: "stoppedByHand"; session: string; posted: boolean }
   | { kind: "crashed"; deaths: number };
@@ -76,9 +79,16 @@ export type RunId = Pick<RunView, "id" | "sessionId">;
 
 export type Action =
   | { kind: "claim"; issue: number }
-  | { kind: "start"; issue: number; restart: Restart["reason"] | null; after: string | null }
+  | { kind: "start"; issue: number; restart: "crash" | "context" | null; after: string | null }
   | { kind: "stop"; issue: number; run: RunId }
-  | { kind: "wake"; issue: number; run: RunId; message: string; restart: "checks" | null }
+  | {
+      kind: "wake";
+      issue: number;
+      run: RunId;
+      message: string;
+      restart: { reason: "checks" } | { reason: "conflict"; head: string } | null;
+    }
+  | { kind: "updateBranch"; issue: number; pr: number; head: string }
   | { kind: "closeWait"; issue: number; wait: { id: number; c: Wait }; answers: string[] }
   | { kind: "markStuck"; issue: number; reason: string }
   | { kind: "postCost"; issue: number; pr: number; sessions: string[] }
@@ -92,10 +102,12 @@ export const NEXT = {
   working: ["working"],
   askedInBox: ["ended"],
   waiting: ["waiting", "working"],
-  prOpen: ["prOpen"],
+  prOpen: ["prOpen", "behind"],
   prMerged: ["prMerged"],
   prClosedUnmerged: ["ended"],
   checksFailed: ["working", "ended"],
+  behind: ["behind"],
+  conflicting: ["working", "ended"],
   limited: ["limited"],
   limitReset: ["working"],
   held: ["held"],
@@ -103,21 +115,21 @@ export const NEXT = {
   crashed: ["working", "ended"],
 } satisfies { [K in IssueState["kind"]]: readonly (IssueState["kind"] | "gone")[] };
 
-/** The issue was labelled by a trusted person, and its body written or last edited by one. */
-export function trustedIssue(i: Issue, a: Actors): boolean {
-  return i.labelledBy !== null && a.trusted.includes(i.labelledBy) && wroteIt(i, a.trusted);
-}
-
-/**
- * Restarts after a death, and wakes for failed checks, since the issue was last marked stuck:
- * removing the stuck label is a retry, and it starts the count again.
- */
-export function deathsSinceRetry(cs: readonly Comment[], a: Actors): number {
+/** The factory comments since the issue was last marked stuck: removing the label is a retry. */
+function sinceRetry(cs: readonly Comment[], a: Actors): FactoryComment[] {
   const fs = factoryComments(cs, a).map((x) => x.c);
-  const since = fs.findLastIndex((c) => c.kind === "stuck") + 1;
 
-  return fs.slice(since).filter((c) => c.kind === "restart" && c.reason !== "context").length;
+  return fs.slice(fs.findLastIndex((c) => c.kind === "stuck") + 1);
 }
+
+/** Restarts after a death, and wakes for failed checks, since the last retry. */
+export function deathsSinceRetry(cs: readonly Comment[], a: Actors): number {
+  return sinceRetry(cs, a).filter((c) => c.kind === "restart" && (c.reason === "crash" || c.reason === "checks")).length;
+}
+
+/** Wakes to merge the base in, since the last retry, that were for PR head `head`. */
+const conflictWakes = (cs: readonly Comment[], a: Actors, head: string) =>
+  sinceRetry(cs, a).filter((c) => c.kind === "restart" && c.reason === "conflict" && c.head === head).length;
 
 /** The issue's PR, unless it was closed unmerged before the issue was last marked stuck. */
 function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | null {
@@ -126,10 +138,6 @@ function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | nul
 
   return pr.state === "CLOSED" && (pr.closedAt ?? "") < stuckAt ? null : pr;
 }
-
-/** The first open PR, other than the issue's own, whose files overlap the plan's. */
-const overlapping = (plan: string, open: readonly OpenPr[], n: number) =>
-  overlappingPr(planFiles(plan), open, branchFor(n))?.pr ?? null;
 
 export function classify(l: Local, w: World): IssueState {
   const issue = w.gh.issues.find((i) => i.number === l.issue);
@@ -164,10 +172,27 @@ export function classify(l: Local, w: World): IssueState {
 
   if (pr?.state === "CLOSED") return { kind: "prClosedUnmerged", pr: pr.number };
 
-  if (pr !== null)
-    return pr.checks === "FAILURE" || pr.checks === "ERROR"
-      ? { kind: "checksFailed", pr: pr.number, deaths }
-      : { kind: "prOpen", pr: pr.number };
+  if (pr !== null) {
+    const hold = prHold(pr, w.gh.base);
+    const stopped = current === undefined || current.state === "stopped";
+
+    switch (hold?.kind) {
+      case "conflict":
+        return {
+          kind: "conflicting",
+          pr: pr.number,
+          head: pr.headSha,
+          base: hold.base,
+          deaths: deathsSinceRetry(cs, w.actors) + conflictWakes(cs, w.actors, pr.headSha),
+        };
+      case "behind":
+        return stopped ? { kind: "behind", pr: pr.number, head: pr.headSha, base: hold.base } : { kind: "prOpen", pr: pr.number };
+      case "red":
+        return { kind: "held", on: hold };
+      case undefined:
+        return failed(pr.checks) ? { kind: "checksFailed", pr: pr.number, deaths } : { kind: "prOpen", pr: pr.number };
+    }
+  }
 
   /** The worker stops a run only to restart it, and names it in the restart it posts first. */
   const fs = factoryComments(cs, w.actors).map((x) => x.c);
@@ -184,9 +209,9 @@ export function classify(l: Local, w: World): IssueState {
       ? { kind: "limited", until: current.rejectedUntil }
       : { kind: "limitReset" };
 
-  const byPr = overlapping(l.plan ?? latest(cs, w.actors, "plan")?.c.text ?? "", w.gh.open, l.issue);
+  const on = planHold(l.issue, planFiles(l.plan ?? postedPlan(issue, w.actors)?.text ?? ""), w.gh, w.actors);
 
-  if (byPr !== null) return { kind: "held", byPr };
+  if (on !== null) return { kind: "held", on };
   const until = limitedUntil(w);
 
   if (until !== null) return { kind: "limited", until };
@@ -213,14 +238,14 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
   const cost = (pr: number): Action => ({ kind: "postCost", issue: n, pr, sessions: l.runs.map((r) => r.sessionId) });
   const stuck = (reason: string): Action[] => [...stop, { kind: "markStuck", issue: n, reason }];
 
-  const start = (restart: Restart["reason"] | null): Action => ({
+  const start = (restart: Extract<Action, { kind: "start" }>["restart"]): Action => ({
     kind: "start",
     issue: n,
     restart,
     after: current?.sessionId ?? null,
   });
 
-  const wake = (message: string, restart: "checks" | null = null): Action[] =>
+  const wake = (message: string, restart: Extract<Action, { kind: "wake" }>["restart"] = null): Action[] =>
     current === undefined ? [] : [{ kind: "wake", issue: n, run: current, message, restart }];
 
   switch (s.kind) {
@@ -251,7 +276,18 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     case "checksFailed":
       return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
         ? stuck(`the checks on PR #${s.pr} failed ${s.deaths} times`)
-        : wake(`The checks on PR #${s.pr} failed. Read them with \`gh pr checks ${s.pr}\`, fix and push.`, "checks");
+        : wake(`The checks on PR #${s.pr} failed. Read them with \`gh pr checks ${s.pr}\`, fix and push.`, {
+            reason: "checks",
+          });
+    case "behind":
+      return [cost(s.pr), { kind: "updateBranch", issue: n, pr: s.pr, head: s.head }];
+    case "conflicting":
+      return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
+        ? stuck(`PR #${s.pr} still conflicts with ${s.base} after its run was woken ${s.deaths} times to merge ${s.base} in`)
+        : wake(
+            `PR #${s.pr} conflicts with ${s.base}. Run \`git fetch origin ${s.base}\` and \`git merge origin/${s.base}\` on your branch: merge, never rebase or force-push. Resolve the conflicts, run the checks locally, then push.`,
+            { reason: "conflict", head: s.head },
+          );
     case "limitReset":
       return wake("Your usage limit has reset. Go on with the work.");
     case "crashed":
@@ -270,6 +306,7 @@ export function occupies(s: IssueState): boolean {
     case "limitReset":
       return true;
     case "checksFailed":
+    case "conflicting":
     case "crashed":
       return s.deaths < CRASHES_BEFORE_STUCK;
     case "ended":
@@ -277,6 +314,7 @@ export function occupies(s: IssueState): boolean {
     case "prOpen":
     case "prMerged":
     case "prClosedUnmerged":
+    case "behind":
     case "limited":
     case "held":
     case "stoppedByHand":
@@ -305,12 +343,16 @@ export function stateLine(s: IssueState): string {
       return `PR #${s.pr} closed without merging`;
     case "checksFailed":
       return `checks failed on PR #${s.pr} (${s.deaths} of ${CRASHES_BEFORE_STUCK})`;
+    case "behind":
+      return holdLine({ kind: "behind", pr: s.pr, base: s.base });
+    case "conflicting":
+      return `${holdLine({ kind: "conflict", pr: s.pr, base: s.base })} (${s.deaths} of ${CRASHES_BEFORE_STUCK})`;
     case "limited":
       return `usage limit until ${new Date(s.until * 1000).toISOString()}`;
     case "limitReset":
       return "usage limit reset";
     case "held":
-      return `held until PR #${s.byPr} merges`;
+      return holdLine(s.on);
     case "stoppedByHand":
       return "stopped by hand";
     case "crashed":
@@ -318,12 +360,15 @@ export function stateLine(s: IssueState): string {
   }
 }
 
-/** Whether `i` may start here now: trusted, unblocked, clear of open PRs, and unclaimed or claimed by this machine. */
+/**
+ * Whether `i` may start here now: trusted, unblocked, held by no open PR or earlier plan, and
+ * unclaimed or claimed by this machine.
+ */
 function startable(i: Issue, w: World): { resume: boolean; planned: boolean } | null {
   if (!trustedIssue(i, w.actors) || i.blocked) return null;
-  const plan = latest(i.comments, w.actors, "plan");
+  const plan = postedPlan(i, w.actors);
 
-  if (plan !== null && overlapping(plan.c.text, w.gh.open, i.number) !== null) return null;
+  if (plan !== null && planHold(i.number, planFiles(plan.text), w.gh, w.actors) !== null) return null;
   const planned = plan !== null;
 
   if (!w.gh.claimed.has(i.number)) return { resume: false, planned };

@@ -64,32 +64,37 @@ const IssueNode = z.object({
   comments: Comments,
 });
 
+const Rollup = z.nullable(z.object({ state: z.string() }));
+
+const MERGE_FIELDS = {
+  mergeable: z.literal(["MERGEABLE", "CONFLICTING", "UNKNOWN"]),
+  mergeStateStatus: z.string(),
+  headRefOid: z.string(),
+  commits: z.object({ nodes: z.array(z.object({ commit: z.object({ statusCheckRollup: Rollup }) })) }),
+};
+
+const MergeNode = z.object(MERGE_FIELDS);
+
+const MERGE = "mergeable mergeStateStatus headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }";
+
 const OpenPrNode = z.object({
+  ...MERGE_FIELDS,
   number: z.int(),
   headRefName: z.string(),
   files: z.nullable(z.object({ pageInfo: Page, nodes: z.array(z.object({ path: z.string() })) })),
 });
 
 const PrNode = z.object({
+  ...MERGE_FIELDS,
   number: z.int(),
   headRefName: z.string(),
   state: z.literal(["OPEN", "CLOSED", "MERGED"]),
   closedAt: z.nullable(z.string()),
-  commits: z.object({
-    nodes: z.array(
-      z.object({
-        commit: z.object({
-          statusCheckRollup: z.nullable(z.object({ state: z.string() })),
-        }),
-      }),
-    ),
-  }),
   comments: Comments,
 });
 
 const PRS = `pageInfo { hasNextPage } nodes {
-  number headRefName state closedAt
-  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+  number headRefName state closedAt ${MERGE}
   comments(first: 100) { pageInfo { hasNextPage } nodes { ${COMMENT} } }
 }`;
 
@@ -103,6 +108,7 @@ const Data = z.object({
       refs: z.object({ pageInfo: Page, nodes: z.array(z.object({ name: z.string() })) }),
       undos: z.object({ pageInfo: Page, nodes: z.array(z.object({ body: z.string(), author: Actor, editor: Actor })) }),
       merged: PrList,
+      base: z.object({ name: z.string(), target: z.object({ statusCheckRollup: z.optional(Rollup) }) }),
     }),
   }),
 });
@@ -130,13 +136,14 @@ export function snapshotQuery(local: readonly number[]): string {
     }
     open: pullRequests(states: OPEN, first: 100) {
       pageInfo { hasNextPage }
-      nodes { number headRefName files(first: 100) { pageInfo { hasNextPage } nodes { path } } }
+      nodes { number headRefName ${MERGE} files(first: 100) { pageInfo { hasNextPage } nodes { path } } }
     }
     refs(refPrefix: "refs/heads/${LABEL}/", first: 100) { pageInfo { hasNextPage } nodes { name } }
     undos: issues(labels: ["${UNDO_LABEL}"], first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
       pageInfo { hasNextPage }
       nodes { body author { __typename login } editor { __typename login } }
     }
+    base: defaultBranchRef { name target { ... on Commit { statusCheckRollup { state } } } }
     merged: pullRequests(states: MERGED, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) { ${PRS} }
     ${prs}
   }
@@ -158,20 +165,28 @@ export type Issue = {
   comments: Comment[];
 };
 
-export type OpenPr = {
+/** Whether GitHub can merge a PR as it stands, as GitHub names it; UNKNOWN until it has worked it out. */
+export type Merge = {
+  mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  /** `mergeStateStatus`: BEHIND, DIRTY, BLOCKED, CLEAN, UNKNOWN and the rest. */
+  mergeState: string;
+  headSha: string;
+  /** The newest commit's combined check state, as GitHub names it, or null before any check. */
+  checks: string | null;
+};
+
+export type OpenPr = Merge & {
   number: number;
   head: string;
   /** Null when the PR changes more files than one page lists: it may touch anything. */
   files: string[] | null;
 };
 
-export type Pr = {
+export type Pr = Merge & {
   number: number;
   head: string;
   state: "OPEN" | "CLOSED" | "MERGED";
   closedAt: string | null;
-  /** The newest commit's combined check state, as GitHub names it, or null before any check. */
-  checks: string | null;
   comments: Comment[];
 };
 
@@ -183,6 +198,8 @@ export type Snapshot = {
   claimed: Set<number>;
   undos: { body: string; author: string | null; editor: string | null }[];
   merged: Pr[];
+  /** The default branch, and its newest commit's combined check state. */
+  base: { name: string; checks: string | null };
   /**
    * Windows that held more than they list: undo issues past the newest 100, merged PRs past the
    * newest 50, a merged PR's comments past its first 100. Every other connection is read whole.
@@ -190,12 +207,19 @@ export type Snapshot = {
   truncated: string[];
 };
 
+const merge = (p: z.infer<typeof MergeNode>): Merge => ({
+  mergeable: p.mergeable,
+  mergeState: p.mergeStateStatus,
+  headSha: p.headRefOid,
+  checks: p.commits.nodes[0]?.commit.statusCheckRollup?.state ?? null,
+});
+
 const toPr = (p: z.infer<typeof PrNode>, cs: Comment[]): Pr => ({
+  ...merge(p),
   number: p.number,
   head: p.headRefName,
   state: p.state,
   closedAt: p.closedAt,
-  checks: p.commits.nodes[0]?.commit.statusCheckRollup?.state ?? null,
   comments: cs,
 });
 
@@ -285,6 +309,7 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
   return {
     issues,
     open: r.open.nodes.map((p) => ({
+      ...merge(p),
       number: p.number,
       head: p.headRefName,
       files: p.files === null || p.files.pageInfo.hasNextPage ? null : p.files.nodes.map((f) => f.path),
@@ -293,12 +318,18 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
     claimed: new Set(r.refs.nodes.flatMap((ref) => issueOf(`${LABEL}/${ref.name}`) ?? [])),
     undos: r.undos.nodes.map((u) => ({ body: u.body, author: login(u.author), editor: login(u.editor) })),
     merged: r.merged.nodes.map((p) => toPr(p, p.comments.nodes.map(toComment))),
+    base: { name: r.base.name, checks: r.base.target.statusCheckRollup?.state ?? null },
     truncated: [
       ...(r.undos.pageInfo.hasNextPage ? ["undo issues"] : []),
       ...(r.merged.pageInfo.hasNextPage ? ["merged PRs"] : []),
       ...r.merged.nodes.flatMap((p) => (p.comments.pageInfo.hasNextPage ? [`PR #${p.number}'s comments`] : [])),
     ],
   };
+}
+
+/** The issue was labelled by a trusted person, and its body written or last edited by one. */
+export function trustedIssue(i: Issue, a: Actors): boolean {
+  return i.labelledBy !== null && a.trusted.includes(i.labelledBy) && wroteIt(i, a.trusted);
 }
 
 /** The call comments trusted people opened an undo issue for. */

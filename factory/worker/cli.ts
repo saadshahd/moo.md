@@ -11,7 +11,8 @@ import { WHY_MAX, type Plan } from "../lib/formats.ts";
 import {
   branchFor, factoryComments, issueOf, latest, markStuck, must, post, repoOf, upsert, type Actors,
 } from "../lib/github.ts";
-import { HANDOFF_PATH, PLAN_PATH, overlappingPr, planFiles, planGaps, planText } from "../lib/plan.ts";
+import { planHold } from "../lib/holds.ts";
+import { HANDOFF_PATH, PLAN_PATH, planFiles, planGaps, planText } from "../lib/plan.ts";
 import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
 import { comments, LABEL, readSnapshot } from "../lib/snapshot.ts";
 import { approved, APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
@@ -55,12 +56,13 @@ async function plan(h: Here): Promise<string> {
   const gaps = planGaps(text);
 
   if (gaps.length > 0) throw new Refusal(`the plan lacks: ${gaps.join(", ")}. Fill each and run plan again.`, 2);
-  const open = (await readSnapshot(run, h.repo, [])).open;
-  const hit = overlappingPr(planFiles(text), open, branchFor(h.issue));
+  const hold = planHold(h.issue, planFiles(text), await readSnapshot(run, h.repo, []), h.actors);
 
-  if (hit !== null)
+  if (hold !== null)
     throw new Refusal(
-      `the plan touches ${hit.files.join(", ")}, which open PR #${hit.pr} also changes. Stop: the factory takes this issue again after #${hit.pr} merges.`,
+      hold.kind === "pr"
+        ? `the plan touches ${hold.files.join(", ")}, which open PR #${hold.pr} also changes. Stop: the factory takes this issue again after #${hold.pr} merges.`
+        : `the plan touches ${hold.files.join(", ")}, which the plan of #${hold.issue}, posted first, also touches. Stop: the factory takes this issue again after #${hold.issue}'s PR merges or #${hold.issue} ends.`,
       3,
     );
 

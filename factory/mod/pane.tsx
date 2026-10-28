@@ -33,7 +33,7 @@ const READ_EVERY_SECONDS = 20;
 const FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const FRAME_MS = 80;
 
-type Tab = "questions" | "plans" | "stuck" | "calls" | "cost";
+type Tab = "questions" | "plans" | "held" | "stuck" | "calls" | "cost";
 
 type Read =
   | { kind: "unread" }
@@ -248,7 +248,7 @@ export const registerPane: Register = (on) => {
     await $.command.register({
       name: "factory",
       description:
-        "What the factory needs from you: questions, plans, stuck runs, calls, cost per merged PR",
+        "What the factory needs from you: questions, plans, held and stuck runs, calls, cost per merged PR",
       immediate: true,
     });
 
@@ -307,6 +307,7 @@ export const registerPane: Register = (on) => {
 const TABS = [
   { name: "questions", color: "claude" },
   { name: "plans", color: "warning" },
+  { name: "held", color: "warning" },
   { name: "stuck", color: "error" },
   { name: "calls", color: "suggestion" },
 ] as const;
@@ -462,6 +463,16 @@ function view($: EngineInterface, ui: ElementTable, r: Rows, width: number) {
   const cards: Record<Tab, () => RenderChildren> = {
     questions: () => waits(r.questions, "no question waits for you", "claude"),
     plans: () => waits(r.plans, "no plan waits for you", "warning"),
+    held: () =>
+      r.held.length === 0
+        ? empty("nothing is held")
+        : r.held.map((h) =>
+            card("warning", [
+              head(`#${h.issue}  ${h.title}`, "warning"),
+              <Text>{h.line}</Text>,
+              foot([pill(`open-held-${h.issue}`, "open", () => void openUrl($, h.url))]),
+            ]),
+          ),
     stuck: () =>
       r.stuck.length === 0
         ? empty("no run is stuck")
@@ -561,8 +572,8 @@ function view($: EngineInterface, ui: ElementTable, r: Rows, width: number) {
   };
 
   return [
-    <Box flexDirection="row" justifyContent="space-between" gap={4}>
-      <Box flexDirection="row" gap={3}>
+    <Box flexDirection="row" justifyContent="space-between" gap={2}>
+      <Box flexDirection="row" gap={2}>
         {TABS.map((t) =>
           tabButton(t.name, t.color, `${t.name}(${r[t.name].length})`),
         )}

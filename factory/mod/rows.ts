@@ -6,7 +6,8 @@ import {
   latest,
   type Actors,
 } from "../lib/github.ts";
-import { undone, type Snapshot } from "../lib/snapshot.ts";
+import { holdLine, waitsFor } from "../lib/holds.ts";
+import { trustedIssue, undone, type Snapshot } from "../lib/snapshot.ts";
 import { answerTo, openWait } from "../lib/wait.ts";
 
 export type WaitRow = {
@@ -25,11 +26,20 @@ export type StuckRow = {
   reason: string;
 };
 
+/** An issue the factory holds, and what it waits for. */
+export type HeldRow = {
+  issue: number;
+  title: string;
+  url: string;
+  line: string;
+};
+
 export type CallRow = Call & { callId: number; url: string };
 
 export type Rows = {
   questions: WaitRow[];
   plans: WaitRow[];
+  held: HeldRow[];
   stuck: StuckRow[];
   calls: CallRow[];
   costs: { pr: number; tokens: number }[];
@@ -81,6 +91,12 @@ export function rows(s: Snapshot, a: Actors): Rows {
       : [],
   );
 
+  const held = s.issues.flatMap((i) => {
+    const h = trustedIssue(i, a) && !i.labels.includes(STUCK_LABEL) ? waitsFor(i, s, a) : null;
+
+    return h === null ? [] : [{ issue: i.number, title: i.title, url: i.url, line: holdLine(h) }];
+  });
+
   const calls = s.issues.flatMap((i) => {
     const urls = new Map(i.comments.map((c) => [c.id, c.url]));
 
@@ -101,6 +117,7 @@ export function rows(s: Snapshot, a: Actors): Rows {
   return {
     questions: waits.filter((w) => w.plan === null),
     plans: waits.filter((w) => w.plan !== null),
+    held,
     stuck,
     calls,
     costs,

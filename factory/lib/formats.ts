@@ -88,11 +88,13 @@ const Cost = z.object({
 
 type Cost = z.infer<typeof Cost>;
 
+/** A `conflict` wake names the PR head it was for: a run that leaves that head conflicting failed. */
 const Restart = z.object({
   kind: z.literal("restart"),
   issue: Issue,
-  reason: z.literal(["crash", "context", "checks"]),
+  reason: z.literal(["crash", "context", "checks", "conflict"]),
   session: z.string(),
+  head: z.optional(z.string()),
 });
 
 export type Restart = z.infer<typeof Restart>;
@@ -187,6 +189,7 @@ const RESTARTED = {
   context:
     "**Restarted** · its context passed the cap; a fresh session goes on from the plan, branch and handoff",
   checks: "**Woken** · its PR's checks failed after it ended its turn",
+  conflict: "**Woken** · its PR conflicts with the base branch; the run merges the base in",
 } satisfies { [R in Restart["reason"]]: string };
 
 const CODECS = {

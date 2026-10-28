@@ -142,23 +142,41 @@ const cost = (issue: number, pr: number, output: number): FactoryComment => ({
   output,
 });
 
+const mergeState = (mergeStateStatus: string, checks: string | null = null) => ({
+  mergeable: mergeStateStatus === "DIRTY" ? "CONFLICTING" : "UNKNOWN",
+  mergeStateStatus,
+  headRefOid: "h1",
+  commits: { nodes: checks === null ? [] : [{ commit: { statusCheckRollup: { state: checks } } }] },
+});
+
 const merged = (number: number, headRefName: string, cs: CommentNode[]) => ({
   number,
   headRefName,
   state: "MERGED",
   closedAt: "2026-10-26T21:00:00Z",
-  commits: { nodes: [] },
+  ...mergeState("UNKNOWN"),
   comments: page(cs),
+});
+
+const openPr = (number: number, headRefName: string, state: string, checks: string | null = null) => ({
+  number,
+  headRefName,
+  ...mergeState(state, checks),
+  files: page([{ path: "src/a.ts" }]),
 });
 
 const undoBody = (call: number) => render({ kind: "undo", call, text: "…" });
 
-function graphql(undos = [{ body: undoBody(81), author: ME, editor: null }]) {
+function graphql(
+  undos = [{ body: undoBody(81), author: ME, editor: null }],
+  open: ReturnType<typeof openPr>[] = [],
+  baseChecks = "SUCCESS",
+) {
   return {
     data: {
       repository: {
         work: page(ISSUES),
-        open: page([]),
+        open: page(open),
         refs: page([]),
         undos: page([...undos, { body: undoBody(80), author: STRANGER, editor: null }]),
         merged: {
@@ -169,6 +187,7 @@ function graphql(undos = [{ body: undoBody(81), author: ME, editor: null }]) {
             merged(22, "fix/by-hand", [comment(220, cost(9, 22, 9_999_999))]),
           ],
         },
+        base: { name: "main", target: { statusCheckRollup: { state: baseChecks } } },
       },
     },
   };
@@ -215,6 +234,23 @@ describe("rows", () => {
     expect(rows(await snapshot(), ACTORS).truncated).toEqual(["merged PRs"]);
   });
 
+  test("held says what each trusted, unstuck issue waits for: its PR's merge state, or a red main", async () => {
+    const open = [
+      openPr(30, "factory/9", "BEHIND"),
+      openPr(31, "factory/10", "DIRTY"),
+      openPr(32, "factory/11", "BLOCKED", "FAILURE"),
+      openPr(33, "factory/7", "DIRTY"),
+      openPr(34, "factory/13", "DIRTY"),
+    ];
+
+    expect(rows(await snapshot(graphql(undefined, open, "FAILURE")), ACTORS).held).toEqual([
+      { issue: 9, title: "Settings layout", url: "https://github.com/o/smoke/issues/9", line: "PR #30 is behind main; the worker updates its branch" },
+      { issue: 10, title: "Rail items", url: "https://github.com/o/smoke/issues/10", line: "PR #31 conflicts with main; its run merges main in" },
+      { issue: 11, title: "Answered elsewhere", url: "https://github.com/o/smoke/issues/11", line: "held: main is red, so PR #32's failed checks wait for it to go green" },
+      { issue: 13, title: "A wait a stranger posted", url: "https://github.com/o/smoke/issues/13", line: "PR #34 conflicts with main; its run merges main in" },
+    ]);
+    expect(rows(await snapshot(graphql(undefined, [openPr(32, "factory/11", "BLOCKED", "FAILURE")])), ACTORS).held).toEqual([]);
+  });
   test("an undo issue's body reads back as the call it undoes", async () => {
     const r = rows(await snapshot(), ACTORS);
     const body = parse(undoIssue(r.calls[0]!).body);

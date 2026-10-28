@@ -17,6 +17,7 @@ Check each, then show the user every one that holds: what it would cause and the
 | Holds | Causes | Clears it |
 |---|---|---|
 | the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one | auto-merge merges unchecked code | require a check the repo already runs; it has none → propose one |
+| the required check leaves branches free to be out of date: `strict_required_status_checks_policy` in that ruleset, or `required_status_checks.strict` in that protection, is false | two PRs green alone merge into a red base; the worker refuses to start | turn it on where the check is required |
 | `bun`, `gh` or `wt` is not on `PATH` | the worker can't start | `brew install bun gh worktrunk` |
 | Linux, and `bwrap` or `socat` is not on `PATH` | every run is sandboxed there, and its commands fail without them | `sudo apt install bubblewrap socat` |
 

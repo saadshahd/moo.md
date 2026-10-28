@@ -39,22 +39,63 @@ export function loginRefusal(r: { stdout: string; stderr: string }): string {
     : "Claude Code has no login on this machine, so no run could start. Run `claude auth login`, or set up an API key.";
 }
 
-/** Each answers with a count only on success; a repo without classic protection gets a 404. */
-async function requiredChecks(repo: string, base: string): Promise<number> {
-  const asks = [
-    [`repos/${repo}/rules/branches/${base}`, '[.[] | select(.type == "required_status_checks")] | length'],
-    [`repos/${repo}/branches/${base}/protection/required_status_checks`, ".contexts | length"],
-  ];
+const BranchRules = z.array(
+  z.object({
+    type: z.string(),
+    parameters: z.optional(
+      z.object({
+        strict_required_status_checks_policy: z.optional(z.boolean()),
+        required_status_checks: z.optional(z.array(z.object({ context: z.string() }))),
+      }),
+    ),
+  }),
+);
 
-  const counts = await Promise.all(
-    asks.map(async ([path, jq]) => {
-      const r = await run(["gh", "api", path!, "--jq", jq!]);
+const Protection = z.object({
+  strict: z.boolean(),
+  contexts: z.array(z.string()),
+  checks: z.optional(z.array(z.object({ context: z.string() }))),
+});
 
-      return r.exitCode === 0 ? Number(r.stdout.trim()) || 0 : 0;
-    }),
-  );
+/**
+ * Why the base's required checks leave auto-merge unsafe, from `rules/branches/<base>` and the
+ * classic `protection/required_status_checks`, each null when unreadable: a repo without classic
+ * protection gets a 404. A source passes only when it names a check and requires branches up to
+ * date, or two PRs green alone could merge into a red base.
+ */
+export function checksRefusal(repo: string, base: string, [rules, protection]: [string | null, string | null]): string {
+  const sources = [
+    ...(rules === null ? [] : z.parse(BranchRules, JSON.parse(rules)))
+      .filter((r) => r.type === "required_status_checks")
+      .map((r) => ({
+        checks: r.parameters?.required_status_checks?.length ?? 0,
+        strict: r.parameters?.strict_required_status_checks_policy ?? false,
+      })),
+    ...(protection === null ? [] : [z.parse(Protection, JSON.parse(protection))]).map((p) => ({
+      checks: new Set([...p.contexts, ...(p.checks ?? []).map((c) => c.context)]).size,
+      strict: p.strict,
+    })),
+  ].filter((s) => s.checks > 0);
 
-  return counts.reduce((a, b) => a + b, 0);
+  if (sources.length === 0)
+    return `${repo} ${base} requires no checks, so auto-merge would merge unchecked code. Require a check on ${base} first.`;
+
+  return sources.some((s) => s.strict)
+    ? ""
+    : `${repo} ${base} requires checks but not branches up to date before merging, so two PRs green alone can merge into a red ${base}. Turn on "Require branches to be up to date before merging" where ${base} requires the check: strict_required_status_checks_policy in its ruleset, or required_status_checks.strict in its branch protection.`;
+}
+
+async function requiredChecks(repo: string, base: string): Promise<[string | null, string | null]> {
+  const read = async (path: string) => {
+    const r = await run(["gh", "api", path]);
+
+    return r.exitCode === 0 ? r.stdout : null;
+  };
+
+  return Promise.all([
+    read(`repos/${repo}/rules/branches/${base}`),
+    read(`repos/${repo}/branches/${base}/protection/required_status_checks`),
+  ]);
 }
 
 export async function refusals(
@@ -78,9 +119,7 @@ export async function refusals(
     Object.entries(user.enabledPlugins ?? {}).some(([k, on]) => on && k.startsWith("factory@"))
       ? ""
       : "the factory plugin is not installed and enabled for your user, so runs load no factory hooks. Install it with /plugin.",
-    (await requiredChecks(repo, base)) > 0
-      ? ""
-      : `${repo} ${base} requires no checks, so auto-merge would merge unchecked code. Require a check on ${base} first.`,
+    checksRefusal(repo, base, await requiredChecks(repo, base)),
     bot,
   ].filter((r) => r !== "");
 }

@@ -499,6 +499,7 @@ describe("snapshot", () => {
       claimed: new Set(),
       merged: [],
       truncated: [],
+      base: { name: "main", checks: null },
       undos: [
         { body: undo(1), author: ME, editor: null },
         { body: undo(2), author: "stranger", editor: null },
