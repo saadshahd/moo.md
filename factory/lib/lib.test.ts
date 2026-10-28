@@ -537,18 +537,36 @@ describe("required checks", () => {
   const rollup = (state: string | null) => ({ nodes: state === null ? [] : [{ commit: { statusCheckRollup: { state } } }] });
   const merge = (state: string | null) => ({ mergeable: "MERGEABLE", mergeStateStatus: "BLOCKED", headRefOid: "h1", commits: rollup(state) });
   const prNode = (number: number, head: string, state: string, checks: string | null) => ({ number, headRefName: head, state, closedAt: null, ...merge(checks), comments: page([]) });
-  const openNode = (number: number, head: string, checks: string | null) => ({ number, headRefName: head, ...merge(checks), files: page([]) });
+  const openNode = (number: number, head: string, checks: string | null) => ({ number, headRefName: head, author: null, ...merge(checks), files: page([]) });
   const run = (name: string, status: string, conclusion: string | null, isRequired = true) => ({ __typename: "CheckRun", name, status, conclusion, isRequired });
   const status = (context: string, state: string, isRequired = true) => ({ __typename: "StatusContext", context, state, isRequired });
 
   type CheckNode = ReturnType<typeof run> | ReturnType<typeof status>;
 
+  type ReviewComment = { path: string; line: number | null; originalLine: number | null; body: string };
+
+  type Paged<T> = { pageInfo: { hasNextPage: boolean }; nodes: T[] };
+
   /**
    * GitHub, answering the snapshot query with local issue #7's PR #31 and the open PRs, and the
    * second query with `required` as the PR's newest commit's checks. `asked` gets each PR read so.
    */
-  function github<R>(required: CheckNode[], open = [openNode(31, "factory/7", "FAILURE")], asked: number[] = [], reviews: R[] = []): Run {
-    const base = [run("test", "COMPLETED", "FAILURE"), run("ratchet", "COMPLETED", "FAILURE")];
+  /** A connection's first page of `first`, saying whether more follow, and every page after it, as `--paginate --slurp` prints them. */
+  const paged = <T>(first: T[], ...rest: T[][]) => ({ first: { pageInfo: { hasNextPage: rest.length > 0 }, nodes: first }, all: [first, ...rest] });
+
+  /**
+   * GitHub, answering the snapshot query with local issue #7's PR #31 and the open PRs, and the
+   * second query with `required` as the PR's newest commit's checks. `asked` gets each PR read so.
+   * A list past one page is answered page by page to the query that asks for its `$endCursor`.
+   */
+  function github<R>(
+    required: CheckNode[] | ReturnType<typeof paged<CheckNode>>,
+    open = [openNode(31, "factory/7", "FAILURE")],
+    asked: number[] = [],
+    reviews: R[] = [],
+    { base = paged([run("test", "COMPLETED", "FAILURE"), run("ratchet", "COMPLETED", "FAILURE")]), comments = [[]] }: { base?: ReturnType<typeof paged<CheckNode>>; comments?: ReviewComment[][] } = {},
+  ): Run {
+    const req = Array.isArray(required) ? paged(required) : required;
 
     const repository = {
       work: page([]),
@@ -556,18 +574,30 @@ describe("required checks", () => {
       refs: page([]),
       undos: page([]),
       merged: page([prNode(40, "factory/9", "MERGED", "FAILURE")]),
-      base: { name: "main", target: { oid: "m1", statusCheckRollup: { contexts: page(base) } } },
+      base: { name: "main", target: { oid: "m1", statusCheckRollup: { contexts: base.first } } },
       pr7: page([{ ...prNode(31, "factory/7", "OPEN", "FAILURE"), reviews: { nodes: reviews } }]),
     };
 
-    const contexts = { commits: { nodes: [{ commit: { statusCheckRollup: { contexts: page(required) } } }] } };
+    const contexts = (c: Paged<CheckNode>) => ({ data: { repository: { pullRequest: { commits: { nodes: [{ commit: { statusCheckRollup: { contexts: c } } }] } } } } });
+    const answer = <T>(data: T) => ({ exitCode: 0, stdout: JSON.stringify(data), stderr: "" });
+    const each = <T>(all: T[][]): Paged<T>[] => all.map((nodes, i) => ({ pageInfo: { hasNextPage: i < all.length - 1 }, nodes }));
 
     return async (argv) => {
-      if (!argv.some((a) => a.startsWith("query=") && a.includes("isRequired")))
-        return { exitCode: 0, stdout: JSON.stringify({ data: { repository } }), stderr: "" };
-      asked.push(Number(argv.find((a) => a.startsWith("n="))?.slice(2)));
+      const query = argv.find((a) => a.startsWith("query=")) ?? "";
+      const slurp = argv.includes("--slurp");
 
-      return { exitCode: 0, stdout: JSON.stringify({ data: { repository: { pullRequest: contexts } } }), stderr: "" };
+      if (query.includes("isRequired")) {
+        asked.push(Number(argv.find((a) => a.startsWith("n="))?.slice(2)));
+
+        return answer(slurp ? each(req.all).map(contexts) : contexts(req.first));
+      }
+
+      if (query.includes("object(oid"))
+        return answer(each(base.all).map((c) => ({ data: { repository: { object: { statusCheckRollup: { contexts: c } } } } })));
+
+      if (query.includes("node(id")) return answer(each(comments).map((c) => ({ data: { node: { comments: c } } })));
+
+      return answer({ data: { repository } });
     };
   }
 
@@ -613,6 +643,7 @@ describe("required checks", () => {
   });
 
   const reviewNode = (more: { comments?: { pageInfo: { hasNextPage: boolean }; nodes: { path: string; line: number | null; originalLine: number | null; body: string }[] } } = {}) => ({
+    id: "PRR_900",
     databaseId: 900,
     state: "CHANGES_REQUESTED",
     body: "Keep it.",
@@ -645,9 +676,22 @@ describe("required checks", () => {
     expect(snapshotQuery([])).not.toContain("reviews(");
   });
 
-  test("a review whose inline comments run past one page fails the read, never half read", async () => {
-    const more = { comments: { pageInfo: { hasNextPage: true }, nodes: [] } };
+  test("a review whose inline comments run past one page is read page by page, never half read", async () => {
+    const note = (n: number) => ({ path: "a.ts", line: n, originalLine: n, body: `note ${n}` });
+    const more = { comments: { pageInfo: { hasNextPage: true }, nodes: [note(1)] } };
+    const s = await readSnapshot(github([], undefined, [], [reviewNode(more)], { comments: [[note(1)], [note(2)]] }), "o/r", [7]);
 
-    await expect(readSnapshot(github([], undefined, [], [reviewNode(more)]), "o/r", [7])).rejects.toThrow("GitHub listed only part of");
+    expect(s.prs.get(7)?.reviews[0]?.comments.map((c) => c.body)).toEqual(["note 1", "note 2"]);
+  });
+
+  test("checks past one page, on the base or a PR, are read page by page, never half read", async () => {
+    const asked: number[] = [];
+    const base = paged([run("test", "COMPLETED", "SUCCESS")], [run("e2e", "COMPLETED", "FAILURE")]);
+    const required = paged([run("test", "COMPLETED", "SUCCESS")], [run("e2e", "IN_PROGRESS", null)]);
+    const s = await readSnapshot(github(required, undefined, asked, [], { base }), "o/r", [7]);
+
+    expect(s.base.checks).toEqual([{ name: "test", state: "SUCCESS" }, { name: "e2e", state: "FAILURE" }]);
+    expect(s.prs.get(7)).toMatchObject({ checks: "PENDING", required: ["test", "e2e"] });
+    expect(asked).toEqual([31, 31]);
   });
 });

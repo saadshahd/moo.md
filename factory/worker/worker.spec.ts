@@ -471,7 +471,7 @@ describe("a local issue's state and actions", () => {
     const gh = (head: string) =>
       snapshot({
         issues: [issue(7)],
-        open: [{ ...pr(3), number: 9, head, files: ["src/a.ts"] }],
+        open: [{ ...pr(3), author: BOT, number: 9, head, files: ["src/a.ts"] }],
       });
 
     expect(
@@ -791,7 +791,7 @@ describe("plans posted first hold later ones", () => {
     expect(alone([])).toBe("crashed");
   });
   test("an open PR holds before a plan does", () => {
-    const w = world({ ...gh, open: [{ ...pr(3), files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
+    const w = world({ ...gh, open: [{ ...pr(3), author: BOT, files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
 
     expect(classify(w.local[0]!, w)).toMatchObject({ kind: "held", on: { kind: "pr", pr: 53, files: ["src/a.ts"] } });
   });
@@ -946,7 +946,7 @@ describe("picking new work", () => {
   test("an issue whose plan overlaps an open PR waits", () => {
     const gh = snapshot({
       issues: [issue(4, { comments: [plan] })],
-      open: [{ ...pr(3), number: 9, head: "x", files: null }],
+      open: [{ ...pr(3), author: BOT, number: 9, head: "x", files: null }],
     });
 
     expect(pick(world(gh, []))).toEqual([]);

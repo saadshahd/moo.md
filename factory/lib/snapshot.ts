@@ -23,6 +23,9 @@ const login = (a: z.infer<typeof Actor>) =>
 
 const Page = z.object({ hasNextPage: z.boolean() });
 
+/** A connection read past its first page takes `$endCursor` and asks for this, and only it does. */
+const PAGE = "pageInfo { hasNextPage endCursor }";
+
 const CommentNode = z.object({
   databaseId: z.int(),
   body: z.string(),
@@ -89,7 +92,9 @@ const RequiredNode = z.union([
 
 const CHECK = "__typename ... on CheckRun { name status conclusion } ... on StatusContext { context state }";
 
-const BaseChecks = z.nullable(z.object({ contexts: z.object({ pageInfo: Page, nodes: z.array(CheckNode) }) }));
+const Contexts = z.object({ pageInfo: Page, nodes: z.array(CheckNode) });
+
+const BaseChecks = z.nullable(z.object({ contexts: Contexts }));
 
 /** Check run conclusions that fail; a run that finished any other way passed. */
 const FAILED_RUN = new Set(["FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
@@ -131,6 +136,7 @@ const OpenPrNode = z.object({
   ...MERGE_FIELDS,
   number: z.int(),
   headRefName: z.string(),
+  author: Actor,
   files: z.nullable(z.object({ pageInfo: Page, nodes: z.array(z.object({ path: z.string() })) })),
 });
 
@@ -145,16 +151,19 @@ const PR_FIELDS = {
 
 const PrNode = z.object(PR_FIELDS);
 
+const ReviewComments = z.object({
+  pageInfo: Page,
+  nodes: z.array(z.object({ path: z.string(), line: z.nullable(z.int()), originalLine: z.nullable(z.int()), body: z.string() })),
+});
+
 const ReviewNode = z.object({
+  id: z.string(),
   databaseId: z.int(),
   state: z.string(),
   body: z.string(),
   author: Actor,
   commit: z.nullable(z.object({ oid: z.string() })),
-  comments: z.object({
-    pageInfo: Page,
-    nodes: z.array(z.object({ path: z.string(), line: z.nullable(z.int()), originalLine: z.nullable(z.int()), body: z.string() })),
-  }),
+  comments: ReviewComments,
 });
 
 const LocalPrNode = z.object({ ...PR_FIELDS, reviews: z.object({ nodes: z.array(ReviewNode) }) });
@@ -162,9 +171,11 @@ const LocalPrNode = z.object({ ...PR_FIELDS, reviews: z.object({ nodes: z.array(
 const PR = `number headRefName state closedAt ${MERGE}
   comments(first: 100) { pageInfo { hasNextPage } nodes { ${COMMENT} } }`;
 
+const REVIEW_COMMENT = "path line originalLine body";
+
 const REVIEWS = `reviews(last: 20) { nodes {
-  databaseId state body author { __typename login } commit { oid }
-  comments(first: 50) { pageInfo { hasNextPage } nodes { path line originalLine body } }
+  id databaseId state body author { __typename login } commit { oid }
+  comments(first: 50) { pageInfo { hasNextPage } nodes { ${REVIEW_COMMENT} } }
 } }`;
 
 const PrList = z.object({ pageInfo: Page, nodes: z.array(PrNode) });
@@ -209,7 +220,7 @@ export function snapshotQuery(local: readonly number[]): string {
     }
     open: pullRequests(states: OPEN, first: 100) {
       pageInfo { hasNextPage }
-      nodes { number headRefName ${MERGE} files(first: 100) { pageInfo { hasNextPage } nodes { path } } }
+      nodes { number headRefName author { __typename login } ${MERGE} files(first: 100) { pageInfo { hasNextPage } nodes { path } } }
     }
     refs(refPrefix: "refs/heads/${LABEL}/", first: 100) { pageInfo { hasNextPage } nodes { name } }
     undos: issues(labels: ["${UNDO_LABEL}"], first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -261,6 +272,7 @@ export type Merge = {
 export type OpenPr = Merge & {
   number: number;
   head: string;
+  author: string | null;
   /** Null when the PR changes more files than one page lists: it may touch anything. */
   files: string[] | null;
 };
@@ -300,7 +312,8 @@ export type Snapshot = {
   base: { name: string; sha: string; checks: Check[] };
   /**
    * Windows that held more than they list: undo issues past the newest 100, merged PRs past the
-   * newest 50, a merged PR's comments past its first 100. Every other connection is read whole.
+   * newest 50, a merged PR's comments past its first 100. Every other connection is read whole,
+   * or the read fails.
    */
   truncated: string[];
 };
@@ -330,30 +343,24 @@ function whole(path: string, page: { hasNextPage: boolean }): void {
   if (page.hasNextPage) throw new Error(`GitHub listed only part of ${path}; the factory reads it whole or not at all`);
 }
 
-function toReview(pr: number, r: z.infer<typeof ReviewNode>): Review {
-  whole(`review ${r.databaseId}'s comments on PR #${pr}`, r.comments.pageInfo);
+const toReview = (r: z.infer<typeof ReviewNode>, comments: z.infer<typeof ReviewComments>["nodes"]): Review => ({
+  id: r.databaseId,
+  state: r.state,
+  body: r.body,
+  author: login(r.author),
+  commit: r.commit?.oid ?? null,
+  comments: comments.map((c) => ({ path: c.path, line: c.line ?? c.originalLine, body: c.body })),
+});
 
-  return {
-    id: r.databaseId,
-    state: r.state,
-    body: r.body,
-    author: login(r.author),
-    commit: r.commit?.oid ?? null,
-    comments: r.comments.nodes.map((c) => ({ path: c.path, line: c.line ?? c.originalLine, body: c.body })),
-  };
-}
-
-const CommentsPage = z.array(
-  z.object({
-    data: z.object({
-      repository: z.object({
-        issueOrPullRequest: z.object({
-          comments: z.object({ nodes: z.array(CommentNode) }),
-        }),
+const CommentsPage = z.object({
+  data: z.object({
+    repository: z.object({
+      issueOrPullRequest: z.object({
+        comments: z.object({ nodes: z.array(CommentNode) }),
       }),
     }),
   }),
-);
+});
 
 async function graphql(run: Run, repo: string, query: string, ...more: string[]): Promise<string> {
   const [owner, name] = repo.split("/");
@@ -362,24 +369,64 @@ async function graphql(run: Run, repo: string, query: string, ...more: string[])
     "-f", `query=${query}`]);
 }
 
+/** Every page of `query`, whose one connection is read with `$endCursor` and `PAGE`: one response per page, each `Page`. */
+async function pages<T>(run: Run, repo: string, Page: z.ZodMiniType<T>, query: string, ...more: string[]): Promise<T[]> {
+  return z.parse(z.array(Page), JSON.parse(await graphql(run, repo, query, "--paginate", "--slurp", ...more)));
+}
+
 /** Every comment on issue or PR `n`, oldest first. */
 export async function comments(run: Run, repo: string, n: number): Promise<Comment[]> {
-  const page = `comments(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${COMMENT} } }`;
+  const page = `comments(first: 100, after: $endCursor) { ${PAGE} nodes { ${COMMENT} } }`;
 
-  const out = await graphql(
+  const out = await pages(
     run,
     repo,
+    CommentsPage,
     `query($owner: String!, $name: String!, $n: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) {
     issueOrPullRequest(number: $n) { ... on Issue { ${page} } ... on PullRequest { ${page} } }
   }
 }`,
-    "--paginate", "--slurp", "-F", `n=${n}`,
+    "-F", `n=${n}`,
   );
 
-  return z
-    .parse(CommentsPage, JSON.parse(out))
-    .flatMap((p) => p.data.repository.issueOrPullRequest.comments.nodes.map(toComment));
+  return out.flatMap((p) => p.data.repository.issueOrPullRequest.comments.nodes.map(toComment));
+}
+
+const ReviewCommentsPage = z.object({ data: z.object({ node: z.object({ comments: ReviewComments }) }) });
+
+/** Every inline comment of review `id`, GraphQL's node id for it. */
+async function reviewComments(run: Run, repo: string, id: string): Promise<z.infer<typeof ReviewComments>["nodes"]> {
+  const out = await pages(
+    run,
+    repo,
+    ReviewCommentsPage,
+    `query($id: ID!, $endCursor: String) {
+  node(id: $id) { ... on PullRequestReview { comments(first: 100, after: $endCursor) { ${PAGE} nodes { ${REVIEW_COMMENT} } } } }
+}`,
+    "-F", `id=${id}`,
+  );
+
+  return out.flatMap((p) => p.data.node.comments.nodes);
+}
+
+const CommitChecksPage = z.object({ data: z.object({ repository: z.object({ object: z.object({ statusCheckRollup: BaseChecks }) }) }) });
+
+/** Every check on commit `sha`. */
+async function commitChecks(run: Run, repo: string, sha: string): Promise<z.infer<typeof Contexts>["nodes"]> {
+  const out = await pages(
+    run,
+    repo,
+    CommitChecksPage,
+    `query($owner: String!, $name: String!, $sha: GitObjectID!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    object(oid: $sha) { ... on Commit { statusCheckRollup { contexts(first: 100, after: $endCursor) { ${PAGE} nodes { ${CHECK} } } } } }
+  }
+}`,
+    "-f", `sha=${sha}`,
+  );
+
+  return out.flatMap((p) => p.data.repository.object.statusCheckRollup?.contexts.nodes ?? []);
 }
 
 const RequiredData = z.object({
@@ -400,26 +447,29 @@ const RequiredData = z.object({
   }),
 });
 
-const REQUIRED = `query($owner: String!, $name: String!, $n: Int!) {
+/** The query for PR `$n`'s newest commit's checks, each saying whether the PR requires it: the first page, else every page. */
+const required = (paged: boolean) => `query($owner: String!, $name: String!, $n: Int!${paged ? ", $endCursor: String" : ""}) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $n) {
-      commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) {
-        pageInfo { hasNextPage }
+      commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100${paged ? ", after: $endCursor" : ""}) {
+        ${paged ? PAGE : "pageInfo { hasNextPage }"}
         nodes { ${CHECK} ... on CheckRun { isRequired(pullRequestNumber: $n) } ... on StatusContext { isRequired(pullRequestNumber: $n) } }
       } } } } }
     }
   }
 }`;
 
+const contextsOf = (d: z.infer<typeof RequiredData>) => d.data.repository.pullRequest.commits.nodes[0]?.commit.statusCheckRollup?.contexts;
+
 /** The checks GitHub requires for PR `n`, on its newest commit: which ones takes the PR's number, so they can't ride in the snapshot's query. */
 async function requiredChecks(run: Run, repo: string, n: number): Promise<Check[]> {
-  const contexts = z.parse(RequiredData, JSON.parse(await graphql(run, repo, REQUIRED, "-F", `n=${n}`))).data.repository
-    .pullRequest.commits.nodes[0]?.commit.statusCheckRollup?.contexts;
+  const first = contextsOf(z.parse(RequiredData, JSON.parse(await graphql(run, repo, required(false), "-F", `n=${n}`))));
 
-  if (contexts === undefined) return [];
-  whole(`PR #${n}'s checks`, contexts.pageInfo);
+  const all = first?.pageInfo.hasNextPage
+    ? (await pages(run, repo, RequiredData, required(true), "-F", `n=${n}`)).flatMap((d) => contextsOf(d)?.nodes ?? [])
+    : (first?.nodes ?? []);
 
-  return contexts.nodes.flatMap((c) => (c.isRequired ? [toCheck(c)] : []));
+  return all.flatMap((c) => (c.isRequired ? [toCheck(c)] : []));
 }
 
 export async function readSnapshot(run: Run, repo: string, local: readonly number[]): Promise<Snapshot> {
@@ -428,9 +478,13 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
   whole("the open factory issues", r.work.pageInfo);
   whole("the open PRs", r.open.pageInfo);
   whole("the factory branches", r.refs.pageInfo);
-  const baseChecks = r.base.target.statusCheckRollup?.contexts;
+  const baseContexts = r.base.target.statusCheckRollup?.contexts;
 
-  if (baseChecks !== undefined) whole(`${r.base.name}'s checks`, baseChecks.pageInfo);
+
+  const baseChecks = baseContexts?.pageInfo.hasNextPage
+    ? await commitChecks(run, repo, r.base.target.oid)
+    : (baseContexts?.nodes ?? []);
+
   const reads = new Map<number, Promise<Check[]>>();
 
   /**
@@ -481,7 +535,12 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
 
       if (newest === undefined) return [];
       const cs = await commentsOf(newest.number, newest.comments);
-      const reviews = newest.reviews.nodes.map((r) => toReview(newest.number, r));
+
+      const reviews = await Promise.all(
+        newest.reviews.nodes.map(async (r) =>
+          toReview(r, r.comments.pageInfo.hasNextPage ? await reviewComments(run, repo, r.id) : r.comments.nodes),
+        ),
+      );
 
       return [[n, { ...toPr(newest, cs, await checksOf(newest, newest.state === "OPEN")), reviews }]];
     }),
@@ -492,6 +551,7 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
       ...merge(p, await checksOf(p, true)),
       number: p.number,
       head: p.headRefName,
+      author: login(p.author),
       files: p.files === null || p.files.pageInfo.hasNextPage ? null : p.files.nodes.map((f) => f.path),
     })),
   );
@@ -503,7 +563,7 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
     claimed: new Set(r.refs.nodes.flatMap((ref) => issueOf(`${LABEL}/${ref.name}`) ?? [])),
     undos: r.undos.nodes.map((u) => ({ body: u.body, author: login(u.author), editor: login(u.editor) })),
     merged: r.merged.nodes.map((p) => toPr(p, p.comments.nodes.map(toComment), UNREAD)),
-    base: { name: r.base.name, sha: r.base.target.oid, checks: baseChecks?.nodes.map(toCheck) ?? [] },
+    base: { name: r.base.name, sha: r.base.target.oid, checks: baseChecks.map(toCheck) },
     truncated: [
       ...(r.undos.pageInfo.hasNextPage ? ["undo issues"] : []),
       ...(r.merged.pageInfo.hasNextPage ? ["merged PRs"] : []),

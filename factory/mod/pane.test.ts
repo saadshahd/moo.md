@@ -161,6 +161,7 @@ const merged = (number: number, headRefName: string, cs: CommentNode[]) => ({
 const openPr = (number: number, headRefName: string, state: string, checks: string | null = null) => ({
   number,
   headRefName,
+  author: null,
   ...mergeState(state, checks),
   files: page([{ path: "src/a.ts" }]),
 });
