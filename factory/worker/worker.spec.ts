@@ -32,6 +32,7 @@ import { run } from "./proc.ts";
 import { claimIn, runView, sessionsNamed } from "./snapshot.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { upsert, type Run } from "../lib/github.ts";
+import { gitConfigEnv } from "../lib/bot.ts";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -925,6 +926,18 @@ describe("proc", () => {
     delete process.env.FACTORY_PROC_PROBE;
 
     expect(r.stdout.trim()).toBe("bot");
+  });
+});
+
+describe("git under the factory's git config", () => {
+  /** Real git, given the config through the environment the way the worker and the run hooks give it. */
+  const git = async (...argv: string[]) =>
+    (await new Response(Bun.spawn(["git", ...argv], { cwd: tmpdir(), env: { ...process.env, ...gitConfigEnv() }, stdout: "pipe" }).stdout).text()).trim();
+
+  test("pushes to GitHub's SSH remotes over HTTPS, and signs no commit whatever the user's own config says", async () => {
+    expect(await git("ls-remote", "--get-url", "git@github.com:o/r.git")).toBe("https://github.com/o/r.git");
+    expect(await git("ls-remote", "--get-url", "ssh://git@github.com/o/r.git")).toBe("https://github.com/o/r.git");
+    expect(await git("config", "--get", "commit.gpgsign")).toBe("false");
   });
 });
 

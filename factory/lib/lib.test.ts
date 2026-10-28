@@ -1,5 +1,5 @@
 import { describe, expect, test } from "claude-code/testing";
-import { botEnv, needsRenew, RENEW_BEFORE_MS, type Bot } from "./bot.ts";
+import { botEnv, gitConfigEnv, needsRenew, RENEW_BEFORE_MS, type Bot } from "./bot.ts";
 import {
   parse,
   render,
@@ -488,6 +488,21 @@ describe("bot", () => {
       GIT_AUTHOR_NAME: BOT,
       GIT_CONFIG_VALUE_1: "!gh auth git-credential",
     });
+  });
+  test("its git config hands git the bot's token, rewrites GitHub's SSH remotes to HTTPS and signs nothing", () => {
+    const env = gitConfigEnv();
+    const count = Number(env.GIT_CONFIG_COUNT);
+
+    const pairs = Array.from({ length: count }, (_, i) => [env[`GIT_CONFIG_KEY_${i}`], env[`GIT_CONFIG_VALUE_${i}`]]);
+
+    expect(pairs).toEqual([
+      ["credential.helper", ""],
+      ["credential.helper", "!gh auth git-credential"],
+      ["url.https://github.com/.insteadOf", "git@github.com:"],
+      ["url.https://github.com/.insteadOf", "ssh://git@github.com/"],
+      ["commit.gpgsign", "false"],
+    ]);
+    expect(botEnv(b)).toMatchObject(env);
   });
 });
 

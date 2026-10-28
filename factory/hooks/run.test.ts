@@ -1,5 +1,6 @@
 import type { ToolCallInput } from "claude-code";
 import { describe, expect, test, type Engine } from "claude-code/testing";
+import { gitConfigEnv } from "../lib/bot.ts";
 import { parse, render, type Answer, type FactoryComment } from "../lib/formats.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
 import { unseenNotes } from "./notes.ts";
@@ -610,6 +611,24 @@ describe("bot", () => {
     h.tool(() => ({ result: {} }));
     const r: any = await h.call(read);
     expect((r.context ?? []).join("\n")).not.toContain("no GitHub login");
+  });
+
+  /** The factory's git config as the run's environment holds it. */
+  const gitConfig = (env: Map<string, string | undefined>) =>
+    Object.fromEntries(Object.keys(gitConfigEnv()).map((k) => [k, env.get(k)]));
+
+  test("a run's git takes every entry of the factory's git config", async ($, on) => {
+    const h = host($, on);
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    expect(gitConfig(h.env)).toEqual(gitConfigEnv());
+  });
+
+  test("a run with no bot token takes every entry of it too", async ($, on) => {
+    const h = host($, on, { token: null });
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    expect(gitConfig(h.env)).toEqual(gitConfigEnv());
   });
 });
 

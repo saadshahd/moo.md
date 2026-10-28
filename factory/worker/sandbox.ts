@@ -30,4 +30,9 @@ export const RUN_SETTINGS = {
     },
   },
   permissions: { deny: [`Read(~/${APP_DIR}/**)`] },
+  /**
+   * A project's own settings may name an editor that waits for a window (`code --wait`); a run
+   * has none, so its `git merge` would wait for good. `--settings` outranks project settings.
+   */
+  env: { GIT_EDITOR: "true" },
 };

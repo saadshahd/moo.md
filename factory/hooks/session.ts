@@ -1,5 +1,5 @@
 import type { EngineInterface, ToolCallInput, ToolCallResult } from "claude-code";
-import { botEnv, type Bot } from "../lib/bot.ts";
+import { botEnv, gitConfigEnv, type Bot } from "../lib/bot.ts";
 import { messageOf } from "../lib/errors.ts";
 import { issueOf, must, repoOf, runName, type Run } from "../lib/github.ts";
 import type { FactoryRun } from "./state.d.ts";
@@ -29,18 +29,25 @@ export function runner($: EngineInterface): Run {
  * bot, gh and git get no login at all, so the run fails on GitHub rather than acting as the user.
  * `GH_CONFIG_DIR` alone is not enough: with no token in the environment, gh falls back to the
  * user's token in the macOS keychain, so `GH_TOKEN` holds a placeholder. `$.env.set` takes each
- * name as a literal, so the names are spelled out.
+ * name as a literal, so the names are spelled out, one pair per entry of the factory's git config.
  */
 export async function useLogin($: EngineInterface, cwd: string, bot: Bot | null): Promise<void> {
   const env = bot === null ? null : botEnv(bot);
+  const git = gitConfigEnv();
   await $.env.set("GH_CONFIG_DIR", `${cwd}/.factory/no-gh-login`);
   await $.env.set("GH_TOKEN", env?.GH_TOKEN ?? "factory-no-login");
   await $.env.set("GITHUB_TOKEN", undefined);
-  await $.env.set("GIT_CONFIG_COUNT", "2");
-  await $.env.set("GIT_CONFIG_KEY_0", "credential.helper");
-  await $.env.set("GIT_CONFIG_VALUE_0", "");
-  await $.env.set("GIT_CONFIG_KEY_1", "credential.helper");
-  await $.env.set("GIT_CONFIG_VALUE_1", "!gh auth git-credential");
+  await $.env.set("GIT_CONFIG_COUNT", git.GIT_CONFIG_COUNT);
+  await $.env.set("GIT_CONFIG_KEY_0", git.GIT_CONFIG_KEY_0);
+  await $.env.set("GIT_CONFIG_VALUE_0", git.GIT_CONFIG_VALUE_0);
+  await $.env.set("GIT_CONFIG_KEY_1", git.GIT_CONFIG_KEY_1);
+  await $.env.set("GIT_CONFIG_VALUE_1", git.GIT_CONFIG_VALUE_1);
+  await $.env.set("GIT_CONFIG_KEY_2", git.GIT_CONFIG_KEY_2);
+  await $.env.set("GIT_CONFIG_VALUE_2", git.GIT_CONFIG_VALUE_2);
+  await $.env.set("GIT_CONFIG_KEY_3", git.GIT_CONFIG_KEY_3);
+  await $.env.set("GIT_CONFIG_VALUE_3", git.GIT_CONFIG_VALUE_3);
+  await $.env.set("GIT_CONFIG_KEY_4", git.GIT_CONFIG_KEY_4);
+  await $.env.set("GIT_CONFIG_VALUE_4", git.GIT_CONFIG_VALUE_4);
 
   if (env === null) return;
   await $.env.set("GIT_AUTHOR_NAME", env.GIT_AUTHOR_NAME);
