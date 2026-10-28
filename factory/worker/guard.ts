@@ -148,7 +148,8 @@ export async function guard(
     (err: Error) => `the factory's GitHub App can't act on ${repo}: ${err.message}`,
   );
 
-  const checks = checksReason(repo, base, await branchReads(repo, base));
+  /** Drafts never arm auto-merge: the person who merges each one checks it. */
+  const checks = rules.pr?.draft ? null : checksReason(repo, base, await branchReads(repo, base));
 
   return {
     refusals: [
