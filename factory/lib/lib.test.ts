@@ -454,6 +454,12 @@ describe("rules", () => {
     ]);
     expect("errors" in parseRules("{")).toBe(true);
   });
+  test("a run's sandbox may add the repo's own hosts and folders", () => {
+    const sandbox = { domains: ["npm.example.com"], paths: ["~/Library/pnpm/store/v10"] };
+
+    expect(parseRules(JSON.stringify({ ...good, sandbox }))).toEqual({ ...good, sandbox });
+    expect("errors" in parseRules(JSON.stringify({ ...good, sandbox: { paths: [""] } }))).toBe(true);
+  });
   test("the bot is a [bot] login, and never trusted", () => {
     expect("errors" in parseRules(JSON.stringify({ ...good, bot: "me" }))).toBe(
       true,

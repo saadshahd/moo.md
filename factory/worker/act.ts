@@ -9,7 +9,7 @@ import { approved, notes } from "../lib/wait.ts";
 import type { Action, World } from "./decide.ts";
 import { run } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
-import { RUN_SETTINGS } from "./sandbox.ts";
+import { runSettings } from "./sandbox.ts";
 import { sessionFacts, worktrees, type Ctx } from "./snapshot.ts";
 
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
@@ -58,6 +58,8 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
   const issue = w.gh.issues.find((i) => i.number === n);
 
   if (issue === undefined) throw new Error(`#${n} is no open factory issue`);
+  /** Read before the worktree is made, so rules that would open the App's key fail the start first. */
+  const settings = runSettings(w.rules);
   const plan = latest(issue.comments, w.actors, "plan")?.c ?? null;
   const cwd = pathOf(w, n) ?? (await worktreeFor(ctx, n, plan));
 
@@ -73,7 +75,7 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
     cli: CLI,
   });
 
-  const flags = ["--permission-mode", "bypassPermissions", "--settings", JSON.stringify(RUN_SETTINGS)];
+  const flags = ["--permission-mode", "bypassPermissions", "--settings", JSON.stringify(settings)];
   await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...flags, prompt], { cwd });
 }
 

@@ -27,6 +27,8 @@ export const Rules = z.object({
     judge: z.array(Text),
     none: z.array(Text),
   }),
+  /** What a run's sandbox adds for this repo: hosts it may reach, such as a registry, and folders it may write. */
+  sandbox: z.optional(z.object({ domains: z.optional(z.array(Text)), paths: z.optional(z.array(Text)) })),
 });
 
 export type Rules = z.infer<typeof Rules>;
