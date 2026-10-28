@@ -405,7 +405,11 @@ describe("a local issue's state and actions", () => {
       ]),
     );
 
-    expect(once.actions[0]).toMatchObject({ kind: "wake", restart: { reason: "checks" } });
+    expect(once.actions[0]).toMatchObject({
+      kind: "wake",
+      restart: { reason: "checks" },
+      message: expect.stringContaining("git merge origin/factory/7"),
+    });
 
     const twice = [crash(), crash()];
 
@@ -525,8 +529,9 @@ describe("an open PR GitHub can't merge as it stands", () => {
 
     const message = actions.flatMap((a) => (a.kind === "wake" ? [a.message] : [])).join("");
 
-    for (const s of ["git merge origin/main", "never rebase or force-push", "run the checks", "push"])
+    for (const s of ["git merge origin/factory/7", "git merge origin/main", "never rebase or force-push", "run the checks", "push"])
       expect(message).toContain(s);
+    expect(message.indexOf("origin/factory/7")).toBeLessThan(message.indexOf("origin/main"));
   });
   test("GitHub's DIRTY alone is a conflict too; UNKNOWN does nothing until GitHub works it out", () => {
     const stopped = (p: Pr) => step(world(gh(p), [here(7, [session("stopped")])])).state.kind;

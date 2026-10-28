@@ -4,7 +4,7 @@
  */
 
 import { parse, type FactoryComment, type Wait } from "../lib/formats.ts";
-import { factoryComments, fromBot, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
+import { branchFor, factoryComments, fromBot, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { failed, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
 import { planFiles } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
@@ -248,6 +248,9 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
   const wake = (message: string, restart: Extract<Action, { kind: "wake" }>["restart"] = null): Action[] =>
     current === undefined ? [] : [{ kind: "wake", issue: n, run: current, message, restart }];
 
+  /** The worker may have merged the base into the branch on GitHub, so the run's copy is behind it. */
+  const catchUp = `First run \`git fetch origin\` and \`git merge origin/${branchFor(n)}\`: merge, never rebase or force-push.`;
+
   switch (s.kind) {
     case "ended":
       return [...stop, ...(s.pr === null ? [] : [cost(s.pr)]), { kind: "removeWorktree", issue: n }];
@@ -276,7 +279,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     case "checksFailed":
       return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
         ? stuck(`the checks on PR #${s.pr} failed ${s.deaths} times`)
-        : wake(`The checks on PR #${s.pr} failed. Read them with \`gh pr checks ${s.pr}\`, fix and push.`, {
+        : wake(`The checks on PR #${s.pr} failed. ${catchUp} Read them with \`gh pr checks ${s.pr}\`, fix and push.`, {
             reason: "checks",
           });
     case "behind":
@@ -285,7 +288,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
       return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
         ? stuck(`PR #${s.pr} still conflicts with ${s.base} after its run was woken ${s.deaths} times to merge ${s.base} in`)
         : wake(
-            `PR #${s.pr} conflicts with ${s.base}. Run \`git fetch origin ${s.base}\` and \`git merge origin/${s.base}\` on your branch: merge, never rebase or force-push. Resolve the conflicts, run the checks locally, then push.`,
+            `PR #${s.pr} conflicts with ${s.base}. ${catchUp} Then run \`git merge origin/${s.base}\`. Resolve the conflicts, run the checks locally, then push.`,
             { reason: "conflict", head: s.head },
           );
     case "limitReset":
