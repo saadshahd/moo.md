@@ -1024,13 +1024,12 @@ describe("run prompt", () => {
     expect(at("names read well")).toBeLessThan(at(`Write ${PR_PATH}`));
     expect(at(`Write ${PR_PATH}`)).toBeLessThan(at(usage(base.cli).pr));
   });
-  test("no verdict follows the PR, and the stuck rule stays", () => {
+  test("no verdict follows the PR, and the stuck rule holds only once the PR is open", () => {
     const p = runPrompt(base);
 
     expect(p).not.toContain("verdict");
     expect(p).not.toContain("never holds the merge");
-    expect(p).toContain(`After 2 failed fixes of the same failure`);
-    expect(p).toContain(usage(base.cli).stuck);
+    expect(p).toContain(`Once the PR is open, after 2 failed fixes of the same failure, run \`${usage(base.cli).stuck}\``);
   });
   test("where the project's own rules say to stop and wait, the run asks with AskUserQuestion", () => {
     expect(runPrompt(base)).toContain("Where the project's own rules say to stop and wait for a person, ask with AskUserQuestion instead");

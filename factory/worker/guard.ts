@@ -132,7 +132,7 @@ async function branchReads(repo: string, base: string): Promise<[string | null, 
   ]);
 }
 
-export async function refusals(
+export async function guard(
   repo: string,
   base: string,
   rules: Rules,

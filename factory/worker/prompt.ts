@@ -74,7 +74,7 @@ ${list(i.rules.layers.check)}
 ${list(i.rules.layers.judge)}
    Take at most 2 rounds of fixes for the checks, then at most 2 for the rules. What still fails after them goes in the PR's body, never to \`stuck\`.
 7. Write ${PR_PATH}: the PR's body, as the project's own PR rules ask for one, with an unticked box (\`- [ ] …\`) for each check that still fails and each rule the diff still breaks. Then run \`${u.pr}\`.
-8. After 2 failed fixes of the same failure, run \`${u.stuck}\` and stop.
+8. Once the PR is open, after 2 failed fixes of the same failure, run \`${u.stuck}\` and stop.
 
 End your turn after step 7 or step 8, and never wait on the PR's checks: the worker wakes you when a required check fails, the PR conflicts with the base, or a review asks for changes.`;
 }

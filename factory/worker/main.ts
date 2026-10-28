@@ -13,7 +13,7 @@ import { apply, log, say } from "./act.ts";
 import { botFor, readApp } from "./app.ts";
 import { trustedIssue } from "../lib/snapshot.ts";
 import { classify, decide, occupies, stateLine } from "./decide.ts";
-import { refusals } from "./guard.ts";
+import { guard } from "./guard.ts";
 import { machineId, platformOf, type Platform } from "./platform.ts";
 import { run } from "./proc.ts";
 import { readWorld, type Ctx } from "./snapshot.ts";
@@ -92,10 +92,10 @@ async function main(dir: string): Promise<void> {
   await must(run, ["git", "fetch", "origin", base], { cwd: dir });
   const rules = await readRules(run, dir);
   const app = await readApp();
-  const { refusals: no, warnings } = await refusals(repo, base, rules, app);
+  const { refusals, warnings } = await guard(repo, base, rules, app);
 
-  if (no.length > 0) {
-    for (const r of no) console.error(`factory: ${r}`);
+  if (refusals.length > 0) {
+    for (const r of refusals) console.error(`factory: ${r}`);
     process.exit(1);
   }
 
