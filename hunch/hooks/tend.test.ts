@@ -1,33 +1,33 @@
 import { describe, expect, mock, test } from "claude-code/testing";
-import { DOC_MAX, drawable, hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { type Smooth, parseFixes, CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, AGENT_RETURN, IDEAS_FORMAT, ideaSegments, agentRows, agentView, bandModel, chipRows, fromFile, isSourceFile, links, placeName, cardRows, chipLabel, factParts, firstLine, bareFact, cleanCard, clip, commandFor, hasRun, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unreadable, withOpen } from "./tend.tsx";
+import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
+import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
 
 describe("card parse", () => {
   test("good block", async () => {
-    expect(latestCard([said(block('{"intent":"x","facts":["a"]}'))])).toEqual({
-      intent: "x",
+    expect(latestCard([said(block('{"facts":["a"],"questions":[{"q":"x?","options":[]}]}'))])).toEqual({
       facts: ["a"],
+      questions: [{ q: "x?", options: [] }],
     });
   });
   test("bad JSON is skipped for an older good one", async () => {
     expect(
-      latestCard([said(block('{"intent":"old"}')), said(block("{not json"))]),
-    ).toEqual({ intent: "old" });
+      latestCard([said(block('{"facts":["old"]}')), said(block("{not json"))]),
+    ).toEqual({ facts: ["old"] });
   });
   test("absent keys stay absent; no block is empty", async () => {
-    expect(latestCard([said(block('{"shape":"s"}'))])).toEqual({ shape: "s" });
+    expect(latestCard([said(block('{"facts":["s"]}'))])).toEqual({ facts: ["s"] });
     expect(latestCard([said("no card")])).toEqual({});
   });
   test("each key from the newest block that has it", async () => {
     expect(
       latestCard([
-        said(block('{"skills":[{"name":"hope:judge","outcome":"v"}],"intent":"a"}')),
-        said(block('{"intent":"b"}')),
+        said(block('{"ideas":[{"by":"Tufte","idea":"v"}],"facts":["a"]}')),
+        said(block('{"facts":["b"]}')),
       ]),
-    ).toEqual({ intent: "b", skills: [{ name: "hope:judge", outcome: "v" }] });
+    ).toEqual({ facts: ["b"], ideas: [{ by: "Tufte", idea: "v" }] });
   });
   test("[] clears an older list", async () => {
     expect(
@@ -38,10 +38,10 @@ describe("card parse", () => {
     expect(
       latestCard([
         said(block('{"suggestions":["a"]}')),
-        said(block('{"intent":"x"}')),
+        said(block('{"facts":["x"]}')),
         said(block('{"suggestions":["b","c"]}')),
       ]),
-    ).toEqual({ intent: "x", suggestions: ["a", "b", "c"] });
+    ).toEqual({ facts: ["x"], suggestions: ["a", "b", "c"] });
   });
   test("a repeated suggestion shows once", async () => {
     expect(
@@ -54,122 +54,58 @@ describe("card parse", () => {
   test("latest block wins", async () => {
     expect(
       latestCard([
-        said(block('{"intent":"a"}')),
-        said(block('{"intent":"b"}')),
+        said(block('{"facts":["a"]}')),
+        said(block('{"facts":["b"]}')),
       ]),
-    ).toEqual({ intent: "b" });
+    ).toEqual({ facts: ["b"] });
   });
 });
 
 test("a card quoted in a reply is shown, and so is everything after it", async () => {
-  const reply = 'It said:\n> ```card\n> {"intent":"x"}\n> ```\n\nPart of this is stale.';
+  const reply = 'It said:\n> ```card\n> {"facts":["x"]}\n> ```\n\nPart of this is stale.';
   expect(stripCards(reply)).toBe(reply);
   expect(latestCard([said(reply)])).toEqual({});
 });
 
 test("card block hidden, closed or still streaming", async () => {
-  expect(stripCards(block('{"intent":"x"}'))).toBe("reply");
-  expect(stripCards('reply\n```card\n{"intent":"x","fa')).toBe("reply");
+  expect(stripCards(block('{"facts":["x"]}'))).toBe("reply");
+  expect(stripCards('reply\n```card\n{"facts":["x"],"qu')).toBe("reply");
 });
 
 test("malformed fields dropped, good ones kept", async () => {
   expect(
     cleanCard({
       intent: "x",
-      shape: 3,
       facts: ["a", 2, ""],
       questions: [{ q: "a?", options: "y" }, { q: "b?", options: ["y"] }],
-      skills: [{ name: "hope:clarify" }, { name: "hope:judge", outcome: "verdict" }],
-      watch: [{ label: "docs" }],
+      suggestions: [3],
     }),
   ).toEqual({
-    intent: "x",
     facts: ["a"],
     questions: [{ q: "b?", options: ["y"] }],
-    skills: [{ name: "hope:judge", outcome: "verdict" }],
-    watch: [],
+    suggestions: [],
   });
 });
 
-test("a skill counts as run with or without its plugin prefix", async () => {
-  const ran = new Set(["hope:clarify"]);
-  expect(hasRun(ran, "hope:clarify")).toBe(true);
-  expect(hasRun(ran, "clarify")).toBe(true);
-  expect(hasRun(ran, "hope:judge")).toBe(false);
-});
-
-test("a run skill is marked done, its label left bare", async () => {
-  const [[run]] = cardRows({ skills: [{ name: "hope:judge", outcome: "v" }] } as any, "skills", new Set(["hope:judge"]));
-  expect(run).toEqual({ id: "skill:0", label: "hope:judge", kind: "line", state: "done", column: true });
-});
 test("a chip previews its card with one number", async () => {
-  const c = {
-    intent: "i",
-    facts: ["a", "b"],
-    questions: [{ q: "x", options: [] }, { q: "y", options: [] }],
-    skills: [{ name: "hope:intent" }, { name: "hope:draft" }],
-  } as any;
-  const s = (ran: string[] = []) => ({ card: c, ran: new Set(ran), rows: [], paneItem: null, smooth: { fixes: [], trend: "" } });
-  expect(chipLabel("intent", s())).toBe("intent");
-  expect(chipLabel("facts", s())).toBe("facts 2");
-  expect(chipLabel("questions", s())).toBe("questions 2");
-  expect(chipLabel("skills", s(["hope:intent"]))).toBe("skills 1/2");
-  expect(chipLabel("suggestions", { ...s(), card: { suggestions: ["a", "b"] } })).toBe("suggestions 2");
-});
-test("first line: the first non-empty one, trimmed", async () => {
-  expect(firstLine("\n  find the parser \nmore")).toBe("find the parser");
+  const c = { questions: [{ q: "x", options: [] }, { q: "y", options: [] }], suggestions: ["a"] };
+  expect(chipLabel("questions", c)).toBe("questions 2");
+  expect(chipLabel("suggestions", c)).toBe("suggestions 1");
 });
 test("a fact is a list item; in the pane it wraps under its bullet", async () => {
-  const [[f]] = cardRows({ facts: ["alpha beta gamma delta"] } as any, "facts", new Set());
+  const [[f]] = cardRows({ facts: ["alpha beta gamma delta"] } as any, "facts");
   expect(f.label).toBe("• alpha beta gamma delta");
   expect(wrap(f.label, 12)).toEqual(["• alpha beta", "  gamma", "  delta"]);
 });
 test("a card line wraps at the measure; chips never wrap", async () => {
-  const body = [[{ id: "probe:intent", label: "word ".repeat(40).trim(), kind: "line" as const }]];
-  const lines = layout({ chips: [], body, doc: "" }, 300);
+  const body = [[{ id: "probe:fact 1", label: "word ".repeat(40).trim(), kind: "line" as const }]];
+  const lines = layout({ chips: [], body }, 300);
   expect(lines.length).toBe(3);
   expect(lines.every((l) => l.cells[0].text.length <= 76)).toBe(true);
 });
-test("a teammate's pane reads its summary and its SendMessage, never the wrapper", async () => {
-  const v = agentView([
-    { role: "user", text: '<teammate-message teammate_id="team-lead" summary="Read notes.md">\nRead the file and list syntax.\n</teammate-message>' },
-    { role: "assistant", text: "", toolUses: [{ tool: "SendMessage", input: { to: "team-lead", summary: "syntax listed", message: "1. headers" } }] },
-    { role: "assistant", text: "" },
-  ]);
-  expect(v).toMatchObject({ asked: "Read notes.md", returned: "syntax listed", body: "1. headers" });
-});
-test("a subagent's pane reads its first line and its last reply", async () => {
-  const v = agentView([
-    { role: "user", text: "\nFind the parser.\nMore." },
-    { role: "assistant", text: "It is in tend.tsx." },
-  ]);
-  expect(v).toMatchObject({ asked: "Find the parser.", returned: "", body: "It is in tend.tsx." });
-});
-test("an agent's pane reads like the session's card: intent, outcome, watch, facts", async () => {
-  const v = agentView([
-    { role: "user", text: "Count words." },
-    { role: "assistant", text: "", toolUses: [{ tool: "Write", input: { file_path: "/tmp/wc.py" } }, { tool: "Read", input: { file_path: "/tmp/a.md" } }] },
-    { role: "assistant", text: 'Done.\n\n```card\n{"intent":"count md words","facts":["wc counts markup"]}\n```\n' },
-  ]);
-  expect(v.body).toBe("Done.");
-  expect(v.footprint).toEqual(["/tmp/wc.py"]);
-  const rows = agentRows(v, "counter", "a1");
-  expect(rows.map((r) => r.map((i) => i.label.trim()))).toEqual([
-    ["intent", "count md words"],
-    [],
-    ["outcome", "Done."],
-    [],
-    ["watch", "wc.py"],
-    [],
-    ["facts", "• wc counts markup"],
-    [],
-    ["report", "read it all"],
-  ]);
-  expect(rows.filter((r) => r.length).map((r) => r[1].id)).toEqual(["probe:counter intent", "probe:counter outcome", "open:/tmp/wc.py", "probe:counter fact 1", "report:a1"]);
-});
 test("a fact reads as its claim, then the rest dim under it, a blank line between facts", async () => {
   expect(factParts("Suno sings. ACE Studio lost because it has no Arabic.")).toEqual(["Suno sings.", "ACE Studio lost because it has no Arabic."]);
-  const rows = cardRows({ facts: ["Suno sings. ACE lost.", "One claim"] } as any, "facts", new Set());
+  const rows = cardRows({ facts: ["Suno sings. ACE lost.", "One claim"] } as any, "facts");
   expect(rows.map((r) => r.map((i) => [i.label, i.kind, i.indent ?? 0]))).toEqual([
     [["• Suno sings.", "line", 0]],
     [["ACE lost.", "note", 2]],
@@ -182,7 +118,7 @@ test("questions are a list, each with its answers as a clickable list under it; 
     { q: "In your Suno account, is 8345526f a Voice or a Style Persona?", options: ["Voice", "Style Persona"] },
     { q: "May each song folder commit its band code?", options: ["Yes, add it to CLAUDE.md", "No, keep it untracked"] },
   ] };
-  const lines = layout({ chips: [], body: cardRows(card, "questions", new Set()), doc: "" }, 40);
+  const lines = layout({ chips: [], body: cardRows(card, "questions") }, 40);
   const text = lines.map((l) => " ".repeat(l.cells[0]?.x ?? 0) + l.cells.map((c) => c.text).join(""));
   expect(text).toEqual([
     "• In your Suno account, is 8345526f a",
@@ -196,61 +132,18 @@ test("questions are a list, each with its answers as a clickable list under it; 
     "  ◦ No, keep it untracked",
   ]);
 });
-test("a table's first column takes its widest cell; the next column wraps inside itself", async () => {
-  const card = { skills: [
-    { name: "hope:clarify", outcome: "reading A confirmed" },
-    { name: "mattpocock-skills:research", outcome: "three cited research files" },
-    { name: "hope:intent", outcome: "the audit of memory, CLAUDE.md and skills against the settled route" },
-  ] };
-  const lines = layout({ chips: [], body: cardRows(card, "skills", new Set()), doc: "" }, 80);
-  const outcomeX = lines.map((l) => l.cells.at(-1)!.x);
-  expect(new Set(outcomeX).size).toBe(1);
-  expect(outcomeX[0]).toBe("mattpocock-skills:research".length + 2);
-  expect(lines.length).toBe(4);
-});
 test("an item that won't fit the rest of its line starts the next one", async () => {
-  const body: Item[][] = [[{ id: "a", label: "x".repeat(30), kind: "line" }, { id: "b", label: "y".repeat(20), kind: "quiet" }, { id: "c", label: "z", kind: "quiet" }]];
-  const lines = layout({ chips: [], body, doc: "" }, 40);
+  const body: Item[][] = [[{ id: "a", label: "x".repeat(30), kind: "line" }, { id: "b", label: "y".repeat(20), kind: "line" }, { id: "c", label: "z", kind: "line" }]];
+  const lines = layout({ chips: [], body }, 40);
   expect(lines.map((l) => l.cells.map((c) => c.text))).toEqual([["x".repeat(30)], ["y".repeat(20), "z"]]);
 });
 test("in the pane a row's last item runs on below itself, aligned", async () => {
   const body = [[{ id: "n", label: "facts    ", kind: "note" as const }, { id: "f", label: "• " + "word ".repeat(12).trim(), kind: "line" as const }]];
-  const lines = layout({ chips: [], body, doc: "" }, 40);
+  const lines = layout({ chips: [], body }, 40);
   expect(lines.length).toBeGreaterThan(1);
   expect(lines.slice(1).every((l) => l.cells[0].x === lines[0].cells[1].x && l.cells[0].text.startsWith("  "))).toBe(true);
 });
-test("source files go to the editor; pages, pictures and urls do not", async () => {
-  expect(isSourceFile("/tmp/wc.py")).toBe(true);
-  expect(isSourceFile("/tmp/tend-lab/wordcount")).toBe(true);
-  expect(isSourceFile("/tmp/shot.png")).toBe(false);
-  expect(isSourceFile("https://x.dev/a.ts")).toBe(false);
-});
-test("an agent's pane shows its fullest report, not a closing line", async () => {
-  const v = agentView([
-    { role: "user", text: "Survey." },
-    { role: "assistant", text: "", toolUses: [{ tool: "SendMessage", input: { summary: "survey done", message: "a long report ".repeat(5) } }] },
-    { role: "assistant", text: "", toolUses: [{ tool: "SendMessage", input: { summary: "bye", message: "Task complete" } }] },
-  ]);
-  expect(v.returned).toBe("survey done");
-});
-test("a pane lists a doc's links to click, beside the file when relative", async () => {
-  expect(links("see [a](x.md), [b](https://y.dev) and [c](#top) and [a](x.md) and [link](url)")).toEqual(["x.md", "https://y.dev"]);
-  expect(fromFile("/r/docs/a.md", "x.md")).toBe("/r/docs/x.md");
-  expect(fromFile("/r/docs/a.md", "https://y.dev")).toBe("https://y.dev");
-});
-test("an agent's outcome is its own one line, else its summary, else its first line of prose", async () => {
-  const body = (text: string) => agentView([{ role: "user", text: "x" }, { role: "assistant", text }]);
-  const own = body('# Findings\n\nwc overcounts.\n\n```card\n{"outcome":"use markdown-it"}\n```\n');
-  expect(agentRows(own, "a", "1").find((r) => r[0]?.label.trim() === "outcome")?.[1].label).toBe("use markdown-it");
-  const prose = body("# Findings\n\nwc overcounts.");
-  expect(agentRows(prose, "a", "1").find((r) => r[0]?.label.trim() === "outcome")?.[1].label).toBe("wc overcounts.");
-});
-test("a place reads by its name, not its full path", async () => {
-  expect(placeName("/tmp/tend-lab/expert/wordcount.py")).toBe("wordcount.py");
-  expect(placeName("https://www.example.com/blog/post/")).toBe("example.com/blog/post");
-  expect(placeName("https://example.com")).toBe("example.com");
-});
-test("a planned skill resolves to a real command, or none", async () => {
+test("a skill name resolves to a real command, or none", async () => {
   const names = ["hope:clarify", "hope:judge", "clear"];
   expect(commandFor(names, "clarify")).toBe("hope:clarify");
   expect(commandFor(names, "hope:judge")).toBe("hope:judge");
@@ -265,144 +158,61 @@ test("a prompt runs a command only when it starts with one", async () => {
   expect(slashName("run /hope:intent")).toBeUndefined();
 });
 
-test("long agent labels clipped", async () => {
-  expect(clip("x".repeat(50))).toHaveLength(40);
-  expect(clip("short")).toBe("short");
-});
-
 test("fact source prefix stripped", async () => {
   expect(bareFact("User confirmed: dark mode exists")).toBe("dark mode exists");
   expect(bareFact("Found: no settings page")).toBe("no settings page");
   expect(bareFact("Toggle only")).toBe("Toggle only");
 });
 
-const model = (card: object, open: string | null = null, rows: object[] = [], smooth: Smooth = { fixes: [], trend: "" }) =>
-  bandModel({
-    card: card as any,
-    paneItem: open && `card:${open}`,
-    ran: new Set(),
-    rows: rows as any,
-    smooth,
-  });
+const model = (card: object, open: string | null = null) => bandModel(card as any, open && `card:${open}`);
 
 describe("band", () => {
-  // pending.sh's line for the first real fix, meta-harness, 2026-10-26.
-  const REAL = "/Users/u/.claude/projects/-Users-u-repos-meta-harness/memory\tsmooth/2026-10-26\tAgents will use `roundup-app/roundup`, single-quote `--jq` slices, and not retry on benign `gh` exit codes: `mem/reference_gh-pr-pitfalls.md`.\n";
-  test("smooth: a chip; the trend first, then each fix clipped, its branch beside it", async () => {
-    const fixes = parseFixes(REAL);
-    expect(fixes).toHaveLength(1);
-    expect(fixes[0]!.branch).toBe("smooth/2026-10-26");
-    const sm = { fixes, trend: "failed commands, gh pr: 5 → 0" };
-    expect(model({}, null, [], sm).chips.map((c) => c.label)).toEqual(["smooth 1"]);
-    const rows = chipRows("smooth", { card: {}, ran: new Set(), rows: [], paneItem: null, smooth: sm });
-    expect(rows.map((r) => r.map((i) => i.id))).toEqual([["smooth-trend"], ["smooth:0", "smooth-note:0"]]);
-    expect(rows[0]![0]!.label).toBe("since the last kept fix: failed commands, gh pr: 5 → 0");
-    expect(rows[1]![0]!.label.length).toBeLessThanOrEqual(60);
+  test("no card: nothing", async () => {
+    expect(model({})).toEqual({ chips: [], body: [] });
   });
-  test("smooth with only a trend: a chip with no count", async () => {
-    expect(model({}, null, [], { fixes: [], trend: "x: 2 → 0" }).chips.map((c) => c.label)).toEqual(["smooth"]);
-  });
-  test("pending.sh lines that are not three fields are no fix", async () => {
-    expect(parseFixes("")).toEqual([]);
-    expect(parseFixes("/r\tsmooth/x\n/r\t\tfix\n")).toEqual([]);
-  });
-  test("clicking a fix puts keep-or-drop and its diff command in the prompt", async ($, on) => {
-    mock.store(on);
-    on("session.id", () => ({ value: "s1" }));
-    on("session.surfaces", () => ({ value: ["terminal"] }));
-    on("session.messages", () => ({ value: [] }));
-    on("session.root", () => ({ value: "/r" }));
-    on("process.run", (_, e: any) => ({
-      value: { exitCode: 0, stdout: String(e.argv[0]).endsWith("pending.sh") ? REAL : "", stderr: "" },
-    }) as any);
-    on("ui.invalidate", () => ({ value: undefined }));
-    on("turn.complete", (_, e) => ({ text: e.answer }));
-    let box = "";
-    on("prompt.read", () => ({ value: { text: box, cursor: box.length } }));
-    on("prompt.fill", (_, e) => {
-      box = e.mode === "replace" ? e.text : box + e.text;
-      return { isFilled: true };
-    });
-    await $.turn.complete({ answer: "ok", durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
-    const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 80 } as any });
-    await band.post({ act: "smooth:0" });
-    expect(box).toContain("keep or drop the smooth fix on smooth/2026-10-26 in /Users/u/.claude/projects/-Users-u-repos-meta-harness/memory");
-    expect(box).toContain("diff HEAD...smooth/2026-10-26");
-  });
-  test("no card, no agents: nothing", async () => {
-    expect(model({})).toEqual({ doc: "", chips: [], body: [] });
-  });
-  test("card: only chips with content", async () => {
-    const b = model({ intent: "x", questions: [{ q: "a?", options: ["y"] }] });
-    expect(b.chips.map((c) => c.id)).toEqual(["chip:intent", "chip:questions"]);
+  test("only questions and suggestions are chips, and only with content", async () => {
+    const b = model({ facts: ["a"], ideas: [{ by: "x", idea: "y" }], suggestions: [], questions: [{ q: "a?", options: ["y"] }] });
+    expect(b.chips.map((c) => c.id)).toEqual(["chip:questions"]);
   });
   test("a card in the pane marks its chip; the band never opens it above the chips", async () => {
-    const b = model({ facts: ["a", "b"] }, "facts");
+    const b = model({ suggestions: ["a", "b"] }, "suggestions");
     expect(b.chips[0].open).toBe(true);
     expect(b.body).toEqual([]);
   });
   test("no undefined anywhere: Client props refuse it", async () => {
-    const b = model({ intent: "x", facts: ["a"] }, "facts", [{ id: "a", label: "l", done: true }]);
+    const b = model({ facts: ["a"], suggestions: ["a"] }, "suggestions");
     const holes = (v: unknown): boolean =>
       v === undefined || (typeof v === "object" && v !== null && Object.values(v).some(holes));
     expect(holes(b)).toBe(false);
   });
-  test("agents are a chip, never a standing row; it marks one still working", async () => {
-    const b = model({}, null, [
-      { id: "a1", label: "count files", type: "Explore", done: false },
-      { id: "a2", label: "scan", type: "Explore", done: true, read: true },
-    ]);
-    expect(b.chips).toEqual([{ id: "chip:agents", label: "agents 2", kind: "chip", state: "running" }]);
-    expect(b.body).toEqual([]);
-  });
-  test("the agents list: each agent, dim once read, the one shown marked open", async () => {
-    const rows = chipRows("agents", {
-      card: {}, ran: new Set(), paneItem: "agent:a1", smooth: { fixes: [], trend: "" },
-      rows: [{ id: "a1", label: "l", type: "Explore", done: true, read: true }],
-    });
-    expect(rows).toEqual([[{ id: "agent:a1", label: "l", kind: "line", state: "done", read: true, open: true }]]);
-  });
-  test("intent and shape read as padded paragraphs, one per sentence, a blank line apart", async () => {
-  const intent = "Fix the pane. Each card reads in it; nothing opens above the chips.";
-  const lines = layout({ chips: [], body: cardRows({ intent }, "intent", new Set()), doc: "" }, 72);
-  expect(lines.map((l) => [l.cells[0].x, l.cells[0].text])).toEqual([
-    [2, "Fix the pane."],
-    [2, ""],
-    [2, "Each card reads in it;"],
-    [2, ""],
-    [2, "nothing opens above the chips."],
-  ]);
-  expect(new Set(lines.map((l) => l.cells[0].item.id))).toEqual(new Set(["probe:intent"]));
-});
 test("a question's rows: the question, which takes no click, then each answer", async () => {
     const rows = cardRows(
       { questions: [{ q: "a?", options: ["x", "y"] }] },
       "questions",
-      new Set(),
     );
     expect(rows.map((r) => r.map((i) => i.id))).toEqual([["question:0"], ["answer:0:0"], ["answer:0:1"]]);
     // A click reaches only what the arrows can stop on.
-    expect(navRows({ chips: [], body: rows, doc: "" }).map((r) => r.map((i) => i.id))).toEqual([["answer:0:0"], ["answer:0:1"]]);
+    expect(navRows({ chips: [], body: rows }).map((r) => r.map((i) => i.id))).toEqual([["answer:0:0"], ["answer:0:1"]]);
   });
 });
 
 describe("arrows", () => {
   // The facts pane over a row of chips: the arrows and clicks read any band the same way.
   const b = {
-    ...model({ facts: ["a", "b"], intent: "x" }, "facts", [{ id: "a1", label: "count", done: true }]),
-    body: cardRows({ facts: ["a", "b"] }, "facts", new Set()),
+    ...model({ questions: [{ q: "q?", options: [] }], suggestions: ["s"] }, "suggestions"),
+    body: cardRows({ facts: ["a", "b"] }, "facts"),
   };
   const rows = navRows(b);
   test("rows as drawn: each card line, then the chips; a blank line is no stop", async () => {
     expect(rows.map((r) => r.map((i) => i.id))).toEqual([
       ["probe:fact 1"],
       ["probe:fact 2"],
-      ["chip:intent", "chip:facts", "chip:agents"],
+      ["chip:questions", "chip:suggestions"],
     ]);
   });
   test("left/right stay in the row; up/down change rows", async () => {
     expect(move({ row: 2, col: 0 }, rows, "right")).toEqual({ row: 2, col: 1 });
-    expect(move({ row: 2, col: 2 }, rows, "right")).toEqual({ row: 2, col: 2 });
+    expect(move({ row: 2, col: 1 }, rows, "right")).toEqual({ row: 2, col: 1 });
     expect(move({ row: 2, col: 1 }, rows, "up")).toEqual({ row: 1, col: 0 });
     expect(move({ row: 0, col: 0 }, rows, "up")).toEqual({ row: 0, col: 0 });
     expect(move({ row: 1, col: 0 }, rows, "down")).toEqual({ row: 2, col: 1 }); // back on the open chip
@@ -410,34 +220,23 @@ describe("arrows", () => {
   test("a click lands on the item drawn there", async () => {
     const cells = layout(b, 80);
     expect(cells.map((l) => l.y)).toEqual([0, 1, 2, 3]);
-    // facts at y=0 and 2 around the blank line; chips "[ intent ] [ ▴ facts ]" at y=3
+    // facts at y=0 and 2 around the blank line; chips "[ questions 1 ] [ ▴ suggestions 1 ]" at y=3
     expect(hit(cells, 0, 0)?.id).toBe("probe:fact 1");
     expect(hit(cells, 0, 1)).toBeUndefined();
     expect(hit(cells, 0, 2)?.id).toBe("probe:fact 2");
-    expect(hit(cells, 1, 3)?.id).toBe("chip:intent");
-    expect(hit(cells, 12, 3)?.id).toBe("chip:facts");
+    expect(hit(cells, 1, 3)?.id).toBe("chip:questions");
+    expect(hit(cells, 18, 3)?.id).toBe("chip:suggestions");
     expect(hit(cells, 40, 0)).toBeUndefined();
   });
   test("a word wider than the line is the one thing clipped", async () => {
-    const wide = { chips: [], body: cardRows({ facts: ["x".repeat(100)] }, "facts", new Set()), doc: "" };
+    const wide = { chips: [], body: cardRows({ facts: ["x".repeat(100)] }, "facts") };
     const cell = layout(wide, 40).flatMap((l) => l.cells).find((c) => c.item.id === "probe:fact 1")!;
     expect(cell.x + cell.text.length).toBeLessThanOrEqual(40);
     expect(cell.text.endsWith("…")).toBe(true);
   });
   test("notes are read, never focused", async () => {
-    const body = cardRows({ skills: [{ name: "hope:judge", outcome: "verdict" }] }, "skills", new Set());
-    expect(navRows({ chips: [], body, doc: "" })[0].map((i) => i.id)).toEqual(["skill:0"]);
-  });
-});
-
-describe("unreadable", () => {
-  test("a missing file reads as not written yet", async () => {
-    const err = "HooksError: hunch: $.fs.read(/a/b.md) failed: ENOENT";
-    expect(unreadable("/a/b.md", err)).toBe("_not written yet: /a/b.md_");
-  });
-  test("any other failure shows as it came", async () => {
-    const err = "HooksError: hunch: $.fs.read(/a/b.md) failed: EACCES";
-    expect(unreadable("/a/b.md", err)).toBe(`_${err}_`);
+    const body = cardRows({ facts: ["Claim. What lost."] }, "facts");
+    expect(navRows({ chips: [], body }).map((r) => r.map((i) => i.id))).toEqual([["probe:fact 1"]]);
   });
 });
 
@@ -447,7 +246,7 @@ describe("open questions", () => {
     expect(proseQuestions(reply, [])).toEqual(["Ship it now?", "Is that right?"]);
   });
   test("a quoted card hides nothing after it", async () => {
-    const reply = "It said:\n> ```card\n> {\"intent\":\"x\"}\n> ```\n\nShould the demo keep going?";
+    const reply = "It said:\n> ```card\n> {\"facts\":[\"x\"]}\n> ```\n\nShould the demo keep going?";
     expect(proseQuestions(reply, [])).toEqual(["Should the demo keep going?"]);
   });
   test("one already a card question, or asked twice, is skipped", async () => {
@@ -463,16 +262,16 @@ describe("open questions", () => {
     expect(turnQuestions("Old?\nShip?", before)).toEqual([...before, { q: "Ship?", options: [] }]);
   });
   test("the card shows the open questions, not its blocks' own; none kept yet leaves the blocks'", async () => {
-    const card = { intent: "i", questions: [{ q: "Stale?", options: [] }] };
-    expect(withOpen(card, [])).toEqual({ intent: "i" });
-    expect(withOpen(card, [{ q: "Now?", options: [] }])).toEqual({ intent: "i", questions: [{ q: "Now?", options: [] }] });
+    const card = { facts: ["i"], questions: [{ q: "Stale?", options: [] }] };
+    expect(withOpen(card, [])).toEqual({ facts: ["i"] });
+    expect(withOpen(card, [{ q: "Now?", options: [] }])).toEqual({ facts: ["i"], questions: [{ q: "Now?", options: [] }] });
     expect(withOpen(card, undefined)).toEqual(card);
   });
   test("a prose question joins the card, a repeat does not, and the next prompt closes them all", async ($, on) => {
     mock.store(on);
     on("session.id", () => ({ value: "s1" }));
     on("session.surfaces", () => ({ value: ["terminal"] }));
-    const msgs = [said(block('{"intent":"i","questions":[{"q":"Which one?","options":["a"]}]}'))];
+    const msgs = [said(block('{"facts":["i"],"questions":[{"q":"Which one?","options":["a"]}]}'))];
     on("session.messages", () => ({ value: msgs }));
     on("ui.invalidate", () => ({ value: undefined }));
     on("turn.complete", (_, e) => ({ text: e.answer }));
@@ -489,33 +288,14 @@ describe("open questions", () => {
       { q: "Ship it now?", options: [] },
     ]);
     await $.prompt.submit({ text: "check it against main", origin: { kind: "composer" } } as any);
-    expect(await replayed()).toEqual({ intent: "i" });
+    expect(await replayed()).toEqual({ facts: ["i"] });
   });
-});
-
-test("an agent's return, report or notification, asks for one line or an empty card; a shell's return and the user's prompt do not", async ($, on) => {
-  mock.store(on);
-  on("session.id", () => ({ value: "s1" }));
-  on("session.messages", () => ({ value: [] }));
-  on("agent.list", () => ({ value: [{ id: "a1", name: "scan", type: "Explore", status: "completed" }] }));
-  on("prompt.submit", (_, e) => ({ text: e.text, context: e.context }));
-  const note = (id: string) =>
-    $.prompt.submit({ text: `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n</task-notification>`, origin: { kind: "task-notification" } } as any);
-  expect(((await note("a1")) as any).context).toContain(AGENT_RETURN);
-  expect(((await note("b9")) as any).context ?? []).not.toContain(AGENT_RETURN);
-  const handback = await $.prompt.submit({ text: `Another Claude session sent a message: <agent-message from="a1"> [Subagent hand-back] 20 files.`, origin: { kind: "peer" } } as any);
-  expect((handback as any).context).toContain(AGENT_RETURN);
-  const own = await $.prompt.submit({ text: "go on", origin: { kind: "composer" } } as any);
-  expect((own as any).context ?? []).not.toContain(AGENT_RETURN);
-  // The reply it asks for draws nothing in the thread.
-  expect(stripCards("```card\n{}\n```")).toBe("");
 });
 
 test("a compaction ends on the whole card, word for word, open questions only", async ($, on) => {
   const card = {
-    intent: "Land W7: the card survives compaction.",
-    shape: "Replay the card; never trust the summary.",
     facts: ["The summary keeps what it chooses; the card keeps the rest."],
+    suggestions: ["Replay the card → never trust the summary."],
     questions: [{ q: "Closed?", options: ["y"] }],
   };
   const open = [{ q: "Ship now?", options: ["yes", "no"] }, { q: "Which branch?", options: [] }];
@@ -527,25 +307,12 @@ test("a compaction ends on the whole card, word for word, open questions only", 
   const { messages } = await $.session.compact({ trigger: "manual", messages: [said(block(JSON.stringify(card)))] });
   expect(messages?.[0]).toEqual(summary);
   expect(latestCard([messages![1] as any])).toEqual({ ...card, questions: open });
-  for (const s of [card.intent, card.shape, card.facts[0], ...open.map((q) => q.q)])
+  for (const s of [card.facts[0], card.suggestions[0], ...open.map((q) => q.q)])
     expect(messages![1].text.includes(JSON.stringify(s))).toBe(true);
 });
 
 test("an empty card adds nothing to a compaction", async () => {
   expect(replayCard({})).toBeUndefined();
-});
-
-describe("pane doc", () => {
-  test("a doc past the Markdown limit is cut at a whole line and says so", async () => {
-    const doc = "line of forty characters, give or take.\n".repeat(600);
-    const out = drawable(doc);
-    expect(out.length).toBeLessThanOrEqual(DOC_MAX);
-    expect(out.endsWith("_…the rest is past what the pane can draw_")).toBe(true);
-    expect(out.split("\n\n_…")[0].endsWith("take.")).toBe(true);
-  });
-  test("a doc within the limit is drawn whole", async () => {
-    expect(drawable("short")).toBe("short");
-  });
 });
 
 /** A store that refuses a write taking its JSON past `cap` characters, as the engine's does past 4 MiB. */
@@ -606,14 +373,13 @@ test("a store over its cap with no session list shrinks to the current session",
   expect(store.get("tend:recent")).toEqual(["s1"]);
 });
 
-// The work machine's store, full: the band showed only agents, since every write tend awaited threw first.
+// The work machine's store, full: the band lost its card, since every write tend awaited threw first.
 test("a full store leaves the band its card and a card skill its ask; the refusal shows once", async ($, on) => {
   cappedStore(on, 0);
   mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
-  on("session.messages", () => ({ value: [said(block('{"intent":"i","facts":["f"]}'))] }));
-  on("agent.list", () => ({ value: [] }));
+  on("session.messages", () => ({ value: [said(block('{"suggestions":["s"],"questions":[{"q":"q?","options":[]}]}'))] }));
   on("command.list", () => ({ value: [{ name: "hope:intent" }] as any }));
   on("command.register", () => ({ value: undefined }));
   const toasts: unknown[] = [];
@@ -622,7 +388,7 @@ test("a full store leaves the band its card and a card skill its ask; the refusa
   on("prompt.submit", (_, e) => ({ text: e.text, context: e.context }));
   const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 80 } as any });
   const chips = (((await band.find({ type: "Client" }))?.props.props as any)?.chips ?? []).map((c: any) => c.id);
-  expect(chips).toEqual(["chip:intent", "chip:facts"]);
+  expect(chips).toEqual(["chip:questions", "chip:suggestions"]);
   expect(((await $.tool.call({ tool: "Skill", skill: "hope:intent" } as any)) as any).context).toContain(CARD_FORMAT);
   const prompt = await $.prompt.submit({ text: "/hope:intent tidy it", origin: { kind: "composer" } } as any);
   expect((prompt as any).context).toContain(CARD_FORMAT);
@@ -657,7 +423,7 @@ test("clicking answers to two questions: each fills its own line once, a changed
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   const qs = [{ q: "Ship?", options: ["yes", "no"] }, { q: "Where?", options: ["main", "branch"] }];
-  on("session.messages", () => ({ value: [said(block(JSON.stringify({ intent: "i", questions: qs })))] }));
+  on("session.messages", () => ({ value: [said(block(JSON.stringify({ questions: qs })))] }));
   on("ui.invalidate", () => ({ value: undefined }));
   on("turn.complete", (_, e) => ({ text: e.answer }));
   let box = "";
@@ -693,14 +459,13 @@ describe("ideas", () => {
     expect(cleanCard({ ideas: [...ideas, { by: "X" }, { by: "Y", idea: "z", why: 3 }] }).ideas).toEqual(ideas);
   });
   test("the names are one column; only the ideas take a click; the why and test sit under the idea", async () => {
-    const body = cardRows({ ideas }, "ideas", new Set());
-    expect(navRows({ chips: [], body, doc: "" }).map((r) => r.map((i) => i.id))).toEqual([["probe:idea 1"], ["probe:idea 2"]]);
-    const lines = layout({ chips: [], body, doc: "" }, 72);
+    const body = cardRows({ ideas }, "ideas");
+    expect(navRows({ chips: [], body }).map((r) => r.map((i) => i.id))).toEqual([["probe:idea 1"], ["probe:idea 2"]]);
+    const lines = layout({ chips: [], body }, 72);
     const x = (id: string) => lines.flatMap((l) => l.cells).find((c) => c.item.id === id)!.x;
     expect(x("probe:idea 1")).toBe(x("probe:idea 2"));
     expect(x("idea-note:0:0")).toBe(x("probe:idea 1"));
     expect(x("idea-note:0:1")).toBe(x("probe:idea 1"));
-    expect(chipLabel("ideas", { card: { ideas }, ran: new Set(), rows: [], paneItem: null, smooth: { fixes: [], trend: "" } })).toBe("ideas 2");
   });
   test("consult is asked for its ideas as a card; another card skill for the session's", async ($, on) => {
     mock.store(on);
@@ -712,11 +477,31 @@ describe("ideas", () => {
     expect(await asked("hope:consult")).toEqual([IDEAS_FORMAT]);
     expect(await asked("hope:intent")).not.toContain(IDEAS_FORMAT);
   });
-  test("clicking an idea puts its stem in the prompt", async ($, on) => {
+  test("ideas and facts are no chip; /ideas and /facts open them in the pane, or say there are none", async ($, on) => {
     mock.store(on);
     on("session.id", () => ({ value: "s1" }));
     on("session.surfaces", () => ({ value: ["terminal"] }));
     on("session.messages", () => ({ value: [said(block(JSON.stringify({ ideas })))] }));
+    on("ui.invalidate", () => ({ value: undefined }));
+    on("turn.complete", (_, e) => ({ text: e.answer }));
+    const opened: unknown[] = [];
+    on("ui.open", (_, e) => (opened.push(e), { value: { isPlaced: true } }) as any);
+    const toasts: unknown[] = [];
+    on("ui.toast", (_, e) => (toasts.push(e), { value: undefined }));
+    await $.turn.complete({ answer: "ok", durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    expect(model({ ideas }).chips).toEqual([]);
+    await $.command.run({ command: "ideas", args: "" } as any);
+    expect(opened).toHaveLength(1);
+    await $.command.run({ command: "facts", args: "" } as any);
+    expect(opened).toHaveLength(1);
+    expect(toasts).toHaveLength(1);
+  });
+  test("clicking an idea puts its stem in the prompt", async ($, on) => {
+    mock.store(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
+    // A question keeps the band drawn, so a click has a Client to come from.
+    on("session.messages", () => ({ value: [said(block(JSON.stringify({ ideas, questions: [{ q: "q?", options: [] }] })))] }));
     on("ui.invalidate", () => ({ value: undefined }));
     on("turn.complete", (_, e) => ({ text: e.answer }));
     let box = "";
@@ -820,8 +605,6 @@ test("a short form that fills its token cap is dropped, and the reply stays long
     return { value: undefined };
   });
   on("model.complete", () => ({ value: { isAnswered: true, text: "No tool checks sung words yet. | 40", usage: { output_tokens: SHORT_CAP } } }) as any);
-  on("session.root", () => ({ value: "/r" }));
-  on("process.run", () => ({ value: { exitCode: 0, stdout: "", stderr: "" } }) as any);
   let shown = "";
   on("ui.render", (_, e) => {
     shown = (e.props as any).text;

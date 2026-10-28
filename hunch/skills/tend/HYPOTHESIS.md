@@ -1,4 +1,4 @@
-With `tend` on, what the session settled and what its agents returned sit one click away above the prompt, and what goes back to the model goes in the user's own words.
+With `tend` on, the session's open questions and Claude's suggestions sit one click away above the prompt, its facts and consult's ideas one command away (`/facts`, `/ideas`), and what goes back to the model goes in the user's own words.
 
 Graduate when it stays on for 10 real sessions with no part turned off and the user never scrolls back for something the band holds. Kill if the user turns it off, or a chip hides something they needed.
 
@@ -43,3 +43,8 @@ In control, 1–7, per round: first-timer 3 → 3 → 4, expert 3 → 4 → 5. R
 - Source files open in the editor (`code -g`), the rest with `open`.
 - Cut: a standing agents row (the user: "agents should exist as a pane only"); the full report inline (card-sized, plain); uppercase and coloured buttons (Norman, Wathan and Jev agreed: brackets are the sign, colour means state).
 - The band grows upward: a card opens above its chips, so the chips never move under the pointer (`▴` marks the open one). The transcript can still move above them while a turn streams.
+
+### 2026-10-28 — slimmed to what the user uses
+
+- Cut: the intent, shape, watch, agents, smooth and skills chips (the user almost never used them), and with them the agent cards, the agent-return ask, the file pane and the next-skill Tab hint. smooth still runs nightly; its fixes read as `smooth/<date>` branches.
+- Facts and ideas leave the band: Claude still writes them in the card, and `/facts` and `/ideas` open them in the pane.

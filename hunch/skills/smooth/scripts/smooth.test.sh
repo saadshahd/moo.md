@@ -76,8 +76,6 @@ ok "checked-out branch untouched"        '! grep -q "make test" "$repo/CLAUDE.md
 ok "no worktree left"                    '[ "$(git -C "$repo" worktree list | wc -l)" -eq 1 ]'
 ok "output names review, keep, drop"     'printf "%s" "$out" | grep -q "review: git" && printf "%s" "$out" | grep -q "keep:" && printf "%s" "$out" | grep -q "drop:"'
 
-pending=$("$here/pending.sh" "$repo")
-ok "pending lists the waiting fix"       '[ "$pending" = "$(printf "%s\t%s\t%s" "$repo" "$branch" "the agent runs make test, from CLAUDE.md")" ]'
 ok "a waiting fix has no trend yet"      '[ -z "$("$here/trend.sh" "$repo")" ]'
 
 run
@@ -85,7 +83,6 @@ ok "second run today: says so"           '[ $code -eq 0 ] && printf "%s" "$out" 
 
 git -C "$repo" branch -q -m "$branch" smooth/2000-01-01
 git -C "$repo" merge -q --no-edit smooth/2000-01-01
-ok "a kept fix is no longer pending"     '[ -z "$("$here/pending.sh" "$repo")" ]'
 STUB_MODE=mem run
 ok "trend recounts the last kept fix"         'printf "%s" "$out" | grep -q "trend: failed commands, make tset: 2 → 2"'
 ok "memory fix on the memory branch"     'git -C "$proj/memory" show "$branch:tests.md" | grep -q "make test" && [ ! -e "$proj/memory/tests.md" ]'

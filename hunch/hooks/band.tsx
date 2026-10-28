@@ -5,12 +5,9 @@
 export type Item = {
   id: string;
   label: string;
-  kind: "chip" | "line" | "quiet" | "note" | "title";
+  kind: "chip" | "line" | "note" | "title";
   /** Its card or pane is showing. */
   open?: true;
-  state?: "done" | "running";
-  /** An agent already read: kept for reopening, drawn dim. */
-  read?: true;
   /** It sits this far past where it would start: an answer under its question. */
   indent?: number;
   /** One of a row's leading columns: each cell takes the width of the widest one in its place
@@ -19,8 +16,7 @@ export type Item = {
   /** What the reader acts on, set bold among quieter text. */
   strong?: true;
 };
-/** `doc`: markdown read below the rows (the pane's result or file); "" for none. */
-export type Band = { chips: Item[]; body: Item[][]; doc: string };
+export type Band = { chips: Item[]; body: Item[][] };
 
 /** The pane's width, padding included: its text runs about 72 characters, past which a line is hard to read back. */
 export const MEASURE = 76;
@@ -59,23 +55,19 @@ export function move(f: Focus, rows: Item[][], key: string): Focus {
   return { row, col };
 }
 
-const GLYPH = { done: " ✓", running: " ●" };
-const GLYPH_COLOR = { done: "success", running: "warning" };
-
-/** An item's text in its pieces: brackets for what acts like a button, a state glyph. */
+/** An item's text in its pieces: brackets for what acts like a button. */
 function pieces(i: Item) {
   const button = i.kind === "chip" || i.id === "close";
   return {
     pre: button ? `[ ${i.open ? "▴ " : ""}` : "",
     label: i.label,
-    glyph: i.state ? GLYPH[i.state] : "",
     post: button ? " ]" : "",
   };
 }
 
 const textOf = (i: Item) => {
   const p = pieces(i);
-  return p.pre + p.label + p.glyph + p.post;
+  return p.pre + p.label + p.post;
 };
 
 export type Line = {
@@ -167,18 +159,6 @@ function wrapLine(text: string, width: number): string[] {
   return out.map((l) => (l.length > width ? `${l.slice(0, width - 1)}…` : l));
 }
 
-/** Claude Code refuses a Markdown whose text runs past this many characters. */
-export const DOC_MAX = 10_000;
-const CUT = "\n\n_…the rest is past what the pane can draw_";
-
-/** The doc as the pane can draw it: past `DOC_MAX`, cut at the last whole line that fits. */
-export function drawable(doc: string): string {
-  if (doc.length <= DOC_MAX) return doc;
-  const head = doc.slice(0, DOC_MAX - CUT.length);
-  const line = head.lastIndexOf("\n");
-  return (line > 0 ? head.slice(0, line) : head) + CUT;
-}
-
 export function hit(lines: Line[], x: number, y: number): Item | undefined {
   return lines
     .find((l) => l.y === y)
@@ -189,7 +169,7 @@ export function hit(lines: Line[], x: number, y: number): Item | undefined {
 const typed = new WeakMap<object, string>();
 
 export default function BandView(band: Band, surface: any) {
-  const { Box, Text, Markdown } = surface.elements;
+  const { Box, Text } = surface.elements;
   const rows = navRows(band);
   const lines = layout(band, surface.columns || 200);
   const f = move(surface.state ?? { row: 0, col: 0 }, rows, "");
@@ -234,7 +214,7 @@ export default function BandView(band: Band, surface: any) {
   });
 
   // Colour carries state only, by theme key so it follows the user's theme:
-  // what is open in the engine's selection blue, ✓ and ● in their colours.
+  // what is open in the engine's selection blue.
   // Brackets recede so the words stand; hover marks what takes a click.
   const draw = (c: Cell, marginLeft: number) => {
     const i = c.item;
@@ -247,10 +227,9 @@ export default function BandView(band: Band, surface: any) {
         : [
             p.pre && Text({ key: "pre", color: "subtle", children: p.pre }),
             p.label,
-            p.glyph && Text({ key: "g", color: GLYPH_COLOR[i.state!], children: p.glyph }),
             p.post && Text({ key: "post", color: "subtle", children: p.post }),
           ].filter(Boolean);
-    if (i.kind === "quiet" || i.kind === "note" || i.read) style.dimColor = true;
+    if (i.kind === "note") style.dimColor = true;
     if (i.open) Object.assign(style, { bold: true, color: "suggestion" });
     if (i.kind === "title" || i.strong) style.bold = true;
     if (focusable(i)) style.hover = { color: "suggestion" };
@@ -272,18 +251,6 @@ export default function BandView(band: Band, surface: any) {
       ? [Box({ key: "body", flexDirection: "column", children: body })]
       : []),
     ...lines.filter((l) => l.part === "chips").map(row),
-    ...(band.doc
-      ? [
-          Box({
-            key: "doc",
-            marginTop: 1,
-            children: [
-              // A Client's Markdown takes no link handler: its links are listed as rows instead.
-              Markdown({ key: "md", text: drawable(band.doc) }),
-            ],
-          }),
-        ]
-      : []),
   ];
   return Box({ flexDirection: "column", children: out });
 }

@@ -5,53 +5,22 @@ export type Question = { q: string; options: string[] };
 /** One expert's idea to try; `test` pits it against the version that exists. */
 export type Idea = { by: string; idea: string; why?: string; test?: string };
 export type Card = {
-  intent?: string;
-  shape?: string;
-  /** An agent's own one-line answer; the session's card has none. */
-  outcome?: string;
   facts?: string[];
   /** What the agent would change and kept to itself, from the complain skill. */
   suggestions?: string[];
   questions?: Question[];
   ideas?: Idea[];
-  skills?: { name: string; outcome: string }[];
-  watch?: { label: string; open: string; see?: string }[];
 };
-type Msg = {
-  role: string;
-  text: string;
-  toolUses?: { tool: string; input: Record<string, unknown> }[];
-  toolResults?: { text: string }[];
-};
-/** A fix smooth left on a branch, waiting to be kept or dropped: `dir` is the repo or memory folder it sits in. */
-export type Fix = { dir: string; branch: string; line: string };
-/** What smooth has for the project: its waiting fixes, and how the friction behind the last kept one moved ("" for none). */
-export type Smooth = { fixes: Fix[]; trend: string };
-/** `read`: opened once, drawn dim in the agents list. */
-export type Row = {
-  id: string;
-  label: string;
-  type: string;
-  done: boolean;
-  read?: true;
-};
-
-// What a card's facts are, for the session and its agents alike.
+type Msg = { role: string; text: string };
+// What a card's facts are.
 const FACTS =
   "what the user should carry forward — durable, in plain words, no file paths, tool steps or change details";
 
 export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what it settled; omit unchanged keys, [] clears a list:
-{"intent":"…","shape":"…","facts":["…"],"questions":[{"q":"…","options":["…"]}],"skills":[{"name":"hope:…","outcome":"…"}],"watch":[{"label":"…","open":"url|path|pane:path","see":"…"}]}
-facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open. skills: the planned skills in order. watch: where a human looks and what should appear there, never agent state.
+{"facts":["…"],"questions":[{"q":"…","options":["…"]}]}
+facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
-// Asked of every agent the session starts, so its pane reads like the session's card.
-export const AGENT_CARD = `End your final answer (your last reply, or your last message to the lead) with a \`\`\`card JSON block: {"intent":"…","outcome":"…","facts":["…"]}. intent: what you set out to do. outcome: your answer in one line. facts: ${FACTS}.`;
-// Asked of the session when one of its agents returns: the result sits in the agents pane, not the thread.
-export const AGENT_RETURN = `The user did not send this agent's return; its result sits in their agents pane. Carry on any work it unblocks. Then, if the result changes what the user does next, tell them in one line. Otherwise your reply is only an empty card block:
-\`\`\`card
-{}
-\`\`\``;
-// Asked of consult, so its ideas list in the band to pick from.
+// Asked of consult, so `/ideas` lists its ideas to pick from.
 export const IDEAS_FORMAT = `End your reply with a \`\`\`card JSON block of the ideas, and your yes/no as its one question:
 {"ideas":[{"by":"<expert>","idea":"…","why":"…","test":"…"}],"questions":[{"q":"…","options":["yes","no"]}]}
 test: only where this idea's win differs from the one the reply names for all. The question is the reply's last line, word for word. The user cites an idea by its 1-based position: \`idea 2: …\`.`;
@@ -72,18 +41,9 @@ const CARD_RE = /(?<=^|\n)```card[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*\n?/g;
 const PANE = "tend";
 
 const PAD = 2;
-const CHIPS = [
-  "intent",
-  "shape",
-  "facts",
-  "ideas",
-  "questions",
-  "suggestions",
-  "skills",
-  "watch",
-  "smooth",
-  "agents",
-] as const;
+const CHIPS = ["questions", "suggestions"] as const;
+// Kept in the card, shown only when asked for.
+const ON_DEMAND = ["facts", "ideas"] as const;
 
 // ---- pure ----
 
@@ -147,9 +107,6 @@ const list = <T,>(v: unknown, keep: (x: any) => x is T): T[] | undefined =>
 /** The model's JSON, keeping only well-formed parts, so a bad field can't break the band. */
 export function cleanCard(c: any): Card {
   const card: Card = {
-    intent: str(c.intent) ? c.intent : undefined,
-    shape: str(c.shape) ? c.shape : undefined,
-    outcome: str(c.outcome) ? c.outcome : undefined,
     facts: list(c.facts, str),
     suggestions: list(c.suggestions, str),
     questions: list(
@@ -165,23 +122,13 @@ export function cleanCard(c: any): Card {
         (d.why === undefined || str(d.why)) &&
         (d.test === undefined || str(d.test)),
     ),
-    skills: list(
-      c.skills,
-      (k): k is { name: string; outcome: string } =>
-        str(k?.name) && str(k.outcome),
-    ),
-    watch: list(
-      c.watch,
-      (w): w is { label: string; open: string; see?: string } =>
-        str(w?.label) && str(w.open),
-    ),
   };
   for (const k of Object.keys(card) as (keyof Card)[])
     if (card[k] === undefined) delete card[k];
   return card;
 }
 
-/** Each key from the newest block that has it: a clarify card keeps compose's skills.
+/** Each key from the newest block that has it: a clarify card keeps consult's ideas.
  * Suggestions add up instead, oldest first: a later one never hides an earlier, and a repeat shows once. */
 export function latestCard(msgs: Msg[]): Card {
   const card: Card = {};
@@ -271,11 +218,6 @@ export function replayCard(card: Card): string | undefined {
   return `The session card as it stood before this compaction, word for word:\n\`\`\`card\n${JSON.stringify(card)}\n\`\`\`\n`;
 }
 
-/** A plan may name `clarify` where the engine reports `hope:clarify`. */
-export function hasRun(ran: Set<string>, name: string): boolean {
-  return ran.has(name) || [...ran].some((r) => r.endsWith(`:${name}`));
-}
-
 /** The command a prompt starts with: `/hope:intent x` gives `hope:intent`; a path like `/a/b.md` gives none. */
 export function slashName(text: string): string | undefined {
   return text.match(/^\/([\w:-]+)(?:\s|$)/)?.[1];
@@ -286,36 +228,6 @@ export function commandFor(names: string[], name: string): string | undefined {
   return (
     names.find((n) => n === name) ?? names.find((n) => n.endsWith(`:${name}`))
   );
-}
-
-export function clip(text: string, max = 40): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
-
-export function tablesToLists(md: string): string {
-  const out: string[] = [];
-  let head: string[] | null = null;
-  const cells = (l: string) =>
-    l
-      .trim()
-      .replace(/\\\|/g, "\0")
-      .replace(/^\||\|$/g, "")
-      .split("|")
-      .map((c) => c.trim().replace(/\0/g, "|"));
-  for (const l of md.split("\n")) {
-    if (!l.trim().startsWith("|")) {
-      head = null;
-      out.push(l);
-    } else if (/^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(l)) continue;
-    else if (!head) head = cells(l);
-    else {
-      const c = cells(l);
-      out.push(`- **${c[0]}**`);
-      for (let i = 1; i < c.length; i++)
-        out.push(`  - ${head[i] ?? ""}: ${c[i]}`);
-    }
-  }
-  return out.join("\n");
 }
 
 export function bareFact(f: string): string {
@@ -371,118 +283,7 @@ export function ideaSegments(text: string): Segment[] {
   return out;
 }
 
-export function firstLine(text: string): string {
-  return (
-    text
-      .split("\n")
-      .find((l) => l.trim())
-      ?.trim() ?? ""
-  );
-}
-
-const TEAMMATE_RE =
-  /^\s*<teammate-message\b([^>]*)>([\s\S]*?)<\/teammate-message>\s*$/;
-
-export type AgentView = {
-  asked: string;
-  returned: string;
-  body: string;
-  card: Card;
-  footprint: string[];
-};
-
-/** What an agent was asked, what it returned, the card it ended on, and the files and pages
- * it changed or fetched. A teammate's brief arrives wrapped as a teammate-message, and its
- * answer is its last SendMessage. */
-export function agentView(msgs: Msg[]): AgentView {
-  const first =
-    msgs.find((m) => m.role === "user" && m.text.trim())?.text ?? "";
-  const wrapped = first.match(TEAMMATE_RE);
-  const summary = wrapped?.[1].match(/summary="([^"]*)"/)?.[1];
-  const asked = summary || firstLine(wrapped ? wrapped[2] : first);
-  const footprint = [
-    ...new Set(
-      msgs.flatMap((m) =>
-        (m.toolUses ?? []).flatMap((t) => {
-          const target = FOOTPRINT[t.tool] && t.input[FOOTPRINT[t.tool]];
-          return typeof target === "string" ? [target] : [];
-        }),
-      ),
-    ),
-  ];
-  // The report is the fullest thing it said back: a closing "task complete" never hides it.
-  let returned = "";
-  let raw = "";
-  for (const m of msgs) {
-    if (m.role !== "assistant") continue;
-    for (const t of m.toolUses ?? []) {
-      const message = t.tool === "SendMessage" ? t.input.message : undefined;
-      if (typeof message === "string" && message.length >= raw.length) {
-        raw = message;
-        returned = String(t.input.summary ?? "");
-      }
-    }
-    if (m.text.trim().length >= raw.length) {
-      raw = m.text;
-      returned = "";
-    }
-  }
-  const card = latestCard([{ role: "assistant", text: raw }]);
-  return { asked, returned, body: stripCards(raw), card, footprint };
-}
-
-// The tools whose argument is a place a human can look: what the agent changed or read online.
-const FOOTPRINT: Record<string, string> = {
-  Write: "file_path",
-  Edit: "file_path",
-  NotebookEdit: "notebook_path",
-  WebFetch: "url",
-};
-
-/** The places a markdown text links to, in order, once each: a pane lists them to click. */
-export function links(md: string): string[] {
-  return [
-    ...new Set(
-      [...md.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)]
-        .map((m) => m[1].replace(/^file:\/\//, ""))
-        // A place: a url, a path, or a file name; never an anchor or a bare word like `url`.
-        .filter(
-          (h) =>
-            /^([a-z]+:\/\/|\/|\.{1,2}\/|~\/)/i.test(h) ||
-            /\.[a-z0-9]+$/i.test(h),
-        ),
-    ),
-  ];
-}
-
-/** A place as a person names it: a file by its name, a page by its site and path. */
-export function placeName(target: string): string {
-  const url = target.match(/^[a-z]+:\/\/(?:www\.)?([^/?#]+)([^?#]*)/i);
-  if (url)
-    return `${url[1]}${url[2].length > 1 ? url[2].replace(/\/$/, "") : ""}`;
-  return target.split("/").pop() || target;
-}
-
-/** What a pane shows for a file it could not read: a missing file is one not written yet. */
-export function unreadable(path: string, err: unknown): string {
-  return /\bENOENT\b/.test(String(err))
-    ? `_not written yet: ${path}_`
-    : `_${String(err)}_`;
-}
-
-/** A link read in a file, as a place to open: relative ones sit beside the file. */
-export function fromFile(file: string, href: string): string {
-  return href.startsWith("/") || href.includes("://")
-    ? href
-    : `${file.slice(0, file.lastIndexOf("/") + 1)}${href}`;
-}
-
 const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
-const quiet = (id: string, label: string): Item => ({
-  id,
-  label,
-  kind: "quiet",
-});
 const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
 const title = (id: string, label: string): Item => ({
   id,
@@ -506,100 +307,27 @@ export function factParts(f: string): [string, string] {
   return [head, rest.join(" ")];
 }
 
-/** Facts as bullets a blank line apart: each claim, then what lost and why dim under it.
- * `whose` names the probe: "" for the session's card, an agent's name and a space for its pane. */
-function factRows(facts: string[], whose: string): Item[][] {
+/** Facts as bullets a blank line apart: each claim, then what lost and why dim under it. */
+function factRows(facts: string[]): Item[][] {
   return spaced(
     facts.map((f, i) => {
       const [head, rest] = factParts(f);
       return [
-        [line(`probe:${whose}fact ${i + 1}`, `• ${head}`)],
-        ...(rest ? [[under(note(`fact-note:${whose}${i}`, rest))]] : []),
+        [line(`probe:fact ${i + 1}`, `• ${head}`)],
+        ...(rest ? [[under(note(`fact-note:${i}`, rest))]] : []),
       ];
     }),
   );
 }
 
-/** An agent's pane as a card: intent, outcome, where to look, the facts it rests on; the full
- * report one click further. Its sections sit a blank line apart, the labels one column. */
-export function agentRows(v: AgentView, name: string, id: string): Item[][] {
-  const label = (word: string) => column(note(`note:${word}`, word));
-  const section = (word: string, rows: Item[][]) =>
-    rows.length
-      ? [rows.map((r, i) => (r.length ? [label(i ? "" : word), ...r] : r))]
-      : [];
-  const outcome =
-    v.card.outcome || v.returned || firstLine(v.body.replace(/^#.*$/gm, ""));
-  const intent = v.card.intent || v.asked;
-  return spaced([
-    ...section(
-      "intent",
-      intent ? [[line(`probe:${name} intent`, intent)]] : [],
-    ),
-    // The answer is what the reader came for: it reads bold.
-    ...section(
-      "outcome",
-      outcome
-        ? [
-            [
-              {
-                ...line(`probe:${name} outcome`, outcome),
-                strong: true as const,
-              },
-            ],
-          ]
-        : [],
-    ),
-    ...section(
-      "watch",
-      [...new Set([...v.footprint, ...links(v.body)])].map((f) => [
-        line(`open:${f}`, placeName(f)),
-      ]),
-    ),
-    ...section("facts", factRows(v.card.facts ?? [], `${name} `)),
-    ...section(
-      "report",
-      v.body ? [[quiet(`report:${id}`, "read it all")]] : [],
-    ),
-  ]);
-}
-
-const SOURCE_RE =
-  /\.(tsx?|jsx?|mjs|cjs|json|py|rb|go|rs|java|kt|swift|c|h|cc|cpp|hpp|cs|sh|zsh|toml|ya?ml|css|scss|sql|lua|txt)$/i;
-
-/** A local text file a person edits, not a page, a picture or a document to view. */
-export function isSourceFile(target: string): boolean {
-  return (
-    !target.includes("://") &&
-    (SOURCE_RE.test(target) || !/\.[^/]+$/.test(target))
-  );
-}
-
-/** A chip's label with the one number that previews its card: how many, or skills run of planned. */
-export function chipLabel(name: string, s: Shown): string {
-  if (name === "intent" || name === "shape") return name;
-  if (name === "skills") {
-    const planned = s.card.skills ?? [];
-    return `skills ${planned.filter((k) => hasRun(s.ran, k.name)).length}/${planned.length}`;
-  }
-  if (name === "facts") return `facts ${s.card.facts?.length ?? 0}`;
-  if (name === "questions") return `questions ${s.card.questions?.length ?? 0}`;
-  if (name === "ideas") return `ideas ${s.card.ideas?.length ?? 0}`;
-  if (name === "suggestions")
-    return `suggestions ${s.card.suggestions?.length ?? 0}`;
-  if (name === "smooth")
-    return s.smooth.fixes.length ? `smooth ${s.smooth.fixes.length}` : "smooth";
-  return `${name} ${chipRows(name, s).length}`;
+/** A chip's label with the one number that previews its card: how many. */
+export function chipLabel(name: (typeof CHIPS)[number], card: Card): string {
+  return `${name} ${card[name]?.length ?? 0}`;
 }
 
 /** A card's lines; each inner list is one row the arrows move along. */
-export function cardRows(c: Card, name: string, ran: Set<string>): Item[][] {
-  if (name === "intent" || name === "shape")
-    // Each sentence its own paragraph, set in from the pane's edge.
-    return c[name]
-      ? [[under(line(`probe:${name}`, sentences(c[name]!).join("\n\n")))]]
-      : [];
-  if (name === "facts") return factRows(c.facts ?? [], "");
+export function cardRows(c: Card, name: string): Item[][] {
+  if (name === "facts") return factRows(c.facts ?? []);
   if (name === "suggestions")
     return spaced(
       (c.suggestions ?? []).map((t, i) => [
@@ -635,98 +363,18 @@ export function cardRows(c: Card, name: string, ran: Set<string>): Item[][] {
         ),
       ]),
     );
-  if (name === "skills")
-    return (c.skills ?? []).map((k, i) => [
-      column({
-        ...line(`skill:${i}`, k.name),
-        ...(hasRun(ran, k.name) ? { state: "done" as const } : {}),
-      }),
-      note(`skill-note:${i}`, k.outcome),
-    ]);
-  if (name === "watch")
-    return (c.watch ?? []).map((w, i) => [
-      column(line(`watch:${i}`, w.label)),
-      quiet(`probe:watch ${i + 1}`, "?"),
-      ...(w.see ? [note(`watch-note:${i}`, w.see)] : []),
-    ]);
   return [];
 }
 
-function agentItem(r: Row, paneItem: string | null): Item {
+/** The band is its chips alone, each with content: every card reads in the pane. */
+export function bandModel(card: Card, paneItem: string | null): Band {
   return {
-    id: `agent:${r.id}`,
-    label: clip(r.label),
-    kind: "line",
-    state: r.done ? "done" : "running",
-    ...(r.read ? { read: true as const } : {}),
-    ...(paneItem === `agent:${r.id}` ? { open: true as const } : {}),
-  };
-}
-
-/** What the band draws from. */
-export type Shown = {
-  card: Card;
-  ran: Set<string>;
-  rows: Row[];
-  paneItem: string | null;
-  smooth: Smooth;
-};
-
-/** The chip a pane item belongs to: a card's own, or agents for an agent's card or report. */
-export function paneChip(paneItem: string | null): string | undefined {
-  const [kind, ...rest] = (paneItem ?? "").split(":");
-  return kind === "card"
-    ? rest.join(":")
-    : kind === "agent" || kind === "report"
-      ? "agents"
-      : undefined;
-}
-
-/** The rows a chip opens: the card's, the session's agents, or smooth's trend and waiting fixes. */
-export function chipRows(name: string, s: Shown): Item[][] {
-  return name === "agents"
-    ? s.rows.map((r) => [agentItem(r, s.paneItem)])
-    : name === "smooth"
-      ? smoothRows(s.smooth)
-      : cardRows(s.card, name, s.ran);
-}
-
-/** The trend first, the one line that says whether the work got smoother; then each fix and its branch. */
-export function smoothRows(sm: Smooth): Item[][] {
-  return [
-    ...(sm.trend ? [[note("smooth-trend", `since the last kept fix: ${sm.trend}`)]] : []),
-    ...sm.fixes.map((f, i) => [
-      column(line(`smooth:${i}`, clip(f.line, 60))),
-      note(`smooth-note:${i}`, f.branch),
-    ]),
-  ];
-}
-
-/** smooth's pending.sh output: one fix per line, `<dir> TAB <branch> TAB <the fix>`. */
-export function parseFixes(stdout: string): Fix[] {
-  return stdout
-    .split("\n")
-    .map((l) => l.split("\t"))
-    .flatMap(([dir, branch, line, ...more]) =>
-      dir && branch && line && !more.length ? [{ dir, branch, line }] : [],
-    );
-}
-
-/** The band is its chips alone: every card reads in the pane. */
-export function bandModel(s: Shown): Band {
-  const shown = CHIPS.filter((n) => chipRows(n, s).length > 0);
-  return {
-    doc: "",
-    chips: shown.map((n) => ({
+    chips: CHIPS.filter((n) => card[n]?.length).map((n) => ({
       id: `chip:${n}`,
-      label: chipLabel(n, s),
+      label: chipLabel(n, card),
       kind: "chip",
       // Client props refuse undefined, so an unmarked chip has no key at all.
-      ...(paneChip(s.paneItem) === n ? { open: true as const } : {}),
-      // While any agent works, its chip says so.
-      ...(n === "agents" && s.rows.some((r) => !r.done)
-        ? { state: "running" as const }
-        : {}),
+      ...(paneItem === `card:${n}` ? { open: true as const } : {}),
     })),
     body: [],
   };
@@ -735,29 +383,13 @@ export function bandModel(s: Shown): Band {
 // ---- state ----
 
 let card: Card = {};
-let rows: Row[] = [];
 // The questions still open: a card block holds only those its writer chose, and the user's
 // next prompt closes them all, however it answered them.
 let open: Question[] | undefined;
 let paneItem: string | null = null;
 let lastPaneItem: string | null = null;
-const ran = new Set<string>();
-// The plan moved this turn (new card, or a skill ran): only then suggest the next skill.
-let planMoved = false;
-let nextCmd: string | undefined;
-const paneText = new Map<string, string>();
-// The agent a pane shows, kept past a reset that empties the rows while its pane stays open.
-const paneAgent = new Map<string, Row>();
-// Agents of a session this module no longer serves.
-const gone = new Set<string>();
-// Teammates whose last turn ended; a tool call of theirs starts them again.
-const idle = new Set<string>();
-// What each opened agent was asked and returned: a wrong brief is the cheapest thing to catch.
-const views = new Map<string, AgentView>();
 let started = false;
 let sessionId = "";
-// smooth's view of the project: fixes read at the session's start and after each turn, the trend at the start.
-let smooth: Smooth = { fixes: [], trend: "" };
 // Bumped to hand the keys back to the prompt: the Client redraws under a new key.
 let fills = 0;
 // The stem last put in the box, to swap while it stands bare.
@@ -783,6 +415,12 @@ async function registerCommands($: any) {
     description: "Show replies at full length, or short again",
     immediate: true,
   });
+  for (const name of ON_DEMAND)
+    await $.command.register({
+      name,
+      description: `Show this session's ${name}`,
+      immediate: true,
+    });
 }
 
 // A rewrite that fills its token cap was cut off, and with it the reply's closing ask.
@@ -807,40 +445,7 @@ async function shorten($: any, reply: string) {
 
 async function readSession($: any) {
   await sid($);
-  const msgs: Msg[] = await $.session.messages();
-  const next = withOpen(latestCard(msgs), open);
-  if (JSON.stringify(next) !== JSON.stringify(card)) planMoved = true;
-  card = next;
-  $.ui.invalidate("ui.render");
-}
-
-/** One of smooth's scripts, run in the project; "" outside any repo, where the scripts exit 2. */
-async function smoothScript($: any, name: string): Promise<string> {
-  const r = await $.process.run(
-    [`${$.plugin.root}/skills/smooth/scripts/${name}`],
-    { cwd: await $.session.root() },
-  );
-  if (r.exitCode === 2) return "";
-  if (r.exitCode !== 0)
-    throw new Error(`smooth's ${name} failed: ${r.stderr.trim()}`);
-  return r.stdout;
-}
-
-// The last failure shown: a read every turn would otherwise repeat it every turn.
-let smoothError = "";
-async function readSmooth($: any, withTrend: boolean) {
-  try {
-    const fixes = parseFixes(await smoothScript($, "pending.sh"));
-    const trend = withTrend
-      ? (await smoothScript($, "trend.sh")).trim()
-      : smooth.trend;
-    smooth = { fixes, trend };
-    smoothError = "";
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg !== smoothError) $.ui.toast(`tend: ${msg}`);
-    smoothError = msg;
-  }
+  card = withOpen(latestCard(await $.session.messages()), open);
   $.ui.invalidate("ui.render");
 }
 
@@ -875,14 +480,11 @@ async function sid($: any): Promise<string> {
 async function load($: any, id: string) {
   if (!(await headless($))) await keepRecent($, id);
   const get = (k: string) => $.store.get(`tend:${id}:${k}`);
-  for (const r of ((await get("ran")) as string[]) ?? []) ran.add(r);
-  for (const i of ((await get("idle")) as string[]) ?? []) idle.add(i);
   for (const [k, v] of Object.entries(
     ((await get("short")) as Record<string, string>) ?? {},
   ))
     short.set(k, v);
   open = (await get("open")) as Question[] | undefined;
-  rows = ((await $.store.get(`tend:${id}`)) as Row[]) ?? [];
 }
 
 /** A `-p` run or the SDK draws nowhere, so nobody sees what it would keep. Hooks spawn many:
@@ -947,12 +549,6 @@ async function keepRecent($: any, id: string) {
   await save($, "tend:recent", kept);
 }
 
-async function remember($: any) {
-  await sid($);
-  await save($, `tend:${sessionId}:ran`, [...ran]);
-  await save($, `tend:${sessionId}:idle`, [...idle]);
-}
-
 async function setOpen($: any, questions: Question[]) {
   await sid($);
   open = questions;
@@ -961,116 +557,23 @@ async function setOpen($: any, questions: Question[]) {
   await save($, `tend:${sessionId}:open`, open);
 }
 
-// Finished agents drop out of $.agent.list(); rows keep them for the session.
-async function readAgents($: any) {
-  await sid($);
-  const listed: Row[] = ((await $.agent.list()) as any[])
-    .filter((a) => !a.parentId && !gone.has(a.id))
-    .map((a) => ({
-      id: a.id,
-      label: a.name ?? a.description,
-      type: a.type,
-      // A teammate stays `running` while idle; its own turn ending is what says done.
-      done:
-        a.type === "teammate"
-          ? idle.has(a.id)
-          : a.status !== "running" && a.status !== "pending",
-    }));
-  // Read after every await: a flag set a moment ago by another hook stands.
-  const next = [
-    ...listed.map((l) => ({ ...rows.find((k) => k.id === l.id), ...l })),
-    ...rows
-      .filter((k) => !listed.some((l) => l.id === k.id))
-      .map((k) => ({ ...k, done: true })),
-  ];
-  if (JSON.stringify(next) === JSON.stringify(rows)) return;
-  rows = next;
-  await save($, `tend:${sessionId}`, rows);
-  // A pane opened on an agent, its card or its report, reloads as the agent's rows change;
-  // loadAgent alone decides when there is a result to show.
-  const shown = paneItem?.match(/^(?:agent|report):(.+)$/)?.[1] ?? "";
-  if (shown && !paneText.has(`agent:${shown}`)) await loadAgent($, shown);
-  $.ui.invalidate("ui.render");
-}
-
-async function loadAgent($: any, id: string) {
-  const view = agentView(await $.session.messages({ agentId: id }));
-  views.set(`agent:${id}`, view);
-  if (rows.find((r) => r.id === id)?.done)
-    paneText.set(`agent:${id}`, view.body || "_no result_");
-}
-
-async function openAgent($: any, id: string) {
-  const r = rows.find((x) => x.id === id);
-  if (r) paneAgent.set(`agent:${id}`, r);
-  // The pane answers the click at once; the agent's words fill in when read.
-  const shown = showPane($, `agent:${id}`);
-  await loadAgent($, id);
-  // Rows may have been swapped by a poll while this waited: mark the current one.
-  if (rows.some((x) => x.id === id && x.done && !x.read)) {
-    rows = rows.map((x) => (x.id === id ? { ...x, read: true as const } : x));
-    await save($, `tend:${sessionId}`, rows);
-  }
-  $.ui.invalidate("ui.render");
-  await shown;
-}
-
-async function openTarget($: any, target: string) {
-  if (target.startsWith("pane:")) return showPane($, `file:${target.slice(5)}`);
-  if (/\.(md|markdown)$/i.test(target) && !target.includes("://"))
-    return showPane($, `file:${target}`);
-  return openOutside($, target, isSourceFile(target));
-}
-
-// In VS Code (`code`) when asked and it opens, else by the system's default.
-async function openOutside($: any, target: string, inEditor: boolean) {
-  const run = (argv: string[]) =>
-    $.process
-      .run(argv, { timeoutMs: 10000 })
-      .catch((err: unknown) => ({ exitCode: -1, stderr: String(err) }));
-  const opened = inEditor && (await run(["code", "-g", target])).exitCode === 0;
-  if (!opened && (await run(["open", target])).exitCode !== 0)
-    $.ui.toast(`can't open ${target}`);
-}
-
 async function showPane($: any, item: string) {
   paneItem = item;
   lastPaneItem = item;
-  // Open before reading: an open answering the press is placed at any width.
   // Never takes the keys: they stay with the prompt; a click inside hands them over.
-  const opened = $.ui.open({ id: PANE, title: "tend", closeOnEscape: true });
-  if (item.startsWith("file:"))
-    await $.fs.read(item.slice(5)).then(
-      (t: string) => paneText.set(item, t),
-      (err: unknown) => paneText.set(item, unreadable(item.slice(5), err)),
-    );
   $.ui.invalidate("ui.render");
-  const r = await opened;
+  const r = await $.ui.open({ id: PANE, title: "tend", closeOnEscape: true });
   if (!r.isPlaced) $.ui.toast(r.reason);
 }
 
-async function command($: any, name: string): Promise<string | undefined> {
+/** The card a skill is asked for, run where the run is certain (its Skill tool call, a prompt that
+ * starts with its command), since `skill.prompt` never reaches a user plugin where managed settings
+ * seat sec-default. */
+async function cardAsk($: any, name: string): Promise<string[]> {
   const names = ((await $.command.list()) as { name: string }[]).map(
     (c) => c.name,
   );
-  return commandFor(names, name);
-}
-
-async function slash($: any, name: string): Promise<string | undefined> {
-  const cmd = await command($, name);
-  return cmd && `/${cmd} `;
-}
-
-// A skill the session itself runs moves the plan; a card skill is asked for its card. Called only
-// where the run is certain (its Skill tool call, a prompt that starts with its command), since
-// `skill.prompt` never reaches a user plugin where managed settings seat sec-default.
-async function skillRan($: any, name: string): Promise<string[]> {
-  const skill = await command($, name);
-  if (!skill) return [];
-  ran.add(skill);
-  planMoved = true;
-  await remember($);
-  const format = CARD_SKILLS.get(skill);
+  const format = CARD_SKILLS.get(commandFor(names, name) ?? "");
   return format ? [format] : [];
 }
 
@@ -1085,7 +588,7 @@ async function fill($: any, text: string) {
   const box: string = (await $.prompt.read()).text;
   // A second press of the same line leaves the box as it is.
   if (box.trimEnd().endsWith(text.trimEnd())) return;
-  // A stem left bare is swapped for the new one, never stacked: "intent: fact 2: " can't happen.
+  // A stem left bare is swapped for the new one, never stacked: "idea 1: fact 2: " can't happen.
   const bare =
     lastStem && box.endsWith(lastStem)
       ? box.slice(0, -lastStem.length)
@@ -1115,22 +618,13 @@ async function setAnswer($: any, n: number, options: string[], pick: string) {
 }
 
 function reset() {
-  // The old session's agents can linger in `$.agent.list()`; they are never this session's.
-  for (const r of rows) gone.add(r.id);
   card = {};
-  rows = [];
   open = undefined;
   paneItem = null;
   lastPaneItem = null;
-  ran.clear();
-  idle.clear();
-  views.clear();
-  paneText.clear();
   typedFrom.clear();
   short.clear();
   lastStem = "";
-  planMoved = false;
-  nextCmd = undefined;
 }
 
 // What a press or Enter on a band or pane item does.
@@ -1146,26 +640,7 @@ async function act($: any, id: string) {
     const q = card.questions?.[i];
     // Answered once sent, not on the click: an abandoned answer leaves the question up.
     if (q) await setAnswer($, i + 1, q.options, q.options[j]);
-  } else if (kind === "skill") {
-    const k = card.skills?.[Number(arg)];
-    const cmd = k && (await slash($, k.name));
-    cmd ? await fill($, cmd) : $.ui.toast(`no command ${k?.name ?? ""}`);
-  } else if (kind === "watch") {
-    const w = card.watch?.[Number(arg)];
-    if (w) await openTarget($, w.open);
-  } else if (kind === "agent")
-    // A second press on what the pane shows closes it.
-    paneItem === id ? await $.ui.close({ id: PANE }) : await openAgent($, arg);
-  else if (kind === "smooth") {
-    const f = smooth.fixes[Number(arg)];
-    if (f)
-      await fill(
-        $,
-        `keep or drop the smooth fix on ${f.branch} in ${f.dir} (git -C ${f.dir} diff HEAD...${f.branch}): `,
-      );
-  } else if (kind === "open") await openTarget($, arg);
-  else if (kind === "close") await $.ui.close({ id: PANE });
-  else if (kind === "report") await showPane($, id);
+  } else if (kind === "close") await $.ui.close({ id: PANE });
   $.ui.invalidate("ui.render");
 }
 
@@ -1174,7 +649,6 @@ export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     const r = await next(e);
     await sid($);
-    loud($, readSmooth($, true));
     return r;
   });
 
@@ -1198,63 +672,35 @@ export const register: Register = (on) => {
     return {};
   });
 
-  // Every agent the session starts is asked to end on a card; an agent at work again is running and unread.
-  // A skill an agent runs is the agent's: it moves no plan and gets no card (AGENT_CARD asks its own).
+  for (const name of ON_DEMAND)
+    on("command.run", { command: name }, async ($) => {
+      if (card[name]?.length) await showPane($, `card:${name}`);
+      else $.ui.toast(`no ${name} yet`);
+      return {};
+    });
+
+  // A skill the session itself runs is asked for its card; an agent's skill is the agent's.
   on("tool.call", async ($, e, next) => {
-    if (
-      !e.agentId &&
-      e.tool === "Agent" &&
-      typeof (e as any).prompt === "string"
-    )
-      return next({
-        ...e,
-        prompt: `${(e as any).prompt}\n\n${AGENT_CARD}`,
-      } as any);
     const skill = (e as any).skill;
-    if (!e.agentId && e.tool === "Skill" && typeof skill === "string") {
-      const r = await next(e);
-      if (r.deny !== undefined) return r;
-      const asked = await skillRan($, skill);
-      return asked.length
-        ? { ...r, context: [...(r.context ?? []), ...asked] }
-        : r;
-    }
-    if (!e.agentId) return next(e);
-    const id = e.agentId;
-    if (idle.delete(id) || rows.some((x) => x.id === id && x.read)) {
-      rows = rows.map(({ read, ...x }) =>
-        x.id === id || !read ? x : { ...x, read },
-      );
-      paneText.delete(`agent:${id}`);
-      loud(
-        $,
-        remember($).then(() => readAgents($)),
-      );
-    }
-    return next(e);
+    if (e.agentId || e.tool !== "Skill" || typeof skill !== "string")
+      return next(e);
+    const r = await next(e);
+    if (r.deny !== undefined) return r;
+    const asked = await cardAsk($, skill);
+    return asked.length
+      ? { ...r, context: [...(r.context ?? []), ...asked] }
+      : r;
   });
 
   // The user's own prompt keeps a card already shown current: the model is asked for the keys this turn changes.
   on("prompt.submit", async ($, e, next) => {
     // A prompt that starts with a skill's command runs it, however the prompt arrived.
     const name = slashName(e.text);
-    const asked = name ? await skillRan($, name) : [];
+    const asked = name ? await cardAsk($, name) : [];
     const withContext = (more: string[]) =>
       more.length
         ? next({ ...e, context: [...(e.context ?? []), ...more] })
         : next(e);
-    // An agent's return arrives twice: its report as a peer's hand-back, then the task notification.
-    if (e.origin.kind === "task-notification" || e.origin.kind === "peer") {
-      const id = e.text
-        .match(/<task-id>([^<]+)<\/task-id>|<agent-message from="([^"]+)"/)
-        ?.slice(1)
-        .find(Boolean);
-      const agent =
-        !!id &&
-        (rows.some((r) => r.id === id) ||
-          ((await $.agent.list()) as any[]).some((a) => a.id === id));
-      return withContext(agent ? [...asked, AGENT_RETURN] : asked);
-    }
     if (e.origin.kind !== "composer") return withContext(asked);
     // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
     await setOpen($, []);
@@ -1264,41 +710,21 @@ export const register: Register = (on) => {
     ]);
   });
 
-  on("prompt.suggest", async ($, e, next) =>
-    e.origin.kind === "suggestion" && nextCmd
-      ? next({ ...e, text: nextCmd })
-      : next(e),
-  );
-
   on("turn.complete", async ($, e, next) => {
     const r = await next(e);
-    if (e.agentId) {
-      idle.add(e.agentId);
-      await remember($);
-      await readAgents($);
-    } else {
-      // Each turn moves the session to the front, so a long one outlives the sessions opened since.
-      if (!(await headless($)))
-        await save($, "tend:recent", await recent($, await sid($)));
-      loud($, readSmooth($, false));
-      await readSession($);
-      await setOpen($, turnQuestions(e.answer, card.questions ?? []));
-      const reply = stripCards(e.answer);
-      const asked =
-        ((await $.session.messages()) as Msg[]).findLast(
-          (m) => m.role === "user",
-        )?.text ?? "";
-      if (!(await headless($)) && wantsShort(reply, asked))
-        loud($, shorten($, reply));
-      const nextSkill =
-        planMoved && card.skills?.find((k) => !hasRun(ran, k.name));
-      planMoved = false;
-      // A suggestion made while the turn is live never shows.
-      nextCmd = (nextSkill && (await slash($, nextSkill.name))) || undefined;
-      const cmd = nextCmd;
-      if (cmd)
-        $.clock.after(1500, () => loud($, $.prompt.suggest({ text: cmd })));
-    }
+    if (e.agentId) return r;
+    // Each turn moves the session to the front, so a long one outlives the sessions opened since.
+    if (!(await headless($)))
+      await save($, "tend:recent", await recent($, await sid($)));
+    await readSession($);
+    await setOpen($, turnQuestions(e.answer, card.questions ?? []));
+    const reply = stripCards(e.answer);
+    const asked =
+      ((await $.session.messages()) as Msg[]).findLast(
+        (m) => m.role === "user",
+      )?.text ?? "";
+    if (!(await headless($)) && wantsShort(reply, asked))
+      loud($, shorten($, reply));
     return r;
   });
 
@@ -1335,7 +761,6 @@ export const register: Register = (on) => {
     }
     return r;
   });
-
   // The card block is for the band; the model keeps it, the transcript doesn't show it.
   on("ui.render", { component: "AssistantMessage" }, ($, e, next) => {
     const stripped = stripCards(e.props.text);
@@ -1371,26 +796,15 @@ export const register: Register = (on) => {
     return next({ ...e, props: { ...e.props, text } });
   });
 
-  // A teammate's message to the lead carries the card tend asked for; the row shows it without.
-  on("ui.render", { component: "UserMessage" }, ($, e, next) => {
-    const text = stripCards(e.props.text);
-    return text === e.props.text
-      ? next(e)
-      : next({ ...e, props: { ...e.props, text } });
-  });
-
   on("ui.render", { component: "AbovePrompt" }, ($, e, next) => {
     if (e.props.hasSurvey) return next(e);
     if (!started) {
       started = true;
-      // The poll starts first, so a failed step below (shown) never leaves the agents unread.
-      $.clock.every(2000, () => loud($, readAgents($)));
       loud(
         $,
         (async () => {
           await registerCommands($);
           await readSession($);
-          await readAgents($);
         })(),
       );
     }
@@ -1398,7 +812,7 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const band = bandModel({ card, paneItem, ran, rows, smooth });
+    const band = bandModel(card, paneItem);
     if (!band.chips.length) return <Box />;
     // A blank line parts the band from the reply above it, so the chips read as controls, not its last line.
     return (
@@ -1412,7 +826,6 @@ export const register: Register = (on) => {
       </Box>
     );
   });
-
   on("ui.message", async ($, e, next) => {
     const data = e.data as
       { act?: unknown; type?: unknown; release?: unknown } | undefined;
@@ -1443,92 +856,26 @@ export const register: Register = (on) => {
     const els = $.ui.resolve(e);
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const item = paneItem ?? "";
+    const name = (paneItem ?? "").replace(/^card:/, "");
     const width = Math.min(e.props.bodyColumns, MEASURE);
-    const inner = width - 2 * PAD;
-    const kind = item.slice(0, item.indexOf(":"));
-    const rest = item.slice(kind.length + 1);
-    const agent = rows.find((r) => r.id === rest) ?? paneAgent.get(item);
-    const view = views.get(item);
-    const close: Item = { id: "close", label: "close", kind: "line" };
     // The whole pane is one Client: clicks and keys reach it, typing goes on to the prompt.
-    const pane: Band =
-      kind === "agent" && agent
-        ? {
-            chips: [],
-            body: [
-              [
-                {
-                  id: "title",
-                  label: agent.label,
-                  kind: "title",
-                  state: agent.done ? "done" : "running",
-                },
-                { id: "note:type", label: agent.type ?? "", kind: "note" },
-                { id: "chip:agents", label: "back", kind: "quiet" },
-                close,
-              ],
-              [],
-              ...(view ? agentRows(view, agent.label, agent.id) : []),
-            ],
-            doc: "",
-          }
-        : kind === "report"
-          ? {
-              chips: [],
-              body: [
-                [
-                  {
-                    id: "title",
-                    label: paneAgent.get(`agent:${rest}`)?.label ?? "report",
-                    kind: "title",
-                  },
-                  { id: "note:report", label: "report", kind: "note" },
-                  { id: `agent:${rest}`, label: "back", kind: "quiet" },
-                  close,
-                ],
-              ],
-              doc: tablesToLists(paneText.get(`agent:${rest}`) ?? ""),
-            }
-          : {
-              chips: [],
-              body: [
-                [
-                  {
-                    id: "title",
-                    label:
-                      kind === "card" ? rest : (rest.split("/").pop() ?? rest),
-                    kind: "title",
-                  },
-                  close,
-                ],
-                [],
-                ...(kind === "card"
-                  ? chipRows(rest, { card, ran, rows, paneItem, smooth })
-                  : links(paneText.get(item) ?? "")
-                      .map((href) => fromFile(rest, href))
-                      .map((l, i) => [
-                        {
-                          id: `note:links${i}`,
-                          label: (i ? "" : "links").padEnd(9),
-                          kind: "note" as const,
-                        },
-                        {
-                          id: `open:${l}`,
-                          label: placeName(l),
-                          kind: "line" as const,
-                        },
-                      ])),
-              ],
-              doc:
-                kind === "card" ? "" : tablesToLists(paneText.get(item) ?? ""),
-            };
+    const pane: Band = {
+      chips: [],
+      body: [
+        [
+          { id: "title", label: name, kind: "title" },
+          { id: "close", label: "close", kind: "line" },
+        ],
+        [],
+        ...cardRows(card, name),
+      ],
+    };
     return (
       <Box width={width} paddingX={PAD} paddingY={1}>
         <Client
           key={`pane-${fills}`}
           module="./band.tsx"
-          width={inner}
+          width={width - 2 * PAD}
           props={pane}
         />
       </Box>
