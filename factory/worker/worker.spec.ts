@@ -646,9 +646,8 @@ describe("a review on an open PR", () => {
       expect(message).toContain(s);
     expect(message).toMatch(/push, then reply once on the PR .*with what changed and what was left\.$/);
   });
-  test("a review on an older head, an approval, a stranger's, an empty one, or one already woken for never wakes it", () => {
+  test("an approval, a stranger's, an empty one, or one already woken for never wakes it", () => {
     for (const w of [
-      at([review({ commit: "h0" })]),
       at([review({ state: "APPROVED" })]),
       at([review({ author: "stranger" })]),
       at([review({ state: "COMMENTED", body: " ", comments: [] })]),
@@ -662,6 +661,13 @@ describe("a review on an open PR", () => {
     const retried = [reviewWake(900, "2026-10-26T09:00:00Z"), posted({ kind: "stuck", issue: 7, reason: "x" }, "2026-10-26T09:30:00Z")];
 
     expect(step(at([review()], retried)).state).toMatchObject({ kind: "reviewed", rounds: 0 });
+  });
+  test("a review made before a push the run made for something else still wakes it; one woken for before a retry and pushed past does not", () => {
+    expect(step(at([review({ commit: "h0" })])).state).toMatchObject({ kind: "reviewed", rounds: 0 });
+
+    const retried = [reviewWake(900, "2026-10-26T09:00:00Z"), posted({ kind: "stuck", issue: 7, reason: "x" }, "2026-10-26T09:30:00Z")];
+
+    expect(step(at([review({ commit: "h0" })], retried)).state.kind).toBe("prOpen");
   });
   test("a third review round marks the issue stuck", () => {
     const { state, actions } = step(at([review({ id: 903 })], [reviewWake(901), reviewWake(902)]));

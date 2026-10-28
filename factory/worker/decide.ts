@@ -72,7 +72,7 @@ export type IssueState =
   | { kind: "behind"; pr: number; head: string; base: string }
   /** `deaths` counts the wakes that left the PR conflicting while the base stayed at `baseSha`. */
   | { kind: "conflicting"; pr: number; base: string; baseSha: string; deaths: number }
-  /** A trusted review asks for changes on the PR's head; `rounds` counts review wakes since the last retry. */
+  /** A trusted review asks for changes; `rounds` counts review wakes since the last retry. */
   | { kind: "reviewed"; pr: number; review: Review; rounds: number }
   | { kind: "limited"; until: number }
   | { kind: "limitReset" }
@@ -174,17 +174,22 @@ export function deathsSinceRetry(cs: readonly Comment[], a: Actors): number {
 const conflictWakes = (cs: readonly Comment[], a: Actors, sha: string) =>
   sinceRetry(cs, a).filter((c) => c.kind === "restart" && c.reason === "conflict" && c.baseSha === sha).length;
 
+/** The reviews `fs` woke a run for, one per review wake. */
+const reviewsIn = (fs: readonly FactoryComment[]) =>
+  fs.flatMap((c) => (c.kind === "restart" && c.reason === "review" ? [c.review] : []));
+
 /** The reviews woken for since the last retry, one per review wake. */
-const reviewWakes = (cs: readonly Comment[], a: Actors) =>
-  sinceRetry(cs, a).flatMap((c) => (c.kind === "restart" && c.reason === "review" ? [c.review] : []));
+const reviewWakes = (cs: readonly Comment[], a: Actors) => reviewsIn(sinceRetry(cs, a));
 
 /**
  * The newest review the run should answer: a trusted person's, commenting or asking for changes
- * (an approval stands, and a push would dismiss it), saying something, made on the PR's head so
- * after the run's last push, and not woken for since the last retry.
+ * (an approval stands, and a push would dismiss it), saying something, and not woken for since
+ * the last retry. One woken for before the retry counts again only on the PR's head: a push
+ * since then answered it.
  */
 function actionableReview(pr: Pr, cs: readonly Comment[], a: Actors): Review | null {
   const woken = new Set(reviewWakes(cs, a));
+  const ever = new Set(reviewsIn(factoryComments(cs, a).map((x) => x.c)));
 
   return (
     pr.reviews.findLast(
@@ -193,8 +198,8 @@ function actionableReview(pr: Pr, cs: readonly Comment[], a: Actors): Review | n
         a.trusted.includes(r.author) &&
         (r.state === "COMMENTED" || r.state === "CHANGES_REQUESTED") &&
         (r.body.trim() !== "" || r.comments.length > 0) &&
-        r.commit === pr.headSha &&
-        !woken.has(r.id),
+        !woken.has(r.id) &&
+        (!ever.has(r.id) || r.commit === pr.headSha),
     ) ?? null
   );
 }
