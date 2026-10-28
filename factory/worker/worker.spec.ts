@@ -978,6 +978,7 @@ const base: RunInput = {
   handoff: null,
   rules: RULES,
   cli: "bun /f/worker/cli.ts",
+  base: "main",
 };
 
 describe("run prompt", () => {
@@ -1008,8 +1009,32 @@ describe("run prompt", () => {
   test("the run writes the PR's body, by the project's PR rules, before it runs pr", () => {
     const p = runPrompt(base);
 
-    expect(p).toContain(`write ${PR_PATH}`);
+    expect(p).toContain(`Write ${PR_PATH}`);
     expect(p.indexOf(PR_PATH)).toBeLessThan(p.indexOf(usage(base.cli).pr));
+  });
+  test("before the PR it runs each check, then judges the diff from the base by each judge rule, and boxes what is left", () => {
+    const p = runPrompt({ ...base, rules: { ...RULES, layers: { ...RULES.layers, check: ["bun run lint", "bun test"] } } });
+    const at = (s: string) => p.indexOf(s);
+
+    expect(p).toContain("bun test");
+    expect(p).toContain("`git diff origin/main...HEAD`");
+    expect(p).toContain("at most 2 rounds of fixes");
+    expect(p).toContain("an unticked box (`- [ ] …`)");
+    expect(at("bun run lint")).toBeLessThan(at("origin/main...HEAD"));
+    expect(at("origin/main...HEAD")).toBeLessThan(at("names read well"));
+    expect(at("names read well")).toBeLessThan(at(`Write ${PR_PATH}`));
+    expect(at(`Write ${PR_PATH}`)).toBeLessThan(at(usage(base.cli).pr));
+  });
+  test("no verdict follows the PR, and the stuck rule stays", () => {
+    const p = runPrompt(base);
+
+    expect(p).not.toContain("verdict");
+    expect(p).not.toContain("never holds the merge");
+    expect(p).toContain(`After 2 failed fixes of the same failure`);
+    expect(p).toContain(usage(base.cli).stuck);
+  });
+  test("where the project's own rules say to stop and wait, the run asks with AskUserQuestion", () => {
+    expect(runPrompt(base)).toContain("Where the project's own rules say to stop and wait for a person, ask with AskUserQuestion instead");
   });
   test("a restarted run goes on from the plan and the handoff", () => {
     const p = runPrompt({

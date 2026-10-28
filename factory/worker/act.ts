@@ -143,6 +143,7 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
     handoff: latest(issue.comments, w.actors, "handoff")?.c.text ?? null,
     rules: w.rules,
     cli: CLI,
+    base: ctx.base,
   });
 
   const flags = ["--permission-mode", "bypassPermissions", "--settings", JSON.stringify(settings)];
