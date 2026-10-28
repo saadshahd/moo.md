@@ -1,0 +1,19 @@
+{
+  "name": "factory",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "test -f .claude-plugin/types/tsconfig.json || { echo \"factory: no engine types; open Claude Code with this plugin loaded and run /plugin-types\" >&2; exit 1; }; tsc --noEmit -p worker && tsc --noEmit -p tsconfig.mod.json",
+    "lint": "oxlint --ignore-pattern 'lib/vendor/**' --ignore-pattern 'worker/vendor/**' hooks lib worker mod",
+    "vendor": "bun build lib/vendor/zod-mini.d.ts --format esm --target browser --outfile lib/vendor/zod-mini.js && bun build worker/vendor/auth-app.d.ts --format esm --target bun --outfile worker/vendor/auth-app.js",
+    "test": "bun test && claude plugin test ."
+  },
+  "devDependencies": {
+    "@octokit/auth-app": "8.3.1",
+    "@oxlint/plugins": "1.89.0",
+    "@types/bun": "1.3.14",
+    "oxlint": "1.89.0",
+    "typescript": "5.9.2",
+    "zod": "4.6.7"
+  }
+}

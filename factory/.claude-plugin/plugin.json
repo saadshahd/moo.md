@@ -1,0 +1,11 @@
+{
+  "name": "factory",
+  "version": "0.1.0",
+  "description": "A GitHub agent factory that runs on your own machine. Issues labelled factory become background Claude Code runs with hope; you see plans, calls, stuck runs and cost per merged PR in /factory.",
+  "types": "./hooks/state.d.ts",
+  "keywords": ["factory", "issues", "background", "worker"],
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  }
+}
