@@ -96,7 +96,7 @@ const snapshot = (more: Partial<Snapshot> = {}): Snapshot => ({
   undos: [],
   merged: [],
   truncated: [],
-  base: { name: "main", checks: "SUCCESS" },
+  base: { name: "main", sha: "m1", checks: "SUCCESS" },
   ...more,
 });
 
@@ -252,6 +252,17 @@ function after(
       case "postCost":
       case "claim":
       case "updateBranch":
+        break;
+      case "postHeld":
+        next = {
+          ...next,
+          gh: {
+            ...next.gh,
+            issues: next.gh.issues.map((i) =>
+              i.number === n ? { ...i, comments: [...i.comments, posted({ kind: "held", issue: n, on: a.on })] } : i,
+            ),
+          },
+        };
         break;
     }
 
@@ -452,7 +463,7 @@ describe("a local issue's state and actions", () => {
 
     expect(
       step(world(gh("factory/3"), [here(7, [session("done")], plan)])).state,
-    ).toEqual({ kind: "held", on: { kind: "pr", pr: 9, files: ["src/a.ts"] } });
+    ).toEqual({ kind: "held", on: { kind: "pr", pr: 9, files: ["src/a.ts"] }, posted: false });
     expect(
       step(world(gh("factory/7"), [here(7, [session("done")], plan)])).state
         .kind,
@@ -497,8 +508,8 @@ describe("an open PR GitHub can't merge as it stands", () => {
   const gh = (p: Pr, more: Partial<Snapshot> = {}, comments: Comment[] = []) =>
     snapshot({ issues: [issue(7, { comments })], prs: new Map([[7, p]]), ...more });
 
-  const conflictWake = (head: string) =>
-    posted({ kind: "restart", issue: 7, reason: "conflict", session: "s", head });
+  const conflictWake = (baseSha: string) =>
+    posted({ kind: "restart", issue: 7, reason: "conflict", session: "s", baseSha });
 
   const dirty = pr(7, { mergeable: "CONFLICTING", mergeState: "DIRTY" });
 
@@ -519,13 +530,13 @@ describe("an open PR GitHub can't merge as it stands", () => {
     expect(state.kind).toBe("prOpen");
     expect(kinds(actions)).toEqual(["postCost", "stop"]);
   });
-  test("conflicting, the run is woken to merge the base in, and the wake records the head it was for", () => {
+  test("conflicting, the run is woken to merge the base in, and the wake records the base commit it was for", () => {
     const { state, actions } = step(world(gh(dirty), [here(7, [session("done")])]));
 
-    expect(state).toEqual({ kind: "conflicting", pr: 57, head: "h1", base: "main", deaths: 0 });
+    expect(state).toEqual({ kind: "conflicting", pr: 57, base: "main", baseSha: "m1", deaths: 0 });
     expect(occupies(state)).toBe(true);
     expect(stateLine(state)).toBe(`PR #57 conflicts with main; its run merges main in (0 of ${CRASHES_BEFORE_STUCK})`);
-    expect(actions).toEqual([expect.objectContaining({ kind: "wake", restart: { reason: "conflict", head: "h1" } })]);
+    expect(actions).toEqual([expect.objectContaining({ kind: "wake", restart: { reason: "conflict", baseSha: "m1" } })]);
 
     const message = actions.flatMap((a) => (a.kind === "wake" ? [a.message] : [])).join("");
 
@@ -539,32 +550,37 @@ describe("an open PR GitHub can't merge as it stands", () => {
     expect(stopped(pr(7, { mergeState: "DIRTY" }))).toBe("conflicting");
     expect(stopped(pr(7, { mergeable: "UNKNOWN", mergeState: "UNKNOWN" }))).toBe("prOpen");
   });
-  test("a fix fails only when the run ended and the PR still conflicts at the head it was woken for", () => {
-    const thrice = (head: string) =>
-      step(world(gh(dirty, {}, [conflictWake(head), conflictWake(head), conflictWake(head)]), [here(7, [session("done")])]));
+  test("a fix fails when the run ended and the PR still conflicts while the base has not moved, whatever it pushed", () => {
+    const thrice = (baseSha: string, p = dirty) =>
+      step(world(gh(p, {}, [conflictWake(baseSha), conflictWake(baseSha), conflictWake(baseSha)]), [here(7, [session("done")])]));
 
-    const sameHead = thrice("h1");
+    expect(thrice("m1", { ...dirty, headSha: "h9" }).state).toMatchObject({ kind: "conflicting", deaths: 3 });
 
-    expect(sameHead.state).toMatchObject({ kind: "conflicting", deaths: 3 });
-    expect(sameHead.actions).toEqual([
+    const sameBase = thrice("m1");
+
+    expect(sameBase.state).toMatchObject({ kind: "conflicting", deaths: 3 });
+    expect(sameBase.actions).toEqual([
       { kind: "stop", issue: 7, run: session("done") },
       { kind: "markStuck", issue: 7, reason: "PR #57 still conflicts with main after its run was woken 3 times to merge main in" },
     ]);
 
-    const newConflict = thrice("h0");
+    const newConflict = thrice("m0");
 
     expect(newConflict.state).toMatchObject({ kind: "conflicting", deaths: 0 });
     expect(kinds(newConflict.actions)).toEqual(["wake"]);
   });
   test("a wake to merge the base in is no death", () => {
-    expect(deathsSinceRetry([conflictWake("h1"), crash()], A)).toBe(1);
+    expect(deathsSinceRetry([conflictWake("m1"), crash()], A)).toBe(1);
   });
   test("failed checks while the base's own newest commit is red hold the PR: no wake, no count", () => {
     const failing = pr(7, { checks: "FAILURE" });
-    const onBase = (checks: string) => step(world(gh(failing, { base: { name: "main", checks } }), [here(7, [session("stopped")])]));
+
+    const onBase = (checks: string) =>
+      step(world(gh(failing, { base: { name: "main", sha: "m1", checks } }), [here(7, [session("stopped")])]));
+
     const red = onBase("FAILURE");
 
-    expect(red.state).toEqual({ kind: "held", on: { kind: "red", pr: 57, base: "main" } });
+    expect(red.state).toEqual({ kind: "held", on: { kind: "red", pr: 57, base: "main" }, posted: false });
     expect(red.actions).toEqual([]);
     expect(occupies(red.state)).toBe(false);
     expect(stateLine(red.state)).toBe("held: main is red, so PR #57's failed checks wait for it to go green");
@@ -587,10 +603,19 @@ describe("plans posted first hold later ones", () => {
     const w = world(gh, [here(7, [session("done")]), here(4, [session("done")])]);
     const later = classify(w.local[0]!, w);
 
-    expect(later).toEqual({ kind: "held", on: { kind: "plan", issue: 4, files: ["src/a.ts"] } });
+    expect(later).toEqual({ kind: "held", on: { kind: "plan", issue: 4, files: ["src/a.ts"] }, posted: false });
     expect(stateLine(later)).toBe("held until #4 merges or ends: its plan, posted first, also touches src/a.ts");
     expect(classify(w.local[1]!, w).kind).toBe("crashed");
-    expect(step(world(gh, [here(7, [session("done")])])).actions).toEqual([]);
+  });
+  test("a hold on a run that exists is posted once, so its release is no crash", () => {
+    const first = step(world(gh, [here(7, [session("done")])]));
+
+    expect(first.actions).toEqual([{ kind: "postHeld", issue: 7, on: { kind: "plan", issue: 4 } }]);
+
+    const seven = gh.issues[1]!;
+    const recorded = { ...seven, comments: [...seven.comments, posted({ kind: "held", issue: 7, on: { kind: "plan", issue: 4 } })] };
+
+    expect(step(world({ ...gh, issues: [gh.issues[0]!, recorded] }, [here(7, [session("done")])])).actions).toEqual([]);
   });
   test("plans posted in the same second go by issue number, so two never hold each other", () => {
     const at = "2026-10-26T09:00:00Z";
@@ -616,10 +641,34 @@ describe("plans posted first hold later ones", () => {
   test("an open PR holds before a plan does", () => {
     const w = world({ ...gh, open: [{ ...pr(3), files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
 
-    expect(classify(w.local[0]!, w)).toEqual({ kind: "held", on: { kind: "pr", pr: 53, files: ["src/a.ts"] } });
+    expect(classify(w.local[0]!, w)).toMatchObject({ kind: "held", on: { kind: "pr", pr: 53, files: ["src/a.ts"] } });
   });
   test("a later plan is never started while the earlier issue is open", () => {
     expect(pick(world(gh, []))).toEqual([{ issue: 4, resume: false }]);
+  });
+});
+
+describe("a run its hold stopped goes on once the hold is gone, and no release is a death", () => {
+  const held = (on: { kind: "pr"; pr: number } | { kind: "plan"; issue: number }) => posted({ kind: "held", issue: 7, on });
+  const released = posted({ kind: "restart", issue: 7, reason: "held", session: "s" });
+  const at = (comments: Comment[]) => world(snapshot({ issues: [issue(7, { comments })] }), [here(7, [session("done")])]);
+
+  test("three hold and release cycles never mark the issue stuck", () => {
+    const cycles = [held({ kind: "pr", pr: 9 }), released, held({ kind: "plan", issue: 4 }), released, held({ kind: "pr", pr: 9 })];
+    const { state, actions } = step(at(cycles));
+
+    expect(state).toEqual({ kind: "released" });
+    expect(actions).toEqual([
+      { kind: "stop", issue: 7, run: session("done") },
+      { kind: "start", issue: 7, restart: "held", after: "sid-1" },
+    ]);
+    expect(occupies(state)).toBe(true);
+    expect(stateLine(state)).toBe("what held it is gone; a fresh session goes on");
+    expect(deathsSinceRetry([...cycles, released], A)).toBe(0);
+  });
+  test("a run that dies after its release is a crash, and real crashes still reach stuck", () => {
+    expect(step(at([held({ kind: "pr", pr: 9 }), released])).state).toEqual({ kind: "crashed", deaths: 1 });
+    expect(kinds(step(at([crash(), crash(), held({ kind: "pr", pr: 9 }), released])).actions)).toEqual(["stop", "markStuck"]);
   });
 });
 

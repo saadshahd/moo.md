@@ -108,7 +108,7 @@ const Data = z.object({
       refs: z.object({ pageInfo: Page, nodes: z.array(z.object({ name: z.string() })) }),
       undos: z.object({ pageInfo: Page, nodes: z.array(z.object({ body: z.string(), author: Actor, editor: Actor })) }),
       merged: PrList,
-      base: z.object({ name: z.string(), target: z.object({ statusCheckRollup: z.optional(Rollup) }) }),
+      base: z.object({ name: z.string(), target: z.object({ oid: z.string(), statusCheckRollup: z.optional(Rollup) }) }),
     }),
   }),
 });
@@ -143,7 +143,7 @@ export function snapshotQuery(local: readonly number[]): string {
       pageInfo { hasNextPage }
       nodes { body author { __typename login } editor { __typename login } }
     }
-    base: defaultBranchRef { name target { ... on Commit { statusCheckRollup { state } } } }
+    base: defaultBranchRef { name target { ... on Commit { oid statusCheckRollup { state } } } }
     merged: pullRequests(states: MERGED, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) { ${PRS} }
     ${prs}
   }
@@ -198,8 +198,8 @@ export type Snapshot = {
   claimed: Set<number>;
   undos: { body: string; author: string | null; editor: string | null }[];
   merged: Pr[];
-  /** The default branch, and its newest commit's combined check state. */
-  base: { name: string; checks: string | null };
+  /** The default branch, its newest commit, and that commit's combined check state. */
+  base: { name: string; sha: string; checks: string | null };
   /**
    * Windows that held more than they list: undo issues past the newest 100, merged PRs past the
    * newest 50, a merged PR's comments past its first 100. Every other connection is read whole.
@@ -318,7 +318,7 @@ export async function readSnapshot(run: Run, repo: string, local: readonly numbe
     claimed: new Set(r.refs.nodes.flatMap((ref) => issueOf(`${LABEL}/${ref.name}`) ?? [])),
     undos: r.undos.nodes.map((u) => ({ body: u.body, author: login(u.author), editor: login(u.editor) })),
     merged: r.merged.nodes.map((p) => toPr(p, p.comments.nodes.map(toComment))),
-    base: { name: r.base.name, checks: r.base.target.statusCheckRollup?.state ?? null },
+    base: { name: r.base.name, sha: r.base.target.oid, checks: r.base.target.statusCheckRollup?.state ?? null },
     truncated: [
       ...(r.undos.pageInfo.hasNextPage ? ["undo issues"] : []),
       ...(r.merged.pageInfo.hasNextPage ? ["merged PRs"] : []),

@@ -102,6 +102,9 @@ describe("formats", () => {
       output: 4,
     },
     { kind: "restart", issue: 7, reason: "crash", session: "s1" },
+    { kind: "restart", issue: 7, reason: "conflict", session: "s1", baseSha: "m1" },
+    { kind: "held", issue: 7, on: { kind: "plan", issue: 4 } },
+    { kind: "held", issue: 7, on: { kind: "pr", pr: 9 } },
     { kind: "stuck", issue: 7, reason: "two fixes failed" },
     { kind: "undo", call: 55, text: "Picked: x\n\nTo undo: y" },
   ];
@@ -499,7 +502,7 @@ describe("snapshot", () => {
       claimed: new Set(),
       merged: [],
       truncated: [],
-      base: { name: "main", checks: null },
+      base: { name: "main", sha: "m1", checks: null },
       undos: [
         { body: undo(1), author: ME, editor: null },
         { body: undo(2), author: "stranger", editor: null },

@@ -7,11 +7,11 @@
 import { parseArgs } from "node:util";
 import { messageOf } from "../lib/errors.ts";
 import { CALL } from "../lib/commands.ts";
-import { WHY_MAX, type Plan } from "../lib/formats.ts";
+import { holder, WHY_MAX, type Plan } from "../lib/formats.ts";
 import {
   branchFor, factoryComments, issueOf, latest, markStuck, must, post, repoOf, upsert, type Actors,
 } from "../lib/github.ts";
-import { planHold } from "../lib/holds.ts";
+import { heldOn, heldSince, planHold } from "../lib/holds.ts";
 import { HANDOFF_PATH, PLAN_PATH, planFiles, planGaps, planText } from "../lib/plan.ts";
 import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
 import { comments, LABEL, readSnapshot } from "../lib/snapshot.ts";
@@ -57,16 +57,22 @@ async function plan(h: Here): Promise<string> {
 
   if (gaps.length > 0) throw new Refusal(`the plan lacks: ${gaps.join(", ")}. Fill each and run plan again.`, 2);
   const hold = planHold(h.issue, planFiles(text), await readSnapshot(run, h.repo, []), h.actors);
+  const cs = await comments(run, h.repo, h.issue);
 
-  if (hold !== null)
+  if (hold !== null) {
+    const on = heldOn(hold);
+    const was = heldSince(cs, h.actors);
+
+    if (was === null || holder(was) !== holder(on)) await post(run, h.repo, h.issue, { kind: "held", issue: h.issue, on });
+
     throw new Refusal(
       hold.kind === "pr"
         ? `the plan touches ${hold.files.join(", ")}, which open PR #${hold.pr} also changes. Stop: the factory takes this issue again after #${hold.pr} merges.`
         : `the plan touches ${hold.files.join(", ")}, which the plan of #${hold.issue}, posted first, also touches. Stop: the factory takes this issue again after #${hold.issue}'s PR merges or #${hold.issue} ends.`,
       3,
     );
+  }
 
-  const cs = await comments(run, h.repo, h.issue);
   const next: Plan = { kind: "plan", issue: h.issue, seal: seal(text), text };
   await upsert(run, h.repo, h.issue, next, cs, h.actors);
 

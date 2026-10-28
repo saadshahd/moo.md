@@ -3,7 +3,8 @@
  * agree on it and say it in the same words.
  */
 
-import { branchFor, latest, STUCK_LABEL, type Actors } from "./github.ts";
+import type { HeldOn } from "./formats.ts";
+import { branchFor, factoryComments, latest, STUCK_LABEL, type Actors, type Comment } from "./github.ts";
 import { overlap, overlappingPr, planFiles } from "./plan.ts";
 import { trustedIssue, type Issue, type Merge, type Snapshot } from "./snapshot.ts";
 
@@ -14,7 +15,7 @@ export type Hold =
   | { kind: "behind"; pr: number; base: string }
   | { kind: "conflict"; pr: number; base: string };
 
-type PlanHold = Extract<Hold, { kind: "pr" | "plan" }>;
+export type PlanHold = Extract<Hold, { kind: "pr" | "plan" }>;
 
 type PrHold = Extract<Hold, { kind: "red" | "behind" | "conflict" }>;
 
@@ -53,6 +54,15 @@ export function planHold(n: number, files: readonly string[], s: Snapshot, a: Ac
     .find((p) => p.files.length > 0);
 
   return first === undefined ? null : { kind: "plan", ...first };
+}
+
+export const heldOn = (h: PlanHold): HeldOn => (h.kind === "pr" ? { kind: "pr", pr: h.pr } : { kind: "plan", issue: h.issue });
+
+/** What the current session's plan was held for: a `held` posted since the newest restart. */
+export function heldSince(cs: readonly Comment[], a: Actors): HeldOn | null {
+  const c = factoryComments(cs, a).findLast((x) => x.c.kind === "held" || x.c.kind === "restart")?.c;
+
+  return c?.kind === "held" ? c.on : null;
 }
 
 /** What an open PR waits for before it can merge; GitHub's UNKNOWN is no answer yet, so nothing. */

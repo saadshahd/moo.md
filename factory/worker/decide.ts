@@ -3,9 +3,9 @@
  * takes, and which waiting issues to start. Pure: `apply` in act.ts is the only edge.
  */
 
-import { parse, type FactoryComment, type Wait } from "../lib/formats.ts";
+import { holder, parse, type FactoryComment, type HeldOn, type Wait } from "../lib/formats.ts";
 import { branchFor, factoryComments, fromBot, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
-import { failed, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
+import { failed, heldOn, heldSince, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
 import { planFiles } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { trustedIssue, type Issue, type Pr, type Snapshot } from "../lib/snapshot.ts";
@@ -65,11 +65,14 @@ export type IssueState =
   | { kind: "checksFailed"; pr: number; deaths: number }
   /** The worker updates the branch itself, at the head it saw. */
   | { kind: "behind"; pr: number; head: string; base: string }
-  /** `deaths` counts the wakes that left the PR conflicting at this same head. */
-  | { kind: "conflicting"; pr: number; head: string; base: string; deaths: number }
+  /** `deaths` counts the wakes that left the PR conflicting while the base stayed at `baseSha`. */
+  | { kind: "conflicting"; pr: number; base: string; baseSha: string; deaths: number }
   | { kind: "limited"; until: number }
   | { kind: "limitReset" }
-  | { kind: "held"; on: Extract<Hold, { kind: "pr" | "plan" | "red" }> }
+  /** `posted` once the issue records a plan hold for the current session. */
+  | { kind: "held"; on: Extract<Hold, { kind: "pr" | "plan" | "red" }>; posted: boolean }
+  /** What held the current session's plan is gone. */
+  | { kind: "released" }
   /** A person ran `claude stop` on it; `posted` once the issue says so. */
   | { kind: "stoppedByHand"; session: string; posted: boolean }
   | { kind: "crashed"; deaths: number };
@@ -79,16 +82,17 @@ export type RunId = Pick<RunView, "id" | "sessionId">;
 
 export type Action =
   | { kind: "claim"; issue: number }
-  | { kind: "start"; issue: number; restart: "crash" | "context" | null; after: string | null }
+  | { kind: "start"; issue: number; restart: "crash" | "context" | "held" | null; after: string | null }
   | { kind: "stop"; issue: number; run: RunId }
   | {
       kind: "wake";
       issue: number;
       run: RunId;
       message: string;
-      restart: { reason: "checks" } | { reason: "conflict"; head: string } | null;
+      restart: { reason: "checks" } | { reason: "conflict"; baseSha: string } | null;
     }
   | { kind: "updateBranch"; issue: number; pr: number; head: string }
+  | { kind: "postHeld"; issue: number; on: HeldOn }
   | { kind: "closeWait"; issue: number; wait: { id: number; c: Wait }; answers: string[] }
   | { kind: "markStuck"; issue: number; reason: string }
   | { kind: "postCost"; issue: number; pr: number; sessions: string[] }
@@ -111,6 +115,7 @@ export const NEXT = {
   limited: ["limited"],
   limitReset: ["working"],
   held: ["held"],
+  released: ["working"],
   stoppedByHand: ["stoppedByHand"],
   crashed: ["working", "ended"],
 } satisfies { [K in IssueState["kind"]]: readonly (IssueState["kind"] | "gone")[] };
@@ -127,9 +132,9 @@ export function deathsSinceRetry(cs: readonly Comment[], a: Actors): number {
   return sinceRetry(cs, a).filter((c) => c.kind === "restart" && (c.reason === "crash" || c.reason === "checks")).length;
 }
 
-/** Wakes to merge the base in, since the last retry, that were for PR head `head`. */
-const conflictWakes = (cs: readonly Comment[], a: Actors, head: string) =>
-  sinceRetry(cs, a).filter((c) => c.kind === "restart" && c.reason === "conflict" && c.head === head).length;
+/** Wakes to merge the base in, since the last retry, that were for base commit `sha`. */
+const conflictWakes = (cs: readonly Comment[], a: Actors, sha: string) =>
+  sinceRetry(cs, a).filter((c) => c.kind === "restart" && c.reason === "conflict" && c.baseSha === sha).length;
 
 /** The issue's PR, unless it was closed unmerged before the issue was last marked stuck. */
 function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | null {
@@ -181,14 +186,14 @@ export function classify(l: Local, w: World): IssueState {
         return {
           kind: "conflicting",
           pr: pr.number,
-          head: pr.headSha,
           base: hold.base,
-          deaths: deathsSinceRetry(cs, w.actors) + conflictWakes(cs, w.actors, pr.headSha),
+          baseSha: w.gh.base.sha,
+          deaths: deathsSinceRetry(cs, w.actors) + conflictWakes(cs, w.actors, w.gh.base.sha),
         };
       case "behind":
         return stopped ? { kind: "behind", pr: pr.number, head: pr.headSha, base: hold.base } : { kind: "prOpen", pr: pr.number };
       case "red":
-        return { kind: "held", on: hold };
+        return { kind: "held", on: hold, posted: false };
       case undefined:
         return failed(pr.checks) ? { kind: "checksFailed", pr: pr.number, deaths } : { kind: "prOpen", pr: pr.number };
     }
@@ -211,10 +216,15 @@ export function classify(l: Local, w: World): IssueState {
 
   const on = planHold(l.issue, planFiles(l.plan ?? postedPlan(issue, w.actors)?.text ?? ""), w.gh, w.actors);
 
-  if (on !== null) return { kind: "held", on };
+  const stoppedOn = heldSince(cs, w.actors);
+
+  if (on !== null)
+    return { kind: "held", on, posted: stoppedOn !== null && holder(stoppedOn) === holder(heldOn(on)) };
   const until = limitedUntil(w);
 
   if (until !== null) return { kind: "limited", until };
+
+  if (stoppedOn !== null && current !== undefined) return { kind: "released" };
 
   return { kind: "crashed", deaths };
 }
@@ -258,8 +268,13 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
       return [...stop, start("context")];
     case "working":
     case "limited":
-    case "held":
       return [];
+    case "held":
+      return s.posted || s.on.kind === "red" || current === undefined
+        ? []
+        : [{ kind: "postHeld", issue: n, on: heldOn(s.on) }];
+    case "released":
+      return [...stop, start("held")];
     case "stoppedByHand":
       return s.posted ? [] : [{ kind: "postStopped", issue: n, session: s.session }];
     case "askedInBox":
@@ -289,7 +304,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
         ? stuck(`PR #${s.pr} still conflicts with ${s.base} after its run was woken ${s.deaths} times to merge ${s.base} in`)
         : wake(
             `PR #${s.pr} conflicts with ${s.base}. ${catchUp} Then run \`git merge origin/${s.base}\`. Resolve the conflicts, run the checks locally, then push.`,
-            { reason: "conflict", head: s.head },
+            { reason: "conflict", baseSha: s.baseSha },
           );
     case "limitReset":
       return wake("Your usage limit has reset. Go on with the work.");
@@ -307,6 +322,7 @@ export function occupies(s: IssueState): boolean {
     case "overCap":
     case "waiting":
     case "limitReset":
+    case "released":
       return true;
     case "checksFailed":
     case "conflicting":
@@ -356,6 +372,8 @@ export function stateLine(s: IssueState): string {
       return "usage limit reset";
     case "held":
       return holdLine(s.on);
+    case "released":
+      return "what held it is gone; a fresh session goes on";
     case "stoppedByHand":
       return "stopped by hand";
     case "crashed":

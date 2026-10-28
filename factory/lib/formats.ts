@@ -88,16 +88,31 @@ const Cost = z.object({
 
 type Cost = z.infer<typeof Cost>;
 
-/** A `conflict` wake names the PR head it was for: a run that leaves that head conflicting failed. */
+/**
+ * A `conflict` wake names the base commit it was for: a run that leaves its PR conflicting while
+ * the base stays there failed.
+ */
 const Restart = z.object({
   kind: z.literal("restart"),
   issue: Issue,
-  reason: z.literal(["crash", "context", "checks", "conflict"]),
+  reason: z.literal(["crash", "context", "checks", "conflict", "held"]),
   session: z.string(),
-  head: z.optional(z.string()),
+  baseSha: z.optional(z.string()),
 });
 
 export type Restart = z.infer<typeof Restart>;
+
+const HeldOn = z.union([
+  z.object({ kind: z.literal("pr"), pr: Issue }),
+  z.object({ kind: z.literal("plan"), issue: Issue }),
+]);
+
+export type HeldOn = z.infer<typeof HeldOn>;
+
+/** The run's plan was refused for what `on` names; once that is gone, the restart is no death. */
+const Held = z.object({ kind: z.literal("held"), issue: Issue, on: HeldOn });
+
+export const holder = (on: HeldOn) => (on.kind === "pr" ? `PR #${on.pr} merges` : `#${on.issue} merges or ends`);
 
 const Stuck = z.object({ kind: z.literal("stuck"), issue: Issue, reason: z.string() });
 
@@ -109,7 +124,7 @@ const Undo = z.object({ kind: z.literal("undo"), call: Id, text: z.string() });
 
 export type FactoryComment = z.infer<
   typeof Plan | typeof Call | typeof Wait | typeof Answer | typeof Handoff | typeof Cost | typeof Restart
-  | typeof Stuck | typeof Stopped | typeof Undo
+  | typeof Held | typeof Stuck | typeof Stopped | typeof Undo
 >;
 
 export type Kind = FactoryComment["kind"];
@@ -190,6 +205,7 @@ const RESTARTED = {
     "**Restarted** · its context passed the cap; a fresh session goes on from the plan, branch and handoff",
   checks: "**Woken** · its PR's checks failed after it ended its turn",
   conflict: "**Woken** · its PR conflicts with the base branch; the run merges the base in",
+  held: "**Restarted** · what held it is gone; a fresh session goes on from the plan, branch and handoff",
 } satisfies { [R in Restart["reason"]]: string };
 
 const CODECS = {
@@ -223,6 +239,7 @@ const CODECS = {
       `**Cost** · ${total(c).toLocaleString("en-US")} tokens: ${c.input} input, ${c.cacheRead} cache read, ${c.cacheWrite} cache write, ${c.output} output, over ${c.sessions.length} session(s)`,
   ),
   restart: kind(Restart, "bot", null, (c) => RESTARTED[c.reason]),
+  held: kind(Held, "bot", null, (c) => `**Held** · until ${holder(c.on)}`),
   stuck: kind(Stuck, "bot", null, (c) => `**Stuck** · ${c.reason}`),
   stopped: kind(
     Stopped,

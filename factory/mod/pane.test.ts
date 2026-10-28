@@ -187,7 +187,7 @@ function graphql(
             merged(22, "fix/by-hand", [comment(220, cost(9, 22, 9_999_999))]),
           ],
         },
-        base: { name: "main", target: { statusCheckRollup: { state: baseChecks } } },
+        base: { name: "main", target: { oid: "m1", statusCheckRollup: { state: baseChecks } } },
       },
     },
   };
