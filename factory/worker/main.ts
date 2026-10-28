@@ -101,13 +101,14 @@ async function main(dir: string): Promise<void> {
   await must(run, ["git", "fetch", "origin", base], { cwd: dir });
   const rules = await readRules(run, dir);
   const app = await readApp();
-  const no = await refusals(repo, base, rules, app);
+  const { refusals: no, warnings } = await refusals(repo, base, rules, app);
 
   if (no.length > 0) {
     for (const r of no) console.error(`factory: ${r}`);
     process.exit(1);
   }
 
+  for (const w of warnings) log(`warning: ${w}`);
   const ctx: Ctx = { app, dir, repo, base, machine: await machineId(run, p) };
   log(`watching ${repo} (${base}), ${rules.atOnce} at once`);
 

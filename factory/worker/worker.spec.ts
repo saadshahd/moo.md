@@ -24,7 +24,7 @@ import {
 } from "./decide.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
 import { machineId, platformOf } from "./platform.ts";
-import { checksRefusal, loginRefusal } from "./guard.ts";
+import { checksReason, loginRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
 import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
@@ -687,20 +687,47 @@ describe("the base must require branches up to date", () => {
 
   const protection = (strict: boolean) => JSON.stringify({ strict, contexts: ["test"], checks: [] });
 
+  /** `branches/<base>` as a token that can't read the protection sees it: the checks, no `strict`. */
+  const branch = (contexts: string[]) =>
+    JSON.stringify({
+      name: "main",
+      protected: true,
+      protection: {
+        enabled: true,
+        required_status_checks: { enforcement_level: "everyone", contexts, checks: contexts.map((context) => ({ context, app_id: 1 })) },
+      },
+    });
+
   test("a strict ruleset or strict protection passes", () => {
-    expect(checksRefusal("o/r", "main", [ruleset(true), null])).toBe("");
-    expect(checksRefusal("o/r", "main", [null, protection(true)])).toBe("");
-    expect(checksRefusal("o/r", "main", [ruleset(false), protection(true)])).toBe("");
+    expect(checksReason("o/r", "main", [ruleset(true), null, branch(["test"])])).toBe(null);
+    expect(checksReason("o/r", "main", [null, protection(true), branch(["test"])])).toBe(null);
+    expect(checksReason("o/r", "main", [ruleset(false), protection(true), branch(["test"])])).toBe(null);
   });
   test("checks required, but not up to date, refuses and says how to turn it on", () => {
-    const no = checksRefusal("o/r", "main", [ruleset(false), protection(false)]);
+    const no = checksReason("o/r", "main", [ruleset(false), protection(false), branch(["test"])]);
+
+    expect(no?.kind).toBe("refusal");
 
     for (const s of ["up to date", "strict_required_status_checks_policy", "required_status_checks.strict"])
-      expect(no).toContain(s);
+      expect(no?.text).toContain(s);
   });
   test("no check required refuses as before; a strict rule naming no check is no check", () => {
-    expect(checksRefusal("o/r", "main", [null, null])).toContain("requires no checks");
-    expect(checksRefusal("o/r", "main", [ruleset(true, 0), null])).toContain("requires no checks");
+    expect(checksReason("o/r", "main", [null, null, null])?.text).toContain("requires no checks");
+    expect(checksReason("o/r", "main", [ruleset(true, 0), null, branch([])])?.text).toContain("requires no checks");
+  });
+  test("branch protection that requires checks, its strict flag unreadable by this token, warns while no readable source is strict", () => {
+    for (const rules of [ruleset(false), null]) {
+      const gap = checksReason("o/r", "main", [rules, null, branch(["test"])]);
+
+      expect(gap?.kind).toBe("warning");
+
+      for (const s of ["can't read whether", "up to date", "red main"]) expect(gap?.text).toContain(s);
+    }
+  });
+  test("with the protection unreadable and no checks in the branch's own view, it refuses as before", () => {
+    expect(checksReason("o/r", "main", [ruleset(false), null, branch([])])?.text).toContain("not branches up to date");
+    expect(checksReason("o/r", "main", [ruleset(false), null, null])?.text).toContain("not branches up to date");
+    expect(checksReason("o/r", "main", [null, null, branch([])])?.text).toContain("requires no checks");
   });
 });
 
