@@ -34,7 +34,7 @@ import { createdPath, letGo, onBranch, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
-import { runSettings } from "./sandbox.ts";
+import { readsShut, runSettings } from "./sandbox.ts";
 import { chmod, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1234,6 +1234,10 @@ describe("a run's sandbox", () => {
       "~/.config/fac*",
     ])
       expect(() => withPaths("/tmp/build", p)).toThrow(".config/factory");
+  });
+  test("a key folder named from the root is shut from the root, not from the settings' folder", () => {
+    expect(readsShut("/Users/me/dotfiles/factory")).toBe("Read(//Users/me/dotfiles/factory/**)");
+    expect(readsShut("~/.config/factory")).toBe("Read(~/.config/factory/**)");
   });
   test("a path that reaches the key folder through a symlink is refused", async () => {
     const root = await mkdtemp(join(tmpdir(), "factory-link-"));

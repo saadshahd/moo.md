@@ -50,6 +50,9 @@ function writable(path: string): string {
   return path;
 }
 
+/** The permission rule that shuts `folder` to the file tools: a rule reads one leading `/` from the settings' own folder, and `//` from the root. */
+export const readsShut = (folder: string) => `Read(${folder.startsWith("/") ? `/${folder}` : folder}/**)`;
+
 export function runSettings(rules: Rules) {
   const key = keyFolder();
   const shut = key === join(homedir(), APP_DIR) ? [`~/${APP_DIR}`] : [`~/${APP_DIR}`, key];
@@ -76,7 +79,7 @@ export function runSettings(rules: Rules) {
         ],
       },
     },
-    permissions: { deny: shut.map((f) => `Read(${f}/**)`) },
+    permissions: { deny: shut.map(readsShut) },
     /**
      * A project's own settings may name an editor that waits for a window (`code --wait`); a run
      * has none, so its `git merge` would wait for good. `--settings` outranks project settings.
