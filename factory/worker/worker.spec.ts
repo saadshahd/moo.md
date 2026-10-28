@@ -997,13 +997,11 @@ describe("run prompt", () => {
     expect(p).not.toContain("You are continuing");
   });
   test("it dictates the approval question the ask hook recognises, and ends the turn after the PR, never watching its checks", () => {
-    expect(p()).toContain(`question "${APPROVAL_QUESTION}"`);
-    expect(p()).not.toContain("gh pr checks --watch");
-    expect(p()).toContain("the worker wakes you when a required check fails, the PR conflicts with the base, or a review asks for changes");
+    const p = runPrompt(base);
 
-    function p() {
-      return runPrompt(base);
-    }
+    expect(p).toContain(`question "${APPROVAL_QUESTION}"`);
+    expect(p).not.toContain("gh pr checks --watch");
+    expect(p).toContain("the worker wakes you when a required check fails, the PR conflicts with the base, or a review asks for changes");
   });
   test("the run writes the PR's body, by the project's PR rules, before it runs pr", () => {
     const p = runPrompt(base);
@@ -1264,10 +1262,14 @@ describe("upsert says what it did, so the log names a cost posted or changed", (
   });
 });
 
+/** Git in a scratch repo: a fixed author, no signing whatever the user's own config says, and a throw on any failure. */
+const gitIn = (cwd: string, ...a: string[]) =>
+  must(run, ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...a], { cwd });
+
 describe("a worktree counts as this machine's run only when its branch carries this machine's claim", () => {
   test("its own claim, another machine's, none, and an unreadable ref", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-claim-"));
-    const git = (...a: string[]) => run(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir });
+    const git = (...a: string[]) => gitIn(dir, ...a);
     await git("init", "-q", "-b", "main");
     await git("commit", "-q", "--allow-empty", "-m", "base");
     await git("update-ref", "refs/remotes/origin/main", "HEAD");
@@ -1333,7 +1335,7 @@ describe("worktrees from git or the repo's own commands", () => {
 
   test("a worktree another branch took is refused before anything goes on in it", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-branch-"));
-    const git = (...a: string[]) => run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...a], { cwd: dir });
+    const git = (...a: string[]) => gitIn(dir, ...a);
     await git("init", "-q", "-b", "factory/7");
     await git("commit", "-q", "--allow-empty", "-m", "base");
 
@@ -1348,12 +1350,11 @@ describe("worktrees from git or the repo's own commands", () => {
   async function claimedRepo() {
     const root = await realpath(await mkdtemp(join(tmpdir(), "factory-worktree-")));
     const dir = join(root, "r");
-    const git = (cwd: string, ...a: string[]) => must(run, ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...a], { cwd });
-    await git(root, "init", "-q", "--bare", "origin.git");
-    await git(root, "init", "-q", "-b", "main", "r");
-    await git(dir, "remote", "add", "origin", join(root, "origin.git"));
-    await git(dir, "commit", "-q", "--allow-empty", "-m", "claim");
-    await git(dir, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/factory/7");
+    await gitIn(root, "init", "-q", "--bare", "origin.git");
+    await gitIn(root, "init", "-q", "-b", "main", "r");
+    await gitIn(dir, "remote", "add", "origin", join(root, "origin.git"));
+    await gitIn(dir, "commit", "-q", "--allow-empty", "-m", "claim");
+    await gitIn(dir, "push", "-q", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/factory/7");
 
     return { root, dir };
   }
@@ -1440,7 +1441,7 @@ describe("platform", () => {
 describe("a missing rules file says to run setup, not git's words", () => {
   test("absent, present, and malformed", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-rules-"));
-    const git = (...a: string[]) => run(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir });
+    const git = (...a: string[]) => gitIn(dir, ...a);
     await git("init", "-q", "-b", "main");
     await git("commit", "-q", "--allow-empty", "-m", "base");
     await git("update-ref", "refs/remotes/origin/main", "HEAD");
