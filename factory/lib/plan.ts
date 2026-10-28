@@ -8,6 +8,7 @@ import type { OpenPr } from "./snapshot.ts";
 
 export const PLAN_PATH = ".factory/plan.md";
 export const HANDOFF_PATH = ".factory/handoff.md";
+export const PR_PATH = ".factory/pr.md";
 
 const SECTIONS = ["Types", "Signatures", "Files"] as const;
 

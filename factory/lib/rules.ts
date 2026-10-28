@@ -38,6 +38,8 @@ export const Rules = z.object({
    * gets that path as `{dir}`. Without them, git adds each worktree beside the main one.
    */
   worktree: z.optional(z.object({ create: Argv, release: Argv })),
+  /** `draft`: each PR opens as a draft that a person marks ready and merges; auto-merge is never armed. */
+  pr: z.optional(z.object({ draft: z.boolean() })),
 });
 
 export type Rules = z.infer<typeof Rules>;

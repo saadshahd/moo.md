@@ -12,8 +12,8 @@ import {
   branchFor, factoryComments, issueOf, latest, markStuck, must, post, repoOf, upsert, type Actors,
 } from "../lib/github.ts";
 import { heldOn, heldSince, planHold } from "../lib/holds.ts";
-import { HANDOFF_PATH, PLAN_PATH, planFiles, planGaps, planText } from "../lib/plan.ts";
-import { actorsOf, readRules, RULES_PATH } from "../lib/rules.ts";
+import { HANDOFF_PATH, PLAN_PATH, PR_PATH, planFiles, planGaps, planText } from "../lib/plan.ts";
+import { actorsOf, readRules, RULES_PATH, type Rules } from "../lib/rules.ts";
 import { comments, LABEL, readSnapshot } from "../lib/snapshot.ts";
 import { approved, APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
 import { botFor, readApp } from "./app.ts";
@@ -32,15 +32,16 @@ export function seal(text: string): string {
   return new Bun.CryptoHasher("sha256").update(text).digest("hex");
 }
 
-type Here = { cwd: string; issue: number; repo: string; actors: Actors };
+type Here = { cwd: string; issue: number; repo: string; rules: Rules; actors: Actors };
 
 async function here(cwd: string): Promise<Here> {
   const issue = issueOf(await must(run, ["git", "branch", "--show-current"], { cwd }));
 
   if (issue === null) throw new Refusal("not on a factory/<n> branch", 2);
   const repo = await repoOf(run, cwd);
+  const rules = await readRules(run, cwd);
 
-  return { cwd, issue, repo, actors: actorsOf(await readRules(run, cwd), repo) };
+  return { cwd, issue, repo, rules, actors: actorsOf(rules, repo) };
 }
 
 async function read(cwd: string, path: string): Promise<string> {
@@ -113,6 +114,36 @@ async function handoff(h: Here): Promise<string> {
   return "handoff posted";
 }
 
+/** The PR's body as the run wrote it, ends trimmed; refused while missing or blank. */
+export async function prText(cwd: string): Promise<string> {
+  const f = Bun.file(`${cwd}/${PR_PATH}`);
+  const text = (await f.exists()) ? (await f.text()).trim() : "";
+
+  if (text === "") throw new Refusal(`${PR_PATH} is missing or blank; write the PR's body there first`, 4);
+
+  return text;
+}
+
+/** The PR's body: the run's text, then the line that closes the issue, then the plan it was built from. */
+export function prBody(text: string, issue: number, seal: string): string {
+  return `${text.trim()}\n\nCloses #${issue}\n\nPlan: seal \`${seal.slice(0, 8)}\`, approved on #${issue}.`;
+}
+
+type PrAt = Pick<Here, "repo" | "issue" | "rules">;
+
+/** The command that opens issue `h.issue`'s PR, as a draft when the rules want a person to mark each one ready. */
+export function prCreate(h: PrAt, title: string, body: string): string[] {
+  const draft = h.rules.pr?.draft ?? false;
+
+  return ["gh", "pr", "create", "--repo", h.repo, "--head", branchFor(h.issue), "--label", LABEL,
+    "--title", title, "--body", body, ...(draft ? ["--draft"] : [])];
+}
+
+/** The command that arms auto-merge on PR `url`, or none when the rules want drafts: a person merges those. */
+export function prMerge(h: PrAt, url: string): string[] | null {
+  return h.rules.pr?.draft ? null : ["gh", "pr", "merge", url, "--auto", "--squash"];
+}
+
 async function pr(h: Here): Promise<string> {
   const cs = await comments(run, h.repo, h.issue);
   const p = latest(cs, h.actors, "plan");
@@ -125,6 +156,7 @@ async function pr(h: Here): Promise<string> {
     throw new Refusal("the issue has no call; post each choice you made without asking with `call` first", 4);
 
   if (!approved(cs, h.actors, p.c.seal)) throw new Refusal("the plan is not approved; ask for approval first", 4);
+  const text = await prText(h.cwd);
   const head = branchFor(h.issue);
   const sh = async (...argv: string[]) => (await must(run, argv, { cwd: h.cwd })).trim();
   const base = await sh("git", "rev-parse", "--abbrev-ref", "origin/HEAD");
@@ -137,15 +169,13 @@ async function pr(h: Here): Promise<string> {
     "--json", "url", "--jq", ".[0].url // empty");
 
   const title = await sh("gh", "issue", "view", String(h.issue), "--repo", h.repo, "--json", "title", "--jq", ".title");
-  const body = `Closes #${h.issue}\n\nPlan: seal \`${p.c.seal.slice(0, 8)}\`, approved on #${h.issue}.`;
 
-  const url =
-    open !== ""
-      ? open
-      : await sh("gh", "pr", "create", "--repo", h.repo, "--head", head, "--label", LABEL,
-          "--title", title, "--body", body);
+  /** An open PR's body is never written again: a person, or a review lane, may have added to it. */
+  const url = open !== "" ? open : await sh(...prCreate(h, title, prBody(text, h.issue, p.c.seal)));
+  const merge = prMerge(h, url);
 
-  await sh("gh", "pr", "merge", url, "--auto", "--squash");
+  if (merge === null) return `${url} is open as a draft; a person marks it ready and merges it`;
+  await sh(...merge);
 
   return `${url} open, auto-merge on`;
 }

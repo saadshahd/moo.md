@@ -461,6 +461,10 @@ describe("rules", () => {
     expect(parseRules(JSON.stringify({ ...good, worktree }))).toEqual({ ...good, worktree });
     expect("errors" in parseRules(JSON.stringify({ ...good, worktree: { ...worktree, create: [] } }))).toBe(true);
   });
+  test("a repo may want its PRs opened as drafts", () => {
+    expect(parseRules(JSON.stringify({ ...good, pr: { draft: true } }))).toEqual({ ...good, pr: { draft: true } });
+    expect("errors" in parseRules(JSON.stringify({ ...good, pr: {} }))).toBe(true);
+  });
   test("a run's sandbox may add the repo's own hosts and folders", () => {
     const sandbox = { domains: ["npm.example.com"], paths: ["~/Library/pnpm/store/v10"] };
 

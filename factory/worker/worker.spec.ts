@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { usage } from "../lib/commands.ts";
 import { parse, render, type FactoryComment, type Plan, type Wait } from "../lib/formats.ts";
 import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
-import { PLAN_PATH, planGaps } from "../lib/plan.ts";
+import { PLAN_PATH, PR_PATH, planGaps } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import type { Check, Issue, Pr, Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
-import { seal } from "./cli.ts";
+import { prBody, prCreate, prMerge, prText, seal } from "./cli.ts";
 import {
   actionsFor,
   classify,
@@ -862,6 +862,12 @@ describe("run prompt", () => {
       return runPrompt(base);
     }
   });
+  test("the run writes the PR's body, by the project's PR rules, before it runs pr", () => {
+    const p = runPrompt(base);
+
+    expect(p).toContain(`write ${PR_PATH}`);
+    expect(p.indexOf(PR_PATH)).toBeLessThan(p.indexOf(usage(base.cli).pr));
+  });
   test("a restarted run goes on from the plan and the handoff", () => {
     const p = runPrompt({
       ...base,
@@ -882,6 +888,36 @@ describe("seal", () => {
     );
     expect(seal("## Types\na")).not.toBe(seal("## Types\nb"));
     expect(planGaps("## Types\na")).toEqual(["Signatures", "Files"]);
+  });
+});
+
+describe("the PR a run opens", () => {
+  const h = (draft?: boolean) => ({ repo: "o/r", issue: 7, rules: draft === undefined ? RULES : { ...RULES, pr: { draft } } });
+
+  test("its body is the run's own text, then the line that closes the issue, then the sealed plan", () => {
+    expect(prBody("## Context\n\nDue dates.\n\n", 7, SEAL)).toBe(
+      `## Context\n\nDue dates.\n\nCloses #7\n\nPlan: seal \`${SEAL.slice(0, 8)}\`, approved on #7.`,
+    );
+  });
+  test("it opens as a draft when the rules say so, and auto-merge is armed only on a PR that is no draft", () => {
+    expect(prCreate(h(true), "Add due dates", "body")).toEqual([
+      "gh", "pr", "create", "--repo", "o/r", "--head", "factory/7", "--label", "factory", "--title", "Add due dates", "--body", "body", "--draft",
+    ]);
+    expect(prCreate(h(), "Add due dates", "body")).not.toContain("--draft");
+    expect(prCreate(h(false), "Add due dates", "body")).not.toContain("--draft");
+    expect(prMerge(h(true), "https://github.com/o/r/pull/9")).toBe(null);
+    expect(prMerge(h(), "https://github.com/o/r/pull/9")).toEqual(["gh", "pr", "merge", "https://github.com/o/r/pull/9", "--auto", "--squash"]);
+  });
+  test("pr refuses with exit 4 while its body file is missing or blank, naming the file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "factory-pr-"));
+    const refused = { code: 4, message: expect.stringContaining(PR_PATH) };
+
+    await expect(prText(dir)).rejects.toMatchObject(refused);
+    await Bun.write(join(dir, PR_PATH), " \n\n");
+    await expect(prText(dir)).rejects.toMatchObject(refused);
+    await Bun.write(join(dir, PR_PATH), "## Context\n\nDue dates.\n");
+    expect(await prText(dir)).toBe("## Context\n\nDue dates.");
+    await rm(dir, { recursive: true });
   });
 });
 

@@ -5,7 +5,7 @@
 
 import { usage } from "../lib/commands.ts";
 import { branchFor } from "../lib/github.ts";
-import { HANDOFF_PATH, PLAN_PATH } from "../lib/plan.ts";
+import { HANDOFF_PATH, PLAN_PATH, PR_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
 
@@ -65,7 +65,7 @@ ${list(i.rules.layers.plan)}
    Ask only when undoing a choice costs more than asking, and say why in one or two sentences in the same message.
    An ask goes to the issue; the answer arrives as your next message.
 5. Commit and push as you go. After each push, write ${HANDOFF_PATH} (what is done, what is left, any step cut off) and run \`${u.handoff}\`.
-6. When the checks pass locally, run \`${u.pr}\`.
+6. When the checks pass locally, write ${PR_PATH}: the PR's body, as the project's own PR rules ask for one. Then run \`${u.pr}\`.
 7. Post a verdict on the diff as a PR comment: does it meet the issue and these rules?
 ${list(i.rules.layers.judge)}
    The verdict never holds the merge.
