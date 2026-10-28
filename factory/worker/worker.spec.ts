@@ -669,6 +669,10 @@ describe("a review on an open PR", () => {
 
     expect(step(at([review({ commit: "h0" })], retried)).state.kind).toBe("prOpen");
   });
+  test("a request for changes its author approved past never wakes it; another person's approval leaves it standing", () => {
+    expect(step(at([review({ commit: "h0" }), review({ id: 901, state: "APPROVED", body: "" })])).state.kind).toBe("prOpen");
+    expect(step(at([review({ commit: "h0" }), review({ id: 901, state: "APPROVED", body: "", author: "other" })])).state.kind).toBe("reviewed");
+  });
   test("a third review round marks the issue stuck", () => {
     const { state, actions } = step(at([review({ id: 903 })], [reviewWake(901), reviewWake(902)]));
 

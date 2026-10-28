@@ -183,9 +183,9 @@ const reviewWakes = (cs: readonly Comment[], a: Actors) => reviewsIn(sinceRetry(
 
 /**
  * The newest review the run should answer: a trusted person's, commenting or asking for changes
- * (an approval stands, and a push would dismiss it), saying something, and not woken for since
- * the last retry. One woken for before the retry counts again only on the PR's head: a push
- * since then answered it.
+ * (an approval stands, and a push would dismiss it), saying something, its author not approving
+ * since, and not woken for since the last retry. One woken for before the retry counts again
+ * only on the PR's head: a push since then answered it.
  */
 function actionableReview(pr: Pr, cs: readonly Comment[], a: Actors): Review | null {
   const woken = new Set(reviewWakes(cs, a));
@@ -193,11 +193,12 @@ function actionableReview(pr: Pr, cs: readonly Comment[], a: Actors): Review | n
 
   return (
     pr.reviews.findLast(
-      (r) =>
+      (r, i) =>
         r.author !== null &&
         a.trusted.includes(r.author) &&
         (r.state === "COMMENTED" || r.state === "CHANGES_REQUESTED") &&
         (r.body.trim() !== "" || r.comments.length > 0) &&
+        !pr.reviews.slice(i + 1).some((later) => later.author === r.author && later.state === "APPROVED") &&
         !woken.has(r.id) &&
         (!ever.has(r.id) || r.commit === pr.headSha),
     ) ?? null
