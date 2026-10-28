@@ -35,7 +35,7 @@ import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
 import { runSettings } from "./sandbox.ts";
-import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -1224,6 +1224,15 @@ describe("a run's sandbox", () => {
       "~/.config/fac*",
     ])
       expect(() => withPaths("/tmp/build", p)).toThrow(".config/factory");
+  });
+  test("a path that reaches the key folder through a symlink is refused", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-link-"));
+    await symlink(homedir(), join(root, "home"));
+
+    for (const p of [`${root}/home/.config/factory`, `${root}/home/.config`, `${root}/home/**`])
+      expect(() => withPaths(p)).toThrow(".config/factory");
+    expect(() => withPaths(`${root}/home/.config/factory-old`)).not.toThrow();
+    await rm(root, { recursive: true });
   });
   test("a path beside the key folder passes; a relative one is refused, having no place to compare", () => {
     expect(() => withPaths("~/.config/factory-old", "/tmp/build", "~/Library/pnpm/**")).not.toThrow();

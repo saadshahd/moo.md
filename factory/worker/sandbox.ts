@@ -4,13 +4,25 @@
  * folder and can't be turned off; a `Read` rule shuts the folder to the file tools. The run hooks
  * mint the bot's token through `$.process.run`, outside the sandbox. A machine with no sandbox
  * fails the run's commands rather than running them unsandboxed. The rules add the repo's own
- * hosts and folders, never the key's folder.
+ * hosts and folders, never the key's folder, however a symlink spells it.
  */
 
+import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { RULES_PATH, type Rules } from "../lib/rules.ts";
 import { APP_DIR } from "./app.ts";
+
+/** Absolute `path` with the symlinks in its longest existing part resolved, and the rest as written. */
+function real(path: string): string {
+  if (existsSync(path)) return realpathSync(path);
+  const up = dirname(path);
+
+  return up === path ? path : join(real(up), basename(path));
+}
+
+/** The App's key folder, wherever its symlinks lead. */
+const keyFolder = () => real(join(homedir(), APP_DIR));
 
 /** Whether `path` is `folder` or sits inside it. */
 function inside(path: string, folder: string): boolean {
@@ -30,15 +42,18 @@ function writable(path: string): string {
   const full = folder === "~" || folder.startsWith("~/") ? join(homedir(), folder.slice(1)) : folder;
 
   if (!isAbsolute(full)) throw new Error(`${RULES_PATH} sandbox.paths: ${path} is relative; start it at / or ~`);
-  const key = join(homedir(), APP_DIR);
+  const [at, key] = [real(full), keyFolder()];
 
-  if (inside(full, key) || inside(key, full))
+  if (inside(at, key) || inside(key, at))
     throw new Error(`${RULES_PATH} sandbox.paths: ${path} would let a run write the App's key folder ~/${APP_DIR}`);
 
   return path;
 }
 
 export function runSettings(rules: Rules) {
+  const key = keyFolder();
+  const shut = key === join(homedir(), APP_DIR) ? [`~/${APP_DIR}`] : [`~/${APP_DIR}`, key];
+
   return {
     sandbox: {
       enabled: true,
@@ -47,7 +62,7 @@ export function runSettings(rules: Rules) {
       /** On macOS, lets Go tools such as `gh` reach the TLS trust service, without which they fail every TLS check. */
       enableWeakerNetworkIsolation: true,
       filesystem: {
-        denyRead: [`~/${APP_DIR}`],
+        denyRead: shut,
         allowWrite: ["~/.bun", "~/.npm", "~/.cache", ...(rules.sandbox?.paths ?? []).map(writable)],
       },
       network: {
@@ -61,7 +76,7 @@ export function runSettings(rules: Rules) {
         ],
       },
     },
-    permissions: { deny: [`Read(~/${APP_DIR}/**)`] },
+    permissions: { deny: shut.map((f) => `Read(${f}/**)`) },
     /**
      * A project's own settings may name an editor that waits for a window (`code --wait`); a run
      * has none, so its `git merge` would wait for good. `--settings` outranks project settings.
