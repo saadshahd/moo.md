@@ -32,3 +32,4 @@ A plugin may define its own beliefs, principles, and constraints serving the mis
 - **hold** — Comprehension at the human's pace: grasp a change, drive a behavior, land one thing in an audience, until they can say how it works with the agent out of the room. See `hold/PHILOSOPHY.md`.
 - **hunch** — Experimental staging ground. Cheap to enter, honest to exit: every experiment graduates or dies. See `hunch/PHILOSOPHY.md`.
 - **sound** — Code taste as installable rules: a corpus selected against a repo's real surfaces, delivered as user-owned reference files.
+- **factory** — Unwatched work the human still decides: a labelled issue becomes a background run with hope that waits for plan approval, posts each choice it makes alone with how to undo it, and opens a PR held to the repo's own rules, each failure listed.
