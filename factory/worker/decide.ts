@@ -16,7 +16,8 @@ export const CRASHES_BEFORE_STUCK = 3;
 /** Review wakes a run gets between retries; the next actionable review marks the issue stuck. */
 export const REVIEW_ROUNDS = 2;
 
-export const SESSION_STATES = ["working", "blocked", "done", "stopped"] as const;
+/** `failed`: its process died and would not respawn. `claude stop` leaves it failed. */
+export const SESSION_STATES = ["working", "blocked", "done", "stopped", "failed"] as const;
 
 export type SessionState = (typeof SESSION_STATES)[number];
 
@@ -250,7 +251,7 @@ export function classify(l: Local, w: World): IssueState {
 
   if (pr !== null) {
     const hold = prHold(pr, w.gh.base);
-    const stopped = current === undefined || current.state === "stopped";
+    const stopped = current === undefined || current.state === "stopped" || current.state === "failed";
 
     if (hold?.kind === "conflict")
       return {
@@ -344,8 +345,13 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     after: current?.sessionId ?? null,
   });
 
+  /** `--resume` wakes a failed run, which no stop can end, without its flags or sandbox: a new run takes its place. */
   const wake = (message: string, restart: Extract<Action, { kind: "wake" }>["restart"] = null): Action[] =>
-    current === undefined ? [] : [{ kind: "wake", issue: n, run: current, message, restart }];
+    current === undefined
+      ? []
+      : current.state === "failed"
+        ? [start("crash")]
+        : [{ kind: "wake", issue: n, run: current, message, restart }];
 
   /** The worker may have merged the base into the branch on GitHub, so the run's copy is behind it. */
   const catchUp = `First run \`git fetch origin\` and \`git merge origin/${branchFor(n)}\`: merge, never rebase or force-push.`;

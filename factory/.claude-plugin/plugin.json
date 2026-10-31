@@ -1,6 +1,6 @@
 {
   "name": "factory",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A GitHub agent factory that runs on your own machine. Issues labelled factory become background Claude Code runs with hope; you see plans, calls, stuck runs and cost per merged PR in /factory.",
   "types": "./hooks/state.d.ts",
   "keywords": ["factory", "issues", "background", "worker"],

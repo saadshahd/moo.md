@@ -28,29 +28,32 @@ export type Ctx = {
 
 const PROJECTS = join(homedir(), ".claude", "projects");
 
-/** `claude agents` lists interactive sessions too, with another shape; runs are background ones. */
-const Session = z.union([
-  z.object({ kind: z.literal("interactive") }),
-  z.object({
-    kind: z.literal("background"),
-    id: z.string(),
-    sessionId: z.string(),
-    name: z.optional(z.nullable(z.string())),
-    startedAt: z.number(),
-    state: z.literal(SESSION_STATES),
-    /** "input needed" while its own question box waits; its transcript holds the ask only once answered. */
-    waitingFor: z.optional(z.nullable(z.string())),
-  }),
-]);
+const Background = z.object({
+  kind: z.literal("background"),
+  id: z.string(),
+  sessionId: z.string(),
+  name: z.string(),
+  startedAt: z.number(),
+  state: z.literal(SESSION_STATES),
+  /** "input needed" while its own question box waits; its transcript holds the ask only once answered. */
+  waitingFor: z.optional(z.nullable(z.string())),
+});
 
-type Background = Extract<z.infer<typeof Session>, { kind: "background" }>;
+type Background = z.infer<typeof Background>;
 
-/** The background sessions named `name` in `claude agents --json` output, oldest first. */
+/**
+ * The background sessions named `name` in `claude agents --json` output, oldest first. Only
+ * they are read whole: the list holds every session on the machine, and a shape or state no run
+ * has must not blind the worker to its own runs.
+ */
 export function sessionsNamed(agentsJson: string, name: string): Background[] {
-  return z
-    .parse(z.array(Session), JSON.parse(agentsJson))
-    .flatMap((s) => (s.kind === "background" && s.name === name ? [s] : []))
-    .sort((a, b) => a.startedAt - b.startedAt);
+  const all: unknown = JSON.parse(agentsJson);
+
+  if (!Array.isArray(all)) throw new Error("claude agents --json printed no list");
+  const named = z.object({ kind: z.literal("background"), name: z.literal(name) });
+  const ours = all.filter((s) => z.safeParse(named, s).success);
+
+  return z.parse(z.array(Background), ours).sort((a, b) => a.startedAt - b.startedAt);
 }
 
 export const runView = (s: Background, f: Facts): RunView => ({

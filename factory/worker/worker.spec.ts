@@ -201,7 +201,7 @@ function after(
       case "removeWorktree":
         return "gone";
       case "stop":
-        next = setRun((r) => ({ ...r, state: "stopped" }));
+        next = setRun((r) => ({ ...r, state: r.state === "failed" ? "failed" : "stopped" }));
         break;
       case "wake":
         next = setRun((r) => ({
@@ -1318,6 +1318,49 @@ describe("smoke run 2 (saadshahd/factory-smoke #5, 2026-10-27)", () => {
       "PR #8 merged",
       "ended: closed, PR #8",
     ]);
+  });
+});
+
+describe("a session whose process died (saadshahd/moo.md, 2026-10-31)", () => {
+  /** The one failed session in that day's `claude agents --json --all`: an idle one in another repo. */
+  const FAILED = {
+    id: "1e16ac8d",
+    cwd: "/Users/saad.shahd/repos/factory-smoke",
+    kind: "background",
+    startedAt: 1793062564722,
+    sessionId: "1e16ac8d-2acb-4785-a6d5-b8afbb49fa68",
+    state: "failed",
+  };
+
+  const agents = (...more: object[]) => JSON.stringify([...JSON.parse(AGENTS_AT_TICK), ...more]);
+
+  test("one in another repo leaves the worker's runs readable", () => {
+    const runs = sessionsNamed(agents(FAILED), "factory:saadshahd/factory-smoke#5");
+
+    expect(runs.map((r) => r.id)).toEqual(["94637db3"]);
+  });
+  test("a run's own failed session is read as failed", () => {
+    const own = { ...FAILED, name: "factory:saadshahd/factory-smoke#8" };
+
+    expect(sessionsNamed(agents(own), own.name).map((r) => r.state)).toEqual(["failed"]);
+  });
+  test("an answered wait closes, and a new run takes the failed one's place, never woken", () => {
+    const w = posted(waitFor);
+    const { actions } = step(world(snapshot({ issues: [issue(7, { comments: [w, said("Map")] })] }), [here(7, [session("failed")])]));
+
+    expect(kinds(actions)).toEqual(["closeWait", "start"]);
+    expect(actions[1]).toMatchObject({ restart: "crash", after: "sid-1" });
+  });
+  test("behind its base, the PR's branch is updated with no stop first", () => {
+    const gh = snapshot({ issues: [issue(7)], prs: new Map([[7, pr(7, { mergeState: "BEHIND" })]]) });
+
+    expect(step(world(gh, [here(7, [session("failed")])])).state.kind).toBe("behind");
+  });
+  test("with no PR, it is a death, and the run starts again", () => {
+    const { state, actions } = step(world(snapshot({ issues: [issue(7)] }), [here(7, [session("failed")])]));
+
+    expect(state).toEqual({ kind: "crashed", deaths: 1 });
+    expect(kinds(actions)).toEqual(["stop", "start"]);
   });
 });
 
