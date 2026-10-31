@@ -14,7 +14,7 @@ Authoring doctrine for this repo's own skills, hooks, and runtime files lives in
 
 **Hooks always fail open:** on any error, pass the event on and show the failure once. A hook that fails closed blocks what it wraps in every future session.
 
-> **Enforcement:** nothing here is mechanically checked — the repo has no doc gate, and no shell file in this repo is checked by anything.
+> **Enforcement:** a factory run checks the `check` layer of `.claude/factory.json` before its PR; nothing checks a direct push.
 
 ## Philosophy
 
