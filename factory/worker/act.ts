@@ -173,6 +173,31 @@ async function updateBranch(ctx: Ctx, n: number, pr: number, head: string): Prom
   return true;
 }
 
+const serviceUp = async () => (await run(["claude", "daemon", "status"])).exitCode === 0;
+
+/**
+ * Stops session `id` through Claude Code's background service, started first if it is down. A
+ * `claude --bg` starts the service, and it exits once no session is left: it retires a session
+ * idle for an hour, as a run waiting on a person is. Down, it stops nothing. Started the way
+ * `claude --bg` starts it, it marks the sessions it lost stopped, and exits again once idle.
+ * Detached, so a restart of the worker leaves it and the runs it hosts alone.
+ */
+export async function stopRun(id: string): Promise<void> {
+  if (!(await serviceUp())) {
+    const argv = ["claude", "daemon", "run", "--origin", "transient"];
+    Bun.spawn(argv, { detached: true, env: process.env, stdio: ["ignore", "ignore", "ignore"] }).unref();
+
+    for (let i = 0; !(await serviceUp()); i++) {
+      if (i === 40) throw new Error("Claude Code's background service is down and would not start");
+      await Bun.sleep(250);
+    }
+
+    log("Claude Code's background service was down; the worker started it");
+  }
+
+  await must(run, ["claude", "stop", id]);
+}
+
 /** Does one action; false when a claim was lost, so the issue's later actions are skipped. */
 export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
   const n = a.issue;
@@ -197,7 +222,7 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
     }
 
     case "stop":
-      await must(run, ["claude", "stop", a.run.id]);
+      await stopRun(a.run.id);
 
       return true;
     case "wake": {
@@ -211,7 +236,7 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
        * sandbox. Resumed while not stopped, it starts a new session with none of them, so a failed
        * stop ends the wake here.
        */
-      await must(run, ["claude", "stop", a.run.id]);
+      await stopRun(a.run.id);
       await must(run, ["claude", "--bg", "--resume", a.run.sessionId, a.message], { cwd });
       log(`#${n}: woken`);
 

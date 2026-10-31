@@ -30,7 +30,7 @@ import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedBy } from "../lib/r
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
-import { createdPath, letGo, onBranch, worktreeFor } from "./act.ts";
+import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
@@ -1361,6 +1361,43 @@ describe("a session whose process died (saadshahd/moo.md, 2026-10-31)", () => {
 
     expect(state).toEqual({ kind: "crashed", deaths: 1 });
     expect(kinds(actions)).toEqual(["stop", "start"]);
+  });
+});
+
+describe("a run is stopped even while Claude Code's background service is down (saadshahd/moo.md #68, 2026-10-31)", () => {
+  /** A stub `claude` whose service is up once `daemon run` has run; it logs each call. */
+  async function stubbed(up: boolean, f: () => Promise<void>): Promise<string[]> {
+    const root = await mkdtemp(join(tmpdir(), "factory-service-"));
+    await mkdir(join(root, "bin"));
+
+    if (up) await Bun.write(join(root, "up"), "");
+    const stub = join(root, "bin", "claude");
+    await Bun.write(stub, `#!/bin/sh\necho "$*" >> "${root}/calls"\ncase "$1 $2" in\n  "daemon status") [ -e "${root}/up" ] ;;\n  "daemon run") touch "${root}/up" ;;\nesac\n`);
+    await chmod(stub, 0o755);
+    const path = process.env.PATH;
+    process.env.PATH = `${join(root, "bin")}:${path}`;
+
+    try {
+      await f();
+    } finally {
+      process.env.PATH = path;
+    }
+
+    const calls = (await Bun.file(join(root, "calls")).text()).trim().split("\n");
+    await rm(root, { recursive: true });
+
+    return calls;
+  }
+
+  test("down, the service is started the way `claude --bg` starts it, and the run is stopped once it is up", async () => {
+    const calls = await stubbed(false, () => stopRun("0dd65ec5"));
+
+    expect(calls[0]).toBe("daemon status");
+    expect(calls).toContain("daemon run --origin transient");
+    expect(calls.slice(-2)).toEqual(["daemon status", "stop 0dd65ec5"]);
+  });
+  test("up, the run is just stopped", async () => {
+    expect(await stubbed(true, () => stopRun("0dd65ec5"))).toEqual(["daemon status", "stop 0dd65ec5"]);
   });
 });
 
