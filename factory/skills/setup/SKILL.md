@@ -12,7 +12,7 @@ Run **hope:intent** on what this setup is for: a trial or a worker that stays up
 
 ## What stands in the way
 
-Check each, then show the user every one that holds: what it would cause and the command that clears it. Run a command once the user agrees. Write nothing past this stage while any holds.
+Check each, then show the user every one that holds: what it would cause and the command that clears it. Run a clear that touches only this repo's working tree (a stale lock, a leftover file) yourself, once the repo's own note confirms it, and report it cleared; run one that changes GitHub settings or installs software on the machine once the user agrees. Write nothing past this stage while any holds.
 
 | Holds | Causes | Clears it |
 |---|---|---|
@@ -23,22 +23,22 @@ Check each, then show the user every one that holds: what it would cause and the
 
 With `pr.draft` true, the first two rows never hold: no PR auto-merges, and the worker checks neither.
 
-The gap: `gh api repos/<repo>/branches/<base>/protection/required_status_checks` fails for this login, `branches/<base>` still names a required check, and no ruleset is strict. Nobody here can read whether that protection requires branches up to date, so the worker starts and logs a warning saying so. Tell the user; it does not stand in the way.
+The gap: `gh api repos/<repo>/branches/<base>/protection/required_status_checks` fails for this login, `branches/<base>` still names a required check, and no ruleset is strict. Nobody here can read whether that protection requires branches up to date, so the worker starts and logs a warning saying so. Run any read the repo ships for it and give the user its result with the warning; it does not stand in the way.
 
 ## The GitHub App
 
 Done when `~/.config/factory/app.json` exists and `bun <root>/worker/cli.ts token`, run in the repo, prints a token. Otherwise only the user can get one. Whoever creates it sets:
 
 - Webhook: Active unchecked.
-- Repository permissions: Contents, Issues and Pull requests read and write; Checks, Commit statuses and Metadata read; no Workflows. Without Workflows, GitHub refuses the App any push that brings in a change to `.github/workflows/`, so once the base changes a workflow, each open PR behind it stalls until a person updates its branch. Tell the user.
+- Repository permissions: Contents, Issues and Pull requests read and write; Checks, Commit statuses and Metadata read; no Workflows. Without Workflows, GitHub refuses the App any push that brings in a change to `.github/workflows/`, so once the base changes a workflow, each open PR behind it stalls until a person updates its branch. Read what the repo records of the open PRs and tell the user which ones it stalls, by number.
 - Installed on this repo only.
 
 `gh repo view --json isInOrganization` says who creates it:
 
 | The repo is | The App |
 |---|---|
-| the user's own (`false`) | the user creates it at https://github.com/settings/apps/new, installable only on their account, then installs it on this repo |
-| an organization's (`true`) | the user can't create an App the organization installs: they ask the organization's admins for one the organization owns, and for its Client ID and a private key |
+| the user's own (`false`) | read the repo's manifest and notes, fill in the name, URL and settings, and hand the user the filled values with https://github.com/settings/apps/new; creating it in their login is theirs, installable only on their account, then they install it on this repo |
+| an organization's (`true`) | the user can't create an App the organization installs: read the repo's docs for who the admins are and how to ask, then hand the user the request ready to send, naming them, asking for an App the organization owns and for its Client ID and a private key |
 
 Save the private key as `~/.config/factory/app.pem`, mode 600. Write `~/.config/factory/app.json` as `{ "clientId": "<Client ID>", "key": "app.pem" }` and run `token` again.
 
@@ -52,7 +52,7 @@ bun -e "const r=(await import('<root>/lib/rules.ts')).parseRules(await Bun.file(
 
 - `bot`: the `name` that `token` prints.
 - `trusted`: the logins intent named; never the bot.
-- `atOnce`, `waitsPerDay`: ask. `contextCap` 300000 unless they name another; `paneEverySeconds` only if they name one.
+- `atOnce`, `waitsPerDay`: ask. Read the runbook and repo docs first: a figure they state is the answer, and the user is asked only for one nothing states. `contextCap` 300000 unless they name another; `paneEverySeconds` only if they name one.
 - `taste`: `CLAUDE.md`, `AGENTS.md` and any taste file they name. Put every rule those files state on one of the `layers`:
 
   | Layer   | A rule that                                                                              |
@@ -73,7 +73,7 @@ Commit it on a branch and open a PR to the default branch.
 
 - `gh label create factory --force`, `gh label create factory:stuck --force` and `gh label create factory:undo --force`
 - `gh repo edit --enable-auto-merge`, unless `pr.draft` is true
-- Unless `~/.claude.json` has `projects["<repo path>"].hasTrustDialogAccepted` true, the user runs `claude` in the repo once and accepts the trust prompt.
+- Unless `~/.claude.json` has `projects["<repo path>"].hasTrustDialogAccepted` true (read it yourself and report which holds), the user runs `claude` in the repo once and accepts the trust prompt.
 
 ## The worker
 
