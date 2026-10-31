@@ -38,8 +38,8 @@
     ],
     "plan": [
       "A model-judgment boundary (a judge, a generated artifact, an LLM check) gets a deterministic fence where one exists, and a measured pass-rate on a labeled set before anyone trusts it.",
-      "No persistent work or pipeline state files (.jsonl, workflow-state.json); conversation markers only.",
-      "Build nothing Claude Code will ship natively (task management, memory, tool orchestration); compete on thinking quality.",
+      "No work-state file only the agent reads (.jsonl, workflow-state.json).",
+      "Rebuild nothing Claude Code already ships and turns on; compete on thinking quality.",
       "No parallel agent sessions beyond what the human can attend to.",
       "Never trade human comprehension for output volume, and never automate friction that builds understanding.",
       "A change goes in the plugin whose role in PHILOSOPHY.md fits it.",

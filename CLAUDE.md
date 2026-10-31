@@ -38,8 +38,8 @@ A skill or hook that leans on a model's judgment (a judge, a generated artifact,
 - Windows paths in scripts.
 - Inline examples that narrow the exploration space — a specimen of desired output rather than a case that fixes the meaning of a term or marks where a property stops holding.
 - Catalogs of what the harness already enumerates (tool indexes, skill tables) — not a parent routing to its own children.
-- Persistent work/pipeline state files (.jsonl, workflow-state.json) — conversation markers only
-- Building features Claude Code will ship natively (task management, memory, tool orchestration) — compete on thinking quality
+- Work-state files only the agent reads (.jsonl, workflow-state.json)
+- Rebuilding what Claude Code already ships and turns on — compete on thinking quality
 - Cargo cult process steps (ritual without reason)
 - Optimizing for output volume while degrading human comprehension
 - Automating friction that builds understanding (edge case exploration, consequence engagement)
