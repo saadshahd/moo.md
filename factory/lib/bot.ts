@@ -20,9 +20,9 @@ export function needsRenew(bot: Bot | null, now: number): boolean {
 /**
  * The git config every factory git command runs under. The credential helpers are cleared, then
  * gh's is set, so git hands GitHub the bot's token in place of the user's keychain login. That
- * helper answers over HTTPS only, and a run's sandbox blocks SSH, so GitHub's SSH remotes are
- * rewritten to HTTPS. Signing is off: a user's global `commit.gpgsign` would send a run after a
- * key its sandbox can't reach.
+ * helper answers over HTTPS only, so GitHub's SSH remotes are rewritten to HTTPS, or git would
+ * push with the user's own SSH key. Signing is off: a user's global `commit.gpgsign` would sign
+ * the bot's commits with the user's key, or wait on a passphrase nobody types.
  */
 const GIT_CONFIG = [
   ["credential.helper", ""],

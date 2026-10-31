@@ -10,10 +10,15 @@ import { approved, notes } from "../lib/wait.ts";
 import type { Action, World } from "./decide.ts";
 import { run } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
-import { runSettings } from "./sandbox.ts";
 import { sessionFacts, worktrees, type Ctx } from "./snapshot.ts";
 
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
+
+/**
+ * A project's own settings may name an editor that waits for a window (`code --wait`); a run
+ * has none, so its `git merge` would wait for good. `--settings` outranks project settings.
+ */
+const RUN_SETTINGS = JSON.stringify({ env: { GIT_EDITOR: "true" } });
 
 export const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
 
@@ -66,7 +71,7 @@ export async function onBranch(path: string, n: number): Promise<void> {
 
 /**
  * Git with the repo's hooks off, for the worker's checkouts of a run's branch: the run may have
- * rewritten a hooks folder the repo tracks, such as husky's, and the worker runs unsandboxed.
+ * rewritten a hooks folder the repo tracks, such as husky's, and the worker runs none of it.
  */
 const GIT_NO_HOOKS = ["git", "-c", "core.hooksPath=/dev/null"] as const;
 
@@ -134,8 +139,6 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
   const issue = w.gh.issues.find((i) => i.number === n);
 
   if (issue === undefined) throw new Error(`#${n} is no open factory issue`);
-  /** Read before the worktree is made, so rules that would open the App's key fail the start first. */
-  const settings = runSettings(w.rules);
   const plan = latest(issue.comments, w.actors, "plan")?.c ?? null;
   const cwd = pathOf(w, n) ?? (await worktreeFor(ctx, w.rules, n, plan));
 
@@ -152,7 +155,7 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
     base: ctx.base,
   });
 
-  const flags = ["--permission-mode", "bypassPermissions", "--settings", JSON.stringify(settings)];
+  const flags = ["--permission-mode", "bypassPermissions", "--settings", RUN_SETTINGS];
   await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...flags, prompt], { cwd });
 }
 
@@ -232,9 +235,9 @@ export async function apply(ctx: Ctx, w: World, a: Action): Promise<boolean> {
       await onBranch(cwd, n);
       await restarted(a.restart, a.run.sessionId);
       /**
-       * After `claude stop`, `--resume` wakes the same session under its own id, name, flags and
-       * sandbox. Resumed while not stopped, it starts a new session with none of them, so a failed
-       * stop ends the wake here.
+       * After `claude stop`, `--resume` wakes the same session under its own id, name and flags.
+       * Resumed while not stopped, it starts a new session with none of them, so a failed stop ends
+       * the wake here.
        */
       await stopRun(a.run.id);
       await must(run, ["claude", "--bg", "--resume", a.run.sessionId, a.message], { cwd });

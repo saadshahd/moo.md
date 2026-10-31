@@ -19,7 +19,6 @@ Check each, then show the user every one that holds: what it would cause and the
 | the default branch requires no status check: neither `gh api repos/<repo>/rules/branches/<base>` nor its branch protection names one, and neither does `protection.required_status_checks` in `gh api repos/<repo>/branches/<base>` | auto-merge merges unchecked code | require a check the repo already runs; it has none → propose one |
 | the required check leaves branches free to be out of date: `strict_required_status_checks_policy` in each ruleset that requires one, and `required_status_checks.strict` in that protection, are false, and the gap below does not apply | two PRs green alone merge into a red base; the worker refuses to start | turn it on where the check is required |
 | `bun` or `gh` is not on `PATH` | the worker can't start | `brew install bun gh` |
-| Linux, and `bwrap` or `socat` is not on `PATH` | every run is sandboxed there, and its commands fail without them | `sudo apt install bubblewrap socat` |
 
 With `pr.draft` true, the first two rows never hold: no PR auto-merges, and the worker checks neither.
 
@@ -63,8 +62,7 @@ bun -e "const r=(await import('<root>/lib/rules.ts')).parseRules(await Bun.file(
   | `none`  | no layer can hold                                                                        |
 
   A rule that reads two ways → **hope:clarify** before placing it. The user can't state their taste → **hope:elicit**. Show the mapping as a table and let the user move rules before writing it. Before each PR, a run runs every `check` entry and judges its diff by every `judge` rule; what it can't fix goes in the PR's body as unticked boxes.
-- `sandbox`, only when runs need more than the default sandbox gives: `domains` for hosts such as a private package registry, `paths` for folders outside the worktree they write, such as a package store. Each path starts at `/` or `~/` and stays out of `~/.config/factory`.
-- `worktree`, only when the repo has its own commands that lend worktrees, such as a pool: `create` and `release`, each an argv run with no shell from the main worktree. `create` gets `{name}` and prints the worktree's path last; `release` gets that path as `{dir}`. They run outside the sandbox, as the worker: a program the repo tracks, a run's PR can change, so name one from outside the repo. Without it, git adds each worktree beside the main one.
+- `worktree`, only when the repo has its own commands that lend worktrees, such as a pool: `create` and `release`, each an argv run with no shell from the main worktree. `create` gets `{name}` and prints the worktree's path last; `release` gets that path as `{dir}`. They run as the worker: a program the repo tracks, a run's PR can change, so name one from outside the repo. Without it, git adds each worktree beside the main one.
 - `pr.draft`: true when a person marks each PR ready and merges it; the factory then never arms auto-merge.
 
 Commit it on a branch and open a PR to the default branch.

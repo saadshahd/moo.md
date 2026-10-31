@@ -34,9 +34,8 @@ import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
-import { readsShut, runSettings } from "./sandbox.ts";
-import { chmod, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const BOT = "moo-factory[bot]";
@@ -1205,52 +1204,6 @@ describe("git under the factory's git config", () => {
     expect(await git("ls-remote", "--get-url", "git@github.com:o/r.git")).toBe("https://github.com/o/r.git");
     expect(await git("ls-remote", "--get-url", "ssh://git@github.com/o/r.git")).toBe("https://github.com/o/r.git");
     expect(await git("config", "--get", "commit.gpgsign")).toBe("false");
-  });
-});
-
-describe("a run's sandbox", () => {
-  const withPaths = (...paths: string[]) => runSettings({ ...RULES, sandbox: { paths } });
-
-  test("adds the repo's hosts and folders to the factory's own, and keeps the App's key folder shut", () => {
-    const own = runSettings(RULES);
-    const s = runSettings({ ...RULES, sandbox: { domains: ["npm.example.com"], paths: ["~/Library/pnpm/store/v10"] } });
-
-    expect(s.sandbox.network.allowedDomains).toEqual([...own.sandbox.network.allowedDomains, "npm.example.com"]);
-    expect(s.sandbox.filesystem.allowWrite).toEqual([...own.sandbox.filesystem.allowWrite, "~/Library/pnpm/store/v10"]);
-    expect(s.sandbox.filesystem.denyRead).toEqual(["~/.config/factory"]);
-    expect(s.permissions.deny).toEqual(["Read(~/.config/factory/**)"]);
-    expect(s.env).toEqual({ GIT_EDITOR: "true" });
-  });
-  test("refuses a path that is the App's key folder, holds it, or sits inside it, however it is spelled", () => {
-    for (const p of [
-      "~/.config/factory",
-      "~/.config/factory/",
-      `${homedir()}/.config/factory/app.pem`,
-      "~/.config",
-      "~",
-      "/",
-      "~/Library/../.config/factory",
-      "~/**",
-      "~/.config/fac*",
-    ])
-      expect(() => withPaths("/tmp/build", p)).toThrow(".config/factory");
-  });
-  test("a key folder named from the root is shut from the root, not from the settings' folder", () => {
-    expect(readsShut("/Users/me/dotfiles/factory")).toBe("Read(//Users/me/dotfiles/factory/**)");
-    expect(readsShut("~/.config/factory")).toBe("Read(~/.config/factory/**)");
-  });
-  test("a path that reaches the key folder through a symlink is refused", async () => {
-    const root = await mkdtemp(join(tmpdir(), "factory-link-"));
-    await symlink(homedir(), join(root, "home"));
-
-    for (const p of [`${root}/home/.config/factory`, `${root}/home/.config`, `${root}/home/**`])
-      expect(() => withPaths(p)).toThrow(".config/factory");
-    expect(() => withPaths(`${root}/home/.config/factory-old`)).not.toThrow();
-    await rm(root, { recursive: true });
-  });
-  test("a path beside the key folder passes; a relative one is refused, having no place to compare", () => {
-    expect(() => withPaths("~/.config/factory-old", "/tmp/build", "~/Library/pnpm/**")).not.toThrow();
-    expect(() => withPaths("../..")).toThrow("relative");
   });
 });
 

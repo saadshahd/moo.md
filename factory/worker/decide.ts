@@ -345,7 +345,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     after: current?.sessionId ?? null,
   });
 
-  /** `--resume` wakes a failed run, which no stop can end, without its flags or sandbox: a new run takes its place. */
+  /** `--resume` wakes a failed run, which no stop can end, without its flags: a new run takes its place. */
   const wake = (message: string, restart: Extract<Action, { kind: "wake" }>["restart"] = null): Action[] =>
     current === undefined
       ? []
