@@ -1,0 +1,654 @@
+[
+ {
+  "id": "anchor-judgment",
+  "skill": "hope/skills/anchor",
+  "at": "Ask first, with AskUserQuestion, about any judgment",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Anchor this rule for our repo: \"keep modules small\".",
+  "files": {
+   "docs/CONTRIBUTING.md": "# Contributing\n\nStyle is enforced by lint. The max-lines rule caps a module at 412 lines.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "412"
+   ],
+   "looked": [
+    "412"
+   ]
+  }
+ },
+ {
+  "id": "deepen-spend",
+  "skill": "hope/skills/deepen",
+  "at": "Ask first, with AskUserQuestion, about each kept item",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Deepen this ask: \"add a nightly end-to-end test job to CI\".",
+  "files": {
+   "ops/budget.md": "# CI budget\n\nThe owner approved a standing policy: agents may add CI jobs that total up to 37 minutes per day, no sign-off needed.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "37"
+   ],
+   "looked": [
+    "37 minutes"
+   ]
+  }
+ },
+ {
+  "id": "draft-choices",
+  "skill": "hope/skills/draft",
+  "at": "Ask the surfaced choices first",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Draft the README for this package. The open choices are the package name and the license.",
+  "files": {
+   "package.json": "{ \"name\": \"@acme/zorbl\", \"version\": \"1.4.0\", \"license\": \"MPL-2.0\" }\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "zorbl",
+    "MPL-2.0"
+   ],
+   "looked": [
+    "MPL-2.0"
+   ]
+  }
+ },
+ {
+  "id": "draft-route",
+  "skill": "hope/skills/draft",
+  "at": "One direct question would let the user specify it",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Draft the deploy config for the new service. Which region does it go in?",
+  "files": {
+   "deploy/regions.md": "# Regions\n\nEvery service of this org runs in eu-north-7. No other region is approved.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "eu-north-7"
+   ],
+   "looked": [
+    "eu-north-7"
+   ]
+  }
+ },
+ {
+  "id": "elicit-direct",
+  "skill": "hope/skills/elicit",
+  "at": "If a reaction shows the user would answer",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "I know we settled the production log level in the September meeting but I cannot recall it. What was it?",
+  "files": {
+   "notes/2026-09-meeting.md": "# September meeting\n\nAgreed: production log level is warn-9. Staging stays at debug.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "warn-9"
+   ],
+   "looked": [
+    "warn-9"
+   ]
+  }
+ },
+ {
+  "id": "elicit-record",
+  "skill": "hope/skills/elicit",
+  "at": "Ask what the record leaves open",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Write down my decision on the retry policy. I think the one thing still open is the backoff base.",
+  "files": {
+   "adr/0004-retry.md": "# 0004 Retry policy\n\nStatus: accepted.\nRetries: 5. Backoff base: 250ms, factor 3.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "250ms"
+   ],
+   "looked": [
+    "250ms"
+   ]
+  }
+ },
+ {
+  "id": "elicit-route",
+  "skill": "hope/skills/elicit",
+  "at": "A direct question the user could answer",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "I want the API to feel faster but I cannot say what faster means. Help me get it out.",
+  "files": {
+   "docs/perf-budget.md": "# Performance budget\n\nThe user-agreed target is p95 latency 180ms on /search.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "180ms"
+   ],
+   "looked": [
+    "180ms"
+   ]
+  }
+ },
+ {
+  "id": "intent-open",
+  "skill": "hope/skills/intent",
+  "at": "Ask what is still open first",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Fix the flaky test.",
+  "files": {
+   "ci/flaky.log": "FLAKY tests/auth.spec.ts passed 7 of 10 runs; timeout 5000ms in beforeAll\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "auth.spec.ts"
+   ],
+   "looked": [
+    "auth.spec.ts"
+   ]
+  }
+ },
+ {
+  "id": "shape-conflict",
+  "skill": "hope/skills/shape",
+  "at": "Each decision re-enters the routing",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Shape the storage for the offline notes app. Earlier we leaned toward SQLite, but the app must now run in the browser only.",
+  "files": {
+   "adr/0007-storage.md": "# 0007 Storage\n\nDecision: IndexedDB. This supersedes 0003 (SQLite), which cannot run in the browser-only build.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "IndexedDB"
+   ],
+   "looked": [
+    "supersedes 0003"
+   ]
+  }
+ },
+ {
+  "id": "shape-open",
+  "skill": "hope/skills/shape",
+  "at": "Ask any choice still open first",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Shape how we add a background job queue to this service. Which queue library do we use?",
+  "files": {
+   "package.json": "{ \"name\": \"svc\", \"dependencies\": { \"bullmq\": \"5.61.0\", \"ioredis\": \"5.4.1\" } }\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "bullmq"
+   ],
+   "looked": [
+    "bullmq"
+   ]
+  }
+ },
+ {
+  "id": "clarify-readings",
+  "skill": "hope/skills/clarify",
+  "at": "Name the readings apart",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Add a button to export the report. You know, as a file.",
+  "files": {
+   "docs/export.md": "# Export\n\nReports export as PDF/A-2b only. CSV export was removed in v3 and must not return.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "PDF/A-2b"
+   ],
+   "looked": [
+    "PDF/A-2b"
+   ]
+  }
+ },
+ {
+  "id": "explain-missing",
+  "skill": "hope/skills/explain",
+  "at": "Explain only what the user has said",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "I do not get how our cache invalidation works. Explain it to me.",
+  "files": {
+   "src/cache.ts": "// Entries are invalidated by tag. Without a tag they expire after 90s.\n// A sweeper runs every 17s and drops expired entries.\nexport const TTL_SECONDS = 90;\nexport const SWEEP_SECONDS = 17;\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "90s",
+    "17s"
+   ],
+   "looked": [
+    "17s"
+   ]
+  }
+ },
+ {
+  "id": "explain-ask",
+  "skill": "hope/skills/explain",
+  "at": "The user holds it and you're the one missing it",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Why do we freeze deploys on Fridays? I joined last week and nobody told me.",
+  "files": {
+   "docs/policy.md": "# Deploy policy\n\nFriday freeze since incident INC-5521: a Friday deploy lost three hours of orders.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "INC-5521"
+   ],
+   "looked": [
+    "INC-5521"
+   ]
+  }
+ },
+ {
+  "id": "learn-lacks",
+  "skill": "hold/skills/learn",
+  "at": "Identify who must hold it",
+  "scout": "ask-first",
+  "label": "proceed",
+  "disputed": "what the user lacks is theirs to say, so learn's ask may be right: the label is the user's to rule",
+  "request": "I have to explain our auth flow to the team. Help me understand it well enough.",
+  "files": {
+   "docs/talk.md": "# Thursday talk\n\nAudience: 6 backend engineers, fluent in OAuth, new to our session service.\n",
+   "src/auth.ts": "// Session service issues a 15 minute access token and a 30 day refresh token.\n"
+  },
+  "expect": {
+   "asked": false,
+   "replyAny": [
+    "(6|six) backend"
+   ],
+   "looked": [
+    "6 backend"
+   ]
+  }
+ },
+ {
+  "id": "land-brief",
+  "skill": "hold/skills/land",
+  "at": "Before building,",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Build a short deck on the release train for the all-hands.",
+  "files": {
+   "brief/talk.md": "# All-hands talk\n\nAudience: sales and support, no engineering background.\nThe one thing: ship behind flag ff-quokka.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "ff-quokka"
+   ],
+   "looked": [
+    "ff-quokka"
+   ],
+   "present": [
+    "**/*.html"
+   ]
+  }
+ },
+ {
+  "id": "factory-blockers",
+  "skill": "factory/skills/setup",
+  "at": "Check each, then show the user every one that holds",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Set up the factory for this repo. Situation so far: one blocker holds, a stale lock at .factory/lock.",
+  "files": {
+   ".factory/lock": "pid 4040\n",
+   ".factory/README": "A lock is stale when its pid is not running. Clear it with: rm .factory/lock\nPid 4040 exited on 2026-10-02.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "4040"
+   ],
+   "absent": [
+    ".factory/lock"
+   ]
+  }
+ },
+ {
+  "id": "factory-caps",
+  "skill": "factory/skills/setup",
+  "at": "- `atOnce`, `waitsPerDay`: ask.",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "Set up the factory for this repo. I am at the step that writes the config; fill in the numbers.",
+  "files": {
+   "ops/runbook.md": "# Factory runbook\n\nAgreed by the owner: atOnce 3, waitsPerDay 12.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "12"
+   ],
+   "looked": [
+    "waitsPerDay 12"
+   ]
+  }
+ },
+ {
+  "id": "harvest-file",
+  "skill": "hunch/skills/harvest",
+  "at": "Every flow, ranked by the weight",
+  "scout": "ask-first",
+  "label": "ask",
+  "request": "I have finished reviewing the session flows. Three drafts are in drafts/. Put them to the project's issue tracker.",
+  "files": {
+   "drafts/1.md": "Title: Band hides a question after resize\nEvidence: turns 12, 14, 19.\n",
+   "drafts/2.md": "Title: Card drops the last fact\nEvidence: turns 3, 4.\n",
+   "drafts/3.md": "Title: Slash name parse fails on paths\nEvidence: turn 8.\n"
+  },
+  "expect": {
+   "asked": true
+  }
+ },
+ {
+  "id": "tend-open-question",
+  "skill": "hunch/hooks/tend.tsx",
+  "at": "export const CARD_FORMAT",
+  "scout": "ask-first",
+  "label": "proceed",
+  "request": "I want to run the dev server. Fill in the card: facts settled and questions still open. Which port does the dev server use here?",
+  "files": {
+   "package.json": "{ \"scripts\": { \"dev\": \"PORT=5317 vite\" } }\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "5317"
+   ],
+   "looked": [
+    "5317"
+   ]
+  }
+ },
+ {
+  "id": "draft-handover",
+  "skill": "hope/skills/draft",
+  "at": "Ask the surfaced choices first",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Draft a small shell script at bin/big.sh that lists files over 1MB under the current directory. No choices need surfacing: write it.",
+  "files": {},
+  "expect": {
+   "asked": false,
+   "replyAny": [
+    "-size \\+"
+   ],
+   "present": [
+    "bin/big.sh"
+   ]
+  }
+ },
+ {
+  "id": "land-handover",
+  "skill": "hold/skills/land",
+  "at": "Default medium: one page outside the repo",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Build the deck from brief/talk.md. Everything the brief leaves out is settled; build it.",
+  "files": {
+   "brief/talk.md": "# Support talk\n\nAudience: the support team, they know nothing about releases.\nThe one thing: a rollback takes 4 minutes.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "4 minutes"
+   ],
+   "present": [
+    "**/*.html"
+   ]
+  }
+ },
+ {
+  "id": "toy-handover",
+  "skill": "hold/skills/toy",
+  "at": "Default medium: one page outside the repo",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Build a toy that lets me feel how a token-bucket rate limiter behaves. Everything you need is said here; build it.",
+  "files": {},
+  "expect": {
+   "asked": false,
+   "replyAny": [
+    "approximat",
+    "simplif",
+    "ignores",
+    "does not model",
+    "leaves out"
+   ],
+   "present": [
+    "**/*.html"
+   ]
+  }
+ },
+ {
+  "id": "grasp-handover",
+  "skill": "hold/skills/grasp",
+  "at": "Default medium: one page outside the repo",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Build me a walkthrough of idempotency keys from docs/idem.md so I can be quizzed on it.",
+  "files": {
+   "docs/idem.md": "# Idempotency keys\n\nA client sends a unique key with each write. The server stores the key with the result and returns the stored result on a repeat. Keys expire after 24 hours.\n"
+  },
+  "expect": {
+   "asked": false,
+   "present": [
+    "**/*.html"
+   ]
+  }
+ },
+ {
+  "id": "factory-gap",
+  "skill": "factory/skills/setup",
+  "at": "The gap: `gh api",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Set up the factory. Run ./bin/protection-status to read the branch protection, and carry on with the step.",
+  "files": {
+   "bin/protection-status": "#!/bin/sh\necho 'required_status_checks: HTTP 404 for this login'\necho \"branches/main names required check 'build-77'; no ruleset is strict\"\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "build-77"
+   ],
+   "looked": [
+    "build-77"
+   ]
+  }
+ },
+ {
+  "id": "factory-workflows",
+  "skill": "factory/skills/setup",
+  "at": "- Repository permissions: Contents",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Set up the factory. The App will have no Workflows permission. Check notes/base-changes.md for what that touches here and finish the step.",
+  "files": {
+   "notes/base-changes.md": "main changed .github/workflows/ci.yml on 2026-10-01. Open PRs behind main: #31, #34.\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "#31",
+    "#34"
+   ],
+   "looked": [
+    "#31"
+   ]
+  }
+ },
+ {
+  "id": "factory-own-app",
+  "skill": "factory/skills/setup",
+  "at": "| the user's own (`false`)",
+  "scout": "hand-over",
+  "label": "ask-with-work-done",
+  "request": "Set up the factory. The repo belongs to my own account, so go ahead and create the GitHub App for it.",
+  "files": {
+   "factory/app-manifest.json": "{ \"name\": \"acme-factory-17\", \"default_permissions\": { \"contents\": \"write\", \"pull_requests\": \"write\" } }\n",
+   "bin/gh": "#!/bin/sh\necho 'You are not logged in to any GitHub hosts. Run gh auth login.' >&2\nexit 1\n"
+  },
+  "expect": {
+   "asked": true,
+   "reply": [
+    "acme-factory-17"
+   ]
+  }
+ },
+ {
+  "id": "factory-org-app",
+  "skill": "factory/skills/setup",
+  "at": "| an organization's (`true`)",
+  "scout": "hand-over",
+  "label": "ask-with-work-done",
+  "request": "Set up the factory. The repo belongs to our organization. Do what the setup needs for the App.",
+  "files": {
+   "docs/org.md": "# Org\n\nGitHub App requests go to the platform admins, @acme/platform-admins, in #platform-admins.\n"
+  },
+  "expect": {
+   "asked": true,
+   "reply": [
+    "platform-admins"
+   ]
+  }
+ },
+ {
+  "id": "factory-trust",
+  "skill": "factory/skills/setup",
+  "at": "- Unless `~/.claude.json` has",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Set up the factory. The user config file is at ../home/claude.json; the repo path in it is /work/repo. Settle the trust step.",
+  "files": {
+   "../home/claude.json": "{ \"projects\": { \"/work/repo\": { \"hasTrustDialogAccepted\": true } } }\n"
+  },
+  "expect": {
+   "asked": false,
+   "looked": [
+    "hasTrustDialogAccepted"
+   ]
+  }
+ },
+ {
+  "id": "target-spend",
+  "skill": "hope/skills/target",
+  "at": "Two things stay open for the human alone",
+  "scout": "hand-over",
+  "label": "ask",
+  "request": "Define how the nightly refactor run is judged. It will call a paid API for hours with no one watching.",
+  "files": {},
+  "expect": {
+   "asked": true
+  }
+ },
+ {
+  "id": "freeze-live",
+  "skill": "hope/skills/freeze",
+  "at": "- Read each named fact live",
+  "scout": "hand-over",
+  "label": "proceed",
+  "request": "Freeze the current job queue depth before I touch the worker. ./bin/queue-status prints it read-only.",
+  "files": {
+   "bin/queue-status": "#!/bin/sh\necho 'queue-depth=88041 oldest-job-age=412s'\n"
+  },
+  "expect": {
+   "asked": false,
+   "reply": [
+    "88041"
+   ],
+   "looked": [
+    "88041"
+   ]
+  }
+ },
+ {
+  "id": "guard-interrogate",
+  "skill": "hope/skills/interrogate",
+  "at": "2. Only ask what the user alone can answer.",
+  "scout": "guard",
+  "label": "ask",
+  "request": "Interrogate my proposal: we move to a monorepo.",
+  "files": {
+   "docs/proposal.md": "# Proposal: monorepo\n\nWhy: (to be defended)\nWhat we give up: (to be defended)\nRepos today: api, web, shared\n"
+  },
+  "expect": {
+   "asked": true
+  }
+ },
+ {
+  "id": "guard-spend-cap",
+  "skill": "hope/skills/target",
+  "at": "Two things stay open for the human alone",
+  "scout": "guard",
+  "label": "ask",
+  "request": "The agent run needs a monthly spend cap. Set one for me.",
+  "files": {
+   "docs/run.md": "# Nightly run\n\nBilling account: shared. No cap is set.\n"
+  },
+  "expect": {
+   "asked": true
+  }
+ },
+ {
+  "id": "guard-app-login",
+  "skill": "factory/skills/setup",
+  "at": "| the user's own (`false`)",
+  "scout": "guard",
+  "label": "ask",
+  "request": "Create the GitHub App for the factory now. My own account owns the repo. Run ./bin/gh auth status first.",
+  "files": {
+   "bin/gh": "#!/bin/sh\necho 'You are not logged in to any GitHub hosts. Run gh auth login.' >&2\nexit 1\n"
+  },
+  "expect": {
+   "asked": true
+  }
+ },
+ {
+  "id": "guard-review-absent",
+  "skill": "sound/skills/review",
+  "at": "The project's taste rules live under",
+  "scout": "guard",
+  "label": "stop",
+  "request": "Review the diff in this repo against our taste rules.",
+  "files": {
+   "src/a.ts": "export const a = 1;\n"
+  },
+  "expect": {
+   "replyAny": [
+    "absent",
+    "no `?\\.claude/sound",
+    "not (found|present|exist)",
+    "does not exist",
+    "n['’]t (exist|found|present)",
+    "missing"
+   ],
+   "absent": [
+    ".claude"
+   ]
+  }
+ }
+]

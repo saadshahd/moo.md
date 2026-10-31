@@ -54,15 +54,13 @@ Before building any unit, count how often its target situation occurs in real se
 - A body names a sibling in exactly two places: a refusal, and a route — wherever in the body those sit. There the name _is_ the refusal's or the route's content, and a reader without it is stranded.
 - Ending over hand-off: a finished run states what is now settled and what is still open, in its own words. Naming who handles it next hardcodes the graph n², so one trigger change edits every sibling.
 
-**Turning to the user — information decides who is asked, never the skill's habit.** A skill states once, over every point where it asks or hands something over, `only what nothing in reach settles; read what does, and say where its answer came from`, in those words. In reach: the repo, its docs and history, the record, the user's notes and accounts, and any read-only tool the session has, read at the source that settles the fact. A step that is free, reversible and inside the work is done and its result reported, never handed over as a link, path or command. What stays the user's:
+**Turning to the user — information decides who is asked, never the skill's habit.** `hope/hooks/reach.ts` adds the rule to every system prompt, skill or none, so no skill restates it. A skill's own "ask" beats that rule where the two meet, so each ask a skill states covers only what sources in reach leave open. What stays the user's:
 
 | Turn to the user for                                                                        | Unless                                                                              | The turn carries                                              |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | What only they hold — what they want, their reasons, taste and limits, what they understand | A wrong guess costs less to undo than the question costs: state it, they correct it | What was read, so they answer only what is left               |
 | An act only their login or authority can take                                               | —                                                                                   | The work done: values filled, request drafted, one exact step |
 | An act that spends their money or time, reaches outside the work, or can't be undone        | Their words, this session or recorded in reach, authorize that act and its content  | The act ready to run on their yes                             |
-
-A fact out of reach is named as a gap wherever a claim or choice rests on it.
 
 **Output form — bound by what the skill hands back, never by one shared sentence.** Plain words is the only part that holds across all three:
 
@@ -80,7 +78,7 @@ Every hook is a function hook: it reaches the human with no model turn. The API 
 
 - A hook never starts a turn the human didn't ask for: no wake, no `$.prompt.submit` of its own.
 - What a hook finds waits where the human looks next, the band above the prompt, and appears there only while it holds something. Detail unfolds on a press and folds back.
-- A hook hands to Claude only on the human's Enter: `$.prompt.fill` a sentence start they finish, with any bulk added as `prompt.submit` context.
+- A hook hands to Claude only on the human's Enter: `$.prompt.fill` a sentence start they finish, with any bulk added as `prompt.submit` context. The one exception is a rule every turn must hold, added as a `prompt.compose` section that never varies, as `reach.ts` does.
 - Work longer than one dispatch runs unawaited, so the turn's end is never held.
 - State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files. Module variables hold only what a hot reload may drop: it drops them.
 - A failure shows once, as a toast, and the event passes on.

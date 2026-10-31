@@ -9,6 +9,6 @@ One offer per turn: put it out and wait for the reaction. Read the reaction — 
 
 If a reaction shows the user would answer a direct question, ask it instead of staging the next offer.
 
-Ask what the record leaves open first, with AskUserQuestion. Then hand back the record whole, in words the user confirmed as theirs.
+Ask what the record leaves open, with AskUserQuestion, once it holds what sources in reach settle, each with where it came from. Then hand back the record whole, in words the user confirmed as theirs.
 
-A direct question the user could answer would get it said → ask it. The user has said it, but the words admit two readings that would build different things → use **clarify** skill. The user is missing something already settled, not holding something unsaid → use **explain** skill.
+A direct question the user could answer, and no source in reach does, would get it said → ask it. The user has said it, but the words admit two readings that would build different things → use **clarify** skill. The user is missing something already settled, in a source in reach or their earlier words, not holding something unsaid → use **explain** skill.

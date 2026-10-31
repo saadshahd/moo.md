@@ -1,5 +1,5 @@
 {
   "modules": [
-    "./slop.tsx"
+    "./index.tsx"
   ]
 }

@@ -3,7 +3,7 @@ name: land
 description: Build a stepped deck an audience works through until one thing of it stays with them. Use when the user needs an audience to come away holding one thing.
 ---
 
-Before building, clarify what the conversation lacks of the audience — what they already know — and of the one thing: the single memory, action, or feeling they keep. Say the brief back, then build. One idea per slide; cut any slide the one thing does not need. Where the material does not say why, the slide says the reason is not recorded. Never guess one.
+Before building, take from the conversation and sources in reach the audience — what they already know — and the one thing: the single memory, action, or feeling they keep. Clarify with the user only what neither holds. Say the brief back, then build. One idea per slide; cut any slide the one thing does not need. Where the material does not say why, the slide says the reason is not recorded. Never guess one.
 
 Open on a curiosity gap — a question, a surprising number, a belief flipped — never a topic title.
 

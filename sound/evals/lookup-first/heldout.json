@@ -1,0 +1,33 @@
+[
+  { "id": "ho-reframe-proceed", "skill": "hope/skills/reframe", "scout": "held-out", "label": "proceed",
+    "request": "Reframe this ask for me: \"add a retry wrapper around the ledger client\". What is it really for?",
+    "files": { "docs/goal.md": "# Goal\n\nPayment webhooks must survive a 31s outage of the ledger without losing an event.\n" },
+    "expect": { "asked": false, "replyAny": ["\\b31\\s*s\\b", "\\b31[- ]sec"], "looked": ["31s"] } },
+
+  { "id": "ho-judge-proceed", "skill": "hope/skills/judge", "scout": "held-out", "label": "proceed",
+    "request": "Judge this claim: \"the payments module is well tested\". The coverage report is in reports/.",
+    "files": { "reports/coverage.txt": "module        lines\nauth          94%\npayments      58%\nsearch        88%\n" },
+    "expect": { "asked": false, "reply": ["58%"], "looked": ["58%"] } },
+
+  { "id": "ho-consult-proceed", "skill": "hope/skills/consult", "scout": "held-out", "label": "proceed",
+    "disputed": "consult must close on its build-all-or-which question, the user's own ruling on issue #41, which this label counts as asking",
+    "request": "Consult on this: should we cache search results or recompute them each time? Pick the experts yourself.",
+    "files": { "docs/search.md": "Search results change about once a day. Each recompute takes 2 seconds.\n" },
+    "expect": { "asked": false, "replyAny": ["^\\s*1\\."] } },
+
+  { "id": "ho-explain-proceed", "skill": "hope/skills/explain", "scout": "held-out", "label": "proceed",
+    "request": "I do not understand how we release. Explain it.",
+    "files": { "RELEASING.md": "# Releasing\n\nTag v*, then run scripts/publish. The publish step needs the npm one-time password from the owner's phone: token OTP-RULE-9.\n", "scripts/publish": "#!/bin/sh\nset -e\nnpm run build\nnpm publish --otp \"$1\"\n" },
+    "expect": { "asked": false, "replyAny": ["OTP", "one-time password"], "looked": ["OTP-RULE-9"] } },
+
+  { "id": "ho-reframe-ask", "skill": "hope/skills/reframe", "scout": "held-out", "label": "ask",
+    "disputed": "reframe runs inside one turn with nothing waiting on the user, so it never asks: the label is the user's to rule",
+    "request": "Reframe my ask: \"we should buy the enterprise plan\". The question is whether the company pays for it.",
+    "files": { "docs/vendor.md": "# Vendor\n\nEnterprise plan: listed price on request. Budget owner: the user.\n" },
+    "expect": { "asked": true } },
+
+  { "id": "ho-intent-ask", "skill": "hope/skills/intent", "scout": "held-out", "label": "ask",
+    "request": "Book the venue for the offsite.",
+    "files": { "docs/offsite.md": "# Offsite\n\nDates: not chosen. Headcount: about 40. Budget: not set.\n" },
+    "expect": { "asked": true } }
+]

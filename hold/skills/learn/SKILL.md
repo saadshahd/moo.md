@@ -3,7 +3,7 @@ name: learn
 description: Help the user understand something well enough to explain it. Use when the user needs to understand something and it is not yet clear what kind of understanding they need.
 ---
 
-Identify who must hold it, what they lack; clarify with the user what the conversation lacks.
+Identify who must hold it and what they lack, from the conversation and sources in reach; clarify with the user only what neither holds.
 
 Route by what they lack, invoking the named skill with the Skill tool:
 

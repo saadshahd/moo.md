@@ -15,6 +15,6 @@ Route each thing still left to invent by what it is, invoking the named skill wi
 
 Route again until nothing is left to invent.
 
-Ask what is still open first, with AskUserQuestion. A restated ask is the user's to take: offer it beside the ask as given. Before rewriting the ask, use **deepen** skill on it. Then state the work order, naming no skill: the ask, the bar it must meet, and what it must NOT do where that surfaced. As short as it goes with nothing in the spec lost.
+Ask what is still open first, with AskUserQuestion. A gap whose wrong guess costs less to undo than the question costs to ask is not open: the work order states it as an assumption. A restated ask is the user's to take: offer it beside the ask as given. Before rewriting the ask, use **deepen** skill on it. Then state the work order, naming no skill: the ask, the bar it must meet, and what it must NOT do where that surfaced. As short as it goes with nothing in the spec lost.
 
 The WHAT is confirmed and what's open is the technical path → use **shape** skill.
