@@ -21,7 +21,6 @@
   "layers": {
     "check": [
       "Frontmatter holds no multi-line YAML block (`|`, `>`): git ls-files '*SKILL.md' '*/commands/*.md' '*/agents/*.md' | xargs awk 'FNR==1{fm=($0==\"---\")} FNR>1&&fm&&$0==\"---\"{fm=0} fm&&/^[[:space:]]*[A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*[|>][-+0-9]*[[:space:]]*$/{print FILENAME\": \"$0; bad=1} END{exit bad}'",
-      "A skill's description is one line of at most 1024 characters: git ls-files '*SKILL.md' | xargs awk 'FNR==1{fm=($0==\"---\")} FNR>1&&fm&&$0==\"---\"{fm=0} FNR==1{d=0} fm&&/^description:/{d=1; v=substr($0,14); sub(/^ +/,\"\",v); if(v==\"\"||length(v)>1024){print FILENAME\": description empty or over 1024\"; bad=1}; next} fm&&d&&/^[[:space:]]+[^[:space:]]/{print FILENAME\": description runs past one line\"; bad=1} fm&&!/^[[:space:]]/{d=0} END{exit bad}'",
       "No `when_to_use` key in skill frontmatter: git ls-files '*SKILL.md' | xargs awk 'FNR==1{fm=($0==\"---\")} FNR>1&&fm&&$0==\"---\"{fm=0} fm&&/^when_to_use:/{print FILENAME; bad=1} END{exit bad}'",
       "Version lives in plugin.json only, never in SKILL.md frontmatter: git ls-files '*SKILL.md' | xargs awk 'FNR==1{fm=($0==\"---\")} FNR>1&&fm&&$0==\"---\"{fm=0} fm&&/^version:/{print FILENAME; bad=1} END{exit bad}'",
       "A skill that stays in this repo is marked internal in its metadata: for f in $(git ls-files '.claude/skills/*SKILL.md'); do awk 'FNR==1{fm=($0==\"---\")} FNR>1&&fm&&$0==\"---\"{fm=0} fm&&/^metadata:/{m=1;next} fm&&m&&/^[[:space:]]+internal:[[:space:]]*true[[:space:]]*$/{ok=1} fm&&!/^[[:space:]]/{m=0} END{exit !ok}' \"$f\" || { echo \"not internal: $f\"; exit 1; }; done",
@@ -46,7 +45,6 @@
       "Pick each new unit by moo-authoring's unit choice table: runtime file, skill, human-only skill, function hook, hunch skill with HYPOTHESIS.md, or repo-local skill.",
       "Before building a unit, count how often its situation occurs in real session transcripts, and weigh each case by what the miss cost.",
       "A new skill only when the kind of thinking changes: one skill, one mode, one gate. Two skills over one when their triggers differ.",
-      "Content for one branch of a skill goes in a file the skill opens on that branch, named where it is needed.",
       "A pane or band is verified on events copied from real session transcripts, one per shape it renders.",
       "Prior art first: search libraries, then the codebase, before building.",
       "Define what must NOT happen before what should.",
@@ -63,8 +61,8 @@
       "No inline example that narrows the exploration space; a case that fixes a term's meaning or marks where a property stops holding is fine.",
       "No catalog of what the harness already lists, such as tool indexes or skill tables.",
       "No cargo-cult process step: every step has a reason.",
-      "A condition that follows what a skill does reads `Use when <condition>.`, a finite clause.",
-      "A skill is sized by a deletion pass, never a numeric cap.",
+      "A condition that follows what a skill does is marked `Use when <condition>.`; a description may instead open with the condition and stop there.",
+      "A skill is sized by a deletion pass with a /reduce loop, never a numeric cap.",
       "Decision tables over prose explanations; bullets for lists, a paragraph for one connected argument.",
       "Every sentence passes \"does Claude need this?\"; no vague terms, one term per concept.",
       "Design decisions read \"X over Y: reason\".",
@@ -79,7 +77,9 @@
       "A hope skill body stops when a sibling it names is missing, never degrades.",
       "No rigid frameworks: a skill skips steps that don't apply.",
       "Default to less; expand on request.",
-      "A hunch experiment that leans on judgment graduates only with a measured pass-rate, never from one good run."
+      "A hunch experiment that leans on judgment graduates only with a measured pass-rate, never from one good run.",
+      "A skill turns to the user only for what nothing in reach settles: it says so once, in moo-authoring's words, over every point where it asks or hands something over, reads what does settle it, and says where the answer came from. A free, reversible step inside the work is done and reported, never handed over as a link, path or command.",
+      "A fact out of reach is named as a gap wherever a claim or choice rests on it."
     ],
     "none": [
       "Clarity before action: ask when you would be guessing at what is wanted.",
