@@ -2,8 +2,9 @@ import type { Register } from "claude-code";
 import { MEASURE, type Band, type Item } from "./band.tsx";
 
 export type Question = { q: string; options: string[] };
-/** One expert's idea to try; `test` pits it against the version that exists. */
-export type Idea = { by: string; idea: string; why?: string; test?: string };
+/** One expert's idea to try; `test` pits it against the version that exists; `chosen` is absent
+ * where the reply left the pick to the user. */
+export type Idea = { by: string; idea: string; why?: string; test?: string; chosen?: boolean };
 export type Card = {
   facts?: string[];
   /** What the agent would change and kept to itself, from the complain skill. */
@@ -21,9 +22,9 @@ export const CARD_FORMAT = `End your reply with a \`\`\`card JSON block of what 
 facts: ${FACTS}; one that settles a choice names what lost. questions: every question still open; the user's next prompt closes them all, so restate any still open.
 The user cites items by 1-based position: \`fact 2: …\`, \`q1: <option> — …\`.`;
 // Asked of consult, so `/ideas` lists its ideas to pick from.
-export const IDEAS_FORMAT = `End your reply with a \`\`\`card JSON block of the ideas, and your yes/no as its one question:
-{"ideas":[{"by":"<expert>","idea":"…","why":"…","test":"…"}],"questions":[{"q":"…","options":["yes","no"]}]}
-test: only where this idea's win differs from the one the reply names for all. The question is the reply's last line, word for word. The user cites an idea by its 1-based position: \`idea 2: …\`.`;
+export const IDEAS_FORMAT = `End your reply with a \`\`\`card JSON block of the ideas:
+{"ideas":[{"by":"<expert>","idea":"…","why":"…","test":"…","chosen":true}],"questions":[{"q":"…","options":["…"]}]}
+test: only where this idea's win differs from the one the reply names for all. chosen: true for an idea the reply chose, false for one it dropped, absent for one it left to the user. questions: only the picks the reply leaves to the user. The user cites an idea by its 1-based position: \`idea 2: …\`.`;
 // The card each skill is asked for.
 const CARD_SKILLS = new Map([
   ...[
@@ -120,7 +121,8 @@ export function cleanCard(c: any): Card {
         str(d?.by) &&
         str(d.idea) &&
         (d.why === undefined || str(d.why)) &&
-        (d.test === undefined || str(d.test)),
+        (d.test === undefined || str(d.test)) &&
+        (d.chosen === undefined || typeof d.chosen === "boolean"),
     ),
   };
   for (const k of Object.keys(card) as (keyof Card)[])
@@ -237,11 +239,12 @@ export function bareFact(f: string): string {
   );
 }
 
-/** A consult reply cut where its colours change: markdown as written, each idea's head, and the
- * lines under it and the shared win, which recede. */
+/** A consult reply cut where its colours change: markdown as written, each idea's head, the line
+ * saying why it was chosen, and what recedes: the lines under an idea, a dropped idea whole, the shared win. */
 export type Segment =
   | { md: string }
   | { head: { lead: string; change: string; rest: string } }
+  | { chosen: string }
   | { dim: string };
 
 export function ideaSegments(text: string): Segment[] {
@@ -256,6 +259,7 @@ export function ideaSegments(text: string): Segment[] {
   const plain = (t: string) => t.replace(/\*\*?|`/g, "");
   for (const l of text.split("\n")) {
     const head = l.match(/^(\d+\.\s.*?)\*\*(.+?)\*\*(.*)$/);
+    const droppedHead = !head && /^\d+\.\s.* — /.test(l);
     if (head) {
       flush();
       inList = listed = true;
@@ -266,10 +270,15 @@ export function ideaSegments(text: string): Segment[] {
           rest: plain(head[3]),
         },
       });
-    } else if (inList && /^\s+\S/.test(l)) out.push({ dim: plain(l) });
+    } else if (droppedHead && (inList || !listed)) {
+      flush();
+      inList = listed = true;
+      out.push({ dim: plain(l) });
+    } else if (inList && /^\s+Chosen because\b/.test(l)) out.push({ chosen: plain(l) });
+    else if (inList && /^\s+\S/.test(l)) out.push({ dim: plain(l) });
     // A blank line between ideas keeps them apart.
     else if (inList && !l.trim()) out.push({ dim: "" });
-    // Past the ideas, all but the closing question recedes: the win, and any note the rules left out.
+    // Past the ideas, all but a question recedes: the win, and any note the rules left out.
     else if (listed && l.trim() && !l.trim().endsWith("?")) {
       flush();
       inList = false;
@@ -349,7 +358,7 @@ export function cardRows(c: Card, name: string): Item[][] {
       (c.ideas ?? []).map((d, i) => [
         [
           column(note(`idea-by:${i}`, d.by)),
-          { ...line(`probe:idea ${i + 1}`, d.idea), strong: true as const },
+          { ...line(`probe:idea ${i + 1}`, d.idea), ...(d.chosen !== false && { strong: true as const }) },
         ],
         ...[d.why, d.test && `A/B: ${d.test}`].flatMap((t, k) =>
           t
@@ -778,6 +787,10 @@ export const register: Register = (on) => {
           {ideaSegments(text).map((g, i) =>
             "md" in g ? (
               <Markdown key={`md${i}`} text={g.md} />
+            ) : "chosen" in g ? (
+              <Text key={`c${i}`} color="success">
+                {g.chosen}
+              </Text>
             ) : "head" in g ? (
               <Text key={`h${i}`}>
                 {g.head.lead}

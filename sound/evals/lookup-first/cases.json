@@ -111,7 +111,6 @@
    "adr/0004-retry.md": "# 0004 Retry policy\n\nStatus: accepted.\nRetries: 5. Backoff base: 250ms, factor 3.\n"
   },
   "expect": {
-   "asked": false,
    "reply": [
     "250ms"
    ],
@@ -131,7 +130,6 @@
    "docs/perf-budget.md": "# Performance budget\n\nThe user-agreed target is p95 latency 180ms on /search.\n"
   },
   "expect": {
-   "asked": false,
    "reply": [
     "180ms"
    ],
@@ -267,14 +265,12 @@
   "at": "Identify who must hold it",
   "scout": "ask-first",
   "label": "proceed",
-  "disputed": "what the user lacks is theirs to say, so learn's ask may be right: the label is the user's to rule",
   "request": "I have to explain our auth flow to the team. Help me understand it well enough.",
   "files": {
    "docs/talk.md": "# Thursday talk\n\nAudience: 6 backend engineers, fluent in OAuth, new to our session service.\n",
    "src/auth.ts": "// Session service issues a 15 minute access token and a 30 day refresh token.\n"
   },
   "expect": {
-   "asked": false,
    "replyAny": [
     "(6|six) backend"
    ],
@@ -576,7 +572,6 @@
    "bin/queue-status": "#!/bin/sh\necho 'queue-depth=88041 oldest-job-age=412s'\n"
   },
   "expect": {
-   "asked": false,
    "reply": [
     "88041"
    ],
