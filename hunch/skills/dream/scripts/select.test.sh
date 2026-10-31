@@ -4,7 +4,7 @@
 set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
-root=$(mktemp -d)
+root=$(mktemp -d "${TMPDIR:-/tmp}/select.XXXXXX")
 trap 'rm -rf "$root"' EXIT
 mem=$root/mem repo=$root/repo
 mkdir -p "$mem" "$repo/src"

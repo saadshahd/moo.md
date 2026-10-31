@@ -21,7 +21,7 @@ if [ -n "$(find "$lock" -mmin -60 2>/dev/null)" ] && kill -0 "$(cat "$lock")" 2>
 fi
 echo $$ > "$lock"
 
-work=$(mktemp -d)
+work=$(mktemp -d "${TMPDIR:-/tmp}/dream.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 trap 'echo "dream: failed; uncommitted edits so far: git -C \"$mem\" diff" >&2' ERR
 

@@ -3,7 +3,7 @@
 set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
-root=$(mktemp -d)
+root=$(mktemp -d "${TMPDIR:-/tmp}/scrub.XXXXXX")
 trap 'rm -rf "$root"' EXIT
 
 export CLAUDE_CONFIG_DIR="$root/config"
