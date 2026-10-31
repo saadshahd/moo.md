@@ -82,7 +82,7 @@ Every hook is a function hook: it reaches the human with no model turn. The API 
 - What a hook finds waits where the human looks next, the band above the prompt, and appears there only while it holds something. Detail unfolds on a press and folds back.
 - A hook hands to Claude only on the human's Enter: `$.prompt.fill` a sentence start they finish, with any bulk added as `prompt.submit` context.
 - Work longer than one dispatch runs unawaited, so the turn's end is never held.
-- State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files or module variables. A hot reload drops module variables.
+- State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files. Module variables hold only what a hot reload may drop: it drops them.
 - A failure shows once, as a toast, and the event passes on.
 - A pane or band is verified on events copied from real session transcripts, one per shape it renders; a synthetic event alone never verifies it.
 - One hooks module per plugin; a second part composes into it. A second registration on the same event and matcher in one plugin is dropped silently.

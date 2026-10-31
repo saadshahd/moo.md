@@ -14,7 +14,7 @@ Authoring doctrine for this repo's own skills, hooks, and runtime files lives in
 
 **Hooks always fail open:** on any error, pass the event on and show the failure once. A hook that fails closed blocks what it wraps in every future session.
 
-> **Enforcement:** nothing here is mechanically checked — the repo has no doc gate, and no shell file in this repo is checked by anything.
+> **Enforcement:** a factory run checks the `check` layer of `.claude/factory.json` before its PR; nothing checks a direct push.
 
 ## Philosophy
 
@@ -38,9 +38,8 @@ A skill or hook that leans on a model's judgment (a judge, a generated artifact,
 - Windows paths in scripts.
 - Inline examples that narrow the exploration space — a specimen of desired output rather than a case that fixes the meaning of a term or marks where a property stops holding.
 - Catalogs of what the harness already enumerates (tool indexes, skill tables) — not a parent routing to its own children.
-- Persistent work/pipeline state files (.jsonl, workflow-state.json) — conversation markers only
-- Task management APIs in skills (TaskCreate/TaskList/TaskUpdate)
-- Building features Claude Code will ship natively (task management, memory, tool orchestration) — compete on thinking quality
+- Work-state files only the agent reads (.jsonl, workflow-state.json)
+- Rebuilding what Claude Code already ships and turns on — compete on thinking quality
 - Cargo cult process steps (ritual without reason)
 - Optimizing for output volume while degrading human comprehension
 - Automating friction that builds understanding (edge case exploration, consequence engagement)
