@@ -452,11 +452,15 @@ test("clicking answers to two questions: each fills its own line once, a changed
 
 describe("ideas", () => {
   const ideas = [
-    { by: "Tufte", idea: "one aligned row per file", why: "the eye compares what lines up", test: "now vs rows: wins if read once" },
-    { by: "Orwell", idea: "at most five lines" },
+    { by: "Tufte", idea: "one aligned row per file", why: "the eye compares what lines up", test: "now vs rows: wins if read once", chosen: true },
+    { by: "Orwell", idea: "at most five lines", chosen: false },
   ];
-  test("an idea needs who and what; a bad why or test drops it", async () => {
-    expect(cleanCard({ ideas: [...ideas, { by: "X" }, { by: "Y", idea: "z", why: 3 }] }).ideas).toEqual(ideas);
+  test("an idea needs who and what; a bad why, test or chosen drops it", async () => {
+    expect(cleanCard({ ideas: [...ideas, { by: "X" }, { by: "Y", idea: "z", why: 3 }, { by: "Z", idea: "z", chosen: "yes" }] }).ideas).toEqual(ideas);
+  });
+  test("a dropped idea is not bold; a chosen one is", async () => {
+    const strong = cardRows({ ideas }, "ideas").flat().filter((i) => i.strong).map((i) => i.id);
+    expect(strong).toEqual(["probe:idea 1"]);
   });
   test("the names are one column; only the ideas take a click; the why and test sit under the idea", async () => {
     const body = cardRows({ ideas }, "ideas");
@@ -521,18 +525,30 @@ describe("ideas", () => {
 });
 
 test("a consult reply splits where its colours change", async () => {
-  const reply = "1. Mostafa — **open on the title**\n   *his hooks open on it*\n\n2. Wegz — **leave a line `open`**\n   *no side*\n   win: louder\n\nWin: you pick it blind.\nIdea 5 is measured instead.\nBuild all two?";
+  const reply = "1. Mostafa — **open on the title**\n   *his hooks open on it*\n   Chosen because the title is the hook\n\n2. Wegz — leave a line `open`\n   *no side*\n   win: louder\n   Doesn't apply because the verse is full\n\n3. Ruby — **end on the bridge**\n   *the turn lands late*\n\nWin: you pick it blind.\nIdea 5 is measured instead.\nDo you want the bridge to land late?";
   expect(ideaSegments(reply)).toEqual([
     { head: { lead: "1. Mostafa — ", change: "open on the title", rest: "" } },
     { dim: "   his hooks open on it" },
+    { chosen: "   Chosen because the title is the hook" },
     { dim: "" },
-    { head: { lead: "2. Wegz — ", change: "leave a line open", rest: "" } },
+    { dim: "2. Wegz — leave a line open" },
     { dim: "   no side" },
     { dim: "   win: louder" },
+    { dim: "   Doesn't apply because the verse is full" },
+    { dim: "" },
+    { head: { lead: "3. Ruby — ", change: "end on the bridge", rest: "" } },
+    { dim: "   the turn lands late" },
     { dim: "" },
     { dim: "Win: you pick it blind." },
     { dim: "Idea 5 is measured instead." },
-    { md: "Build all two?" },
+    { md: "Do you want the bridge to land late?" },
+  ]);
+});
+
+test("a reply that opens on a dropped idea still splits", async () => {
+  expect(ideaSegments("1. Wegz — leave a line open\n   Doesn't apply because the verse is full")).toEqual([
+    { dim: "1. Wegz — leave a line open" },
+    { dim: "   Doesn't apply because the verse is full" },
   ]);
 });
 
