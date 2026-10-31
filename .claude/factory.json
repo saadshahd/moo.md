@@ -72,7 +72,7 @@
       "A hook never starts a turn the human didn't ask for: no wake, no `$.prompt.submit` of its own. It hands to Claude only on the human's Enter, through `$.prompt.fill`.",
       "What a hook finds waits in the band above the prompt, only while it holds something; detail unfolds on a press and folds back.",
       "Hook work longer than one dispatch runs unawaited, so the turn's end is never held.",
-      "Hook state lives in `$.state` (this session) or `$.store` (across sessions), never in temp files or module variables: a hot reload drops module variables.",
+      "Hook state lives in `$.state` (this session) or `$.store` (across sessions), never in temp files; module variables hold only what a hot reload may drop.",
       "A hook that spawns headless `claude -p` copies its flag set from `hope/hooks/judge.sh`.",
       "A hope skill body stops when a sibling it names is missing, never degrades.",
       "No rigid frameworks: a skill skips steps that don't apply.",
