@@ -81,7 +81,7 @@ Start only once `git fetch origin && git show origin/HEAD:.claude/factory.json` 
 
 | | macOS: launchd | Linux: systemd user unit |
 |---|---|---|
-| File | `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`: `ProgramArguments`, `EnvironmentVariables.PATH` (plus `caffeinate`'s directory), `KeepAlive` and `RunAtLoad` true | `~/.config/systemd/user/factory-<repo name>.service`: `ExecStart`, `Environment=PATH=…`, `Restart=always`, `WantedBy=default.target` |
+| File | `~/Library/LaunchAgents/md.moo.factory.<repo name>.plist`: `ProgramArguments`, `EnvironmentVariables.PATH` (plus `/usr/bin:/bin:/usr/sbin:/sbin`, where `caffeinate` and `ioreg` live), `KeepAlive` and `RunAtLoad` true | `~/.config/systemd/user/factory-<repo name>.service`: `ExecStart`, `Environment=PATH=…`, `Restart=always`, `WantedBy=default.target` |
 | Load | `launchctl bootstrap gui/$(id -u) <plist>` | `systemctl --user enable --now factory-<repo name>`; `loginctl enable-linger` so it runs while logged out |
 | Log | `StandardOutPath` and `StandardErrorPath`: `~/Library/Logs/factory-<repo name>.log` | `journalctl --user -u factory-<repo name>` |
 
