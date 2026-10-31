@@ -30,8 +30,6 @@ export const Rules = z.object({
     judge: z.array(Text),
     none: z.array(Text),
   }),
-  /** What a run's sandbox adds for this repo: hosts it may reach, such as a registry, and folders it may write. */
-  sandbox: z.optional(z.object({ domains: z.optional(z.array(Text)), paths: z.optional(z.array(Text)) })),
   /**
    * The repo's own commands that lend a run its worktree and take it back, such as a pool of warm
    * ones. `create` gets `{name}` as `factory-<n>` and prints the worktree's path last; `release`

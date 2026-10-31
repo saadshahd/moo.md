@@ -4,7 +4,7 @@
 set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
-root=$(cd "$(mktemp -d)" && pwd -P)
+root=$(cd "$(mktemp -d "${TMPDIR:-/tmp}/smooth.XXXXXX")" && pwd -P)
 trap 'rm -rf "$root"' EXIT
 repo=$root/repo
 export CLAUDE_CONFIG_DIR=$root/config

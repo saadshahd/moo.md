@@ -17,7 +17,7 @@ if git -C "$root" rev-parse -q --verify "refs/heads/$branch" >/dev/null ||
   echo "smooth: already ran today ($branch)"; exit 0
 fi
 
-work=$(cd "$(mktemp -d)" && pwd -P)
+work=$(cd "$(mktemp -d "${TMPDIR:-/tmp}/smooth.XXXXXX")" && pwd -P)
 # A branch still at its start holds no fix: a failed or empty run leaves none behind.
 cleanup() {
   local g

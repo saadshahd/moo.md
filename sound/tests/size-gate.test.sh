@@ -3,24 +3,25 @@
 set -euo pipefail
 gate=$(cd "$(dirname "$0")/../corpus/placement" && pwd)/file-stays-under-a-size-cap.gate
 fails=0
+err=$(mktemp "${TMPDIR:-/tmp}/size-gate-err.XXXXXX")
 
 big() { awk -v n="$1" 'BEGIN { for (i = 0; i < n; i++) print "a" }'; }
 
 repo() {
-  cd "$(mktemp -d)"
+  cd "$(mktemp -d "${TMPDIR:-/tmp}/size-gate.XXXXXX")"
   git init -q && git config user.email t@t && git config user.name t
   git commit -q --allow-empty -m root
 }
 
 expect() { # expect <block|pass> <name>
   local got=pass
-  /bin/bash "$gate" 2>/tmp/size-gate.err || got=block
-  if [ "$got" = "$1" ]; then echo "ok   $2"; else echo "FAIL $2 (got $got)"; cat /tmp/size-gate.err; fails=$((fails + 1)); fi
+  /bin/bash "$gate" 2>"$err" || got=block
+  if [ "$got" = "$1" ]; then echo "ok   $2"; else echo "FAIL $2 (got $got)"; cat "$err"; fails=$((fails + 1)); fi
 }
 
 repo; big 1000 >a.ts; git add a.ts; expect pass 'new file at the cap'
 repo; big 1001 >a.ts; git add a.ts; expect block 'new file over the cap'
-grep -q 'a.ts  1001 lines, new file' /tmp/size-gate.err && echo 'ok   message names the file' || { echo 'FAIL message'; fails=$((fails + 1)); }
+grep -q 'a.ts  1001 lines, new file' "$err" && echo 'ok   message names the file' || { echo 'FAIL message'; fails=$((fails + 1)); }
 repo; big 900 >a.ts; git add a.ts; git commit -qm a; big 1100 >a.ts; git add a.ts; expect block 'file grows past the cap'
 repo; big 1500 >a.ts; git add a.ts; git commit -qm a; big 1600 >a.ts; git add a.ts; expect block 'old file over the cap grows'
 repo; big 1500 >a.ts; git add a.ts; git commit -qm a; big 1400 >a.ts; git add a.ts; expect pass 'old file over the cap shrinks'

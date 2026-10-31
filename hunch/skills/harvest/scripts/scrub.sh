@@ -14,7 +14,7 @@ config="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 transcript=$(ls "$config"/projects/*/"$1".jsonl 2>/dev/null | head -1 || true)
 [ -n "$transcript" ] || { echo "scrub.sh: no transcript for session $1 under $config/projects" >&2; exit 2; }
 
-terms=$(mktemp)
+terms=$(mktemp "${TMPDIR:-/tmp}/scrub.XXXXXX")
 trap 'rm -f "$terms" "$terms.f"' EXIT
 
 # One "<source><TAB><term>" per line.

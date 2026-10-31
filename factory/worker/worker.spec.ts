@@ -30,13 +30,12 @@ import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedBy } from "../lib/r
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
-import { createdPath, letGo, onBranch, worktreeFor } from "./act.ts";
+import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
 import { gitConfigEnv } from "../lib/bot.ts";
-import { readsShut, runSettings } from "./sandbox.ts";
-import { chmod, mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const BOT = "moo-factory[bot]";
@@ -1208,52 +1207,6 @@ describe("git under the factory's git config", () => {
   });
 });
 
-describe("a run's sandbox", () => {
-  const withPaths = (...paths: string[]) => runSettings({ ...RULES, sandbox: { paths } });
-
-  test("adds the repo's hosts and folders to the factory's own, and keeps the App's key folder shut", () => {
-    const own = runSettings(RULES);
-    const s = runSettings({ ...RULES, sandbox: { domains: ["npm.example.com"], paths: ["~/Library/pnpm/store/v10"] } });
-
-    expect(s.sandbox.network.allowedDomains).toEqual([...own.sandbox.network.allowedDomains, "npm.example.com"]);
-    expect(s.sandbox.filesystem.allowWrite).toEqual([...own.sandbox.filesystem.allowWrite, "~/Library/pnpm/store/v10"]);
-    expect(s.sandbox.filesystem.denyRead).toEqual(["~/.config/factory"]);
-    expect(s.permissions.deny).toEqual(["Read(~/.config/factory/**)"]);
-    expect(s.env).toEqual({ GIT_EDITOR: "true" });
-  });
-  test("refuses a path that is the App's key folder, holds it, or sits inside it, however it is spelled", () => {
-    for (const p of [
-      "~/.config/factory",
-      "~/.config/factory/",
-      `${homedir()}/.config/factory/app.pem`,
-      "~/.config",
-      "~",
-      "/",
-      "~/Library/../.config/factory",
-      "~/**",
-      "~/.config/fac*",
-    ])
-      expect(() => withPaths("/tmp/build", p)).toThrow(".config/factory");
-  });
-  test("a key folder named from the root is shut from the root, not from the settings' folder", () => {
-    expect(readsShut("/Users/me/dotfiles/factory")).toBe("Read(//Users/me/dotfiles/factory/**)");
-    expect(readsShut("~/.config/factory")).toBe("Read(~/.config/factory/**)");
-  });
-  test("a path that reaches the key folder through a symlink is refused", async () => {
-    const root = await mkdtemp(join(tmpdir(), "factory-link-"));
-    await symlink(homedir(), join(root, "home"));
-
-    for (const p of [`${root}/home/.config/factory`, `${root}/home/.config`, `${root}/home/**`])
-      expect(() => withPaths(p)).toThrow(".config/factory");
-    expect(() => withPaths(`${root}/home/.config/factory-old`)).not.toThrow();
-    await rm(root, { recursive: true });
-  });
-  test("a path beside the key folder passes; a relative one is refused, having no place to compare", () => {
-    expect(() => withPaths("~/.config/factory-old", "/tmp/build", "~/Library/pnpm/**")).not.toThrow();
-    expect(() => withPaths("../..")).toThrow("relative");
-  });
-});
-
 describe("smoke run 2 (saadshahd/factory-smoke #5, 2026-10-27)", () => {
   const actors = actorsOf(SMOKE_RULES, "saadshahd/factory-smoke");
   const first = session("stopped", { id: "94637db3", sessionId: "94637db3-4da9-4b97-aa43-4088b6605e34" });
@@ -1361,6 +1314,43 @@ describe("a session whose process died (saadshahd/moo.md, 2026-10-31)", () => {
 
     expect(state).toEqual({ kind: "crashed", deaths: 1 });
     expect(kinds(actions)).toEqual(["stop", "start"]);
+  });
+});
+
+describe("a run is stopped even while Claude Code's background service is down (saadshahd/moo.md #68, 2026-10-31)", () => {
+  /** A stub `claude` whose service is up once `daemon run` has run; it logs each call. */
+  async function stubbed(up: boolean, f: () => Promise<void>): Promise<string[]> {
+    const root = await mkdtemp(join(tmpdir(), "factory-service-"));
+    await mkdir(join(root, "bin"));
+
+    if (up) await Bun.write(join(root, "up"), "");
+    const stub = join(root, "bin", "claude");
+    await Bun.write(stub, `#!/bin/sh\necho "$*" >> "${root}/calls"\ncase "$1 $2" in\n  "daemon status") [ -e "${root}/up" ] ;;\n  "daemon run") touch "${root}/up" ;;\nesac\n`);
+    await chmod(stub, 0o755);
+    const path = process.env.PATH;
+    process.env.PATH = `${join(root, "bin")}:${path}`;
+
+    try {
+      await f();
+    } finally {
+      process.env.PATH = path;
+    }
+
+    const calls = (await Bun.file(join(root, "calls")).text()).trim().split("\n");
+    await rm(root, { recursive: true });
+
+    return calls;
+  }
+
+  test("down, the service is started the way `claude --bg` starts it, and the run is stopped once it is up", async () => {
+    const calls = await stubbed(false, () => stopRun("0dd65ec5"));
+
+    expect(calls[0]).toBe("daemon status");
+    expect(calls).toContain("daemon run --origin transient");
+    expect(calls.slice(-2)).toEqual(["daemon status", "stop 0dd65ec5"]);
+  });
+  test("up, the run is just stopped", async () => {
+    expect(await stubbed(true, () => stopRun("0dd65ec5"))).toEqual(["daemon status", "stop 0dd65ec5"]);
   });
 });
 
