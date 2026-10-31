@@ -9,23 +9,21 @@ Doctrine for authoring moo's own surfaces.
 
 ## Frontmatter
 
-A skill's frontmatter carries `name` and `description`; read any shipped `SKILL.md` for the current key set. The description is one line, and Claude Code caps it at 1024 characters.
+No `when_to_use`.
 
-No `when_to_use`. Claude Code reads that key and renders it dash-joined onto the description, but every other agent copies `SKILL.md` verbatim and never reads it, so the text deciding when a skill fires would be invisible wherever it is installed outside Claude Code.
+A condition that follows what the skill does is marked `Use when <condition>.`
+A description may also open with the condition and stop there, where naming the capability would discriminate nothing.
 
-A condition that follows what the skill does is marked `Use when <condition>.` — a finite clause, never a bare noun phrase or a bare dash. The key name was what marked the condition as a condition; in one string nothing else does, and an unmarked trailing clause reads as more of what the skill produces. A description may also open with the condition and stop there, where naming the capability would discriminate nothing.
+A skill that stays in this repo declares `metadata.internal: true`.
 
-A skill that stays in this repo declares `metadata.internal: true`. The skills.sh installer walks the tree and offers every `SKILL.md` it finds; that flag is what it filters on.
-
-Version lives in `plugin.json` only (DRY). The official Claude Code spec does not allow `version` in SKILL.md frontmatter.
+Version lives in `plugin.json` only. Claude Code spec does not allow `version` in SKILL.md frontmatter.
 
 ## Sizing
 
-- Size a skill by a deletion pass, never a numeric cap.
-- Put branch-specific content in files the skill opens when the branch is taken, and name them where they are needed.
+- Size a skill by a deletion pass using a /reduce loop, never a numeric cap.
 - Decision tables > prose explanations.
 
-## Token Efficiency
+## Efficiency
 
 - Challenge every sentence: "Does Claude need this?"
 - Bullets for enumerable items; a paragraph when the point is one connected argument.
@@ -37,32 +35,42 @@ Phrase design decisions as "X over Y: reason".
 
 **Unit choice** — behavior inlines at build, data references at runtime; a skill's firing is probabilistic, so behavior that must run every time is a hook:
 
-| The new thing is... | Unit |
-|---|---|
-| Data selected per use (catalog, profile, corpus) | Runtime file |
-| A trigger + procedure that stands alone | Skill |
-| A trigger only the human perceives | Skill with `disable-model-invocation: true` |
-| Behavior that must run every time, deterministically | Function hook |
-| An unproven idea | hunch skill + `HYPOTHESIS.md`; graduates or dies |
-| Doctrine for this repo's own surfaces | Repo-local skill in `.claude/skills/`; never ships |
+| The new thing is...                                  | Unit                                               |
+| ---------------------------------------------------- | -------------------------------------------------- |
+| Data selected per use (catalog, profile, corpus)     | Runtime file                                       |
+| A trigger + procedure that stands alone              | Skill                                              |
+| A trigger only the human perceives                   | Skill with `disable-model-invocation: true`        |
+| Behavior that must run every time, deterministically | Function hook aka claude code mods                 |
+| An unproven idea                                     | hunch skill + `HYPOTHESIS.md`; graduates or dies   |
+| Doctrine for this repo's own surfaces                | Repo-local skill in `.claude/skills/`; never ships |
 
-Base rate over build: before building any unit, count how often its target situation occurs in real session transcripts, and weigh each case by what the miss cost. A rare, cheap situation caps the value whatever the build's accuracy; a planted test prompt proves the mechanism, never the value.
+Before building any unit, count how often its target situation occurs in real session transcripts, and weigh each case by what the miss cost. A rare, cheap situation caps the value whatever the build's accuracy; a planted test prompt proves the mechanism, never the value.
 
 **Composition — name-calls, never imports:**
 
 - Skills compose by name: a composer names a move and invokes it with the Skill tool; a body never inlines another body.
 - New skill when the cognitive mode changes (clarify WHAT ≠ decide HOW ≠ judge unsupervised work; find ≠ fix). One skill = one mode + one gate.
 - Two skills over one when triggers differ; a shared explanation the pair needs lives in this file, which owns skill-design reasoning, not in either skill.
-- A body names a sibling in exactly two places: a refusal, and a route — wherever in the body those sit. There the name *is* the refusal's or the route's content, and a reader without it is stranded.
+- A body names a sibling in exactly two places: a refusal, and a route — wherever in the body those sit. There the name _is_ the refusal's or the route's content, and a reader without it is stranded.
 - Ending over hand-off: a finished run states what is now settled and what is still open, in its own words. Naming who handles it next hardcodes the graph n², so one trigger change edits every sibling.
+
+**Turning to the user — information decides who is asked, never the skill's habit.** A skill states once, over every point where it asks or hands something over, `only what nothing in reach settles; read what does, and say where its answer came from`, in those words. In reach: the repo, its docs and history, the record, the user's notes and accounts, and any read-only tool the session has, read at the source that settles the fact. A step that is free, reversible and inside the work is done and its result reported, never handed over as a link, path or command. What stays the user's:
+
+| Turn to the user for                                                                        | Unless                                                                              | The turn carries                                              |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| What only they hold — what they want, their reasons, taste and limits, what they understand | A wrong guess costs less to undo than the question costs: state it, they correct it | What was read, so they answer only what is left               |
+| An act only their login or authority can take                                               | —                                                                                   | The work done: values filled, request drafted, one exact step |
+| An act that spends their money or time, reaches outside the work, or can't be undone        | Their words, this session or recorded in reach, authorize that act and its content  | The act ready to run on their yes                             |
+
+A fact out of reach is named as a gap wherever a claim or choice rests on it.
 
 **Output form — bound by what the skill hands back, never by one shared sentence.** Plain words is the only part that holds across all three:
 
-| The Output hands back | Bound it by |
-|---|---|
-| Something the agent restated in its own words | As short as it goes with nothing *the skill can't afford to drop* lost — name that thing, it differs per skill |
-| The user's own words — a record, an amended proposal | Preserving them. A compression clause here destroys the result |
-| A structure the reader navigates — verdict then evidence, a case set then a rule | Bounding each part where a reader would pad it, never the whole |
+| The Output hands back                                                            | Bound it by                                                                                                    |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Something the agent restated in its own words                                    | As short as it goes with nothing _the skill can't afford to drop_ lost — name that thing, it differs per skill |
+| The user's own words — a record, an amended proposal                             | Preserving them. A compression clause here destroys the result                                                 |
+| A structure the reader navigates — verdict then evidence, a case set then a rule | Bounding each part where a reader would pad it, never the whole                                                |
 
 A cap counted in lines is a compression budget on a handed-back artifact — replace it. A cap on one turn of a loop is pacing, and the rest arrives on the user's next pull — keep it.
 
