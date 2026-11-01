@@ -25,3 +25,10 @@ Graduate when it stays on for 10 real sessions, the user runs `/long` in at most
 
 - The user ran `/long` in 3 or more sessions, which misses the graduation bar. Most runs were to check that nothing was missing, not to get back a cut fact, so the kill bar isn't met either.
 - So far, the `/long` count measures trust, not loss. The redraw stays on, unchanged.
+
+### 2026-11-01 — the token cap dropped whole rewrites
+
+- Haiku's thinking counts in its output tokens. On 8 real replies of 400 to 5,000 characters, a rewrite spent 1,000 to 3,900 tokens.
+- 6 of the 8 passed the 2,048 cap, so their replies stayed long, though every rewrite ended whole.
+- The cap is now 16,000. At it, 8 of 8 came back whole, the largest at 4,208 tokens.
+- A cut rewrite still passes its cap: one cut at a 1,200 cap reported 3,248 tokens.
