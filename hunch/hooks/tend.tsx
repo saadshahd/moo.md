@@ -433,7 +433,9 @@ async function registerCommands($: any) {
 }
 
 // A rewrite that fills its token cap was cut off, and with it the reply's closing ask.
-export const SHORT_CAP = 2048;
+// Haiku's thinking counts in its output tokens, about 2,000 on a 4,000-character reply,
+// so the cap sits far above thinking and text together.
+export const SHORT_CAP = 16_000;
 
 /** Redraws a long reply short once the turn ends: its long form already showed while it streamed. */
 async function shorten($: any, reply: string) {
