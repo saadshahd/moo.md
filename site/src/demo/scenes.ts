@@ -36,6 +36,7 @@ import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as widen from "./sessions/widen";
 import * as interrogate from "./sessions/interrogate";
 import * as shift from "./sessions/shift";
 import * as elicit from "./sessions/elicit";
@@ -45,31 +46,6 @@ import * as intent from "./sessions/intent";
 import * as inversion from "./sessions/inversion";
 import * as draft from "./sessions/draft";
 import * as reduce from "./sessions/reduce";
-
-// ---- Move pages: one scene each, the one that carries the move.
-
-export const anchorScene: Scene = {
-  chrome: anchor.chrome,
-  turns: anchor.turns,
-  // gen.py drops what Claude Code drew under a long command while it ran.
-  beats: [
-    {
-      at: 0,
-      text: "The finding: an index blocked payment writes for 9 minutes.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      q: 0,
-      text: "Which tables? Each box shows the migrations it fails.",
-    },
-    {
-      at: 0,
-      on: "reply",
-      text: "The test caught 0043; the table lists what's still open.",
-    },
-  ],
-};
 
 // ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
 // skill with moo on. The page opens where turn 1 first waits on the user, a
@@ -84,6 +60,8 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const widenScene = skill(widen);
+export const anchorScene = skill(anchor);
 export const interrogateScene = skill(interrogate);
 export const shiftScene = skill(shift);
 export const elicitScene = skill(elicit);

@@ -13,7 +13,6 @@ take() {
   python3 gen.py "$P-$1/$2.jsonl" "$HOME/$1" "$R/$3" "../src/demo/sessions/$4.ts" "${@:5}" \
     --keys "$R/keylog/$4.json" --raw "$OUT/$4.json" --activity-from-snaps
 }
-take billing da305481-3f66-456c-a1dc-04d9f93b97c9 rec3/anchor anchor 0=zzmx9.799
 take invoices f24358fa-2e6b-42e6-86b1-1591d6551fa8 rec2/skills skills 0=tfsdk9.846 1=12y0zha.384
 take shop db17126e-b9e3-4038-a8a5-b3234ff2206e rec2/chain chain 0=23q9us.1586
 # One session per take, in a world take() can't name: turn 0 ran with all of
@@ -40,3 +39,7 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-agent-kit/9b1e2fb4-7d13-46b
   --keys "$R/rec6/shift2/keylog.json" --raw "$OUT/shift.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-callgate/5c8f031e-615c-433f-9fc7-1f64c02cc60d.jsonl" /Users/Shared/callgate "$R/rec5/interrogate" ../src/demo/sessions/interrogate.ts 1=wyaxdk.1470 \
   --keys "$R/rec5/interrogate/keylog.json" --raw "$OUT/interrogate.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-billing/07241682-be5d-45db-92c4-87443ee0449e.jsonl" /Users/Shared/billing "$R/rec6/anchor" ../src/demo/sessions/anchor.ts 1=191385i.1253 \
+  --keys "$R/rec6/anchor/keylog.json" --raw "$OUT/anchor.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-motionpad/035ed991-9174-47d0-b597-e635327f8b9c.jsonl" /Users/Shared/motionpad "$R/rec5/widen" ../src/demo/sessions/widen.ts 1=cxplqx.2109 \
+  --keys "$R/rec5/widen/keylog.json" --raw "$OUT/widen.json" --activity-from-snaps

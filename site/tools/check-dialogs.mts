@@ -11,7 +11,6 @@ import type { Scene } from "../src/demo/types.ts";
 
 const R = `${homedir()}/moo-rec-tools`;
 const takes: [string, Scene, string][] = [
-  ["anchor", S.anchorScene, "rec3/anchor"],
   ["skills", S.skillsScene, "rec2/skills"],
   ["chain", S.chainScene, "rec2/chain"],
   ["clarify", S.clarifyScene, "rec5/clarify"],

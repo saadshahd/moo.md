@@ -20,8 +20,9 @@ type Cell = [string, string?];
 // filling it; Claude Code then draws the row without the space. A word longer
 // than the width starts on the row it follows when that breaks it no more
 // often than starting a new row would (wrap-ansi's rule), and breaks at the
-// edge with no space carried.
-function wrap(cs: Cell[], width: number, first = width): Cell[][] {
+// edge with no space carried; a shorter word is never broken, even on a first
+// row narrower than the width.
+function wrap(cs: Cell[], width: number, first = width, keep = false): Cell[][] {
   const lines: Cell[][] = [];
   let line: Cell[] = [];
   let i = 0;
@@ -54,7 +55,7 @@ function wrap(cs: Cell[], width: number, first = width): Cell[][] {
     }
     if (line.length) line.push([" "]);
     line.push(...word);
-    while (line.length > room()) {
+    while (word.length > width && line.length > room()) {
       const r = room();
       broke[lines.length] = true;
       lines.push(line.slice(0, r));
@@ -62,7 +63,11 @@ function wrap(cs: Cell[], width: number, first = width): Cell[][] {
     }
     i = j;
   }
-  return [...lines, line];
+  const rows = [...lines, line];
+  room();
+  // A space carried off a row that overflowed its limit stays drawn.
+  const over = (k: number) => rows[k].length > (k ? width : first);
+  return keep ? rows.map((r, k) => (carried[k] && over(k - 1) ? [[" "] as Cell, ...r] : r)) : rows;
 }
 
 // Ink's wrap, for what Claude Code lays out in boxes and code blocks (wrap-ansi
@@ -296,16 +301,16 @@ function table(rows: Line[], width: number): Cell[][] {
 /** A table too wide to draw: each row as "header: value" lines, the header
  * bold, between rules 3 short of the width. The value wraps 1 short of the
  * width, its first line as many shorter as the header has letters; that line
- * then wraps again behind the header. So recorded at 45 columns, but for one
- * value that Claude Code wrapped with a space leading its last line, and one
- * it drew with two spaces inside `lsof +D` (intent): no rule found. */
+ * then wraps again behind the header. A row after one that overflowed its
+ * limit keeps the space it carried (widen). So recorded at 45 columns, but for
+ * one value drawn with two spaces inside `lsof +D` (intent): no rule found. */
 function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
   const rule = plain("─".repeat(width - 3));
   return body.flatMap((r, k) => [
     ...(k ? [rule] : []),
     ...head.flatMap((h, c) => {
       const key = inline(h, "b");
-      const [first = [], ...rest] = wrap(r[c], width - 1, width - 1 - key.length);
+      const [first = [], ...rest] = wrap(r[c], width - 1, width - 1 - key.length, true);
       const line = wrap([...key, ...plain(":", "b"), ...plain(" "), ...first], width);
       // Ink keeps the space the value broke at; past the edge it takes a row
       // of its own, as recorded at 45.
