@@ -201,7 +201,7 @@ function world(
 
     return { value: undefined };
   });
-  // A window program: it beats, goes quiet, or exits on its own (a click on it, Escape, its parent gone).
+  // A window program: it beats, goes quiet, or exits on its own (a click on it, its parent gone).
   on("process.spawn", async function* (_$, e, next) {
     const w = { argv: [...e.argv], env: { ...e.env }, isEnded: false };
 
@@ -443,7 +443,7 @@ test("a window lives two minutes at most, whatever its program does", async ($, 
   expect(await label(keys[0]!)).toBe("open");
 });
 
-test("a window its program closed (a click on it, Escape, its parent gone) reads [open] again, unannounced", async ($, on) => {
+test("a window its program closed (a click on it, its parent gone) reads [open] again, unannounced", async ($, on) => {
   const w = world(on, APPLE, undefined, "exits");
   const { ui, keys, label } = await windowed($);
 

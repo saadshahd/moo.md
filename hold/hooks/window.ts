@@ -54,13 +54,11 @@ print(json.dumps({'x': x, 'y': y, 'area': {'x': 0, 'y': 0, 'width': root.winfo_s
 `;
 
 /**
- * macOS: JavaScript for Automation, run by `osascript`, drawing an AppKit panel. It reads the
- * Escape key's state off the keyboard: the panel holds no focus, so no key reaches it.
+ * macOS: JavaScript for Automation, run by `osascript`, drawing an AppKit panel.
  */
 export const MACOS = String.raw`
 // ${MARKER}
 ObjC.import('Cocoa')
-ObjC.import('CoreGraphics')
 ObjC.import('unistd')
 
 function run () {
@@ -99,24 +97,19 @@ function run () {
   say('shown')
   const parent = $.getppid()
   const end = Date.now() + (Number(read('HOLD_WINDOW_LIFE')) || 120) * 1000
-  const escape = 53
-  let wasEscape = $.CGEventSourceKeyState(0, escape)
   while (Date.now() < end && $.getppid() === parent) {
-    const event = app.nextEventMatchingMaskUntilDateInModeDequeue($.NSEventMaskAny, $.NSDate.dateWithTimeIntervalSinceNow(0.03), $.NSDefaultRunLoopMode, true)
+    const event = app.nextEventMatchingMaskUntilDateInModeDequeue($.NSEventMaskAny, $.NSDate.dateWithTimeIntervalSinceNow(0.1), $.NSDefaultRunLoopMode, true)
     // Only a click on the panel reaches this app: a left or right mouse-down closes it.
     if (!event.isNil()) {
       if (event.type === 1 || event.type === 3) return
       app.sendEvent(event)
     }
-    const isEscape = $.CGEventSourceKeyState(0, escape)
-    if (isEscape && !wasEscape) return
-    wasEscape = isEscape
     say('.')
   }
 }
 `;
 
-/** Linux and other X11 desktops: Python's Tk, an undecorated tooltip window. No key reaches it. */
+/** Linux and other X11 desktops: Python's Tk, an undecorated tooltip window. */
 export const LINUX = String.raw`
 # ${MARKER}
 import math, os, sys
