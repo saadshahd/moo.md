@@ -565,7 +565,7 @@ const CONSULT = [
 describe("a reply that ends on ideas", () => {
   const SHORT = "| bridge → | gains |\n|---|---|\n| a bar late | the turn lands |\n\nNext: choose late or on time.";
   // What Claude Code's own drawing was handed, and the reply as tend drew it.
-  const setup = ($: any, on: any) => {
+  const setup = ($: any, on: any, shortForm = SHORT) => {
     mock.store(on);
     const clock = mock.clock(on);
     on("session.id", () => ({ value: "s1" }));
@@ -573,7 +573,7 @@ describe("a reply that ends on ideas", () => {
     on("session.messages", () => ({ value: [{ role: "user", text: "/hope:consult", toolUses: [] }, said(CONSULT)] }));
     on("ui.invalidate", () => ({ value: undefined }));
     on("ui.toast", () => ({ value: undefined }));
-    on("model.complete", () => ({ value: { isAnswered: true, text: SHORT, usage: {} } }) as any);
+    on("model.complete", () => ({ value: { isAnswered: true, text: shortForm, usage: {} } }) as any);
     const host: string[] = [];
     on("ui.render", (_: any, e: any) => {
       host.push(e.props.text);
@@ -623,6 +623,17 @@ describe("a reply that ends on ideas", () => {
     await clock.settle();
     await mount();
     expect(host).toEqual([SHORT]);
+  });
+  test("a short form that keeps the ideas keeps their tones", async ($, on) => {
+    const kept = "1. Mostafa — **Open on the title**\n   Chosen because the hook is the title\n2. Wegz — Leave a line open\n\nNext: choose late or on time.";
+    const { clock, host, mount } = setup($, on, kept);
+    await $.turn.complete({ answer: CONSULT, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    await clock.settle();
+    const reply = await mount();
+    expect(host).toEqual(["1. Mostafa — **Open on the title**"]);
+    expect(await md(reply, true)).toEqual(["2. Wegz — Leave a line open", "Next: choose late or on time."]);
+    expect((await reply.find({ type: "Text", text: "Chosen because the hook is the title" }))?.props.color).toBe("success");
+    expect(await reply.find({ text: /Open the verse/ })).toBeUndefined();
   });
   test("a surface with no ⏺ gutter gets the reply as markdown, card cut", async ($, on) => {
     const { host, mount } = setup($, on);
