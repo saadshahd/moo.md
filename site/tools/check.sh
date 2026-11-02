@@ -7,8 +7,15 @@ cd "$(dirname "$0")"
 OUT=${TMPDIR:-/tmp}/moo-docs-gen
 R=$HOME/moo-rec-tools
 fail=0
-for t in skills:rec2/skills chain:rec2/chain clarify:rec5/clarify draft:rec5/draft freeze:rec5/freeze inversion:rec5/inversion reduce:rec6/reduce intent:rec5/intent shape:rec5/shape2 explain:rec5/explain elicit:rec5/elicit shift:rec6/shift2 interrogate:rec5/interrogate anchor:rec6/anchor widen:rec5/widen deepen:rec5/deepen judge:rec5/judge; do
+END=" anchor judge reframe "
+for t in skills:rec2/skills chain:rec2/chain clarify:rec5/clarify draft:rec5/draft freeze:rec5/freeze inversion:rec5/inversion reduce:rec6/reduce intent:rec5/intent shape:rec5/shape2 explain:rec5/explain elicit:rec5/elicit shift:rec6/shift2 interrogate:rec5/interrogate anchor:rec6/anchor widen:rec5/widen deepen:rec5/deepen judge:rec5/judge reframe:rec5/reframe; do
   page=${t%%:*} dir=$R/${t#*:}
+  # Tall captures taken before tend's short form: the end captures stand in.
+  if [[ "$END" == *" $page "* ]]; then
+    out=$(npx tsx check-end.mts "$OUT/$page.json" "$dir") || fail=1
+    echo "$page end: $out"
+    continue
+  fi
   for w in 45 80 120; do
     # The recorder's tall3 captures replace tall where both exist.
     cap=$dir/tall3-$w.ansi; [ -f "$cap" ] || cap=$dir/tall-$w.ansi

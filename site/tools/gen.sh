@@ -47,3 +47,5 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-mdcheck/5037ebf8-2b11-44de-
   --keys "$R/rec5/deepen/keylog.json" --raw "$OUT/deepen.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-chimebox/78d4c320-8c1f-471a-86b6-3913ad568ab6.jsonl" /Users/Shared/chimebox "$R/rec5/judge" ../src/demo/sessions/judge.ts 1=unihze.385 \
   --keys "$R/rec5/judge/keylog.json" --raw "$OUT/judge.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-shopdeck/bb2058ca-ca5c-4f13-b04b-c6f9e438b387.jsonl" /Users/Shared/shopdeck "$R/rec5/reframe" ../src/demo/sessions/reframe.ts 1=1o2366w.407 \
+  --keys "$R/rec5/reframe/keylog.json" --raw "$OUT/reframe.json" --activity-from-snaps

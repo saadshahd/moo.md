@@ -36,6 +36,7 @@ import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as reframe from "./sessions/reframe";
 import * as judge from "./sessions/judge";
 import * as deepen from "./sessions/deepen";
 import * as widen from "./sessions/widen";
@@ -62,6 +63,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const reframeScene = skill(reframe);
 export const judgeScene = skill(judge);
 export const deepenScene = skill(deepen);
 export const widenScene = skill(widen);

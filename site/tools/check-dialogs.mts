@@ -40,21 +40,26 @@ for (const [name, scene, dir] of takes) {
     p.dialogs.flatMap((d, j) => scene.turns[i].dialogs![j].questions.map((_, q) => ({ i, j, q, d }))),
   );
   for (const f of readdirSync(`${R}/${dir}/dialogs`).filter((f) => !f.includes("80x50")).sort()) {
-    // q<n>-o<k>, q<n>-notes, q<n><m>-review (the review of the dialog asking n to m), review.
-    const m = /^(?:q(\d+)-)?(o(\d+)|notes|review)-(\d+)x\d+\.ansi$/.exec(f);
+    // q<n>-o<k>, q<n>-notes, q<n><m>-review (the review of the dialog asking n to m), review;
+    // p<n>… and p-review the same for the plain turn, whose questions p counts
+    // apart: q then counts the rest.
+    const m = /^(?:([pq])(\d*)-)?(o(\d+)|notes|review)-(\d+)x\d+\.ansi$/.exec(f);
     if (!m) throw new Error(`${dir}/dialogs/${f}: a capture this check cannot place`);
-    const at = qs[(m[1] ? (m[2] === "review" ? firstOf(m[1]) : +m[1]) : qs.length) - 1];
+    const split = scene.plain !== undefined && readdirSync(`${R}/${dir}/dialogs`).some((x) => x.startsWith("p"));
+    const list = !split ? qs : qs.filter((x) => (x.i === scene.plain) === (m[1] === "p"));
+    const run = m[2];
+    const at = list[(run ? (m[3] === "review" ? firstOf(run) : +run) : list.length) - 1];
     const asked = scene.turns[at.i].dialogs![at.j].questions.length;
     const moments = at.d.script.moments;
     const mo =
-      m[2] === "review"
+      m[3] === "review"
         ? moments.find((x) => x.q === asked)
-        : m[2] === "notes"
+        : m[3] === "notes"
           ? moments.findLast((x) => x.q === at.q && x.noting)
           : moments.find((x) => x.q === at.q);
     if (!mo) throw new Error(`${dir}/dialogs/${f}: the demo never shows that moment`);
     // The recorded terminal's rows for the dialog, plus those the site keeps above it for keycaps.
-    const ours = frame(scene, at.d.open + mo.at + 0.01, +m[4], m[3] ? +m[3] - 1 : undefined, ROWS + KEYCAPS).bottom.map(text);
+    const ours = frame(scene, at.d.open + mo.at + 0.01, +m[5], m[4] ? +m[4] - 1 : undefined, ROWS + KEYCAPS).bottom.map(text);
     const cap = readFileSync(`${R}/${dir}/dialogs/${f}`, "utf8")
       .split("\n")
       .map((l) => l.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\xa0/g, " ").trimEnd());
