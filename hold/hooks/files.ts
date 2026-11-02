@@ -52,15 +52,20 @@ export function viewable(
 /** The last part of a path, which names the file on its [view]. */
 export const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
-/** Markdown as `Markdown` takes it: tab and newline its only control characters, 100000 at most. */
+/**
+ * The most characters a markdown view shows: a drawing holds 100000 in all, and the row and its
+ * buttons take some.
+ */
+export const MARKDOWN_MAX = 90_000;
+
+/** Markdown as `Markdown` takes it: tab and newline its only control characters, `MARKDOWN_MAX` at most. */
 export function cleanMarkdown(text: string): { text: string; isCut: boolean } {
   // eslint-disable-next-line no-control-regex
   const clean = text
     .replace(/\r\n?/g, "\n")
     .replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "");
-  const MAX = 90_000;
 
-  return clean.length <= MAX
+  return clean.length <= MARKDOWN_MAX
     ? { text: clean, isCut: false }
-    : { text: clean.slice(0, MAX), isCut: true };
+    : { text: clean.slice(0, MARKDOWN_MAX), isCut: true };
 }

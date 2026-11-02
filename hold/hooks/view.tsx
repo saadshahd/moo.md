@@ -6,7 +6,7 @@ import type {
   RenderViewport,
 } from "claude-code";
 import { altOf, hasMermaid, segments } from "./fences.ts";
-import { cleanMarkdown, kindOf, nameOf, viewable } from "./files.ts";
+import { cleanMarkdown, kindOf, MARKDOWN_MAX, nameOf, viewable } from "./files.ts";
 import { drawsPixels, type TermEnv } from "./terminal.ts";
 import { LINUX, MACOS } from "./window.ts";
 
@@ -291,7 +291,7 @@ async function withViews(
         framed(
           <Box flexDirection="column">
             <Markdown text={doc.text} />
-            {doc.isCut ? <Text dimColor>cut at 90000 characters</Text> : null}
+            {doc.isCut ? <Text dimColor>{`cut at ${MARKDOWN_MAX} characters`}</Text> : null}
           </Box>,
         ),
       );
