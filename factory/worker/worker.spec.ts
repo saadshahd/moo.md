@@ -780,10 +780,18 @@ describe("only a person changes the factory's rules and the repo's workflows", (
     expect(step(at(["src/a.ts"])).state.kind).toBe("working");
     expect(step(at(null)).state.kind).toBe("working");
   });
-  test("a factory PR with no worktree here closes when it changes the rules, whatever its issue says", () => {
-    const w = world(snapshot({ issues: [issue(7)], open: [touching([RULES_PATH])] }), []);
+  test("a factory PR with no worktree here closes when it changes the rules, then its live issue is marked stuck", () => {
+    const at = (issues: Issue[]) => prsToClose(world(snapshot({ issues, open: [touching([RULES_PATH])] }), []));
+    const close = { kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining(RULES_PATH) };
 
-    expect(prsToClose(w)).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining(RULES_PATH) }]);
+    expect(at([issue(7)])).toEqual([[close, { kind: "markStuck", issue: 7, reason: `its PR #57 changed ${RULES_PATH}` }]]);
+    expect(at([])).toEqual([[close]]);
+    expect(at([issue(7, { labels: ["factory", STUCK_LABEL] })])).toEqual([[close]]);
+  });
+  test("its issue never starts again in the tick that marks it stuck", () => {
+    const gh = snapshot({ issues: [issue(7)], claimed: new Set([7]), open: [touching([RULES_PATH])] });
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]) })).flat().map((a) => a.kind)).toEqual(["closePr", "markStuck"]);
   });
 });
 
@@ -792,8 +800,8 @@ describe("an issue that ends with no worktree here still closes its PR", () => {
   const at = (issues: Issue[], more: Partial<World> = {}, author = BOT) => prsToClose(world(snapshot({ issues, open: [open(author)] }), [], more));
 
   test("closed, unlabelled or no longer trusted, its open PR closes, saying why", () => {
-    expect(at([])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]);
-    expect(at([issue(7, { editor: "stranger" })])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("does not trust") }]);
+    expect(at([])).toEqual([[{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]]);
+    expect(at([issue(7, { editor: "stranger" })])).toEqual([[{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("does not trust") }]]);
   });
   test("a stuck or live issue keeps its PR, as does a PR the factory never opened or one a worktree here watches", () => {
     expect(at([issue(7, { labels: ["factory", STUCK_LABEL] })])).toEqual([]);
@@ -806,7 +814,7 @@ describe("an issue that ends with no worktree here still closes its PR", () => {
   test("a factory that acts as the user closes the PRs a trusted login opened, and no one else's", () => {
     const asUser = { actors: { bot: null, trusted: [ME] } };
 
-    expect(at([], asUser, ME)).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]);
+    expect(at([], asUser, ME)).toEqual([[{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]]);
     expect(at([], asUser, "stranger")).toEqual([]);
   });
   test("decide closes it in a group of its own", () => {

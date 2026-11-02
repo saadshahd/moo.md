@@ -101,6 +101,12 @@ const CLOSES_PR = {
 const GUARDED_CHANGED = (files: readonly string[]) =>
   `This PR changes ${files.join(", ")}, which only a person changes, so the factory closed it.`;
 
+/** What ends issue `n` whose open PR `pr` changes `files`, which only a person changes: the PR closes, then the issue is stuck. */
+const guardedEnd = (n: number, pr: number, files: readonly string[]): Action[] => [
+  { kind: "closePr", issue: n, pr, reason: GUARDED_CHANGED(files) },
+  { kind: "markStuck", issue: n, reason: `its PR #${pr} changed ${files.join(", ")}` },
+];
+
 /**
  * The paths open PR `p` changes that only a person changes. A PR changing more files than one
  * page lists is left to `push` and `pr`, which refuse such a branch, and to the worker's check of
@@ -371,11 +377,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     }
 
     case "guardedChanged":
-      return [
-        ...stop,
-        { kind: "closePr", issue: n, pr: s.pr, reason: GUARDED_CHANGED(s.files) },
-        { kind: "markStuck", issue: n, reason: `its PR #${s.pr} changed ${s.files.join(", ")}` },
-      ];
+      return [...stop, ...guardedEnd(n, s.pr, s.files)];
     case "overCap":
       return [...stop, start("context")];
     case "working":
@@ -524,16 +526,17 @@ function startable(i: Issue, w: World): { resume: boolean; planned: boolean } | 
 
 /**
  * The issues to start, up to the free slots: unfinished ones (with a plan) first, then the
- * oldest. Nothing starts while a usage limit holds.
+ * oldest. Nothing starts while a usage limit holds, nor an issue `prsToClose` marks stuck.
  */
 export function pick(w: World): { issue: number; resume: boolean }[] {
   const local = new Set(w.local.map((l) => l.issue));
   const free = w.rules.atOnce - w.local.filter((l) => occupies(classify(l, w))).length;
 
   if (free <= 0 || limitedUntil(w) !== null) return [];
+  const stuck = new Set(prsToClose(w).flat().flatMap((a) => (a.kind === "markStuck" ? [a.issue] : [])));
 
   return w.gh.issues
-    .filter((i) => !local.has(i.number) && !i.labels.includes(STUCK_LABEL))
+    .filter((i) => !local.has(i.number) && !i.labels.includes(STUCK_LABEL) && !stuck.has(i.number))
     .flatMap((i) => {
       const c = startable(i, w);
 
@@ -545,24 +548,27 @@ export function pick(w: World): { issue: number; resume: boolean }[] {
 }
 
 /**
- * The open `factory/<n>` PRs the factory opened, with no worktree here, that must close: one
- * changing the rules file, or one whose issue was closed, unlabelled or lost its trust. A stuck
- * issue's PR stays, as it does for a local issue. Each machine decides from GitHub alone, so any
- * one of them closes it.
+ * The open `factory/<n>` PRs the factory opened, with no worktree here, that must close, a group
+ * of actions each: one changing what only a person changes, its live issue marked stuck after,
+ * or one whose issue was closed, unlabelled or lost its trust. A stuck issue's PR stays, as it
+ * does for a local issue. Each machine decides from GitHub alone, so any one of them closes it.
  */
-export function prsToClose(w: World): Action[] {
+export function prsToClose(w: World): Action[][] {
   const here = new Set([...w.local.map((l) => l.issue), ...w.foreign]);
 
-  return w.gh.open.flatMap((p): Action[] => {
+  return w.gh.open.flatMap((p): Action[][] => {
     const n = issueOf(p.head);
 
     if (n === null || here.has(n) || p.author === null || !factoryLogins(w.actors).includes(p.author)) return [];
     const issue = w.gh.issues.find((i) => i.number === n);
     const why = issue === undefined ? "closed" : endedWhy(issue, w.actors);
     const guarded = guardedFiles(p);
-    const reason = guarded.length > 0 ? GUARDED_CHANGED(guarded) : why === null ? null : CLOSES_PR[why]?.(n);
 
-    return reason == null ? [] : [{ kind: "closePr", issue: n, pr: p.number, reason }];
+    /** An issue already over is left as it is. */
+    if (guarded.length > 0) return [guardedEnd(n, p.number, guarded).filter((a) => why === null || a.kind !== "markStuck")];
+    const reason = why === null ? null : CLOSES_PR[why]?.(n);
+
+    return reason == null ? [] : [[{ kind: "closePr", issue: n, pr: p.number, reason }]];
   });
 }
 
@@ -570,7 +576,7 @@ export function prsToClose(w: World): Action[] {
 export function decide(w: World): Action[][] {
   return [
     ...w.local.map((l) => actionsFor(classify(l, w), l)),
-    ...prsToClose(w).map((a) => [a]),
+    ...prsToClose(w),
     ...pick(w).map(({ issue, resume }): Action[] => [
       ...(resume ? [] : [{ kind: "claim", issue } satisfies Action]),
       { kind: "start", issue, restart: null, after: null },
