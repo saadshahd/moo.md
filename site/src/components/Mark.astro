@@ -1,0 +1,13 @@
+---
+// The moo.md mark: the name in the terminal's type, then a red block cursor.
+// The cursor waits for you: the next keystroke, and so the decision, is
+// yours. The letters are real text, so the link is named "moo.md";
+// public/favicon.svg draws the cursor alone.
+---
+
+<span class="mark" translate="no">moo.md<span class="caret" aria-hidden="true"></span></span>
+
+<style>
+  .mark { display: inline-flex; align-items: center; font: 400 1.3rem / 1 var(--__sl-font-mono); letter-spacing: -0.02em; color: var(--sl-color-white); }
+  .caret { display: inline-block; width: 0.55em; height: 1.05em; margin-inline-start: 0.08em; background: var(--moo-accent); }
+</style>

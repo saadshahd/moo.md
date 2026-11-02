@@ -1,0 +1,36 @@
+---
+// One menu's links (TopBar.astro). A chain shows its title and its one line;
+// a move shows its command and what it does. The page you are on is toned,
+// with an ink bar: a state marker, so it never takes the accent.
+type Item = { href: string; label: string; note?: string };
+const { items, here, kind } = Astro.props as { items: Item[]; here: string; kind: string };
+---
+
+<ul class={kind}>
+  {items.map((i) => (
+    <li>
+      <a href={i.href} aria-current={i.href === here ? "page" : undefined}>
+        <span class="label">{i.label}</span>
+        {i.note && <span class="note">{i.note}</span>}
+      </a>
+    </li>
+  ))}
+</ul>
+
+<style>
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  a {
+    position: relative; display: flex; flex-direction: column; gap: 0.2rem; padding: 0.7rem 0.75rem 0.7rem 1.4rem;
+    border-radius: 0.5rem; color: var(--moo-ink); text-decoration: none; transition: background-color 120ms ease-out;
+  }
+  a:hover, a[aria-current="page"] { background: var(--moo-band); }
+  a:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: -2px; }
+  /* The page you are on. */
+  a[aria-current="page"]::before {
+    content: ""; position: absolute; left: 0.6rem; top: 0.75rem; bottom: 0.75rem; width: 0.3rem; background: var(--moo-ink);
+  }
+  .label { font: 600 0.9375rem / 1.25 var(--__sl-font); }
+  .note { font: 400 0.875rem / 1.35 var(--__sl-font); color: var(--sl-color-gray-3); }
+  .moves a { flex-direction: row; align-items: baseline; gap: 1rem; }
+  .moves .label { flex: none; width: 5rem; font: 400 0.9375rem / 1.25 var(--__sl-font-mono); }
+</style>

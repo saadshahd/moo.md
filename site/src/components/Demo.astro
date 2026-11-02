@@ -1,0 +1,399 @@
+---
+// A Claude Code mock built from a real recorded session: same glyphs, colors,
+// wrap rule, spinner verbs and replies, cut only where "… +N lines" says so.
+// Autoplays in view and loops, narrated by beat captions above it and lighting
+// the move on screen in the page's strip (PageTitle.astro), with a player's
+// controls below: play and pause,
+// a timeline with a tick per beat, speed. Under reduced motion, the timeline
+// steps through one still per beat. `summary` tells a screen reader what it
+// shows. Every box around the terminal has a fixed height, so the terminal
+// sits at the same place and size on every demo page at a given viewport.
+import type { Scene } from "../demo/types";
+import { beatEnds, beatTimes, frame, moveTimes, phases, ROWS } from "../demo/render";
+import { stripMoves } from "../moves";
+// The terminal font: Fira Code, as in the Solo terminal the demos are checked
+// against. Its glyphs for box drawing come from the symbols subset.
+import "@fontsource/fira-code/latin-400.css";
+import "@fontsource/fira-code/latin-700.css";
+import "@fontsource/fira-code/symbols2-400.css";
+
+type Props = { scene: Scene; summary: string };
+const SPEEDS = [0.5, 1, 1.5, 2];
+const { scene, summary } = Astro.props;
+const names = stripMoves(Astro.locals.starlightRoute.entry);
+
+// Each cut the demo makes, said under it.
+const edited = [
+  ...(scene.turns.some((turn) => turn.askedPermission) ? ["permission prompts we approved while recording are cut"] : []),
+  ...(scene.cut ?? []),
+];
+// Beats name a turn (and a skill call or question in it) and play in order, or
+// a caption would show at the wrong time.
+const times = beatTimes(scene);
+if (!times.length || times.some((x, k) => !(x > (k ? times[k - 1] : -1))))
+  throw new Error(`Demo "${scene.turns[0].user}": beats must exist, name what they show, and play in order`);
+// A move's chip lights from its start and jumps to the beat there, so each
+// move starts a beat, in order, and each skill call a beat names has a chip.
+const starts = moveTimes(scene, names);
+const chips = starts.map((at) => ({ at, beat: times.indexOf(at) }));
+if (
+  chips.some((c, k) => c.beat < 0 || (k > 0 && !(c.at > chips[k - 1].at))) ||
+  scene.beats.some((b, k) => b.on === "move" && !starts.includes(times[k]))
+)
+  throw new Error(`Demo "${scene.turns[0].user}": each move in the strip must start a beat, in order, and each skill call a beat names must be in the strip`);
+// Draw the demo here at every recorded width, each second and each beat, so
+// a scene the player cannot draw fails the build, not the page.
+const { length } = phases(scene);
+for (const cols of [45, 80, 120])
+  for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...times, ...beatEnds(scene)]) frame(scene, s, cols);
+---
+
+<div class="demo not-content" style={`--rows: ${ROWS}`} data-demo={JSON.stringify({ scene, chips })}>
+  <div class="col">
+    <figure class="term-wrap">
+      <figcaption class="vh">{summary}</figcaption>
+      <div class="beats" aria-hidden="true">
+        {scene.beats.map((b) => <p class="caption" data-beat>{b.text}</p>)}
+      </div>
+      <div class="term" data-term>
+        <div class="caret-trail" data-trail aria-hidden="true"></div>
+        <!-- An empty row gives the terminal its width before the player draws. -->
+        <div class="scroll" data-scroll tabindex="0" role="region" aria-label="Claude Code transcript"><div class="row"></div></div>
+        <div class="bottom" data-bottom tabindex="-1"></div>
+        <div class="toast" data-toast aria-hidden="true"></div>
+        <div class="caret" data-caret aria-hidden="true"></div>
+        <div class="keys" data-keys aria-hidden="true"></div>
+        <div class="flash" data-flash aria-hidden="true"></div>
+      </div>
+      <div class="controls">
+        <button type="button" class="play" data-play aria-label="Pause demo">❚❚</button>
+        <span class="now" data-now aria-hidden="true">0:00</span>
+        <div class="track" data-track role="slider" tabindex="0" aria-label="Demo timeline">
+          <div class="rail"><div class="fill" data-fill></div></div>
+          <div class="knob" data-knob aria-hidden="true"></div>
+        </div>
+        <span class="total" data-total aria-hidden="true"></span>
+        <div class="speed" role="group" aria-label="Speed">
+          {SPEEDS.map((x) => <button type="button" data-speed={x} aria-pressed={String(x === 1)}>{x}×</button>)}
+        </div>
+      </div>
+      <p class="note">
+        {edited.length > 0 && `Edited: ${edited.join("; ")}. `}<span class="light">Light colours darkened for contrast.</span>
+      </p>
+    </figure>
+    <div class="probe" data-probe aria-hidden="true"><span>0000000000</span></div>
+  </div>
+</div>
+
+<script is:inline define:vars={{ ROWS }}>
+  // Rows: as many as the screen holds down to the demo's end, from 14 up to
+  // the recorded ROWS; what follows the demo, as on the front page, scrolls.
+  // Set here, before the first paint, and on resize; the player reads them.
+  // The boxes around the terminal have fixed heights, so every chain and move
+  // page gets the same count at a given viewport.
+  const MIN = 14;
+  const root = document.currentScript.previousElementSibling;
+  const term = root.querySelector("[data-term]");
+  const panel = root.closest(".content-panel");
+  const fit = () => {
+    const row = parseFloat(getComputedStyle(term).lineHeight);
+    const rows = Number(getComputedStyle(root).getPropertyValue("--rows"));
+    const box = term.getBoundingClientRect();
+    const end = root.getBoundingClientRect().bottom + parseFloat(getComputedStyle(panel).paddingBottom);
+    const room = innerHeight - (box.top + scrollY) - (box.height - rows * row) - (end - box.bottom);
+    const set = (n) => root.style.setProperty("--rows", String(Math.max(MIN, Math.min(ROWS, n))));
+    set(Math.floor(room / row));
+    // What the measure missed (a pixel of border), taken off in whole rows.
+    const over = root.getBoundingClientRect().bottom + scrollY + parseFloat(getComputedStyle(panel).paddingBottom) - innerHeight;
+    if (over > 0) set(Number(getComputedStyle(root).getPropertyValue("--rows")) - Math.ceil(over / row));
+    root.dispatchEvent(new Event("fit"));
+  };
+  fit();
+  addEventListener("resize", fit);
+  // The theme sets the note line's height (see the light clause).
+  new MutationObserver(fit).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+
+<script>
+  import { mount } from "../demo/player";
+  for (const root of document.querySelectorAll<HTMLElement>("[data-demo]")) mount(root);
+</script>
+
+<style>
+  /* Styles reach rows the player builds; hence :global. */
+  .demo { --muted: var(--sl-color-gray-3); --accent: var(--sl-color-accent); container: demo / inline-size; }
+  .col { position: relative; width: fit-content; max-width: 100%; }
+  /* Columns: the widest width the recordings were captured at that the column
+     fits, cells plus the terminal's padding, border, a thin scrollbar and the
+     cell kept clear of it (7px cells: 120 needs 872px, 80 needs 604px). Captions and
+     the note under the controls get as many lines as the longest on any demo
+     page needs at that width, in either theme, so no page's terminal sits
+     lower and a theme change moves nothing. */
+  .col { --cols: 45; --cap-lines: 2; --note-lines: 3; }
+  @container demo (min-width: 604px) { .col { --cols: 80; --cap-lines: 1; --note-lines: 2; } }
+  @container demo (min-width: 872px) { .col { --cols: 120; --note-lines: 1; } }
+  .vh {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+
+  /* Narration above the terminal: every beat laid out in one cell of fixed
+     height, so nothing moves when one replaces another. */
+  /* No width of their own: the captions wrap at the terminal's width, so the
+     column, and the controls under it, is as wide as the terminal. */
+  .beats {
+    display: grid; align-items: end; margin-bottom: 0.2rem; width: 0; min-width: 100%;
+    font-size: var(--sl-text-lg); line-height: 1.35; height: calc(var(--cap-lines) * 1.35em); overflow: hidden;
+  }
+  /* --in runs 0 to 1 as a beat's caption takes over (player.ts): it fades in
+     and rises 6px. */
+  .beats .caption {
+    grid-area: 1 / 1; opacity: var(--in, 0); transform: translateY(calc((1 - var(--in, 0)) * 6px));
+  }
+  @media (prefers-reduced-motion: reduce) { .beats .caption { transform: none; } }
+  /* The captions' type is the site chrome's (chrome.css). */
+  .demo :global(.caption) { margin: 0; }
+
+  /* The player's controls under the terminal: play, the time so far, the
+     timeline with its knob, the length, and the speed group. Their look is the
+     site chrome's (chrome.css); these rules only lay them out. */
+  .controls { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; width: 0; min-width: 100%; }
+  .controls button {
+    flex: none; border: 0; background: none; color: var(--muted); cursor: pointer;
+    font: inherit; font-size: var(--sl-text-xs); min-width: 1.8rem; height: 1.8rem; border-radius: 0.4rem;
+  }
+  .controls button:hover { color: var(--sl-color-white); }
+  .demo :global(button:focus-visible), .track:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .now, .total { flex: none; font-size: var(--sl-text-xs); font-variant-numeric: tabular-nums; color: var(--muted); }
+  @container demo (max-width: 603px) { .now, .total { display: none; } }
+  .speed { flex: none; display: flex; font-variant-numeric: tabular-nums; }
+  .speed button[aria-pressed="true"] { color: var(--sl-color-white); }
+  .knob { position: absolute; top: 50%; left: 0; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: var(--muted); pointer-events: none; z-index: 1; }
+  .track { position: relative; flex: 1; height: 1.8rem; cursor: pointer; touch-action: none; border-radius: 0.3rem; }
+  .rail { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: var(--sl-color-gray-5); overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--muted); }
+  /* A tick per beat: a dot on the rail. The timeline is the target; a press
+     near a tick goes to its beat (player.ts). */
+  .demo :global(.tick) {
+    position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px; pointer-events: none;
+    border-radius: 50%; background: var(--sl-color-white); box-shadow: 0 0 0 2px var(--sl-color-black);
+  }
+  .demo.reduced .play, .demo.reduced .speed, .demo.reduced .now, .demo.reduced .total { visibility: hidden; }
+
+  /* The terminal's colours, per page theme. Dark: as recorded from Claude
+     Code 2.1.316, its ANSI colours Solo's (One Dark). Light: Claude Code's light
+     theme, its four colours that fail AA darkened just enough, as the user
+     asked; the ground, text and border, and One Light's ANSI colours, are the
+     site's picks (the note under the demo says so in light). The caret stays
+     #e6e6e6 in both: it inverts what is under it. */
+  .demo {
+    --t-bg: #141414; --t-fg: #e6e6e6; --t-border: #2c2c2c; --t-scroll: #3a3a3a; --t-user: #373737;
+    --t-o: #d77757; --t-o2: #eb9f7f; --t-g: #999999; --t-g2: #adadad; --t-l: #b1b9f9; --t-tab-fg: #000000;
+    --t-w: #ffffff; --t-r: #888888; --t-add: #38a660; --t-del: #b3596b; --t-ok: #4eba65; --t-amb: #ffc107;
+    --t-cursor: #e6e6e6; --t-logo: #d77757; --t-eye: #000000; --smear-l: 0.78;
+    --t-c31: #f07178; --t-c32: #98c379; --t-c34: #7aa2f7; --t-c37: #abb2bf; --t-c95: #d5bfff; --t-c96: #7fdbca;
+    --t-key-bg: #2a2a2aee; --t-key-border: #444444; --t-key-fg: #e6e6e6; --t-flash-bg: #000000aa; --t-flash-fg: #ffffff;
+  }
+  .note .light { display: none; }
+
+  /* The terminal: colors as recorded from Claude Code 2.1.316; type as the
+     user's Solo terminal draws it (terminalFontScale 0.923 of its 13px base,
+     terminalLineHeight 1.7, terminalLetterSpacing 0.95), as measured on a
+     screen shot of Solo at 80 columns on a 2x display: a cell is Fira Code
+     6's advance (1200/1950 em) times 0.95, 14 device pixels; a row is 1.7
+     times 12px rounded up, 41; a box line is one device pixel. Fontsource's
+     Fira Code advances 0.6em, so letter-spacing makes up the rest. --cell
+     and --row size everything a terminal sizes in cells. */
+  .term-wrap { margin: 0; }
+  .demo { --fs: calc(13px * 0.923); --row: 20.5px; --cell: 7px; --line: 1px; }
+  @media (min-resolution: 2dppx) { .demo { --line: 0.5px; } }
+  .demo :global(.term), .probe {
+    font-family: "Fira Code", Menlo, "SF Mono", ui-monospace, monospace;
+    font-size: var(--fs);
+    line-height: var(--row);
+    letter-spacing: calc(var(--cell) - 0.6em);
+    font-variant-ligatures: none;
+  }
+  .demo :global(.term) {
+    --fade: 1;
+    display: flex; flex-direction: column;
+    /* --rows rows of text inside the padding and border. */
+    height: calc(var(--rows) * var(--row) + 1.2rem + 2px);
+    width: fit-content; max-width: 100%;
+    /* The grid sits centred in the frame: the room it leaves splits evenly
+       between the two sides; the scroll's own right padding and its
+       scrollbar sit inside the right half. */
+    --inset: max(4px, calc((100% - var(--cols) * var(--cell) - 2px) / 2));
+    padding: 0.6rem 0 0.6rem var(--inset); border: 1px solid var(--t-border); border-radius: 0.6rem;
+    background: var(--t-bg); color: var(--t-fg);
+  }
+  /* Padding on the right: an overlay scrollbar covers it, not the last column. */
+  .demo :global(.scroll) {
+    position: relative; z-index: 1; flex: 1; min-height: 0; padding-right: var(--cell); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; overflow-anchor: none;
+    scrollbar-width: thin; scrollbar-color: var(--t-scroll) transparent; scrollbar-gutter: stable;
+  }
+  .demo :global(.scroll:focus-visible) { outline: 1px solid var(--accent); outline-offset: 2px; }
+  /* A fade at the top says there is more above to scroll back to. */
+  .scroll.above { mask-image: linear-gradient(to bottom, transparent 0, #000 calc(2 * var(--row))); }
+  .bottom { flex: none; position: relative; z-index: 1; }
+  .bottom:focus { outline: none; }
+  /* A toast slides in over the top right corner of the terminal's text, from
+     its right edge, as hunch's did. */
+  .demo :global(.term) { position: relative; }
+  .toast {
+    position: absolute; top: 0.6rem; left: var(--inset); width: calc(var(--cols) * var(--cell));
+    overflow: hidden; pointer-events: none;
+  }
+  .toast :global(.box) { width: fit-content; margin-left: auto; background: var(--t-bg); }
+  .toast :global(.box .row) { width: auto; }
+  /* Measures one column, for the caret. */
+  .probe { position: absolute; top: 0; left: 0; visibility: hidden; white-space: pre; }
+  .demo :global(.row) { width: calc(var(--cols) * var(--cell)); height: var(--row); white-space: pre; overflow: hidden; opacity: var(--fade); }
+  /* A glyph Fira Code lacks comes from another font, with its own width; a
+     terminal keeps it in one cell. */
+  .demo :global(.gl) { display: inline-block; width: var(--cell); letter-spacing: 0; text-align: center; overflow: visible; }
+  /* Box drawing as a terminal draws it: each arm reaches the cell's edge, so
+     lines join across rows at any line height. The glyph stays, unseen, for
+     copying. Arms: u(p), d(own), l(eft), r(ight); a: a rounded corner. */
+  .demo :global(.bx) { display: inline-block; position: relative; height: var(--row); vertical-align: top; }
+  .demo :global(.bx > i) { font-style: normal; opacity: 0; }
+  .demo :global(.bx::before), .demo :global(.bx::after) { content: ""; position: absolute; border: 0 solid; }
+  .demo :global(.bx::before) { left: calc(50% - var(--line) / 2); border-left-width: var(--line); top: calc(50% - var(--line) / 2); bottom: calc(50% - var(--line) / 2); }
+  .demo :global(.bx.u::before) { top: 0; }
+  .demo :global(.bx.d::before) { bottom: 0; }
+  .demo :global(.bx::after) { top: calc(50% - var(--line) / 2); border-top-width: var(--line); left: calc(50% - var(--line) / 2); right: calc(50% - var(--line) / 2); }
+  .demo :global(.bx.l::after) { left: 0; }
+  .demo :global(.bx.r::after) { right: 0; }
+  .demo :global(.bx.a::before) { display: none; }
+  .demo :global(.bx.a::after) { border-left-width: var(--line); }
+  .demo :global(.bx.a.d::after) { bottom: 0; }
+  .demo :global(.bx.a.u::after) { top: 0; bottom: calc(50% - var(--line) / 2); border-top-width: 0; border-bottom-width: var(--line); }
+  .demo :global(.bx.a.l::after) { border-left-width: 0; border-right-width: var(--line); }
+  .demo :global(.bx.a.d.r::after) { border-top-left-radius: calc(var(--cell) * 0.6); }
+  .demo :global(.bx.a.d.l::after) { border-top-right-radius: calc(var(--cell) * 0.6); }
+  .demo :global(.bx.a.u.r::after) { border-bottom-left-radius: calc(var(--cell) * 0.6); }
+  .demo :global(.bx.a.u.l::after) { border-bottom-right-radius: calc(var(--cell) * 0.6); }
+  .demo :global(.row.user) { background: var(--t-user); box-shadow: 0 1px 0 var(--t-user); }
+  /* The logo in whole pixels, centered in its row. A quadrant of a terminal
+     cell is twice as tall as it is wide, so each is --px wide and 2 --px tall. */
+  .demo :global(svg.logo .eye) { fill: var(--t-eye); }
+  .demo :global(svg.logo .body) { fill: var(--t-logo); }
+  .demo :global(svg.logo) {
+    --px: 2px;
+    display: inline-block; vertical-align: top;
+    width: calc(var(--w) * var(--px)); height: calc(var(--h) * 2 * var(--px));
+    margin-top: calc((var(--row) - var(--h) * 2 * var(--px)) / 2);
+  }
+  .demo :global(.o) { color: var(--t-o); }
+  .demo :global(.b) { font-weight: bold; }
+  .demo :global(.i) { font-style: italic; }
+  .demo :global(.g) { color: var(--t-g); }
+  .demo :global(.l) { color: var(--t-l); }
+  .demo :global(.w) { color: var(--t-w); }
+  .demo :global(.r) { color: var(--t-r); }
+  .demo :global(.add) { color: var(--t-add); }
+  .demo :global(.del) { color: var(--t-del); }
+  .demo :global(.cursor) { background: var(--t-cursor); }
+  .demo :global(.tab) { background: var(--t-l); color: var(--t-tab-fg); }
+  .demo :global(.ok) { color: var(--t-ok); }
+  .demo :global(.d) { opacity: 0.5; }
+  .demo :global(.amb) { color: var(--t-amb); }
+  .demo :global(.o2) { color: var(--t-o2); }
+  .demo :global(.g2) { color: var(--t-g2); }
+  /* ANSI colors in the Solo palette the demos are checked against. */
+  .demo :global(.c31) { color: var(--t-c31); }
+  .demo :global(.c32) { color: var(--t-c32); }
+  .demo :global(.c34) { color: var(--t-c34); }
+  .demo :global(.c37) { color: var(--t-c37); }
+  .demo :global(.c95) { color: var(--t-c95); }
+  .demo :global(.c96) { color: var(--t-c96); }
+  /* Half a row under each option's description, as the user asked (fit() in
+     render.ts counts it). */
+  .demo :global(.row.gap) { margin-bottom: calc(var(--row) / 2); }
+  /* Half a row under the banner, as the user asked, so the first prompt reads
+     apart from it. It scrolls with the transcript; the terminal keeps its height. */
+  .demo :global(.row.banner) { margin-bottom: calc(var(--row) / 2); }
+  .demo :global([data-opt]) { cursor: pointer; }
+
+  /* The cursor: a block that inverts the text under it, gliding between cells
+     at the playback speed (--glide, player.ts), blinking softly at rest; plain
+     under reduced motion. A move leaves a short smear behind the text: flat,
+     a soft hue that changes with each move, fading in --decay into the
+     cursor's own colour as it shows (--t-cursor); --smear-l sets its
+     lightness per theme. */
+  .caret, .caret-trail { position: absolute; left: 0; top: 0; pointer-events: none; }
+  .caret {
+    width: var(--cell); height: var(--row); background: #e6e6e6; mix-blend-mode: difference;
+    transition: transform var(--glide, 90ms) cubic-bezier(0.22, 1, 0.36, 1); z-index: 2;
+  }
+  .caret:global(.rest) { animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+  .caret-trail {
+    background: var(--t-cursor); opacity: 0; border-radius: 2px; z-index: 0;
+    transition: opacity var(--decay, 280ms) cubic-bezier(0.22, 1, 0.36, 1), background-color var(--decay, 280ms) ease;
+  }
+  .caret-trail:global(.hot) { background: oklch(var(--smear-l, 0.78) 0.09 var(--hue, 0)); opacity: 0.4; }
+  @media (prefers-reduced-motion: reduce) {
+    .caret { transition: none; }
+    .caret:global(.rest) { animation: none; }
+    .caret-trail { display: none; }
+  }
+
+  /* A click on the terminal plays or pauses it, as on a video: the new state's
+     glyph shows in the centre, then fades. */
+  .demo :global(.term) { cursor: pointer; }
+  .demo :global(.term [data-opt]) { cursor: pointer; }
+  .flash {
+    position: absolute; left: 50%; top: 50%; width: 3.5rem; height: 3.5rem; margin: -1.75rem 0 0 -1.75rem;
+    display: grid; place-items: center; border-radius: 50%; background: var(--t-flash-bg); color: var(--t-flash-fg);
+    font: 1.3rem / 1 var(--sl-font); pointer-events: none; opacity: 0; z-index: 4;
+  }
+  .flash:global(.on) { animation: flash 600ms ease-out forwards; }
+  @keyframes flash { 0% { opacity: 1; transform: scale(0.9); } 100% { opacity: 0; transform: scale(1.15); } }
+
+  /* Keys the recorder pressed, as keycaps centred just above the prompt box
+     or the dialog (player.ts placeKeys()), so they cover none of its text. */
+  .keys {
+    position: absolute; left: 50%; top: 0; transform: translateX(-50%); display: flex; gap: 0.3rem;
+    max-width: calc(100% - 1.4rem); justify-content: center;
+    pointer-events: none; font-family: var(--sl-font); z-index: 3;
+  }
+  .keys :global(kbd) {
+    font: 600 var(--sl-text-xs) / 1 var(--sl-font); color: var(--t-key-fg); background: var(--t-key-bg);
+    border: 1px solid var(--t-key-border); border-bottom-width: 2px; border-radius: 0.35rem; padding: 0.3rem 0.45rem;
+    flex: none; white-space: nowrap;
+  }
+  /* Typed text lands whole, as the recorder sent it: one cap, cut to fit. */
+  .keys :global(kbd.txt) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
+
+  /* What the demo cuts from the recording; always shown, and read by screen readers. */
+  .note {
+    width: 0; min-width: 100%; margin: 0.4rem 0 0; color: var(--muted); font-size: var(--sl-text-xs);
+    line-height: 1.5; height: calc(var(--note-lines) * 1.5em); overflow: hidden;
+  }
+
+  /* Between demo pages, the terminal and the controls stay put while what
+     they show changes (the view transition in the global styles). */
+  .demo :global(.term) { view-transition-name: demo-term; }
+  .controls { view-transition-name: demo-controls; }
+</style>
+
+<style is:global>
+  :root[data-theme="light"] .demo {
+    --t-bg: #ffffff; --t-fg: #1a1a1a; --t-border: #dcdad5; --t-scroll: #c8c8c8; --t-user: #f0f0f0;
+    --t-o: #b06147; --t-o2: #a76650; --t-g: #666666; --t-g2: #767676; --t-l: #5567f2; --t-tab-fg: #ffffff;
+    --t-w: #000000; --t-r: #8a8a8a; --t-add: #28863a; --t-del: #d1454b; --t-ok: #2c7a39; --t-amb: #966c1e;
+    --t-cursor: #1a1a1a; --smear-l: 0.62;
+    --t-c31: #ca4c41; --t-c32: #418441; --t-c34: #3b6fdf; --t-c37: #696c77; --t-c95: #a626a4; --t-c96: #017cb1;
+    --t-key-bg: #f4f4f4ee; --t-key-border: #c8c8c8; --t-key-fg: #1a1a1a; --t-flash-bg: #1a1a1acc;
+  }
+  :root[data-theme="light"] .demo .note .light { display: inline; }
+  /* Pages with a demo get less space around the title, so the terminal gets
+     more rows. */
+  :root:has(.demo) main .content-panel { padding-block: 0.75rem; }
+  :root:has(.demo) main { padding-bottom: 0; }
+  /* Going from one demo page to another, the browser swaps the pages in one
+     transition, so the terminal never jumps. */
+  @view-transition { navigation: auto; }
+  @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+</style>

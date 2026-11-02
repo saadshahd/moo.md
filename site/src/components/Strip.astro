@@ -1,0 +1,45 @@
+---
+// The strip of the moves a page's demo runs, one row of fixed height that
+// scrolls rather than wraps: a chain's moves in order, or a move page's move
+// and what it does. A chip lights while its move is on screen and goes to it
+// when clicked (player.ts); one strip per page.
+import { stripMoves } from "../moves";
+
+const { entry } = Astro.locals.starlightRoute;
+const { moves, move } = entry.data;
+const names = stripMoves(entry);
+---
+
+<div class="strip" data-strip role="group" aria-label="Moves in this demo">
+  {names.map((m, k) => (
+    <>
+      {k > 0 && <span class="arrow" aria-hidden="true">→</span>}
+      <button type="button" class="chip" data-chip aria-label={`Go to /${m}`}>/{m}</button>
+    </>
+  ))}
+  {!moves && move && <span class="line">{move}</span>}
+</div>
+
+<style>
+  /* One row that scrolls rather than wraps: the moves as words, no outlines.
+     Moves already played in ink, the live one ink and paper swapped, the ones
+     to come muted. The accent stays the call to action's. */
+  .strip {
+    position: relative; display: flex; align-items: center; gap: 0.15rem; height: 2rem; margin: 0;
+    overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;
+  }
+  .chip {
+    flex: none; font: 400 0.9375rem / 1 var(--__sl-font-mono); color: var(--sl-color-gray-3); background: none;
+    border: 0; border-radius: var(--moo-pill); padding: 0.4rem 0.6rem; cursor: pointer;
+    transition: background-color 0.2s ease-out, color 0.2s ease-out;
+  }
+  .chip:has(~ :global(.chip.on)) { color: var(--moo-ink); }
+  .chip:hover { background: var(--moo-paper); color: var(--moo-ink); }
+  .chip:global(.on) { background: var(--moo-ink); color: var(--moo-paper); }
+  .chip:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  .arrow { flex: none; padding-inline: 0.15rem; color: var(--sl-color-gray-4); font-size: 0.8rem; }
+  .line { margin-inline-start: 0.5rem; color: var(--moo-ink); font-size: 0.9375rem; }
+  @media (max-width: 40rem) {
+    .chip { font-size: 0.8125rem; padding: 0.35rem 0.45rem; }
+  }
+</style>

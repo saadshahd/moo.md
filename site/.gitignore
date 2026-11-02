@@ -1,0 +1,8 @@
+.astro/
+dist/
+node_modules/
+# The root .gitignore drops /*/tsconfig.json (plugin hook types); this one is ours.
+!tsconfig.json
+dist-chrome/
+dist-taste/
+src/fonts/

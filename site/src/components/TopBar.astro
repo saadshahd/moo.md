@@ -1,0 +1,155 @@
+---
+// The site's one bar, in place of Starlight's header and sidebar: the mark,
+// the Chains and Moves menus, search (⌘K), GitHub and Install, the one action,
+// as a filled pill. It has one height at every width (--sl-nav-height,
+// chrome.css), so a demo's terminal sits at the same place on every page. Under 50rem the menus and GitHub
+// fold into one Menu sheet; Install and the theme toggle stay in the bar.
+// Menus are popovers: no script opens them; the script below only places each
+// under its button, and flips the theme.
+import Search from "@astrojs/starlight/components/Search.astro";
+import Mark from "./Mark.astro";
+import MenuItems from "./MenuItems.astro";
+import { href } from "../link";
+import { siteMenus } from "../menus";
+
+const here = Astro.url.pathname;
+const menus = await siteMenus();
+const install = href("install");
+const home = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/`;
+const github = "https://github.com/saadshahd/moo.md";
+---
+
+<div class="bar">
+  <a class="home" href={home}><Mark /></a>
+
+  <nav aria-label="Site">
+    {menus.map((m) => (
+      <>
+        <button type="button" class="wide menu-btn" popovertarget={`menu-${m.id}`} aria-current={m.items.some((i) => i.href === here) ? "true" : undefined}>
+          {m.label}<span class="count" aria-label={`, ${m.items.length} pages`}>{m.items.length}</span>
+        </button>
+        <div id={`menu-${m.id}`} class={`wide menu ${m.id}`} popover>
+          <MenuItems items={m.items} here={here} kind={m.id} />
+        </div>
+      </>
+    ))}
+  </nav>
+
+  <div class="end">
+    <Search />
+    <button type="button" class="theme" data-theme-toggle aria-label="Switch to dark theme">
+      <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+    </button>
+    <a class="wide gh" href={github} aria-label="moo.md on GitHub">
+      <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    </a>
+    <a class="moo-action install" href={install} aria-current={install === here ? "page" : undefined}>Install</a>
+    <button type="button" class="narrow sheet-btn" popovertarget="menu-sheet" aria-label="Menu">
+      <svg class="open" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg class="close" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div id="menu-sheet" class="sheet" popover>
+    <nav aria-label="Site">
+      {menus.map((m) => (
+        <section>
+          <h2>{m.label}<span class="count">{m.items.length}</span></h2>
+          <MenuItems items={m.items} here={here} kind={m.id} />
+        </section>
+      ))}
+      <a class="sheet-gh" href={github}>moo.md on GitHub</a>
+    </nav>
+  </div>
+</div>
+
+<script>
+  // A menu opens under its button. Popovers sit in the top layer, so they
+  // are placed in viewport units; the bar never scrolls, so the place holds.
+  for (const menu of document.querySelectorAll<HTMLElement>(".bar .menu")) {
+    const button = document.querySelector<HTMLElement>(`[popovertarget="${menu.id}"]`)!;
+    menu.addEventListener("beforetoggle", (e) => {
+      if ((e as ToggleEvent).newState !== "open") return;
+      const r = button.getBoundingClientRect();
+      menu.style.left = `${Math.round(r.left)}px`;
+    });
+  }
+
+  // The theme follows the system until the toggle picks one; picking the
+  // system's own theme drops the saved choice, so it follows again.
+  const toggle = document.querySelector<HTMLButtonElement>("[data-theme-toggle]")!;
+  const system = () => (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const label = () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    toggle.setAttribute("aria-label", `Switch to ${next} theme`);
+  };
+  label();
+  toggle.addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    if (next === system()) localStorage.removeItem("starlight-theme");
+    else localStorage.setItem("starlight-theme", next);
+    label();
+  });
+</script>
+
+<style>
+  .bar {
+    display: flex; align-items: center; gap: 1rem; height: 100%;
+  }
+  .home { display: inline-flex; align-items: center; margin-inline-end: 0.5rem; color: var(--sl-color-white); text-decoration: none; }
+  .bar > nav { display: flex; align-items: center; gap: 0.25rem; }
+  .end { margin-inline-start: auto; display: flex; align-items: center; gap: 0.875rem; }
+
+  /* A menu is a plain word in ink with its count where a chevron would be.
+     It shows a tone only on hover, and the surface's tone while its panel is
+     open. */
+  .menu-btn {
+    display: inline-flex; align-items: center; gap: 0.4rem; height: 2rem; padding: 0 0.75rem;
+    font: 500 0.9375rem / 1 var(--__sl-font); color: var(--moo-ink);
+    background: none; border: 0; border-radius: var(--moo-pill); cursor: pointer;
+    transition: background-color 120ms ease-out;
+  }
+  .menu-btn:hover { background: var(--moo-paper); }
+  .menu-btn:has(+ .menu:popover-open) { background: var(--moo-surface); }
+  .count { font: 400 0.75rem / 1 var(--__sl-font-mono); color: var(--sl-color-gray-3); }
+
+  .gh, .sheet-btn, .theme {
+    display: inline-flex; align-items: center; justify-content: center; color: var(--sl-color-gray-2);
+    background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none; transition: color 120ms ease-out, background-color 120ms ease-out;
+  }
+  .gh:hover, .sheet-btn:hover, .theme:hover { color: var(--moo-ink); }
+  .theme { width: 2rem; height: 2rem; border-radius: var(--moo-pill); background: var(--moo-paper); }
+  .theme:hover { background: var(--moo-surface); }
+  :root[data-theme="light"] .theme .sun, :root[data-theme="dark"] .theme .moon { display: none; }
+  .install { height: 2.25rem; padding: 0 1.1rem; font-size: var(--sl-text-sm); }
+  .sheet-btn { width: 2.5rem; height: 2.5rem; border-radius: var(--moo-pill); }
+  .sheet-btn .close { display: none; }
+  .bar:has(.sheet:popover-open) .sheet-btn { background: var(--moo-surface); color: var(--moo-ink); }
+  .bar:has(.sheet:popover-open) .sheet-btn .open { display: none; }
+  .bar:has(.sheet:popover-open) .sheet-btn .close { display: block; }
+
+  /* Panels float, so they alone carry a shadow. */
+  .menu, .sheet { margin: 0; border: 0; background: var(--moo-surface); color: var(--moo-ink); }
+  .menu {
+    position: fixed; top: calc(var(--sl-nav-height) - 0.125rem); padding: 0.375rem;
+    border-radius: 0.75rem; box-shadow: var(--sl-shadow-md);
+  }
+  .menu.chains { width: 25rem; }
+  .menu.moves { width: 24rem; }
+  /* On a phone, one sheet from the bar to the foot of the screen. */
+  .sheet { position: fixed; inset: var(--sl-nav-height) 0 0 0; width: 100%; height: auto; max-height: none; overflow: auto; padding: 1.5rem 1rem; }
+  .sheet section + section { margin-top: 1.75rem; }
+  .sheet h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0.75rem 0.5rem; font: 600 1.375rem / 1.2 var(--moo-heading); letter-spacing: -0.02em; color: var(--moo-ink); }
+  .sheet h2 .count { font-size: 0.8125rem; }
+  .sheet-gh { display: inline-block; margin: 1.75rem 0.75rem 0; color: var(--sl-color-gray-2); font: 400 var(--sl-text-base) / 1.4 var(--__sl-font); }
+  .narrow { display: none; }
+  @media (max-width: 50rem) {
+    .bar { gap: 0.5rem; }
+    .end { gap: 0.5rem; }
+    .bar .wide { display: none; }
+    .narrow { display: inline-flex; }
+  }
+  :focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+</style>

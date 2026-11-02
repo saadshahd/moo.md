@@ -1,0 +1,13 @@
+---
+title: /freeze
+move: snapshots the world now
+description: Freeze snapshots the world as it is now, so the agent works from what it read, not from memory or guesses.
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { freezeScene } from "../../../demo/scenes";
+
+<Demo
+  scene={freezeScene}
+  summary="Claude Code. /hope:freeze on the order export, which stopped sending orders to the warehouse this morning, before anyone touches it. While it works, one activity line shows at a time: it lists the repo, reads the worker's synced state and the order queue, and matches the log's byte counts. The reply is a snapshot as of the worker's last sync, in three tables: what it observed and where each fact lives, among them that every run since 09:40Z failed with 413 Payload Too Large; five gaps, each with how to fill it by hand; and what it concluded, marked as not observed. You type lock, and it locks the snapshot with the five gaps still open."
+/>

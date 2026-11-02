@@ -1,0 +1,185 @@
+/* The frame around every page: one bar height and one column at every
+   width, the band the bar and title row share, the ⌘K field, search, and
+   the front page's margin note. Colours and type come from identity.css. */
+:root,
+:root[data-theme] {
+  --sl-nav-height: 3rem;
+  /* One centred column, as wide as the terminal at 120 columns (884px, where
+     Demo.astro's container query switches to 120): every page's title, strip,
+     caption, terminal and controls share its edges, between equal gutters. */
+  --sl-content-width: 55.25rem;
+  --sl-nav-pad-x: 1.5rem;
+  --sl-nav-pad-y: 0;
+}
+@media (max-width: 50rem) {
+  :root { --sl-nav-pad-x: 1rem; }
+}
+
+/* The band: the bar and the first panel (a demo page's strip row, another
+   page's title) on one tone, the page below on paper. Only colour changes,
+   so every box keeps its place. */
+.main-frame .content-panel:first-child { background: var(--moo-band); }
+
+/* The bar is fixed, so a rubber-band scroll slides the page under it and
+   opens a strip of paper between the bar and the band. No page bounces;
+   a page taller than the screen still scrolls, and the transcript keeps
+   its own contained scroll. */
+html, body { overscroll-behavior: none; }
+
+/* ⌘K: a filled pill on wide screens, an icon on narrow ones. */
+site-search button[data-open-modal] {
+  height: 2rem;
+  border: 0;
+  border-radius: var(--moo-pill);
+  background: var(--moo-paper);
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+site-search button[data-open-modal]:hover { background: var(--moo-surface); color: var(--moo-ink); }
+site-search button[data-open-modal] kbd { background: transparent; border: 0; color: var(--sl-color-gray-3); }
+@media (min-width: 50rem) {
+  site-search button[data-open-modal] { width: 15rem; max-width: none; padding-inline: 0.85rem 0.65rem; }
+}
+@media (max-width: 50rem) {
+  site-search button[data-open-modal] { width: 2.5rem; height: 2.5rem; background: none; justify-content: center; }
+}
+
+/* Pages without a demo (Install, 404): the title at display size, the
+   description under it in plain words, the content across the column. */
+:root:not(:has(.demo)) .main-frame .content-panel:first-child { padding-block: 3rem 2.5rem; }
+:root:not(:has(.demo)) .content-panel h1:not(.rule) {
+  font-size: clamp(2.5rem, 1.2rem + 5vw, 5.5rem); line-height: 0.95; letter-spacing: -0.04em;
+}
+.lede { margin: 1rem 0 0; max-width: 40ch; font-size: var(--sl-text-xl); line-height: 1.45; color: var(--moo-ink); }
+
+/* The demo fills the column, so the terminal's edges are the column's: the
+   gutters either side stay equal at every width. */
+.demo .col { width: 100%; }
+.demo .col .term { width: auto; }
+
+/* The front page's margin note: what the site is and the chains. It sits in
+   the right gutter, out of the flow, so the terminal holds the box it has on
+   every demo page; where the gutter is too narrow, it hides. Install is the
+   bar's alone. */
+.landing-side { display: none; }
+@media (min-width: 88rem) {
+  .sl-markdown-content:has(> .landing-side) { position: relative; }
+  .sl-markdown-content > .landing-side {
+    position: absolute; top: 0; left: calc(100% + 1.5rem); width: calc((100vw - 55.25rem) / 2 - 3rem); margin: 0;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem;
+  }
+}
+.landing-side p { margin: 0; }
+.landing-side .tagline { font: 600 1.125rem / 1.3 var(--moo-heading); letter-spacing: -0.02em; color: var(--moo-ink); }
+.landing-side .chains { font-size: var(--sl-text-base); line-height: 1.5; color: var(--moo-ink); }
+.landing-side .chains a { color: var(--sl-color-text-accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.landing-side .chains a:hover { color: var(--sl-color-accent-high); }
+
+/* The one action, wherever it appears: a filled red pill. */
+.moo-action {
+  display: inline-flex; align-items: center; justify-content: center; height: 2.75rem; padding: 0 1.4rem;
+  border-radius: var(--moo-pill); background: var(--sl-color-accent); color: var(--moo-on-accent);
+  font: 600 var(--sl-text-base) / 1 var(--__sl-font); text-decoration: none;
+  transition: background-color 120ms ease-out, transform 120ms ease-out;
+}
+.moo-action:hover { background: var(--sl-color-accent-high); color: var(--moo-on-accent); }
+.moo-action:active { transform: translateY(1px); }
+
+/* Search: the dialog and Pagefind's results in the site's type, colours and
+   spacing. One result is a page title and, under it, its matching passages,
+   each a row on a surface one tone off the dialog; no page icons, no tree
+   lines, no outlines. Starlight's rules sit in a cascade layer, so these win
+   without !important. */
+site-search dialog { border: 0; border-radius: var(--moo-radius); background: var(--moo-paper); }
+#starlight__search {
+  --pagefind-ui-font: var(--__sl-font);
+  --pagefind-ui-background: var(--moo-surface);
+  --pagefind-ui-border: transparent;
+  --pagefind-ui-border-width: 0px;
+  --pagefind-ui-border-radius: var(--moo-pill);
+  --pagefind-ui-primary: var(--moo-ink);
+  --pagefind-ui-text: var(--moo-ink);
+  --sl-search-result-pad-inline-start: 1.1rem;
+  --sl-search-result-pad-inline-end: 1.1rem;
+  --sl-search-result-spacing: 1rem;
+}
+#starlight__search input:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+#starlight__search .pagefind-ui__search-input { font-size: var(--sl-text-base); }
+#starlight__search .pagefind-ui__message { font: 400 var(--sl-text-sm) / 1.4 var(--__sl-font); color: var(--sl-color-gray-3); padding-inline: 0.25rem; }
+#starlight__search .pagefind-ui__result-inner > .pagefind-ui__result-title::before,
+#starlight__search .pagefind-ui__result-nested::before { content: none; }
+#starlight__search .pagefind-ui__result-inner { gap: 2px; border-radius: var(--moo-radius); overflow: hidden; }
+#starlight__search .pagefind-ui__result-title:not(:where(.pagefind-ui__result-nested *)) { background: var(--moo-band); }
+#starlight__search .pagefind-ui__result-nested { background: var(--moo-surface); padding-block: 0.7rem; }
+#starlight__search .pagefind-ui__result-link { font: 600 var(--sl-text-base) / 1.25 var(--moo-heading); letter-spacing: -0.015em; --pagefind-ui-text: var(--moo-ink); }
+#starlight__search .pagefind-ui__result-nested .pagefind-ui__result-link { font: 600 var(--sl-text-sm) / 1.3 var(--__sl-font); }
+#starlight__search .pagefind-ui__result-excerpt { font-size: var(--sl-text-sm); line-height: 1.5; color: var(--sl-color-gray-3); }
+#starlight__search mark { color: var(--moo-ink); background: var(--sl-color-accent-low); border-radius: 2px; padding: 0 1px; font-weight: 500; }
+#starlight__search .pagefind-ui__result-title:not(:where(.pagefind-ui__result-nested *)):is(:hover, :focus-within),
+#starlight__search .pagefind-ui__result-nested:is(:hover, :focus-within) { outline: none; background: var(--sl-color-accent-low); }
+#starlight__search .pagefind-ui__button { font: 600 var(--sl-text-sm) / 1 var(--__sl-font); border: 0; border-radius: var(--moo-pill); background: var(--moo-band); color: var(--moo-ink); }
+
+/* Install: the two ways side by side across the column, one under the other
+   on a phone. */
+.ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: 2rem 2rem; }
+.ways h2 { margin: 0 0 0.5rem; font: 600 clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem) / 1.15 var(--moo-heading); letter-spacing: -0.025em; color: var(--moo-ink); }
+.ways p { margin: 0 0 0.25rem; max-width: 46ch; line-height: 1.5; }
+/* hunch, the optional third command: a plain line set apart from hope's two. */
+.ways p.optional { margin-top: 1.5rem; color: var(--sl-color-gray-3); }
+.install-note { margin-top: 2.5rem; color: var(--sl-color-gray-3); }
+/* On a phone Install holds three commands and two ways in one screen: the
+   title row and gaps tighten, and the plain lines step down a size. */
+@media (max-width: 40rem) {
+  :root:has(.ways) .main-frame .content-panel:first-child { padding-block: 1.25rem 1rem; }
+  :root:has(.ways) .content-panel h1 { font-size: 2.25rem; }
+  :root:has(.ways) .lede { margin-top: 0.5rem; font-size: var(--sl-text-base); }
+  .ways { gap: 1.5rem; }
+  .ways p, .install-note { font-size: var(--sl-text-sm); }
+  .ways p.optional { margin-top: 1rem; }
+  .install-note { margin-top: 1.25rem; }
+}
+
+/* One vertical rhythm around the demo: the title row's padding, the gap
+   from the band to the caption, from the caption to the terminal, and from
+   the terminal to the player are all one step of 11px, on a phone too. That
+   is the largest step that leaves the terminal 32 rows at 1440x900 and 26 at
+   390x844; Demo.astro fits the rows, the same on every page. */
+:root:has(.demo) { --moo-step: 0.6875rem; }
+:root:has(.demo) .main-frame main .content-panel { padding-block: var(--moo-step); }
+:root:has(.demo) .main-frame main .content-panel + .content-panel { padding-bottom: 0; }
+.demo .beats { margin-bottom: var(--moo-step); }
+
+/* The demo's head and player in the site's look; Demo.astro lays them out.
+   The caption narrates under the page's title: the heading face, smaller and
+   muted, on the row height .beats keeps (1.35 × 1.125rem). */
+.demo .beats .caption {
+  font: 600 1rem / 1.51875rem var(--moo-heading); letter-spacing: -0.01em; color: var(--sl-color-gray-3);
+}
+
+/* The player under the terminal, as wide as it: a filled round play button,
+   the time so far and the length, a rail with a knob and a notch per beat,
+   and speed as a four-way switch, 2rem tall, one step under the terminal. */
+.demo .controls { gap: 0.75rem; margin-top: var(--moo-step); height: 2rem; }
+.demo .controls .play {
+  width: 2rem; min-width: 2rem; height: 2rem; border-radius: var(--moo-pill);
+  background: var(--moo-ink); color: var(--moo-paper); font-size: 0.625rem; letter-spacing: 0.08em; padding: 0 0 0 0.08em;
+  transition: background-color 120ms ease-out;
+}
+.demo .controls .play:hover { background: var(--sl-color-gray-2); color: var(--moo-paper); }
+.demo .controls :is(.now, .total) { font: 400 0.75rem / 1 var(--__sl-font-mono); }
+.demo .controls .now { color: var(--sl-color-gray-2); }
+.demo .controls .total { color: var(--sl-color-gray-3); }
+.demo .controls .track { height: 2rem; }
+.demo .controls .rail { height: 6px; margin-top: -3px; border-radius: 3px; background: var(--sl-color-gray-5); }
+.demo .controls .fill { background: var(--moo-ink); }
+.demo .controls .tick { width: 2px; height: 6px; margin: -3px -1px; border-radius: 0; background: var(--moo-paper); box-shadow: none; }
+.demo .controls .knob { width: 16px; height: 16px; margin: -8px; background: var(--moo-ink); box-shadow: 0 0 0 2px var(--moo-paper); }
+.demo .controls .speed { gap: 2px; padding: 2px; border-radius: var(--moo-pill); background: var(--moo-band); }
+.demo .controls .speed button {
+  min-width: 0; height: 1.5rem; padding: 0 0.6rem; border-radius: var(--moo-pill);
+  font: 600 0.78rem / 1 var(--__sl-font); color: var(--sl-color-gray-2);
+}
+.demo .controls .speed button:hover { color: var(--moo-ink); }
+.demo .controls .speed button[aria-pressed="true"] { background: var(--moo-ink); color: var(--moo-paper); }
+@media (max-width: 40rem) { .demo .controls .speed button { padding: 0 0.45rem; } }
