@@ -5,7 +5,8 @@
 import * as S from "../src/demo/scenes.ts";
 import type { Scene } from "../src/demo/types.ts";
 
-const BANNED = [/\/private\/tmp/, /\/tmp\//, /\/Users\//, /\/home\//, /~\//, /sandbox/i, /EPERM/];
+// A /tmp/ inside another folder ("/data/tmp/") is the scene's own disk.
+const BANNED = [/\/private\/tmp/, /(?<![\w.-])\/tmp\//, /\/Users\//, /\/home\//, /~\//, /sandbox/i, /EPERM/];
 let bad = 0;
 for (const [name, scene] of Object.entries(S) as [string, Scene][]) {
   if (scene?.plain === undefined) continue;

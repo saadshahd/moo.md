@@ -1,0 +1,13 @@
+---
+title: /intent
+move: turns a rough ask into a work order
+description: "You start from a clear ask, after answering only what you alone know."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { intentScene } from "../../../demo/scenes";
+
+<Demo
+  scene={intentScene}
+  summary="Claude Code. With moo off, you say the agent box is running out of disk space and ask what can be cleaned safely. Claude reads the dumped df, du and worktree state and ranks what is safe to clean: idle worktrees and build output, about 315 GB. It warns against deleting straight from the stale snapshot and lists a second tier to check first. In the same session with moo on, you type /hope:intent. Claude asks two questions, since the agent runner never removes its worktree: you pick stopping the disk from filling over a one-off cleanup, and a nightly sweep from cron over running it by hand. It hands back a work order: the scripts to build, one safety check per worktree, what it must not do, and how you will know it is right."
+/>

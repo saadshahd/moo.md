@@ -28,3 +28,7 @@ python3 gen.py "$HOME/.claude/projects/-private-tmp-notes-box/e6e801af-24c1-4c55
   --keys "$R/rec5/inversion/keylog.json" --raw "$OUT/inversion.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-catalog/48819e2a-8ba3-4fb0-84e7-e92069ab8dad.jsonl" /Users/Shared/catalog "$R/rec6/reduce" ../src/demo/sessions/reduce.ts  \
   --keys "$R/rec6/reduce/keylog.json" --raw "$OUT/reduce.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-harness/b85c0514-4eaf-431a-bd2a-c1d9ddb2ea19.jsonl" /Users/Shared/harness "$R/rec5/intent" ../src/demo/sessions/intent.ts 1=ha69of.1849 \
+  --keys "$R/rec5/intent/keylog.json" --raw "$OUT/intent.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-glossary2/f9bd03e0-5a3e-4b36-b9ad-c119dbf14795.jsonl" /Users/Shared/glossary2 "$R/rec5/shape2" ../src/demo/sessions/shape.ts 1=1idh1op.901 \
+  --keys "$R/rec5/shape2/keylog.json" --raw "$OUT/shape.json" --activity-from-snaps
