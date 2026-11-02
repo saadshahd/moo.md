@@ -44,15 +44,15 @@ async function asBot(app: App, repo: string): Promise<void> {
   Object.assign(process.env, botEnv(bot));
 }
 
-async function tick(ctx: Ctx, p: Platform): Promise<void> {
+export async function tick(ctx: Ctx, p: Platform): Promise<void> {
+  /** Before anything reaches GitHub: a token that expired while the machine slept would fail the fetch. */
+  if (ctx.app !== null) await asBot(ctx.app, ctx.repo);
   await must(run, ["git", "fetch", "origin", ctx.base], { cwd: ctx.dir });
   const rules = await readRules(run, ctx.dir);
 
   /** Who the worker acts as is set at its start; rules that changed it wait for a restart. */
   if ((rules.bot === undefined) !== (ctx.app === null))
     throw new Error(`the rules ${rules.bot === undefined ? "no longer name a bot" : `now name the bot ${rules.bot}`}; restart the worker`);
-
-  if (ctx.app !== null) await asBot(ctx.app, ctx.repo);
   const byFactory = await rulesChangedByFactory(run, ctx.dir, ctx.repo);
 
   if (byFactory !== null)

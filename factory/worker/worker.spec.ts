@@ -31,6 +31,8 @@ import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedByFactory } from ".
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
+import { tick } from "./main.ts";
+import type { App } from "./app.ts";
 import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
@@ -1690,6 +1692,21 @@ describe("rules a factory PR changed stop the worker", () => {
     expect(await rulesChangedByFactory(github([{ number: 13, head: { ref: "tighten-rules" } }]), dir, "o/r")).toBe(null);
     expect(await rulesChangedByFactory(github([]), dir, "o/r")).toBe(null);
     expect(asked).toEqual(Array(3).fill(`repos/o/r/commits/${rules}/pulls`));
+    await rm(dir, { recursive: true });
+  });
+});
+
+describe("a worker that acts as an App", () => {
+  test("renews the App's token before its first fetch, so a token that expired while the machine slept fails no tick", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "factory-tick-"));
+    await gitIn(dir, "init", "-q", "-b", "main");
+
+    /** SAFETY: `botFor` only calls the App, and this one fails at its first call. */
+    const app = (async () => {
+      throw new Error("the App can't mint");
+    }) as unknown as App;
+
+    await expect(tick({ app, dir, repo: "o/r", base: "main", machine: "m" }, platformOf("linux")!)).rejects.toThrow("the App can't mint");
     await rm(dir, { recursive: true });
   });
 });
