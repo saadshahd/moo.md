@@ -1,84 +1,124 @@
-// Copied from image-preview 0.2.2 (https://github.com/midudev/better-claude, plugins/image-preview/hooks/window.ts),
-// MIT © Miguel Ángel Durán (midudev); the macOS and Linux programs only, unchanged. The licence is in ./window.LICENSE.
+// The window programs are adapted from image-preview 0.2.2 (https://github.com/midudev/better-claude,
+// plugins/image-preview/hooks/window.ts), MIT © Miguel Ángel Durán (midudev): changed to open where
+// the hook places them and to close on their own. The licence is in ./window.LICENSE.
 //
-// The programs that show a picture in a window of its own, by the pointer, outside the terminal:
-// one a system, each run with what it needs in the environment (IMAGE_PREVIEW_FILE, the picture;
-// IMAGE_PREVIEW_SIZE, its longest side at most; IMAGE_PREVIEW_LIFE, how many seconds at most it
-// stays). Each writes `shown` once the window is up, or a line starting `error`, then a `.` every
-// tenth of a second, so the one reading it is woken to end it, and it ends when nobody reads. The
-// window never takes the focus or the pointer: the terminal keeps both.
+// Each shows a picture in a borderless window outside the terminal, one program a system, run
+// with what it needs in the environment: HOLD_WINDOW_FILE, the PNG; HOLD_WINDOW_RECT, the window
+// as `x y width height` from the top left of the main screen, in points; HOLD_WINDOW_LIFE, how
+// many seconds at most it stays. Each writes `shown` once the window is up, or a line starting
+// `error`, then a `.` a beat, and exits on a click on its window, when its parent goes, when
+// nobody reads it, or at the end of its life. The window never takes the focus: the terminal
+// keeps it.
 
-/** macOS: JavaScript for Automation, run by `osascript`, drawing an AppKit panel. */
-export const MACOS = String.raw`
+/** A line in each window program and in no other, so `pkill -f` finds every window open. */
+export const MARKER = "moo-hold-view-window";
+
+/** The window's border round its picture, in points. */
+export const PAD = 6;
+
+/**
+ * macOS: where the pointer is, and the room on the screen it is on, as Pointer's JSON. AppKit
+ * counts from the main screen's bottom left; the JSON from its top left.
+ */
+export const MACOS_POINTER = String.raw`
 ObjC.import('Cocoa')
 
 function run () {
-  const env = $.NSProcessInfo.processInfo.environment
-  const read = key => { const value = env.objectForKey(key); return value.isNil() ? '' : ObjC.unwrap(value) }
-  const say = text => $.NSFileHandle.fileHandleWithStandardOutput.writeData($(text + '\n').dataUsingEncoding($.NSUTF8StringEncoding))
-  const largest = Number(read('IMAGE_PREVIEW_SIZE')) || 800
-  // An accessory app: no Dock icon, never the active one.
-  $.NSApplication.sharedApplication.setActivationPolicy(1)
-  const image = $.NSImage.alloc.initWithContentsOfFile(read('IMAGE_PREVIEW_FILE'))
-  if (image.isNil() || image.representations.count === 0) { say('error: cannot read the image'); return }
-  const pixels = image.representations.firstObject
   const mouse = $.NSEvent.mouseLocation
   const screens = $.NSScreen.screens
+  const top = screens.objectAtIndex(0).frame.size.height
   let screen = $.NSScreen.mainScreen
   for (let i = 0; i < screens.count; i++) {
     const frame = screens.objectAtIndex(i).frame
     if (mouse.x >= frame.origin.x && mouse.x < frame.origin.x + frame.size.width && mouse.y >= frame.origin.y && mouse.y < frame.origin.y + frame.size.height) screen = screens.objectAtIndex(i)
   }
   const area = screen.visibleFrame
-  let width = pixels.pixelsWide / screen.backingScaleFactor
-  let height = pixels.pixelsHigh / screen.backingScaleFactor
-  const fit = Math.min(1, largest / Math.max(width, height), (area.size.width * 0.7) / width, (area.size.height * 0.7) / height)
-  width = Math.round(width * fit)
-  height = Math.round(height * fit)
-  const pad = 6
-  const gap = 18
-  const outer = { width: width + pad * 2, height: height + pad * 2 }
-  const top = area.origin.y + area.size.height
-  const right = area.origin.x + area.size.width
-  // Above the pointer and to its right; under it, or to its left, where there is no room: never
-  // over the pointer, which stays on the terminal.
-  let x = mouse.x + gap
-  let y = mouse.y + gap
-  if (y + outer.height > top) y = mouse.y - gap - outer.height
-  if (x + outer.width > right) x = mouse.x - gap - outer.width
-  x = Math.max(area.origin.x, Math.min(x, right - outer.width))
-  y = Math.max(area.origin.y, Math.min(y, top - outer.height))
+  return JSON.stringify({
+    x: mouse.x,
+    y: top - mouse.y,
+    area: { x: area.origin.x, y: top - area.origin.y - area.size.height, width: area.size.width, height: area.size.height },
+    scale: screen.backingScaleFactor
+  })
+}
+`;
+
+/** Linux and other X11 desktops: the same, from Python's Tk; X11 counts pixels from the top left. */
+export const LINUX_POINTER = String.raw`
+import json
+import tkinter as tk
+
+root = tk.Tk()
+root.withdraw()
+x, y = root.winfo_pointerxy()
+print(json.dumps({'x': x, 'y': y, 'area': {'x': 0, 'y': 0, 'width': root.winfo_screenwidth(), 'height': root.winfo_screenheight()}, 'scale': 1}))
+`;
+
+/**
+ * macOS: JavaScript for Automation, run by `osascript`, drawing an AppKit panel. It reads the
+ * Escape key's state off the keyboard: the panel holds no focus, so no key reaches it.
+ */
+export const MACOS = String.raw`
+// ${MARKER}
+ObjC.import('Cocoa')
+ObjC.import('CoreGraphics')
+ObjC.import('unistd')
+
+function run () {
+  const env = $.NSProcessInfo.processInfo.environment
+  const read = key => { const value = env.objectForKey(key); return value.isNil() ? '' : ObjC.unwrap(value) }
+  const say = text => $.NSFileHandle.fileHandleWithStandardOutput.writeData($(text + '\n').dataUsingEncoding($.NSUTF8StringEncoding))
+  const app = $.NSApplication.sharedApplication
+  // An accessory app: no Dock icon, never the active one.
+  app.setActivationPolicy(1)
+  app.finishLaunching
+  const image = $.NSImage.alloc.initWithContentsOfFile(read('HOLD_WINDOW_FILE'))
+  if (image.isNil() || image.representations.count === 0) { say('error: cannot read the image'); return }
+  const [x, y, width, height] = read('HOLD_WINDOW_RECT').split(' ').map(Number)
+  if (!(width > 0 && height > 0)) { say('error: no place for the window'); return }
+  const top = $.NSScreen.screens.objectAtIndex(0).frame.size.height
+  const pad = ${PAD}
   // Borderless and non-activating; over every app window, on every space, full-screen ones too.
-  const panel = $.NSPanel.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(x, y, outer.width, outer.height), 128, 2, false)
+  const panel = $.NSPanel.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(x, top - y - height, width, height), 128, 2, false)
   panel.level = 25
-  panel.ignoresMouseEvents = true
   panel.hasShadow = true
   panel.opaque = false
   panel.backgroundColor = $.NSColor.clearColor
   panel.collectionBehavior = 1 | 16 | 256
-  const backdrop = $.NSVisualEffectView.alloc.initWithFrame($.NSMakeRect(0, 0, outer.width, outer.height))
+  const backdrop = $.NSVisualEffectView.alloc.initWithFrame($.NSMakeRect(0, 0, width, height))
   backdrop.material = 13
   backdrop.state = 1
   backdrop.wantsLayer = true
   backdrop.layer.cornerRadius = 10
   backdrop.layer.masksToBounds = true
-  const view = $.NSImageView.alloc.initWithFrame($.NSMakeRect(pad, pad, width, height))
+  const view = $.NSImageView.alloc.initWithFrame($.NSMakeRect(pad, pad, width - pad * 2, height - pad * 2))
   view.image = image
   view.imageScaling = 3
   backdrop.addSubview(view)
   panel.contentView = backdrop
   panel.orderFrontRegardless
   say('shown')
-  const end = Date.now() + (Number(read('IMAGE_PREVIEW_LIFE')) || 120) * 1000
-  while (Date.now() < end) {
-    $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.1))
+  const parent = $.getppid()
+  const end = Date.now() + (Number(read('HOLD_WINDOW_LIFE')) || 120) * 1000
+  const escape = 53
+  let wasEscape = $.CGEventSourceKeyState(0, escape)
+  while (Date.now() < end && $.getppid() === parent) {
+    const event = app.nextEventMatchingMaskUntilDateInModeDequeue($.NSEventMaskAny, $.NSDate.dateWithTimeIntervalSinceNow(0.03), $.NSDefaultRunLoopMode, true)
+    // Only a click on the panel reaches this app: a left or right mouse-down closes it.
+    if (!event.isNil()) {
+      if (event.type === 1 || event.type === 3) return
+      app.sendEvent(event)
+    }
+    const isEscape = $.CGEventSourceKeyState(0, escape)
+    if (isEscape && !wasEscape) return
+    wasEscape = isEscape
     say('.')
   }
 }
-`
+`;
 
-/** Linux and other X11 desktops: Python's Tk, an undecorated tooltip window. The picture is a PNG. */
+/** Linux and other X11 desktops: Python's Tk, an undecorated tooltip window. No key reaches it. */
 export const LINUX = String.raw`
+# ${MARKER}
 import math, os, sys
 try:
     import tkinter as tk
@@ -86,8 +126,12 @@ except ImportError:
     print('error: no tkinter', flush=True)
     sys.exit(1)
 
-largest = int(os.environ.get('IMAGE_PREVIEW_SIZE') or 800)
-life = float(os.environ.get('IMAGE_PREVIEW_LIFE') or 120)
+life = float(os.environ.get('HOLD_WINDOW_LIFE') or 120)
+try:
+    x, y, width, height = (int(float(v)) for v in os.environ.get('HOLD_WINDOW_RECT', '').split())
+except ValueError:
+    print('error: no place for the window', flush=True)
+    sys.exit(1)
 try:
     root = tk.Tk()
 except tk.TclError as error:
@@ -101,35 +145,28 @@ for name, value in (('-topmost', True), ('-type', 'tooltip')):
     except tk.TclError:
         pass
 try:
-    image = tk.PhotoImage(file=os.environ.get('IMAGE_PREVIEW_FILE', ''))
+    image = tk.PhotoImage(file=os.environ.get('HOLD_WINDOW_FILE', ''))
 except tk.TclError:
     print('error: cannot read the image', flush=True)
     sys.exit(1)
-screen_width, screen_height = root.winfo_screenwidth(), root.winfo_screenheight()
-step = max(1, math.ceil(max(image.width() / min(largest, screen_width * 0.7), image.height() / min(largest, screen_height * 0.7))))
+pad = ${PAD}
+step = max(1, math.ceil(max(image.width() / max(1, width - pad * 2), image.height() / max(1, height - pad * 2))))
 if step > 1:
     image = image.subsample(step)
-pad, gap = 6, 18
-width, height = image.width() + pad * 2, image.height() + pad * 2
 root.configure(background='#202020')
 tk.Label(root, image=image, borderwidth=0, highlightthickness=0, background='#202020').pack(padx=pad, pady=pad)
-mouse_x, mouse_y = root.winfo_pointerxy()
-# Above the pointer and to its right; under it, or to its left, where there is no room: never over
-# the pointer, which stays on the terminal.
-x, y = mouse_x + gap, mouse_y - gap - height
-if y < 0:
-    y = mouse_y + gap
-if x + width > screen_width:
-    x = mouse_x - gap - width
-x = max(0, min(x, screen_width - width))
-y = max(0, min(y, screen_height - height))
 root.geometry('%dx%d+%d+%d' % (width, height, x, y))
+root.bind('<ButtonPress>', lambda event: root.destroy())
 root.deiconify()
 root.update_idletasks()
 print('shown', flush=True)
+parent = os.getppid()
 
 
 def beat():
+    if os.getppid() != parent:
+        root.destroy()
+        return
     try:
         print('.', flush=True)
     except (BrokenPipeError, OSError):
@@ -143,5 +180,4 @@ def beat():
 beat()
 root.after(int(life * 1000), root.destroy)
 root.mainloop()
-`
-
+`;

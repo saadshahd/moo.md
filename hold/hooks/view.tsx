@@ -8,7 +8,8 @@ import type {
 import { altOf, hasMermaid, segments } from "./fences.ts";
 import { cleanMarkdown, kindOf, MARKDOWN_MAX, nameOf, viewable } from "./files.ts";
 import { drawsPixels, type TermEnv } from "./terminal.ts";
-import { LINUX, MACOS } from "./window.ts";
+import { closeWindow, isWindowOpen, toggleWindow, windowOf } from "./popover.ts";
+import { failOnce, messageOf, redraw } from "./ui.ts";
 
 /** A PNG `draw/draw.ts` wrote, and the box of cells it fills. */
 type Picture = { png: string; file: string; columns: number; rows: number };
@@ -27,25 +28,8 @@ const docs = new Map<
 >();
 /** An opened picture view's drawing, by its Button's key. */
 const pictures = new Map<string, string>();
-const toasted = new Set<string>();
 let theme: Promise<string> | undefined;
 let termEnv: Promise<TermEnv> | undefined;
-let windowing: Promise<"macos" | "linux" | null> | undefined;
-let popover: { key: string; isOpen: boolean } | undefined;
-
-const messageOf = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
-const redraw = ($: EngineInterface) => $.ui.invalidate("ui.render");
-
-/** Shows `why` once a session, as hooks fail: the event it met passes on unchanged. */
-function failOnce($: EngineInterface, why: string) {
-  // A toast is one line: a cause written over several, as pele's parse errors are, is joined.
-  const text = `hold: ${why.replace(/\s+/g, " ").trim()}`;
-
-  if (toasted.has(text)) return;
-  toasted.add(text);
-  $.ui.toast(text);
-}
 
 async function hash(text: string): Promise<string> {
   const digest = new Uint8Array(
@@ -87,27 +71,6 @@ function pixelsHere(
   return termEnv.then((env) =>
     drawsPixels(env, viewport?.isFullscreen === true),
   );
-}
-
-/** Which system's program opens a picture in a window by the pointer; none over ssh. */
-function windowOf($: EngineInterface) {
-  windowing ??= (async () => {
-    if ((await $.env.get("SSH_CONNECTION")) || (await $.env.get("SSH_TTY")))
-      return null;
-    const os = (
-      await $.process.run(["uname", "-s"]).catch(() => undefined)
-    )?.stdout.trim();
-
-    if (os === "Darwin") return "macos";
-    if (os !== "Linux" || !(await $.env.get("DISPLAY"))) return null;
-    const tk = await $.process
-      .run(["python3", "-c", "import tkinter"])
-      .catch(() => undefined);
-
-    return tk?.exitCode === 0 ? "linux" : null;
-  })();
-
-  return windowing;
 }
 
 /**
@@ -175,57 +138,6 @@ function fit(box: Box, viewport: RenderViewport | undefined, inset = 4): Box {
   };
 }
 
-/**
- * Opens `file` in a borderless window by the pointer, or closes it when `key` has it open; the
- * program says `.` ten times a second, so the loop wakes to see a close and leaving it ends the
- * window. One that ends without saying `shown` opened none, which shows once.
- */
-function toggleWindow($: EngineInterface, key: string, file: string) {
-  const was = popover;
-
-  if (was) was.isOpen = false;
-  popover = undefined;
-  redraw($);
-  if (was?.key === key) return;
-  const me = { key, isOpen: true };
-
-  popover = me;
-  void (async () => {
-    const system = await windowOf($);
-    const env = {
-      IMAGE_PREVIEW_FILE: file,
-      IMAGE_PREVIEW_SIZE: "800",
-      IMAGE_PREVIEW_LIFE: "120",
-    };
-    let said = "";
-    let isShown = false;
-
-    try {
-      if (!system)
-        throw new Error("no window can open here (over ssh, or no desktop)");
-      const argv =
-        system === "macos"
-          ? ["osascript", "-l", "JavaScript", "-e", MACOS]
-          : ["python3", "-c", LINUX];
-
-      for await (const { text } of $.process.spawn({ argv, env })) {
-        if (said.length < 2000) said += text;
-        if (/^shown$/m.test(text)) isShown = true;
-        if (!me.isOpen) break;
-      }
-    } catch (err) {
-      said += messageOf(err);
-    }
-    if (popover === me) popover = undefined;
-    redraw($);
-    if (!isShown && me.isOpen)
-      failOnce(
-        $,
-        `the picture's window did not open: ${said.replace(/\.\n/g, "").trim().slice(0, 200) || "its program could not start"}`,
-      );
-  })();
-}
-
 /** A tool row with a [view] for each picture or markdown file its calls touched. */
 async function withViews(
   $: EngineInterface,
@@ -244,7 +156,7 @@ async function withViews(
     const kind = kindOf(path)!;
     const name = files.length === 1 ? "" : ` ${nameOf(path)}`;
     const isWindow = kind === "picture" && !pixels;
-    const isOpen = isWindow ? popover?.key === id : opened.has(id);
+    const isOpen = isWindow ? isWindowOpen(id) : opened.has(id);
 
     buttons.push(
       <Button
@@ -253,6 +165,8 @@ async function withViews(
         dimColor
         onPress={async () => {
           if (opened.delete(id)) return redraw($);
+          // Closing reads no file, so a picture moved since still closes.
+          if (isWindowOpen(id)) return closeWindow($);
           try {
             if (kind === "markdown") {
               docs.set(id, cleanMarkdown(await $.fs.read(path)));
@@ -265,7 +179,7 @@ async function withViews(
 
               if ("error" in d) throw new Error(d.error);
               pictures.set(id, key);
-              if (isWindow) return toggleWindow($, id, d.file);
+              if (isWindow) return toggleWindow($, id, d.file, d.png);
             }
             opened.add(id);
           } catch (err) {
@@ -323,6 +237,13 @@ const isDone = (c: {
 }) => !c.isRunning && !c.isErrored && !c.isInterrupted;
 
 export const register: Register = (on) => {
+  // A /clear ends the session and not the process: the window would outlive its button.
+  on("session.end", async ($, e, next) => {
+    closeWindow($);
+
+    return next(e);
+  });
+
   on("config.set", { key: "theme" }, async ($, e, next) => {
     const r = await next(e);
 
@@ -399,9 +320,9 @@ export const register: Register = (on) => {
             {window ? (
               <Button
                 key={open}
-                label={popover?.key === open ? "close" : "open"}
+                label={isWindowOpen(open) ? "close" : "open"}
                 dimColor
-                onPress={() => toggleWindow($, open, d.file)}
+                onPress={() => toggleWindow($, open, d.file, d.png)}
               />
             ) : null}
           </Box>,

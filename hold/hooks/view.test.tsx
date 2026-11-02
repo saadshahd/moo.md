@@ -146,10 +146,15 @@ function world(
   on: On,
   env: Record<string, string>,
   draw: { exitCode: number; stderr?: string } | "no bun" = { exitCode: 0 },
+  program: "beats" | "silent" | "exits" = "beats",
 ) {
   const runs: string[][] = [];
   const toasts: string[] = [];
-  const windows: { argv: string[]; isEnded: boolean }[] = [];
+  const windows: {
+    argv: string[];
+    env: Record<string, string>;
+    isEnded: boolean;
+  }[] = [];
   const clock = mock.clock(on);
 
   mock.env(on, env);
@@ -166,7 +171,9 @@ function world(
       ? '{"columns":40,"rows":10}'
       : e.argv[0] === "uname"
         ? "Darwin\n"
-        : "";
+        : e.argv[0] === "osascript"
+          ? JSON.stringify(POINTER)
+          : "";
     const failed = isDraw && draw !== "no bun" ? draw : { exitCode: 0, stderr: "" };
 
     return {
@@ -190,20 +197,22 @@ function world(
 
     return { value: undefined };
   });
-  on("process.spawn", async function* (_$, e) {
-    const w = { argv: [...e.argv], isEnded: false };
+  // A window program: it beats, goes quiet, or exits on its own (a click on it, Escape, its parent gone).
+  on("process.spawn", async function* (_$, e, next) {
+    const w = { argv: [...e.argv], env: { ...e.env }, isEnded: false };
 
     windows.push(w);
+    next.signal.addEventListener("abort", () => (w.isEnded = true));
     try {
       yield { stream: "stdout" as const, text: "shown\n" };
+      if (program === "exits") return { value: { code: 0, signal: null } };
       for (;;) {
-        await clock.sleep(100);
+        await (program === "silent" ? new Promise(() => {}) : clock.sleep(100));
         yield { stream: "stdout" as const, text: ".\n" };
       }
     } finally {
       w.isEnded = true;
     }
-
   });
   const drawn: string[] = [];
 
@@ -216,6 +225,14 @@ function world(
 
   return { runs, toasts, windows, clock, drawn };
 }
+
+/** The pointer on the button, on a 1440 by 900 point screen whose menu bar takes 25. */
+const POINTER = {
+  x: 300,
+  y: 200,
+  area: { x: 0, y: 25, width: 1440, height: 875 },
+  scale: 2,
+};
 
 const VIEWPORT = { columns: 100, rows: 40, isFullscreen: true };
 
@@ -329,44 +346,112 @@ test("without bun the reply passes on, and the toast names bun", async ($, on) =
   expect(w.toasts.join()).toMatch(/could not run bun.*https:\/\/bun\.sh/);
 });
 
-test("where the terminal draws no pixels, the diagram opens in a window by the pointer and closes on a second press", async ($, on) => {
-  const w = world(on, APPLE);
-  const ui = await reply($, REPLY);
-  const open = await settled(
-    async () =>
-      (await ui.findAll({ type: "Button" })).find(
-        (b) => b.props.label === "open",
-      ),
-    (x) => x !== undefined,
+/** Mounts the reply where no pixels draw, and the label of its first window button. */
+async function windowed($: Engine, text = REPLY) {
+  const ui = await reply($, text);
+  const buttons = await settled(
+    () => ui.findAll({ type: "Button" }),
+    (b) => b.length > 0 && b.every((x) => x.props.label === "open"),
   );
+  const label = async (key: string) => (await ui.find({ key }))?.props.label;
+
+  return { ui, keys: buttons.map((b) => b.props.key as string), label };
+}
+
+const windowsUp = (w: ReturnType<typeof world>, n: number) =>
+  settled(
+    async () => w.windows.length,
+    (x) => x === n,
+  );
+
+test("where the terminal draws no pixels, the diagram opens in a window under the pointer and closes on a second press", async ($, on) => {
+  const w = world(on, APPLE);
+  const { ui, keys, label } = await windowed($);
 
   expect(await ui.find({ type: "Image" })).toBeUndefined();
   expect(
     await ui.find({ type: "Text", text: "Mermaid diagram: flowchart LR" }),
   ).toBeDefined();
-  await ui.press({ key: open!.props.key as string });
-  await settled(
-    async () => w.windows.length,
-    (n) => n === 1,
-  );
-  expect(w.windows[0]!.argv.slice(0, 3)).toEqual([
-    "osascript",
-    "-l",
-    "JavaScript",
-  ]);
-  expect(
-    (await ui.findAll({ type: "Button" })).some(
-      (b) => b.props.label === "close",
-    ),
-  ).toBe(true);
-  await ui.press({ key: open!.props.key as string });
-  expect(w.windows[0]!.isEnded).toBe(false);
-  await w.clock.advance(100);
+  await ui.press({ key: keys[0]! });
+  await windowsUp(w, 1);
+  expect(w.windows[0]!.argv.slice(0, 3)).toEqual(["osascript", "-l", "JavaScript"]);
+  // The 1 by 1 pixel PNG at a scale of 2, in its 6 point border, its left edge at the pointer, 24 below.
+  expect(w.windows[0]!.env.HOLD_WINDOW_RECT).toBe("300 224 13 13");
+  expect(await label(keys[0]!)).toBe("close");
+  await ui.press({ key: keys[0]! });
   expect(w.windows[0]!.isEnded).toBe(true);
-  expect(
-    (await ui.findAll({ type: "Button" })).some((b) => b.props.label === "open"),
-  ).toBe(true);
+  expect(await label(keys[0]!)).toBe("open");
   await ui.unmount();
+});
+
+test("each open first ends every window open, of any session; a second window ends the first", async ($, on) => {
+  const w = world(on, APPLE);
+  const { ui, keys } = await windowed($, `${fence(FLOW)}\n\n${fence("pie")}`);
+  const pkills = () => w.runs.filter((r) => r[0] === "pkill");
+
+  await ui.press({ key: keys[0]! });
+  await windowsUp(w, 1);
+  expect(pkills()).toEqual([["pkill", "-f", "moo-hold-view-window"]]);
+  await ui.press({ key: keys[1]! });
+  await windowsUp(w, 2);
+  expect(w.windows.map((x) => x.isEnded)).toEqual([true, false]);
+  expect(pkills()).toHaveLength(2);
+  await ui.unmount();
+});
+
+test("a window program gone quiet still ends on the second press", async ($, on) => {
+  const w = world(on, APPLE, undefined, "silent");
+  const { ui, keys, label } = await windowed($);
+
+  await ui.press({ key: keys[0]! });
+  await windowsUp(w, 1);
+  await ui.press({ key: keys[0]! });
+  expect(w.windows[0]!.isEnded).toBe(true);
+  expect(await label(keys[0]!)).toBe("open");
+});
+
+test("the session ending, a /clear among its ways, ends the window", async ($, on) => {
+  const w = world(on, APPLE);
+  on("session.end", (_$, e) => ({ sessionId: e.sessionId }));
+  const { ui, keys } = await windowed($);
+
+  await ui.press({ key: keys[0]! });
+  await windowsUp(w, 1);
+  await $.session.end({ reason: "clear", sessionId: "s1" } as never);
+  await settled(
+    async () => w.windows[0]!.isEnded,
+    (x) => x,
+  );
+  expect(w.windows[0]!.isEnded).toBe(true);
+});
+
+test("a window lives two minutes at most, whatever its program does", async ($, on) => {
+  const w = world(on, APPLE, undefined, "silent");
+  const { ui, keys, label } = await windowed($);
+
+  await ui.press({ key: keys[0]! });
+  await windowsUp(w, 1);
+  expect(w.windows[0]!.env.HOLD_WINDOW_LIFE).toBe("120");
+  await w.clock.advance(119_000);
+  expect(w.windows[0]!.isEnded).toBe(false);
+  await w.clock.advance(1_000);
+  expect(w.windows[0]!.isEnded).toBe(true);
+  expect(await label(keys[0]!)).toBe("open");
+});
+
+test("a window its program closed (a click on it, Escape, its parent gone) reads [open] again, unannounced", async ($, on) => {
+  const w = world(on, APPLE, undefined, "exits");
+  const { ui, keys, label } = await windowed($);
+
+  await ui.press({ key: keys[0]! });
+  await windowsUp(w, 1);
+  expect(
+    await settled(
+      () => label(keys[0]!),
+      (x) => x === "open",
+    ),
+  ).toBe("open");
+  expect(w.toasts).toEqual([]);
 });
 
 type Node = { type: string; props?: Record<string, unknown>; children?: unknown[] };
