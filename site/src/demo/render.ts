@@ -15,21 +15,25 @@ export type Row = { segs: Seg[]; cls?: string; opt?: number; input?: number };
 type Cell = [string, string?];
 
 // ---- Wrapping ---------------------------------------------------------------
-// Greedy by words; a word longer than the width breaks at the edge. Matches the
-// recordings but for four rows (list items and a paragraph, at 45, 80 and 120)
-// that Claude Code broke a word early. Each would fill the width exactly, yet
-// other rows recorded filling it: no rule found.
+// Greedy by words; a word longer than the width breaks at the edge. As in
+// wrapInk, the space after a row that fills its width starts the next row, so
+// that row holds one column less; Claude Code then draws it without the space.
 function wrap(cs: Cell[], width: number, first = width): Cell[][] {
   const lines: Cell[][] = [];
   let line: Cell[] = [];
   let i = 0;
+  const room = () => {
+    const full = lines.length ? width : first;
+    const last = lines[lines.length - 1];
+    return last && last.length >= (lines.length > 1 ? width : first) ? full - 1 : full;
+  };
   while (i < cs.length) {
     while (i < cs.length && cs[i][0] === " ") i++;
     let j = i;
     while (j < cs.length && cs[j][0] !== " ") j++;
     if (i === j) break;
     const word = cs.slice(i, j);
-    if (line.length && line.length + 1 + word.length > (lines.length ? width : first)) {
+    if (line.length && line.length + 1 + word.length > room()) {
       lines.push(line);
       line = [];
     }
