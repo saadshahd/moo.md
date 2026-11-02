@@ -20,6 +20,12 @@ export const CAPTIONS: Record<string, string[]> = {
     "First: how many processes run the webhook? Only you know.",
     "The picked path, step by step, and the test to run next.",
   ],
+  consult: [
+    "Without moo: should we drop unit tests for end-to-end only?",
+    "Partly right; a contract test instead, and nothing changed.",
+    "Same session, now with moo.",
+    "Four calls, each with its reason; what \"pending\" becomes is yours.",
+  ],
   clarify: [
     "Without moo: add a retry, unsure about idempotency.",
     "Duplicates handled; the retry waits on a question.",
