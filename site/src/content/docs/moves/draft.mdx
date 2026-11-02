@@ -1,0 +1,13 @@
+---
+title: /draft
+move: builds something to react to
+description: Draft builds a small, real version first, then asks the choices it could not settle, each option shown as what it would build.
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { draftScene } from "../../../demo/scenes";
+
+<Demo
+  scene={draftScene}
+  summary="Claude Code. /hope:draft on what a deploy tool prints when a failed check blocks a deploy; today it only says 'deploy blocked'. While it works, one activity line shows at a time: it adds a formatter and runs it on real and edge-case data. Then a dialog asks three questions, and beside the options a box shows what the message prints for the option under the cursor. Skipped checks: failed only, as recommended. Error text: the first line only, with a note to skip a blank line or a stack frame. Links: each check and the run, as recommended. The reply shows the message built from those picks and run on the repo's CI data, tested on the real run and on blank, stack-frame and no-error cases, and a table of the smaller choices it made, each with when to pick otherwise."
+/>

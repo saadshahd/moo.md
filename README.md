@@ -4,7 +4,7 @@ Why introduce friction? Because **YOU** the human end up being the world model. 
 
 **moo/hope** doesn't build, and doesn't author your code, rules, or taste. It works alongside build tooling like [superpowers](https://github.com/obra/superpowers).
 
-One idea runs through every layer: **never delegate a decision.**
+One idea runs through every layer: **agents at the pace you think.**
 
 ## Installation (30-second setup)
 

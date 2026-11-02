@@ -1,0 +1,13 @@
+---
+title: /reduce
+move: cuts what can wait
+description: Reduce cuts what you don't have to say up front, and runs again until there is nothing left to cut.
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { reduceScene } from "../../../demo/scenes";
+
+<Demo
+  scene={reduceScene}
+  summary="Claude Code. You ask for a PR description for a cache change, for the reviewer who wrote the cache, and Claude writes a long one with What, Why, Cost and Tests sections. You type /reduce, and it rewrites the description in a few short paragraphs that keep the cost question for the reviewer. /reduce on that cuts it again, and a third run shortens its labels and keeps every fact."
+/>
