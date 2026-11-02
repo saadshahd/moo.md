@@ -59,7 +59,7 @@ bun -e "const r=(await import('<root>/lib/rules.ts')).parseRules(await Bun.file(
 ```
 
 - `bot`: the `name` that `token` prints, only where the factory acts as an App; left out, it acts as the user.
-- `trusted`: the logins intent named; never a bot.
+- `trusted`: the logins intent named; never a bot. Where the factory acts as the user, their `gh` login is among them, or the worker refuses to start.
 - `atOnce`, `waitsPerDay`: ask. Read the runbook and repo docs first: a figure they state is the answer, and the user is asked only for one nothing states. `contextCap` 300000 unless they name another; `paneEverySeconds` only if they name one.
 - `taste`: `CLAUDE.md`, `AGENTS.md` and any taste file they name. Put every rule those files state on one of the `layers`:
 

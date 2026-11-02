@@ -25,7 +25,7 @@ import {
 } from "./decide.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
 import { machineId, platformOf } from "./platform.ts";
-import { checksReason, loginRefusal } from "./guard.ts";
+import { checksReason, loginRefusal, userRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
 import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedByFactory } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
@@ -1787,6 +1787,15 @@ describe("the worker starts on any Claude setup and refuses only without one", (
     expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "third_party", "apiProvider": "bedrock"}', stderr: "" })).toBe("");
     expect(loginRefusal({ stdout: '{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}', stderr: "" })).toContain("claude auth login");
     expect(loginRefusal({ stdout: "", stderr: "unknown command" })).toContain("unknown command");
+  });
+});
+
+describe("a worker that acts as the user starts only as a login the rules trust", () => {
+  test("a trusted login starts; any other is refused, named, with how to fix it", () => {
+    expect(userRefusal(ME, [ME, "alice"])).toBe("");
+    expect(userRefusal("bob", [ME, "alice"])).toBe(
+      "gh is logged in as bob, whom the rules do not trust, so the factory's own comments as bob would never count. Add bob to the rules' trusted, or switch gh to a trusted login with `gh auth switch`.",
+    );
   });
 });
 

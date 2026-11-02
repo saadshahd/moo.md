@@ -2,7 +2,8 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Rules } from "../lib/rules.ts";
+import { must } from "../lib/github.ts";
+import { actorsOf, type Rules } from "../lib/rules.ts";
 import * as z from "../lib/vendor/zod-mini.js";
 import { botFor, type App } from "./app.ts";
 import { run } from "./proc.ts";
@@ -37,6 +38,13 @@ export function loginRefusal(r: { stdout: string; stderr: string }): string {
   return z.parse(AuthStatus, raw).loggedIn
     ? ""
     : "Claude Code has no login on this machine, so no run could start. Run `claude auth login`, or set up an API key.";
+}
+
+/** A factory that acts as the user writes as gh's `login`, and a factory comment counts only from a trusted login. */
+export function userRefusal(login: string, trusted: readonly string[]): string {
+  return trusted.includes(login)
+    ? ""
+    : `gh is logged in as ${login}, whom the rules do not trust, so the factory's own comments as ${login} would never count. Add ${login} to the rules' trusted, or switch gh to a trusted login with \`gh auth switch\`.`;
 }
 
 const BranchRules = z.array(
@@ -140,14 +148,20 @@ export async function guard(
 ): Promise<{ refusals: string[]; warnings: string[] }> {
   const user = await settings(join(homedir(), ".claude", "settings.json"));
 
-  /** A factory that acts as the user needs no App. */
-  const bot = app === null ? "" : await botFor(app, repo).then(
-    (b) =>
-      b.name === rules.bot
-        ? ""
-        : `the App acts as ${b.name}, but the rules file names ${rules.bot}`,
-    (err: Error) => `the factory's GitHub App can't act on ${repo}: ${err.message}`,
-  );
+  /** Who the factory writes as: gh's login where it acts as the user, needing no App, else the App's bot. */
+  const actor =
+    app === null
+      ? await must(run, ["gh", "api", "user", "--jq", ".login"]).then(
+          (login) => userRefusal(login.trim(), actorsOf(rules, repo).trusted),
+          (err: Error) => `gh can't say whom it is logged in as: ${err.message}`,
+        )
+      : await botFor(app, repo).then(
+          (b) =>
+            b.name === rules.bot
+              ? ""
+              : `the App acts as ${b.name}, but the rules file names ${rules.bot}`,
+          (err: Error) => `the factory's GitHub App can't act on ${repo}: ${err.message}`,
+        );
 
   /** Drafts never arm auto-merge: the person who merges each one checks it. */
   const checks = rules.pr?.draft ? null : checksReason(repo, base, await branchReads(repo, base));
@@ -159,7 +173,7 @@ export async function guard(
         ? ""
         : "the factory plugin is not installed and enabled for your user, so runs load no factory hooks. Install it with /plugin.",
       checks?.kind === "refusal" ? checks.text : "",
-      bot,
+      actor,
     ].filter((r) => r !== ""),
     warnings: checks?.kind === "warning" ? [checks.text] : [],
   };
