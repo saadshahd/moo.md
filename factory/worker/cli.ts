@@ -132,12 +132,14 @@ export function prBody(text: string, issue: number, seal: string): string {
 /**
  * Refuses a branch that changes what only a person changes, naming each such path. A rename
  * counts as its two paths, so a file moved out of a guarded folder counts, and `-z` prints each
- * path as it is, where git would quote one with an unusual character.
+ * path as it is, where git would quote one with an unusual character. `--no-relative` lists the
+ * whole repo from the root, from any folder, whatever git's `diff.relative` says.
  */
 async function refuseGuarded(cwd: string): Promise<void> {
   const sh = async (...argv: string[]) => (await must(run, argv, { cwd })).trim();
   const base = await sh("git", "rev-parse", "--abbrev-ref", "origin/HEAD");
-  const guarded = guardedIn((await sh("git", "diff", "--name-only", "--no-renames", "-z", `${base}...HEAD`)).split("\0"));
+  const argv = ["git", "diff", "--name-only", "--no-renames", "--no-relative", "-z", `${base}...HEAD`];
+  const guarded = guardedIn((await sh(...argv)).split("\0"));
 
   if (guarded.length > 0)
     throw new Refusal(`the branch changes ${guarded.join(", ")}, which only a person changes; take those changes out`, 4);

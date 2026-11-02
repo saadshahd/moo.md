@@ -1232,6 +1232,27 @@ describe("the PR a run opens", () => {
     await expect(pushBranch(dir, 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
     await rm(root, { recursive: true });
   });
+  test("push refuses a guarded path from a subfolder, where git's diff.relative would hide it", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir] = [join(root, "origin.git"), join(root, "w")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+    await mkdir(join(dir, "src"));
+    await mkdir(join(dir, ".github", "workflows"), { recursive: true });
+    await Bun.write(join(dir, "src", "a.ts"), "export {};\n");
+    await Bun.write(join(dir, ".github", "workflows", "ci.yml"), "on: push\n");
+    await git("add", ".");
+    await git("commit", "-q", "-m", "work");
+    await git("config", "diff.relative", "true");
+
+    await expect(pushBranch(join(dir, "src"), 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
+    await rm(root, { recursive: true });
+  });
   test("pr refuses with exit 4 while its body file is missing or blank, naming the file", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-pr-"));
     const refused = { code: 4, message: expect.stringContaining(PR_PATH) };
