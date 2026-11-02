@@ -399,11 +399,29 @@ const user = (text: string, cols: number): Row[] =>
  * a summary that fills its last row pushes that space onto a row of its own
  * (router at 45). */
 const tools = (summary: string, cols: number): Row[] => {
+  const at = summary.indexOf(" [ view ");
+  if (at >= 0 && !summary.endsWith(" [ view ]")) return [...counts(summary.slice(0, at), cols), ...files(summary.slice(at), cols)];
   const view = summary.endsWith(" [ view ]");
   const rows = counts(view ? summary.slice(0, -" [ view ]".length) : summary, cols);
   const full = rows.length > 0 && rows[rows.length - 1].segs.map((s) => s[0]).join("").length >= cols;
   return [...rows, ...(view && full ? [BLANK] : []),
     ...(view ? [{ segs: [["  "], ["[ view ]", "g b"]] } as Row] : [])];
+};
+/** Links to the files a turn wrote, "[ view <file> ]", bold grey, on one row
+ * under the summary. Claude Code draws the links that do not fit as a strip
+ * down the right edge over the rows below (compose); that strip is a layout
+ * glitch and is left out, as are links the recording cut. */
+const files = (links: string, cols: number): Row[] => {
+  const segs: Seg[] = [["  "]];
+  let used = 2;
+  for (const link of links.match(/\[ view [^\]]+ \]/g) ?? []) {
+    const gap = used > 2 ? 1 : 0;
+    if (used + gap + link.length > cols) break;
+    if (gap) segs.push([" "]);
+    segs.push([link, "g b"]);
+    used += gap + link.length;
+  }
+  return used > 2 ? [{ segs }] : [];
 };
 const counts = (summary: string, cols: number): Row[] =>
   wrap(
@@ -1199,16 +1217,14 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
     // Half a row of space under each description, the user's choice for the
     // site: Claude Code draws none. fit() counts it against the row budget.
     ...q.options.flatMap((o, i) => {
+      // A label too wide for its row wraps under itself (compose at 45).
       const rows: Row[] = [
-        {
-          segs: [
-            cur(i),
-            [`${i + 1}.`, "g"],
-            [" "],
-            ...box(m.ticked.includes(i)),
-            [o.label, m.cursor === i ? "l" : undefined],
-          ],
-        },
+        ...lead(
+          [cur(i), [`${i + 1}.`, "g"], [" "], ...box(m.ticked.includes(i))],
+          [[" ".repeat(indent)]],
+          plain(o.label, m.cursor === i ? "l" : undefined),
+          cols - indent,
+        ),
         ...lead(
           [[" ".repeat(indent)]],
           [[" ".repeat(indent)]],

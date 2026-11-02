@@ -53,3 +53,5 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-taskline/747b138f-f11a-4616
   --keys "$R/rec5/router/keylog.json" --raw "$OUT/router.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-termsync/42cfda2b-6840-4032-b84c-cb9a2035785a.jsonl" /Users/Shared/termsync "$R/rec5/target" ../src/demo/sessions/target.ts 1=1a6l0p3.1134 2=1dzl6pk.1760 \
   --keys "$R/rec5/target/keylog.json" --raw "$OUT/target.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-agentdesk/da6d1f7c-8940-4ebc-83a2-81e3bb31eb11.jsonl" /Users/Shared/agentdesk "$R/rec5/compose" ../src/demo/sessions/compose.ts  \
+  --keys "$R/rec5/compose/keylog.json" --raw "$OUT/compose.json" --activity-from-snaps

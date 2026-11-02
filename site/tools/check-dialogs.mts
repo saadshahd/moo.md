@@ -2,7 +2,8 @@
 // notes typed, or its review screen, at 45, 80 and 120 columns) against the
 // demo's rows below the transcript at that moment, text only.
 // Usage: check-dialogs.mts
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { same, stripAt, unstrip } from "./strip.mts";
 import { homedir } from "node:os";
 import * as S from "../src/demo/scenes.ts";
 import { frame, phases, KEYCAPS, ROWS } from "../src/demo/render.ts";
@@ -21,6 +22,7 @@ const takes: [string, Scene, string][] = [
   ["deepen", S.deepenScene, "rec5/deepen"],
   ["router", S.routerScene, "rec5/router"],
   ["target", S.targetScene, "rec5/target"],
+  ["compose", S.composeScene, "rec5/compose"],
 ];
 const text = (r: Row) => r.segs.map((s: Seg) => s[0]).join("").replace(/\xa0/g, " ").trimEnd();
 let total = 0;
@@ -66,8 +68,11 @@ for (const [name, scene, dir] of takes) {
       .split("\n")
       .map((l) => l.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\xa0/g, " ").trimEnd());
     while (cap.length && !cap[cap.length - 1]) cap.pop();
-    const tail = cap.slice(-ours.length);
-    const diffs = ours.flatMap((o, k) => (o === tail[k] ? [] : [k]));
+    // The view-link strip, at the column the tall capture of that width shows.
+    const tall = `${R}/${dir}/tall-${m[5]}.ansi`;
+    const strip = existsSync(tall) ? stripAt(readFileSync(tall, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").trimEnd()), +m[5]) : undefined;
+    const tail = unstrip(cap, +m[5], strip).slice(-ours.length);
+    const diffs = ours.flatMap((o, k) => (same(o, tail[k] ?? "") ? [] : [k]));
     total++;
     if (!diffs.length) continue;
     bad++;
