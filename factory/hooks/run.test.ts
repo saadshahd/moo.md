@@ -1,6 +1,6 @@
 import type { ToolCallInput } from "claude-code";
 import { describe, expect, test, type Engine } from "claude-code/testing";
-import { gitConfigEnv } from "../lib/bot.ts";
+import { gitConfigEnv } from "../lib/git.ts";
 import { parse, render, type Answer, type FactoryComment } from "../lib/formats.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
 import { unseenNotes } from "./notes.ts";
@@ -14,6 +14,9 @@ const RULES = JSON.stringify({
   taste: [],
   layers: { check: [], plan: [], judge: [], none: [] },
 });
+
+/** Rules that name no bot: the factory acts as the user. */
+const AS_USER = JSON.stringify({ ...JSON.parse(RULES), bot: undefined });
 
 const SEAL = "0123456789abcdef".repeat(4);
 const T0 = Date.parse("2026-10-26T10:00:00Z");
@@ -32,6 +35,8 @@ type Fake = {
   token?: string | null;
   agents?: boolean;
   posts?: boolean;
+  /** The session's own environment, before any hook sets a variable. */
+  own?: Record<string, string>;
 };
 
 /** A comment as GitHub's GraphQL API lists it: a bot by its slug, without `[bot]`. */
@@ -59,6 +64,7 @@ function host($: Engine, on: any, fake: Fake = {}) {
     token: BOT,
     agents: true,
     posts: true,
+    own: {},
     ...fake,
   };
 
@@ -188,6 +194,8 @@ function host($: Engine, on: any, fake: Fake = {}) {
     return { value: {} };
   });
 
+  on("env.get", async (_$: any, e: any) => ({ value: env.has(e.name) ? env.get(e.name) : f.own[e.name] }));
+
   on("ui.toast", async (_$: any, e: any) => {
     toasts.push(e.text);
 
@@ -227,6 +235,7 @@ function host($: Engine, on: any, fake: Fake = {}) {
     count: (cmd: string) => calls.filter((c) => c === cmd).length,
     mints: () => calls.filter((c) => c.startsWith("bun ")).length,
     noToken: () => void (f.token = null),
+    rulesAre: (text: string) => void (f.rules = text),
     file: (path: string, text: string) => void files.set(path, text),
     tick: (ms: number) => void (now += ms),
     tool: (result: () => any) => void (core = result),
@@ -278,6 +287,14 @@ describe("which session is a run", () => {
     expect(r.text).toBe("answered");
     expect([...h.env.keys()]).toEqual([]);
     expect(h.mints()).toBe(0);
+  });
+
+  test("acting as the user, a factory branch that can't tell keeps the user's login and shows why once", async ($, on) => {
+    const h = host($, on, { agents: false, rules: AS_USER });
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    expect([...h.env.keys()]).toEqual([]);
+    expect(h.toasts.length).toBe(1);
   });
 
   test("the run is resolved once a session", async ($, on) => {
@@ -552,6 +569,49 @@ describe("bot", () => {
     expect(h.env.get("GIT_AUTHOR_NAME")).toBe("moo-factory[bot]");
     expect(h.env.get("GIT_CONFIG_VALUE_1")).toBe("!gh auth git-credential");
     expect(h.mints()).toBe(1);
+  });
+
+  test("a run whose rules name no bot keeps the user's login, mints nothing and hears nothing of it", async ($, on) => {
+    const h = host($, on, { rules: AS_USER });
+    h.tool(() => ({ result: {} }));
+    const r: any = await h.call(read);
+    expect([...h.env.keys()]).toEqual([]);
+    expect(h.mints()).toBe(0);
+    expect((r.context ?? []).join("\n")).not.toContain("no GitHub login");
+  });
+
+  test("acting as the user, a run that lost its login while the rules were unreadable gets its own back once they read again", async ($, on) => {
+    const h = host($, on, { rules: "{", token: null, own: { GH_TOKEN: "gho_own" } });
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
+    h.rulesAre(AS_USER);
+    await h.call(read);
+    expect(h.env.get("GH_TOKEN")).toBe("gho_own");
+    expect(h.env.get("GH_CONFIG_DIR")).toBeUndefined();
+  });
+
+  test("acting as the user, a session that lost its login while it could tell neither its run nor its rules gets it back once the rules read", async ($, on) => {
+    const h = host($, on, { rules: "{", agents: false, own: { GH_TOKEN: "gho_own" } });
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
+    h.rulesAre(AS_USER);
+    await h.call(read);
+    expect(h.env.get("GH_TOKEN")).toBe("gho_own");
+    expect(h.env.get("GH_CONFIG_DIR")).toBeUndefined();
+  });
+
+  test("acting as the user, a run that took the bot's login while the rules were unreadable commits as itself again", async ($, on) => {
+    const h = host($, on, { rules: "{" });
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    expect(h.env.get("GIT_AUTHOR_NAME")).toBe("moo-factory[bot]");
+    h.rulesAre(AS_USER);
+    await h.call(read);
+    expect(h.env.get("GIT_AUTHOR_NAME")).toBeUndefined();
+    expect(h.env.get("GIT_COMMITTER_EMAIL")).toBeUndefined();
+    expect(h.env.get("GH_TOKEN")).toBeUndefined();
   });
 
   test("a token near expiry is renewed", async ($, on) => {

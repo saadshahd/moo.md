@@ -10,15 +10,10 @@ import { approved, notes } from "../lib/wait.ts";
 import type { Action, World } from "./decide.ts";
 import { run } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
+import { runFlags } from "./settings.ts";
 import { sessionFacts, worktrees, type Ctx } from "./snapshot.ts";
 
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
-
-/**
- * A project's own settings may name an editor that waits for a window (`code --wait`); a run
- * has none, so its `git merge` would wait for good. `--settings` outranks project settings.
- */
-const RUN_SETTINGS = JSON.stringify({ env: { GIT_EDITOR: "true" } });
 
 export const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
 
@@ -155,14 +150,12 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
     base: ctx.base,
   });
 
-  const flags = ["--permission-mode", "bypassPermissions", "--settings", RUN_SETTINGS];
-  await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...flags, prompt], { cwd });
+  await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...runFlags(CLI), prompt], { cwd });
 }
 
 /**
- * Merges the base into PR `pr`'s branch on GitHub, as the bot, only while its head is still
- * `head`. A head that moved since the snapshot is GitHub's 422, and no failure: the next tick
- * reads the new one.
+ * Merges the base into PR `pr`'s branch on GitHub only while its head is still `head`. A head
+ * that moved since the snapshot is GitHub's 422, and no failure: the next tick reads the new one.
  */
 async function updateBranch(ctx: Ctx, n: number, pr: number, head: string): Promise<boolean> {
   const r = await run(["gh", "api", "-X", "PUT", `repos/${ctx.repo}/pulls/${pr}/update-branch`,

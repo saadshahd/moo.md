@@ -5,7 +5,8 @@ import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { PLAN_PATH, PR_PATH, planGaps } from "../lib/plan.ts";
 import { LABEL, UNDO_LABEL, type Check, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
-import { prBody, prCreate, prMerge, prText, seal } from "./cli.ts";
+import { prBody, prCreate, prMerge, prText, pushBranch, seal } from "./cli.ts";
+import { runFlags } from "./settings.ts";
 import {
   actionsFor,
   classify,
@@ -24,16 +25,18 @@ import {
 } from "./decide.ts";
 import { runPrompt, type RunInput } from "./prompt.ts";
 import { machineId, platformOf } from "./platform.ts";
-import { checksReason, loginRefusal } from "./guard.ts";
+import { checksReason, loginRefusal, userRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
-import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedBy } from "../lib/rules.ts";
+import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedByFactory } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
+import { actorChange, tick } from "./main.ts";
+import { createAppAuth } from "./vendor/auth-app.js";
 import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
-import { gitConfigEnv } from "../lib/bot.ts";
+import { gitConfigEnv } from "../lib/git.ts";
 import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -137,6 +140,7 @@ const world = (
   rules: RULES,
   local,
   claimedHere: new Set(),
+  claimedPrs: new Map(),
   foreign: [],
   ...more,
 });
@@ -554,7 +558,7 @@ describe("an open PR GitHub can't merge as it stands", () => {
 
     const message = actions.flatMap((a) => (a.kind === "wake" ? [a.message] : [])).join("");
 
-    for (const s of ["git merge origin/factory/7", "git merge origin/main", "never rebase or force-push", "run the checks", "push"])
+    for (const s of ["git merge origin/factory/7", "git merge origin/main", "never rebase or force-push", "run the checks", "the factory's `push`"])
       expect(message).toContain(s);
     expect(message.indexOf("origin/factory/7")).toBeLessThan(message.indexOf("origin/main"));
   });
@@ -643,7 +647,8 @@ describe("a review on an open PR", () => {
       "never rebase or force-push",
     ])
       expect(message).toContain(s);
-    expect(message).toMatch(/push, then reply once on the PR .*with what changed and what was left\.$/);
+    expect(message).not.toContain("gh pr comment");
+    expect(message).toMatch(/push with the factory's `push`, then post the handoff: what changed and what was left\.$/);
   });
   test("an approval, a stranger's, an empty one, or one already woken for never wakes it", () => {
     for (const w of [
@@ -751,7 +756,7 @@ describe("killing an issue closes its PR", () => {
   });
 });
 
-describe("only a person changes the factory's rules", () => {
+describe("only a person changes the factory's rules and the repo's workflows", () => {
   const touching = (files: string[] | null, author = BOT) => ({ ...pr(7), author, files });
 
   const at = (files: string[] | null, runs = [session("working")]) =>
@@ -760,19 +765,56 @@ describe("only a person changes the factory's rules", () => {
   test("a run's open PR that changes the rules file is closed and the issue marked stuck, the run stopped first, even mid-work", () => {
     const { state, actions } = step(at(["src/a.ts", RULES_PATH]));
 
-    expect(state).toEqual({ kind: "rulesChanged", pr: 57 });
+    expect(state).toEqual({ kind: "guardedChanged", pr: 57, files: [RULES_PATH] });
     expect(occupies(state)).toBe(false);
     expect(kinds(actions)).toEqual(["stop", "closePr", "markStuck"]);
     expect(actions[1]).toMatchObject({ pr: 57, reason: expect.stringContaining(RULES_PATH) });
+  });
+  test("so is one that changes a workflow, which CI runs with the repo's secrets", () => {
+    const { state, actions } = step(at(["src/a.ts", ".github/workflows/ci.yml"]));
+
+    expect(state).toEqual({ kind: "guardedChanged", pr: 57, files: [".github/workflows/ci.yml"] });
+    expect(stateLine(state)).toBe("PR #57 changes .github/workflows/ci.yml, which only a person changes");
+    expect(actions[1]).toMatchObject({ reason: expect.stringContaining(".github/workflows/ci.yml") });
   });
   test("a PR leaving the rules file alone, or listing more files than one page, goes on", () => {
     expect(step(at(["src/a.ts"])).state.kind).toBe("working");
     expect(step(at(null)).state.kind).toBe("working");
   });
-  test("the bot's PR with no worktree here closes when it changes the rules, whatever its issue says", () => {
-    const w = world(snapshot({ issues: [issue(7)], open: [touching([RULES_PATH])] }), []);
+  test("a factory PR with no worktree here closes when it changes the rules, then its live issue is marked stuck", () => {
+    const at = (issues: Issue[]) => prsToClose(world(snapshot({ issues, open: [touching([RULES_PATH])] }), []));
+    const close = { kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining(RULES_PATH) };
 
-    expect(prsToClose(w)).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining(RULES_PATH) }]);
+    expect(at([issue(7)])).toEqual([[close, { kind: "markStuck", issue: 7, reason: `its PR #57 changed ${RULES_PATH}` }]]);
+    expect(at([])).toEqual([[close]]);
+    expect(at([issue(7, { labels: ["factory", STUCK_LABEL] })])).toEqual([[close]]);
+  });
+  test("its issue never starts again in the tick that marks it stuck", () => {
+    const gh = snapshot({ issues: [issue(7)], claimed: new Set([7]), open: [touching([RULES_PATH])] });
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]) })).flat().map((a) => a.kind)).toEqual(["closePr", "markStuck"]);
+  });
+  test("a tick that closed the PR and failed or ended before the stuck mark: the next one marks the issue stuck, never resumes it", () => {
+    const gh = snapshot({ issues: [issue(7)], claimed: new Set([7]) });
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" } as const;
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]), claimedPrs: new Map([[7, closed]]) }))).toEqual([
+      [{ kind: "markStuck", issue: 7, reason: "its PR #57 was closed without merging" }],
+    ]);
+  });
+  test("once a person retries it, it resumes, and a run that stops before a new PR is no closed PR's", () => {
+    const stuck = posted({ kind: "stuck", issue: 7, reason: `its PR #57 changed ${RULES_PATH}` }, "2026-10-26T09:30:00Z");
+    const retried = issue(7, { comments: [stuck] });
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" } as const;
+    const gh = snapshot({ issues: [retried], claimed: new Set([7]) });
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]), claimedPrs: new Map([[7, closed]]) }))).toEqual([
+      [{ kind: "start", issue: 7, restart: null, after: null }],
+    ]);
+
+    const resumed = world(snapshot({ issues: [retried], prs: new Map([[7, pr(7, closed)]]) }), [here(7, [session("done")])]);
+
+    expect(step(resumed).state.kind).toBe("crashed");
   });
 });
 
@@ -781,15 +823,22 @@ describe("an issue that ends with no worktree here still closes its PR", () => {
   const at = (issues: Issue[], more: Partial<World> = {}, author = BOT) => prsToClose(world(snapshot({ issues, open: [open(author)] }), [], more));
 
   test("closed, unlabelled or no longer trusted, its open PR closes, saying why", () => {
-    expect(at([])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]);
-    expect(at([issue(7, { editor: "stranger" })])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("does not trust") }]);
+    expect(at([])).toEqual([[{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]]);
+    expect(at([issue(7, { editor: "stranger" })])).toEqual([[{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("does not trust") }]]);
   });
-  test("a stuck or live issue keeps its PR, as does a PR the bot never opened or one a worktree here watches", () => {
+  test("a stuck or live issue keeps its PR, as does a PR the factory never opened or one a worktree here watches", () => {
     expect(at([issue(7, { labels: ["factory", STUCK_LABEL] })])).toEqual([]);
     expect(at([issue(7)])).toEqual([]);
     expect(at([], {}, ME)).toEqual([]);
+    expect(at([], {}, "stranger")).toEqual([]);
     expect(at([], { local: [here(7)] })).toEqual([]);
     expect(at([], { foreign: [7] })).toEqual([]);
+  });
+  test("a factory that acts as the user closes the PRs a trusted login opened, and no one else's", () => {
+    const asUser = { actors: { bot: null, trusted: [ME] } };
+
+    expect(at([], asUser, ME)).toEqual([[{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]]);
+    expect(at([], asUser, "stranger")).toEqual([]);
   });
   test("decide closes it in a group of its own", () => {
     expect(decide(world(snapshot({ open: [open()] }), []))).toEqual([[expect.objectContaining({ kind: "closePr", pr: 57 })]]);
@@ -1085,6 +1134,13 @@ describe("run prompt", () => {
     expect(p).not.toContain("never holds the merge");
     expect(p).toContain(`Once the PR is open, after 2 failed fixes of the same failure, run \`${usage(base.cli).stuck}\``);
   });
+  test("the run pushes only through push, never with git push", () => {
+    const p = runPrompt(base);
+
+    expect(p).toContain(`Commit as you go, and run \`${usage(base.cli).push}\` to push`);
+    expect(p).toContain("never `git push`");
+    expect(p.indexOf(usage(base.cli).push)).toBeLessThan(p.indexOf(usage(base.cli).handoff));
+  });
   test("where the project's own rules say to stop and wait, the run asks with AskUserQuestion", () => {
     expect(runPrompt(base)).toContain("Where the project's own rules say to stop and wait for a person, ask with AskUserQuestion instead");
   });
@@ -1111,6 +1167,26 @@ describe("seal", () => {
   });
 });
 
+describe("how a run starts", () => {
+  const flags = runFlags("bun /f/worker/cli.ts");
+  const settings = JSON.parse(flags[flags.indexOf("--settings") + 1]!);
+
+  test("in auto mode, never bypassing permissions", () => {
+    expect(flags.slice(0, 2)).toEqual(["--permission-mode", "auto"]);
+    expect(flags.join(" ")).not.toContain("bypassPermissions");
+  });
+  test("every shell command reaches the classifier, and no tool writes to GitHub but the factory's commands", () => {
+    expect(settings.autoMode.classifyAllShell).toBe(true);
+    expect(settings.permissions.deny).toEqual(expect.arrayContaining(["Bash(git push *)", "Bash(gh auth *)", "Bash(gh issue *)", "Bash(gh api *)"]));
+    expect(settings.autoMode.allow[0]).toBe("$defaults");
+    expect(settings.autoMode.allow).toContainEqual(expect.stringContaining("bun /f/worker/cli.ts plan, call, handoff, push, pr, stuck"));
+    expect(settings.autoMode.hard_deny[0]).toBe("$defaults");
+  });
+  test("with no editor to wait for, and git reaching GitHub through gh's login", () => {
+    expect(settings.env).toEqual({ GIT_EDITOR: "true", ...gitConfigEnv() });
+  });
+});
+
 describe("the PR a run opens", () => {
   const h = (draft?: boolean) => ({ repo: "o/r", issue: 7, rules: draft === undefined ? RULES : { ...RULES, pr: { draft } } });
 
@@ -1127,6 +1203,78 @@ describe("the PR a run opens", () => {
     expect(prCreate(h(false), "Add due dates", "body")).not.toContain("--draft");
     expect(prMerge(h(true), "https://github.com/o/r/pull/9")).toBe(null);
     expect(prMerge(h(), "https://github.com/o/r/pull/9")).toEqual(["gh", "pr", "merge", "https://github.com/o/r/pull/9", "--auto", "--squash"]);
+  });
+  test("push sends the branch to its own name on origin, and refuses one that changes a path only a person changes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir] = [join(root, "origin.git"), join(root, "w")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+    await Bun.write(join(dir, "src.ts"), "export {};\n");
+    await git("add", "src.ts");
+    await git("commit", "-q", "-m", "work");
+
+    expect(await pushBranch(dir, 7)).toBe("pushed factory/7");
+    expect((await gitIn(origin, "rev-parse", "factory/7")).trim()).toBe((await git("rev-parse", "HEAD")).trim());
+
+    await mkdir(join(dir, ".github", "workflows"), { recursive: true });
+    await Bun.write(join(dir, ".github", "workflows", "ci.yml"), "on: push\n");
+    await git("add", ".github");
+    await git("commit", "-q", "-m", "ci");
+
+    await expect(pushBranch(dir, 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
+    expect((await gitIn(origin, "rev-parse", "factory/7")).trim()).not.toBe((await git("rev-parse", "HEAD")).trim());
+    await rm(root, { recursive: true });
+  });
+  test("push refuses a workflow whose name git would quote, and one moved out of the workflows folder", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir] = [join(root, "origin.git"), join(root, "w")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await mkdir(join(dir, ".github", "workflows"), { recursive: true });
+    await Bun.write(join(dir, ".github", "workflows", "ci.yml"), "on: push\n");
+    await git("add", ".github");
+    await git("commit", "-q", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+
+    await Bun.write(join(dir, ".github", "workflows", "déploy.yml"), "on: push\n");
+    await git("add", ".github");
+    await git("commit", "-q", "-m", "deploy");
+    await expect(pushBranch(dir, 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/déploy.yml") });
+
+    await git("reset", "-q", "--hard", "origin/main");
+    await git("mv", ".github/workflows/ci.yml", "ci.yml");
+    await git("commit", "-q", "-m", "move");
+    await expect(pushBranch(dir, 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
+    await rm(root, { recursive: true });
+  });
+  test("push refuses a guarded path from a subfolder, where git's diff.relative would hide it", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir] = [join(root, "origin.git"), join(root, "w")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+    await mkdir(join(dir, "src"));
+    await mkdir(join(dir, ".github", "workflows"), { recursive: true });
+    await Bun.write(join(dir, "src", "a.ts"), "export {};\n");
+    await Bun.write(join(dir, ".github", "workflows", "ci.yml"), "on: push\n");
+    await git("add", ".");
+    await git("commit", "-q", "-m", "work");
+    await git("config", "diff.relative", "true");
+
+    await expect(pushBranch(join(dir, "src"), 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
+    await rm(root, { recursive: true });
   });
   test("pr refuses with exit 4 while its body file is missing or blank, naming the file", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-pr-"));
@@ -1186,17 +1334,17 @@ describe("smoke run 1 (saadshahd/factory-smoke, 2026-10-27)", () => {
 });
 
 describe("proc", () => {
-  test("a child sees the environment as it is now, so the worker's commands act as the bot", async () => {
-    process.env.FACTORY_PROC_PROBE = "bot";
+  test("a child sees the environment as it is now, so the worker's commands take the git config it set", async () => {
+    process.env.FACTORY_PROC_PROBE = "set";
     const r = await run(["sh", "-c", "echo $FACTORY_PROC_PROBE"]);
     delete process.env.FACTORY_PROC_PROBE;
 
-    expect(r.stdout.trim()).toBe("bot");
+    expect(r.stdout.trim()).toBe("set");
   });
 });
 
 describe("git under the factory's git config", () => {
-  /** Real git, given the config through the environment the way the worker and the run hooks give it. */
+  /** Real git, given the config through the environment the way the worker and its runs get it. */
   const git = async (...argv: string[]) =>
     (await new Response(Bun.spawn(["git", ...argv], { cwd: tmpdir(), env: { ...process.env, ...gitConfigEnv() }, stdout: "pipe" }).stdout).text()).trim();
 
@@ -1569,8 +1717,8 @@ describe("platform", () => {
   });
 });
 
-describe("rules the bot's own PR changed stop the worker", () => {
-  test("the newest commit to the rules file is asked for its PRs: the bot's names its PR, a person's or none is null", async () => {
+describe("rules a factory PR changed stop the worker", () => {
+  test("the newest commit to the rules file is asked for its PRs: one from a factory branch names its PR, another or none is null", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-rules-by-"));
     const git = (...a: string[]) => gitIn(dir, ...a);
     await git("init", "-q", "-b", "main");
@@ -1592,11 +1740,39 @@ describe("rules the bot's own PR changed stop the worker", () => {
       return { exitCode: 0, stdout: JSON.stringify(pulls), stderr: "" };
     };
 
-    expect(await rulesChangedBy(github([{ number: 12, user: { login: BOT } }]), dir, "o/r", BOT)).toBe(12);
-    expect(await rulesChangedBy(github([{ number: 13, user: { login: ME } }]), dir, "o/r", BOT)).toBe(null);
-    expect(await rulesChangedBy(github([]), dir, "o/r", BOT)).toBe(null);
+    expect(await rulesChangedByFactory(github([{ number: 12, head: { ref: "factory/7" } }]), dir, "o/r")).toBe(12);
+    expect(await rulesChangedByFactory(github([{ number: 13, head: { ref: "tighten-rules" } }]), dir, "o/r")).toBe(null);
+    expect(await rulesChangedByFactory(github([]), dir, "o/r")).toBe(null);
     expect(asked).toEqual(Array(3).fill(`repos/o/r/commits/${rules}/pulls`));
     await rm(dir, { recursive: true });
+  });
+});
+
+describe("a worker that acts as an App", () => {
+  test("renews the App's token before its first fetch, so a token that expired while the machine slept fails no tick", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "factory-tick-"));
+    await gitIn(dir, "init", "-q", "-b", "main");
+
+    /** An App whose key can't sign: its mint fails at once, before any request, and the repo has no origin to fetch. */
+    const app = createAppAuth({ appId: "1", privateKey: "no key" });
+    const ticked = tick({ app, dir, repo: "o/r", base: "main", machine: "m" }, platformOf("linux")!);
+
+    await expect(ticked).rejects.toMatchObject({ message: expect.not.stringContaining("git fetch") });
+    await rm(dir, { recursive: true });
+  });
+});
+
+describe("who the worker acts as is set at its start", () => {
+  const asUser: Rules = { ...RULES, bot: undefined };
+
+  test("rules that still name who it acts as let it go on", () => {
+    expect(actorChange(RULES, BOT)).toBeNull();
+    expect(actorChange(asUser, null)).toBeNull();
+  });
+  test("rules that name another bot, a bot where it acts as the user, or none where it acts as a bot stop its ticks", () => {
+    expect(actorChange({ ...RULES, bot: "other[bot]" }, BOT)).toBe(`the rules now name the bot other[bot], not ${BOT}; restart the worker`);
+    expect(actorChange(RULES, null)).toBe(`the rules now name the bot ${BOT}; restart the worker`);
+    expect(actorChange(asUser, BOT)).toBe("the rules no longer name a bot; restart the worker");
   });
 });
 
@@ -1634,6 +1810,15 @@ describe("the worker starts on any Claude setup and refuses only without one", (
     expect(loginRefusal({ stdout: '{"loggedIn": true, "authMethod": "third_party", "apiProvider": "bedrock"}', stderr: "" })).toBe("");
     expect(loginRefusal({ stdout: '{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}', stderr: "" })).toContain("claude auth login");
     expect(loginRefusal({ stdout: "", stderr: "unknown command" })).toContain("unknown command");
+  });
+});
+
+describe("a worker that acts as the user starts only as a login the rules trust", () => {
+  test("a trusted login starts; any other is refused, named, with how to fix it", () => {
+    expect(userRefusal(ME, [ME, "alice"])).toBe("");
+    expect(userRefusal("bob", [ME, "alice"])).toBe(
+      "gh is logged in as bob, whom the rules do not trust, so the factory's own comments as bob would never count. Add bob to the rules' trusted, or switch gh to a trusted login with `gh auth switch`.",
+    );
   });
 });
 

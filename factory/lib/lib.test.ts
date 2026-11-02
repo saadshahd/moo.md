@@ -1,5 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
-import { botEnv, gitConfigEnv, needsRenew, RENEW_BEFORE_MS, type Bot } from "./bot.ts";
+import { botEnv, needsRenew, RENEW_BEFORE_MS, type Bot } from "./bot.ts";
+import { gitConfigEnv } from "./git.ts";
 import {
   parse,
   render,
@@ -22,8 +23,8 @@ import {
 } from "./github.ts";
 import { cutToFailures, isTestCommand } from "./logs.ts";
 import { overlap, planFiles, planGaps, planText } from "./plan.ts";
-import { actorsOf, parseRules } from "./rules.ts";
-import { readSnapshot, snapshotQuery, undone, type Snapshot } from "./snapshot.ts";
+import { actorsOf, guardedIn, parseRules, RULES_PATH } from "./rules.ts";
+import { newestPrs, readSnapshot, snapshotQuery, undone, type Snapshot } from "./snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, usage } from "./transcript.ts";
 import {
   APPROVAL_QUESTION,
@@ -202,6 +203,13 @@ describe("authors", () => {
 
     expect(factoryComments(cs, A).map((x) => x.id)).toEqual([3, 6]);
     expect(latest(cs, A, "plan")?.id).toBe(3);
+  });
+  test("a factory that acts as the user takes every kind from a trusted login, and none from a bot", () => {
+    const asUser: Actors = { bot: null, trusted: [ME] };
+    const cs = [comment(1, render(plan), ME), comment(2, render(plan), "stranger"), bot(3, plan), comment(4, render(answer), ME)];
+
+    expect(factoryComments(cs, asUser).map((x) => x.id)).toEqual([1, 4]);
+    expect(latest(cs, asUser, "plan")?.id).toBe(1);
   });
 });
 
@@ -434,6 +442,7 @@ describe("rules", () => {
     const r = parseRules(JSON.stringify(good));
     expect(r).toEqual(good);
     expect("errors" in r ? null : actorsOf(r, "owner/app")).toEqual(A);
+    expect("errors" in r ? null : actorsOf({ ...r, bot: undefined }, "owner/app").bot).toBe(null);
     expect(
       "errors" in r
         ? null
@@ -464,6 +473,17 @@ describe("rules", () => {
   test("a repo may want its PRs opened as drafts", () => {
     expect(parseRules(JSON.stringify({ ...good, pr: { draft: true } }))).toEqual({ ...good, pr: { draft: true } });
     expect("errors" in parseRules(JSON.stringify({ ...good, pr: {} }))).toBe(true);
+  });
+  test("a key the rules don't hold fails loud", () => {
+    expect(parseRules(JSON.stringify({ ...good, sandbox: { domains: [] } }))).toEqual({
+      errors: [".claude/factory.json sandbox: no such field"],
+    });
+  });
+  test("only a person changes the rules file and the workflows; a file beside them is anyone's", () => {
+    expect(guardedIn([RULES_PATH, ".github/workflows/ci.yml", ".github/CODEOWNERS", "src/a.ts", ".claude/factory.json.bak"])).toEqual([
+      RULES_PATH,
+      ".github/workflows/ci.yml",
+    ]);
   });
   test("the bot is a [bot] login, and never trusted", () => {
     expect("errors" in parseRules(JSON.stringify({ ...good, bot: "me" }))).toBe(
@@ -523,6 +543,24 @@ describe("snapshot", () => {
     };
 
     expect([...undone(s, A)]).toEqual([1]);
+  });
+  test("the newest PRs of some issues come in one query, read for their state alone; none asked for, no query", async () => {
+    const asked: string[] = [];
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" };
+    const page = <T>(nodes: T[]) => ({ pageInfo: { hasNextPage: false }, nodes });
+
+    const github: Run = async (argv) => {
+      asked.push(argv.find((a) => a.startsWith("query=")) ?? "");
+
+      return { exitCode: 0, stdout: JSON.stringify({ data: { repository: { pr7: page([closed]), pr8: page([]) } } }), stderr: "" };
+    };
+
+    expect(await newestPrs(github, "o/r", [7, 8])).toEqual(new Map([[7, closed]]));
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain('headRefName: "factory/8"');
+    expect(asked[0]).not.toContain("comments(");
+    expect(await newestPrs(github, "o/r", [])).toEqual(new Map());
+    expect(asked).toHaveLength(1);
   });
 });
 

@@ -1,8 +1,9 @@
 import type { Args, EngineInterface, Next, ToolCallResult } from "claude-code";
 import { Bot, needsRenew } from "../lib/bot.ts";
 import { must } from "../lib/github.ts";
+import { readRules } from "../lib/rules.ts";
 import * as z from "../lib/vendor/zod-mini.js";
-import { cliPath, inRun, runner, useLogin } from "./session.ts";
+import { cliPath, inRun, runner, useLogin, useOwnLogin } from "./session.ts";
 import type { FactoryRun } from "./state.d.ts";
 
 /**
@@ -23,9 +24,11 @@ async function heldBot($: EngineInterface, fr: FactoryRun): Promise<Bot> {
 }
 
 /**
- * Before any tool runs in a factory run, makes what it starts act on GitHub as the factory's bot.
- * With no token to be had, the tool still runs with no GitHub login at all, never the user's, and
- * the run hears once that it has none: a run told nothing goes looking for a token of its own.
+ * Before any tool runs in a factory run whose rules name a bot, makes what it starts act on GitHub
+ * as that bot. With no token to be had, the tool still runs with no GitHub login at all, never the
+ * user's, and the run hears once that it has none: a run told nothing goes looking for a token of
+ * its own. Rules that name no bot leave the run acting as the user, its own login put back where
+ * unreadable rules took it.
  */
 export async function actAsBot(
   $: EngineInterface,
@@ -35,6 +38,11 @@ export async function actAsBot(
   let unminted = false;
 
   await inRun($, undefined, async (fr) => {
+    /** Unreadable rules take the bot's path: a run never falls back to the user's login by accident. */
+    const rules = await readRules(runner($), fr.cwd).catch(() => null);
+
+    if (rules !== null && rules.bot === undefined) return useOwnLogin($);
+
     try {
       await useLogin($, fr.cwd, await heldBot($, fr));
     } catch (err) {

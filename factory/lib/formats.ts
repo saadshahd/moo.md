@@ -131,7 +131,7 @@ export type FactoryComment = z.infer<
 
 export type Kind = FactoryComment["kind"];
 
-/** Who may write a kind: the factory's bot, or a person the rules file trusts. */
+/** Who may write a kind: the factory, as its bot or the user it acts as, or a person the rules trust. */
 type Author = "bot" | "trusted";
 
 type TextField<C> = {

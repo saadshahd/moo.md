@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set the factory up on the current repo — the GitHub App, rules file, labels, auto-merge, and the worker.
+description: Set the factory up on the current repo — its GitHub login, rules file, labels, auto-merge, and the worker.
 disable-model-invocation: true
 ---
 
@@ -24,9 +24,18 @@ With `pr.draft` true, the first two rows never hold: no PR auto-merges, and the 
 
 The gap: `gh api repos/<repo>/branches/<base>/protection/required_status_checks` fails for this login, `branches/<base>` still names a required check, and no ruleset is strict. Nobody here can read whether that protection requires branches up to date, so the worker starts and logs a warning saying so. Run any read the repo ships for it and give the user its result with the warning; it does not stand in the way.
 
-## The GitHub App
+## The GitHub login
 
-Done when `~/.config/factory/app.json` exists and `bun <root>/worker/cli.ts token`, run in the repo, prints a token. Otherwise only the user can get one. Whoever creates it sets:
+The factory acts as the user's own `gh` login or as a GitHub App's bot; the rules' `bot` picks. Ask which, after reading what the repo and the organization's docs say of App keys:
+
+| The factory acts as | When | Done when |
+|---|---|---|
+| the user's `gh` login | no App can be had, or the organization forbids App keys on this machine | `gh auth status` shows that login with the `repo` scope, authorized for the organization's single sign-on where it has one |
+| a GitHub App's bot | the repo is the user's own, or the organization grants an App whose key may live here | `~/.config/factory/app.json` exists and `bun <root>/worker/cli.ts token`, run in the repo, prints a token |
+
+As the user, every claim, comment, push and PR carries the user's name, and GitHub refuses an author's approval of their own PR: where the default branch requires a review, someone else approves each factory PR. Tell the user, and say so in the rules PR, so the people who review know these PRs come to them.
+
+As a bot, only the user can get the App. Whoever creates it sets:
 
 - Webhook: Active unchecked.
 - Repository permissions: Contents, Issues and Pull requests read and write; Checks, Commit statuses and Metadata read; no Workflows. Without Workflows, GitHub refuses the App any push that brings in a change to `.github/workflows/`, so once the base changes a workflow, each open PR behind it stalls until a person updates its branch. Read what the repo records of the open PRs and tell the user which ones it stalls, by number.
@@ -49,8 +58,8 @@ Write `.claude/factory.json` with the user, every field `<root>/lib/rules.ts` de
 bun -e "const r=(await import('<root>/lib/rules.ts')).parseRules(await Bun.file('.claude/factory.json').text()); if ('errors' in r) { console.error(r.errors.join('\n')); process.exit(1) }"
 ```
 
-- `bot`: the `name` that `token` prints.
-- `trusted`: the logins intent named; never the bot.
+- `bot`: the `name` that `token` prints, only where the factory acts as an App; left out, it acts as the user.
+- `trusted`: the logins intent named; never a bot. Where the factory acts as the user, their `gh` login is among them, or the worker refuses to start.
 - `atOnce`, `waitsPerDay`: ask. Read the runbook and repo docs first: a figure they state is the answer, and the user is asked only for one nothing states. `contextCap` 300000 unless they name another; `paneEverySeconds` only if they name one.
 - `taste`: `CLAUDE.md`, `AGENTS.md` and any taste file they name. Put every rule those files state on one of the `layers`:
 
@@ -71,7 +80,7 @@ Commit it on a branch and open a PR to the default branch.
 
 - `gh label create factory --force`, `gh label create factory:stuck --force` and `gh label create factory:undo --force`
 - `gh repo edit --enable-auto-merge`, unless `pr.draft` is true
-- Unless `~/.claude.json` has `projects["<repo path>"].hasTrustDialogAccepted` true (read it yourself and report which holds), the user runs `claude` in the repo once and accepts the trust prompt.
+- Claude Code 2.1.316 starts a background run, `claude --bg`, only where the trust prompt was accepted. A git worktree shares its main checkout's trust, so each worktree git adds or a pool lends needs none of its own; a separate clone does. The trust sits in `~/.claude.json` under the main checkout's on-disk path, matched exactly, case included: a key `/Users/Name/repo` misses a checkout that sits at `/Users/name/repo`. `dirname "$(git rev-parse --path-format=absolute --git-common-dir)"` prints that path. Unless `projects["<that path>"].hasTrustDialogAccepted` is true (read it yourself and report whether it holds), the user runs `claude` once in the main checkout, opened by that path, and accepts the prompt. Runs that fail with "Workspace not trusted" need the same.
 
 ## The worker
 

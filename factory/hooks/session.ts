@@ -1,7 +1,9 @@
 import type { EngineInterface, ToolCallInput, ToolCallResult } from "claude-code";
-import { botEnv, gitConfigEnv, type Bot } from "../lib/bot.ts";
+import { botEnv, type Bot } from "../lib/bot.ts";
+import { gitConfigEnv } from "../lib/git.ts";
 import { messageOf } from "../lib/errors.ts";
 import { issueOf, must, repoOf, runName, type Run } from "../lib/github.ts";
+import { readRules } from "../lib/rules.ts";
 import type { FactoryRun } from "./state.d.ts";
 
 /** A `tool.call` event for tool `T`. */
@@ -34,6 +36,7 @@ export function runner($: EngineInterface): Run {
 export async function useLogin($: EngineInterface, cwd: string, bot: Bot | null): Promise<void> {
   const env = bot === null ? null : botEnv(bot);
   const git = gitConfigEnv();
+  await keepOwnLogin($);
   await $.env.set("GH_CONFIG_DIR", `${cwd}/.factory/no-gh-login`);
   await $.env.set("GH_TOKEN", env?.GH_TOKEN ?? "factory-no-login");
   await $.env.set("GITHUB_TOKEN", undefined);
@@ -56,11 +59,46 @@ export async function useLogin($: EngineInterface, cwd: string, bot: Bot | null)
   await $.env.set("GIT_COMMITTER_EMAIL", env.GIT_COMMITTER_EMAIL);
 }
 
+/** Reads the session's own values of what `useLogin` sets, once, before it first sets one. */
+async function keepOwnLogin($: EngineInterface): Promise<void> {
+  const { value: held } = await $.state.get({ plugin: "factory", key: "ownLogin" });
+
+  if (held !== undefined) return;
+  await $.state.set({ plugin: "factory", key: "ownLogin" }, {
+    GH_CONFIG_DIR: await $.env.get("GH_CONFIG_DIR"),
+    GH_TOKEN: await $.env.get("GH_TOKEN"),
+    GITHUB_TOKEN: await $.env.get("GITHUB_TOKEN"),
+    GIT_AUTHOR_NAME: await $.env.get("GIT_AUTHOR_NAME"),
+    GIT_AUTHOR_EMAIL: await $.env.get("GIT_AUTHOR_EMAIL"),
+    GIT_COMMITTER_NAME: await $.env.get("GIT_COMMITTER_NAME"),
+    GIT_COMMITTER_EMAIL: await $.env.get("GIT_COMMITTER_EMAIL"),
+  });
+}
+
+/**
+ * Puts back the session's own GitHub login wherever `useLogin` set another, so a run that acts as
+ * the user rests on no earlier call either. The factory's git config stays: a run starts with it.
+ */
+export async function useOwnLogin($: EngineInterface): Promise<void> {
+  const { value: own } = await $.state.get({ plugin: "factory", key: "ownLogin" });
+
+  if (own === undefined) return;
+  await $.env.set("GH_CONFIG_DIR", own.GH_CONFIG_DIR);
+  await $.env.set("GH_TOKEN", own.GH_TOKEN);
+  await $.env.set("GITHUB_TOKEN", own.GITHUB_TOKEN);
+  await $.env.set("GIT_AUTHOR_NAME", own.GIT_AUTHOR_NAME);
+  await $.env.set("GIT_AUTHOR_EMAIL", own.GIT_AUTHOR_EMAIL);
+  await $.env.set("GIT_COMMITTER_NAME", own.GIT_COMMITTER_NAME);
+  await $.env.set("GIT_COMMITTER_EMAIL", own.GIT_COMMITTER_EMAIL);
+}
+
 /**
  * The factory run this session is, or null. A session is a run when it sits on a `factory/<n>`
  * branch and carries the name the worker gave that issue's run; a person's session in the same
  * worktree is not. `$` carries no session name, so the session finds its own among the ones
- * `claude agents` lists. A `factory/<n>` session that can't tell loses the user's login.
+ * `claude agents` lists. Where the rules name a bot, or can't be read, a `factory/<n>` session that
+ * can't tell loses the user's login; a factory that acts as the user leaves it, or puts it back
+ * where unreadable rules took it, as gh under the placeholder could never find the run again.
  */
 async function currentRun($: EngineInterface): Promise<FactoryRun | null> {
   const held = await $.state.get({ plugin: "factory", key: "run" });
@@ -85,7 +123,10 @@ async function currentRun($: EngineInterface): Promise<FactoryRun | null> {
       if (all.find((s) => s.sessionId === id)?.name === runName(repo, issue))
         found = { repo, issue, cwd };
     } catch (err) {
-      await useLogin($, cwd, null);
+      const rules = await readRules(run, cwd).catch(() => null);
+
+      if (rules === null || rules.bot !== undefined) await useLogin($, cwd, null);
+      else await useOwnLogin($);
       throw err;
     }
   }

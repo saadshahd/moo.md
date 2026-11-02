@@ -1,7 +1,17 @@
-import { must, type Actors, type Run } from "./github.ts";
+import { issueOf, must, type Actors, type Run } from "./github.ts";
 import * as z from "./vendor/zod-mini.js";
 
 export const RULES_PATH = ".claude/factory.json";
+
+/**
+ * What only a person changes: the factory's rules, and the workflows CI runs with the repo's
+ * secrets. A path ending in `/` stands for everything under it.
+ */
+const GUARDED = [RULES_PATH, ".github/workflows/"] as const;
+
+/** The paths among `files` that only a person changes. */
+export const guardedIn = (files: readonly string[]) =>
+  files.filter((f) => GUARDED.some((g) => (g.endsWith("/") ? f.startsWith(g) : f === g)));
 
 const Text = z.string().check(z.minLength(1));
 
@@ -17,9 +27,12 @@ export const Rules = z.object({
   contextCap: z.int().check(z.minimum(1)),
   /** How often the open `/factory` pane reads GitHub again, in seconds. Default 20. */
   paneEverySeconds: z.optional(z.int().check(z.minimum(10))),
-  /** The factory App's bot login, `<slug>[bot]`: the only author whose factory comments count. */
-  bot: Text.check(z.regex(/\[bot\]$/)),
-  /** Whose comments, labels and issue bodies count. Default: the repo's owner. Never the bot. */
+  /**
+   * The factory App's bot login, `<slug>[bot]`, where the factory acts as an App: the only author
+   * whose factory comments count. Without one, the factory acts as the user's own gh login.
+   */
+  bot: z.optional(Text.check(z.regex(/\[bot\]$/))),
+  /** Whose comments, labels and issue bodies count. Default: the repo's owner. Never a bot. */
   trusted: z.optional(z.array(Text.check(z.regex(/^(?!.*\[bot\]$)/)))),
   /** Where the project's taste lives (its CLAUDE.md, a taste file), repo-relative. */
   taste: z.array(Text),
@@ -53,15 +66,20 @@ export function parseRules(json: string): Rules | { errors: string[] } {
 
   const r = z.safeParse(Rules, raw);
 
-  return r.success
-    ? r.data
-    : {
-        errors: r.error.issues.map((i) => `${RULES_PATH} ${i.path.join(".") || "(root)"}: ${i.message}`),
-      };
+  if (!r.success)
+    return { errors: r.error.issues.map((i) => `${RULES_PATH} ${i.path.join(".") || "(root)"}: ${i.message}`) };
+
+  /**
+   * Parsing drops a key the rules don't hold; one left in the file is a field that changed or went.
+   * SAFETY: `Rules` parsed `raw`, so it is an object.
+   */
+  const stale = Object.keys(raw as object).filter((k) => !(k in r.data));
+
+  return stale.length === 0 ? r.data : { errors: stale.map((k) => `${RULES_PATH} ${k}: no such field`) };
 }
 
 export function actorsOf(rules: Rules, repo: string): Actors {
-  return { bot: rules.bot, trusted: rules.trusted ?? [repo.split("/")[0]!] };
+  return { bot: rules.bot ?? null, trusted: rules.trusted ?? [repo.split("/")[0]!] };
 }
 
 const HEAD = "refs/remotes/origin/HEAD";
@@ -82,18 +100,18 @@ export async function readRules(run: Run, cwd: string): Promise<Rules> {
   return r;
 }
 
-const Pulls = z.array(z.object({ number: z.int(), user: z.nullable(z.object({ login: z.string() })) }));
+const Pulls = z.array(z.object({ number: z.int(), head: z.object({ ref: z.string() }) }));
 
 /**
- * The PR `bot` opened that made the newest change to the rules on origin's default branch, or
- * null when someone else's PR or push made it. A run holds the bot's token, so it can open and
- * merge a PR of its own that no check of the worker's sees before the merge.
+ * The factory PR, from a `factory/<n>` branch, that made the newest change to the rules on
+ * origin's default branch, or null when another PR or a push made it. A run writes to GitHub, as
+ * the bot or the user, so a PR of its own could merge before any check of the worker's sees it.
  */
-export async function rulesChangedBy(run: Run, cwd: string, repo: string, bot: string): Promise<number | null> {
+export async function rulesChangedByFactory(run: Run, cwd: string, repo: string): Promise<number | null> {
   const sha = (await must(run, ["git", "log", "-1", "--format=%H", HEAD, "--", RULES_PATH], { cwd })).trim();
 
   if (sha === "") return null;
   const prs = z.parse(Pulls, JSON.parse(await must(run, ["gh", "api", `repos/${repo}/commits/${sha}/pulls`])));
 
-  return prs.find((p) => p.user?.login === bot)?.number ?? null;
+  return prs.find((p) => issueOf(p.head.ref) !== null)?.number ?? null;
 }
