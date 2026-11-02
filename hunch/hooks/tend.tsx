@@ -4,7 +4,13 @@ import { MEASURE, type Band, type Item } from "./band.tsx";
 export type Question = { q: string; options: string[] };
 /** One expert's idea to try; `test` pits it against the version that exists; `chosen` is absent
  * where the reply left the pick to the user. */
-export type Idea = { by: string; idea: string; why?: string; test?: string; chosen?: boolean };
+export type Idea = {
+  by: string;
+  idea: string;
+  why?: string;
+  test?: string;
+  chosen?: boolean;
+};
 export type Card = {
   facts?: string[];
   /** What the agent would change and kept to itself, from the complain skill. */
@@ -239,58 +245,64 @@ export function bareFact(f: string): string {
   );
 }
 
-/** A consult reply cut where its colours change: markdown as written, each idea's head, the line
- * saying why it was chosen, and what recedes: the lines under an idea, a dropped idea whole, the shared win. */
-export type Segment =
-  | { md: string }
-  | { head: { lead: string; change: string; rest: string } }
-  | { chosen: string }
-  | { dim: string };
+/** A part of a consult reply, markdown as written, in the tone it draws in: an idea's head, a line
+ * under an idea (`under` is the head's marker width), the line saying why it was chosen, a run of
+ * text, or a blank row (`md` empty). */
+export type Segment = {
+  md: string;
+  tone: "plain" | "dim" | "chosen";
+  under?: number;
+};
 
+/** A consult reply cut where its tones change. What recedes: the lines under an idea, a dropped
+ * idea whole, and every line after the list but a question. */
 export function ideaSegments(text: string): Segment[] {
   const out: Segment[] = [];
-  let md: string[] = [];
   let inList = false;
   let listed = false;
-  const flush = () => {
-    if (md.join("\n").trim()) out.push({ md: md.join("\n") });
-    md = [];
+  let marker = 0;
+  // The run of text being added to: a table or a paragraph stays one block while its tone holds.
+  let open: Segment | undefined;
+  const push = (s: Segment) => {
+    out.push(s);
+    open = undefined;
   };
-  const plain = (t: string) => t.replace(/\*\*?|`/g, "");
   for (const l of text.split("\n")) {
-    const head = l.match(/^(\d+\.\s.*?)\*\*(.+?)\*\*(.*)$/);
-    const droppedHead = !head && /^\d+\.\s.* — /.test(l);
-    if (head) {
-      flush();
+    const head = /^\d+\.\s.*\*\*.+?\*\*/.test(l);
+    const dropped = !head && /^\d+\.\s.* — /.test(l) && (inList || !listed);
+    if (head || dropped) {
       inList = listed = true;
-      out.push({
-        head: {
-          lead: plain(head[1]),
-          change: plain(head[2]),
-          rest: plain(head[3]),
-        },
+      marker = l.match(/^\d+\.\s/)![0].length;
+      push({ md: l, tone: head ? "plain" : "dim" });
+    } else if (inList && /^\s+\S/.test(l))
+      push({
+        md: l.trim(),
+        tone: /^\s+Chosen because\b/.test(l) ? "chosen" : "dim",
+        under: marker,
       });
-    } else if (droppedHead && (inList || !listed)) {
-      flush();
-      inList = listed = true;
-      out.push({ dim: plain(l) });
-    } else if (inList && /^\s+Chosen because\b/.test(l)) out.push({ chosen: plain(l) });
-    else if (inList && /^\s+\S/.test(l)) out.push({ dim: plain(l) });
     // A blank line between ideas keeps them apart.
-    else if (inList && !l.trim()) out.push({ dim: "" });
-    // Past the ideas, all but a question recedes: the win, and any note the rules left out.
-    else if (listed && l.trim() && !l.trim().endsWith("?")) {
-      flush();
-      inList = false;
-      out.push({ dim: plain(l) });
+    else if (inList && !l.trim()) push({ md: "", tone: "plain" });
+    else if (!l.trim()) {
+      if (open) open.md += "\n";
     } else {
-      if (l.trim()) inList = false;
-      md.push(l);
+      inList = false;
+      // Past the ideas, all but a question recedes: the win, and any note the rules left out.
+      const tone = listed && !l.trim().endsWith("?") ? "dim" : "plain";
+      if (open?.tone === tone) open.md += `\n${l}`;
+      else {
+        // A blank line where the tone changes stays a blank row.
+        if (open?.md.endsWith("\n")) push({ md: "", tone: "plain" });
+        push({ md: l, tone });
+        open = out[out.length - 1];
+      }
     }
   }
-  flush();
+  for (const s of out) s.md = s.md.trimEnd();
   return out;
 }
+
+// The terminal draws a reply's text two columns in, after its ⏺.
+const GUTTER = 2;
 
 const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
 const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
@@ -358,7 +370,10 @@ export function cardRows(c: Card, name: string): Item[][] {
       (c.ideas ?? []).map((d, i) => [
         [
           column(note(`idea-by:${i}`, d.by)),
-          { ...line(`probe:idea ${i + 1}`, d.idea), ...(d.chosen !== false && { strong: true as const }) },
+          {
+            ...line(`probe:idea ${i + 1}`, d.idea),
+            ...(d.chosen !== false && { strong: true as const }),
+          },
         ],
         ...[d.why, d.test && `A/B: ${d.test}`].flatMap((t, k) =>
           t
@@ -489,13 +504,15 @@ async function sid($: any): Promise<string> {
 }
 
 async function load($: any, id: string) {
-  if (!(await headless($))) await keepRecent($, id);
   const get = (k: string) => $.store.get(`tend:${id}:${k}`);
   for (const [k, v] of Object.entries(
     ((await get("short")) as Record<string, string>) ?? {},
   ))
     short.set(k, v);
   open = (await get("open")) as Question[] | undefined;
+  $.ui.invalidate("ui.render");
+  // Pruning reads every value in the store, seconds on a full one, so the replies never wait on it.
+  if (!(await headless($))) loud($, keepRecent($, id));
 }
 
 /** A `-p` run or the SDK draws nowhere, so nobody sees what it would keep. Hooks spawn many:
@@ -731,9 +748,8 @@ export const register: Register = (on) => {
     await setOpen($, turnQuestions(e.answer, card.questions ?? []));
     const reply = stripCards(e.answer);
     const asked =
-      ((await $.session.messages()) as Msg[]).findLast(
-        (m) => m.role === "user",
-      )?.text ?? "";
+      ((await $.session.messages()) as Msg[]).findLast((m) => m.role === "user")
+        ?.text ?? "";
     if (!(await headless($)) && wantsShort(reply, asked))
       loud($, shorten($, reply));
     return r;
@@ -773,7 +789,7 @@ export const register: Register = (on) => {
     return r;
   });
   // The card block is for the band; the model keeps it, the transcript doesn't show it.
-  on("ui.render", { component: "AssistantMessage" }, ($, e, next) => {
+  on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
     const stripped = stripCards(e.props.text);
     const text = (!showLong && short.get(textKey(stripped))) || stripped;
     if (text === e.props.text) return next(e);
@@ -781,34 +797,33 @@ export const register: Register = (on) => {
       const { Box } = $.ui.resolve(e);
       return <Box />;
     }
-    // A reply that ends on ideas draws them itself: the change stands out, the rest recedes.
-    if (latestCard([{ role: "assistant", text: e.props.text }]).ideas?.length) {
-      const { Box, Text, Markdown } = $.ui.resolve(e);
-      return (
-        <Box flexDirection="column">
-          {ideaSegments(text).map((g, i) =>
-            "md" in g ? (
-              <Markdown key={`md${i}`} text={g.md} />
-            ) : "chosen" in g ? (
-              <Text key={`c${i}`} color="success">
-                {g.chosen}
-              </Text>
-            ) : "head" in g ? (
-              <Text key={`h${i}`}>
-                {g.head.lead}
-                <Text bold>{g.head.change}</Text>
-                {g.head.rest}
-              </Text>
-            ) : (
-              <Text key={`d${i}`} dimColor>
-                {g.dim}
-              </Text>
-            ),
-          )}
+    const draw = (t: string) => next({ ...e, props: { ...e.props, text: t } });
+    const ideas =
+      e.surface === "terminal" &&
+      latestCard([{ role: "assistant", text: e.props.text }]).ideas?.length;
+    const [first, ...rest] = ideas ? ideaSegments(text) : [];
+    if (!rest.length) return draw(text);
+    // A reply that ends on ideas: Claude Code draws its first part, ⏺ and all; the rest
+    // follows under it in tone, so the change stands out and the rest recedes.
+    const { Box, Text, Markdown } = $.ui.resolve(e);
+    return (
+      <Box flexDirection="column">
+        {await draw(first.md)}
+        <Box flexDirection="column" paddingLeft={GUTTER}>
+          {rest.map((s, i) => (
+            <Box key={`s${i}`} paddingLeft={s.under ?? 0}>
+              {!s.md ? (
+                <Text> </Text>
+              ) : s.tone === "chosen" ? (
+                <Text color="success">{s.md.replace(/\*\*?|`/g, "")}</Text>
+              ) : (
+                <Markdown text={s.md} dimColor={s.tone === "dim"} />
+              )}
+            </Box>
+          ))}
         </Box>
-      );
-    }
-    return next({ ...e, props: { ...e.props, text } });
+      </Box>
+    );
   });
 
   on("ui.render", { component: "AbovePrompt" }, ($, e, next) => {

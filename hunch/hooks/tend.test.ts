@@ -315,8 +315,9 @@ test("an empty card adds nothing to a compaction", async () => {
   expect(replayCard({})).toBeUndefined();
 });
 
-/** A store that refuses a write taking its JSON past `cap` characters, as the engine's does past 4 MiB. */
-function cappedStore(on: any, cap: number, entries: [string, unknown][] = []): Map<string, unknown> {
+/** A store that refuses a write taking its JSON past `cap` characters, as the engine's does past 4 MiB;
+ * it lists its keys once `listed` resolves. */
+function cappedStore(on: any, cap: number, entries: [string, unknown][] = [], listed = Promise.resolve()): Map<string, unknown> {
   const store = new Map<string, unknown>(entries);
   const size = () => JSON.stringify(Object.fromEntries(store)).length;
   on("store.get", (_: any, e: any) => ({ value: store.get(e.key) }));
@@ -330,7 +331,7 @@ function cappedStore(on: any, cap: number, entries: [string, unknown][] = []): M
     return { value: undefined };
   });
   on("store.delete", (_: any, e: any) => (store.delete(e.key), { value: undefined }));
-  on("store.keys", () => ({ value: [...store.keys()] }));
+  on("store.keys", async () => (await listed, { value: [...store.keys()] }));
   return store;
 }
 
@@ -341,20 +342,26 @@ const savedOf = (s: string, mib: number): [string, unknown] => [`tend:${s}:short
 test("a new session keeps the newest sessions that fit in 3 MiB, however many", async ($, on) => {
   const old = Array.from({ length: 5 }, (_, i) => `old${i}`);
   const store = cappedStore(on, 8 * MiB, [...old.map((s) => savedOf(s, 1)), ["tend:recent", old]]);
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
+  // The prune runs unawaited.
+  await clock.settle();
   expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(old.slice(0, 3).map((s) => savedOf(s, 1)[0]));
   expect(store.get("tend:recent")).toEqual(["s1", ...old.slice(0, 3)]);
 });
 
 test("the live session keeps its keys past the budget; the older ones go", async ($, on) => {
   const store = cappedStore(on, 8 * MiB, [savedOf("s1", 4), savedOf("old0", 0.5), ["tend:recent", ["old0", "s1"]]]);
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "resume", cwd: "/p" } as any);
+  // The prune runs unawaited.
+  await clock.settle();
   expect([...store.keys()]).toEqual([savedOf("s1", 4)[0], "tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
 });
@@ -365,10 +372,13 @@ test("a store over its cap with no session list shrinks to the current session",
     100,
     Array.from({ length: 10 }, (_, i): [string, unknown] => [`tend:old${i}:short`, "x".repeat(20)]),
   );
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
+  // The prune runs unawaited.
+  await clock.settle();
   expect([...store.keys()]).toEqual(["tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
 });
@@ -393,6 +403,32 @@ test("a full store leaves the band its card and a card skill its ask; the refusa
   const prompt = await $.prompt.submit({ text: "/hope:intent tidy it", origin: { kind: "composer" } } as any);
   expect((prompt as any).context).toContain(CARD_FORMAT);
   expect(toasts).toHaveLength(1);
+});
+
+// On the work machine's full store, reading every value took 7.7 s of the 9 s before a resumed
+// session's replies drew short.
+test("a resumed session's replies draw short before the store is pruned", async ($, on) => {
+  // The prune lists the keys, then reads every value: held here until the reply has drawn.
+  let release = () => {};
+  const listed = new Promise<void>((r) => (release = r));
+  const short = { [textKey(WALL)]: "No tool checks sung words yet." };
+  const store = cappedStore(on, 8 * MiB, [["tend:s1:short", short], ["tend:old0:short", {}], ["tend:recent", ["old0", "s1"]]], listed);
+  const clock = mock.clock(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("ui.invalidate", () => ({ value: undefined }));
+  on("session.start", (_, e) => e);
+  let shown = "";
+  on("ui.render", (_, e) => {
+    shown = (e.props as any).text;
+    return { type: "Box", props: {} } as any;
+  });
+  await $.session.start({ source: "resume", cwd: "/p" } as any);
+  await (await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any })).drawn();
+  expect(shown).toBe(short[textKey(WALL)]);
+  release();
+  await clock.settle();
+  expect(store.get("tend:recent")).toEqual(["s1", "old0"]);
 });
 
 test("a headless session keeps nothing, so it pushes no live session out", async ($, on) => {
@@ -524,31 +560,148 @@ describe("ideas", () => {
   });
 });
 
-test("a consult reply splits where its colours change", async () => {
-  const reply = "1. Mostafa — **open on the title**\n   *his hooks open on it*\n   Chosen because the title is the hook\n\n2. Wegz — leave a line `open`\n   *no side*\n   win: louder\n   Doesn't apply because the verse is full\n\n3. Ruby — **end on the bridge**\n   *the turn lands late*\n\nWin: you pick it blind.\nIdea 5 is measured instead.\nDo you want the bridge to land late?";
-  expect(ideaSegments(reply)).toEqual([
-    { head: { lead: "1. Mostafa — ", change: "open on the title", rest: "" } },
-    { dim: "   his hooks open on it" },
-    { chosen: "   Chosen because the title is the hook" },
-    { dim: "" },
-    { dim: "2. Wegz — leave a line open" },
-    { dim: "   no side" },
-    { dim: "   win: louder" },
-    { dim: "   Doesn't apply because the verse is full" },
-    { dim: "" },
-    { head: { lead: "3. Ruby — ", change: "end on the bridge", rest: "" } },
-    { dim: "   the turn lands late" },
-    { dim: "" },
-    { dim: "Win: you pick it blind." },
-    { dim: "Idea 5 is measured instead." },
-    { md: "Do you want the bridge to land late?" },
+// The shape of a consult reply that drew as raw text (2026-11-02): no reply bullet, its ideas
+// flush left, its table as pipe rows. Every part of it: chosen, open and dropped ideas, the win,
+// a table, the next action, the card.
+const CONSULT = [
+  "1. Mostafa — **Open the verse on the title**",
+  "   *His hooks open on the title; this verse buries it.*",
+  "   Chosen because the hook is the title",
+  "",
+  "2. Ruby — **End on the bridge, a bar late**",
+  "   *The turn lands late, so the ear waits for it.*",
+  "",
+  "3. Wegz — Leave a line open",
+  "   *No side takes the open line.*",
+  "   Doesn't apply because the verse is full",
+  "",
+  "Win: you pick the take blind.",
+  "",
+  "Idea 2 is yours to decide:",
+  "",
+  "| bridge → | gains | costs |",
+  "|---|---|---|",
+  "| a bar late | the turn lands | one more bar |",
+  "| on time (today) | no change | the turn blurs |",
+  "",
+  "Next: choose late or on time for idea 2, and I'll write ideas 1–2 into the song.",
+  "",
+  "```card",
+  JSON.stringify({
+    ideas: [
+      { by: "Mostafa", idea: "Open the verse on the title", why: "His hooks open on the title.", chosen: true },
+      { by: "Ruby", idea: "End on the bridge, a bar late", why: "The turn lands late." },
+      { by: "Wegz", idea: "Leave a line open", why: "No side takes it.", chosen: false },
+    ],
+    questions: [{ q: "Where does the bridge end?", options: ["a bar late", "on time"] }],
+  }),
+  "```",
+].join("\n");
+
+describe("a reply that ends on ideas", () => {
+  const SHORT = "| bridge → | gains |\n|---|---|\n| a bar late | the turn lands |\n\nNext: choose late or on time.";
+  // What Claude Code's own drawing was handed, and the reply as tend drew it.
+  const setup = ($: any, on: any, shortForm = SHORT) => {
+    mock.store(on);
+    const clock = mock.clock(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
+    on("session.messages", () => ({ value: [{ role: "user", text: "/hope:consult", toolUses: [] }, said(CONSULT)] }));
+    on("ui.invalidate", () => ({ value: undefined }));
+    on("ui.toast", () => ({ value: undefined }));
+    on("model.complete", () => ({ value: { isAnswered: true, text: shortForm, usage: {} } }) as any);
+    const host: string[] = [];
+    on("ui.render", (_: any, e: any) => {
+      host.push(e.props.text);
+      return { type: "Box", props: {} } as any;
+    });
+    on("turn.complete", (_: any, e: any) => ({ text: e.answer }));
+    const mount = async (surface: "terminal" | "desktop" = "terminal") => {
+      host.length = 0;
+      const reply = await $.ui.mount({ plugin: "hunch", surface, component: "AssistantMessage", props: { text: CONSULT, isFirstOfReply: true } as any });
+      await reply.drawn();
+      return reply;
+    };
+    return { clock, host, mount };
+  };
+  const md = async (reply: any, dim: boolean) =>
+    (await reply.findAll({ type: "Markdown" })).filter((m: any) => !!m.props.dimColor === dim).map((m: any) => m.props.text);
+
+  test("Claude Code draws its first idea, ⏺ and all; the card shows nowhere", async ($, on) => {
+    const { host, mount } = setup($, on);
+    const reply = await mount();
+    expect(host).toEqual(["1. Mostafa — **Open the verse on the title**"]);
+    expect(JSON.stringify(await reply.drawn())).not.toContain("```card");
+  });
+  test("a dropped idea dims whole; an open one draws as written", async ($, on) => {
+    const { mount } = setup($, on);
+    const reply = await mount();
+    expect(await md(reply, true)).toContain("3. Wegz — Leave a line open");
+    expect(await md(reply, true)).toContain("Doesn't apply because the verse is full");
+    expect(await md(reply, false)).toContain("2. Ruby — **End on the bridge, a bar late**");
+  });
+  test("\"Chosen because\" is green, under its idea", async ($, on) => {
+    const { mount } = setup($, on);
+    const reply = await mount();
+    const chosen = await reply.find({ type: "Text", text: "Chosen because the hook is the title" });
+    expect(chosen?.props.color).toBe("success");
+  });
+  test("every line after the list fades, the table one drawn block", async ($, on) => {
+    const { mount } = setup($, on);
+    const reply = await mount();
+    const after = (await md(reply, true)).find((t: string) => t.startsWith("Win:"));
+    expect(after).toContain("| bridge → | gains | costs |\n|---|---|---|");
+    expect(after).toContain("Next: choose late or on time for idea 2");
+  });
+  test("its short form draws as Claude Code draws it", async ($, on) => {
+    const { clock, host, mount } = setup($, on);
+    await $.turn.complete({ answer: CONSULT, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    await clock.settle();
+    await mount();
+    expect(host).toEqual([SHORT]);
+  });
+  test("a short form that keeps the ideas keeps their tones", async ($, on) => {
+    const kept = "1. Mostafa — **Open on the title**\n   Chosen because the hook is the title\n2. Wegz — Leave a line open\n\nNext: choose late or on time.";
+    const { clock, host, mount } = setup($, on, kept);
+    await $.turn.complete({ answer: CONSULT, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    await clock.settle();
+    const reply = await mount();
+    expect(host).toEqual(["1. Mostafa — **Open on the title**"]);
+    expect(await md(reply, true)).toEqual(["2. Wegz — Leave a line open", "Next: choose late or on time."]);
+    expect((await reply.find({ type: "Text", text: "Chosen because the hook is the title" }))?.props.color).toBe("success");
+    expect(await reply.find({ text: /Open the verse/ })).toBeUndefined();
+  });
+  test("a surface with no ⏺ gutter gets the reply as markdown, card cut", async ($, on) => {
+    const { host, mount } = setup($, on);
+    await mount("desktop");
+    expect(host).toEqual([stripCards(CONSULT)]);
+  });
+});
+
+test("a consult reply splits where its tones change", async () => {
+  expect(ideaSegments(stripCards(CONSULT))).toEqual([
+    { md: "1. Mostafa — **Open the verse on the title**", tone: "plain" },
+    { md: "*His hooks open on the title; this verse buries it.*", tone: "dim", under: 3 },
+    { md: "Chosen because the hook is the title", tone: "chosen", under: 3 },
+    { md: "", tone: "plain" },
+    { md: "2. Ruby — **End on the bridge, a bar late**", tone: "plain" },
+    { md: "*The turn lands late, so the ear waits for it.*", tone: "dim", under: 3 },
+    { md: "", tone: "plain" },
+    { md: "3. Wegz — Leave a line open", tone: "dim" },
+    { md: "*No side takes the open line.*", tone: "dim", under: 3 },
+    { md: "Doesn't apply because the verse is full", tone: "dim", under: 3 },
+    { md: "", tone: "plain" },
+    { md: "Win: you pick the take blind.\n\nIdea 2 is yours to decide:\n\n| bridge → | gains | costs |\n|---|---|---|\n| a bar late | the turn lands | one more bar |\n| on time (today) | no change | the turn blurs |\n\nNext: choose late or on time for idea 2, and I'll write ideas 1–2 into the song.", tone: "dim" },
   ]);
 });
 
-test("a reply that opens on a dropped idea still splits", async () => {
-  expect(ideaSegments("1. Wegz — leave a line open\n   Doesn't apply because the verse is full")).toEqual([
-    { dim: "1. Wegz — leave a line open" },
-    { dim: "   Doesn't apply because the verse is full" },
+test("a question after the list stays bright, a blank row apart", async () => {
+  expect(ideaSegments("1. Ruby — **end on the bridge**\n\nWin: louder.\n\nDo you want it late?")).toEqual([
+    { md: "1. Ruby — **end on the bridge**", tone: "plain" },
+    { md: "", tone: "plain" },
+    { md: "Win: louder.", tone: "dim" },
+    { md: "", tone: "plain" },
+    { md: "Do you want it late?", tone: "plain" },
   ]);
 });
 
