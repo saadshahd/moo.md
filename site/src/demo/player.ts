@@ -134,12 +134,11 @@ export function mount(root: HTMLElement) {
   const tickAt = (k: number) => (motion.matches ? k / Math.max(1, ticks.length - 1) : times[k] / length);
   const placeTicks = () => ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
 
-  // Captions and the note sit in boxes of fixed lines (Demo.astro); text
-  // longer than its box would be cut, so say so.
-  const note = root.querySelector<HTMLElement>(".note")!;
+  // Captions sit in a box of fixed lines (Demo.astro); text longer than the
+  // box would be cut, so say so.
   function checkBoxes() {
     const box = beats[0]?.parentElement;
-    const cut = [...beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1), ...(note.scrollHeight > note.clientHeight + 1 ? [note] : [])];
+    const cut = beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1);
     if (cut.length) console.error("Demo text longer than its box; give the box more lines in Demo.astro:", cut.map((el) => el.textContent));
   }
 

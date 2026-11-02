@@ -2,7 +2,9 @@
 // The site's one bar, in place of Starlight's header and sidebar: the mark,
 // the Chains and Moves menus, search (⌘K), GitHub and Install, the one action,
 // as a filled pill. It has one height at every width (--sl-nav-height,
-// chrome.css), so a demo's terminal sits at the same place on every page. Under 50rem the menus and GitHub
+// chrome.css), so a demo's terminal sits at the same place on every page. Its
+// contents sit in the content's centred column; its ground runs full width.
+// Under 50rem the menus and GitHub
 // fold into one Menu sheet; Install and the theme toggle stay in the bar.
 // Menus are popovers: no script opens them; the script below only places each
 // under its button, and flips the theme.
@@ -97,6 +99,7 @@ const github = "https://github.com/saadshahd/moo.md";
 <style>
   .bar {
     display: flex; align-items: center; gap: 1rem; height: 100%;
+    max-width: var(--sl-content-width); margin-inline: auto;
   }
   .home { display: inline-flex; align-items: center; margin-inline-end: 0.5rem; color: var(--sl-color-white); text-decoration: none; }
   .bar > nav { display: flex; align-items: center; gap: 0.25rem; }
