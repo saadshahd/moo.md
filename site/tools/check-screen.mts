@@ -35,7 +35,7 @@ for (let i = A.length - 1; i >= 0; i--)
   for (let j = B.length - 1; j >= 0; j--)
     L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
 const words = (ls: string[]) =>
-  ls.map((l) => l.replace(/^\s*#{1,6} /, "").replace(/\*\*|`/g, "")).join(" ").split(/\s+/).filter(Boolean).join(" ");
+  ls.map((l) => l.replace(/^(⏺ )?\s*(#{1,6} )?/, "").replace(/\*\*|`/g, "")).join(" ").split(/\s+/).filter(Boolean).join(" ");
 // Each ```markdown block of the replies, as words.
 const blocks: string[] = [];
 (function walk(x: unknown): void {
@@ -59,11 +59,16 @@ let i = 0;
 let j = 0;
 let a0 = 0;
 let b0 = 0;
+// A blank row matched between two parted runs joins them into one hunk: a
+// rendered block and its source part around blank rows that need not align.
 while (i < A.length || j < B.length) {
-  if (i < A.length && j < B.length && A[i] === B[j]) {
+  if (i < A.length && j < B.length && A[i] === B[j] && (A[i] !== "" || (i === a0 && j === b0))) {
     hunk(A.slice(a0, i), B.slice(b0, j), a0);
     a0 = ++i;
     b0 = ++j;
+  } else if (i < A.length && j < B.length && A[i] === B[j]) {
+    i++;
+    j++;
   } else if (j >= B.length || (i < A.length && L[i + 1][j] >= L[i][j + 1])) i++;
   else j++;
 }

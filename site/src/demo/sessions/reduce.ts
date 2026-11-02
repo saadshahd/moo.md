@@ -1,94 +1,69 @@
 import type { Chrome, Turn } from "../types";
 
-export const chrome: Chrome = {"context": "0%", "style": "hold:Plain"};
+export const chrome: Chrome = {"context": "0%"};
 
 export const turns: Turn[] = [
   {
     user: "write the PR description: price_cache.ts TTL 5m -> 1h to cut catalog load; tests updated and passing, hit rate up locally. The reviewer wrote price_cache.ts.",
-    tools: "Ran 3 shell commands",
+    tools: "Read 1 file, ran 2 shell commands",
     activity: [
-      {"at": 1.5, "line": "Showing working diff, recent commits, and cache source", "tool": "$ git diff && git log --oneline -5 && ls -a && cat src/price_cache.ts"},
-      {"at": 6.5, "line": "Showing working diff, recent commits, and cache source", "tool": "$ ls src test && git show --stat f0ff143 && cat README.md package.json && cat test/price_cache.test.ts && grep -rn \"price_events\\|price.changed\\|drop(\" --include=*.ts . | grep -v node_modules; npm test 2>&1 | tail -20"},
-      {"at": 8.5, "line": "Reading event handler, prior commit body, and checking for open PR", "tool": "$ cat src/price_events.ts && git log -1 --format=%B f0ff143 && git remote -v && gh pr list --head price-cache-ttl 2>&1 | head"},
+      {"at": 1.8, "line": "Running git diff && git show --stat HEAD && cat src/price…", "tool": "$ git diff && git show --stat HEAD && cat src/price_cache.ts"},
+      {"at": 3.8, "line": "Running git diff && git show --stat HEAD && cat src/price…", "tool": "$ cat src/price_events.ts README.md package.json"},
+      {"at": 5.8, "line": "Running git diff && git show --stat HEAD && cat src/price…", "tool": "$ npm test 2>&1 | tail -15"},
     ],
-    replyAt: 93.0,
+    replyAt: 15.0,
     chrome: [
-      [-1.5, {"context": "0%", "style": "hold:Plain"}],
-      [-0.5, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Waddling"}}],
-      [0.5, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "thinking with xhigh effort"}}],
-      [1.5, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 75 tokens · thinking with xhigh effort"}}],
-      [1.5, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 206 tokens"}}],
-      [2.5, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 216 tokens · thought for 1s"}}],
-      [3.5, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 222 tokens · thinking with xhigh effort"}}],
-      [4.5, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 297 tokens · thinking with xhigh effort"}}],
-      [5.5, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 472 tokens · thought for 2s"}}],
-      [6.5, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 579 tokens · thought for 2s"}}],
-      [6.5, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 590 tokens"}}],
-      [7.5, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 617 tokens"}}],
-      [8.5, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 713 tokens"}}],
-      [9.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 743 tokens · thinking with xhigh effort"}}],
-      [9.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 752 tokens · thinking with xhigh effort"}}],
-      [19.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 752 tokens · still thinking with xhigh effort"}}],
-      [20.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · thought for 11s"}}],
-      [21.5, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · thought for 11s"}}],
-      [22.5, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens"}}],
-      [73.5, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · thinking with xhigh effort"}}],
-      [83.5, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · still thinking with xhigh effort"}}],
-      [92.5, {"context": "4% · 37.6k", "style": "hold:Plain"}],
-      [93.5, {"context": "4% · 39.5k", "style": "hold:Plain"}],
+      [-2.2, {"context": "0%"}],
+      [-0.2, {"context": "0%", "spin": {"verb": "Wrangling"}}],
+      [0.8, {"context": "0%", "spin": {"verb": "Befuddling", "tail": "thinking with medium effort"}}],
+      [1.8, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 157 tokens"}}],
+      [2.8, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 183 tokens · thinking with medium effort"}}],
+      [2.8, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 192 tokens · thinking with medium effort"}}],
+      [3.8, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 380 tokens · thinking with medium effort"}}],
+      [4.8, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 403 tokens · thinking with medium effort"}}],
+      [5.8, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 575 tokens"}}],
+      [5.8, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 590 tokens · thought for 1s"}}],
+      [6.8, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 599 tokens · thinking with medium effort"}}],
+      [14.8, {"context": "4% · 37.1k"}],
+      [15.8, {"context": "4% · 37.3k"}],
     ],
     reply: [
-      "Here's the PR description. Fill in the two `TODO`s first:",
+      "I checked the diff and ran `npm test`: 3/3 pass. Here's the description:",
       "",
       "```markdown",
-      "catalog: cache prices for 1 hour instead of 5 minutes",
+      "## catalog: raise price cache TTL from 5 min to 1 h",
       "",
-      "## What",
+      "### What",
+      "`TTL_MS` in `src/price_cache.ts` goes from `5 * 60 * 1000` to `60 * 60 * 1000`. The two tests that check the TTL edges move from 4/6 min to 59/61 min.",
       "",
-      "Raise `TTL_MS` in `src/price_cache.ts` from 5 minutes to 1 hour.",
+      "### Why",
+      "To cut calls from catalog to the pricing service. Each `PriceCache.get` miss is one call. A `price.changed` event still drops the SKU right away (`src/price_events.ts`), so a normal price change shows up as fast as before.",
       "",
-      "## Why",
+      "Hit rate locally: <before → after, and how it was measured>",
       "",
-      "Each cache miss calls the pricing service. A longer TTL means fewer misses,",
-      "so fewer calls and less catalog load.",
+      "### Tradeoff",
+      "As the comment in `price_cache.ts` says, the TTL \"only bounds how long a missed event can leave a stale price on the page.\" This change raises that limit from **5 minutes to 1 hour**. If a `price.changed` event is lost, a product page can show the old price for up to an hour.",
       "",
-      "Local hit rate (`hits / (hits + misses)`): TODO% before, TODO% after,",
-      "over TODO (which SKUs, how many reads, over how long).",
+      "This is fine only if missed events are rare enough, or an hour of a wrong price is acceptable. <How often events are missed / why an hour is OK.>",
       "",
-      "## Cost",
-      "",
-      "The header comment in `price_cache.ts` says the TTL bounds how long a missed",
-      "`price.changed` event leaves a stale price on the page. This change raises",
-      "that bound from 5 minutes to 1 hour.",
-      "",
-      "I don't know how often events go missing. `price_events.ts` drops the SKU",
-      "and has no retry or replay.",
-      "",
-      "Question for review: is up to an hour of stale price acceptable here?",
-      "",
-      "Memory use stays the same. `get()` never removes expired entries, so the map",
-      "already holds every SKU ever read, whatever the TTL.",
-      "",
-      "## Tests",
-      "",
-      "- The boundary tests now wait 59 and 61 minutes, up from 4 and 6.",
-      "- `npm test`: 3 pass, 0 fail.",
-      "",
-      "No doc changes: the header comment names `TTL_MS`, not a number, and the",
-      "README gives no TTL.",
+      "### Testing",
+      "- `npm test`: 3/3 pass.",
+      "- The tests check the new TTL edges (hit at 59 min, refetch at 61 min) and that a `price.changed` event drops the SKU. No test covers a missed event, because the TTL is the only protection there.",
       "```",
       "",
-      "Decide whether up to an hour of stale price is acceptable; the Cost section asks this.",
-      "Next: put your local before and after hit rates in place of the `TODO`s, then open the PR.",
+      "Fill in two things before you post it:",
+      "",
+      "- **Hit-rate numbers.** \"Hit rate up locally\" isn't enough evidence. `PriceCache` already counts `hits`/`misses`, so before/after numbers from the same local run are easy to get. A local run also probably doesn't reflect how production traffic is spread across SKUs.",
+      "- **Why an hour of possible staleness is OK.** The reviewer wrote the comment that says the TTL limits stale prices. A 12× longer TTL is the first thing they'll ask about, so the description should answer it.",
     ],
     keys: [
       [
-        -1.5,
+        -2.1,
         "type",
         "write the PR description: price_cache.ts TTL 5m -> 1h to cut catalog load; tests updated and passing, hit rate up locally. The reviewer wrote price_cache.ts."
       ],
       [
-        -0.5,
+        -0.1,
         "key",
         "Enter"
       ]
@@ -96,62 +71,52 @@ export const turns: Turn[] = [
   },
   {
     user: "/hope:reduce",
-    replyAt: 20.9,
+    replyAt: 6.7,
     chrome: [
-      [-129.9, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "thinking with xhigh effort"}}],
-      [-128.9, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 75 tokens · thinking with xhigh effort"}}],
-      [-128.9, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 206 tokens"}}],
-      [-127.9, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 216 tokens · thought for 1s"}}],
-      [-126.9, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 222 tokens · thinking with xhigh effort"}}],
-      [-125.9, {"context": "3% · 34.4k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 297 tokens · thinking with xhigh effort"}}],
-      [-124.9, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 472 tokens · thought for 2s"}}],
-      [-123.9, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 579 tokens · thought for 2s"}}],
-      [-123.9, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 590 tokens"}}],
-      [-122.9, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 617 tokens"}}],
-      [-121.9, {"context": "4% · 35.8k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 713 tokens"}}],
-      [-120.9, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 743 tokens · thinking with xhigh effort"}}],
-      [-120.9, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 752 tokens · thinking with xhigh effort"}}],
-      [-110.9, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 752 tokens · still thinking with xhigh effort"}}],
-      [-109.9, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · thought for 11s"}}],
-      [-108.9, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · thought for 11s"}}],
-      [-107.9, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens"}}],
-      [-56.9, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · thinking with xhigh effort"}}],
-      [-46.9, {"context": "4% · 37.6k", "style": "hold:Plain", "spin": {"verb": "Spelunking", "tail": "↓ 1.8k tokens · still thinking with xhigh effort"}}],
-      [-37.9, {"context": "4% · 37.6k", "style": "hold:Plain"}],
-      [-36.9, {"context": "4% · 39.5k", "style": "hold:Plain"}],
-      [0.1, {"context": "4% · 39.5k", "style": "hold:Plain", "spin": {"verb": "Elucidating"}}],
-      [0.1, {"context": "4% · 39.5k", "style": "hold:Plain", "spin": {"verb": "Elucidating", "tail": "thinking with xhigh effort"}}],
-      [11.1, {"context": "4% · 39.5k", "style": "hold:Plain", "spin": {"verb": "Elucidating", "tail": "still thinking with xhigh effort"}}],
-      [19.1, {"context": "4% · 42.1k", "style": "hold:Plain"}],
-      [40.1, {"context": "4% · 42.1k", "style": "hold:Plain", "spin": {"verb": "Orbiting"}}],
+      [-60.5, {"context": "0%", "spin": {"verb": "Befuddling", "tail": "thinking with medium effort"}}],
+      [-59.5, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 157 tokens"}}],
+      [-58.5, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 183 tokens · thinking with medium effort"}}],
+      [-58.5, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 192 tokens · thinking with medium effort"}}],
+      [-57.5, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 380 tokens · thinking with medium effort"}}],
+      [-56.5, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 403 tokens · thinking with medium effort"}}],
+      [-55.5, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 575 tokens"}}],
+      [-55.5, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 590 tokens · thought for 1s"}}],
+      [-54.5, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 599 tokens · thinking with medium effort"}}],
+      [-46.5, {"context": "4% · 37.1k"}],
+      [-45.5, {"context": "4% · 37.3k"}],
+      [-22.5, {"context": "4% · 37.3k", "style": "hold:Plain"}],
+      [-0.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Twisting"}}],
+      [0.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "thinking with medium effort"}}],
+      [4.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "↓ 25 tokens · thought for 4s"}}],
+      [5.5, {"context": "4% · 44.4k", "style": "hold:Plain"}],
+      [31.5, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing"}}],
+      [31.5, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing", "tail": "thinking with medium effort"}}],
     ],
     reply: [
       "```markdown",
-      "catalog: cache prices for 1 hour instead of 5 minutes",
+      "## catalog: raise price cache TTL from 5 min to 1 h",
       "",
-      "Cuts catalog load: fewer cache misses, so fewer pricing-service calls.",
-      "Local hit rate: TODO% → TODO% over TODO (which SKUs, how many reads, how long).",
+      "Cuts calls to the pricing service. A `price.changed` event still drops the SKU",
+      "right away, so normal price changes show up as fast as before.",
       "",
-      "**Cost:** the header comment in `price_cache.ts` says the TTL limits how long",
-      "a missed `price.changed` event leaves a stale price on the page. That limit",
-      "is now 1 hour, up from 5 minutes. I don't know how often events go missing:",
-      "`price_events.ts` has no retry or replay. Is an hour of stale price acceptable?",
+      "Hit rate locally: <before → after>",
       "",
-      "Memory use stays the same: `get()` never removes expired entries.",
+      "**Tradeoff:** the TTL is the only limit on a stale price after a missed event",
+      "(see the comment in `price_cache.ts`). A lost event can now leave the old price",
+      "on a product page for up to 1 h instead of 5 min. <Why an hour is acceptable.>",
       "",
-      "Tests: boundary waits move from 4/6 to 59/61 minutes; `npm test` passes 3/3.",
-      "No doc changes: the header comment names `TTL_MS`, not a value, and the",
-      "README gives no TTL.",
+      "**Tests:** `npm test` passes 3/3. The TTL edge tests now use 59 and 61 min.",
+      "No test covers a missed event.",
       "```",
     ],
     keys: [
       [
-        -15.7,
+        -2.7,
         "type",
-        "/reduce"
+        "/hope:reduce"
       ],
       [
-        -2.8,
+        -0.1,
         "key",
         "Enter"
       ]
@@ -164,15 +129,15 @@ export const turns: Turn[] = [
             "  "
           ],
           [
-            "❯ /hope:",
+            "❯ /",
             "l"
           ],
           [
-            "reduce",
+            "hope:reduce",
             "l b"
           ],
           [
-            " (reduce)           (hope) Re-derive something written into",
+            "                    (hope) Re-derive something written into",
             "l"
           ]
         ],
@@ -190,7 +155,7 @@ export const turns: Turn[] = [
             "  "
           ],
           [
-            "  /apple-design                   Apple's approach to interface design and",
+            "  /hope:router                    (hope) Spawn agents and verify their",
             "g"
           ]
         ],
@@ -199,7 +164,7 @@ export const turns: Turn[] = [
             "                                    "
           ],
           [
-            "fluid, physical motion, translated for th…",
+            "output — route work, never do it. Use whe…",
             "g"
           ]
         ]
@@ -208,91 +173,178 @@ export const turns: Turn[] = [
   },
   {
     user: "/hope:reduce",
-    replyAt: 15.9,
+    replyAt: 5.9,
     chrome: [
-      [-40.4, {"context": "4% · 39.5k", "style": "hold:Plain", "spin": {"verb": "Elucidating"}}],
-      [-40.4, {"context": "4% · 39.5k", "style": "hold:Plain", "spin": {"verb": "Elucidating", "tail": "thinking with xhigh effort"}}],
-      [-29.4, {"context": "4% · 39.5k", "style": "hold:Plain", "spin": {"verb": "Elucidating", "tail": "still thinking with xhigh effort"}}],
-      [-21.4, {"context": "4% · 42.1k", "style": "hold:Plain"}],
-      [-0.4, {"context": "4% · 42.1k", "style": "hold:Plain", "spin": {"verb": "Orbiting"}}],
-      [0.6, {"context": "4% · 42.1k", "style": "hold:Plain", "spin": {"verb": "Orbiting", "tail": "thinking with xhigh effort"}}],
-      [10.6, {"context": "4% · 42.1k", "style": "hold:Plain", "spin": {"verb": "Orbiting", "tail": "still thinking with xhigh effort"}}],
-      [13.6, {"context": "4% · 42.1k", "style": "hold:Plain"}],
-      [14.6, {"context": "5% · 45k", "style": "hold:Plain"}],
-      [36.6, {"context": "5% · 45k", "style": "hold:Plain", "spin": {"verb": "Drizzling"}}],
+      [-31.0, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Twisting"}}],
+      [-31.0, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "thinking with medium effort"}}],
+      [-27.0, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "↓ 25 tokens · thought for 4s"}}],
+      [-26.0, {"context": "4% · 44.4k", "style": "hold:Plain"}],
+      [-0.0, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing"}}],
+      [-0.0, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing", "tail": "thinking with medium effort"}}],
+      [5.0, {"context": "5% · 45.6k", "style": "hold:Plain"}],
     ],
     reply: [
       "```markdown",
-      "catalog: cache prices for 1 hour instead of 5 minutes",
+      "## catalog: price cache TTL 5 min → 1 h",
       "",
-      "Fewer cache misses mean fewer pricing-service calls and less catalog load.",
-      "Local hit rate: TODO% → TODO% (TODO: which SKUs, how many reads, how long).",
+      "Cuts calls to the pricing service. `price.changed` still drops a SKU at once.",
+      "Hit rate locally: <before → after>",
       "",
-      "**Cost:** the `price_cache.ts` header comment says the TTL caps how long a",
-      "missed `price.changed` event leaves a stale price. I don't know how often",
-      "events go missing: `price_events.ts` has no retry or replay. Is up to an hour",
-      "of stale price acceptable?",
+      "**Tradeoff:** if a `price.changed` event is missed, the old price can now stay",
+      "up for 1 h instead of 5 min (see the comment in `price_cache.ts`).",
+      "<Why an hour is acceptable.>",
       "",
-      "- Memory use stays the same: `get()` never removes expired entries.",
-      "- Tests: the boundary waits change from 4 and 6 minutes to 59 and 61;",
-      "  `npm test` passes 3/3.",
-      "- No doc changes: neither the header comment nor the README states a TTL.",
+      "**Tests:** 3/3 pass. The TTL edge tests now use 59 and 61 min.",
+      "No test covers a missed event.",
       "```",
     ],
     keys: [
       [
-        -3.7,
+        -2.6,
         "type",
-        "/reduce"
+        "/hope:reduce"
       ],
       [
-        -2.2,
+        -0.1,
         "key",
         "Enter"
       ]
     ],
+    menu: {
+      "after": 0,
+      "rows": [
+        [
+          [
+            "  "
+          ],
+          [
+            "❯ /",
+            "l"
+          ],
+          [
+            "hope:reduce",
+            "l b"
+          ],
+          [
+            "                    (hope) Re-derive something written into",
+            "l"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "the shortest version that still covers ev…",
+            "l"
+          ]
+        ],
+        [
+          [
+            "  "
+          ],
+          [
+            "  /hope:router                    (hope) Spawn agents and verify their",
+            "g"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "output — route work, never do it. Use whe…",
+            "g"
+          ]
+        ]
+      ]
+    },
   },
   {
     user: "/hope:reduce",
-    replyAt: 16.7,
+    replyAt: 4.6,
     chrome: [
-      [-36.3, {"context": "4% · 42.1k", "style": "hold:Plain", "spin": {"verb": "Orbiting", "tail": "thinking with xhigh effort"}}],
-      [-26.3, {"context": "4% · 42.1k", "style": "hold:Plain", "spin": {"verb": "Orbiting", "tail": "still thinking with xhigh effort"}}],
-      [-23.3, {"context": "4% · 42.1k", "style": "hold:Plain"}],
-      [-22.3, {"context": "5% · 45k", "style": "hold:Plain"}],
-      [-0.3, {"context": "5% · 45k", "style": "hold:Plain", "spin": {"verb": "Drizzling"}}],
-      [0.7, {"context": "5% · 45k", "style": "hold:Plain", "spin": {"verb": "Drizzling", "tail": "thinking with xhigh effort"}}],
-      [10.7, {"context": "5% · 45k", "style": "hold:Plain", "spin": {"verb": "Drizzling", "tail": "still thinking with xhigh effort"}}],
-      [14.7, {"context": "5% · 47.4k", "style": "hold:Plain"}],
+      [-15.9, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing", "tail": "thinking with medium effort"}}],
+      [-11.9, {"context": "5% · 45.6k", "style": "hold:Plain"}],
+      [0.1, {"context": "5% · 45.6k", "style": "hold:Plain", "spin": {"verb": "Sautéing"}}],
+      [1.1, {"context": "5% · 45.6k", "style": "hold:Plain", "spin": {"verb": "Sautéing", "tail": "thinking with medium effort"}}],
+      [4.1, {"context": "5% · 46.8k", "style": "hold:Plain"}],
     ],
     reply: [
       "```markdown",
-      "catalog: cache prices for 1 hour instead of 5 minutes",
+      "## catalog: price cache TTL 5 min → 1 h",
       "",
-      "Cuts pricing-service calls and catalog load. Local hit rate: TODO% → TODO%",
-      "(TODO: which SKUs, how many reads, how long).",
+      "Cuts calls to the pricing service. `price.changed` still drops a SKU at once.",
+      "Hit rate locally: <before → after>",
       "",
-      "**Cost:** the header comment in `price_cache.ts` says the TTL caps how long a",
-      "missed `price.changed` event leaves a stale price. That cap is now 1 hour.",
-      "I don't know how often events go missing; `price_events.ts` has no retry or",
-      "replay. Is that acceptable?",
+      "**Tradeoff:** if a `price.changed` event is missed, the old price can now stay",
+      "up for 1 h instead of 5 min (see the comment in `price_cache.ts`).",
+      "<Why an hour is acceptable.>",
       "",
-      "- Memory: unchanged; `get()` never removes expired entries.",
-      "- Tests: boundary waits 4/6 → 59/61 min; `npm test` passes 3/3.",
-      "- Docs: no change; neither the header comment nor the README states a TTL.",
+      "**Tests:** 3/3 pass. The TTL edge tests now check 59 and 61 min. None covers",
+      "a missed event.",
       "```",
     ],
     keys: [
       [
-        -3.8,
+        -2.6,
         "type",
-        "/reduce"
+        "/hope:reduce"
       ],
       [
-        -2.3,
+        -0.1,
         "key",
         "Enter"
       ]
     ],
+    menu: {
+      "after": 0,
+      "rows": [
+        [
+          [
+            "  "
+          ],
+          [
+            "❯ /",
+            "l"
+          ],
+          [
+            "hope:reduce",
+            "l b"
+          ],
+          [
+            "                    (hope) Re-derive something written into",
+            "l"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "the shortest version that still covers ev…",
+            "l"
+          ]
+        ],
+        [
+          [
+            "  "
+          ],
+          [
+            "  /hope:router                    (hope) Spawn agents and verify their",
+            "g"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "output — route work, never do it. Use whe…",
+            "g"
+          ]
+        ]
+      ]
+    },
   },
 ];

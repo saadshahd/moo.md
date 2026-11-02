@@ -34,10 +34,10 @@ import type { Chrome, Scene, Turn } from "./types";
 import * as freeze from "./sessions/freeze";
 import * as anchor from "./sessions/anchor";
 import * as draft from "./sessions/draft";
-import * as reduce from "./sessions/reduce";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as reduce from "./sessions/reduce";
 
 // ---- Move pages: one scene each, the one that carries the move.
 
@@ -108,25 +108,6 @@ export const draftScene: Scene = {
   ],
 };
 
-/** The turn with `menu` drawn over its prompt box. */
-const withMenu = (turn: Turn, menu: Turn["menu"]): Turn => ({ ...turn, menu });
-export const reduceScene: Scene = {
-  chrome: reduce.chrome,
-  // The later /hope:reduce turns: no capture fell between typing "/reduce" and
-  // its Enter, so they show the menu the first one drew for the same text.
-  turns: reduce.turns.map((turn, i) => (i > 1 ? withMenu(turn, reduce.turns[1].menu) : turn)),
-  // render.ts draws a ```markdown block rendered; Claude Code drew it as source.
-  beats: [
-    { at: 0, text: "A PR description for the reviewer who wrote the cache." },
-    { at: 1, text: "The headings go; the cost question stays." },
-    {
-      at: 2,
-      text: "Again: the tail becomes a short list.",
-    },
-    { at: 3, text: "The third pass trims words, not facts." },
-  ],
-};
-
 // ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
 // skill with moo on. The page opens where turn 1 first waits on the user, a
 // step from turn 0's reply. Captions are empty until a writer drafts them: one
@@ -140,6 +121,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const reduceScene = skill(reduce);
 
 // ---- Chain pages: one session where /compose runs each move as it comes up.
 
