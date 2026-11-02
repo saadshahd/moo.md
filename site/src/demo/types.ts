@@ -17,9 +17,6 @@ export type Turn = {
   activity?: Activity[];
   /** The AskUserQuestion dialogs the turn opened before its reply, in order. */
   dialogs?: Dialog[];
-  /** Claude Code asked permission to run tools, which the recorder gave; the
-   * demo draws none of those prompts. */
-  askedPermission?: true;
   /** The toast hunch showed once the reply was in, e.g. tend's. */
   toast?: string;
   /** The keys the recorder sent, from its key log, in order: seconds after
@@ -100,8 +97,6 @@ export type Scene = {
   /** What Claude Code drew around the prompt box before the first prompt. */
   chrome: Chrome;
   turns: Turn[];
-  /** What else the demo cuts from the recording, said in its "Edited:" note. */
-  cut?: string[];
   /** In the order they play; the first opens the demo. */
   beats: Beat[];
 };

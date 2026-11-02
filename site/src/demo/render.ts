@@ -132,8 +132,7 @@ const text = (line: Line) =>
  * the lines inside stand as written: with no language, in lavender; "diff",
  * + lines green and - lines red, in the terminal's palette; any other, plain.
  * A "markdown" block is the one edit: Claude Code showed it as source, and the
- * site renders it as Claude Code renders markdown outside a block (the demo's
- * "Edited:" note says so). */
+ * site renders it as Claude Code renders markdown outside a block. */
 function draw(lines: Line[], width: number): Cell[][] {
   const out: Cell[][] = [];
   let afterHeading = false;

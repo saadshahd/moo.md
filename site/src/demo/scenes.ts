@@ -57,7 +57,6 @@ export const anchorScene: Scene = {
   chrome: anchor.chrome,
   turns: anchor.turns,
   // gen.py drops what Claude Code drew under a long command while it ran.
-  cut: ["the running time and background hint under long commands"],
   beats: [
     {
       at: 0,
@@ -116,7 +115,6 @@ export const reduceScene: Scene = {
   // its Enter, so they show the menu the first one drew for the same text.
   turns: reduce.turns.map((turn, i) => (i > 1 ? withMenu(turn, reduce.turns[1].menu) : turn)),
   // render.ts draws a ```markdown block rendered; Claude Code drew it as source.
-  cut: ["the PR text's markdown is rendered, where Claude Code showed it as source"],
   beats: [
     { at: 0, text: "A PR description for the reviewer who wrote the cache." },
     { at: 1, text: "The headings go; the cost question stays." },

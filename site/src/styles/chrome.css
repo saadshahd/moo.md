@@ -4,15 +4,13 @@
 :root,
 :root[data-theme] {
   --sl-nav-height: 3rem;
-  /* One centred column, as wide as the terminal at 120 columns (884px, where
-     Demo.astro's container query switches to 120): every page's title, strip,
-     caption, terminal and controls share its edges, between equal gutters. */
-  --sl-content-width: 55.25rem;
-  --sl-nav-pad-x: 1.5rem;
+  /* One centred column: the bar's contents (TopBar.astro) and every page's
+     title, strip, caption, terminal and controls share its edges, between
+     equal gutters. The bar's side padding is the content's, so the edges
+     meet at every width. Change it with the margin note's breakpoint below. */
+  --sl-content-width: 87.5rem;
+  --sl-nav-pad-x: var(--sl-content-pad-x);
   --sl-nav-pad-y: 0;
-}
-@media (max-width: 50rem) {
-  :root { --sl-nav-pad-x: 1rem; }
 }
 
 /* The band: the bar and the first panel (a demo page's strip row, another
@@ -60,13 +58,13 @@ site-search button[data-open-modal] kbd { background: transparent; border: 0; co
 
 /* The front page's margin note: what the site is and the chains. It sits in
    the right gutter, out of the flow, so the terminal holds the box it has on
-   every demo page; where the gutter is too narrow, it hides. Install is the
-   bar's alone. */
+   every demo page; where the gutter is narrower than 13.375rem, it hides.
+   Install is the bar's alone. The breakpoint is --sl-content-width + 32.75rem. */
 .landing-side { display: none; }
-@media (min-width: 88rem) {
+@media (min-width: 120.25rem) {
   .sl-markdown-content:has(> .landing-side) { position: relative; }
   .sl-markdown-content > .landing-side {
-    position: absolute; top: 0; left: calc(100% + 1.5rem); width: calc((100vw - 55.25rem) / 2 - 3rem); margin: 0;
+    position: absolute; top: 0; left: calc(100% + 1.5rem); width: calc((100vw - var(--sl-content-width)) / 2 - 3rem); margin: 0;
     display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem;
   }
 }
@@ -143,8 +141,8 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 /* One vertical rhythm around the demo: the title row's padding, the gap
    from the band to the caption, from the caption to the terminal, and from
    the terminal to the player are all one step of 11px, on a phone too. That
-   is the largest step that leaves the terminal 32 rows at 1440x900 and 26 at
-   390x844; Demo.astro fits the rows, the same on every page. */
+   leaves the terminal 33 rows at 1440x900 and 29 at 390x844; Demo.astro fits
+   the rows, the same on every page. */
 :root:has(.demo) { --moo-step: 0.6875rem; }
 :root:has(.demo) .main-frame main .content-panel { padding-block: var(--moo-step); }
 :root:has(.demo) .main-frame main .content-panel + .content-panel { padding-bottom: 0; }
