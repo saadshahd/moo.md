@@ -32,7 +32,7 @@ import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } 
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
 import { actorChange, tick } from "./main.ts";
-import type { App } from "./app.ts";
+import { createAppAuth } from "./vendor/auth-app.js";
 import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
@@ -1709,12 +1709,11 @@ describe("a worker that acts as an App", () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-tick-"));
     await gitIn(dir, "init", "-q", "-b", "main");
 
-    /** SAFETY: `botFor` only calls the App, and this one fails at its first call. */
-    const app = (async () => {
-      throw new Error("the App can't mint");
-    }) as unknown as App;
+    /** An App whose key can't sign: its mint fails at once, before any request, and the repo has no origin to fetch. */
+    const app = createAppAuth({ appId: "1", privateKey: "no key" });
+    const ticked = tick({ app, dir, repo: "o/r", base: "main", machine: "m" }, platformOf("linux")!);
 
-    await expect(tick({ app, dir, repo: "o/r", base: "main", machine: "m" }, platformOf("linux")!)).rejects.toThrow("the App can't mint");
+    await expect(ticked).rejects.toMatchObject({ message: expect.not.stringContaining("git fetch") });
     await rm(dir, { recursive: true });
   });
 });
