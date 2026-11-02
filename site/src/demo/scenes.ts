@@ -41,19 +41,6 @@ import * as reduce from "./sessions/reduce";
 
 // ---- Move pages: one scene each, the one that carries the move.
 
-export const freezeScene: Scene = {
-  chrome: freeze.chrome,
-  turns: freeze.turns,
-  beats: [
-    {
-      at: 0,
-      text: "The ask: the export that stopped this morning.",
-    },
-    { at: 0, on: "reply", text: "Three tables: what it saw, couldn't see, inferred." },
-    { at: 1, text: "You type lock; five gaps stay open." },
-  ],
-};
-
 export const anchorScene: Scene = {
   chrome: anchor.chrome,
   turns: anchor.turns,
@@ -90,6 +77,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const freezeScene = skill(freeze);
 export const draftScene = skill(draft);
 export const reduceScene = skill(reduce);
 

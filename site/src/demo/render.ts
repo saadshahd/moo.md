@@ -15,9 +15,10 @@ export type Row = { segs: Seg[]; cls?: string; opt?: number; input?: number };
 type Cell = [string, string?];
 
 // ---- Wrapping ---------------------------------------------------------------
-// Greedy by words; a word longer than the width breaks at the edge. At 80
-// columns it matches the recordings but for a few list items, which Claude Code
-// broke one word early.
+// Greedy by words; a word longer than the width breaks at the edge. Matches the
+// recordings but for four rows (list items and a paragraph, at 45, 80 and 120)
+// that Claude Code broke a word early. Each would fill the width exactly, yet
+// other rows recorded filling it: no rule found.
 function wrap(cs: Cell[], width: number, first = width): Cell[][] {
   const lines: Cell[][] = [];
   let line: Cell[] = [];
