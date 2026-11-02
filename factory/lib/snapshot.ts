@@ -17,7 +17,7 @@ export const UNDO_LABEL = "factory:undo";
 
 const Actor = z.nullable(z.object({ __typename: z.string(), login: z.string() }));
 
-/** GraphQL names a bot by its slug; REST and git say `<slug>[bot]`. */
+/** GraphQL names a bot by its slug; REST, git and the rules file say `<slug>[bot]`. */
 const login = (a: z.infer<typeof Actor>) =>
   a === null ? null : a.__typename === "Bot" ? `${a.login}[bot]` : a.login;
 

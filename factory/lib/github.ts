@@ -1,4 +1,4 @@
-import { parse, render, type FactoryComment, type Kind } from "./formats.ts";
+import { parse, render, writer, type FactoryComment, type Kind } from "./formats.ts";
 
 export type Run = (
   argv: readonly string[],
@@ -36,8 +36,11 @@ export type Comment = {
   url: string;
 };
 
-/** The people whose words count; the factory acts as one of them. */
-export type Actors = { trusted: readonly string[] };
+/** The factory's bot, or null when it acts as the user, and the people whose words count. */
+export type Actors = { bot: string | null; trusted: readonly string[] };
+
+/** Who writes the factory's own comments and PRs: its bot, or with none, the people it acts as. */
+export const factoryLogins = (a: Actors): readonly string[] => (a.bot === null ? a.trusted : [a.bot]);
 
 /**
  * Written by one of `logins` and edited by nobody else. A repo's maintainers can edit anyone's
@@ -54,14 +57,18 @@ export function wroteIt(
   );
 }
 
+export const fromFactory = (c: Comment, a: Actors) => wroteIt(c, factoryLogins(a));
 export const fromTrusted = (c: Comment, a: Actors) => wroteIt(c, a.trusted);
 
-/** The factory comments trusted people wrote, oldest first. */
+/** The comments that are factory comments from the author their kind allows, oldest first. */
 export function factoryComments(cs: readonly Comment[], a: Actors): { id: number; c: FactoryComment }[] {
   return cs.flatMap((x) => {
-    const c = fromTrusted(x, a) ? parse(x.body) : null;
+    const c = parse(x.body);
 
-    return c === null ? [] : [{ id: x.id, c }];
+    if (c === null) return [];
+    const ok = writer(c.kind) === "bot" ? fromFactory(x, a) : fromTrusted(x, a);
+
+    return ok ? [{ id: x.id, c }] : [];
   });
 }
 
@@ -86,7 +93,7 @@ export async function edit(run: Run, repo: string, id: number, c: FactoryComment
 }
 
 /**
- * Posts `c` on `n`, or edits the newest trusted comment of its kind among `existing` when it
+ * Posts `c` on `n`, or edits the factory's newest comment of its kind among `existing` when it
  * differs, so a rerun after a crash never posts twice. Says which it did.
  */
 export async function upsert(

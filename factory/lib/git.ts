@@ -1,8 +1,9 @@
 /**
  * The git config every factory git command runs under. The credential helpers are cleared, then
- * gh's is set, so git hands GitHub the user's gh login whatever the keychain holds. That helper
- * answers over HTTPS only, and a worker started by launchd has no SSH agent, so GitHub's SSH
- * remotes are rewritten to HTTPS. Signing is off: an unattended run can't answer a key's prompt.
+ * gh's is set, so git hands GitHub gh's login: the factory bot's token where `GH_TOKEN` holds one,
+ * else the user's. That helper answers over HTTPS only, and a worker started by launchd has no SSH
+ * agent, so GitHub's SSH remotes are rewritten to HTTPS. Signing is off: an unattended run can't
+ * answer a key's prompt.
  */
 const GIT_CONFIG = [
   ["credential.helper", ""],

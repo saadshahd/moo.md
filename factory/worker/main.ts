@@ -7,9 +7,11 @@
 
 import { messageOf } from "../lib/errors.ts";
 import { must, repoOf } from "../lib/github.ts";
+import { botEnv, needsRenew, type Bot } from "../lib/bot.ts";
 import { gitConfigEnv } from "../lib/git.ts";
 import { actorsOf, readRules, rulesChangedByFactory, RULES_PATH } from "../lib/rules.ts";
 import { apply, log, say } from "./act.ts";
+import { botFor, readApp, type App } from "./app.ts";
 import { trustedIssue } from "../lib/snapshot.ts";
 import { classify, decide, occupies, stateLine } from "./decide.ts";
 import { guard } from "./guard.ts";
@@ -33,9 +35,24 @@ function holdAwake(p: Platform, busy: boolean): void {
   }
 }
 
+let bot: Bot | null = null;
+
+/** Mints the App's token again near its expiry; the worker's commands then act as its bot. */
+async function asBot(app: App, repo: string): Promise<void> {
+  if (bot !== null && !needsRenew(bot, Date.now())) return;
+  bot = await botFor(app, repo);
+  Object.assign(process.env, botEnv(bot));
+}
+
 async function tick(ctx: Ctx, p: Platform): Promise<void> {
   await must(run, ["git", "fetch", "origin", ctx.base], { cwd: ctx.dir });
   const rules = await readRules(run, ctx.dir);
+
+  /** Who the worker acts as is set at its start; rules that changed it wait for a restart. */
+  if ((rules.bot === undefined) !== (ctx.app === null))
+    throw new Error(`the rules ${rules.bot === undefined ? "no longer name a bot" : `now name the bot ${rules.bot}`}; restart the worker`);
+
+  if (ctx.app !== null) await asBot(ctx.app, ctx.repo);
   const byFactory = await rulesChangedByFactory(run, ctx.dir, ctx.repo);
 
   if (byFactory !== null)
@@ -87,7 +104,8 @@ async function main(dir: string): Promise<void> {
 
   await must(run, ["git", "fetch", "origin", base], { cwd: dir });
   const rules = await readRules(run, dir);
-  const { refusals, warnings } = await guard(repo, base, rules);
+  const app = rules.bot === undefined ? null : await readApp();
+  const { refusals, warnings } = await guard(repo, base, rules, app);
 
   if (refusals.length > 0) {
     for (const r of refusals) console.error(`factory: ${r}`);
@@ -95,8 +113,8 @@ async function main(dir: string): Promise<void> {
   }
 
   for (const w of warnings) log(`warning: ${w}`);
-  const ctx: Ctx = { dir, repo, base, machine: await machineId(run, p) };
-  log(`watching ${repo} (${base}), ${rules.atOnce} at once`);
+  const ctx: Ctx = { app, dir, repo, base, machine: await machineId(run, p) };
+  log(`watching ${repo} (${base}), ${rules.atOnce} at once, as ${rules.bot ?? "the user's gh login"}`);
 
   if (p.awake === null) log(`no keep-awake command for ${process.platform}, so busy runs never hold the machine awake`);
 

@@ -16,6 +16,7 @@ import { HANDOFF_PATH, PLAN_PATH, PR_PATH, planFiles, planGaps, planText } from 
 import { actorsOf, guardedIn, readRules, type Rules } from "../lib/rules.ts";
 import { comments, LABEL, readSnapshot } from "../lib/snapshot.ts";
 import { approved, APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
+import { botFor, readApp } from "./app.ts";
 import { run } from "./proc.ts";
 
 class Refusal extends Error {
@@ -206,6 +207,8 @@ async function main(argv: string[]): Promise<string> {
       return handoff(await here(cwd));
     case "push":
       return pushBranch(cwd, (await here(cwd)).issue);
+    case "token":
+      return JSON.stringify(await botFor(await readApp(), await repoOf(run, cwd)));
     case "pr":
       return pr(await here(cwd));
     case "stuck": {
@@ -219,7 +222,7 @@ async function main(argv: string[]): Promise<string> {
     }
 
     default:
-      throw new Refusal(`usage: factory <plan|call|handoff|push|pr|stuck> …`, 2);
+      throw new Refusal(`usage: factory <plan|call|handoff|push|pr|stuck|token> …`, 2);
   }
 }
 

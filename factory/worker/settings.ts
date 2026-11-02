@@ -1,9 +1,9 @@
 /**
- * How a run starts. A run acts as the user, so what keeps it to the factory's own GitHub writes is
- * Claude Code's permission check: deny rules stop the plain forms of a GitHub write before anything
- * else, and auto mode's classifier judges every shell command against the rules below, with the
- * user's own allow rules set aside. Neither is a wall: a deny rule matches text, and the classifier
- * judges.
+ * How a run starts. A run holds a GitHub login, its bot's or the user's, so what keeps it to the
+ * factory's own GitHub writes is Claude Code's permission check: deny rules stop the plain forms of
+ * a GitHub write before anything else, and auto mode's classifier judges every shell command
+ * against the rules below, with the user's own allow rules set aside. Neither is a wall: a deny
+ * rule matches text, and the classifier judges.
  */
 
 import { gitConfigEnv } from "../lib/git.ts";

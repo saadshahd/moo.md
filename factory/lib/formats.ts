@@ -131,11 +131,14 @@ export type FactoryComment = z.infer<
 
 export type Kind = FactoryComment["kind"];
 
+/** Who may write a kind: the factory, as its bot or the user it acts as, or a person the rules trust. */
+type Author = "bot" | "trusted";
+
 type TextField<C> = {
   [K in Exclude<keyof C, "kind">]: C[K] extends string ? K : never;
 }[Exclude<keyof C, "kind">];
 
-type Spec = { codec: z.ZodMiniType<FactoryComment, string> };
+type Spec = { by: Author; codec: z.ZodMiniType<FactoryComment, string> };
 
 const MARKER = /^<!-- factory:([a-z]+) (\{.*\}) -->\n?/;
 
@@ -167,6 +170,7 @@ function textOf(body: string): string {
 
 function kind<C extends FactoryComment>(
   schema: z.ZodMiniType<C, C>,
+  by: Author,
   text: TextField<C> | null,
   show: (c: C) => string,
 ) {
@@ -194,7 +198,7 @@ function kind<C extends FactoryComment>(
     },
   });
 
-  return { codec };
+  return { by, codec };
 }
 
 const RESTARTED = {
@@ -208,16 +212,17 @@ const RESTARTED = {
 } satisfies { [R in Restart["reason"]]: string };
 
 const CODECS = {
-  plan: kind(Plan, "text", (c) => `**Plan** · seal \`${c.seal.slice(0, 8)}\``),
+  plan: kind(Plan, "bot", "text", (c) => `**Plan** · seal \`${c.seal.slice(0, 8)}\``),
   call: kind(
     Call,
+    "bot",
     "why",
     (c) =>
       `**Call** · ${c.choice}\nPicked: ${c.picked}${
         c.others.length === 0 ? "" : ` (not ${c.others.join(", not ")})`
       }\nTo undo: ${c.undo}`,
   ),
-  wait: kind(Wait, null, (c) =>
+  wait: kind(Wait, "bot", null, (c) =>
     c.questions
       .map(
         (q, i) =>
@@ -227,24 +232,26 @@ const CODECS = {
       )
       .join("\n"),
   ),
-  answer: kind(Answer, null, (c) => `**Answer** · ${c.answers.join(" · ")}`),
-  handoff: kind(Handoff, "text", () => "**Handoff**"),
+  answer: kind(Answer, "trusted", null, (c) => `**Answer** · ${c.answers.join(" · ")}`),
+  handoff: kind(Handoff, "bot", "text", () => "**Handoff**"),
   cost: kind(
     Cost,
+    "bot",
     null,
     (c) =>
       `**Cost** · ${total(c).toLocaleString("en-US")} tokens: ${c.input} input, ${c.cacheRead} cache read, ${c.cacheWrite} cache write, ${c.output} output, over ${c.sessions.length} session(s)`,
   ),
-  restart: kind(Restart, null, (c) => RESTARTED[c.reason]),
-  held: kind(Held, null, (c) => `**Held** · until ${holder(c.on)}`),
-  stuck: kind(Stuck, null, (c) => `**Stuck** · ${c.reason}`),
+  restart: kind(Restart, "bot", null, (c) => RESTARTED[c.reason]),
+  held: kind(Held, "bot", null, (c) => `**Held** · until ${holder(c.on)}`),
+  stuck: kind(Stuck, "bot", null, (c) => `**Stuck** · ${c.reason}`),
   stopped: kind(
     Stopped,
+    "bot",
     null,
     (c) => `**Stopped** · by hand; the factory leaves it. Go on with \`claude --bg --resume ${c.session}\`, or close the issue`,
   ),
-  undo: kind(Undo, "text", (c) => `**Undo** · factory call ${c.call}`),
-} satisfies { [C in FactoryComment as C["kind"]]: { codec: z.ZodMiniType<C, string> } };
+  undo: kind(Undo, "trusted", "text", (c) => `**Undo** · factory call ${c.call}`),
+} satisfies { [C in FactoryComment as C["kind"]]: { by: Author; codec: z.ZodMiniType<C, string> } };
 
 type Table = { [K in Kind]: Spec };
 
@@ -278,3 +285,5 @@ export function parse(body: string): FactoryComment | null {
 
   return r.success ? r.data : null;
 }
+
+export const writer = (kind: Kind): Author => TABLE[kind].by;

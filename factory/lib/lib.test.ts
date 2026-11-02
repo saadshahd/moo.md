@@ -1,4 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
+import { botEnv, needsRenew, RENEW_BEFORE_MS, type Bot } from "./bot.ts";
+import { gitConfigEnv } from "./git.ts";
 import {
   parse,
   render,
@@ -19,7 +21,6 @@ import {
   type Comment,
   type Run,
 } from "./github.ts";
-import { gitConfigEnv } from "./git.ts";
 import { cutToFailures, isTestCommand } from "./logs.ts";
 import { overlap, planFiles, planGaps, planText } from "./plan.ts";
 import { actorsOf, guardedIn, parseRules, RULES_PATH } from "./rules.ts";
@@ -38,7 +39,7 @@ import {
 const SEAL = "a".repeat(64);
 const BOT = "moo-factory[bot]";
 const ME = "owner";
-const A: Actors = { trusted: [ME] };
+const A: Actors = { bot: BOT, trusted: [ME] };
 
 const Q = {
   question: "Which store?",
@@ -59,7 +60,7 @@ const comment = (
   editor: string | null = null,
 ): Comment => ({ id, body, author, editor, createdAt: "", url: `u${id}` });
 
-const posted = (id: number, c: FactoryComment) => comment(id, render(c));
+const bot = (id: number, c: FactoryComment) => comment(id, render(c), BOT);
 
 const wait = (questions = [Q], approves: string | null = null): Wait => ({
   kind: "wait",
@@ -187,20 +188,28 @@ describe("authors", () => {
   test("a comment counts only when written, and last edited, by the logins named", () => {
     expect(wroteIt(comment(1, ""), [ME])).toBe(true);
     expect(wroteIt(comment(1, "", ME, ME), [ME])).toBe(true);
-    expect(wroteIt(comment(1, "", ME, "stranger"), [ME])).toBe(false);
+    expect(wroteIt(comment(1, "", ME, BOT), [ME])).toBe(false);
     expect(wroteIt(comment(1, "", null), [ME])).toBe(false);
   });
-  test("every kind counts from a trusted login, and none from anyone else", () => {
+  test("bot kinds count only from the bot, a person's kinds only from the trusted", () => {
     const cs = [
       comment(1, render(plan), ME),
       comment(2, render(plan), "stranger"),
-      comment(3, render(answer), "stranger"),
-      comment(4, render(answer), ME),
-      comment(5, render(plan), BOT),
+      bot(3, plan),
+      bot(4, answer),
+      comment(5, render(answer), "stranger"),
+      comment(6, render(answer), ME),
     ];
 
-    expect(factoryComments(cs, A).map((x) => x.id)).toEqual([1, 4]);
-    expect(latest(cs, A, "plan")?.id).toBe(1);
+    expect(factoryComments(cs, A).map((x) => x.id)).toEqual([3, 6]);
+    expect(latest(cs, A, "plan")?.id).toBe(3);
+  });
+  test("a factory that acts as the user takes every kind from a trusted login, and none from a bot", () => {
+    const asUser: Actors = { bot: null, trusted: [ME] };
+    const cs = [comment(1, render(plan), ME), comment(2, render(plan), "stranger"), bot(3, plan), comment(4, render(answer), ME)];
+
+    expect(factoryComments(cs, asUser).map((x) => x.id)).toEqual([1, 4]);
+    expect(latest(cs, asUser, "plan")?.id).toBe(1);
   });
 });
 
@@ -226,15 +235,15 @@ describe("wait", () => {
       author,
     );
 
-  test("only the newest unanswered wait is open", () => {
-    expect(openWait([posted(1, wait())], A)?.id).toBe(1);
+  test("only the bot's newest unanswered wait is open", () => {
+    expect(openWait([bot(1, wait())], A)?.id).toBe(1);
     expect(
-      openWait([posted(1, wait()), posted(2, { ...wait(), answers: ["Map"] })], A),
+      openWait([bot(1, wait()), bot(2, { ...wait(), answers: ["Map"] })], A),
     ).toBe(null);
-    expect(openWait([comment(1, render(wait()), "stranger")], A)).toBe(null);
+    expect(openWait([comment(1, render(wait()))], A)).toBe(null);
   });
   test("an answer comment naming the wait answers it, question by question", () => {
-    const cs = [posted(1, wait()), answerComment(2, 1, ["Array"])];
+    const cs = [bot(1, wait()), answerComment(2, 1, ["Array"])];
     expect(answerTo(cs, A, { id: 1, c: wait() })).toEqual({
       id: 2,
       answers: ["Array"],
@@ -242,7 +251,7 @@ describe("wait", () => {
     });
   });
   test("a plain comment answers a one-question wait; one before the wait never does", () => {
-    const cs = [comment(1, "earlier"), posted(2, wait()), comment(3, " Map \n")];
+    const cs = [comment(1, "earlier"), bot(2, wait()), comment(3, " Map \n")];
     expect(answerTo(cs, A, { id: 2, c: wait() })).toEqual({
       id: 3,
       answers: ["Map"],
@@ -252,18 +261,18 @@ describe("wait", () => {
   test("a plain comment answers no wait of several questions, and no approval", () => {
     const two = wait([Q, Q]);
     expect(
-      answerTo([posted(1, two), comment(2, "Map")], A, { id: 1, c: two }),
+      answerTo([bot(1, two), comment(2, "Map")], A, { id: 1, c: two }),
     ).toBe(null);
     const asks = wait([APPROVAL], SEAL);
     expect(
-      answerTo([posted(1, asks), comment(2, "Approve")], A, { id: 1, c: asks }),
+      answerTo([bot(1, asks), comment(2, "Approve")], A, { id: 1, c: asks }),
     ).toBe(null);
   });
-  test("an answer from a stranger, or one a stranger edited, is passed over", () => {
+  test("an answer from a stranger, or one the bot edited, is passed over", () => {
     const cs = [
-      posted(1, wait()),
+      bot(1, wait()),
       comment(2, "Array", "stranger"),
-      comment(3, "Array", ME, "stranger"),
+      comment(3, "Array", ME, BOT),
       comment(4, "Map"),
     ];
 
@@ -287,7 +296,7 @@ describe("wait", () => {
     ).toBe(false);
     expect(
       approved(
-        [posted(2, { ...wait([APPROVAL], SEAL), answers: ["Approve"] })],
+        [bot(2, { ...wait([APPROVAL], SEAL), answers: ["Approve"] })],
         A,
         SEAL,
       ),
@@ -301,7 +310,7 @@ describe("wait", () => {
   test("notes are trusted people's words that answer no wait", () => {
     const cs = [
       comment(1, "first"),
-      posted(2, wait()),
+      bot(2, wait()),
       comment(3, "Map"),
       comment(4, "later"),
       comment(5, "hi", "stranger"),
@@ -419,6 +428,7 @@ describe("rules", () => {
     atOnce: 2,
     waitsPerDay: 5,
     contextCap: 400000,
+    bot: BOT,
     taste: ["CLAUDE.md"],
     layers: {
       check: ["tsc strict"],
@@ -432,6 +442,7 @@ describe("rules", () => {
     const r = parseRules(JSON.stringify(good));
     expect(r).toEqual(good);
     expect("errors" in r ? null : actorsOf(r, "owner/app")).toEqual(A);
+    expect("errors" in r ? null : actorsOf({ ...r, bot: undefined }, "owner/app").bot).toBe(null);
     expect(
       "errors" in r
         ? null
@@ -463,11 +474,10 @@ describe("rules", () => {
     expect(parseRules(JSON.stringify({ ...good, pr: { draft: true } }))).toEqual({ ...good, pr: { draft: true } });
     expect("errors" in parseRules(JSON.stringify({ ...good, pr: {} }))).toBe(true);
   });
-  test("a key the rules no longer hold fails loud", () => {
-    expect(parseRules(JSON.stringify({ ...good, bot: BOT }))).toEqual({
-      errors: [".claude/factory.json bot: no such field"],
+  test("a key the rules don't hold fails loud", () => {
+    expect(parseRules(JSON.stringify({ ...good, sandbox: { domains: [] } }))).toEqual({
+      errors: [".claude/factory.json sandbox: no such field"],
     });
-    expect("errors" in parseRules(JSON.stringify({ ...good, sandbox: { domains: [] } }))).toBe(true);
   });
   test("only a person changes the rules file and the workflows; a file beside them is anyone's", () => {
     expect(guardedIn([RULES_PATH, ".github/workflows/ci.yml", ".github/CODEOWNERS", "src/a.ts", ".claude/factory.json.bak"])).toEqual([
@@ -475,7 +485,10 @@ describe("rules", () => {
       ".github/workflows/ci.yml",
     ]);
   });
-  test("a bot login is never trusted", () => {
+  test("the bot is a [bot] login, and never trusted", () => {
+    expect("errors" in parseRules(JSON.stringify({ ...good, bot: "me" }))).toBe(
+      true,
+    );
     expect(
       "errors" in parseRules(JSON.stringify({ ...good, trusted: [ME, BOT] })),
     ).toBe(true);
@@ -485,18 +498,27 @@ describe("rules", () => {
   });
 });
 
-describe("git", () => {
-  test("git reaches GitHub over HTTPS through gh's login, and signs nothing", () => {
-    const env = gitConfigEnv();
-    const pairs = Array.from({ length: Number(env.GIT_CONFIG_COUNT) }, (_, i) => [env[`GIT_CONFIG_KEY_${i}`], env[`GIT_CONFIG_VALUE_${i}`]]);
+describe("bot", () => {
+  const b: Bot = {
+    token: "t",
+    expiresAt: "2026-10-26T12:00:00Z",
+    name: BOT,
+    email: "1+x@users.noreply.github.com",
+  };
 
-    expect(pairs).toEqual([
-      ["credential.helper", ""],
-      ["credential.helper", "!gh auth git-credential"],
-      ["url.https://github.com/.insteadOf", "git@github.com:"],
-      ["url.https://github.com/.insteadOf", "ssh://git@github.com/"],
-      ["commit.gpgsign", "false"],
-    ]);
+  const at = Date.parse(b.expiresAt);
+
+  test("a token renews once it is within the renew window, or when none is held", () => {
+    expect(needsRenew(null, at)).toBe(true);
+    expect(needsRenew(b, at - RENEW_BEFORE_MS - 1)).toBe(false);
+    expect(needsRenew(b, at - RENEW_BEFORE_MS + 1)).toBe(true);
+  });
+  test("its environment points gh, git push and git commit at the bot", () => {
+    expect(botEnv(b)).toMatchObject({
+      ...gitConfigEnv(),
+      GH_TOKEN: "t",
+      GIT_AUTHOR_NAME: BOT,
+    });
   });
 });
 
@@ -515,7 +537,7 @@ describe("snapshot", () => {
       undos: [
         { body: undo(1), author: ME, editor: null },
         { body: undo(2), author: "stranger", editor: null },
-        { body: undo(3), author: ME, editor: "stranger" },
+        { body: undo(3), author: ME, editor: BOT },
         { body: "Undoes factory call 4.", author: ME, editor: null },
       ],
     };

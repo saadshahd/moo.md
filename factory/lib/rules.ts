@@ -27,6 +27,11 @@ export const Rules = z.object({
   contextCap: z.int().check(z.minimum(1)),
   /** How often the open `/factory` pane reads GitHub again, in seconds. Default 20. */
   paneEverySeconds: z.optional(z.int().check(z.minimum(10))),
+  /**
+   * The factory App's bot login, `<slug>[bot]`, where the factory acts as an App: the only author
+   * whose factory comments count. Without one, the factory acts as the user's own gh login.
+   */
+  bot: z.optional(Text.check(z.regex(/\[bot\]$/))),
   /** Whose comments, labels and issue bodies count. Default: the repo's owner. Never a bot. */
   trusted: z.optional(z.array(Text.check(z.regex(/^(?!.*\[bot\]$)/)))),
   /** Where the project's taste lives (its CLAUDE.md, a taste file), repo-relative. */
@@ -74,7 +79,7 @@ export function parseRules(json: string): Rules | { errors: string[] } {
 }
 
 export function actorsOf(rules: Rules, repo: string): Actors {
-  return { trusted: rules.trusted ?? [repo.split("/")[0]!] };
+  return { bot: rules.bot ?? null, trusted: rules.trusted ?? [repo.split("/")[0]!] };
 }
 
 const HEAD = "refs/remotes/origin/HEAD";
@@ -99,8 +104,8 @@ const Pulls = z.array(z.object({ number: z.int(), head: z.object({ ref: z.string
 
 /**
  * The factory PR, from a `factory/<n>` branch, that made the newest change to the rules on
- * origin's default branch, or null when another PR or a push made it. A run acts as the user, so
- * a PR of its own could merge before any check of the worker's sees it.
+ * origin's default branch, or null when another PR or a push made it. A run writes to GitHub, as
+ * the bot or the user, so a PR of its own could merge before any check of the worker's sees it.
  */
 export async function rulesChangedByFactory(run: Run, cwd: string, repo: string): Promise<number | null> {
   const sha = (await must(run, ["git", "log", "-1", "--format=%H", HEAD, "--", RULES_PATH], { cwd })).trim();

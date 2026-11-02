@@ -2,6 +2,7 @@
   "atOnce": 3,
   "waitsPerDay": 5,
   "contextCap": 300000,
+  "bot": "moo-factory[bot]",
   "trusted": [
     "saadshahd"
   ],

@@ -39,8 +39,9 @@ import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+const BOT = "moo-factory[bot]";
 const ME = "owner";
-const A: Actors = { trusted: [ME] };
+const A: Actors = { bot: BOT, trusted: [ME] };
 const NOW = Date.parse("2026-10-26T12:00:00Z");
 const SEAL = "a".repeat(64);
 
@@ -48,6 +49,7 @@ const RULES: Rules = {
   atOnce: 2,
   waitsPerDay: 3,
   contextCap: 1000,
+  bot: BOT,
   taste: ["CLAUDE.md"],
   layers: {
     check: [],
@@ -73,7 +75,7 @@ const said = (
 });
 
 const posted = (c: FactoryComment, createdAt?: string) =>
-  said(render(c), ME, createdAt);
+  said(render(c), BOT, createdAt);
 
 const issue = (n: number, more: Partial<Issue> = {}): Issue => ({
   number: n,
@@ -471,7 +473,7 @@ describe("a local issue's state and actions", () => {
     const gh = (head: string) =>
       snapshot({
         issues: [issue(7)],
-        open: [{ ...pr(3), author: ME, number: 9, head, files: ["src/a.ts"] }],
+        open: [{ ...pr(3), author: BOT, number: 9, head, files: ["src/a.ts"] }],
       });
 
     expect(
@@ -752,7 +754,7 @@ describe("killing an issue closes its PR", () => {
 });
 
 describe("only a person changes the factory's rules and the repo's workflows", () => {
-  const touching = (files: string[] | null, author = ME) => ({ ...pr(7), author, files });
+  const touching = (files: string[] | null, author = BOT) => ({ ...pr(7), author, files });
 
   const at = (files: string[] | null, runs = [session("working")]) =>
     world(snapshot({ issues: [issue(7)], prs: new Map([[7, pr(7)]]), open: [touching(files)] }), [here(7, runs)]);
@@ -784,19 +786,26 @@ describe("only a person changes the factory's rules and the repo's workflows", (
 });
 
 describe("an issue that ends with no worktree here still closes its PR", () => {
-  const open = (author = ME) => ({ ...pr(7), author, files: ["src/a.ts"] });
-  const at = (issues: Issue[], more: Partial<World> = {}, author = ME) => prsToClose(world(snapshot({ issues, open: [open(author)] }), [], more));
+  const open = (author = BOT) => ({ ...pr(7), author, files: ["src/a.ts"] });
+  const at = (issues: Issue[], more: Partial<World> = {}, author = BOT) => prsToClose(world(snapshot({ issues, open: [open(author)] }), [], more));
 
   test("closed, unlabelled or no longer trusted, its open PR closes, saying why", () => {
     expect(at([])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]);
     expect(at([issue(7, { editor: "stranger" })])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("does not trust") }]);
   });
-  test("a stuck or live issue keeps its PR, as does one no trusted login opened or one a worktree here watches", () => {
+  test("a stuck or live issue keeps its PR, as does a PR the factory never opened or one a worktree here watches", () => {
     expect(at([issue(7, { labels: ["factory", STUCK_LABEL] })])).toEqual([]);
     expect(at([issue(7)])).toEqual([]);
+    expect(at([], {}, ME)).toEqual([]);
     expect(at([], {}, "stranger")).toEqual([]);
     expect(at([], { local: [here(7)] })).toEqual([]);
     expect(at([], { foreign: [7] })).toEqual([]);
+  });
+  test("a factory that acts as the user closes the PRs a trusted login opened, and no one else's", () => {
+    const asUser = { actors: { bot: null, trusted: [ME] } };
+
+    expect(at([], asUser, ME)).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]);
+    expect(at([], asUser, "stranger")).toEqual([]);
   });
   test("decide closes it in a group of its own", () => {
     expect(decide(world(snapshot({ open: [open()] }), []))).toEqual([[expect.objectContaining({ kind: "closePr", pr: 57 })]]);
@@ -854,7 +863,7 @@ describe("plans posted first hold later ones", () => {
     expect(alone([])).toBe("crashed");
   });
   test("an open PR holds before a plan does", () => {
-    const w = world({ ...gh, open: [{ ...pr(3), author: ME, files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
+    const w = world({ ...gh, open: [{ ...pr(3), author: BOT, files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
 
     expect(classify(w.local[0]!, w)).toMatchObject({ kind: "held", on: { kind: "pr", pr: 53, files: ["src/a.ts"] } });
   });
@@ -1009,7 +1018,7 @@ describe("picking new work", () => {
   test("an issue whose plan overlaps an open PR waits", () => {
     const gh = snapshot({
       issues: [issue(4, { comments: [plan] })],
-      open: [{ ...pr(3), author: ME, number: 9, head: "x", files: null }],
+      open: [{ ...pr(3), author: BOT, number: 9, head: "x", files: null }],
     });
 
     expect(pick(world(gh, []))).toEqual([]);
@@ -1230,11 +1239,14 @@ describe("smoke run 1 (saadshahd/factory-smoke, 2026-10-27)", () => {
     expect(step(smoke(at(AGENTS_AT_TICK, 6)))).toEqual({ state: { kind: "working" }, actions: [] });
   });
 
+  test("the restarts the worker posted as the user count no deaths", () => {
+    for (const i of ISSUES) expect(deathsSinceRetry(i.comments, actors)).toBe(0);
+  });
+
   test("a run that ended its turn asking for help is stopped before its restart", () => {
     const { state, actions } = step(smoke(at(AGENTS_LATER, 5)));
 
-    /** The restart the worker posted on #5 counts, as every restart from the user's login now does. */
-    expect(state).toEqual({ kind: "crashed", deaths: 2 });
+    expect(state).toEqual({ kind: "crashed", deaths: 1 });
     expect(actions).toMatchObject([
       { kind: "stop", run: { id: "0e462418" } },
       { kind: "start", restart: "crash", after: "0e462418-b22d-4e15-a8ad-8d9676426c92" },
@@ -1294,7 +1306,7 @@ describe("smoke run 2 (saadshahd/factory-smoke #5, 2026-10-27)", () => {
     expect(occupies(state)).toBe(false);
 
     const w = at("2026-10-27T00:48:00Z", [first, second]);
-    const stopped = said(render({ kind: "stopped", issue: 5, session: second.sessionId }), "saadshahd");
+    const stopped = posted({ kind: "stopped", issue: 5, session: second.sessionId });
     const issue5 = w.gh.issues[0]!;
     const again = { ...w, gh: { ...w.gh, issues: [{ ...issue5, comments: [...issue5.comments, stopped] }] } };
 
