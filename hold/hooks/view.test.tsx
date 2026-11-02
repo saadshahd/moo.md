@@ -189,9 +189,13 @@ function world(
   on("fs.read", (_$, e) => ({
     value: e.as === "bytes" ? { base64: PNG } : "# Notes\n\nbody",
   }));
-  on("fs.stat", () => ({
-    value: { kind: "file" as const, size: 10, mtimeMs: 1, isLink: false },
-  }));
+  const files = { isGone: false };
+
+  on("fs.stat", () => {
+    if (files.isGone) throw new Error("ENOENT: no such file");
+
+    return { value: { kind: "file" as const, size: 10, mtimeMs: 1, isLink: false } };
+  });
   on("ui.toast", (_$, e) => {
     toasts.push(e.text);
 
@@ -223,7 +227,7 @@ function world(
     return <Box key="engine" />;
   });
 
-  return { runs, toasts, windows, clock, drawn };
+  return { runs, toasts, windows, clock, drawn, files };
 }
 
 /** The pointer on the button, on a 1440 by 900 point screen whose menu bar takes 25. */
@@ -451,6 +455,22 @@ test("a window its program closed (a click on it, Escape, its parent gone) reads
       (x) => x === "open",
     ),
   ).toBe("open");
+  expect(w.toasts).toEqual([]);
+});
+
+test("a picture's window closes on the second press without reading its file again", async ($, on) => {
+  const w = world(on, APPLE);
+  const ui = await $.ui.mount(
+    TOOL("Read", { file_path: "/r/shot.png" }, { type: "image", file: {} }),
+  );
+  const key = "view-toolu_1-/r/shot.png";
+
+  await ui.press({ key });
+  await windowsUp(w, 1);
+  w.files.isGone = true;
+  await ui.press({ key });
+  expect(w.windows[0]!.isEnded).toBe(true);
+  expect((await ui.find({ key }))?.props.label).toBe("view");
   expect(w.toasts).toEqual([]);
 });
 

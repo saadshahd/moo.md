@@ -156,6 +156,8 @@ export function toggleWindow(
           probe.stderr.trim() || "the pointer could not be found",
         );
       const r = place(JSON.parse(probe.stdout) as Pointer, size);
+      // Closed while the pointer was read: the window open now is another's to keep.
+      if (isClosed) return;
       // One window at a time, whichever session or load of this module opened the last.
       await $.process.run(["pkill", "-f", MARKER]).catch(() => undefined);
       if (isClosed) return;

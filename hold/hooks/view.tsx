@@ -239,7 +239,11 @@ const isDone = (c: {
 export const register: Register = (on) => {
   // A /clear ends the session and not the process: the window would outlive its button.
   on("session.end", async ($, e, next) => {
-    closeWindow($);
+    try {
+      closeWindow($);
+    } catch (err) {
+      failOnce($, `the picture's window may stay open: ${messageOf(err)}`);
+    }
 
     return next(e);
   });
