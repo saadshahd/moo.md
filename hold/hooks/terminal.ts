@@ -1,7 +1,5 @@
 /** The environment variables that tell which terminal the session draws in. */
 export type TermEnv = {
-  /** `1` or `0`: the person's word over every guess below. */
-  HOLD_VIEW_PIXELS?: string;
   TERM_PROGRAM?: string;
   TERM_PROGRAM_VERSION?: string;
   TERM?: string;
@@ -19,16 +17,15 @@ const atLeast = (version: string | undefined, major: number, minor: number) => {
 
 /**
  * Whether Claude Code's `Image` draws pixels here, as its 2.1.316 types say: kitty and Ghostty,
- * and iTerm2 3.5 or later under fullscreen rendering. roundup inherits the variables of whatever
- * started it, so they say nothing there until it names itself iTerm2. tmux needs passthrough
- * settings this cannot see, so it counts as none.
+ * and iTerm2 3.5 or later under fullscreen rendering. roundup answers Claude Code as iTerm2 does,
+ * whatever variables it inherited from what started it. tmux needs passthrough settings this
+ * cannot see, so it counts as none.
  */
 export function drawsPixels(env: TermEnv, isFullscreen: boolean): boolean {
-  if (env.HOLD_VIEW_PIXELS === "1") return true;
-  if (env.HOLD_VIEW_PIXELS === "0") return false;
+  if (env.ROUNDUP_TERMINAL) return true;
   if (env.TERM_PROGRAM === "iTerm.app")
     return isFullscreen && atLeast(env.TERM_PROGRAM_VERSION, 3, 5);
-  if (env.ROUNDUP_TERMINAL || env.TMUX) return false;
+  if (env.TMUX) return false;
   if (/^(1|true|yes|on)$/i.test(env.CLAUDE_CODE_FORCE_TERMINAL_IMAGES ?? ""))
     return true;
   if (env.TERM_PROGRAM === "ghostty") return true;

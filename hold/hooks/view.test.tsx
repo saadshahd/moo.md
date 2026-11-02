@@ -130,27 +130,11 @@ describe("drawsPixels", () => {
     ],
     [
       "roundup, whatever it inherited",
-      { ROUNDUP_TERMINAL: "1", TERM_PROGRAM: "ghostty" },
-      true,
+      { ROUNDUP_TERMINAL: "1", TERM_PROGRAM: "Apple_Terminal" },
       false,
-    ],
-    [
-      "roundup naming itself iTerm2",
-      {
-        ROUNDUP_TERMINAL: "1",
-        TERM_PROGRAM: "iTerm.app",
-        TERM_PROGRAM_VERSION: "3.5.0",
-      },
-      true,
       true,
     ],
     ["tmux", { TMUX: "/tmp/tmux", TERM_PROGRAM: "ghostty" }, true, false],
-    [
-      "the person's word",
-      { HOLD_VIEW_PIXELS: "0", TERM_PROGRAM: "ghostty" },
-      true,
-      false,
-    ],
   ];
 
   for (const [name, env, isFullscreen, want] of cases)

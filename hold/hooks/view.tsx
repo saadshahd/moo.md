@@ -73,7 +73,6 @@ function pixelsHere(
   viewport: RenderViewport | undefined,
 ): Promise<boolean> {
   termEnv ??= (async () => ({
-    HOLD_VIEW_PIXELS: await $.env.get("HOLD_VIEW_PIXELS"),
     TERM_PROGRAM: await $.env.get("TERM_PROGRAM"),
     TERM_PROGRAM_VERSION: await $.env.get("TERM_PROGRAM_VERSION"),
     TERM: await $.env.get("TERM"),
