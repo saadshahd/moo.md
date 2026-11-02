@@ -18,7 +18,7 @@ type Box = { columns: number; rows: number };
 // What a hot reload may drop: a dropped drawing is drawn again, a dropped view folds.
 const drawings = new Map<string, Drawn>();
 const pending = new Map<string, Promise<Drawn>>();
-/** The [source] and [view] opened, by their Button's key. */
+/** The [view]s unfolded, by their Button's key. */
 const opened = new Set<string>();
 /** An opened markdown view's text, or why it has none, by its Button's key. */
 const docs = new Map<
@@ -164,9 +164,9 @@ function draw(
   return work;
 }
 
-/** `box` shrunk as a whole to fit the room the transcript gives it. */
-function fit(box: Box, viewport: RenderViewport | undefined): Box {
-  const columns = Math.max(8, (viewport?.columns ?? 80) - 4);
+/** `box` shrunk as a whole to fit the room the transcript gives it, less `inset` columns. */
+function fit(box: Box, viewport: RenderViewport | undefined, inset = 4): Box {
+  const columns = Math.max(8, (viewport?.columns ?? 80) - inset);
   const rows = Math.max(6, Math.min(60, (viewport?.rows ?? 40) - 8));
   const s = Math.min(1, columns / box.columns, rows / box.rows);
 
@@ -280,25 +280,27 @@ async function withViews(
     const doc = docs.get(id);
     const pic = drawings.get(pictures.get(id) ?? "");
 
+    // An unfolded view sits in a border under its row's buttons, its left edge at theirs.
+    const framed = (content: RenderElement) => (
+      <Box key={`v-${id}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+        {content}
+      </Box>
+    );
+
     if (kind === "markdown" && doc && "text" in doc)
       views.push(
-        <Box key={`v-${id}`} flexDirection="column">
-          <Markdown text={doc.text} />
-          {doc.isCut ? <Text dimColor>cut at 90000 characters</Text> : null}
-        </Box>,
+        framed(
+          <Box flexDirection="column">
+            <Markdown text={doc.text} />
+            {doc.isCut ? <Text dimColor>cut at 90000 characters</Text> : null}
+          </Box>,
+        ),
       );
     if (kind === "picture" && pic && "png" in pic) {
-      const box = fit(pic, e.viewport);
+      // The row's indent, the border and its padding: 2 + 2 + 2 columns.
+      const box = fit(pic, e.viewport, 6);
 
-      views.push(
-        <Image
-          key={`v-${id}`}
-          source={{ png: pic.png }}
-          columns={box.columns}
-          rows={box.rows}
-          alt={nameOf(path)}
-        />,
-      );
+      views.push(framed(<Image source={{ png: pic.png }} columns={box.columns} rows={box.rows} alt={nameOf(path)} />));
     }
   }
 
@@ -381,7 +383,6 @@ export const register: Register = (on) => {
           return next(e);
         }
         const box = fit(d, e.viewport);
-        const source = `source-${key}-${i}`;
         const open = `open-${key}-${i}`;
 
         parts.push(
@@ -396,27 +397,13 @@ export const register: Register = (on) => {
             ) : (
               <Text dimColor>{alt}</Text>
             )}
-            <Box flexDirection="row" gap={1}>
-              {window ? (
-                <Button
-                  key={open}
-                  label={popover?.key === open ? "close" : "open"}
-                  dimColor
-                  onPress={() => toggleWindow($, open, d.file)}
-                />
-              ) : null}
+            {window ? (
               <Button
-                key={source}
-                label="source"
+                key={open}
+                label={popover?.key === open ? "close" : "open"}
                 dimColor
-                onPress={() => {
-                  if (!opened.delete(source)) opened.add(source);
-                  redraw($);
-                }}
+                onPress={() => toggleWindow($, open, d.file)}
               />
-            </Box>
-            {opened.has(source) ? (
-              <Markdown text={`\`\`\`mermaid\n${s.mermaid}\n\`\`\``} />
             ) : null}
           </Box>,
         );

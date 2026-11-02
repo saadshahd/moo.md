@@ -259,7 +259,7 @@ async function settled<T>(
   return read();
 }
 
-test("a closed fence draws as an Image in place, its source one press away", async ($, on) => {
+test("a closed fence draws as an Image in place, with no button under it", async ($, on) => {
   const w = world(on, GHOSTTY);
   const ui = await reply($, REPLY);
   const image = await settled(
@@ -286,14 +286,7 @@ test("a closed fence draws as an Image in place, its source one press away", asy
   expect(
     await ui.find({ type: "Markdown", text: /```mermaid/ }),
   ).toBeUndefined();
-  const source = (await ui.findAll({ type: "Button" })).find(
-    (b) => b.props.label === "source",
-  )!;
-
-  await ui.press({ key: source.props.key as string });
-  expect(
-    await ui.find({ type: "Markdown", text: /```mermaid\nflowchart LR/ }),
-  ).toBeDefined();
+  expect(await ui.findAll({ type: "Button" })).toHaveLength(0);
   await ui.unmount();
 });
 
@@ -392,6 +385,35 @@ test("where the terminal draws no pixels, the diagram opens in a window by the p
   await ui.unmount();
 });
 
+type Node = { type: string; props?: Record<string, unknown>; children?: unknown[] };
+
+/**
+ * Where the first `type` element sits in a drawn tree: inside a bordered Box, and after the
+ * tree's first Button in document order, which on the terminal is above it.
+ */
+function layout(tree: unknown, type: string) {
+  let isUnderButton = false;
+  let sawButton = false;
+  let found: Node[] | undefined;
+
+  const walk = (n: unknown, up: Node[]) => {
+    if (found || !n || typeof n !== "object") return;
+    const node = n as Node;
+
+    if (node.type === "Button") sawButton = true;
+    if (node.type === type) {
+      found = up;
+      isUnderButton = sawButton;
+      return;
+    }
+    for (const c of node.children ?? []) walk(c, [...up, node]);
+  };
+
+  walk(tree, []);
+
+  return { isFramed: !!found?.some((n) => n.type === "Box" && n.props?.borderStyle), isUnderButton };
+}
+
 const TOOL = (tool: string, input: unknown, output: unknown) => ({
   plugin: "hold",
   surface: "terminal" as const,
@@ -425,6 +447,7 @@ test("a markdown file Claude wrote gets [view]: one press unfolds it in place, t
   await ui.press({ key });
   expect(await ui.find({ type: "Markdown", text: /# Notes/ })).toBeDefined();
   expect((await ui.find({ key }))?.props.label).toBe("fold");
+  expect(layout(await ui.drawn(), "Markdown")).toEqual({ isFramed: true, isUnderButton: true });
   await ui.press({ key });
   expect(await ui.find({ type: "Markdown" })).toBeUndefined();
   await ui.unmount();
@@ -441,6 +464,7 @@ test("a picture Claude read unfolds as an Image, drawn once", async ($, on) => {
     source: { png: PNG },
     alt: "shot.png",
   });
+  expect(layout(await ui.drawn(), "Image")).toEqual({ isFramed: true, isUnderButton: true });
   expect(
     w.runs.filter((r) => r[0] === "bun").map((r) => r.slice(2, 4)),
   ).toEqual([["picture", "/r/shot.png"]]);
