@@ -49,3 +49,5 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-chimebox/78d4c320-8c1f-471a
   --keys "$R/rec5/judge/keylog.json" --raw "$OUT/judge.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-shopdeck/bb2058ca-ca5c-4f13-b04b-c6f9e438b387.jsonl" /Users/Shared/shopdeck "$R/rec5/reframe" ../src/demo/sessions/reframe.ts 1=1o2366w.407 \
   --keys "$R/rec5/reframe/keylog.json" --raw "$OUT/reframe.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-taskline/747b138f-f11a-4616-b573-8a4a2f907eef.jsonl" /Users/Shared/taskline "$R/rec5/router" ../src/demo/sessions/router.ts 1=7n6pdk.227 2=pwka8t.165 3=1mama6j.178 4=1qk293w.215 5=kmb6ih.162 6=t7290f.887 \
+  --keys "$R/rec5/router/keylog.json" --raw "$OUT/router.json" --activity-from-snaps

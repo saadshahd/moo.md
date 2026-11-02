@@ -381,10 +381,14 @@ const user = (text: string, cols: number): Row[] =>
 
 /** The collapsed tool summary, two columns in: grey, counts bold, +lines
  * green, -lines red. A closing "[ view ]" takes a row of its own, bold grey,
- * at any width (interrogate). */
+ * at any width (interrogate). The space before it stays with the summary, so
+ * a summary that fills its last row pushes that space onto a row of its own
+ * (router at 45). */
 const tools = (summary: string, cols: number): Row[] => {
   const view = summary.endsWith(" [ view ]");
-  return [...counts(view ? summary.slice(0, -" [ view ]".length) : summary, cols),
+  const rows = counts(view ? summary.slice(0, -" [ view ]".length) : summary, cols);
+  const full = rows.length > 0 && rows[rows.length - 1].segs.map((s) => s[0]).join("").length >= cols;
+  return [...rows, ...(view && full ? [BLANK] : []),
     ...(view ? [{ segs: [["  "], ["[ view ]", "g b"]] } as Row] : [])];
 };
 const counts = (summary: string, cols: number): Row[] =>

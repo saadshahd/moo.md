@@ -1,0 +1,13 @@
+---
+title: /router
+move: hands work to agents and checks it
+description: "You talk to one agent that hands out the work and checks every return."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { routerScene } from "../../../demo/scenes";
+
+<Demo
+  scene={routerScene}
+  summary="Claude Code. With moo off, you ask Claude to review the feat/csv-export and feat/due-dates branches against docs/rules.md, build a taskline ls command, and sketch a first design in docs/sync.md. Claude does all four itself. It reports that neither branch is ready to merge, lists each broken rule and bug, shows the ls diff, and ends with decisions for you about the sync design. In the same session with moo on, you type /hope:router you don't work yourself. A dialog asks what to send to agents, since the tasks are already done; you pick Agents re-check my work. Claude starts five agents that were not given its findings. As each one returns, it reports what that review found. When all five are back, a table marks each piece settled or open: ls is not ready to commit, the sync design needs rework, and whether add breaks rule 5 needs your call. It ends by asking you to decide rule 5 and whether agents should fix ls and redo the sync doc."
+/>
