@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, withOpen } from "./tend.tsx";
+import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -562,35 +562,100 @@ const CONSULT = [
   "```",
 ].join("\n");
 
-test("a reply that ends on ideas draws as markdown, card hidden, at full length and short", async ($, on) => {
-  mock.store(on);
-  const clock = mock.clock(on);
-  on("session.id", () => ({ value: "s1" }));
-  on("session.surfaces", () => ({ value: ["terminal"] }));
-  on("session.messages", () => ({ value: [{ role: "user", text: "/hope:consult", toolUses: [] }, said(CONSULT)] }));
-  on("ui.invalidate", () => ({ value: undefined }));
-  on("ui.toast", () => ({ value: undefined }));
+describe("a reply that ends on ideas", () => {
   const SHORT = "| bridge → | gains |\n|---|---|\n| a bar late | the turn lands |\n\nNext: choose late or on time.";
-  on("model.complete", () => ({ value: { isAnswered: true, text: SHORT, usage: {} } }) as any);
-  let shown = "";
-  on("ui.render", (_, e) => {
-    shown = (e.props as any).text;
-    return { type: "Box", props: {} } as any;
-  });
-  on("turn.complete", (_, e) => ({ text: e.answer }));
-  const draw = async () => {
-    shown = "";
-    const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: CONSULT, isFirstOfReply: true } as any });
-    await reply.drawn();
-    return shown;
+  // What Claude Code's own drawing was handed, and the reply as tend drew it.
+  const setup = ($: any, on: any) => {
+    mock.store(on);
+    const clock = mock.clock(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
+    on("session.messages", () => ({ value: [{ role: "user", text: "/hope:consult", toolUses: [] }, said(CONSULT)] }));
+    on("ui.invalidate", () => ({ value: undefined }));
+    on("ui.toast", () => ({ value: undefined }));
+    on("model.complete", () => ({ value: { isAnswered: true, text: SHORT, usage: {} } }) as any);
+    const host: string[] = [];
+    on("ui.render", (_: any, e: any) => {
+      host.push(e.props.text);
+      return { type: "Box", props: {} } as any;
+    });
+    on("turn.complete", (_: any, e: any) => ({ text: e.answer }));
+    const mount = async (surface: "terminal" | "desktop" = "terminal") => {
+      host.length = 0;
+      const reply = await $.ui.mount({ plugin: "hunch", surface, component: "AssistantMessage", props: { text: CONSULT, isFirstOfReply: true } as any });
+      await reply.drawn();
+      return reply;
+    };
+    return { clock, host, mount };
   };
-  const long = await draw();
-  expect(long).toContain("1. Mostafa — **Open the verse on the title**");
-  expect(long).toContain("| bridge → | gains | costs |");
-  expect(long).not.toContain("```card");
-  await $.turn.complete({ answer: CONSULT, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
-  await clock.settle();
-  expect(await draw()).toBe(SHORT);
+  const md = async (reply: any, dim: boolean) =>
+    (await reply.findAll({ type: "Markdown" })).filter((m: any) => !!m.props.dimColor === dim).map((m: any) => m.props.text);
+
+  test("Claude Code draws its first idea, ⏺ and all; the card shows nowhere", async ($, on) => {
+    const { host, mount } = setup($, on);
+    const reply = await mount();
+    expect(host).toEqual(["1. Mostafa — **Open the verse on the title**"]);
+    expect(JSON.stringify(await reply.drawn())).not.toContain("```card");
+  });
+  test("a dropped idea dims whole; an open one draws as written", async ($, on) => {
+    const { mount } = setup($, on);
+    const reply = await mount();
+    expect(await md(reply, true)).toContain("3. Wegz — Leave a line open");
+    expect(await md(reply, true)).toContain("Doesn't apply because the verse is full");
+    expect(await md(reply, false)).toContain("2. Ruby — **End on the bridge, a bar late**");
+  });
+  test("\"Chosen because\" is green, under its idea", async ($, on) => {
+    const { mount } = setup($, on);
+    const reply = await mount();
+    const chosen = await reply.find({ type: "Text", text: "Chosen because the hook is the title" });
+    expect(chosen?.props.color).toBe("success");
+  });
+  test("every line after the list fades, the table one drawn block", async ($, on) => {
+    const { mount } = setup($, on);
+    const reply = await mount();
+    const after = (await md(reply, true)).find((t: string) => t.startsWith("Win:"));
+    expect(after).toContain("| bridge → | gains | costs |\n|---|---|---|");
+    expect(after).toContain("Next: choose late or on time for idea 2");
+  });
+  test("its short form draws as Claude Code draws it", async ($, on) => {
+    const { clock, host, mount } = setup($, on);
+    await $.turn.complete({ answer: CONSULT, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    await clock.settle();
+    await mount();
+    expect(host).toEqual([SHORT]);
+  });
+  test("a surface with no ⏺ gutter gets the reply as markdown, card cut", async ($, on) => {
+    const { host, mount } = setup($, on);
+    await mount("desktop");
+    expect(host).toEqual([stripCards(CONSULT)]);
+  });
+});
+
+test("a consult reply splits where its tones change", async () => {
+  expect(ideaSegments(stripCards(CONSULT))).toEqual([
+    { md: "1. Mostafa — **Open the verse on the title**", tone: "plain" },
+    { md: "*His hooks open on the title; this verse buries it.*", tone: "dim", under: 3 },
+    { md: "Chosen because the hook is the title", tone: "chosen", under: 3 },
+    { md: "", tone: "plain" },
+    { md: "2. Ruby — **End on the bridge, a bar late**", tone: "plain" },
+    { md: "*The turn lands late, so the ear waits for it.*", tone: "dim", under: 3 },
+    { md: "", tone: "plain" },
+    { md: "3. Wegz — Leave a line open", tone: "dim" },
+    { md: "*No side takes the open line.*", tone: "dim", under: 3 },
+    { md: "Doesn't apply because the verse is full", tone: "dim", under: 3 },
+    { md: "", tone: "plain" },
+    { md: "Win: you pick the take blind.\n\nIdea 2 is yours to decide:\n\n| bridge → | gains | costs |\n|---|---|---|\n| a bar late | the turn lands | one more bar |\n| on time (today) | no change | the turn blurs |\n\nNext: choose late or on time for idea 2, and I'll write ideas 1–2 into the song.", tone: "dim" },
+  ]);
+});
+
+test("a question after the list stays bright, a blank row apart", async () => {
+  expect(ideaSegments("1. Ruby — **end on the bridge**\n\nWin: louder.\n\nDo you want it late?")).toEqual([
+    { md: "1. Ruby — **end on the bridge**", tone: "plain" },
+    { md: "", tone: "plain" },
+    { md: "Win: louder.", tone: "dim" },
+    { md: "", tone: "plain" },
+    { md: "Do you want it late?", tone: "plain" },
+  ]);
 });
 
 describe("short replies", () => {
