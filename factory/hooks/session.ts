@@ -36,6 +36,7 @@ export function runner($: EngineInterface): Run {
 export async function useLogin($: EngineInterface, cwd: string, bot: Bot | null): Promise<void> {
   const env = bot === null ? null : botEnv(bot);
   const git = gitConfigEnv();
+  await keepOwnLogin($);
   await $.env.set("GH_CONFIG_DIR", `${cwd}/.factory/no-gh-login`);
   await $.env.set("GH_TOKEN", env?.GH_TOKEN ?? "factory-no-login");
   await $.env.set("GITHUB_TOKEN", undefined);
@@ -56,6 +57,39 @@ export async function useLogin($: EngineInterface, cwd: string, bot: Bot | null)
   await $.env.set("GIT_AUTHOR_EMAIL", env.GIT_AUTHOR_EMAIL);
   await $.env.set("GIT_COMMITTER_NAME", env.GIT_COMMITTER_NAME);
   await $.env.set("GIT_COMMITTER_EMAIL", env.GIT_COMMITTER_EMAIL);
+}
+
+/** Reads the session's own values of what `useLogin` sets, once, before it first sets one. */
+async function keepOwnLogin($: EngineInterface): Promise<void> {
+  const { value: held } = await $.state.get({ plugin: "factory", key: "ownLogin" });
+
+  if (held !== undefined) return;
+  await $.state.set({ plugin: "factory", key: "ownLogin" }, {
+    GH_CONFIG_DIR: await $.env.get("GH_CONFIG_DIR"),
+    GH_TOKEN: await $.env.get("GH_TOKEN"),
+    GITHUB_TOKEN: await $.env.get("GITHUB_TOKEN"),
+    GIT_AUTHOR_NAME: await $.env.get("GIT_AUTHOR_NAME"),
+    GIT_AUTHOR_EMAIL: await $.env.get("GIT_AUTHOR_EMAIL"),
+    GIT_COMMITTER_NAME: await $.env.get("GIT_COMMITTER_NAME"),
+    GIT_COMMITTER_EMAIL: await $.env.get("GIT_COMMITTER_EMAIL"),
+  });
+}
+
+/**
+ * Puts back the session's own GitHub login wherever `useLogin` set another, so a run that acts as
+ * the user rests on no earlier call either. The factory's git config stays: a run starts with it.
+ */
+export async function useOwnLogin($: EngineInterface): Promise<void> {
+  const { value: own } = await $.state.get({ plugin: "factory", key: "ownLogin" });
+
+  if (own === undefined) return;
+  await $.env.set("GH_CONFIG_DIR", own.GH_CONFIG_DIR);
+  await $.env.set("GH_TOKEN", own.GH_TOKEN);
+  await $.env.set("GITHUB_TOKEN", own.GITHUB_TOKEN);
+  await $.env.set("GIT_AUTHOR_NAME", own.GIT_AUTHOR_NAME);
+  await $.env.set("GIT_AUTHOR_EMAIL", own.GIT_AUTHOR_EMAIL);
+  await $.env.set("GIT_COMMITTER_NAME", own.GIT_COMMITTER_NAME);
+  await $.env.set("GIT_COMMITTER_EMAIL", own.GIT_COMMITTER_EMAIL);
 }
 
 /**
