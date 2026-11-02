@@ -315,8 +315,9 @@ test("an empty card adds nothing to a compaction", async () => {
   expect(replayCard({})).toBeUndefined();
 });
 
-/** A store that refuses a write taking its JSON past `cap` characters, as the engine's does past 4 MiB. */
-function cappedStore(on: any, cap: number, entries: [string, unknown][] = []): Map<string, unknown> {
+/** A store that refuses a write taking its JSON past `cap` characters, as the engine's does past 4 MiB;
+ * it lists its keys once `listed` resolves. */
+function cappedStore(on: any, cap: number, entries: [string, unknown][] = [], listed = Promise.resolve()): Map<string, unknown> {
   const store = new Map<string, unknown>(entries);
   const size = () => JSON.stringify(Object.fromEntries(store)).length;
   on("store.get", (_: any, e: any) => ({ value: store.get(e.key) }));
@@ -330,7 +331,7 @@ function cappedStore(on: any, cap: number, entries: [string, unknown][] = []): M
     return { value: undefined };
   });
   on("store.delete", (_: any, e: any) => (store.delete(e.key), { value: undefined }));
-  on("store.keys", () => ({ value: [...store.keys()] }));
+  on("store.keys", async () => (await listed, { value: [...store.keys()] }));
   return store;
 }
 
@@ -341,20 +342,26 @@ const savedOf = (s: string, mib: number): [string, unknown] => [`tend:${s}:short
 test("a new session keeps the newest sessions that fit in 3 MiB, however many", async ($, on) => {
   const old = Array.from({ length: 5 }, (_, i) => `old${i}`);
   const store = cappedStore(on, 8 * MiB, [...old.map((s) => savedOf(s, 1)), ["tend:recent", old]]);
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
+  // The prune runs unawaited.
+  await clock.settle();
   expect([...store.keys()].filter((k) => k !== "tend:recent")).toEqual(old.slice(0, 3).map((s) => savedOf(s, 1)[0]));
   expect(store.get("tend:recent")).toEqual(["s1", ...old.slice(0, 3)]);
 });
 
 test("the live session keeps its keys past the budget; the older ones go", async ($, on) => {
   const store = cappedStore(on, 8 * MiB, [savedOf("s1", 4), savedOf("old0", 0.5), ["tend:recent", ["old0", "s1"]]]);
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "resume", cwd: "/p" } as any);
+  // The prune runs unawaited.
+  await clock.settle();
   expect([...store.keys()]).toEqual([savedOf("s1", 4)[0], "tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
 });
@@ -365,10 +372,13 @@ test("a store over its cap with no session list shrinks to the current session",
     100,
     Array.from({ length: 10 }, (_, i): [string, unknown] => [`tend:old${i}:short`, "x".repeat(20)]),
   );
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s1" }));
   on("session.surfaces", () => ({ value: ["terminal"] }));
   on("session.start", (_, e) => e);
   await $.session.start({ source: "startup", cwd: "/p" } as any);
+  // The prune runs unawaited.
+  await clock.settle();
   expect([...store.keys()]).toEqual(["tend:recent"]);
   expect(store.get("tend:recent")).toEqual(["s1"]);
 });
@@ -393,6 +403,32 @@ test("a full store leaves the band its card and a card skill its ask; the refusa
   const prompt = await $.prompt.submit({ text: "/hope:intent tidy it", origin: { kind: "composer" } } as any);
   expect((prompt as any).context).toContain(CARD_FORMAT);
   expect(toasts).toHaveLength(1);
+});
+
+// On the work machine's full store, reading every value took 7.7 s of the 9 s before a resumed
+// session's replies drew short.
+test("a resumed session's replies draw short before the store is pruned", async ($, on) => {
+  // The prune lists the keys, then reads every value: held here until the reply has drawn.
+  let release = () => {};
+  const listed = new Promise<void>((r) => (release = r));
+  const short = { [textKey(WALL)]: "No tool checks sung words yet." };
+  const store = cappedStore(on, 8 * MiB, [["tend:s1:short", short], ["tend:old0:short", {}], ["tend:recent", ["old0", "s1"]]], listed);
+  const clock = mock.clock(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("ui.invalidate", () => ({ value: undefined }));
+  on("session.start", (_, e) => e);
+  let shown = "";
+  on("ui.render", (_, e) => {
+    shown = (e.props as any).text;
+    return { type: "Box", props: {} } as any;
+  });
+  await $.session.start({ source: "resume", cwd: "/p" } as any);
+  await (await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any })).drawn();
+  expect(shown).toBe(short[textKey(WALL)]);
+  release();
+  await clock.settle();
+  expect(store.get("tend:recent")).toEqual(["s1", "old0"]);
 });
 
 test("a headless session keeps nothing, so it pushes no live session out", async ($, on) => {

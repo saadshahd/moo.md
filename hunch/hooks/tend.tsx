@@ -504,13 +504,15 @@ async function sid($: any): Promise<string> {
 }
 
 async function load($: any, id: string) {
-  if (!(await headless($))) await keepRecent($, id);
   const get = (k: string) => $.store.get(`tend:${id}:${k}`);
   for (const [k, v] of Object.entries(
     ((await get("short")) as Record<string, string>) ?? {},
   ))
     short.set(k, v);
   open = (await get("open")) as Question[] | undefined;
+  $.ui.invalidate("ui.render");
+  // Pruning reads every value in the store, seconds on a full one, so the replies never wait on it.
+  if (!(await headless($))) loud($, keepRecent($, id));
 }
 
 /** A `-p` run or the SDK draws nowhere, so nobody sees what it would keep. Hooks spawn many:
