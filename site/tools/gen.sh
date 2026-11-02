@@ -32,3 +32,7 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-harness/b85c0514-4eaf-431a-
   --keys "$R/rec5/intent/keylog.json" --raw "$OUT/intent.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-glossary2/f9bd03e0-5a3e-4b36-b9ad-c119dbf14795.jsonl" /Users/Shared/glossary2 "$R/rec5/shape2" ../src/demo/sessions/shape.ts 1=1idh1op.901 \
   --keys "$R/rec5/shape2/keylog.json" --raw "$OUT/shape.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-songbook/7df3e3d8-8160-4d5d-beec-a91a11a4f7ef.jsonl" /Users/Shared/songbook "$R/rec5/explain" ../src/demo/sessions/explain.ts  \
+  --keys "$R/rec5/explain/keylog.json" --raw "$OUT/explain.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-taskdesk/b1b2d5e3-76a8-4b4b-8c42-ecde8db5297e.jsonl" /Users/Shared/taskdesk "$R/rec5/elicit" ../src/demo/sessions/elicit.ts 2=p2fc51.516 3=p7jusv.1214 \
+  --keys "$R/rec5/elicit/keylog.json" --raw "$OUT/elicit.json" --activity-from-snaps

@@ -36,6 +36,8 @@ import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as elicit from "./sessions/elicit";
+import * as explain from "./sessions/explain";
 import * as shape from "./sessions/shape";
 import * as intent from "./sessions/intent";
 import * as inversion from "./sessions/inversion";
@@ -80,6 +82,8 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const elicitScene = skill(elicit);
+export const explainScene = skill(explain);
 export const shapeScene = skill(shape);
 export const intentScene = skill(intent);
 export const inversionScene = skill(inversion);

@@ -142,7 +142,8 @@ const text = (line: Line) =>
  * the lines inside stand as written: with no language, in lavender; "diff",
  * + lines green and - lines red, in the terminal's palette; any other, plain.
  * A "markdown" block is the one edit: Claude Code showed it as source, and the
- * site renders it as Claude Code renders markdown outside a block. */
+ * site renders it as Claude Code renders markdown outside a block. A "card"
+ * block is not drawn: Claude Code showed none (elicit). */
 function draw(lines: Line[], width: number): Cell[][] {
   const out: Cell[][] = [];
   let afterHeading = false;
@@ -167,6 +168,7 @@ function draw(lines: Line[], width: number): Cell[][] {
       lang = raw.slice(3).trim();
       continue;
     }
+    if (fenced && lang === "card") continue;
     if (fenced) {
       const cls = lang === "diff" ? { "+": "c32", "-": "c31" }[raw[0]] : lang ? undefined : "l";
       // A line keeps its indent; a row it wraps onto drops one leading space,

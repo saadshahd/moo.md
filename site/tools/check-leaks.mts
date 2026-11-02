@@ -6,10 +6,15 @@ import { userInfo } from "node:os";
 import * as S from "../src/demo/scenes.ts";
 import type { Scene } from "../src/demo/types.ts";
 
-// A /tmp/ inside another folder ("/data/tmp/") is the scene's own disk, and a
-// home path written as ~/ names no one; the user's name names them.
+// The Door's rule: the user's name, a home path not written as ~/, and the
+// recording rig's folders are refused. A take's own project path under
+// /Users/Shared/ names no one, nor does a /tmp/ inside another folder
+// ("/data/tmp/"), the scene's own disk.
 const user = userInfo().username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const BANNED = [/\/private\/tmp/, /(?<![\w.-])\/tmp\//, /\/Users\//, /\/home\//, new RegExp(user, "i"), /sandbox/i, /EPERM/];
+const BANNED = [
+  /\/private\/tmp/, /(?<![\w.-])\/tmp\//, /\/Users\/(?!Shared\/)/, /\/home\//, new RegExp(user, "i"),
+  /moo-rec/, /\brec[56]\//, /sandbox/i, /EPERM/,
+];
 let bad = 0;
 for (const [name, scene] of Object.entries(S) as [string, Scene][]) {
   if (scene?.plain === undefined) continue;
