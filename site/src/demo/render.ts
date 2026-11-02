@@ -38,12 +38,16 @@ function wrap(cs: Cell[], width: number, first = width, keep = false): Cell[][] 
     return limit(n) - (carry ? 1 : 0);
   };
   while (i < cs.length) {
+    const from = i;
     while (i < cs.length && cs[i][0] === " ") i++;
+    // Spaces between words close up to one, but a run inside code stays.
+    const run = cs.slice(from, i);
+    const gap: Cell[] = run.length > 1 && run.every((c) => /\bl\b/.test(c[1] ?? "")) ? run : [[" "]];
     let j = i;
     while (j < cs.length && cs[j][0] !== " ") j++;
     if (i === j) break;
     const word = cs.slice(i, j);
-    if (line.length && line.length + 1 + word.length > room()) {
+    if (line.length && line.length + gap.length + word.length > room()) {
       const left = room() - line.length - 1;
       const stay =
         word.length > width && left > 0 &&
@@ -53,7 +57,7 @@ function wrap(cs: Cell[], width: number, first = width, keep = false): Cell[][] 
         line = [];
       }
     }
-    if (line.length) line.push([" "]);
+    if (line.length) line.push(...gap);
     line.push(...word);
     while (word.length > width && line.length > room()) {
       const r = room();
@@ -303,15 +307,35 @@ function table(rows: Line[], width: number): Cell[][] {
  * bold, between rules 3 short of the width. The value wraps 1 short of the
  * width, its first line as many shorter as the header has letters; that line
  * then wraps again behind the header. A row after one that overflowed its
- * limit keeps the space it carried (widen). So recorded at 45 columns, but for
- * one value drawn with two spaces inside `lsof +D` (intent): no rule found. */
+ * limit keeps the space it carried (widen). So recorded at 45 columns. */
+/** A listed value as Claude Code first lays it out: wrapped as Ink does at
+ * `width`, its rows joined by a space. Doubled spaces then close up, but in
+ * code a row's end leaves two: "`lsof +D`" drew "lsof  +D" (intent),
+ * "`cannot open plughw:S2 (No such device)`" drew "open  plughw:S2 (No  such"
+ * (judge). */
+function reflowed(cs: Cell[], width: number): Cell[] {
+  const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
+  // A row that ends inside a word joins the next with nothing.
+  const rows = wrapInk(cs, Math.max(1, width));
+  let at = 0;
+  const joined = rows.flatMap((r, k) => {
+    const split = k > 0 && cs[at - 1]?.[0] !== " " && cs[at]?.[0] !== " ";
+    at += r.length;
+    return k && !split ? [[" ", rows[k - 1].at(-1)?.[1]] as Cell, ...r] : r;
+  });
+  return joined.filter((c, k) => !(c[0] === " " && joined[k - 1]?.[0] === " " && !(code(c) && code(joined[k - 1]))));
+}
+
 function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
   const rule = plain("─".repeat(width - 3));
   return body.flatMap((r, k) => [
     ...(k ? [rule] : []),
     ...head.flatMap((h, c) => {
+      // A column with no header shows its value alone, and nothing when the
+      // value is empty too (judge).
+      if (!h.trim()) return r[c].length ? wrap(r[c], width - 1) : [];
       const key = inline(h, "b");
-      const [first = [], ...rest] = wrap(r[c], width - 1, width - 1 - key.length, true);
+      const [first = [], ...rest] = wrap(reflowed(r[c], width - 1 - key.length), width - 1, width - 1 - key.length, true);
       const line = wrap([...key, ...plain(":", "b"), ...plain(" "), ...first], width);
       // Ink keeps the space the value broke at; past the edge it takes a row
       // of its own, as recorded at 45.
