@@ -3,8 +3,7 @@
 // any other page its command and what it does. The page you are on is toned,
 // with an ink bar: a state marker, so it never takes the accent. A menu with
 // groups (the Moves) shows each group under its heading, two columns wide;
-// `stack` puts the groups in one column (the phone sheet, the 404), and on a
-// phone each line under its command. Tab order follows the groups either way. `at` names the place
+// `stack` puts the groups in one column (the phone sheet, the 404). Tab order follows the groups either way. `at` names the place
 // the menu shows, for the headings' ids.
 type Item = { href: string; label: string; note?: string };
 type Group = { heading: string; items: Item[] };
@@ -73,10 +72,10 @@ const id = `${at}-group`;
   }
   .groups .note { white-space: nowrap; }
   .groups a { padding-block: 0.55rem; }
-  /* Stacked: one column; on a phone, each line under its command. */
+  /* Stacked: one column; on a screen too narrow for a command and its line
+     side by side (320 px), the line goes under its command. */
   .groups.stack { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-  @media (max-width: 50rem) {
+  @media (max-width: 23.5rem) {
     .groups.stack .commands a { flex-direction: column; align-items: stretch; gap: 0.2rem; }
-    .groups.stack .note { overflow: hidden; text-overflow: ellipsis; }
   }
 </style>
