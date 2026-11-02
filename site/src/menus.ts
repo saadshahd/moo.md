@@ -9,7 +9,6 @@ const GROUPS = [
   { id: "start", label: "Start" },
   { id: "moves", label: "Moves" },
   { id: "chains", label: "Chains" },
-  { id: "actions", label: "Actions" },
 ];
 export const siteMenus = async () => {
   const byTitle = (a: { data: { title: string } }, b: { data: { title: string } }) => a.data.title.localeCompare(b.data.title);
