@@ -80,7 +80,7 @@ Commit it on a branch and open a PR to the default branch.
 
 - `gh label create factory --force`, `gh label create factory:stuck --force` and `gh label create factory:undo --force`
 - `gh repo edit --enable-auto-merge`, unless `pr.draft` is true
-- Claude Code starts a background run only in a folder whose trust prompt was accepted: the repo, and each folder the rules' `worktree` `create` command can lend, such as a pool's slots. For each, unless `~/.claude.json` has `projects["<path>"].hasTrustDialogAccepted` true (read it yourself and report which hold), the user runs `claude` there once and accepts the prompt.
+- Claude Code 2.1.316 starts a background run, `claude --bg`, only where the trust prompt was accepted. A git worktree shares its main checkout's trust, so each worktree git adds or a pool lends needs none of its own; a separate clone does. The trust sits in `~/.claude.json` under the main checkout's on-disk path, matched exactly, case included: a key `/Users/Name/repo` misses a checkout that sits at `/Users/name/repo`. `dirname "$(git rev-parse --path-format=absolute --git-common-dir)"` prints that path. Unless `projects["<that path>"].hasTrustDialogAccepted` is true (read it yourself and report whether it holds), the user runs `claude` once in the main checkout, opened by that path, and accepts the prompt. Runs that fail with "Workspace not trusted" need the same.
 
 ## The worker
 
