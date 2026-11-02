@@ -3,7 +3,7 @@
  * their comments, open PRs with their files, each local issue's PR, the claimed branches, undo
  * issues, recent merged PRs and the base's checks. An open factory PR whose checks have not all
  * passed costs one query more, for the ones GitHub requires. Worker and pane read the same
- * snapshot, so every machine agrees.
+ * snapshot, so every machine agrees. `newestPrs` reads other issues' PRs, for their state alone.
  */
 
 import { parse } from "./formats.ts";
@@ -195,13 +195,15 @@ const Data = z.object({
   }),
 });
 
+/** The PRs from issue `n`'s branch, newest first, aliased `pr<n>`, each with `fields`. */
+const prsFrom = (n: number, fields: string) =>
+  `pr${n}: pullRequests(headRefName: "${branchFor(n)}", first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) {
+      pageInfo { hasNextPage } nodes { ${fields} }
+    }`;
+
 /** The query, with one PR lookup per issue this machine has a worktree for. */
 export function snapshotQuery(local: readonly number[]): string {
-  const prs = local
-    .map((n) => `pr${n}: pullRequests(headRefName: "${branchFor(n)}", first: 5, states: [OPEN, CLOSED, MERGED], orderBy: {field: CREATED_AT, direction: DESC}) {
-      pageInfo { hasNextPage } nodes { ${PR} ${REVIEWS} }
-    }`)
-    .join("\n");
+  const prs = local.map((n) => prsFrom(n, `${PR} ${REVIEWS}`)).join("\n");
 
   return `query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
@@ -298,6 +300,9 @@ export type Pr = Merge & {
   /** Its newest 20 reviews, oldest first. */
   reviews: Review[];
 };
+
+/** Whether a PR merged, closed unmerged or stays open, and when it closed. */
+export type PrState = Pick<Pr, "number" | "state" | "closedAt">;
 
 export type Snapshot = {
   issues: Issue[];
@@ -470,6 +475,28 @@ async function requiredChecks(run: Run, repo: string, n: number): Promise<Check[
     : (first?.nodes ?? []);
 
   return all.flatMap((c) => (c.isRequired ? [toCheck(c)] : []));
+}
+
+const PrStateNode = z.object({ number: PR_FIELDS.number, state: PR_FIELDS.state, closedAt: PR_FIELDS.closedAt });
+
+const PrStates = z.object({ data: z.object({ repository: z.record(z.string(), z.object({ nodes: z.array(PrStateNode) })) }) });
+
+/** The newest PR from each of issues `ns`'s branches, read for its state alone, in one query; none for an issue with no PR. */
+export async function newestPrs(run: Run, repo: string, ns: readonly number[]): Promise<Map<number, PrState>> {
+  if (ns.length === 0) return new Map();
+  const query = `query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    ${ns.map((n) => prsFrom(n, "number state closedAt")).join("\n")}
+  }
+}`;
+
+  const r = z.parse(PrStates, JSON.parse(await graphql(run, repo, query))).data.repository;
+
+  return new Map(ns.flatMap((n): [number, PrState][] => {
+    const newest = r[`pr${n}`]?.nodes[0];
+
+    return newest === undefined ? [] : [[n, newest]];
+  }));
 }
 
 export async function readSnapshot(run: Run, repo: string, local: readonly number[]): Promise<Snapshot> {

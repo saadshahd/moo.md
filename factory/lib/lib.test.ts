@@ -24,7 +24,7 @@ import {
 import { cutToFailures, isTestCommand } from "./logs.ts";
 import { overlap, planFiles, planGaps, planText } from "./plan.ts";
 import { actorsOf, guardedIn, parseRules, RULES_PATH } from "./rules.ts";
-import { readSnapshot, snapshotQuery, undone, type Snapshot } from "./snapshot.ts";
+import { newestPrs, readSnapshot, snapshotQuery, undone, type Snapshot } from "./snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, usage } from "./transcript.ts";
 import {
   APPROVAL_QUESTION,
@@ -543,6 +543,24 @@ describe("snapshot", () => {
     };
 
     expect([...undone(s, A)]).toEqual([1]);
+  });
+  test("the newest PRs of some issues come in one query, read for their state alone; none asked for, no query", async () => {
+    const asked: string[] = [];
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" };
+    const page = <T>(nodes: T[]) => ({ pageInfo: { hasNextPage: false }, nodes });
+
+    const github: Run = async (argv) => {
+      asked.push(argv.find((a) => a.startsWith("query=")) ?? "");
+
+      return { exitCode: 0, stdout: JSON.stringify({ data: { repository: { pr7: page([closed]), pr8: page([]) } } }), stderr: "" };
+    };
+
+    expect(await newestPrs(github, "o/r", [7, 8])).toEqual(new Map([[7, closed]]));
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toContain('headRefName: "factory/8"');
+    expect(asked[0]).not.toContain("comments(");
+    expect(await newestPrs(github, "o/r", [])).toEqual(new Map());
+    expect(asked).toHaveLength(1);
   });
 });
 

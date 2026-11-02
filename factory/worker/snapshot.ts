@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { branchFor, issueOf, must, runName, STUCK_LABEL, type Actors } from "../lib/github.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
-import { readSnapshot } from "../lib/snapshot.ts";
+import { newestPrs, readSnapshot } from "../lib/snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, sum, usage, type Usage } from "../lib/transcript.ts";
 import * as z from "../lib/vendor/zod-mini.js";
 import { SESSION_STATES, type Local, type RunView, type World } from "./decide.ts";
@@ -177,6 +177,7 @@ export async function readWorld(ctx: Ctx, rules: Rules, actors: Actors): Promise
   }
 
   const foreign = all.flatMap((t, i) => (claimed[i] ? [] : [t.issue]));
+  const claimedPrs = await newestPrs(run, ctx.repo, [...here]);
 
-  return { now: Date.now(), gh, actors, rules, local, claimedHere: here, foreign };
+  return { now: Date.now(), gh, actors, rules, local, claimedHere: here, claimedPrs, foreign };
 }

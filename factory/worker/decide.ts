@@ -8,7 +8,7 @@ import { branchFor, factoryComments, factoryLogins, fromFactory, issueOf, STUCK_
 import { failed, heldOn, heldSince, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
 import { HANDOFF_PATH, planFiles } from "../lib/plan.ts";
 import { guardedIn, type Rules } from "../lib/rules.ts";
-import { LABEL, trustedIssue, type Issue, type OpenPr, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
+import { LABEL, trustedIssue, type Issue, type OpenPr, type Pr, type PrState, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
 
 export const CRASHES_BEFORE_STUCK = 3;
@@ -53,6 +53,8 @@ export type World = {
   local: Local[];
   /** Claimed branches whose claim commit this machine pushed. */
   claimedHere: ReadonlySet<number>;
+  /** The newest PR from each branch in `claimedHere` that has one. */
+  claimedPrs: ReadonlyMap<number, PrState>;
   /** Issues with a `factory/<n>` worktree here that this machine never claimed: never acted on. */
   foreign: readonly number[];
 };
@@ -97,6 +99,8 @@ const CLOSES_PR = {
   untrusted: (n: number) => `Issue #${n} was labelled or edited by someone the factory does not trust, so the factory closed this PR.`,
   stuck: null,
 } as const satisfies Record<Ended["why"], ((n: number) => string) | null>;
+
+const CLOSED_UNMERGED = (pr: number) => `its PR #${pr} was closed without merging`;
 
 const GUARDED_CHANGED = (files: readonly string[]) =>
   `This PR changes ${files.join(", ")}, which only a person changes, so the factory closed it.`;
@@ -215,7 +219,7 @@ function actionableReview(pr: Pr, cs: readonly Comment[], a: Actors): Review | n
 }
 
 /** The issue's PR, unless it was closed unmerged before the issue was last marked stuck. */
-function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | null {
+function livePr<P extends PrState>(pr: P | undefined, cs: readonly Comment[], a: Actors): P | null {
   if (pr === undefined) return null;
   const stuckAt = cs.findLast((c) => fromFactory(c, a) && parse(c.body)?.kind === "stuck")?.createdAt ?? "";
 
@@ -404,7 +408,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     case "prMerged":
       return [cost(s.pr), ...stop];
     case "prClosedUnmerged":
-      return stuck(`its PR #${s.pr} was closed without merging`);
+      return stuck(CLOSED_UNMERGED(s.pr));
     case "checksFailed":
       return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
         ? stuck(`the checks on PR #${s.pr} failed ${s.deaths} times`)
@@ -526,14 +530,16 @@ function startable(i: Issue, w: World): { resume: boolean; planned: boolean } | 
 
 /**
  * The issues to start, up to the free slots: unfinished ones (with a plan) first, then the
- * oldest. Nothing starts while a usage limit holds, nor an issue `prsToClose` marks stuck.
+ * oldest. Nothing starts while a usage limit holds, nor an issue `prsToClose` or `closedClaims`
+ * marks stuck.
  */
 export function pick(w: World): { issue: number; resume: boolean }[] {
   const local = new Set(w.local.map((l) => l.issue));
   const free = w.rules.atOnce - w.local.filter((l) => occupies(classify(l, w))).length;
 
   if (free <= 0 || limitedUntil(w) !== null) return [];
-  const stuck = new Set(prsToClose(w).flat().flatMap((a) => (a.kind === "markStuck" ? [a.issue] : [])));
+  const marked = [...prsToClose(w), ...closedClaims(w)].flat();
+  const stuck = new Set(marked.flatMap((a) => (a.kind === "markStuck" ? [a.issue] : [])));
 
   return w.gh.issues
     .filter((i) => !local.has(i.number) && !i.labels.includes(STUCK_LABEL) && !stuck.has(i.number))
@@ -572,11 +578,28 @@ export function prsToClose(w: World): Action[][] {
   });
 }
 
+/**
+ * The issues claimed here, with no worktree here, whose PR closed unmerged since their last
+ * retry, each marked stuck, as `classify` marks a local one. So a tick that closed a PR that
+ * changed a guarded path, then failed or ended before the stuck mark, leaves no issue to resume.
+ */
+function closedClaims(w: World): Action[][] {
+  const local = new Set(w.local.map((l) => l.issue));
+
+  return w.gh.issues.flatMap((i): Action[][] => {
+    if (!w.claimedHere.has(i.number) || local.has(i.number) || i.labels.includes(STUCK_LABEL)) return [];
+    const pr = livePr(w.claimedPrs.get(i.number), i.comments, w.actors);
+
+    return pr?.state === "CLOSED" ? [[{ kind: "markStuck", issue: i.number, reason: CLOSED_UNMERGED(pr.number) }]] : [];
+  });
+}
+
 /** Every action this tick, grouped by issue: a group stops at its first failure. */
 export function decide(w: World): Action[][] {
   return [
     ...w.local.map((l) => actionsFor(classify(l, w), l)),
     ...prsToClose(w),
+    ...closedClaims(w),
     ...pick(w).map(({ issue, resume }): Action[] => [
       ...(resume ? [] : [{ kind: "claim", issue } satisfies Action]),
       { kind: "start", issue, restart: null, after: null },

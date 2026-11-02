@@ -140,6 +140,7 @@ const world = (
   rules: RULES,
   local,
   claimedHere: new Set(),
+  claimedPrs: new Map(),
   foreign: [],
   ...more,
 });
@@ -792,6 +793,28 @@ describe("only a person changes the factory's rules and the repo's workflows", (
     const gh = snapshot({ issues: [issue(7)], claimed: new Set([7]), open: [touching([RULES_PATH])] });
 
     expect(decide(world(gh, [], { claimedHere: new Set([7]) })).flat().map((a) => a.kind)).toEqual(["closePr", "markStuck"]);
+  });
+  test("a tick that closed the PR and failed or ended before the stuck mark: the next one marks the issue stuck, never resumes it", () => {
+    const gh = snapshot({ issues: [issue(7)], claimed: new Set([7]) });
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" } as const;
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]), claimedPrs: new Map([[7, closed]]) }))).toEqual([
+      [{ kind: "markStuck", issue: 7, reason: "its PR #57 was closed without merging" }],
+    ]);
+  });
+  test("once a person retries it, it resumes, and a run that stops before a new PR is no closed PR's", () => {
+    const stuck = posted({ kind: "stuck", issue: 7, reason: `its PR #57 changed ${RULES_PATH}` }, "2026-10-26T09:30:00Z");
+    const retried = issue(7, { comments: [stuck] });
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" } as const;
+    const gh = snapshot({ issues: [retried], claimed: new Set([7]) });
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]), claimedPrs: new Map([[7, closed]]) }))).toEqual([
+      [{ kind: "start", issue: 7, restart: null, after: null }],
+    ]);
+
+    const resumed = world(snapshot({ issues: [retried], prs: new Map([[7, pr(7, closed)]]) }), [here(7, [session("done")])]);
+
+    expect(step(resumed).state.kind).toBe("crashed");
   });
 });
 
