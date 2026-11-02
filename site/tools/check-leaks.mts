@@ -2,11 +2,14 @@
 // activity, dialogs, replies, toasts, menus), must name no machine path and
 // no sandbox: a take with a hit is refused, and its recorder records again.
 // Usage: check-leaks.mts
+import { userInfo } from "node:os";
 import * as S from "../src/demo/scenes.ts";
 import type { Scene } from "../src/demo/types.ts";
 
-// A /tmp/ inside another folder ("/data/tmp/") is the scene's own disk.
-const BANNED = [/\/private\/tmp/, /(?<![\w.-])\/tmp\//, /\/Users\//, /\/home\//, /~\//, /sandbox/i, /EPERM/];
+// A /tmp/ inside another folder ("/data/tmp/") is the scene's own disk, and a
+// home path written as ~/ names no one; the user's name names them.
+const user = userInfo().username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const BANNED = [/\/private\/tmp/, /(?<![\w.-])\/tmp\//, /\/Users\//, /\/home\//, new RegExp(user, "i"), /sandbox/i, /EPERM/];
 let bad = 0;
 for (const [name, scene] of Object.entries(S) as [string, Scene][]) {
   if (scene?.plain === undefined) continue;
