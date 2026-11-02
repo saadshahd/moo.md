@@ -1,15 +1,18 @@
 ---
 // A Claude Code mock built from a real recorded session: same glyphs, colors,
 // wrap rule, spinner verbs and replies, cut only where "… +N lines" says so.
+// Under the page's goal sentence (its description; none on the front page).
 // Autoplays in view and loops, narrated by beat captions above it and lighting
 // the move on screen in the page's strip (PageTitle.astro), with a player's
 // controls below: play and pause,
 // a timeline with a tick per beat, speed. Under reduced motion, the timeline
 // steps through one still per beat. `summary` tells a screen reader what it
-// shows. Every box around the terminal has a fixed height, so the terminal
+// shows. A recording with a plain turn (Scene.plain) opens paused on moo's
+// hand-back instead, with a "without moo" button that steps back to the plain
+// reply. Every box around the terminal has a fixed height, so the terminal
 // sits at the same place and size on every demo page at a given viewport.
 import type { Scene } from "../demo/types";
-import { beatEnds, beatTimes, frame, moveTimes, phases, ROWS } from "../demo/render";
+import { beatEnds, beatTimes, frame, moveTimes, phases, replyStands, ROWS } from "../demo/render";
 import { stripMoves } from "../moves";
 // The terminal font: Fira Code, as in the Solo terminal the demos are checked
 // against. Its glyphs for box drawing come from the symbols subset.
@@ -20,7 +23,12 @@ import "@fontsource/fira-code/symbols2-400.css";
 type Props = { scene: Scene; summary: string };
 const SPEEDS = [0.5, 1, 1.5, 2];
 const { scene, summary } = Astro.props;
-const names = stripMoves(Astro.locals.starlightRoute.entry);
+const { entry, id: route } = Astro.locals.starlightRoute;
+const names = stripMoves(entry);
+// The goal sentence: every demo page's description but the front page's,
+// which keeps the slot empty so its terminal sits where every other's does.
+const goal = route === "" ? "" : entry.data.description;
+if (goal === undefined) throw new Error(`Demo page "${route}" needs a description: its goal sentence`);
 
 // Beats name a turn (and a skill call or question in it) and play in order, or
 // a caption would show at the wrong time.
@@ -36,6 +44,14 @@ if (
   scene.beats.some((b, k) => b.on === "move" && !starts.includes(times[k]))
 )
   throw new Error(`Demo "${scene.turns[0].user}": each move in the strip must start a beat, in order, and each skill call a beat names must be in the strip`);
+// A plain turn is a prompt, not a command, and the turn after it runs this
+// page's first move.
+const { plain } = scene;
+const move = plain === undefined ? undefined : scene.turns[plain + 1];
+if (plain !== undefined && (!move || scene.turns[plain].user.startsWith("/") || move.user.match(/^\/(\S+)/)?.[1]?.split(":").pop() !== names[0]))
+  throw new Error(`Demo "${scene.turns[0].user}": its plain turn must be a prompt, and the turn after it must run /${names[0]}`);
+// Where it opens, paused: moo's hand-back; one step back, the plain reply.
+const opens = plain === undefined ? undefined : { handBack: replyStands(scene, plain + 1), plain: replyStands(scene, plain), moveStarts: phases(scene).timing[plain + 1].start };
 // Draw the demo here at every recorded width, each second and each beat, so
 // a scene the player cannot draw fails the build, not the page.
 const { length } = phases(scene);
@@ -43,8 +59,9 @@ for (const cols of [45, 80, 120])
   for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...times, ...beatEnds(scene)]) frame(scene, s, cols);
 ---
 
-<div class="demo not-content" style={`--rows: ${ROWS}`} data-demo={JSON.stringify({ scene, chips })}>
+<div class="demo not-content" style={`--rows: ${ROWS}`} data-demo={JSON.stringify({ scene, chips, opens })}>
   <div class="col">
+    <p class="goal" data-goal aria-hidden={goal ? undefined : "true"}>{goal}</p>
     <figure class="term-wrap">
       <figcaption class="vh">{summary}</figcaption>
       <div class="beats" aria-hidden="true">
@@ -61,7 +78,8 @@ for (const cols of [45, 80, 120])
         <div class="flash" data-flash aria-hidden="true"></div>
       </div>
       <div class="controls">
-        <button type="button" class="play" data-play aria-label="Pause demo">❚❚</button>
+        {opens && <button type="button" class="without" data-without aria-pressed="false">without moo</button>}
+        <button type="button" class="play" data-play aria-label={opens ? "Play demo" : "Pause demo"}>{opens ? "▶" : "❚❚"}</button>
         <span class="now" data-now aria-hidden="true">0:00</span>
         <div class="track" data-track role="slider" tabindex="0" aria-label="Demo timeline">
           <div class="rail"><div class="fill" data-fill></div></div>
@@ -118,13 +136,28 @@ for (const cols of [45, 80, 120])
      cell kept clear of it (7px cells: 120 needs 872px, 80 needs 604px).
      Captions get as many lines as the longest on any demo page needs at that
      width, so no page's terminal sits lower. */
-  .col { --cols: 45; --cap-lines: 2; }
-  @container demo (min-width: 604px) { .col { --cols: 80; --cap-lines: 1; } }
-  @container demo (min-width: 872px) { .col { --cols: 120; } }
+  .col { --cols: 45; --cap-lines: 2; --goal-lines: 3; }
+  @container demo (min-width: 604px) { .col { --cols: 80; --cap-lines: 1; --goal-lines: 2; } }
+  /* A frame wider than 120 columns need: the cell grows until they fill it,
+     leaving one cell and 12px a side (room for a scrollbar), and the type and
+     row grow with it in the recorded ratios (--fs, --row below), as the user
+     asked. Below that, the recorded size. */
+  @container demo (min-width: 872px) {
+    .col {
+      --cols: 120; --goal-lines: 1;
+      --cell: max(7px, calc((100cqi - 26px) / 122));
+      --fs: calc(var(--cell) * 13 * 0.923 / 7);
+      --row: calc(var(--cell) * 20.5 / 7);
+    }
+  }
   .vh {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
   }
+
+  /* The goal sentence above the narration: as many lines as the longest goal
+     needs at that width, so every page's terminal sits at the same place. */
+  .goal { width: 0; min-width: 100%; height: calc(var(--goal-lines) * var(--goal-lh)); overflow: hidden; }
 
   /* Narration above the terminal: every beat laid out in one cell of fixed
      height, so nothing moves when one replaces another. */
@@ -266,7 +299,7 @@ for (const cols of [45, 80, 120])
   .demo :global(svg.logo .eye) { fill: var(--t-eye); }
   .demo :global(svg.logo .body) { fill: var(--t-logo); }
   .demo :global(svg.logo) {
-    --px: 2px;
+    --px: calc(var(--cell) * 2 / 7);
     display: inline-block; vertical-align: top;
     width: calc(var(--w) * var(--px)); height: calc(var(--h) * 2 * var(--px));
     margin-top: calc((var(--row) - var(--h) * 2 * var(--px)) / 2);

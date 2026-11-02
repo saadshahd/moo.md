@@ -582,6 +582,9 @@ export function beatEnds(scene: Scene, timing = phases(scene).timing) {
   });
 }
 
+/** When turn `i`'s reply stands whole on screen, before the next turn types. */
+export const replyStands = (scene: Scene, i: number) => phases(scene).timing[i].reply + K.reveal;
+
 /** When each named move first shows: as the turn whose prompt runs it starts
  * typing, or as its skill call shows, whichever comes first. A skill goes by
  * its last part: "hope:freeze" is freeze. */
