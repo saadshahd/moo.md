@@ -31,7 +31,7 @@ import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedByFactory } from ".
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
-import { tick } from "./main.ts";
+import { actorChange, tick } from "./main.ts";
 import type { App } from "./app.ts";
 import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
@@ -1708,6 +1708,20 @@ describe("a worker that acts as an App", () => {
 
     await expect(tick({ app, dir, repo: "o/r", base: "main", machine: "m" }, platformOf("linux")!)).rejects.toThrow("the App can't mint");
     await rm(dir, { recursive: true });
+  });
+});
+
+describe("who the worker acts as is set at its start", () => {
+  const asUser: Rules = { ...RULES, bot: undefined };
+
+  test("rules that still name who it acts as let it go on", () => {
+    expect(actorChange(RULES, BOT)).toBeNull();
+    expect(actorChange(asUser, null)).toBeNull();
+  });
+  test("rules that name another bot, a bot where it acts as the user, or none where it acts as a bot stop its ticks", () => {
+    expect(actorChange({ ...RULES, bot: "other[bot]" }, BOT)).toBe(`the rules now name the bot other[bot], not ${BOT}; restart the worker`);
+    expect(actorChange(RULES, null)).toBe(`the rules now name the bot ${BOT}; restart the worker`);
+    expect(actorChange(asUser, BOT)).toBe("the rules no longer name a bot; restart the worker");
   });
 });
 

@@ -9,7 +9,7 @@ import { messageOf } from "../lib/errors.ts";
 import { must, repoOf } from "../lib/github.ts";
 import { botEnv, needsRenew, type Bot } from "../lib/bot.ts";
 import { gitConfigEnv } from "../lib/git.ts";
-import { actorsOf, readRules, rulesChangedByFactory, RULES_PATH } from "../lib/rules.ts";
+import { actorsOf, readRules, rulesChangedByFactory, RULES_PATH, type Rules } from "../lib/rules.ts";
 import { apply, log, say } from "./act.ts";
 import { botFor, readApp, type App } from "./app.ts";
 import { trustedIssue } from "../lib/snapshot.ts";
@@ -38,21 +38,34 @@ function holdAwake(p: Platform, busy: boolean): void {
 let bot: Bot | null = null;
 
 /** Mints the App's token again near its expiry; the worker's commands then act as its bot. */
-async function asBot(app: App, repo: string): Promise<void> {
-  if (bot !== null && !needsRenew(bot, Date.now())) return;
+async function asBot(app: App, repo: string): Promise<Bot> {
+  if (bot !== null && !needsRenew(bot, Date.now())) return bot;
   bot = await botFor(app, repo);
   Object.assign(process.env, botEnv(bot));
+
+  return bot;
+}
+
+/**
+ * How the rules no longer name who the worker acts as, `me`: its App's bot, or null for the
+ * user's gh login. Null while they agree.
+ */
+export function actorChange(rules: Rules, me: string | null): string | null {
+  if ((rules.bot ?? null) === me) return null;
+  const was = me === null ? "" : `, not ${me}`;
+
+  return `the rules ${rules.bot === undefined ? "no longer name a bot" : `now name the bot ${rules.bot}${was}`}; restart the worker`;
 }
 
 export async function tick(ctx: Ctx, p: Platform): Promise<void> {
   /** Before anything reaches GitHub: a token that expired while the machine slept would fail the fetch. */
-  if (ctx.app !== null) await asBot(ctx.app, ctx.repo);
+  const me = ctx.app === null ? null : (await asBot(ctx.app, ctx.repo)).name;
   await must(run, ["git", "fetch", "origin", ctx.base], { cwd: ctx.dir });
   const rules = await readRules(run, ctx.dir);
+  const changed = actorChange(rules, me);
 
   /** Who the worker acts as is set at its start; rules that changed it wait for a restart. */
-  if ((rules.bot === undefined) !== (ctx.app === null))
-    throw new Error(`the rules ${rules.bot === undefined ? "no longer name a bot" : `now name the bot ${rules.bot}`}; restart the worker`);
+  if (changed !== null) throw new Error(changed);
   const byFactory = await rulesChangedByFactory(run, ctx.dir, ctx.repo);
 
   if (byFactory !== null)
