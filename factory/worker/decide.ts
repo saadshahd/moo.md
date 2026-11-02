@@ -579,15 +579,17 @@ export function prsToClose(w: World): Action[][] {
 }
 
 /**
- * The issues claimed here, with no worktree here, whose PR closed unmerged since their last
- * retry, each marked stuck, as `classify` marks a local one. So a tick that closed a PR that
+ * The trusted issues claimed here, with no worktree here, whose PR closed unmerged since their
+ * last retry, each marked stuck, as `classify` marks a local one. So a tick that closed a PR that
  * changed a guarded path, then failed or ended before the stuck mark, leaves no issue to resume.
+ * An untrusted issue would never resume, and the factory writes nothing on it.
  */
 function closedClaims(w: World): Action[][] {
   const local = new Set(w.local.map((l) => l.issue));
 
   return w.gh.issues.flatMap((i): Action[][] => {
-    if (!w.claimedHere.has(i.number) || local.has(i.number) || i.labels.includes(STUCK_LABEL)) return [];
+    if (!w.claimedHere.has(i.number) || local.has(i.number) || i.labels.includes(STUCK_LABEL) || !trustedIssue(i, w.actors))
+      return [];
     const pr = livePr(w.claimedPrs.get(i.number), i.comments, w.actors);
 
     return pr?.state === "CLOSED" ? [[{ kind: "markStuck", issue: i.number, reason: CLOSED_UNMERGED(pr.number) }]] : [];
