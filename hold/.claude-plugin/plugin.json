@@ -1,8 +1,8 @@
 {
   "name": "hold",
-  "version": "0.0.12",
-  "description": "Comprehension at the human's pace. Grasp a change, drive a behavior, land one thing in an audience — until you can say how it works with the agent out of the room.",
-  "keywords": ["learn", "grasp", "toy", "land", "comprehension"],
+  "version": "0.1.0",
+  "description": "Comprehension at the human's pace. Grasp a change, drive a behavior, land one thing in an audience — until you can say how it works with the agent out of the room. A reply's Mermaid diagrams draw as pictures, and the pictures and markdown Claude touches open in place.",
+  "keywords": ["learn", "grasp", "toy", "land", "comprehension", "mermaid", "view"],
   "author": {
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"
