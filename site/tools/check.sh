@@ -1,7 +1,8 @@
 #!/bin/bash
 # Check every demo against the recorder's captures: each take's transcript
 # against its tall captures at 45, 80 and 120 columns (run gen.sh first: it
-# writes the raw turns this reads), then every dialog capture.
+# writes the raw turns this reads), then every dialog capture, then every
+# skill take for machine paths and the sandbox.
 cd "$(dirname "$0")"
 OUT=${TMPDIR:-/tmp}/moo-docs-gen
 R=$HOME/moo-rec-tools
@@ -16,4 +17,5 @@ for t in freeze:rec3/freeze anchor:rec3/anchor draft:rec3/draft skills:rec2/skil
   done
 done
 npx tsx check-dialogs.mts || fail=1
+npx tsx check-leaks.mts || fail=1
 exit $fail
