@@ -239,59 +239,6 @@ export function bareFact(f: string): string {
   );
 }
 
-/** A consult reply cut where its colours change: markdown as written, each idea's head, the line
- * saying why it was chosen, and what recedes: the lines under an idea, a dropped idea whole, the shared win. */
-export type Segment =
-  | { md: string }
-  | { head: { lead: string; change: string; rest: string } }
-  | { chosen: string }
-  | { dim: string };
-
-export function ideaSegments(text: string): Segment[] {
-  const out: Segment[] = [];
-  let md: string[] = [];
-  let inList = false;
-  let listed = false;
-  const flush = () => {
-    if (md.join("\n").trim()) out.push({ md: md.join("\n") });
-    md = [];
-  };
-  const plain = (t: string) => t.replace(/\*\*?|`/g, "");
-  for (const l of text.split("\n")) {
-    const head = l.match(/^(\d+\.\s.*?)\*\*(.+?)\*\*(.*)$/);
-    const droppedHead = !head && /^\d+\.\s.* — /.test(l);
-    if (head) {
-      flush();
-      inList = listed = true;
-      out.push({
-        head: {
-          lead: plain(head[1]),
-          change: plain(head[2]),
-          rest: plain(head[3]),
-        },
-      });
-    } else if (droppedHead && (inList || !listed)) {
-      flush();
-      inList = listed = true;
-      out.push({ dim: plain(l) });
-    } else if (inList && /^\s+Chosen because\b/.test(l)) out.push({ chosen: plain(l) });
-    else if (inList && /^\s+\S/.test(l)) out.push({ dim: plain(l) });
-    // A blank line between ideas keeps them apart.
-    else if (inList && !l.trim()) out.push({ dim: "" });
-    // Past the ideas, all but a question recedes: the win, and any note the rules left out.
-    else if (listed && l.trim() && !l.trim().endsWith("?")) {
-      flush();
-      inList = false;
-      out.push({ dim: plain(l) });
-    } else {
-      if (l.trim()) inList = false;
-      md.push(l);
-    }
-  }
-  flush();
-  return out;
-}
-
 const line = (id: string, label: string): Item => ({ id, label, kind: "line" });
 const note = (id: string, label: string): Item => ({ id, label, kind: "note" });
 const title = (id: string, label: string): Item => ({
@@ -780,33 +727,6 @@ export const register: Register = (on) => {
     if (!text.trim()) {
       const { Box } = $.ui.resolve(e);
       return <Box />;
-    }
-    // A reply that ends on ideas draws them itself: the change stands out, the rest recedes.
-    if (latestCard([{ role: "assistant", text: e.props.text }]).ideas?.length) {
-      const { Box, Text, Markdown } = $.ui.resolve(e);
-      return (
-        <Box flexDirection="column">
-          {ideaSegments(text).map((g, i) =>
-            "md" in g ? (
-              <Markdown key={`md${i}`} text={g.md} />
-            ) : "chosen" in g ? (
-              <Text key={`c${i}`} color="success">
-                {g.chosen}
-              </Text>
-            ) : "head" in g ? (
-              <Text key={`h${i}`}>
-                {g.head.lead}
-                <Text bold>{g.head.change}</Text>
-                {g.head.rest}
-              </Text>
-            ) : (
-              <Text key={`d${i}`} dimColor>
-                {g.dim}
-              </Text>
-            ),
-          )}
-        </Box>
-      );
     }
     return next({ ...e, props: { ...e.props, text } });
   });
