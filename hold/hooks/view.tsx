@@ -307,7 +307,9 @@ async function withViews(
       <Box flexDirection="row" gap={1} paddingLeft={2}>
         {buttons}
       </Box>
-      {views}
+      <Box flexDirection="column" gap={1} paddingLeft={2}>
+        {views}
+      </Box>
     </Box>
   );
 }
