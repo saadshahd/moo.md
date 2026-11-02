@@ -96,7 +96,7 @@ function run () {
   panel.orderFrontRegardless
   say('shown')
   const parent = $.getppid()
-  const end = Date.now() + (Number(read('HOLD_WINDOW_LIFE')) || 120) * 1000
+  const end = Date.now() + Number(read('HOLD_WINDOW_LIFE')) * 1000
   while (Date.now() < end && $.getppid() === parent) {
     const event = app.nextEventMatchingMaskUntilDateInModeDequeue($.NSEventMaskAny, $.NSDate.dateWithTimeIntervalSinceNow(0.1), $.NSDefaultRunLoopMode, true)
     // Only a click on the panel reaches this app: a left or right mouse-down closes it.
@@ -119,7 +119,7 @@ except ImportError:
     print('error: no tkinter', flush=True)
     sys.exit(1)
 
-life = float(os.environ.get('HOLD_WINDOW_LIFE') or 120)
+life = float(os.environ['HOLD_WINDOW_LIFE'])
 try:
     x, y, width, height = (int(float(v)) for v in os.environ.get('HOLD_WINDOW_RECT', '').split())
 except ValueError:
