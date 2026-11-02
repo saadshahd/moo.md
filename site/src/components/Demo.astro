@@ -214,7 +214,9 @@ for (const cols of [45, 80, 120])
      Fira Code advances 0.6em, so letter-spacing makes up the rest. --cell
      and --row size everything a terminal sizes in cells. */
   .term-wrap { margin: 0; }
-  .demo { --fs: calc(13px * 0.923); --row: 20.5px; --cell: 7px; --line: 1px; }
+  /* 13px × 0.923 is 11.999px; 12px reads the same and clears Lighthouse's
+     12px floor for legible text. */
+  .demo { --fs: 12px; --row: 20.5px; --cell: 7px; --line: 1px; }
   @media (min-resolution: 2dppx) { .demo { --line: 0.5px; } }
   .demo :global(.term), .probe {
     font-family: "Fira Code", Menlo, "SF Mono", ui-monospace, monospace;
