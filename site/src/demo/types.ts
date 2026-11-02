@@ -103,8 +103,8 @@ export type Scene = {
   /** In the order they play; the first opens the demo. */
   beats: Beat[];
   /** The turn Claude Code ran with all of moo off, if the recording has one.
-   * The turn after it runs the move, and the demo opens paused on that turn's
-   * reply, moo's hand-back; one step back, labelled "without moo", shows this
-   * turn's reply. */
+   * The turn after it runs the move, and the demo opens paused where that
+   * turn first waits on the user, moo's hand-back: its first dialog, or else
+   * its reply. One step back, labelled "without moo", shows this turn's reply. */
   plain?: number;
 };

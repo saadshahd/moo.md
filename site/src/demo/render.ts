@@ -585,6 +585,14 @@ export function beatEnds(scene: Scene, timing = phases(scene).timing) {
 /** When turn `i`'s reply stands whole on screen, before the next turn types. */
 export const replyStands = (scene: Scene, i: number) => phases(scene).timing[i].reply + K.reveal;
 
+/** When turn `i` first waits on the user: its first dialog, options showing,
+ * halfway to the first key on it (the keycaps that sent the prompt gone, the
+ * pick not yet moved), or else its reply standing. */
+export const firstWait = (scene: Scene, i: number) => {
+  const d = phases(scene).timing[i].dialogs[0];
+  return d ? d.open + (d.script.moments[1]?.at ?? d.script.length) / 2 : replyStands(scene, i);
+};
+
 /** When each named move first shows: as the turn whose prompt runs it starts
  * typing, or as its skill call shows, whichever comes first. A skill goes by
  * its last part: "hope:freeze" is freeze. */

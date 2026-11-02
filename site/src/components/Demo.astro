@@ -12,7 +12,7 @@
 // reply. Every box around the terminal has a fixed height, so the terminal
 // sits at the same place and size on every demo page at a given viewport.
 import type { Scene } from "../demo/types";
-import { beatEnds, beatTimes, frame, moveTimes, phases, replyStands, ROWS } from "../demo/render";
+import { beatEnds, beatTimes, firstWait, frame, moveTimes, phases, replyStands, ROWS } from "../demo/render";
 import { stripMoves } from "../moves";
 // The terminal font: Fira Code, as in the Solo terminal the demos are checked
 // against. Its glyphs for box drawing come from the symbols subset.
@@ -50,8 +50,9 @@ const { plain } = scene;
 const move = plain === undefined ? undefined : scene.turns[plain + 1];
 if (plain !== undefined && (!move || scene.turns[plain].user.startsWith("/") || move.user.match(/^\/(\S+)/)?.[1]?.split(":").pop() !== names[0]))
   throw new Error(`Demo "${scene.turns[0].user}": its plain turn must be a prompt, and the turn after it must run /${names[0]}`);
-// Where it opens, paused: moo's hand-back; one step back, the plain reply.
-const opens = plain === undefined ? undefined : { handBack: replyStands(scene, plain + 1), plain: replyStands(scene, plain), moveStarts: phases(scene).timing[plain + 1].start };
+// Where it opens, paused: where moo first hands the decision to the user;
+// one step back, the plain reply.
+const opens = plain === undefined ? undefined : { handBack: firstWait(scene, plain + 1), plain: replyStands(scene, plain), moveStarts: phases(scene).timing[plain + 1].start };
 // Draw the demo here at every recorded width, each second and each beat, so
 // a scene the player cannot draw fails the build, not the page.
 const { length } = phases(scene);
