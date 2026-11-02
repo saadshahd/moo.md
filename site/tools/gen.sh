@@ -38,3 +38,5 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-taskdesk/b1b2d5e3-76a8-4b4b
   --keys "$R/rec5/elicit/keylog.json" --raw "$OUT/elicit.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-agent-kit/9b1e2fb4-7d13-46bb-bfef-b6956ed54df2.jsonl" /Users/Shared/agent-kit "$R/rec6/shift2" ../src/demo/sessions/shift.ts 1=1x004a.933 \
   --keys "$R/rec6/shift2/keylog.json" --raw "$OUT/shift.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-callgate/5c8f031e-615c-433f-9fc7-1f64c02cc60d.jsonl" /Users/Shared/callgate "$R/rec5/interrogate" ../src/demo/sessions/interrogate.ts 1=wyaxdk.1470 \
+  --keys "$R/rec5/interrogate/keylog.json" --raw "$OUT/interrogate.json" --activity-from-snaps

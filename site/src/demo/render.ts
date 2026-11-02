@@ -15,20 +15,24 @@ export type Row = { segs: Seg[]; cls?: string; opt?: number; input?: number };
 type Cell = [string, string?];
 
 // ---- Wrapping ---------------------------------------------------------------
-// Greedy by words; a word longer than the width breaks at the edge. As in
-// wrapInk, the space after a row that fills its width starts the next row, so
-// that row holds one column less, and counts toward filling it; Claude Code
-// then draws the row without the space.
+// Greedy by words. As in wrapInk, the space after a row that fills its width
+// starts the next row, so that row holds one column less, and counts toward
+// filling it; Claude Code then draws the row without the space. A word longer
+// than the width starts on the row it follows when that breaks it no more
+// often than starting a new row would (wrap-ansi's rule), and breaks at the
+// edge with no space carried.
 function wrap(cs: Cell[], width: number, first = width): Cell[][] {
   const lines: Cell[][] = [];
   let line: Cell[] = [];
   let i = 0;
-  // Whether each row so far began with a carried space.
+  // Whether each row so far began with a carried space, and whether it ended
+  // inside a word.
   const carried: boolean[] = [];
+  const broke: boolean[] = [];
   const room = () => {
     const n = lines.length;
     const limit = (k: number) => (k ? width : first);
-    const carry = n > 0 && lines[n - 1].length + (carried[n - 1] ? 1 : 0) >= limit(n - 1);
+    const carry = n > 0 && !broke[n - 1] && lines[n - 1].length + (carried[n - 1] ? 1 : 0) >= limit(n - 1);
     carried[n] = carry;
     return limit(n) - (carry ? 1 : 0);
   };
@@ -39,14 +43,22 @@ function wrap(cs: Cell[], width: number, first = width): Cell[][] {
     if (i === j) break;
     const word = cs.slice(i, j);
     if (line.length && line.length + 1 + word.length > room()) {
-      lines.push(line);
-      line = [];
+      const left = room() - line.length - 1;
+      const stay =
+        word.length > width && left > 0 &&
+        Math.floor((word.length - 1) / width) >= 1 + Math.floor((word.length - left - 1) / width);
+      if (!stay) {
+        lines.push(line);
+        line = [];
+      }
     }
     if (line.length) line.push([" "]);
     line.push(...word);
-    while (line.length > width) {
-      lines.push(line.slice(0, width));
-      line = line.slice(width);
+    while (line.length > room()) {
+      const r = room();
+      broke[lines.length] = true;
+      lines.push(line.slice(0, r));
+      line = line.slice(r);
     }
     i = j;
   }
@@ -338,8 +350,14 @@ const user = (text: string, cols: number): Row[] =>
   ).map((l): Row => ({ segs: segs(l), cls: "user" }));
 
 /** The collapsed tool summary, two columns in: grey, counts bold, +lines
- * green, -lines red. */
-const tools = (summary: string, cols: number): Row[] =>
+ * green, -lines red. A closing "[ view ]" takes a row of its own, bold grey,
+ * at any width (interrogate). */
+const tools = (summary: string, cols: number): Row[] => {
+  const view = summary.endsWith(" [ view ]");
+  return [...counts(view ? summary.slice(0, -" [ view ]".length) : summary, cols),
+    ...(view ? [{ segs: [["  "], ["[ view ]", "g b"]] } as Row] : [])];
+};
+const counts = (summary: string, cols: number): Row[] =>
   wrap(
     summary
       .split(/(\+\d+|-\d+|\d+)/)
@@ -531,10 +549,12 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
       t = next;
     });
     const sent = t;
-    // Each dialog takes the keys pressed while it was open; any other key
-    // after sending lands where its recorded moment falls.
+    // Each dialog takes the keys pressed while it was open, give or take a
+    // second: the key log and the session file keep separate clocks (the
+    // Enter that answered interrogate's second dialog was logged 0.2 s after
+    // the answer). Any other key after sending lands where its moment falls.
     const post = keys.filter(([at]) => at >= 0);
-    const within = (d: Dialog) => post.filter(([at]) => at >= d.at[0] - 1 && at <= d.at[1]);
+    const within = (d: Dialog) => post.filter(([at]) => at >= d.at[0] - 1 && at <= d.at[1] + 1);
     const stray = post.filter((k) => !dialogs.some((d) => within(d).includes(k)));
     let u = sent + K.lead;
     const opened: Phase["dialogs"] = [];
@@ -1000,8 +1020,8 @@ const asked = (d: Dialog, cols: number) =>
   activityRows(escape(d.questions[0].question), d.tool, cols);
 
 /** Text after a lead, wrapped to the width left; later rows take `rest`. */
-const lead = (first: Seg[], rest: Seg[], cells: Cell[], width: number): Row[] =>
-  wrap(cells, width).map((l, k): Row => ({
+const lead = (first: Seg[], rest: Seg[], cells: Cell[], width: number, firstWidth = width): Row[] =>
+  wrap(cells, width, firstWidth).map((l, k): Row => ({
     segs: [...(k ? rest : first), ...segs(l)],
   }));
 
@@ -1052,10 +1072,13 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
       BLANK,
       ...qs.flatMap((q) => [
         ...ask(q.question, " ", "● ", cols),
+        // The answer's first row holds 5 short of the width, the rest 4
+        // (recorded with a typed answer at 45, 80 and 120).
         ...lead(
           [["   "], ["→ ", "ok"]],
           [["   "]],
           plain(answer(q), "ok"),
+          cols - 4,
           cols - 5,
         ),
       ]),

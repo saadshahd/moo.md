@@ -201,7 +201,13 @@ for n, a in enumerate(starts):
             qd = {'header': q['header'], 'question': q['question'], 'multiSelect': bool(q.get('multiSelect')),
                   'options': [{'label': o['label'], 'description': o['description'], **({'preview': o['preview']} if 'preview' in o else {})} for o in q['options']],
                   'picked': [i for _, i in found]}
-            if rest and not found: qd['typed'] = rest
+            # One pick is the label alone, even when another label starts it
+            # ("Let it run" in "Let it run, alert"); anything else was typed,
+            # even when it starts with a label ("None in 50. And the top 3 ...").
+            if not q.get('multiSelect'):
+                qd['picked'] = [labels.index(ans)] if ans in labels else []
+                if ans not in labels: qd['typed'] = ans
+            elif rest and not found: qd['typed'] = rest
             elif rest: raise SystemExit(f'answer has words beyond its pick: {ans!r}')
             if note: qd['notes'] = note
             qs.append(qd)

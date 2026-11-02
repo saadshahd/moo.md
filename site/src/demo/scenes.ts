@@ -36,6 +36,7 @@ import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as interrogate from "./sessions/interrogate";
 import * as shift from "./sessions/shift";
 import * as elicit from "./sessions/elicit";
 import * as explain from "./sessions/explain";
@@ -83,6 +84,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const interrogateScene = skill(interrogate);
 export const shiftScene = skill(shift);
 export const elicitScene = skill(elicit);
 export const explainScene = skill(explain);

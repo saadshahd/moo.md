@@ -18,9 +18,20 @@ const takes: [string, Scene, string][] = [
   ["draft", S.draftScene, "rec5/draft"],
   ["intent", S.intentScene, "rec5/intent"],
   ["shape", S.shapeScene, "rec5/shape2"],
+  ["interrogate", S.interrogateScene, "rec5/interrogate"],
 ];
 const text = (r: Row) => r.segs.map((s: Seg) => s[0]).join("").replace(/\xa0/g, " ").trimEnd();
 let total = 0;
+/** The first question of a review's name, which runs its questions' numbers
+ * together: "3456" is 3 to 6, "111213" is 11 to 13. */
+const firstOf = (run: string) => {
+  for (let n = 1; n <= +run; n++) {
+    let s = "";
+    for (let k = n; s.length < run.length; k++) s += k;
+    if (s === run) return n;
+  }
+  throw new Error(`a review named for no run of questions: q${run}`);
+};
 let bad = 0;
 for (const [name, scene, dir] of takes) {
   const { timing } = phases(scene);
@@ -32,7 +43,7 @@ for (const [name, scene, dir] of takes) {
     // q<n>-o<k>, q<n>-notes, q<n><m>-review (the review of the dialog asking n to m), review.
     const m = /^(?:q(\d+)-)?(o(\d+)|notes|review)-(\d+)x\d+\.ansi$/.exec(f);
     if (!m) throw new Error(`${dir}/dialogs/${f}: a capture this check cannot place`);
-    const at = qs[(m[1] ? +m[1][0] : qs.length) - 1];
+    const at = qs[(m[1] ? (m[2] === "review" ? firstOf(m[1]) : +m[1]) : qs.length) - 1];
     const asked = scene.turns[at.i].dialogs![at.j].questions.length;
     const moments = at.d.script.moments;
     const mo =
