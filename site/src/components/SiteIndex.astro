@@ -1,5 +1,5 @@
 ---
-// Every chain and move, two lists side by side (menus.ts), for a page that
+// Every page, one list per menu group side by side (menus.ts), for a page that
 // has lost its reader: the 404.
 import MenuItems from "./MenuItems.astro";
 import { siteMenus } from "../menus";
@@ -11,7 +11,7 @@ const menus = await siteMenus();
   {menus.map((m) => (
     <section>
       <h2>{m.label}</h2>
-      <MenuItems items={m.items} here={Astro.url.pathname} kind={m.id} />
+      <MenuItems items={m.items} here={Astro.url.pathname} kind={m.look} />
     </section>
   ))}
 </div>

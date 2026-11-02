@@ -1,6 +1,6 @@
 ---
 // One menu's links (TopBar.astro). A chain shows its title and its one line;
-// a move shows its command and what it does. The page you are on is toned,
+// any other page its command and what it does. The page you are on is toned,
 // with an ink bar: a state marker, so it never takes the accent.
 type Item = { href: string; label: string; note?: string };
 const { items, here, kind } = Astro.props as { items: Item[]; here: string; kind: string };
@@ -31,6 +31,7 @@ const { items, here, kind } = Astro.props as { items: Item[]; here: string; kind
   }
   .label { font: 600 0.9375rem / 1.25 var(--__sl-font); }
   .note { font: 400 0.875rem / 1.35 var(--__sl-font); color: var(--sl-color-gray-3); }
-  .moves a { flex-direction: row; align-items: baseline; gap: 1rem; }
-  .moves .label { flex: none; width: 5rem; font: 400 0.9375rem / 1.25 var(--__sl-font-mono); }
+  .commands a { flex-direction: row; align-items: baseline; gap: 1rem; }
+  /* As wide as the longest command, /interrogate. */
+  .commands .label { flex: none; width: 7rem; font: 400 0.9375rem / 1.25 var(--__sl-font-mono); }
 </style>

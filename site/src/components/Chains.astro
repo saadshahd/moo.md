@@ -2,7 +2,7 @@
 // Every chain page as one line of links, by title (menus.ts).
 import { siteMenus } from "../menus";
 
-const [chains] = await siteMenus();
+const chains = (await siteMenus()).find((m) => m.id === "chains")!;
 ---
 
 {chains.items.map((c, k) => (<>{k > 0 && " · "}<a href={c.href}>{c.label}</a></>))}

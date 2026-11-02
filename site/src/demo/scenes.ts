@@ -30,7 +30,7 @@
 // - Option gaps: half a row of space under each option's description and above
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.
-import type { Scene, Turn } from "./types";
+import type { Chrome, Scene, Turn } from "./types";
 import * as freeze from "./sessions/freeze";
 import * as anchor from "./sessions/anchor";
 import * as draft from "./sessions/draft";
@@ -127,20 +127,19 @@ export const reduceScene: Scene = {
   ],
 };
 
-// Turn 0 ran with all of moo off, turn 1 with it on, in one session: the page
-// opens paused on turn 1's reply, a step from turn 0's.
-export const clarifyScene: Scene = {
-  chrome: clarify.chrome,
-  turns: clarify.turns,
-  beats: [
-    { at: 0, text: "The ask: a retry, unsure about idempotency." },
-    { at: 0, on: "reply", text: "It asks about idempotency, then picks a reading itself." },
-    { at: 1, text: "Now /clarify, on the same ask." },
-    { at: 1, on: "dialog", q: 0, text: "Three readings; each box shows what it builds." },
-    { at: 1, on: "reply", text: "You picked the reading; the ask now reads one way." },
-  ],
+// ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
+// skill with moo on. The page opens where turn 1 first waits on the user, a
+// step from turn 0's reply. Captions are empty until a writer drafts them: one
+// beat as each turn starts and one as its reply arrives.
+
+const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => ({
+  chrome,
+  turns,
+  beats: turns.flatMap((_, at): Scene["beats"] => [{ at, text: "" }, { at, on: "reply", text: "" }]),
   plain: 0,
-};
+});
+
+export const clarifyScene = skill(clarify);
 
 // ---- Chain pages: one session where /compose runs each move as it comes up.
 
