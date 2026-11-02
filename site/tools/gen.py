@@ -125,9 +125,20 @@ def snap_activity(part, sent, hi, reply_at, rep, replayed, windows=()):
             shown.append(rows[j][5:]); j += 1
         # A long-running command adds its time and output so far, and a hint.
         if shown[-1] == '(ctrl+b to run in background)': shown.pop()
-        shown[-1] = re.sub(r' \((\d+m )?\d+s( · \d+ lines?)?\)$', '', shown[-1])
+        # The time and line count can wrap onto a row of their own.
+        shown = re.sub(r' ?\n?\((\d+m )?\d+s( · \d+ ?\n?lines?)?\)$', '', '\n'.join(shown)).split('\n')
         cut = squash(''.join(shown)).rstrip('…')
         full = next((d for d in details if squash(d).startswith(cut)), None)
+        # A command of many lines shows each line cut at the edge: its rows
+        # then come in order, the first at the start.
+        def rows_in(d):
+            sd, pos = squash(d), 0
+            for k, r in enumerate(squash(x).rstrip('…') for x in shown):
+                at = sd.find(r, pos)
+                if at < 0 or (k == 0 and at): return False
+                pos = at + len(r)
+            return True
+        if full is None and len(shown) > 1: full = next((d for d in details if rows_in(d)), None)
         if full is None: raise SystemExit(f'{sn["file"]}: no tool in the session starts {cut[:60]!r}')
         counted = re.match(r'^(Reading|Editing|Searching|Calling|Running|Listing|Writing|Fetching)\b.*…$', label) and re.search(r'\d', label)
         if not counted and label not in known:

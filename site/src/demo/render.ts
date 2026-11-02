@@ -141,7 +141,20 @@ function inline(text: string, cls?: string): Cell[] {
   for (let k = 0; k < cs.length; k++) {
     const ch = cs[k];
     if (ch === "\\" && k + 1 < cs.length) out.push([cs[++k], style()]);
-    else if (ch === "`") l = !l;
+    else if (ch === "`" && !l && cs[k + 1] === "`") {
+      // A span opened by a run of ticks closes at the next run as long and
+      // drops one space at each end: `` `x` `` draws `x` (target).
+      let n = 1;
+      while (cs[k + n] === "`") n++;
+      const tail = cs.slice(k + n).join("");
+      const end = new RegExp(`(?<!\`)\`{${n}}(?!\`)`).exec(tail);
+      if (!end) { k += n - 1; continue; }
+      const body = tail.slice(0, end.index).replace(/^ (.*) $/s, "$1");
+      l = true;
+      for (const c of body) out.push([c, style()]);
+      l = false;
+      k += n + Array.from(tail.slice(0, end.index)).length + n - 1;
+    } else if (ch === "`") l = !l;
     else if (l || ch !== "*") out.push([ch, style()]);
     else if (cs[k + 1] === "*") {
       b = !b;
@@ -225,11 +238,12 @@ function draw(lines: Line[], width: number): Cell[][] {
  * sentence ("a 202.", "Node 22.") as a no-break space, so no row of the item
  * starts with what reads as a numbered item's mark. Recorded in three list
  * items; three such numbers in paragraphs kept a plain space. It reads the
- * markdown, so a number in code ("`5 * 1000`.") keeps a plain space. */
+ * markdown, so a number in code ("`5 * 1000`.") keeps a plain space, and a
+ * decimal ("for 1.5 s") is no mark (target). */
 function keepNumbered(cs: Cell[]): Cell[] {
   const s = cs.map(([ch]) => ch).join("");
   const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
-  return cs.map((c, k) => (c[0] === " " && !code(cs[k + 1]) && /^\d+[.)]/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
+  return cs.map((c, k) => (c[0] === " " && !code(cs[k + 1]) && /^\d+[.)](?!\d)/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
 }
 
 // ---- Tables -------------------------------------------------------------------
