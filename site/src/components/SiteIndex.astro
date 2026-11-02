@@ -11,7 +11,7 @@ const menus = await siteMenus();
   {menus.map((m) => (
     <section>
       <h2>{m.label}</h2>
-      <MenuItems items={m.items} here={Astro.url.pathname} kind={m.look} />
+      <MenuItems items={m.items} groups={m.groups} here={Astro.url.pathname} kind={m.look} stack at="index" />
     </section>
   ))}
 </div>

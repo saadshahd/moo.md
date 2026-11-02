@@ -31,7 +31,7 @@ const github = "https://github.com/saadshahd/moo.md";
           {m.label}<span class="count" aria-label={`, ${m.items.length} pages`}>{m.items.length}</span>
         </button>
         <div id={`menu-${m.id}`} class={`wide menu ${m.look}`} popover>
-          <MenuItems items={m.items} here={here} kind={m.look} />
+          <MenuItems items={m.items} groups={m.groups} here={here} kind={m.look} at="bar" />
         </div>
       </>
     ))}
@@ -58,7 +58,7 @@ const github = "https://github.com/saadshahd/moo.md";
       {menus.map((m) => (
         <section>
           <h2>{m.label}<span class="count">{m.items.length}</span></h2>
-          <MenuItems items={m.items} here={here} kind={m.look} />
+          <MenuItems items={m.items} groups={m.groups} here={here} kind={m.look} stack at="sheet" />
         </section>
       ))}
       <a class="sheet-gh" href={github}>moo.md on GitHub</a>
@@ -75,6 +75,12 @@ const github = "https://github.com/saadshahd/moo.md";
       if ((e as ToggleEvent).newState !== "open") return;
       const r = button.getBoundingClientRect();
       menu.style.left = `${Math.round(r.left)}px`;
+    });
+    // A menu wider than the room right of its button moves left to fit.
+    menu.addEventListener("toggle", (e) => {
+      if ((e as ToggleEvent).newState !== "open") return;
+      const over = menu.getBoundingClientRect().right - (innerWidth - 16);
+      if (over > 0) menu.style.left = `${Math.max(16, Math.round(menu.getBoundingClientRect().left - over))}px`;
     });
   }
 
@@ -141,6 +147,7 @@ const github = "https://github.com/saadshahd/moo.md";
   }
   .menu.chains { width: 25rem; }
   .menu.commands { width: 24rem; }
+  .menu:has(.groups) { width: max-content; max-width: calc(100vw - 2rem); }
   /* On a phone, one sheet from the bar to the foot of the screen. */
   .sheet { position: fixed; inset: var(--sl-nav-height) 0 0 0; width: 100%; height: auto; max-height: none; overflow: auto; padding: 1.5rem 1rem; }
   .sheet section + section { margin-top: 1.75rem; }
