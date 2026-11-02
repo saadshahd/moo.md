@@ -1197,6 +1197,31 @@ describe("the PR a run opens", () => {
     expect((await gitIn(origin, "rev-parse", "factory/7")).trim()).not.toBe((await git("rev-parse", "HEAD")).trim());
     await rm(root, { recursive: true });
   });
+  test("push refuses a workflow whose name git would quote, and one moved out of the workflows folder", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir] = [join(root, "origin.git"), join(root, "w")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await mkdir(join(dir, ".github", "workflows"), { recursive: true });
+    await Bun.write(join(dir, ".github", "workflows", "ci.yml"), "on: push\n");
+    await git("add", ".github");
+    await git("commit", "-q", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+
+    await Bun.write(join(dir, ".github", "workflows", "déploy.yml"), "on: push\n");
+    await git("add", ".github");
+    await git("commit", "-q", "-m", "deploy");
+    await expect(pushBranch(dir, 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/déploy.yml") });
+
+    await git("reset", "-q", "--hard", "origin/main");
+    await git("mv", ".github/workflows/ci.yml", "ci.yml");
+    await git("commit", "-q", "-m", "move");
+    await expect(pushBranch(dir, 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
+    await rm(root, { recursive: true });
+  });
   test("pr refuses with exit 4 while its body file is missing or blank, naming the file", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-pr-"));
     const refused = { code: 4, message: expect.stringContaining(PR_PATH) };
