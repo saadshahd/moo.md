@@ -212,7 +212,7 @@ function world(
       if (program === "exits") return { value: { code: 0, signal: null } };
       for (;;) {
         await (program === "silent" ? new Promise(() => {}) : clock.sleep(100));
-        yield { stream: "stdout" as const, text: ".\n" };
+        yield { stream: "stdout" as const, text: `.\n` };
       }
     } finally {
       w.isEnded = true;
