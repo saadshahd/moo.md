@@ -36,6 +36,7 @@ import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as deepen from "./sessions/deepen";
 import * as widen from "./sessions/widen";
 import * as interrogate from "./sessions/interrogate";
 import * as shift from "./sessions/shift";
@@ -60,6 +61,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const deepenScene = skill(deepen);
 export const widenScene = skill(widen);
 export const anchorScene = skill(anchor);
 export const interrogateScene = skill(interrogate);

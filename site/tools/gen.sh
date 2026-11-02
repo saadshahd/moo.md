@@ -43,3 +43,5 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-billing/07241682-be5d-45db-
   --keys "$R/rec6/anchor/keylog.json" --raw "$OUT/anchor.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-motionpad/035ed991-9174-47d0-b597-e635327f8b9c.jsonl" /Users/Shared/motionpad "$R/rec5/widen" ../src/demo/sessions/widen.ts 1=cxplqx.2109 \
   --keys "$R/rec5/widen/keylog.json" --raw "$OUT/widen.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-mdcheck/5037ebf8-2b11-44de-af67-08332c4f2df8.jsonl" /Users/Shared/mdcheck "$R/rec5/deepen" ../src/demo/sessions/deepen.ts 3=1yb24mf.883 \
+  --keys "$R/rec5/deepen/keylog.json" --raw "$OUT/deepen.json" --activity-from-snaps

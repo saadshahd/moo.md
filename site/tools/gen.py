@@ -66,16 +66,21 @@ def toast_of(raw):
 # came from a session resumed in another permission mode.
 tall_p = next(p for p in (os.path.join(rec, 'tall3-120.ansi'), os.path.join(rec, 'tall-120.ansi')) if os.path.exists(p))
 tall = [strip(r).rstrip() for r in open(tall_p, encoding='utf-8').read().split('\n')]
-summaries = []
+# A task notification draws no prompt: its summary follows the done line
+# ("✻ Brewed for 1m 5s · …") of the turn before.
+summaries, notices = [], []
 for i, r in enumerate(tall):
-    if r.startswith('❯ ') and i + 2 < len(tall):
+    notice = r.startswith('✻ ')
+    if (r.startswith('❯ ') or notice) and i + 2 < len(tall):
         j = i + 1
-        while j < len(tall) and tall[j].strip(): j += 1
+        while not notice and j < len(tall) and tall[j].strip(): j += 1
         k = j + 1
         rows = []
         while k < len(tall) and tall[k].startswith('  ') and not tall[k].startswith('  ⎿'):
             rows.append(tall[k].strip()); k += 1
-        summaries.append(' '.join(rows) if rows and not tall[k - 1 if rows else k].startswith('⏺') and re.match(r'^(Read|Ran|Called|Edited|Searched|Listed|Wrote|Created|Fetched|Listed)', rows[0] if rows else '') else None)
+        found = ' '.join(rows) if rows and not tall[k - 1 if rows else k].startswith('⏺') and re.match(r'^(Read|Ran|Called|Edited|Searched|Listed|Wrote|Created|Fetched|Listed)', rows[0] if rows else '') else None
+        if not notice: summaries.append(found)
+        elif found: notices.append(found)
 
 def snap_activity(part, sent, hi, reply_at, rep, replayed, windows=()):
     """The activity lines as the snaps show them while the turn worked: each
@@ -155,7 +160,11 @@ for n, a in enumerate(starts):
     if key:
         reply = short[key]
     turn = {'user': shown_prompt(recs[a]['message']['content'])}
-    drawn = summaries[n] if n < len(summaries) else None
+    if turn['user'].startswith('<task-notification>'):
+        drawn = notices.pop(0) if notices else None
+    else:
+        m = sum(1 for x in starts[:n] if not shown_prompt(recs[x]['message']['content']).startswith('<task-notification>'))
+        drawn = summaries[m] if m < len(summaries) else None
     if drawn != (rep['final'] or None):
         print(f'turn {n}: tool summary drawn {drawn!r}, replayed {rep["final"]!r}; using the drawn one', file=sys.stderr)
     if drawn: turn['tools'] = drawn
@@ -294,6 +303,14 @@ for n, turn in enumerate(turns):
                 if 'menu' in turn: raise SystemExit(f'turn {n}: two menus')
                 turn['menu'] = {'after': ki, 'rows': menu}
                 break
+
+# A subagent's task notification is no prompt: Claude Code drew no prompt row,
+# only the tool summary and the reply it led to, under the turn before.
+for k in range(len(turns) - 1, 0, -1):
+    if turns[k]['user'].startswith('<task-notification>'):
+        t = turns.pop(k)
+        assert not t.get('keys') and not t.get('dialogs'), 'a task notification with keys or dialogs'
+        turns[k - 1]['more'] = [{**({'tools': t['tools']} if t.get('tools') else {}), 'reply': t['reply']}, *t.get('more', []), *turns[k - 1].get('more', [])]
 
 first = next(s for s in snaps if 'context' in s)
 J = lambda v: json.dumps(v, ensure_ascii=False)

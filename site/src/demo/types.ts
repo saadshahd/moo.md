@@ -35,6 +35,9 @@ export type Turn = {
    * screens captured while the turn ran. */
   chrome: [number, Chrome][];
   reply: Line[];
+  /** What came after the reply with no prompt: a subagent finished, and
+   * Claude Code drew its tool summary and the reply it led to. */
+  more?: { tools?: string; reply: Line[] }[];
 };
 
 /** What Claude Code drew around the prompt box at one moment. */

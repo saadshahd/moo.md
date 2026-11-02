@@ -18,6 +18,7 @@ const takes: [string, Scene, string][] = [
   ["intent", S.intentScene, "rec5/intent"],
   ["shape", S.shapeScene, "rec5/shape2"],
   ["interrogate", S.interrogateScene, "rec5/interrogate"],
+  ["deepen", S.deepenScene, "rec5/deepen"],
 ];
 const text = (r: Row) => r.segs.map((s: Seg) => s[0]).join("").replace(/\xa0/g, " ").trimEnd();
 let total = 0;

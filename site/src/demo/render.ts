@@ -234,7 +234,8 @@ function keepNumbered(cs: Cell[]): Cell[] {
 // all fit in `width` - 2 - 3 per column - 1; otherwise each keeps its longest
 // word and shares what is left by how much more its widest cell wants, floored.
 // When even the longest words do not fit, each column takes its longest word's
-// share of the room, floored, and words break at the edge (shift, at 45).
+// share of the room, floored, at least 3, and words break at the edge (shift
+// and deepen, at 45).
 // Cells wrap as Ink does; the header is centered, body cells left, and each
 // cell sits floor(spare / 2) rows down. When a cell would wrap past 4 rows,
 // each row becomes "header: value" lines between rules; the 4-row limit is
@@ -267,7 +268,7 @@ function table(rows: Line[], width: number): Cell[][] {
       ? widest
       : extra >= 0
         ? longest.map((m, c) => m + Math.floor(((widest[c] - m) * extra) / want))
-        : longest.map((m) => Math.floor((m * room) / sum(longest)));
+        : longest.map((m) => Math.max(3, Math.floor((m * room) / sum(longest))));
   const wrapped = grid.map((r) => r.map((cs, c) => (cs.length ? wrapInk(cs, cols[c]) : [[]])));
   if (wrapped.some((r) => r.some((cell) => cell.length > 4)))
     return listed(head, grid.slice(1), width);
@@ -523,7 +524,7 @@ type Phase = {
 
 /** Time to read a turn's reply once it is on screen, by its lines of text. */
 const readTime = (turn: Turn) =>
-  Math.min(K.readMax, K.read + K.perLine * turn.reply.filter((l) => l.trim()).length);
+  Math.min(K.readMax, K.read + K.perLine * [turn.reply, ...(turn.more ?? []).map((m) => m.reply)].flat().filter((l) => l.trim()).length);
 
 /** When each turn of a scene plays its keys, sends, finishes replying. */
 const timed = new WeakMap<Scene, { timing: Phase[]; length: number }>();
@@ -717,6 +718,10 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
     const n = Math.ceil(rows.length * ramp(s, p.reply, p.reply + K.reveal));
     transcript.push(...rows.slice(0, n), ...(n ? [BLANK] : []));
     if (n < rows.length) transcript.push(spinner(chrome.spin, since), BLANK);
+    // What came after it with no prompt shows once the reply is all in.
+    else
+      for (const m of turn.more ?? [])
+        transcript.push(...(m.tools ? [...tools(m.tools, cols), BLANK] : []), ...reply(m.reply, cols), BLANK);
   });
   if (transcript[transcript.length - 1] === BLANK) transcript.pop();
   return { transcript, typing, menu, asking, chrome };
