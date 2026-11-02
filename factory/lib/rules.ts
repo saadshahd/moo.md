@@ -3,6 +3,16 @@ import * as z from "./vendor/zod-mini.js";
 
 export const RULES_PATH = ".claude/factory.json";
 
+/**
+ * What only a person changes: the factory's rules, and the workflows CI runs with the repo's
+ * secrets. A path ending in `/` stands for everything under it.
+ */
+const GUARDED = [RULES_PATH, ".github/workflows/"] as const;
+
+/** The paths among `files` that only a person changes. */
+export const guardedIn = (files: readonly string[]) =>
+  files.filter((f) => GUARDED.some((g) => (g.endsWith("/") ? f.startsWith(g) : f === g)));
+
 const Text = z.string().check(z.minLength(1));
 
 /** A command and its arguments, run with no shell. */

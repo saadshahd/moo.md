@@ -7,7 +7,7 @@ import { holder, parse, type FactoryComment, type HeldOn, type Wait } from "../l
 import { branchFor, factoryComments, fromTrusted, issueOf, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { failed, heldOn, heldSince, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
 import { HANDOFF_PATH, planFiles } from "../lib/plan.ts";
-import { RULES_PATH, type Rules } from "../lib/rules.ts";
+import { guardedIn, type Rules } from "../lib/rules.ts";
 import { LABEL, trustedIssue, type Issue, type OpenPr, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { answerMessage, answerTo, openWait } from "../lib/wait.ts";
 
@@ -60,7 +60,7 @@ export type World = {
 export type IssueState =
   | { kind: "ended"; why: "closed" | "stuck" | "untrusted"; pr: Pick<Pr, "number" | "state"> | null }
   /** Its open PR changes the rules file, which only a person changes. */
-  | { kind: "rulesChanged"; pr: number }
+  | { kind: "guardedChanged"; pr: number; files: string[] }
   | { kind: "overCap" }
   | { kind: "working" }
   | { kind: "askedInBox" }
@@ -98,13 +98,15 @@ const CLOSES_PR = {
   stuck: null,
 } as const satisfies Record<Ended["why"], ((n: number) => string) | null>;
 
-const RULES_CHANGED = `This PR changes ${RULES_PATH}, and only a person changes the factory's rules, so the factory closed it.`;
+const GUARDED_CHANGED = (files: readonly string[]) =>
+  `This PR changes ${files.join(", ")}, which only a person changes, so the factory closed it.`;
 
 /**
- * Whether open PR `p` changes the rules file. A PR changing more files than one page lists is
- * left to the worker's check of who last changed the rules on the base.
+ * The paths open PR `p` changes that only a person changes. A PR changing more files than one
+ * page lists is left to `push` and `pr`, which refuse such a branch, and to the worker's check of
+ * who last changed the rules on the base.
  */
-const changesRules = (p: OpenPr | undefined) => p?.files?.includes(RULES_PATH) ?? false;
+const guardedFiles = (p: OpenPr | undefined) => guardedIn(p?.files ?? []);
 
 /** Why a listed issue is over for the factory, or null while it goes on. */
 function endedWhy(i: Issue, a: Actors): "stuck" | "untrusted" | null {
@@ -139,7 +141,7 @@ export type Action =
 /** The states each state's actions can lead to; `gone` is a removed worktree. */
 export const NEXT = {
   ended: ["gone"],
-  rulesChanged: ["ended"],
+  guardedChanged: ["ended"],
   overCap: ["working"],
   working: ["working"],
   askedInBox: ["ended"],
@@ -229,7 +231,9 @@ export function classify(l: Local, w: World): IssueState {
   if (why !== null) return ended(why);
   const own = w.gh.open.find((p) => p.number === w.gh.prs.get(l.issue)?.number);
 
-  if (own !== undefined && changesRules(own)) return { kind: "rulesChanged", pr: own.number };
+  const guarded = guardedFiles(own);
+
+  if (own !== undefined && guarded.length > 0) return { kind: "guardedChanged", pr: own.number, files: guarded };
   const current = l.runs.at(-1);
   const cs = issue.comments;
 
@@ -324,7 +328,7 @@ function reviewMessage(n: number, s: Extract<IssueState, { kind: "reviewed" }>, 
     ...(body === "" ? [] : [body.split("\n").map((line) => `> ${line}`).join("\n")]),
     ...(inline.length === 0 ? [] : [`Inline comments:\n${inline.join("\n")}`]),
     `${catchUp} Fix what is in the scope of issue #${n}, and list the rest as follow-ups in ${HANDOFF_PATH}.`,
-    `Then push, then reply once on the PR (\`gh pr comment ${s.pr}\`) with what changed and what was left.`,
+    "Then push with the factory's `push`, then post the handoff: what changed and what was left.",
   ].join("\n\n");
 }
 
@@ -366,11 +370,11 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
       return [...stop, ...(s.pr === null ? [] : [cost(s.pr.number)]), ...close, { kind: "removeWorktree", issue: n }];
     }
 
-    case "rulesChanged":
+    case "guardedChanged":
       return [
         ...stop,
-        { kind: "closePr", issue: n, pr: s.pr, reason: RULES_CHANGED },
-        { kind: "markStuck", issue: n, reason: `its PR #${s.pr} changed ${RULES_PATH}` },
+        { kind: "closePr", issue: n, pr: s.pr, reason: GUARDED_CHANGED(s.files) },
+        { kind: "markStuck", issue: n, reason: `its PR #${s.pr} changed ${s.files.join(", ")}` },
       ];
     case "overCap":
       return [...stop, start("context")];
@@ -402,7 +406,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
     case "checksFailed":
       return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
         ? stuck(`the checks on PR #${s.pr} failed ${s.deaths} times`)
-        : wake(`The checks on PR #${s.pr} failed. ${catchUp} Read them with \`gh pr checks ${s.pr}\`, fix and push.`, {
+        : wake(`The checks on PR #${s.pr} failed. ${catchUp} Read them with \`gh pr checks ${s.pr}\`, fix them, and push with the factory's \`push\`.`, {
             reason: "checks",
           });
     case "reviewed":
@@ -417,7 +421,7 @@ export function actionsFor(s: IssueState, l: Local): Action[] {
       return s.deaths >= CRASHES_BEFORE_STUCK || current === undefined
         ? stuck(`PR #${s.pr} still conflicts with ${s.base} after its run was woken ${s.deaths} times to merge ${s.base} in`)
         : wake(
-            `PR #${s.pr} conflicts with ${s.base}. ${catchUp} Then run \`git merge origin/${s.base}\`. Resolve the conflicts, run the checks locally, then push.`,
+            `PR #${s.pr} conflicts with ${s.base}. ${catchUp} Then run \`git merge origin/${s.base}\`. Resolve the conflicts, run the checks locally, then push with the factory's \`push\`.`,
             { reason: "conflict", baseSha: s.baseSha },
           );
     case "limitReset":
@@ -445,7 +449,7 @@ export function occupies(s: IssueState): boolean {
     case "reviewed":
       return s.rounds < REVIEW_ROUNDS;
     case "ended":
-    case "rulesChanged":
+    case "guardedChanged":
     case "askedInBox":
     case "prOpen":
     case "prMerged":
@@ -463,8 +467,8 @@ export function stateLine(s: IssueState): string {
   switch (s.kind) {
     case "ended":
       return `ended: ${s.why}${s.pr === null ? "" : `, PR #${s.pr.number}`}`;
-    case "rulesChanged":
-      return `PR #${s.pr} changes ${RULES_PATH}`;
+    case "guardedChanged":
+      return `PR #${s.pr} changes ${s.files.join(", ")}, which only a person changes`;
     case "overCap":
       return "its context passed the cap";
     case "working":
@@ -555,7 +559,8 @@ export function prsToClose(w: World): Action[] {
     if (n === null || here.has(n) || p.author === null || !w.actors.trusted.includes(p.author)) return [];
     const issue = w.gh.issues.find((i) => i.number === n);
     const why = issue === undefined ? "closed" : endedWhy(issue, w.actors);
-    const reason = changesRules(p) ? RULES_CHANGED : why === null ? null : CLOSES_PR[why]?.(n);
+    const guarded = guardedFiles(p);
+    const reason = guarded.length > 0 ? GUARDED_CHANGED(guarded) : why === null ? null : CLOSES_PR[why]?.(n);
 
     return reason == null ? [] : [{ kind: "closePr", issue: n, pr: p.number, reason }];
   });

@@ -5,7 +5,7 @@ import { STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { PLAN_PATH, PR_PATH, planGaps } from "../lib/plan.ts";
 import { LABEL, UNDO_LABEL, type Check, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
-import { prBody, prCreate, prMerge, prText, seal } from "./cli.ts";
+import { prBody, prCreate, prMerge, prText, pushBranch, seal } from "./cli.ts";
 import {
   actionsFor,
   classify,
@@ -552,7 +552,7 @@ describe("an open PR GitHub can't merge as it stands", () => {
 
     const message = actions.flatMap((a) => (a.kind === "wake" ? [a.message] : [])).join("");
 
-    for (const s of ["git merge origin/factory/7", "git merge origin/main", "never rebase or force-push", "run the checks", "push"])
+    for (const s of ["git merge origin/factory/7", "git merge origin/main", "never rebase or force-push", "run the checks", "the factory's `push`"])
       expect(message).toContain(s);
     expect(message.indexOf("origin/factory/7")).toBeLessThan(message.indexOf("origin/main"));
   });
@@ -641,7 +641,8 @@ describe("a review on an open PR", () => {
       "never rebase or force-push",
     ])
       expect(message).toContain(s);
-    expect(message).toMatch(/push, then reply once on the PR .*with what changed and what was left\.$/);
+    expect(message).not.toContain("gh pr comment");
+    expect(message).toMatch(/push with the factory's `push`, then post the handoff: what changed and what was left\.$/);
   });
   test("an approval, a stranger's, an empty one, or one already woken for never wakes it", () => {
     for (const w of [
@@ -749,7 +750,7 @@ describe("killing an issue closes its PR", () => {
   });
 });
 
-describe("only a person changes the factory's rules", () => {
+describe("only a person changes the factory's rules and the repo's workflows", () => {
   const touching = (files: string[] | null, author = ME) => ({ ...pr(7), author, files });
 
   const at = (files: string[] | null, runs = [session("working")]) =>
@@ -758,10 +759,17 @@ describe("only a person changes the factory's rules", () => {
   test("a run's open PR that changes the rules file is closed and the issue marked stuck, the run stopped first, even mid-work", () => {
     const { state, actions } = step(at(["src/a.ts", RULES_PATH]));
 
-    expect(state).toEqual({ kind: "rulesChanged", pr: 57 });
+    expect(state).toEqual({ kind: "guardedChanged", pr: 57, files: [RULES_PATH] });
     expect(occupies(state)).toBe(false);
     expect(kinds(actions)).toEqual(["stop", "closePr", "markStuck"]);
     expect(actions[1]).toMatchObject({ pr: 57, reason: expect.stringContaining(RULES_PATH) });
+  });
+  test("so is one that changes a workflow, which CI runs with the repo's secrets", () => {
+    const { state, actions } = step(at(["src/a.ts", ".github/workflows/ci.yml"]));
+
+    expect(state).toEqual({ kind: "guardedChanged", pr: 57, files: [".github/workflows/ci.yml"] });
+    expect(stateLine(state)).toBe("PR #57 changes .github/workflows/ci.yml, which only a person changes");
+    expect(actions[1]).toMatchObject({ reason: expect.stringContaining(".github/workflows/ci.yml") });
   });
   test("a PR leaving the rules file alone, or listing more files than one page, goes on", () => {
     expect(step(at(["src/a.ts"])).state.kind).toBe("working");
@@ -1083,6 +1091,13 @@ describe("run prompt", () => {
     expect(p).not.toContain("never holds the merge");
     expect(p).toContain(`Once the PR is open, after 2 failed fixes of the same failure, run \`${usage(base.cli).stuck}\``);
   });
+  test("the run pushes only through push, never with git push", () => {
+    const p = runPrompt(base);
+
+    expect(p).toContain(`Commit as you go, and run \`${usage(base.cli).push}\` to push`);
+    expect(p).toContain("never `git push`");
+    expect(p.indexOf(usage(base.cli).push)).toBeLessThan(p.indexOf(usage(base.cli).handoff));
+  });
   test("where the project's own rules say to stop and wait, the run asks with AskUserQuestion", () => {
     expect(runPrompt(base)).toContain("Where the project's own rules say to stop and wait for a person, ask with AskUserQuestion instead");
   });
@@ -1125,6 +1140,32 @@ describe("the PR a run opens", () => {
     expect(prCreate(h(false), "Add due dates", "body")).not.toContain("--draft");
     expect(prMerge(h(true), "https://github.com/o/r/pull/9")).toBe(null);
     expect(prMerge(h(), "https://github.com/o/r/pull/9")).toEqual(["gh", "pr", "merge", "https://github.com/o/r/pull/9", "--auto", "--squash"]);
+  });
+  test("push sends the branch to its own name on origin, and refuses one that changes a path only a person changes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir] = [join(root, "origin.git"), join(root, "w")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+    await Bun.write(join(dir, "src.ts"), "export {};\n");
+    await git("add", "src.ts");
+    await git("commit", "-q", "-m", "work");
+
+    expect(await pushBranch(dir, 7)).toBe("pushed factory/7");
+    expect((await gitIn(origin, "rev-parse", "factory/7")).trim()).toBe((await git("rev-parse", "HEAD")).trim());
+
+    await mkdir(join(dir, ".github", "workflows"), { recursive: true });
+    await Bun.write(join(dir, ".github", "workflows", "ci.yml"), "on: push\n");
+    await git("add", ".github");
+    await git("commit", "-q", "-m", "ci");
+
+    await expect(pushBranch(dir, 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
+    expect((await gitIn(origin, "rev-parse", "factory/7")).trim()).not.toBe((await git("rev-parse", "HEAD")).trim());
+    await rm(root, { recursive: true });
   });
   test("pr refuses with exit 4 while its body file is missing or blank, naming the file", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-pr-"));

@@ -22,7 +22,7 @@ import {
 import { gitConfigEnv } from "./git.ts";
 import { cutToFailures, isTestCommand } from "./logs.ts";
 import { overlap, planFiles, planGaps, planText } from "./plan.ts";
-import { actorsOf, parseRules } from "./rules.ts";
+import { actorsOf, guardedIn, parseRules, RULES_PATH } from "./rules.ts";
 import { readSnapshot, snapshotQuery, undone, type Snapshot } from "./snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, usage } from "./transcript.ts";
 import {
@@ -468,6 +468,12 @@ describe("rules", () => {
       errors: [".claude/factory.json bot: no such field"],
     });
     expect("errors" in parseRules(JSON.stringify({ ...good, sandbox: { domains: [] } }))).toBe(true);
+  });
+  test("only a person changes the rules file and the workflows; a file beside them is anyone's", () => {
+    expect(guardedIn([RULES_PATH, ".github/workflows/ci.yml", ".github/CODEOWNERS", "src/a.ts", ".claude/factory.json.bak"])).toEqual([
+      RULES_PATH,
+      ".github/workflows/ci.yml",
+    ]);
   });
   test("a bot login is never trusted", () => {
     expect(

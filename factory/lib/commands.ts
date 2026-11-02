@@ -15,6 +15,7 @@ export function usage(cli: string) {
     plan: `${cli} plan`,
     call: `${cli} call ${flags}`,
     handoff: `${cli} handoff`,
+    push: `${cli} push`,
     pr: `${cli} pr`,
     stuck: `${cli} stuck "<the reason, in one line>"`,
   };

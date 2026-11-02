@@ -13,7 +13,7 @@ import {
 } from "../lib/github.ts";
 import { heldOn, heldSince, planHold } from "../lib/holds.ts";
 import { HANDOFF_PATH, PLAN_PATH, PR_PATH, planFiles, planGaps, planText } from "../lib/plan.ts";
-import { actorsOf, readRules, RULES_PATH, type Rules } from "../lib/rules.ts";
+import { actorsOf, guardedIn, readRules, type Rules } from "../lib/rules.ts";
 import { comments, LABEL, readSnapshot } from "../lib/snapshot.ts";
 import { approved, APPROVAL_QUESTION, APPROVE } from "../lib/wait.ts";
 import { run } from "./proc.ts";
@@ -128,6 +128,24 @@ export function prBody(text: string, issue: number, seal: string): string {
   return `${text.trim()}\n\nCloses #${issue}\n\nPlan: seal \`${seal.slice(0, 8)}\`, approved on #${issue}.`;
 }
 
+/** Refuses a branch that changes what only a person changes, naming each such path. */
+async function refuseGuarded(cwd: string): Promise<void> {
+  const sh = async (...argv: string[]) => (await must(run, argv, { cwd })).trim();
+  const base = await sh("git", "rev-parse", "--abbrev-ref", "origin/HEAD");
+  const guarded = guardedIn((await sh("git", "diff", "--name-only", `${base}...HEAD`)).split("\n"));
+
+  if (guarded.length > 0)
+    throw new Refusal(`the branch changes ${guarded.join(", ")}, which only a person changes; take those changes out`, 4);
+}
+
+/** Pushes the branch of issue `issue` to its own name on origin, never forced. */
+export async function pushBranch(cwd: string, issue: number): Promise<string> {
+  await refuseGuarded(cwd);
+  await must(run, ["git", "push", "origin", `HEAD:refs/heads/${branchFor(issue)}`], { cwd });
+
+  return `pushed ${branchFor(issue)}`;
+}
+
 type PrAt = Pick<Here, "repo" | "issue" | "rules">;
 
 /** The command that opens issue `h.issue`'s PR, as a draft when the rules want a person to mark each one ready. */
@@ -158,11 +176,7 @@ async function pr(h: Here): Promise<string> {
   const text = await prText(h.cwd);
   const head = branchFor(h.issue);
   const sh = async (...argv: string[]) => (await must(run, argv, { cwd: h.cwd })).trim();
-  const base = await sh("git", "rev-parse", "--abbrev-ref", "origin/HEAD");
-  const changed = await sh("git", "diff", "--name-only", `${base}...HEAD`);
-
-  if (changed.split("\n").includes(RULES_PATH))
-    throw new Refusal(`the branch changes ${RULES_PATH}; only a person changes the factory's rules`, 4);
+  await refuseGuarded(h.cwd);
 
   const open = await sh("gh", "pr", "list", "--repo", h.repo, "--head", head, "--state", "open",
     "--json", "url", "--jq", ".[0].url // empty");
@@ -190,6 +204,8 @@ async function main(argv: string[]): Promise<string> {
       return call(await here(cwd), parseArgs({ args: rest, options: CALL, strict: true }).values);
     case "handoff":
       return handoff(await here(cwd));
+    case "push":
+      return pushBranch(cwd, (await here(cwd)).issue);
     case "pr":
       return pr(await here(cwd));
     case "stuck": {
@@ -203,7 +219,7 @@ async function main(argv: string[]): Promise<string> {
     }
 
     default:
-      throw new Refusal(`usage: factory <plan|call|handoff|pr|stuck> …`, 2);
+      throw new Refusal(`usage: factory <plan|call|handoff|push|pr|stuck> …`, 2);
   }
 }
 

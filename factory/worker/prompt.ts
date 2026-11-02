@@ -67,7 +67,7 @@ ${list(i.rules.layers.plan)}
    Ask only when undoing a choice costs more than asking, and say why in one or two sentences in the same message.
    An ask goes to the issue; the answer arrives as your next message.
    Where the project's own rules say to stop and wait for a person, ask with AskUserQuestion instead: nobody reads a turn that ends on a question, and the worker counts a turn that ends without a PR as a crash.
-5. Commit and push as you go. After each push, write ${HANDOFF_PATH} (what is done, what is left, any step cut off) and run \`${u.handoff}\`.
+5. Commit as you go, and run \`${u.push}\` to push; never \`git push\`, which the factory blocks. \`push\` refuses a branch that changes the rules file or a workflow: only a person changes those. After each push, write ${HANDOFF_PATH} (what is done, what is left, any step cut off) and run \`${u.handoff}\`.
 6. Before the PR, run each of the project's checks and fix what fails:
 ${list(i.rules.layers.check)}
    Then judge the diff, \`git diff origin/${i.base}...HEAD\`, against each of these rules and fix what breaks one:
