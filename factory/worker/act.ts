@@ -3,7 +3,6 @@
 import { join, resolve } from "node:path";
 import { branchFor, closePr, edit, latest, markStuck, must, post, runName, upsert } from "../lib/github.ts";
 import { total, type Plan, type Restart } from "../lib/formats.ts";
-import { gitConfigEnv } from "../lib/git.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { sum } from "../lib/transcript.ts";
@@ -11,16 +10,10 @@ import { approved, notes } from "../lib/wait.ts";
 import type { Action, World } from "./decide.ts";
 import { run } from "./proc.ts";
 import { runPrompt } from "./prompt.ts";
+import { runFlags } from "./settings.ts";
 import { sessionFacts, worktrees, type Ctx } from "./snapshot.ts";
 
 const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
-
-/**
- * A project's own settings may name an editor that waits for a window (`code --wait`); a run
- * has none, so its `git merge` would wait for good. `--settings` outranks project settings. A
- * run's git takes the worker's git config too, whatever the run's shell profile resets.
- */
-const RUN_SETTINGS = JSON.stringify({ env: { GIT_EDITOR: "true", ...gitConfigEnv() } });
 
 export const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
 
@@ -157,8 +150,7 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
     base: ctx.base,
   });
 
-  const flags = ["--permission-mode", "bypassPermissions", "--settings", RUN_SETTINGS];
-  await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...flags, prompt], { cwd });
+  await must(run, ["claude", "--bg", "--name", runName(ctx.repo, n), ...runFlags(CLI), prompt], { cwd });
 }
 
 /**

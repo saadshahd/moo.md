@@ -6,6 +6,7 @@ import { PLAN_PATH, PR_PATH, planGaps } from "../lib/plan.ts";
 import { LABEL, UNDO_LABEL, type Check, type Issue, type Pr, type Review, type Snapshot } from "../lib/snapshot.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
 import { prBody, prCreate, prMerge, prText, pushBranch, seal } from "./cli.ts";
+import { runFlags } from "./settings.ts";
 import {
   actionsFor,
   classify,
@@ -1121,6 +1122,26 @@ describe("seal", () => {
     );
     expect(seal("## Types\na")).not.toBe(seal("## Types\nb"));
     expect(planGaps("## Types\na")).toEqual(["Signatures", "Files"]);
+  });
+});
+
+describe("how a run starts", () => {
+  const flags = runFlags("bun /f/worker/cli.ts");
+  const settings = JSON.parse(flags[flags.indexOf("--settings") + 1]!);
+
+  test("in auto mode, never bypassing permissions", () => {
+    expect(flags.slice(0, 2)).toEqual(["--permission-mode", "auto"]);
+    expect(flags.join(" ")).not.toContain("bypassPermissions");
+  });
+  test("every shell command reaches the classifier, and no tool writes to GitHub but the factory's commands", () => {
+    expect(settings.autoMode.classifyAllShell).toBe(true);
+    expect(settings.permissions.deny).toEqual(expect.arrayContaining(["Bash(git push *)", "Bash(gh auth *)", "Bash(gh issue *)", "Bash(gh api *)"]));
+    expect(settings.autoMode.allow[0]).toBe("$defaults");
+    expect(settings.autoMode.allow).toContainEqual(expect.stringContaining("bun /f/worker/cli.ts plan, call, handoff, push, pr, stuck"));
+    expect(settings.autoMode.hard_deny[0]).toBe("$defaults");
+  });
+  test("with no editor to wait for, and git reaching GitHub through gh's login", () => {
+    expect(settings.env).toEqual({ GIT_EDITOR: "true", ...gitConfigEnv() });
   });
 });
 
