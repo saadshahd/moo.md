@@ -31,6 +31,7 @@
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.
 import type { Chrome, Scene, Turn } from "./types";
+import { CAPTIONS } from "./captions";
 import * as freeze from "./sessions/freeze";
 import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
@@ -56,36 +57,45 @@ import * as reduce from "./sessions/reduce";
 
 // ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
 // skill with moo on. The page opens where turn 1 first waits on the user, a
-// step from turn 0's reply. Captions are empty until a writer drafts them: one
-// beat as each turn starts and one as its reply arrives.
+// step from turn 0's reply. Each turn has two captions (captions.ts): one as
+// it starts and one as its reply arrives; a page with no captions yet shows
+// empty ones. A page whose captions don't match its turns fails the build.
 
-const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => ({
-  chrome,
-  turns,
-  beats: turns.flatMap((_, at): Scene["beats"] => [{ at, text: "" }, { at, on: "reply", text: "" }]),
-  plain: 0,
-});
+const skill = (name: string, { chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => {
+  const text = CAPTIONS[name];
+  if (text && text.length !== turns.length * 2)
+    throw new Error(`captions.ts: ${name} has ${text.length} captions for ${turns.length} turns, not ${turns.length * 2}`);
+  return {
+    chrome,
+    turns,
+    beats: turns.flatMap((_, at): Scene["beats"] => [
+      { at, text: text?.[2 * at] ?? "" },
+      { at, on: "reply", text: text?.[2 * at + 1] ?? "" },
+    ]),
+    plain: 0,
+  };
+};
 
-export const clarifyScene = skill(clarify);
-export const consultScene = skill(consult);
-export const composeScene = skill(compose);
-export const targetScene = skill(target);
-export const routerScene = skill(router);
-export const reframeScene = skill(reframe);
-export const judgeScene = skill(judge);
-export const deepenScene = skill(deepen);
-export const widenScene = skill(widen);
-export const anchorScene = skill(anchor);
-export const interrogateScene = skill(interrogate);
-export const shiftScene = skill(shift);
-export const elicitScene = skill(elicit);
-export const explainScene = skill(explain);
-export const shapeScene = skill(shape);
-export const intentScene = skill(intent);
-export const inversionScene = skill(inversion);
-export const freezeScene = skill(freeze);
-export const draftScene = skill(draft);
-export const reduceScene = skill(reduce);
+export const clarifyScene = skill("clarify", clarify);
+export const consultScene = skill("consult", consult);
+export const composeScene = skill("compose", compose);
+export const targetScene = skill("target", target);
+export const routerScene = skill("router", router);
+export const reframeScene = skill("reframe", reframe);
+export const judgeScene = skill("judge", judge);
+export const deepenScene = skill("deepen", deepen);
+export const widenScene = skill("widen", widen);
+export const anchorScene = skill("anchor", anchor);
+export const interrogateScene = skill("interrogate", interrogate);
+export const shiftScene = skill("shift", shift);
+export const elicitScene = skill("elicit", elicit);
+export const explainScene = skill("explain", explain);
+export const shapeScene = skill("shape", shape);
+export const intentScene = skill("intent", intent);
+export const inversionScene = skill("inversion", inversion);
+export const freezeScene = skill("freeze", freeze);
+export const draftScene = skill("draft", draft);
+export const reduceScene = skill("reduce", reduce);
 
 // ---- Chain pages: one session where /compose runs each move as it comes up.
 
