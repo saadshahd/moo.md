@@ -10,9 +10,9 @@
 //   row (as "~/orders"). What is left, "Claude Code v2.1.316", takes one row,
 //   so the logo is drawn that tall (render.ts header()), with half a row of
 //   space under it (Demo.astro's .banner).
-// - Status line: cut to context use at the left and "◎ hold:Plain" at the
-//   right, where Claude Code drew it; the weekly use and the model between
-//   them are left out (render.ts statusRow()).
+// - Status line: cut to context use at the left and the output style, as
+//   "◎ hold:Plain", at the right, where Claude Code drew it; the weekly use
+//   and the model between them are left out (render.ts statusRow()).
 // - Removed: the mode row under the status line, "⏵⏵ bypass permissions on
 //   (shift+tab to cycle)". Nothing below it needs its row (render.ts frame()).
 // - Removed: Claude Code's notices above the prompt box, "◉ xhigh · /effort"
@@ -37,6 +37,7 @@ import * as draft from "./sessions/draft";
 import * as reduce from "./sessions/reduce";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
+import * as clarify from "./sessions/clarify";
 
 // ---- Move pages: one scene each, the one that carries the move.
 
@@ -124,6 +125,21 @@ export const reduceScene: Scene = {
     },
     { at: 3, text: "The third pass trims words, not facts." },
   ],
+};
+
+// Turn 0 ran with all of moo off, turn 1 with it on, in one session: the page
+// opens paused on turn 1's reply, a step from turn 0's.
+export const clarifyScene: Scene = {
+  chrome: clarify.chrome,
+  turns: clarify.turns,
+  beats: [
+    { at: 0, text: "The ask: a retry, unsure about idempotency." },
+    { at: 0, on: "reply", text: "It asks about idempotency, then picks a reading itself." },
+    { at: 1, text: "Now /clarify, on the same ask." },
+    { at: 1, on: "dialog", q: 0, text: "Three readings; each box shows what it builds." },
+    { at: 1, on: "reply", text: "You picked the reading; the ask now reads one way." },
+  ],
+  plain: 0,
 };
 
 // ---- Chain pages: one session where /compose runs each move as it comes up.

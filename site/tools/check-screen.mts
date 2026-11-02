@@ -19,7 +19,8 @@ const scene: Scene = {
 };
 const text = (r: Row) => r.segs.map((s: Seg) => (s[1] === "logo" ? "" : s[0])).join("").trimEnd();
 const ours = frame(scene, 1e9, +w).transcript.map(text);
-const screen = readFileSync(cap, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+// Claude Code draws some spaces as no-break spaces (U+00A0); text only, as in check-dialogs.mts.
+const screen = readFileSync(cap, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").replace(/\xa0/g, " ").trimEnd());
 const from = (xs: string[]) => xs.slice(xs.findIndex((l) => l.startsWith("❯ ")));
 const end = screen.findLastIndex((l) => /^\S /.test(l) && / · done /.test(l));
 const done = (l: string) => /^\S (\S+ for .*· done |.*messages? hidden)/.test(l) || /^  .*(hidden|show\))\s*$/.test(l);

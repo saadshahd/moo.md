@@ -19,3 +19,7 @@ take ship d087d508-ca94-4b7f-9589-c2527bb9d1dd rec3/draft draft 0=p72nx4.1034
 take catalog b7212ad9-5d95-4cc6-8995-103a9399db1c rec2/reduce reduce 0=1bazap6.1471
 take invoices f24358fa-2e6b-42e6-86b1-1591d6551fa8 rec2/skills skills 0=tfsdk9.846 1=12y0zha.384
 take shop db17126e-b9e3-4038-a8a5-b3234ff2206e rec2/chain chain 0=23q9us.1586
+# A world under /private/tmp, which take() can't name. Turn 0 ran with all of
+# moo off, turn 1 with it on, in one session.
+python3 gen.py "$HOME/.claude/projects/-private-tmp-payhooks/443a7b35-46d1-41bf-bde4-4ce40174592d.jsonl" /private/tmp/payhooks "$R/rec4/clarify3" ../src/demo/sessions/clarify.ts 1=14wxkdb.688 \
+  --keys "$R/rec4/clarify3/keylog.json" --raw "$OUT/clarify.json" --activity-from-snaps

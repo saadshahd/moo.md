@@ -1,0 +1,13 @@
+---
+title: /clarify
+move: splits two readings so you pick one
+description: "When your words read two ways, you pick the one you meant."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { clarifyScene } from "../../../demo/scenes";
+
+<Demo
+  scene={clarifyScene}
+  summary="Claude Code. You ask for a retry in a webhook consumer, unsure about idempotency. With moo off, Claude asks whether fulfilment takes an idempotency key; you pick Don't know / no. It then picks one reading itself, retrying failed fulfilment jobs, builds it with tests and reports what it changed. Then, in the same session with moo on, you type /hope:clarify. A dialog asks which reading you meant, with a box beside each option showing what it builds: retry failed jobs, only make the payment provider's redeliveries safe, or retry the HTTP call. You pick retry failed jobs, and the reply lists each reading and its outcome, then states the confirmed ask."
+/>

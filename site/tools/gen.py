@@ -42,7 +42,7 @@ def chrome_of(s):
     # The mode row, the notice above the prompt box, the dim suggestion in it,
     # the hook the spinner names and hunch's band are left out of the demos,
     # as the user asked; the spinner keeps its verb and counter.
-    c = {'context': s['context']}
+    c = {'context': s['context'], **({'style': s['style']} if s.get('style') else {})}
     if s.get('spin'):
         tail = ' · '.join(x for x in (s['spin'].get('tail') or '').split(' · ')
                           if x and not re.match(r'^running .* hook$|^(\d+m )?\d+s$', x))
@@ -217,11 +217,16 @@ for n, a in enumerate(starts):
     hi = ts(recs[b]) if b < len(recs) else float('inf')
     chrome, last = [], None
     for s in snaps:
-        if not (lo < s['t'] < hi) or s['dialog'] or 'context' not in s or s['cols'] != 80: continue
+        if not (lo < s['t'] < hi) or s['dialog'] or 'context' not in s or s.get('cut') or s['cols'] != 80: continue
         c = chrome_of(s)
         if c != last:
             chrome.append([round(s['t'] - sent, 1), c])
             last = c
+    # A turn run with moo off ends where its session did: snaps after its
+    # reply that name another output style come from the session resumed for
+    # the next turn, whose own chrome holds them.
+    at_reply = next((c for x, c in reversed(chrome) if x <= reply_at - sent), {})
+    chrome = [[x, c] for x, c in chrome if x <= reply_at - sent or c.get('style') == at_reply.get('style')]
     turn['chrome'] = chrome
     toast = next((toast_of(s['raw']) for s in snaps if reply_at <= s['t'] < hi and toast_of(s['raw'])), None)
     if toast: turn['toast'] = toast
@@ -230,9 +235,11 @@ for n, a in enumerate(starts):
 
 # The recorder's keys, each in the turn it drove: a key belongs to the turn
 # whose reply had not yet come in. Seconds after that turn's prompt was sent.
+# A key pressed before sending stays before it: rounding can't take it to 0.
 for e in events:
     n = min(sum(1 for _, r in abs_times if r < e['t']), len(turns) - 1)
-    turns[n].setdefault('keys', []).append([round(e['t'] - abs_times[n][0], 1), e['kind'], e['value']])
+    at = e['t'] - abs_times[n][0]
+    turns[n].setdefault('keys', []).append([round(at, 1) if at >= 0 or round(at, 1) < 0 else -0.1, e['kind'], e['value']])
 
 COLORS = {'38;2;177;185;249': 'l', '38;2;153;153;153': 'g'}
 def segs_of(raw):

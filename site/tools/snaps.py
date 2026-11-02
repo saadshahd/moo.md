@@ -1,4 +1,4 @@
-# Read each snap's chrome: the status line's context use, the spinner (verb and
+# Read each snap's chrome: the status line's context use and output style, the spinner (verb and
 # the words after its counter), a notice above the prompt box, the prompt's
 # text or dim suggestion, the mode row's grey words, hunch's band, and whether
 # a dialog is open. Usage: snaps.py <snaps dir> → JSON lines on stdout.
@@ -17,6 +17,12 @@ def parse(path):
     if ctx:
         m = re.search(r'◔ Context (\d+%(?: · [\d.]+k)?)', ctx)
         out['context'] = m.group(1)
+        # The output style ends the status line, which wraps onto the rows
+        # under it; a line cut short with "…" hides whether it had one.
+        k = rows.index(ctx)
+        style = next((m.group(1) for r in rows[k:k + 3] for m in [re.search(r'◎ (\S+)', r)] if m), None)
+        if style: out['style'] = style
+        elif ctx.endswith('…'): out['cut'] = True
     mode = next((r for r in rows if '⏵⏵' in r), None)
     if mode: out['mode'] = mode.split('bypass permissions on', 1)[1].strip()
     spin = [r for r in rows if re.match(r'^[·✢✳✶✻✽*] \S+… ', r + ' ')]

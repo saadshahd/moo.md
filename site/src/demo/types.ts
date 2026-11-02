@@ -41,6 +41,9 @@ export type Turn = {
 export type Chrome = {
   /** The status line's context use: "0%", or "4% · 35.1k". */
   context: string;
+  /** The output style the status line names at its right, e.g. "hold:Plain";
+   * none when Claude Code ran without one. */
+  style?: string;
   /** The spinner's verb, and its words after the counter, e.g. "↓ 232 tokens"
    * (none: Claude Code showed no counter yet). */
   spin?: { verb: string; tail?: string };

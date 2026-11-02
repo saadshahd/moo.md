@@ -791,7 +791,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     rule,
     // The mode row under it, "⏵⏵ bypass permissions on …", is left out, as
     // the user asked (scenes.ts).
-    statusRow(chrome.context, cols),
+    statusRow(chrome, cols),
   ];
   // The cursor ends the typed text, or starts the empty prompt.
   const col = typing ? 2 + prompt[prompt.length - 1].length : 2;
@@ -802,20 +802,21 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
 const CAPS: Record<string, string> = { Enter: "⏎", Down: "↓", Up: "↑", Left: "←", Right: "→", Escape: "Esc", Tab: "⇥", BSpace: "⌫" };
 
 /** The status line as the user's status line drew it, cut to the two parts
- * the demo keeps: context use at the left, the output style at the right,
+ * the demo keeps: context use at the left, the output style, if any, at the right,
  * ending two columns from the edge, as recorded. On the page the gap between
  * them grows, so the output style ends at the frame's right edge (Demo.astro's
  * .wide), as the user asked. */
-function statusRow(context: string, cols: number): Row {
+function statusRow({ context, style }: Chrome, cols: number): Row {
   const [pct, size] = context.split(" · ");
   const left: Seg[] = [
     ["  "],
     [`◔ Context ${pct}`, "c95"],
     ...(size ? ([[" · ", "c37"], [size, "c95"]] as Seg[]) : []),
   ];
-  const style = "◎ hold:Plain";
+  if (!style) return { segs: left, cls: "wide" };
+  const right = `◎ ${style}`;
   const used = left.reduce((n, [x]) => n + [...x].length, 0);
-  return { segs: [...left, [" ".repeat(Math.max(1, cols - 2 - used - style.length)), "fill"], [style, "c96"]], cls: "wide" };
+  return { segs: [...left, [" ".repeat(Math.max(1, cols - 2 - used - right.length)), "fill"], [right, "c96"]], cls: "wide" };
 }
 
 /** Rows a dialog leaves above it for the keycaps (player.ts placeKeys()). */
@@ -1070,10 +1071,12 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
   const box = (on: boolean): Seg[] =>
     q.multiSelect ? [on ? ["[✔] ", "ok"] : ["[ ] "]] : [];
   const indent = q.multiSelect ? 9 : 5;
+  // Tab moves between questions only when there are several, as recorded.
+  const nav = qs.length > 1 ? "Tab/Arrow keys to navigate" : "↑/↓ to navigate";
   const footer =
     m.cursor === n
-      ? "Enter to select · Tab/Arrow keys to navigate · ctrl+g to edit in Vim · Esc to cancel"
-      : "Enter to select · Tab/Arrow keys to navigate · Esc to cancel";
+      ? `Enter to select · ${nav} · ctrl+g to edit in Vim · Esc to cancel`
+      : `Enter to select · ${nav} · Esc to cancel`;
   return [
     rule,
     ...tabs,
@@ -1188,11 +1191,12 @@ function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols:
   const LIST = 30;
   const GAP = 4;
   // The box fits the dialog's widest preview line, any question's, up to the
-  // room left: every question's box is that wide.
+  // room left, and is never under 44 columns (recorded: a widest line of 38
+  // drew 44; 41 to 56 drew widest + 4): every question's box is that wide.
   const widest = Math.max(
     ...d.questions.flatMap((x) => x.options.flatMap((o) => (o.preview ?? "").split("\n").map((l) => ticks(l).length))),
   );
-  const boxW = Math.min(cols - LIST - GAP, widest + 4);
+  const boxW = Math.min(cols - LIST - GAP, Math.max(44, widest + 4));
   const inner = Math.max(1, boxW - 4);
   const lines = (q.options[cursor]?.preview ?? "No preview available")
     .trim()
