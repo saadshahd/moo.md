@@ -26,3 +26,5 @@ python3 gen.py "$HOME/.claude/projects/-private-tmp-ship/059abca1-a83f-4860-b7f7
   --keys "$R/rec5/draft/keylog.json" --raw "$OUT/draft.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-private-tmp-orders/41cb9a31-f9bf-4747-8ffe-ab062e739a8d.jsonl" /private/tmp/orders "$R/rec5/freeze" ../src/demo/sessions/freeze.ts 1=9za8h9.2481 2=82nmta.250 \
   --keys "$R/rec5/freeze/keylog.json" --raw "$OUT/freeze.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-private-tmp-notes-box/e6e801af-24c1-4c55-9df8-1a3dd3f48428.jsonl" /private/tmp/notes-box "$R/rec5/inversion" ../src/demo/sessions/inversion.ts 1=lbn3eh.795 \
+  --keys "$R/rec5/inversion/keylog.json" --raw "$OUT/inversion.json" --activity-from-snaps

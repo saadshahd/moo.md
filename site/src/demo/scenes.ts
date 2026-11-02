@@ -36,6 +36,7 @@ import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as inversion from "./sessions/inversion";
 import * as draft from "./sessions/draft";
 import * as reduce from "./sessions/reduce";
 
@@ -77,6 +78,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const inversionScene = skill(inversion);
 export const freezeScene = skill(freeze);
 export const draftScene = skill(draft);
 export const reduceScene = skill(reduce);
