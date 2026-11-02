@@ -39,7 +39,8 @@ const redraw = ($: EngineInterface) => $.ui.invalidate("ui.render");
 
 /** Shows `why` once a session, as hooks fail: the event it met passes on unchanged. */
 function failOnce($: EngineInterface, why: string) {
-  const text = `hold: ${why}`;
+  // A toast is one line: a cause written over several, as pele's parse errors are, is joined.
+  const text = `hold: ${why.replace(/\s+/g, " ").trim()}`;
 
   if (toasted.has(text)) return;
   toasted.add(text);

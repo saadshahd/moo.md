@@ -323,7 +323,7 @@ test("a fence still streaming draws nothing and runs nothing", async ($, on) => 
 test("a diagram that fails to draw passes the reply on unchanged and says why once", async ($, on) => {
   const w = world(on, GHOSTTY, {
     exitCode: 1,
-    stderr: "Parse error on line 2",
+    stderr: "Parse error on line 2:\n A-->\n-----^",
   });
   const ui = await reply($, REPLY);
 
@@ -335,7 +335,7 @@ test("a diagram that fails to draw passes the reply on unchanged and says why on
   await reply($, REPLY);
   expect(w.toasts).toEqual([
     expect.stringMatching(
-      /^hold: a Mermaid diagram did not draw.*Parse error on line 2/,
+      /^hold: a Mermaid diagram did not draw.*Parse error on line 2: A--> -----\^$/,
     ),
   ]);
 });
