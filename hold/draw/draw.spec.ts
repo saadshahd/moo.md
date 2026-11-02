@@ -84,10 +84,10 @@ test("every theme fills every colour pele reads; an unknown theme goes by its na
 });
 
 describe("size", () => {
-  test("a box is 16 by 28 device pixels a cell", () => {
+  test("a box is 16 by 32 device pixels a cell", () => {
     expect(boxPixels({ columns: 10, rows: 2 })).toEqual({
       width: 160,
-      height: 56,
+      height: 64,
     });
   });
 
@@ -95,7 +95,7 @@ describe("size", () => {
     const px = boxPixels({ columns: 255, rows: 255 });
 
     expect(px.width * px.height).toBeLessThanOrEqual(MAX_PIXELS);
-    expect(px.width / px.height).toBeCloseTo(8 / 14, 2);
+    expect(px.width / px.height).toBeCloseTo(0.5, 2);
   });
 
   test("a diagram's box is whole cells, 1 to 255", () => {

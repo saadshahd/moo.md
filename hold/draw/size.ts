@@ -1,11 +1,11 @@
 /**
- * The engine tells a mod no cell's size in pixels, so the box assumes a nominal cell: 8 by 14
- * points, drawn at a device pixel ratio of 2. Cells measure 8 by 13 in iTerm2 at 12 points and
- * about 8 by 17 in Ghostty at 13. The picture keeps its aspect inside its box: where cells are
- * taller than this, the box ends in a blank strip; shorter, in one at the right. pele lays text out at 16 px;
- * drawn at 1.2 of that, a label reads at about the terminal's own size.
+ * The engine tells a mod no cell's size in pixels, so the box assumes a nominal cell twice as
+ * tall as wide, 8 by 16 points, drawn at a device pixel ratio of 2: iTerm2's cells measure about
+ * 6.7 by 13 at 12 points, Ghostty's 8 by 17 at 13. The picture keeps its aspect inside its box,
+ * so a terminal off that ratio leaves a blank strip at the box's right or bottom. pele lays text
+ * out at 16 px; drawn at 1.2 of that, a label reads at about the terminal's own size.
  */
-export const CELL = { width: 8, height: 14 } as const;
+export const CELL = { width: 8, height: 16 } as const;
 export const RATIO = 2;
 const DIAGRAM_SCALE = 1.2;
 
