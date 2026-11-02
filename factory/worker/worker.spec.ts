@@ -802,6 +802,12 @@ describe("only a person changes the factory's rules and the repo's workflows", (
       [{ kind: "markStuck", issue: 7, reason: "its PR #57 was closed without merging" }],
     ]);
   });
+  test("an issue that ended untrusted is left alone on the next tick, its closed PR and claim notwithstanding", () => {
+    const gh = snapshot({ issues: [issue(7, { editor: "stranger" })], claimed: new Set([7]) });
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" } as const;
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]), claimedPrs: new Map([[7, closed]]) }))).toEqual([]);
+  });
   test("once a person retries it, it resumes, and a run that stops before a new PR is no closed PR's", () => {
     const stuck = posted({ kind: "stuck", issue: 7, reason: `its PR #57 changed ${RULES_PATH}` }, "2026-10-26T09:30:00Z");
     const retried = issue(7, { comments: [stuck] });
