@@ -16,10 +16,8 @@ take() {
 take billing da305481-3f66-456c-a1dc-04d9f93b97c9 rec3/anchor anchor 0=zzmx9.799
 take invoices f24358fa-2e6b-42e6-86b1-1591d6551fa8 rec2/skills skills 0=tfsdk9.846 1=12y0zha.384
 take shop db17126e-b9e3-4038-a8a5-b3234ff2206e rec2/chain chain 0=23q9us.1586
-# A world under /private/tmp, which take() can't name. Turn 0 ran with all of
-# moo off, turn 1 with it on, in one session.
-python3 gen.py "$HOME/.claude/projects/-private-tmp-catalog/7b225a66-32b2-4468-8bb5-711b0f6cb6a1.jsonl" /private/tmp/catalog "$R/rec5/reduce" ../src/demo/sessions/reduce.ts  \
-  --keys "$R/rec5/reduce/keylog.json" --raw "$OUT/reduce.json" --activity-from-snaps
+# One session per take, in a world take() can't name: turn 0 ran with all of
+# moo off, the later turns with it on.
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-relay/88e77a6e-df44-4292-a0b9-80bb76951473.jsonl" /Users/Shared/relay "$R/rec5/clarify" ../src/demo/sessions/clarify.ts 1=1nh2zwu.460 \
   --keys "$R/rec5/clarify/keylog.json" --raw "$OUT/clarify.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-private-tmp-ship/059abca1-a83f-4860-b7f7-b76340ea8c71.jsonl" /private/tmp/ship "$R/rec5/draft" ../src/demo/sessions/draft.ts 1=16v4raq.684 \
@@ -28,3 +26,5 @@ python3 gen.py "$HOME/.claude/projects/-private-tmp-orders/41cb9a31-f9bf-4747-8f
   --keys "$R/rec5/freeze/keylog.json" --raw "$OUT/freeze.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-private-tmp-notes-box/e6e801af-24c1-4c55-9df8-1a3dd3f48428.jsonl" /private/tmp/notes-box "$R/rec5/inversion" ../src/demo/sessions/inversion.ts 1=lbn3eh.795 \
   --keys "$R/rec5/inversion/keylog.json" --raw "$OUT/inversion.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-catalog/48819e2a-8ba3-4fb0-84e7-e92069ab8dad.jsonl" /Users/Shared/catalog "$R/rec6/reduce" ../src/demo/sessions/reduce.ts  \
+  --keys "$R/rec6/reduce/keylog.json" --raw "$OUT/reduce.json" --activity-from-snaps

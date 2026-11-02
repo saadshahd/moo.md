@@ -195,10 +195,12 @@ function draw(lines: Line[], width: number): Cell[][] {
 /** In a list item, Claude Code draws the space before a number that ends a
  * sentence ("a 202.", "Node 22.") as a no-break space, so no row of the item
  * starts with what reads as a numbered item's mark. Recorded in three list
- * items; three such numbers in paragraphs kept a plain space. */
+ * items; three such numbers in paragraphs kept a plain space. It reads the
+ * markdown, so a number in code ("`5 * 1000`.") keeps a plain space. */
 function keepNumbered(cs: Cell[]): Cell[] {
   const s = cs.map(([ch]) => ch).join("");
-  return cs.map((c, k) => (c[0] === " " && /^\d+\.(\s|$)/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
+  const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
+  return cs.map((c, k) => (c[0] === " " && !code(cs[k + 1]) && /^\d+\.(\s|$)/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
 }
 
 // ---- Tables -------------------------------------------------------------------

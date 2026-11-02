@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 OUT=${TMPDIR:-/tmp}/moo-docs-gen
 R=$HOME/moo-rec-tools
 fail=0
-for t in anchor:rec3/anchor skills:rec2/skills chain:rec2/chain reduce:rec5/reduce clarify:rec5/clarify draft:rec5/draft freeze:rec5/freeze inversion:rec5/inversion; do
+for t in anchor:rec3/anchor skills:rec2/skills chain:rec2/chain clarify:rec5/clarify draft:rec5/draft freeze:rec5/freeze inversion:rec5/inversion reduce:rec6/reduce; do
   page=${t%%:*} dir=$R/${t#*:}
   for w in 45 80 120; do
     # The recorder's tall3 captures replace tall where both exist.

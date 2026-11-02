@@ -9,5 +9,5 @@ import { reduceScene } from "../../../demo/scenes";
 
 <Demo
   scene={reduceScene}
-  summary="Claude Code. With moo off, you ask for a PR description for a cache change, for the reviewer who wrote the cache, and Claude writes one with What, Why, Tradeoff and Tests sections. In the same session with moo on, you type /hope:reduce: the description drops its section headings and keeps the tradeoff and the tests. A second /hope:reduce shortens its lines, and a third changes only its last line."
+  summary="Claude Code. With moo off, you ask for a PR description for raising the price cache's TTL from 5 minutes to 1 hour. Claude notes that the change isn't in the checkout and the reviewer's comment argues against it, then writes a description with Why, What changed, Trade-off, Results and Not measured sections. In the same session with moo on, you type /hope:reduce: the description keeps one heading, the change, the trade-off and the results. A second /hope:reduce shortens each part, and a third cuts a few more words from each."
 />

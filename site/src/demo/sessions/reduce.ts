@@ -5,56 +5,73 @@ export const chrome: Chrome = {"context": "0%"};
 export const turns: Turn[] = [
   {
     user: "write the PR description: price_cache.ts TTL 5m -> 1h to cut catalog load; tests updated and passing, hit rate up locally. The reviewer wrote price_cache.ts.",
-    tools: "Read 1 file, ran 2 shell commands",
+    tools: "Ran 3 shell commands",
     activity: [
-      {"at": 1.8, "line": "Running git diff && git show --stat HEAD && cat src/price…", "tool": "$ git diff && git show --stat HEAD && cat src/price_cache.ts"},
-      {"at": 3.8, "line": "Running git diff && git show --stat HEAD && cat src/price…", "tool": "$ cat src/price_events.ts README.md package.json"},
-      {"at": 5.8, "line": "Running git diff && git show --stat HEAD && cat src/price…", "tool": "$ npm test 2>&1 | tail -15"},
+      {"at": 4.8, "line": "Inspecting branch diff and TTL references", "tool": "$ git log --oneline main..HEAD; git diff --stat main...HEAD; git status --short; grep -rn -i \"ttl\\|price.changed\\|60 \\*\\|1000\" --include=*.ts . | grep -v node_modules | head -40"},
+      {"at": 8.8, "line": "Inspecting branch diff and TTL references", "tool": "$ git branch -a; git log --oneline -5; git show --stat HEAD; ls -R | grep -v node_modules | head -40; grep -rn -i -E \"ttl|price.changed\" . --exclude-dir=node_modules --exclude-dir=.git | head -40"},
+      {"at": 12.8, "line": "Reading cache, events, tests, README", "tool": "$ cat src/price_cache.ts src/price_events.ts test/price_cache.test.ts README.md package.json; git stash list"},
     ],
-    replyAt: 15.0,
+    replyAt: 25.1,
     chrome: [
       [-2.2, {"context": "0%"}],
-      [-0.2, {"context": "0%", "spin": {"verb": "Wrangling"}}],
-      [0.8, {"context": "0%", "spin": {"verb": "Befuddling", "tail": "thinking with medium effort"}}],
-      [1.8, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 157 tokens"}}],
-      [2.8, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 183 tokens · thinking with medium effort"}}],
-      [2.8, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 192 tokens · thinking with medium effort"}}],
-      [3.8, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 380 tokens · thinking with medium effort"}}],
-      [4.8, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 403 tokens · thinking with medium effort"}}],
-      [5.8, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 575 tokens"}}],
-      [5.8, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 590 tokens · thought for 1s"}}],
-      [6.8, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 599 tokens · thinking with medium effort"}}],
-      [14.8, {"context": "4% · 37.1k"}],
-      [15.8, {"context": "4% · 37.3k"}],
+      [-0.2, {"context": "0%", "spin": {"verb": "Combobulating"}}],
+      [2.8, {"context": "0%", "spin": {"verb": "Puttering", "tail": "thinking with medium effort"}}],
+      [4.8, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 175 tokens · thinking with medium effort"}}],
+      [4.8, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 285 tokens · thought for 1s"}}],
+      [5.8, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 294 tokens · thought for 1s"}}],
+      [6.8, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 301 tokens · thought for 1s"}}],
+      [7.8, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 301 tokens"}}],
+      [7.8, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 318 tokens"}}],
+      [8.8, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 397 tokens"}}],
+      [9.8, {"context": "4% · 35.6k", "spin": {"verb": "Puttering", "tail": "↓ 472 tokens"}}],
+      [10.8, {"context": "4% · 35.6k", "spin": {"verb": "Puttering", "tail": "↓ 483 tokens"}}],
+      [10.8, {"context": "4% · 35.6k", "spin": {"verb": "Puttering", "tail": "↓ 484 tokens · thinking with medium effort"}}],
+      [11.8, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 622 tokens · thinking with medium effort"}}],
+      [12.8, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 709 tokens · thinking with medium effort"}}],
+      [12.8, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 718 tokens · thought for 1s"}}],
+      [13.8, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 720 tokens · thinking with medium effort"}}],
+      [23.8, {"context": "4% · 37.7k", "spin": {"verb": "Puttering", "tail": "↓ 1.6k tokens · thought for 10s"}}],
+      [24.8, {"context": "4% · 37.7k"}],
     ],
     reply: [
-      "I checked the diff and ran `npm test`: 3/3 pass. Here's the description:",
+      "I wrote the description, but this checkout doesn't contain the change, so I couldn't check what it claims.",
+      "",
+      "- **The change isn't here.** `price-cache-ttl` has one commit, Robin's original `f0ff143` (\"cache prices for 5 minutes\"), and nothing is uncommitted. `src/price_cache.ts:4` is still `5 * 60 * 1000`. The tests still expect 5 minutes: `test/price_cache.test.ts:23` expects a new fetch after 6 minutes, which would fail at a 1h TTL. Push the commit or point me at it, and I'll check the diff and run `npm test`.",
+      "- **The reviewer's comment argues against this change.** `price_cache.ts:1-3` says the TTL \"only bounds how long a missed event can leave a stale price on the page.\" So 1h means a missed `price.changed` can show a wrong price for up to an hour instead of 5 minutes. Robin will ask about this first, so the description takes it on directly.",
+      "- **\"Hit rate up locally\" has no number.** I left placeholders. Fill them in or cut the line, because a reviewer will discount a vague claim.",
       "",
       "```markdown",
-      "## catalog: raise price cache TTL from 5 min to 1 h",
-      "",
-      "### What",
-      "`TTL_MS` in `src/price_cache.ts` goes from `5 * 60 * 1000` to `60 * 60 * 1000`. The two tests that check the TTL edges move from 4/6 min to 59/61 min.",
+      "## Raise price cache TTL from 5 minutes to 1 hour",
       "",
       "### Why",
-      "To cut calls from catalog to the pricing service. Each `PriceCache.get` miss is one call. A `price.changed` event still drops the SKU right away (`src/price_events.ts`), so a normal price change shows up as fast as before.",
+      "Catalog page views are still calling the pricing service more than we'd like.",
+      "Raising `TTL_MS` in `src/price_cache.ts` so each SKU's price is fetched at most",
+      "once an hour (unless a change event drops it first) cuts that load.",
       "",
-      "Hit rate locally: <before → after, and how it was measured>",
+      "### What changed",
+      "- `TTL_MS`: `5 * 60 * 1000` → `60 * 60 * 1000`",
+      "- `test/price_cache.test.ts`: the hit/expiry tests now wait around the 1h",
+      "  boundary instead of 5m.",
       "",
-      "### Tradeoff",
-      "As the comment in `price_cache.ts` says, the TTL \"only bounds how long a missed event can leave a stale price on the page.\" This change raises that limit from **5 minutes to 1 hour**. If a `price.changed` event is lost, a product page can show the old price for up to an hour.",
+      "### What this trades off",
+      "Prices still update right away when a change happens: `price.changed` drops the",
+      "SKU (`price_events.ts`), and that path is unchanged. The TTL only matters when",
+      "an event is **missed**. In that case the worst-case stale price on a page goes",
+      "from 5 minutes to 1 hour.",
       "",
-      "This is fine only if missed events are rare enough, or an hour of a wrong price is acceptable. <How often events are missed / why an hour is OK.>",
+      "<!-- State why that's acceptable, or what covers it: how often events are",
+      "     missed, whether we alert on consumer lag, etc. If unknown, say so. -->",
       "",
-      "### Testing",
-      "- `npm test`: 3/3 pass.",
-      "- The tests check the new TTL edges (hit at 59 min, refetch at 61 min) and that a `price.changed` event drops the SKU. No test covers a missed event, because the TTL is the only protection there.",
+      "### Results",
+      "- `npm test` passes.",
+      "- Local hit rate: <before>% → <after>% over <workload / duration>.",
+      "",
+      "### Not measured",
+      "- Hit rate and pricing-service load in production.",
+      "- How often `price.changed` events are actually missed.",
       "```",
       "",
-      "Fill in two things before you post it:",
-      "",
-      "- **Hit-rate numbers.** \"Hit rate up locally\" isn't enough evidence. `PriceCache` already counts `hits`/`misses`, so before/after numbers from the same local run are easy to get. A local run also probably doesn't reflect how production traffic is spread across SKUs.",
-      "- **Why an hour of possible staleness is OK.** The reviewer wrote the comment that says the TTL limits stale prices. A 12× longer TTL is the first thing they'll ask about, so the description should answer it.",
+      "I don't know how often events are missed in production. If that number is meaningfully above zero, the reviewer will likely push for a middle value like 15–30 minutes, or for a fix to event delivery.",
     ],
     keys: [
       [
@@ -71,42 +88,133 @@ export const turns: Turn[] = [
   },
   {
     user: "/hope:reduce",
-    replyAt: 6.7,
+    replyAt: 6.1,
     chrome: [
-      [-60.5, {"context": "0%", "spin": {"verb": "Befuddling", "tail": "thinking with medium effort"}}],
-      [-59.5, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 157 tokens"}}],
-      [-58.5, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 183 tokens · thinking with medium effort"}}],
-      [-58.5, {"context": "4% · 35.1k", "spin": {"verb": "Befuddling", "tail": "↓ 192 tokens · thinking with medium effort"}}],
-      [-57.5, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 380 tokens · thinking with medium effort"}}],
-      [-56.5, {"context": "4% · 36.7k", "spin": {"verb": "Befuddling", "tail": "↓ 403 tokens · thinking with medium effort"}}],
-      [-55.5, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 575 tokens"}}],
-      [-55.5, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 590 tokens · thought for 1s"}}],
-      [-54.5, {"context": "4% · 37.1k", "spin": {"verb": "Befuddling", "tail": "↓ 599 tokens · thinking with medium effort"}}],
-      [-46.5, {"context": "4% · 37.1k"}],
-      [-45.5, {"context": "4% · 37.3k"}],
-      [-22.5, {"context": "4% · 37.3k", "style": "hold:Plain"}],
-      [-0.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Twisting"}}],
-      [0.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "thinking with medium effort"}}],
-      [4.5, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "↓ 25 tokens · thought for 4s"}}],
-      [5.5, {"context": "4% · 44.4k", "style": "hold:Plain"}],
-      [31.5, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing"}}],
-      [31.5, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing", "tail": "thinking with medium effort"}}],
+      [-63.7, {"context": "0%", "spin": {"verb": "Combobulating"}}],
+      [-61.7, {"context": "0%", "spin": {"verb": "Puttering", "tail": "thinking with medium effort"}}],
+      [-59.7, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 175 tokens · thinking with medium effort"}}],
+      [-59.7, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 285 tokens · thought for 1s"}}],
+      [-58.7, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 294 tokens · thought for 1s"}}],
+      [-57.7, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 301 tokens · thought for 1s"}}],
+      [-56.7, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 301 tokens"}}],
+      [-56.7, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 318 tokens"}}],
+      [-55.7, {"context": "4% · 35.2k", "spin": {"verb": "Puttering", "tail": "↓ 397 tokens"}}],
+      [-54.7, {"context": "4% · 35.6k", "spin": {"verb": "Puttering", "tail": "↓ 472 tokens"}}],
+      [-53.7, {"context": "4% · 35.6k", "spin": {"verb": "Puttering", "tail": "↓ 483 tokens"}}],
+      [-53.7, {"context": "4% · 35.6k", "spin": {"verb": "Puttering", "tail": "↓ 484 tokens · thinking with medium effort"}}],
+      [-52.7, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 622 tokens · thinking with medium effort"}}],
+      [-51.7, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 709 tokens · thinking with medium effort"}}],
+      [-51.7, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 718 tokens · thought for 1s"}}],
+      [-50.7, {"context": "4% · 36.4k", "spin": {"verb": "Puttering", "tail": "↓ 720 tokens · thinking with medium effort"}}],
+      [-40.7, {"context": "4% · 37.7k", "spin": {"verb": "Puttering", "tail": "↓ 1.6k tokens · thought for 10s"}}],
+      [-39.7, {"context": "4% · 37.7k"}],
+      [-22.7, {"context": "4% · 37.7k", "style": "hold:Plain"}],
+      [0.3, {"context": "4% · 37.7k", "style": "hold:Plain", "spin": {"verb": "Sketching"}}],
+      [2.3, {"context": "4% · 37.7k", "style": "hold:Plain", "spin": {"verb": "Transfiguring", "tail": "thinking with medium effort"}}],
+      [3.3, {"context": "5% · 45.1k", "style": "hold:Plain"}],
     ],
     reply: [
       "```markdown",
-      "## catalog: raise price cache TTL from 5 min to 1 h",
+      "## Price cache TTL: 5 minutes → 1 hour",
       "",
-      "Cuts calls to the pricing service. A `price.changed` event still drops the SKU",
-      "right away, so normal price changes show up as fast as before.",
+      "Cuts pricing-service load from catalog page views. `TTL_MS` in",
+      "`src/price_cache.ts` goes from `5 * 60 * 1000` to `60 * 60 * 1000`.",
+      "The hit and expiry tests in `test/price_cache.test.ts` now test the 1h edge.",
       "",
-      "Hit rate locally: <before → after>",
+      "**Tradeoff:** `price.changed` still drops a SKU at once. The TTL only limits",
+      "how long a missed event can leave a wrong price on the page: now 1h, was 5m.",
+      "<!-- Why that's acceptable, or what catches missed events. -->",
       "",
-      "**Tradeoff:** the TTL is the only limit on a stale price after a missed event",
-      "(see the comment in `price_cache.ts`). A lost event can now leave the old price",
-      "on a product page for up to 1 h instead of 5 min. <Why an hour is acceptable.>",
+      "**Results:** `npm test` passes. Local hit rate went from <before>% to <after>%",
+      "over <workload>. Production hit rate and missed-event rate: not measured.",
+      "```",
+    ],
+    keys: [
+      [
+        -2.8,
+        "type",
+        "/hope:reduce"
+      ],
+      [
+        -0.2,
+        "key",
+        "Enter"
+      ]
+    ],
+    menu: {
+      "after": 0,
+      "rows": [
+        [
+          [
+            "  "
+          ],
+          [
+            "❯ /",
+            "l"
+          ],
+          [
+            "hope:reduce",
+            "l b"
+          ],
+          [
+            "                    (hope) Re-derive something written into",
+            "l"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "the shortest version that still covers ev…",
+            "l"
+          ]
+        ],
+        [
+          [
+            "  "
+          ],
+          [
+            "  /hope:router                    (hope) Spawn agents and verify their",
+            "g"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "output — route work, never do it. Use whe…",
+            "g"
+          ]
+        ]
+      ]
+    },
+  },
+  {
+    user: "/hope:reduce",
+    replyAt: 3.5,
+    chrome: [
+      [-24.7, {"context": "4% · 37.7k", "style": "hold:Plain", "spin": {"verb": "Sketching"}}],
+      [-22.7, {"context": "4% · 37.7k", "style": "hold:Plain", "spin": {"verb": "Transfiguring", "tail": "thinking with medium effort"}}],
+      [-21.7, {"context": "5% · 45.1k", "style": "hold:Plain"}],
+      [0.3, {"context": "5% · 45.1k", "style": "hold:Plain", "spin": {"verb": "Actualizing"}}],
+      [1.3, {"context": "5% · 45.1k", "style": "hold:Plain", "spin": {"verb": "Actualizing", "tail": "↓ 25 tokens · thinking with medium effort"}}],
+      [2.3, {"context": "5% · 46.1k", "style": "hold:Plain"}],
+      [17.3, {"context": "5% · 46.1k", "style": "hold:Plain", "spin": {"verb": "Nucleating"}}],
+    ],
+    reply: [
+      "```markdown",
+      "## Price cache TTL: 5m → 1h",
       "",
-      "**Tests:** `npm test` passes 3/3. The TTL edge tests now use 59 and 61 min.",
-      "No test covers a missed event.",
+      "Cuts pricing-service load. `TTL_MS` in `src/price_cache.ts` goes from 5 to 60",
+      "minutes; `test/price_cache.test.ts` now tests the 1h edge.",
+      "",
+      "**Tradeoff:** `price.changed` still drops a SKU at once, but a missed event can",
+      "now leave a wrong price up for 1h, not 5m. <!-- Why that's acceptable. -->",
+      "",
+      "**Results:** `npm test` passes. Local hit rate: <before>% → <after>%.",
+      "Production hit rate and missed-event rate are not measured.",
       "```",
     ],
     keys: [
@@ -116,7 +224,7 @@ export const turns: Turn[] = [
         "/hope:reduce"
       ],
       [
-        -0.1,
+        -0.2,
         "key",
         "Enter"
       ]
@@ -173,126 +281,39 @@ export const turns: Turn[] = [
   },
   {
     user: "/hope:reduce",
-    replyAt: 5.9,
+    replyAt: 3.6,
     chrome: [
-      [-31.0, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Twisting"}}],
-      [-31.0, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "thinking with medium effort"}}],
-      [-27.0, {"context": "4% · 37.3k", "style": "hold:Plain", "spin": {"verb": "Bootstrapping", "tail": "↓ 25 tokens · thought for 4s"}}],
-      [-26.0, {"context": "4% · 44.4k", "style": "hold:Plain"}],
-      [-0.0, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing"}}],
-      [-0.0, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing", "tail": "thinking with medium effort"}}],
-      [5.0, {"context": "5% · 45.6k", "style": "hold:Plain"}],
+      [-17.5, {"context": "5% · 45.1k", "style": "hold:Plain", "spin": {"verb": "Actualizing"}}],
+      [-16.5, {"context": "5% · 45.1k", "style": "hold:Plain", "spin": {"verb": "Actualizing", "tail": "↓ 25 tokens · thinking with medium effort"}}],
+      [-15.5, {"context": "5% · 46.1k", "style": "hold:Plain"}],
+      [-0.5, {"context": "5% · 46.1k", "style": "hold:Plain", "spin": {"verb": "Nucleating"}}],
+      [1.5, {"context": "5% · 46.1k", "style": "hold:Plain", "spin": {"verb": "Nucleating", "tail": "thinking with medium effort"}}],
+      [2.5, {"context": "5% · 46.9k", "style": "hold:Plain"}],
+      [3.5, {"context": "5% · 46.9k", "style": "hold:Plain", "spin": {"verb": "Nucleating", "tail": "↓ 311 tokens"}}],
+      [3.5, {"context": "5% · 46.9k", "style": "hold:Plain"}],
     ],
     reply: [
       "```markdown",
-      "## catalog: price cache TTL 5 min → 1 h",
+      "## Price cache TTL: 5m → 1h",
       "",
-      "Cuts calls to the pricing service. `price.changed` still drops a SKU at once.",
-      "Hit rate locally: <before → after>",
+      "Cuts pricing-service load. Changes `TTL_MS` in `src/price_cache.ts`; tests",
+      "now check the 1h edge and pass.",
       "",
-      "**Tradeoff:** if a `price.changed` event is missed, the old price can now stay",
-      "up for 1 h instead of 5 min (see the comment in `price_cache.ts`).",
-      "<Why an hour is acceptable.>",
+      "**Tradeoff:** `price.changed` still drops a SKU at once, but a missed event",
+      "now leaves a wrong price up for 1h, not 5m. <!-- Why that's acceptable. -->",
       "",
-      "**Tests:** 3/3 pass. The TTL edge tests now use 59 and 61 min.",
-      "No test covers a missed event.",
+      "Local hit rate: <before>% → <after>%. Production hit rate and missed-event",
+      "rate are not measured.",
       "```",
     ],
     keys: [
       [
-        -2.6,
+        -2.7,
         "type",
         "/hope:reduce"
       ],
       [
-        -0.1,
-        "key",
-        "Enter"
-      ]
-    ],
-    menu: {
-      "after": 0,
-      "rows": [
-        [
-          [
-            "  "
-          ],
-          [
-            "❯ /",
-            "l"
-          ],
-          [
-            "hope:reduce",
-            "l b"
-          ],
-          [
-            "                    (hope) Re-derive something written into",
-            "l"
-          ]
-        ],
-        [
-          [
-            "                                    "
-          ],
-          [
-            "the shortest version that still covers ev…",
-            "l"
-          ]
-        ],
-        [
-          [
-            "  "
-          ],
-          [
-            "  /hope:router                    (hope) Spawn agents and verify their",
-            "g"
-          ]
-        ],
-        [
-          [
-            "                                    "
-          ],
-          [
-            "output — route work, never do it. Use whe…",
-            "g"
-          ]
-        ]
-      ]
-    },
-  },
-  {
-    user: "/hope:reduce",
-    replyAt: 4.6,
-    chrome: [
-      [-15.9, {"context": "4% · 44.4k", "style": "hold:Plain", "spin": {"verb": "Photosynthesizing", "tail": "thinking with medium effort"}}],
-      [-11.9, {"context": "5% · 45.6k", "style": "hold:Plain"}],
-      [0.1, {"context": "5% · 45.6k", "style": "hold:Plain", "spin": {"verb": "Sautéing"}}],
-      [1.1, {"context": "5% · 45.6k", "style": "hold:Plain", "spin": {"verb": "Sautéing", "tail": "thinking with medium effort"}}],
-      [4.1, {"context": "5% · 46.8k", "style": "hold:Plain"}],
-    ],
-    reply: [
-      "```markdown",
-      "## catalog: price cache TTL 5 min → 1 h",
-      "",
-      "Cuts calls to the pricing service. `price.changed` still drops a SKU at once.",
-      "Hit rate locally: <before → after>",
-      "",
-      "**Tradeoff:** if a `price.changed` event is missed, the old price can now stay",
-      "up for 1 h instead of 5 min (see the comment in `price_cache.ts`).",
-      "<Why an hour is acceptable.>",
-      "",
-      "**Tests:** 3/3 pass. The TTL edge tests now check 59 and 61 min. None covers",
-      "a missed event.",
-      "```",
-    ],
-    keys: [
-      [
-        -2.6,
-        "type",
-        "/hope:reduce"
-      ],
-      [
-        -0.1,
+        -0.2,
         "key",
         "Enter"
       ]
