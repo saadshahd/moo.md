@@ -17,15 +17,20 @@ type Cell = [string, string?];
 // ---- Wrapping ---------------------------------------------------------------
 // Greedy by words; a word longer than the width breaks at the edge. As in
 // wrapInk, the space after a row that fills its width starts the next row, so
-// that row holds one column less; Claude Code then draws it without the space.
+// that row holds one column less, and counts toward filling it; Claude Code
+// then draws the row without the space.
 function wrap(cs: Cell[], width: number, first = width): Cell[][] {
   const lines: Cell[][] = [];
   let line: Cell[] = [];
   let i = 0;
+  // Whether each row so far began with a carried space.
+  const carried: boolean[] = [];
   const room = () => {
-    const full = lines.length ? width : first;
-    const last = lines[lines.length - 1];
-    return last && last.length >= (lines.length > 1 ? width : first) ? full - 1 : full;
+    const n = lines.length;
+    const limit = (k: number) => (k ? width : first);
+    const carry = n > 0 && lines[n - 1].length + (carried[n - 1] ? 1 : 0) >= limit(n - 1);
+    carried[n] = carry;
+    return limit(n) - (carry ? 1 : 0);
   };
   while (i < cs.length) {
     while (i < cs.length && cs[i][0] === " ") i++;
@@ -164,8 +169,9 @@ function draw(lines: Line[], width: number): Cell[][] {
     }
     if (fenced) {
       const cls = lang === "diff" ? { "+": "c32", "-": "c31" }[raw[0]] : lang ? undefined : "l";
-      // A line keeps its indent; rows it wraps onto start at the gutter.
-      out.push(...wrapInk(plain(raw, cls), width).map((r, k) => (k ? r.slice(r.findIndex(([ch]) => ch !== " ")) : r)));
+      // A line keeps its indent; a row it wraps onto drops one leading space,
+      // the one carried from the full row above, and keeps any others.
+      out.push(...wrapInk(plain(raw, cls), width).map((r, k) => (k && r[0]?.[0] === " " ? r.slice(1) : r)));
       continue;
     }
     if (!raw.trim()) {
@@ -200,7 +206,7 @@ function draw(lines: Line[], width: number): Cell[][] {
 function keepNumbered(cs: Cell[]): Cell[] {
   const s = cs.map(([ch]) => ch).join("");
   const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
-  return cs.map((c, k) => (c[0] === " " && !code(cs[k + 1]) && /^\d+\.(\s|$)/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
+  return cs.map((c, k) => (c[0] === " " && !code(cs[k + 1]) && /^\d+[.)]/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
 }
 
 // ---- Tables -------------------------------------------------------------------
@@ -273,7 +279,8 @@ function table(rows: Line[], width: number): Cell[][] {
  * bold, between rules 3 short of the width. The value wraps 1 short of the
  * width, its first line as many shorter as the header has letters; that line
  * then wraps again behind the header. So recorded at 45 columns, but for one
- * value that Claude Code wrapped with a space leading its last line. */
+ * value that Claude Code wrapped with a space leading its last line, and one
+ * it drew with two spaces inside `lsof +D` (intent): no rule found. */
 function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
   const rule = plain("─".repeat(width - 3));
   return body.flatMap((r, k) => [
@@ -1205,10 +1212,12 @@ function beside(texts: Cell[][], widths: number[], trim = false): Cell[][] {
  * both sides shrink and wrap, as recorded at 45. */
 /** A preview's line as Claude Code draws its markdown: `code` in lavender,
  * ticks dropped, a bullet indented up to 3 spaces drawn "- " at the margin
- * (recorded: "  + key" as "- key"), the rest as written. */
+ * with one space after it (recorded: "  +   key" as "- key"), a backslash
+ * ending the line dropped (the space before it stays), the rest as written. */
 const ticks = (line: string): Cell[] =>
   line
-    .replace(/^ {0,3}[-+*] /, "- ")
+    .replace(/^ {0,3}[-+*] +/, "- ")
+    .replace(/\\$/, "")
     .split("`")
     .flatMap((part, k) => plain(part, k % 2 ? "l" : undefined));
 
