@@ -582,6 +582,9 @@ export function beatEnds(scene: Scene, timing = phases(scene).timing) {
   });
 }
 
+/** When turn `i`'s reply stands whole on screen, before the next turn types. */
+export const replyStands = (scene: Scene, i: number) => phases(scene).timing[i].reply + K.reveal;
+
 /** When each named move first shows: as the turn whose prompt runs it starts
  * typing, or as its skill call shows, whichever comes first. A skill goes by
  * its last part: "hope:freeze" is freeze. */
@@ -730,7 +733,9 @@ const prompted = (text: string): Cell[] =>
 export function frame(scene: Scene, s: number, cols: number, pick?: number, rows = ROWS): Frame {
   const { timing, length } = phases(scene);
   const { transcript, typing, menu, asking, chrome } = transcriptAt(scene, s, cols);
-  const rule: Row = { segs: [["─".repeat(cols), "r"]] };
+  // The prompt box's rules and the status line reach the frame's right edge
+  // (Demo.astro's .wide); the text in it wraps at `cols`.
+  const rule: Row = { segs: [["─".repeat(cols), "r"]], cls: "wide rule" };
   const prompt = wrap(prompted(typing), cols - 2);
   // tend's toast belongs to the newest reply in.
   const done = timing.findLastIndex((p) => s >= p.reply);
@@ -798,7 +803,9 @@ const CAPS: Record<string, string> = { Enter: "⏎", Down: "↓", Up: "↑", Lef
 
 /** The status line as the user's status line drew it, cut to the two parts
  * the demo keeps: context use at the left, the output style at the right,
- * ending two columns from the edge, as recorded. */
+ * ending two columns from the edge, as recorded. On the page the gap between
+ * them grows, so the output style ends at the frame's right edge (Demo.astro's
+ * .wide), as the user asked. */
 function statusRow(context: string, cols: number): Row {
   const [pct, size] = context.split(" · ");
   const left: Seg[] = [
@@ -808,7 +815,7 @@ function statusRow(context: string, cols: number): Row {
   ];
   const style = "◎ hold:Plain";
   const used = left.reduce((n, [x]) => n + [...x].length, 0);
-  return { segs: [...left, [" ".repeat(Math.max(1, cols - 2 - used - style.length))], [style, "c96"]] };
+  return { segs: [...left, [" ".repeat(Math.max(1, cols - 2 - used - style.length)), "fill"], [style, "c96"]], cls: "wide" };
 }
 
 /** Rows a dialog leaves above it for the keycaps (player.ts placeKeys()). */

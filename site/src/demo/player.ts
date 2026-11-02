@@ -3,7 +3,9 @@
 // and speed. Beat captions narrate above, and the page's strip of moves
 // lights the one on screen; the terminal scrolls back like one; the reader
 // can pick a dialog's option. Under reduced motion, the timeline steps through
-// one still per beat instead. Demo.astro sets the columns and rows.
+// one still per beat instead. A demo with a plain turn opens paused on moo's
+// hand-back, and its "without moo" button steps back to the plain reply and
+// forth again. Demo.astro sets the columns and rows.
 import { beatEnds, beatTimes, frame, phases, type Frame, type Row, type Seg } from "./render";
 import type { Scene } from "./types";
 
@@ -77,7 +79,12 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 let demos = 0;
 
 export function mount(root: HTMLElement) {
-  const { scene, chips } = JSON.parse(root.dataset.demo!) as { scene: Scene; chips: { at: number; beat: number }[] };
+  const { scene, chips, opens } = JSON.parse(root.dataset.demo!) as {
+    scene: Scene;
+    chips: { at: number; beat: number }[];
+    /** When moo's hand-back and the plain reply stand, and when the move's turn starts typing. */
+    opens?: { handBack: number; plain: number; moveStarts: number };
+  };
   const $ = <T extends HTMLElement>(k: string) => root.querySelector<T>(`[data-${k}]`)!;
   const term = $("term");
   const scroll = $("scroll");
@@ -87,6 +94,7 @@ export function mount(root: HTMLElement) {
   const trail = $("trail");
   const keycaps = $("keys");
   const playBtn = $<HTMLButtonElement>("play");
+  const withoutBtn = root.querySelector<HTMLButtonElement>("[data-without]");
   // Speeds are the speed group's buttons, each naming its own.
   const speedBtns = [...root.querySelectorAll<HTMLButtonElement>("[data-speed]")];
   const nowEl = $("now");
@@ -105,12 +113,15 @@ export function mount(root: HTMLElement) {
   const { length } = phases(scene);
   const times = beatTimes(scene);
 
-  let t = 0;
+  let t = opens?.handBack ?? 0;
   let last = 0;
   let speed = 1;
   let still = 0; // the still on screen under reduced motion
+  // Under reduced motion, the moment held in place of a beat's still: the
+  // hand-back or the plain reply, until the reader goes to a beat.
+  let held = opens?.handBack;
   let inView = false;
-  let userPaused = false;
+  let userPaused = opens !== undefined;
   let following = true; // false while the reader has scrolled up to read
   let pick: number | undefined; // the option the reader put the cursor on
   let ticking = false;
@@ -134,11 +145,12 @@ export function mount(root: HTMLElement) {
   const tickAt = (k: number) => (motion.matches ? k / Math.max(1, ticks.length - 1) : times[k] / length);
   const placeTicks = () => ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
 
-  // Captions sit in a box of fixed lines (Demo.astro); text longer than the
-  // box would be cut, so say so.
+  // Captions and the goal sentence sit in boxes of fixed lines (Demo.astro);
+  // text longer than its box would be cut, so say so.
+  const goal = $("goal");
   function checkBoxes() {
     const box = beats[0]?.parentElement;
-    const cut = beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1);
+    const cut = [...beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1), ...(goal.scrollHeight > goal.clientHeight + 1 ? [goal] : [])];
     if (cut.length) console.error("Demo text longer than its box; give the box more lines in Demo.astro:", cut.map((el) => el.textContent));
   }
 
@@ -169,8 +181,9 @@ export function mount(root: HTMLElement) {
   function paint() {
     const reduced = motion.matches;
     root.classList.toggle("reduced", reduced);
-    const now = reduced ? stillAt(still) : t;
+    const now = reduced ? (held ?? stillAt(still)) : t;
     f = frame(scene, now, cols, pick, rows);
+    if (reduced && held !== undefined) still = f.beat;
     const next = [
       f.transcript.map((r) => rowHtml(r)).join(""),
       f.asking ? optionRows(f.bottom, id, f.asking.cursor) : f.bottom.map((r) => rowHtml(r)).join(""),
@@ -211,6 +224,8 @@ export function mount(root: HTMLElement) {
       ? ""
       : f.keys.map((k) => `<kbd${k.text ? ' class="txt"' : ""} style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
     lightChip(chips.findLastIndex((c) => c.at <= now));
+    // Pressed while the plain reply is on screen, before the move is typed.
+    withoutBtn?.setAttribute("aria-pressed", String(now < opens!.moveStarts));
     stickToBottom();
     placeCaret();
     placeKeys();
@@ -365,6 +380,7 @@ export function mount(root: HTMLElement) {
   function seekBeat(k: number) {
     if (motion.matches) {
       still = Math.min(Math.max(0, k), beats.length - 1);
+      held = undefined;
       pick = undefined;
       draw();
     // Past the caption's fade-in, so a paused demo shows it.
@@ -401,6 +417,14 @@ export function mount(root: HTMLElement) {
     const moved = down && (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4 || scroll.scrollTop !== down.top);
     if (motion.matches || moved || getSelection()?.toString() || (e.target as HTMLElement).closest("[data-opt]")) return;
     playBtn.click();
+  });
+  // A step between the plain reply and moo's hand-back: it pauses there.
+  withoutBtn?.addEventListener("click", () => {
+    const to = withoutBtn.getAttribute("aria-pressed") === "true" ? opens!.handBack : opens!.plain;
+    userPaused = true;
+    held = to;
+    if (!motion.matches) seek(to);
+    sync();
   });
   speedBtns.forEach((b) =>
     b.addEventListener("click", () => {
@@ -466,10 +490,11 @@ export function mount(root: HTMLElement) {
   new ResizeObserver(fit).observe(root);
   root.addEventListener("fit", fit);
 
-  // Start from the top each time the demo comes into view.
+  // Start from the top each time the demo comes into view, unless it opens
+  // paused on the hand-back: then it stays where the reader left it.
   new IntersectionObserver(
     ([entry]) => {
-      if (entry.isIntersecting && !inView) {
+      if (entry.isIntersecting && !inView && !opens) {
         t = 0;
         following = true;
         pick = undefined;
