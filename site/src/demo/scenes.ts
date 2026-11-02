@@ -36,6 +36,7 @@ import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as consult from "./sessions/consult";
 import * as compose from "./sessions/compose";
 import * as target from "./sessions/target";
 import * as router from "./sessions/router";
@@ -66,6 +67,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const consultScene = skill(consult);
 export const composeScene = skill(compose);
 export const targetScene = skill(target);
 export const routerScene = skill(router);
