@@ -138,18 +138,7 @@ for (const cols of [45, 80, 120])
      width, so no page's terminal sits lower. */
   .col { --cols: 45; --cap-lines: 2; --goal-lines: 3; }
   @container demo (min-width: 604px) { .col { --cols: 80; --cap-lines: 1; --goal-lines: 2; } }
-  /* A frame wider than 120 columns need: the cell grows until they fill it,
-     leaving one cell and 12px a side (room for a scrollbar), and the type and
-     row grow with it in the recorded ratios (--fs, --row below), as the user
-     asked. Below that, the recorded size. */
-  @container demo (min-width: 872px) {
-    .col {
-      --cols: 120; --goal-lines: 1;
-      --cell: max(7px, calc((100cqi - 26px) / 122));
-      --fs: calc(var(--cell) * 13 * 0.923 / 7);
-      --row: calc(var(--cell) * 20.5 / 7);
-    }
-  }
+  @container demo (min-width: 872px) { .col { --cols: 120; --goal-lines: 1; } }
   .vh {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
@@ -240,10 +229,10 @@ for (const cols of [45, 80, 120])
     /* --rows rows of text inside the padding and border. */
     height: calc(var(--rows) * var(--row) + 1.2rem + 2px);
     width: fit-content; max-width: 100%;
-    /* The grid sits centred in the frame: the room it leaves splits evenly
-       between the two sides; the scroll's own right padding and its
-       scrollbar sit inside the right half. */
-    --inset: max(4px, calc((100% - var(--cols) * var(--cell) - 2px) / 2));
+    /* The grid sits at the frame's left, 24px in, or centred where the
+       frame leaves less; the scroll's own right padding and its scrollbar
+       sit in the room on the right. 100cqi is the frame's width. */
+    --inset: max(4px, min(24px, calc((100cqi - var(--cols) * var(--cell) - 2px) / 2)));
     padding: 0.6rem 0 0.6rem var(--inset); border: 1px solid var(--t-border); border-radius: 0.6rem;
     background: var(--t-bg); color: var(--t-fg);
   }
@@ -294,12 +283,22 @@ for (const cols of [45, 80, 120])
   .demo :global(.bx.a.u.r::after) { border-bottom-left-radius: calc(var(--cell) * 0.6); }
   .demo :global(.bx.a.u.l::after) { border-bottom-right-radius: calc(var(--cell) * 0.6); }
   .demo :global(.row.user) { background: var(--t-user); box-shadow: 0 1px 0 var(--t-user); }
+  /* Claude Code's full-width rows reach the frame's right edge, the left
+     inset away from it, as the user asked: the user turn's bar, the prompt
+     box's rules, the status line, whose output style ends there. Their text
+     still wraps at --cols. */
+  .demo :global(.row.user), .demo :global(.row.wide) {
+    width: min(100%, max(var(--cols) * var(--cell), 100cqi - 2px - 2 * var(--inset)));
+  }
+  .demo :global(.row.wide) { display: flex; }
+  .demo :global(.row.wide .fill), .demo :global(.row.rule > span) { flex: 1; display: flex; }
+  .demo :global(.row.rule .bx) { flex: 1; }
   /* The logo in whole pixels, centered in its row. A quadrant of a terminal
      cell is twice as tall as it is wide, so each is --px wide and 2 --px tall. */
   .demo :global(svg.logo .eye) { fill: var(--t-eye); }
   .demo :global(svg.logo .body) { fill: var(--t-logo); }
   .demo :global(svg.logo) {
-    --px: calc(var(--cell) * 2 / 7);
+    --px: 2px;
     display: inline-block; vertical-align: top;
     width: calc(var(--w) * var(--px)); height: calc(var(--h) * 2 * var(--px));
     margin-top: calc((var(--row) - var(--h) * 2 * var(--px)) / 2);

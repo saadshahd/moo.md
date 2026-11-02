@@ -193,10 +193,9 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 }
 .demo .controls .without:hover { color: var(--moo-ink); background: var(--moo-surface); }
 .demo .controls .without[aria-pressed="true"] { background: var(--moo-ink); color: var(--moo-paper); }
-/* On a phone the step joins the row, so the row's gaps and pills tighten to
-   leave the timeline room. */
+/* On a phone the step takes a row of its own above the player's, so the
+   timeline keeps its width. */
 @media (max-width: 40rem) {
-  .demo .controls:has(.without) { gap: 0.4rem; }
-  .demo .controls .without { padding: 0 0.55rem; font-size: 0.75rem; }
-  .demo .controls:has(.without) .speed button { padding: 0 0.38rem; }
+  .demo .controls:has(.without) { flex-wrap: wrap; height: auto; row-gap: var(--moo-step); }
+  .demo .controls .without { margin-inline-end: 100%; }
 }
