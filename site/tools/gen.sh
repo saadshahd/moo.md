@@ -36,3 +36,5 @@ python3 gen.py "$HOME/.claude/projects/-Users-Shared-songbook/7df3e3d8-8160-4d5d
   --keys "$R/rec5/explain/keylog.json" --raw "$OUT/explain.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-taskdesk/b1b2d5e3-76a8-4b4b-8c42-ecde8db5297e.jsonl" /Users/Shared/taskdesk "$R/rec5/elicit" ../src/demo/sessions/elicit.ts 2=p2fc51.516 3=p7jusv.1214 \
   --keys "$R/rec5/elicit/keylog.json" --raw "$OUT/elicit.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-Users-Shared-agent-kit/9b1e2fb4-7d13-46bb-bfef-b6956ed54df2.jsonl" /Users/Shared/agent-kit "$R/rec6/shift2" ../src/demo/sessions/shift.ts 1=1x004a.933 \
+  --keys "$R/rec6/shift2/keylog.json" --raw "$OUT/shift.json" --activity-from-snaps

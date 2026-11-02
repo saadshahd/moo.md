@@ -216,11 +216,13 @@ function keepNumbered(cs: Cell[]): Cell[] {
 // recordings at 45, 80 and 120 columns. Columns take their widest cell when
 // all fit in `width` - 2 - 3 per column - 1; otherwise each keeps its longest
 // word and shares what is left by how much more its widest cell wants, floored.
+// When even the longest words do not fit, each column takes its longest word's
+// share of the room, floored, and words break at the edge (shift, at 45).
 // Cells wrap as Ink does; the header is centered, body cells left, and each
-// cell sits floor(spare / 2) rows down. When even the longest words do not
-// fit, or a cell would wrap past 4 rows, each row becomes "header: value"
-// lines between rules; the 4-row limit is the one guess here: it is the only
-// rule seen that tells the recorded table at 45 columns from the list.
+// cell sits floor(spare / 2) rows down. When a cell would wrap past 4 rows,
+// each row becomes "header: value" lines between rules; the 4-row limit is
+// the one guess here: it is the only rule seen that tells the recorded tables
+// at 45 columns from the lists.
 
 /** Whether a line is a row of a markdown table. */
 const isRow = (l: Line) => /^\s*\|/.test(l);
@@ -246,9 +248,11 @@ function table(rows: Line[], width: number): Cell[][] {
   const cols =
     sum(widest) <= room
       ? widest
-      : longest.map((m, c) => m + Math.floor(((widest[c] - m) * extra) / want));
+      : extra >= 0
+        ? longest.map((m, c) => m + Math.floor(((widest[c] - m) * extra) / want))
+        : longest.map((m) => Math.floor((m * room) / sum(longest)));
   const wrapped = grid.map((r) => r.map((cs, c) => (cs.length ? wrapInk(cs, cols[c]) : [[]])));
-  if (extra < 0 || wrapped.some((r) => r.some((cell) => cell.length > 4)))
+  if (wrapped.some((r) => r.some((cell) => cell.length > 4)))
     return listed(head, grid.slice(1), width);
   const line = (l: string, m: string, r: string) =>
     plain(l + cols.map((w) => "─".repeat(w + 2)).join(m) + r);
