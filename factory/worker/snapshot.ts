@@ -12,12 +12,10 @@ import type { Rules } from "../lib/rules.ts";
 import { readSnapshot } from "../lib/snapshot.ts";
 import { contextSize, pendingAsk, rejectedUntil, sum, usage, type Usage } from "../lib/transcript.ts";
 import * as z from "../lib/vendor/zod-mini.js";
-import type { App } from "./app.ts";
 import { SESSION_STATES, type Local, type RunView, type World } from "./decide.ts";
 import { run } from "./proc.ts";
 
 export type Ctx = {
-  app: App;
   /** The target repo's main worktree. */
   dir: string;
   repo: string;

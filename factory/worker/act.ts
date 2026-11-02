@@ -3,6 +3,7 @@
 import { join, resolve } from "node:path";
 import { branchFor, closePr, edit, latest, markStuck, must, post, runName, upsert } from "../lib/github.ts";
 import { total, type Plan, type Restart } from "../lib/formats.ts";
+import { gitConfigEnv } from "../lib/git.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { sum } from "../lib/transcript.ts";
@@ -16,9 +17,10 @@ const CLI = `bun ${join(import.meta.dir, "cli.ts")}`;
 
 /**
  * A project's own settings may name an editor that waits for a window (`code --wait`); a run
- * has none, so its `git merge` would wait for good. `--settings` outranks project settings.
+ * has none, so its `git merge` would wait for good. `--settings` outranks project settings. A
+ * run's git takes the worker's git config too, whatever the run's shell profile resets.
  */
-const RUN_SETTINGS = JSON.stringify({ env: { GIT_EDITOR: "true" } });
+const RUN_SETTINGS = JSON.stringify({ env: { GIT_EDITOR: "true", ...gitConfigEnv() } });
 
 export const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
 
@@ -160,9 +162,8 @@ async function start(ctx: Ctx, w: World, n: number): Promise<void> {
 }
 
 /**
- * Merges the base into PR `pr`'s branch on GitHub, as the bot, only while its head is still
- * `head`. A head that moved since the snapshot is GitHub's 422, and no failure: the next tick
- * reads the new one.
+ * Merges the base into PR `pr`'s branch on GitHub only while its head is still `head`. A head
+ * that moved since the snapshot is GitHub's 422, and no failure: the next tick reads the new one.
  */
 async function updateBranch(ctx: Ctx, n: number, pr: number, head: string): Promise<boolean> {
   const r = await run(["gh", "api", "-X", "PUT", `repos/${ctx.repo}/pulls/${pr}/update-branch`,

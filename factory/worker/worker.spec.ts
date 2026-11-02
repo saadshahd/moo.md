@@ -26,21 +26,20 @@ import { runPrompt, type RunInput } from "./prompt.ts";
 import { machineId, platformOf } from "./platform.ts";
 import { checksReason, loginRefusal } from "./guard.ts";
 import { pendingAsk, usage as usageOf } from "../lib/transcript.ts";
-import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedBy } from "../lib/rules.ts";
+import { actorsOf, readRules, Rules, RULES_PATH, rulesChangedByFactory } from "../lib/rules.ts";
 import { AGENTS_AT_TICK, AGENTS_LATER, ISSUES, OPEN_ASK, RULES as SMOKE_RULES } from "./fixtures/smoke1.ts";
 import { run } from "./proc.ts";
 import { claimIn, factoryWorktrees, runView, sessionsNamed, worktrees } from "./snapshot.ts";
 import { createdPath, letGo, onBranch, stopRun, worktreeFor } from "./act.ts";
 import { ISSUE_5, PR_8 } from "./fixtures/smoke2.ts";
 import { closePr, must, upsert, type Run } from "../lib/github.ts";
-import { gitConfigEnv } from "../lib/bot.ts";
+import { gitConfigEnv } from "../lib/git.ts";
 import { chmod, mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const BOT = "moo-factory[bot]";
 const ME = "owner";
-const A: Actors = { bot: BOT, trusted: [ME] };
+const A: Actors = { trusted: [ME] };
 const NOW = Date.parse("2026-10-26T12:00:00Z");
 const SEAL = "a".repeat(64);
 
@@ -48,7 +47,6 @@ const RULES: Rules = {
   atOnce: 2,
   waitsPerDay: 3,
   contextCap: 1000,
-  bot: BOT,
   taste: ["CLAUDE.md"],
   layers: {
     check: [],
@@ -74,7 +72,7 @@ const said = (
 });
 
 const posted = (c: FactoryComment, createdAt?: string) =>
-  said(render(c), BOT, createdAt);
+  said(render(c), ME, createdAt);
 
 const issue = (n: number, more: Partial<Issue> = {}): Issue => ({
   number: n,
@@ -472,7 +470,7 @@ describe("a local issue's state and actions", () => {
     const gh = (head: string) =>
       snapshot({
         issues: [issue(7)],
-        open: [{ ...pr(3), author: BOT, number: 9, head, files: ["src/a.ts"] }],
+        open: [{ ...pr(3), author: ME, number: 9, head, files: ["src/a.ts"] }],
       });
 
     expect(
@@ -752,7 +750,7 @@ describe("killing an issue closes its PR", () => {
 });
 
 describe("only a person changes the factory's rules", () => {
-  const touching = (files: string[] | null, author = BOT) => ({ ...pr(7), author, files });
+  const touching = (files: string[] | null, author = ME) => ({ ...pr(7), author, files });
 
   const at = (files: string[] | null, runs = [session("working")]) =>
     world(snapshot({ issues: [issue(7)], prs: new Map([[7, pr(7)]]), open: [touching(files)] }), [here(7, runs)]);
@@ -769,7 +767,7 @@ describe("only a person changes the factory's rules", () => {
     expect(step(at(["src/a.ts"])).state.kind).toBe("working");
     expect(step(at(null)).state.kind).toBe("working");
   });
-  test("the bot's PR with no worktree here closes when it changes the rules, whatever its issue says", () => {
+  test("a factory PR with no worktree here closes when it changes the rules, whatever its issue says", () => {
     const w = world(snapshot({ issues: [issue(7)], open: [touching([RULES_PATH])] }), []);
 
     expect(prsToClose(w)).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining(RULES_PATH) }]);
@@ -777,17 +775,17 @@ describe("only a person changes the factory's rules", () => {
 });
 
 describe("an issue that ends with no worktree here still closes its PR", () => {
-  const open = (author = BOT) => ({ ...pr(7), author, files: ["src/a.ts"] });
-  const at = (issues: Issue[], more: Partial<World> = {}, author = BOT) => prsToClose(world(snapshot({ issues, open: [open(author)] }), [], more));
+  const open = (author = ME) => ({ ...pr(7), author, files: ["src/a.ts"] });
+  const at = (issues: Issue[], more: Partial<World> = {}, author = ME) => prsToClose(world(snapshot({ issues, open: [open(author)] }), [], more));
 
   test("closed, unlabelled or no longer trusted, its open PR closes, saying why", () => {
     expect(at([])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("was closed or lost its") }]);
     expect(at([issue(7, { editor: "stranger" })])).toEqual([{ kind: "closePr", issue: 7, pr: 57, reason: expect.stringContaining("does not trust") }]);
   });
-  test("a stuck or live issue keeps its PR, as does a PR the bot never opened or one a worktree here watches", () => {
+  test("a stuck or live issue keeps its PR, as does one no trusted login opened or one a worktree here watches", () => {
     expect(at([issue(7, { labels: ["factory", STUCK_LABEL] })])).toEqual([]);
     expect(at([issue(7)])).toEqual([]);
-    expect(at([], {}, ME)).toEqual([]);
+    expect(at([], {}, "stranger")).toEqual([]);
     expect(at([], { local: [here(7)] })).toEqual([]);
     expect(at([], { foreign: [7] })).toEqual([]);
   });
@@ -847,7 +845,7 @@ describe("plans posted first hold later ones", () => {
     expect(alone([])).toBe("crashed");
   });
   test("an open PR holds before a plan does", () => {
-    const w = world({ ...gh, open: [{ ...pr(3), author: BOT, files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
+    const w = world({ ...gh, open: [{ ...pr(3), author: ME, files: ["src/a.ts"] }] }, [here(7, [session("done")])]);
 
     expect(classify(w.local[0]!, w)).toMatchObject({ kind: "held", on: { kind: "pr", pr: 53, files: ["src/a.ts"] } });
   });
@@ -1002,7 +1000,7 @@ describe("picking new work", () => {
   test("an issue whose plan overlaps an open PR waits", () => {
     const gh = snapshot({
       issues: [issue(4, { comments: [plan] })],
-      open: [{ ...pr(3), author: BOT, number: 9, head: "x", files: null }],
+      open: [{ ...pr(3), author: ME, number: 9, head: "x", files: null }],
     });
 
     expect(pick(world(gh, []))).toEqual([]);
@@ -1170,14 +1168,11 @@ describe("smoke run 1 (saadshahd/factory-smoke, 2026-10-27)", () => {
     expect(step(smoke(at(AGENTS_AT_TICK, 6)))).toEqual({ state: { kind: "working" }, actions: [] });
   });
 
-  test("the restarts the worker posted as the user count no deaths", () => {
-    for (const i of ISSUES) expect(deathsSinceRetry(i.comments, actors)).toBe(0);
-  });
-
   test("a run that ended its turn asking for help is stopped before its restart", () => {
     const { state, actions } = step(smoke(at(AGENTS_LATER, 5)));
 
-    expect(state).toEqual({ kind: "crashed", deaths: 1 });
+    /** The restart the worker posted on #5 counts, as every restart from the user's login now does. */
+    expect(state).toEqual({ kind: "crashed", deaths: 2 });
     expect(actions).toMatchObject([
       { kind: "stop", run: { id: "0e462418" } },
       { kind: "start", restart: "crash", after: "0e462418-b22d-4e15-a8ad-8d9676426c92" },
@@ -1186,17 +1181,17 @@ describe("smoke run 1 (saadshahd/factory-smoke, 2026-10-27)", () => {
 });
 
 describe("proc", () => {
-  test("a child sees the environment as it is now, so the worker's commands act as the bot", async () => {
-    process.env.FACTORY_PROC_PROBE = "bot";
+  test("a child sees the environment as it is now, so the worker's commands take the git config it set", async () => {
+    process.env.FACTORY_PROC_PROBE = "set";
     const r = await run(["sh", "-c", "echo $FACTORY_PROC_PROBE"]);
     delete process.env.FACTORY_PROC_PROBE;
 
-    expect(r.stdout.trim()).toBe("bot");
+    expect(r.stdout.trim()).toBe("set");
   });
 });
 
 describe("git under the factory's git config", () => {
-  /** Real git, given the config through the environment the way the worker and the run hooks give it. */
+  /** Real git, given the config through the environment the way the worker and its runs get it. */
   const git = async (...argv: string[]) =>
     (await new Response(Bun.spawn(["git", ...argv], { cwd: tmpdir(), env: { ...process.env, ...gitConfigEnv() }, stdout: "pipe" }).stdout).text()).trim();
 
@@ -1237,7 +1232,7 @@ describe("smoke run 2 (saadshahd/factory-smoke #5, 2026-10-27)", () => {
     expect(occupies(state)).toBe(false);
 
     const w = at("2026-10-27T00:48:00Z", [first, second]);
-    const stopped = posted({ kind: "stopped", issue: 5, session: second.sessionId });
+    const stopped = said(render({ kind: "stopped", issue: 5, session: second.sessionId }), "saadshahd");
     const issue5 = w.gh.issues[0]!;
     const again = { ...w, gh: { ...w.gh, issues: [{ ...issue5, comments: [...issue5.comments, stopped] }] } };
 
@@ -1569,8 +1564,8 @@ describe("platform", () => {
   });
 });
 
-describe("rules the bot's own PR changed stop the worker", () => {
-  test("the newest commit to the rules file is asked for its PRs: the bot's names its PR, a person's or none is null", async () => {
+describe("rules a factory PR changed stop the worker", () => {
+  test("the newest commit to the rules file is asked for its PRs: one from a factory branch names its PR, another or none is null", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-rules-by-"));
     const git = (...a: string[]) => gitIn(dir, ...a);
     await git("init", "-q", "-b", "main");
@@ -1592,9 +1587,9 @@ describe("rules the bot's own PR changed stop the worker", () => {
       return { exitCode: 0, stdout: JSON.stringify(pulls), stderr: "" };
     };
 
-    expect(await rulesChangedBy(github([{ number: 12, user: { login: BOT } }]), dir, "o/r", BOT)).toBe(12);
-    expect(await rulesChangedBy(github([{ number: 13, user: { login: ME } }]), dir, "o/r", BOT)).toBe(null);
-    expect(await rulesChangedBy(github([]), dir, "o/r", BOT)).toBe(null);
+    expect(await rulesChangedByFactory(github([{ number: 12, head: { ref: "factory/7" } }]), dir, "o/r")).toBe(12);
+    expect(await rulesChangedByFactory(github([{ number: 13, head: { ref: "tighten-rules" } }]), dir, "o/r")).toBe(null);
+    expect(await rulesChangedByFactory(github([]), dir, "o/r")).toBe(null);
     expect(asked).toEqual(Array(3).fill(`repos/o/r/commits/${rules}/pulls`));
     await rm(dir, { recursive: true });
   });

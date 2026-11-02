@@ -4,7 +4,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Rules } from "../lib/rules.ts";
 import * as z from "../lib/vendor/zod-mini.js";
-import { botFor, type App } from "./app.ts";
 import { run } from "./proc.ts";
 
 const Settings = z.object({
@@ -136,17 +135,8 @@ export async function guard(
   repo: string,
   base: string,
   rules: Rules,
-  app: App,
 ): Promise<{ refusals: string[]; warnings: string[] }> {
   const user = await settings(join(homedir(), ".claude", "settings.json"));
-
-  const bot = await botFor(app, repo).then(
-    (b) =>
-      b.name === rules.bot
-        ? ""
-        : `the App acts as ${b.name}, but the rules file names ${rules.bot}`,
-    (err: Error) => `the factory's GitHub App can't act on ${repo}: ${err.message}`,
-  );
 
   /** Drafts never arm auto-merge: the person who merges each one checks it. */
   const checks = rules.pr?.draft ? null : checksReason(repo, base, await branchReads(repo, base));
@@ -158,7 +148,6 @@ export async function guard(
         ? ""
         : "the factory plugin is not installed and enabled for your user, so runs load no factory hooks. Install it with /plugin.",
       checks?.kind === "refusal" ? checks.text : "",
-      bot,
     ].filter((r) => r !== ""),
     warnings: checks?.kind === "warning" ? [checks.text] : [],
   };

@@ -17,14 +17,12 @@ const PANE = {
 } as const;
 
 const ME = { __typename: "User", login: "o" };
-const BOT = { __typename: "Bot", login: "moo-factory" };
 const STRANGER = { __typename: "User", login: "drive-by" };
 
 const RULES = {
   atOnce: 1,
   waitsPerDay: 5,
   contextCap: 150_000,
-  bot: "moo-factory[bot]",
   taste: [],
   layers: { check: [], plan: [], judge: [], none: [] },
 };
@@ -37,7 +35,7 @@ const ACTORS = actorsOf(rules, "o/smoke");
 
 type Actor = { __typename: string; login: string };
 
-const comment = (databaseId: number, c: FactoryComment, author: Actor = BOT, editor: Actor | null = null) => ({
+const comment = (databaseId: number, c: FactoryComment, author: Actor = ME, editor: Actor | null = null) => ({
   databaseId,
   body: render(c),
   url: `https://github.com/o/smoke/issues/${"issue" in c ? c.issue : 0}#issuecomment-${databaseId}`,
@@ -123,8 +121,8 @@ const ISSUES = [
     }),
     comment(
       82,
-      { kind: "call", issue: 8, choice: "a bot call a stranger edited", picked: "x", others: [], why: "", undo: "" },
-      BOT,
+      { kind: "call", issue: 8, choice: "a call a stranger edited", picked: "x", others: [], why: "", undo: "" },
+      ME,
       STRANGER,
     ),
     comment(83, { kind: "stuck", issue: 8, reason: "cleared by retry" }),
@@ -227,7 +225,7 @@ describe("rows", () => {
     expect(r.plans.map((w) => [w.waitId, w.plan])).toEqual([[101, "## Types\n\ntype RailItem = { id: string }"]]);
   });
 
-  test("stuck takes the label and the bot's newest reason", async () => {
+  test("stuck takes the label and the newest reason", async () => {
     expect(rows(await snapshot(), ACTORS).stuck).toEqual([
       {
         issue: 7,
@@ -242,7 +240,7 @@ describe("rows", () => {
     expect(rows(await snapshot(), ACTORS).calls.map((c) => c.callId)).toEqual([80]);
   });
 
-  test("cost counts the bot's cost comments on factory branches only", async () => {
+  test("cost counts the cost comments on factory branches only", async () => {
     expect(rows(await snapshot(), ACTORS).costs).toEqual([
       { pr: 20, tokens: 4_000 },
       { pr: 21, tokens: 6_000 },

@@ -4,7 +4,7 @@
  */
 
 import { holder, parse, type FactoryComment, type HeldOn, type Wait } from "../lib/formats.ts";
-import { branchFor, factoryComments, fromBot, issueOf, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
+import { branchFor, factoryComments, fromTrusted, issueOf, STUCK_LABEL, type Actors, type Comment } from "../lib/github.ts";
 import { failed, heldOn, heldSince, holdLine, planHold, postedPlan, prHold, type Hold } from "../lib/holds.ts";
 import { HANDOFF_PATH, planFiles } from "../lib/plan.ts";
 import { RULES_PATH, type Rules } from "../lib/rules.ts";
@@ -209,7 +209,7 @@ function actionableReview(pr: Pr, cs: readonly Comment[], a: Actors): Review | n
 /** The issue's PR, unless it was closed unmerged before the issue was last marked stuck. */
 function livePr(pr: Pr | undefined, cs: readonly Comment[], a: Actors): Pr | null {
   if (pr === undefined) return null;
-  const stuckAt = cs.findLast((c) => fromBot(c, a) && parse(c.body)?.kind === "stuck")?.createdAt ?? "";
+  const stuckAt = cs.findLast((c) => fromTrusted(c, a) && parse(c.body)?.kind === "stuck")?.createdAt ?? "";
 
   return pr.state === "CLOSED" && (pr.closedAt ?? "") < stuckAt ? null : pr;
 }
@@ -541,9 +541,10 @@ export function pick(w: World): { issue: number; resume: boolean }[] {
 }
 
 /**
- * The bot's open `factory/<n>` PRs with no worktree here that must close: one changing the rules
- * file, or one whose issue was closed, unlabelled or lost its trust. A stuck issue's PR stays, as
- * it does for a local issue. Each machine decides from GitHub alone, so any one of them closes it.
+ * The open `factory/<n>` PRs a trusted login opened, with no worktree here, that must close: one
+ * changing the rules file, or one whose issue was closed, unlabelled or lost its trust. A stuck
+ * issue's PR stays, as it does for a local issue. Each machine decides from GitHub alone, so any
+ * one of them closes it.
  */
 export function prsToClose(w: World): Action[] {
   const here = new Set([...w.local.map((l) => l.issue), ...w.foreign]);
@@ -551,7 +552,7 @@ export function prsToClose(w: World): Action[] {
   return w.gh.open.flatMap((p): Action[] => {
     const n = issueOf(p.head);
 
-    if (n === null || here.has(n) || p.author !== w.actors.bot) return [];
+    if (n === null || here.has(n) || p.author === null || !w.actors.trusted.includes(p.author)) return [];
     const issue = w.gh.issues.find((i) => i.number === n);
     const why = issue === undefined ? "closed" : endedWhy(issue, w.actors);
     const reason = changesRules(p) ? RULES_CHANGED : why === null ? null : CLOSES_PR[why]?.(n);

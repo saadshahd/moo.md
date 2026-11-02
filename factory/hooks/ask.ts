@@ -67,9 +67,9 @@ async function takeWait(
 
 /**
  * In a factory run, an ask goes to the issue as a wait and the run ends its turn until the answer
- * comes. An approval names the seal of the plan the bot posted last, so the answer approves that
- * plan and no later one. When it can't, the ask goes on to the run's own question box, where agent
- * view shows the run waiting.
+ * comes. An approval names the seal of the plan posted last, so the answer approves that plan and
+ * no later one. When it can't, the ask goes on to the run's own question box, where agent view
+ * shows the run waiting.
  */
 export async function askOnIssue(
   $: EngineInterface,

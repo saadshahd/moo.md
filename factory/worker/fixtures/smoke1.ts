@@ -3,15 +3,16 @@ import type { Issue } from "../../lib/snapshot.ts";
 
 /**
  * Smoke run 1 on saadshahd/factory-smoke, 2026-10-27 (issue #63, "Smoke run 1 failed").
- * `ISSUES` is the snapshot read from GitHub after the run: the bot's plans and the restarts the
- * worker posted as the user. The session lists rebuild the run's sessions (ids, names, start times
- * from `claude agents --json --all`) in the shapes probe sessions showed that day: a session whose
+ * `ISSUES` is the snapshot read from GitHub after the run: the run's plans and the worker's restarts.
+ * The App's bot posted them then; they read here as the user's, since the factory now acts as the
+ * user. The session lists rebuild the run's sessions (ids, names, start times from
+ * `claude agents --json --all`) in the shapes probe sessions showed that day: a session whose
  * own question box waits is `blocked`, `waiting`, `waitingFor: "input needed"`; one that ended its
  * turn asking for help is `blocked`, `idle`, with no `waitingFor`. `OPEN_ASK` is the #5 run's
  * transcript tail, trimmed: its approval ask was open, and no line of it holds the ask.
  */
 
-export const RULES: Rules = {"atOnce": 3, "waitsPerDay": 5, "contextCap": 300000, "bot": "moo-factory[bot]", "trusted": ["saadshahd"], "taste": [], "layers": {"check": [], "plan": [], "judge": [], "none": []}};
+export const RULES: Rules = {"atOnce": 3, "waitsPerDay": 5, "contextCap": 300000, "trusted": ["saadshahd"], "taste": [], "layers": {"check": [], "plan": [], "judge": [], "none": []}};
 
 export const ISSUES: Issue[] = [
   {
@@ -33,7 +34,7 @@ export const ISSUES: Issue[] = [
         "body": "<!-- factory:plan {\"issue\":5,\"seal\":\"ae960ccc1a9702481f613aec3b7468e4fe2da3b3da4b30ac6d333d127e65370f\"} -->\n**Plan** · seal `ae960ccc`\n\n# Plan: task list stats (#5)\n\nA pure function that summarises a `TaskList` into counts and a whole-number percent done. `format` is untouched.\n\n## Types\n\n```ts\n// src/stats.ts\nexport type Stats = {\n  readonly open: number;\n  readonly done: number;\n  readonly percentDone: number; // whole percent 0..100, Math.round(done / total * 100); 0 for an empty list\n};\n```\n\n## Signatures\n\n```ts\n// src/stats.ts\nexport const stats: (list: TaskList) => Stats;\n```\n\n## Files\n\n- src/stats.ts\n- test/stats.test.ts",
         "url": "https://github.com/saadshahd/factory-smoke/issues/5#issuecomment-6430719451",
         "createdAt": "2026-10-27T00:34:08Z",
-        "author": "moo-factory[bot]",
+        "author": "saadshahd",
         "editor": null
       },
       {
@@ -65,7 +66,7 @@ export const ISSUES: Issue[] = [
         "body": "<!-- factory:plan {\"issue\":6,\"seal\":\"794527d9497cc916db91d7837c85bb63aea1987cfe742de57b28e518970fee08\"} -->\n**Plan** · seal `794527d9`\n\n# Plan: parse a markdown checklist into a task list (#6)\n\n`parse(text)` reads `- [ ] title` / `- [x] title` lines into a `TaskList`,\nnumbering tasks 1, 2, … in order. Blank (whitespace-only) lines are skipped.\nThe first line that is not a checklist item stops the parse and comes back as\na `ParseError` value naming its 1-based line number — returned, not thrown.\n\n## Types\n\n```ts\n// src/parse.ts\nexport type ParseError = {\n  readonly kind: \"not-a-checklist-item\";\n  readonly line: number; // 1-based line number in the input\n  readonly text: string; // the offending line, as written\n};\n\nexport type ParseResult =\n  | { readonly ok: true; readonly list: TaskList }\n  | { readonly ok: false; readonly error: ParseError };\n```\n\n## Signatures\n\n```ts\n// src/parse.ts\nexport const parse = (text: string): ParseResult;\n```\n\n- A checklist item is `- [ ] <title>` or `- [x] <title>` (`X` also accepted), at\n  the start of the line, with a non-blank title. Tasks are built with the\n  existing `createTask` (which trims the title) and `complete`.\n- Lines split on `\\n` or `\\r\\n`.\n- Anything else non-blank (prose, `*` bullets, indented items, `- [ ]` with no\n  title) is a `ParseError` for that line.\n\n## Files\n\n- src/parse.ts\n- test/parse.test.ts",
         "url": "https://github.com/saadshahd/factory-smoke/issues/6#issuecomment-6430723309",
         "createdAt": "2026-10-27T00:34:25Z",
-        "author": "moo-factory[bot]",
+        "author": "saadshahd",
         "editor": null
       }
     ]
@@ -89,7 +90,7 @@ export const ISSUES: Issue[] = [
         "body": "<!-- factory:plan {\"issue\":7,\"seal\":\"2c165d45945c612f582259a4597f631c82224bf38e3b6677baad6ab90c4de3d8\"} -->\n**Plan** · seal `2c165d45`\n\n# Plan: undo and redo for task list changes (#7)\n\nA history is a value: the states before, the current state, and the states undone.\n`add` and `markDone` stay as they are; a caller records their result into the history.\n\n## Types\n\n- `History<T>` — `{ readonly past: readonly T[]; readonly present: T; readonly future: readonly T[] }`\n  - `past`: earlier states, oldest first\n  - `present`: the current state\n  - `future`: undone states, the next redo first\n\n## Signatures\n\n- `start<T>(present: T): History<T>` — a history with nothing to undo or redo\n- `record<T>(history: History<T>, next: T): History<T>` — `next` becomes present, old present joins past, future is dropped\n- `undo<T>(history: History<T>): History<T>` — step back one state; with empty `past`, returns `history` unchanged\n- `redo<T>(history: History<T>): History<T>` — step forward one state; with empty `future`, returns `history` unchanged\n\n## Files\n\n- src/history.ts\n- test/history.test.ts",
         "url": "https://github.com/saadshahd/factory-smoke/issues/7#issuecomment-6430720451",
         "createdAt": "2026-10-27T00:34:13Z",
-        "author": "moo-factory[bot]",
+        "author": "saadshahd",
         "editor": null
       },
       {

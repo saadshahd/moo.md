@@ -1,4 +1,4 @@
-import { parse, render, writer, type FactoryComment, type Kind } from "./formats.ts";
+import { parse, render, type FactoryComment, type Kind } from "./formats.ts";
 
 export type Run = (
   argv: readonly string[],
@@ -36,12 +36,12 @@ export type Comment = {
   url: string;
 };
 
-/** The factory's bot, and the people whose words count. */
-export type Actors = { bot: string; trusted: readonly string[] };
+/** The people whose words count; the factory acts as one of them. */
+export type Actors = { trusted: readonly string[] };
 
 /**
- * Written by one of `logins` and edited by nobody else. The bot can edit anyone's comment, so
- * an edit by anyone outside `logins` voids the comment.
+ * Written by one of `logins` and edited by nobody else. A repo's maintainers can edit anyone's
+ * comment, so an edit by anyone outside `logins` voids the comment.
  */
 export function wroteIt(
   c: { author: string | null; editor: string | null },
@@ -54,18 +54,14 @@ export function wroteIt(
   );
 }
 
-export const fromBot = (c: Comment, a: Actors) => wroteIt(c, [a.bot]);
 export const fromTrusted = (c: Comment, a: Actors) => wroteIt(c, a.trusted);
 
-/** The comments that are factory comments from the author their kind allows, oldest first. */
+/** The factory comments trusted people wrote, oldest first. */
 export function factoryComments(cs: readonly Comment[], a: Actors): { id: number; c: FactoryComment }[] {
   return cs.flatMap((x) => {
-    const c = parse(x.body);
+    const c = fromTrusted(x, a) ? parse(x.body) : null;
 
-    if (c === null) return [];
-    const ok = writer(c.kind) === "bot" ? fromBot(x, a) : fromTrusted(x, a);
-
-    return ok ? [{ id: x.id, c }] : [];
+    return c === null ? [] : [{ id: x.id, c }];
   });
 }
 
@@ -90,7 +86,7 @@ export async function edit(run: Run, repo: string, id: number, c: FactoryComment
 }
 
 /**
- * Posts `c` on `n`, or edits the bot's newest comment of its kind among `existing` when it
+ * Posts `c` on `n`, or edits the newest trusted comment of its kind among `existing` when it
  * differs, so a rerun after a crash never posts twice. Says which it did.
  */
 export async function upsert(

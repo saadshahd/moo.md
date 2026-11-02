@@ -6,11 +6,10 @@
  */
 
 import { messageOf } from "../lib/errors.ts";
-import { botEnv, needsRenew, type Bot } from "../lib/bot.ts";
 import { must, repoOf } from "../lib/github.ts";
-import { actorsOf, readRules, rulesChangedBy, RULES_PATH } from "../lib/rules.ts";
+import { gitConfigEnv } from "../lib/git.ts";
+import { actorsOf, readRules, rulesChangedByFactory, RULES_PATH } from "../lib/rules.ts";
 import { apply, log, say } from "./act.ts";
-import { botFor, readApp } from "./app.ts";
 import { trustedIssue } from "../lib/snapshot.ts";
 import { classify, decide, occupies, stateLine } from "./decide.ts";
 import { guard } from "./guard.ts";
@@ -34,24 +33,13 @@ function holdAwake(p: Platform, busy: boolean): void {
   }
 }
 
-let bot: Bot | null = null;
-
-async function asBot(ctx: Ctx): Promise<Bot> {
-  if (bot !== null && !needsRenew(bot, Date.now())) return bot;
-  bot = await botFor(ctx.app, ctx.repo);
-  Object.assign(process.env, botEnv(bot));
-
-  return bot;
-}
-
 async function tick(ctx: Ctx, p: Platform): Promise<void> {
-  const me = await asBot(ctx);
   await must(run, ["git", "fetch", "origin", ctx.base], { cwd: ctx.dir });
   const rules = await readRules(run, ctx.dir);
-  const byBot = await rulesChangedBy(run, ctx.dir, ctx.repo, me.name);
+  const byFactory = await rulesChangedByFactory(run, ctx.dir, ctx.repo);
 
-  if (byBot !== null)
-    throw new Error(`the newest change to ${RULES_PATH} on ${ctx.base} came from the bot's PR #${byBot}; revert it, or change the file in a PR of your own, and the worker goes on`);
+  if (byFactory !== null)
+    throw new Error(`the newest change to ${RULES_PATH} on ${ctx.base} came from factory PR #${byFactory}; revert it, or change the file in a PR from a branch of your own, and the worker goes on`);
   const world = await readWorld(ctx, rules, actorsOf(rules, ctx.repo));
 
   const states = world.local.map((l) => classify(l, world));
@@ -88,6 +76,8 @@ async function main(dir: string): Promise<void> {
   const p = platformOf(process.platform);
 
   if (p === null) throw new Error(`the worker runs on macOS and Linux, not ${process.platform}`);
+  /** Every git command the worker starts, and every run it starts, reaches GitHub through gh's login. */
+  Object.assign(process.env, gitConfigEnv());
   const repo = await repoOf(run, dir);
 
   /** The run hooks and the rules read origin's default branch. */
@@ -97,8 +87,7 @@ async function main(dir: string): Promise<void> {
 
   await must(run, ["git", "fetch", "origin", base], { cwd: dir });
   const rules = await readRules(run, dir);
-  const app = await readApp();
-  const { refusals, warnings } = await guard(repo, base, rules, app);
+  const { refusals, warnings } = await guard(repo, base, rules);
 
   if (refusals.length > 0) {
     for (const r of refusals) console.error(`factory: ${r}`);
@@ -106,7 +95,7 @@ async function main(dir: string): Promise<void> {
   }
 
   for (const w of warnings) log(`warning: ${w}`);
-  const ctx: Ctx = { app, dir, repo, base, machine: await machineId(run, p) };
+  const ctx: Ctx = { dir, repo, base, machine: await machineId(run, p) };
   log(`watching ${repo} (${base}), ${rules.atOnce} at once`);
 
   if (p.awake === null) log(`no keep-awake command for ${process.platform}, so busy runs never hold the machine awake`);

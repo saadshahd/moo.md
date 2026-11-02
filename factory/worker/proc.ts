@@ -4,7 +4,7 @@ export const run: Run = async (argv, opts) => {
   const p = Bun.spawn([...argv], {
     cwd: opts?.cwd,
     stdin: opts?.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
-    /** Bun hands a child the environment it started with unless given one; the bot's is set later. */
+    /** Bun hands a child the environment it started with unless given one; the git config is set later. */
     env: process.env,
     stdout: "pipe",
     stderr: "pipe",

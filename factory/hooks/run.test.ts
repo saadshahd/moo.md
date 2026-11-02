@@ -1,13 +1,11 @@
 import type { ToolCallInput } from "claude-code";
 import { describe, expect, test, type Engine } from "claude-code/testing";
-import { gitConfigEnv } from "../lib/bot.ts";
 import { parse, render, type Answer, type FactoryComment } from "../lib/formats.ts";
 import { APPROVAL_QUESTION } from "../lib/wait.ts";
 import { unseenNotes } from "./notes.ts";
 import { localDay, whyAsked } from "./ask.ts";
 
 const RULES = JSON.stringify({
-  bot: "moo-factory[bot]",
   atOnce: 1,
   waitsPerDay: 1,
   contextCap: 1000,
@@ -18,18 +16,10 @@ const RULES = JSON.stringify({
 const SEAL = "0123456789abcdef".repeat(4);
 const T0 = Date.parse("2026-10-26T10:00:00Z");
 
-const BOT = JSON.stringify({
-  token: "ghs_bot",
-  expiresAt: "2026-10-26T11:00:00Z",
-  name: "moo-factory[bot]",
-  email: "1+moo-factory[bot]@users.noreply.github.com",
-});
-
 type Fake = {
   branch?: string;
   name?: string | null;
   rules?: string;
-  token?: string | null;
   agents?: boolean;
   posts?: boolean;
 };
@@ -56,7 +46,6 @@ function host($: Engine, on: any, fake: Fake = {}) {
     branch: "factory/7",
     name: "factory:o/r#7",
     rules: RULES,
-    token: BOT,
     agents: true,
     posts: true,
     ...fake,
@@ -120,9 +109,6 @@ function host($: Engine, on: any, fake: Fake = {}) {
           )
         : fail("claude agents failed");
 
-    if (argv[0] === "bun")
-      return f.token === null ? fail("the App isn't installed") : ok(f.token);
-
     if (argv[1] === "repo") return ok("o/r\n");
 
     if (argv[1] === "api" && argv[2] === "graphql")
@@ -147,7 +133,7 @@ function host($: Engine, on: any, fake: Fake = {}) {
     github.push({
       id,
       body: JSON.parse(e.init.stdin).body,
-      author: "moo-factory[bot]",
+      author: "o",
       editor: null,
       createdAt: "",
     });
@@ -207,7 +193,7 @@ function host($: Engine, on: any, fake: Fake = {}) {
       return p ? [p] : [];
     });
 
-  const say = (c: FactoryComment, author = "moo-factory[bot]") =>
+  const say = (c: FactoryComment, author = "o") =>
     github.push({ id: nextId++, body: render(c), author, editor: null, createdAt: "" });
 
   const answer = ({ author, ...c }: Answer & { author: string }) =>
@@ -225,8 +211,6 @@ function host($: Engine, on: any, fake: Fake = {}) {
     toasts,
     dirs,
     count: (cmd: string) => calls.filter((c) => c === cmd).length,
-    mints: () => calls.filter((c) => c.startsWith("bun ")).length,
-    noToken: () => void (f.token = null),
     file: (path: string, text: string) => void files.set(path, text),
     tick: (ms: number) => void (now += ms),
     tool: (result: () => any) => void (core = result),
@@ -271,30 +255,36 @@ describe("which session is a run", () => {
     expect([...h.env.keys()]).toEqual([]);
   });
 
-  test("a person's session in a run's worktree keeps its own login and its own question box", async ($, on) => {
+  test("a person's session in a run's worktree keeps its own question box", async ($, on) => {
     const h = host($, on, { name: "my session" });
     h.tool(answered);
     const r: any = await h.call(ask("Which?"));
     expect(r.text).toBe("answered");
-    expect([...h.env.keys()]).toEqual([]);
-    expect(h.mints()).toBe(0);
+    expect(h.said()).toEqual([]);
   });
 
-  test("the run is resolved once a session", async ($, on) => {
+  test("the run is resolved once a session, and its tools keep the user's environment", async ($, on) => {
     const h = host($, on);
     h.tool(() => ({ result: {} }));
     await h.call(read);
     await h.call(read);
     expect(h.count("claude agents")).toBe(1);
+    expect([...h.env.keys()]).toEqual([]);
   });
 
-  test("a factory branch that can't tell loses the user's login, runs the tool and shows why once", async ($, on) => {
+  test("a factory branch that can't tell runs the tool and shows why once", async ($, on) => {
     const h = host($, on, { agents: false });
-    h.tool(() => ({ result: {} }));
+    let ran = 0;
+
+    h.tool(() => {
+      ran++;
+
+      return { result: {} };
+    });
+
     await h.call(read);
     await h.call(read);
-    expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
-    expect(h.env.get("GH_CONFIG_DIR")).toBe("/w/.factory/no-gh-login");
+    expect(ran).toBe(2);
     expect(h.toasts.length).toBe(1);
     expect(h.toasts[0]).toContain("claude agents failed");
   });
@@ -341,7 +331,7 @@ describe("ask", () => {
     expect(r.deny).toContain("post it as a call");
   });
 
-  test("a plan approval always waits, names the bot's newest plan, and never counts against the cap", async ($, on) => {
+  test("a plan approval always waits, names the newest plan, and never counts against the cap", async ($, on) => {
     const h = host($, on);
     h.say({ kind: "plan", issue: 7, seal: SEAL, text: "p" });
     h.tool(never);
@@ -353,9 +343,9 @@ describe("ask", () => {
     expect(waits.map((w) => w.approves)).toEqual([SEAL, SEAL, null]);
   });
 
-  test("an approval names no plan someone other than the bot posted", async ($, on) => {
+  test("an approval names no plan an untrusted login posted", async ($, on) => {
     const h = host($, on);
-    h.say({ kind: "plan", issue: 7, seal: SEAL, text: "p" }, "o");
+    h.say({ kind: "plan", issue: 7, seal: SEAL, text: "p" }, "stranger");
     h.tool(never);
     await h.call(ask(APPROVAL_QUESTION));
     expect(h.said().find((c) => c.kind === "wait")).toMatchObject({ approves: null });
@@ -473,13 +463,13 @@ describe("notes", () => {
     url: "",
   });
 
-  test("factory comments, the bot's words and a note someone else edited are never notes", () => {
-    const actors = { bot: "moo-factory[bot]", trusted: ["o"] };
+  test("factory comments, an untrusted login's words and a note someone else edited are never notes", () => {
+    const actors = { trusted: ["o"] };
 
     const cs = [
       at(1, render({ kind: "stuck", issue: 1, reason: "x" }), "o"),
-      at(2, "Approve", "moo-factory[bot]"),
-      at(3, "keep going", "o", "moo-factory[bot]"),
+      at(2, "Approve", "renovate[bot]"),
+      at(3, "keep going", "o", "stranger"),
       at(4, "keep it small", "o"),
     ];
 
@@ -539,96 +529,6 @@ describe("logs", () => {
     });
 
     expect(r.text).toBe(out);
-  });
-});
-
-describe("bot", () => {
-  test("a run acts on GitHub as the bot, minting its token once while it is fresh", async ($, on) => {
-    const h = host($, on);
-    h.tool(() => ({ result: {} }));
-    await h.call(read);
-    await h.call(read);
-    expect(h.env.get("GH_TOKEN")).toBe("ghs_bot");
-    expect(h.env.get("GIT_AUTHOR_NAME")).toBe("moo-factory[bot]");
-    expect(h.env.get("GIT_CONFIG_VALUE_1")).toBe("!gh auth git-credential");
-    expect(h.mints()).toBe(1);
-  });
-
-  test("a token near expiry is renewed", async ($, on) => {
-    const h = host($, on);
-    h.tool(() => ({ result: {} }));
-    await h.call(read);
-    h.tick(55 * 60_000);
-    await h.call(read);
-    expect(h.mints()).toBe(2);
-  });
-
-  test("a renewal that fails leaves no GitHub login, not the old token", async ($, on) => {
-    const h = host($, on);
-    h.tool(() => ({ result: {} }));
-    await h.call(read);
-    h.env.clear();
-    h.noToken();
-    h.tick(55 * 60_000);
-    await h.call(read);
-    expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
-    expect(h.env.get("GH_CONFIG_DIR")).toBe("/w/.factory/no-gh-login");
-    expect(h.env.get("GIT_CONFIG_VALUE_0")).toBe("");
-    expect(h.env.get("GIT_CONFIG_VALUE_1")).toBe("!gh auth git-credential");
-  });
-
-  test("with no bot token the tool still runs, with no GitHub login, and the failure shows", async ($, on) => {
-    const h = host($, on, { token: null });
-    let ran = false;
-
-    h.tool(() => {
-      ran = true;
-
-      return { result: {} };
-    });
-
-    await h.call({
-      tool: "Bash",
-      tool_use_id: "t",
-      command: "gh pr list",
-    });
-    expect(ran).toBe(true);
-    expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
-    expect(h.toasts[0]).toContain("the App isn't installed");
-  });
-
-  test("a run with no bot token hears once that it has no login, and not to look for one", async ($, on) => {
-    const h = host($, on, { token: null });
-    h.tool(() => ({ result: {} }));
-    const first: any = await h.call(read);
-    const second: any = await h.call(read);
-    expect(first.context.join("\n")).toContain("Don't look for a token");
-    expect(second.context ?? []).not.toContain(first.context.at(-1));
-  });
-
-  test("a run whose token mints hears nothing about its login", async ($, on) => {
-    const h = host($, on);
-    h.tool(() => ({ result: {} }));
-    const r: any = await h.call(read);
-    expect((r.context ?? []).join("\n")).not.toContain("no GitHub login");
-  });
-
-  /** The factory's git config as the run's environment holds it. */
-  const gitConfig = (env: Map<string, string | undefined>) =>
-    Object.fromEntries(Object.keys(gitConfigEnv()).map((k) => [k, env.get(k)]));
-
-  test("a run's git takes every entry of the factory's git config", async ($, on) => {
-    const h = host($, on);
-    h.tool(() => ({ result: {} }));
-    await h.call(read);
-    expect(gitConfig(h.env)).toEqual(gitConfigEnv());
-  });
-
-  test("a run with no bot token takes every entry of it too", async ($, on) => {
-    const h = host($, on, { token: null });
-    h.tool(() => ({ result: {} }));
-    await h.call(read);
-    expect(gitConfig(h.env)).toEqual(gitConfigEnv());
   });
 });
 
