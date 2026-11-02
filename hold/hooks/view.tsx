@@ -342,10 +342,13 @@ export const register: Register = (on) => {
       ]);
       const window = pixels ? null : await windowOf($);
       const parts: RenderElement[] = [];
+      // The engine's own drawing of the reply's first prose keeps the bullet that opens a reply.
+      let lead: RenderElement | null = null;
 
       for (const [i, s] of segments(e.props.text).entries()) {
         if ("md" in s) {
-          parts.push(<Markdown key={`md-${i}`} text={s.md} />);
+          if (i === 0) lead = await next({ ...e, props: { ...e.props, text: s.md } });
+          else parts.push(<Markdown key={`md-${i}`} text={s.md} />);
           continue;
         }
         if ("writing" in s) {
@@ -417,8 +420,11 @@ export const register: Register = (on) => {
       }
 
       return (
-        <Box flexDirection="column" gap={1}>
-          {parts}
+        <Box flexDirection="column">
+          {lead}
+          <Box flexDirection="column" gap={1} marginTop={1} paddingLeft={2}>
+            {parts}
+          </Box>
         </Box>
       );
     } catch (err) {

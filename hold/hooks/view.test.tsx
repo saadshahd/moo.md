@@ -221,13 +221,16 @@ function world(
     }
 
   });
+  const drawn: string[] = [];
+
   on("ui.render", ($, e) => {
     const { Box } = $.ui.resolve(e);
 
+    if (e.component === "AssistantMessage") drawn.push(e.props.text);
     return <Box key="engine" />;
   });
 
-  return { runs, toasts, windows, clock };
+  return { runs, toasts, windows, clock, drawn };
 }
 
 const VIEWPORT = { columns: 100, rows: 40, isFullscreen: true };
@@ -277,9 +280,9 @@ test("a closed fence draws as an Image in place, its source one press away", asy
     "light",
     expect.stringMatching(/^\/tmp\/moo-hold-view\/[0-9a-f]{24}\.png$/),
   ]);
-  expect(
-    await ui.find({ type: "Markdown", text: "Here is the flow:" }),
-  ).toBeDefined();
+  // The engine draws the first prose, and the bullet that opens the reply with it.
+  expect(w.drawn).toContain("Here is the flow:");
+  expect(await ui.find({ type: "Markdown", text: "That is all." })).toBeDefined();
   expect(
     await ui.find({ type: "Markdown", text: /```mermaid/ }),
   ).toBeUndefined();
