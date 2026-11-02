@@ -1005,8 +1005,9 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
     const rows = (w: number) =>
       wrapInk(cells, w).map((r) => r.slice(r.findIndex(([ch]) => ch !== " ")));
     // The bar comes with a long question at any width: recorded on questions
-    // of 82 characters and more, never on one of 48 (where between, unknown).
-    const barred = text.length > 60;
+    // of 82 characters and more, never on one of 75 or less, even where it
+    // wraps (where between, unknown).
+    const barred = text.length > 75;
     const bar: Seg[] = barred ? [[before], ["│", "d"], [" "]] : [[before]];
     return rows(barred ? left - 2 : left).map((l, k): Row => ({
       segs: [...bar, [k ? " ".repeat(mark.length) : mark], ...segs(l)],
@@ -1210,9 +1211,12 @@ function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols:
   const GAP = 4;
   // The box fits the dialog's widest preview line, any question's, up to the
   // room left, and is never under 44 columns (recorded: a widest line of 38
-  // drew 44; 41 to 56 drew widest + 4): every question's box is that wide.
+  // drew 44; 41 to 73 drew widest + 4): every question's box is that wide.
+  // A preview is trimmed first, so its first line's indent counts for nothing.
   const widest = Math.max(
-    ...d.questions.flatMap((x) => x.options.flatMap((o) => (o.preview ?? "").split("\n").map((l) => ticks(l).length))),
+    ...d.questions.flatMap((x) =>
+      x.options.flatMap((o) => (o.preview ?? "").trim().split("\n").map((l) => ticks(l).length)),
+    ),
   );
   const boxW = Math.min(cols - LIST - GAP, Math.max(44, widest + 4));
   const inner = Math.max(1, boxW - 4);

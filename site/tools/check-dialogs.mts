@@ -12,10 +12,10 @@ import type { Scene } from "../src/demo/types.ts";
 const R = `${homedir()}/moo-rec-tools`;
 const takes: [string, Scene, string][] = [
   ["anchor", S.anchorScene, "rec3/anchor"],
-  ["draft", S.draftScene, "rec3/draft"],
   ["skills", S.skillsScene, "rec2/skills"],
   ["chain", S.chainScene, "rec2/chain"],
   ["clarify", S.clarifyScene, "rec5/clarify"],
+  ["draft", S.draftScene, "rec5/draft"],
 ];
 const text = (r: Row) => r.segs.map((s: Seg) => s[0]).join("").replace(/\xa0/g, " ").trimEnd();
 let total = 0;

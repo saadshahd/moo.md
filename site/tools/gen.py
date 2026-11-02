@@ -240,6 +240,13 @@ for e in events:
     n = min(sum(1 for _, r in abs_times if r < e['t']), len(turns) - 1)
     at = e['t'] - abs_times[n][0]
     turns[n].setdefault('keys', []).append([round(at, 1) if at >= 0 or round(at, 1) < 0 else -0.1, e['kind'], e['value']])
+# The Enter that sent a prompt can land a moment after the session file's
+# send time, the two clocks apart: within a second, it is still the send.
+for turn in turns:
+    keys = turn.get('keys', [])
+    if not any(at < 0 and kind == 'key' and v == 'Enter' for at, kind, v in keys):
+        k = next((k for k, (at, kind, v) in enumerate(keys) if kind == 'key' and v == 'Enter' and at <= 1.0), None)
+        if k is not None: keys[k][0] = -0.1
 
 COLORS = {'38;2;177;185;249': 'l', '38;2;153;153;153': 'g'}
 def segs_of(raw):

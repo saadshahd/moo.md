@@ -15,7 +15,6 @@ take() {
 }
 take orders 4a9b9619-c027-490e-88d4-e8b049c797e1 rec3/freeze freeze 0=1438gmx.2638 1=mda649.169
 take billing da305481-3f66-456c-a1dc-04d9f93b97c9 rec3/anchor anchor 0=zzmx9.799
-take ship d087d508-ca94-4b7f-9589-c2527bb9d1dd rec3/draft draft 0=p72nx4.1034
 take invoices f24358fa-2e6b-42e6-86b1-1591d6551fa8 rec2/skills skills 0=tfsdk9.846 1=12y0zha.384
 take shop db17126e-b9e3-4038-a8a5-b3234ff2206e rec2/chain chain 0=23q9us.1586
 # A world under /private/tmp, which take() can't name. Turn 0 ran with all of
@@ -24,3 +23,5 @@ python3 gen.py "$HOME/.claude/projects/-private-tmp-catalog/7b225a66-32b2-4468-8
   --keys "$R/rec5/reduce/keylog.json" --raw "$OUT/reduce.json" --activity-from-snaps
 python3 gen.py "$HOME/.claude/projects/-Users-Shared-relay/88e77a6e-df44-4292-a0b9-80bb76951473.jsonl" /Users/Shared/relay "$R/rec5/clarify" ../src/demo/sessions/clarify.ts 1=1nh2zwu.460 \
   --keys "$R/rec5/clarify/keylog.json" --raw "$OUT/clarify.json" --activity-from-snaps
+python3 gen.py "$HOME/.claude/projects/-private-tmp-ship/059abca1-a83f-4860-b7f7-b76340ea8c71.jsonl" /private/tmp/ship "$R/rec5/draft" ../src/demo/sessions/draft.ts 1=16v4raq.684 \
+  --keys "$R/rec5/draft/keylog.json" --raw "$OUT/draft.json" --activity-from-snaps

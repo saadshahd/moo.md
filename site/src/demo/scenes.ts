@@ -33,10 +33,10 @@
 import type { Chrome, Scene, Turn } from "./types";
 import * as freeze from "./sessions/freeze";
 import * as anchor from "./sessions/anchor";
-import * as draft from "./sessions/draft";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
 import * as clarify from "./sessions/clarify";
+import * as draft from "./sessions/draft";
 import * as reduce from "./sessions/reduce";
 
 // ---- Move pages: one scene each, the one that carries the move.
@@ -77,37 +77,6 @@ export const anchorScene: Scene = {
   ],
 };
 
-export const draftScene: Scene = {
-  chrome: draft.chrome,
-  turns: draft.turns,
-  beats: [
-    { at: 0, text: "The ask: a blocked deploy that names its check." },
-    {
-      at: 0,
-      on: "dialog",
-      q: 0,
-      text: "The formatter runs; each box shows what an option prints.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      q: 1,
-      text: "Not the recommended pick: first line only, with a note.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      q: 2,
-      text: "Links: each failed check, plus the run.",
-    },
-    {
-      at: 0,
-      on: "reply",
-      text: "Your picks, tested; below, the calls it made alone.",
-    },
-  ],
-};
-
 // ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
 // skill with moo on. The page opens where turn 1 first waits on the user, a
 // step from turn 0's reply. Captions are empty until a writer drafts them: one
@@ -121,6 +90,7 @@ const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => (
 });
 
 export const clarifyScene = skill(clarify);
+export const draftScene = skill(draft);
 export const reduceScene = skill(reduce);
 
 // ---- Chain pages: one session where /compose runs each move as it comes up.
