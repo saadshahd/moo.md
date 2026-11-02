@@ -278,7 +278,12 @@ describe("rows", () => {
   });
 });
 
-function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: (typeof RULES & { paneEverySeconds?: number }) | null = RULES) {
+function world(
+  on: On,
+  holdIssueCreate?: Promise<void>,
+  rulesFile: (typeof RULES & { paneEverySeconds?: number }) | null = RULES,
+  open: ReturnType<typeof openPr>[] = [],
+) {
   const ran: string[][] = [];
   const posted: string[] = [];
   const toasts: string[] = [];
@@ -317,7 +322,7 @@ function world(on: On, holdIssueCreate?: Promise<void>, rulesFile: (typeof RULES
       return out(JSON.stringify([{ data: { repository: { issueOrPullRequest: { comments: { nodes } } } } }]));
     }
 
-    if (a.startsWith("gh api graphql")) return out(JSON.stringify(asksRequired(e.argv) ? REQUIRED : graphql(undos)));
+    if (a.startsWith("gh api graphql")) return out(JSON.stringify(asksRequired(e.argv) ? REQUIRED : graphql(undos, open)));
 
     if (a.startsWith("gh issue create")) {
       if (holdIssueCreate) await holdIssueCreate;
@@ -466,6 +471,19 @@ test("the open pane reads GitHub every 20 s by default, and again right after a 
   await ui.press({ key: "tab-stuck" });
   await ui.press({ key: "retry-7" });
   expect(snapshotReads(w.ran)).toBe(first + 2);
+  await ui.unmount();
+});
+
+test("the held tab says what each held issue waits for, and opens it", async ($, on) => {
+  const w = world(on, undefined, RULES, [openPr(30, "factory/9", "BEHIND")]);
+  const ui = await $.ui.mount(PANE);
+
+  await w.clock.advance(1);
+  await ui.press({ key: "tab-held" });
+  expect(await ui.find({ type: "Text", text: /PR #30 is behind main/ })).toBeDefined();
+  await ui.press({ key: "open-held-9" });
+  await w.clock.advance(1);
+  expect(w.ran).toContainEqual(["open", "https://github.com/o/smoke/issues/9"]);
   await ui.unmount();
 });
 

@@ -463,11 +463,11 @@ function view($: EngineInterface, ui: ElementTable, r: Rows, width: number) {
     held: () =>
       r.held.length === 0
         ? empty("nothing is held")
-        : r.held.map((h) =>
+        : r.held.map((row) =>
             card("warning", [
-              head(`#${h.issue}  ${h.title}`, "warning"),
-              <Text>{h.line}</Text>,
-              foot([pill(`open-held-${h.issue}`, "open", () => void openUrl($, h.url))]),
+              head(`#${row.issue}  ${row.title}`, "warning"),
+              <Text>{row.line}</Text>,
+              foot([pill(`open-held-${row.issue}`, "open", () => void openUrl($, row.url))]),
             ]),
           ),
     stuck: () =>
