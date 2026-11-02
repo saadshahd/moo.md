@@ -179,12 +179,21 @@ function draw(lines: Line[], width: number): Cell[][] {
     const item = !fenced && /^(-|\d+\.) (.*)$/.exec(rest);
     const mark = item ? item[1] + " " : "";
     const hang = lead.length + mark.length;
-    wrap(inline(item ? item[2] : rest), width - hang).forEach((l, k) =>
+    wrap(item ? keepNumbered(inline(item[2])) : inline(rest), width - hang).forEach((l, k) =>
       out.push([...plain(k ? " ".repeat(hang) : lead + mark), ...l]),
     );
   }
   while (out.length && !out[out.length - 1].length) out.pop();
   return out;
+}
+
+/** In a list item, Claude Code draws the space before a number that ends a
+ * sentence ("a 202.", "Node 22.") as a no-break space, so no row of the item
+ * starts with what reads as a numbered item's mark. Recorded in three list
+ * items; three such numbers in paragraphs kept a plain space. */
+function keepNumbered(cs: Cell[]): Cell[] {
+  const s = cs.map(([ch]) => ch).join("");
+  return cs.map((c, k) => (c[0] === " " && /^\d+\.(\s|$)/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
 }
 
 // ---- Tables -------------------------------------------------------------------
@@ -1187,10 +1196,11 @@ function beside(texts: Cell[][], widths: number[], trim = false): Cell[][] {
  * amber "✂ N lines hidden" rule; "Notes:" under it. Below about 62 columns
  * both sides shrink and wrap, as recorded at 45. */
 /** A preview's line as Claude Code draws its markdown: `code` in lavender,
- * ticks dropped, a "+ " or "* " bullet drawn "- ", the rest as written. */
+ * ticks dropped, a bullet indented up to 3 spaces drawn "- " at the margin
+ * (recorded: "  + key" as "- key"), the rest as written. */
 const ticks = (line: string): Cell[] =>
   line
-    .replace(/^(\s*)[+*] /, "$1- ")
+    .replace(/^ {0,3}[-+*] /, "- ")
     .split("`")
     .flatMap((part, k) => plain(part, k % 2 ? "l" : undefined));
 

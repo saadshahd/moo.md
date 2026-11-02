@@ -17,7 +17,7 @@ const scene: Scene = {
   turns: JSON.parse(readFileSync(turns, "utf8")),
   beats: [{ at: 0, text: "" }],
 };
-const text = (r: Row) => r.segs.map((s: Seg) => (s[1] === "logo" ? "" : s[0])).join("").trimEnd();
+const text = (r: Row) => r.segs.map((s: Seg) => (s[1] === "logo" ? "" : s[0])).join("").replace(/\xa0/g, " ").trimEnd();
 const ours = frame(scene, 1e9, +w).transcript.map(text);
 // Claude Code draws some spaces as no-break spaces (U+00A0); text only, as in check-dialogs.mts.
 const screen = readFileSync(cap, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").replace(/\xa0/g, " ").trimEnd());

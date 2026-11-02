@@ -9,5 +9,5 @@ import { clarifyScene } from "../../../demo/scenes";
 
 <Demo
   scene={clarifyScene}
-  summary="Claude Code. You ask for a retry in a webhook consumer, unsure about idempotency. With moo off, Claude asks whether fulfilment takes an idempotency key; you pick Don't know / no. It then picks one reading itself, retrying failed fulfilment jobs, builds it with tests and reports what it changed. Then, in the same session with moo on, you type /hope:clarify. A dialog asks which reading you meant, with a box beside each option showing what it builds: retry failed jobs, only make the payment provider's redeliveries safe, or retry the HTTP call. You pick retry failed jobs, and the reply lists each reading and its outcome, then states the confirmed ask."
+  summary="Claude Code. With moo off, you ask for a retry in a webhook consumer, unsure about idempotency. Claude makes repeated events harmless, stops short of the retry, and ends on a question: can the fulfilment service take an idempotency key? In the same session with moo on, you type /hope:clarify. A dialog asks which retry you mean, with a box beside each of four readings showing what it builds; a retry in the webhook handler is ruled out. You pick worker retries, cautious, and the reply states the confirmed ask and a table of each failure and its outcome."
 />
