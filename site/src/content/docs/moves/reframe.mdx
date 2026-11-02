@@ -1,0 +1,13 @@
+---
+title: /reframe
+move: finds what the ask is for
+description: "You see the outcome your ask serves before you build the step you named."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { reframeScene } from "../../../demo/scenes";
+
+<Demo
+  scene={reframeScene}
+  summary="Claude Code. With moo off, you ask Claude to build your own clone of Pixlane, a visual-check service: snapshot every screen's HTML on each PR, diff it against main, and a command to approve the diffs. Claude builds it with Node's own snapshot tests and an approve command, lists what it tested and how it differs from Pixlane, and leaves you the steps to run it on PRs. In the same session with moo on, you type /hope:reframe. The reply restates the problem: no PR that changes a screen's HTML merges until a named reviewer accepts that change. Git and PR review already store and show the diff, so you don't need to build snapshot storage, a diff viewer or an approve command. The work left is the merge gate: a CI job, branch protection and CODEOWNERS."
+/>

@@ -1,0 +1,275 @@
+import type { Chrome, Turn } from "../types";
+
+export const chrome: Chrome = {"context": "0%"};
+
+export const turns: Turn[] = [
+  {
+    user: "Add a retry to our webhook consumer, unsure about idempotency",
+    tools: "Called 1 tool, ran 2 shell commands",
+    activity: [
+      {"at": 2.8, "line": "Listing repo files and printing sources", "tool": "$ ls -a && git ls-files && cat package.json && for f in $(git ls-files 'src/*' 'db/*' 'test/*'); do echo \"=== $f\"; cat \"$f\"; done"},
+      {"at": 60.8, "line": "Checking tsconfig and baseline tests", "tool": "$ cat tsconfig.json && ls .claude && npm test 2>&1 | tail -5"},
+      {"at": 72.8, "line": "Applying dedupe changes, adding tests, running tests and typechecking", "tool": "$ python3 - <<'EOF'\nimport re\np='db/schema.sql'; s=open(p).read()\ns=s.replace(\"\"\"  state   text  not null default 'queued'\n);\"\"\",\"\"\"  state   text  not null default 'queued',\n  -- Enqueueing the same key twice is a no-op (e.g. a redelivered webhook).\n  dedupe_key text unique\n);\"\"\")\ns=s.replace(\"payment_id    text not null,\",\"payment_id    text not null unique,\")\nopen(p,'w').write(s)\n\np='src/queue/jobs.ts'; s=open(p).read()\ns=s.replace(\"\"\"export async function enqueue(kind: string, payload: unknown) {\n  await db.query(\"insert into jobs (kind, payload) values ($1, $2)\", [\n    kind,\n    payload,\n  ]);\n}\"\"\",\"\"\"// A second enqueue with the same dedupeKey is a no-op.\nexport async function enqueue(kind: string, payload: unknown, dedupeKey: string) {\n  await db.query(\n    \"insert into jobs (kind, payload, dedupe_key) values ($1, $2, $3) on conflict (dedupe_key) do nothing\",\n    [kind, payload, dedupeKey],\n  );\n}\"\"\")\nopen(p,'w').write(s)\n\np='src/webhooks/consumer.ts'; s=open(p).read()\ns=s.replace(\"\"\"    await enqueue(\"fulfil-order\", { eventId: event.id, payment: event.data });\"\"\",\"\"\"    // Redeliveries reuse event.id, so they collapse onto the first job.\n    await enqueue(\n      \"fulfil-order\",\n      { eventId: event.id, payment: event.data },\n      `payflow:${event.id}`,\n    );\"\"\")\nopen(p,'w').write(s)\n\np='src/orders.ts'; s=open(p).read()\ns=s.replace(\"\"\"  const { sku, qty, address } = p.payment.metadata;\"\"\",\"\"\"  const existing = await db.query(\n    \"select 1 from orders where payment_id = $1\",\n    [p.payment.id],\n  );\n  if (existing.rows.length > 0) return;\n  const { sku, qty, address } = p.payment.metadata;\"\"\")\nopen(p,'w').write(s)\nEOF\nmkdir -p test && cat > test/idempotency.test.ts <<'EOF'\nimport { beforeEach, expect, it, vi } from \"vitest\";\nimport { testDb } from \"./db\";\n\nconst h = vi.hoisted(() => ({ db: undefined as any }));\nvi.mock(\"../src/db/pool\", () => ({\n  db: { query: (sql: string, params?: unknown[]) => h.db.query(sql, params) },\n}));\n\nconst { enqueue } = await import(\"../src/queue/jobs\");\nconst { fulfilOrder } = await import(\"../src/orders\");\n\nbeforeEach(async () => {\n  h.db = await testDb();\n  vi.unstubAllGlobals();\n});\n\nit(\"collapses a redelivered event onto one job\", async () => {\n  const payload = { eventId: \"evt_1\", payment: { id: \"pay_1\" } };\n  await enqueue(\"fulfil-order\", payload, \"payflow:evt_1\");\n  await enqueue(\"fulfil-order\", payload, \"payflow:evt_1\");\n  const { rows } = await h.db.query(\"select count(*)::int as n from jobs\");\n  expect(rows[0].n).toBe(1);\n});\n\nit(\"creates one fulfilment order per payment, however often it runs\", async () => {\n  const fetch = vi.fn(async () => Response.json({ orderId: \"ful_1\" }));\n  vi.stubGlobal(\"fetch\", fetch);\n  const job = {\n    eventId: \"evt_1\",\n    payment: { id: \"pay_1\", metadata: { sku: \"A\", qty: 1, address: \"x\" } },\n  };\n  await fulfilOrder(job);\n  await fulfilOrder(job);\n  expect(fetch).toHaveBeenCalledTimes(1);\n  const { rows } = await h.db.query(\"select count(*)::int as n from orders\");\n  expect(rows[0].n).toBe(1);\n});\nEOF\nnpm test 2>&1 | tail -8; npx tsc 2>&1 | tail -5; git diff"},
+      {"at": 75.8, "line": "Applying dedupe changes, adding tests, running tests and typechecking", "tool": "$ cat tsconfig.json && ls .claude && npm test 2>&1 | tail -5"},
+    ],
+    replyAt: 88.0,
+    chrome: [
+      [-9.2, {"context": "0%"}],
+      [-0.2, {"context": "0%", "spin": {"verb": "Razzle-dazzling"}}],
+      [1.8, {"context": "0%", "spin": {"verb": "Computing", "tail": "thinking with medium effort"}}],
+      [2.8, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 138 tokens · thinking with medium effort"}}],
+      [2.8, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 211 tokens"}}],
+      [3.8, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 222 tokens · thought for 1s"}}],
+      [4.8, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 225 tokens · thought for 1s"}}],
+      [5.8, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 225 tokens"}}],
+      [5.8, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 225 tokens · thinking with medium effort"}}],
+      [11.8, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens · thought for 6s"}}],
+      [12.8, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens · thought for 6s"}}],
+      [13.8, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens"}}],
+      [55.8, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens · thinking with medium effort"}}],
+      [59.8, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 865 tokens · thought for 5s"}}],
+      [60.8, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 1.1k tokens · thought for 5s"}}],
+      [61.8, {"context": "4% · 37.9k", "spin": {"verb": "Computing", "tail": "↓ 1.2k tokens · thought for 5s"}}],
+      [61.8, {"context": "4% · 37.9k", "spin": {"verb": "Computing", "tail": "↓ 1.4k tokens"}}],
+      [63.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.5k tokens"}}],
+      [64.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.6k tokens"}}],
+      [66.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.7k tokens"}}],
+      [66.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.8k tokens"}}],
+      [68.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.9k tokens"}}],
+      [69.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.0k tokens"}}],
+      [70.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.1k tokens"}}],
+      [71.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.2k tokens"}}],
+      [72.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.3k tokens"}}],
+      [75.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.9k tokens"}}],
+      [76.8, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.9k tokens · thinking with medium effort"}}],
+      [84.8, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.0k tokens · thought for 7s"}}],
+      [84.8, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.7k tokens · thought for 7s"}}],
+      [85.8, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.8k tokens · thought for 7s"}}],
+      [86.8, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.8k tokens"}}],
+      [87.8, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.9k tokens"}}],
+      [87.8, {"context": "4% · 41.3k"}],
+    ],
+    reply: [
+      "I made duplicate events harmless, but I haven't built the retry yet. Whether a retry is safe depends on something I can't find in this repo.",
+      "",
+      "**Why I stopped short of the retry**",
+      "- **Payflow already retries the webhook.** It resends any event we don't answer with a 2xx, for three days, with the same event id. A retry loop inside the handler would only add duplicates. The job worker in `src/queue/jobs.ts` is what never retries: a failed job stays failed.",
+      "- **Duplicates could already happen with no retry involved.** If a job was queued but our 202 reply never reached Payflow, Payflow sent the event again. That made a second job and shipped the order twice.",
+      "- **Retrying a failed job can ship twice.** `createFulfilmentOrder` creates a new order on every call and gives up after 5 seconds. After a timeout or 5xx, the order may already exist on the fulfilment side. And if the call succeeds but saving our `orders` row fails, a retry ships again.",
+      "",
+      "**What I changed** (tests and typecheck pass; nothing committed)",
+      "- **Repeat events are ignored:** `jobs` gets a `dedupe_key text unique` column. `enqueue` now takes a key and does nothing if it's already there. The consumer passes `payflow:<event id>`, so a resent event matches the first job and still gets a 202.",
+      "- **One order per payment:** `orders.payment_id` is now unique. `fulfilOrder` returns early if the payment already has an order, which covers a job whose work finished but whose \"done\" update failed.",
+      "- **Tests:** a new file, `test/idempotency.test.ts`, checks that the same event queued twice makes one job, and that running `fulfilOrder` twice calls fulfilment once.",
+      "",
+      "**Production needs these run by hand**, since `db/schema.sql` doesn't migrate anything. First check for existing duplicates; the unique constraint can't be added while any exist, and the old bug may have created some:",
+      "```sql",
+      "select payment_id, count(*) from orders group by 1 having count(*) > 1;",
+      "-- if rows come back, resolve them first (one of each may be a double shipment)",
+      "alter table jobs add column dedupe_key text unique;",
+      "alter table orders add constraint orders_payment_id_key unique (payment_id);",
+      "```",
+      "Old jobs keep an empty `dedupe_key`, so they don't conflict. Deploy the code and run the migration together: the new code needs the column.",
+      "",
+      "**One question decides the retry design:** can the fulfilment service's `POST /orders` take an idempotency key or our own reference, or can it look up an order by reference?",
+      "- **If yes:** I'll send the payment id as the key and add limited retries with backoff to the worker. Permanent errors like 4xx responses or missing metadata won't be retried.",
+      "- **If no:** I'll retry only failures that happen before the request is sent. Timeouts and 5xx responses stay failed for a person to check.",
+      "",
+      "Please confirm from that service's docs rather than just adding an `Idempotency-Key` header: if the server ignores it, the code looks safe but still ships twice.",
+      "",
+      "Also, a worker that crashes mid-job leaves it marked `running` forever, and nothing picks it up again. I've left that alone.",
+    ],
+    keys: [
+      [
+        -2.0,
+        "type",
+        "Add a retry to our webhook consumer, unsure about idempotency"
+      ],
+      [
+        -0.1,
+        "key",
+        "Enter"
+      ]
+    ],
+  },
+  {
+    user: "/hope:clarify",
+    tools: "Called 1 tool",
+    dialogs: [
+      {
+        "at": [
+          13.3,
+          67.9
+        ],
+        "after": 0,
+        "questions": [
+          {
+            "header": "Retry kind",
+            "question": "Which retry do you mean? (A retry inside the webhook handler is ruled out: consumer.ts says Payflow already resends any event we don't answer with a 2xx, for 3 days.)",
+            "multiSelect": false,
+            "options": [
+              {
+                "label": "Worker retries, keyed",
+                "description": "Retry failed fulfil-order jobs with backoff, sending payment id as an idempotency key. Safe only if the fulfilment service honours the key.",
+                "preview": "jobs: + attempts, run_after\nwork(): on error\n  4xx / bad metadata -> failed\n  else attempts < N  -> queued, backoff\n  else               -> failed\nfulfilment POST\n  + Idempotency-Key: <payment id>"
+              },
+              {
+                "label": "Worker retries, cautious",
+                "description": "Retry only failures before the fulfilment POST is sent. Timeouts and 5xx stay failed for a person to check.",
+                "preview": "work(): on error\n  failed before POST -> queued, backoff\n  timeout / 5xx      -> failed (manual)\n  4xx                -> failed"
+              },
+              {
+                "label": "Retry the HTTP call",
+                "description": "Loop a few times inside createFulfilmentOrder itself; no job-level retry. Same double-ship risk on timeouts.",
+                "preview": "createFulfilmentOrder:\n  for try in 1..3:\n    POST /orders\n    ok -> return\n    wait, try again\n  throw"
+              },
+              {
+                "label": "No retry, just idempotency",
+                "description": "Keep what's built: repeat events collapse to one job, one order per payment. Failed jobs stay failed.",
+                "preview": "(already implemented, tests pass)\njobs.dedupe_key unique\norders.payment_id unique\nfulfilOrder: skip if order exists"
+              }
+            ],
+            "picked": [
+              1
+            ]
+          }
+        ]
+      }
+    ],
+    replyAt: 73.1,
+    chrome: [
+      [-137.4, {"context": "0%", "spin": {"verb": "Razzle-dazzling"}}],
+      [-136.4, {"context": "0%", "spin": {"verb": "Computing", "tail": "thinking with medium effort"}}],
+      [-135.4, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 138 tokens · thinking with medium effort"}}],
+      [-135.4, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 211 tokens"}}],
+      [-134.4, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 222 tokens · thought for 1s"}}],
+      [-133.4, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 225 tokens · thought for 1s"}}],
+      [-132.4, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 225 tokens"}}],
+      [-132.4, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 225 tokens · thinking with medium effort"}}],
+      [-126.4, {"context": "3% · 33.3k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens · thought for 6s"}}],
+      [-125.4, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens · thought for 6s"}}],
+      [-124.4, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens"}}],
+      [-82.4, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 827 tokens · thinking with medium effort"}}],
+      [-78.4, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 865 tokens · thought for 5s"}}],
+      [-77.4, {"context": "4% · 36k", "spin": {"verb": "Computing", "tail": "↓ 1.1k tokens · thought for 5s"}}],
+      [-76.4, {"context": "4% · 37.9k", "spin": {"verb": "Computing", "tail": "↓ 1.2k tokens · thought for 5s"}}],
+      [-76.4, {"context": "4% · 37.9k", "spin": {"verb": "Computing", "tail": "↓ 1.4k tokens"}}],
+      [-74.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.5k tokens"}}],
+      [-73.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.6k tokens"}}],
+      [-71.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.7k tokens"}}],
+      [-71.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.8k tokens"}}],
+      [-69.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 1.9k tokens"}}],
+      [-68.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.0k tokens"}}],
+      [-67.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.1k tokens"}}],
+      [-66.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.2k tokens"}}],
+      [-65.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.3k tokens"}}],
+      [-62.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.9k tokens"}}],
+      [-61.4, {"context": "4% · 38.7k", "spin": {"verb": "Computing", "tail": "↓ 2.9k tokens · thinking with medium effort"}}],
+      [-53.4, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.0k tokens · thought for 7s"}}],
+      [-53.4, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.7k tokens · thought for 7s"}}],
+      [-52.4, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.8k tokens · thought for 7s"}}],
+      [-51.4, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.8k tokens"}}],
+      [-50.4, {"context": "4% · 41.3k", "spin": {"verb": "Computing", "tail": "↓ 3.9k tokens"}}],
+      [-50.4, {"context": "4% · 41.3k"}],
+      [-23.4, {"context": "4% · 41.3k", "style": "hold:Plain"}],
+      [-0.4, {"context": "4% · 41.3k", "style": "hold:Plain", "spin": {"verb": "Leavening"}}],
+      [1.6, {"context": "4% · 41.3k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "thinking with medium effort"}}],
+      [6.6, {"context": "4% · 41.3k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 607 tokens · thought for 6s"}}],
+      [7.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 635 tokens · thought for 6s"}}],
+      [8.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 671 tokens · thought for 6s"}}],
+      [9.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 723 tokens"}}],
+      [9.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 768 tokens"}}],
+      [10.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 812 tokens"}}],
+      [11.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 872 tokens"}}],
+      [12.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 909 tokens"}}],
+      [68.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 1.2k tokens"}}],
+      [68.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 1.3k tokens"}}],
+      [69.6, {"context": "5% · 50.9k", "style": "hold:Plain", "spin": {"verb": "Caramelizing", "tail": "↓ 1.3k tokens · thinking with medium effort"}}],
+      [73.6, {"context": "5% · 52.3k", "style": "hold:Plain"}],
+    ],
+    reply: [
+      "Confirmed: the job worker retries a failed fulfil-order job only when it failed before the fulfilment POST went out.",
+      "",
+      "| failure | outcome |",
+      "|---|---|",
+      "| before the POST is sent | re-queued after a backoff delay, up to a set number of tries |",
+      "| timeout or 5xx from fulfilment | stays failed for a person to check |",
+      "| 4xx or missing metadata | stays failed |",
+      "",
+      "Next: I build this in `src/queue/jobs.ts`, with tests, on top of the existing duplicate checks.",
+    ],
+    keys: [
+      [
+        -2.2,
+        "type",
+        "/hope:clarify"
+      ],
+      [
+        -0.1,
+        "key",
+        "Enter"
+      ],
+      [
+        35.3,
+        "key",
+        "Down"
+      ],
+      [
+        43.7,
+        "key",
+        "Down"
+      ],
+      [
+        52.2,
+        "key",
+        "Down"
+      ],
+      [
+        60.6,
+        "key",
+        "Up"
+      ],
+      [
+        61.1,
+        "key",
+        "Up"
+      ],
+      [
+        67.9,
+        "key",
+        "Enter"
+      ]
+    ],
+    menu: {
+      "after": 0,
+      "rows": [
+        [
+          [
+            "  "
+          ],
+          [
+            "❯ /",
+            "l"
+          ],
+          [
+            "hope:clarify",
+            "l b"
+          ],
+          [
+            "                   (hope) Turn words with two readings into",
+            "l"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "one confirmed ask. Use when the user's wo…",
+            "l"
+          ]
+        ]
+      ]
+    },
+  },
+];

@@ -1,0 +1,13 @@
+---
+title: /consult
+move: brings experts' ideas, not a verdict
+description: "You see how named experts would change your choice, then decide yourself."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { consultScene } from "../../../demo/scenes";
+
+<Demo
+  scene={consultScene}
+  summary="Claude Code. With moo off, you ask whether a teammate is right to delete the unit tests and test billing only end to end. Claude says partly: the fake payments service drifted and nothing caught it, but deleting unit tests wouldn't fix that, and the 31-hour delay came from when tests run. It proposes a contract test run on a schedule, and points out that a pending charge marks an invoice unpaid. In the same session with moo on, you type /hope:consult. The reply is four numbered ideas, each with one line of why: charge() returns an outcome we own or throws, one contract test runs on the fake and on staging, the staging contract runs hourly, and a unit test pins what a pending charge does. A Win line follows. A table shows what it built and tested, and a second table weighs what a pending charge should become. It ends by asking you to choose that, and to name the real staging URL variable."
+/>

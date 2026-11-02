@@ -10,9 +10,9 @@
 //   row (as "~/orders"). What is left, "Claude Code v2.1.316", takes one row,
 //   so the logo is drawn that tall (render.ts header()), with half a row of
 //   space under it (Demo.astro's .banner).
-// - Status line: cut to context use at the left and "◎ hold:Plain" at the
-//   right, where Claude Code drew it; the weekly use and the model between
-//   them are left out (render.ts statusRow()).
+// - Status line: cut to context use at the left and the output style, as
+//   "◎ hold:Plain", at the right, where Claude Code drew it; the weekly use
+//   and the model between them are left out (render.ts statusRow()).
 // - Removed: the mode row under the status line, "⏵⏵ bypass permissions on
 //   (shift+tab to cycle)". Nothing below it needs its row (render.ts frame()).
 // - Removed: Claude Code's notices above the prompt box, "◉ xhigh · /effort"
@@ -30,101 +30,72 @@
 // - Option gaps: half a row of space under each option's description and above
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.
-import type { Scene, Turn } from "./types";
+import type { Chrome, Scene, Turn } from "./types";
+import { CAPTIONS } from "./captions";
 import * as freeze from "./sessions/freeze";
 import * as anchor from "./sessions/anchor";
-import * as draft from "./sessions/draft";
-import * as reduce from "./sessions/reduce";
 import * as skills from "./sessions/skills";
 import * as chain from "./sessions/chain";
+import * as clarify from "./sessions/clarify";
+import * as consult from "./sessions/consult";
+import * as compose from "./sessions/compose";
+import * as target from "./sessions/target";
+import * as router from "./sessions/router";
+import * as reframe from "./sessions/reframe";
+import * as judge from "./sessions/judge";
+import * as deepen from "./sessions/deepen";
+import * as widen from "./sessions/widen";
+import * as interrogate from "./sessions/interrogate";
+import * as shift from "./sessions/shift";
+import * as elicit from "./sessions/elicit";
+import * as explain from "./sessions/explain";
+import * as shape from "./sessions/shape";
+import * as intent from "./sessions/intent";
+import * as inversion from "./sessions/inversion";
+import * as draft from "./sessions/draft";
+import * as reduce from "./sessions/reduce";
 
-// ---- Move pages: one scene each, the one that carries the move.
+// ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
+// skill with moo on. The page opens where turn 1 first waits on the user, a
+// step from turn 0's reply. Each turn has two captions (captions.ts): one as
+// it starts and one as its reply arrives; a page with no captions yet shows
+// empty ones. A page whose captions don't match its turns fails the build.
 
-export const freezeScene: Scene = {
-  chrome: freeze.chrome,
-  turns: freeze.turns,
-  beats: [
-    {
-      at: 0,
-      text: "The ask: the export that stopped this morning.",
-    },
-    { at: 0, on: "reply", text: "Three tables: what it saw, couldn't see, inferred." },
-    { at: 1, text: "You type lock; five gaps stay open." },
-  ],
+const skill = (name: string, { chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => {
+  const text = CAPTIONS[name];
+  if (text && text.length !== turns.length * 2)
+    throw new Error(`captions.ts: ${name} has ${text.length} captions for ${turns.length} turns, not ${turns.length * 2}`);
+  return {
+    chrome,
+    turns,
+    beats: turns.flatMap((_, at): Scene["beats"] => [
+      { at, text: text?.[2 * at] ?? "" },
+      { at, on: "reply", text: text?.[2 * at + 1] ?? "" },
+    ]),
+    plain: 0,
+  };
 };
 
-export const anchorScene: Scene = {
-  chrome: anchor.chrome,
-  turns: anchor.turns,
-  // gen.py drops what Claude Code drew under a long command while it ran.
-  beats: [
-    {
-      at: 0,
-      text: "The finding: an index blocked payment writes for 9 minutes.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      q: 0,
-      text: "Which tables? Each box shows the migrations it fails.",
-    },
-    {
-      at: 0,
-      on: "reply",
-      text: "The test caught 0043; the table lists what's still open.",
-    },
-  ],
-};
-
-export const draftScene: Scene = {
-  chrome: draft.chrome,
-  turns: draft.turns,
-  beats: [
-    { at: 0, text: "The ask: a blocked deploy that names its check." },
-    {
-      at: 0,
-      on: "dialog",
-      q: 0,
-      text: "The formatter runs; each box shows what an option prints.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      q: 1,
-      text: "Not the recommended pick: first line only, with a note.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      q: 2,
-      text: "Links: each failed check, plus the run.",
-    },
-    {
-      at: 0,
-      on: "reply",
-      text: "Your picks, tested; below, the calls it made alone.",
-    },
-  ],
-};
-
-/** The turn with `menu` drawn over its prompt box. */
-const withMenu = (turn: Turn, menu: Turn["menu"]): Turn => ({ ...turn, menu });
-export const reduceScene: Scene = {
-  chrome: reduce.chrome,
-  // The later /hope:reduce turns: no capture fell between typing "/reduce" and
-  // its Enter, so they show the menu the first one drew for the same text.
-  turns: reduce.turns.map((turn, i) => (i > 1 ? withMenu(turn, reduce.turns[1].menu) : turn)),
-  // render.ts draws a ```markdown block rendered; Claude Code drew it as source.
-  beats: [
-    { at: 0, text: "A PR description for the reviewer who wrote the cache." },
-    { at: 1, text: "The headings go; the cost question stays." },
-    {
-      at: 2,
-      text: "Again: the tail becomes a short list.",
-    },
-    { at: 3, text: "The third pass trims words, not facts." },
-  ],
-};
+export const clarifyScene = skill("clarify", clarify);
+export const consultScene = skill("consult", consult);
+export const composeScene = skill("compose", compose);
+export const targetScene = skill("target", target);
+export const routerScene = skill("router", router);
+export const reframeScene = skill("reframe", reframe);
+export const judgeScene = skill("judge", judge);
+export const deepenScene = skill("deepen", deepen);
+export const widenScene = skill("widen", widen);
+export const anchorScene = skill("anchor", anchor);
+export const interrogateScene = skill("interrogate", interrogate);
+export const shiftScene = skill("shift", shift);
+export const elicitScene = skill("elicit", elicit);
+export const explainScene = skill("explain", explain);
+export const shapeScene = skill("shape", shape);
+export const intentScene = skill("intent", intent);
+export const inversionScene = skill("inversion", inversion);
+export const freezeScene = skill("freeze", freeze);
+export const draftScene = skill("draft", draft);
+export const reduceScene = skill("reduce", reduce);
 
 // ---- Chain pages: one session where /compose runs each move as it comes up.
 

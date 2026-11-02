@@ -1,21 +1,49 @@
 ---
 // One menu's links (TopBar.astro). A chain shows its title and its one line;
-// a move shows its command and what it does. The page you are on is toned,
-// with an ink bar: a state marker, so it never takes the accent.
+// any other page its command and what it does. The page you are on is toned,
+// with an ink bar: a state marker, so it never takes the accent. A menu with
+// groups (the Moves) shows each group under its heading, two columns wide;
+// `stack` puts the groups in one column (the phone sheet, the 404). Tab order follows the groups either way. `at` names the place
+// the menu shows, for the headings' ids.
 type Item = { href: string; label: string; note?: string };
-const { items, here, kind } = Astro.props as { items: Item[]; here: string; kind: string };
+type Group = { heading: string; items: Item[] };
+const { items, groups, here, kind, stack = false, at } = Astro.props as {
+  items: Item[]; groups?: Group[]; here: string; kind: string; stack?: boolean; at: string;
+};
+// Group headings' ids: unique per place a menu shows on the page.
+const id = `${at}-group`;
 ---
 
-<ul class={kind}>
-  {items.map((i) => (
-    <li>
-      <a href={i.href} aria-current={i.href === here ? "page" : undefined}>
-        <span class="label">{i.label}</span>
-        {i.note && <span class="note">{i.note}</span>}
-      </a>
-    </li>
-  ))}
-</ul>
+{groups ? (
+  <div class:list={["groups", { stack }]}>
+    {groups.map((g, k) => (
+      <div class="group">
+        <div class="heading" id={`${id}-${k}`}>{g.heading}</div>
+        <ul class={kind} aria-labelledby={`${id}-${k}`}>
+          {g.items.map((i) => (
+            <li>
+              <a href={i.href} aria-current={i.href === here ? "page" : undefined}>
+                <span class="label">{i.label}</span>
+                {i.note && <span class="note">{i.note}</span>}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+) : (
+  <ul class={kind}>
+    {items.map((i) => (
+      <li>
+        <a href={i.href} aria-current={i.href === here ? "page" : undefined}>
+          <span class="label">{i.label}</span>
+          {i.note && <span class="note">{i.note}</span>}
+        </a>
+      </li>
+    ))}
+  </ul>
+)}
 
 <style>
   ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
@@ -31,6 +59,23 @@ const { items, here, kind } = Astro.props as { items: Item[]; here: string; kind
   }
   .label { font: 600 0.9375rem / 1.25 var(--__sl-font); }
   .note { font: 400 0.875rem / 1.35 var(--__sl-font); color: var(--sl-color-gray-3); }
-  .moves a { flex-direction: row; align-items: baseline; gap: 1rem; }
-  .moves .label { flex: none; width: 5rem; font: 400 0.9375rem / 1.25 var(--__sl-font-mono); }
+  .commands a { flex-direction: row; align-items: baseline; gap: 1rem; }
+  /* As wide as the longest command, /interrogate. */
+  .commands .label { flex: none; width: 7rem; font: 400 0.9375rem / 1.25 var(--__sl-font-mono); }
+
+  /* Groups: two columns, filled row by row, so the order reads and tabs
+     group by group. A line stays on one row. */
+  .groups { display: grid; grid-template-columns: repeat(2, max-content); gap: 0.75rem 0.5rem; }
+  .heading {
+    margin: 0.5rem 0.75rem 0.25rem 1.4rem; font: 500 0.75rem / 1.2 var(--__sl-font);
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--sl-color-gray-3);
+  }
+  .groups .note { white-space: nowrap; }
+  .groups a { padding-block: 0.55rem; }
+  /* Stacked: one column; on a screen too narrow for a command and its line
+     side by side (320 px), the line goes under its command. */
+  .groups.stack { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  @media (max-width: 23.5rem) {
+    .groups.stack .commands a { flex-direction: column; align-items: stretch; gap: 0.2rem; }
+  }
 </style>

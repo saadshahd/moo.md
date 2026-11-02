@@ -1,0 +1,13 @@
+---
+title: /widen
+move: gathers cases, then a rule
+description: "You gather every case like this one, so the rule fits unseen ones."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { widenScene } from "../../../demo/scenes";
+
+<Demo
+  scene={widenScene}
+  summary="Claude Code. With moo off, you ask Claude to fix a bug: after you press play in the preview, the card's keyframes in the editor jump to their end values. Claude finds that a vendored library writes into the keyframes it is given, passes it a deep copy instead, and the tests pass. In the same session with moo on, you type /hope:widen. The reply states one rule: only a user edit may write the document; anything else gets a copy that covers every write it makes. A table tests the rule on every call that touches the document, finding three more places that write it by mistake, and a second table applies it to situations outside that set. It ends with the fix for those three places."
+/>

@@ -4,75 +4,121 @@ export const chrome: Chrome = {"context": "0%"};
 
 export const turns: Turn[] = [
   {
-    user: "/hope:draft what ship prints when a failed check blocks a deploy. Today it only says \"deploy blocked\", and people ask in chat which check failed.",
-    tools: "Called 5 tools, ran 3 shell commands",
+    user: "Change what ship prints when a failed check blocks a deploy. Today it only says \"deploy blocked\", and people ask in chat which check failed.",
+    tools: "Edited 1 file +10 -4, ran 3 shell commands",
     activity: [
-      {"at": 3.4, "line": "Listing repo files and recent commit history", "tool": "$ ls -la && git log --stat -3 && ls .codegraph 2>/dev/null; find . -type f -not -path './.git/*' -not -path './node_modules/*' | head -100"},
-      {"at": 7.4, "line": "Listing repo files and recent commit history", "tool": "$ for f in README.md .gitignore package.json bin/ship.js .ship/last-run.json src/checks.js src/deploy.js; do echo \"=== $f\"; cat -n \"$f\"; done; node --version"},
-      {"at": 82.4, "line": "Adding the formatter, wire it in, running it on real and edge-case data", "tool": "$ cat >> src/checks.js <<'EOF'\n\n// What to print when the run's failed checks block a deploy.\nexport function blockedMessage(run) {\n  const failed = run.checks.filter((c) => c.status === \"failed\");\n  const indent = (text) => text.split(\"\\n\").map((line) => `    ${line}`);\n  return [\n    `deploy blocked: ${failed.length} of ${run.checks.length} checks failed` +\n      ` on ${run.commit.slice(0, 7)} (${run.branch})`,\n    ...failed.flatMap((c) => [\n      \"\",\n      `  ${c.name}`,\n      ...(c.error ? indent(c.error) : []),\n      ...indent(c.url),\n    ]),\n    \"\",\n    `full run: ${run.url}`,\n  ].join(\"\\n\");\n}\nEOF\nsed -i '' 's|import { lastRun } from \"../src/checks.js\";|import { blockedMessage, lastRun } from \"../src/checks.js\";|; s|  console.error(\"deploy blocked\");|  console.error(blockedMessage(run));|' bin/ship.js\ngit diff\necho \"=== real run\"; node bin/ship.js deploy staging; echo \"exit $?\"\necho \"=== two failures, one without error, one multi-line\"\nnode --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    { name: \"lint\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/2\" },\n    { name: \"unit tests\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/3\",\n      error: \"expected 3, got 4\\n  at cart.test.js:12\" },\n  ],\n}));' | cat -A | head -30"},
-      {"at": 83.4, "line": "Adding the formatter, wire it in, running it on real and edge-case data", "tool": "$ for f in README.md .gitignore package.json bin/ship.js .ship/last-run.json src/checks.js src/deploy.js; do echo \"=== $f\"; cat -n \"$f\"; done; node --version"},
-      {"at": 87.4, "line": "Adding the formatter, wire it in, running it on real and edge-case data", "tool": "$ node --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    { name: \"lint\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/2\" },\n    { name: \"unit tests\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/3\",\n      error: \"expected 3, got 4\\n  at cart.test.js:12\" },\n  ],\n}));' | cat -vet; node bin/ship.js deploy staging 2>&1 >/dev/null | awk '{ if (length > 80) print \"LONG: \" $0 }'; git status --short"},
-      {"at": 244.4, "line": "When ship blocks a deploy, should the message also show skipped checks? In the last CI run, \"e2e checkout\" was skipped alongside the failed \"migrations dry-run\".", "tool": "$ node --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    { name: \"lint\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/2\" },\n    { name: \"unit tests\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/3\",\n      error: \"expected 3, got 4\\n  at cart.test.js:12\" },\n  ],\n}));' | cat -vet; node bin/ship.js deploy staging 2>&1 >/dev/null | awk '{ if (length > 80) print \"LONG: \" $0 }'; git status --short"},
-      {"at": 274.4, "line": "Applying the first-useful-line rule and rerunning all cases", "tool": "$ cat > src/checks.js <<'EOF'\nimport { readFileSync } from \"node:fs\";\n\n// The CI run for the commit being deployed. Each check:\n// { name, status: \"passed\" | \"failed\" | \"skipped\", url, seconds, error? }\nexport function lastRun() {\n  return JSON.parse(readFileSync(new URL(\"../.ship/last-run.json\", import.meta.url)));\n}\n\n// What to print when the run's failed checks block a deploy.\nexport function blockedMessage(run) {\n  const failed = run.checks.filter((c) => c.status === \"failed\");\n  return [\n    `deploy blocked: ${failed.length} of ${run.checks.length} checks failed` +\n      ` on ${run.commit.slice(0, 7)} (${run.branch})`,\n    ...failed.flatMap((c) => {\n      const what = firstMessageLine(c.error ?? \"\");\n      return [\"\", `  ${c.name}`, ...(what ? [`    ${what}`] : []), `    ${c.url}`];\n    }),\n    \"\",\n    `full run: ${run.url}`,\n  ].join(\"\\n\");\n}\n\n// The first line of an error that is neither blank nor a stack frame (\"at ...\").\nfunction firstMessageLine(error) {\n  return error\n    .split(\"\\n\")\n    .map((line) => line.trim())\n    .find((line) => line !== \"\" && !line.startsWith(\"at \"));\n}\nEOF\necho \"=== real run\"; node bin/ship.js deploy staging; echo \"exit $?\"\necho \"=== edge cases\"\nnode --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconst f = (name, error) => ({ name, status: \"failed\", url: `https://ci.example.test/runs/9/${name}`, error });\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    f(\"no-error\"),\n    f(\"multi-line\", \"expected 3, got 4\\n    at cart.test.js:12\"),\n    f(\"blank-first\", \"\\n   \\nTimeout after 30s\"),\n    f(\"frame-first\", \"    at Object.<anonymous> (x.js:1:1)\\nTypeError: cart is undefined\"),\n    f(\"frames-only\", \"    at a (x.js:1)\\n    at b (y.js:2)\"),\n  ],\n}));' | cat -vet\nnode bin/ship.js deploy staging 2>&1 | awk \"length > 80 { print \\\"LONG: \\\" \\$0 }\"; awk \"length > 80 { print FILENAME\\\": \\\"FNR }\" src/checks.js bin/ship.js\ngit diff --stat"},
-      {"at": 275.4, "line": "Applying the first-useful-line rule and rerunning all cases", "tool": "$ node --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    { name: \"lint\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/2\" },\n    { name: \"unit tests\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/3\",\n      error: \"expected 3, got 4\\n  at cart.test.js:12\" },\n  ],\n}));' | cat -vet; node bin/ship.js deploy staging 2>&1 >/dev/null | awk '{ if (length > 80) print \"LONG: \" $0 }'; git status --short"},
-      {"at": 280.4, "line": "Wrap two long source lines and recheck output", "tool": "$ python3 - <<'EOF'\np = \"src/checks.js\"\ns = open(p).read()\ns = s.replace('''      return [\"\", `  ${c.name}`, ...(what ? [`    ${what}`] : []), `    ${c.url}`];''',\n'''      return [\n        \"\",\n        `  ${c.name}`,\n        ...(what ? [`    ${what}`] : []),\n        `    ${c.url}`,\n      ];''')\ns = s.replace('''// The first line of an error that is neither blank nor a stack frame (\"at ...\").''',\n'''// The first error line that is neither blank nor a stack frame (\"at ...\").''')\nopen(p, \"w\").write(s)\nEOF\nawk 'length > 80 { print FILENAME\": \"FNR }' src/checks.js; node bin/ship.js deploy staging; echo \"exit $?\"; git diff"},
-      {"at": 281.4, "line": "Wrap two long source lines and recheck output", "tool": "$ node --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    { name: \"lint\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/2\" },\n    { name: \"unit tests\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/3\",\n      error: \"expected 3, got 4\\n  at cart.test.js:12\" },\n  ],\n}));' | cat -vet; node bin/ship.js deploy staging 2>&1 >/dev/null | awk '{ if (length > 80) print \"LONG: \" $0 }'; git status --short"},
-      {"at": 326.4, "line": "Tighten the stack-frame test and rerun every case", "tool": "$ python3 - <<'EOF'\np = \"src/checks.js\"\ns = open(p).read()\ns = s.replace('''// The first error line that is neither blank nor a stack frame (\"at ...\").''',\n'''// The first error line that is neither blank nor a stack frame\n// (\"at <somewhere>:<line>\").''')\ns = s.replace('''    .find((line) => line !== \"\" && !line.startsWith(\"at \"));''',\n'''    .find((line) => line !== \"\" && !/^at .+:\\\\d+/.test(line));''')\nopen(p, \"w\").write(s)\nEOF\nsed -n '29,36p' src/checks.js\necho \"=== real run\"; node bin/ship.js deploy staging; echo \"exit $?\"\necho \"=== edge cases\"\nnode --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconst f = (name, error) => ({ name, status: \"failed\", url: `https://ci.example.test/runs/9/${name}`, error });\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    f(\"no-error\"),\n    f(\"multi-line\", \"expected 3, got 4\\n    at cart.test.js:12\"),\n    f(\"blank-first\", \"\\n   \\nTimeout after 30s\"),\n    f(\"node-frame-first\", \"    at Object.<anonymous> (x.js:1:1)\\nTypeError: cart is undefined\"),\n    f(\"java-frame-first\", \"\\tat com.shop.Cart(Cart.java:12)\\nNullPointerException: cart\"),\n    f(\"at-least\", \"at least 3 items required\\n    at check (cart.js:4)\"),\n    f(\"at-line\", \"at line 12: unexpected token\"),\n    f(\"frames-only\", \"    at a (x.js:1)\\n    at b (y.js:2)\"),\n  ],\n}));'"},
-      {"at": 327.4, "line": "Tighten the stack-frame test and rerun every case", "tool": "$ node --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    { name: \"lint\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/2\" },\n    { name: \"unit tests\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/3\",\n      error: \"expected 3, got 4\\n  at cart.test.js:12\" },\n  ],\n}));' | cat -vet; node bin/ship.js deploy staging 2>&1 >/dev/null | awk '{ if (length > 80) print \"LONG: \" $0 }'; git status --short"},
+      {"at": 1.3, "line": "Listing repo files and finding the blocked message", "tool": "$ git ls-files && ls -a && grep -rn \"deploy blocked\" . --exclude-dir=.git"},
+      {"at": 4.3, "line": "Listing repo files and finding the blocked message", "tool": "$ for f in bin/ship.js src/checks.js src/deploy.js package.json README.md .gitignore .ship/last-run.json; do echo \"=== $f\"; cat -n $f; done; ls .claude"},
+      {"at": 13.3, "line": "Running ship against failing, multi-failing, and passing CI data", "tool": "$ node bin/ship.js deploy staging; echo \"exit=$?\"\n# no-error, multi-failure, and all-passing variants against a temp copy\ncp .ship/last-run.json \"$TMPDIR/orig.json\"\nnode -e 'const f=\".ship/last-run.json\",r=JSON.parse(require(\"fs\").readFileSync(f));r.checks[0].status=\"failed\";require(\"fs\").writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"\nnode -e 'const f=\".ship/last-run.json\",r=JSON.parse(require(\"fs\").readFileSync(f));r.checks.forEach(c=>c.status=\"passed\");require(\"fs\").writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"\ncp \"$TMPDIR/orig.json\" .ship/last-run.json && git status --short"},
+    ],
+    replyAt: 18.8,
+    chrome: [
+      [-2.7, {"context": "0%"}],
+      [-0.7, {"context": "0%", "spin": {"verb": "Osmosing"}}],
+      [1.3, {"context": "0%", "spin": {"verb": "Scampering"}}],
+      [1.3, {"context": "0%", "spin": {"verb": "Scampering", "tail": "↓ 28 tokens"}}],
+      [2.3, {"context": "4% · 35.1k", "spin": {"verb": "Scampering", "tail": "↓ 107 tokens"}}],
+      [3.3, {"context": "4% · 35.1k", "spin": {"verb": "Scampering", "tail": "↓ 118 tokens"}}],
+      [4.3, {"context": "4% · 35.1k", "spin": {"verb": "Scampering", "tail": "↓ 167 tokens"}}],
+      [4.3, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 253 tokens"}}],
+      [5.3, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 270 tokens · thinking with medium effort"}}],
+      [6.3, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 275 tokens · thinking with medium effort"}}],
+      [7.3, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 313 tokens · thought for 3s"}}],
+      [8.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 475 tokens · thought for 3s"}}],
+      [9.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 647 tokens · thought for 3s"}}],
+      [9.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 685 tokens"}}],
+      [10.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 734 tokens"}}],
+      [11.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 766 tokens"}}],
+      [12.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 842 tokens"}}],
+      [12.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 887 tokens"}}],
+      [13.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 968 tokens"}}],
+      [14.3, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 1.2k tokens · thinking with medium effort"}}],
+      [18.3, {"context": "4% · 36.6k"}],
+      [19.3, {"context": "4% · 37.9k"}],
+    ],
+    reply: [
+      "When a deploy is blocked, ship now prints which checks failed, the error each one reported, and a link to its CI job. I ran it against the current CI data and this is the output:",
+      "",
+      "```",
+      "deploy blocked: 1 check failed on 8f3c2a9",
+      "  ✗ migrations dry-run: column \"region\" of relation \"orders\" already exists",
+      "    https://ci.example.test/runs/4812/jobs/4",
+      "```",
+      "",
+      "The change is in `bin/ship.js:13` and is the only file changed.",
+      "",
+      "I also ran it against edited copies of the CI data for two more cases, then put the original file back:",
+      "- **Two failed checks:** the header says \"2 checks failed\" and lists both. A check with no error message shows just its name and link.",
+      "- **All checks passing:** the deploy goes ahead and exits with 0, same as before.",
+      "",
+      "The exit code stays 1 when a check fails, so scripts that rely on it won't break.",
+      "",
+      "Decision for you: **skipped checks aren't shown.** The current data has \"e2e checkout\" marked skipped, and since skipped checks don't block a deploy I left them out. If you'd rather warn about them so a skipped checkout test doesn't go unnoticed, that's a one-line addition.",
+      "",
+      "The project has no tests yet, so I didn't add one for this.",
+    ],
+    keys: [
+      [
+        -2.1,
+        "type",
+        "Change what ship prints when a failed check blocks a deploy. Today it only says \"deploy blocked\", and people ask in chat which check failed."
+      ],
+      [
+        -0.1,
+        "key",
+        "Enter"
+      ]
+    ],
+  },
+  {
+    user: "/hope:draft",
+    tools: "Edited 1 file +22 -10, called 2 tools, ran 1 shell command",
+    activity: [
+      {"at": 762.9, "line": "Running ship on real, noisy-error, and passing CI data", "tool": "$ cp .ship/last-run.json \"$TMPDIR/orig.json\"\nnode bin/ship.js deploy staging; echo \"exit=$?\"; echo ---\nnode -e 'const f=\".ship/last-run.json\",fs=require(\"fs\"),r=JSON.parse(fs.readFileSync(f));r.checks[0].status=\"failed\";r.checks[0].error=\"\\n    at build (x.js:1)\\nTypeError: x is undefined\\n    at y (z.js:2)\";r.checks[1].status=\"failed\";r.checks[1].error=\"   \\n   at only (frame.js:1)\";r.checks[4].status=\"passed\";fs.writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"; echo ---\nnode -e 'const f=\".ship/last-run.json\",fs=require(\"fs\"),r=JSON.parse(fs.readFileSync(f));r.checks.forEach(c=>c.status=\"passed\");fs.writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"\ncp \"$TMPDIR/orig.json\" .ship/last-run.json && git status --short"},
+      {"at": 843.9, "line": "I count only JavaScript lines that start with \"at \" as stack frames. A Python error would print \"Traceback (most recent call last):\" as its reason. Should ship also skip Python traceback lines?", "tool": "$ cp .ship/last-run.json \"$TMPDIR/orig.json\"\nnode bin/ship.js deploy staging; echo \"exit=$?\"; echo ---\nnode -e 'const f=\".ship/last-run.json\",fs=require(\"fs\"),r=JSON.parse(fs.readFileSync(f));r.checks[0].status=\"failed\";r.checks[0].error=\"\\n    at build (x.js:1)\\nTypeError: x is undefined\\n    at y (z.js:2)\";r.checks[1].status=\"failed\";r.checks[1].error=\"   \\n   at only (frame.js:1)\";r.checks[4].status=\"passed\";fs.writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"; echo ---\nnode -e 'const f=\".ship/last-run.json\",fs=require(\"fs\"),r=JSON.parse(fs.readFileSync(f));r.checks.forEach(c=>c.status=\"passed\");fs.writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"\ncp \"$TMPDIR/orig.json\" .ship/last-run.json && git status --short"},
     ],
     dialogs: [
       {
         "at": [
-          110.0,
-          244.1
+          13.5,
+          748.4
         ],
-        "after": 5,
-        "tool": "$ node --input-type=module -e '\nimport { blockedMessage } from \"./src/checks.js\";\nconsole.log(blockedMessage({\n  commit: \"abcdef1234567890\", branch: \"feat/x\", url: \"https://ci.example.test/runs/9\",\n  checks: [\n    { name: \"build\", status: \"passed\", url: \"u1\" },\n    { name: \"lint\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/2\" },\n    { name: \"unit tests\", status: \"failed\", url: \"https://ci.example.test/runs/9/jobs/3\",\n      error: \"expected 3, got 4\\n  at cart.test.js:12\" },\n  ],\n}));' | cat -vet; node bin/ship.js deploy staging 2>&1 >/dev/null | awk '{ if (length > 80) print \"LONG: \" $0 }'; git status --short",
+        "after": 0,
         "questions": [
           {
             "header": "Skipped",
-            "question": "When ship blocks a deploy, should the message also show skipped checks? In the last CI run, \"e2e checkout\" was skipped alongside the failed \"migrations dry-run\".",
+            "question": "When a deploy is blocked, should ship also list checks that were skipped? Right now the e2e checkout check is skipped and ship says nothing about it.",
             "multiSelect": false,
             "options": [
               {
-                "label": "Failed only (Recommended)",
-                "description": "What the draft prints now. Skipped checks don't block, so it leaves them out.",
-                "preview": "deploy blocked: 1 of 6 checks failed on 8f3c2a9 (main)\n\n  migrations dry-run\n    column \"region\" of relation \"orders\" already exists\n    https://ci.example.test/runs/4812/jobs/4\n\nfull run: https://ci.example.test/runs/4812"
+                "label": "Leave them out",
+                "description": "Current draft. Only failed checks block, so only they print. Pick the other if a skipped check is often the real problem.",
+                "preview": "deploy blocked: 1 check failed on 8f3c2a9\n  ✗ migrations dry-run: column \"region\" ...\n    https://ci.example.test/runs/4812/jobs/4"
               },
               {
-                "label": "Name skipped checks",
-                "description": "One extra line naming each skipped check, so readers can tell whether e2e ran.",
-                "preview": "deploy blocked: 1 of 6 checks failed on 8f3c2a9 (main)\n\n  migrations dry-run\n    column \"region\" of relation \"orders\" already exists\n    https://ci.example.test/runs/4812/jobs/4\n\nskipped: e2e checkout\nfull run: https://ci.example.test/runs/4812"
-              },
-              {
-                "label": "List skipped like failed",
-                "description": "Skipped checks get a full entry with a status word and a link.",
-                "preview": "deploy blocked: 1 of 6 checks failed on 8f3c2a9 (main)\n\n  migrations dry-run: failed\n    column \"region\" of relation \"orders\" already exists\n    https://ci.example.test/runs/4812/jobs/4\n\n  e2e checkout: skipped\n    https://ci.example.test/runs/4812/jobs/5\n\nfull run: https://ci.example.test/runs/4812"
+                "label": "List them after",
+                "description": "Adds a note line so no one assumes e2e passed.",
+                "preview": "deploy blocked: 1 check failed on 8f3c2a9\n  ✗ migrations dry-run: column \"region\" ...\n    https://ci.example.test/runs/4812/jobs/4\n  skipped: e2e checkout"
               }
             ],
             "picked": [
-              0
+              1
             ]
           },
           {
             "header": "Error text",
-            "question": "How much of a failed check's error text should the blocked message print? The preview uses a made-up run where the unit tests error spans two lines.",
+            "question": "Real check errors can be long stack traces. How much of each error should ship print?",
             "multiSelect": false,
             "options": [
               {
-                "label": "Full error (Recommended)",
-                "description": "What the draft prints now. Every line, indented. Long stack traces would print in full.",
-                "preview": "deploy blocked: 2 of 3 checks failed on abcdef1 (feat/x)\n\n  lint\n    https://ci.example.test/runs/9/jobs/2\n\n  unit tests\n    expected 3, got 4\n      at cart.test.js:12\n    https://ci.example.test/runs/9/jobs/3\n\nfull run: https://ci.example.test/runs/9"
+                "label": "Whole error",
+                "description": "Current draft. Fine while errors are one line, as in the sample data. Pick the other if your CI errors run many lines.",
+                "preview": "  ✗ migrations dry-run: column \"region\" of relation\n    \"orders\" already exists\n    at Migrator.run (...)\n    at ...\n    https://ci.example.test/runs/4812/jobs/4"
               },
               {
                 "label": "First line only",
-                "description": "Keeps the block short when errors carry stack traces. The link has the rest.",
-                "preview": "deploy blocked: 2 of 3 checks failed on abcdef1 (feat/x)\n\n  lint\n    https://ci.example.test/runs/9/jobs/2\n\n  unit tests\n    expected 3, got 4\n    https://ci.example.test/runs/9/jobs/3\n\nfull run: https://ci.example.test/runs/9"
-              },
-              {
-                "label": "No error text",
-                "description": "Check names and links only. Readers click through for the error.",
-                "preview": "deploy blocked: 2 of 3 checks failed on abcdef1 (feat/x)\n\n  lint\n    https://ci.example.test/runs/9/jobs/2\n\n  unit tests\n    https://ci.example.test/runs/9/jobs/3\n\nfull run: https://ci.example.test/runs/9"
+                "description": "Keeps output short; the link holds the rest.",
+                "preview": "  ✗ migrations dry-run: column \"region\" of relation \"orders\" already exists\n    https://ci.example.test/runs/4812/jobs/4"
               }
             ],
             "picked": [
@@ -81,19 +127,90 @@ export const turns: Turn[] = [
             "notes": "First line only, unless that line is blank or just a stack frame. Then take the first line that says what went wrong."
           },
           {
-            "header": "Links",
-            "question": "Which CI links should the blocked message print?",
+            "header": "Marker",
+            "question": "Should failed checks start with the ✗ symbol or with plain ASCII? Some CI logs and Windows terminals show ✗ as junk.",
             "multiSelect": false,
             "options": [
               {
-                "label": "Each check + run (Recommended)",
-                "description": "What the draft prints now. One click to the failed job's log.",
-                "preview": "deploy blocked: 1 of 6 checks failed on 8f3c2a9 (main)\n\n  migrations dry-run\n    column \"region\" of relation \"orders\" already exists\n    https://ci.example.test/runs/4812/jobs/4\n\nfull run: https://ci.example.test/runs/4812"
+                "label": "✗ symbol",
+                "description": "Current draft. Pick ASCII if ship runs inside CI logs or old terminals.",
+                "preview": "  ✗ migrations dry-run: ..."
               },
               {
-                "label": "Run link only",
-                "description": "Shorter. Readers find the failed job on the run page.",
-                "preview": "deploy blocked: 1 of 6 checks failed on 8f3c2a9 (main)\n\n  migrations dry-run\n    column \"region\" of relation \"orders\" already exists\n\nfull run: https://ci.example.test/runs/4812"
+                "label": "ASCII 'FAIL'",
+                "description": "Shows the same everywhere.",
+                "preview": "  FAIL migrations dry-run: ..."
+              }
+            ],
+            "picked": [
+              0
+            ]
+          },
+          {
+            "header": "Link",
+            "question": "Which link should a failed check show: its own CI job, or the whole CI run?",
+            "multiSelect": false,
+            "options": [
+              {
+                "label": "Each check's job",
+                "description": "Current draft. Goes straight to the failing log. Pick the run link if people need the full picture first.",
+                "preview": "  ✗ migrations dry-run: ...\n    https://ci.example.test/runs/4812/jobs/4"
+              },
+              {
+                "label": "One run link",
+                "description": "One link at the bottom for the whole run.",
+                "preview": "  ✗ migrations dry-run: ...\nsee https://ci.example.test/runs/4812"
+              }
+            ],
+            "picked": [
+              0
+            ],
+            "notes": "Each job, and the run link once at the end."
+          }
+        ]
+      },
+      {
+        "at": [
+          770.9,
+          843.3
+        ],
+        "after": 1,
+        "tool": "$ cp .ship/last-run.json \"$TMPDIR/orig.json\"\nnode bin/ship.js deploy staging; echo \"exit=$?\"; echo ---\nnode -e 'const f=\".ship/last-run.json\",fs=require(\"fs\"),r=JSON.parse(fs.readFileSync(f));r.checks[0].status=\"failed\";r.checks[0].error=\"\\n    at build (x.js:1)\\nTypeError: x is undefined\\n    at y (z.js:2)\";r.checks[1].status=\"failed\";r.checks[1].error=\"   \\n   at only (frame.js:1)\";r.checks[4].status=\"passed\";fs.writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"; echo ---\nnode -e 'const f=\".ship/last-run.json\",fs=require(\"fs\"),r=JSON.parse(fs.readFileSync(f));r.checks.forEach(c=>c.status=\"passed\");fs.writeFileSync(f,JSON.stringify(r))'\nnode bin/ship.js deploy staging; echo \"exit=$?\"\ncp \"$TMPDIR/orig.json\" .ship/last-run.json && git status --short",
+        "questions": [
+          {
+            "header": "Python",
+            "question": "I count only JavaScript lines that start with \"at \" as stack frames. A Python error would print \"Traceback (most recent call last):\" as its reason. Should ship also skip Python traceback lines?",
+            "multiSelect": false,
+            "options": [
+              {
+                "label": "JS frames only",
+                "description": "Current draft. Fine if every check that can fail runs on Node. Pick the other if any check runs Python.",
+                "preview": "  ✗ lint: Traceback (most recent call last):\n    https://ci.example.test/runs/4812/jobs/3"
+              },
+              {
+                "label": "Also Python",
+                "description": "Skips the Traceback header and the File \"...\" lines. A Python error's message comes last, so ship takes the last line.",
+                "preview": "  ✗ lint: KeyError: 'region'\n    https://ci.example.test/runs/4812/jobs/3"
+              }
+            ],
+            "picked": [
+              0
+            ]
+          },
+          {
+            "header": "No message",
+            "question": "If an error has only blank lines and stack frames, what should ship print?",
+            "multiSelect": false,
+            "options": [
+              {
+                "label": "Name only",
+                "description": "Current draft. The job link has the full error. Pick the other if a bare name looks like a missing error.",
+                "preview": "  ✗ unit tests\n    https://ci.example.test/runs/4812/jobs/2"
+              },
+              {
+                "label": "First frame",
+                "description": "Shows where the error came from.",
+                "preview": "  ✗ unit tests: at only (frame.js:1)\n    https://ci.example.test/runs/4812/jobs/2"
               }
             ],
             "picked": [
@@ -103,209 +220,265 @@ export const turns: Turn[] = [
         ]
       }
     ],
-    replyAt: 348.5,
+    replyAt: 849.6,
     chrome: [
-      [-5.6, {"context": "0%"}],
-      [-0.6, {"context": "0%", "spin": {"verb": "Photosynthesizing"}}],
-      [2.4, {"context": "0%", "spin": {"verb": "Contemplating", "tail": "thinking with xhigh effort"}}],
-      [3.4, {"context": "3% · 34.9k", "spin": {"verb": "Contemplating", "tail": "↓ 143 tokens · thinking with xhigh effort"}}],
-      [3.4, {"context": "3% · 34.9k", "spin": {"verb": "Contemplating", "tail": "↓ 206 tokens"}}],
-      [4.4, {"context": "3% · 34.9k", "spin": {"verb": "Contemplating", "tail": "↓ 224 tokens · thought for 1s"}}],
-      [5.4, {"context": "3% · 34.9k", "spin": {"verb": "Contemplating", "tail": "↓ 230 tokens · thought for 1s"}}],
-      [6.4, {"context": "3% · 34.9k", "spin": {"verb": "Contemplating", "tail": "↓ 230 tokens"}}],
-      [7.4, {"context": "3% · 34.9k", "spin": {"verb": "Contemplating", "tail": "↓ 327 tokens"}}],
-      [8.4, {"context": "4% · 35.8k", "spin": {"verb": "Contemplating", "tail": "↓ 377 tokens"}}],
-      [8.4, {"context": "4% · 35.8k", "spin": {"verb": "Contemplating", "tail": "↓ 387 tokens"}}],
-      [9.4, {"context": "4% · 35.8k", "spin": {"verb": "Contemplating", "tail": "↓ 388 tokens · thinking with xhigh effort"}}],
-      [19.4, {"context": "4% · 35.8k", "spin": {"verb": "Contemplating", "tail": "↓ 388 tokens · still thinking with xhigh effort"}}],
-      [29.4, {"context": "4% · 35.8k", "spin": {"verb": "Contemplating", "tail": "↓ 388 tokens · thinking more with xhigh effort"}}],
-      [32.4, {"context": "4% · 35.8k", "spin": {"verb": "Contemplating", "tail": "↓ 2.6k tokens · thought for 24s"}}],
-      [33.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 2.6k tokens · thought for 24s"}}],
-      [34.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 2.6k tokens"}}],
-      [65.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 2.6k tokens · thinking with xhigh effort"}}],
-      [75.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 2.6k tokens · still thinking with xhigh effort"}}],
-      [77.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 4.0k tokens · thought for 12s"}}],
-      [78.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 4.1k tokens"}}],
-      [80.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 4.2k tokens"}}],
-      [81.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 4.3k tokens"}}],
-      [82.4, {"context": "4% · 37.1k", "spin": {"verb": "Contemplating", "tail": "↓ 4.9k tokens"}}],
-      [83.4, {"context": "4% · 40.4k", "spin": {"verb": "Contemplating", "tail": "↓ 4.9k tokens"}}],
-      [86.4, {"context": "4% · 40.4k", "spin": {"verb": "Contemplating", "tail": "↓ 5.0k tokens"}}],
-      [86.4, {"context": "4% · 40.4k", "spin": {"verb": "Contemplating", "tail": "↓ 5.1k tokens"}}],
-      [87.4, {"context": "4% · 43.4k", "spin": {"verb": "Contemplating", "tail": "↓ 5.2k tokens"}}],
-      [88.4, {"context": "4% · 43.4k", "spin": {"verb": "Contemplating", "tail": "↓ 5.3k tokens"}}],
-      [89.4, {"context": "4% · 43.4k", "spin": {"verb": "Contemplating", "tail": "↓ 5.3k tokens · thinking with xhigh effort"}}],
-      [99.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.3k tokens · thought for 10s"}}],
-      [100.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.4k tokens · thought for 10s"}}],
-      [101.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.4k tokens"}}],
-      [102.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.5k tokens"}}],
-      [103.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.6k tokens"}}],
-      [104.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.7k tokens"}}],
-      [105.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.8k tokens"}}],
-      [106.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 6.9k tokens"}}],
-      [107.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 7.0k tokens"}}],
-      [109.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 7.1k tokens"}}],
-      [244.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 7.9k tokens"}}],
-      [246.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 7.9k tokens · thinking with xhigh effort"}}],
-      [256.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 7.9k tokens · still thinking with xhigh effort"}}],
-      [266.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 7.9k tokens · thinking more with xhigh effort"}}],
-      [267.4, {"context": "4% · 44k", "spin": {"verb": "Contemplating", "tail": "↓ 9.9k tokens · thought for 21s"}}],
-      [267.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 9.9k tokens · thought for 21s"}}],
-      [268.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 10.0k tokens · thought for 21s"}}],
-      [269.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 10.1k tokens"}}],
-      [270.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 10.2k tokens"}}],
-      [272.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 10.3k tokens"}}],
-      [273.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 10.4k tokens"}}],
-      [274.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.0k tokens"}}],
-      [276.4, {"context": "5% · 47.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.0k tokens · thinking with xhigh effort"}}],
-      [278.4, {"context": "5% · 50.8k", "spin": {"verb": "Contemplating", "tail": "↓ 11.2k tokens · thinking with xhigh effort"}}],
-      [278.4, {"context": "5% · 50.8k", "spin": {"verb": "Contemplating", "tail": "↓ 11.3k tokens · thought for 1s"}}],
-      [279.4, {"context": "5% · 50.8k", "spin": {"verb": "Contemplating", "tail": "↓ 11.4k tokens · thought for 1s"}}],
-      [280.4, {"context": "5% · 50.8k", "spin": {"verb": "Contemplating", "tail": "↓ 11.5k tokens · thought for 1s"}}],
-      [281.4, {"context": "5% · 50.8k", "spin": {"verb": "Contemplating", "tail": "↓ 11.5k tokens"}}],
-      [282.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.6k tokens · thinking with xhigh effort"}}],
-      [283.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.7k tokens · thinking with xhigh effort"}}],
-      [283.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.7k tokens · thought for 1s"}}],
-      [286.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.7k tokens"}}],
-      [323.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.8k tokens"}}],
-      [324.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 11.9k tokens"}}],
-      [325.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 12.0k tokens"}}],
-      [326.4, {"context": "5% · 52.2k", "spin": {"verb": "Contemplating", "tail": "↓ 12.1k tokens"}}],
-      [327.4, {"context": "5% · 53.1k", "spin": {"verb": "Contemplating", "tail": "↓ 12.2k tokens"}}],
-      [328.4, {"context": "5% · 53.1k", "spin": {"verb": "Contemplating", "tail": "↓ 12.3k tokens"}}],
-      [329.4, {"context": "5% · 53.1k", "spin": {"verb": "Contemplating", "tail": "↓ 12.3k tokens · thinking with xhigh effort"}}],
-      [339.4, {"context": "5% · 53.1k", "spin": {"verb": "Contemplating", "tail": "↓ 12.3k tokens · still thinking with xhigh effort"}}],
-      [348.4, {"context": "5% · 53.1k"}],
-      [349.4, {"context": "5% · 54.4k"}],
+      [-58.1, {"context": "0%", "spin": {"verb": "Osmosing"}}],
+      [-57.1, {"context": "0%", "spin": {"verb": "Scampering"}}],
+      [-57.1, {"context": "0%", "spin": {"verb": "Scampering", "tail": "↓ 28 tokens"}}],
+      [-56.1, {"context": "4% · 35.1k", "spin": {"verb": "Scampering", "tail": "↓ 107 tokens"}}],
+      [-55.1, {"context": "4% · 35.1k", "spin": {"verb": "Scampering", "tail": "↓ 118 tokens"}}],
+      [-54.1, {"context": "4% · 35.1k", "spin": {"verb": "Scampering", "tail": "↓ 167 tokens"}}],
+      [-54.1, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 253 tokens"}}],
+      [-53.1, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 270 tokens · thinking with medium effort"}}],
+      [-52.1, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 275 tokens · thinking with medium effort"}}],
+      [-51.1, {"context": "4% · 35.3k", "spin": {"verb": "Scampering", "tail": "↓ 313 tokens · thought for 3s"}}],
+      [-50.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 475 tokens · thought for 3s"}}],
+      [-49.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 647 tokens · thought for 3s"}}],
+      [-49.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 685 tokens"}}],
+      [-48.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 734 tokens"}}],
+      [-47.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 766 tokens"}}],
+      [-46.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 842 tokens"}}],
+      [-46.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 887 tokens"}}],
+      [-45.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 968 tokens"}}],
+      [-44.1, {"context": "4% · 36.6k", "spin": {"verb": "Scampering", "tail": "↓ 1.2k tokens · thinking with medium effort"}}],
+      [-40.1, {"context": "4% · 36.6k"}],
+      [-39.1, {"context": "4% · 37.9k"}],
+      [-22.1, {"context": "4% · 37.9k", "style": "hold:Plain"}],
+      [-0.1, {"context": "4% · 37.9k", "style": "hold:Plain", "spin": {"verb": "Whirlpooling"}}],
+      [0.9, {"context": "4% · 37.9k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "thinking with medium effort"}}],
+      [4.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 163 tokens · thought for 4s"}}],
+      [5.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 325 tokens · thought for 4s"}}],
+      [6.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 525 tokens"}}],
+      [7.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 625 tokens"}}],
+      [7.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 682 tokens"}}],
+      [8.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 720 tokens"}}],
+      [9.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 800 tokens"}}],
+      [9.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 844 tokens"}}],
+      [10.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 891 tokens"}}],
+      [11.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 954 tokens"}}],
+      [12.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 997 tokens"}}],
+      [747.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 1.1k tokens"}}],
+      [748.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 1.3k tokens"}}],
+      [749.9, {"context": "4% · 44.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 1.4k tokens · thinking with medium effort"}}],
+      [754.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 1.6k tokens · thought for 5s"}}],
+      [754.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 1.8k tokens · thought for 5s"}}],
+      [755.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 2.0k tokens"}}],
+      [756.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 2.1k tokens"}}],
+      [757.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 2.2k tokens"}}],
+      [758.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 2.3k tokens"}}],
+      [759.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 2.4k tokens"}}],
+      [761.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 2.5k tokens"}}],
+      [763.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.1k tokens"}}],
+      [764.9, {"context": "5% · 46.7k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.1k tokens · thinking with medium effort"}}],
+      [766.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.3k tokens · thought for 1s"}}],
+      [767.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.4k tokens · thought for 1s"}}],
+      [768.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.5k tokens"}}],
+      [769.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.6k tokens"}}],
+      [842.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.7k tokens"}}],
+      [843.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.7k tokens · thinking with medium effort"}}],
+      [849.9, {"context": "5% · 48.8k", "style": "hold:Plain"}],
+      [849.9, {"context": "5% · 49.7k", "style": "hold:Plain"}],
     ],
     reply: [
-      "Draft built and left uncommitted on `main`, in `bin/ship.js` and `src/checks.js`:",
+      "The new message is in `bin/ship.js:12-36`.",
+      "It is not committed.",
       "",
       "```",
-      "deploy blocked: 1 of 6 checks failed on 8f3c2a9 (main)",
-      "",
-      "  migrations dry-run",
-      "    column \"region\" of relation \"orders\" already exists",
+      "deploy blocked: 1 check failed",
+      "  ✗ migrations dry-run: column \"region\" of relation \"orders\" already exists",
       "    https://ci.example.test/runs/4812/jobs/4",
-      "",
-      "full run: https://ci.example.test/runs/4812",
+      "  skipped: e2e checkout",
+      "run: https://ci.example.test/runs/4812",
       "```",
       "",
-      "Tested on the real run: it still exits 1.",
-      "Also tested: blank, stack-frame and no-error cases.",
+      "| case tried | result |",
+      "|---|---|",
+      "| error starts with blank lines and \"at …\" frames | shows the first real line: `TypeError: x is undefined` |",
+      "| error that is only blank lines and frames | shows the check name and link, no reason |",
+      "| every check passed | deploys, exits 0 |",
       "",
-      "| open choice | picked | pick otherwise if |",
-      "|---|---|---|",
-      "| what counts as a stack frame | `at <file>:<line>` (Node, Java) | CI runs Python: it starts `Traceback…`, error last |",
-      "| error with only frames | print no error line | you want the first frame |",
-      "| `1 of 6` count | includes skipped checks | the hidden skipped check confuses readers |",
-      "| `deploy blocked` first | kept | nothing searches logs for it |",
-      "| plain text, no color | yes | people read it only in a terminal |",
-      "| 7-character commit hash | copied in `src/deploy.js` | this ships: share one helper |",
-      "",
-      "Next: answer the open choices in the card, or mark up the block above.",
+      "Next: read the change in `bin/ship.js` and tell me whether to commit it.",
     ],
     keys: [
       [
-        -5.6,
+        -2.6,
         "type",
-        "/hope:draft what ship prints when a failed check blocks a deploy. Today it only says \"deploy blocked\", and people ask in chat which check failed."
+        "/hope:draft"
       ],
       [
-        -0.9,
+        -0.1,
         "key",
         "Enter"
       ],
       [
-        123.3,
+        626.7,
         "key",
         "Down"
       ],
       [
-        131.6,
+        635.1,
         "key",
         "Down"
       ],
       [
-        139.9,
-        "key",
-        "Down"
-      ],
-      [
-        153.5,
+        640.8,
         "key",
         "Up"
       ],
       [
-        153.5,
-        "key",
-        "Up"
-      ],
-      [
-        153.5,
-        "key",
-        "Up"
-      ],
-      [
-        154.5,
+        641.7,
         "key",
         "Enter"
       ],
       [
-        167.5,
+        656.5,
         "key",
         "Down"
       ],
       [
-        175.8,
-        "key",
-        "Down"
-      ],
-      [
-        184.1,
-        "key",
-        "Up"
-      ],
-      [
-        185.1,
+        664.9,
         "key",
         "n"
       ],
       [
-        190.4,
+        665.7,
         "type",
         "First line only, unless that line is blank or just a stack frame. Then take the first line that says what went wrong."
       ],
       [
-        203.7,
+        677.5,
         "key",
         "Enter"
       ],
       [
-        217.9,
+        691.8,
         "key",
         "Down"
       ],
       [
-        226.2,
+        700.2,
         "key",
         "Up"
       ],
       [
-        227.2,
+        701.1,
         "key",
         "Enter"
       ],
       [
-        241.7,
+        715.6,
+        "key",
+        "Down"
+      ],
+      [
+        724.1,
+        "key",
+        "Up"
+      ],
+      [
+        724.9,
+        "key",
+        "n"
+      ],
+      [
+        725.8,
+        "type",
+        "Each job, and the run link once at the end."
+      ],
+      [
+        734.4,
         "key",
         "Enter"
       ],
       [
-        246.7,
+        748.4,
+        "key",
+        "Enter"
+      ],
+      [
+        797.3,
+        "key",
+        "Down"
+      ],
+      [
+        805.7,
+        "key",
+        "Up"
+      ],
+      [
+        806.6,
+        "key",
+        "Enter"
+      ],
+      [
+        821.0,
+        "key",
+        "Down"
+      ],
+      [
+        829.4,
+        "key",
+        "Up"
+      ],
+      [
+        830.3,
+        "key",
+        "Enter"
+      ],
+      [
+        843.3,
         "key",
         "Enter"
       ]
     ],
+    menu: {
+      "after": 0,
+      "rows": [
+        [
+          [
+            "  "
+          ],
+          [
+            "❯ /",
+            "l"
+          ],
+          [
+            "hope:draft",
+            "l b"
+          ],
+          [
+            "                     (hope) Build the thing the user can't",
+            "l"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "specify, choices surfaced. Use when the u…",
+            "l"
+          ]
+        ],
+        [
+          [
+            "  "
+          ],
+          [
+            "  /hope:reframe                   (hope) Restate a problem off the framing",
+            "g"
+          ]
+        ],
+        [
+          [
+            "                                    "
+          ],
+          [
+            "it arrived in. Use when a framing came by…",
+            "g"
+          ]
+        ]
+      ]
+    },
   },
 ];

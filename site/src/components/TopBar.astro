@@ -1,6 +1,6 @@
 ---
 // The site's one bar, in place of Starlight's header and sidebar: the mark,
-// the Chains and Moves menus, search (⌘K), GitHub and Install, the one action,
+// the Start, Moves and Chains menus, search (⌘K), GitHub and Install, the one action,
 // as a filled pill. It has one height at every width (--sl-nav-height,
 // chrome.css), so a demo's terminal sits at the same place on every page. Its
 // contents sit in the content's centred column; its ground runs full width.
@@ -30,8 +30,8 @@ const github = "https://github.com/saadshahd/moo.md";
         <button type="button" class="wide menu-btn" popovertarget={`menu-${m.id}`} aria-current={m.items.some((i) => i.href === here) ? "true" : undefined}>
           {m.label}<span class="count" aria-label={`, ${m.items.length} pages`}>{m.items.length}</span>
         </button>
-        <div id={`menu-${m.id}`} class={`wide menu ${m.id}`} popover>
-          <MenuItems items={m.items} here={here} kind={m.id} />
+        <div id={`menu-${m.id}`} class={`wide menu ${m.look}`} popover>
+          <MenuItems items={m.items} groups={m.groups} here={here} kind={m.look} at="bar" />
         </div>
       </>
     ))}
@@ -58,7 +58,7 @@ const github = "https://github.com/saadshahd/moo.md";
       {menus.map((m) => (
         <section>
           <h2>{m.label}<span class="count">{m.items.length}</span></h2>
-          <MenuItems items={m.items} here={here} kind={m.id} />
+          <MenuItems items={m.items} groups={m.groups} here={here} kind={m.look} stack at="sheet" />
         </section>
       ))}
       <a class="sheet-gh" href={github}>moo.md on GitHub</a>
@@ -75,6 +75,12 @@ const github = "https://github.com/saadshahd/moo.md";
       if ((e as ToggleEvent).newState !== "open") return;
       const r = button.getBoundingClientRect();
       menu.style.left = `${Math.round(r.left)}px`;
+    });
+    // A menu wider than the room right of its button moves left to fit.
+    menu.addEventListener("toggle", (e) => {
+      if ((e as ToggleEvent).newState !== "open") return;
+      const over = menu.getBoundingClientRect().right - (innerWidth - 16);
+      if (over > 0) menu.style.left = `${Math.max(16, Math.round(menu.getBoundingClientRect().left - over))}px`;
     });
   }
 
@@ -140,7 +146,8 @@ const github = "https://github.com/saadshahd/moo.md";
     border-radius: 0.75rem; box-shadow: var(--sl-shadow-md);
   }
   .menu.chains { width: 25rem; }
-  .menu.moves { width: 24rem; }
+  .menu.commands { width: 24rem; }
+  .menu:has(.groups) { width: max-content; max-width: calc(100vw - 2rem); }
   /* On a phone, one sheet from the bar to the foot of the screen. */
   .sheet { position: fixed; inset: var(--sl-nav-height) 0 0 0; width: 100%; height: auto; max-height: none; overflow: auto; padding: 1.5rem 1rem; }
   .sheet section + section { margin-top: 1.75rem; }

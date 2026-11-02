@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { frame } from "../src/demo/render.ts";
 import type { Row, Seg } from "../src/demo/render.ts";
 import type { Scene } from "../src/demo/types.ts";
+import { same, unstrip } from "./strip.mts";
 
 const [turns, cap, w] = process.argv.slice(2);
 const scene: Scene = {
@@ -17,9 +18,10 @@ const scene: Scene = {
   turns: JSON.parse(readFileSync(turns, "utf8")),
   beats: [{ at: 0, text: "" }],
 };
-const text = (r: Row) => r.segs.map((s: Seg) => (s[1] === "logo" ? "" : s[0])).join("").trimEnd();
+const text = (r: Row) => r.segs.map((s: Seg) => (s[1] === "logo" ? "" : s[0])).join("").replace(/\xa0/g, " ").trimEnd();
 const ours = frame(scene, 1e9, +w).transcript.map(text);
-const screen = readFileSync(cap, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").trimEnd());
+// Claude Code draws some spaces as no-break spaces (U+00A0); text only, as in check-dialogs.mts.
+const screen = unstrip(readFileSync(cap, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").replace(/\xa0/g, " ").trimEnd()), +w);
 const from = (xs: string[]) => xs.slice(xs.findIndex((l) => l.startsWith("❯ ")));
 const end = screen.findLastIndex((l) => /^\S /.test(l) && / · done /.test(l));
 const done = (l: string) => /^\S (\S+ for .*· done |.*messages? hidden)/.test(l) || /^  .*(hidden|show\))\s*$/.test(l);
@@ -32,9 +34,9 @@ const B = norm(from(screen.slice(0, end + 1)));
 const L = Array.from({ length: A.length + 1 }, () => new Array<number>(B.length + 1).fill(0));
 for (let i = A.length - 1; i >= 0; i--)
   for (let j = B.length - 1; j >= 0; j--)
-    L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    L[i][j] = same(A[i], B[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
 const words = (ls: string[]) =>
-  ls.map((l) => l.replace(/^\s*#{1,6} /, "").replace(/\*\*|`/g, "")).join(" ").split(/\s+/).filter(Boolean).join(" ");
+  ls.map((l) => l.replace(/^(⏺ )?\s*(#{1,6} )?/, "").replace(/\*\*|`/g, "")).join(" ").split(/\s+/).filter(Boolean).join(" ");
 // Each ```markdown block of the replies, as words.
 const blocks: string[] = [];
 (function walk(x: unknown): void {
@@ -58,11 +60,16 @@ let i = 0;
 let j = 0;
 let a0 = 0;
 let b0 = 0;
+// A blank row matched between two parted runs joins them into one hunk: a
+// rendered block and its source part around blank rows that need not align.
 while (i < A.length || j < B.length) {
-  if (i < A.length && j < B.length && A[i] === B[j]) {
+  if (i < A.length && j < B.length && same(A[i], B[j]) && (A[i] !== "" || (i === a0 && j === b0))) {
     hunk(A.slice(a0, i), B.slice(b0, j), a0);
     a0 = ++i;
     b0 = ++j;
+  } else if (i < A.length && j < B.length && same(A[i], B[j])) {
+    i++;
+    j++;
   } else if (j >= B.length || (i < A.length && L[i + 1][j] >= L[i][j + 1])) i++;
   else j++;
 }

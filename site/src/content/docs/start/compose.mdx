@@ -1,0 +1,13 @@
+---
+title: /compose
+move: chains the skills an ask needs
+description: "You name the goal once; each skill joins when needed and waits for you."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { composeScene } from "../../../demo/scenes";
+
+<Demo
+  scene={composeScene}
+  summary="Claude Code. With moo off, you send one long ask about a todo shelf: a maximise key, hover hints with shortcuts, a cleaner header, a + on each group, a new todo row, drag to reassign like a kanban board, a clearer drawer, and nested todos that mean dependency, with /consult, /shape and /deepen named. Claude asks four questions in a dialog: how nesting maps to dependency, who owns a subtree, how an agent gets notified, and what export and delete do. You type B waits on A (sequence) and Message at its next idle, and pick Subtree shares one owner and Markdown to clipboard. Claude writes 9 issues, 0042 to 0050, and says the three skills aren't installed, so it did their job in the repo's own format. It lists what must not go wrong, a table of what each issue builds, and four choices for you to check. In the same session with moo on, you type /hope:compose. A dialog asks how the page loads its scripts and whether quick capture is always visible or opens on demand; you pick Plain scripts and On demand. Claude updates the issues and shows a table of each change and the issues it touches. It ends with what to do next: read issues 0042 to 0050, then say whether to commit them."
+/>

@@ -1,0 +1,13 @@
+---
+title: /interrogate
+move: makes you defend your plan
+description: "You defend each decision in your plan, or change it, before it's built."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { interrogateScene } from "../../../demo/scenes";
+
+<Demo
+  scene={interrogateScene}
+  summary="Claude Code. With moo off, you say you have settled how callgate works: a fast judge model checks every tool call before it runs and blocks the slow-for-no-reason ones once. You ask Claude to build it. Claude builds the hook as the plan describes, with passing tests, and lists decisions to check and what the judge's trial data says: it gives different answers to the same call and never names a faster way. In the same session with moo on, you type /hope:interrogate. Claude asks you to defend the plan in five rounds of questions, thirteen in all: the bar the judge must meet, how many wrong blocks you accept, what happens when the judge is down, what context it may see, and what each of three plain rules covers. In one answer you write that the top three need no model: plain rules first, the judge only for the rest. It hands back a table of every decision in your words, each marked amended, defended or open, and asks whether to rebuild around the three rules."
+/>

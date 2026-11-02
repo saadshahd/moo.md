@@ -1,13 +1,21 @@
 #!/bin/bash
 # Check every demo against the recorder's captures: each take's transcript
 # against its tall captures at 45, 80 and 120 columns (run gen.sh first: it
-# writes the raw turns this reads), then every dialog capture.
+# writes the raw turns this reads), then every dialog capture, then every
+# skill take for machine paths and the sandbox.
 cd "$(dirname "$0")"
 OUT=${TMPDIR:-/tmp}/moo-docs-gen
 R=$HOME/moo-rec-tools
 fail=0
-for t in freeze:rec3/freeze anchor:rec3/anchor draft:rec3/draft reduce:rec2/reduce skills:rec2/skills chain:rec2/chain; do
+END=" anchor judge reframe "
+for t in skills:rec2/skills chain:rec2/chain clarify:rec5/clarify draft:rec5/draft freeze:rec5/freeze inversion:rec5/inversion reduce:rec6/reduce intent:rec5/intent shape:rec5/shape2 explain:rec5/explain elicit:rec5/elicit shift:rec6/shift2 interrogate:rec5/interrogate anchor:rec6/anchor widen:rec5/widen deepen:rec5/deepen judge:rec5/judge reframe:rec5/reframe router:rec5/router target:rec5/target compose:rec5/compose consult:rec5/consult; do
   page=${t%%:*} dir=$R/${t#*:}
+  # Tall captures taken before tend's short form: the end captures stand in.
+  if [[ "$END" == *" $page "* ]]; then
+    out=$(npx tsx check-end.mts "$OUT/$page.json" "$dir") || fail=1
+    echo "$page end: $out"
+    continue
+  fi
   for w in 45 80 120; do
     # The recorder's tall3 captures replace tall where both exist.
     cap=$dir/tall3-$w.ansi; [ -f "$cap" ] || cap=$dir/tall-$w.ansi
@@ -16,4 +24,5 @@ for t in freeze:rec3/freeze anchor:rec3/anchor draft:rec3/draft reduce:rec2/redu
   done
 done
 npx tsx check-dialogs.mts || fail=1
+npx tsx check-leaks.mts || fail=1
 exit $fail

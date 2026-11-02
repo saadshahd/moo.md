@@ -1,0 +1,13 @@
+---
+title: /judge
+move: decides when you can't
+description: "When you can't decide it yourself, you get one recommendation and its evidence."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { judgeScene } from "../../../demo/scenes";
+
+<Demo
+  scene={judgeScene}
+  summary="Claude Code. With moo off, you say the chime box got stuck looping the cow sound again and ask Claude to look into it. Claude reads the nine boot logs and the player code. A table compares good and stuck boots: every stuck boot had the speaker plugged in after the Pi was running, then an over-current and a USB disconnect. It finds a retry loop that never reopens the device, recommends a code fix and a workaround, and says the Y-cable in the parts note would probably still help. In the same session with moo on, you type /hope:judge are you sure we need that cable? The reply gives one verdict: not needed for the stuck loop, because the speaker only tripped the port when plugged in after boot. A table cites the boot logs for each fact, and it ends with the next step: copy the deployed player off the box so the loop can be fixed."
+/>

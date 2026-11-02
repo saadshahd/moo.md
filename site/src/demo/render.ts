@@ -15,32 +15,63 @@ export type Row = { segs: Seg[]; cls?: string; opt?: number; input?: number };
 type Cell = [string, string?];
 
 // ---- Wrapping ---------------------------------------------------------------
-// Greedy by words; a word longer than the width breaks at the edge. At 80
-// columns it matches the recordings but for a few list items, which Claude Code
-// broke one word early.
-function wrap(cs: Cell[], width: number, first = width): Cell[][] {
+// Greedy by words. As in wrapInk, the space after a row that fills its width
+// starts the next row, so that row holds one column less, and counts toward
+// filling it; Claude Code then draws the row without the space. A word longer
+// than the width starts on the row it follows when that breaks it no more
+// often than starting a new row would (wrap-ansi's rule), and breaks at the
+// edge with no space carried; a shorter word is never broken, even on a first
+// row narrower than the width.
+function wrap(cs: Cell[], width: number, first = width, keep = false): Cell[][] {
   const lines: Cell[][] = [];
   let line: Cell[] = [];
   let i = 0;
+  // Whether each row so far began with a carried space, and whether it ended
+  // inside a word.
+  const carried: boolean[] = [];
+  const broke: boolean[] = [];
+  const room = () => {
+    const n = lines.length;
+    const limit = (k: number) => (k ? width : first);
+    const carry = n > 0 && !broke[n - 1] && lines[n - 1].length + (carried[n - 1] ? 1 : 0) >= limit(n - 1);
+    carried[n] = carry;
+    return limit(n) - (carry ? 1 : 0);
+  };
   while (i < cs.length) {
+    const from = i;
     while (i < cs.length && cs[i][0] === " ") i++;
+    // Spaces between words close up to one, but a run inside code stays.
+    const run = cs.slice(from, i);
+    const gap: Cell[] = run.length > 1 && run.every((c) => /\bl\b/.test(c[1] ?? "")) ? run : [[" "]];
     let j = i;
     while (j < cs.length && cs[j][0] !== " ") j++;
     if (i === j) break;
     const word = cs.slice(i, j);
-    if (line.length && line.length + 1 + word.length > (lines.length ? width : first)) {
-      lines.push(line);
-      line = [];
+    if (line.length && line.length + gap.length + word.length > room()) {
+      const left = room() - line.length - 1;
+      const stay =
+        word.length > width && left > 0 &&
+        Math.floor((word.length - 1) / width) >= 1 + Math.floor((word.length - left - 1) / width);
+      if (!stay) {
+        lines.push(line);
+        line = [];
+      }
     }
-    if (line.length) line.push([" "]);
+    if (line.length) line.push(...gap);
     line.push(...word);
-    while (line.length > width) {
-      lines.push(line.slice(0, width));
-      line = line.slice(width);
+    while (word.length > width && line.length > room()) {
+      const r = room();
+      broke[lines.length] = true;
+      lines.push(line.slice(0, r));
+      line = line.slice(r);
     }
     i = j;
   }
-  return [...lines, line];
+  const rows = [...lines, line];
+  room();
+  // A space carried off a row that overflowed its limit stays drawn.
+  const over = (k: number) => rows[k].length > (k ? width : first);
+  return keep ? rows.map((r, k) => (carried[k] && over(k - 1) ? [[" "] as Cell, ...r] : r)) : rows;
 }
 
 // Ink's wrap, for what Claude Code lays out in boxes and code blocks (wrap-ansi
@@ -110,7 +141,20 @@ function inline(text: string, cls?: string): Cell[] {
   for (let k = 0; k < cs.length; k++) {
     const ch = cs[k];
     if (ch === "\\" && k + 1 < cs.length) out.push([cs[++k], style()]);
-    else if (ch === "`") l = !l;
+    else if (ch === "`" && !l && cs[k + 1] === "`") {
+      // A span opened by a run of ticks closes at the next run as long and
+      // drops one space at each end: `` `x` `` draws `x` (target).
+      let n = 1;
+      while (cs[k + n] === "`") n++;
+      const tail = cs.slice(k + n).join("");
+      const end = new RegExp(`(?<!\`)\`{${n}}(?!\`)`).exec(tail);
+      if (!end) { k += n - 1; continue; }
+      const body = tail.slice(0, end.index).replace(/^ (.*) $/s, "$1");
+      l = true;
+      for (const c of body) out.push([c, style()]);
+      l = false;
+      k += n + Array.from(tail.slice(0, end.index)).length + n - 1;
+    } else if (ch === "`") l = !l;
     else if (l || ch !== "*") out.push([ch, style()]);
     else if (cs[k + 1] === "*") {
       b = !b;
@@ -132,7 +176,8 @@ const text = (line: Line) =>
  * the lines inside stand as written: with no language, in lavender; "diff",
  * + lines green and - lines red, in the terminal's palette; any other, plain.
  * A "markdown" block is the one edit: Claude Code showed it as source, and the
- * site renders it as Claude Code renders markdown outside a block. */
+ * site renders it as Claude Code renders markdown outside a block. A "card"
+ * block is not drawn: Claude Code showed none (elicit). */
 function draw(lines: Line[], width: number): Cell[][] {
   const out: Cell[][] = [];
   let afterHeading = false;
@@ -157,10 +202,12 @@ function draw(lines: Line[], width: number): Cell[][] {
       lang = raw.slice(3).trim();
       continue;
     }
+    if (fenced && lang === "card") continue;
     if (fenced) {
       const cls = lang === "diff" ? { "+": "c32", "-": "c31" }[raw[0]] : lang ? undefined : "l";
-      // A line keeps its indent; rows it wraps onto start at the gutter.
-      out.push(...wrapInk(plain(raw, cls), width).map((r, k) => (k ? r.slice(r.findIndex(([ch]) => ch !== " ")) : r)));
+      // A line keeps its indent; a row it wraps onto drops one leading space,
+      // the one carried from the full row above, and keeps any others.
+      out.push(...wrapInk(plain(raw, cls), width).map((r, k) => (k && r[0]?.[0] === " " ? r.slice(1) : r)));
       continue;
     }
     if (!raw.trim()) {
@@ -179,7 +226,7 @@ function draw(lines: Line[], width: number): Cell[][] {
     const item = !fenced && /^(-|\d+\.) (.*)$/.exec(rest);
     const mark = item ? item[1] + " " : "";
     const hang = lead.length + mark.length;
-    wrap(inline(item ? item[2] : rest), width - hang).forEach((l, k) =>
+    wrap(item ? keepNumbered(inline(item[2])) : inline(rest), width - hang).forEach((l, k) =>
       out.push([...plain(k ? " ".repeat(hang) : lead + mark), ...l]),
     );
   }
@@ -187,16 +234,31 @@ function draw(lines: Line[], width: number): Cell[][] {
   return out;
 }
 
+/** In a list item, Claude Code draws the space before a number that ends a
+ * sentence ("a 202.", "Node 22.") as a no-break space, so no row of the item
+ * starts with what reads as a numbered item's mark. Recorded in three list
+ * items; three such numbers in paragraphs kept a plain space. It reads the
+ * markdown, so a number in code ("`5 * 1000`.") keeps a plain space, and a
+ * decimal ("for 1.5 s") is no mark (target). */
+function keepNumbered(cs: Cell[]): Cell[] {
+  const s = cs.map(([ch]) => ch).join("");
+  const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
+  return cs.map((c, k) => (c[0] === " " && !code(cs[k + 1]) && /^\d+[.)](?!\d)/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
+}
+
 // ---- Tables -------------------------------------------------------------------
 // A markdown table as Claude Code draws it, inferred from every table in the
 // recordings at 45, 80 and 120 columns. Columns take their widest cell when
 // all fit in `width` - 2 - 3 per column - 1; otherwise each keeps its longest
 // word and shares what is left by how much more its widest cell wants, floored.
+// When even the longest words do not fit, each column takes its longest word's
+// share of the room, floored, at least 3, and words break at the edge (shift
+// and deepen, at 45).
 // Cells wrap as Ink does; the header is centered, body cells left, and each
-// cell sits floor(spare / 2) rows down. When even the longest words do not
-// fit, or a cell would wrap past 4 rows, each row becomes "header: value"
-// lines between rules; the 4-row limit is the one guess here: it is the only
-// rule seen that tells the recorded table at 45 columns from the list.
+// cell sits floor(spare / 2) rows down. When a cell would wrap past 4 rows,
+// each row becomes "header: value" lines between rules; the 4-row limit is
+// the one guess here: it is the only rule seen that tells the recorded tables
+// at 45 columns from the lists.
 
 /** Whether a line is a row of a markdown table. */
 const isRow = (l: Line) => /^\s*\|/.test(l);
@@ -222,9 +284,11 @@ function table(rows: Line[], width: number): Cell[][] {
   const cols =
     sum(widest) <= room
       ? widest
-      : longest.map((m, c) => m + Math.floor(((widest[c] - m) * extra) / want));
+      : extra >= 0
+        ? longest.map((m, c) => m + Math.floor(((widest[c] - m) * extra) / want))
+        : longest.map((m) => Math.max(3, Math.floor((m * room) / sum(longest))));
   const wrapped = grid.map((r) => r.map((cs, c) => (cs.length ? wrapInk(cs, cols[c]) : [[]])));
-  if (extra < 0 || wrapped.some((r) => r.some((cell) => cell.length > 4)))
+  if (wrapped.some((r) => r.some((cell) => cell.length > 4)))
     return listed(head, grid.slice(1), width);
   const line = (l: string, m: string, r: string) =>
     plain(l + cols.map((w) => "─".repeat(w + 2)).join(m) + r);
@@ -256,15 +320,36 @@ function table(rows: Line[], width: number): Cell[][] {
 /** A table too wide to draw: each row as "header: value" lines, the header
  * bold, between rules 3 short of the width. The value wraps 1 short of the
  * width, its first line as many shorter as the header has letters; that line
- * then wraps again behind the header. So recorded at 45 columns, but for one
- * value that Claude Code wrapped with a space leading its last line. */
+ * then wraps again behind the header. A row after one that overflowed its
+ * limit keeps the space it carried (widen). So recorded at 45 columns. */
+/** A listed value as Claude Code first lays it out: wrapped as Ink does at
+ * `width`, its rows joined by a space. Doubled spaces then close up, but in
+ * code a row's end leaves two: "`lsof +D`" drew "lsof  +D" (intent),
+ * "`cannot open plughw:S2 (No such device)`" drew "open  plughw:S2 (No  such"
+ * (judge). */
+function reflowed(cs: Cell[], width: number): Cell[] {
+  const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
+  // A row that ends inside a word joins the next with nothing.
+  const rows = wrapInk(cs, Math.max(1, width));
+  let at = 0;
+  const joined = rows.flatMap((r, k) => {
+    const split = k > 0 && cs[at - 1]?.[0] !== " " && cs[at]?.[0] !== " ";
+    at += r.length;
+    return k && !split ? [[" ", rows[k - 1].at(-1)?.[1]] as Cell, ...r] : r;
+  });
+  return joined.filter((c, k) => !(c[0] === " " && joined[k - 1]?.[0] === " " && !(code(c) && code(joined[k - 1]))));
+}
+
 function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
   const rule = plain("─".repeat(width - 3));
   return body.flatMap((r, k) => [
     ...(k ? [rule] : []),
     ...head.flatMap((h, c) => {
+      // A column with no header shows its value alone, and nothing when the
+      // value is empty too (judge).
+      if (!h.trim()) return r[c].length ? wrap(r[c], width - 1) : [];
       const key = inline(h, "b");
-      const [first = [], ...rest] = wrap(r[c], width - 1, width - 1 - key.length);
+      const [first = [], ...rest] = wrap(reflowed(r[c], width - 1 - key.length), width - 1, width - 1 - key.length, true);
       const line = wrap([...key, ...plain(":", "b"), ...plain(" "), ...first], width);
       // Ink keeps the space the value broke at; past the edge it takes a row
       // of its own, as recorded at 45.
@@ -309,8 +394,36 @@ const user = (text: string, cols: number): Row[] =>
   ).map((l): Row => ({ segs: segs(l), cls: "user" }));
 
 /** The collapsed tool summary, two columns in: grey, counts bold, +lines
- * green, -lines red. */
-const tools = (summary: string, cols: number): Row[] =>
+ * green, -lines red. A closing "[ view ]" takes a row of its own, bold grey,
+ * at any width (interrogate). The space before it stays with the summary, so
+ * a summary that fills its last row pushes that space onto a row of its own
+ * (router at 45). */
+const tools = (summary: string, cols: number): Row[] => {
+  const at = summary.indexOf(" [ view ");
+  if (at >= 0 && !summary.endsWith(" [ view ]")) return [...counts(summary.slice(0, at), cols), ...files(summary.slice(at), cols)];
+  const view = summary.endsWith(" [ view ]");
+  const rows = counts(view ? summary.slice(0, -" [ view ]".length) : summary, cols);
+  const full = rows.length > 0 && rows[rows.length - 1].segs.map((s) => s[0]).join("").length >= cols;
+  return [...rows, ...(view && full ? [BLANK] : []),
+    ...(view ? [{ segs: [["  "], ["[ view ]", "g b"]] } as Row] : [])];
+};
+/** Links to the files a turn wrote, "[ view <file> ]", bold grey, on one row
+ * under the summary. Claude Code draws the links that do not fit as a strip
+ * down the right edge over the rows below (compose); that strip is a layout
+ * glitch and is left out, as are links the recording cut. */
+const files = (links: string, cols: number): Row[] => {
+  const segs: Seg[] = [["  "]];
+  let used = 2;
+  for (const link of links.match(/\[ view [^\]]+ \]/g) ?? []) {
+    const gap = used > 2 ? 1 : 0;
+    if (used + gap + link.length > cols) break;
+    if (gap) segs.push([" "]);
+    segs.push([link, "g b"]);
+    used += gap + link.length;
+  }
+  return used > 2 ? [{ segs }] : [];
+};
+const counts = (summary: string, cols: number): Row[] =>
   wrap(
     summary
       .split(/(\+\d+|-\d+|\d+)/)
@@ -471,7 +584,7 @@ type Phase = {
 
 /** Time to read a turn's reply once it is on screen, by its lines of text. */
 const readTime = (turn: Turn) =>
-  Math.min(K.readMax, K.read + K.perLine * turn.reply.filter((l) => l.trim()).length);
+  Math.min(K.readMax, K.read + K.perLine * [turn.reply, ...(turn.more ?? []).map((m) => m.reply)].flat().filter((l) => l.trim()).length);
 
 /** When each turn of a scene plays its keys, sends, finishes replying. */
 const timed = new WeakMap<Scene, { timing: Phase[]; length: number }>();
@@ -502,10 +615,12 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
       t = next;
     });
     const sent = t;
-    // Each dialog takes the keys pressed while it was open; any other key
-    // after sending lands where its recorded moment falls.
+    // Each dialog takes the keys pressed while it was open, give or take a
+    // second: the key log and the session file keep separate clocks (the
+    // Enter that answered interrogate's second dialog was logged 0.2 s after
+    // the answer). Any other key after sending lands where its moment falls.
     const post = keys.filter(([at]) => at >= 0);
-    const within = (d: Dialog) => post.filter(([at]) => at >= d.at[0] - 1 && at <= d.at[1]);
+    const within = (d: Dialog) => post.filter(([at]) => at >= d.at[0] - 1 && at <= d.at[1] + 1);
     const stray = post.filter((k) => !dialogs.some((d) => within(d).includes(k)));
     let u = sent + K.lead;
     const opened: Phase["dialogs"] = [];
@@ -585,6 +700,14 @@ export function beatEnds(scene: Scene, timing = phases(scene).timing) {
 /** When turn `i`'s reply stands whole on screen, before the next turn types. */
 export const replyStands = (scene: Scene, i: number) => phases(scene).timing[i].reply + K.reveal;
 
+/** When turn `i` first waits on the user: its first dialog, options showing,
+ * halfway to the first key on it (the keycaps that sent the prompt gone, the
+ * pick not yet moved), or else its reply standing. */
+export const firstWait = (scene: Scene, i: number) => {
+  const d = phases(scene).timing[i].dialogs[0];
+  return d ? d.open + (d.script.moments[1]?.at ?? d.script.length) / 2 : replyStands(scene, i);
+};
+
 /** When each named move first shows: as the turn whose prompt runs it starts
  * typing, or as its skill call shows, whichever comes first. A skill goes by
  * its last part: "hope:freeze" is freeze. */
@@ -655,6 +778,10 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
     const n = Math.ceil(rows.length * ramp(s, p.reply, p.reply + K.reveal));
     transcript.push(...rows.slice(0, n), ...(n ? [BLANK] : []));
     if (n < rows.length) transcript.push(spinner(chrome.spin, since), BLANK);
+    // What came after it with no prompt shows once the reply is all in.
+    else
+      for (const m of turn.more ?? [])
+        transcript.push(...(m.tools ? [...tools(m.tools, cols), BLANK] : []), ...reply(m.reply, cols), BLANK);
   });
   if (transcript[transcript.length - 1] === BLANK) transcript.pop();
   return { transcript, typing, menu, asking, chrome };
@@ -791,7 +918,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     rule,
     // The mode row under it, "⏵⏵ bypass permissions on …", is left out, as
     // the user asked (scenes.ts).
-    statusRow(chrome.context, cols),
+    statusRow(chrome, cols),
   ];
   // The cursor ends the typed text, or starts the empty prompt.
   const col = typing ? 2 + prompt[prompt.length - 1].length : 2;
@@ -802,20 +929,21 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
 const CAPS: Record<string, string> = { Enter: "⏎", Down: "↓", Up: "↑", Left: "←", Right: "→", Escape: "Esc", Tab: "⇥", BSpace: "⌫" };
 
 /** The status line as the user's status line drew it, cut to the two parts
- * the demo keeps: context use at the left, the output style at the right,
+ * the demo keeps: context use at the left, the output style, if any, at the right,
  * ending two columns from the edge, as recorded. On the page the gap between
  * them grows, so the output style ends at the frame's right edge (Demo.astro's
  * .wide), as the user asked. */
-function statusRow(context: string, cols: number): Row {
+function statusRow({ context, style }: Chrome, cols: number): Row {
   const [pct, size] = context.split(" · ");
   const left: Seg[] = [
     ["  "],
     [`◔ Context ${pct}`, "c95"],
     ...(size ? ([[" · ", "c37"], [size, "c95"]] as Seg[]) : []),
   ];
-  const style = "◎ hold:Plain";
+  if (!style) return { segs: left, cls: "wide" };
+  const right = `◎ ${style}`;
   const used = left.reduce((n, [x]) => n + [...x].length, 0);
-  return { segs: [...left, [" ".repeat(Math.max(1, cols - 2 - used - style.length)), "fill"], [style, "c96"]], cls: "wide" };
+  return { segs: [...left, [" ".repeat(Math.max(1, cols - 2 - used - right.length)), "fill"], [right, "c96"]], cls: "wide" };
 }
 
 /** Rows a dialog leaves above it for the keycaps (player.ts placeKeys()). */
@@ -962,8 +1090,8 @@ const asked = (d: Dialog, cols: number) =>
   activityRows(escape(d.questions[0].question), d.tool, cols);
 
 /** Text after a lead, wrapped to the width left; later rows take `rest`. */
-const lead = (first: Seg[], rest: Seg[], cells: Cell[], width: number): Row[] =>
-  wrap(cells, width).map((l, k): Row => ({
+const lead = (first: Seg[], rest: Seg[], cells: Cell[], width: number, firstWidth = width): Row[] =>
+  wrap(cells, width, firstWidth).map((l, k): Row => ({
     segs: [...(k ? rest : first), ...segs(l)],
   }));
 
@@ -987,8 +1115,9 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
     const rows = (w: number) =>
       wrapInk(cells, w).map((r) => r.slice(r.findIndex(([ch]) => ch !== " ")));
     // The bar comes with a long question at any width: recorded on questions
-    // of 82 characters and more, never on one of 48 (where between, unknown).
-    const barred = text.length > 60;
+    // of 82 characters and more, never on one of 75 or less, even where it
+    // wraps (where between, unknown).
+    const barred = text.length > 75;
     const bar: Seg[] = barred ? [[before], ["│", "d"], [" "]] : [[before]];
     return rows(barred ? left - 2 : left).map((l, k): Row => ({
       segs: [...bar, [k ? " ".repeat(mark.length) : mark], ...segs(l)],
@@ -1013,10 +1142,13 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
       BLANK,
       ...qs.flatMap((q) => [
         ...ask(q.question, " ", "● ", cols),
+        // The answer's first row holds 5 short of the width, the rest 4
+        // (recorded with a typed answer at 45, 80 and 120).
         ...lead(
           [["   "], ["→ ", "ok"]],
           [["   "]],
           plain(answer(q), "ok"),
+          cols - 4,
           cols - 5,
         ),
       ]),
@@ -1070,10 +1202,12 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
   const box = (on: boolean): Seg[] =>
     q.multiSelect ? [on ? ["[✔] ", "ok"] : ["[ ] "]] : [];
   const indent = q.multiSelect ? 9 : 5;
+  // Tab moves between questions only when there are several, as recorded.
+  const nav = qs.length > 1 ? "Tab/Arrow keys to navigate" : "↑/↓ to navigate";
   const footer =
     m.cursor === n
-      ? "Enter to select · Tab/Arrow keys to navigate · ctrl+g to edit in Vim · Esc to cancel"
-      : "Enter to select · Tab/Arrow keys to navigate · Esc to cancel";
+      ? `Enter to select · ${nav} · ctrl+g to edit in Vim · Esc to cancel`
+      : `Enter to select · ${nav} · Esc to cancel`;
   return [
     rule,
     ...tabs,
@@ -1083,16 +1217,14 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
     // Half a row of space under each description, the user's choice for the
     // site: Claude Code draws none. fit() counts it against the row budget.
     ...q.options.flatMap((o, i) => {
+      // A label too wide for its row wraps under itself (compose at 45).
       const rows: Row[] = [
-        {
-          segs: [
-            cur(i),
-            [`${i + 1}.`, "g"],
-            [" "],
-            ...box(m.ticked.includes(i)),
-            [o.label, m.cursor === i ? "l" : undefined],
-          ],
-        },
+        ...lead(
+          [cur(i), [`${i + 1}.`, "g"], [" "], ...box(m.ticked.includes(i))],
+          [[" ".repeat(indent)]],
+          plain(o.label, m.cursor === i ? "l" : undefined),
+          cols - indent,
+        ),
         ...lead(
           [[" ".repeat(indent)]],
           [[" ".repeat(indent)]],
@@ -1176,10 +1308,13 @@ function beside(texts: Cell[][], widths: number[], trim = false): Cell[][] {
  * amber "✂ N lines hidden" rule; "Notes:" under it. Below about 62 columns
  * both sides shrink and wrap, as recorded at 45. */
 /** A preview's line as Claude Code draws its markdown: `code` in lavender,
- * ticks dropped, a "+ " or "* " bullet drawn "- ", the rest as written. */
+ * ticks dropped, a bullet indented up to 3 spaces drawn "- " at the margin
+ * with one space after it (recorded: "  +   key" as "- key"), a backslash
+ * ending the line dropped (the space before it stays), the rest as written. */
 const ticks = (line: string): Cell[] =>
   line
-    .replace(/^(\s*)[+*] /, "$1- ")
+    .replace(/^ {0,3}[-+*] +/, "- ")
+    .replace(/\\$/, "")
     .split("`")
     .flatMap((part, k) => plain(part, k % 2 ? "l" : undefined));
 
@@ -1188,11 +1323,15 @@ function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols:
   const LIST = 30;
   const GAP = 4;
   // The box fits the dialog's widest preview line, any question's, up to the
-  // room left: every question's box is that wide.
+  // room left, and is never under 44 columns (recorded: a widest line of 38
+  // drew 44; 41 to 73 drew widest + 4): every question's box is that wide.
+  // A preview is trimmed first, so its first line's indent counts for nothing.
   const widest = Math.max(
-    ...d.questions.flatMap((x) => x.options.flatMap((o) => (o.preview ?? "").split("\n").map((l) => ticks(l).length))),
+    ...d.questions.flatMap((x) =>
+      x.options.flatMap((o) => (o.preview ?? "").trim().split("\n").map((l) => ticks(l).length)),
+    ),
   );
-  const boxW = Math.min(cols - LIST - GAP, widest + 4);
+  const boxW = Math.min(cols - LIST - GAP, Math.max(44, widest + 4));
   const inner = Math.max(1, boxW - 4);
   const lines = (q.options[cursor]?.preview ?? "No preview available")
     .trim()

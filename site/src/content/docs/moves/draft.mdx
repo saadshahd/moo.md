@@ -1,6 +1,6 @@
 ---
 title: /draft
-move: builds something to react to
+move: builds a thing to react to
 description: "You get a small, real version to react to before you must choose."
 tableOfContents: false
 ---
@@ -9,5 +9,5 @@ import { draftScene } from "../../../demo/scenes";
 
 <Demo
   scene={draftScene}
-  summary="Claude Code. /hope:draft on what a deploy tool prints when a failed check blocks a deploy; today it only says 'deploy blocked'. While it works, one activity line shows at a time: it adds a formatter and runs it on real and edge-case data. Then a dialog asks three questions, and beside the options a box shows what the message prints for the option under the cursor. Skipped checks: failed only, as recommended. Error text: the first line only, with a note to skip a blank line or a stack frame. Links: each check and the run, as recommended. The reply shows the message built from those picks and run on the repo's CI data, tested on the real run and on blank, stack-frame and no-error cases, and a table of the smaller choices it made, each with when to pick otherwise."
+  summary="Claude Code. With moo off, you ask Claude to change what a deploy tool prints when a failed check blocks a deploy; today it only says 'deploy blocked'. Claude makes it list each failed check with its error and a link, and says it left out skipped checks. In the same session with moo on, you type /hope:draft. A dialog asks four questions, and beside the options a box shows what the tool prints for the option under the cursor. You pick: list skipped checks after the failures; the first line of each error, with a note to skip a blank line or a stack frame; the ✗ symbol; each check's own job link, with a note to add the run link once at the end. A second dialog asks two more: skip only JavaScript stack frames, and show just the check's name when its error has nothing else. The reply shows what the tool now prints on the repo's CI data and a table of the cases it tried."
 />

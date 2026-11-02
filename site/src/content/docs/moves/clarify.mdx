@@ -1,0 +1,13 @@
+---
+title: /clarify
+move: splits two readings apart
+description: "When your words read two ways, you pick the one you meant."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { clarifyScene } from "../../../demo/scenes";
+
+<Demo
+  scene={clarifyScene}
+  summary="Claude Code. With moo off, you ask for a retry in a webhook consumer, unsure about idempotency. Claude makes repeated events harmless, stops short of the retry, and ends on a question: can the fulfilment service take an idempotency key? In the same session with moo on, you type /hope:clarify. A dialog asks which retry you mean, with a box beside each of four readings showing what it builds; a retry in the webhook handler is ruled out. You pick worker retries, cautious, and the reply states the confirmed ask and a table of each failure and its outcome."
+/>

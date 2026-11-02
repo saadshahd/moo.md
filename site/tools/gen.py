@@ -42,7 +42,7 @@ def chrome_of(s):
     # The mode row, the notice above the prompt box, the dim suggestion in it,
     # the hook the spinner names and hunch's band are left out of the demos,
     # as the user asked; the spinner keeps its verb and counter.
-    c = {'context': s['context']}
+    c = {'context': s['context'], **({'style': s['style']} if s.get('style') else {})}
     if s.get('spin'):
         tail = ' · '.join(x for x in (s['spin'].get('tail') or '').split(' · ')
                           if x and not re.match(r'^running .* hook$|^(\d+m )?\d+s$', x))
@@ -66,16 +66,21 @@ def toast_of(raw):
 # came from a session resumed in another permission mode.
 tall_p = next(p for p in (os.path.join(rec, 'tall3-120.ansi'), os.path.join(rec, 'tall-120.ansi')) if os.path.exists(p))
 tall = [strip(r).rstrip() for r in open(tall_p, encoding='utf-8').read().split('\n')]
-summaries = []
+# A task notification draws no prompt: its summary follows the done line
+# ("✻ Brewed for 1m 5s · …") of the turn before.
+summaries, notices = [], []
 for i, r in enumerate(tall):
-    if r.startswith('❯ ') and i + 2 < len(tall):
+    notice = r.startswith('✻ ')
+    if (r.startswith('❯ ') or notice) and i + 2 < len(tall):
         j = i + 1
-        while j < len(tall) and tall[j].strip(): j += 1
+        while not notice and j < len(tall) and tall[j].strip(): j += 1
         k = j + 1
         rows = []
         while k < len(tall) and tall[k].startswith('  ') and not tall[k].startswith('  ⎿'):
             rows.append(tall[k].strip()); k += 1
-        summaries.append(' '.join(rows) if rows and not tall[k - 1 if rows else k].startswith('⏺') and re.match(r'^(Read|Ran|Called|Edited|Searched|Listed|Wrote|Created|Fetched|Listed)', rows[0] if rows else '') else None)
+        found = ' '.join(rows) if rows and not tall[k - 1 if rows else k].startswith('⏺') and re.match(r'^(Read|Ran|Called|Edited|Searched|Listed|Wrote|Created|Fetched|Listed)', rows[0] if rows else '') else None
+        if not notice: summaries.append(found)
+        elif found: notices.append(found)
 
 def snap_activity(part, sent, hi, reply_at, rep, replayed, windows=()):
     """The activity lines as the snaps show them while the turn worked: each
@@ -120,9 +125,20 @@ def snap_activity(part, sent, hi, reply_at, rep, replayed, windows=()):
             shown.append(rows[j][5:]); j += 1
         # A long-running command adds its time and output so far, and a hint.
         if shown[-1] == '(ctrl+b to run in background)': shown.pop()
-        shown[-1] = re.sub(r' \((\d+m )?\d+s( · \d+ lines?)?\)$', '', shown[-1])
+        # The time and line count can wrap onto a row of their own.
+        shown = re.sub(r' ?\n?\((\d+m )?\d+s( · \d+ ?\n?lines?)?\)$', '', '\n'.join(shown)).split('\n')
         cut = squash(''.join(shown)).rstrip('…')
         full = next((d for d in details if squash(d).startswith(cut)), None)
+        # A command of many lines shows each line cut at the edge: its rows
+        # then come in order, the first at the start.
+        def rows_in(d):
+            sd, pos = squash(d), 0
+            for k, r in enumerate(squash(x).rstrip('…') for x in shown):
+                at = sd.find(r, pos)
+                if at < 0 or (k == 0 and at): return False
+                pos = at + len(r)
+            return True
+        if full is None and len(shown) > 1: full = next((d for d in details if rows_in(d)), None)
         if full is None: raise SystemExit(f'{sn["file"]}: no tool in the session starts {cut[:60]!r}')
         counted = re.match(r'^(Reading|Editing|Searching|Calling|Running|Listing|Writing|Fetching)\b.*…$', label) and re.search(r'\d', label)
         if not counted and label not in known:
@@ -155,7 +171,11 @@ for n, a in enumerate(starts):
     if key:
         reply = short[key]
     turn = {'user': shown_prompt(recs[a]['message']['content'])}
-    drawn = summaries[n] if n < len(summaries) else None
+    if turn['user'].startswith('<task-notification>'):
+        drawn = notices.pop(0) if notices else None
+    else:
+        m = sum(1 for x in starts[:n] if not shown_prompt(recs[x]['message']['content']).startswith('<task-notification>'))
+        drawn = summaries[m] if m < len(summaries) else None
     if drawn != (rep['final'] or None):
         print(f'turn {n}: tool summary drawn {drawn!r}, replayed {rep["final"]!r}; using the drawn one', file=sys.stderr)
     if drawn: turn['tools'] = drawn
@@ -201,7 +221,13 @@ for n, a in enumerate(starts):
             qd = {'header': q['header'], 'question': q['question'], 'multiSelect': bool(q.get('multiSelect')),
                   'options': [{'label': o['label'], 'description': o['description'], **({'preview': o['preview']} if 'preview' in o else {})} for o in q['options']],
                   'picked': [i for _, i in found]}
-            if rest and not found: qd['typed'] = rest
+            # One pick is the label alone, even when another label starts it
+            # ("Let it run" in "Let it run, alert"); anything else was typed,
+            # even when it starts with a label ("None in 50. And the top 3 ...").
+            if not q.get('multiSelect'):
+                qd['picked'] = [labels.index(ans)] if ans in labels else []
+                if ans not in labels: qd['typed'] = ans
+            elif rest and not found: qd['typed'] = rest
             elif rest: raise SystemExit(f'answer has words beyond its pick: {ans!r}')
             if note: qd['notes'] = note
             qs.append(qd)
@@ -217,11 +243,16 @@ for n, a in enumerate(starts):
     hi = ts(recs[b]) if b < len(recs) else float('inf')
     chrome, last = [], None
     for s in snaps:
-        if not (lo < s['t'] < hi) or s['dialog'] or 'context' not in s or s['cols'] != 80: continue
+        if not (lo < s['t'] < hi) or s['dialog'] or 'context' not in s or s.get('cut') or s['cols'] != 80: continue
         c = chrome_of(s)
         if c != last:
             chrome.append([round(s['t'] - sent, 1), c])
             last = c
+    # A turn run with moo off ends where its session did: snaps after its
+    # reply that name another output style come from the session resumed for
+    # the next turn, whose own chrome holds them.
+    at_reply = next((c for x, c in reversed(chrome) if x <= reply_at - sent), {})
+    chrome = [[x, c] for x, c in chrome if x <= reply_at - sent or c.get('style') == at_reply.get('style')]
     turn['chrome'] = chrome
     toast = next((toast_of(s['raw']) for s in snaps if reply_at <= s['t'] < hi and toast_of(s['raw'])), None)
     if toast: turn['toast'] = toast
@@ -230,9 +261,18 @@ for n, a in enumerate(starts):
 
 # The recorder's keys, each in the turn it drove: a key belongs to the turn
 # whose reply had not yet come in. Seconds after that turn's prompt was sent.
+# A key pressed before sending stays before it: rounding can't take it to 0.
 for e in events:
     n = min(sum(1 for _, r in abs_times if r < e['t']), len(turns) - 1)
-    turns[n].setdefault('keys', []).append([round(e['t'] - abs_times[n][0], 1), e['kind'], e['value']])
+    at = e['t'] - abs_times[n][0]
+    turns[n].setdefault('keys', []).append([round(at, 1) if at >= 0 or round(at, 1) < 0 else -0.1, e['kind'], e['value']])
+# The Enter that sent a prompt can land a moment after the session file's
+# send time, the two clocks apart: within a second, it is still the send.
+for turn in turns:
+    keys = turn.get('keys', [])
+    if not any(at < 0 and kind == 'key' and v == 'Enter' for at, kind, v in keys):
+        k = next((k for k, (at, kind, v) in enumerate(keys) if kind == 'key' and v == 'Enter' and at <= 1.0), None)
+        if k is not None: keys[k][0] = -0.1
 
 COLORS = {'38;2;177;185;249': 'l', '38;2;153;153;153': 'g'}
 def segs_of(raw):
@@ -274,6 +314,14 @@ for n, turn in enumerate(turns):
                 if 'menu' in turn: raise SystemExit(f'turn {n}: two menus')
                 turn['menu'] = {'after': ki, 'rows': menu}
                 break
+
+# A subagent's task notification is no prompt: Claude Code drew no prompt row,
+# only the tool summary and the reply it led to, under the turn before.
+for k in range(len(turns) - 1, 0, -1):
+    if turns[k]['user'].startswith('<task-notification>'):
+        t = turns.pop(k)
+        assert not t.get('keys') and not t.get('dialogs'), 'a task notification with keys or dialogs'
+        turns[k - 1]['more'] = [{**({'tools': t['tools']} if t.get('tools') else {}), 'reply': t['reply']}, *t.get('more', []), *turns[k - 1].get('more', [])]
 
 first = next(s for s in snaps if 'context' in s)
 J = lambda v: json.dumps(v, ensure_ascii=False)

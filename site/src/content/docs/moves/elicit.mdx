@@ -1,0 +1,13 @@
+---
+title: /elicit
+move: puts your hunch into words
+description: "You say what you know but couldn't put into words, by reacting to examples."
+tableOfContents: false
+---
+import Demo from "../../../components/Demo.astro";
+import { elicitScene } from "../../../demo/scenes";
+
+<Demo
+  scene={elicitScene}
+  summary="Claude Code. With moo off, you ask whether the app needs a proper animation library, because its motion is below your bar. Claude says no: it lists what is wrong with the motion today and a five-step plan built from CSS, built-in browser animation and one drag library, then asks what engine runs the app. In the same session with moo on, you type /hope:elicit. Claude asks which feel comes closest to your bar, as a table of feels, apps that have them and what each would mean in the app. You answer that the examples don't fit, and it asks again with desktop apps. You say you don't know and to let an expert decide. It picks quick and firm and hands back a table with a decision for every effect."
+/>

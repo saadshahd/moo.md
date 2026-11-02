@@ -1,6 +1,6 @@
 ---
 title: /anchor
-move: turns findings into harness rules
+move: turns findings into checks
 description: "Your finding becomes a rule the harness checks the same way every time."
 tableOfContents: false
 ---
@@ -9,5 +9,5 @@ import { anchorScene } from "../../../demo/scenes";
 
 <Demo
   scene={anchorScene}
-  summary="Claude Code. /hope:anchor on a finding from Tuesday's outage: migration 0042 ran CREATE INDEX on payments without CONCURRENTLY, and writes to payments blocked for 9 minutes. While it works, one activity line shows at a time; it tries CONCURRENTLY on a throwaway Postgres 16 loaded with 3 million rows. A dialog asks which tables the CI check should cover, and beside each option a box shows which migrations it passes and fails. You keep every table, the recommended answer, and add a note: small tables grow; payments was small once. The reply states the rule: every CREATE INDEX is CONCURRENTLY, alone in a no-transaction file. The new test failed on migration 0043, so it rewrote 0043, and a table lists what is tested and what is still open."
+  summary="Claude Code. With moo off, you give a finding from Tuesday's outage: migration 0042 ran CREATE INDEX on payments without CONCURRENTLY, and writes to payments blocked for 9 minutes. You ask Claude to turn it into a rule for the team. Claude finds that migration 0043 made the same mistake and rewrites it, writes a README rule with three parts, adds a test that checks every migration, and tests each part against a local Postgres. In the same session with moo on, you type /hope:anchor. The reply rewrites the rule as four checks a machine can run: a table maps each judgment in the old rule to its check and test result, and a short trace shows 0042 failing check 1. It ends with three statements the trigger misses that lock writes the same way."
 />
