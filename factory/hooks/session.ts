@@ -97,7 +97,8 @@ export async function useOwnLogin($: EngineInterface): Promise<void> {
  * branch and carries the name the worker gave that issue's run; a person's session in the same
  * worktree is not. `$` carries no session name, so the session finds its own among the ones
  * `claude agents` lists. Where the rules name a bot, or can't be read, a `factory/<n>` session that
- * can't tell loses the user's login; a factory that acts as the user leaves it.
+ * can't tell loses the user's login; a factory that acts as the user leaves it, or puts it back
+ * where unreadable rules took it, as gh under the placeholder could never find the run again.
  */
 async function currentRun($: EngineInterface): Promise<FactoryRun | null> {
   const held = await $.state.get({ plugin: "factory", key: "run" });
@@ -125,6 +126,7 @@ async function currentRun($: EngineInterface): Promise<FactoryRun | null> {
       const rules = await readRules(run, cwd).catch(() => null);
 
       if (rules === null || rules.bot !== undefined) await useLogin($, cwd, null);
+      else await useOwnLogin($);
       throw err;
     }
   }

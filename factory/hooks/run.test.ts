@@ -591,6 +591,17 @@ describe("bot", () => {
     expect(h.env.get("GH_CONFIG_DIR")).toBeUndefined();
   });
 
+  test("acting as the user, a session that lost its login while it could tell neither its run nor its rules gets it back once the rules read", async ($, on) => {
+    const h = host($, on, { rules: "{", agents: false, own: { GH_TOKEN: "gho_own" } });
+    h.tool(() => ({ result: {} }));
+    await h.call(read);
+    expect(h.env.get("GH_TOKEN")).toBe("factory-no-login");
+    h.rulesAre(AS_USER);
+    await h.call(read);
+    expect(h.env.get("GH_TOKEN")).toBe("gho_own");
+    expect(h.env.get("GH_CONFIG_DIR")).toBeUndefined();
+  });
+
   test("acting as the user, a run that took the bot's login while the rules were unreadable commits as itself again", async ($, on) => {
     const h = host($, on, { rules: "{" });
     h.tool(() => ({ result: {} }));
