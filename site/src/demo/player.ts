@@ -7,6 +7,7 @@
 // "without moo" button steps back to the plain reply and forth to moo's
 // hand-back. Demo.astro sets the columns and rows.
 import { beatEnds, beatTimes, frame, phases, type Frame, type Row, type Seg } from "./render";
+import { currentSpeed, followSpeed, pickSpeed } from "./speed";
 import type { Scene } from "./types";
 
 
@@ -121,7 +122,7 @@ export function mount(root: HTMLElement) {
 
   let t = 0;
   let last = 0;
-  let speed = 1;
+  let speed = currentSpeed();
   let still = 0; // the still on screen under reduced motion
   // Under reduced motion, the moment held in place of a beat's still: the
   // hand-back or the plain reply the "without moo" button stepped to, until
@@ -492,12 +493,12 @@ export function mount(root: HTMLElement) {
     if (!motion.matches) seek(to);
     sync();
   });
-  speedBtns.forEach((b) =>
-    b.addEventListener("click", () => {
-      speed = Number(b.dataset.speed);
-      sync();
-    }),
-  );
+  // A speed picked here, or in another player, plays here too (speed.ts).
+  speedBtns.forEach((b) => b.addEventListener("click", () => pickSpeed(Number(b.dataset.speed))));
+  followSpeed((x) => {
+    speed = x;
+    sync();
+  });
 
   // The timeline seeks where it is pressed, and follows a drag; a press within
   // half a fingertip (12px) of a tick goes to that beat.

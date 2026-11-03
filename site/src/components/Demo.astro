@@ -13,6 +13,7 @@
 import type { Scene } from "../demo/types";
 import { beatEnds, beatTimes, firstWait, frame, moveTimes, phases, replyStands, ROWS } from "../demo/render";
 import { demoMoves } from "../moves";
+import { SPEEDS } from "../demo/speed";
 // The terminal font: Fira Code, as in the Solo terminal the demos are checked
 // against. Its glyphs for box drawing come from the symbols subset.
 import "@fontsource/fira-code/latin-400.css";
@@ -20,7 +21,6 @@ import "@fontsource/fira-code/latin-700.css";
 import "@fontsource/fira-code/symbols2-400.css";
 
 type Props = { scene: Scene; summary: string };
-const SPEEDS = [0.5, 1, 1.5, 2];
 const { scene, summary } = Astro.props;
 const { entry } = Astro.locals.starlightRoute;
 const names = demoMoves(entry);
