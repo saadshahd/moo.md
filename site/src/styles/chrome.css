@@ -188,39 +188,51 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 .demo .controls .speed button[aria-pressed="true"] { background: var(--moo-ink); color: var(--moo-paper); }
 @media (max-width: 40rem) { .demo .controls .speed button { padding: 0 0.45rem; } }
 /* A chain's timeline: a chapter per move (player.ts). Each name sits over its
-   part of the rail, the playing one in ink, the others muted; the rail, the
-   knob and the other controls line up under them. Where the names would
-   touch (.tight) or on a phone, the time names the move instead, as wide as
-   the longest name so the timeline holds still. On a phone the timeline
-   takes a row of its own above the buttons, the time where the names sit. */
+   part of the rail, muted, the playing one in a pill that glides from name
+   to name; the rail, the knob and the other controls line up under them.
+   Where the names would touch (.tight) or on a phone, the time names the
+   move instead, in the pill, as wide as the longest name so the timeline
+   holds still. On a phone the timeline takes a row of its own above the
+   buttons, the time where the names sit. */
 .demo .controls.chaptered { align-items: flex-end; height: auto; }
 .demo .chaptered :is(.now, .total) { line-height: 2rem; }
-.demo .chaptered .chapters > span {
-  position: absolute; top: 0; font: 400 0.75rem / 1 var(--__sl-font-mono); white-space: nowrap;
-  color: var(--sl-color-gray-3); transition: color 120ms ease-out;
+.demo .chaptered [data-names] > span {
+  padding: 4px 6px; font: 400 0.75rem / 1 var(--__sl-font-mono); white-space: nowrap; color: var(--sl-color-gray-3);
 }
-.demo .chaptered .chapters > .on { color: var(--moo-ink); }
+.demo .chaptered .chapters span { position: absolute; top: 0; }
 .demo .chaptered.tight .chapters { visibility: hidden; }
-.demo .chaptered .at { display: none; grid-template-areas: "a"; margin-inline-start: 0.4em; }
-.demo .chaptered .at > span { grid-area: a; visibility: hidden; }
-.demo .chaptered .at > .on { visibility: visible; color: var(--moo-ink); }
-.demo .chaptered.tight .at { display: inline-grid; }
+/* The pill: the names' copy, paper on ink, clipped to the playing one. */
+.demo .chaptered .lit {
+  position: absolute; inset: 0; pointer-events: none; background: var(--moo-ink);
+  clip-path: inset(0 100% 0 0); opacity: 0;
+  transition: opacity 0.15s ease-out, clip-path 0.26s cubic-bezier(0.77, 0, 0.175, 1);
+}
+.demo .chaptered .lit.enter { transition: opacity 0.15s ease-out, clip-path 0.15s cubic-bezier(0.23, 1, 0.32, 1); }
+.demo .chaptered .lit > span { color: var(--moo-paper); }
+.demo .chaptered .at { display: none; margin-inline-start: 0.4em; }
+.demo .chaptered .names { position: relative; display: inline-grid; }
+.demo .chaptered .names > * { display: grid; grid-template-areas: "a"; justify-items: start; }
+.demo .chaptered .names [data-names] > span { grid-area: a; visibility: hidden; }
+.demo .chaptered .names [data-names] > .on { visibility: visible; }
+.demo .chaptered .names [data-names]:not(.lit) > .on { color: var(--moo-ink); }
+.demo .chaptered.tight .at { display: inline; }
 @container demo (min-width: 604px) {
-  .demo .chaptered:not(.tight) .track { height: 2.75rem; }
-  .demo .chaptered:not(.tight) :is(.rail, .knob) { top: calc(50% + 0.375rem); }
+  .demo .chaptered:not(.tight) .track { height: 3rem; }
+  .demo .chaptered:not(.tight) :is(.rail, .knob) { top: calc(50% + 0.5rem); }
 }
 @container demo (max-width: 603px) {
   .demo .controls.chaptered { position: relative; flex-wrap: wrap; row-gap: 0.25rem; }
-  .demo .chaptered .track { order: -1; flex-basis: 100%; height: 2.75rem; }
-  .demo .chaptered :is(.rail, .knob) { top: calc(50% + 0.375rem); }
+  .demo .chaptered .track { order: -1; flex-basis: 100%; height: 3rem; }
+  .demo .chaptered :is(.rail, .knob) { top: calc(50% + 0.5rem); }
   .demo .chaptered .chapters { display: none; }
   .demo .chaptered .now { display: block; position: absolute; top: 0; left: 0; line-height: 1; pointer-events: none; }
-  .demo .chaptered .at { display: inline-grid; }
+  .demo .chaptered .at { display: inline; }
   .demo .chaptered .speed { margin-inline-start: auto; }
 }
-/* Under reduced motion the time hides, and the move's name stays. */
-.demo.reduced .chaptered .at > .on { visibility: visible; }
-@media (prefers-reduced-motion: reduce) { .demo .chaptered .chapters > span { transition: none; } }
+/* Under reduced motion the time hides, and the move's name stays; the pill
+   jumps. */
+.demo.reduced .chaptered .at { visibility: visible; }
+@media (prefers-reduced-motion: reduce) { .demo .chaptered :is(.lit, .lit.enter) { transition: none; } }
 /* The step back to the plain reply, in the amber of its turn on the
    timeline, so it is the timeline's legend: filled while that turn is on
    screen, outlined once moo's starts. */

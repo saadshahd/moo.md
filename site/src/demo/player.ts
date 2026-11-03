@@ -107,7 +107,10 @@ export function mount(root: HTMLElement) {
   // A chain's moves, as chapters of the timeline (Demo.astro): a name on the
   // rail each, and one beside the time when the names don't fit there.
   const chapterEls = [...root.querySelectorAll<HTMLElement>("[data-chapters] > *")];
-  const atEls = [...root.querySelectorAll<HTMLElement>("[data-at] > *")];
+  // Every set of the names: on the rail and beside the time, each with its
+  // pill's copy (placePills).
+  const nameSets = [...root.querySelectorAll<HTMLElement>("[data-names]")].map((s) => [...s.children] as HTMLElement[]);
+  const pills = [...root.querySelectorAll<HTMLElement>("[data-pill]")];
   if (chapterEls.length && chapterEls.length !== chips.length)
     throw new Error(`The timeline shows ${chapterEls.length} moves; the demo has ${chips.length}`);
   const beats = [...root.querySelectorAll<HTMLElement>("[data-beat]")];
@@ -166,14 +169,16 @@ export function mount(root: HTMLElement) {
     const w = track.clientWidth;
     let end = -Infinity;
     let fits = true;
+    const railPill = pills.find((p) => p.parentElement!.classList.contains("chapters"))!;
     chapterEls.forEach((el, k) => {
       const mid = ((chapterStart(k) + (k + 1 < chips.length ? chapterStart(k + 1) : 1)) / 2) * w;
       const left = Math.min(Math.max(0, mid - el.offsetWidth / 2), w - el.offsetWidth);
-      el.style.left = `${left}px`;
-      fits &&= left >= end + 12;
+      el.style.left = (railPill.children[k] as HTMLElement).style.left = `${left}px`;
+      fits &&= left >= end + 4;
       end = left + el.offsetWidth;
     });
     track.parentElement!.classList.toggle("tight", !fits);
+    if (lit >= 0) placePills("land");
   }
   new ResizeObserver(placeChapters).observe(track);
   document.fonts.ready.then(placeChapters);
@@ -274,14 +279,40 @@ export function mount(root: HTMLElement) {
     keycaps.style.top = `${Math.max(parseFloat(getComputedStyle(term).paddingTop), top)}px`;
   }
 
-  // The chapter on screen lights up, on the rail and beside the time; its
-  // name, if the timeline has chapters.
+  // The chapter on screen lights up, on the rail and beside the time, and
+  // the pill glides to its name; returns the name, if the timeline has
+  // chapters.
   function lightChapter(k: number) {
     if (k !== lit) {
+      const shown = lit >= 0;
       lit = k;
-      [chapterEls, atEls].forEach((els) => els.forEach((el, i) => el.classList.toggle("on", i === k)));
+      nameSets.forEach((els) => els.forEach((el, i) => el.classList.toggle("on", i === k)));
+      placePills(shown ? "glide" : "enter");
     }
     return chapterEls[k]?.textContent ?? "";
+  }
+
+  // Each pill is a copy of its names in paper on ink (Demo.astro), clipped to
+  // the playing one: it glides from name to name, grows into place when it
+  // first shows, and lands with no motion when the names move (a resize, the
+  // font arriving, the names leaving the rail for the time).
+  function placePills(how: "glide" | "enter" | "land") {
+    for (const pill of pills) {
+      const on = pill.children[lit] as HTMLElement | undefined;
+      pill.classList.toggle("enter", how === "enter");
+      if (!on?.offsetWidth) continue;
+      const [w, h] = [pill.offsetWidth, pill.offsetHeight];
+      const inset = (d: number) =>
+        `inset(${on.offsetTop + d}px ${w - on.offsetLeft - on.offsetWidth + d}px ${h - on.offsetTop - on.offsetHeight + d}px ${on.offsetLeft + d}px round var(--moo-pill))`;
+      if (how !== "glide") {
+        pill.style.transition = "none";
+        pill.style.clipPath = inset(how === "enter" ? 3 : 0);
+        void pill.offsetWidth; // start from here
+        pill.style.transition = "";
+      }
+      pill.style.clipPath = inset(0);
+      pill.style.opacity = "1";
+    }
   }
 
   // The cursor glides to its cell, leaving a short smear, and blinks softly

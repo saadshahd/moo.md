@@ -79,10 +79,23 @@ for (const cols of [45, 80, 120])
         <button type="button" class="play" data-play aria-label="Pause demo">❚❚</button>
         <span class="now" aria-hidden="true">
           <span data-now>0:00</span>
-          {chaptered && <span class="at" data-at>{names.map((m) => <span>· /{m}</span>)}</span>}
+          {chaptered && (
+            <span class="at">
+              ·{" "}
+              <span class="names">
+                <span data-names>{names.map((m) => <span>/{m}</span>)}</span>
+                <span class="lit" data-names data-pill>{names.map((m) => <span>/{m}</span>)}</span>
+              </span>
+            </span>
+          )}
         </span>
         <div class="track" data-track role="slider" tabindex="0" aria-label="Demo timeline">
-          {chaptered && <div class="chapters" data-chapters aria-hidden="true">{names.map((m) => <span>/{m}</span>)}</div>}
+          {chaptered && (
+            <div class="chapters" aria-hidden="true">
+              <div data-names data-chapters>{names.map((m) => <span>/{m}</span>)}</div>
+              <div class="lit" data-names data-pill>{names.map((m) => <span>/{m}</span>)}</div>
+            </div>
+          )}
           <div class="rail" data-rail><div class="fill" data-fill></div></div>
           <div class="knob" data-knob aria-hidden="true"></div>
         </div>
