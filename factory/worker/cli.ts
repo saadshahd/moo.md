@@ -7,6 +7,7 @@
 import { parseArgs } from "node:util";
 import { messageOf } from "../lib/errors.ts";
 import { CALL } from "../lib/commands.ts";
+import { GIT_NO_HOOKS } from "../lib/git.ts";
 import { holder, WHY_MAX, type Plan } from "../lib/formats.ts";
 import {
   branchFor, factoryComments, issueOf, latest, markStuck, must, post, repoOf, upsert, type Actors,
@@ -145,10 +146,10 @@ async function refuseGuarded(cwd: string): Promise<void> {
     throw new Refusal(`the branch changes ${guarded.join(", ")}, which only a person changes; take those changes out`, 4);
 }
 
-/** Pushes the branch of issue `issue` to its own name on origin, never forced. */
+/** Pushes the branch of issue `issue` to its own name on origin, never forced, running none of the repo's hooks. */
 export async function pushBranch(cwd: string, issue: number): Promise<string> {
   await refuseGuarded(cwd);
-  await must(run, ["git", "push", "origin", `HEAD:refs/heads/${branchFor(issue)}`], { cwd });
+  await must(run, [...GIT_NO_HOOKS, "push", "origin", `HEAD:refs/heads/${branchFor(issue)}`], { cwd });
 
   return `pushed ${branchFor(issue)}`;
 }
