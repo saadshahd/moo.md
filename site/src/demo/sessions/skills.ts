@@ -9,14 +9,14 @@ export const turns: Turn[] = [
     activity: [
       {"at": 2.9, "line": "Showing repo history and file list", "tool": "$ git log --stat -5 && ls -la && find . -type f -not -path './.git/*' -not -path './node_modules/*' | head -100"},
       {"at": 5.9, "line": "Showing repo history and file list", "tool": "$ for f in README.md .gitignore package.json src/invoice.js test/invoice.test.js; do echo \"=== $f\"; cat -n \"$f\"; done; ls .codegraph 2>/dev/null; node --version; ls ~/.claude/projects/-Users-dev-invoices/memory/ 2>/dev/null"},
-      {"at": 15.9, "line": "Calling **1** tool, running **2** shell commands…", "tool": "$ for f in README.md .gitignore package.json src/invoice.js test/invoice.test.js; do echo \"=== $f\"; cat -n \"$f\"; done; ls .codegraph 2>/dev/null; node --version; ls ~/.claude/projects/-Users-dev-invoices/memory/ 2>/dev/null", "move": "mattpocock-skills:domain-modeling"},
+      {"at": 15.9, "line": "Calling **1** tool, running **2** shell commands…", "tool": "$ for f in README.md .gitignore package.json src/invoice.js test/invoice.test.js; do echo \"=== $f\"; cat -n \"$f\"; done; ls .codegraph 2>/dev/null; node --version; ls ~/.claude/projects/-Users-dev-invoices/memory/ 2>/dev/null"},
       {"at": 16.9, "line": "Calling **1** tool, running **3** shell commands…", "tool": "$ for f in README.md .gitignore package.json src/invoice.js test/invoice.test.js; do echo \"=== $f\"; cat -n \"$f\"; done; ls .codegraph 2>/dev/null; node --version; ls ~/.claude/projects/-Users-dev-invoices/memory/ 2>/dev/null"},
       {"at": 17.9, "line": "Calling **1** tool, running **3** shell commands…", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
-      {"at": 30.9, "line": "Calling **2** tools, running **3** shell commands…", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md", "move": "show-me:show-me"},
+      {"at": 30.9, "line": "Calling **2** tools, running **3** shell commands…", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
       {"at": 101.9, "line": "Calling **3** tools, running **3** shell commands…", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
       {"at": 175.9, "line": "INV-1001 ($1,200, due Oct 15) becomes overdue on Oct 16. Which rule sets its late fee? The amounts are examples; pick Other to name your own rule or amount.", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
       {"at": 307.9, "line": "Where should the 1.5%-a-month rate and the 10% cap live? The choice decides what happens to unpaid invoices if the rate ever changes.", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
-      {"at": 342.9, "line": "Editing **1** file +**32**, calling **5** tools, running **3** shell commands…", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md", "move": "mattpocock-skills:tdd"},
+      {"at": 342.9, "line": "Editing **1** file +**32**, calling **5** tools, running **3** shell commands…", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
       {"at": 347.9, "line": "Editing **1** file +**32**, calling **6** tools, running **3** shell commands…", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
       {"at": 380.9, "line": "Tests for late interest: check it only through what an invoice owes, amountDue(invoice, today), and keep the interest math private to src/invoice.js?", "tool": "$ cd ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.0/skills/engineering/domain-modeling && ls && cat CONTEXT-FORMAT.md"},
       {"at": 400.9, "line": "Running baseline tests and computing test dates", "tool": "$ npm test 2>&1 | tail -12; node -e '\nconst add=(d,n)=>{const x=new Date(d+\"T00:00:00Z\");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};\nfor (const n of [30,31,61,120,121,180,181]) console.log(n, add(\"2026-10-15\",n));'"},
@@ -34,6 +34,11 @@ export const turns: Turn[] = [
       {"at": 448.9, "line": "Running tests after adding the terms check", "tool": "$ npm test 2>&1 | grep -E '^(not ok|ok|# (pass|fail))|actual|expected|Missing expected'"},
       {"at": 462.9, "line": "Running tests and showing the full diff", "tool": "$ npm test 2>&1 | grep -E '^# (pass|fail)' && git status --short && git diff"},
       {"at": 516.9, "line": "Rerunning tests and checking zero terms charge no interest", "tool": "$ npm test 2>&1 | grep -E '^# (pass|fail)' && node --input-type=module -e '\nimport { amountDue } from \"./src/invoice.js\";\nconst inv = { id: \"INV-1001\", issuedOn: \"2026-10-01\", termsDays: 14, totalCents: 120000, paidOn: null, lateInterestTerms: { monthlyBps: 0, capBps: 0 } };\nconsole.log(amountDue(inv, \"2026-10-16\"), amountDue(inv, \"2027-06-01\"));'"},
+    ],
+    launches: [
+      {"at": 15.797, "skill": "mattpocock-skills:domain-modeling"},
+      {"at": 31.109, "skill": "show-me:show-me"},
+      {"at": 342.516, "skill": "mattpocock-skills:tdd"},
     ],
     dialogs: [
       {

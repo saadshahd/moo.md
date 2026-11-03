@@ -15,6 +15,9 @@ export type Turn = {
   interrupted?: true;
   /** The activity lines focus mode showed while Claude worked, in order. */
   activity?: Activity[];
+  /** Each skill the turn launched, by its Skill call in the session file:
+   * seconds after the prompt was sent, and the skill, e.g. "hope:widen". */
+  launches?: { at: number; skill: string }[];
   /** The AskUserQuestion dialogs the turn opened before its reply, in order. */
   dialogs?: Dialog[];
   /** The toast hunch showed once the reply was in, e.g. tend's. */
@@ -53,14 +56,12 @@ export type Chrome = {
 };
 
 /** One activity line and the tool line under it, from `at` seconds after the
- * prompt was sent. A Skill call shows no label of its own: `move` names the
- * skill, and `line` is the counted summary, counts in **bold**. */
+ * prompt was sent. A counted summary has its counts in **bold**. */
 export type Activity = {
   at: number;
   line: Line;
   /** The newest tool's line: "$ " and the command, a path, or a pattern. */
   tool?: string;
-  move?: string;
 };
 
 /** One question of an AskUserQuestion dialog, and how the recorder answered. */
@@ -91,8 +92,8 @@ export type Dialog = {
 };
 
 /** A caption above the terminal that narrates the demo. It takes over as turn
- * `at` starts typing; with `on: "move"` as its activity reaches skill call `n`
- * (counting from 0); with `on: "dialog"` as its dialog `d` (default 0) shows
+ * `at` starts typing; with `on: "move"` as its skill launch `n` (counting
+ * from 0) is made; with `on: "dialog"` as its dialog `d` (default 0) shows
  * question `q`; with `on: "reply"` as its reply arrives. */
 export type Beat =
   | { at: number; on?: "reply"; text: string }

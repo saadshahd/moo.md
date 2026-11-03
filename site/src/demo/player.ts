@@ -82,7 +82,9 @@ let demos = 0;
 export function mount(root: HTMLElement) {
   const { scene, chips, without } = JSON.parse(root.dataset.demo!) as {
     scene: Scene;
-    chips: { at: number; beat: number }[];
+    /** A chain's chapters: when each move launches and ends, and the beat on
+     * screen at its launch. */
+    chips: { at: number; end: number; beat: number }[];
     /** When moo's hand-back and the plain reply stand, and when the move's turn starts typing. */
     without?: { handBack: number; plain: number; moveStarts: number };
   };
@@ -156,17 +158,21 @@ export function mount(root: HTMLElement) {
   // moo's turn starts (chrome.css).
   const mooFrom = () => (without ? tickAt(times.findIndex((x) => x >= without.moveStarts)) : 0);
 
-  // A chapter runs from its move's start to the next one's, the first from the
-  // timeline's start. The rail parts where each later one starts. Each name
-  // sits centred on its chapter, inside the timeline, or slides right to
-  // clear the name before it while it still starts over its own chapter;
-  // where one can't, the names leave the rail and the time names the move
-  // instead. One rule for every chain.
-  const chapterStart = (k: number) => (k ? tickAt(chips[k].beat) : 0);
+  // A chapter runs from its move's launch to its end (Demo.astro); under
+  // reduced motion, from the beat on screen at each. The rail parts where each
+  // starts and ends. Each name sits centred on its chapter, inside the
+  // timeline, or slides right to clear the name before it while it still
+  // starts over its own chapter; where one can't, the names leave the rail
+  // and the time names the move instead. One rule for every chain.
+  const placeAt = (s: number) =>
+    motion.matches ? Math.max(0, times.findLastIndex((x) => x <= s)) / Math.max(1, beats.length - 1) : s / length;
+  const chapterStart = (k: number) => placeAt(chips[k].at);
+  const chapterEnd = (k: number) => placeAt(chips[k].end);
   function placeChapters() {
     if (!chapterEls.length) return;
-    const starts = chips.map((_, k) => `${chapterStart(k) * 100}%`).slice(1);
-    rail.style.maskImage = `linear-gradient(to right, ${starts
+    const parts = [...new Set(chips.flatMap((_, k) => [chapterStart(k), chapterEnd(k)]))].filter((x) => x > 0 && x < 1);
+    rail.style.maskImage = `linear-gradient(to right, ${parts
+      .map((x) => `${x * 100}%`)
       .map((x) => `#000 calc(${x} - 1.5px), transparent calc(${x} - 1.5px) calc(${x} + 1.5px), #000 calc(${x} + 1.5px)`)
       .join(", ")})`;
     const w = track.clientWidth;
@@ -174,7 +180,7 @@ export function mount(root: HTMLElement) {
     let fits = true;
     const railPill = pills.find((p) => p.parentElement!.classList.contains("chapters"))!;
     chapterEls.forEach((el, k) => {
-      const [from, to] = [chapterStart(k), k + 1 < chips.length ? chapterStart(k + 1) : 1].map((x) => x * w);
+      const [from, to] = [chapterStart(k), chapterEnd(k)].map((x) => x * w);
       const left = Math.min(Math.max(0, (from + to) / 2 - el.offsetWidth / 2, end + 4), w - el.offsetWidth);
       el.style.left = (railPill.children[k] as HTMLElement).style.left = `${left}px`;
       fits &&= left >= end + 4 && left <= to - 8;
@@ -251,7 +257,7 @@ export function mount(root: HTMLElement) {
     fill.style.clipPath = `inset(0 calc(100% - ${at}) 0 0)`;
     knob.style.left = at;
     nowEl.textContent = clock(now);
-    const move = lightChapter(Math.max(0, chips.findLastIndex((c) => c.at <= now)));
+    const move = lightChapter(chips.findIndex((c) => c.at <= now && now < c.end));
     if (reduced) {
       track.setAttribute("aria-valuenow", String(still + 1));
       track.setAttribute("aria-valuetext", `${move ? `${move}: ` : ""}${scene.beats[still].text}`);
@@ -517,13 +523,14 @@ export function mount(root: HTMLElement) {
     else if (motion.matches) seekBeat(Math.round(x * (beats.length - 1)));
     else seek(x * length);
   };
-  // On a chain's timeline, a tap goes to its chapter's start (a name's own,
-  // since a name may reach past its chapter) and a drag scrubs.
+  // On a chain's timeline, a tap on a chapter goes to its launch (a name's
+  // own, since a name may reach past its chapter), a tap outside one seeks
+  // there, and a drag scrubs.
   let tap: { x: number; k: number } | undefined;
   const chapterAt = (e: PointerEvent) => {
     const named = chapterEls.indexOf((e.target as HTMLElement).closest<HTMLElement>("[data-chapters] > *")!);
     const x = (e.clientX - track.getBoundingClientRect().left) / track.clientWidth;
-    return named >= 0 ? named : Math.max(0, chips.findLastIndex((_, k) => chapterStart(k) <= x));
+    return named >= 0 ? named : chips.findIndex((_, k) => chapterStart(k) <= x && x < chapterEnd(k));
   };
   track.addEventListener("pointerdown", (e) => {
     track.setPointerCapture(e.pointerId);
@@ -535,8 +542,10 @@ export function mount(root: HTMLElement) {
     tap = undefined;
     seekTo(e);
   });
-  track.addEventListener("pointerup", () => {
-    if (tap) seekBeat(chips[tap.k].beat);
+  track.addEventListener("pointerup", (e) => {
+    if (tap && tap.k < 0) seekTo(e);
+    else if (tap && motion.matches) seekBeat(chips[tap.k].beat);
+    else if (tap) seek(chips[tap.k].at);
     tap = undefined;
   });
 

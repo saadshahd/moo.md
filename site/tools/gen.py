@@ -6,7 +6,8 @@
 # key log. The module names no home folder: see renamed().
 # Usage: gen.py <session.jsonl> <cwd> <rec dir> <out.ts> [N=tend short key ...]
 #   [--keys keylog.json] [--activity-from-snaps] [--raw turns.json] [--comment text]
-# --raw writes the turns as recorded, home folder and all, for check-screen.mts.
+# --raw writes the turns as recorded, home folder and all, for check-screen.mts,
+# and the session file's path beside them (.src), for check-timing.mts.
 import json, os, re, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(__file__))
 from snaps import parse as parse_snap, strip
@@ -98,10 +99,6 @@ def snap_activity(part, sent, hi, reply_at, rep, replayed, windows=()):
             elif c['name'] in ('Grep', 'Glob'): details.append(f'"{i["pattern"]}"')
     squash = lambda x: re.sub(r'\s+', '', x)
     known = {re.sub(r'\*\*', '', st['line']) for st in rep['states']}
-    # The replay keeps a skill's name on every state after its call; a move is
-    # where the name changes.
-    moves = [(st['at'], st['move']) for k, st in enumerate(rep['states'])
-             if st.get('move') and st['move'] != next((x.get('move') for x in reversed(rep['states'][:k]) if x.get('move')), None)]
     out, last = [], None
     for sn in snaps:
         if not (sent + 1 <= sn['t'] < min(hi, reply_at)) or sn['dialog'] or sn['cols'] != 80: continue
@@ -150,11 +147,6 @@ def snap_activity(part, sent, hi, reply_at, rep, replayed, windows=()):
         last = key
         at = round(sn['t'] - sent, 1)
         out.append({'at': at, 'line': line, 'tool': full})
-    # A skill call shows as the counted line it set; the first one at or after it carries the move.
-    for t, mv in moves:
-        a = next((a for a in out if a['at'] >= round(t - sent - 1, 1) and 'move' not in a and re.search(r'\*\*', a['line'])), None)
-        if a: a['move'] = mv
-        else: print(f'skill call {mv} at {t - sent:.1f}s shows on no snap', file=sys.stderr)
     return out
 
 turns, abs_times = [], []
@@ -191,16 +183,21 @@ for n, a in enumerate(starts):
             if k != prev: ask_states.append({'after': len(activity), 'tool': st['detail']})
             prev = k
             continue
-        if not st['line'] or (k == prev and not st.get('move')): continue
+        if not st['line'] or k == prev: continue
         prev = k
         activity.append({'at': round(st['at'] - sent, 1), 'line': st['line'] if st.get('move') else esc(st['line']),
-                         **({'tool': st['detail']} if st['detail'] else {}), **({'move': st['move']} if st.get('move') else {})})
+                         **({'tool': st['detail']} if st['detail'] else {})})
     if '--activity-from-snaps' in opts:
         closes = [ts(next(e for e in part if e.get('type') == 'user' and isinstance(e.get('toolUseResult'), dict) and 'answers' in e['toolUseResult']
                           and any(c.get('tool_use_id') == use['id'] for c in e['message']['content'] if isinstance(c, dict)))) for _, use in asks]
         activity = snap_activity(part, sent, ts(recs[b]) if b < len(recs) else float('inf'), reply_at, rep, activity,
                                  [(o, c) for (o, _), c in zip(asks, closes)])
     if activity: turn['activity'] = activity
+    # Each skill the turn launched, when its Skill call was logged: a chain's
+    # chapter starts there (Demo.astro).
+    launches = [{'at': round(ts(e) - sent, 3), 'skill': c['input']['skill']} for e in part if e.get('type') == 'assistant'
+                for c in e['message']['content'] if c.get('type') == 'tool_use' and c['name'] == 'Skill']
+    if launches: turn['launches'] = launches
     dialogs = []
     for n_ask, (opened, use) in enumerate(asks):
         res = next(e for e in part if e.get('type') == 'user' and isinstance(e.get('toolUseResult'), dict) and 'answers' in e['toolUseResult']
@@ -331,7 +328,7 @@ for t in turns:
     lines.append('  {')
     for k, v in t.items():
         if k == 'reply': lines += ['    reply: [', *(f'      {J(x)},' for x in v), '    ],']
-        elif k in ('activity', 'chrome'): lines += [f'    {k}: [', *(f'      {J(x)},' for x in v), '    ],']
+        elif k in ('activity', 'launches', 'chrome'): lines += [f'    {k}: [', *(f'      {J(x)},' for x in v), '    ],']
         else: lines.append(f'    {k}: {json.dumps(v, ensure_ascii=False, indent=2).replace(chr(10), chr(10) + "    ")},')
     lines.append('  },')
 lines += ['];', '']
@@ -348,5 +345,8 @@ for name in {user, re.sub(r'[.]', '-', user)}:
     if name.lower() in module.lower():
         raise SystemExit(f'{out}: names the user ({name!r}) after renaming')
 open(out, 'w').write(module)
-if raw_out: json.dump(turns, open(raw_out, 'w'), ensure_ascii=False)
+if raw_out:
+    json.dump(turns, open(raw_out, 'w'), ensure_ascii=False)
+    # The session file beside them, for check-timing.mts to read its Skill calls itself.
+    open(re.sub(r'\.json$', '', raw_out) + '.src', 'w').write(os.path.abspath(sess))
 print(out, [(t['user'][:40], len(t.get('activity', [])), len(t['chrome']), t.get('toast'), len(t.get('dialogs', [])), len(t.get('keys', [])), bool(t.get('menu'))) for t in turns])

@@ -121,9 +121,9 @@ export const chainScene: Scene = {
       at: 0,
       on: "move",
       n: 2,
-      text: "Four files changed so far; the reply sums them up.",
+      text: "Tests rerun: red on the old code, green on the new.",
     },
-    { at: 0, on: "move", n: 3, text: "Tests rerun: red on the old code, green on the new." },
+    { at: 0, on: "move", n: 3, text: "Four files changed so far; the reply sums them up." },
     {
       at: 0,
       on: "reply",

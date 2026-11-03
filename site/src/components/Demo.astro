@@ -11,7 +11,7 @@
 // hand-back. Every box around the terminal has a fixed height, so the terminal
 // sits at the same place and size on every demo page at a given viewport.
 import type { Scene } from "../demo/types";
-import { beatEnds, beatTimes, firstWait, frame, moveTimes, phases, replyStands, ROWS } from "../demo/render";
+import { beatEnds, beatTimes, chapters, firstWait, frame, phases, replyStands, ROWS } from "../demo/render";
 import { demoMoves } from "../moves";
 import { SPEEDS } from "../demo/speed";
 // The terminal font: Fira Code, as in the Solo terminal the demos are checked
@@ -30,16 +30,17 @@ const names = demoMoves(entry);
 const times = beatTimes(scene);
 if (!times.length || times.some((x, k) => !(x > (k ? times[k - 1] : -1))))
   throw new Error(`Demo "${scene.turns[0].user}": beats must exist, name what they show, and play in order`);
-// A move's chapter runs from its start, and a tap on it goes to the beat
-// there, so each move starts a beat, in order, and each skill call a beat
-// names has a chapter.
-const starts = moveTimes(scene, names);
-const chips = starts.map((at) => ({ at, beat: times.indexOf(at) }));
+// A move's chapter runs from its launch to the next skill's or its turn's
+// end, and a tap on it goes to its launch; under reduced motion, to the beat
+// on screen there. The moves launch in the page's order, and each skill
+// launch a beat names is one of them.
+const chips = chapters(scene, names).map((c) => ({ ...c, beat: times.findLastIndex((x) => x <= c.at) }));
+const skill = (b: (typeof scene.beats)[number]) => b.on === "move" && scene.turns[b.at].launches![b.n].skill.split(":").pop()!;
 if (
-  chips.some((c, k) => c.beat < 0 || (k > 0 && !(c.at > chips[k - 1].at))) ||
-  scene.beats.some((b, k) => b.on === "move" && !starts.includes(times[k]))
+  chips.some((c, k) => k > 0 && !(c.at >= chips[k - 1].end)) ||
+  scene.beats.some((b) => b.on === "move" && !names.includes(skill(b) as string))
 )
-  throw new Error(`Demo "${scene.turns[0].user}": each move must start a beat, in order, and each skill call a beat names must be one of the page's moves`);
+  throw new Error(`Demo "${scene.turns[0].user}": the moves must launch in the page's order, and each skill launch a beat names must be one of the page's moves`);
 // A plain turn is a prompt, not a command, and the turn after it runs this
 // page's first move.
 const { plain } = scene;

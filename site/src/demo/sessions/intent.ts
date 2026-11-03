@@ -100,6 +100,10 @@ export const turns: Turn[] = [
   {
     user: "/hope:intent",
     tools: "Called 4 tools",
+    launches: [
+      {"at": 5.457, "skill": "hope:reframe"},
+      {"at": 51.521, "skill": "hope:deepen"},
+    ],
     dialogs: [
       {
         "at": [

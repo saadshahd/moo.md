@@ -96,7 +96,10 @@ export const turns: Turn[] = [
       {"at": 6.6, "line": "Running git ls-files && ls .claude && git log --oneline", "tool": "$ git ls-files && ls .claude && git log --oneline"},
       {"at": 47.6, "line": "Today's fix combines a burst of posts into one save, but only inside one server process. The repo doesn't say how many processes run the webhook in production. Which describes it?", "tool": "$ git ls-files && ls .claude && git log --oneline"},
       {"at": 78.6, "line": "With each batch stored as its own row, readers can no longer find every key in packages.keys at once. How should they see the merged keys?", "tool": "$ git ls-files && ls .claude && git log --oneline"},
-      {"at": 81.6, "line": "Calling **3** tools, running **1** shell command…", "tool": "$ git ls-files && ls .claude && git log --oneline", "move": "hope:inversion"},
+      {"at": 81.6, "line": "Calling **3** tools, running **1** shell command…", "tool": "$ git ls-files && ls .claude && git log --oneline"},
+    ],
+    launches: [
+      {"at": 81.235, "skill": "hope:inversion"},
     ],
     dialogs: [
       {

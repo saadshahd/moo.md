@@ -2,7 +2,8 @@
 # Check every demo against the recorder's captures: each take's transcript
 # against its tall captures at 45, 80 and 120 columns (run gen.sh first: it
 # writes the raw turns this reads), then every dialog capture, then every
-# skill take for machine paths and the sandbox.
+# skill take for machine paths and the sandbox, then the built site's demos
+# for idle stands and for chapters off their skills' recorded launches.
 cd "$(dirname "$0")"
 OUT=${TMPDIR:-/tmp}/moo-docs-gen
 R=$HOME/moo-rec-tools
@@ -25,4 +26,6 @@ for t in skills:rec2/skills chain:rec2/chain clarify:rec5/clarify draft:rec5/dra
 done
 npx tsx check-dialogs.mts || fail=1
 npx tsx check-leaks.mts || fail=1
+(cd .. && npm run build >/dev/null) || fail=1
+npx tsx check-timing.mts ../dist "$OUT" || fail=1
 exit $fail
