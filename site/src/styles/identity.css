@@ -1,14 +1,10 @@
-/* moo.md's identity: bone paper and ink, or their dark twins, and one pine
-   green; Instrument Sans for the chrome, Switzer Semibold set tight for
-   headings, and Fira Code only for what is code: the terminal, the commands,
-   the moves and the mark. The bar and the title row sit on a band one tone
-   off the page: surfaces part by tone, never by a line. Starlight's
-   ThemeProvider sets data-theme before the first paint, from a saved choice
-   (the bar's toggle) or the system setting.
-   Contrast, light: ink on paper 15.3:1, on the band 13.6; muted 6.8 and 6.1;
-   pine on paper 6.1, on the band 5.5; white on pine 7.0.
-   Contrast, dark: ink on page 14.7, on the band 13.5; muted 7.1 and 6.5;
-   green on page 8.5, on the band 7.8; ink on green 9.1. */
+/* moo.md's identity, one light theme: bone paper and ink, and one pine
+   green, with the terminal always dark (Demo.astro); Instrument Sans for the
+   chrome, Switzer Semibold set tight for headings, and Fira Code only for
+   what is code: the terminal, the commands, the moves and the mark. The bar and the title row sit on a band one tone
+   off the page: surfaces part by tone, never by a line.
+   Contrast: ink on paper 15.3:1, on the band 13.6; muted 6.8 and 6.1;
+   pine on paper 6.1, on the band 5.5; white on pine 7.0. */
 /* Fetched at build time (tools/fetch-fonts.mjs); see its note on the licence. */
 @font-face {
   font-family: "Switzer";
@@ -46,10 +42,9 @@
 
   --sl-font: "Instrument Sans";
   --sl-font-mono: "Fira Code";
-}
 
-:root[data-theme="light"],
-[data-theme="light"] ::backdrop {
+  /* Starlight's own light values apply too: ThemeProvider.astro keeps
+     data-theme light. */
   color-scheme: light;
   --moo-paper: #f0efeb;
   --moo-band: #e5e3de;
@@ -70,38 +65,13 @@
   --sl-shadow-md: 0 8px 24px rgb(28 26 22 / 0.12), 0 1px 2px rgb(28 26 22 / 0.08);
 }
 
-:root[data-theme="dark"],
-[data-theme="dark"] ::backdrop {
-  color-scheme: dark;
-  --moo-paper: #1a1917;
-  --moo-band: #222120;
-  --moo-surface: #2a2926;
-  --moo-ink: #ecebe7;
-  --moo-accent: #5cc98a;
-  --moo-on-accent: #121212;
-
-  --sl-color-gray-1: #d6d3cc;
-  --sl-color-gray-2: #c4c0b8;
-  --sl-color-gray-3: #a8a49c;
-  --sl-color-gray-4: #7d7970;
-  --sl-color-gray-5: #3a3834;
-  --sl-color-accent-low: #1f3a2a;
-  --sl-color-accent-high: #7fd9a5;
-  --sl-color-text-accent: #5cc98a;
-  --sl-color-backdrop-overlay: rgb(0 0 0 / 0.5);
-  --sl-shadow-md: 0 10px 28px rgb(0 0 0 / 0.45), 0 1px 2px rgb(0 0 0 / 0.3);
-}
-
 :root .content-panel h1,
 :root .sl-markdown-content :is(h2, h3) {
   font-family: var(--moo-heading);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
-:root .content-panel h1 { letter-spacing: -0.03em; }
-/* The front page's rule (h1.rule, PageTitle.astro) keeps its own size: it
-   sits on the strip's fixed row. */
-:root .content-panel h1:not(.rule) { font-size: 1.75rem; line-height: 1.2; }
+:root .content-panel h1 { letter-spacing: -0.03em; font-size: 1.75rem; line-height: 1.2; }
 :root .sl-markdown-content h2 { font-size: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem); }
 :root .sl-markdown-content h3 { font-size: 1.25rem; }
 

@@ -1,0 +1,8 @@
+---
+// The site has one theme, light, with the terminal always dark (identity.css,
+// Demo.astro). Starlight renders <html data-theme="dark"> and its own
+// ThemeProvider picks a theme from a saved choice or the system; this one sets
+// light before the first paint, so Starlight's light values apply.
+---
+
+<script is:inline>document.documentElement.dataset.theme = "light";</script>

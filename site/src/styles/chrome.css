@@ -46,7 +46,7 @@ site-search button[data-open-modal] kbd { background: transparent; border: 0; co
 /* Pages without a demo (Install, 404): the title at display size, the
    description under it in plain words, the content across the column. */
 :root:not(:has(.demo)) .main-frame .content-panel:first-child { padding-block: 3rem 2.5rem; }
-:root:not(:has(.demo)) .content-panel h1:not(.rule) {
+:root:not(:has(.demo)) .content-panel h1 {
   font-size: clamp(2.5rem, 1.2rem + 5vw, 5.5rem); line-height: 0.95; letter-spacing: -0.04em;
 }
 .lede { margin: 1rem 0 0; max-width: 40ch; font-size: var(--sl-text-xl); line-height: 1.45; color: var(--moo-ink); }
@@ -154,10 +154,6 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 .demo .beats .caption {
   font: 600 1rem / 1.51875rem var(--moo-heading); letter-spacing: -0.01em; color: var(--sl-color-gray-3);
 }
-
-/* The page's goal sentence, over the caption: the heading face, in ink. */
-.demo .goal { --goal-lh: 1.75rem; margin: 0 0 var(--moo-step); font: 600 1.25rem / var(--goal-lh) var(--moo-heading); letter-spacing: -0.015em; color: var(--moo-ink); }
-@media (max-width: 40rem) { .demo .goal { --goal-lh: 1.45rem; font-size: 1.0625rem; } }
 
 /* The player under the terminal, as wide as it: a filled round play button,
    the time so far and the length, a rail with a knob and a notch per beat,

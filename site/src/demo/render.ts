@@ -839,13 +839,13 @@ export type Frame = {
   /** Where the terminal's cursor rests: a row of `bottom` and a column; none
    * while a dialog without a text field is open. */
   cursor?: { row: number; col: number };
-  /** The keys the recorder sent in the last moments, oldest first, each with
-   * its opacity: it fades over the second half of its stay. */
-  keys: { label: string; text: boolean; fade: number }[];
+  /** The keys the recorder pressed in the last moments, oldest first, each
+   * with its opacity: it fades over the second half of its stay. Typed text
+   * gets none; the prompt box or the dialog's field shows it. */
+  keys: { label: string; fade: number }[];
   /** The question on screen, if a dialog is open: its index, how many options
    * it has, and which one the dialog's cursor is on. */
   asking?: { q: number; options: number; cursor: number };
-  fade: number;
   /** The beat whose caption shows, and its opacity. */
   beat: number;
   caption: number;
@@ -858,7 +858,7 @@ const prompted = (text: string): Cell[] =>
 /** Everything on screen `s` seconds into a scene, in a terminal `rows` high;
  * `pick` puts the dialog's cursor on an option the reader chose. */
 export function frame(scene: Scene, s: number, cols: number, pick?: number, rows = ROWS): Frame {
-  const { timing, length } = phases(scene);
+  const { timing } = phases(scene);
   const { transcript, typing, menu, asking, chrome } = transcriptAt(scene, s, cols);
   // The prompt box's rules and the status line reach the frame's right edge
   // (Demo.astro's .wide); the text in it wraps at `cols`.
@@ -872,15 +872,14 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     turn?.toast && since >= 0 && since < K.toastFor
       ? { rows: toastRows(turn.toast, cols), slide: ramp(since, 0, K.slide) }
       : undefined;
-  const fade = Math.min(ramp(s, 0, 0.25), 1 - ramp(s, length - 0.3, length));
   const times = beatTimes(scene, timing);
   const beat = Math.max(0, times.findLastIndex((x) => s >= x));
-  const caption = Math.min(fade, ramp(s, times[beat], times[beat] + 0.3));
+  const caption = ramp(s, times[beat], times[beat] + 0.3);
   const keys = timing.flatMap((p) =>
     p.caps.flatMap(([at, kind, value]) => {
       const age = s - at;
-      return age >= 0 && age < K.keyFor
-        ? [{ label: kind === "type" ? (value === " " ? "␣" : value) : (CAPS[value] ?? value), text: kind === "type" && value !== " ", fade: Math.min(1, 2 - (2 * age) / K.keyFor) }]
+      return kind === "key" && age >= 0 && age < K.keyFor
+        ? [{ label: CAPS[value] ?? value, fade: Math.min(1, 2 - (2 * age) / K.keyFor) }]
         : [];
     }),
   );
@@ -900,7 +899,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     const shown = keep(drawn, room, Math.max(0, drawn.findIndex((r) => r.cls === "ask")));
     const at = shown.findIndex((r) => r.input !== undefined);
     return {
-      transcript, bottom: shown, toast, keys, fade, beat, caption,
+      transcript, bottom: shown, toast, keys, beat, caption,
       cursor: at < 0 ? undefined : { row: at, col: shown[at].input! },
       asking: q ? { q: moment.q, options: q.options.length, cursor: moment.cursor } : undefined,
     };
@@ -922,7 +921,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
   ];
   // The cursor ends the typed text, or starts the empty prompt.
   const col = typing ? 2 + prompt[prompt.length - 1].length : 2;
-  return { transcript, bottom, toast, keys, fade, beat, caption, cursor: { row: bottom.indexOf(input[input.length - 1]), col } };
+  return { transcript, bottom, toast, keys, beat, caption, cursor: { row: bottom.indexOf(input[input.length - 1]), col } };
 }
 
 /** A key's cap, as KeyCastr draws it. */

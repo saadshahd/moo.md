@@ -25,8 +25,6 @@
 // - Removed: hunch's band above the prompt box, "[-]" and its chips, as
 //   "[ questions 2 ]"; the demo can't click it, so its rows go to the
 //   transcript (tools/gen.py chrome_of()).
-// - Light theme: drawn from Claude Code's colours, darkened for contrast; not
-//   a recording (Demo.astro's terminal colours). Dark is as recorded.
 // - Option gaps: half a row of space under each option's description and above
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.
@@ -56,8 +54,7 @@ import * as draft from "./sessions/draft";
 import * as reduce from "./sessions/reduce";
 
 // ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
-// skill with moo on. The page opens where turn 1 first waits on the user, a
-// step from turn 0's reply. Each turn has two captions (captions.ts): one as
+// skill with moo on. The page plays both, turn 0 first. Each turn has two captions (captions.ts): one as
 // it starts and one as its reply arrives; a page with no captions yet shows
 // empty ones. A page whose captions don't match its turns fails the build.
 

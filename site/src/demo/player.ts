@@ -1,11 +1,11 @@
-// Plays a demo's scene in a loop while it is in view, on one clock `t`, with a
-// player's controls under it: play and pause, a timeline with a tick per beat,
-// and speed. Beat captions narrate above, and the page's strip of moves
+// Plays a demo's scene once while it is in view, from its first ask to its
+// last frame, on one clock `t`, with a player's controls under it: play and
+// pause, replay once it ends, a timeline with a tick per beat, and speed. Beat captions narrate above, and the page's strip of moves
 // lights the one on screen; the terminal scrolls back like one; the reader
 // can pick a dialog's option. Under reduced motion, the timeline steps through
-// one still per beat instead. A demo with a plain turn opens paused on moo's
-// hand-back, and its "without moo" button steps back to the plain reply and
-// forth again. Demo.astro sets the columns and rows.
+// one still per beat instead. A demo with a plain turn plays it first; its
+// "without moo" button steps back to the plain reply and forth to moo's
+// hand-back. Demo.astro sets the columns and rows.
 import { beatEnds, beatTimes, frame, phases, type Frame, type Row, type Seg } from "./render";
 import type { Scene } from "./types";
 
@@ -79,11 +79,11 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 let demos = 0;
 
 export function mount(root: HTMLElement) {
-  const { scene, chips, opens } = JSON.parse(root.dataset.demo!) as {
+  const { scene, chips, without } = JSON.parse(root.dataset.demo!) as {
     scene: Scene;
     chips: { at: number; beat: number }[];
     /** When moo's hand-back and the plain reply stand, and when the move's turn starts typing. */
-    opens?: { handBack: number; plain: number; moveStarts: number };
+    without?: { handBack: number; plain: number; moveStarts: number };
   };
   const $ = <T extends HTMLElement>(k: string) => root.querySelector<T>(`[data-${k}]`)!;
   const term = $("term");
@@ -113,15 +113,16 @@ export function mount(root: HTMLElement) {
   const { length } = phases(scene);
   const times = beatTimes(scene);
 
-  let t = opens?.handBack ?? 0;
+  let t = 0;
   let last = 0;
   let speed = 1;
   let still = 0; // the still on screen under reduced motion
   // Under reduced motion, the moment held in place of a beat's still: the
-  // hand-back or the plain reply, until the reader goes to a beat.
-  let held = opens?.handBack;
+  // hand-back or the plain reply the "without moo" button stepped to, until
+  // the reader goes to a beat.
+  let held: number | undefined;
   let inView = false;
-  let userPaused = opens !== undefined;
+  let userPaused = false;
   let following = true; // false while the reader has scrolled up to read
   let pick: number | undefined; // the option the reader put the cursor on
   let ticking = false;
@@ -145,12 +146,11 @@ export function mount(root: HTMLElement) {
   const tickAt = (k: number) => (motion.matches ? k / Math.max(1, ticks.length - 1) : times[k] / length);
   const placeTicks = () => ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
 
-  // Captions and the goal sentence sit in boxes of fixed lines (Demo.astro);
-  // text longer than its box would be cut, so say so.
-  const goal = $("goal");
+  // Captions sit in a box of fixed lines (Demo.astro); text longer than its
+  // box would be cut, so say so.
   function checkBoxes() {
     const box = beats[0]?.parentElement;
-    const cut = [...beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1), ...(goal.scrollHeight > goal.clientHeight + 1 ? [goal] : [])];
+    const cut = beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1);
     if (cut.length) console.error("Demo text longer than its box; give the box more lines in Demo.astro:", cut.map((el) => el.textContent));
   }
 
@@ -176,7 +176,7 @@ export function mount(root: HTMLElement) {
    * on screen, whole, before the next beat takes over. */
   const ends = beatEnds(scene);
   const stillAt = (k: number) =>
-    Math.max(times[k], Math.min(ends[k], times[k + 1] ?? length, length - 0.3) - 0.05);
+    Math.max(times[k], Math.min(ends[k], times[k + 1] ?? length) - 0.05);
 
   function paint() {
     const reduced = motion.matches;
@@ -202,7 +202,6 @@ export function mount(root: HTMLElement) {
     // Sliding in from the right edge, the box's left part shows first.
     const box = toast.firstElementChild as HTMLElement | null;
     if (box) box.style.transform = `translateX(${(1 - f.toast!.slide) * 100}%)`;
-    term.style.setProperty("--fade", String(f.fade));
     beats.forEach((b, k) => {
       b.classList.toggle("on", k === f!.beat);
       b.style.setProperty("--in", k === f!.beat ? String(f!.caption) : "0");
@@ -222,10 +221,10 @@ export function mount(root: HTMLElement) {
     // Keys fade in and out with the clock, so a still shows none.
     keycaps.innerHTML = reduced
       ? ""
-      : f.keys.map((k) => `<kbd${k.text ? ' class="txt"' : ""} style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
+      : f.keys.map((k) => `<kbd style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
     lightChip(chips.findLastIndex((c) => c.at <= now));
     // Pressed while the plain reply is on screen, before the move is typed.
-    withoutBtn?.setAttribute("aria-pressed", String(now < opens!.moveStarts));
+    withoutBtn?.setAttribute("aria-pressed", String(now < without!.moveStarts));
     stickToBottom();
     placeCaret();
     placeKeys();
@@ -326,7 +325,8 @@ export function mount(root: HTMLElement) {
     }
   });
 
-  const running = () => inView && !userPaused && following && !motion.matches;
+  const ended = () => t >= length;
+  const running = () => inView && !userPaused && following && !motion.matches && !ended();
 
   // A frame that fails to draw says so in the terminal, and the demo stops.
   function draw() {
@@ -346,16 +346,18 @@ export function mount(root: HTMLElement) {
       return;
     }
     // A frame's timestamp can precede the performance.now() taken when play began.
-    t = (t + (Math.max(0, now - last) / 1000) * speed) % length;
+    t = Math.min(length, t + (Math.max(0, now - last) / 1000) * speed);
     last = now;
-    draw();
+    // At the end the demo holds its last frame, and play becomes replay.
+    if (ended()) sync();
+    else draw();
     requestAnimationFrame(tick);
   }
 
   function sync() {
     const paused = userPaused || !following;
-    playBtn.textContent = paused ? "▶" : "❚❚";
-    playBtn.setAttribute("aria-label", paused ? "Play demo" : "Pause demo");
+    playBtn.textContent = ended() ? "↻" : paused ? "▶" : "❚❚";
+    playBtn.setAttribute("aria-label", ended() ? "Replay demo" : paused ? "Play demo" : "Pause demo");
     speedBtns.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === speed)));
     placeTicks();
     track.setAttribute("aria-valuemax", String(motion.matches ? beats.length : Math.floor(length)));
@@ -371,11 +373,12 @@ export function mount(root: HTMLElement) {
   /** Jump to time `s`; a reader's pick no longer applies. Playing stays playing. */
   function seek(s: number) {
     jumped = true;
-    t = Math.min(Math.max(0, s), length - 0.01);
+    t = Math.min(Math.max(0, s), length);
     pick = undefined;
     following = true;
     last = performance.now();
-    draw();
+    // A seek can end the demo or take it back from its end.
+    sync();
   }
   function seekBeat(k: number) {
     if (motion.matches) {
@@ -389,7 +392,8 @@ export function mount(root: HTMLElement) {
   const beatNow = () => (motion.matches ? still : (f?.beat ?? 0));
   chipEls.forEach((el, k) => el.addEventListener("click", () => seekBeat(chips[k].beat)));
 
-  // Play always returns to the newest line and lets the demo drive the dialog.
+  // Play always returns to the newest line and lets the demo drive the dialog;
+  // at the end, it replays from the first ask.
   // The glyph of the state play or pause just put the demo in, shown in the
   // terminal's centre, then faded.
   const flash = $("flash");
@@ -400,7 +404,10 @@ export function mount(root: HTMLElement) {
     flash.classList.add("on");
   }
   playBtn.addEventListener("click", () => {
-    if (userPaused || !following) {
+    if (ended()) {
+      seek(0);
+      userPaused = false;
+    } else if (userPaused || !following) {
       userPaused = false;
       following = true;
       pick = undefined;
@@ -420,7 +427,7 @@ export function mount(root: HTMLElement) {
   });
   // A step between the plain reply and moo's hand-back: it pauses there.
   withoutBtn?.addEventListener("click", () => {
-    const to = withoutBtn.getAttribute("aria-pressed") === "true" ? opens!.handBack : opens!.plain;
+    const to = withoutBtn.getAttribute("aria-pressed") === "true" ? without!.handBack : without!.plain;
     userPaused = true;
     held = to;
     if (!motion.matches) seek(to);
@@ -490,15 +497,10 @@ export function mount(root: HTMLElement) {
   new ResizeObserver(fit).observe(root);
   root.addEventListener("fit", fit);
 
-  // Start from the top each time the demo comes into view, unless it opens
-  // paused on the hand-back: then it stays where the reader left it.
+  // It plays only in view; out of view, it holds where it is, and an ended
+  // demo stays on its last frame.
   new IntersectionObserver(
     ([entry]) => {
-      if (entry.isIntersecting && !inView && !opens) {
-        t = 0;
-        following = true;
-        pick = undefined;
-      }
       inView = entry.isIntersecting;
       sync();
     },
