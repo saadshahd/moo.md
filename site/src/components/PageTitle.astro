@@ -1,20 +1,27 @@
 ---
 // On a demo page, the front page among them, the title is for the tab and
-// screen readers; a move page shows its strip in its place, above the
-// divider, and a chain names its moves on the demo's timeline. Every other
+// screen readers; in its place, above the divider, one muted line names what
+// the demo shows: a move page's command and what it does, a chain page's
+// name, or the front page's chain's. The line is the same height on every
+// demo page, so the terminal sits at the same place on each. Every other
 // page shows its title and, under it, its description in plain words.
-import Strip from "./Strip.astro";
+import { getEntry } from "astro:content";
 
 const { entry } = Astro.locals.starlightRoute;
-const { title, moves, move, template } = entry.data;
+const { title, moves, move, chain, template } = entry.data;
 const demo = (moves !== undefined || move !== undefined) && template !== "splash";
+const played = chain === undefined ? undefined : await getEntry("docs", chain);
+if (chain !== undefined && played?.data.moves?.join() !== moves?.join())
+  throw new Error(`${entry.id}: its chain "${chain}" must be a chain page with the same moves`);
 ---
 
 {
   demo ? (
     <>
       <h1 id="_top" class="vh">{title}</h1>
-      {moves === undefined && <Strip />}
+      <p class="names">
+        {move === undefined ? (played ?? entry).data.title : <><span class="cmd">{title}</span> · {move}</>}
+      </p>
     </>
   ) : (
     <>
@@ -36,4 +43,11 @@ const demo = (moves !== undefined || move !== undefined) && template !== "splash
     position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
   }
+  /* One line of fixed height, muted, that scrolls rather than wraps. */
+  .names {
+    height: 2rem; margin: 0; line-height: 2rem;
+    overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;
+    font-size: 0.9375rem; color: var(--sl-color-gray-3);
+  }
+  .cmd { font-family: var(--__sl-font-mono); }
 </style>

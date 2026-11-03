@@ -12,6 +12,8 @@ export const collections = {
         move: z.string().refine((s) => s.split(/\s+/).length <= 8, "eight words or fewer").optional(),
         // A chain page: its moves in order, as its demo runs them.
         moves: z.array(z.string()).optional(),
+        // The front page: the chain page whose demo it plays, by id, for its name.
+        chain: z.string().optional(),
       }),
     }),
   }),
