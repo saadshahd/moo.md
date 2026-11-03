@@ -1,21 +1,28 @@
 /* The frame around every page: one bar height and one column at every
-   width, the band the bar and title row share, the ⌘K field, search, and
-   the front page's margin note. Colours and type come from identity.css. */
+   width, the band the bar and title row share, the ⌘K field and search.
+   Colours and type come from identity.css. */
 :root,
 :root[data-theme] {
-  --sl-nav-height: 3rem;
+  /* The bar is its tallest item, Install (TopBar.astro), with one padding
+     above and below: no row reserved for anything else. */
+  --moo-bar-item: 2.25rem;
+  --moo-bar-pad: 0.375rem;
+  --sl-nav-height: calc(var(--moo-bar-item) + 2 * var(--moo-bar-pad));
   /* One centred column: the bar's contents (TopBar.astro) and every page's
-     title, strip, caption, terminal and controls share its edges, between
-     equal gutters. The bar's side padding is the content's, so the edges
-     meet at every width. Change it with the margin note's breakpoint below. */
+     title, caption, terminal and controls share its edges, between equal
+     gutters. The bar's side padding is the content's, so the edges meet at
+     every width. */
   --sl-content-width: 87.5rem;
   --sl-nav-pad-x: var(--sl-content-pad-x);
-  --sl-nav-pad-y: 0;
+  --sl-nav-pad-y: var(--moo-bar-pad);
 }
+/* Starlight's hairline under the bar is clear here, so it would only take a
+   pixel off the bottom padding. */
+.header { border-bottom: 0; }
 
-/* The band: the bar and the first panel (a demo page's strip row, another
-   page's title) on one tone, the page below on paper. Only colour changes,
-   so every box keeps its place. */
+/* The band: the bar and the first panel (another page's title; a demo
+   page's holds only its hidden title) on one tone, the page below on paper.
+   Only colour changes, so every box keeps its place. */
 .main-frame .content-panel:first-child { background: var(--moo-band); }
 
 /* The bar is fixed, so a rubber-band scroll slides the page under it and
@@ -40,7 +47,7 @@ site-search button[data-open-modal] kbd { background: transparent; border: 0; co
   site-search button[data-open-modal] { width: 15rem; max-width: none; padding-inline: 0.85rem 0.65rem; }
 }
 @media (max-width: 50rem) {
-  site-search button[data-open-modal] { width: 2.5rem; height: 2.5rem; background: none; justify-content: center; }
+  site-search button[data-open-modal] { width: var(--moo-bar-item); height: var(--moo-bar-item); background: none; justify-content: center; }
 }
 
 /* Pages without a demo (Install, 404): the title at display size, the
@@ -120,14 +127,14 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
   .install-note { margin-top: 1.25rem; }
 }
 
-/* One vertical rhythm around the demo: the title row's padding, the gap
-   from the band to the caption, from the caption to the terminal, and from
-   the terminal to the player are all one step of 11px, on a phone too. That
-   leaves the terminal 33 rows at 1440x900 and 29 at 390x844; Demo.astro fits
-   the rows, the same on every page. */
+/* One vertical rhythm around the demo: the gap from the band to the
+   caption, from the caption to the terminal, and from the terminal to the
+   player are all one step of 11px, on a phone too. The title panel holds
+   only the hidden title, so it takes no room. Demo.astro fits the rows, the
+   same on every page. */
 :root:has(.demo) { --moo-step: 0.6875rem; }
-:root:has(.demo) .main-frame main .content-panel { padding-block: var(--moo-step); }
-:root:has(.demo) .main-frame main .content-panel + .content-panel { padding-bottom: 0; }
+:root:has(.demo) .main-frame main .content-panel:first-child { padding-block: 0; }
+:root:has(.demo) .main-frame main .content-panel + .content-panel { padding-block: var(--moo-step) 0; }
 .demo .beats { margin-bottom: var(--moo-step); }
 
 /* The demo's head and player in the site's look; Demo.astro lays them out.
