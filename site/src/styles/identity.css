@@ -99,9 +99,7 @@
   letter-spacing: -0.01em;
 }
 :root .content-panel h1 { letter-spacing: -0.03em; }
-/* The front page's rule (h1.rule, PageTitle.astro) keeps its own size: it
-   sits on the strip's fixed row. */
-:root .content-panel h1:not(.rule) { font-size: 1.75rem; line-height: 1.2; }
+:root .content-panel h1 { font-size: 1.75rem; line-height: 1.2; }
 :root .sl-markdown-content h2 { font-size: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem); }
 :root .sl-markdown-content h3 { font-size: 1.25rem; }
 

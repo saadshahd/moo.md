@@ -1,33 +1,21 @@
 ---
-// On a chain or move page, the title is for the tab and screen readers; in its
-// place, above the divider, sits the strip of the moves its demo runs. The
-// front page shows its title, the site's rule, on that same row before the
-// strip, so its terminal sits where every demo page's does. A demo page's
-// description is its goal sentence, above the player (Demo.astro). Every other page
-// shows its title and, under it, its description in plain words.
+// On a demo page, the front page among them, the title is for the tab and
+// screen readers; in its place, above the divider, sits the strip of the
+// moves its demo runs. A demo page's description is its goal sentence, above
+// the player (Demo.astro). Every other page shows its title and, under it,
+// its description in plain words.
 import Strip from "./Strip.astro";
 
 const { entry } = Astro.locals.starlightRoute;
 const { title, moves, move, template } = entry.data;
 const demo = (moves !== undefined || move !== undefined) && template !== "splash";
-// Starlight gives the root index.mdx the route id "".
-const front = Astro.locals.starlightRoute.id === "";
 ---
 
 {
   demo ? (
     <>
-      {front ? (
-        <div class="lead">
-          <h1 id="_top" class="rule">{title}</h1>
-          <Strip />
-        </div>
-      ) : (
-        <>
-          <h1 id="_top" class="vh">{title}</h1>
-          <Strip />
-        </>
-      )}
+      <h1 id="_top" class="vh">{title}</h1>
+      <Strip />
     </>
   ) : (
     <>
@@ -44,18 +32,6 @@ const front = Astro.locals.starlightRoute.id === "";
     line-height: var(--sl-line-height-headings);
     font-weight: 600;
     color: var(--sl-color-white);
-  }
-  /* One row of the strip's height: the rule never wraps, and the strip
-     scrolls in what is left. */
-  .lead { display: flex; align-items: center; gap: 1.25rem; height: 2rem; }
-  .lead > :global(.strip) { flex: 1; min-width: 0; }
-  .rule {
-    flex: 0 1 auto; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    font: 600 1.5rem / 2rem var(--moo-heading); letter-spacing: -0.03em;
-  }
-  @media (max-width: 40rem) {
-    .lead { gap: 0.75rem; }
-    .rule { font-size: 1.1rem; }
   }
   .vh {
     position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden;

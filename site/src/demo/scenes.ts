@@ -56,8 +56,7 @@ import * as draft from "./sessions/draft";
 import * as reduce from "./sessions/reduce";
 
 // ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
-// skill with moo on. The page opens where turn 1 first waits on the user, a
-// step from turn 0's reply. Each turn has two captions (captions.ts): one as
+// skill with moo on. The page plays both, turn 0 first. Each turn has two captions (captions.ts): one as
 // it starts and one as its reply arrives; a page with no captions yet shows
 // empty ones. A page whose captions don't match its turns fails the build.
 

@@ -2,14 +2,14 @@
 // A Claude Code mock built from a real recorded session: same glyphs, colors,
 // wrap rule, spinner verbs and replies, cut only where "… +N lines" says so.
 // Under the page's goal sentence (its description; none on the front page).
-// Autoplays in view and loops, narrated by beat captions above it and lighting
-// the move on screen in the page's strip (PageTitle.astro), with a player's
-// controls below: play and pause,
-// a timeline with a tick per beat, speed. Under reduced motion, the timeline
+// Plays once in view, from its first ask to its last frame, narrated by beat
+// captions above it and lighting the move on screen in the page's strip
+// (PageTitle.astro), with a player's controls below: play and pause, a
+// timeline with a tick per beat, speed. Under reduced motion, the timeline
 // steps through one still per beat. `summary` tells a screen reader what it
-// shows. A recording with a plain turn (Scene.plain) opens paused on moo's
-// hand-back instead, with a "without moo" button that steps back to the plain
-// reply. Every box around the terminal has a fixed height, so the terminal
+// shows. A recording with a plain turn (Scene.plain) plays it first, and its
+// "without moo" button steps back to the plain reply and forth to moo's
+// hand-back. Every box around the terminal has a fixed height, so the terminal
 // sits at the same place and size on every demo page at a given viewport.
 import type { Scene } from "../demo/types";
 import { beatEnds, beatTimes, firstWait, frame, moveTimes, phases, replyStands, ROWS } from "../demo/render";
@@ -50,17 +50,17 @@ const { plain } = scene;
 const move = plain === undefined ? undefined : scene.turns[plain + 1];
 if (plain !== undefined && (!move || scene.turns[plain].user.startsWith("/") || move.user.match(/^\/(\S+)/)?.[1]?.split(":").pop() !== names[0]))
   throw new Error(`Demo "${scene.turns[0].user}": its plain turn must be a prompt, and the turn after it must run /${names[0]}`);
-// Where it opens, paused: where moo first hands the decision to the user;
-// one step back, the plain reply.
-const opens = plain === undefined ? undefined : { handBack: firstWait(scene, plain + 1), plain: replyStands(scene, plain), moveStarts: phases(scene).timing[plain + 1].start };
+// The "without moo" button's two stops: where moo first hands the decision to
+// the user, and one step back, the plain reply.
+const without = plain === undefined ? undefined : { handBack: firstWait(scene, plain + 1), plain: replyStands(scene, plain), moveStarts: phases(scene).timing[plain + 1].start };
 // Draw the demo here at every recorded width, each second and each beat, so
 // a scene the player cannot draw fails the build, not the page.
 const { length } = phases(scene);
 for (const cols of [45, 80, 120])
-  for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...times, ...beatEnds(scene)]) frame(scene, s, cols);
+  for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...times, ...beatEnds(scene), length]) frame(scene, s, cols);
 ---
 
-<div class="demo not-content" style={`--rows: ${ROWS}`} data-demo={JSON.stringify({ scene, chips, opens })}>
+<div class="demo not-content" style={`--rows: ${ROWS}`} data-demo={JSON.stringify({ scene, chips, without })}>
   <div class="col">
     <p class="goal" data-goal aria-hidden={goal ? undefined : "true"}>{goal}</p>
     <figure class="term-wrap">
@@ -79,8 +79,8 @@ for (const cols of [45, 80, 120])
         <div class="flash" data-flash aria-hidden="true"></div>
       </div>
       <div class="controls">
-        {opens && <button type="button" class="without" data-without aria-pressed="false">without moo</button>}
-        <button type="button" class="play" data-play aria-label={opens ? "Play demo" : "Pause demo"}>{opens ? "▶" : "❚❚"}</button>
+        {without && <button type="button" class="without" data-without aria-pressed="false">without moo</button>}
+        <button type="button" class="play" data-play aria-label="Pause demo">❚❚</button>
         <span class="now" data-now aria-hidden="true">0:00</span>
         <div class="track" data-track role="slider" tabindex="0" aria-label="Demo timeline">
           <div class="rail"><div class="fill" data-fill></div></div>
@@ -227,7 +227,6 @@ for (const cols of [45, 80, 120])
     font-variant-ligatures: none;
   }
   .demo :global(.term) {
-    --fade: 1;
     display: flex; flex-direction: column;
     /* --rows rows of text inside the padding and border. */
     height: calc(var(--rows) * var(--row) + 1.2rem + 2px);
@@ -260,7 +259,7 @@ for (const cols of [45, 80, 120])
   .toast :global(.box .row) { width: auto; }
   /* Measures one column, for the caret. */
   .probe { position: absolute; top: 0; left: 0; visibility: hidden; white-space: pre; }
-  .demo :global(.row) { width: calc(var(--cols) * var(--cell)); height: var(--row); white-space: pre; overflow: hidden; opacity: var(--fade); }
+  .demo :global(.row) { width: calc(var(--cols) * var(--cell)); height: var(--row); white-space: pre; overflow: hidden; }
   /* A glyph Fira Code lacks comes from another font, with its own width; a
      terminal keeps it in one cell. */
   .demo :global(.gl) { display: inline-block; width: var(--cell); letter-spacing: 0; text-align: center; overflow: visible; }

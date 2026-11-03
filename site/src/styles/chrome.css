@@ -46,7 +46,7 @@ site-search button[data-open-modal] kbd { background: transparent; border: 0; co
 /* Pages without a demo (Install, 404): the title at display size, the
    description under it in plain words, the content across the column. */
 :root:not(:has(.demo)) .main-frame .content-panel:first-child { padding-block: 3rem 2.5rem; }
-:root:not(:has(.demo)) .content-panel h1:not(.rule) {
+:root:not(:has(.demo)) .content-panel h1 {
   font-size: clamp(2.5rem, 1.2rem + 5vw, 5.5rem); line-height: 0.95; letter-spacing: -0.04em;
 }
 .lede { margin: 1rem 0 0; max-width: 40ch; font-size: var(--sl-text-xl); line-height: 1.45; color: var(--moo-ink); }
