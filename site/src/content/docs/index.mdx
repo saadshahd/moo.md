@@ -13,7 +13,6 @@ moves:
   - widen
   - anchor
 ---
-import Chains from "../../components/Chains.astro";
 import Demo from "../../components/Demo.astro";
 import { chainScene } from "../../demo/scenes";
 
@@ -21,8 +20,3 @@ import { chainScene } from "../../demo/scenes";
   scene={chainScene}
   summary="Claude Code. One ask to /hope:compose: some customers were charged twice this week; find the cause and make sure it can't come back. Each move takes over as it comes up: /freeze snapshots production, /deepen sets the bar, a dialog asks whether the payment provider honors an idempotency key, then /widen and /anchor. The reply gives the cause, the charges to refund, and tests that fail on the old code."
 />
-
-<aside class="landing-side not-content" aria-label="About moo.md">
-  <p class="tagline">Each move is a skill: it asks only what is yours to decide, then waits for you. Chained, each starts where the last stopped.</p>
-  <p class="chains">Watch a chain: <Chains /></p>
-</aside>

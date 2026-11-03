@@ -56,24 +56,6 @@ site-search button[data-open-modal] kbd { background: transparent; border: 0; co
 .demo .col { width: 100%; }
 .demo .col .term { width: auto; }
 
-/* The front page's margin note: what the site is and the chains. It sits in
-   the right gutter, out of the flow, so the terminal holds the box it has on
-   every demo page; where the gutter is narrower than 13.25rem, it hides.
-   Install is the bar's alone. The breakpoint is --sl-content-width + 32.5rem. */
-.landing-side { display: none; }
-@media (min-width: 120rem) {
-  .sl-markdown-content:has(> .landing-side) { position: relative; }
-  .sl-markdown-content > .landing-side {
-    position: absolute; top: 0; left: calc(100% + 1.5rem); width: calc((100vw - var(--sl-content-width)) / 2 - 3rem); margin: 0;
-    display: flex; flex-direction: column; align-items: flex-start; gap: 1.25rem;
-  }
-}
-.landing-side p { margin: 0; }
-.landing-side .tagline { font: 600 1.125rem / 1.3 var(--moo-heading); letter-spacing: -0.02em; color: var(--moo-ink); }
-.landing-side .chains { font-size: var(--sl-text-base); line-height: 1.5; color: var(--moo-ink); }
-.landing-side .chains a { color: var(--sl-color-text-accent); text-underline-offset: 3px; text-decoration-thickness: 1px; }
-.landing-side .chains a:hover { color: var(--sl-color-accent-high); }
-
 /* The one action, wherever it appears: a filled red pill. */
 .moo-action {
   display: inline-flex; align-items: center; justify-content: center; height: 2.75rem; padding: 0 1.4rem;
