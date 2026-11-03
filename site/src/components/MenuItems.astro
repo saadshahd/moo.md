@@ -61,6 +61,7 @@ const id = `${at}-group`;
   .label { font: 600 0.9375rem / 1.25 var(--__sl-font); }
   .note { font: 400 0.875rem / 1.35 var(--__sl-font); color: var(--sl-color-gray-3); }
   .commands a { flex-direction: row; align-items: baseline; gap: 1rem; }
+  .commands .note { white-space: nowrap; }
   /* As wide as the longest command, /interrogate. */
   .commands .label { flex: none; width: 7rem; font: 400 0.9375rem / 1.25 var(--__sl-font-mono); }
 
@@ -71,7 +72,6 @@ const id = `${at}-group`;
     margin: 0.5rem 0.75rem 0.25rem 1.4rem; font: 500 0.75rem / 1.2 var(--__sl-font);
     letter-spacing: 0.04em; text-transform: uppercase; color: var(--sl-color-gray-3);
   }
-  .groups .note { white-space: nowrap; }
   .groups a { padding-block: 0.55rem; }
   /* Stacked: as many columns as fit one command, /interrogate, the longest. */
   .groups.stack { grid-template-columns: repeat(auto-fill, minmax(9.25rem, 1fr)); gap: 1rem 0.5rem; }

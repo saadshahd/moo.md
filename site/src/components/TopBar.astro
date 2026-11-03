@@ -120,8 +120,8 @@ const github = "https://github.com/saadshahd/moo.md";
     border-radius: 0.75rem; box-shadow: var(--sl-shadow-md);
   }
   .menu.chains { width: 25rem; }
-  .menu.commands { width: 24rem; }
-  .menu:has(.groups) { width: max-content; max-width: calc(100vw - 2rem); }
+  /* As wide as its longest line, so none wraps. */
+  .menu.commands { width: max-content; max-width: calc(100vw - 2rem); }
   /* On a phone, one sheet from the bar to the foot of the screen. */
   .sheet { position: fixed; inset: var(--sl-nav-height) 0 0 0; width: 100%; height: auto; max-height: none; overflow: auto; padding: 1.5rem 1rem; }
   .sheet section + section { margin-top: 1.75rem; }
