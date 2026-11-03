@@ -158,8 +158,10 @@ export function mount(root: HTMLElement) {
 
   // A chapter runs from its move's start to the next one's, the first from the
   // timeline's start. The rail parts where each later one starts. Each name
-  // sits centred on its chapter, inside the timeline; where two would touch,
-  // the names leave the rail and the time names the move instead.
+  // sits centred on its chapter, inside the timeline, or slides right to
+  // clear the name before it while it still starts over its own chapter;
+  // where one can't, the names leave the rail and the time names the move
+  // instead. One rule for every chain.
   const chapterStart = (k: number) => (k ? tickAt(chips[k].beat) : 0);
   function placeChapters() {
     if (!chapterEls.length) return;
@@ -172,10 +174,10 @@ export function mount(root: HTMLElement) {
     let fits = true;
     const railPill = pills.find((p) => p.parentElement!.classList.contains("chapters"))!;
     chapterEls.forEach((el, k) => {
-      const mid = ((chapterStart(k) + (k + 1 < chips.length ? chapterStart(k + 1) : 1)) / 2) * w;
-      const left = Math.min(Math.max(0, mid - el.offsetWidth / 2), w - el.offsetWidth);
+      const [from, to] = [chapterStart(k), k + 1 < chips.length ? chapterStart(k + 1) : 1].map((x) => x * w);
+      const left = Math.min(Math.max(0, (from + to) / 2 - el.offsetWidth / 2, end + 4), w - el.offsetWidth);
       el.style.left = (railPill.children[k] as HTMLElement).style.left = `${left}px`;
-      fits &&= left >= end + 4;
+      fits &&= left >= end + 4 && left <= to - 8;
       end = left + el.offsetWidth;
     });
     track.parentElement!.classList.toggle("tight", !fits);

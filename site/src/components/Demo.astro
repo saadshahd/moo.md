@@ -53,6 +53,9 @@ const without = plain === undefined ? undefined : { handBack: firstWait(scene, p
 // a scene the player cannot draw fails the build, not the page.
 const { length } = phases(scene);
 const chaptered = names.length > 1;
+// A chain page's timeline names every move it lists, one chapter each.
+if (entry.data.moves && (!chaptered || chips.length !== entry.data.moves.length))
+  throw new Error(`${entry.id}: its timeline must show one chapter per move in its moves list`);
 for (const cols of [45, 80, 120])
   for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...times, ...beatEnds(scene), length]) frame(scene, s, cols);
 ---
