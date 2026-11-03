@@ -49,8 +49,15 @@ export function viewable(
   ];
 }
 
-/** The last part of a path, which names the file on its [view]. */
+/** The last part of a path: the file's name. */
 export const nameOf = (path: string) => path.slice(path.lastIndexOf("/") + 1);
+
+/**
+ * The file's name on its [view], cut at its first dot. roundup opens a printed file name on a
+ * plain click and keeps the click from Claude Code, so a label holds no dot and no slash.
+ */
+export const labelOf = (path: string) =>
+  nameOf(path).replace(/^\.+/, "").split(".")[0] || "file";
 
 /**
  * The most characters a markdown view shows: a drawing holds 100000 in all, and the row and its

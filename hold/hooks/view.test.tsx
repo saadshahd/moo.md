@@ -129,10 +129,17 @@ describe("drawsPixels", () => {
       false,
     ],
     [
-      "roundup, whatever it inherited",
+      "roundup fullscreen, whatever it inherited",
       { ROUNDUP_TERMINAL: "1", TERM_PROGRAM: "Apple_Terminal" },
-      false,
       true,
+      true,
+    ],
+    ["roundup on the main screen", { ROUNDUP_TERMINAL: "1" }, false, false],
+    [
+      "Solo, on Ghostty's terminfo",
+      { TERM_PROGRAM: "solo", TERM: "xterm-ghostty" },
+      true,
+      false,
     ],
     ["tmux", { TMUX: "/tmp/tmux", TERM_PROGRAM: "ghostty" }, true, false],
   ];
@@ -557,6 +564,20 @@ test("a picture Claude read unfolds as an Image, drawn once", async ($, on) => {
   expect(
     w.runs.filter((r) => r[0] === "bun").map((r) => r.slice(2, 4)),
   ).toEqual([["picture", "/r/shot.png"]]);
+  await ui.unmount();
+});
+
+test("a [view] names its file with no dot or slash, which roundup would open on a click", async ($, on) => {
+  world(on, GHOSTTY);
+  const changedFiles = ["/r/clarify-dark-390.png", "/r/icon@2x.final.svg"];
+  const ui = await $.ui.mount(
+    TOOL("Bash", { command: "shoot" }, { bashEditDiff: { files: [], moreFiles: 0, changedFiles } }),
+  );
+
+  expect((await ui.findAll({ type: "Button" })).map((b) => b.props.label)).toEqual([
+    "view clarify-dark-390",
+    "view icon@2x",
+  ]);
   await ui.unmount();
 });
 

@@ -6,7 +6,7 @@ import type {
   RenderViewport,
 } from "claude-code";
 import { altOf, hasMermaid, segments } from "./fences.ts";
-import { cleanMarkdown, kindOf, MARKDOWN_MAX, nameOf, viewable } from "./files.ts";
+import { cleanMarkdown, kindOf, labelOf, MARKDOWN_MAX, nameOf, viewable } from "./files.ts";
 import { drawsPixels, type TermEnv } from "./terminal.ts";
 import { closeWindow, isWindowOpen, toggleWindow, windowOf } from "./popover.ts";
 import { failOnce, messageOf, redraw } from "./ui.ts";
@@ -154,7 +154,7 @@ async function withViews(
   for (const path of files) {
     const id = `view-${e.requestId}-${path}`;
     const kind = kindOf(path)!;
-    const name = files.length === 1 ? "" : ` ${nameOf(path)}`;
+    const name = files.length === 1 ? "" : ` ${labelOf(path)}`;
     const isWindow = kind === "picture" && !pixels;
     const isOpen = isWindow ? isWindowOpen(id) : opened.has(id);
 

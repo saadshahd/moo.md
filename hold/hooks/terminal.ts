@@ -17,25 +17,21 @@ const atLeast = (version: string | undefined, major: number, minor: number) => {
 
 /**
  * Whether Claude Code's `Image` draws pixels here, as its 2.1.316 types say: kitty and Ghostty,
- * and iTerm2 3.5 or later under fullscreen rendering. roundup answers Claude Code as iTerm2 does,
- * whatever variables it inherited from what started it. tmux needs passthrough settings this
+ * and iTerm2 3.5 or later under fullscreen rendering. Claude Code asks the terminal itself (a
+ * kitty graphics query, XTVERSION); hold cannot see the answers, so it reads the variables that
+ * name the terminal. roundup answers XTVERSION as iTerm2 3.5 does, whatever it inherited. A
+ * `TERM_PROGRAM` names the program; `TERM` may name terminfo it borrowed, as Solo borrows
+ * Ghostty's, so it counts only where no program is named. tmux needs passthrough settings this
  * cannot see, so it counts as none.
  */
 export function drawsPixels(env: TermEnv, isFullscreen: boolean): boolean {
-  if (env.ROUNDUP_TERMINAL) return true;
+  if (env.ROUNDUP_TERMINAL) return isFullscreen;
   if (env.TERM_PROGRAM === "iTerm.app")
     return isFullscreen && atLeast(env.TERM_PROGRAM_VERSION, 3, 5);
   if (env.TMUX) return false;
   if (/^(1|true|yes|on)$/i.test(env.CLAUDE_CODE_FORCE_TERMINAL_IMAGES ?? ""))
     return true;
-  if (env.TERM_PROGRAM === "ghostty") return true;
-  if (
-    env.TERM_PROGRAM &&
-    /^(Apple_Terminal|vscode|WezTerm|WarpTerminal|Hyper|Tabby)$/.test(
-      env.TERM_PROGRAM,
-    )
-  )
-    return false;
+  if (env.TERM_PROGRAM) return env.TERM_PROGRAM === "ghostty";
 
   return (
     env.TERM === "xterm-kitty" ||
