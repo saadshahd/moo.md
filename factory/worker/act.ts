@@ -3,6 +3,7 @@
 import { join, resolve } from "node:path";
 import { branchFor, closePr, edit, latest, markStuck, must, post, runName, upsert } from "../lib/github.ts";
 import { total, type Plan, type Restart } from "../lib/formats.ts";
+import { GIT_NO_HOOKS } from "../lib/git.ts";
 import { PLAN_PATH } from "../lib/plan.ts";
 import type { Rules } from "../lib/rules.ts";
 import { sum } from "../lib/transcript.ts";
@@ -63,12 +64,6 @@ export async function onBranch(path: string, n: number): Promise<void> {
 
   if (branch !== branchFor(n)) throw new Error(`${path} is on ${branch === "" ? "no branch" : branch}, not ${branchFor(n)}`);
 }
-
-/**
- * Git with the repo's hooks off, for the worker's checkouts of a run's branch: the run may have
- * rewritten a hooks folder the repo tracks, such as husky's, and the worker runs none of it.
- */
-const GIT_NO_HOOKS = ["git", "-c", "core.hooksPath=/dev/null"] as const;
 
 /**
  * The rules' worktree commands run as the worker's own children, from the main worktree, never

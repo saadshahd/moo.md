@@ -23,3 +23,9 @@ export function gitConfigEnv() {
     ]),
   ]);
 }
+
+/**
+ * Git with the repo's hooks off, for git the factory runs on a run's branch: the run may have
+ * rewritten a hooks folder the repo tracks, such as husky's, and the factory runs none of it.
+ */
+export const GIT_NO_HOOKS = ["git", "-c", "core.hooksPath=/dev/null"] as const;

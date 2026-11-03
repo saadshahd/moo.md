@@ -1282,6 +1282,31 @@ describe("the PR a run opens", () => {
     await expect(pushBranch(join(dir, "src"), 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
     await rm(root, { recursive: true });
   });
+  test("push runs no hook the run's branch tracks, where the repo's hooks folder is a tracked one", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir, ran] = [join(root, "origin.git"), join(root, "w"), join(root, "hook-ran")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+    await mkdir(join(dir, ".husky"));
+
+    for (const hook of ["pre-push", "reference-transaction"]) {
+      await Bun.write(join(dir, ".husky", hook), `#!/bin/sh\necho ${hook} >> ${ran}\n`);
+      await chmod(join(dir, ".husky", hook), 0o755);
+    }
+
+    await git("add", ".husky");
+    await git("commit", "-q", "-m", "hooks");
+    await git("config", "core.hooksPath", ".husky");
+
+    expect(await pushBranch(dir, 7)).toBe("pushed factory/7");
+    expect(await Bun.file(ran).exists()).toBe(false);
+    await rm(root, { recursive: true });
+  });
   test("pr refuses with exit 4 while its body file is missing or blank, naming the file", async () => {
     const dir = await mkdtemp(join(tmpdir(), "factory-pr-"));
     const refused = { code: 4, message: expect.stringContaining(PR_PATH) };
