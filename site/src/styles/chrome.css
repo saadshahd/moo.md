@@ -155,10 +155,6 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
   font: 600 1rem / 1.51875rem var(--moo-heading); letter-spacing: -0.01em; color: var(--sl-color-gray-3);
 }
 
-/* The page's goal sentence, over the caption: the heading face, in ink. */
-.demo .goal { --goal-lh: 1.75rem; margin: 0 0 var(--moo-step); font: 600 1.25rem / var(--goal-lh) var(--moo-heading); letter-spacing: -0.015em; color: var(--moo-ink); }
-@media (max-width: 40rem) { .demo .goal { --goal-lh: 1.45rem; font-size: 1.0625rem; } }
-
 /* The player under the terminal, as wide as it: a filled round play button,
    the time so far and the length, a rail with a knob and a notch per beat,
    and speed as a four-way switch, 2rem tall, one step under the terminal. */

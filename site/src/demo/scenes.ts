@@ -25,8 +25,6 @@
 // - Removed: hunch's band above the prompt box, "[-]" and its chips, as
 //   "[ questions 2 ]"; the demo can't click it, so its rows go to the
 //   transcript (tools/gen.py chrome_of()).
-// - Light theme: drawn from Claude Code's colours, darkened for contrast; not
-//   a recording (Demo.astro's terminal colours). Dark is as recorded.
 // - Option gaps: half a row of space under each option's description and above
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.

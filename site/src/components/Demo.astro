@@ -1,7 +1,6 @@
 ---
 // A Claude Code mock built from a real recorded session: same glyphs, colors,
 // wrap rule, spinner verbs and replies, cut only where "… +N lines" says so.
-// Under the page's goal sentence (its description; none on the front page).
 // Plays once in view, from its first ask to its last frame, narrated by beat
 // captions above it and lighting the move on screen in the page's strip
 // (PageTitle.astro), with a player's controls below: play and pause, a
@@ -23,12 +22,8 @@ import "@fontsource/fira-code/symbols2-400.css";
 type Props = { scene: Scene; summary: string };
 const SPEEDS = [0.5, 1, 1.5, 2];
 const { scene, summary } = Astro.props;
-const { entry, id: route } = Astro.locals.starlightRoute;
+const { entry } = Astro.locals.starlightRoute;
 const names = stripMoves(entry);
-// The goal sentence: every demo page's description but the front page's,
-// which keeps the slot empty so its terminal sits where every other's does.
-const goal = route === "" ? "" : entry.data.description;
-if (goal === undefined) throw new Error(`Demo page "${route}" needs a description: its goal sentence`);
 
 // Beats name a turn (and a skill call or question in it) and play in order, or
 // a caption would show at the wrong time.
@@ -62,7 +57,6 @@ for (const cols of [45, 80, 120])
 
 <div class="demo not-content" style={`--rows: ${ROWS}`} data-demo={JSON.stringify({ scene, chips, without })}>
   <div class="col">
-    <p class="goal" data-goal aria-hidden={goal ? undefined : "true"}>{goal}</p>
     <figure class="term-wrap">
       <figcaption class="vh">{summary}</figcaption>
       <div class="beats" aria-hidden="true">
@@ -137,17 +131,13 @@ for (const cols of [45, 80, 120])
      cell kept clear of it (7px cells: 120 needs 872px, 80 needs 604px).
      Captions get as many lines as the longest on any demo page needs at that
      width, so no page's terminal sits lower. */
-  .col { --cols: 45; --cap-lines: 2; --goal-lines: 3; }
-  @container demo (min-width: 604px) { .col { --cols: 80; --cap-lines: 1; --goal-lines: 2; } }
-  @container demo (min-width: 872px) { .col { --cols: 120; --goal-lines: 1; } }
+  .col { --cols: 45; --cap-lines: 2; }
+  @container demo (min-width: 604px) { .col { --cols: 80; --cap-lines: 1; } }
+  @container demo (min-width: 872px) { .col { --cols: 120; } }
   .vh {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
   }
-
-  /* The goal sentence above the narration: as many lines as the longest goal
-     needs at that width, so every page's terminal sits at the same place. */
-  .goal { width: 0; min-width: 100%; height: calc(var(--goal-lines) * var(--goal-lh)); overflow: hidden; }
 
   /* Narration above the terminal: every beat laid out in one cell of fixed
      height, so nothing moves when one replaces another. */
@@ -192,17 +182,13 @@ for (const cols of [45, 80, 120])
   }
   .demo.reduced .play, .demo.reduced .speed, .demo.reduced .now, .demo.reduced .total { visibility: hidden; }
 
-  /* The terminal's colours, per page theme. Dark: as recorded from Claude
-     Code 2.1.316, its ANSI colours Solo's (One Dark). Light: Claude Code's light
-     theme, its four colours that fail AA darkened just enough, as the user
-     asked; the ground, text and border, and One Light's ANSI colours, are the
-     site's picks. The caret stays
-     #e6e6e6 in both: it inverts what is under it. */
+  /* The terminal's colours, dark on the light page: as recorded from Claude
+     Code 2.1.316, its ANSI colours Solo's (One Dark). */
   .demo {
     --t-bg: #141414; --t-fg: #e6e6e6; --t-border: #2c2c2c; --t-scroll: #3a3a3a; --t-user: #373737;
     --t-o: #d77757; --t-o2: #eb9f7f; --t-g: #999999; --t-g2: #adadad; --t-l: #b1b9f9; --t-tab-fg: #000000;
     --t-w: #ffffff; --t-r: #888888; --t-add: #38a660; --t-del: #b3596b; --t-ok: #4eba65; --t-amb: #ffc107;
-    --t-cursor: #e6e6e6; --t-logo: #d77757; --t-eye: #000000; --smear-l: 0.78;
+    --t-cursor: #e6e6e6; --t-logo: #d77757; --t-eye: #000000;
     --t-c31: #f07178; --t-c32: #98c379; --t-c34: #7aa2f7; --t-c37: #abb2bf; --t-c95: #d5bfff; --t-c96: #7fdbca;
     --t-key-bg: #2a2a2aee; --t-key-border: #444444; --t-key-fg: #e6e6e6; --t-flash-bg: #000000aa; --t-flash-fg: #ffffff;
   }
@@ -340,8 +326,7 @@ for (const cols of [45, 80, 120])
      at the playback speed (--glide, player.ts), blinking softly at rest; plain
      under reduced motion. A move leaves a short smear behind the text: flat,
      a soft hue that changes with each move, fading in --decay into the
-     cursor's own colour as it shows (--t-cursor); --smear-l sets its
-     lightness per theme. */
+     cursor's own colour as it shows (--t-cursor). */
   .caret, .caret-trail { position: absolute; left: 0; top: 0; pointer-events: none; }
   .caret {
     width: var(--cell); height: var(--row); background: #e6e6e6; mix-blend-mode: difference;
@@ -353,7 +338,7 @@ for (const cols of [45, 80, 120])
     background: var(--t-cursor); opacity: 0; border-radius: 2px; z-index: 0;
     transition: opacity var(--decay, 280ms) cubic-bezier(0.22, 1, 0.36, 1), background-color var(--decay, 280ms) ease;
   }
-  .caret-trail:global(.hot) { background: oklch(var(--smear-l, 0.78) 0.09 var(--hue, 0)); opacity: 0.4; }
+  .caret-trail:global(.hot) { background: oklch(0.78 0.09 var(--hue, 0)); opacity: 0.4; }
   @media (prefers-reduced-motion: reduce) {
     .caret { transition: none; }
     .caret:global(.rest) { animation: none; }
@@ -384,8 +369,6 @@ for (const cols of [45, 80, 120])
     border: 1px solid var(--t-key-border); border-bottom-width: 2px; border-radius: 0.35rem; padding: 0.3rem 0.45rem;
     flex: none; white-space: nowrap;
   }
-  /* Typed text lands whole, as the recorder sent it: one cap, cut to fit. */
-  .keys :global(kbd.txt) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
 
   /* Between demo pages, the terminal and the controls stay put while what
      they show changes (the view transition in the global styles). */
@@ -394,14 +377,6 @@ for (const cols of [45, 80, 120])
 </style>
 
 <style is:global>
-  :root[data-theme="light"] .demo {
-    --t-bg: #ffffff; --t-fg: #1a1a1a; --t-border: #dcdad5; --t-scroll: #c8c8c8; --t-user: #f0f0f0;
-    --t-o: #b06147; --t-o2: #a76650; --t-g: #666666; --t-g2: #767676; --t-l: #5567f2; --t-tab-fg: #ffffff;
-    --t-w: #000000; --t-r: #8a8a8a; --t-add: #28863a; --t-del: #d1454b; --t-ok: #2c7a39; --t-amb: #966c1e;
-    --t-cursor: #1a1a1a; --smear-l: 0.62;
-    --t-c31: #ca4c41; --t-c32: #418441; --t-c34: #3b6fdf; --t-c37: #696c77; --t-c95: #a626a4; --t-c96: #017cb1;
-    --t-key-bg: #f4f4f4ee; --t-key-border: #c8c8c8; --t-key-fg: #1a1a1a; --t-flash-bg: #1a1a1acc;
-  }
   /* Pages with a demo get less space around the title, so the terminal gets
      more rows. */
   :root:has(.demo) main .content-panel { padding-block: 0.75rem; }

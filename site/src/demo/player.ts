@@ -146,12 +146,11 @@ export function mount(root: HTMLElement) {
   const tickAt = (k: number) => (motion.matches ? k / Math.max(1, ticks.length - 1) : times[k] / length);
   const placeTicks = () => ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
 
-  // Captions and the goal sentence sit in boxes of fixed lines (Demo.astro);
-  // text longer than its box would be cut, so say so.
-  const goal = $("goal");
+  // Captions sit in a box of fixed lines (Demo.astro); text longer than its
+  // box would be cut, so say so.
   function checkBoxes() {
     const box = beats[0]?.parentElement;
-    const cut = [...beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1), ...(goal.scrollHeight > goal.clientHeight + 1 ? [goal] : [])];
+    const cut = beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1);
     if (cut.length) console.error("Demo text longer than its box; give the box more lines in Demo.astro:", cut.map((el) => el.textContent));
   }
 
@@ -222,7 +221,7 @@ export function mount(root: HTMLElement) {
     // Keys fade in and out with the clock, so a still shows none.
     keycaps.innerHTML = reduced
       ? ""
-      : f.keys.map((k) => `<kbd${k.text ? ' class="txt"' : ""} style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
+      : f.keys.map((k) => `<kbd style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
     lightChip(chips.findLastIndex((c) => c.at <= now));
     // Pressed while the plain reply is on screen, before the move is typed.
     withoutBtn?.setAttribute("aria-pressed", String(now < without!.moveStarts));

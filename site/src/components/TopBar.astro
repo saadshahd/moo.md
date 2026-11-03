@@ -5,9 +5,9 @@
 // chrome.css), so a demo's terminal sits at the same place on every page. Its
 // contents sit in the content's centred column; its ground runs full width.
 // Under 50rem the menus and GitHub
-// fold into one Menu sheet; Install and the theme toggle stay in the bar.
+// fold into one Menu sheet; Install stays in the bar.
 // Menus are popovers: no script opens them; the script below only places each
-// under its button, and flips the theme.
+// under its button.
 import Search from "@astrojs/starlight/components/Search.astro";
 import Mark from "./Mark.astro";
 import MenuItems from "./MenuItems.astro";
@@ -39,10 +39,6 @@ const github = "https://github.com/saadshahd/moo.md";
 
   <div class="end">
     <Search />
-    <button type="button" class="theme" data-theme-toggle aria-label="Switch to dark theme">
-      <svg class="moon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-      <svg class="sun" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
-    </button>
     <a class="wide gh" href={github} aria-label="moo.md on GitHub">
       <svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
     </a>
@@ -83,23 +79,6 @@ const github = "https://github.com/saadshahd/moo.md";
       if (over > 0) menu.style.left = `${Math.max(16, Math.round(menu.getBoundingClientRect().left - over))}px`;
     });
   }
-
-  // The theme follows the system until the toggle picks one; picking the
-  // system's own theme drops the saved choice, so it follows again.
-  const toggle = document.querySelector<HTMLButtonElement>("[data-theme-toggle]")!;
-  const system = () => (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-  const label = () => {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    toggle.setAttribute("aria-label", `Switch to ${next} theme`);
-  };
-  label();
-  toggle.addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    if (next === system()) localStorage.removeItem("starlight-theme");
-    else localStorage.setItem("starlight-theme", next);
-    label();
-  });
 </script>
 
 <style>
@@ -124,14 +103,11 @@ const github = "https://github.com/saadshahd/moo.md";
   .menu-btn:has(+ .menu:popover-open) { background: var(--moo-surface); }
   .count { font: 400 0.75rem / 1 var(--__sl-font-mono); color: var(--sl-color-gray-3); }
 
-  .gh, .sheet-btn, .theme {
+  .gh, .sheet-btn {
     display: inline-flex; align-items: center; justify-content: center; color: var(--sl-color-gray-2);
     background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none; transition: color 120ms ease-out, background-color 120ms ease-out;
   }
-  .gh:hover, .sheet-btn:hover, .theme:hover { color: var(--moo-ink); }
-  .theme { width: 2rem; height: 2rem; border-radius: var(--moo-pill); background: var(--moo-paper); }
-  .theme:hover { background: var(--moo-surface); }
-  :root[data-theme="light"] .theme .sun, :root[data-theme="dark"] .theme .moon { display: none; }
+  .gh:hover, .sheet-btn:hover { color: var(--moo-ink); }
   .install { height: 2.25rem; padding: 0 1.1rem; font-size: var(--sl-text-sm); }
   .sheet-btn { width: 2.5rem; height: 2.5rem; border-radius: var(--moo-pill); }
   .sheet-btn .close { display: none; }

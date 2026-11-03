@@ -14,6 +14,8 @@ export default defineConfig({
         // the site's menus, search and GitHub link.
         Header: "./src/components/TopBar.astro",
         PageTitle: "./src/components/PageTitle.astro",
+        // One theme: the light page, whatever the system or a saved choice says.
+        ThemeProvider: "./src/components/ThemeProvider.astro",
         Footer: "./src/components/Footer.astro",
       },
       customCss: [

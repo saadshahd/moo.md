@@ -839,9 +839,10 @@ export type Frame = {
   /** Where the terminal's cursor rests: a row of `bottom` and a column; none
    * while a dialog without a text field is open. */
   cursor?: { row: number; col: number };
-  /** The keys the recorder sent in the last moments, oldest first, each with
-   * its opacity: it fades over the second half of its stay. */
-  keys: { label: string; text: boolean; fade: number }[];
+  /** The keys the recorder pressed in the last moments, oldest first, each
+   * with its opacity: it fades over the second half of its stay. Typed text
+   * gets none; the prompt box or the dialog's field shows it. */
+  keys: { label: string; fade: number }[];
   /** The question on screen, if a dialog is open: its index, how many options
    * it has, and which one the dialog's cursor is on. */
   asking?: { q: number; options: number; cursor: number };
@@ -877,8 +878,8 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
   const keys = timing.flatMap((p) =>
     p.caps.flatMap(([at, kind, value]) => {
       const age = s - at;
-      return age >= 0 && age < K.keyFor
-        ? [{ label: kind === "type" ? (value === " " ? "␣" : value) : (CAPS[value] ?? value), text: kind === "type" && value !== " ", fade: Math.min(1, 2 - (2 * age) / K.keyFor) }]
+      return kind === "key" && age >= 0 && age < K.keyFor
+        ? [{ label: CAPS[value] ?? value, fade: Math.min(1, 2 - (2 * age) / K.keyFor) }]
         : [];
     }),
   );
