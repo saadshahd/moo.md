@@ -234,13 +234,16 @@ for (const cols of [45, 80, 120])
   .demo :global(.term) {
     display: flex; flex-direction: column;
     /* --rows rows of text inside the padding and border. */
-    height: calc(var(--rows) * var(--row) + 1.2rem + 2px);
+    height: calc(var(--rows) * var(--row) + 2 * var(--pad) + 2px);
     width: fit-content; max-width: 100%;
-    /* The grid sits at the frame's left, 24px in, or centred where the
-       frame leaves less; the scroll's own right padding and its scrollbar
-       sit in the room on the right. 100cqi is the frame's width. */
-    --inset: max(4px, min(24px, calc((100cqi - var(--cols) * var(--cell) - 2px) / 2)));
-    padding: 0.6rem 0 0.6rem var(--inset); border: 1px solid var(--t-border); border-radius: 0.6rem;
+    /* One inner padding, --pad, above, below and at the left, where the grid
+       sits, or centred where the frame leaves less; the scroll's own right
+       padding and its scrollbar sit in the room on the right, and the
+       full-width rows end --inset from the right edge. 100cqi is the
+       frame's width. */
+    --pad: 16px;
+    --inset: max(4px, min(var(--pad), calc((100cqi - var(--cols) * var(--cell) - 2px) / 2)));
+    padding: var(--pad) 0 var(--pad) var(--inset); border: 1px solid var(--t-border); border-radius: 0.6rem;
     background: var(--t-bg); color: var(--t-fg);
   }
   /* Padding on the right: an overlay scrollbar covers it, not the last column. */
@@ -257,7 +260,7 @@ for (const cols of [45, 80, 120])
      its right edge, as hunch's did. */
   .demo :global(.term) { position: relative; }
   .toast {
-    position: absolute; top: 0.6rem; left: var(--inset); width: calc(var(--cols) * var(--cell));
+    position: absolute; top: var(--pad); left: var(--inset); width: calc(var(--cols) * var(--cell));
     overflow: hidden; pointer-events: none;
   }
   .toast :global(.box) { width: fit-content; margin-left: auto; background: var(--t-bg); }
