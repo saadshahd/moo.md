@@ -179,7 +179,7 @@ for (const cols of [45, 80, 120])
   .knob { position: absolute; top: 50%; left: 0; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: var(--muted); pointer-events: none; z-index: 1; }
   .track { position: relative; flex: 1; height: 1.8rem; cursor: pointer; touch-action: none; border-radius: 0.3rem; }
   .rail { position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: var(--sl-color-gray-5); overflow: hidden; }
-  .fill { height: 100%; width: 0; background: var(--muted); }
+  .fill { height: 100%; clip-path: inset(0 100% 0 0); background: var(--muted); }
   /* A tick per beat: a dot on the rail. The timeline is the target; a press
      near a tick goes to its beat (player.ts). */
   .demo :global(.tick) {

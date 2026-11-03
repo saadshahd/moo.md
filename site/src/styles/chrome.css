@@ -171,7 +171,12 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 .demo .controls .total { color: var(--sl-color-gray-3); }
 .demo .controls .track { height: 2rem; }
 .demo .controls .rail { height: 6px; margin-top: -3px; border-radius: 3px; background: var(--sl-color-gray-5); }
-.demo .controls .fill { background: var(--moo-ink); }
+/* The fill is the turn without moo in amber up to where moo's turn starts
+   (--moo-from, player.ts; a tick marks it too), then moo's pine; a chain is
+   pine throughout. */
+.demo .controls .fill {
+  background: linear-gradient(to right, var(--moo-without) var(--moo-from, 0%), var(--moo-accent) var(--moo-from, 0%));
+}
 .demo .controls .tick { width: 2px; height: 6px; margin: -3px -1px; border-radius: 0; background: var(--moo-paper); box-shadow: none; }
 .demo .controls .knob { width: 16px; height: 16px; margin: -8px; background: var(--moo-ink); box-shadow: 0 0 0 2px var(--moo-paper); }
 .demo .controls .speed { gap: 2px; padding: 2px; border-radius: var(--moo-pill); background: var(--moo-band); }
@@ -216,14 +221,17 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 /* Under reduced motion the time hides, and the move's name stays. */
 .demo.reduced .chaptered .at > .on { visibility: visible; }
 @media (prefers-reduced-motion: reduce) { .demo .chaptered .chapters > span { transition: none; } }
-/* The step back to the plain reply: a pill in the speed group's look, ink and
-   paper swapped while the plain reply is on screen. */
+/* The step back to the plain reply, in the amber of its turn on the
+   timeline, so it is the timeline's legend: filled while that turn is on
+   screen, outlined once moo's starts. */
 .demo .controls .without {
   min-width: 0; height: 2rem; padding: 0 0.85rem; border-radius: var(--moo-pill); white-space: nowrap;
-  background: var(--moo-band); color: var(--moo-ink); font: 600 0.8125rem / 1 var(--__sl-font);
+  background: none; box-shadow: inset 0 0 0 2px var(--moo-without); color: var(--moo-ink);
+  font: 600 0.8125rem / 1 var(--__sl-font); transition: background-color 120ms ease-out;
 }
-.demo .controls .without:hover { color: var(--moo-ink); background: var(--moo-surface); }
-.demo .controls .without[aria-pressed="true"] { background: var(--moo-ink); color: var(--moo-paper); }
+.demo .controls .without:hover { color: var(--moo-ink); background: var(--moo-band); }
+.demo .controls .without[aria-pressed="true"] { background: var(--moo-without); }
+@media (prefers-reduced-motion: reduce) { .demo .controls .without { transition: none; } }
 /* On a phone the step takes a row of its own above the player's, so the
    timeline keeps its width. */
 @media (max-width: 40rem) {

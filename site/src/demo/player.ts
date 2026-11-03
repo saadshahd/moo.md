@@ -148,6 +148,9 @@ export function mount(root: HTMLElement) {
   });
   const tickAt = (k: number) => (motion.matches ? k / Math.max(1, beats.length - 1) : times[k] / length);
   const placeTicks = () => ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
+  // The fill turns from the plain turn's colour to moo's at the tick where
+  // moo's turn starts (chrome.css).
+  const mooFrom = () => (without ? tickAt(times.findIndex((x) => x >= without.moveStarts)) : 0);
 
   // A chapter runs from its move's start to the next one's, the first from the
   // timeline's start. The rail parts where each later one starts. Each name
@@ -237,7 +240,7 @@ export function mount(root: HTMLElement) {
     });
     // The fill, its knob and the time readout show where the demo is.
     const at = `${(reduced ? still / Math.max(1, beats.length - 1) : t / length) * 100}%`;
-    fill.style.width = at;
+    fill.style.clipPath = `inset(0 calc(100% - ${at}) 0 0)`;
     knob.style.left = at;
     nowEl.textContent = clock(now);
     const move = lightChapter(Math.max(0, chips.findLastIndex((c) => c.at <= now)));
@@ -385,6 +388,7 @@ export function mount(root: HTMLElement) {
     speedBtns.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === speed)));
     placeTicks();
     placeChapters();
+    fill.style.setProperty("--moo-from", `${mooFrom() * 100}%`);
     track.setAttribute("aria-valuemax", String(motion.matches ? beats.length : Math.floor(length)));
     track.setAttribute("aria-valuemin", motion.matches ? "1" : "0");
     if (running() && !ticking) {

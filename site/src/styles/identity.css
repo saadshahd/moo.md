@@ -4,7 +4,9 @@
    what is code: the terminal, the commands, the moves and the mark. The bar and the title row sit on a band one tone
    off the page: surfaces part by tone, never by a line.
    Contrast: ink on paper 15.3:1, on the band 13.6; muted 6.8 and 6.1;
-   pine on paper 6.1, on the band 5.5; white on pine 7.0. */
+   pine on paper 6.1, on the band 5.5; white on pine 7.0. A demo's turn
+   without moo is amber, lighter than the pine so the two part in grey too:
+   on paper 3.4, on the band 3.0, ink on it 4.5. */
 /* Fetched at build time (tools/fetch-fonts.mjs); see its note on the licence. */
 @font-face {
   font-family: "Switzer";
@@ -52,6 +54,7 @@
   --moo-ink: #1a1917;
   --moo-accent: #17663a;
   --moo-on-accent: #ffffff;
+  --moo-without: #b5730a;
 
   --sl-color-gray-1: #2a2825;
   --sl-color-gray-2: #3a3733;
