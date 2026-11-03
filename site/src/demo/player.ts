@@ -378,7 +378,8 @@ export function mount(root: HTMLElement) {
     pick = undefined;
     following = true;
     last = performance.now();
-    draw();
+    // A seek can end the demo or take it back from its end.
+    sync();
   }
   function seekBeat(k: number) {
     if (motion.matches) {
