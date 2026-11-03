@@ -56,12 +56,13 @@ const names = stripMoves(entry);
   .lit {
     position: absolute; inset-block: 0; left: 0; width: max-content; pointer-events: none;
     background: var(--moo-ink); clip-path: inset(0 100% 0 0); opacity: 0;
-    /* Opacity first: player.ts lands the clip by naming opacity alone. */
     transition: opacity 0.15s ease-out, clip-path 0.26s cubic-bezier(0.77, 0, 0.175, 1);
   }
+  /* Showing, it grows into place from a little inside the chip. */
+  .lit.enter { transition: opacity 0.15s ease-out, clip-path 0.15s cubic-bezier(0.23, 1, 0.32, 1); }
   .lit .chip, .lit .arrow { color: var(--moo-paper); transition: none; }
   @media (prefers-reduced-motion: reduce) {
-    .lit { transition: none; }
+    .lit, .lit.enter { transition: none; }
   }
   @media (max-width: 40rem) {
     .chip { font-size: 0.8125rem; padding: 0.35rem 0.45rem; }

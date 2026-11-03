@@ -253,34 +253,53 @@ export function mount(root: HTMLElement) {
       if (i === k) el.setAttribute("aria-current", "step");
       else el.removeAttribute("aria-current");
     });
-    placePill(!shown);
+    placePill(shown ? "glide" : "enter");
     const on = chipEls[k];
-    if (on && strip.scrollWidth > strip.clientWidth)
-      strip.scrollTo({
-        left: on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2,
-        behavior: motion.matches ? "auto" : "smooth",
-      });
+    if (!on || strip.scrollWidth <= strip.clientWidth) return;
+    const left = on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2;
+    if (shown) scrollWith(left);
+    else strip.scrollLeft = left;
   }
 
   // The pill clips the strip's lit copy (Strip.astro) to the live chip. It
-  // glides from chip to chip, and lands with no glide when it first shows or
-  // the chips change size (a resize, the font arriving).
+  // glides from chip to chip, grows into place when it shows, and lands with
+  // no motion when the chips change size (a resize, the font arriving).
   const litRow = strip.querySelector<HTMLElement>("[data-lit]")!;
   const litChips = [...litRow.querySelectorAll<HTMLElement>(".chip")];
-  function placePill(instant: boolean) {
+  function placePill(how: "glide" | "enter" | "land") {
     const on = litChips[lit];
+    litRow.classList.toggle("enter", how === "enter");
+    if (on) {
+      const [w, h] = [litRow.offsetWidth, litRow.offsetHeight];
+      const [x, y] = [on.offsetLeft, on.offsetTop];
+      const inset = (d: number) =>
+        `inset(${y + d}px ${w - x - on.offsetWidth + d}px ${h - y - on.offsetHeight + d}px ${x + d}px round var(--moo-pill))`;
+      if (how !== "glide") {
+        litRow.style.transition = "none";
+        litRow.style.clipPath = inset(how === "enter" ? 3 : 0);
+        void litRow.offsetWidth; // start from here
+        litRow.style.transition = "";
+      }
+      litRow.style.clipPath = inset(0);
+    }
     litRow.style.opacity = on ? "1" : "0";
-    if (!on) return;
-    const [w, h] = [litRow.offsetWidth, litRow.offsetHeight];
-    const [x, y] = [on.offsetLeft, on.offsetTop];
-    const clip = `inset(${y}px ${w - x - on.offsetWidth}px ${h - y - on.offsetHeight}px ${x}px round var(--moo-pill))`;
-    if (!instant) return void (litRow.style.clipPath = clip);
-    litRow.style.transitionProperty = "opacity";
-    litRow.style.clipPath = clip;
-    void litRow.offsetWidth; // land before the glide returns
-    litRow.style.transitionProperty = "";
   }
-  new ResizeObserver(() => placePill(true)).observe(litRow);
+  new ResizeObserver(() => placePill("land")).observe(litRow);
+
+  // The strip scrolls in step with the glide, on its clock and curve, so on
+  // screen the pill only moves toward the move it lights.
+  let scrolling = 0;
+  function scrollWith(left: number) {
+    cancelAnimationFrame(scrolling);
+    const start = strip.scrollLeft;
+    const glide = litRow.getAnimations().find((a) => (a as CSSTransition).transitionProperty === "clip-path");
+    const step = () => {
+      const p = glide?.playState === "running" ? (glide.effect?.getComputedTiming().progress ?? 1) : 1;
+      strip.scrollLeft = start + p * (left - start);
+      if (p < 1) scrolling = requestAnimationFrame(step);
+    };
+    step();
+  }
 
   // The cursor glides to its cell, leaving a short smear, and blinks softly
   // once at rest; it inverts the text under it, so it covers none.
