@@ -192,7 +192,7 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 .demo .chaptered :is(.now, .total) { line-height: 2rem; }
 .demo .chaptered .chapters > span {
   position: absolute; top: 0; font: 400 0.75rem / 1 var(--__sl-font-mono); white-space: nowrap;
-  color: var(--sl-color-gray-3); transition: color 0.2s ease;
+  color: var(--sl-color-gray-3); transition: color 120ms ease-out;
 }
 .demo .chaptered .chapters > .on { color: var(--moo-ink); }
 .demo .chaptered.tight .chapters { visibility: hidden; }
