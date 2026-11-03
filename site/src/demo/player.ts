@@ -301,6 +301,8 @@ export function mount(root: HTMLElement) {
     for (const pill of pills) {
       const on = pill.children[lit] as HTMLElement | undefined;
       pill.classList.toggle("enter", how === "enter");
+      // No chapter lit: the pill fades out where it is.
+      if (!on) pill.style.opacity = "0";
       if (!on?.offsetWidth) continue;
       const [w, h] = [pill.offsetWidth, pill.offsetHeight];
       const inset = (d: number) =>
