@@ -3,8 +3,9 @@ import { href } from "./link";
 import { MOVE_GROUPS } from "./move-groups";
 
 /** The site's lists, in the menu's order, each a folder of pages by title:
- * a chain shows its one line (its description), every other page its command
- * and what it does (its move line). Groups with no page yet are left out.
+ * a chain shows its one line (its description), a move its command alone,
+ * and every other page its command and what it does (its move line). Groups
+ * with no page yet are left out.
  * The top bar's menus and the 404 page show them. */
 const GROUPS = [
   { id: "start", label: "Start" },
@@ -23,7 +24,7 @@ export const siteMenus = async () => {
         name: e.id.slice(id.length + 1),
         href: href(e.id),
         label: e.data.title,
-        note: id === "chains" ? e.data.description : e.data.move,
+        note: id === "chains" ? e.data.description : id === "moves" ? undefined : e.data.move,
       })),
     })),
   );
