@@ -242,20 +242,45 @@ export function mount(root: HTMLElement) {
     keycaps.style.top = `${Math.max(parseFloat(getComputedStyle(term).paddingTop), top)}px`;
   }
 
-  // The move on screen lights up; in a strip that overflows, it scrolls into
-  // view (the strip alone, never the page).
+  // The move on screen lights up, and the pill glides to it; in a strip that
+  // overflows, it scrolls into view (the strip alone, never the page).
   function lightChip(k: number) {
     if (k === lit) return;
+    const shown = lit >= 0;
     lit = k;
     chipEls.forEach((el, i) => {
       el.classList.toggle("on", i === k);
       if (i === k) el.setAttribute("aria-current", "step");
       else el.removeAttribute("aria-current");
     });
+    placePill(!shown);
     const on = chipEls[k];
     if (on && strip.scrollWidth > strip.clientWidth)
-      strip.scrollLeft = on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2;
+      strip.scrollTo({
+        left: on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2,
+        behavior: motion.matches ? "auto" : "smooth",
+      });
   }
+
+  // The pill clips the strip's lit copy (Strip.astro) to the live chip. It
+  // glides from chip to chip, and lands with no glide when it first shows or
+  // the chips change size (a resize, the font arriving).
+  const litRow = strip.querySelector<HTMLElement>("[data-lit]")!;
+  const litChips = [...litRow.querySelectorAll<HTMLElement>(".chip")];
+  function placePill(instant: boolean) {
+    const on = litChips[lit];
+    litRow.style.opacity = on ? "1" : "0";
+    if (!on) return;
+    const [w, h] = [litRow.offsetWidth, litRow.offsetHeight];
+    const [x, y] = [on.offsetLeft, on.offsetTop];
+    const clip = `inset(${y}px ${w - x - on.offsetWidth}px ${h - y - on.offsetHeight}px ${x}px round var(--moo-pill))`;
+    if (!instant) return void (litRow.style.clipPath = clip);
+    litRow.style.transitionProperty = "opacity";
+    litRow.style.clipPath = clip;
+    void litRow.offsetWidth; // land before the glide returns
+    litRow.style.transitionProperty = "";
+  }
+  new ResizeObserver(() => placePill(true)).observe(litRow);
 
   // The cursor glides to its cell, leaving a short smear, and blinks softly
   // once at rest; it inverts the text under it, so it covers none.

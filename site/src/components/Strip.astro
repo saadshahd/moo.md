@@ -18,27 +18,51 @@ const names = stripMoves(entry);
     </>
   ))}
   {!moves && move && <span class="line">{move}</span>}
+  <div class="lit" data-lit aria-hidden="true">
+    {names.map((m, k) => (
+      <>
+        {k > 0 && <span class="arrow">→</span>}
+        <span class="chip">/{m}</span>
+      </>
+    ))}
+  </div>
 </div>
 
 <style>
   /* One row that scrolls rather than wraps: the moves as words, no outlines.
-     Moves already played in ink, the live one ink and paper swapped, the ones
-     to come muted. The accent stays the call to action's. */
+     Moves already played in ink, the ones to come muted. The live one sits in
+     the pill, ink and paper swapped: a copy of the row in those colours,
+     clipped to the live chip, so the pill glides from word to word while the
+     words hold still (player.ts places the clip). The accent stays the call
+     to action's. */
+  .strip, .lit { display: flex; align-items: center; gap: 0.15rem; }
   .strip {
-    position: relative; display: flex; align-items: center; gap: 0.15rem; height: 2rem; margin: 0;
+    position: relative; height: 2rem; margin: 0;
     overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none;
   }
   .chip {
     flex: none; font: 400 0.9375rem / 1 var(--__sl-font-mono); color: var(--sl-color-gray-3); background: none;
     border: 0; border-radius: var(--moo-pill); padding: 0.4rem 0.6rem; cursor: pointer;
-    transition: background-color 0.2s ease-out, color 0.2s ease-out;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
-  .chip:has(~ :global(.chip.on)) { color: var(--moo-ink); }
-  .chip:hover { background: var(--moo-paper); color: var(--moo-ink); }
-  .chip:global(.on) { background: var(--moo-ink); color: var(--moo-paper); }
+  .chip:has(~ :global(.chip.on)), .chip:global(.on) { color: var(--moo-ink); }
   .chip:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+  @media (hover: hover) and (pointer: fine) {
+    .chip:hover { background: var(--moo-paper); color: var(--moo-ink); }
+  }
   .arrow { flex: none; padding-inline: 0.15rem; color: var(--sl-color-gray-4); font-size: 0.8rem; }
   .line { margin-inline-start: 0.5rem; color: var(--moo-ink); font-size: 0.9375rem; }
+  /* Hidden until a move is on screen; on screen, it eases in place. */
+  .lit {
+    position: absolute; inset-block: 0; left: 0; width: max-content; pointer-events: none;
+    background: var(--moo-ink); clip-path: inset(0 100% 0 0); opacity: 0;
+    /* Opacity first: player.ts lands the clip by naming opacity alone. */
+    transition: opacity 0.15s ease-out, clip-path 0.26s cubic-bezier(0.77, 0, 0.175, 1);
+  }
+  .lit .chip, .lit .arrow { color: var(--moo-paper); transition: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .lit { transition: none; }
+  }
   @media (max-width: 40rem) {
     .chip { font-size: 0.8125rem; padding: 0.35rem 0.45rem; }
   }
