@@ -15,6 +15,13 @@
   --sl-content-width: 87.5rem;
   --sl-nav-pad-x: var(--sl-content-pad-x);
   --sl-nav-pad-y: var(--moo-bar-pad);
+  /* Menus (TopBar.astro, MenuItems.astro): the panel's padding is each row's
+     margin from its edge, and the row's radius nests inside the panel's. A
+     row's text sits one row-padding in from both of its sides. */
+  --moo-menu-pad: 0.375rem;
+  --moo-menu-radius: 0.75rem;
+  --moo-row-radius: calc(var(--moo-menu-radius) - var(--moo-menu-pad));
+  --moo-row-pad: 1rem;
 }
 /* Starlight's hairline under the bar is clear here, so it would only take a
    pixel off the bottom padding. */
