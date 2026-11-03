@@ -802,6 +802,12 @@ describe("only a person changes the factory's rules and the repo's workflows", (
       [{ kind: "markStuck", issue: 7, reason: "its PR #57 was closed without merging" }],
     ]);
   });
+  test("an issue that ended untrusted is left alone on the next tick, its closed PR and claim notwithstanding", () => {
+    const gh = snapshot({ issues: [issue(7, { editor: "stranger" })], claimed: new Set([7]) });
+    const closed = { number: 57, state: "CLOSED", closedAt: "2026-10-26T09:00:00Z" } as const;
+
+    expect(decide(world(gh, [], { claimedHere: new Set([7]), claimedPrs: new Map([[7, closed]]) }))).toEqual([]);
+  });
   test("once a person retries it, it resumes, and a run that stops before a new PR is no closed PR's", () => {
     const stuck = posted({ kind: "stuck", issue: 7, reason: `its PR #57 changed ${RULES_PATH}` }, "2026-10-26T09:30:00Z");
     const retried = issue(7, { comments: [stuck] });
@@ -1274,6 +1280,31 @@ describe("the PR a run opens", () => {
     await git("config", "diff.relative", "true");
 
     await expect(pushBranch(join(dir, "src"), 7)).rejects.toMatchObject({ code: 4, message: expect.stringContaining(".github/workflows/ci.yml") });
+    await rm(root, { recursive: true });
+  });
+  test("push runs no hook the run's branch tracks, where the repo's hooks folder is a tracked one", async () => {
+    const root = await mkdtemp(join(tmpdir(), "factory-push-"));
+    const [origin, dir, ran] = [join(root, "origin.git"), join(root, "w"), join(root, "hook-ran")];
+    await gitIn(root, "init", "-q", "--bare", origin);
+    await gitIn(root, "clone", "-q", origin, dir);
+    const git = (...a: string[]) => gitIn(dir, ...a);
+    await git("commit", "-q", "--allow-empty", "-m", "base");
+    await git("push", "-q", "origin", "HEAD:refs/heads/main");
+    await git("remote", "set-head", "origin", "main");
+    await git("switch", "-q", "-c", "factory/7");
+    await mkdir(join(dir, ".husky"));
+
+    for (const hook of ["pre-push", "reference-transaction"]) {
+      await Bun.write(join(dir, ".husky", hook), `#!/bin/sh\necho ${hook} >> ${ran}\n`);
+      await chmod(join(dir, ".husky", hook), 0o755);
+    }
+
+    await git("add", ".husky");
+    await git("commit", "-q", "-m", "hooks");
+    await git("config", "core.hooksPath", ".husky");
+
+    expect(await pushBranch(dir, 7)).toBe("pushed factory/7");
+    expect(await Bun.file(ran).exists()).toBe(false);
     await rm(root, { recursive: true });
   });
   test("pr refuses with exit 4 while its body file is missing or blank, naming the file", async () => {
