@@ -28,7 +28,7 @@ const github = "https://github.com/saadshahd/moo.md";
     {menus.map((m) => (
       <>
         <button type="button" class="wide menu-btn" popovertarget={`menu-${m.id}`} aria-current={m.items.some((i) => i.href === here) ? "true" : undefined}>
-          {m.label}<span class="count" aria-label={`, ${m.items.length} pages`}>{m.items.length}</span>
+          {m.label}
         </button>
         <div id={`menu-${m.id}`} class={`wide menu ${m.look}`} popover>
           <MenuItems items={m.items} groups={m.groups} here={here} kind={m.look} at="bar" />
@@ -53,7 +53,7 @@ const github = "https://github.com/saadshahd/moo.md";
     <nav aria-label="Site">
       {menus.map((m) => (
         <section>
-          <h2>{m.label}<span class="count">{m.items.length}</span></h2>
+          <h2>{m.label}</h2>
           <MenuItems items={m.items} groups={m.groups} here={here} kind={m.look} stack at="sheet" />
         </section>
       ))}
@@ -90,9 +90,8 @@ const github = "https://github.com/saadshahd/moo.md";
   .bar > nav { display: flex; align-items: center; gap: 0.25rem; }
   .end { margin-inline-start: auto; display: flex; align-items: center; gap: 0.875rem; }
 
-  /* A menu is a plain word in ink with its count where a chevron would be.
-     It shows a tone only on hover, and the surface's tone while its panel is
-     open. */
+  /* A menu is a plain word in ink. It shows a tone only on hover, and the
+     surface's tone while its panel is open. */
   .menu-btn {
     display: inline-flex; align-items: center; gap: 0.4rem; height: 2rem; padding: 0 0.75rem;
     font: 500 0.9375rem / 1 var(--__sl-font); color: var(--moo-ink);
@@ -101,7 +100,6 @@ const github = "https://github.com/saadshahd/moo.md";
   }
   .menu-btn:hover { background: var(--moo-paper); }
   .menu-btn:has(+ .menu:popover-open) { background: var(--moo-surface); }
-  .count { font: 400 0.75rem / 1 var(--__sl-font-mono); color: var(--sl-color-gray-3); }
 
   .gh, .sheet-btn {
     display: inline-flex; align-items: center; justify-content: center; color: var(--sl-color-gray-2);
@@ -128,7 +126,6 @@ const github = "https://github.com/saadshahd/moo.md";
   .sheet { position: fixed; inset: var(--sl-nav-height) 0 0 0; width: 100%; height: auto; max-height: none; overflow: auto; padding: 1.5rem 1rem; }
   .sheet section + section { margin-top: 1.75rem; }
   .sheet h2 { display: flex; align-items: center; gap: 0.5rem; margin: 0 0.75rem 0.5rem; font: 600 1.375rem / 1.2 var(--moo-heading); letter-spacing: -0.02em; color: var(--moo-ink); }
-  .sheet h2 .count { font-size: 0.8125rem; }
   .sheet-gh { display: inline-block; margin: 1.75rem 0.75rem 0; color: var(--sl-color-gray-2); font: 400 var(--sl-text-base) / 1.4 var(--__sl-font); }
   .narrow { display: none; }
   @media (max-width: 50rem) {

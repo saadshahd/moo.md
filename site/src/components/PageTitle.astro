@@ -1,8 +1,8 @@
 ---
 // On a demo page, the front page among them, the title is for the tab and
-// screen readers; in its place, above the divider, sits the strip of the
-// moves its demo runs. Every other page shows its title and, under it, its
-// description in plain words.
+// screen readers; a move page shows its strip in its place, above the
+// divider, and a chain names its moves on the demo's timeline. Every other
+// page shows its title and, under it, its description in plain words.
 import Strip from "./Strip.astro";
 
 const { entry } = Astro.locals.starlightRoute;
@@ -14,7 +14,7 @@ const demo = (moves !== undefined || move !== undefined) && template !== "splash
   demo ? (
     <>
       <h1 id="_top" class="vh">{title}</h1>
-      <Strip />
+      {moves === undefined && <Strip />}
     </>
   ) : (
     <>

@@ -1,7 +1,7 @@
 // Plays a demo's scene once while it is in view, from its first ask to its
 // last frame, on one clock `t`, with a player's controls under it: play and
-// pause, replay once it ends, a timeline with a tick per beat, and speed. Beat captions narrate above, and the page's strip of moves
-// lights the one on screen; the terminal scrolls back like one; the reader
+// pause, replay once it ends, a timeline with a tick per beat, and speed. Beat captions narrate above; a chain's moves are
+// chapters of the timeline; the terminal scrolls back like one; the reader
 // can pick a dialog's option. Under reduced motion, the timeline steps through
 // one still per beat instead. A demo with a plain turn plays it first; its
 // "without moo" button steps back to the plain reply and forth to moo's
@@ -103,10 +103,13 @@ export function mount(root: HTMLElement) {
   const track = $("track");
   const fill = $("fill");
   const probe = $("probe");
-  // The page's strip of moves sits in its title (PageTitle.astro), one per page.
-  const strip = document.querySelector<HTMLElement>("[data-strip]")!;
-  const chipEls = [...strip.querySelectorAll<HTMLButtonElement>("[data-chip]")];
-  if (chipEls.length !== chips.length) throw new Error(`The strip shows ${chipEls.length} moves; the demo has ${chips.length}`);
+  const rail = $("rail");
+  // A chain's moves, as chapters of the timeline (Demo.astro): a name on the
+  // rail each, and one beside the time when the names don't fit there.
+  const chapterEls = [...root.querySelectorAll<HTMLElement>("[data-chapters] > *")];
+  const atEls = [...root.querySelectorAll<HTMLElement>("[data-at] > *")];
+  if (chapterEls.length && chapterEls.length !== chips.length)
+    throw new Error(`The timeline shows ${chapterEls.length} moves; the demo has ${chips.length}`);
   const beats = [...root.querySelectorAll<HTMLElement>("[data-beat]")];
   const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const id = `demo${++demos}`;
@@ -131,20 +134,46 @@ export function mount(root: HTMLElement) {
   const rowsNow = () => Number(getComputedStyle(root).getPropertyValue("--rows"));
   let cols = colsNow();
   let rows = rowsNow();
-  let lit = -1; // the chip of the move on screen
+  let lit = -1; // the chapter of the move on screen
   let f: Frame | undefined;
 
   // A tick on the timeline per beat: a mark, not a target of its own, since
   // beats can sit closer than a finger. The timeline is the target, and the
-  // arrow keys go from beat to beat.
-  const ticks = scene.beats.map(() => {
+  // arrow keys go from beat to beat. Chapters mark a chain's timeline instead.
+  const ticks = (chapterEls.length ? [] : scene.beats).map(() => {
     const tick = document.createElement("span");
     tick.className = "tick";
     track.append(tick);
     return tick;
   });
-  const tickAt = (k: number) => (motion.matches ? k / Math.max(1, ticks.length - 1) : times[k] / length);
+  const tickAt = (k: number) => (motion.matches ? k / Math.max(1, beats.length - 1) : times[k] / length);
   const placeTicks = () => ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
+
+  // A chapter runs from its move's start to the next one's, the first from the
+  // timeline's start. The rail parts where each later one starts. Each name
+  // sits centred on its chapter, inside the timeline; where two would touch,
+  // the names leave the rail and the time names the move instead.
+  const chapterStart = (k: number) => (k ? tickAt(chips[k].beat) : 0);
+  function placeChapters() {
+    if (!chapterEls.length) return;
+    const starts = chips.map((_, k) => `${chapterStart(k) * 100}%`).slice(1);
+    rail.style.maskImage = `linear-gradient(to right, ${starts
+      .map((x) => `#000 calc(${x} - 1.5px), transparent calc(${x} - 1.5px) calc(${x} + 1.5px), #000 calc(${x} + 1.5px)`)
+      .join(", ")})`;
+    const w = track.clientWidth;
+    let end = -Infinity;
+    let fits = true;
+    chapterEls.forEach((el, k) => {
+      const mid = ((chapterStart(k) + (k + 1 < chips.length ? chapterStart(k + 1) : 1)) / 2) * w;
+      const left = Math.min(Math.max(0, mid - el.offsetWidth / 2), w - el.offsetWidth);
+      el.style.left = `${left}px`;
+      fits &&= left >= end + 12;
+      end = left + el.offsetWidth;
+    });
+    track.parentElement!.classList.toggle("tight", !fits);
+  }
+  new ResizeObserver(placeChapters).observe(track);
+  document.fonts.ready.then(placeChapters);
 
   // Captions sit in a box of fixed lines (Demo.astro); text longer than its
   // box would be cut, so say so.
@@ -211,18 +240,18 @@ export function mount(root: HTMLElement) {
     fill.style.width = at;
     knob.style.left = at;
     nowEl.textContent = clock(now);
+    const move = lightChapter(Math.max(0, chips.findLastIndex((c) => c.at <= now)));
     if (reduced) {
       track.setAttribute("aria-valuenow", String(still + 1));
-      track.setAttribute("aria-valuetext", scene.beats[still].text);
+      track.setAttribute("aria-valuetext", `${move ? `${move}: ` : ""}${scene.beats[still].text}`);
     } else {
       track.setAttribute("aria-valuenow", String(Math.floor(t)));
-      track.setAttribute("aria-valuetext", `${clock(t)} of ${clock(length)}: ${scene.beats[f.beat].text}`);
+      track.setAttribute("aria-valuetext", `${clock(t)}${move ? `, ${move}` : ` of ${clock(length)}`}: ${scene.beats[f.beat].text}`);
     }
     // Keys fade in and out with the clock, so a still shows none.
     keycaps.innerHTML = reduced
       ? ""
       : f.keys.map((k) => `<kbd style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
-    lightChip(chips.findLastIndex((c) => c.at <= now));
     // Pressed while the plain reply is on screen, before the move is typed.
     withoutBtn?.setAttribute("aria-pressed", String(now < without!.moveStarts));
     stickToBottom();
@@ -242,63 +271,14 @@ export function mount(root: HTMLElement) {
     keycaps.style.top = `${Math.max(parseFloat(getComputedStyle(term).paddingTop), top)}px`;
   }
 
-  // The move on screen lights up, and the pill glides to it; in a strip that
-  // overflows, it scrolls into view (the strip alone, never the page).
-  function lightChip(k: number) {
-    if (k === lit) return;
-    const shown = lit >= 0;
-    lit = k;
-    chipEls.forEach((el, i) => {
-      el.classList.toggle("on", i === k);
-      if (i === k) el.setAttribute("aria-current", "step");
-      else el.removeAttribute("aria-current");
-    });
-    placePill(shown ? "glide" : "enter");
-    const on = chipEls[k];
-    if (!on || strip.scrollWidth <= strip.clientWidth) return;
-    const left = on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2;
-    if (shown) scrollWith(left);
-    else strip.scrollLeft = left;
-  }
-
-  // The pill clips the strip's lit copy (Strip.astro) to the live chip. It
-  // glides from chip to chip, grows into place when it shows, and lands with
-  // no motion when the chips change size (a resize, the font arriving).
-  const litRow = strip.querySelector<HTMLElement>("[data-lit]")!;
-  const litChips = [...litRow.querySelectorAll<HTMLElement>(".chip")];
-  function placePill(how: "glide" | "enter" | "land") {
-    const on = litChips[lit];
-    litRow.classList.toggle("enter", how === "enter");
-    if (on) {
-      const [w, h] = [litRow.offsetWidth, litRow.offsetHeight];
-      const [x, y] = [on.offsetLeft, on.offsetTop];
-      const inset = (d: number) =>
-        `inset(${y + d}px ${w - x - on.offsetWidth + d}px ${h - y - on.offsetHeight + d}px ${x + d}px round var(--moo-pill))`;
-      if (how !== "glide") {
-        litRow.style.transition = "none";
-        litRow.style.clipPath = inset(how === "enter" ? 3 : 0);
-        void litRow.offsetWidth; // start from here
-        litRow.style.transition = "";
-      }
-      litRow.style.clipPath = inset(0);
+  // The chapter on screen lights up, on the rail and beside the time; its
+  // name, if the timeline has chapters.
+  function lightChapter(k: number) {
+    if (k !== lit) {
+      lit = k;
+      [chapterEls, atEls].forEach((els) => els.forEach((el, i) => el.classList.toggle("on", i === k)));
     }
-    litRow.style.opacity = on ? "1" : "0";
-  }
-  new ResizeObserver(() => placePill("land")).observe(litRow);
-
-  // The strip scrolls in step with the glide, on its clock and curve, so on
-  // screen the pill only moves toward the move it lights.
-  let scrolling = 0;
-  function scrollWith(left: number) {
-    cancelAnimationFrame(scrolling);
-    const start = strip.scrollLeft;
-    const glide = litRow.getAnimations().find((a) => (a as CSSTransition).transitionProperty === "clip-path");
-    const step = () => {
-      const p = glide?.playState === "running" ? (glide.effect?.getComputedTiming().progress ?? 1) : 1;
-      strip.scrollLeft = start + p * (left - start);
-      if (p < 1) scrolling = requestAnimationFrame(step);
-    };
-    step();
+    return chapterEls[k]?.textContent ?? "";
   }
 
   // The cursor glides to its cell, leaving a short smear, and blinks softly
@@ -404,6 +384,7 @@ export function mount(root: HTMLElement) {
     playBtn.setAttribute("aria-label", ended() ? "Replay demo" : paused ? "Play demo" : "Pause demo");
     speedBtns.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === speed)));
     placeTicks();
+    placeChapters();
     track.setAttribute("aria-valuemax", String(motion.matches ? beats.length : Math.floor(length)));
     track.setAttribute("aria-valuemin", motion.matches ? "1" : "0");
     if (running() && !ticking) {
@@ -434,7 +415,6 @@ export function mount(root: HTMLElement) {
     } else seek(times[Math.min(Math.max(0, k), times.length - 1)] + 0.3);
   }
   const beatNow = () => (motion.matches ? still : (f?.beat ?? 0));
-  chipEls.forEach((el, k) => el.addEventListener("click", () => seekBeat(chips[k].beat)));
 
   // Play always returns to the newest line and lets the demo drive the dialog;
   // at the end, it replays from the first ask.
@@ -497,12 +477,27 @@ export function mount(root: HTMLElement) {
     else if (motion.matches) seekBeat(Math.round(x * (beats.length - 1)));
     else seek(x * length);
   };
+  // On a chain's timeline, a tap goes to its chapter's start (a name's own,
+  // since a name may reach past its chapter) and a drag scrubs.
+  let tap: { x: number; k: number } | undefined;
+  const chapterAt = (e: PointerEvent) => {
+    const named = chapterEls.indexOf((e.target as HTMLElement).closest<HTMLElement>("[data-chapters] > *")!);
+    const x = (e.clientX - track.getBoundingClientRect().left) / track.clientWidth;
+    return named >= 0 ? named : Math.max(0, chips.findLastIndex((_, k) => chapterStart(k) <= x));
+  };
   track.addEventListener("pointerdown", (e) => {
     track.setPointerCapture(e.pointerId);
-    seekTo(e);
+    if (chapterEls.length) tap = { x: e.clientX, k: chapterAt(e) };
+    else seekTo(e);
   });
   track.addEventListener("pointermove", (e) => {
-    if (track.hasPointerCapture(e.pointerId)) seekTo(e);
+    if (!track.hasPointerCapture(e.pointerId) || (tap && Math.abs(e.clientX - tap.x) <= 4)) return;
+    tap = undefined;
+    seekTo(e);
+  });
+  track.addEventListener("pointerup", () => {
+    if (tap) seekBeat(chips[tap.k].beat);
+    tap = undefined;
   });
 
   // Picking an option pauses the demo and moves the dialog's cursor to it.

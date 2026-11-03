@@ -2,9 +2,9 @@
 // A Claude Code mock built from a real recorded session: same glyphs, colors,
 // wrap rule, spinner verbs and replies, cut only where "… +N lines" says so.
 // Plays once in view, from its first ask to its last frame, narrated by beat
-// captions above it and lighting the move on screen in the page's strip
-// (PageTitle.astro), with a player's controls below: play and pause, a
-// timeline with a tick per beat, speed. Under reduced motion, the timeline
+// captions above it, with a player's controls below: play and pause, a
+// timeline with a tick per beat, speed. A chain's timeline has a chapter per
+// move in place of the ticks, named. Under reduced motion, the timeline
 // steps through one still per beat. `summary` tells a screen reader what it
 // shows. A recording with a plain turn (Scene.plain) plays it first, and its
 // "without moo" button steps back to the plain reply and forth to moo's
@@ -30,15 +30,16 @@ const names = stripMoves(entry);
 const times = beatTimes(scene);
 if (!times.length || times.some((x, k) => !(x > (k ? times[k - 1] : -1))))
   throw new Error(`Demo "${scene.turns[0].user}": beats must exist, name what they show, and play in order`);
-// A move's chip lights from its start and jumps to the beat there, so each
-// move starts a beat, in order, and each skill call a beat names has a chip.
+// A move's chapter runs from its start, and a tap on it goes to the beat
+// there, so each move starts a beat, in order, and each skill call a beat
+// names has a chapter.
 const starts = moveTimes(scene, names);
 const chips = starts.map((at) => ({ at, beat: times.indexOf(at) }));
 if (
   chips.some((c, k) => c.beat < 0 || (k > 0 && !(c.at > chips[k - 1].at))) ||
   scene.beats.some((b, k) => b.on === "move" && !starts.includes(times[k]))
 )
-  throw new Error(`Demo "${scene.turns[0].user}": each move in the strip must start a beat, in order, and each skill call a beat names must be in the strip`);
+  throw new Error(`Demo "${scene.turns[0].user}": each move must start a beat, in order, and each skill call a beat names must be one of the page's moves`);
 // A plain turn is a prompt, not a command, and the turn after it runs this
 // page's first move.
 const { plain } = scene;
@@ -51,6 +52,7 @@ const without = plain === undefined ? undefined : { handBack: firstWait(scene, p
 // Draw the demo here at every recorded width, each second and each beat, so
 // a scene the player cannot draw fails the build, not the page.
 const { length } = phases(scene);
+const chaptered = names.length > 1;
 for (const cols of [45, 80, 120])
   for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...times, ...beatEnds(scene), length]) frame(scene, s, cols);
 ---
@@ -72,12 +74,16 @@ for (const cols of [45, 80, 120])
         <div class="keys" data-keys aria-hidden="true"></div>
         <div class="flash" data-flash aria-hidden="true"></div>
       </div>
-      <div class="controls">
+      <div class:list={["controls", { chaptered }]}>
         {without && <button type="button" class="without" data-without aria-pressed="false">without moo</button>}
         <button type="button" class="play" data-play aria-label="Pause demo">❚❚</button>
-        <span class="now" data-now aria-hidden="true">0:00</span>
+        <span class="now" aria-hidden="true">
+          <span data-now>0:00</span>
+          {chaptered && <span class="at" data-at>{names.map((m) => <span>· /{m}</span>)}</span>}
+        </span>
         <div class="track" data-track role="slider" tabindex="0" aria-label="Demo timeline">
-          <div class="rail"><div class="fill" data-fill></div></div>
+          {chaptered && <div class="chapters" data-chapters aria-hidden="true">{names.map((m) => <span>/{m}</span>)}</div>}
+          <div class="rail" data-rail><div class="fill" data-fill></div></div>
           <div class="knob" data-knob aria-hidden="true"></div>
         </div>
         <span class="total" data-total aria-hidden="true"></span>
