@@ -529,8 +529,8 @@ const header = (): Row[] => [
 // Seconds. The demo plays the recorder's keys and Claude's work in order at its
 // own pace, cut as a screencast editor cuts idle time: the screen stands still
 // for IDLE seconds at most, unless it shows words to read. Typed text, a
-// skill's caption, a dialog and a reply stay up as long as reading their words
-// takes (readFor); a pause, an activity line, a key move on sooner
+// dialog and a reply stay up as long as reading their words takes (readFor);
+// a pause, an activity line, a skill's launch, a key move on sooner
 // (tools/check-timing.mts holds every demo to this).
 
 /** The longest the screen stands still with nothing new to read. */
@@ -582,8 +582,8 @@ type Phase = {
   /** When the slash menu shows, and until when. */
   menu?: [number, number];
   acts: number[];
-  /** When each Skill call of the turn was made, and until when its screen holds. */
-  launches: { at: number; until: number }[];
+  /** When each Skill call of the turn was made. */
+  launches: number[];
   dialogs: { open: number; script: Script }[];
   reply: number;
   /** How long the reply stays to be read once it is in. */
@@ -591,9 +591,6 @@ type Phase = {
   /** Each key the recorder sent, when it lands: name or text, as logged. */
   caps: [number, Key[1], string][];
 };
-
-/** The caption a scene's beat sets for turn `at`, on what `on` names; "" for none. */
-const caption = (scene: Scene, match: (b: Beat) => boolean) => scene.beats.find(match)?.text ?? "";
 
 /** When each turn of a scene plays its keys, sends, finishes replying. */
 const timed = new WeakMap<Scene, { timing: Phase[]; length: number }>();
@@ -603,7 +600,7 @@ export function phases(scene: Scene): { timing: Phase[]; length: number } {
 }
 function time(scene: Scene): { timing: Phase[]; length: number } {
   let t = K.start;
-  const timing = scene.turns.map((turn, i): Phase => {
+  const timing = scene.turns.map((turn): Phase => {
     const { keys, activity = [], dialogs = [], launches = [], user } = turn;
     const start = t;
     // The keys before the prompt was sent type it; the last is the Enter that sent it.
@@ -647,7 +644,7 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
     // What the turn shows, in the order it happened: each activity line, each
     // dialog after the lines shown before it opened, and each skill launch
     // after whatever was on screen when its Skill call was made. A launch
-    // holds that screen while its caption is read.
+    // takes no time of its own; the line on screen holds as its own.
     type Stop = { at: number; run: () => void };
     const stops: Stop[] = [];
     let u = sent + K.lead;
@@ -657,16 +654,15 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
     // The activity line on screen, as its label and tool line: a dialog leaves
     // its question there. A line that repeats it changes nothing, so takes no time.
     let onScreen = "";
-    const ask = (d: Dialog, j: number) => {
+    const ask = (d: Dialog) => {
       onScreen = `${escape(d.questions[0].question)}\n${d.tool ?? ""}`;
-      const said = d.questions.map((_, q) => caption(scene, (b) => b.at === i && b.on === "dialog" && (b.d ?? 0) === j && b.q === q));
-      const sc = script(d, within(d), said);
+      const sc = script(d, within(d));
       opened.push({ open: u, script: sc });
       caps.push(...sc.caps.map(([at, kind, value]): Phase["caps"][number] => [u + at, kind, value]));
       u += sc.length + K.act;
     };
     activity.forEach((a, k) => {
-      dialogs.forEach((d, j) => d.after === k && stops.push({ at: d.at[0], run: () => ask(d, j) }));
+      dialogs.forEach((d) => d.after === k && stops.push({ at: d.at[0], run: () => ask(d) }));
       stops.push({
         at: a.at,
         run: () => {
@@ -677,24 +673,16 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
         },
       });
     });
-    dialogs.forEach((d, j) => d.after >= activity.length && stops.push({ at: d.at[0], run: () => ask(d, j) }));
-    launches.forEach(({ at, skill }, n) => {
+    dialogs.forEach((d) => d.after >= activity.length && stops.push({ at: d.at[0], run: () => ask(d) }));
+    launches.forEach(({ at, skill }) => {
       const inside = dialogs.find((d) => d.at[0] < at && at < d.at[1]);
       if (inside) throw new Error(`"${user}": ${skill} launched while a dialog was open`);
-      const run = () => {
-        const at = u;
-        u += launchHold(scene, i, n);
-        launched.push({ at, until: u });
-      };
       const k = stops.findIndex((s) => s.at > at);
-      stops.splice(k < 0 ? stops.length : k, 0, { at, run });
+      stops.splice(k < 0 ? stops.length : k, 0, { at, run: () => launched.push(u) });
     });
     stops.forEach((s) => s.run());
     const reply = stops.length ? u : sent + K.think;
-    const read = readFor(
-      ...[turn.reply, ...(turn.more ?? []).map((m) => m.reply)].flat(),
-      caption(scene, (b) => b.at === i && b.on === "reply"),
-    );
+    const read = readFor(...[turn.reply, ...(turn.more ?? []).map((m) => m.reply)].flat());
     const p: Phase = { start, sent, typing, menu, acts, launches: launched, dialogs: opened, reply, read, caps };
     for (const [at, kind, value] of stray) caps.push([demoAt(turn, p, at), kind, value]);
     caps.sort((a, b) => a[0] - b[0]);
@@ -704,19 +692,12 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
   return { timing, length: t };
 }
 
-/** How long skill launch `n` of turn `i` holds the screen: as long as its
- * caption takes to read, or no time with none. */
-const launchHold = (scene: Scene, i: number, n: number) => {
-  const text = caption(scene, (b) => b.at === i && b.on === "move" && b.n === n);
-  return text ? readFor(text) : 0;
-};
-
-/** When a beat's caption takes over: as its turn starts typing, as its dialog
+/** When a beat's moment comes: as its turn starts typing, as its dialog
  * shows the question, as its skill launches, or as its reply arrives. */
 function beatTime(beat: Beat, timing: Phase[]) {
   const p = timing[beat.at];
   if (beat.on === "reply") return p.reply;
-  if (beat.on === "move") return p.launches[beat.n].at;
+  if (beat.on === "move") return p.launches[beat.n];
   if (beat.on === "dialog") {
     const d = p.dialogs[beat.d ?? 0];
     return d.open + d.script.moments.find((m) => m.q === beat.q)!.at;
@@ -724,7 +705,7 @@ function beatTime(beat: Beat, timing: Phase[]) {
   return p.start;
 }
 
-/** When each beat's caption takes over; a beat naming no turn, question or
+/** When each beat's moment comes; a beat naming no turn, question or
  * skill launch gets NaN. */
 export function beatTimes(scene: Scene, timing = phases(scene).timing) {
   return scene.beats.map((b) => {
@@ -746,7 +727,7 @@ export function beatEnds(scene: Scene, timing = phases(scene).timing) {
     const p = timing[b.at];
     if (b.on === "reply") return p.reply + K.reveal + p.read;
     if (b.on === "move") {
-      const { at } = p.launches[b.n];
+      const at = p.launches[b.n];
       return Math.min(p.reply, ...[...p.acts, ...p.dialogs.map((d) => d.open)].filter((x) => x > at));
     }
     if (b.on === "dialog") {
@@ -778,7 +759,7 @@ export function chapters(scene: Scene, names: string[], timing = phases(scene).t
     const typed = turn.user.match(/^\/(\S+)/)?.[1];
     return [
       ...(typed ? [{ i, at: timing[i].sent, name: last(typed) }] : []),
-      ...(turn.launches ?? []).map((l, n) => ({ i, at: timing[i].launches[n].at, name: last(l.skill) })),
+      ...(turn.launches ?? []).map((l, n) => ({ i, at: timing[i].launches[n], name: last(l.skill) })),
     ];
   });
   return names.map((name) => {
@@ -846,8 +827,10 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
     if (turn.tools && since > K.think * 0.4)
       transcript.push(...tools(turn.tools, cols), ...(turn.interrupted ? [INTERRUPTED] : []), BLANK);
     const rows = reply(turn.reply, cols);
-    // Row by row, the last one landing as the reveal ends.
-    const n = Math.floor(rows.length * ramp(s, p.reply, p.reply + K.reveal));
+    // Row by row, the first landing as the reply arrives and the last as the
+    // reveal ends.
+    const n =
+      s < p.reply ? 0 : Math.min(rows.length, Math.max(1, Math.floor(rows.length * ramp(s, p.reply, p.reply + K.reveal))));
     transcript.push(...rows.slice(0, n), ...(n ? [BLANK] : []));
     if (n < rows.length) transcript.push(spinner(chrome.spin, since, counted), BLANK);
     // What came after it with no prompt shows once the reply is all in.
@@ -873,7 +856,7 @@ function recordedAt(turn: Turn, p: Phase, at: number): number {
     [p.start, t.keys[0][0]],
     [p.sent, 0],
     ...p.acts.map((x, k): [number, number] => [x, t.activity![k].at]),
-    ...p.launches.flatMap(({ at, until }, n): [number, number][] => [[at, t.launches![n].at], [until, t.launches![n].at]]),
+    ...p.launches.map((at, n): [number, number] => [at, t.launches![n].at]),
     ...p.dialogs.flatMap((d, j): [number, number][] => [
       [d.open, t.dialogs![j].at[0]],
       [d.open + d.script.length, t.dialogs![j].at[1]],
@@ -919,9 +902,8 @@ export type Frame = {
   /** The question on screen, if a dialog is open: its index, how many options
    * it has, and which one the dialog's cursor is on. */
   asking?: { q: number; options: number; cursor: number };
-  /** The beat whose caption shows, and its opacity. */
+  /** The newest beat whose moment has come. */
   beat: number;
-  caption: number;
   /** The names of tend's chips on screen, e.g. "questions"; a pane opens
    * only on one of them. */
   chips: string[];
@@ -951,7 +933,6 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
       : undefined;
   const times = beatTimes(scene, timing);
   const beat = Math.max(0, times.findLastIndex((x) => s >= x));
-  const caption = ramp(s, times[beat], times[beat] + 0.3);
   const keys = timing.flatMap((p) =>
     p.caps.flatMap(([at, kind, value]) => {
       const age = s - at;
@@ -976,7 +957,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     const shown = keep(drawn, room, Math.max(0, drawn.findIndex((r) => r.cls === "ask")));
     const at = shown.findIndex((r) => r.input !== undefined);
     return {
-      transcript, bottom: shown, toast, keys, beat, caption, chips: [],
+      transcript, bottom: shown, toast, keys, beat, chips: [],
       cursor: at < 0 ? undefined : { row: at, col: shown[at].input! },
       asking: q ? { q: moment.q, options: q.options.length, cursor: moment.cursor } : undefined,
     };
@@ -1009,7 +990,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
   // The cursor ends the typed text, or starts the empty prompt.
   const col = typing ? 2 + prompt[prompt.length - 1].length : 2;
   return {
-    transcript, bottom, toast, keys, beat, caption,
+    transcript, bottom, toast, keys, beat,
     chips: chips.map((c) => c.id.replace(/^chip:/, "")),
     cursor: { row: bottom.indexOf(input[input.length - 1]), col },
   };
@@ -1186,10 +1167,9 @@ const previewed = (q: Dialog["questions"][number]) =>
  * n opens the notes field, typed text lands whole, Enter picks the cursor's
  * option and moves to the next question, the review screen, or Submit. Each
  * pick and each text typed must be the one the session file records. A
- * question stays as long as reading it, its options and `said[q]` (its
- * caption) takes; the review screen, its questions and answers; a preview,
- * its own words. */
-function script(d: Dialog, keys: Key[], said: string[] = []): Script {
+ * question stays as long as reading it and its options takes; the review
+ * screen, its questions and answers; a preview, its own words. */
+function script(d: Dialog, keys: Key[]): Script {
   const qs = d.questions;
   const fail = (why: string): never => {
     throw new Error(`Dialog "${qs.map((q) => q.header).join(", ")}": ${why}`);
@@ -1205,7 +1185,7 @@ function script(d: Dialog, keys: Key[], said: string[] = []): Script {
       return k < 0;
     });
   };
-  const reading = (from: Moment | undefined, to: Moment) => readFor(...fresh(from, to), said[to.q] ?? "");
+  const reading = (from: Moment | undefined, to: Moment) => readFor(...fresh(from, to));
   let m: Moment = { at: 0, q: 0, cursor: 0, shown: 0, ticked: [], typed: "", notes: "", noting: false };
   const moments: Moment[] = [m];
   const caps: Script["caps"] = [];

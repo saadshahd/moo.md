@@ -16,7 +16,7 @@ const [turns, cap, w] = process.argv.slice(2);
 const scene: Scene = {
   chrome: { context: "0%" },
   turns: JSON.parse(readFileSync(turns, "utf8")),
-  beats: [{ at: 0, text: "" }],
+  beats: [{ at: 0 }],
 };
 const text = (r: Row) => r.segs.map((s: Seg) => (s[1] === "logo" ? "" : s[0])).join("").replace(/\xa0/g, " ").trimEnd();
 const ours = frame(scene, 1e9, +w).transcript.map(text);

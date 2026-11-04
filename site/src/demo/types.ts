@@ -97,14 +97,14 @@ export type Dialog = {
   questions: Question[];
 };
 
-/** A caption above the terminal that narrates the demo. It takes over as turn
- * `at` starts typing; with `on: "move"` as its skill launch `n` (counting
- * from 0) is made; with `on: "dialog"` as its dialog `d` (default 0) shows
- * question `q`; with `on: "reply"` as its reply arrives. */
+/** A moment of the demo: a tick on its timeline, and a still under reduced
+ * motion. It comes as turn `at` starts typing; with `on: "move"` as its skill
+ * launch `n` (counting from 0) is made; with `on: "dialog"` as its dialog `d`
+ * (default 0) shows question `q`; with `on: "reply"` as its reply arrives. */
 export type Beat =
-  | { at: number; on?: "reply"; text: string }
-  | { at: number; on: "move"; n: number; text: string }
-  | { at: number; on: "dialog"; d?: number; q: number; text: string };
+  | { at: number; on?: "reply" }
+  | { at: number; on: "move"; n: number }
+  | { at: number; on: "dialog"; d?: number; q: number };
 
 export type Scene = {
   /** What Claude Code drew around the prompt box before the first prompt. */

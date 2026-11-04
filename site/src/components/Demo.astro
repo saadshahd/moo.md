@@ -1,11 +1,10 @@
 ---
 // A Claude Code mock built from a real recorded session: same glyphs, colors,
 // wrap rule, spinner verbs and replies, cut only where "… +N lines" says so.
-// Plays once in view, from its first ask to its last frame, narrated by beat
-// captions above it, with a player's controls below: play and pause, a
-// timeline with a tick per beat, speed. A chain's timeline has a chapter per
-// move in place of the ticks, named. Under reduced motion, the timeline
-// steps through one still per beat. `summary` tells a screen reader what it
+// Plays once in view, from its first ask to its last frame, with a player's
+// controls below: play and pause, a timeline with a tick per beat, speed. A
+// chain's timeline has a chapter per move in place of the ticks, named. Under
+// reduced motion, the timeline steps through one still per beat. `summary` tells a screen reader what it
 // shows. A recording with a plain turn (Scene.plain) plays it first, and its
 // "without moo" button steps back to the plain reply and forth to moo's
 // hand-back. Every box around the terminal has a fixed height, so the terminal
@@ -26,7 +25,7 @@ const { entry } = Astro.locals.starlightRoute;
 const names = demoMoves(entry);
 
 // Beats name a turn (and a skill call or question in it) and play in order, or
-// a caption would show at the wrong time.
+// a tick or a reduced-motion still would mark the wrong moment.
 const times = beatTimes(scene);
 if (!times.length || times.some((x, k) => !(x > (k ? times[k - 1] : -1))))
   throw new Error(`Demo "${scene.turns[0].user}": beats must exist, name what they show, and play in order`);
@@ -65,9 +64,6 @@ for (const cols of [45, 80, 120])
   <div class="col">
     <figure class="term-wrap">
       <figcaption class="vh">{summary}</figcaption>
-      <div class="beats" aria-hidden="true">
-        {scene.beats.map((b) => <p class="caption" data-beat>{b.text}</p>)}
-      </div>
       <div class="term" data-term>
         <div class="caret-trail" data-trail aria-hidden="true"></div>
         <!-- An empty row gives the terminal its width before the player draws. -->
@@ -151,33 +147,14 @@ for (const cols of [45, 80, 120])
   .col { position: relative; width: fit-content; max-width: 100%; }
   /* Columns: the widest width the recordings were captured at that the column
      fits, cells plus the terminal's padding, border, a thin scrollbar and the
-     cell kept clear of it (7px cells: 120 needs 872px, 80 needs 604px).
-     Captions get as many lines as the longest on any demo page needs at that
-     width, so no page's terminal sits lower. */
-  .col { --cols: 45; --cap-lines: 2; }
-  @container demo (min-width: 604px) { .col { --cols: 80; --cap-lines: 1; } }
+     cell kept clear of it (7px cells: 120 needs 872px, 80 needs 604px). */
+  .col { --cols: 45; }
+  @container demo (min-width: 604px) { .col { --cols: 80; } }
   @container demo (min-width: 872px) { .col { --cols: 120; } }
   .vh {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
   }
-
-  /* Narration above the terminal: every beat laid out in one cell of fixed
-     height, so nothing moves when one replaces another. */
-  /* No width of their own: the captions wrap at the terminal's width, so the
-     column, and the controls under it, is as wide as the terminal. */
-  .beats {
-    display: grid; align-items: end; margin-bottom: 0.2rem; width: 0; min-width: 100%;
-    font-size: var(--sl-text-lg); line-height: 1.35; height: calc(var(--cap-lines) * 1.35em); overflow: hidden;
-  }
-  /* --in runs 0 to 1 as a beat's caption takes over (player.ts): it fades in
-     and rises 6px. */
-  .beats .caption {
-    grid-area: 1 / 1; opacity: var(--in, 0); transform: translateY(calc((1 - var(--in, 0)) * 6px));
-  }
-  @media (prefers-reduced-motion: reduce) { .beats .caption { transform: none; } }
-  /* The captions' type is the site chrome's (chrome.css). */
-  .demo :global(.caption) { margin: 0; }
 
   /* The player's controls under the terminal: play, the time so far, the
      timeline with its knob, the length, and the speed group. Their look is the

@@ -1,5 +1,5 @@
 // What each page's demo plays: the turns of one recorded session and the beats
-// that narrate it.
+// that mark its moments.
 //
 // Changed from the recordings, as the user asked:
 // - Renamed: each path under the home folder is written ~/…, and a project
@@ -33,7 +33,6 @@
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.
 import type { Chrome, Scene, Turn } from "./types";
-import { CAPTIONS } from "./captions";
 import * as freeze from "./sessions/freeze";
 import * as anchor from "./sessions/anchor";
 import * as skills from "./sessions/skills";
@@ -58,45 +57,36 @@ import * as draft from "./sessions/draft";
 import * as reduce from "./sessions/reduce";
 
 // ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
-// skill with moo on. The page plays both, turn 0 first. Each turn has two captions (captions.ts): one as
-// it starts and one as its reply arrives; a page with no captions yet shows
-// empty ones. A page whose captions don't match its turns fails the build.
+// skill with moo on. The page plays both, turn 0 first. Each turn has two
+// beats: as it starts and as its reply arrives.
 
-const skill = (name: string, { chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => {
-  const text = CAPTIONS[name];
-  if (text && text.length !== turns.length * 2)
-    throw new Error(`captions.ts: ${name} has ${text.length} captions for ${turns.length} turns, not ${turns.length * 2}`);
-  return {
-    chrome,
-    turns,
-    beats: turns.flatMap((_, at): Scene["beats"] => [
-      { at, text: text?.[2 * at] ?? "" },
-      { at, on: "reply", text: text?.[2 * at + 1] ?? "" },
-    ]),
-    plain: 0,
-  };
-};
+const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => ({
+  chrome,
+  turns,
+  beats: turns.flatMap((_, at): Scene["beats"] => [{ at }, { at, on: "reply" }]),
+  plain: 0,
+});
 
-export const clarifyScene = skill("clarify", clarify);
-export const consultScene = skill("consult", consult);
-export const composeScene = skill("compose", compose);
-export const targetScene = skill("target", target);
-export const routerScene = skill("router", router);
-export const reframeScene = skill("reframe", reframe);
-export const judgeScene = skill("judge", judge);
-export const deepenScene = skill("deepen", deepen);
-export const widenScene = skill("widen", widen);
-export const anchorScene = skill("anchor", anchor);
-export const interrogateScene = skill("interrogate", interrogate);
-export const shiftScene = skill("shift", shift);
-export const elicitScene = skill("elicit", elicit);
-export const explainScene = skill("explain", explain);
-export const shapeScene = skill("shape", shape);
-export const intentScene = skill("intent", intent);
-export const inversionScene = skill("inversion", inversion);
-export const freezeScene = skill("freeze", freeze);
-export const draftScene = skill("draft", draft);
-export const reduceScene = skill("reduce", reduce);
+export const clarifyScene = skill(clarify);
+export const consultScene = skill(consult);
+export const composeScene = skill(compose);
+export const targetScene = skill(target);
+export const routerScene = skill(router);
+export const reframeScene = skill(reframe);
+export const judgeScene = skill(judge);
+export const deepenScene = skill(deepen);
+export const widenScene = skill(widen);
+export const anchorScene = skill(anchor);
+export const interrogateScene = skill(interrogate);
+export const shiftScene = skill(shift);
+export const elicitScene = skill(elicit);
+export const explainScene = skill(explain);
+export const shapeScene = skill(shape);
+export const intentScene = skill(intent);
+export const inversionScene = skill(inversion);
+export const freezeScene = skill(freeze);
+export const draftScene = skill(draft);
+export const reduceScene = skill(reduce);
 
 // ---- Chain pages: one session where /compose runs each move as it comes up.
 
@@ -104,35 +94,13 @@ export const chainScene: Scene = {
   chrome: chain.chrome,
   turns: chain.turns,
   beats: [
-    {
-      at: 0,
-      text: "One ask: find the double charge, and keep it from coming back.",
-    },
-    { at: 0, on: "move", n: 0, text: "Reading prod's logs and the provider's export." },
-    {
-      at: 0,
-      on: "move",
-      n: 1,
-      text: "The bar comes first; no code yet.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      q: 0,
-      text: "The provider's site is out of reach, so it asks you.",
-    },
-    {
-      at: 0,
-      on: "move",
-      n: 2,
-      text: "Tests rerun: red on the old code, green on the new.",
-    },
-    { at: 0, on: "move", n: 3, text: "Four files changed so far; the reply sums them up." },
-    {
-      at: 0,
-      on: "reply",
-      text: "The cause first, then seven charges to refund.",
-    },
+    { at: 0 },
+    { at: 0, on: "move", n: 0 },
+    { at: 0, on: "move", n: 1 },
+    { at: 0, on: "dialog", q: 0 },
+    { at: 0, on: "move", n: 2 },
+    { at: 0, on: "move", n: 3 },
+    { at: 0, on: "reply" },
   ],
 };
 
@@ -140,52 +108,15 @@ export const skillsScene: Scene = {
   chrome: skills.chrome,
   turns: skills.turns,
   beats: [
-    { at: 0, text: "One ask, three skills from other plugins." },
-    {
-      at: 0,
-      on: "move",
-      n: 0,
-      text: "From mattpocock-skills: the terms come first.",
-    },
-    {
-      at: 0,
-      on: "move",
-      n: 1,
-      text: "From the show-me plugin: each option, sketched.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      d: 0,
-      q: 0,
-      text: "The box: what one invoice owes under each rule.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      d: 1,
-      q: 0,
-      text: "Against the recommendation: the rate lives on each invoice.",
-    },
-    {
-      at: 0,
-      on: "move",
-      n: 2,
-      text: "From mattpocock-skills too: tests before code.",
-    },
-    {
-      at: 0,
-      on: "dialog",
-      d: 2,
-      q: 0,
-      text: "Tests see only what an invoice owes.",
-    },
-    {
-      at: 0,
-      on: "reply",
-      text: "Eight tests pass; the last line asks you.",
-    },
-    { at: 1, text: "Your answer, in your words." },
-    { at: 1, on: "reply", text: "A ninth test now holds your answer." },
+    { at: 0 },
+    { at: 0, on: "move", n: 0 },
+    { at: 0, on: "move", n: 1 },
+    { at: 0, on: "dialog", d: 0, q: 0 },
+    { at: 0, on: "dialog", d: 1, q: 0 },
+    { at: 0, on: "move", n: 2 },
+    { at: 0, on: "dialog", d: 2, q: 0 },
+    { at: 0, on: "reply" },
+    { at: 1 },
+    { at: 1, on: "reply" },
   ],
 };

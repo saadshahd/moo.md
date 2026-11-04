@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { frame } from "../src/demo/render.ts";
 const [json, dir] = process.argv.slice(2);
-const scene: any = { chrome: { context: "0%" }, turns: JSON.parse(readFileSync(json, "utf8")), beats: [{ at: 0, text: "" }] };
+const scene: any = { chrome: { context: "0%" }, turns: JSON.parse(readFileSync(json, "utf8")), beats: [{ at: 0 }] };
 let bad = 0;
 for (const w of [45, 80, 120]) {
   const ours = frame(scene, 1e9, w).transcript.map((r: any) => r.segs.map((s: any) => (s[1] === "logo" ? "" : s[0])).join("").replace(/\xa0/g, " ").trimEnd());

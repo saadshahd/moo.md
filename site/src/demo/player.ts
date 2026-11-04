@@ -1,14 +1,14 @@
 // Plays a demo's scene once while it is in view, from its first ask to its
 // last frame, on one clock `t`, with a player's controls under it: play and
-// pause, replay once it ends, a timeline with a tick per beat, and speed. Beat captions narrate above; a chain's moves are
-// chapters of the timeline; the terminal scrolls back like one; the reader
-// can pick a dialog's option. Under reduced motion, the timeline steps through
+// pause, replay once it ends, a timeline with a tick per beat, and speed; a
+// chain's moves are chapters of the timeline; the terminal scrolls back like
+// one; the reader can pick a dialog's option. Under reduced motion, the timeline steps through
 // one still per beat instead. A demo with a plain turn plays it first; its
 // "without moo" button steps back to the plain reply and forth to moo's
 // hand-back. Demo.astro sets the columns and rows.
 import { beatEnds, beatTimes, frame, phases, type Frame, type Row, type Seg } from "./render";
 import { currentSpeed, followSpeed, pickSpeed } from "./speed";
-import type { Scene } from "./types";
+import type { Beat, Scene } from "./types";
 
 
 // Quadrants per block glyph: upper-left, upper-right, lower-left, lower-right.
@@ -133,7 +133,16 @@ export function mount(root: HTMLElement) {
   const pills = [...root.querySelectorAll<HTMLElement>("[data-pill]")];
   if (chapterEls.length && chapterEls.length !== chips.length)
     throw new Error(`The timeline shows ${chapterEls.length} moves; the demo has ${chips.length}`);
-  const beats = [...root.querySelectorAll<HTMLElement>("[data-beat]")];
+  const beats = scene.beats;
+  // What each beat marks, for a screen reader: the prompt, the skill call, the
+  // question by its header, or the reply; the plain turn's, without moo.
+  const marks = ({ at, ...b }: Beat) => {
+    const what =
+      b.on === "move" ? "skill call"
+      : b.on === "dialog" ? `question "${scene.turns[at].dialogs![b.d ?? 0].questions[b.q].header}"`
+      : (b.on ?? "prompt");
+    return at === scene.plain ? `${what}, without moo` : what;
+  };
   const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const id = `demo${++demos}`;
   const { length } = phases(scene);
@@ -165,7 +174,7 @@ export function mount(root: HTMLElement) {
   // A tick on the timeline per beat: a mark, not a target of its own, since
   // beats can sit closer than a finger. The timeline is the target, and the
   // arrow keys go from beat to beat. Chapters mark a chain's timeline instead.
-  const ticks = (chapterEls.length ? [] : scene.beats).map(() => {
+  const ticks = (chapterEls.length ? [] : beats).map(() => {
     const tick = document.createElement("span");
     tick.className = "tick";
     track.append(tick);
@@ -211,17 +220,8 @@ export function mount(root: HTMLElement) {
   new ResizeObserver(placeChapters).observe(track);
   document.fonts.ready.then(placeChapters);
 
-  // Captions sit in a box of fixed lines (Demo.astro); text longer than its
-  // box would be cut, so say so.
-  function checkBoxes() {
-    const box = beats[0]?.parentElement;
-    const cut = beats.filter((b) => box && b.scrollHeight > box.clientHeight + 1);
-    if (cut.length) console.error("Demo text longer than its box; give the box more lines in Demo.astro:", cut.map((el) => el.textContent));
-  }
-
   // The columns the CSS picked and the rows Demo.astro's script set.
   function fit() {
-    checkBoxes();
     if (colsNow() === cols && rowsNow() === rows) return;
     jumped = true;
     cols = colsNow();
@@ -276,10 +276,6 @@ export function mount(root: HTMLElement) {
     // Sliding in from the right edge, the box's left part shows first.
     const box = toast.firstElementChild as HTMLElement | null;
     if (box) box.style.transform = `translateX(${(1 - f.toast!.slide) * 100}%)`;
-    beats.forEach((b, k) => {
-      b.classList.toggle("on", k === f!.beat);
-      b.style.setProperty("--in", k === f!.beat ? String(f!.caption) : "0");
-    });
     // The fill, its knob and the time readout show where the demo is.
     const at = `${(reduced ? still / Math.max(1, beats.length - 1) : t / length) * 100}%`;
     fill.style.clipPath = `inset(0 calc(100% - ${at}) 0 0)`;
@@ -288,10 +284,10 @@ export function mount(root: HTMLElement) {
     const move = lightChapter(chips.findIndex((c) => c.at <= now && now < c.end));
     if (reduced) {
       track.setAttribute("aria-valuenow", String(still + 1));
-      track.setAttribute("aria-valuetext", `${move ? `${move}: ` : ""}${scene.beats[still].text}`);
+      track.setAttribute("aria-valuetext", `${move ? `${move}: ` : ""}${marks(beats[still])}`);
     } else {
       track.setAttribute("aria-valuenow", String(Math.floor(t)));
-      track.setAttribute("aria-valuetext", `${clock(t)}${move ? `, ${move}` : ` of ${clock(length)}`}: ${scene.beats[f.beat].text}`);
+      track.setAttribute("aria-valuetext", `${clock(t)}${move ? `, ${move}` : ` of ${clock(length)}`}: ${marks(beats[f.beat])}`);
     }
     // Keys fade in and out with the clock, so a still shows none.
     keycaps.innerHTML = reduced
@@ -487,7 +483,7 @@ export function mount(root: HTMLElement) {
       pick = undefined;
       pane = undefined;
       draw();
-    // Past the caption's fade-in, so a paused demo shows it.
+    // Just past the beat's moment, so a paused demo shows what it marks.
     } else seek(times[Math.min(Math.max(0, k), times.length - 1)] + 0.3);
   }
   const beatNow = () => (motion.matches ? still : (f?.beat ?? 0));
@@ -630,7 +626,6 @@ export function mount(root: HTMLElement) {
   });
 
   motion.addEventListener("change", sync);
-  checkBoxes();
   new ResizeObserver(fit).observe(root);
   root.addEventListener("fit", fit);
 

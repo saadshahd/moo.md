@@ -2,7 +2,7 @@
 // 1. No screen stands still longer than IDLE seconds unless it shows words to
 //    read: words in rows newly shown, at READ's pace, from the last change of
 //    the burst that showed them. Frames sampled 30 a second at 80 columns;
-//    the spinner and the status line are not news, a caption and a toast are.
+//    the spinner and the status line are not news, a toast is.
 // 2. Each chapter starts within a frame of its skill's launch, as the session
 //    file logs it (the prompt that ran it, or its Skill call), and ends at the
 //    next launch in that turn or the turn's reply, whichever comes first; the
@@ -47,12 +47,11 @@ const sceneOf = (d: Demo) => {
 const text = (r: Row) => r.segs.map(([c, k]) => (k === "logo" ? "" : c)).join("");
 const SPIN = /^[·✢✳✶✻✽] /;
 /** What a reader can read at `s`: transcript and bottom rows, the status line
- * and spinner aside, then the caption and the toast. */
+ * and spinner aside, then the toast. */
 function shown(scene: Scene, s: number): string[] {
   const f = frame(scene, s, 80);
   return [
     ...[...f.transcript, ...f.bottom.slice(0, -1)].map(text).filter((r) => !SPIN.test(r)),
-    `caption: ${scene.beats[f.beat]?.text ?? ""}`,
     ...(f.toast?.rows.map(text) ?? []),
   ];
 }
