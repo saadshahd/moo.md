@@ -121,7 +121,6 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 .ways p { margin: 0 0 0.25rem; max-width: 46ch; line-height: 1.5; }
 /* hunch, the optional third command: a plain line set apart from hope's two. */
 .ways p.optional { margin-top: 1.5rem; color: var(--sl-color-gray-3); }
-.install-note { margin-top: 2.5rem; color: var(--sl-color-gray-3); }
 /* On a phone Install holds three commands and two ways in one screen: the
    title row and gaps tighten, and the plain lines step down a size. */
 @media (max-width: 40rem) {
@@ -129,9 +128,8 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
   :root:has(.ways) .content-panel h1 { font-size: 2.25rem; }
   :root:has(.ways) .lede { margin-top: 0.5rem; font-size: var(--sl-text-base); }
   .ways { gap: 1.5rem; }
-  .ways p, .install-note { font-size: var(--sl-text-sm); }
+  .ways p { font-size: var(--sl-text-sm); }
   .ways p.optional { margin-top: 1rem; }
-  .install-note { margin-top: 1.25rem; }
 }
 
 /* One vertical rhythm around the demo: the gap from the band to the
