@@ -547,6 +547,8 @@ const readFor = (...texts: string[]) =>
 const K = {
   start: 0.4,
   enter: 0.4,
+  // The most a typed prompt holds, read, before the key after it.
+  typed: 2.5,
   // Claude's pause before its first tool or dialog, or before a reply with none.
   lead: 0.8,
   think: 0.9,
@@ -613,11 +615,24 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
     const typing: Phase["typing"] = [];
     let menu: Phase["menu"];
     let text = "";
+    // The text typed since the last key: keys typed one after another land
+    // at once, so the prompt shows whole and holds once while it is read.
+    let run = "";
     pre.forEach(([, kind, value], k) => {
       caps.push([t, kind, value]);
       if (kind === "type") typing.push([t, (text += value)]);
+      run = kind === "type" ? run + value : "";
       if (k === pre.length - 1) return;
-      const next = t + (kind === "type" ? readFor(value) : pre[k + 1][2] === "Enter" ? K.enter : K.nav);
+      const [, kindNext, valueNext] = pre[k + 1];
+      const next =
+        t +
+        (kind === "type"
+          ? kindNext === "type"
+            ? 0
+            : Math.min(K.typed, readFor(run))
+          : valueNext === "Enter"
+            ? K.enter
+            : K.nav);
       if (turn.menu?.after === k) menu = [t, next];
       t = next;
     });
