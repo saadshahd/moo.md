@@ -1,14 +1,17 @@
 // Claude Code's terminal as recorded (v2.1.316): rows of styled segments, built
 // for any column count, and one clock that says what is on screen at time t.
 import type { Beat, Chrome, Dialog, Line, Scene, Turn } from "./types";
+import { layout, MEASURE, type Band, type Cell as BandCell, type Item } from "./band";
 
 /** The terminal's height in rows, as recorded: dialogs are laid out for it
  * (a preview's rows fit under it; a taller dialog shows its last rows). The
  * player may show fewer rows; a dialog taller than those shows its last. */
 export const ROWS = 36;
 
-/** A run of text and the classes that color it (see Demo.astro's styles). */
-export type Seg = [string, string?];
+/** A run of text and the classes that color it (see Demo.astro's styles),
+ * and what a click on it does, if it is one of tend's buttons: its item's id,
+ * e.g. "chip:questions" or "close". */
+export type Seg = [string, string?, string?];
 /** `opt`: the dialog option the row draws, which the reader can pick;
  * `input`: the column of the text cursor, on the row of a field being typed in. */
 export type Row = { segs: Seg[]; cls?: string; opt?: number; input?: number };
@@ -904,6 +907,9 @@ export type Frame = {
   /** The beat whose caption shows, and its opacity. */
   beat: number;
   caption: number;
+  /** The names of tend's chips on screen, e.g. "questions"; a pane opens
+   * only on one of them. */
+  chips: string[];
 };
 
 /** Typed text as the prompt box draws it: a slash command's name lavender. */
@@ -911,8 +917,9 @@ const prompted = (text: string): Cell[] =>
   text.split(/(\s+)/).flatMap((w) => plain(w, /^\/[a-z][\w:-]*$/.test(w) ? "l" : undefined));
 
 /** Everything on screen `s` seconds into a scene, in a terminal `rows` high;
- * `pick` puts the dialog's cursor on an option the reader chose. */
-export function frame(scene: Scene, s: number, cols: number, pick?: number, rows = ROWS): Frame {
+ * `pick` puts the dialog's cursor on an option the reader chose; `pane` opens
+ * tend's pane for the chip of that name, if it shows. */
+export function frame(scene: Scene, s: number, cols: number, pick?: number, rows = ROWS, pane?: string): Frame {
   const { timing } = phases(scene);
   const { transcript, typing, menu, asking, chrome } = transcriptAt(scene, s, cols);
   // The prompt box's rules and the status line reach the frame's right edge
@@ -954,7 +961,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     const shown = keep(drawn, room, Math.max(0, drawn.findIndex((r) => r.cls === "ask")));
     const at = shown.findIndex((r) => r.input !== undefined);
     return {
-      transcript, bottom: shown, toast, keys, beat, caption,
+      transcript, bottom: shown, toast, keys, beat, caption, chips: [],
       cursor: at < 0 ? undefined : { row: at, col: shown[at].input! },
       asking: q ? { q: moment.q, options: q.options.length, cursor: moment.cursor } : undefined,
     };
@@ -962,7 +969,15 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
   const input: Row[] = typing
     ? prompt.map((l, k): Row => ({ segs: [k ? ["  "] : ["❯ "], ...segs(l)] }))
     : [{ segs: [["❯ "]] }];
-  const bottom: Row[] = [
+  // tend's band, as recorded, and the pane its chips open: the newest reply's.
+  const chips = (chrome.band ?? []).map((label): Item => {
+    const name = label.replace(/ \d+$/, "");
+    if (!turn?.panes?.[name]) throw new Error(`tend's chip "${label}" shows, and no turn's reply in has its pane`);
+    return { id: `chip:${name}`, label, kind: "chip", ...(name === pane ? { open: true as const } : {}) };
+  });
+  const open = chips.some((c) => c.open) ? turn!.panes![pane!] : undefined;
+  const below: Row[] = [
+    ...(chips.length ? bandRows(chips, cols) : []),
     // The row Claude Code keeps above the prompt box for a notice, blank: its
     // notices are left out, as the user asked (scenes.ts). The slash menu
     // takes it, as recorded.
@@ -974,9 +989,86 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     // the user asked (scenes.ts).
     statusRow(chrome, cols),
   ];
+  // The pane takes the rows the terminal has left above the rest.
+  const bottom = [...(open ? paneRows(open, cols, rows - height(below)) : []), ...below];
   // The cursor ends the typed text, or starts the empty prompt.
   const col = typing ? 2 + prompt[prompt.length - 1].length : 2;
-  return { transcript, bottom, toast, keys, beat, caption, cursor: { row: bottom.indexOf(input[input.length - 1]), col } };
+  return {
+    transcript, bottom, toast, keys, beat, caption,
+    chips: chips.map((c) => c.id.replace(/^chip:/, "")),
+    cursor: { row: bottom.indexOf(input[input.length - 1]), col },
+  };
+}
+
+// ---- tend ---------------------------------------------------------------------
+// tend's band and pane, laid out by tend's own layout() (band.ts)
+// and styled as its BandView draws them.
+
+/** One laid-out item in segments: a button's brackets subtle unless it is
+ * open or clipped, a note dim, a title, a strong line or an open chip bold,
+ * an open chip in the selection colour. The chips and close act on a click. */
+function itemSegs({ item, text }: BandCell): Seg[] {
+  const button = item.kind === "chip" || item.id === "close";
+  const act = button ? item.id : undefined;
+  const cls = join(
+    item.open ? "l" : item.kind === "note" ? "g" : undefined,
+    item.open || item.kind === "title" || item.strong ? "b" : undefined,
+  );
+  const at = text.indexOf(item.label);
+  if (!button || item.open || at < 0) return [[text, cls, act]];
+  return [
+    [text.slice(0, at), "sub", act],
+    [item.label, cls, act],
+    [text.slice(at + item.label.length), "sub", act],
+  ];
+}
+
+/** A band or pane's lines as rows, each item at its planned column. */
+function laidOut(b: Band, width: number): Row[] {
+  return layout(b, width).map((l) => {
+    const out: Seg[] = [];
+    let x = 0;
+    for (const c of l.cells) {
+      if (c.x > x) out.push([" ".repeat(c.x - x)]);
+      out.push(...itemSegs(c));
+      x = c.x + c.text.length;
+    }
+    return { segs: out };
+  });
+}
+
+/** The band as recorded: Claude Code's grey "[-]" ending a column from the
+ * right edge, then tend's chips. On the page the "[-]" row reaches the frame's
+ * right edge, as the status line does (Demo.astro's .wide). */
+const bandRows = (chips: Item[], cols: number): Row[] => [
+  { segs: [[" ".repeat(Math.max(0, cols - 4)), "fill"], ["[-]", "g"], [" "]], cls: "wide" },
+  ...laidOut({ chips, body: [] }, cols),
+];
+
+/** tend's pane, which Claude Code's main screen seats above the prompt. No
+ * recording shows one open: the frame is drawn as the toast's box, titled
+ * "tend" as tend opens it, around tend's Pane render (tend.tsx): at most
+ * MEASURE wide, its text two columns in and a blank row above and below. In
+ * fewer than `room` rows its title row stays and its last lines give way to
+ * a grey "…". */
+function paneRows(pane: Band, cols: number, room: number): Row[] {
+  const inner = Math.min(cols - 2, MEASURE);
+  const side = (r: Row): Row => {
+    const used = r.segs.reduce((n, [x]) => n + [...x].length, 0);
+    return { segs: [["│", "d"], ["  "], ...r.segs, [" ".repeat(Math.max(0, inner - 4 - used))], ["  "], ["│", "d"]] };
+  };
+  const title = " tend ";
+  const lines = laidOut(pane, inner - 4);
+  // The frame's own rows: its two edges and a blank row inside each.
+  const fits = Math.max(1, room - 4);
+  const shown = lines.length <= fits ? lines : [...lines.slice(0, Math.max(1, fits - 1)), { segs: [["…", "g"]] }];
+  return [
+    { segs: [["╭─", "d"], [title, "g"], ["─".repeat(Math.max(0, inner - 1 - title.length)) + "╮", "d"]] },
+    side(BLANK),
+    ...shown.map(side),
+    side(BLANK),
+    { segs: [["╰" + "─".repeat(inner) + "╯", "d"]] },
+  ].map((r) => ({ ...r, cls: "pane" }));
 }
 
 /** A key's cap, as KeyCastr draws it. */

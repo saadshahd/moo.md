@@ -40,10 +40,11 @@ snaps = [parse_snap(os.path.join(rec, 'snaps', f)) | {'raw': open(os.path.join(r
          for f in sorted(os.listdir(os.path.join(rec, 'snaps'))) if f.endswith('.ansi')]
 
 def chrome_of(s):
-    # The mode row, the notice above the prompt box, the dim suggestion in it,
-    # the hook the spinner names and hunch's band are left out of the demos,
-    # as the user asked; the spinner keeps its verb and counter.
-    c = {'context': s['context'], **({'style': s['style']} if s.get('style') else {})}
+    # The mode row, the notice above the prompt box, the dim suggestion in it
+    # and the hook the spinner names are left out of the demos, as the user
+    # asked; the spinner keeps its verb and counter, and tend's band its chips.
+    c = {'context': s['context'], **({'style': s['style']} if s.get('style') else {}),
+         **({'band': s['band']} if s.get('band') else {})}
     if s.get('spin'):
         tail = ' · '.join(x for x in (s['spin'].get('tail') or '').split(' · ')
                           if x and not re.match(r'^running .* hook$|^(\d+m )?\d+s$', x))
@@ -149,6 +150,40 @@ def snap_activity(part, sent, hi, reply_at, rep, replayed, windows=()):
         out.append({'at': at, 'line': line, 'tool': full})
     return out
 
+# tend's band at each moment and the pane each chip opens, by tend's own
+# functions replayed over the session (card.mts): from each turn's full text,
+# since tend's short form holds no card.
+ends = [*starts[1:], len(recs)]
+# Each turn's text blocks, timed; its reply is the last.
+said = [[(ts(e), c['text']) for e in recs[a:b] if e.get('type') == 'assistant' for c in e['message']['content'] if c.get('type') == 'text' and c['text'].strip()]
+        for a, b in zip(starts, ends)]
+reply_abs = [s[-1][0] if s else ts(recs[b - 1]) for s, b in zip(said, ends)]
+# A turn recorded with moo off ran no tend: no snap while it worked names an
+# output style, as every turn with moo on names hold's.
+def moo_on(n):
+    return any(sn.get('style') for sn in snaps if sn['cols'] == 80 and ts(recs[starts[n]]) <= sn['t'] <= reply_abs[n])
+card_in = [{'tend': moo_on(n), 'composer': not shown_prompt(recs[a]['message']['content']).startswith('<task-notification>'),
+            'texts': [x for _, x in said[n]], 'answer': said[n][-1][1] if said[n] else ''} for n, a in enumerate(starts)]
+with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as tf:
+    json.dump(card_in, tf)
+cards = json.loads(subprocess.check_output(['npx', 'tsx', os.path.join(os.path.dirname(__file__), 'card.mts'), tf.name]))
+# The chips each snap drew must be the ones tend's functions give for that
+# moment: those of the turn running (questions closed at its prompt), or, once
+# its reply is in, those it left. The session file logs a prompt after its
+# hooks ran and a reply before the turn ends, and a snap's time is whole
+# seconds, so a snap within GRACE seconds of either may show the other side.
+GRACE = 3
+def turn_at(t): return max((k for k, a in enumerate(starts) if ts(recs[a]) <= t), default=None)
+def band_due(t):
+    n = turn_at(t)
+    if n is None: return []
+    return cards[n]['after'] if t >= reply_abs[n] else cards[n]['during']
+off = [(sn['file'], sn.get('band', []), band_due(sn['t'])) for sn in snaps
+       if sn['cols'] == 80 and not sn['dialog'] and 'context' in sn
+       and sn.get('band', []) not in (band_due(sn['t'] - GRACE), band_due(sn['t']), band_due(sn['t'] + GRACE))]
+if off:
+    raise SystemExit('\n'.join(f'{out}: {f}: tend drew {drew}, its functions give {due}' for f, drew, due in off))
+
 turns, abs_times = [], []
 for n, a in enumerate(starts):
     b = starts[n + 1] if n + 1 < len(starts) else len(recs)
@@ -157,8 +192,7 @@ for n, a in enumerate(starts):
     with tempfile.NamedTemporaryFile('w', suffix='.jsonl', delete=False) as tf:
         tf.write('\n'.join(json.dumps(e) for e in part))
     rep = json.loads(subprocess.check_output(['node', os.path.join(os.path.dirname(__file__), 'replay.mjs'), tf.name, cwd]))
-    texts = [(ts(e), c['text']) for e in part if e.get('type') == 'assistant' for c in e['message']['content'] if c.get('type') == 'text' and c['text'].strip()]
-    reply_at, reply = texts[-1] if texts else (ts(part[-1]), '')
+    reply_at, reply = said[n][-1] if said[n] else (ts(part[-1]), '')
     key = shorts.get(str(n))
     if key:
         reply = short[key]
@@ -250,7 +284,13 @@ for n, a in enumerate(starts):
     # the next turn, whose own chrome holds them.
     at_reply = next((c for x, c in reversed(chrome) if x <= reply_at - sent), {})
     chrome = [[x, c] for x, c in chrome if x <= reply_at - sent or c.get('style') == at_reply.get('style')]
+    # A snap's time is its second, floored: one stamped in the second before
+    # the reply that shows the chips the reply left was taken after it.
+    chrome = [[max(x, turn['replyAt']) if c.get('band') and x < turn['replyAt'] <= x + 1 and c['band'] == cards[n]['after'] else x, c]
+              for x, c in chrome]
     turn['chrome'] = chrome
+    if any(c.get('band') for _, c in chrome) and cards[n]['panes']:
+        turn['panes'] = cards[n]['panes']
     toast = next((toast_of(s['raw']) for s in snaps if reply_at <= s['t'] < hi and toast_of(s['raw'])), None)
     if toast: turn['toast'] = toast
     turn['reply'] = reply.split('\n')
@@ -317,7 +357,7 @@ for n, turn in enumerate(turns):
 for k in range(len(turns) - 1, 0, -1):
     if turns[k]['user'].startswith('<task-notification>'):
         t = turns.pop(k)
-        assert not t.get('keys') and not t.get('dialogs'), 'a task notification with keys or dialogs'
+        assert not t.get('keys') and not t.get('dialogs') and not t.get('panes'), 'a task notification with keys, dialogs or a band'
         turns[k - 1]['more'] = [{**({'tools': t['tools']} if t.get('tools') else {}), 'reply': t['reply']}, *t.get('more', []), *turns[k - 1].get('more', [])]
 
 first = next(s for s in snaps if 'context' in s)
@@ -329,6 +369,11 @@ for t in turns:
     for k, v in t.items():
         if k == 'reply': lines += ['    reply: [', *(f'      {J(x)},' for x in v), '    ],']
         elif k in ('activity', 'launches', 'chrome'): lines += [f'    {k}: [', *(f'      {J(x)},' for x in v), '    ],']
+        elif k == 'panes':
+            lines.append('    panes: {')
+            for name, pane in v.items():
+                lines += [f'      {J(name)}: {{', f'        chips: {J(pane["chips"])},', '        body: [', *(f'          {J(r)},' for r in pane['body']), '        ],', '      },']
+            lines.append('    },')
         else: lines.append(f'    {k}: {json.dumps(v, ensure_ascii=False, indent=2).replace(chr(10), chr(10) + "    ")},')
     lines.append('  },')
 lines += ['];', '']

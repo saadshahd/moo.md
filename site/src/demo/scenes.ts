@@ -22,9 +22,13 @@
 // - Removed: Claude Code's dim suggestion in the empty prompt, as "Try "fix
 //   lint errors"", and the hook the spinner names, as "running PostToolUse
 //   hook"; the spinner keeps its verb and counter (tools/gen.py chrome_of()).
-// - Removed: hunch's band above the prompt box, "[-]" and its chips, as
-//   "[ questions 2 ]"; the demo can't click it, so its rows go to the
-//   transcript (tools/gen.py chrome_of()).
+// - tend's band above the prompt box, "[-]" and its chips, as
+//   "[ questions 2 ]", shows where recorded (tools/gen.py chrome_of()). No
+//   recording opens its pane: a chip's click or Enter opens it, laid out by
+//   tend's own code from the session's text (tools/card.mts), in a frame
+//   drawn as the toast's box, its last lines cut to "…" where the terminal
+//   lacks the rows; it pauses the demo, and a second click, its close, Esc,
+//   play or a seek closes it (render.ts paneRows(), player.ts).
 // - Option gaps: half a row of space under each option's description and above
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.

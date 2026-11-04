@@ -211,7 +211,7 @@ for (const cols of [45, 80, 120])
     --t-bg: #141414; --t-fg: #e6e6e6; --t-border: #2c2c2c; --t-scroll: #3a3a3a; --t-user: #373737;
     --t-o: #d77757; --t-o2: #eb9f7f; --t-g: #999999; --t-g2: #adadad; --t-l: #b1b9f9; --t-tab-fg: #000000;
     --t-w: #ffffff; --t-r: #888888; --t-add: #38a660; --t-del: #b3596b; --t-ok: #4eba65; --t-amb: #ffc107;
-    --t-cursor: #e6e6e6; --t-logo: #d77757; --t-eye: #000000;
+    --t-cursor: #e6e6e6; --t-logo: #d77757; --t-eye: #000000; --t-sub: #505050;
     --t-c31: #f07178; --t-c32: #98c379; --t-c34: #7aa2f7; --t-c37: #abb2bf; --t-c95: #d5bfff; --t-c96: #7fdbca;
     --t-key-bg: #2a2a2aee; --t-key-border: #444444; --t-key-fg: #e6e6e6; --t-flash-bg: #000000aa; --t-flash-fg: #ffffff;
   }
@@ -347,6 +347,15 @@ for (const cols of [45, 80, 120])
      apart from it. It scrolls with the transcript; the terminal keeps its height. */
   .demo :global(.row.banner) { margin-bottom: calc(var(--row) / 2); }
   .demo :global([data-opt]) { cursor: pointer; }
+  /* tend's buttons: its chips and the pane's close, as text in the grid. Its
+     brackets in the subtle grey recorded; hover marks what takes a click in
+     the selection colour, as tend's band does. */
+  .demo :global(.sub) { color: var(--t-sub); }
+  .demo :global(button.act) {
+    all: unset; cursor: pointer; white-space: pre;
+  }
+  .demo :global(button.act:hover) { color: var(--t-l); }
+  .demo :global(button.act:focus-visible) { outline: 1px solid var(--accent); outline-offset: 1px; }
 
   /* The cursor: a block that inverts the text under it, gliding between cells
      at the playback speed (--glide, player.ts), blinking softly at rest; plain

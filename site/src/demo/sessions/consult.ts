@@ -126,7 +126,20 @@ export const turns: Turn[] = [
       [70.7, {"context": "6% · 55.7k", "style": "hold:Plain", "spin": {"verb": "Discombobulating", "tail": "↓ 5.6k tokens"}}],
       [71.7, {"context": "6% · 55.7k", "style": "hold:Plain", "spin": {"verb": "Discombobulating", "tail": "↓ 5.8k tokens"}}],
       [73.7, {"context": "6% · 55.7k", "style": "hold:Plain"}],
+      [74.7, {"context": "6% · 55.7k", "style": "hold:Plain", "band": ["questions 1"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• What should a pending charge make the invoice?", "kind": "title"}],
+          [{"id": "answer:0:0", "label": "◦ unpaid (today)", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:1", "label": "◦ a new pending status", "kind": "line", "indent": 2}],
+        ],
+      },
+    },
     reply: [
       "1. **`charge()` returns an outcome we own, or throws.**",
       "   A v2-style reply now throws instead of marking unpaid.",

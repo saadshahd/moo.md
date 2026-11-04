@@ -237,9 +237,21 @@ export const turns: Turn[] = [
       [50.5, {"context": "6% · 58.1k", "style": "hold:Plain", "spin": {"verb": "Pouncing", "tail": "↓ 4.9k tokens"}}],
       [130.5, {"context": "6% · 58.1k", "style": "hold:Plain", "spin": {"verb": "Pouncing", "tail": "↓ 5.0k tokens"}}],
       [130.5, {"context": "6% · 58.1k", "style": "hold:Plain", "spin": {"verb": "Pouncing", "tail": "↓ 5.0k tokens · thinking with medium effort"}}],
-      [140.5, {"context": "6% · 59.4k", "style": "hold:Plain"}],
+      [140.5, {"context": "6% · 59.4k", "style": "hold:Plain", "band": ["questions 1"]}],
       [203.5, {"context": "6% · 59.4k", "style": "hold:Plain", "spin": {"verb": "Onioning"}}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• Go on to tighten the cap and judge the contract?", "kind": "title"}],
+          [{"id": "answer:0:0", "label": "◦ go", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:1", "label": "◦ change something first", "kind": "line", "indent": 2}],
+        ],
+      },
+    },
     reply: [
       "Draft contract below; react to it, then I anchor and judge it.",
       "",
@@ -441,7 +453,7 @@ export const turns: Turn[] = [
       [-153.2, {"context": "6% · 58.1k", "style": "hold:Plain", "spin": {"verb": "Pouncing", "tail": "↓ 4.9k tokens"}}],
       [-73.2, {"context": "6% · 58.1k", "style": "hold:Plain", "spin": {"verb": "Pouncing", "tail": "↓ 5.0k tokens"}}],
       [-73.2, {"context": "6% · 58.1k", "style": "hold:Plain", "spin": {"verb": "Pouncing", "tail": "↓ 5.0k tokens · thinking with medium effort"}}],
-      [-63.2, {"context": "6% · 59.4k", "style": "hold:Plain"}],
+      [-63.2, {"context": "6% · 59.4k", "style": "hold:Plain", "band": ["questions 1"]}],
       [-0.2, {"context": "6% · 59.4k", "style": "hold:Plain", "spin": {"verb": "Onioning"}}],
       [0.8, {"context": "6% · 59.4k", "style": "hold:Plain", "spin": {"verb": "Onioning", "tail": "thinking with medium effort"}}],
       [1.8, {"context": "6% · 60.5k", "style": "hold:Plain", "spin": {"verb": "Onioning", "tail": "↓ 75 tokens · thinking with medium effort"}}],

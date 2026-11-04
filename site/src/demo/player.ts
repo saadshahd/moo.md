@@ -65,10 +65,27 @@ const segHtml = ([x, c]: Seg) =>
     : c
       ? `<span class="${c}">${cells(x)}</span>`
       : cells(x);
+/** A row's segments; a run of them that acts the same is one of tend's
+ * buttons, and a chip says whether its pane is open. */
+function segsHtml(segs: Seg[]) {
+  const out: string[] = [];
+  for (let k = 0; k < segs.length; ) {
+    const act = segs[k][2];
+    if (!act) {
+      out.push(segHtml(segs[k++]));
+      continue;
+    }
+    const run: Seg[] = [];
+    while (k < segs.length && segs[k][2] === act) run.push(segs[k++]);
+    const open = act.startsWith("chip:") ? ` aria-expanded="${run.some(([x]) => x.includes("▴"))}"` : "";
+    out.push(`<button type="button" class="act" data-act="${act}"${open}>${run.map(segHtml).join("")}</button>`);
+  }
+  return out.join("");
+}
 /** A row; an option's rows carry its index, and its first row is the one a
  * listbox names as the option. */
 const rowHtml = (r: Row, id = "", first = false) =>
-  `<div class="row ${r.cls ?? ""}"${r.opt === undefined ? "" : ` data-opt="${r.opt}"`}${first ? ` id="${id}-opt-${r.opt}" role="option"` : ""}>${r.segs.map(segHtml).join("")}</div>`;
+  `<div class="row ${r.cls ?? ""}"${r.opt === undefined ? "" : ` data-opt="${r.opt}"`}${first ? ` id="${id}-opt-${r.opt}" role="option"` : ""}>${segsHtml(r.segs)}</div>`;
 const optionRows = (rows: Row[], id: string, cursor: number) =>
   rows
     .map((r, k) => {
@@ -134,6 +151,8 @@ export function mount(root: HTMLElement) {
   let userPaused = false;
   let following = true; // false while the reader has scrolled up to read
   let pick: number | undefined; // the option the reader put the cursor on
+  let pane: string | undefined; // the chip whose pane the reader opened
+  let refocus: string | undefined; // the button keys pressed, to keep focus on through a redraw
   let ticking = false;
   let html = ["", "", ""];
   const colsNow = () => Number(getComputedStyle(term).getPropertyValue("--cols"));
@@ -228,7 +247,12 @@ export function mount(root: HTMLElement) {
     const reduced = motion.matches;
     root.classList.toggle("reduced", reduced);
     const now = reduced ? (held ?? stillAt(still)) : t;
-    f = frame(scene, now, cols, pick, rows);
+    f = frame(scene, now, cols, pick, rows, pane);
+    // The pane closes with its chip.
+    if (pane && !f.chips.includes(pane)) {
+      pane = undefined;
+      f = frame(scene, now, cols, pick, rows);
+    }
     if (reduced && held !== undefined) still = f.beat;
     const next = [
       f.transcript.map((r) => rowHtml(r)).join(""),
@@ -236,7 +260,11 @@ export function mount(root: HTMLElement) {
       f.toast ? `<div class="box">${f.toast.rows.map((r) => rowHtml(r)).join("")}</div>` : "",
     ];
     if (next[0] !== html[0]) scroll.innerHTML = next[0];
-    if (next[1] !== html[1]) bottom.innerHTML = next[1];
+    if (next[1] !== html[1]) {
+      bottom.innerHTML = next[1];
+      if (refocus) bottom.querySelector<HTMLElement>(`[data-act="${refocus}"]`)?.focus();
+      refocus = undefined;
+    }
     if (next[2] !== html[2]) toast.innerHTML = next[2];
     html = next;
     // A dialog's options are a listbox the arrow keys move through.
@@ -446,6 +474,7 @@ export function mount(root: HTMLElement) {
     jumped = true;
     t = Math.min(Math.max(0, s), length);
     pick = undefined;
+    pane = undefined;
     following = true;
     last = performance.now();
     // A seek can end the demo or take it back from its end.
@@ -456,6 +485,7 @@ export function mount(root: HTMLElement) {
       still = Math.min(Math.max(0, k), beats.length - 1);
       held = undefined;
       pick = undefined;
+      pane = undefined;
       draw();
     // Past the caption's fade-in, so a paused demo shows it.
     } else seek(times[Math.min(Math.max(0, k), times.length - 1)] + 0.3);
@@ -481,6 +511,7 @@ export function mount(root: HTMLElement) {
       userPaused = false;
       following = true;
       pick = undefined;
+      pane = undefined;
     } else userPaused = true;
     sync();
     flashState();
@@ -492,7 +523,7 @@ export function mount(root: HTMLElement) {
   term.addEventListener("pointerdown", (e) => (down = { x: e.clientX, y: e.clientY, top: scroll.scrollTop }));
   term.addEventListener("click", (e) => {
     const moved = down && (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4 || scroll.scrollTop !== down.top);
-    if (motion.matches || moved || getSelection()?.toString() || (e.target as HTMLElement).closest("[data-opt]")) return;
+    if (motion.matches || moved || getSelection()?.toString() || (e.target as HTMLElement).closest("[data-opt], [data-act], .pane")) return;
     playBtn.click();
   });
   // A step between the plain reply and moo's hand-back: it pauses there.
@@ -559,13 +590,31 @@ export function mount(root: HTMLElement) {
   bottom.addEventListener("click", (e) => {
     const row = (e.target as HTMLElement).closest<HTMLElement>("[data-opt]");
     if (row) choose(Number(row.dataset.opt));
+    const button = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
+    if (button) act(button.dataset.act!, e.detail === 0);
   });
+  // tend's chip opens its pane, or closes it if open; close closes it. The
+  // pane opens paused, as picking an option is, so it holds still to read;
+  // play closes it and goes on. A press by key keeps the focus on what it
+  // pressed, or on the chip once its pane closes.
+  function act(id: string, byKey: boolean) {
+    const name = id.replace(/^chip:/, "");
+    const closing = id === "close" || name === pane;
+    const chip = `chip:${pane ?? name}`;
+    pane = closing ? undefined : name;
+    if (pane) userPaused = true;
+    refocus = byKey ? (closing ? chip : id) : undefined;
+    sync();
+  }
 
   // Keys: Space plays or pauses, ←/→ go to the previous or next beat, ↑/↓
-  // move through a dialog's options.
+  // move through a dialog's options, Esc closes tend's pane.
   root.addEventListener("keydown", (e) => {
     const inButton = (e.target as HTMLElement).closest("button");
-    if (e.key === " " && !inButton) {
+    if (e.key === "Escape" && pane) {
+      e.preventDefault();
+      act("close", bottom.contains(e.target as Node));
+    } else if (e.key === " " && !inButton) {
       e.preventDefault();
       playBtn.click();
     } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {

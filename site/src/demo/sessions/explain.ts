@@ -123,7 +123,18 @@ export const turns: Turn[] = [
       [0.5, {"context": "4% · 40.2k", "style": "hold:Plain", "spin": {"verb": "Zesting", "tail": "thinking with medium effort"}}],
       [6.5, {"context": "4% · 40.2k", "style": "hold:Plain", "spin": {"verb": "Zesting", "tail": "↓ 603 tokens · thought for 6s"}}],
       [7.5, {"context": "5% · 48.6k", "style": "hold:Plain"}],
+      [13.5, {"context": "5% · 48.6k", "style": "hold:Plain", "band": ["questions 1"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• [open] \"left follows the right\": the notes track the voice, or lag behind it?", "kind": "title"}],
+        ],
+      },
+    },
     reply: [
       "Each squeak is a note the tracker placed above the voice, played as raw sine tones.",
       "",

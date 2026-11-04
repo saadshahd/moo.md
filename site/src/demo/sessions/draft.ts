@@ -276,9 +276,21 @@ export const turns: Turn[] = [
       [769.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.6k tokens"}}],
       [842.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.7k tokens"}}],
       [843.9, {"context": "5% · 48.8k", "style": "hold:Plain", "spin": {"verb": "Actioning", "tail": "↓ 3.7k tokens · thinking with medium effort"}}],
-      [849.9, {"context": "5% · 48.8k", "style": "hold:Plain"}],
-      [849.9, {"context": "5% · 49.7k", "style": "hold:Plain"}],
+      [849.9, {"context": "5% · 48.8k", "style": "hold:Plain", "band": ["questions 1"]}],
+      [849.9, {"context": "5% · 49.7k", "style": "hold:Plain", "band": ["questions 1"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• Commit the new blocked-deploy message?", "kind": "title"}],
+          [{"id": "answer:0:0", "label": "◦ Commit", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:1", "label": "◦ Change it first", "kind": "line", "indent": 2}],
+        ],
+      },
+    },
     reply: [
       "The new message is in `bin/ship.js:12-36`.",
       "It is not committed.",

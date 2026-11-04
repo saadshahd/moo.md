@@ -1,4 +1,5 @@
 // What a demo plays: turns of a real recorded Claude Code session.
+import type { Band } from "./band";
 
 /** One logical line as Claude Code drew it: **bold**, `code`, *italic*, leading
  * spaces for indent, "- " or "1. " for list items. Blank is an empty string. */
@@ -37,6 +38,9 @@ export type Turn = {
    * after the prompt was sent (negative while it was typed), read from the
    * screens captured while the turn ran. */
   chrome: [number, Chrome][];
+  /** The pane each of tend's chips opens once the reply is in, by the chip's
+   * name, e.g. "questions": tend's own rows for it (tools/card.mts). */
+  panes?: Record<string, Band>;
   reply: Line[];
   /** What came after the reply with no prompt: a subagent finished, and
    * Claude Code drew its tool summary and the reply it led to. */
@@ -53,6 +57,8 @@ export type Chrome = {
   /** The spinner's verb, and its words after the counter, e.g. "↓ 232 tokens"
    * (none: Claude Code showed no counter yet). */
   spin?: { verb: string; tail?: string };
+  /** tend's chips in the band above the prompt box, e.g. "questions 2". */
+  band?: string[];
 };
 
 /** One activity line and the tool line under it, from `at` seconds after the

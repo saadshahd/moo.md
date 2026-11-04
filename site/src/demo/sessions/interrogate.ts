@@ -603,8 +603,18 @@ export const turns: Turn[] = [
       [590.7, {"context": "7% · 65.3k", "style": "hold:Plain", "spin": {"verb": "Tempering", "tail": "↓ 5.3k tokens"}}],
       [1288.7, {"context": "7% · 65.3k", "style": "hold:Plain", "spin": {"verb": "Tempering", "tail": "↓ 5.5k tokens"}}],
       [1289.7, {"context": "7% · 65.3k", "style": "hold:Plain", "spin": {"verb": "Tempering", "tail": "↓ 5.5k tokens · thinking with medium effort"}}],
-      [1299.7, {"context": "7% · 66.6k", "style": "hold:Plain"}],
+      [1299.9, {"context": "7% · 66.6k", "style": "hold:Plain", "band": ["questions 1"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• Next: shall I rewrite `docs/plan.md` and rebuild `src/hook.js` around the 3 rules?", "kind": "title"}],
+        ],
+      },
+    },
     reply: [
       "Amended proposal: plain rules block the top 3 slow-call patterns, and the judge is put off until later. Every decision below is in your words.",
       "",

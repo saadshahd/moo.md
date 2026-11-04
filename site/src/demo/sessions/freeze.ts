@@ -145,7 +145,21 @@ export const turns: Turn[] = [
       [54.7, {"context": "6% · 55.6k", "style": "hold:Plain", "spin": {"verb": "Spinning", "tail": "↓ 4.8k tokens · thought for 17s"}}],
       [56.7, {"context": "6% · 55.6k", "style": "hold:Plain", "spin": {"verb": "Spinning", "tail": "↓ 4.9k tokens"}}],
       [57.7, {"context": "6% · 55.6k", "style": "hold:Plain"}],
+      [58.7, {"context": "6% · 55.6k", "style": "hold:Plain", "band": ["questions 1"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• Lock the snapshot now, or fill gaps first?", "kind": "title"}],
+          [{"id": "answer:0:0", "label": "◦ Lock with gaps open", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:1", "label": "◦ Fetch worker host state first", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:2", "label": "◦ Ask warehouse for size limit first", "kind": "line", "indent": 2}],
+        ],
+      },
+    },
     reply: [
       "The snapshot holds. Every value below was read from disk at 20:53Z or is listed as a gap; none is made up.",
       "",
@@ -285,6 +299,7 @@ export const turns: Turn[] = [
       [-18.8, {"context": "6% · 55.6k", "style": "hold:Plain", "spin": {"verb": "Spinning", "tail": "↓ 4.8k tokens · thought for 17s"}}],
       [-16.8, {"context": "6% · 55.6k", "style": "hold:Plain", "spin": {"verb": "Spinning", "tail": "↓ 4.9k tokens"}}],
       [-15.8, {"context": "6% · 55.6k", "style": "hold:Plain"}],
+      [-14.8, {"context": "6% · 55.6k", "style": "hold:Plain", "band": ["questions 1"]}],
       [0.2, {"context": "6% · 55.6k", "style": "hold:Plain", "spin": {"verb": "Swooping"}}],
       [1.2, {"context": "6% · 55.6k", "style": "hold:Plain", "spin": {"verb": "Swooping", "tail": "thinking with medium effort"}}],
       [2.2, {"context": "6% · 57.9k", "style": "hold:Plain"}],

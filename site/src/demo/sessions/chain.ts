@@ -252,8 +252,26 @@ export const turns: Turn[] = [
       [601.8, {"context": "9% · 91.8k", "style": "hold:Plain", "spin": {"verb": "Meandering", "tail": "↓ 37.8k tokens · thought for 51s"}}],
       [601.8, {"context": "9% · 91.8k", "style": "hold:Plain", "spin": {"verb": "Meandering", "tail": "↓ 38.4k tokens · thought for 51s"}}],
       [602.8, {"context": "9% · 91.8k", "style": "hold:Plain", "spin": {"verb": "Meandering", "tail": "↓ 38.5k tokens · thought for 51s"}}],
-      [603.8, {"context": "9% · 91.8k", "style": "hold:Plain"}],
+      [603.8, {"context": "9% · 91.8k", "style": "hold:Plain", "band": ["questions 2"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• What does the provider return when a request with the same key arrives while the first is still running?", "kind": "title"}],
+          [{"id": "answer:0:0", "label": "◦ Waits, then returns the first charge", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:1", "label": "◦ 409, key in use", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:2", "label": "◦ Don't know, I'll check their docs", "kind": "line", "indent": 2}],
+          [],
+          [{"id": "question:1", "label": "• Does the shop ever charge the same order again after a decline? Within 24 hours the order's key would replay the old result.", "kind": "title"}],
+          [{"id": "answer:1:0", "label": "◦ No", "kind": "line", "indent": 2}],
+          [{"id": "answer:1:1", "label": "◦ Yes", "kind": "line", "indent": 2}],
+          [{"id": "answer:1:2", "label": "◦ Don't know", "kind": "line", "indent": 2}],
+        ],
+      },
+    },
     reply: [
       "Now, through ops-console on prod, set `timeout_ms` to 3000 and `retries` to 0.",
       "",

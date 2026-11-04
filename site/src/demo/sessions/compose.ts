@@ -527,8 +527,20 @@ export const turns: Turn[] = [
       [153.1, {"context": "8% · 75k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 7.9k tokens"}}],
       [155.1, {"context": "8% · 75k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 7.9k tokens · thinking with medium effort"}}],
       [160.1, {"context": "8% · 75k", "style": "hold:Plain"}],
-      [161.1, {"context": "8% · 75.6k", "style": "hold:Plain"}],
+      [161.1, {"context": "8% · 75.6k", "style": "hold:Plain", "band": ["questions 1"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• Commit the new issues to main?", "kind": "title"}],
+          [{"id": "answer:0:0", "label": "◦ Commit", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:1", "label": "◦ Hold for edits", "kind": "line", "indent": 2}],
+        ],
+      },
+    },
     reply: [
       "Next: read `issues/0042` to `issues/0050`, then tell me whether to commit them.",
       "",
