@@ -18,9 +18,12 @@ Two ways in, two philosophies. The **[Claude Code plugin](https://code.claude.co
 ```bash
 /plugin marketplace add saadshahd/moo.md
 /plugin install hope@moo.md
+/plugin install hold@moo.md
+/reload-plugins
+/output-style hold:Plain
 ```
 
-`hope` is the decision loop, and the reason to be here. More layers ship from the same marketplace: `hold@moo.md`, comprehension at your own pace, `sound@moo.md`, code taste as installable rules, and `hunch@moo.md`, experiments that graduate or die.
+`hope` is the decision loop, and the reason to be here. `hold` is comprehension at your own pace, and its `hold:Plain` output style keeps replies short. More layers ship from the same marketplace: `sound@moo.md`, code taste as installable rules, and `hunch@moo.md`, experiments that graduate or die.
 
 </details>
 

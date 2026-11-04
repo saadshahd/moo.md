@@ -1,6 +1,6 @@
 ---
 title: Install
-description: Each move in the Moves menu is a hope skill. Install hope one of two ways.
+description: Install hope and hold, set the hold:Plain output style, and add hunch if you want it. In Claude Code, or as skill files for other agents.
 tableOfContents: false
 ---
 import Copy from "../../components/Copy.astro";
@@ -11,6 +11,10 @@ import Copy from "../../components/Copy.astro";
     <p>A plugin from the moo.md marketplace. Each moo.md release updates it.</p>
     <Copy command="/plugin marketplace add saadshahd/moo.md" />
     <Copy command="/plugin install hope@moo.md" />
+    <Copy command="/plugin install hold@moo.md" />
+    <p>Load the new plugins, then switch the output style to hold:Plain.</p>
+    <Copy command="/reload-plugins" />
+    <Copy command="/output-style hold:Plain" />
     <p class="optional">Optional: the demos were recorded with hunch's tend on.</p>
     <Copy command="/plugin install hunch@moo.md" />
   </section>
