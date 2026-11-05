@@ -6,21 +6,23 @@
 //     project folder under ~/.claude/projects and its bare folder name, each
 //     as long as the copy's, so text wraps where it did.
 //     | Pages        | Copy                      | World                   |
-//     | clarify      | /Users/Shared/rela1       | /Users/Shared/relay     |
+//     | clarify (off)| /Users/Shared/rela2       | /Users/Shared/relay     |
+//     | clarify (on) | /Users/Shared/rela3       | /Users/Shared/relay     |
 //     | widen        | /Users/Shared/motionpa1   | /Users/Shared/motionpad |
 //     | intent       | /Users/Shared/harnes1     | /Users/Shared/harness   |
 //     | judge (off)  | /Users/Shared/chimebo1    | /Users/Shared/chimebox  |
 //     | judge (on)   | /Users/Shared/chimebo2    | /Users/Shared/chimebox  |
 //     | reframe      | /Users/Shared/shopdec1    | /Users/Shared/shopdeck  |
 //     | shift        | /Users/Shared/agent-ki1   | /Users/Shared/agent-kit |
-//     | shape        | /Users/Shared/glossary1   | /Users/Shared/glossary2 |
+//     | shape        | /Users/Shared/glossary3   | /Users/Shared/glossary2 |
 //     | compose      | /Users/Shared/agentdes1   | /Users/Shared/agentdesk |
-//     | consult      | /Users/Shared/invoicin1   | /Users/Shared/invoicing |
+//     | consult      | /Users/Shared/invoicin2   | /Users/Shared/invoicing |
 //     | elicit       | /Users/Shared/taskdes2    | /Users/Shared/taskdesk  |
-//     | explain      | /Users/Shared/songboo1    | /Users/Shared/songbook  |
+//     | explain      | /Users/Shared/songboo2    | /Users/Shared/songbook  |
 //     | interrogate  | /Users/Shared/callgat1    | /Users/Shared/callgate  |
 //     | deepen       | /Users/Shared/mdchec1     | /Users/Shared/mdcheck   |
-//     | anchor       | /Users/Shared/billin1     | /Users/Shared/billing   |
+//     | anchor (off) | /Users/Shared/billin3     | /Users/Shared/billing   |
+//     | anchor (on)  | /Users/Shared/billin4     | /Users/Shared/billing   |
 //     | reduce       | /Users/Shared/catalo1     | /Users/Shared/catalog   |
 //     | target       | /Users/Shared/termsyn1    | /Users/Shared/termsync  |
 //     | router       | /Users/Shared/tasklin1    | /Users/Shared/taskline  |

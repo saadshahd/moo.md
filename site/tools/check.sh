@@ -13,10 +13,10 @@ fail=0
 # its capture above the next prompt (check-screen.mts).
 PANES=(
   skills-off:rec7/skills-off skills-on:rec2/skills chain-off:rec7/chain-off chain-on:rec2/chain
-  judge-off:rec7/judge-off clarify-off:rec5/clarify draft-off:rec5/draft freeze-off:rec5/freeze
+  judge-off:rec7/judge-off clarify-off:rec7/clarify-off draft-off:rec5/draft freeze-off:rec5/freeze
   inversion-off:rec5/inversion reduce-off:rec6/reduce intent-off:rec5/intent shape-off:rec5/shape2
   explain-off:rec5/explain elicit-off:rec5/elicit shift-off:rec6/shift2 interrogate-off:rec5/interrogate
-  anchor-off:rec6/anchor widen-off:rec5/widen deepen-off:rec5/deepen reframe-off:rec5/reframe
+  anchor-off:rec7/anchor-off widen-off:rec5/widen deepen-off:rec5/deepen reframe-off:rec5/reframe
   router-off:rec5/router target-off:rec5/target compose-off:rec5/compose consult-off:rec5/consult
 )
 for page in intent shape compose consult clarify elicit explain interrogate reframe deepen widen anchor freeze reduce draft target router inversion shift judge; do

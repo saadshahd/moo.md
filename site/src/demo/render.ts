@@ -177,7 +177,9 @@ const text = (line: Line) =>
   line.replace(/\\(.)|\*|`/g, (_, kept) => kept ?? "").trimStart();
 
 /** Lines as Claude Code draws them: headings bold then a blank row, list items
- * with a hanging indent, leading spaces kept as indent. Fences are not drawn;
+ * with a hanging indent, leading spaces kept as indent inside a list, and as
+ * text outside one: a fence at the margin ends a list, so an indented line
+ * after it keeps its spaces on its first row only (clarify). Fences are not drawn;
  * the lines inside stand as written: with no language, in lavender; "diff",
  * + lines green and - lines red, in the terminal's palette; any other, plain.
  * A "markdown" block is the one edit: Claude Code showed it as source, and the
@@ -189,6 +191,7 @@ function draw(lines: Line[], width: number): Cell[][] {
   let fenced = false;
   let lang = "";
   let markdown = false;
+  let inList = false;
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     if (!fenced && isRow(raw)) {
@@ -204,6 +207,7 @@ function draw(lines: Line[], width: number): Cell[][] {
     }
     if (raw.startsWith("```")) {
       fenced = !fenced;
+      inList = false;
       lang = raw.slice(3).trim();
       continue;
     }
@@ -230,6 +234,12 @@ function draw(lines: Line[], width: number): Cell[][] {
     const [, lead, rest] = /^( *)(.*)$/.exec(raw)!;
     const item = !fenced && /^(-|\d+\.) (.*)$/.exec(rest);
     const mark = item ? item[1] + " " : "";
+    if (item) inList = true;
+    else if (!lead) inList = false;
+    if (lead && !inList) {
+      out.push(...wrap(inline(rest), width, width - lead.length).map((l, k) => (k ? l : [...plain(lead), ...l])));
+      continue;
+    }
     const hang = lead.length + mark.length;
     wrap(item ? keepNumbered(inline(item[2])) : inline(rest), width - hang).forEach((l, k) =>
       out.push([...plain(k ? " ".repeat(hang) : lead + mark), ...l]),
@@ -346,7 +356,8 @@ function rejoined(rows: Cell[][]): Cell[] {
  * and the rest, its rows rejoined, wraps again at cols - 3. Each line then
  * wraps as Ink draws text at the reply's width: a space past the edge takes
  * a row of its own (anchor, at 45). A carried space starts a row of the rest
- * (compose); the one carried off the first row is dropped. */
+ * (compose). One carried onto the value's second row is dropped, unless it
+ * sits in code (anchor's `CREATE TABLE`, at 45). */
 function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
   const cols = width + 2;
   const rule = plain("─".repeat(Math.min(cols - 1, 40)));
@@ -358,8 +369,8 @@ function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
       if (!h.trim() && !r[c].length) return [];
       const key = h.trim() ? [...inline(h, "b"), ...plain(":", "b"), ...plain(" ")] : [];
       const rows = wrapInk(r[c], Math.max(key.length ? cols - (key.length - 2) - 3 : cols - 1, 10), false);
-      const rest = rejoined(rows).slice(rows[0].length);
-      while (rest[0]?.[0] === " ") rest.shift();
+      const rest = rejoined(rows.slice(1));
+      while (rest[0]?.[0] === " " && !/\bl\b/.test(rest[0][1] ?? "")) rest.shift();
       const lines = [[...key, ...rows[0]], ...(rest.length ? wrapInk(rest, cols - 3, false) : [])];
       return lines.filter((l, n) => !n || l.some(([ch]) => ch !== " ")).flatMap((l) => wrapInk(l, width));
     }),

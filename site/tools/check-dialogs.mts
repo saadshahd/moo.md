@@ -19,7 +19,8 @@ const panes: [string, Scene, string, "p" | "q"][] = [
   ["skills off", S.skillsScene.off, "rec7/skills-off", "q"],
   ["skills on", S.skillsScene.on, "rec2/skills", "q"],
   ["chain on", S.chainScene.on, "rec2/chain", "q"],
-  ...(["anchor", "clarify", "compose", "deepen", "draft", "elicit", "intent", "interrogate"] as const).map(
+  ["anchor off", S.anchorScene.off, "rec7/anchor-off", "q"],
+  ...(["clarify", "compose", "deepen", "draft", "elicit", "intent", "interrogate", "shape"] as const).map(
     (page): [string, Scene, string, "q"] => [`${page} on`, S[`${page}Scene`].on, `rec7/${page}-on`, "q"],
   ),
 ];
@@ -42,9 +43,10 @@ for (const [name, scene, dir, letter] of panes) {
     p.dialogs.flatMap((d, j) => scene.turns[i].dialogs![j].questions.map((_, q) => ({ scene, i, j, q, d }))),
   );
   for (const f of readdirSync(`${R}/${dir}/dialogs`).filter((f) => !f.includes("80x50")).sort()) {
-    // q<n>-o<k>, q<n>-notes, q<n><m>-review (the review of the dialog asking n to m), review;
+    // q<n>-o<k>, q<n>-notes, q<n><m>-review (the review of the dialog asking n to m), review
+    // or submit (the review of the last dialog);
     // p<n>… and p-review the same for a moo-off turn whose take went on with moo on.
-    const m = /^(?:([pq])(\d*)-)?(o(\d+)|notes|review)-(\d+)x\d+\.ansi$/.exec(f);
+    const m = /^(?:([pq])(\d*)-)?(o(\d+)|notes|review|submit)-(\d+)x\d+\.ansi$/.exec(f);
     if (!m) throw new Error(`${dir}/dialogs/${f}: a capture this check cannot place`);
     if ((m[1] ?? "q") !== letter) continue;
     const list = qs;
@@ -53,7 +55,7 @@ for (const [name, scene, dir, letter] of panes) {
     const asked = at.scene.turns[at.i].dialogs![at.j].questions.length;
     const moments = at.d.script.moments;
     const mo =
-      m[3] === "review"
+      m[3] === "review" || m[3] === "submit"
         ? moments.find((x) => x.q === asked)
         : m[3] === "notes"
           ? moments.findLast((x) => x.q === at.q && x.noting)

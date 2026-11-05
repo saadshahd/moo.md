@@ -4,70 +4,40 @@ export const chrome: Chrome = {"context": "0%", "style": "hold:Plain"};
 
 export const turns: Turn[] = [
   {
-    user: "/hope:clarify Add a retry to our webhook consumer, unsure about idempotency",
+    user: "/hope:clarify Retry failed fulfilment orders, unsure about idempotency",
     tools: "Called 1 tool, ran 1 shell command",
     activity: [
-      {"at": 2.3, "line": "Listing and printing repo source files", "tool": "$ git ls-files && echo ---- && for f in $(git ls-files | grep -v -E 'lock|\\.json$'); do echo \"=== $f\"; cat \"$f\"; done"},
-      {"at": 565.3, "line": "The retry goes on failed fulfil-order jobs in src/queue/jobs.ts: Payflow already retries the webhook itself for three days (consumer.ts). Today a Payflow redelivery already makes a second fulfilment order (no unique key on event or payment). What should this change cover?", "tool": "$ git ls-files && echo ---- && for f in $(git ls-files | grep -v -E 'lock|\\.json$'); do echo \"=== $f\"; cat \"$f\"; done"},
+      {"at": 3.9, "line": "Listing files and read schema and source", "tool": "$ git ls-files && cat db/schema.sql && cat src/*.ts src/*/*.ts 2>/dev/null | head -400"},
+      {"at": 58.9, "line": "Which retry do you mean? Note: fulfilment's POST /orders makes a new order on every call (src/clients/fulfilment.ts), so any retry after a timeout can ship twice.", "tool": "$ git ls-files && cat db/schema.sql && cat src/*.ts src/*/*.ts 2>/dev/null | head -400"},
     ],
     dialogs: [
       {
         "at": [
-          45.8,
-          564.4
+          18.8,
+          57.9
         ],
         "after": 1,
-        "tool": "$ git ls-files && echo ---- && for f in $(git ls-files | grep -v -E 'lock|\\.json$'); do echo \"=== $f\"; cat \"$f\"; done",
+        "tool": "$ git ls-files && cat db/schema.sql && cat src/*.ts src/*/*.ts 2>/dev/null | head -400",
         "questions": [
           {
-            "header": "Scope",
-            "question": "The retry goes on failed fulfil-order jobs in src/queue/jobs.ts: Payflow already retries the webhook itself for three days (consumer.ts). Today a Payflow redelivery already makes a second fulfilment order (no unique key on event or payment). What should this change cover?",
+            "header": "Retry kind",
+            "question": "Which retry do you mean? Note: fulfilment's POST /orders makes a new order on every call (src/clients/fulfilment.ts), so any retry after a timeout can ship twice.",
             "multiSelect": false,
             "options": [
               {
-                "label": "Retry + dedupe (Recommended)",
-                "description": "Retry jobs that throw, and drop repeat Payflow deliveries by event id so each payment makes one order.",
-                "preview": "jobs: + attempts, run_after\n      + unique (event_id)\nworker: on throw -> requeue with backoff,\n        failed after N tries\nintake: same event id -> 202, no new job\norders: + unique (payment_id)"
+                "label": "Worker retries itself",
+                "description": "Queue retries a failed fulfil-order job with backoff, up to N tries, then marks it failed. Needs a guard so a retry never makes a second fulfilment order.",
+                "preview": "jobs: + attempts int, + run_after timestamptz\nwork(): on throw →\n  attempts < N ? requeue with backoff : 'failed'\nfulfilOrder: skip if orders has payment_id"
               },
               {
-                "label": "Retry only",
-                "description": "Retry jobs that throw; leave duplicate Payflow deliveries as they are.",
-                "preview": "jobs: + attempts, run_after\nworker: on throw -> requeue with backoff,\n        failed after N tries"
+                "label": "Replay stuck failed jobs",
+                "description": "A command you run by hand that requeues jobs already in state 'failed'. Same guard needed so a replay never makes a second order.",
+                "preview": "npm run requeue-failed [--id 42]\n  update jobs set state='queued'\n  where state='failed' and kind='fulfil-order'\nfulfilOrder: skip if orders has payment_id"
               },
               {
-                "label": "Retry + dedupe + crash",
-                "description": "Also requeue jobs stuck in 'running' after a process crash; today nothing picks them up.",
-                "preview": "jobs: + attempts, run_after, locked_at\n      + unique (event_id)\nworker: on throw -> requeue with backoff\nsweeper: running and locked_at too old\n         -> queued\norders: + unique (payment_id)"
-              }
-            ],
-            "picked": [
-              0
-            ]
-          },
-          {
-            "header": "Fulfilment",
-            "question": "fulfilment.ts times out after 5s, but fulfilment may have created the order anyway; a retry then makes a duplicate. Does fulfilment's POST /orders accept an idempotency key, or let us look up an order by payment id?",
-            "multiSelect": false,
-            "options": [
-              {
-                "label": "Accepts a key",
-                "description": "We send the payment id as the key; retries are safe end to end.",
-                "preview": "POST /orders\nIdempotency-Key: <payment.id>"
-              },
-              {
-                "label": "Has a lookup",
-                "description": "Before each retry we ask fulfilment whether the order exists.",
-                "preview": "GET /orders?payment_id=<id>\n  found -> record it, skip POST\n  none  -> POST /orders"
-              },
-              {
-                "label": "Neither",
-                "description": "A timeout can still double-order; we retry anyway and only guard our own insert.",
-                "preview": "retry on timeout -> may duplicate\nunique (payment_id) guards our table only"
-              },
-              {
-                "label": "Don't know",
-                "description": "I need to check with the fulfilment team first; the build waits on this.",
-                "preview": "blocked on fulfilment team"
+                "label": "Dedupe Payflow redelivery",
+                "description": "Not new retries: make the same Payflow event id enqueue and fulfil once, since Payflow resends anything we don't 2xx for three days.",
+                "preview": "jobs: + unique (kind, payload->>'eventId')\nenqueue: on conflict do nothing → 202\norders: + unique (payment_id)"
               }
             ],
             "picked": [
@@ -77,69 +47,68 @@ export const turns: Turn[] = [
         ]
       }
     ],
-    replyAt: 569.5,
+    replyAt: 64.8,
     chrome: [
-      [-6.7, {"context": "0%", "style": "hold:Plain"}],
-      [0.3, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Determining"}}],
-      [1.3, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 25 tokens · thinking with medium effort"}}],
-      [1.3, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 165 tokens · thinking with medium effort"}}],
-      [2.3, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 221 tokens · thought for 1s"}}],
-      [3.3, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 232 tokens · thought for 1s"}}],
-      [3.3, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 232 tokens · thinking with medium effort"}}],
-      [10.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 813 tokens · thought for 6s"}}],
-      [12.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 813 tokens"}}],
-      [37.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 813 tokens · thinking with medium effort"}}],
-      [37.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 901 tokens · thinking with medium effort"}}],
-      [38.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.0k tokens · thinking with medium effort"}}],
-      [39.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.1k tokens · thought for 1s"}}],
-      [39.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.2k tokens · thought for 1s"}}],
-      [40.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.2k tokens"}}],
-      [41.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.3k tokens"}}],
-      [42.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.4k tokens"}}],
-      [44.3, {"context": "4% · 40.7k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.5k tokens"}}],
-      [564.3, {"context": "4% · 42.2k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.9k tokens"}}],
-      [565.3, {"context": "4% · 42.2k", "style": "hold:Plain", "spin": {"verb": "Stewing", "tail": "↓ 1.9k tokens · thinking with medium effort"}}],
-      [569.3, {"context": "4% · 43.6k", "style": "hold:Plain"}],
+      [-3.1, {"context": "0%", "style": "hold:Plain"}],
+      [-1.1, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Nesting"}}],
+      [1.9, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "thinking with medium effort"}}],
+      [2.9, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 155 tokens · thinking with medium effort"}}],
+      [3.9, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 208 tokens"}}],
+      [4.9, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 218 tokens · thought for 1s"}}],
+      [4.9, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 219 tokens · thought for 1s"}}],
+      [6.9, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 219 tokens"}}],
+      [7.9, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 219 tokens · thinking with medium effort"}}],
+      [13.9, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 789 tokens · thought for 6s"}}],
+      [13.9, {"context": "4% · 40k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 818 tokens · thought for 6s"}}],
+      [14.9, {"context": "4% · 40k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 880 tokens · thought for 6s"}}],
+      [15.9, {"context": "4% · 40k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 917 tokens"}}],
+      [16.9, {"context": "4% · 40k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 960 tokens"}}],
+      [16.9, {"context": "4% · 40k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 1.0k tokens"}}],
+      [57.9, {"context": "4% · 40k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 1.4k tokens"}}],
+      [58.9, {"context": "4% · 40k", "style": "hold:Plain", "spin": {"verb": "Crafting", "tail": "↓ 1.4k tokens · thinking with medium effort"}}],
+      [64.9, {"context": "4% · 40k", "style": "hold:Plain"}],
+      [64.9, {"context": "4% · 41.4k", "style": "hold:Plain", "band": ["questions 2"]}],
     ],
+    panes: {
+      "questions": {
+        chips: [],
+        body: [
+          [{"id": "title", "label": "questions", "kind": "title"}, {"id": "close", "label": "close", "kind": "line"}],
+          [],
+          [{"id": "question:0", "label": "• Does fulfilment's POST /orders accept an idempotency key?", "kind": "title"}],
+          [{"id": "answer:0:0", "label": "◦ Yes", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:1", "label": "◦ No", "kind": "line", "indent": 2}],
+          [{"id": "answer:0:2", "label": "◦ Unknown, I'll ask", "kind": "line", "indent": 2}],
+          [],
+          [{"id": "question:1", "label": "• How many attempts, and what backoff?", "kind": "title"}],
+          [{"id": "answer:1:0", "label": "◦ 5 tries, exponential from 30s", "kind": "line", "indent": 2}],
+          [{"id": "answer:1:1", "label": "◦ 3 tries, fixed 1 min", "kind": "line", "indent": 2}],
+          [{"id": "answer:1:2", "label": "◦ Other", "kind": "line", "indent": 2}],
+        ],
+      },
+    },
     reply: [
-      "Confirmed.",
+      "The ask: when a fulfil-order job fails, the worker retries it with backoff up to N times, then marks it failed. A retry must never make a second fulfilment order.",
       "",
-      "| Piece | What it builds |",
-      "|---|---|",
-      "| Worker retry (`src/queue/jobs.ts`) | Requeue a throwing job with a growing delay |",
-      "| Worker retry (`src/queue/jobs.ts`) | Mark a job failed after N tries |",
-      "| Intake dedupe (`consumer.ts`, `jobs`) | Unique key on event id |",
-      "| Intake dedupe (`consumer.ts`, `jobs`) | Repeat delivery gets 202 and creates no job |",
-      "| Our table (`orders`) | Unique key on `payment_id` |",
-      "| Fulfilment call (`fulfilment.ts`) | Send `Idempotency-Key: <payment.id>` |",
-      "| Fulfilment call (`fulfilment.ts`) | Retry after a timeout creates no second order |",
+      "That guard has a gap. If fulfilment creates the order but times out before replying, `orders` has no row, so a retry ships twice.",
       "",
-      "Payflow already retries the webhook itself, so the handler gets no retry of its own.",
-      "Next: I write the tests and the change on a new branch, if you say go.",
+      "Only an idempotency key on fulfilment's POST /orders closes that. I can't see from here whether fulfilment accepts one.",
+      "",
+      "Next: I'll check with the fulfilment team whether POST /orders takes an idempotency key. Then you pick N and the backoff.",
     ],
     keys: [
       [
-        -1.9,
+        -2.4,
         "type",
-        "/hope:clarify Add a retry to our webhook consumer, unsure about idempotency"
+        "/hope:clarify Retry failed fulfilment orders, unsure about idempotency"
       ],
       [
-        -0.1,
+        -0.5,
         "key",
         "Enter"
       ],
       [
-        478.5,
-        "key",
-        "Enter"
-      ],
-      [
-        556.7,
-        "key",
-        "Enter"
-      ],
-      [
-        564.4,
+        57.9,
         "key",
         "Enter"
       ]

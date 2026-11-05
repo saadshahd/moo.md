@@ -27,6 +27,8 @@ for page in intent shape compose consult clarify elicit explain interrogate refr
   take "$page" on
 done
 take judge off
+take clarify off
+take anchor off
 take chain off
 take skills off
 # The chain pages' moo-on panes: today's takes, all of moo on.
@@ -34,7 +36,6 @@ python3 gen.py "$P/$(printf %s "$HOME" | tr /. --)-invoices/f24358fa-2e6b-42e6-8
   --keys "$R/keylog/skills.json" --raw "$OUT/skills-on.json" --activity-from-snaps
 python3 gen.py "$P/$(printf %s "$HOME" | tr /. --)-shop/db17126e-b9e3-4038-a8a5-b3234ff2206e.jsonl" "$HOME/shop" "$R/rec2/chain" "$S/chain-on.ts" \
   --keys "$R/keylog/chain.json" --raw "$OUT/chain-on.json" --activity-from-snaps
-first clarify "$P/-Users-Shared-relay/88e77a6e-df44-4292-a0b9-80bb76951473.jsonl" /Users/Shared/relay rec5/clarify
 first draft "$P/-private-tmp-ship/059abca1-a83f-4860-b7f7-b76340ea8c71.jsonl" /private/tmp/ship rec5/draft
 first freeze "$P/-private-tmp-orders/41cb9a31-f9bf-4747-8ffe-ab062e739a8d.jsonl" /private/tmp/orders rec5/freeze
 first inversion "$P/-private-tmp-notes-box/e6e801af-24c1-4c55-9df8-1a3dd3f48428.jsonl" /private/tmp/notes-box rec5/inversion
@@ -45,7 +46,6 @@ first explain "$P/-Users-Shared-songbook/7df3e3d8-8160-4d5d-beec-a91a11a4f7ef.js
 first elicit "$P/-Users-Shared-taskdesk/b1b2d5e3-76a8-4b4b-8c42-ecde8db5297e.jsonl" /Users/Shared/taskdesk rec5/elicit
 first shift "$P/-Users-Shared-agent-kit/9b1e2fb4-7d13-46bb-bfef-b6956ed54df2.jsonl" /Users/Shared/agent-kit rec6/shift2
 first interrogate "$P/-Users-Shared-callgate/5c8f031e-615c-433f-9fc7-1f64c02cc60d.jsonl" /Users/Shared/callgate rec5/interrogate
-first anchor "$P/-Users-Shared-billing/07241682-be5d-45db-92c4-87443ee0449e.jsonl" /Users/Shared/billing rec6/anchor
 first widen "$P/-Users-Shared-motionpad/035ed991-9174-47d0-b597-e635327f8b9c.jsonl" /Users/Shared/motionpad rec5/widen
 first deepen "$P/-Users-Shared-mdcheck/5037ebf8-2b11-44de-af67-08332c4f2df8.jsonl" /Users/Shared/mdcheck rec5/deepen
 first reframe "$P/-Users-Shared-shopdeck/bb2058ca-ca5c-4f13-b04b-c6f9e438b387.jsonl" /Users/Shared/shopdeck rec5/reframe
