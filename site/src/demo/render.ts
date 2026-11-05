@@ -8,10 +8,17 @@ import { layout, MEASURE, type Band, type Cell as BandCell, type Item } from "./
  * player may show fewer rows; a dialog taller than those shows its last. */
 export const ROWS = 36;
 
-/** The terminal every demo shows, in either layout: so a page reads the same
- * on every screen, and a reader of its wait frames sees what a visitor sees.
- * 45 is the widest recorded width a phone holds. */
-export const PANE = { cols: 45, rows: 30 };
+/** The column counts a pane draws at, each one check.sh holds the demos to
+ * against the recorder's captures. Demo.astro picks the widest whose pair
+ * fits the page. */
+export const COLS = [45, 80, 120] as const;
+
+/** The pane the clock is timed at, whatever count a page draws: a dialog
+ * holds for the words it shows here, so a resize never moves a wait. 45 is
+ * the widest recorded width a phone holds. At 26 rows the panes and the
+ * player end 670px down the page, so they fit with no page scroll in a
+ * browser on a 1280 × 800 screen or any larger one. */
+export const PANE = { cols: 45, rows: 26 };
 
 /** A run of text and the classes that color it (see Demo.astro's styles),
  * and what a click on it does, if it is one of tend's buttons: its item's id,

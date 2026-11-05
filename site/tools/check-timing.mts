@@ -1,8 +1,9 @@
 // Every pane of every demo the built site plays, held to the idle cap: no
 // screen stands still longer than IDLE seconds unless it shows words to read:
 // words in rows newly shown, at READ's pace, from the last change of the
-// burst that showed them. Frames sampled 30 a second at the page's pane
-// size; the spinner and the status line are not news, a toast is.
+// burst that showed them. Frames sampled 30 a second at PANE, the pane the
+// clock is timed at; the spinner and the status line are not news, a toast
+// is.
 // Usage: check-timing.mts <site dist dir>. Run npm run build first: the
 // pages' demos come from the build.
 import { readFileSync, readdirSync } from "node:fs";

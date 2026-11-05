@@ -9,9 +9,9 @@
   --moo-bar-pad: 0.375rem;
   --sl-nav-height: calc(var(--moo-bar-item) + 2 * var(--moo-bar-pad));
   /* One centred column: the bar's contents (TopBar.astro) and every page's
-     title, terminal and controls share its edges, between equal
-     gutters. The bar's side padding is the content's, so the edges meet at
-     every width. */
+     title and content share its edges, between equal gutters. The bar's side
+     padding is the content's, so the edges meet at every width. A demo's
+     pair alone reaches past the column, to the gutters (Demo.astro). */
   --sl-content-width: 87.5rem;
   --sl-nav-pad-x: var(--sl-content-pad-x);
   --sl-nav-pad-y: var(--moo-bar-pad);
@@ -65,8 +65,9 @@ site-search button[data-open-modal] kbd { background: transparent; border: 0; co
 }
 .lede { margin: 1rem 0 0; max-width: 40ch; font-size: var(--sl-text-xl); line-height: 1.45; color: var(--moo-ink); }
 
-/* The demo sits centred in the column, so the gutters either side stay equal
-   at every width; the panes keep their one size (Demo.astro). */
+/* The demo sits centred on the page, so the gutters either side stay equal
+   at every width; the panes take the size their column count gives them
+   (Demo.astro). */
 .demo .col { margin-inline: auto; }
 
 /* The one action, wherever it appears: a filled red pill. */

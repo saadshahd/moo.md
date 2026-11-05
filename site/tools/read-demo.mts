@@ -11,9 +11,10 @@
 // The reader is a model's judgment: a rate, never a guarantee. Read its
 // decoy rejection rate before trusting a pass.
 //
-// Usage: read-demo.mts [--cols 45] [--rows 30] [--runs 3] [--jobs 6]
+// Usage: read-demo.mts [--cols 45] [--rows 26] [--runs 3] [--jobs 6]
 //                      [--page clarify] [--frames] [--out dir]
-// The pane is 45 × 30 by default (render.ts PANE), as every page plays it.
+// The pane is render.ts PANE by default: 45 columns, the narrowest a page
+// plays, at the rows every page plays.
 // --frames prints each page's wait frames and calls no model. Each verdict is
 // kept under --out (default $TMPDIR/moo-demo-reader), named for a hash of
 // what the reader is asked, and reused on a rerun only for that same ask;
