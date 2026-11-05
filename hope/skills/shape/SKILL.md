@@ -3,6 +3,8 @@ name: shape
 description: Decide the technical path once the ask is clear. Use when the WHAT is confirmed but more than one way to build it remains — architecture, technology, design.
 ---
 
+Change no file while a choice the path rests on is open. A choice you settle by assuming, however likely the assumption, is open.
+
 ## Route
 
 Decide only among ways that differ where it matters. Where no work order states the bar the ask must meet, use **deepen** skill first. Look up what settles a choice without the user — the bar, their taste from CLAUDE.md and project rules, what their own accounts and plans already offer, facts from the repo, docs, the web. Only choices that stay open after that route to a skill.
@@ -21,7 +23,7 @@ Each decision re-enters the routing: a resolved choice can open the next one or 
 
 ## The path
 
-Ask any choice still open first, with AskUserQuestion. Then state each resolved choice with its reason and what lost.
+Ask every choice still open at once, with AskUserQuestion. Then state each resolved choice with its reason and what lost.
 
 The path is chosen and no target contract will judge it → use **inversion** skill on it; each negated line joins the path as a constraint.
 
