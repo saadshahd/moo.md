@@ -12,7 +12,6 @@ import type { Pair, Scene } from "../demo/types";
 import { frame, PANE, phases, waits } from "../demo/render";
 import { demoMoves } from "../moves";
 import { SPEEDS } from "../demo/speed";
-import * as S from "../demo/scenes";
 // The terminal font: Fira Code, as in the Solo terminal the demos are checked
 // against. Its glyphs for box drawing come from the symbols subset.
 import "@fontsource/fira-code/latin-400.css";
@@ -53,25 +52,12 @@ const drawn = (scene: Scene) => {
 };
 drawn(off);
 drawn(on);
-// The pairs that fail the reader (tools/read-demo.mts): a page that plays one
-// draws no demo until it passes. Each is still drawn and checked above.
-const HIDDEN: Pair[] = [
-  S.shapeScene,
-  S.composeScene,
-  S.consultScene,
-  S.explainScene,
-  S.reduceScene,
-  S.anchorScene,
-  S.deepenScene,
-  S.skillsScene,
-];
 const sides = [
   ["off", "moo off"],
   ["on", "moo on"],
 ] as const;
 ---
 
-{!HIDDEN.includes(pair) && (
 <div class="demo not-content" style={`--cols: ${PANE.cols}; --rows: ${PANE.rows}`} data-demo={JSON.stringify(pair)}>
   <div class="col">
     <figure class="term-wrap">
@@ -113,7 +99,6 @@ const sides = [
     <div class="probe" data-probe aria-hidden="true"><span>0000000000</span></div>
   </div>
 </div>
-)}
 
 <script>
   import { mount } from "../demo/player";
