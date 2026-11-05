@@ -8,8 +8,9 @@
 // frame shows the pane playing, under tabs that name both. Under reduced
 // motion, the timeline steps through one still per wait. `summary` tells a
 // screen reader what it shows. Both panes draw at the widest of COLS whose
-// pair fits the page, as many rows tall as the screen's height leaves them,
-// PANE.rows at least; the clock runs on PANE at every size.
+// pair fits the page, their type grown to fill its width, as many rows tall
+// as the screen's height leaves them, PANE.rows at least; the clock runs on
+// PANE at every size.
 import type { Pair, Scene } from "../demo/types";
 import { COLS, frame, PANE, phases, ROWS, waits } from "../demo/render";
 import { demoMoves } from "../moves";
@@ -118,17 +119,33 @@ const sides = [
   .demo { width: 100cqi; margin-inline: calc((100% - 100cqi) / 2); }
   .col { position: relative; width: fit-content; max-width: 100%; }
   /* A pane: its cells, the padding at its left, the room at its right for
-     the scroll's padding and a thin scrollbar, its border: 356px at 45
-     columns of 7px cells, 601px at 80, 881px at 120. Each is the container
-     its full-width rows reach across. */
+     the scroll's padding and a thin scrollbar, its border: at the 7px
+     floor, 356px at 45 columns, 601px at 80, 881px at 120. Each is the
+     container its full-width rows reach across. */
   .demo { --pad: 16px; }
   .col { --pane-w: calc(var(--cols) * var(--cell) + var(--cell) + 2 * var(--pad) + 2px); }
   /* Both panes draw at the widest of render.ts COLS whose pair, two panes
-     and the gap between, fits: 1778px at 120 columns, 1218px at 80, else
-     45. The player reads --cols from here. */
+     and the gap between, fits at the 7px floor: 1778px at 120 columns,
+     1218px at 80, else 45. Under tabs (below) the one pane draws at the
+     widest that fits alone: 80 from 601px. The player reads --cols from
+     here. */
   .col { --cols: 45; }
+  @container demo (601px <= width < 728px) { .col { --cols: 80; } }
   @container demo (min-width: 1218px) { .col { --cols: 80; } }
   @container demo (min-width: 1778px) { .col { --cols: 120; } }
+  /* Then the type grows until the pair fills the page's width: a cell is
+     what a pane's width, half the page less the gap, leaves each column
+     and the room at the right. It grows no more than lets --rows rows fit
+     the demo's height (chrome.css), so the page never scrolls for it. From
+     a 7px cell, 12px type, to 22px type, past which the pair stands
+     centred: the ceiling the pair needs to fill the width just below a
+     switch to more columns, where 45 columns reach 21px. --cell is a
+     registered length, so 100cqi here is the demo's width, not a pane's. */
+  .col {
+    --fit-w: calc(((100cqi - var(--pad)) / 2 - 2 * var(--pad) - 2px) / (var(--cols) + 1));
+    --fit-h: calc((var(--moo-demo-h) - var(--tabs-h, 0px) - 2 * var(--pad) - 2px) / var(--rows) * 7 / 20.5);
+    --cell: clamp(7px, min(var(--fit-w), var(--fit-h)), 22px * 7 / 12);
+  }
   .pair { position: relative; display: flex; gap: var(--pad); }
   .side { container-type: inline-size; width: var(--pane-w); max-width: 100%; }
   /* Each pane's name sits in its top border, as a frame's title. */
@@ -137,13 +154,15 @@ const sides = [
     padding: 0 var(--cell); background: var(--t-bg); color: var(--t-g); line-height: var(--row);
   }
   /* Where two 45-column panes don't fit side by side (728px), one frame
-     shows the pane playing, at 45, and tabs above it name both, in place of
-     the labels. */
+     shows the pane playing, and tabs above it name both, in place of the
+     labels. */
   .tabs { display: none; gap: 2px; margin-bottom: var(--moo-step, 0.5rem); }
   @container demo (max-width: 727px) {
     /* The tabs' 1.75rem (chrome.css) and the step under them, which the
        pane gives up. */
     .col { --tabs-h: calc(1.75rem + var(--moo-step)); }
+    /* One pane takes the whole width. */
+    .col { --fit-w: calc((100cqi - 2 * var(--pad) - 2px) / (var(--cols) + 1)); }
     .tabs { display: flex; }
     .label { display: none; }
     .demo[data-shown="off"] .side[data-side="on"], .demo[data-shown="on"] .side[data-side="off"] { display: none; }
@@ -199,8 +218,11 @@ const sides = [
      and --row size everything a terminal sizes in cells. */
   .term-wrap { margin: 0; }
   /* 13px × 0.923 is 11.999px; 12px reads the same and clears Lighthouse's
-     12px floor for legible text. */
-  .demo { --fs: 12px; --row: 20.5px; --cell: 7px; --line: 1px; }
+     12px floor for legible text. At a wider cell (above), the type and the
+     row grow with it. */
+  @property --cell { syntax: "<length>"; inherits: true; initial-value: 7px; }
+  .col { --fs: calc(var(--cell) * 12 / 7); --row: calc(var(--cell) * 20.5 / 7); }
+  .demo { --line: 1px; }
   @media (min-resolution: 2dppx) { .demo { --line: 0.5px; } }
   .demo :global(.term), .probe {
     font-family: "Fira Code", Menlo, "SF Mono", ui-monospace, monospace;
@@ -287,7 +309,7 @@ const sides = [
   .demo :global(svg.logo .eye) { fill: var(--t-eye); }
   .demo :global(svg.logo .body) { fill: var(--t-logo); }
   .demo :global(svg.logo) {
-    --px: 2px;
+    --px: calc(var(--cell) * 2 / 7);
     display: inline-block; vertical-align: top;
     width: calc(var(--w) * var(--px)); height: calc(var(--h) * 2 * var(--px));
     margin-top: calc((var(--row) - var(--h) * 2 * var(--px)) / 2);
