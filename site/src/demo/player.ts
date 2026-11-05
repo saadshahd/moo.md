@@ -7,8 +7,8 @@
 // terminal; the reader can pick a dialog's option. Under reduced motion, the
 // timeline steps through one still per wait instead. Demo.astro picks the
 // column count both panes draw at, one of COLS, as the page's width allows,
-// and the player redraws at a new one without moving the clock; the rows are
-// PANE's.
+// and their height, as the screen's allows; the player draws the rows that
+// height holds, and redraws at a new size without moving the clock.
 import { COLS, frame, PANE, phases, waits, type Frame, type Row, type Seg, type Wait } from "./render";
 import { currentSpeed, followSpeed, pickSpeed } from "./speed";
 import type { Pair, Scene } from "./types";
@@ -113,7 +113,15 @@ export function mount(root: HTMLElement) {
   const pair = JSON.parse(root.dataset.demo!) as Pair;
   const $ = <T extends HTMLElement>(k: string, within: ParentNode = root) => within.querySelector<T>(`[data-${k}]`)!;
   const id = `demo${++demos}`;
-  const { rows } = PANE;
+  // The rows a pane's height holds, PANE.rows at least: Demo.astro sizes
+  // both to the screen. The pane a tab hides has no height.
+  const fitted = () => {
+    const term = [...root.querySelectorAll<HTMLElement>("[data-term]")].find((x) => x.offsetHeight)!;
+    const cs = getComputedStyle(term);
+    const inner = term.getBoundingClientRect().height - [cs.paddingTop, cs.paddingBottom, cs.borderTopWidth, cs.borderBottomWidth].reduce((n, x) => n + parseFloat(x), 0);
+    return Math.max(PANE.rows, Math.floor(inner / parseFloat(cs.lineHeight) + 1e-6));
+  };
+  let rows = fitted();
   // The count Demo.astro picked for the page's width.
   const picked = () => {
     const c = Number(getComputedStyle($("pair")).getPropertyValue("--cols"));
@@ -588,10 +596,11 @@ export function mount(root: HTMLElement) {
   });
 
   motion.addEventListener("change", sync);
-  // A layout change can pick another column count; it redraws the same
-  // moment, and moves the cursor with no glide.
+  // A layout change can pick another column count or row count; it redraws
+  // the same moment, and moves the cursor with no glide.
   new ResizeObserver(() => {
     cols = picked();
+    rows = fitted();
     jumped = true;
     draw();
   }).observe(root);

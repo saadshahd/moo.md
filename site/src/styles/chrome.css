@@ -133,10 +133,15 @@ site-search dialog { border: 0; border-radius: var(--moo-radius); background: va
 }
 
 /* One vertical rhythm around the demo: the gap from the band to the
-   terminal and from the terminal to the player are both one step of 11px,
-   on a phone too. The title panel holds only the hidden title, so it takes
-   no room. Demo.astro fits the rows, the same on every page. */
-:root:has(.demo) { --moo-step: 0.6875rem; }
+   terminal, from the terminal to the player and from the player to the
+   screen's bottom edge are each one step of 11px, on a phone too. The title
+   panel holds only the hidden title, so it takes no room. What the screen
+   has left under the bar, less the steps and the 2rem player, is the
+   demo's height: Demo.astro fits the panes and their rows to it. */
+:root:has(.demo) {
+  --moo-step: 0.6875rem;
+  --moo-demo-h: calc(100dvh - var(--sl-nav-height) - 3 * var(--moo-step) - 2rem);
+}
 :root:has(.demo) .main-frame main .content-panel:first-child { padding-block: 0; }
 :root:has(.demo) .main-frame main .content-panel + .content-panel { padding-block: var(--moo-step) 0; }
 

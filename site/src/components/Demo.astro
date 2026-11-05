@@ -8,9 +8,10 @@
 // frame shows the pane playing, under tabs that name both. Under reduced
 // motion, the timeline steps through one still per wait. `summary` tells a
 // screen reader what it shows. Both panes draw at the widest of COLS whose
-// pair fits the page, PANE.rows tall; the clock runs on PANE at every count.
+// pair fits the page, as many rows tall as the screen's height leaves them,
+// PANE.rows at least; the clock runs on PANE at every size.
 import type { Pair, Scene } from "../demo/types";
-import { COLS, frame, PANE, phases, waits } from "../demo/render";
+import { COLS, frame, PANE, phases, ROWS, waits } from "../demo/render";
 import { demoMoves } from "../moves";
 import { SPEEDS } from "../demo/speed";
 // The terminal font: Fira Code, as in the Solo terminal the demos are checked
@@ -44,13 +45,14 @@ const launched = new Set(
 const missed = names.filter((n) => !launched.has(n));
 if (missed.length) fail(`its moo-on pane never runs ${missed.map((n) => `/${n}`).join(", ")}`);
 // Draw each pane here at each second and each wait, at each count the
-// player can pick, so a scene the player cannot draw fails the build, not
-// the page.
+// player can pick, at the fewest rows it draws and at twice the recorded
+// terminal's (taller than a 1440px screen gives), so a scene the player
+// cannot draw fails the build, not the page.
 const drawn = (scene: Scene) => {
   if (!scene.turns.length) return;
   const { length } = phases(scene);
   for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...waits(scene).map((w) => w.at), length])
-    for (const cols of COLS) frame(scene, s, cols, undefined, PANE.rows);
+    for (const cols of COLS) for (const rows of [PANE.rows, 2 * ROWS]) frame(scene, s, cols, undefined, rows);
 };
 drawn(off);
 drawn(on);
@@ -139,6 +141,9 @@ const sides = [
      the labels. */
   .tabs { display: none; gap: 2px; margin-bottom: var(--moo-step, 0.5rem); }
   @container demo (max-width: 727px) {
+    /* The tabs' 1.75rem (chrome.css) and the step under them, which the
+       pane gives up. */
+    .col { --tabs-h: calc(1.75rem + var(--moo-step)); }
     .tabs { display: flex; }
     .label { display: none; }
     .demo[data-shown="off"] .side[data-side="on"], .demo[data-shown="on"] .side[data-side="off"] { display: none; }
@@ -206,8 +211,10 @@ const sides = [
   }
   .demo :global(.term) {
     display: flex; flex-direction: column; box-sizing: border-box;
-    /* --rows rows of text inside the padding and border. */
-    height: calc(var(--rows) * var(--row) + 2 * var(--pad) + 2px);
+    /* The demo's height (chrome.css) less the tabs, if any; --rows rows of
+       text inside the padding and border at least. The player draws the
+       whole rows it holds; part of a row left over shows the transcript. */
+    height: max(calc(var(--rows) * var(--row) + 2 * var(--pad) + 2px), var(--moo-demo-h) - var(--tabs-h, 0px));
     width: 100%;
     /* One inner padding, --pad, above, below and at the left, where the grid
        sits, or centred where the frame leaves less; the scroll's own right

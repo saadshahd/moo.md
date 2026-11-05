@@ -13,11 +13,12 @@ export const ROWS = 36;
  * fits the page. */
 export const COLS = [45, 80, 120] as const;
 
-/** The pane the clock is timed at, whatever count a page draws: a dialog
+/** The pane the clock is timed at, whatever size a page draws: a dialog
  * holds for the words it shows here, so a resize never moves a wait. 45 is
- * the widest recorded width a phone holds. At 26 rows the panes and the
- * player end 670px down the page, so they fit with no page scroll in a
- * browser on a 1280 × 800 screen or any larger one. */
+ * the widest recorded width a phone holds. A pane draws as many rows as the
+ * screen's height leaves it (Demo.astro), never fewer than these, so no pane
+ * hides words a hold counted on; a window too short for 26 rows, under
+ * 670px tall, scrolls the page. */
 export const PANE = { cols: 45, rows: 26 };
 
 /** A run of text and the classes that color it (see Demo.astro's styles),

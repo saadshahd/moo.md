@@ -14,7 +14,7 @@
 // Usage: read-demo.mts [--cols 45] [--rows 26] [--runs 3] [--jobs 6]
 //                      [--page clarify] [--frames] [--out dir]
 // The pane is render.ts PANE by default: 45 columns, the narrowest a page
-// plays, at the rows every page plays.
+// plays, at the fewest rows a page plays.
 // --frames prints each page's wait frames and calls no model. Each verdict is
 // kept under --out (default $TMPDIR/moo-demo-reader), named for a hash of
 // what the reader is asked, and reused on a rerun only for that same ask;
