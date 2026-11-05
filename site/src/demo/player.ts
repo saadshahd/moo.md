@@ -290,9 +290,13 @@ export function mount(root: HTMLElement) {
       // The glide and the smear's fade keep pace with the playback speed.
       term.style.setProperty("--glide", `${90 / speed}ms`);
       term.style.setProperty("--decay", `${280 / speed}ms`);
-      // A jump (a seek, a scrub, a resize) moves the cursor with no glide or smear.
+      // A jump (a seek, a scrub, a resize) moves the cursor with no glide or
+      // smear. The unseen smear goes with it, so it never stands past the
+      // pane's bottom edge after the pane grows shorter, where it would make
+      // the page scroll.
       if (jumped || (px === x && py === y)) {
         trail.classList.remove("hot");
+        trail.style.transform = caret.style.transform;
         caret.style.transition = "none";
         requestAnimationFrame(() => (caret.style.transition = ""));
         return;
