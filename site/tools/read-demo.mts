@@ -4,8 +4,9 @@
 // also gets three decoys built by rule, which it must reject: the pair against
 // the next page's line, the moo-off pane in both panes, and the panes swapped.
 // Each case runs `--runs` times; the majority decides. A layout passes when
-// the real case passes and every decoy fails; a page, when every layout and
-// its prompt check (check-prompts.mts) pass.
+// the real case passes and every decoy fails, or a ruling (RULINGS) counts the
+// decoy's verdict as the reader's miss; a page, when every layout and its
+// prompt check (check-prompts.mts) pass.
 //
 // The reader is a model's judgment: a rate, never a guarantee. Read its
 // decoy rejection rate before trusting a pass.
@@ -61,7 +62,7 @@ function waitFrames(scene: Scene, cols: number, rows = ROWS_): Wait[] {
     const from = Math.min(end, f.top ?? end);
     const turn = scene.turns.length > 1 ? `turn ${w.turn + 1}, ` : "";
     return {
-      what: turn + (w.on === "dialog" ? `dialog ${w.d + 1}, question ${w.q + 1}` : "the reply"),
+      what: turn + (w.on === "dialog" ? `dialog ${w.d + 1}, question ${w.q + 1}` : w.n ? `reply ${w.n + 1}` : "the reply"),
       rows: [...f.transcript.slice(from, from + room), ...f.bottom].map(text),
     };
   });
@@ -194,6 +195,23 @@ async function pool<T>(tasks: (() => Promise<T>)[], n: number): Promise<T[]> {
   return out;
 }
 
+// ---- Rulings ---------------------------------------------------------------
+// A ruling counts one decoy's yes votes as the reader's miss, for the exact
+// ask it judged: the hash names the frames and the line the reader read, so
+// a change to either ends the ruling, and the report says so. The report shows
+// each ruling beside its cell; the rates stay the reader's own.
+
+type Ruling = { page: string; kind: Exclude<Kind, "real">; hash: string; by: string; why: string };
+const RULINGS: Ruling[] = [
+  {
+    page: "interrogate",
+    kind: "other-line",
+    hash: "29fd85ade183",
+    by: "the Door, 2026-11-05",
+    why: 'The "step that stops it" the reader cites, "1. Same verdict 10/10", is an option in an open dialog, not a step moo hands over.',
+  },
+];
+
 // ---- Run ------------------------------------------------------------------
 
 const all = pages();
@@ -213,16 +231,18 @@ if (opt.frames) {
 }
 
 const model = await checkIsolation();
-type Job = { page: Page; cols: number; c: Case; run: number };
+type Job = { page: Page; cols: number; c: Case; run: number; hash: string };
+const hashOf = (c: Case) => createHash("sha256").update(ask(c)).digest("hex").slice(0, 12);
 const jobs: Job[] = chosen.flatMap((page) =>
-  LAYOUTS.flatMap((cols) => cases(page, nextOf(page), cols).flatMap((c) => Array.from({ length: RUNS }, (_, run) => ({ page, cols, c, run })))),
+  LAYOUTS.flatMap((cols) =>
+    cases(page, nextOf(page), cols).flatMap((c) => Array.from({ length: RUNS }, (_, run) => ({ page, cols, c, run, hash: hashOf(c) }))),
+  ),
 );
 const verdicts = await pool(
   jobs.map((j) => () => {
     const dir = join(opt.out, `${j.cols}x${ROWS_}`);
     mkdirSync(dir, { recursive: true });
-    const hash = createHash("sha256").update(ask(j.c)).digest("hex").slice(0, 12);
-    return read(j.c, join(dir, `${j.page.slug}.${j.c.kind}.${j.run}.${hash}.json`)).then((v) => {
+    return read(j.c, join(dir, `${j.page.slug}.${j.c.kind}.${j.run}.${j.hash}.json`)).then((v) => {
       process.stderr.write(`${j.page.slug} ${j.cols} ${j.c.kind} ${j.run}: ${v.shown}\n`);
       return v;
     });
@@ -234,6 +254,12 @@ const verdicts = await pool(
 
 const votes = (page: Page, cols: number, kind: Kind) =>
   jobs.flatMap((j, i) => (j.page === page && j.cols === cols && j.c.kind === kind ? [verdicts[i].shown] : []));
+/** The ruling on a page's decoy at a layout, if one covers the ask it judged;
+ * a ruling whose ask changed covers nothing. */
+const ruled = (page: Page, cols: number, kind: Kind) =>
+  RULINGS.find(
+    (r) => r.page === page.slug && r.kind === kind && jobs.some((j) => j.page === page && j.cols === cols && j.c.kind === kind && j.hash === r.hash),
+  );
 const yes = (vs: boolean[]) => vs.filter(Boolean).length;
 const major = (vs: boolean[]) => yes(vs) * 2 > vs.length;
 const cell = (vs: boolean[], want: boolean) => `${major(vs) === want ? "✓" : "✗"} ${yes(vs)}/${vs.length}`;
@@ -245,10 +271,10 @@ const pass = new Map<Page, boolean>();
 for (const cols of LAYOUTS) {
   out.push(`### ${cols} columns`, "", "| page | real | other line | off/off | swapped | pane marks | layout |", "|---|---|---|---|---|---|---|");
   for (const page of chosen) {
-    const ok = major(votes(page, cols, "real")) && KINDS.slice(1).every((k) => !major(votes(page, cols, k)));
+    const ok = major(votes(page, cols, "real")) && KINDS.slice(1).every((k) => !major(votes(page, cols, k)) || ruled(page, cols, k));
     pass.set(page, (pass.get(page) ?? true) && ok);
     const m = marks(waitFrames(page.pair.on, cols)).join(", ") || "none";
-    out.push(`| ${page.slug} | ${cell(votes(page, cols, "real"), true)} | ${KINDS.slice(1).map((k) => cell(votes(page, cols, k), false)).join(" | ")} | ${m} | ${ok ? "pass" : "fail"} |`);
+    out.push(`| ${page.slug} | ${cell(votes(page, cols, "real"), true)} | ${KINDS.slice(1).map((k) => cell(votes(page, cols, k), false) + (ruled(page, cols, k) ? " (ruled a miss)" : "")).join(" | ")} | ${m} | ${ok ? "pass" : "fail"} |`);
   }
   out.push("");
 }
@@ -257,6 +283,15 @@ for (const kind of KINDS) {
   const vs = chosen.flatMap((p) => LAYOUTS.flatMap((c) => votes(p, c, kind)));
   const right = kind === "real" ? yes(vs) : vs.length - yes(vs);
   out.push(`| ${kind === "real" ? "real accepted" : `${kind} rejected`} | ${right} | ${vs.length} |`);
+}
+const rulings = RULINGS.filter((r) => chosen.some((p) => p.slug === r.page));
+if (rulings.length) {
+  out.push("", "### Rulings", "", "A ruled cell counts as rejected, whatever the reader voted.", "", "| page | decoy | ruling |", "|---|---|---|");
+  for (const r of rulings) {
+    const page = chosen.find((p) => p.slug === r.page)!;
+    const holds = LAYOUTS.every((cols) => ruled(page, cols, r.kind));
+    out.push(`| ${r.page} | ${r.kind} | ${holds ? `${r.by}: ${r.why}` : `**not applied**: the ask changed since ${r.by} ruled on ask ${r.hash}`} |`);
+  }
 }
 out.push("", "### Pages", "", "| page | prompt check | reader | page |", "|---|---|---|---|");
 for (const page of all) {

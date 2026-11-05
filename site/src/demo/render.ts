@@ -590,8 +590,9 @@ type Phase = {
   launches: number[];
   dialogs: { open: number; script: Script }[];
   reply: number;
-  /** How long the reply stays to be read once it is in. */
-  read: number;
+  /** When each reply after the first starts to arrive: a subagent finished
+   * (Turn.more). Each waits for the one before it to come in and be read. */
+  more: number[];
   /** Each key the recorder sent, when it lands: name or text, as logged. */
   caps: [number, Key[1], string][];
 };
@@ -687,12 +688,13 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
     });
     stops.forEach((s) => s.run());
     const reply = stops.length ? u : sent + K.think;
-    const read = readFor(...[turn.reply, ...(turn.more ?? []).map((m) => m.reply)].flat());
-    const p: Phase = { start, sent, typing, menu, acts, launches: launched, dialogs: opened, reply, read, caps };
+    const replies = [turn.reply, ...(turn.more ?? []).map((m) => m.reply)];
+    const arrive = replies.reduce<number[]>((at, r, k) => [...at, k ? at[k - 1] + K.reveal + readFor(...replies[k - 1]) : reply], []);
+    const p: Phase = { start, sent, typing, menu, acts, launches: launched, dialogs: opened, reply, more: arrive.slice(1), caps };
     for (const [at, kind, value] of stray) caps.push([demoAt(turn, p, at), kind, value]);
     caps.sort((a, b) => a[0] - b[0]);
     // A turn that ends on a dialog left open has no reply to show.
-    t = dialogs.at(-1)?.left ? reply : reply + K.reveal + read;
+    t = dialogs.at(-1)?.left ? reply : arrive.at(-1)! + K.reveal + readFor(...replies.at(-1)!);
     return p;
   });
   return { timing, length: t };
@@ -700,9 +702,10 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
 
 /** A moment the terminal waits on the user: a dialog's question, its
  * options showing, halfway to the first key on it (the keycaps before it
- * gone, the pick not yet moved), or a turn's reply standing whole. A turn
- * that ends on a dialog left open waits there, with no reply. */
-export type Wait = { at: number; turn: number } & ({ on: "reply" } | { on: "dialog"; d: number; q: number });
+ * gone, the pick not yet moved), or each reply that ends a turn standing
+ * whole: the turn's own (`n` 0), then each that came after it (Turn.more). A
+ * turn that ends on a dialog left open waits there, with no reply. */
+export type Wait = { at: number; turn: number } & ({ on: "reply"; n: number } | { on: "dialog"; d: number; q: number });
 
 /** Every moment the terminal waits on the user, in order. */
 export function waits(scene: Scene, timing = phases(scene).timing): Wait[] {
@@ -714,7 +717,9 @@ export function waits(scene: Scene, timing = phases(scene).timing): Wait[] {
         return { at: open + (moments[k].at + (moments[k + 1]?.at ?? length)) / 2, turn, on: "dialog", d, q };
       }),
     ),
-    ...(scene.turns[turn].dialogs?.at(-1)?.left ? [] : [{ at: p.reply + K.reveal, turn, on: "reply" } as Wait]),
+    ...(scene.turns[turn].dialogs?.at(-1)?.left
+      ? []
+      : [p.reply, ...p.more].map((at, n): Wait => ({ at: at + K.reveal, turn, on: "reply", n }))),
   ]);
 }
 
@@ -781,13 +786,17 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
     if (n) top = transcript.length;
     transcript.push(...rows.slice(0, n), ...(n ? [BLANK] : []));
     if (n < rows.length) transcript.push(spinner(chrome.spin, since, counted), BLANK);
-    // What came after it with no prompt shows once the reply is all in.
+    // What came after it with no prompt: each reply in turn, row by row as
+    // the first came, once the one before it has been read.
     else
-      for (const m of turn.more ?? []) {
+      (turn.more ?? []).forEach((m, k) => {
+        const at = p.more[k];
+        if (s < at) return;
+        const rows = reply(m.reply, cols);
         transcript.push(...(m.tools ? [...tools(m.tools, cols), BLANK] : []));
         top = transcript.length;
-        transcript.push(...reply(m.reply, cols), BLANK);
-      }
+        transcript.push(...rows.slice(0, Math.max(1, Math.floor(rows.length * ramp(s, at, at + K.reveal)))), BLANK);
+      });
   });
   if (transcript[transcript.length - 1] === BLANK) transcript.pop();
   return { transcript, typing, menu, asking, chrome, top };

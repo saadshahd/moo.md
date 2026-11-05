@@ -4,7 +4,7 @@ title: moo.md
 head:
   - tag: title
     content: moo.md
-description: "Claude Code skills that work at your pace: each asks what is yours to decide and waits for the answer."
+description: "Claude Code skills that work at your pace: each asks what it can't check before it builds on it."
 tableOfContents: false
 moves:
   - compose
@@ -18,5 +18,5 @@ import { chainScene } from "../../demo/scenes";
 
 <Demo
   scene={chainScene}
-  summary="Claude Code. With moo off, you ask: some customers were charged twice this week; find the cause and make sure it can't come back. Claude finds the cause and the charges to refund, and adds a fix it couldn't check against the provider. With moo on, you type /hope:compose and the same words. Each move takes over as it comes up: /freeze, /deepen, a dialog asking whether the payment provider honors an idempotency key, then /widen and /anchor. The reply gives the cause, the charges to refund, and tests that fail on the old code."
+  summary="Claude Code. With moo off, you ask: some customers were charged twice this week; find the cause and make sure it can't come back. Claude finds the cause and the charges to refund, and adds a fix it couldn't check against the provider. With moo on, you type /hope:compose and the same words. Each move takes over as it comes up: /freeze, /deepen, a dialog asking the one fact it can't check, whether the payment provider honors an idempotency key, then /widen and /anchor. The reply gives the cause, the charges to refund, and tests that fail on the old code."
 />

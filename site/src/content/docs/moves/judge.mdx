@@ -1,7 +1,7 @@
 ---
 title: /judge
 move: decides when you can't
-description: "When you can't decide it yourself, you get one recommendation and its evidence."
+description: "You get one committed verdict, each fact with the line it came from."
 tableOfContents: false
 ---
 import Demo from "../../../components/Demo.astro";
@@ -9,5 +9,5 @@ import { judgeScene } from "../../../demo/scenes";
 
 <Demo
   scene={judgeScene}
-  summary="Claude Code. With moo off, you ask whether you need the Y-cable in notes/parts.md. Claude answers probably not, from the nine boot logs: good boots had the speaker plugged in at boot and no errors, while every stuck boot had it plugged in later, then an over-current and a disconnect. It blames a retry loop in player.py that never reopens the device, suggests fixing the player first and buying the cable only if over-currents continue, and warns that the box runs a different player.py from the repo's. With moo on, you type /hope:judge and the same words. The reply gives one verdict: no, the speaker runs fine on the Pi's own port, and player.py causes the stuck loop because it never reopens the speaker. A table cites the logs and code for each fact. It ends: drop the Y-cable from notes/parts.md, then make play() reopen the speaker."
+  summary="Claude Code. With moo off, you ask whether you need the Y-cable in notes/parts.md. Claude answers probably not, from the nine boot logs: good boots had the speaker plugged in at boot and no errors, while every stuck boot had it plugged in later, then an over-current and a disconnect. It blames a retry loop in player.py that never reopens the device, suggests fixing the player first and buying the cable only if over-currents continue, and warns that the box runs a different player.py from the repo's. With moo on, you type /hope:judge and the same words. The reply gives one verdict: no, the speaker runs fine on the Pi's own port, and player.py causes the stuck loop because it never reopens the speaker. A table gives each fact with the log or code line it came from. It ends: drop the Y-cable from notes/parts.md, then make play() reopen the speaker."
 />
