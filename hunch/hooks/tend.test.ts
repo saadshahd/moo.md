@@ -599,7 +599,7 @@ const CONSULT = [
 ].join("\n");
 
 describe("a reply that ends on ideas", () => {
-  const SHORT = "| bridge → | gains |\n|---|---|\n| a bar late | the turn lands |\n\nNext: choose late or on time.";
+  const SHORT = "| idea | by |\n|---|---|\n| open on the title | Mostafa |\n| end the bridge a bar late | Ruby |\n| leave a line open | Wegz |\n\nNext: choose late or on time.";
   // What Claude Code's own drawing was handed, and the reply as tend drew it.
   const setup = ($: any, on: any, shortForm = SHORT) => {
     mock.store(on);
@@ -661,13 +661,13 @@ describe("a reply that ends on ideas", () => {
     expect(host).toEqual([SHORT]);
   });
   test("a short form that keeps the ideas keeps their tones", async ($, on) => {
-    const kept = "1. Mostafa — **Open on the title**\n   Chosen because the hook is the title\n2. Wegz — Leave a line open\n\nNext: choose late or on time.";
+    const kept = "1. Mostafa — **Open on the title**\n   Chosen because the hook is the title\n2. Ruby — **End on the bridge, late**\n3. Wegz — Leave a line open\n\nNext: choose late or on time.";
     const { clock, host, mount } = setup($, on, kept);
     await $.turn.complete({ answer: CONSULT, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
     await clock.settle();
     const reply = await mount();
     expect(host).toEqual(["1. Mostafa — **Open on the title**"]);
-    expect(await md(reply, true)).toEqual(["2. Wegz — Leave a line open", "Next: choose late or on time."]);
+    expect(await md(reply, true)).toEqual(["3. Wegz — Leave a line open", "Next: choose late or on time."]);
     expect((await reply.find({ type: "Text", text: "Chosen because the hook is the title" }))?.props.color).toBe("success");
     expect(await reply.find({ text: /Open the verse/ })).toBeUndefined();
   });
@@ -786,4 +786,62 @@ test("a short form that fills its token cap is dropped, and the reply stays long
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
   await reply.drawn();
   expect(shown).toContain("Three chains are worth building");
+});
+
+// A real consult reply (the consult take, 2026-11-04) and the short form its pane drew: only Fowler's idea of 5.
+const CONSULT_TAKE = "1. Fowler — **Add one contract test that runs on the fake and real client**\n   *The fake lied because nothing ever held it up against the service*\n   Chosen because it removes the cause of Oct 14 and keeps the fast tests\n\n2. Humble — **Run that contract against staging on a timer**\n   *Payments' deploy caused the drift, so our commits can't trigger it*\n   win: drift shows up within the hour, not 31 hours later\n   Chosen because e2e on PRs would still wait for our next push\n\n3. Freeman — **Keep `test/unit` as the 2 s PR gate; e2e stays on main**\n   *The tests did their job; the fake they trusted was wrong*\n   win: PR feedback takes 2 s, not 14 min that can't run locally\n   Chosen because proposal steps 1 and 3 cost speed and don't fix drift\n\n4. Evans — Move the `state === \"succeeded\"` check into `payments.js`\n   *A layer that translates their words into ours keeps drift in one file*\n   Doesn't apply because idea 1 already catches drift (Musashi's razor)\n\n5. Beck — **Add a unit test for a `pending` charge**\n   *v3 has three states, the code handles two, and no test covers the third*\n   win: no customer with a pending charge gets dunning emails\n\nWin: a payments shape change fails a test before customers notice it\n\nYour teammate has the cause right and the fix wrong. The fake drifted, and deleting the fast tests doesn't stop that. So I wrote idea 1:\n\n| piece | status | note |\n|---|---|---|\n| `test/contract/payments.test.js` | tested | fails on Oct 14's `{ status: \"ok\" }` fake |\n| real-client side | skipped | `PAYMENTS_STAGING_URL` is a name I made up |\n| `npm test` now runs the contract | tested | 5 pass, 1 skipped |\n\nGaps: I don't know the payments staging URL. I also don't know whether staging takes direct charges. And `pending` → `\"unpaid\"` is a business call I left open.\n\nNext: decide whether a `pending` charge marks the invoice paid or open. Then set `PAYMENTS_STAGING_URL` in CI and schedule the contract test.\n\n```card\n{\"ideas\":[{\"by\":\"Fowler\",\"idea\":\"Add one contract test that runs on the fake and real client\",\"why\":\"The fake lied because nothing ever held it up against the service\",\"chosen\":true},{\"by\":\"Humble\",\"idea\":\"Run that contract against staging on a timer\",\"why\":\"Payments' deploy caused the drift, so our commits can't trigger it\",\"test\":\"drift shows up within the hour, not 31 hours later\",\"chosen\":true},{\"by\":\"Freeman\",\"idea\":\"Keep test/unit as the 2 s PR gate; e2e stays on main\",\"why\":\"The tests did their job; the fake they trusted was wrong\",\"test\":\"PR feedback takes 2 s, not 14 min that can't run locally\",\"chosen\":true},{\"by\":\"Evans\",\"idea\":\"Move the state === \\\"succeeded\\\" check into payments.js\",\"why\":\"A layer that translates their words into ours keeps drift in one file\",\"chosen\":false},{\"by\":\"Beck\",\"idea\":\"Add a unit test for a pending charge\",\"why\":\"v3 has three states, the code handles two, and no test covers the third\",\"test\":\"no customer with a pending charge gets dunning emails\"}],\"questions\":[{\"q\":\"Should a pending charge mark the invoice paid, open, or unpaid?\",\"options\":[\"open\",\"paid\",\"unpaid (today's behavior)\"]}]}\n```";
+const CONSULT_TAKE_SHORT = "1. Fowler — **Add one contract test that runs on the fake and real client**\n\n| piece | status | note |\n|---|---|---|\n| `test/contract/payments.test.js` | tested | fails on the `{ status: \"ok\" }` fake |\n| real-client side | skipped | `PAYMENTS_STAGING_URL` is a placeholder name I made up |\n| `npm test` now runs the contract | tested | 5 pass, 1 skipped |\n\nI don't know the payments staging URL.\nI don't know whether staging takes direct charges.\nMapping `pending` to `\"unpaid\"` is a business call I left open.\n\nNext: decide whether a `pending` charge marks the invoice paid or open.\nThen set `PAYMENTS_STAGING_URL` in CI.\nThen schedule the contract test.";
+
+test("a short form that drops an idea is dropped, and the reply stays long", async ($, on) => {
+  mock.store(on);
+  const clock = mock.clock(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("session.messages", () => ({ value: [{ role: "user", text: "/hope:consult A teammate wants to delete our unit tests", toolUses: [] }, said(CONSULT_TAKE)] }));
+  on("ui.invalidate", () => ({ value: undefined }));
+  const toasts: any[] = [];
+  on("ui.toast", (_, e) => {
+    toasts.push(e);
+    return { value: undefined };
+  });
+  on("model.complete", () => ({ value: { isAnswered: true, text: CONSULT_TAKE_SHORT, usage: {} } }) as any);
+  const host: string[] = [];
+  on("ui.render", (_, e) => {
+    host.push((e.props as any).text);
+    return { type: "Box", props: {} } as any;
+  });
+  on("turn.complete", (_, e) => ({ text: e.answer }));
+  await $.turn.complete({ answer: CONSULT_TAKE, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+  await clock.settle();
+  expect(JSON.stringify(toasts)).toContain("dropped Humble, Freeman, Evans, Beck");
+  const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: CONSULT_TAKE, isFirstOfReply: true } as any });
+  expect(JSON.stringify(await reply.drawn())).toContain("Beck");
+});
+
+test("a short form no shorter than the reply is dropped, and the reply shows as written", async ($, on) => {
+  mock.store(on);
+  const clock = mock.clock(on);
+  on("session.id", () => ({ value: "s1" }));
+  on("session.surfaces", () => ({ value: ["terminal"] }));
+  on("session.messages", () => ({ value: [{ role: "user", text: "we need to research avalable tools", toolUses: [] }, said(WALL)] }));
+  on("ui.invalidate", () => ({ value: undefined }));
+  const toasts: unknown[] = [];
+  on("ui.toast", (_, e) => {
+    toasts.push(e);
+    return { value: undefined };
+  });
+  const reworded = WALL.replace("The last research agent is back.", "The final research agent has come back.");
+  on("model.complete", () => ({ value: { isAnswered: true, text: reworded, usage: {} } }) as any);
+  let shown = "";
+  on("ui.render", (_, e) => {
+    shown = (e.props as any).text;
+    return { type: "Box", props: {} } as any;
+  });
+  on("turn.complete", (_, e) => ({ text: e.answer }));
+  await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+  await clock.settle();
+  expect(toasts).toHaveLength(0);
+  const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
+  await reply.drawn();
+  expect(shown).toBe(WALL);
 });

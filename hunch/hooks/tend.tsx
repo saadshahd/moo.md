@@ -86,8 +86,8 @@ export function wantsShort(reply: string, prompt: string): boolean {
 // What won the user's blind ranking of real replies: short, but never a fact cut they'd act on.
 export function shortAsk(reply: string): string {
   return `Rewrite the reply below, which an agent sent to a user, as the shortest reply that still covers everything it must.
-It must cover: every decision it asks of the user, every result the user needs, and its next action.
-Derive the rewrite from that coverage, not by deleting sentences. Keep its first-line and last-line order, its tables and its code.
+It must cover: every decision it asks of the user, every result the user needs, every option it weighed with why that option won or lost, and its next action.
+Derive the rewrite from that coverage, not by deleting sentences. Keep its first-line and last-line order, its tables, its code and every item of its lists.
 Cut commit hashes, ids and dates unless the user must act on one.
 Never pack several facts into one line: give each fact the user would act on its own sentence or row, and keep it rather than cut it.
 Hand back the rewritten reply alone.
@@ -452,8 +452,9 @@ async function registerCommands($: any) {
 // so the cap sits far above thinking and text together.
 export const SHORT_CAP = 16_000;
 
-/** Redraws a long reply short once the turn ends: its long form already showed while it streamed. */
-async function shorten($: any, reply: string) {
+/** Redraws a long reply short once the turn ends: its long form already showed while it streamed.
+ * A rewrite no shorter than the reply, or missing any of `names`, keeps the reply long. */
+async function shorten($: any, reply: string, names: string[]) {
   const r = await $.model.complete({
     model: "haiku",
     prompt: shortAsk(reply),
@@ -463,6 +464,13 @@ async function shorten($: any, reply: string) {
   if (!r.isAnswered) throw new Error(`the short reply failed: ${r.reason}`);
   if (r.usage.output_tokens >= SHORT_CAP)
     throw new Error("the short reply ran out of room, so the reply stays long");
+  // A rewrite that saves nothing would only swap the agent's words for Haiku's.
+  if (prose(r.text).length >= prose(reply).length) return;
+  const lost = names.filter((n) => !r.text.includes(n));
+  if (lost.length)
+    throw new Error(
+      `the short reply dropped ${lost.join(", ")}, so the reply stays long`,
+    );
   short.set(textKey(reply), r.text.trim());
   const kept = [...short].slice(-KEPT_SHORT);
   await save($, `tend:${await sid($)}:short`, Object.fromEntries(kept));
@@ -750,8 +758,12 @@ export const register: Register = (on) => {
     const asked =
       ((await $.session.messages()) as Msg[]).findLast((m) => m.role === "user")
         ?.text ?? "";
+    // Each idea's expert the reply names, so the short form never drops one.
+    const by = (latestCard([{ role: "assistant", text: e.answer }]).ideas ?? [])
+      .map((d) => d.by)
+      .filter((n) => reply.includes(n));
     if (!(await headless($)) && wantsShort(reply, asked))
-      loud($, shorten($, reply));
+      loud($, shorten($, reply, by));
     return r;
   });
 
