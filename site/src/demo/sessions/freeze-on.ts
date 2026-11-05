@@ -1,0 +1,86 @@
+import type { Chrome, Turn } from "../types";
+
+export const chrome: Chrome = {"context": "0%", "style": "hold:Plain"};
+
+export const turns: Turn[] = [
+  {
+    user: "/hope:freeze Freeze the order export before anyone touches it. It stopped sending orders to the warehouse this morning.",
+    tools: "Ran 4 shell commands",
+    activity: [
+      {"at": 9.6, "line": "Showing recent commits and repo files", "tool": "$ git log --stat -3 && ls -la && find . -path ./.git -prune -o -type f -print | head -50"},
+      {"at": 13.6, "line": "Showing recent commits and repo files", "tool": "$ for f in README.md .gitignore package.json config/export.json src/export.js var/run/export.json var/run/status.json; do echo \"=== $f\"; cat \"$f\"; echo; done; echo \"=== log\"; wc -l var/log/export.log; tail -40 var/log/export.log; echo \"=== queue\"; wc -l var/queue/pending.jsonl; head -3 var/queue/pending.jsonl; tail -2 var/queue/pending.jsonl; ls -la .claude var/*; date -u"},
+      {"at": 19.6, "line": "Reading deployed settings, status, log summary, queuing size", "tool": "$ cat var/run/export.json var/run/status.json; echo; wc -l var/log/export.log var/queue/pending.jsonl; grep -v \"batch ok\" var/log/export.log | head -5; echo ...; grep -n \"\" var/log/export.log | awk -F'batch' '{print $0}' | sed -n '1,3p'; echo; grep -c \"batch ok\" var/log/export.log; grep -c \"batch failed\" var/log/export.log; grep -n \"batch ok\" var/log/export.log | tail -2; grep -n \"failed\" var/log/export.log | head -2; tail -3 var/log/export.log; head -c 400 var/queue/pending.jsonl; echo; awk '{print length}' var/queue/pending.jsonl | sort -n | tail -1; ls -la --time-style=full-iso var/*/* 2>/dev/null || stat -f \"%Sm %N\" var/*/*; date -u"},
+      {"at": 27.6, "line": "Checking queue contents for thumbnails and date range", "tool": "$ ls -la .claude; python3 -I -c '\nimport json\nq=[json.loads(l) for l in open(\"var/queue/pending.jsonl\") if l.strip()]\nt=[o for o in q if any(\"thumbnail\" in x for x in o[\"lines\"])]\nprint(len(q), len(t), min(o[\"paid_at\"] for o in q), max(o[\"paid_at\"] for o in q))\nprint(sorted(set(k for o in q for x in o[\"lines\"] for k in x)))\n'"},
+    ],
+    replyAt: 40.5,
+    chrome: [
+      [-2.4, {"context": "0%", "style": "hold:Plain"}],
+      [-0.4, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Gusting"}}],
+      [7.6, {"context": "0%", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "thinking with medium effort"}}],
+      [9.6, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 113 tokens · thinking with medium effort"}}],
+      [9.6, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 260 tokens · thought for 1s"}}],
+      [10.6, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 270 tokens · thought for 1s"}}],
+      [11.6, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 276 tokens · thought for 1s"}}],
+      [11.6, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 294 tokens"}}],
+      [12.6, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 346 tokens"}}],
+      [13.6, {"context": "4% · 38k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 384 tokens"}}],
+      [14.6, {"context": "4% · 38.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 500 tokens"}}],
+      [14.6, {"context": "4% · 38.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 530 tokens"}}],
+      [15.6, {"context": "4% · 38.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 539 tokens"}}],
+      [16.6, {"context": "4% · 38.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 564 tokens"}}],
+      [16.6, {"context": "4% · 38.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 598 tokens"}}],
+      [17.6, {"context": "4% · 38.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 663 tokens"}}],
+      [18.6, {"context": "4% · 38.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 700 tokens"}}],
+      [19.6, {"context": "4% · 40.1k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 831 tokens"}}],
+      [19.6, {"context": "4% · 40.1k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 929 tokens"}}],
+      [20.6, {"context": "4% · 40.1k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 941 tokens · thinking with medium effort"}}],
+      [21.6, {"context": "4% · 40.1k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 943 tokens · thinking with medium effort"}}],
+      [25.6, {"context": "4% · 40.1k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 1.0k tokens · thought for 5s"}}],
+      [26.6, {"context": "4% · 41.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 1.2k tokens · thought for 5s"}}],
+      [27.6, {"context": "4% · 41.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 1.4k tokens · thought for 5s"}}],
+      [27.6, {"context": "4% · 41.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 1.5k tokens"}}],
+      [28.6, {"context": "4% · 41.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 1.7k tokens"}}],
+      [29.6, {"context": "4% · 41.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 1.7k tokens · thinking with medium effort"}}],
+      [39.6, {"context": "4% · 41.9k", "style": "hold:Plain", "spin": {"verb": "Imagining", "tail": "↓ 1.7k tokens · still thinking with medium effort"}}],
+      [40.6, {"context": "4% · 41.9k", "style": "hold:Plain"}],
+      [40.6, {"context": "4% · 42.9k", "style": "hold:Plain"}],
+    ],
+    reply: [
+      "Snapshot of `var/` (read Nov 5 00:28 UTC): its data stops at Nov 2 20:51 UTC, 2.2 days old.",
+      "",
+      "**Observed** (read-only; nothing written or sent)",
+      "",
+      "| fact | where |",
+      "|---|---|",
+      "| Last ok batch at 09:30 | `var/log/export.log` |",
+      "| First 413 Payload Too Large at 09:40 | `var/log/export.log` |",
+      "| 21 ok runs, then 68 failed in a row | `var/log/export.log` |",
+      "| First failure: 13 orders, 76,881 bytes | `var/log/export.log:22` |",
+      "| Deployed `batch_size` is 200 | `var/run/export.json` |",
+      "| Repo ships `batch_size` 50; other settings match | `config/export.json` |",
+      "| Job reads deployed settings, not repo config | `src/export.js:4` |",
+      "| Queue: 916 orders, paid 09:31–20:50 | `var/queue/pending.jsonl` |",
+      "| Every queued order has a base64 `thumbnail` | `var/queue/pending.jsonl` |",
+      "| State `running`, next run at 21:00 | `var/run/status.json` |",
+      "",
+      "Conclusion, not observed: the 413s began with the `thumbnail` field, not the batch size, since 13 orders already failed.",
+      "",
+      "Live state on `orders-worker-1` is unknown; the data stopped at 20:51 even though sync should run every minute.",
+      "",
+      "Next: tell me whether you saw the failure today or on Nov 2.",
+      "Then: I'll pull live state from `orders-worker-1`, or you can lock this snapshot with that gap open.",
+    ],
+    keys: [
+      [
+        -1.9,
+        "type",
+        "/hope:freeze Freeze the order export before anyone touches it. It stopped sending orders to the warehouse this morning."
+      ],
+      [
+        -0.1,
+        "key",
+        "Enter"
+      ]
+    ],
+  },
+];

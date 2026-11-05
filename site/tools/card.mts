@@ -5,8 +5,9 @@
 // off ran none), whether the user typed its prompt (a task notification's
 // isn't), each assistant text block it wrote, and its final visible text
 // (turn.complete's `answer`).
-// Out: per turn, the chips' labels while it ran and once it ended, and the
-// pane each chip opens once it ended, as tend's Pane render builds it.
+// Out: per turn, the chips' labels while it ran and once it ended, the pane
+// each chip opens once it ended, as tend's Pane render builds it, and the key
+// tend files the reply's short form under (none: tend ran no turn).
 import { readFileSync } from "node:fs";
 // No package.json above hunch's hooks names them modules, so tsx loads them as
 // CommonJS: their exports come as one default object.
@@ -38,7 +39,7 @@ const out = turns.map((t) => {
   // A turn with moo off adds to the session's messages and nothing else.
   if (!t.tend) {
     msgs.push(...t.texts.map((text) => ({ role: "assistant", text })));
-    return { during: labels(card), after: labels(card), panes: {} };
+    return { during: labels(card), after: labels(card), panes: {}, short: null };
   }
   // prompt.submit: the user's own prompt closes every open question.
   if (t.composer) {
@@ -58,6 +59,6 @@ const out = turns.map((t) => {
       return [name, pane(card, name)];
     }),
   );
-  return { during, after, panes };
+  return { during, after, panes, short: tend.textKey(tend.stripCards(t.answer)) };
 });
 process.stdout.write(JSON.stringify(out));

@@ -3,9 +3,11 @@
 # snaps, checked against the session file replayed (replay.mjs); what Claude
 # Code drew around the prompt box (status line, spinner, slash menu) and
 # tend's toast from the snaps; keys from the recorder's
-# key log. The module names no home folder: see renamed().
-# Usage: gen.py <session.jsonl> <cwd> <rec dir> <out.ts> [N=tend short key ...]
+# key log. A reply tend redrew short shows short, as the screen did. The
+# module names no home folder and no take's copy: see renamed().
+# Usage: gen.py <session.jsonl> <cwd> <rec dir> <out.ts> [--turns N]
 #   [--keys keylog.json] [--activity-from-snaps] [--raw turns.json] [--comment text]
+# --turns keeps the first N turns: a moo-off pane plays today's first turn.
 # --raw writes the turns as recorded, home folder and all, for check-screen.mts,
 # and the session file's path beside them (.src), for check-timing.mts.
 import json, os, re, subprocess, sys, tempfile
@@ -14,11 +16,32 @@ from snaps import parse as parse_snap, strip
 
 sess, cwd, rec, out = sys.argv[1:5]
 opts = sys.argv[5:]
-shorts = dict(o.split('=', 1) for o in opts if re.match(r'^\d+=', o))
 comment = next((opts[i + 1] for i, o in enumerate(opts) if o == '--comment'), '')
 keylog = next((opts[i + 1] for i, o in enumerate(opts) if o == '--keys'), None)
 raw_out = next((opts[i + 1] for i, o in enumerate(opts) if o == '--raw'), None)
+keep_turns = next((int(opts[i + 1]) for i, o in enumerate(opts) if o == '--turns'), None)
 events = json.load(open(keylog))['events'] if keylog else []
+
+def squashed(events):
+    """The recorder's arrow presses that showed each option in turn (qcap.sh)
+    and came back to the pick, as the net moves to the pick alone: each run of
+    arrows becomes its net count, at the times of its last presses. A run no
+    key follows picks nothing (a dialog the take left open), so it goes."""
+    out, run = [], []
+    def close(picked):
+        net = sum(1 if e['value'] == 'Down' else -1 for e in run)
+        if picked and net:
+            out.extend({**e, 'value': 'Down' if net > 0 else 'Up'} for e in run[-abs(net):])
+        run.clear()
+    for e in events:
+        if e['kind'] == 'key' and e['value'] in ('Up', 'Down'):
+            run.append(e)
+            continue
+        close(True)
+        out.append(e)
+    close(False)
+    return out
+events = squashed(events)
 
 recs = [json.loads(l) for l in open(sess)]
 ts = lambda e: __import__('datetime').datetime.fromisoformat(e['timestamp'].replace('Z', '+00:00')).timestamp()
@@ -39,12 +62,14 @@ short = store.get(f'tend:{sid}:short', {}) or {}
 snaps = [parse_snap(os.path.join(rec, 'snaps', f)) | {'raw': open(os.path.join(rec, 'snaps', f), encoding='utf-8').read()}
          for f in sorted(os.listdir(os.path.join(rec, 'snaps'))) if f.endswith('.ansi')]
 
-def chrome_of(s):
+def chrome_of(s, tend):
     # The mode row, the notice above the prompt box, the dim suggestion in it
     # and the hook the spinner names are left out of the demos, as the user
     # asked; the spinner keeps its verb and counter, and tend's band its chips.
+    # A turn with moo off draws no band: another plugin's (easel's "[-]") is
+    # no part of the demo.
     c = {'context': s['context'], **({'style': s['style']} if s.get('style') else {}),
-         **({'band': s['band']} if s.get('band') else {})}
+         **({'band': s['band']} if s.get('band') and tend else {})}
     if s.get('spin'):
         tail = ' · '.join(x for x in (s['spin'].get('tail') or '').split(' · ')
                           if x and not re.match(r'^running .* hook$|^(\d+m )?\d+s$', x))
@@ -157,7 +182,9 @@ ends = [*starts[1:], len(recs)]
 # Each turn's text blocks, timed; its reply is the last.
 said = [[(ts(e), c['text']) for e in recs[a:b] if e.get('type') == 'assistant' for c in e['message']['content'] if c.get('type') == 'text' and c['text'].strip()]
         for a, b in zip(starts, ends)]
-reply_abs = [s[-1][0] if s else ts(recs[b - 1]) for s, b in zip(said, ends)]
+# A turn with no text ends at its last timed record.
+last_t = lambda part: ts(next(e for e in reversed(part) if 'timestamp' in e))
+reply_abs = [s[-1][0] if s else last_t(recs[a:b]) for s, a, b in zip(said, starts, ends)]
 # A turn recorded with moo off ran no tend: no snap while it worked names an
 # output style, as every turn with moo on names hold's.
 def moo_on(n):
@@ -178,8 +205,11 @@ def band_due(t):
     n = turn_at(t)
     if n is None: return []
     return cards[n]['after'] if t >= reply_abs[n] else cards[n]['during']
+def tend_at(t):
+    n = turn_at(t)
+    return card_in[n if n is not None else 0]['tend']
 off = [(sn['file'], sn.get('band', []), band_due(sn['t'])) for sn in snaps
-       if sn['cols'] == 80 and not sn['dialog'] and 'context' in sn
+       if sn['cols'] == 80 and not sn['dialog'] and 'context' in sn and tend_at(sn['t'])
        and sn.get('band', []) not in (band_due(sn['t'] - GRACE), band_due(sn['t']), band_due(sn['t'] + GRACE))]
 if off:
     raise SystemExit('\n'.join(f'{out}: {f}: tend drew {drew}, its functions give {due}' for f, drew, due in off))
@@ -192,10 +222,9 @@ for n, a in enumerate(starts):
     with tempfile.NamedTemporaryFile('w', suffix='.jsonl', delete=False) as tf:
         tf.write('\n'.join(json.dumps(e) for e in part))
     rep = json.loads(subprocess.check_output(['node', os.path.join(os.path.dirname(__file__), 'replay.mjs'), tf.name, cwd]))
-    reply_at, reply = said[n][-1] if said[n] else (ts(part[-1]), '')
-    key = shorts.get(str(n))
-    if key:
-        reply = short[key]
+    reply_at, reply = said[n][-1] if said[n] else (last_t(part), '')
+    # tend redrew the reply short once the turn ended, when it was long.
+    reply = short.get(cards[n]['short'], reply)
     turn = {'user': shown_prompt(recs[a]['message']['content'])}
     if turn['user'].startswith('<task-notification>'):
         drawn = notices.pop(0) if notices else None
@@ -205,12 +234,25 @@ for n, a in enumerate(starts):
     if drawn != (rep['final'] or None):
         print(f'turn {n}: tool summary drawn {drawn!r}, replayed {rep["final"]!r}; using the drawn one', file=sys.stderr)
     if drawn: turn['tools'] = drawn
-    if any('[Request interrupted by user' in json.dumps(e.get('message', {}).get('content', '')) for e in part):
+    asks = [(ts(e), c) for e in part if e.get('type') == 'assistant' for c in e['message']['content'] if c.get('type') == 'tool_use' and c['name'] == 'AskUserQuestion']
+    # Each dialog's answer, or the refusal Claude Code logged when the
+    # recorder closed it unanswered (interrogate's last).
+    results = [next(e for e in part if e.get('type') == 'user' and isinstance(e['message']['content'], list)
+                    and any(c.get('tool_use_id') == use['id'] for c in e['message']['content'] if isinstance(c, dict))) for _, use in asks]
+    answered = lambda res: isinstance(res.get('toolUseResult'), dict) and 'answers' in res['toolUseResult']
+    # A take may end on a dialog it left open: the demo stands on it, with no
+    # reply, as the take's last wait. The recorder's Escape that closed it is
+    # no part of the demo.
+    left = bool(asks) and not answered(results[-1])
+    if any(not answered(r) for r in results[:-1]):
+        raise SystemExit(f'turn {n}: a dialog closed unanswered before the last')
+    if left and said[n] and said[n][-1][0] > asks[-1][0]:
+        raise SystemExit(f'turn {n}: text after the dialog it left open')
+    if not left and any('[Request interrupted by user' in json.dumps(e.get('message', {}).get('content', '')) for e in part):
         turn['interrupted'] = True
     # Activity lines, as make.py read them from the replay.
     esc = lambda x: re.sub(r'([\\*`])', r'\\\1', x)
     activity, prev, ask_states = [], None, []
-    asks = [(ts(e), c) for e in part if e.get('type') == 'assistant' for c in e['message']['content'] if c.get('type') == 'tool_use' and c['name'] == 'AskUserQuestion']
     for st in rep['states']:
         k = (st['line'], st['detail'])
         if st['why'].startswith('AskUserQuestion'):
@@ -222,24 +264,22 @@ for n, a in enumerate(starts):
         activity.append({'at': round(st['at'] - sent, 1), 'line': st['line'] if st.get('move') else esc(st['line']),
                          **({'tool': st['detail']} if st['detail'] else {})})
     if '--activity-from-snaps' in opts:
-        closes = [ts(next(e for e in part if e.get('type') == 'user' and isinstance(e.get('toolUseResult'), dict) and 'answers' in e['toolUseResult']
-                          and any(c.get('tool_use_id') == use['id'] for c in e['message']['content'] if isinstance(c, dict)))) for _, use in asks]
+        closes = [ts(res) for res in results]
         activity = snap_activity(part, sent, ts(recs[b]) if b < len(recs) else float('inf'), reply_at, rep, activity,
                                  [(o, c) for (o, _), c in zip(asks, closes)])
     if activity: turn['activity'] = activity
-    # Each skill the turn launched, when its Skill call was logged: a chain's
-    # chapter starts there (Demo.astro).
+    # Each skill the turn launched, when its Skill call was logged: the demo
+    # keeps the screen's timing true to it (render.ts), and Demo.astro checks
+    # that each move its page names runs.
     launches = [{'at': round(ts(e) - sent, 3), 'skill': c['input']['skill']} for e in part if e.get('type') == 'assistant'
                 for c in e['message']['content'] if c.get('type') == 'tool_use' and c['name'] == 'Skill']
     if launches: turn['launches'] = launches
     dialogs = []
-    for n_ask, (opened, use) in enumerate(asks):
-        res = next(e for e in part if e.get('type') == 'user' and isinstance(e.get('toolUseResult'), dict) and 'answers' in e['toolUseResult']
-                   and any(c.get('tool_use_id') == use['id'] for c in e['message']['content'] if isinstance(c, dict)))
-        r = res['toolUseResult']
+    for n_ask, ((opened, use), res) in enumerate(zip(asks, results)):
+        r = res['toolUseResult'] if answered(res) else {'questions': use['input']['questions'], 'answers': {}}
         qs = []
         for q in r['questions']:
-            ans = r['answers'][q['question']]
+            ans = r['answers'].get(q['question'], '')
             labels = [o['label'] for o in q['options']]
             found = sorted((ans.find(lb), i) for i, lb in enumerate(labels) if lb in ans)
             rest = ans
@@ -255,7 +295,8 @@ for n, a in enumerate(starts):
             # One pick is the label alone, even when another label starts it
             # ("Let it run" in "Let it run, alert"); anything else was typed,
             # even when it starts with a label ("None in 50. And the top 3 ...").
-            if not q.get('multiSelect'):
+            if not answered(res): pass
+            elif not q.get('multiSelect'):
                 qd['picked'] = [labels.index(ans)] if ans in labels else []
                 if ans not in labels: qd['typed'] = ans
             elif rest and not found: qd['typed'] = rest
@@ -265,7 +306,7 @@ for n, a in enumerate(starts):
         st = ask_states[n_ask] if n_ask < len(ask_states) else {}
         after = sum(1 for a in activity if a['at'] < opened - sent) if '--activity-from-snaps' in opts else st.get('after', len(activity))
         dialogs.append({'at': [round(opened - sent, 1), round(ts(res) - sent, 1)], 'after': after,
-                        **({'tool': st['tool']} if st.get('tool') else {}), 'questions': qs})
+                        **({'tool': st['tool']} if st.get('tool') else {}), **({} if answered(res) else {'left': True}), 'questions': qs})
     if dialogs: turn['dialogs'] = dialogs
     turn['replyAt'] = round(reply_at - sent, 1)
     abs_times.append((sent, reply_at))
@@ -275,7 +316,7 @@ for n, a in enumerate(starts):
     chrome, last = [], None
     for s in snaps:
         if not (lo < s['t'] < hi) or s['dialog'] or 'context' not in s or s.get('cut') or s['cols'] != 80: continue
-        c = chrome_of(s)
+        c = chrome_of(s, card_in[n]['tend'])
         if c != last:
             chrome.append([round(s['t'] - sent, 1), c])
             last = c
@@ -291,9 +332,10 @@ for n, a in enumerate(starts):
     turn['chrome'] = chrome
     if any(c.get('band') for _, c in chrome) and cards[n]['panes']:
         turn['panes'] = cards[n]['panes']
-    toast = next((toast_of(s['raw']) for s in snaps if reply_at <= s['t'] < hi and toast_of(s['raw'])), None)
+    # A turn with moo off shows no toast: hunch's toasts are moo's.
+    toast = card_in[n]['tend'] and next((toast_of(s['raw']) for s in snaps if reply_at <= s['t'] < hi and toast_of(s['raw'])), None)
     if toast: turn['toast'] = toast
-    turn['reply'] = reply.split('\n')
+    turn['reply'] = [] if left else reply.split('\n')
     turns.append(turn)
 
 # The recorder's keys, each in the turn it drove: a key belongs to the turn
@@ -360,10 +402,14 @@ for k in range(len(turns) - 1, 0, -1):
         assert not t.get('keys') and not t.get('dialogs') and not t.get('panes'), 'a task notification with keys, dialogs or a band'
         turns[k - 1]['more'] = [{**({'tools': t['tools']} if t.get('tools') else {}), 'reply': t['reply']}, *t.get('more', []), *turns[k - 1].get('more', [])]
 
+# A moo-off pane plays only the first turns of a session that went on with moo on.
+if keep_turns is not None:
+    turns = turns[:keep_turns]
+
 first = next(s for s in snaps if 'context' in s)
 J = lambda v: json.dumps(v, ensure_ascii=False)
 lines = [*(f'// {c}' for c in comment.split('\n') if comment), 'import type { Chrome, Turn } from "../types";', '',
-         f'export const chrome: Chrome = {J(chrome_of(first))};', '', 'export const turns: Turn[] = [']
+         f'export const chrome: Chrome = {J(chrome_of(first, card_in[0]["tend"]))};', '', 'export const turns: Turn[] = [']
 for t in turns:
     lines.append('  {')
     for k, v in t.items():
@@ -378,12 +424,36 @@ for t in turns:
     lines.append('  },')
 lines += ['];', '']
 HOME = os.path.expanduser('~')
-SLUG = re.sub(r'[/.]', '-', HOME)  # how Claude Code names the home folder's projects
+slug = lambda path: re.sub(r'[/.]', '-', path)  # how Claude Code names a folder's projects
+def same_length(swaps):
+    for a, b in swaps:
+        if len(a) != len(b): raise SystemExit(f'{a!r} and {b!r} differ in length: text would wrap elsewhere')
+    return swaps
+# A take ran in a copy of its world, its path as long ("/Users/Shared/rela1"
+# for "/Users/Shared/relay"); the recorder wrote both in the capture folder.
+# The module names the world: its path, its project folder's name and its
+# bare folder name.
+read = lambda name: open(os.path.join(rec, name)).read().strip() if os.path.exists(os.path.join(rec, name)) else None
+copy, world = read('repo'), read('world')
+COPY = same_length([(copy, world), (slug(copy), slug(world)), (os.path.basename(copy), os.path.basename(world))]) if copy and world else []
+COPY = [(a, b) for a, b in COPY if a != b]
+# Then every home path, as the user asked: the site shows no home path and no
+# username. The dev repo's hope reads as the installed plugin, at the same
+# length; any other path under the home folder is written ~/…, and a project
+# folder's name under ~/.claude/projects is written for a user named dev.
+# scenes.ts lists each swap.
+DEV = HOME + '/repos/moo.md/hope/'
+HOMES = [*same_length([(DEV, '~/.claude/plugins/cache/moo-md/hope/')]), (HOME + '/', '~/'), (HOME, '~'),
+         (slug(HOME) + '-', '-Users-dev-')]
 def renamed(text):
-    """Every path under the home folder written ~/…, and a project folder's
-    name under ~/.claude/projects written for a user named dev, as the user
-    asked: the site shows no home path and no username."""
-    return text.replace(HOME + '/', '~/').replace(HOME, '~').replace(SLUG + '-', '-Users-dev-')
+    for a, b in COPY:
+        # The bare name only where it stands alone: "rela1", never in "rela10".
+        pat = re.escape(a) if '/' in a or a.startswith('-') else rf'(?<![\w.-]){re.escape(a)}(?![\w-])'
+        text, hits = re.subn(pat, b, text)
+        print(f'{out}: {a} -> {b}: {hits}', file=sys.stderr)
+    for a, b in HOMES:
+        text = text.replace(a, b)
+    return text
 module = renamed('\n'.join(lines))
 user = os.path.basename(HOME)
 for name in {user, re.sub(r'[.]', '-', user)}:

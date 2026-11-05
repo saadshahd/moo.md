@@ -78,7 +78,8 @@ export type Question = {
   /** `preview`: what the option builds, drawn in a box beside the options
    * while the cursor is on it. Any option with one draws the question that way. */
   options: { label: string; description: string; preview?: string }[];
-  /** The options picked, by index, in the order they were picked. */
+  /** The options picked, by index, in the order they were picked; none in a
+   * dialog left open. */
   picked: number[];
   /** Words typed into "Type something", if any. */
   typed?: string;
@@ -94,27 +95,19 @@ export type Dialog = {
   tool?: string;
   /** How many of the turn's activity lines showed before it opened. */
   after: number;
+  /** The take ended with it open, unanswered: the turn has no reply, and the
+   * pane stands on it (interrogate). */
+  left?: true;
   questions: Question[];
 };
 
-/** A moment of the demo: a tick on its timeline, and a still under reduced
- * motion. It comes as turn `at` starts typing; with `on: "move"` as its skill
- * launch `n` (counting from 0) is made; with `on: "dialog"` as its dialog `d`
- * (default 0) shows question `q`; with `on: "reply"` as its reply arrives. */
-export type Beat =
-  | { at: number; on?: "reply" }
-  | { at: number; on: "move"; n: number }
-  | { at: number; on: "dialog"; d?: number; q: number };
-
+/** One terminal's recording: what Claude Code drew around the prompt box
+ * before the first prompt, and the turns it played. */
 export type Scene = {
-  /** What Claude Code drew around the prompt box before the first prompt. */
   chrome: Chrome;
   turns: Turn[];
-  /** In the order they play; the first opens the demo. */
-  beats: Beat[];
-  /** The turn Claude Code ran with all of moo off, if the recording has one.
-   * The turn after it runs the move; the "without moo" button steps between
-   * this turn's reply and where that turn first waits on the user, moo's
-   * hand-back: its first dialog, or else its reply. */
-  plain?: number;
 };
+
+/** What a demo plays: the same words typed with all of moo off, then with moo
+ * on, each from the same starting files, side by side (Demo.astro). */
+export type Pair = { off: Scene; on: Scene };

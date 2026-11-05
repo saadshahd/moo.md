@@ -1,14 +1,16 @@
-// Plays a demo's scene once while it is in view, from its first ask to its
-// last frame, on one clock `t`, with a player's controls under it: play and
-// pause, replay once it ends, a timeline with a tick per beat, and speed; a
-// chain's moves are chapters of the timeline; the terminal scrolls back like
-// one; the reader can pick a dialog's option. Under reduced motion, the timeline steps through
-// one still per beat instead. A demo with a plain turn plays it first; its
-// "without moo" button steps back to the plain reply and forth to moo's
-// hand-back. Demo.astro sets the columns and rows.
-import { beatEnds, beatTimes, frame, phases, type Frame, type Row, type Seg } from "./render";
+// Plays a demo's pair once while it is in view, on one clock `t`: the moo-off
+// pane plays first, then stands; the moo-on pane waits blank, then plays. A
+// player's controls sit under both: play and pause, replay once it ends, a
+// timeline in two parts, off and on, with a tick at each wait, and speed.
+// Where the two panes don't fit side by side, one frame shows the pane whose
+// part is playing, under tabs that name both. Each pane scrolls back like a
+// terminal; the reader can pick a dialog's option. Under reduced motion, the
+// timeline steps through one still per wait instead. Demo.astro sets the pane
+// size, PANE.
+import { frame, PANE, phases, waits, type Frame, type Row, type Seg, type Wait } from "./render";
 import { currentSpeed, followSpeed, pickSpeed } from "./speed";
-import type { Beat, Scene } from "./types";
+import type { Pair, Scene } from "./types";
+
 
 
 // Quadrants per block glyph: upper-left, upper-right, lower-left, lower-right.
@@ -96,351 +98,327 @@ const optionRows = (rows: Row[], id: string, cursor: number) =>
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 let demos = 0;
 
+const SIDES = ["off", "on"] as const;
+type Side = (typeof SIDES)[number];
+const LABEL: Record<Side, string> = { off: "moo off", on: "moo on" };
+
+/** A wait on the pair's clock, and what it marks, for a screen reader. */
+type Mark = { at: number; side: Side; what: string };
+const what = (scene: Scene, w: Wait) =>
+  w.on === "dialog" ? `question "${scene.turns[w.turn].dialogs![w.d].questions[w.q].header}"` : "reply";
+
 export function mount(root: HTMLElement) {
-  const { scene, chips, without } = JSON.parse(root.dataset.demo!) as {
-    scene: Scene;
-    /** A chain's chapters: when each move launches and ends, and the beat on
-     * screen at its launch. */
-    chips: { at: number; end: number; beat: number }[];
-    /** When moo's hand-back and the plain reply stand, and when the move's turn starts typing. */
-    without?: { handBack: number; plain: number; moveStarts: number };
-  };
-  const $ = <T extends HTMLElement>(k: string) => root.querySelector<T>(`[data-${k}]`)!;
-  const term = $("term");
-  const scroll = $("scroll");
-  const bottom = $("bottom");
-  const toast = $("toast");
-  const caret = $("caret");
-  const trail = $("trail");
-  const keycaps = $("keys");
+  const pair = JSON.parse(root.dataset.demo!) as Pair;
+  const $ = <T extends HTMLElement>(k: string, within: ParentNode = root) => within.querySelector<T>(`[data-${k}]`)!;
+  const id = `demo${++demos}`;
+  const { cols, rows } = PANE;
+  const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  // The moo-off part comes first on the clock; a pane with no turn has none.
+  const lengths = SIDES.map((side) => (pair[side].turns.length ? phases(pair[side]).length : 0));
+  const starts: Record<Side, number> = { off: 0, on: lengths[0] };
+  const length = lengths[0] + lengths[1];
+  const marks: Mark[] = SIDES.flatMap((side) =>
+    pair[side].turns.length
+      ? waits(pair[side]).map((w) => ({ at: starts[side] + w.at, side, what: what(pair[side], w) }))
+      : [],
+  );
+  const sideAt = (s: number): Side => (s < starts.on ? "off" : "on");
+
   const playBtn = $<HTMLButtonElement>("play");
-  const withoutBtn = root.querySelector<HTMLButtonElement>("[data-without]");
   // Speeds are the speed group's buttons, each naming its own.
   const speedBtns = [...root.querySelectorAll<HTMLButtonElement>("[data-speed]")];
+  const tabs = [...root.querySelectorAll<HTMLButtonElement>("[data-tab]")];
   const nowEl = $("now");
   const knob = $("knob");
-  $("total").textContent = clock(phases(scene).length);
+  $("total").textContent = clock(length);
   const track = $("track");
   const fill = $("fill");
-  const probe = $("probe");
   const rail = $("rail");
-  // A chain's moves, as chapters of the timeline (Demo.astro): a name on the
-  // rail each, and one beside the time when the names don't fit there.
-  const chapterEls = [...root.querySelectorAll<HTMLElement>("[data-chapters] > *")];
-  // Every set of the names: on the rail and beside the time, each with its
-  // pill's copy (placePills).
-  const nameSets = [...root.querySelectorAll<HTMLElement>("[data-names]")].map((s) => [...s.children] as HTMLElement[]);
-  const pills = [...root.querySelectorAll<HTMLElement>("[data-pill]")];
-  if (chapterEls.length && chapterEls.length !== chips.length)
-    throw new Error(`The timeline shows ${chapterEls.length} moves; the demo has ${chips.length}`);
-  const beats = scene.beats;
-  // What each beat marks, for a screen reader: the prompt, the skill call, the
-  // question by its header, or the reply; the plain turn's, without moo.
-  const marks = ({ at, ...b }: Beat) => {
-    const what =
-      b.on === "move" ? "skill call"
-      : b.on === "dialog" ? `question "${scene.turns[at].dialogs![b.d ?? 0].questions[b.q].header}"`
-      : (b.on ?? "prompt");
-    return at === scene.plain ? `${what}, without moo` : what;
-  };
-  const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const id = `demo${++demos}`;
-  const { length } = phases(scene);
-  const times = beatTimes(scene);
+  const probe = $("probe");
 
   let t = 0;
   let last = 0;
   let speed = currentSpeed();
-  let still = 0; // the still on screen under reduced motion
-  // Under reduced motion, the moment held in place of a beat's still: the
-  // hand-back or the plain reply the "without moo" button stepped to, until
-  // the reader goes to a beat.
-  let held: number | undefined;
+  let still = 0; // the still on screen under reduced motion: a wait's index
   let inView = false;
   let userPaused = false;
-  let following = true; // false while the reader has scrolled up to read
   let pick: number | undefined; // the option the reader put the cursor on
-  let pane: string | undefined; // the chip whose pane the reader opened
+  let tend: string | undefined; // the chip whose pane the reader opened
   let refocus: string | undefined; // the button keys pressed, to keep focus on through a redraw
   let ticking = false;
-  let html = ["", "", ""];
-  const colsNow = () => Number(getComputedStyle(term).getPropertyValue("--cols"));
-  const rowsNow = () => Number(getComputedStyle(root).getPropertyValue("--rows"));
-  let cols = colsNow();
-  let rows = rowsNow();
-  let lit = -1; // the chapter of the move on screen
-  let f: Frame | undefined;
+  let jumped = true;
 
-  // A tick on the timeline per beat: a mark, not a target of its own, since
-  // beats can sit closer than a finger. The timeline is the target, and the
-  // arrow keys go from beat to beat. Chapters mark a chain's timeline instead.
-  const ticks = (chapterEls.length ? [] : beats).map(() => {
+  const now = () => (motion.matches ? (marks[still]?.at ?? 0) : t);
+
+  /** One terminal: it draws its scene at the pair's clock, from its part's start. */
+  function pane(side: Side) {
+    const box = $(`side="${side}"`);
+    const term = $("term", box);
+    const scroll = $("scroll", box);
+    const bottom = $("bottom", box);
+    const toast = $("toast", box);
+    const caret = $("caret", box);
+    const trail = $("trail", box);
+    const keycaps = $("keys", box);
+    const scene = pair[side];
+    const oid = `${id}-${side}`;
+    let html = ["", "", ""];
+    let f: Frame | undefined;
+    let following = true; // false while the reader has scrolled away to read
+    let stand = 0; // where the scroll stands: the bottom, or the reply's first row
+    let replyTop: number | undefined; // where the reply's first row starts, if one is in
+
+    // A fade at the top says there is more above, unless the reply's first
+    // row is the top row.
+    const fade = () =>
+      scroll.classList.toggle("above", scroll.scrollTop > 0 && !(replyTop !== undefined && Math.abs(scroll.scrollTop - replyTop) <= 1));
+
+    // Where the scroll stands: the newest line, the way a terminal follows
+    // it, until the reply's first row reaches the top, where a waiting pane
+    // holds it, unless the reader scrolled away.
+    function place() {
+      const end = scroll.scrollHeight - scroll.clientHeight;
+      const top = f?.top === undefined ? undefined : (scroll.children[f.top] as HTMLElement | undefined);
+      replyTop = top?.offsetTop;
+      stand = Math.min(end, replyTop ?? end);
+      if (following && Math.abs(scroll.scrollTop - stand) > 1) scroll.scrollTop = stand;
+      fade();
+    }
+
+    function paint(s: number) {
+      const at = s - starts[side];
+      // Before its part, and with no turn at all, the pane stands blank.
+      if (at < 0 || !scene.turns.length) {
+        f = undefined;
+        if (html.some(Boolean)) [scroll.innerHTML, bottom.innerHTML, toast.innerHTML, keycaps.innerHTML] = ["", "", "", ""];
+        html = ["", "", ""];
+        caret.hidden = trail.hidden = true;
+        return;
+      }
+      // The reader's pick and tend's pane belong to the pane playing.
+      const playing = side === sideAt(s);
+      f = frame(scene, at, cols, playing ? pick : undefined, rows, playing ? tend : undefined);
+      // tend's pane closes with its chip.
+      if (playing && tend && !f.chips.includes(tend)) {
+        tend = undefined;
+        f = frame(scene, at, cols, pick, rows);
+      }
+      const next = [
+        f.transcript.map((r) => rowHtml(r)).join(""),
+        f.asking ? optionRows(f.bottom, oid, f.asking.cursor) : f.bottom.map((r) => rowHtml(r)).join(""),
+        f.toast ? `<div class="box">${f.toast.rows.map((r) => rowHtml(r)).join("")}</div>` : "",
+      ];
+      if (next[0] !== html[0]) scroll.innerHTML = next[0];
+      if (next[1] !== html[1]) {
+        bottom.innerHTML = next[1];
+        if (refocus) bottom.querySelector<HTMLElement>(`[data-act="${refocus}"]`)?.focus();
+        refocus = undefined;
+      }
+      if (next[2] !== html[2]) toast.innerHTML = next[2];
+      html = next;
+      // A dialog's options are a listbox the arrow keys move through.
+      if (f.asking) {
+        bottom.setAttribute("role", "listbox");
+        bottom.setAttribute("aria-label", "Options");
+        bottom.setAttribute("aria-activedescendant", `${oid}-opt-${f.asking.cursor}`);
+      } else ["role", "aria-label", "aria-activedescendant"].forEach((a) => bottom.removeAttribute(a));
+      // Sliding in from the right edge, the box's left part shows first.
+      const tbox = toast.firstElementChild as HTMLElement | null;
+      if (tbox) tbox.style.transform = `translateX(${(1 - f.toast!.slide) * 100}%)`;
+      // Keys fade in and out with the clock, so a still shows none.
+      keycaps.innerHTML = motion.matches
+        ? ""
+        : f.keys.map((k) => `<kbd style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
+      place();
+      placeCaret();
+      placeKeys();
+    }
+
+    // Keycaps sit just above the first row with text at the bottom: the prompt
+    // box, or the slash menu over it, or the dialog. They may
+    // cover the transcript, never what the reader picks from; a dialog that
+    // fills the terminal pushes them to its top edge.
+    function placeKeys() {
+      if (!keycaps.childElementCount) return;
+      const first = [...bottom.children].find((r) => r.textContent!.trim()) ?? bottom;
+      const r = term.getBoundingClientRect();
+      const top = first.getBoundingClientRect().top - r.top - keycaps.offsetHeight - 4;
+      keycaps.style.top = `${Math.max(parseFloat(getComputedStyle(term).paddingTop), top)}px`;
+    }
+
+    // The cursor glides to its cell, leaving a short smear, and blinks softly
+    // once at rest; it inverts the text under it, so it covers none.
+    let at = "";
+    let rest: number | undefined;
+    let hue = 0;
+    function placeCaret() {
+      const c = f?.cursor;
+      const row = c && (bottom.children[c.row] as HTMLElement | undefined);
+      caret.hidden = trail.hidden = !row;
+      if (!row || !c) return;
+      const r0 = term.getBoundingClientRect();
+      const r = row.getBoundingClientRect();
+      const cell = probe.firstElementChild!.getBoundingClientRect().width / 10;
+      const x = r.left - r0.left + c.col * cell;
+      const y = r.top - r0.top;
+      const key = `${x},${y}`;
+      if (key === at) return;
+      const [px, py] = at ? at.split(",").map(Number) : [x, y];
+      at = key;
+      caret.style.transform = `translate(${x}px, ${y}px)`;
+      caret.classList.remove("rest");
+      clearTimeout(rest);
+      rest = window.setTimeout(() => caret.classList.add("rest"), 700);
+      // The glide and the smear's fade keep pace with the playback speed.
+      term.style.setProperty("--glide", `${90 / speed}ms`);
+      term.style.setProperty("--decay", `${280 / speed}ms`);
+      // A jump (a seek, a scrub, a resize) moves the cursor with no glide or smear.
+      if (jumped || (px === x && py === y)) {
+        trail.classList.remove("hot");
+        caret.style.transition = "none";
+        requestAnimationFrame(() => (caret.style.transition = ""));
+        return;
+      }
+      // The smear: on the row the cursor lands on, from it back toward where it
+      // came from, at most 6 cells, behind the text. Each move takes the next hue,
+      // so a run of moves cycles through them; it fades into the cursor's own
+      // colour, and at rest only the plain cursor stays.
+      const run = Math.min(Math.max(Math.abs(x - px), cell), 6 * cell);
+      const back = py === y ? Math.sign(px - x) : y > py ? -1 : 1;
+      hue = (hue + 47) % 360;
+      trail.style.transition = "none";
+      trail.style.transform = `translate(${back < 0 ? x - run : x + cell}px, ${y}px)`;
+      trail.style.width = `${run}px`;
+      trail.style.height = `${r.height}px`;
+      trail.style.setProperty("--hue", String(hue));
+      trail.classList.add("hot");
+      void trail.offsetWidth; // start the fade from the hue
+      trail.style.transition = "";
+      trail.classList.remove("hot");
+    }
+
+    // Scrolling away from where the pane stands pauses the demo while this
+    // pane plays, so the text holds still; back there, it resumes. Only
+    // scrolls that follow the reader's own input count.
+    let lastInput = -Infinity;
+    for (const type of ["wheel", "touchmove", "keydown", "pointerdown"])
+      scroll.addEventListener(type, () => (lastInput = performance.now()), { passive: true });
+    scroll.addEventListener("scroll", () => {
+      fade();
+      if (motion.matches || performance.now() - lastInput > 800) return;
+      const there = Math.abs(scroll.scrollTop - stand) <= 2;
+      if (there !== following) {
+        following = there;
+        sync();
+      }
+    });
+
+    // A click on the terminal plays or pauses it, as on a video, unless it picks
+    // a dialog's option, ends a drag that scrolled, or ends selecting text.
+    let down: { x: number; y: number; top: number } | undefined;
+    term.addEventListener("pointerdown", (e) => (down = { x: e.clientX, y: e.clientY, top: scroll.scrollTop }));
+    term.addEventListener("click", (e) => {
+      const moved = down && (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4 || scroll.scrollTop !== down.top);
+      if (motion.matches || moved || getSelection()?.toString() || (e.target as HTMLElement).closest("[data-opt], [data-act], .pane")) return;
+      playBtn.click();
+    });
+    bottom.addEventListener("click", (e) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>("[data-opt]");
+      if (row) choose(Number(row.dataset.opt));
+      const button = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
+      if (button) act(button.dataset.act!, e.detail === 0);
+    });
+
+    return {
+      box,
+      paint,
+      asking: () => f?.asking,
+      contains: (n: Node) => bottom.contains(n),
+      following: () => following,
+      follow: () => (following = true),
+    };
+  }
+  const panes = SIDES.map(pane);
+  const playing = () => panes[SIDES.indexOf(sideAt(now()))];
+
+  // A tick on the timeline per wait: a mark, not a target of its own, since
+  // waits can sit closer than a finger. The timeline is the target, and the
+  // arrow keys go from wait to wait.
+  const ticks = marks.map(() => {
     const tick = document.createElement("span");
     tick.className = "tick";
     track.append(tick);
     return tick;
   });
-  const tickAt = (k: number) => (motion.matches ? k / Math.max(1, beats.length - 1) : times[k] / length);
-  const placeTicks = () => ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
-  // The fill turns from the plain turn's colour to moo's at the tick where
-  // moo's turn starts (chrome.css).
-  const mooFrom = () => (without ? tickAt(times.findIndex((x) => x >= without.moveStarts)) : 0);
-
-  // A chapter runs from its move's launch to its end (Demo.astro); under
-  // reduced motion, from the beat on screen at each. The rail parts where each
-  // starts and ends. Each name sits centred on its chapter, inside the
-  // timeline, or slides right to clear the name before it while it still
-  // starts over its own chapter; where one can't, the names leave the rail
-  // and the time names the move instead. One rule for every chain.
-  const placeAt = (s: number) =>
-    motion.matches ? Math.max(0, times.findLastIndex((x) => x <= s)) / Math.max(1, beats.length - 1) : s / length;
-  const chapterStart = (k: number) => placeAt(chips[k].at);
-  const chapterEnd = (k: number) => placeAt(chips[k].end);
-  function placeChapters() {
-    if (!chapterEls.length) return;
-    const parts = [...new Set(chips.flatMap((_, k) => [chapterStart(k), chapterEnd(k)]))].filter((x) => x > 0 && x < 1);
-    rail.style.maskImage = `linear-gradient(to right, ${parts
-      .map((x) => `${x * 100}%`)
-      .map((x) => `#000 calc(${x} - 1.5px), transparent calc(${x} - 1.5px) calc(${x} + 1.5px), #000 calc(${x} + 1.5px)`)
-      .join(", ")})`;
-    const w = track.clientWidth;
-    let end = -Infinity;
-    let fits = true;
-    const railPill = pills.find((p) => p.parentElement!.classList.contains("chapters"))!;
-    chapterEls.forEach((el, k) => {
-      const [from, to] = [chapterStart(k), chapterEnd(k)].map((x) => x * w);
-      const left = Math.min(Math.max(0, (from + to) / 2 - el.offsetWidth / 2, end + 4), w - el.offsetWidth);
-      el.style.left = (railPill.children[k] as HTMLElement).style.left = `${left}px`;
-      fits &&= left >= end + 4 && left <= to - 8;
-      end = left + el.offsetWidth;
-    });
-    track.parentElement!.classList.toggle("tight", !fits);
-    if (lit >= 0) placePills("land");
+  const tickAt = (k: number) => (motion.matches ? k / Math.max(1, marks.length - 1) : marks[k].at / length);
+  // Where the moo-on part starts on the rail: at its start, or under reduced
+  // motion, at its first still.
+  const onFrom = () => {
+    if (!motion.matches) return starts.on / length;
+    const k = marks.findIndex((m) => m.side === "on");
+    return k <= 0 ? 0 : tickAt(k);
+  };
+  function placeTicks() {
+    ticks.forEach((tick, k) => (tick.style.left = `${tickAt(k) * 100}%`));
+    // The fill turns from moo off's colour to moo on's where its part starts
+    // (chrome.css), and the rail parts there.
+    const x = onFrom() * 100;
+    fill.style.setProperty("--moo-from", `${x}%`);
+    rail.style.maskImage =
+      x > 0 && x < 100
+        ? `linear-gradient(to right, #000 calc(${x}% - 1.5px), transparent calc(${x}% - 1.5px) calc(${x}% + 1.5px), #000 calc(${x}% + 1.5px))`
+        : "";
   }
-  new ResizeObserver(placeChapters).observe(track);
-  document.fonts.ready.then(placeChapters);
-
-  // The columns the CSS picked and the rows Demo.astro's script set.
-  function fit() {
-    if (colsNow() === cols && rowsNow() === rows) return;
-    jumped = true;
-    cols = colsNow();
-    rows = rowsNow();
-    html = ["", "", ""];
-    draw();
-  }
-
-  // Follow the newest line the way a terminal does, unless the reader scrolled up.
-  function stickToBottom() {
-    const end = scroll.scrollHeight - scroll.clientHeight;
-    if (following && Math.abs(scroll.scrollTop - end) > 1) scroll.scrollTop = end;
-    scroll.classList.toggle("above", scroll.scrollTop > 0);
-  }
-
-  /** Under reduced motion, a beat's still: the last moment what it names is
-   * on screen, whole, before the next beat takes over. */
-  const ends = beatEnds(scene);
-  const stillAt = (k: number) =>
-    Math.max(times[k], Math.min(ends[k], times[k + 1] ?? length) - 0.05);
 
   function paint() {
     const reduced = motion.matches;
     root.classList.toggle("reduced", reduced);
-    const now = reduced ? (held ?? stillAt(still)) : t;
-    f = frame(scene, now, cols, pick, rows, pane);
-    // The pane closes with its chip.
-    if (pane && !f.chips.includes(pane)) {
-      pane = undefined;
-      f = frame(scene, now, cols, pick, rows);
-    }
-    if (reduced && held !== undefined) still = f.beat;
-    const next = [
-      f.transcript.map((r) => rowHtml(r)).join(""),
-      f.asking ? optionRows(f.bottom, id, f.asking.cursor) : f.bottom.map((r) => rowHtml(r)).join(""),
-      f.toast ? `<div class="box">${f.toast.rows.map((r) => rowHtml(r)).join("")}</div>` : "",
-    ];
-    if (next[0] !== html[0]) scroll.innerHTML = next[0];
-    if (next[1] !== html[1]) {
-      bottom.innerHTML = next[1];
-      if (refocus) bottom.querySelector<HTMLElement>(`[data-act="${refocus}"]`)?.focus();
-      refocus = undefined;
-    }
-    if (next[2] !== html[2]) toast.innerHTML = next[2];
-    html = next;
-    // A dialog's options are a listbox the arrow keys move through.
-    if (f.asking) {
-      bottom.setAttribute("role", "listbox");
-      bottom.setAttribute("aria-label", "Options");
-      bottom.setAttribute("aria-activedescendant", `${id}-opt-${f.asking.cursor}`);
-    } else ["role", "aria-label", "aria-activedescendant"].forEach((a) => bottom.removeAttribute(a));
-    // Sliding in from the right edge, the box's left part shows first.
-    const box = toast.firstElementChild as HTMLElement | null;
-    if (box) box.style.transform = `translateX(${(1 - f.toast!.slide) * 100}%)`;
+    const s = now();
+    const side = sideAt(s);
+    // Where one frame holds one pane, it shows the one playing, and its tab is on.
+    root.dataset.shown = side;
+    tabs.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === side)));
+    panes.forEach((p) => p.paint(s));
+    jumped = false;
     // The fill, its knob and the time readout show where the demo is.
-    const at = `${(reduced ? still / Math.max(1, beats.length - 1) : t / length) * 100}%`;
+    const at = `${(reduced ? still / Math.max(1, marks.length - 1) : t / length) * 100}%`;
     fill.style.clipPath = `inset(0 calc(100% - ${at}) 0 0)`;
     knob.style.left = at;
-    nowEl.textContent = clock(now);
-    const move = lightChapter(chips.findIndex((c) => c.at <= now && now < c.end));
+    nowEl.textContent = clock(s);
+    const mark = marks.findLast((m) => m.at <= s);
+    const said = mark ? `${LABEL[mark.side]}, ${mark.what}` : LABEL[side];
     if (reduced) {
       track.setAttribute("aria-valuenow", String(still + 1));
-      track.setAttribute("aria-valuetext", `${move ? `${move}: ` : ""}${marks(beats[still])}`);
+      track.setAttribute("aria-valuetext", said);
     } else {
       track.setAttribute("aria-valuenow", String(Math.floor(t)));
-      track.setAttribute("aria-valuetext", `${clock(t)}${move ? `, ${move}` : ` of ${clock(length)}`}: ${marks(beats[f.beat])}`);
-    }
-    // Keys fade in and out with the clock, so a still shows none.
-    keycaps.innerHTML = reduced
-      ? ""
-      : f.keys.map((k) => `<kbd style="opacity:${k.fade}">${esc(k.label)}</kbd>`).join("");
-    // Pressed while the plain reply is on screen, before the move is typed.
-    withoutBtn?.setAttribute("aria-pressed", String(now < without!.moveStarts));
-    stickToBottom();
-    placeCaret();
-    placeKeys();
-  }
-
-  // Keycaps sit just above the first row with text at the bottom: the prompt
-  // box, or the slash menu over it, or the dialog. They may
-  // cover the transcript, never what the reader picks from; a dialog that
-  // fills the terminal pushes them to its top edge.
-  function placeKeys() {
-    if (!keycaps.childElementCount) return;
-    const first = [...bottom.children].find((r) => r.textContent!.trim()) ?? bottom;
-    const box = term.getBoundingClientRect();
-    const top = first.getBoundingClientRect().top - box.top - keycaps.offsetHeight - 4;
-    keycaps.style.top = `${Math.max(parseFloat(getComputedStyle(term).paddingTop), top)}px`;
-  }
-
-  // The chapter on screen lights up, on the rail and beside the time, and
-  // the pill glides to its name; returns the name, if the timeline has
-  // chapters.
-  function lightChapter(k: number) {
-    if (k !== lit) {
-      const shown = lit >= 0;
-      lit = k;
-      nameSets.forEach((els) => els.forEach((el, i) => el.classList.toggle("on", i === k)));
-      placePills(shown ? "glide" : "enter");
-    }
-    return chapterEls[k]?.textContent ?? "";
-  }
-
-  // Each pill is a copy of its names in paper on ink (Demo.astro), clipped to
-  // the playing one: it glides from name to name, grows into place when it
-  // first shows, and lands with no motion when the names move (a resize, the
-  // font arriving, the names leaving the rail for the time).
-  function placePills(how: "glide" | "enter" | "land") {
-    for (const pill of pills) {
-      const on = pill.children[lit] as HTMLElement | undefined;
-      pill.classList.toggle("enter", how === "enter");
-      // No chapter lit: the pill fades out where it is.
-      if (!on) pill.style.opacity = "0";
-      if (!on?.offsetWidth) continue;
-      const [w, h] = [pill.offsetWidth, pill.offsetHeight];
-      const inset = (d: number) =>
-        `inset(${on.offsetTop + d}px ${w - on.offsetLeft - on.offsetWidth + d}px ${h - on.offsetTop - on.offsetHeight + d}px ${on.offsetLeft + d}px round var(--moo-pill))`;
-      if (how !== "glide") {
-        pill.style.transition = "none";
-        pill.style.clipPath = inset(how === "enter" ? 3 : 0);
-        void pill.offsetWidth; // start from here
-        pill.style.transition = "";
-      }
-      pill.style.clipPath = inset(0);
-      pill.style.opacity = "1";
+      track.setAttribute("aria-valuetext", `${clock(t)} of ${clock(length)}: ${said}`);
     }
   }
-
-  // The cursor glides to its cell, leaving a short smear, and blinks softly
-  // once at rest; it inverts the text under it, so it covers none.
-  let at = "";
-  let rest: number | undefined;
-  function placeCaret() {
-    const c = f?.cursor;
-    const row = c && (bottom.children[c.row] as HTMLElement | undefined);
-    caret.hidden = trail.hidden = !row;
-    if (!row || !c) return;
-    const box = term.getBoundingClientRect();
-    const r = row.getBoundingClientRect();
-    const cell = probe.firstElementChild!.getBoundingClientRect().width / 10;
-    const x = r.left - box.left + c.col * cell;
-    const y = r.top - box.top;
-    const key = `${x},${y}`;
-    if (key === at) return;
-    const [px, py] = at ? at.split(",").map(Number) : [x, y];
-    at = key;
-    caret.style.transform = `translate(${x}px, ${y}px)`;
-    caret.classList.remove("rest");
-    clearTimeout(rest);
-    rest = window.setTimeout(() => caret.classList.add("rest"), 700);
-    // The glide and the smear's fade keep pace with the playback speed.
-    term.style.setProperty("--glide", `${90 / speed}ms`);
-    term.style.setProperty("--decay", `${280 / speed}ms`);
-    // A jump (a seek, a scrub, a resize) moves the cursor with no glide or smear.
-    if (jumped || (px === x && py === y)) {
-      jumped = false;
-      trail.classList.remove("hot");
-      caret.style.transition = "none";
-      requestAnimationFrame(() => (caret.style.transition = ""));
-      return;
-    }
-    // The smear: on the row the cursor lands on, from it back toward where it
-    // came from, at most 6 cells, behind the text. Each move takes the next hue,
-    // so a run of moves cycles through them; it fades into the cursor's own
-    // colour, and at rest only the plain cursor stays.
-    const run = Math.min(Math.max(Math.abs(x - px), cell), 6 * cell);
-    const back = py === y ? Math.sign(px - x) : y > py ? -1 : 1;
-    hue = (hue + 47) % 360;
-    trail.style.transition = "none";
-    trail.style.transform = `translate(${back < 0 ? x - run : x + cell}px, ${y}px)`;
-    trail.style.width = `${run}px`;
-    trail.style.height = `${r.height}px`;
-    trail.style.setProperty("--hue", String(hue));
-    trail.classList.add("hot");
-    void trail.offsetWidth; // start the fade from the hue
-    trail.style.transition = "";
-    trail.classList.remove("hot");
-  }
-  let hue = 0;
-  let jumped = true;
-
-  // Scrolling up pauses the demo so the text holds still; back at the bottom, it
-  // resumes. Only scrolls that follow the reader's own input count.
-  let lastInput = -Infinity;
-  for (const type of ["wheel", "touchmove", "keydown", "pointerdown"])
-    scroll.addEventListener(type, () => (lastInput = performance.now()), { passive: true });
-  scroll.addEventListener("scroll", () => {
-    scroll.classList.toggle("above", scroll.scrollTop > 0);
-    if (motion.matches || performance.now() - lastInput > 800) return;
-    const atBottom = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop <= 2;
-    if (atBottom !== following) {
-      following = atBottom;
-      sync();
-    }
-  });
 
   const ended = () => t >= length;
-  const running = () => inView && !userPaused && following && !motion.matches && !ended();
+  const running = () => inView && !userPaused && playing().following() && !motion.matches && !ended();
 
-  // A frame that fails to draw says so in the terminal, and the demo stops.
+  // A frame that fails to draw says so in the pane playing, and the demo stops.
   function draw() {
     try {
       paint();
     } catch (e) {
       userPaused = true;
-      scroll.innerHTML = `<div class="row"><span class="o">This demo failed to draw: ${esc(String(e))}</span></div>`;
-      bottom.innerHTML = "";
+      $("scroll", playing().box).innerHTML = `<div class="row"><span class="o">This demo failed to draw: ${esc(String(e))}</span></div>`;
       throw e;
     }
   }
 
-  function tick(now: number) {
+  function tick(at: number) {
     if (!running()) {
       ticking = false;
       return;
     }
     // A frame's timestamp can precede the performance.now() taken when play began.
-    t = Math.min(length, t + (Math.max(0, now - last) / 1000) * speed);
-    last = now;
+    t = Math.min(length, t + (Math.max(0, at - last) / 1000) * speed);
+    last = at;
     // At the end the demo holds its last frame, and play becomes replay.
     if (ended()) sync();
     else draw();
@@ -448,14 +426,12 @@ export function mount(root: HTMLElement) {
   }
 
   function sync() {
-    const paused = userPaused || !following;
+    const paused = userPaused || !playing().following();
     playBtn.textContent = ended() ? "↻" : paused ? "▶" : "❚❚";
     playBtn.setAttribute("aria-label", ended() ? "Replay demo" : paused ? "Play demo" : "Pause demo");
     speedBtns.forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.speed) === speed)));
     placeTicks();
-    placeChapters();
-    fill.style.setProperty("--moo-from", `${mooFrom() * 100}%`);
-    track.setAttribute("aria-valuemax", String(motion.matches ? beats.length : Math.floor(length)));
+    track.setAttribute("aria-valuemax", String(motion.matches ? marks.length : Math.floor(length)));
     track.setAttribute("aria-valuemin", motion.matches ? "1" : "0");
     if (running() && !ticking) {
       ticking = true;
@@ -465,33 +441,36 @@ export function mount(root: HTMLElement) {
     draw();
   }
 
+  /** Back to where each pane stands, the demo driving the dialog. */
+  function release() {
+    pick = undefined;
+    tend = undefined;
+    panes.forEach((p) => p.follow());
+  }
+
   /** Jump to time `s`; a reader's pick no longer applies. Playing stays playing. */
   function seek(s: number) {
     jumped = true;
     t = Math.min(Math.max(0, s), length);
-    pick = undefined;
-    pane = undefined;
-    following = true;
+    release();
     last = performance.now();
     // A seek can end the demo or take it back from its end.
     sync();
   }
-  function seekBeat(k: number) {
+  function seekWait(k: number) {
+    const to = Math.min(Math.max(0, k), marks.length - 1);
     if (motion.matches) {
-      still = Math.min(Math.max(0, k), beats.length - 1);
-      held = undefined;
-      pick = undefined;
-      pane = undefined;
+      still = to;
+      jumped = true;
+      release();
       draw();
-    // Just past the beat's moment, so a paused demo shows what it marks.
-    } else seek(times[Math.min(Math.max(0, k), times.length - 1)] + 0.3);
+    } else seek(marks[to].at);
   }
-  const beatNow = () => (motion.matches ? still : (f?.beat ?? 0));
 
-  // Play always returns to the newest line and lets the demo drive the dialog;
-  // at the end, it replays from the first ask.
+  // Play always returns to where the panes stand and lets the demo drive the
+  // dialog; at the end, it replays from the first ask.
   // The glyph of the state play or pause just put the demo in, shown in the
-  // terminal's centre, then faded.
+  // pair's centre, then faded.
   const flash = $("flash");
   function flashState() {
     flash.textContent = userPaused ? "❚❚" : "▶";
@@ -503,33 +482,23 @@ export function mount(root: HTMLElement) {
     if (ended()) {
       seek(0);
       userPaused = false;
-    } else if (userPaused || !following) {
+    } else if (userPaused || !playing().following()) {
       userPaused = false;
-      following = true;
-      pick = undefined;
-      pane = undefined;
+      release();
     } else userPaused = true;
     sync();
     flashState();
   });
 
-  // A click on the terminal plays or pauses it, as on a video, unless it picks
-  // a dialog's option, ends a drag that scrolled, or ends selecting text.
-  let down: { x: number; y: number; top: number } | undefined;
-  term.addEventListener("pointerdown", (e) => (down = { x: e.clientX, y: e.clientY, top: scroll.scrollTop }));
-  term.addEventListener("click", (e) => {
-    const moved = down && (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4 || scroll.scrollTop !== down.top);
-    if (motion.matches || moved || getSelection()?.toString() || (e.target as HTMLElement).closest("[data-opt], [data-act], .pane")) return;
-    playBtn.click();
-  });
-  // A step between the plain reply and moo's hand-back: it pauses there.
-  withoutBtn?.addEventListener("click", () => {
-    const to = withoutBtn.getAttribute("aria-pressed") === "true" ? without!.handBack : without!.plain;
-    userPaused = true;
-    held = to;
-    if (!motion.matches) seek(to);
-    sync();
-  });
+  // A tab goes to the start of its pane's part.
+  tabs.forEach((b) =>
+    b.addEventListener("click", () => {
+      const side = b.dataset.tab as Side;
+      if (motion.matches) seekWait(marks.findIndex((m) => m.side === side));
+      else seek(starts[side]);
+    }),
+  );
+
   // A speed picked here, or in another player, plays here too (speed.ts).
   speedBtns.forEach((b) => b.addEventListener("click", () => pickSpeed(Number(b.dataset.speed))));
   followSpeed((x) => {
@@ -538,7 +507,7 @@ export function mount(root: HTMLElement) {
   });
 
   // The timeline seeks where it is pressed, and follows a drag; a press within
-  // half a fingertip (12px) of a tick goes to that beat.
+  // half a fingertip (12px) of a tick goes to that wait.
   const seekTo = (e: PointerEvent) => {
     const r = track.getBoundingClientRect();
     const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
@@ -546,88 +515,75 @@ export function mount(root: HTMLElement) {
       .map((_, k) => ({ k, d: Math.abs(tickAt(k) - x) * r.width }))
       .filter(({ d }) => d <= 12)
       .sort((a, b) => a.d - b.d)[0];
-    if (near) seekBeat(near.k);
-    else if (motion.matches) seekBeat(Math.round(x * (beats.length - 1)));
+    if (near) seekWait(near.k);
+    else if (motion.matches) seekWait(Math.round(x * (marks.length - 1)));
     else seek(x * length);
-  };
-  // On a chain's timeline, a tap on a chapter goes to its launch (a name's
-  // own, since a name may reach past its chapter), a tap outside one seeks
-  // there, and a drag scrubs.
-  let tap: { x: number; k: number } | undefined;
-  const chapterAt = (e: PointerEvent) => {
-    const named = chapterEls.indexOf((e.target as HTMLElement).closest<HTMLElement>("[data-chapters] > *")!);
-    const x = (e.clientX - track.getBoundingClientRect().left) / track.clientWidth;
-    return named >= 0 ? named : chips.findIndex((_, k) => chapterStart(k) <= x && x < chapterEnd(k));
   };
   track.addEventListener("pointerdown", (e) => {
     track.setPointerCapture(e.pointerId);
-    if (chapterEls.length) tap = { x: e.clientX, k: chapterAt(e) };
-    else seekTo(e);
-  });
-  track.addEventListener("pointermove", (e) => {
-    if (!track.hasPointerCapture(e.pointerId) || (tap && Math.abs(e.clientX - tap.x) <= 4)) return;
-    tap = undefined;
     seekTo(e);
   });
-  track.addEventListener("pointerup", (e) => {
-    if (tap && tap.k < 0) seekTo(e);
-    else if (tap && motion.matches) seekBeat(chips[tap.k].beat);
-    else if (tap) seek(chips[tap.k].at);
-    tap = undefined;
+  track.addEventListener("pointermove", (e) => {
+    if (track.hasPointerCapture(e.pointerId)) seekTo(e);
   });
 
   // Picking an option pauses the demo and moves the dialog's cursor to it.
-  const choose = (k: number) => {
-    if (!f?.asking) return;
-    pick = Math.min(Math.max(0, k), f.asking.options - 1);
+  function choose(k: number) {
+    const asking = playing().asking();
+    if (!asking) return;
+    pick = Math.min(Math.max(0, k), asking.options - 1);
     userPaused = true;
     sync();
-  };
-  bottom.addEventListener("click", (e) => {
-    const row = (e.target as HTMLElement).closest<HTMLElement>("[data-opt]");
-    if (row) choose(Number(row.dataset.opt));
-    const button = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
-    if (button) act(button.dataset.act!, e.detail === 0);
-  });
+  }
   // tend's chip opens its pane, or closes it if open; close closes it. The
   // pane opens paused, as picking an option is, so it holds still to read;
   // play closes it and goes on. A press by key keeps the focus on what it
   // pressed, or on the chip once its pane closes.
-  function act(id: string, byKey: boolean) {
-    const name = id.replace(/^chip:/, "");
-    const closing = id === "close" || name === pane;
-    const chip = `chip:${pane ?? name}`;
-    pane = closing ? undefined : name;
-    if (pane) userPaused = true;
-    refocus = byKey ? (closing ? chip : id) : undefined;
+  function act(name: string, byKey: boolean) {
+    const chip = name.replace(/^chip:/, "");
+    const closing = name === "close" || chip === tend;
+    const was = `chip:${tend ?? chip}`;
+    tend = closing ? undefined : chip;
+    if (tend) userPaused = true;
+    refocus = byKey ? (closing ? was : name) : undefined;
     sync();
   }
 
-  // Keys: Space plays or pauses, ←/→ go to the previous or next beat, ↑/↓
+  // Keys: Space plays or pauses, ←/→ go to the previous or next wait, ↑/↓
   // move through a dialog's options, Esc closes tend's pane.
   root.addEventListener("keydown", (e) => {
     const inButton = (e.target as HTMLElement).closest("button");
-    if (e.key === "Escape" && pane) {
+    if (e.key === "Escape" && tend) {
       e.preventDefault();
-      act("close", bottom.contains(e.target as Node));
+      act("close", panes.some((p) => p.contains(e.target as Node)));
     } else if (e.key === " " && !inButton) {
       e.preventDefault();
       playBtn.click();
     } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
-      const k = beatNow();
-      const into = motion.matches ? 0 : t - times[k];
-      // Back from inside a beat goes to its start; from its start, the one before.
-      seekBeat(e.key === "ArrowRight" ? k + 1 : into > 1 ? k : k - 1);
-    } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && f?.asking && !motion.matches) {
+      if (motion.matches) return seekWait(still + (e.key === "ArrowRight" ? 1 : -1));
+      // Forth goes to the next wait, if any; back to the wait before the
+      // moment on screen, past a second of it, or else to the start.
+      if (e.key === "ArrowRight") {
+        const k = marks.findIndex((m) => m.at > t + 0.05);
+        if (k >= 0) seekWait(k);
+      } else {
+        const k = marks.findLastIndex((m) => m.at < t - 1);
+        if (k >= 0) seekWait(k);
+        else seek(0);
+      }
+    } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && playing().asking() && !motion.matches) {
       e.preventDefault();
-      choose(f.asking.cursor + (e.key === "ArrowDown" ? 1 : -1));
+      choose(playing().asking()!.cursor + (e.key === "ArrowDown" ? 1 : -1));
     }
   });
 
   motion.addEventListener("change", sync);
-  new ResizeObserver(fit).observe(root);
-  root.addEventListener("fit", fit);
+  // A layout change moves the cursor with no glide.
+  new ResizeObserver(() => {
+    jumped = true;
+    draw();
+  }).observe(root);
 
   // It plays only in view; out of view, it holds where it is, and an ended
   // demo stays on its last frame.
@@ -637,7 +593,7 @@ export function mount(root: HTMLElement) {
       sync();
     },
     { threshold: 0.4 },
-  ).observe(term);
+  ).observe($("pair"));
 
   sync();
 }

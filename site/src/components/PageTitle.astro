@@ -1,22 +1,12 @@
 ---
-// On a demo page, the front page among them, the title is for the tab and
-// screen readers alone, so the terminal comes first. Every other page shows
-// its title and, under it, its description in plain words.
-const { entry } = Astro.locals.starlightRoute;
-const { title, moves, move, template } = entry.data;
-const demo = (moves !== undefined || move !== undefined) && template !== "splash";
+// Every page shows its title and, under it, its description in plain words.
+// A page that draws a demo (Demo.astro), the front page among them, keeps
+// the title for the tab and screen readers alone, so the terminal comes first.
+const { title, description } = Astro.locals.starlightRoute.entry.data;
 ---
 
-{
-  demo ? (
-    <h1 id="_top" class="vh">{title}</h1>
-  ) : (
-    <>
-      <h1 id="_top">{title}</h1>
-      {entry.data.description && <p class="lede">{entry.data.description}</p>}
-    </>
-  )
-}
+<h1 id="_top">{title}</h1>
+{description && <p class="lede">{description}</p>}
 
 <style>
   h1 {
@@ -26,8 +16,9 @@ const demo = (moves !== undefined || move !== undefined) && template !== "splash
     font-weight: 600;
     color: var(--sl-color-white);
   }
-  .vh {
+  :global(:root:has(.demo)) h1 {
     position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
   }
+  :global(:root:has(.demo)) .lede { display: none; }
 </style>

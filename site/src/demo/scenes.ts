@@ -1,10 +1,39 @@
-// What each page's demo plays: the turns of one recorded session and the beats
-// that mark its moments.
+// What each page's demo plays: a pair, the same words with moo off and on.
 //
 // Changed from the recordings, as the user asked:
-// - Renamed: each path under the home folder is written ~/…, and a project
-//   folder under ~/.claude/projects is named for a user called dev, so no
-//   username shows (tools/gen.py renamed()).
+// - Renamed (tools/gen.py renamed()):
+//   - A take recorded in a copy of its world names the world: its path, its
+//     project folder under ~/.claude/projects and its bare folder name, each
+//     as long as the copy's, so text wraps where it did.
+//     | Pages        | Copy                      | World                   |
+//     | clarify      | /Users/Shared/rela1       | /Users/Shared/relay     |
+//     | widen        | /Users/Shared/motionpa1   | /Users/Shared/motionpad |
+//     | intent       | /Users/Shared/harnes1     | /Users/Shared/harness   |
+//     | judge (off)  | /Users/Shared/chimebo1    | /Users/Shared/chimebox  |
+//     | judge (on)   | /Users/Shared/chimebo2    | /Users/Shared/chimebox  |
+//     | reframe      | /Users/Shared/shopdec1    | /Users/Shared/shopdeck  |
+//     | shift        | /Users/Shared/agent-ki1   | /Users/Shared/agent-kit |
+//     | shape        | /Users/Shared/glossary1   | /Users/Shared/glossary2 |
+//     | compose      | /Users/Shared/agentdes1   | /Users/Shared/agentdesk |
+//     | consult      | /Users/Shared/invoicin1   | /Users/Shared/invoicing |
+//     | elicit       | /Users/Shared/taskdes2    | /Users/Shared/taskdesk  |
+//     | explain      | /Users/Shared/songboo1    | /Users/Shared/songbook  |
+//     | interrogate  | /Users/Shared/callgat1    | /Users/Shared/callgate  |
+//     | deepen       | /Users/Shared/mdchec1     | /Users/Shared/mdcheck   |
+//     | anchor       | /Users/Shared/billin1     | /Users/Shared/billing   |
+//     | reduce       | /Users/Shared/catalo1     | /Users/Shared/catalog   |
+//     | target       | /Users/Shared/termsyn1    | /Users/Shared/termsync  |
+//     | router       | /Users/Shared/tasklin1    | /Users/Shared/taskline  |
+//     | freeze       | /private/tmp/order1       | /private/tmp/orders     |
+//     | draft        | /private/tmp/shi1         | /private/tmp/ship       |
+//     | inversion    | /private/tmp/notes-bo1    | /private/tmp/notes-box  |
+//     | chain (off)  | /Users/Shared/t00/shop    | ~/shop                  |
+//     | skills (off) | /Users/Shared/t01/invoices | ~/invoices             |
+//   - Then every home path, so no home path and no username shows: the dev
+//     repo's hope, ~/repos/moo.md/hope/, as the installed plugin,
+//     ~/.claude/plugins/cache/moo-md/hope/ (the same length); any other path
+//     under the home folder as ~/…, shorter than recorded; and a project
+//     folder's name under ~/.claude/projects as -Users-dev-….
 // - Removed from the welcome banner: the blank row above it, the two under it,
 //   the model row ("Opus 5.5 with xhigh effort · Claude Ultra") and the folder
 //   row (as "~/orders"). What is left, "Claude Code v2.1.316", takes one row,
@@ -32,91 +61,81 @@
 // - Option gaps: half a row of space under each option's description and above
 //   "Type something." (Demo.astro's .gap; render.ts's fit() counts it). Claude
 //   Code draws none.
-import type { Chrome, Scene, Turn } from "./types";
-import * as freeze from "./sessions/freeze";
-import * as anchor from "./sessions/anchor";
-import * as skills from "./sessions/skills";
-import * as chain from "./sessions/chain";
-import * as clarify from "./sessions/clarify";
-import * as consult from "./sessions/consult";
-import * as compose from "./sessions/compose";
-import * as target from "./sessions/target";
-import * as router from "./sessions/router";
-import * as reframe from "./sessions/reframe";
-import * as judge from "./sessions/judge";
-import * as deepen from "./sessions/deepen";
-import * as widen from "./sessions/widen";
-import * as interrogate from "./sessions/interrogate";
-import * as shift from "./sessions/shift";
-import * as elicit from "./sessions/elicit";
-import * as explain from "./sessions/explain";
-import * as shape from "./sessions/shape";
-import * as intent from "./sessions/intent";
-import * as inversion from "./sessions/inversion";
-import * as draft from "./sessions/draft";
-import * as reduce from "./sessions/reduce";
+import type { Chrome, Pair, Turn } from "./types";
+import * as clarifyOff from "./sessions/clarify-off";
+import * as clarifyOn from "./sessions/clarify-on";
+import * as consultOff from "./sessions/consult-off";
+import * as consultOn from "./sessions/consult-on";
+import * as composeOff from "./sessions/compose-off";
+import * as composeOn from "./sessions/compose-on";
+import * as targetOff from "./sessions/target-off";
+import * as targetOn from "./sessions/target-on";
+import * as routerOff from "./sessions/router-off";
+import * as routerOn from "./sessions/router-on";
+import * as reframeOff from "./sessions/reframe-off";
+import * as reframeOn from "./sessions/reframe-on";
+import * as judgeOff from "./sessions/judge-off";
+import * as judgeOn from "./sessions/judge-on";
+import * as deepenOff from "./sessions/deepen-off";
+import * as deepenOn from "./sessions/deepen-on";
+import * as widenOff from "./sessions/widen-off";
+import * as widenOn from "./sessions/widen-on";
+import * as anchorOff from "./sessions/anchor-off";
+import * as anchorOn from "./sessions/anchor-on";
+import * as interrogateOff from "./sessions/interrogate-off";
+import * as interrogateOn from "./sessions/interrogate-on";
+import * as shiftOff from "./sessions/shift-off";
+import * as shiftOn from "./sessions/shift-on";
+import * as elicitOff from "./sessions/elicit-off";
+import * as elicitOn from "./sessions/elicit-on";
+import * as explainOff from "./sessions/explain-off";
+import * as explainOn from "./sessions/explain-on";
+import * as shapeOff from "./sessions/shape-off";
+import * as shapeOn from "./sessions/shape-on";
+import * as intentOff from "./sessions/intent-off";
+import * as intentOn from "./sessions/intent-on";
+import * as inversionOff from "./sessions/inversion-off";
+import * as inversionOn from "./sessions/inversion-on";
+import * as freezeOff from "./sessions/freeze-off";
+import * as freezeOn from "./sessions/freeze-on";
+import * as draftOff from "./sessions/draft-off";
+import * as draftOn from "./sessions/draft-on";
+import * as reduceOff from "./sessions/reduce-off";
+import * as reduceOn from "./sessions/reduce-on";
+import * as chainOff from "./sessions/chain-off";
+import * as chainOn from "./sessions/chain-on";
+import * as skillsOff from "./sessions/skills-off";
+import * as skillsOn from "./sessions/skills-on";
 
-// ---- Skill pages: one session each, turn 0 with all of moo off, turn 1 the
-// skill with moo on. The page plays both, turn 0 first. Each turn has two
-// beats: as it starts and as its reply arrives.
-
-const skill = ({ chrome, turns }: { chrome: Chrome; turns: Turn[] }): Scene => ({
-  chrome,
-  turns,
-  beats: turns.flatMap((_, at): Scene["beats"] => [{ at }, { at, on: "reply" }]),
-  plain: 0,
+// Each page: the same words typed with all of moo off, then with moo on, each
+// in a fresh copy of the same world. A skill page's moo-off pane plays the
+// first turn of an earlier take, whose later turns ran with moo on; judge's
+// and the chain pages' moo-off panes are takes of their own. The chain pages'
+// moo-on panes are their earlier takes, all of moo on.
+const pair = (off: { chrome: Chrome; turns: Turn[] }, on: { chrome: Chrome; turns: Turn[] }): Pair => ({
+  off: { chrome: off.chrome, turns: off.turns },
+  on: { chrome: on.chrome, turns: on.turns },
 });
 
-export const clarifyScene = skill(clarify);
-export const consultScene = skill(consult);
-export const composeScene = skill(compose);
-export const targetScene = skill(target);
-export const routerScene = skill(router);
-export const reframeScene = skill(reframe);
-export const judgeScene = skill(judge);
-export const deepenScene = skill(deepen);
-export const widenScene = skill(widen);
-export const anchorScene = skill(anchor);
-export const interrogateScene = skill(interrogate);
-export const shiftScene = skill(shift);
-export const elicitScene = skill(elicit);
-export const explainScene = skill(explain);
-export const shapeScene = skill(shape);
-export const intentScene = skill(intent);
-export const inversionScene = skill(inversion);
-export const freezeScene = skill(freeze);
-export const draftScene = skill(draft);
-export const reduceScene = skill(reduce);
-
-// ---- Chain pages: one session where /compose runs each move as it comes up.
-
-export const chainScene: Scene = {
-  chrome: chain.chrome,
-  turns: chain.turns,
-  beats: [
-    { at: 0 },
-    { at: 0, on: "move", n: 0 },
-    { at: 0, on: "move", n: 1 },
-    { at: 0, on: "dialog", q: 0 },
-    { at: 0, on: "move", n: 2 },
-    { at: 0, on: "move", n: 3 },
-    { at: 0, on: "reply" },
-  ],
-};
-
-export const skillsScene: Scene = {
-  chrome: skills.chrome,
-  turns: skills.turns,
-  beats: [
-    { at: 0 },
-    { at: 0, on: "move", n: 0 },
-    { at: 0, on: "move", n: 1 },
-    { at: 0, on: "dialog", d: 0, q: 0 },
-    { at: 0, on: "dialog", d: 1, q: 0 },
-    { at: 0, on: "move", n: 2 },
-    { at: 0, on: "dialog", d: 2, q: 0 },
-    { at: 0, on: "reply" },
-    { at: 1 },
-    { at: 1, on: "reply" },
-  ],
-};
+export const clarifyScene = pair(clarifyOff, clarifyOn);
+export const consultScene = pair(consultOff, consultOn);
+export const composeScene = pair(composeOff, composeOn);
+export const targetScene = pair(targetOff, targetOn);
+export const routerScene = pair(routerOff, routerOn);
+export const reframeScene = pair(reframeOff, reframeOn);
+export const judgeScene = pair(judgeOff, judgeOn);
+export const deepenScene = pair(deepenOff, deepenOn);
+export const widenScene = pair(widenOff, widenOn);
+export const anchorScene = pair(anchorOff, anchorOn);
+export const interrogateScene = pair(interrogateOff, interrogateOn);
+export const shiftScene = pair(shiftOff, shiftOn);
+export const elicitScene = pair(elicitOff, elicitOn);
+export const explainScene = pair(explainOff, explainOn);
+export const shapeScene = pair(shapeOff, shapeOn);
+export const intentScene = pair(intentOff, intentOn);
+export const inversionScene = pair(inversionOff, inversionOn);
+export const freezeScene = pair(freezeOff, freezeOn);
+export const draftScene = pair(draftOff, draftOn);
+export const reduceScene = pair(reduceOff, reduceOn);
+export const chainScene = pair(chainOff, chainOn);
+export const skillsScene = pair(skillsOff, skillsOn);

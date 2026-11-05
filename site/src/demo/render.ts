@@ -1,12 +1,17 @@
 // Claude Code's terminal as recorded (v2.1.316): rows of styled segments, built
 // for any column count, and one clock that says what is on screen at time t.
-import type { Beat, Chrome, Dialog, Line, Scene, Turn } from "./types";
+import type { Chrome, Dialog, Line, Scene, Turn } from "./types";
 import { layout, MEASURE, type Band, type Cell as BandCell, type Item } from "./band";
 
 /** The terminal's height in rows, as recorded: dialogs are laid out for it
  * (a preview's rows fit under it; a taller dialog shows its last rows). The
  * player may show fewer rows; a dialog taller than those shows its last. */
 export const ROWS = 36;
+
+/** The terminal every demo shows, in either layout: so a page reads the same
+ * on every screen, and a reader of its wait frames sees what a visitor sees.
+ * 45 is the widest recorded width a phone holds. */
+export const PANE = { cols: 45, rows: 30 };
 
 /** A run of text and the classes that color it (see Demo.astro's styles),
  * and what a click on it does, if it is one of tend's buttons: its item's id,
@@ -25,7 +30,7 @@ type Cell = [string, string?];
 // often than starting a new row would (wrap-ansi's rule), and breaks at the
 // edge with no space carried; a shorter word is never broken, even on a first
 // row narrower than the width.
-function wrap(cs: Cell[], width: number, first = width, keep = false): Cell[][] {
+function wrap(cs: Cell[], width: number, first = width): Cell[][] {
   const lines: Cell[][] = [];
   let line: Cell[] = [];
   let i = 0;
@@ -70,18 +75,15 @@ function wrap(cs: Cell[], width: number, first = width, keep = false): Cell[][] 
     }
     i = j;
   }
-  const rows = [...lines, line];
-  room();
-  // A space carried off a row that overflowed its limit stays drawn.
-  const over = (k: number) => rows[k].length > (k ? width : first);
-  return keep ? rows.map((r, k) => (carried[k] && over(k - 1) ? [[" "] as Cell, ...r] : r)) : rows;
+  return [...lines, line];
 }
 
 // Ink's wrap, for what Claude Code lays out in boxes and code blocks (wrap-ansi
 // with trim off): a line's leading spaces stay on its first row, the space
 // before a word that moves down ends the row above, and a word longer than the
-// width breaks at the edge. Matches the recorded dialogs at 45, 80 and 120.
-function wrapInk(cs: Cell[], width: number): Cell[][] {
+// width breaks at the edge, or, not `hard`, takes a row of its own whole.
+// Matches the recorded dialogs at 45, 80 and 120.
+function wrapInk(cs: Cell[], width: number, hard = true): Cell[][] {
   const words: Cell[][] = [[]];
   const spaces: Cell[] = [];
   for (const c of cs) {
@@ -95,7 +97,7 @@ function wrapInk(cs: Cell[], width: number): Cell[][] {
       if (row().length >= width) rows.push([]);
       row().push(spaces[k - 1]);
     }
-    if (word.length > width) {
+    if (hard && word.length > width) {
       const here =
         1 + Math.floor((word.length - (width - row().length) - 1) / width);
       if (Math.floor((word.length - 1) / width) < here) rows.push([]);
@@ -320,20 +322,13 @@ function table(rows: Line[], width: number): Cell[][] {
   ];
 }
 
-/** A table too wide to draw: each row as "header: value" lines, the header
- * bold, between rules 3 short of the width. The value wraps 1 short of the
- * width, its first line as many shorter as the header has letters; that line
- * then wraps again behind the header. A row after one that overflowed its
- * limit keeps the space it carried (widen). So recorded at 45 columns. */
-/** A listed value as Claude Code first lays it out: wrapped as Ink does at
- * `width`, its rows joined by a space. Doubled spaces then close up, but in
- * code a row's end leaves two: "`lsof +D`" drew "lsof  +D" (intent),
+/** A listed value's rows joined by a space. Doubled spaces then close up,
+ * but in code a row's end leaves two: "`lsof +D`" drew "lsof  +D" (intent),
  * "`cannot open plughw:S2 (No such device)`" drew "open  plughw:S2 (No  such"
- * (judge). */
-function reflowed(cs: Cell[], width: number): Cell[] {
+ * (judge). A row that ends inside a word joins the next with nothing. */
+function rejoined(rows: Cell[][]): Cell[] {
   const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
-  // A row that ends inside a word joins the next with nothing.
-  const rows = wrapInk(cs, Math.max(1, width));
+  const cs = rows.flat();
   let at = 0;
   const joined = rows.flatMap((r, k) => {
     const split = k > 0 && cs[at - 1]?.[0] !== " " && cs[at]?.[0] !== " ";
@@ -343,21 +338,30 @@ function reflowed(cs: Cell[], width: number): Cell[] {
   return joined.filter((c, k) => !(c[0] === " " && joined[k - 1]?.[0] === " " && !(code(c) && code(joined[k - 1]))));
 }
 
+/** A table too wide to draw, as Claude Code 2.1.316 lays it out for the
+ * terminal's `cols` (the reply's width plus its gutter): each row as
+ * "header: value" lines, the header bold, between rules of min(cols - 1, 40).
+ * The value wraps, long words whole, at cols - 3 - the header's width (at
+ * least 10; cols - 1 with no header); its first row goes behind the header,
+ * and the rest, its rows rejoined, wraps again at cols - 3. Each line then
+ * wraps as Ink draws text at the reply's width: a space past the edge takes
+ * a row of its own (anchor, at 45). A carried space starts a row of the rest
+ * (compose); the one carried off the first row is dropped. */
 function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
-  const rule = plain("─".repeat(width - 3));
+  const cols = width + 2;
+  const rule = plain("─".repeat(Math.min(cols - 1, 40)));
   return body.flatMap((r, k) => [
     ...(k ? [rule] : []),
     ...head.flatMap((h, c) => {
       // A column with no header shows its value alone, and nothing when the
       // value is empty too (judge).
-      if (!h.trim()) return r[c].length ? wrap(r[c], width - 1) : [];
-      const key = inline(h, "b");
-      const [first = [], ...rest] = wrap(reflowed(r[c], width - 1 - key.length), width - 1, width - 1 - key.length, true);
-      const line = wrap([...key, ...plain(":", "b"), ...plain(" "), ...first], width);
-      // Ink keeps the space the value broke at; past the edge it takes a row
-      // of its own, as recorded at 45.
-      const spill = rest.length > 0 && line[line.length - 1].length === width;
-      return [...line, ...(spill ? [[]] : []), ...rest];
+      if (!h.trim() && !r[c].length) return [];
+      const key = h.trim() ? [...inline(h, "b"), ...plain(":", "b"), ...plain(" ")] : [];
+      const rows = wrapInk(r[c], Math.max(key.length ? cols - (key.length - 2) - 3 : cols - 1, 10), false);
+      const rest = rejoined(rows).slice(rows[0].length);
+      while (rest[0]?.[0] === " ") rest.shift();
+      const lines = [[...key, ...rows[0]], ...(rest.length ? wrapInk(rest, cols - 3, false) : [])];
+      return lines.filter((l, n) => !n || l.some(([ch]) => ch !== " ")).flatMap((l) => wrapInk(l, width));
     }),
   ]);
 }
@@ -659,7 +663,8 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
       const sc = script(d, within(d));
       opened.push({ open: u, script: sc });
       caps.push(...sc.caps.map(([at, kind, value]): Phase["caps"][number] => [u + at, kind, value]));
-      u += sc.length + K.act;
+      // A dialog left open ends the turn: nothing follows it to wait for.
+      u += sc.length + (d.left ? 0 : K.act);
     };
     activity.forEach((a, k) => {
       dialogs.forEach((d) => d.after === k && stops.push({ at: d.at[0], run: () => ask(d) }));
@@ -686,94 +691,33 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
     const p: Phase = { start, sent, typing, menu, acts, launches: launched, dialogs: opened, reply, read, caps };
     for (const [at, kind, value] of stray) caps.push([demoAt(turn, p, at), kind, value]);
     caps.sort((a, b) => a[0] - b[0]);
-    t = reply + K.reveal + read;
+    // A turn that ends on a dialog left open has no reply to show.
+    t = dialogs.at(-1)?.left ? reply : reply + K.reveal + read;
     return p;
   });
   return { timing, length: t };
 }
 
-/** When a beat's moment comes: as its turn starts typing, as its dialog
- * shows the question, as its skill launches, or as its reply arrives. */
-function beatTime(beat: Beat, timing: Phase[]) {
-  const p = timing[beat.at];
-  if (beat.on === "reply") return p.reply;
-  if (beat.on === "move") return p.launches[beat.n];
-  if (beat.on === "dialog") {
-    const d = p.dialogs[beat.d ?? 0];
-    return d.open + d.script.moments.find((m) => m.q === beat.q)!.at;
-  }
-  return p.start;
+/** A moment the terminal waits on the user: a dialog's question, its
+ * options showing, halfway to the first key on it (the keycaps before it
+ * gone, the pick not yet moved), or a turn's reply standing whole. A turn
+ * that ends on a dialog left open waits there, with no reply. */
+export type Wait = { at: number; turn: number } & ({ on: "reply" } | { on: "dialog"; d: number; q: number });
+
+/** Every moment the terminal waits on the user, in order. */
+export function waits(scene: Scene, timing = phases(scene).timing): Wait[] {
+  return timing.flatMap((p, turn): Wait[] => [
+    ...p.dialogs.flatMap(({ open, script: { moments, length } }, d) =>
+      // A dialog left open shows its first question only: no answer moves it on.
+      scene.turns[turn].dialogs![d].questions.slice(0, scene.turns[turn].dialogs![d].left ? 1 : undefined).map((_, q): Wait => {
+        const k = moments.findIndex((m) => m.q === q);
+        return { at: open + (moments[k].at + (moments[k + 1]?.at ?? length)) / 2, turn, on: "dialog", d, q };
+      }),
+    ),
+    ...(scene.turns[turn].dialogs?.at(-1)?.left ? [] : [{ at: p.reply + K.reveal, turn, on: "reply" } as Wait]),
+  ]);
 }
 
-/** When each beat's moment comes; a beat naming no turn, question or
- * skill launch gets NaN. */
-export function beatTimes(scene: Scene, timing = phases(scene).timing) {
-  return scene.beats.map((b) => {
-    const turn = scene.turns[b.at];
-    const named =
-      turn &&
-      (b.on !== "move" || turn.launches?.[b.n] !== undefined) &&
-      (b.on !== "dialog" || turn.dialogs?.[b.d ?? 0]?.questions[b.q] !== undefined);
-    return named ? beatTime(b, timing) : NaN;
-  });
-}
-
-/** When what each beat names is last on screen, whole: the typed prompt just
- * before its Enter, the screen a skill launched on before the next line, a
- * question answered before its Enter, a reply once read. A still under
- * reduced motion holds it. */
-export function beatEnds(scene: Scene, timing = phases(scene).timing) {
-  return scene.beats.map((b) => {
-    const p = timing[b.at];
-    if (b.on === "reply") return p.reply + K.reveal + p.read;
-    if (b.on === "move") {
-      const at = p.launches[b.n];
-      return Math.min(p.reply, ...[...p.acts, ...p.dialogs.map((d) => d.open)].filter((x) => x > at));
-    }
-    if (b.on === "dialog") {
-      const d = p.dialogs[b.d ?? 0];
-      return d.open + (d.script.moments.find((m) => m.q > b.q)?.at ?? d.script.length);
-    }
-    return p.sent;
-  });
-}
-
-/** When turn `i`'s reply stands whole on screen, before the next turn types. */
-export const replyStands = (scene: Scene, i: number) => phases(scene).timing[i].reply + K.reveal;
-
-/** When turn `i` first waits on the user: its first dialog, options showing,
- * halfway to the first key on it (the keycaps that sent the prompt gone, the
- * pick not yet moved), or else its reply standing. */
-export const firstWait = (scene: Scene, i: number) => {
-  const d = phases(scene).timing[i].dialogs[0];
-  return d ? d.open + (d.script.moments[1]?.at ?? d.script.length) / 2 : replyStands(scene, i);
-};
-
-/** Each named move's chapter: from its launch, the sent prompt that runs it or
- * its Skill call, whichever comes first, to the next skill's launch in that
- * turn or the turn's reply, whichever comes first. A skill goes by its last
- * part: "hope:freeze" is freeze. */
-export function chapters(scene: Scene, names: string[], timing = phases(scene).timing) {
-  const last = (skill: string) => skill.split(":").pop();
-  const launched = scene.turns.flatMap((turn, i) => {
-    const typed = turn.user.match(/^\/(\S+)/)?.[1];
-    return [
-      ...(typed ? [{ i, at: timing[i].sent, name: last(typed) }] : []),
-      ...(turn.launches ?? []).map((l, n) => ({ i, at: timing[i].launches[n], name: last(l.skill) })),
-    ];
-  });
-  return names.map((name) => {
-    const first = launched.find((x) => x.name === name);
-    if (!first) throw new Error(`No prompt or skill call in the demo runs /${name}`);
-    const next = launched.find((x) => x.i === first.i && x.at > first.at);
-    return { at: first.at, end: Math.min(next?.at ?? Infinity, timing[first.i].reply) };
-  });
-}
-
-/** The moment a recorded time of turn `i` plays: seconds after its prompt was
- * sent, as the session file logs them. */
-export const demoTime = (scene: Scene, i: number, recorded: number) =>
-  demoAt(scene.turns[i], phases(scene).timing[i], recorded);
 /** What a working turn shows `at` seconds into the scene: the newest activity
  * line, or a dialog's question once it closed. */
 function working(turn: Turn, p: Phase, at: number, cols: number): Row[] {
@@ -794,6 +738,8 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
   let menu: Row[] | undefined;
   let asking: { dialog: Dialog; moment: Moment } | undefined;
   let chrome = scene.chrome;
+  // The newest reply's first row, once it has one.
+  let top: number | undefined;
   scene.turns.forEach((turn, i) => {
     const p = timing[i];
     if (s < p.start) return;
@@ -804,12 +750,13 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
         menu = turn.menu!.rows.map((r): Row => ({ segs: segs(r.flatMap(([x, c]) => plain(x, c)).slice(0, cols)) }));
       return;
     }
+    top = undefined;
     transcript.push(...user(turn.user, cols), BLANK);
     const since = s - p.sent;
     const counted = Math.min(recordedAt(turn, p, s), turn.replyAt);
     // While a dialog is open, focus mode shows its first question as the
     // activity line; until the reply, the newest activity line.
-    const open = p.dialogs.findIndex((d) => s >= d.open && s < d.open + d.script.length);
+    const open = p.dialogs.findIndex((d, k) => s >= d.open && (turn.dialogs![k].left || s < d.open + d.script.length));
     if (open >= 0) {
       const dialog = turn.dialogs![open];
       transcript.push(...asked(dialog, cols));
@@ -831,15 +778,19 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
     // reveal ends.
     const n =
       s < p.reply ? 0 : Math.min(rows.length, Math.max(1, Math.floor(rows.length * ramp(s, p.reply, p.reply + K.reveal))));
+    if (n) top = transcript.length;
     transcript.push(...rows.slice(0, n), ...(n ? [BLANK] : []));
     if (n < rows.length) transcript.push(spinner(chrome.spin, since, counted), BLANK);
     // What came after it with no prompt shows once the reply is all in.
     else
-      for (const m of turn.more ?? [])
-        transcript.push(...(m.tools ? [...tools(m.tools, cols), BLANK] : []), ...reply(m.reply, cols), BLANK);
+      for (const m of turn.more ?? []) {
+        transcript.push(...(m.tools ? [...tools(m.tools, cols), BLANK] : []));
+        top = transcript.length;
+        transcript.push(...reply(m.reply, cols), BLANK);
+      }
   });
   if (transcript[transcript.length - 1] === BLANK) transcript.pop();
-  return { transcript, typing, menu, asking, chrome };
+  return { transcript, typing, menu, asking, chrome, top };
 }
 
 /** Claude Code's row under the tool summary once the user pressed Esc. */
@@ -902,8 +853,9 @@ export type Frame = {
   /** The question on screen, if a dialog is open: its index, how many options
    * it has, and which one the dialog's cursor is on. */
   asking?: { q: number; options: number; cursor: number };
-  /** The newest beat whose moment has come. */
-  beat: number;
+  /** The transcript row to stand at the top while the terminal waits on
+   * the user: the newest reply's first row, once it is in. */
+  top?: number;
   /** The names of tend's chips on screen, e.g. "questions"; a pane opens
    * only on one of them. */
   chips: string[];
@@ -918,7 +870,7 @@ const prompted = (text: string): Cell[] =>
  * tend's pane for the chip of that name, if it shows. */
 export function frame(scene: Scene, s: number, cols: number, pick?: number, rows = ROWS, pane?: string): Frame {
   const { timing } = phases(scene);
-  const { transcript, typing, menu, asking, chrome } = transcriptAt(scene, s, cols);
+  const { transcript, typing, menu, asking, chrome, top } = transcriptAt(scene, s, cols);
   // The prompt box's rules and the status line reach the frame's right edge
   // (Demo.astro's .wide); the text in it wraps at `cols`.
   const rule: Row = { segs: [["─".repeat(cols), "r"]], cls: "wide rule" };
@@ -931,8 +883,6 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
     turn?.toast && since >= 0 && since < K.toastFor
       ? { rows: toastRows(turn.toast, cols), slide: ramp(since, 0, K.slide) }
       : undefined;
-  const times = beatTimes(scene, timing);
-  const beat = Math.max(0, times.findLastIndex((x) => s >= x));
   const keys = timing.flatMap((p) =>
     p.caps.flatMap(([at, kind, value]) => {
       const age = s - at;
@@ -944,20 +894,10 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
   if (asking) {
     const moment = pick === undefined ? asking.moment : { ...asking.moment, cursor: pick, shown: pick };
     const q = asking.dialog.questions[moment.q];
-    // A dialog taller than the recorded terminal shows its last rows, as
-    // recorded at 45. Taller than the terminal on screen, less the rows the
-    // keycaps take above it, its preview hides lines first, down to one, as
-    // the user asked; then rows above the question go, then rows at the
-    // bottom. The question always shows.
-    const room = rows - KEYCAPS;
-    const draw = (max: number) => fit(dialogRows(asking.dialog, moment, cols, max), ROWS);
-    let max = PREVIEW;
-    let drawn = draw(max);
-    while (max > 1 && height(drawn) > room) drawn = draw(--max);
-    const shown = keep(drawn, room, Math.max(0, drawn.findIndex((r) => r.cls === "ask")));
+    const shown = dialogShown(asking.dialog, moment, cols, rows);
     const at = shown.findIndex((r) => r.input !== undefined);
     return {
-      transcript, bottom: shown, toast, keys, beat, chips: [],
+      transcript, bottom: shown, toast, keys, chips: [],
       cursor: at < 0 ? undefined : { row: at, col: shown[at].input! },
       asking: q ? { q: moment.q, options: q.options.length, cursor: moment.cursor } : undefined,
     };
@@ -990,7 +930,7 @@ export function frame(scene: Scene, s: number, cols: number, pick?: number, rows
   // The cursor ends the typed text, or starts the empty prompt.
   const col = typing ? 2 + prompt[prompt.length - 1].length : 2;
   return {
-    transcript, bottom, toast, keys, beat,
+    transcript, bottom, toast, keys, top,
     chips: chips.map((c) => c.id.replace(/^chip:/, "")),
     cursor: { row: bottom.indexOf(input[input.length - 1]), col },
   };
@@ -1088,6 +1028,20 @@ function statusRow({ context, style }: Chrome, cols: number): Row {
   return { segs: [...left, [" ".repeat(Math.max(1, cols - 2 - used - right.length)), "fill"], [right, "c96"]], cls: "wide" };
 }
 
+/** A dialog's rows on a terminal `rows` high. Taller than the recorded
+ * terminal, it shows its last rows, as recorded at 45. Taller than the
+ * terminal on screen, less the rows the keycaps take above it, its preview
+ * hides lines first, down to one, as the user asked; then rows above the
+ * question go, then rows at the bottom. The question always shows. */
+function dialogShown(d: Dialog, m: Moment, cols: number, rows: number): Row[] {
+  const room = rows - KEYCAPS;
+  const draw = (max: number) => fit(dialogRows(d, m, cols, max), ROWS);
+  let max = PREVIEW;
+  let drawn = draw(max);
+  while (max > 1 && height(drawn) > room) drawn = draw(--max);
+  return keep(drawn, room, Math.max(0, drawn.findIndex((r) => r.cls === "ask")));
+}
+
 /** Rows a dialog leaves above it for the keycaps (player.ts placeKeys()). */
 export const KEYCAPS = 2;
 
@@ -1174,9 +1128,9 @@ function script(d: Dialog, keys: Key[]): Script {
   const fail = (why: string): never => {
     throw new Error(`Dialog "${qs.map((q) => q.header).join(", ")}": ${why}`);
   };
-  // The words a moment shows in rows the moment before did not, at the
-  // recorded 80 columns.
-  const rowsOf = (x?: Moment) => (x ? dialogRows(d, x, 80).map((r) => r.segs.map(([c]) => c).join("")) : []);
+  // The words a moment shows in rows the moment before did not, on the
+  // page's pane.
+  const rowsOf = (x?: Moment) => (x ? dialogShown(d, x, PANE.cols, PANE.rows).map((r) => r.segs.map(([c]) => c).join("")) : []);
   const fresh = (from: Moment | undefined, to: Moment) => {
     const before = rowsOf(from);
     return rowsOf(to).filter((r) => {
@@ -1190,6 +1144,11 @@ function script(d: Dialog, keys: Key[]): Script {
   const moments: Moment[] = [m];
   const caps: Script["caps"] = [];
   let t = reading(undefined, m);
+  // A dialog the take left open stands while it is read, and no key lands on it.
+  if (d.left) {
+    if (keys.length) fail(`a key on a dialog the take left open: ${keys.map(([, , v]) => v).join(" ")}`);
+    return { moments, length: t, caps: [] };
+  }
   // The pause after the last key, so the answer stays picked K.hold before Enter.
   let stood = t;
   let done = false;
@@ -1204,7 +1163,9 @@ function script(d: Dialog, keys: Key[]): Script {
       if (m.noting) next.notes += value;
       else if (q && !previewed(q) && m.cursor === n) next.typed += value;
       else fail(`text typed outside a field: ${value}`);
-      after = readFor(value);
+      // As long as the words it shows take: a narrow notes field shows only
+      // its last rows (chain, at 45).
+      after = reading(m, next);
     } else if (value === "Down" || value === "Up") {
       if (m.noting) fail("an arrow while typing notes");
       const last = !q ? 1 : previewed(q) ? n : n + (q.multiSelect ? 2 : 1);
@@ -1274,9 +1235,9 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
     const rows = (w: number) =>
       wrapInk(cells, w).map((r) => r.slice(r.findIndex(([ch]) => ch !== " ")));
     // The bar comes with a long question at any width: recorded on questions
-    // of 82 characters and more, never on one of 75 or less, even where it
-    // wraps (where between, unknown).
-    const barred = text.length > 75;
+    // of 82 characters and more, never on one of 77 or less, even where it
+    // wraps (compose's moo-on take). Between, unknown: 80 splits it.
+    const barred = text.length > 80;
     const bar: Seg[] = barred ? [[before], ["│", "d"], [" "]] : [[before]];
     return rows(barred ? left - 2 : left).map((l, k): Row => ({
       segs: [...bar, [k ? " ".repeat(mark.length) : mark], ...segs(l)],
@@ -1477,6 +1438,9 @@ const ticks = (line: string): Cell[] =>
     .split("`")
     .flatMap((part, k) => plain(part, k % 2 ? "l" : undefined));
 
+/** The most rows the notes field shows while typed in. */
+const NOTE_ROWS = 5;
+
 function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols: number, max: number): Row[] {
   const cursor = m.shown;
   const LIST = 30;
@@ -1522,9 +1486,16 @@ function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols:
   );
   // The notes field keeps its last column for the cursor; a row after the
   // first loses its leading space.
-  const noteRows = wrapInk(notes, rightW - "Notes: ".length - (m.noting ? 1 : 0)).map((l, k) => [
+  // While typed in, the field takes the columns the list's 30 leave, and
+  // shows its last rows: at 45 columns, 3 columns (chain, skills). The hint
+  // before it takes the right column's width. A row after the field's first
+  // loses its leading space.
+  const noteW = m.noting ? cols - LIST - GAP - "Notes: ".length - 1 : rightW - "Notes: ".length;
+  const noted = wrapInk(notes, noteW);
+  const from = m.noting ? Math.max(0, noted.length - NOTE_ROWS) : 0;
+  const noteRows = noted.slice(from).map((l, k) => [
     ...(k ? plain("       ") : [...plain("Notes:", "l"), ...plain(" ")]),
-    ...(k ? l.slice(Math.max(0, l.findIndex(([ch]) => ch !== " "))) : l),
+    ...(from + k ? l.slice(Math.max(0, l.findIndex(([ch]) => ch !== " "))) : l),
   ]);
   const right: Cell[][] = [...box.flatMap((r) => wrapInk(r, rightW)), [], ...noteRows];
   // An option is three texts in a row: the cursor, the number, the label. The

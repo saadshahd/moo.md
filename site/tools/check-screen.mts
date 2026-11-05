@@ -4,7 +4,9 @@
 // reply aside. The one edit: a ```markdown block, which Claude Code drew as
 // source, the site draws rendered (render.ts). Where the rows part, the
 // capture's rows must come from such a block and, markers gone, hold the same
-// words as ours: rewrapped, never reworded.
+// words as ours: rewrapped, never reworded. A session cut to its first turns
+// (gen.py --turns) is held to the capture's rows above the prompt of the turn
+// after them.
 // Usage: check-screen.mts <turns.json> <tall.ansi> <cols>
 import { readFileSync } from "node:fs";
 import { frame } from "../src/demo/render.ts";
@@ -16,19 +18,28 @@ const [turns, cap, w] = process.argv.slice(2);
 const scene: Scene = {
   chrome: { context: "0%" },
   turns: JSON.parse(readFileSync(turns, "utf8")),
-  beats: [{ at: 0 }],
 };
 const text = (r: Row) => r.segs.map((s: Seg) => (s[1] === "logo" ? "" : s[0])).join("").replace(/\xa0/g, " ").trimEnd();
 const ours = frame(scene, 1e9, +w).transcript.map(text);
 // Claude Code draws some spaces as no-break spaces (U+00A0); text only, as in check-dialogs.mts.
 const screen = unstrip(readFileSync(cap, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").replace(/\xa0/g, " ").trimEnd()), +w);
 const from = (xs: string[]) => xs.slice(xs.findIndex((l) => l.startsWith("❯ ")));
-const end = screen.findLastIndex((l) => /^\S /.test(l) && / · done /.test(l));
+const prompts = screen.flatMap((l, k) => (/^❯ \S/.test(l) ? [k] : []));
+const cut = prompts[scene.turns.length] ?? screen.length;
+const end = screen.slice(0, cut).findLastIndex((l) => /^\S /.test(l) && / · done /.test(l));
 const done = (l: string) => /^\S (\S+ for .*· done |.*messages? hidden)/.test(l) || /^  .*(hidden|show\))\s*$/.test(l);
 const norm = (xs: string[]) =>
   xs.filter((l) => !done(l)).filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n").trim().split("\n");
-const A = norm(from(ours));
-const B = norm(from(screen.slice(0, end + 1)));
+// A take that ends on a dialog it left open shows, after its last prompt,
+// the recorder's Escape, where the demo stands on the dialog (gen.py): both
+// are held to the rows down to that prompt's end.
+const left = scene.turns.at(-1)?.dialogs?.at(-1)?.left;
+const toPrompt = (xs: string[]) => {
+  const k = xs.findLastIndex((l) => /^❯ \S/.test(l));
+  return xs.slice(0, xs.findIndex((l, i) => i > k && !l));
+};
+const A = norm(from(left ? toPrompt(ours) : ours));
+const B = norm(from(left ? toPrompt(screen) : screen.slice(0, end + 1)));
 
 // The longest common run of rows; what lies between two matched rows is a hunk.
 const L = Array.from({ length: A.length + 1 }, () => new Array<number>(B.length + 1).fill(0));

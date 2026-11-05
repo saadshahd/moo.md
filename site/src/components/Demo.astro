@@ -1,101 +1,110 @@
 ---
-// A Claude Code mock built from a real recorded session: same glyphs, colors,
-// wrap rule, spinner verbs and replies, cut only where "… +N lines" says so.
-// Plays once in view, from its first ask to its last frame, with a player's
-// controls below: play and pause, a timeline with a tick per beat, speed. A
-// chain's timeline has a chapter per move in place of the ticks, named. Under
-// reduced motion, the timeline steps through one still per beat. `summary` tells a screen reader what it
-// shows. A recording with a plain turn (Scene.plain) plays it first, and its
-// "without moo" button steps back to the plain reply and forth to moo's
-// hand-back. Every box around the terminal has a fixed height, so the terminal
-// sits at the same place and size on every demo page at a given viewport.
-import type { Scene } from "../demo/types";
-import { beatEnds, beatTimes, chapters, firstWait, frame, phases, replyStands, ROWS } from "../demo/render";
+// A Claude Code mock built from a real recorded pair: the same words typed with
+// moo off and with moo on, two terminals side by side, each with the same
+// glyphs, colors, wrap rule, spinner verbs and replies as recorded, cut only
+// where "… +N lines" says so. Plays once in view: moo off first, then moo on,
+// with a player's controls below: play and pause, a timeline in two parts
+// with a tick at each wait, speed. Where the two don't fit side by side, one
+// frame shows the pane playing, under tabs that name both. Under reduced
+// motion, the timeline steps through one still per wait. `summary` tells a
+// screen reader what it shows. Every pane is PANE in size on every page.
+import type { Pair, Scene } from "../demo/types";
+import { frame, PANE, phases, waits } from "../demo/render";
 import { demoMoves } from "../moves";
 import { SPEEDS } from "../demo/speed";
+import * as S from "../demo/scenes";
 // The terminal font: Fira Code, as in the Solo terminal the demos are checked
 // against. Its glyphs for box drawing come from the symbols subset.
 import "@fontsource/fira-code/latin-400.css";
 import "@fontsource/fira-code/latin-700.css";
 import "@fontsource/fira-code/symbols2-400.css";
 
-type Props = { scene: Scene; summary: string };
-const { scene, summary } = Astro.props;
+type Props = { scene: Pair; summary: string };
+const { scene: pair, summary } = Astro.props;
 const { entry } = Astro.locals.starlightRoute;
 const names = demoMoves(entry);
+const fail = (why: string): never => {
+  throw new Error(`${entry.id}: ${why}`);
+};
 
-// Beats name a turn (and a skill call or question in it) and play in order, or
-// a tick or a reduced-motion still would mark the wrong moment.
-const times = beatTimes(scene);
-if (!times.length || times.some((x, k) => !(x > (k ? times[k - 1] : -1))))
-  throw new Error(`Demo "${scene.turns[0].user}": beats must exist, name what they show, and play in order`);
-// A move's chapter runs from its launch to the next skill's or its turn's
-// end, and a tap on it goes to its launch; under reduced motion, to the beat
-// on screen there. The moves launch in the page's order, and each skill
-// launch a beat names is one of them.
-const chips = chapters(scene, names).map((c) => ({ ...c, beat: times.findLastIndex((x) => x <= c.at) }));
-const skill = (b: (typeof scene.beats)[number]) => b.on === "move" && scene.turns[b.at].launches![b.n].skill.split(":").pop()!;
-if (
-  chips.some((c, k) => k > 0 && !(c.at >= chips[k - 1].end)) ||
-  scene.beats.some((b) => b.on === "move" && !names.includes(skill(b) as string))
-)
-  throw new Error(`Demo "${scene.turns[0].user}": the moves must launch in the page's order, and each skill launch a beat names must be one of the page's moves`);
-// A plain turn is a prompt, not a command, and the turn after it runs this
-// page's first move.
-const { plain } = scene;
-const move = plain === undefined ? undefined : scene.turns[plain + 1];
-if (plain !== undefined && (!move || scene.turns[plain].user.startsWith("/") || move.user.match(/^\/(\S+)/)?.[1]?.split(":").pop() !== names[0]))
-  throw new Error(`Demo "${scene.turns[0].user}": its plain turn must be a prompt, and the turn after it must run /${names[0]}`);
-// The "without moo" button's two stops: where moo first hands the decision to
-// the user, and one step back, the plain reply.
-const without = plain === undefined ? undefined : { handBack: firstWait(scene, plain + 1), plain: replyStands(scene, plain), moveStarts: phases(scene).timing[plain + 1].start };
-// Draw the demo here at every recorded width, each second and each beat, so
-// a scene the player cannot draw fails the build, not the page.
-const { length } = phases(scene);
-const chaptered = names.length > 1;
-// A chain page's timeline names every move it lists, one chapter each.
-if (entry.data.moves && (!chaptered || chips.length !== entry.data.moves.length))
-  throw new Error(`${entry.id}: its timeline must show one chapter per move in its moves list`);
-for (const cols of [45, 80, 120])
-  for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...times, ...beatEnds(scene), length]) frame(scene, s, cols);
+// moo off types words, not a command, and tend draws nothing there: moo's
+// plugins were off. moo on runs the page's first move with its first prompt,
+// and every move the page names, by a prompt or a Skill call.
+const last = (skill: string) => skill.split(":").pop();
+const { off, on } = pair;
+if (off.turns.some((t) => t.user.startsWith("/")))
+  fail(`its moo-off pane types a command: ${off.turns.find((t) => t.user.startsWith("/"))!.user}`);
+if (off.turns.some((t) => t.toast || t.panes || t.chrome.some(([, c]) => c.band?.length)))
+  fail("its moo-off pane draws tend's band, toast or card");
+if (last(on.turns[0]?.user.match(/^\/(\S+)/)?.[1] ?? "") !== names[0])
+  fail(`its moo-on pane's first prompt must run /${names[0]}`);
+const launched = new Set(
+  on.turns.flatMap((t) => [t.user.match(/^\/(\S+)/)?.[1], ...(t.launches ?? []).map((l) => l.skill)].filter(Boolean).map((x) => last(x!))),
+);
+const missed = names.filter((n) => !launched.has(n));
+if (missed.length) fail(`its moo-on pane never runs ${missed.map((n) => `/${n}`).join(", ")}`);
+// Draw each pane here at each second and each wait, so a scene the player
+// cannot draw fails the build, not the page.
+const drawn = (scene: Scene) => {
+  if (!scene.turns.length) return;
+  const { length } = phases(scene);
+  for (const s of [...Array.from({ length: Math.ceil(length) }, (_, k) => k), ...waits(scene).map((w) => w.at), length])
+    frame(scene, s, PANE.cols, undefined, PANE.rows);
+};
+drawn(off);
+drawn(on);
+// The pairs that fail the reader (tools/read-demo.mts): a page that plays one
+// draws no demo until it passes. Each is still drawn and checked above.
+const HIDDEN: Pair[] = [
+  S.shapeScene,
+  S.composeScene,
+  S.consultScene,
+  S.clarifyScene,
+  S.explainScene,
+  S.reduceScene,
+  S.routerScene,
+  S.judgeScene,
+  S.anchorScene,
+  S.interrogateScene,
+  S.chainScene,
+  S.skillsScene,
+];
+const sides = [
+  ["off", "moo off"],
+  ["on", "moo on"],
+] as const;
 ---
 
-<div class="demo not-content" style={`--rows: ${ROWS}`} data-demo={JSON.stringify({ scene, chips, without })}>
+{!HIDDEN.includes(pair) && (
+<div class="demo not-content" style={`--cols: ${PANE.cols}; --rows: ${PANE.rows}`} data-demo={JSON.stringify(pair)}>
   <div class="col">
     <figure class="term-wrap">
       <figcaption class="vh">{summary}</figcaption>
-      <div class="term" data-term>
-        <div class="caret-trail" data-trail aria-hidden="true"></div>
-        <!-- An empty row gives the terminal its width before the player draws. -->
-        <div class="scroll" data-scroll tabindex="0" role="region" aria-label="Claude Code transcript"><div class="row"></div></div>
-        <div class="bottom" data-bottom tabindex="-1"></div>
-        <div class="toast" data-toast aria-hidden="true"></div>
-        <div class="caret" data-caret aria-hidden="true"></div>
-        <div class="keys" data-keys aria-hidden="true"></div>
+      <div class="tabs" role="group" aria-label="Panes">
+        {sides.map(([side, label]) => (
+          <button type="button" data-tab={side} aria-pressed={String(side === "off")}>{label}</button>
+        ))}
+      </div>
+      <div class="pair" data-pair>
+        {sides.map(([side, label]) => (
+          <div class="side" data-side={side}>
+            <div class="term" data-term>
+              <span class="label" aria-hidden="true">{label}</span>
+              <div class="caret-trail" data-trail aria-hidden="true"></div>
+              <div class="scroll" data-scroll tabindex="0" role="region" aria-label={`Claude Code, ${label}`}></div>
+              <div class="bottom" data-bottom tabindex="-1"></div>
+              <div class="toast" data-toast aria-hidden="true"></div>
+              <div class="caret" data-caret aria-hidden="true"></div>
+              <div class="keys" data-keys aria-hidden="true"></div>
+            </div>
+          </div>
+        ))}
         <div class="flash" data-flash aria-hidden="true"></div>
       </div>
-      <div class:list={["controls", { chaptered }]}>
-        {without && <button type="button" class="without" data-without aria-pressed="false">without moo</button>}
+      <div class="controls">
         <button type="button" class="play" data-play aria-label="Pause demo">❚❚</button>
-        <span class="now" aria-hidden="true">
-          <span data-now>0:00</span>
-          {chaptered && (
-            <span class="at">
-              ·{" "}
-              <span class="names">
-                <span data-names>{names.map((m) => <span>/{m}</span>)}</span>
-                <span class="lit" data-names data-pill>{names.map((m) => <span>/{m}</span>)}</span>
-              </span>
-            </span>
-          )}
-        </span>
+        <span class="now" aria-hidden="true" data-now>0:00</span>
         <div class="track" data-track role="slider" tabindex="0" aria-label="Demo timeline">
-          {chaptered && (
-            <div class="chapters" aria-hidden="true">
-              <div data-names data-chapters>{names.map((m) => <span>/{m}</span>)}</div>
-              <div class="lit" data-names data-pill>{names.map((m) => <span>/{m}</span>)}</div>
-            </div>
-          )}
           <div class="rail" data-rail><div class="fill" data-fill></div></div>
           <div class="knob" data-knob aria-hidden="true"></div>
         </div>
@@ -108,33 +117,7 @@ for (const cols of [45, 80, 120])
     <div class="probe" data-probe aria-hidden="true"><span>0000000000</span></div>
   </div>
 </div>
-
-<script is:inline define:vars={{ ROWS }}>
-  // Rows: as many as the screen holds down to the demo's end, from 14 up to
-  // the recorded ROWS; what follows the demo, as on the front page, scrolls.
-  // Set here, before the first paint, and on resize; the player reads them.
-  // The boxes around the terminal have fixed heights, so every chain and move
-  // page gets the same count at a given viewport.
-  const MIN = 14;
-  const root = document.currentScript.previousElementSibling;
-  const term = root.querySelector("[data-term]");
-  const panel = root.closest(".content-panel");
-  const fit = () => {
-    const row = parseFloat(getComputedStyle(term).lineHeight);
-    const rows = Number(getComputedStyle(root).getPropertyValue("--rows"));
-    const box = term.getBoundingClientRect();
-    const end = root.getBoundingClientRect().bottom + parseFloat(getComputedStyle(panel).paddingBottom);
-    const room = innerHeight - (box.top + scrollY) - (box.height - rows * row) - (end - box.bottom);
-    const set = (n) => root.style.setProperty("--rows", String(Math.max(MIN, Math.min(ROWS, n))));
-    set(Math.floor(room / row));
-    // What the measure missed (a pixel of border), taken off in whole rows.
-    const over = root.getBoundingClientRect().bottom + scrollY + parseFloat(getComputedStyle(panel).paddingBottom) - innerHeight;
-    if (over > 0) set(Number(getComputedStyle(root).getPropertyValue("--rows")) - Math.ceil(over / row));
-    root.dispatchEvent(new Event("fit"));
-  };
-  fit();
-  addEventListener("resize", fit);
-</script>
+)}
 
 <script>
   import { mount } from "../demo/player";
@@ -145,12 +128,26 @@ for (const cols of [45, 80, 120])
   /* Styles reach rows the player builds; hence :global. */
   .demo { --muted: var(--sl-color-gray-3); --accent: var(--sl-color-accent); container: demo / inline-size; }
   .col { position: relative; width: fit-content; max-width: 100%; }
-  /* Columns: the widest width the recordings were captured at that the column
-     fits, cells plus the terminal's padding, border, a thin scrollbar and the
-     cell kept clear of it (7px cells: 120 needs 872px, 80 needs 604px). */
-  .col { --cols: 45; }
-  @container demo (min-width: 604px) { .col { --cols: 80; } }
-  @container demo (min-width: 872px) { .col { --cols: 120; } }
+  /* A pane: its cells, the padding at its left, the room at its right for
+     the scroll's padding and a thin scrollbar, its border (45 columns of 7px
+     cells: 356px). Each is the container its full-width rows reach across. */
+  .demo { --pad: 16px; --pane-w: calc(var(--cols) * var(--cell) + var(--cell) + 2 * var(--pad) + 2px); }
+  .pair { position: relative; display: flex; gap: var(--pad); }
+  .side { container-type: inline-size; width: var(--pane-w); max-width: 100%; }
+  /* Each pane's name sits in its top border, as a frame's title. */
+  .label {
+    position: absolute; top: calc(-0.5 * var(--row)); left: calc(var(--inset) + var(--cell)); z-index: 3;
+    padding: 0 var(--cell); background: var(--t-bg); color: var(--t-g); line-height: var(--row);
+  }
+  /* Where two panes don't fit side by side (two panes and the gap between:
+     728px), one frame shows the pane playing, and tabs above it name both,
+     in place of the labels. */
+  .tabs { display: none; gap: 2px; margin-bottom: var(--moo-step, 0.5rem); }
+  @container demo (max-width: 727px) {
+    .tabs { display: flex; }
+    .label { display: none; }
+    .demo[data-shown="off"] .side[data-side="on"], .demo[data-shown="on"] .side[data-side="off"] { display: none; }
+  }
   .vh {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip-path: inset(50%); white-space: nowrap;
@@ -213,16 +210,15 @@ for (const cols of [45, 80, 120])
     font-variant-ligatures: none;
   }
   .demo :global(.term) {
-    display: flex; flex-direction: column;
+    display: flex; flex-direction: column; box-sizing: border-box;
     /* --rows rows of text inside the padding and border. */
     height: calc(var(--rows) * var(--row) + 2 * var(--pad) + 2px);
-    width: fit-content; max-width: 100%;
+    width: 100%;
     /* One inner padding, --pad, above, below and at the left, where the grid
        sits, or centred where the frame leaves less; the scroll's own right
        padding and its scrollbar sit in the room on the right, and the
        full-width rows end --inset from the right edge. 100cqi is the
        frame's width. */
-    --pad: 16px;
     --inset: max(4px, min(var(--pad), calc((100cqi - var(--cols) * var(--cell) - 2px) / 2)));
     padding: var(--pad) 0 var(--pad) var(--inset); border: 1px solid var(--t-border); border-radius: 0.6rem;
     background: var(--t-bg); color: var(--t-fg);
@@ -382,9 +378,10 @@ for (const cols of [45, 80, 120])
     flex: none; white-space: nowrap;
   }
 
-  /* Between demo pages, the terminal and the controls stay put while what
+  /* Between demo pages, the terminals and the controls stay put while what
      they show changes (the view transition in the global styles). */
-  .demo :global(.term) { view-transition-name: demo-term; }
+  [data-side="off"] .term { view-transition-name: demo-off; }
+  [data-side="on"] .term { view-transition-name: demo-on; }
   .controls { view-transition-name: demo-controls; }
 </style>
 

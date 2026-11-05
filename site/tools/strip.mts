@@ -3,7 +3,9 @@
 // that layout glitch out, so the checks take it out of a capture too: the
 // strip starts under a row of view links, far right.
 
-const pure = (r = "") => /^ +\S+$/.test(r);
+// A row of strip text alone: blank up to its column (stripAt), e.g.
+// "f-scroll ]", the end of a link the row above broke (compose).
+const pure = (r = "") => /^ +\S/.test(r);
 
 /** The strip's first column in a capture's rows, if it has one: where the
  * row under a row of view links holds nothing but strip text. */
