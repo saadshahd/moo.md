@@ -420,36 +420,8 @@ const user = (text: string, cols: number): Row[] =>
   ).map((l): Row => ({ segs: segs(l), cls: "user" }));
 
 /** The collapsed tool summary, two columns in: grey, counts bold, +lines
- * green, -lines red. A closing "[ view ]" takes a row of its own, bold grey,
- * at any width (interrogate). The space before it stays with the summary, so
- * a summary that fills its last row pushes that space onto a row of its own
- * (router at 45). */
-const tools = (summary: string, cols: number): Row[] => {
-  const at = summary.indexOf(" [ view ");
-  if (at >= 0 && !summary.endsWith(" [ view ]")) return [...counts(summary.slice(0, at), cols), ...files(summary.slice(at), cols)];
-  const view = summary.endsWith(" [ view ]");
-  const rows = counts(view ? summary.slice(0, -" [ view ]".length) : summary, cols);
-  const full = rows.length > 0 && rows[rows.length - 1].segs.map((s) => s[0]).join("").length >= cols;
-  return [...rows, ...(view && full ? [BLANK] : []),
-    ...(view ? [{ segs: [["  "], ["[ view ]", "g b"]] } as Row] : [])];
-};
-/** Links to the files a turn wrote, "[ view <file> ]", bold grey, on one row
- * under the summary. Claude Code draws the links that do not fit as a strip
- * down the right edge over the rows below (compose); that strip is a layout
- * glitch and is left out, as are links the recording cut. */
-const files = (links: string, cols: number): Row[] => {
-  const segs: Seg[] = [["  "]];
-  let used = 2;
-  for (const link of links.match(/\[ view [^\]]+ \]/g) ?? []) {
-    const gap = used > 2 ? 1 : 0;
-    if (used + gap + link.length > cols) break;
-    if (gap) segs.push([" "]);
-    segs.push([link, "g b"]);
-    used += gap + link.length;
-  }
-  return used > 2 ? [{ segs }] : [];
-};
-const counts = (summary: string, cols: number): Row[] =>
+ * green, -lines red. */
+const tools = (summary: string, cols: number): Row[] =>
   wrap(
     summary
       .split(/(\+\d+|-\d+|\d+)/)
@@ -471,8 +443,7 @@ const counts = (summary: string, cols: number): Row[] =>
 
 /** The activity line while Claude works: a grey bullet, the label wrapped
  * under it, +lines green and -lines red; then the newest tool's line, grey,
- * each of its lines wrapped five columns in, cut at 300 characters with "…"
- * (as recorded: a 296-character command whole, an 844-character one cut). */
+ * five columns in, its first line on one row, cut with "…" (scenes.ts). */
 function activityRows(
   line: Line,
   tool: string | undefined,
@@ -489,16 +460,11 @@ function activityRows(
     segs: [...(i ? GUTTER : DIM_BULLET), ...segs(l)],
   }));
   if (!tool) return [...label, BLANK];
-  const CUT = 300;
-  const shown = tool.length > CUT ? tool.slice(0, CUT - 1) + "…" : tool;
-  const lines = shown.split("\n").flatMap((l) => wrap(plain(l, "g"), cols - 5));
-  return [
-    ...label,
-    ...lines.map((l, i): Row => ({
-      segs: [[i ? "     " : "  ⎿  ", "g"], ...segs(l)],
-    })),
-    BLANK,
-  ];
+  const cmd = plain(tool, "g");
+  const end = cmd.findIndex(([ch]) => ch === "\n");
+  const fits = end < 0 && cmd.length <= cols - 5;
+  const row = fits ? cmd : [...cmd.slice(0, Math.min(end < 0 ? cmd.length : end, cols - 6)), ...plain("…", "g")];
+  return [...label, { segs: [["  ⎿  ", "g"], ...segs(row)] }, BLANK];
 }
 
 const SPIN = ["·", "✢", "✳", "✶", "✻", "✽"];
@@ -510,25 +476,18 @@ const elapsed = (s: number) => {
 /** The spinner `since` seconds into the turn, as recorded: glyph and verb
  * orange, three letters of the verb lit in turn; then, once Claude Code showed
  * one, the counter at `counted`, the recorded seconds the turn had run (it
- * jumps where the demo cut idle time), and the words it showed after it,
- * grey, "thinking …" lighter. */
+ * jumps where the demo cut idle time), and the tokens it showed after it,
+ * grey. */
 function spinner(spin: Chrome["spin"], since: number, counted: number): Row {
   const verb = spin?.verb ?? "";
   const lit = Math.floor(since * 12) % (verb.length + 8) - 3;
   const [a, b] = [Math.max(0, lit), Math.max(0, lit + 3)];
-  const tail = spin?.tail ? spin.tail.split(" · ") : [];
   return {
     segs: [
       [`${SPIN[Math.floor(since * 10) % SPIN.length]} ${verb.slice(0, a)}`, "o"],
       [verb.slice(a, b), "o2"],
       [`${verb.slice(b)}… `, "o"],
-      ...(spin?.tail === undefined
-        ? []
-        : ([
-            ["(" + [elapsed(counted), ...tail.filter((x) => !x.startsWith("thinking"))].join(" · "), "g"],
-            ...tail.filter((x) => x.startsWith("thinking")).flatMap((x): Seg[] => [[" · ", "g"], [x, "g2"]]),
-            [")", "g"],
-          ] as Seg[])),
+      ...(spin?.tail === undefined ? [] : ([[`(${[elapsed(counted), spin.tail].filter(Boolean).join(" · ")})`, "g"]] as Seg[])),
     ],
   };
 }
@@ -787,11 +746,11 @@ function transcriptAt(scene: Scene, s: number, cols: number) {
     const since = s - p.sent;
     const counted = Math.min(recordedAt(turn, p, s), turn.replyAt);
     // While a dialog is open, focus mode shows its first question as the
-    // activity line; until the reply, the newest activity line.
+    // activity line, over the dialog that asks it: the site leaves that copy
+    // out (scenes.ts). Until the reply, the newest activity line.
     const open = p.dialogs.findIndex((d, k) => s >= d.open && (turn.dialogs![k].left || s < d.open + d.script.length));
     if (open >= 0) {
       const dialog = turn.dialogs![open];
-      transcript.push(...asked(dialog, cols));
       asking = { dialog, moment: momentAt(p.dialogs[open].script, s - p.dialogs[open].open) };
       return;
     }
@@ -1331,39 +1290,12 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
       ...ask(q.question, "", "", cols),
       BLANK,
       ...previewRows(d, q, m, cols, max),
-      BLANK,
-      rule,
-      // The cursor past the last option: both it and the last option marked.
-      m.cursor === q.options.length
-        ? { segs: [["❯", "l"], [" "], ["Chat about this", "l"]] }
-        : { segs: [["  Chat about this"]] },
-      BLANK,
-      ...wrap(
-        plain(
-          [
-            "Enter to select",
-            "↑/↓ to navigate",
-            "n to add notes",
-            ...(qs.length > 1 ? ["Tab to switch questions"] : []),
-            ...(m.noting ? ["ctrl+g to edit in Vim"] : []),
-            "Esc to cancel",
-          ].join(" · "),
-          "g",
-        ),
-        cols,
-      ).map((l): Row => ({ segs: segs(l) })),
     ];
   const n = q.options.length;
   const cur = (row: number): Seg => (m.cursor === row ? ["❯ ", "l"] : ["  "]);
   const box = (on: boolean): Seg[] =>
     q.multiSelect ? [on ? ["[✔] ", "ok"] : ["[ ] "]] : [];
   const indent = q.multiSelect ? 9 : 5;
-  // Tab moves between questions only when there are several, as recorded.
-  const nav = qs.length > 1 ? "Tab/Arrow keys to navigate" : "↑/↓ to navigate";
-  const footer =
-    m.cursor === n
-      ? `Enter to select · ${nav} · ctrl+g to edit in Vim · Esc to cancel`
-      : `Enter to select · ${nav} · Esc to cancel`;
   return [
     rule,
     ...tabs,
@@ -1409,12 +1341,6 @@ function dialogRows(d: Dialog, m: Moment, cols: number, max = PREVIEW): Row[] {
     ...(q.multiSelect
       ? [{ segs: [cur(n + 1), ["   "], ["Next", "b"]] } as Row]
       : []),
-    rule,
-    m.cursor === n + (q.multiSelect ? 2 : 1)
-      ? { segs: [["❯ ", "l"], [`${n + 2}. Chat about this`, "l"]] }
-      : { segs: [["  "], [`${n + 2}. Chat about this`]] },
-    BLANK,
-    ...wrap(plain(footer, "g"), cols).map((l): Row => ({ segs: segs(l) })),
   ];
 }
 
@@ -1458,11 +1384,6 @@ function beside(texts: Cell[][], widths: number[], trim = false): Cell[][] {
   );
 }
 
-/** A question with previews, as Claude Code lays it out: the options in 30
- * columns, no descriptions, the cursor's bold; 4 columns on, the cursor's
- * preview in a box filling the rest, its text cut after ROWS - 26 rows with an
- * amber "✂ N lines hidden" rule; "Notes:" under it. Below about 62 columns
- * both sides shrink and wrap, as recorded at 45. */
 /** A preview's line as Claude Code draws its markdown: `code` in lavender,
  * ticks dropped, a bullet indented up to 3 spaces drawn "- " at the margin
  * with one space after it (recorded: "  +   key" as "- key"), a backslash
@@ -1477,10 +1398,24 @@ const ticks = (line: string): Cell[] =>
 /** The most rows the notes field shows while typed in. */
 const NOTE_ROWS = 5;
 
+/** The columns a question with previews gives its options, the gap after
+ * them, and the fewest its box takes (recorded: 44). */
+const LIST = 30;
+const GAP = 4;
+const BOX_MIN = 44;
+/** Whether a question with previews stacks its box under its options. */
+export const stacked = (cols: number) => cols - LIST - GAP < BOX_MIN;
+
+/** A question with previews, as Claude Code lays it out: the options in 30
+ * columns, no descriptions, the cursor's bold; 4 columns on, the cursor's
+ * preview in a box filling the rest, its text cut after ROWS - 26 rows with an
+ * amber "✂ N lines hidden" rule; the notes typed under it. Where the box
+ * would fall under its 44 columns, Claude Code squeezes both sides into
+ * fragments (as recorded at 45); the site stacks them instead: the options at
+ * full width, the box under them, then the notes (scenes.ts). */
 function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols: number, max: number): Row[] {
   const cursor = m.shown;
-  const LIST = 30;
-  const GAP = 4;
+  const isStacked = stacked(cols);
   // The box fits the dialog's widest preview line, any question's, up to the
   // room left, and is never under 44 columns (recorded: a widest line of 38
   // drew 44; 41 to 73 drew widest + 4): every question's box is that wide.
@@ -1490,7 +1425,7 @@ function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols:
       x.options.flatMap((o) => (o.preview ?? "").trim().split("\n").map((l) => ticks(l).length)),
     ),
   );
-  const boxW = Math.min(cols - LIST - GAP, Math.max(44, widest + 4));
+  const boxW = isStacked ? cols : Math.min(cols - LIST - GAP, Math.max(BOX_MIN, widest + 4));
   const inner = Math.max(1, boxW - 4);
   const lines = (q.options[cursor]?.preview ?? "No preview available")
     .trim()
@@ -1510,33 +1445,46 @@ function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols:
     ...(hidden ? [plain(scissors + "─".repeat(Math.max(0, boxW - 1 - scissors.length)) + "┤", "amb")] : []),
     plain(`└${"─".repeat(boxW - 2)}┘`, "g"),
   ];
-  // Notes: a grey hint; with n, a dim placeholder, then the notes typed.
-  const notes = m.noting
-    ? m.notes
-      ? plain(m.notes)
-      : plain("Add notes on this design…", "d")
-    : plain("press n to add notes", "g i");
-  const [listW, rightW] = shrink(
-    [LIST, Math.max(cols - LIST - GAP, hidden ? scissors.length + 1 : 0, "Notes: ".length + "press n to add notes".length)],
-    cols - GAP,
-  );
-  // The notes field keeps its last column for the cursor; a row after the
-  // first loses its leading space.
-  // While typed in, the field takes the columns the list's 30 leave, and
-  // shows its last rows: at 45 columns, 3 columns (chain, skills). The hint
-  // before it takes the right column's width. A row after the field's first
-  // loses its leading space.
-  const noteW = m.noting ? cols - LIST - GAP - "Notes: ".length - 1 : rightW - "Notes: ".length;
-  const noted = wrapInk(notes, noteW);
+  // Notes, once n opens their field: a dim placeholder, then the notes typed.
+  // Claude Code's hint before n, "press n to add notes", is left out.
+  const notes = m.noting && !m.notes ? plain("Add notes on this design…", "d") : plain(m.notes);
+  // The field takes the columns the list's 30 leave, stacked the full width,
+  // and keeps its last column for the cursor while typed in, showing its last
+  // rows. A row after the field's first loses its leading space.
+  const noteW = (isStacked ? cols : cols - LIST - GAP) - "Notes: ".length - (m.noting ? 1 : 0);
+  const noted = m.noting || m.notes ? wrapInk(notes, noteW) : [];
   const from = m.noting ? Math.max(0, noted.length - NOTE_ROWS) : 0;
   const noteRows = noted.slice(from).map((l, k) => [
     ...(k ? plain("       ") : [...plain("Notes:", "l"), ...plain(" ")]),
     ...(from + k ? l.slice(Math.max(0, l.findIndex(([ch]) => ch !== " "))) : l),
   ]);
-  const right: Cell[][] = [...box.flatMap((r) => wrapInk(r, rightW)), [], ...noteRows];
+  // The text cursor ends the notes typed, or starts the placeholder.
+  const caretIn = (row: Cell[]) => row.length - (m.notes ? 0 : notes.length);
+  if (isStacked) {
+    const options = q.options.flatMap((o, i) => {
+      const on = i === cursor;
+      return lead(
+        [[on ? "❯" : " ", on ? "l" : undefined], [` ${i + 1}.`, "g"], [" "]],
+        [["     "]],
+        plain(o.label, on ? "l b" : undefined),
+        cols - 5,
+      ).map((r): Row => ({ ...r, opt: i }));
+    });
+    return [
+      ...options,
+      BLANK,
+      ...box.map((r): Row => ({ segs: segs(r) })),
+      ...(noteRows.length ? [BLANK] : []),
+      ...noteRows.map((r, k): Row => ({
+        segs: segs(r),
+        input: m.noting && k === noteRows.length - 1 ? caretIn(r) : undefined,
+      })),
+    ];
+  }
+  const right: Cell[][] = [...box, ...(noteRows.length ? [[], ...noteRows] : [])];
   // An option is three texts in a row: the cursor, the number, the label. The
   // label counts as wide as it wraps in the column; when the three overflow,
-  // each shrinks and wraps, so the number can break, as recorded at 45.
+  // each shrinks and wraps.
   const owner: number[] = [];
   const left: Cell[][] = q.options.flatMap((o, i) => {
     const on = i === cursor;
@@ -1545,20 +1493,18 @@ function previewRows(d: Dialog, q: Dialog["questions"][number], m: Moment, cols:
       plain(` ${i + 1}.`, "g"),
       plain(` ${o.label}`, on ? "l b" : undefined),
     ];
-    const widest = (c: Cell[]) => Math.max(...wrapInk(c, listW).map((r) => r.length));
-    const rows = beside(texts, shrink(texts.map(widest), listW), true);
+    const widest = (c: Cell[]) => Math.max(...wrapInk(c, LIST).map((r) => r.length));
+    const rows = beside(texts, shrink(texts.map(widest), LIST), true);
     owner.push(...rows.map(() => i));
     return rows;
   });
-  // The text cursor ends the notes typed, or starts the placeholder.
   const field = right.length - 1;
-  const caret = listW + GAP + right[field].length - (m.notes ? 0 : notes.length);
   return Array.from({ length: Math.max(left.length, right.length) }, (_, r): Row => {
     const l = left[r] ?? [];
     return {
-      segs: segs([...l, ...plain(" ".repeat(listW + GAP - l.length)), ...(right[r] ?? [])]),
+      segs: segs([...l, ...plain(" ".repeat(LIST + GAP - l.length)), ...(right[r] ?? [])]),
       opt: owner[r],
-      input: m.noting && r === field ? caret : undefined,
+      input: m.noting && r === field ? LIST + GAP + caretIn(right[r]) : undefined,
     };
   });
 }

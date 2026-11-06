@@ -54,8 +54,8 @@ export type Chrome = {
   /** The output style the status line names at its right, e.g. "hold:Plain";
    * none when Claude Code ran without one. */
   style?: string;
-  /** The spinner's verb, and its words after the counter, e.g. "↓ 232 tokens"
-   * (none: Claude Code showed no counter yet). */
+  /** The spinner's verb, and the tokens after the counter, e.g. "↓ 232
+   * tokens" (none: Claude Code showed no counter yet). */
   spin?: { verb: string; tail?: string };
   /** tend's chips in the band above the prompt box, e.g. "questions 2". */
   band?: string[];

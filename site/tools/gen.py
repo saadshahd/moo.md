@@ -62,17 +62,20 @@ short = store.get(f'tend:{sid}:short', {}) or {}
 snaps = [parse_snap(p) | {'raw': open(p, encoding='utf-8').read()} for p in listing(os.path.join(rec, 'snaps'))]
 
 def chrome_of(s, tend):
-    # The mode row, the notice above the prompt box, the dim suggestion in it
-    # and the hook the spinner names are left out of the demos, as the user
-    # asked; the spinner keeps its verb and counter, and tend's band its chips.
+    # The mode row, the notice above the prompt box, the dim suggestion in it,
+    # the hook the spinner names and its thinking words ("thinking with xhigh
+    # effort", "thought for 1s") are left out of the demos, as the user asked;
+    # the spinner keeps its verb and counter, time and tokens, and tend's band
+    # its chips.
     # A turn with moo off draws no band: another plugin's (easel's "[-]") is
     # no part of the demo.
     c = {'context': s['context'], **({'style': s['style']} if s.get('style') else {}),
          **({'band': s['band']} if s.get('band') and tend else {})}
     if s.get('spin'):
-        tail = ' · '.join(x for x in (s['spin'].get('tail') or '').split(' · ')
-                          if x and not re.match(r'^running .* hook$|^(\d+m )?\d+s$', x))
-        c['spin'] = {'verb': s['spin']['verb'], **({'tail': tail} if tail else {})}
+        parts = [x for x in (s['spin'].get('tail') or '').split(' · ')
+                 if x and not re.match(r'^running .* hook$|^(\d+m )?\d+s$', x)]
+        tail = ' · '.join(x for x in parts if x.startswith('↓ '))
+        c['spin'] = {'verb': s['spin']['verb'], **({'tail': tail} if parts else {})}
     return c
 
 def toast_of(raw):
@@ -404,6 +407,13 @@ for k in range(len(turns) - 1, 0, -1):
 # A moo-off pane plays only the first turns of a session that went on with moo on.
 if keep_turns is not None:
     turns = turns[:keep_turns]
+
+# hold drew a "[ view <file> ]" button under a tool summary for each markdown
+# file the turn touched; it now draws them for pictures only, and no take
+# touched a picture, so every pane leaves them out (scenes.ts). The captures
+# still hold them: check-screen.mts takes them out there (strip.mts).
+unviewed = lambda part: {**part, 'tools': re.sub(r' \[ view.*$', '', part['tools'])} if part.get('tools') else part
+turns = [{**unviewed(t), **({'more': [unviewed(m) for m in t['more']]} if t.get('more') else {})} for t in turns]
 
 first = next(s for s in snaps if 'context' in s)
 J = lambda v: json.dumps(v, ensure_ascii=False)

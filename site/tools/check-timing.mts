@@ -46,7 +46,8 @@ const SPIN = /^[·✢✳✶✻✽] /;
 function shown(scene: Scene, s: number): string[] {
   const f = frame(scene, s, PANE.cols, undefined, PANE.rows);
   return [
-    ...[...f.transcript, ...f.bottom.slice(0, -1)].map(text).filter((r) => !SPIN.test(r)),
+    // A dialog's rows end the bottom where it is open; the status line, where not.
+    ...[...f.transcript, ...(f.bottom.at(-1)?.cls === "wide" ? f.bottom.slice(0, -1) : f.bottom)].map(text).filter((r) => !SPIN.test(r)),
     ...(f.toast?.rows.map(text) ?? []),
   ];
 }

@@ -13,12 +13,11 @@ export const turns: Turn[] = [
     chrome: [
       [-2.6, {"context": "0%"}],
       [-0.6, {"context": "0%", "spin": {"verb": "Gitifying"}}],
-      [1.4, {"context": "0%", "spin": {"verb": "Considering", "tail": "↓ 63 tokens · thinking with medium effort"}}],
+      [1.4, {"context": "0%", "spin": {"verb": "Considering", "tail": "↓ 63 tokens"}}],
       [1.4, {"context": "4% · 35.2k", "spin": {"verb": "Considering", "tail": "↓ 193 tokens"}}],
-      [2.4, {"context": "4% · 35.2k", "spin": {"verb": "Considering", "tail": "↓ 210 tokens · thought for 1s"}}],
-      [3.4, {"context": "4% · 35.2k", "spin": {"verb": "Considering", "tail": "↓ 217 tokens · thinking with medium effort"}}],
-      [13.4, {"context": "4% · 35.2k", "spin": {"verb": "Considering", "tail": "↓ 217 tokens · still thinking with medium effort"}}],
-      [22.4, {"context": "4% · 36k", "spin": {"verb": "Considering", "tail": "↓ 1.6k tokens · thought for 19s"}}],
+      [2.4, {"context": "4% · 35.2k", "spin": {"verb": "Considering", "tail": "↓ 210 tokens"}}],
+      [3.4, {"context": "4% · 35.2k", "spin": {"verb": "Considering", "tail": "↓ 217 tokens"}}],
+      [22.4, {"context": "4% · 36k", "spin": {"verb": "Considering", "tail": "↓ 1.6k tokens"}}],
       [23.4, {"context": "4% · 36k"}],
     ],
     reply: [

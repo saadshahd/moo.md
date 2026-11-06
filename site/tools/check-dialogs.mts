@@ -1,12 +1,15 @@
 // Each dialog capture of a take (question n with the cursor on option k, its
 // notes typed, or its review screen, at 45, 80 and 120 columns) against the
-// demo's rows below the transcript at that moment, text only.
+// demo's rows below the transcript at that moment, text only. A question with
+// previews the site stacks (render.ts stacked()) is held to the capture down
+// to its question's last row, as far up as the capture reaches; under it,
+// each option's label and its preview's first line must show.
 // Usage: check-dialogs.mts
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { same, stripAt, unstrip } from "./strip.mts";
+import { same, stripAt, unhinted, unstrip } from "./strip.mts";
 import { homedir } from "node:os";
 import * as S from "../src/demo/scenes.ts";
-import { frame, phases, KEYCAPS, ROWS } from "../src/demo/render.ts";
+import { frame, phases, stacked, KEYCAPS, ROWS } from "../src/demo/render.ts";
 import type { Row, Seg } from "../src/demo/render.ts";
 import type { Scene } from "../src/demo/types.ts";
 
@@ -26,6 +29,7 @@ const panes: [string, Scene, string, "p" | "q"][] = [
 ];
 const text = (r: Row) => r.segs.map((s: Seg) => s[0]).join("").replace(/\xa0/g, " ").trimEnd();
 let total = 0;
+let held = 0;
 /** The first question of a review's name, which runs its questions' numbers
  * together: "3456" is 3 to 6, "111213" is 11 to 13. */
 const firstOf = (run: string) => {
@@ -62,7 +66,8 @@ for (const [name, scene, dir, letter] of panes) {
           : moments.find((x) => x.q === at.q);
     if (!mo) throw new Error(`${dir}/dialogs/${f}: the demo never shows that moment`);
     // The recorded terminal's rows for the dialog, plus those the site keeps above it for keycaps.
-    const ours = frame(at.scene, at.d.open + mo.at + 0.01, +m[5], m[4] ? +m[4] - 1 : undefined, ROWS + KEYCAPS).bottom.map(text);
+    const shown = frame(at.scene, at.d.open + mo.at + 0.01, +m[5], m[4] ? +m[4] - 1 : undefined, ROWS + KEYCAPS).bottom;
+    let ours = shown.map(text);
     const cap = readFileSync(`${R}/${dir}/dialogs/${f}`, "utf8")
       .split("\n")
       .map((l) => l.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").replace(/\xa0/g, " ").trimEnd());
@@ -70,14 +75,33 @@ for (const [name, scene, dir, letter] of panes) {
     // The view-link strip, at the column the tall capture of that width shows.
     const tall = `${R}/${dir}/tall-${m[5]}.ansi`;
     const strip = existsSync(tall) ? stripAt(readFileSync(tall, "utf8").split("\n").map((l) => l.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "").trimEnd()), +m[5]) : undefined;
-    const tail = unstrip(cap, +m[5], strip).slice(-ours.length);
-    const diffs = ours.flatMap((o, k) => (same(o, tail[k] ?? "") ? [] : [k]));
+    let rec = unhinted(unstrip(cap, +m[5], strip));
+    const q = at.scene.turns[at.i].dialogs![at.j].questions[mo.q];
+    const missing: string[] = [];
+    if (q?.options.some((o) => o.preview !== undefined) && stacked(+m[5])) {
+      // Text only: the box's side bars and a preview's own both read as space.
+      const words = (t: string) => t.replace(/`/g, "").replace(/[│\s]+/g, " ").trim();
+      const has = (t: string) => words(ours.join(" ")).includes(words(t));
+      const pv = (q.options[m[4] ? +m[4] - 1 : mo.shown]?.preview ?? "").trim().split("\n")[0].slice(0, 30);
+      missing.push(...q.options.map((o) => o.label).filter((l) => !has(l)), ...(has(pv) ? [] : [pv]));
+      // Claude Code's dialog ran taller, so its terminal may have lost rows
+      // above the question that ours keeps: held to the rows it shows.
+      const last = shown.findLastIndex((r) => r.cls === "ask");
+      const end = rec.findIndex((r) => same(ours[last], r));
+      rec = end < 0 ? [] : rec.slice(0, end + 1);
+      ours = ours.slice(0, last + 1).slice(-Math.max(1, rec.length));
+      held++;
+    }
+    const tail = rec.slice(-ours.length);
+    const diffs = [...ours.flatMap((o, k) => (same(o, tail[k] ?? "") ? [] : [k])), ...missing.map(() => -1)];
     total++;
     if (!diffs.length) continue;
     bad++;
     console.log(`${name} ${f}: DIFF ${diffs.length} of ${ours.length} rows`);
-    for (const k of diffs.slice(0, 2)) console.log(`   row ${k}\n     ours: ${JSON.stringify(ours[k])}\n     rec : ${JSON.stringify(tail[k])}`);
+    for (const t of missing) console.log(`   not shown: ${JSON.stringify(t)}`);
+    for (const k of diffs.filter((k) => k >= 0).slice(0, 2)) console.log(`   row ${k}\n     ours: ${JSON.stringify(ours[k])}\n     rec : ${JSON.stringify(tail[k])}`);
   }
 }
-console.log(bad ? `DIFF ${bad} of ${total} captures` : `ok ${total} captures`);
+const note = `${held} stacked, held down to the question`;
+console.log(bad ? `DIFF ${bad} of ${total} captures (${note})` : `ok ${total} captures (${note})`);
 process.exit(bad ? 1 : 0);

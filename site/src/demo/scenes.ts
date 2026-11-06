@@ -51,8 +51,27 @@
 //   Their row stays blank, as Claude Code leaves it with none (tools/gen.py
 //   chrome_of()).
 // - Removed: Claude Code's dim suggestion in the empty prompt, as "Try "fix
-//   lint errors"", and the hook the spinner names, as "running PostToolUse
-//   hook"; the spinner keeps its verb and counter (tools/gen.py chrome_of()).
+//   lint errors"", and the spinner's words after its counter, as "running
+//   PostToolUse hook" and "thinking with xhigh effort"; the spinner keeps its
+//   verb, time and tokens (tools/gen.py chrome_of()).
+// - Removed: hold's "[ view ]" buttons under a tool summary, and the strip
+//   Claude Code drew down the right edge where they did not fit their row.
+//   hold now draws them for pictures only, and no take touched a picture
+//   (tools/gen.py).
+// - Removed from each dialog: its key hints, as "Enter to select · ↑/↓ to
+//   navigate · Esc to cancel", the "Chat about this" row and the rule above
+//   it, and "Notes: press n to add notes"; notes typed still show. No take
+//   moved the cursor to "Chat about this" (render.ts dialogRows()).
+// - Removed while a dialog is open: the activity line over it, which repeats
+//   the dialog's first question (render.ts transcriptAt()).
+// - A question with previews, where its box would fall under 44 columns (45),
+//   stacks: its options at full width, the preview's box under them, then
+//   any notes typed. Claude Code squeezes both sides there, so the options'
+//   numbers break and the box shows the preview as 7-column fragments
+//   (render.ts previewRows()).
+// - The tool line under an activity line keeps one row: its first line, cut
+//   with "…" where it runs past the row. Claude Code drew up to 300
+//   characters of it, a heredoc's every line (render.ts activityRows()).
 // - tend's band above the prompt box, "[-]" and its chips, as
 //   "[ questions 2 ]", shows where recorded (tools/gen.py chrome_of()). No
 //   recording opens its pane: a chip's click or Enter opens it, laid out by

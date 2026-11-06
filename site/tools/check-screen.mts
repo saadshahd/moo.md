@@ -1,8 +1,9 @@
 // A session's turns, as recorded (gen.py --raw), drawn at <cols> with nothing
 // folded, must match the tall capture row for row (text only), from the first
-// prompt down, done lines ("✻ … done …") and the prompt box below the last
-// reply aside. The one edit: a ```markdown block, which Claude Code drew as
-// source, the site draws rendered (render.ts). Where the rows part, the
+// prompt down, done lines ("✻ … done …"), the prompt box below the last
+// reply and hold's view buttons (strip.mts) aside. The one edit: a
+// ```markdown block, which Claude Code drew as source, the site draws
+// rendered (render.ts). Where the rows part, the
 // capture's rows must come from such a block and, markers gone, hold the same
 // words as ours: rewrapped, never reworded. A session cut to its first turns
 // (gen.py --turns) is held to the capture's rows above the prompt of the turn
@@ -36,7 +37,8 @@ const norm = (xs: string[]) =>
 const left = scene.turns.at(-1)?.dialogs?.at(-1)?.left;
 const toPrompt = (xs: string[]) => {
   const k = xs.findLastIndex((l) => /^❯ \S/.test(l));
-  return xs.slice(0, xs.findIndex((l, i) => i > k && !l));
+  const end = xs.findIndex((l, i) => i > k && !l);
+  return xs.slice(0, end < 0 ? xs.length : end);
 };
 const A = norm(from(left ? toPrompt(ours) : ours));
 const B = norm(from(left ? toPrompt(screen) : screen.slice(0, end + 1)));
