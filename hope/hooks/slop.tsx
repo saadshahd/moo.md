@@ -356,25 +356,29 @@ export const register: Register = (on) => {
 
   // The chosen findings reach Claude only with the person's own sentence, on their Enter; the
   // changes accept wrote, only with a prompt that keeps the addressed line.
-  on("prompt.submit", async ($, e, next) => {
-    const s = await readSlop($);
-    const fix = s.chosen.length > 0 && e.text.startsWith(FIX_STEM.trim());
-    const told = s.applied.length > 0 && e.text.includes(ADDRESSED);
-    if (!fix && !told) return next(e);
-    await change($, (t) => ({
-      ...t,
-      chosen: fix ? [] : t.chosen,
-      applied: told ? [] : t.applied,
-    }));
-    return next({
-      ...e,
-      context: [
-        ...(e.context ?? []),
-        ...(fix ? [handoff(s.chosen)] : []),
-        ...(told ? [appliedNote(s.applied)] : []),
-      ],
-    });
-  });
+  on(
+    "prompt.submit",
+    { text: new RegExp(`^${FIX_STEM.trim()}|${ADDRESSED}`) },
+    async ($, e, next) => {
+      const s = await readSlop($);
+      const fix = s.chosen.length > 0 && e.text.startsWith(FIX_STEM.trim());
+      const told = s.applied.length > 0 && e.text.includes(ADDRESSED);
+      if (!fix && !told) return next(e);
+      await change($, (t) => ({
+        ...t,
+        chosen: fix ? [] : t.chosen,
+        applied: told ? [] : t.applied,
+      }));
+      return next({
+        ...e,
+        context: [
+          ...(e.context ?? []),
+          ...(fix ? [handoff(s.chosen)] : []),
+          ...(told ? [appliedNote(s.applied)] : []),
+        ],
+      });
+    },
+  );
 
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     const below = await next(e);
