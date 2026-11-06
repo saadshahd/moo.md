@@ -54,7 +54,7 @@ Before building any unit, count how often its target situation occurs in real se
 - A body names a sibling in exactly two places: a refusal, and a route — wherever in the body those sit. There the name _is_ the refusal's or the route's content, and a reader without it is stranded.
 - Ending over hand-off: a finished run states what is now settled and what is still open, in its own words. Naming who handles it next hardcodes the graph n², so one trigger change edits every sibling.
 
-**Turning to the user — information decides who is asked, never the skill's habit.** `hope/hooks/reach.ts` adds the rule to every system prompt, skill or none, so no skill restates it. A skill's own "ask" beats that rule where the two meet, so each ask a skill states covers only what sources in reach leave open. What stays the user's:
+**Turning to the user — information decides who is asked, never the skill's habit.** `hope/hooks/reach.ts` adds the rule to every session, skill or none, so no skill restates it. A skill's own "ask" beats that rule where the two meet, so each ask a skill states covers only what sources in reach leave open. What stays the user's:
 
 | Turn to the user for                                                                        | Unless                                                                              | The turn carries                                              |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -78,11 +78,11 @@ Every hook is a function hook: it reaches the human with no model turn. The API 
 
 - A hook never starts a turn the human didn't ask for: no wake, no `$.prompt.submit` of its own.
 - What a hook finds waits where the human looks next, the band above the prompt, and appears there only while it holds something. Detail unfolds on a press and folds back.
-- A hook hands to Claude only on the human's Enter: `$.prompt.fill` a sentence start they finish, with any bulk added as `prompt.submit` context. The one exception is a rule every turn must hold, added as a `prompt.compose` section that never varies, as `reach.ts` does.
+- A hook hands to Claude only on the human's Enter: `$.prompt.fill` a sentence start they finish, with any bulk added as `prompt.submit` context. The one exception is a rule every turn must hold: it rides whichever prompt enters while the conversation lacks it, as `reach.ts` does. Never a `prompt.compose` section: on Team, Enterprise and managed machines, Claude Code's built-in guard skips every installed plugin's hook there.
 - Work longer than one dispatch runs unawaited, so the turn's end is never held.
 - State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files. Module variables hold only what a hot reload may drop: it drops them.
 - A failure shows once, as a toast, and the event passes on.
 - A pane or band is verified on events copied from real session transcripts, one per shape it renders; a synthetic event alone never verifies it.
-- One hooks module per plugin; a second part composes into it. A second registration on the same event and matcher in one plugin is dropped silently.
+- One hooks module per plugin; a second part composes into it. A second registration on the same event and matcher in one plugin fails the module's load: give one a matcher, as slop's `prompt.submit` does.
 
 A hook that spawns headless `claude -p` copies its flag set from `hope/hooks/judge.sh`, where each flag is commented at the point of use.

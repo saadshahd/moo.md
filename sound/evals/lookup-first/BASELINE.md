@@ -20,3 +20,20 @@ What still fails:
 - `real-typesafe-key` never runs `env` before asking for the key; `real-shared-browsers` never reads the README before saying "run it yourself", passing only on its label.
 - Fixtures that name a file they lack make the ask legitimate: `intent-open`, `explain-missing`, `real-run-test`, `land-brief`, `anchor-judgment`.
 - The sandbox refuses `gh`, `bun` and `command -v`, and `AskUserQuestion` is absent in `-p` mode, so every skill's ask becomes prose.
+
+## Placement check (sonnet, medium effort, 3 trials per case, 2026-11-06)
+
+The rule moved from a system-prompt section (`prompt.compose`) to the context of the session's first prompt (`prompt.submit`), since Claude Code's built-in guard skips a person's `prompt.compose` hooks on Team, Enterprise and managed machines. Both versions ran the same day on the same skills, on the seven cases where the hook had moved the old skills most:
+
+| case | system prompt | first prompt |
+|---|---|---|
+| factory-caps | 1/3 | 1/3 |
+| factory-workflows | 2/3 | 2/3 |
+| factory-own-app | 3/3 | 3/3 |
+| factory-org-app | 3/3 | 3/3 |
+| shape-conflict | 1/3 | 2/3 |
+| real-channel-about | 3/3 | 3/3 |
+| real-shared-browsers | 1/3 | 3/3 |
+| all | 14/21 | 17/21 |
+
+The gap is within this sample's noise: the new place holds the rule at least as well, not better.
