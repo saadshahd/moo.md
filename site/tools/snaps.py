@@ -5,11 +5,26 @@
 import os, re, sys, json
 ESC = re.compile(r'\x1b\[([0-9;]*)m')
 def strip(s): return re.sub(r'\x1b\[[0-9;?]*[a-zA-Z]', '', s)
+def second(path): return int(os.path.basename(path).split('-')[1].split('.')[0])
+def listing(d):
+    """The snaps in d in the order the screen drew them. The loop that takes
+    them (snap.sh) names each <count>-<second>.ansi, so one loop's names sort
+    in order. Two loops left running on one session write one folder: their
+    counts repeat or their seconds go back, and only each file's write time
+    orders them, which a copy of the folder has lost."""
+    names = sorted(f for f in os.listdir(d) if f.endswith('.ansi'))
+    paths = [os.path.join(d, f) for f in names]
+    counts = [f.split('-')[0] for f in names]
+    if len(set(counts)) == len(counts) and all(second(a) <= second(b) for a, b in zip(paths, paths[1:])):
+        return paths
+    lost = [f for f, p in zip(names, paths) if not second(p) <= os.stat(p).st_mtime < second(p) + 1]
+    if lost:
+        raise SystemExit(f'{d}: two loops took its snaps, and {len(lost)} lost the time they were written, {lost[0]} first: their order is unknown')
+    return sorted(paths, key=lambda p: os.stat(p).st_mtime_ns)
 def parse(path):
     raw = open(path, encoding='utf-8').read().split('\n')
     rows = [strip(r).rstrip() for r in raw]
-    t = int(os.path.basename(path).split('-')[1].split('.')[0])
-    out = {'t': t, 'file': os.path.basename(path)}
+    out = {'t': second(path), 'file': os.path.basename(path)}
     # The terminal's width: the recorder resized it to capture dialogs at 45, 80 and 120.
     out['cols'] = max((len(r) for r in rows if r and set(r) == {'─'}), default=0)
     rules = [i for i, r in enumerate(rows) if r.startswith('────') and set(r) == {'─'}]
@@ -48,6 +63,4 @@ def parse(path):
     out['dialog'] = any(r.startswith('Enter to select') for r in rows)
     return out
 if __name__ == '__main__':
-    d = sys.argv[1]
-    for f in sorted(os.listdir(d)):
-        if f.endswith('.ansi'): print(json.dumps(parse(os.path.join(d, f)), ensure_ascii=False))
+    for p in listing(sys.argv[1]): print(json.dumps(parse(p), ensure_ascii=False))

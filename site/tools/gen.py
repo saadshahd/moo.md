@@ -12,7 +12,7 @@
 # and the session file's path beside them (.src), for check-timing.mts.
 import json, os, re, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(__file__))
-from snaps import parse as parse_snap, strip
+from snaps import listing, parse as parse_snap, strip
 
 sess, cwd, rec, out = sys.argv[1:5]
 opts = sys.argv[5:]
@@ -59,8 +59,7 @@ store = json.load(open(store_p if os.path.exists(store_p) else glob.glob(os.path
 sid = os.path.basename(sess).split('.')[0]
 short = store.get(f'tend:{sid}:short', {}) or {}
 
-snaps = [parse_snap(os.path.join(rec, 'snaps', f)) | {'raw': open(os.path.join(rec, 'snaps', f), encoding='utf-8').read()}
-         for f in sorted(os.listdir(os.path.join(rec, 'snaps'))) if f.endswith('.ansi')]
+snaps = [parse_snap(p) | {'raw': open(p, encoding='utf-8').read()} for p in listing(os.path.join(rec, 'snaps'))]
 
 def chrome_of(s, tend):
     # The mode row, the notice above the prompt box, the dim suggestion in it
