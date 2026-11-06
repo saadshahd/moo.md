@@ -1,6 +1,6 @@
 // Claude Code's terminal as recorded (v2.1.316): rows of styled segments, built
 // for any column count, and one clock that says what is on screen at time t.
-import type { Chrome, Dialog, Line, Scene, Turn } from "./types";
+import type { Activity, Chrome, Dialog, Line, Scene, Turn } from "./types";
 import { layout, MEASURE, type Band, type Cell as BandCell, type Item } from "./band";
 
 /** The terminal's height in rows, as recorded: dialogs are laid out for it
@@ -554,7 +554,8 @@ const header = (): Row[] => [
 // for IDLE seconds at most, unless it shows words to read. Typed text, a
 // dialog and a reply stay up as long as reading their words takes (readFor);
 // a pause, an activity line, a skill's launch, a key move on sooner
-// (tools/check-timing.mts holds every demo to this).
+// (tools/check-timing.mts holds every demo to this). A turn's activity lines
+// hold no words to read, so all of them take K.work at most.
 
 /** The longest the screen stands still with nothing new to read. */
 export const IDLE = 1;
@@ -575,8 +576,10 @@ const K = {
   // Claude's pause before its first tool or dialog, or before a reply with none.
   lead: 0.8,
   think: 0.9,
-  // Each activity line.
+  // Each activity line; when a turn's lines would run past work from sending,
+  // they share it.
   act: 0.8,
+  work: 10,
   // A reply's rows coming in.
   reveal: 0.9,
   // tend's toast: when it slides in after the reply starts, the slide, its stay.
@@ -678,6 +681,11 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
     // The activity line on screen, as its label and tool line: a dialog leaves
     // its question there. A line that repeats it changes nothing, so takes no time.
     let onScreen = "";
+    const rowsOf = (a: Activity) => `${a.line}\n${a.tool ?? ""}`;
+    const changes = activity.filter(
+      (a, k) => !k || dialogs.some((d) => d.after === k) || rowsOf(a) !== rowsOf(activity[k - 1]),
+    ).length;
+    const act = Math.min(K.act, (K.work - K.lead) / changes);
     const ask = (d: Dialog) => {
       onScreen = `${escape(d.questions[0].question)}\n${d.tool ?? ""}`;
       const sc = script(d, within(d));
@@ -692,8 +700,8 @@ function time(scene: Scene): { timing: Phase[]; length: number } {
         at: a.at,
         run: () => {
           acts.push(u);
-          const rows = `${a.line}\n${a.tool ?? ""}`;
-          if (rows !== onScreen) u += K.act;
+          const rows = rowsOf(a);
+          if (rows !== onScreen) u += act;
           onScreen = rows;
         },
       });
