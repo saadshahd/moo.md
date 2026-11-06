@@ -58,7 +58,7 @@ function wrap(cs: Cell[], width: number, first = width): Cell[][] {
     while (i < cs.length && cs[i][0] === " ") i++;
     // Spaces between words close up to one, but a run inside code stays.
     const run = cs.slice(from, i);
-    const gap: Cell[] = run.length > 1 && run.every((c) => /\bl\b/.test(c[1] ?? "")) ? run : [[" "]];
+    const gap: Cell[] = run.length > 1 && run.every(code) ? run : [[" "]];
     let j = i;
     while (j < cs.length && cs[j][0] !== " ") j++;
     if (i === j) break;
@@ -180,10 +180,6 @@ function inline(text: string, cls?: string): Cell[] {
 /** Text as a Line that draws it as it stands: marks escaped. */
 const escape = (text: string): Line => text.replace(/[\\*`]/g, "\\$&");
 
-/** Plain text of a line, as a reader sees it: markup gone, indent gone. */
-const text = (line: Line) =>
-  line.replace(/\\(.)|\*|`/g, (_, kept) => kept ?? "").trimStart();
-
 /** Lines as Claude Code draws them: headings bold then a blank row, list items
  * with a hanging indent, leading spaces kept as indent inside a list, and as
  * text outside one: a fence at the margin ends a list, so an indented line
@@ -265,9 +261,11 @@ function draw(lines: Line[], width: number): Cell[][] {
  * decimal ("for 1.5 s") is no mark (target). */
 function keepNumbered(cs: Cell[]): Cell[] {
   const s = cs.map(([ch]) => ch).join("");
-  const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
   return cs.map((c, k) => (c[0] === " " && !code(cs[k + 1]) && /^\d+[.)](?!\d)/.test(s.slice(k + 1)) ? ["\u00a0", c[1]] : c));
 }
+
+/** Whether a cell is drawn as code. */
+const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
 
 // ---- Tables -------------------------------------------------------------------
 // A markdown table as Claude Code draws it, inferred from every table in the
@@ -345,7 +343,6 @@ function table(rows: Line[], width: number): Cell[][] {
  * "`cannot open plughw:S2 (No such device)`" drew "open  plughw:S2 (No  such"
  * (judge). A row that ends inside a word joins the next with nothing. */
 function rejoined(rows: Cell[][]): Cell[] {
-  const code = (c?: Cell) => /\bl\b/.test(c?.[1] ?? "");
   const cs = rows.flat();
   let at = 0;
   const joined = rows.flatMap((r, k) => {
@@ -378,7 +375,7 @@ function listed(head: string[], body: Cell[][][], width: number): Cell[][] {
       const key = h.trim() ? [...inline(h, "b"), ...plain(":", "b"), ...plain(" ")] : [];
       const rows = wrapInk(r[c], Math.max(key.length ? cols - (key.length - 2) - 3 : cols - 1, 10), false);
       const rest = rejoined(rows.slice(1));
-      while (rest[0]?.[0] === " " && !/\bl\b/.test(rest[0][1] ?? "")) rest.shift();
+      while (rest[0]?.[0] === " " && !code(rest[0])) rest.shift();
       const lines = [[...key, ...rows[0]], ...(rest.length ? wrapInk(rest, cols - 3, false) : [])];
       return lines.filter((l, n) => !n || l.some(([ch]) => ch !== " ")).flatMap((l) => wrapInk(l, width));
     }),
