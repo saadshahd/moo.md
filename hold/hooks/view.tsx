@@ -6,7 +6,7 @@ import type {
   RenderViewport,
 } from "claude-code";
 import { altOf, hasMermaid, segments } from "./fences.ts";
-import { cleanMarkdown, kindOf, labelOf, MARKDOWN_MAX, nameOf, viewable } from "./files.ts";
+import { labelOf, nameOf, viewable } from "./files.ts";
 import { drawsPixels, type TermEnv } from "./terminal.ts";
 import { closeWindow, isWindowOpen, toggleWindow, windowOf } from "./popover.ts";
 import { failOnce, messageOf, redraw } from "./ui.ts";
@@ -21,11 +21,6 @@ const drawings = new Map<string, Drawn>();
 const pending = new Map<string, Promise<Drawn>>();
 /** The [view]s unfolded, by their Button's key. */
 const opened = new Set<string>();
-/** An opened markdown view's text, or why it has none, by its Button's key. */
-const docs = new Map<
-  string,
-  { text: string; isCut: boolean } | { error: string }
->();
 /** An opened picture view's drawing, by its Button's key. */
 const pictures = new Map<string, string>();
 let theme: Promise<string> | undefined;
@@ -138,7 +133,7 @@ function fit(box: Box, viewport: RenderViewport | undefined, inset = 4): Box {
   };
 }
 
-/** A tool row with a [view] for each picture or markdown file its calls touched. */
+/** A tool row with a [view] for each picture its calls touched. */
 async function withViews(
   $: EngineInterface,
   els: Elements["terminal"],
@@ -146,16 +141,15 @@ async function withViews(
   row: RenderElement,
   files: string[],
 ) {
-  const { Box, Text, Markdown, Image, Button } = els;
+  const { Box, Image, Button } = els;
   const pixels = await pixelsHere($, e.viewport);
   const buttons: RenderElement[] = [];
   const views: RenderElement[] = [];
 
   for (const path of files) {
     const id = `view-${e.requestId}-${path}`;
-    const kind = kindOf(path)!;
     const name = files.length === 1 ? "" : ` ${labelOf(path)}`;
-    const isWindow = kind === "picture" && !pixels;
+    const isWindow = !pixels;
     const isOpen = isWindow ? isWindowOpen(id) : opened.has(id);
 
     buttons.push(
@@ -168,19 +162,15 @@ async function withViews(
           // Closing reads no file, so a picture moved since still closes.
           if (isWindowOpen(id)) return closeWindow($);
           try {
-            if (kind === "markdown") {
-              docs.set(id, cleanMarkdown(await $.fs.read(path)));
-            } else {
-              const stat = await $.fs.stat(path);
-              const key = await hash(
-                `picture\0${path}\0${stat.size}\0${stat.mtimeMs}`,
-              );
-              const d = await draw($, key, ["picture", path]);
+            const stat = await $.fs.stat(path);
+            const key = await hash(
+              `picture\0${path}\0${stat.size}\0${stat.mtimeMs}`,
+            );
+            const d = await draw($, key, ["picture", path]);
 
-              if ("error" in d) throw new Error(d.error);
-              pictures.set(id, key);
-              if (isWindow) return toggleWindow($, id, d.file, d.png);
-            }
+            if ("error" in d) throw new Error(d.error);
+            pictures.set(id, key);
+            if (isWindow) return toggleWindow($, id, d.file, d.png);
             opened.add(id);
           } catch (err) {
             failOnce($, `${nameOf(path)} has no view: ${messageOf(err)}`);
@@ -190,30 +180,18 @@ async function withViews(
       />,
     );
     if (!opened.has(id)) continue;
-    const doc = docs.get(id);
     const pic = drawings.get(pictures.get(id) ?? "");
 
-    // An unfolded view sits in a border under its row's buttons, its left edge at theirs.
-    const framed = (content: RenderElement) => (
-      <Box key={`v-${id}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
-        {content}
-      </Box>
-    );
-
-    if (kind === "markdown" && doc && "text" in doc)
-      views.push(
-        framed(
-          <Box flexDirection="column">
-            <Markdown text={doc.text} />
-            {doc.isCut ? <Text dimColor>{`cut at ${MARKDOWN_MAX} characters`}</Text> : null}
-          </Box>,
-        ),
-      );
-    if (kind === "picture" && pic && "png" in pic) {
+    if (pic && "png" in pic) {
       // The row's indent, the border and its padding: 2 + 2 + 2 columns.
       const box = fit(pic, e.viewport, 6);
 
-      views.push(framed(<Image source={{ png: pic.png }} columns={box.columns} rows={box.rows} alt={nameOf(path)} />));
+      // An unfolded view sits in a border under its row's buttons, its left edge at theirs.
+      views.push(
+        <Box key={`v-${id}`} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+          <Image source={{ png: pic.png }} columns={box.columns} rows={box.rows} alt={nameOf(path)} />
+        </Box>,
+      );
     }
   }
 

@@ -24,7 +24,7 @@
     {
       "name": "hold",
       "source": "./hold",
-      "description": "Comprehension at the human's pace. Grasp a change, drive a behavior, land one thing in an audience — until you can say how it works with the agent out of the room. A reply's Mermaid diagrams draw as pictures, and the pictures and markdown Claude touches open in place.",
+      "description": "Comprehension at the human's pace. Grasp a change, drive a behavior, land one thing in an audience — until you can say how it works with the agent out of the room. A reply's Mermaid diagrams draw as pictures, and the pictures Claude touches open in place.",
       "category": "comprehension",
       "keywords": [
         "learn",

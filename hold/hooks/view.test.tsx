@@ -1,7 +1,7 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
 import { altOf, segments } from "./fences.ts";
-import { cleanMarkdown, viewable } from "./files.ts";
+import { viewable } from "./files.ts";
 import { drawsPixels } from "./terminal.ts";
 
 const FLOW = "flowchart LR\n  A[Read] --> B{Image?}";
@@ -60,7 +60,7 @@ describe("segments", () => {
 });
 
 describe("viewable", () => {
-  test("Read, Write and Edit name their file; only pictures and markdown count", () => {
+  test("Read, Write and Edit name their file; only pictures count", () => {
     expect(viewable("Read", { file_path: "/a/shot.png" }, {})).toEqual([
       "/a/shot.png",
     ]);
@@ -70,7 +70,7 @@ describe("viewable", () => {
         { file_path: "/a/README.md" },
         { filePath: "/a/README.md" },
       ),
-    ).toEqual(["/a/README.md"]);
+    ).toEqual([]);
     expect(viewable("Edit", { file_path: "/a/main.ts" }, {})).toEqual([]);
     expect(viewable("Read", { file_path: "/a/x.webp" }, {})).toEqual([]);
   });
@@ -89,14 +89,8 @@ describe("viewable", () => {
     };
 
     expect(viewable("Bash", { command: "make" }, output)).toEqual([
-      "/r/a.md",
       "/r/plot.png",
     ]);
-  });
-
-  test("markdown keeps tab and newline as its only control characters", () => {
-    expect(cleanMarkdown("a\r\nb\u001b[31mc\td").text).toBe("a\nb[31mc\td");
-    expect(cleanMarkdown("x".repeat(100_000)).isCut).toBe(true);
   });
 });
 
@@ -193,9 +187,7 @@ function world(
       },
     };
   });
-  on("fs.read", (_$, e) => ({
-    value: e.as === "bytes" ? { base64: PNG } : "# Notes\n\nbody",
-  }));
+  on("fs.read", () => ({ value: { base64: PNG } }));
   const files = { isGone: false };
 
   on("fs.stat", () => {
@@ -527,35 +519,14 @@ const TOOL = (tool: string, input: unknown, output: unknown) => ({
   viewport: VIEWPORT,
 });
 
-test("a markdown file Claude wrote gets [view]: one press unfolds it in place, the next folds it", async ($, on) => {
-  world(on, GHOSTTY);
-  const ui = await $.ui.mount(
-    TOOL(
-      "Write",
-      { file_path: "/r/notes.md", content: "x" },
-      { filePath: "/r/notes.md" },
-    ),
-  );
-  const key = "view-toolu_1-/r/notes.md";
-
-  expect(await ui.find({ key: "engine" })).toBeDefined();
-  expect(await ui.find({ type: "Markdown" })).toBeUndefined();
-  await ui.press({ key });
-  expect(await ui.find({ type: "Markdown", text: /# Notes/ })).toBeDefined();
-  expect((await ui.find({ key }))?.props.label).toBe("fold");
-  expect(layout(await ui.drawn(), "Markdown")).toEqual({ isFramed: true, isUnderButton: true });
-  await ui.press({ key });
-  expect(await ui.find({ type: "Markdown" })).toBeUndefined();
-  await ui.unmount();
-});
-
-test("a picture Claude read unfolds as an Image, drawn once", async ($, on) => {
+test("a picture Claude read unfolds as an Image, drawn once, and folds on the next press", async ($, on) => {
   const w = world(on, GHOSTTY);
   const ui = await $.ui.mount(
     TOOL("Read", { file_path: "/r/shot.png" }, { type: "image", file: {} }),
   );
+  const key = "view-toolu_1-/r/shot.png";
 
-  await ui.press({ key: "view-toolu_1-/r/shot.png" });
+  await ui.press({ key });
   expect((await ui.find({ type: "Image" }))?.props).toMatchObject({
     source: { png: PNG },
     alt: "shot.png",
@@ -564,6 +535,9 @@ test("a picture Claude read unfolds as an Image, drawn once", async ($, on) => {
   expect(
     w.runs.filter((r) => r[0] === "bun").map((r) => r.slice(2, 4)),
   ).toEqual([["picture", "/r/shot.png"]]);
+  expect((await ui.find({ key }))?.props.label).toBe("fold");
+  await ui.press({ key });
+  expect(await ui.find({ type: "Image" })).toBeUndefined();
   await ui.unmount();
 });
 
@@ -581,7 +555,7 @@ test("a [view] names its file with no dot or slash, which roundup would open on 
   await ui.unmount();
 });
 
-test("a running, failed or plain-text tool row draws as the engine draws it", async ($, on) => {
+test("a running row, or one that touched no picture, draws as the engine draws it", async ($, on) => {
   world(on, GHOSTTY);
   const running = await $.ui.mount({
     ...TOOL("Read", { file_path: "/r/a.png" }, undefined),
@@ -593,7 +567,11 @@ test("a running, failed or plain-text tool row draws as the engine draws it", as
 
   expect(await running.findAll({ type: "Button" })).toHaveLength(0);
   await running.unmount();
-  const ts = await $.ui.mount(TOOL("Read", { file_path: "/r/a.ts" }, {}));
+  for (const file_path of ["/r/a.ts", "/r/notes.md"]) {
+    const row = await $.ui.mount(TOOL("Write", { file_path, content: "x" }, { filePath: file_path }));
 
-  expect(await ts.findAll({ type: "Button" })).toHaveLength(0);
+    expect(await row.find({ key: "engine" })).toBeDefined();
+    expect(await row.findAll({ type: "Button" })).toHaveLength(0);
+    await row.unmount();
+  }
 });
