@@ -88,3 +88,32 @@ export { refuseOtherVersion, resolveAdapters, type Slot, SLOTS } from "./adapter
 export { isOp, type OpName } from "./cli/commands.ts";
 
 export { type Io, runOp } from "./cli/ops.ts";
+
+export {
+	CLAUDE_FLOOR,
+	ClaudeRunner,
+	type Effort,
+	type Finished,
+	parseLimit,
+	RUN_SETTINGS,
+	type RunOutcome,
+	type RunRequest,
+	type RunSpec,
+	type RunnerOptions,
+	runArgs,
+	succeeded,
+	TIER_MODELS,
+	type Tier,
+} from "./adapters/claude-p.ts";
+
+export {
+	levelOf,
+	markDone,
+	mergeDecision,
+	PLAN_MARK,
+	RUN_SCHEMA,
+	runBranch,
+	runThinPath,
+	type ThinPathOptions,
+	type ThinResult,
+} from "./worker/thin-path.ts";
