@@ -5,6 +5,7 @@ import {
 	FIXED_PARTS,
 	type HumConfig,
 	type Kind,
+	type Naming,
 	OWNER_WAIT_TAG,
 	SIZES,
 	STUCK_TAG,
@@ -167,6 +168,13 @@ const skillProblems = (hum: HumConfig, env: CheckEnv): Problem[] =>
 	);
 
 /** Every config check at start and on every change; returns all problems found. */
+/** A run branch could then share a name, or a folder, with a claim branch. */
+const prefixesOverlap = ({ runBranchPrefix, claimPrefix }: Naming): boolean =>
+	runBranchPrefix.startsWith(claimPrefix) || claimPrefix.startsWith(runBranchPrefix);
+
+const namingProblems = (hum: HumConfig): Problem[] =>
+	prefixesOverlap(hum) ? [{ check: "shape", problem: "overlapping-prefixes", run: hum.runBranchPrefix, claim: hum.claimPrefix }] : [];
+
 export const checkConfig = (
 	hum: HumConfig,
 	kinds: Readonly<Record<string, Kind>>,
@@ -179,4 +187,5 @@ export const checkConfig = (
 	...Object.entries(kinds).flatMap(([name, kind]) => kindProblems(name, kind, hum)),
 	...eventProblems(hum, kinds),
 	...skillProblems(hum, env),
+	...namingProblems(hum),
 ];

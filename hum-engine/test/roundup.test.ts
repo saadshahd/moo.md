@@ -35,7 +35,7 @@ describe("what a Todo needs to be ready", () => {
 
 		expect((await adapter.workSource.listReady()).map((ref) => ref.id)).toEqual([String(open)]);
 
-		for (const id of [done, blocked, owned]) await expect(adapter.workSource.claim(String(id), "a", 1000)).rejects.toThrow("not open, unblocked and unassigned");
+		for (const id of [done, blocked, owned]) await expect(adapter.workSource.claim(String(id), "a", 1000)).rejects.toThrow("not ready to claim");
 	});
 
 	test("claim comments stay off the thread, and a person's reply reads as a comment", async () => {

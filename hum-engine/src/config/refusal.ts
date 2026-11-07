@@ -12,7 +12,8 @@ export type Problem =
 	| { readonly check: "shape"; readonly kind: string; readonly problem: "tier-table-gap"; readonly purpose: string; readonly level: string; readonly size: string }
 	| { readonly check: "shape"; readonly kind: string; readonly problem: "machine-rejected"; readonly why: string }
 	| { readonly check: "shape"; readonly problem: "missing-file"; readonly file: string }
-	| { readonly check: "shape"; readonly problem: "unknown-level"; readonly level: string };
+	| { readonly check: "shape"; readonly problem: "unknown-level"; readonly level: string }
+	| { readonly check: "shape"; readonly problem: "overlapping-prefixes"; readonly run: string; readonly claim: string };
 
 /** A config change the engine will not take. The caller keeps the last good config. */
 export type Refusal =
@@ -54,6 +55,8 @@ export const describeProblem = (p: Problem): string => {
 			return `file "${p.file}" is missing`;
 		case "unknown-level":
 			return `risk level "${p.level}" is not in levels`;
+		case "overlapping-prefixes":
+			return `the run branch prefix "${p.run}" and the claim prefix "${p.claim}" overlap: one starts with the other`;
 	}
 };
 

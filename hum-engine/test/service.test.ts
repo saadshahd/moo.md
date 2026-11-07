@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runGit } from "../src/adapters/git.ts";
 import { CI_TICK_REF, readCiTick, recordCiTick } from "../src/service/ci-tick.ts";
 import { type Child, EXIT_UPDATED, supervise, type Supervision } from "../src/service/supervise.ts";
 import { checkTokenAge } from "../src/service/token.ts";
@@ -81,7 +80,7 @@ const hangs = (): Child => {
 	return { exited: ended.promise, kill: () => ended.resolve(0) };
 };
 
-test("R7: a worker that exits at start is restarted N times, then one card shows and the script stops with exit 0", async () => {
+test("a worker that exits at start is restarted N times, then one card shows and the script stops with exit 0", async () => {
 	let spawns = 0;
 	const u = unit({ spawn: () => (spawns++, exited(1)) });
 
@@ -95,7 +94,7 @@ test("R7: a worker that exits at start is restarted N times, then one card shows
 	expect(u.clock.at - NOW).toBeLessThan(3 * TICK);
 });
 
-test("R7: crashes spread over more than the window do not stop the restarts", async () => {
+test("crashes spread over more than the window do not stop the restarts", async () => {
 	let spawns = 0;
 
 	const u = unit({
@@ -114,7 +113,7 @@ test("R7: crashes spread over more than the window do not stop the restarts", as
 	expect(u.cardsInStatus().map((c) => c.cause).join()).not.toContain("Restarts have stopped");
 });
 
-test("V2: a worker that exits to take an update is started again and never counts as a crash", async () => {
+test("a worker that exits to take an update is started again and never counts as a crash", async () => {
 	let spawns = 0;
 	const u = unit({ spawn: () => (spawns++ === 9 ? (u.stop.abort(), exited(0)) : exited(EXIT_UPDATED)) });
 
@@ -123,7 +122,7 @@ test("V2: a worker that exits to take an update is started again and never count
 	expect(u.state.faults.list()).toEqual([]);
 });
 
-test("R7: one card when the heartbeat is three ticks old, gone when the worker writes one again", async () => {
+test("one card when the heartbeat is three ticks old, gone when the worker writes one again", async () => {
 	let sleeps = 0;
 	const seen: { sleeps: number; codes: string[] }[] = [];
 	let worker: Child | undefined;
@@ -148,7 +147,7 @@ test("R7: one card when the heartbeat is three ticks old, gone when the worker w
 	expect(seen[3]?.codes).toEqual(["worker-down"]);
 });
 
-test("D6: the token card shows 30 days before the year ends, once, and clears when the date moves", () => {
+test("the token card shows 30 days before the year ends, once, and clears when the date moves", () => {
 	const u = unit({ spawn: () => exited(0) });
 	const madeAgo = (days: number) => new Date(NOW - days * DAY).toISOString().slice(0, 10);
 
@@ -164,7 +163,7 @@ test("D6: the token card shows 30 days before the year ends, once, and clears wh
 	expect(u.state.faults.list()).toEqual([]);
 });
 
-test("D6: a worker's tick shows the card from the config's token date", async () => {
+test("a worker's tick shows the card from the config's token date", async () => {
 	const old = new Date(NOW - 340 * DAY).toISOString().slice(0, 10);
 	const w = await world({}, { config: configWith((raw) => void (raw.hum.ciToken = { setUp: old })) });
 
@@ -175,7 +174,7 @@ test("D6: a worker's tick shows the card from the config's token date", async ()
 	expect(status.ok && status.status.cards.map((c) => c.code)).toEqual(["token-expiring"]);
 });
 
-test("D6: a 401 holds the item where it is with one card naming claude setup-token; the next run that gets through clears it", async () => {
+test("a 401 holds the item where it is with one card naming claude setup-token; the next run that gets through clears it", async () => {
 	const w = await world({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { commitForItem: true }] });
 
 	w.item("a", "docs/a.md");
@@ -208,26 +207,26 @@ test("D6: a 401 holds the item where it is with one card naming claude setup-tok
 	expect(w.state.faults.list().map((c) => c.code)).not.toContain("token-rejected");
 });
 
-test("R2: the scheduled workflow's tick is a ref on the remote; the Mac reads its time", async () => {
+test("the scheduled workflow's tick is a ref on the remote; the Mac reads its time", async () => {
 	const repo = new WorkRepo();
 
 	cleanups.push(() => rmSync(repo.root, { recursive: true, force: true }));
 
 	const mac = repo.worker("mac");
 
-	expect(await readCiTick(runGit, mac, "origin")).toBeUndefined();
+	expect(await readCiTick(mac, "origin")).toBeUndefined();
 
-	await recordCiTick(runGit, repo.owner, "origin", NOW);
-	expect(await readCiTick(runGit, mac, "origin")).toBe(NOW);
+	await recordCiTick(repo.owner, "origin", NOW);
+	expect(await readCiTick(mac, "origin")).toBe(NOW);
 
-	await recordCiTick(runGit, repo.owner, "origin", NOW + 900_000);
-	expect(await readCiTick(runGit, mac, "origin")).toBe(NOW + 900_000);
+	await recordCiTick(repo.owner, "origin", NOW + 900_000);
+	expect(await readCiTick(mac, "origin")).toBe(NOW + 900_000);
 	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe(CI_TICK_REF);
 	// The tick is no branch and no file: main is as it was.
 	expect(sh(repo.remote, ["rev-list", "--count", "main"]).trim()).toBe("1");
 });
 
-test("R2: with the schedule off, a question past its deadline fires on the next event, and the status shows the tick as old", async () => {
+test("with the schedule off, a question past its deadline fires on the next event, and the status shows the tick as old", async () => {
 	const lastTick = NOW;
 	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } }, { worker: { ciTick: async () => lastTick } });
 

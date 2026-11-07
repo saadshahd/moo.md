@@ -1,29 +1,33 @@
-import { createHash } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { z } from "zod";
-import {
-	type Adapter,
-	type AdapterContext,
-	type Answers,
-	type Claim,
-	type ClaimResult,
-	type FollowUp,
-	type Item,
-	ItemId,
-	type ItemRef,
-	PermanentError,
-	type Questions,
-	type WorkSource,
-	type Watch,
-} from "../adapter-api.ts";
-import { answerMarker, type Marker, markedLine, markerOf, parseComment, questionMarker, splitMarker } from "./marked.ts";
+import { type Adapter, type AdapterContext, type Answers, type Item, ItemId, PermanentError, type Questions, type Watch, type WorkSource } from "../adapter-api.ts";
+import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
+import { parseArgument } from "./argument.ts";
+import { claimer, isLive } from "./claim.ts";
+import {
+	answerMarker,
+	commentText,
+	filedFollowUp,
+	followUpBody,
+	followUpNote,
+	type Marker,
+	markedLine,
+	markerLine,
+	parseComment,
+	parseLooseJson,
+	questionMarker,
+	questionText,
+	splitMarker,
+} from "./marked.ts";
 
 const CLAIM_OPEN = "<!-- hum-claim ";
 
-/** An Agent's comment on a Todo is one line of at most 280 characters. */
+/** An Agent's comment on a Todo is one line of at most this many characters. */
 const COMMENT_LIMIT = 280;
+
+const TodoId = ItemId.pipe(z.string().regex(/^(0|[1-9]\d*)$/, "a roundup Todo id is a whole number")).transform(Number);
 
 const Actor = z.looseObject({ kind: z.string(), id: z.string() });
 
@@ -37,10 +41,13 @@ const Todo = z.looseObject({
 	owner: Actor.nullable().optional(),
 });
 
-const Todos = z.union([
-	z.array(Todo),
-	z.looseObject({ todos: z.array(Todo) }).transform((found) => found.todos),
-]);
+type Todo = z.infer<typeof Todo>;
+
+const Todos = z.union([z.array(Todo), z.looseObject({ todos: z.array(Todo) }).transform((found) => found.todos)]);
+
+const Comment = z.looseObject({ id: z.int().nonnegative(), body: z.string(), created_at: z.number() });
+
+type Comment = z.infer<typeof Comment>;
 
 const Reply = z.looseObject({
 	content: z.array(z.looseObject({ type: z.string(), text: z.string().optional() })).optional(),
@@ -48,20 +55,8 @@ const Reply = z.looseObject({
 	structuredContent: Json.optional(),
 });
 
-const environment = () => Object.fromEntries(Object.entries(process.env).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])));
-
-const Comment = z.looseObject({
-	id: z.int().nonnegative(),
-	body: z.string(),
-	created_at: z.number(),
-});
-
 /** One take or renewal of an item's claim, written as a comment. */
-const ClaimEntry = z.strictObject({
-	holder: z.string().min(1),
-	at: z.int().nonnegative(),
-	expiresAt: z.int().nonnegative(),
-});
+const ClaimEntry = z.strictObject({ holder: z.string().min(1), at: z.int().nonnegative(), expiresAt: z.int().nonnegative() });
 
 type ClaimEntry = z.infer<typeof ClaimEntry>;
 
@@ -77,93 +72,48 @@ export type RoundupOptions = {
 	readonly socket?: string;
 };
 
-const claimOf = (body: string): ClaimEntry | undefined => {
-	const split = splitMarker(body, CLAIM_OPEN);
+const environment = (): Record<string, string> => Object.fromEntries(Object.entries(process.env).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])));
 
-	try {
-		return split ? ClaimEntry.parse(JSON.parse(split.json)) : undefined;
-	} catch {
-		return undefined;
-	}
-};
+/** A tool's reply: its structured content, else its text as JSON, else the text itself. */
+const replyValue = (tool: string, result: Awaited<ReturnType<Client["callTool"]>>): Json => {
+	const reply = Reply.parse(result);
+	const text = reply.content?.find((part) => part.type === "text")?.text ?? "";
 
-/**
- * The claim that stands after the comments' order: a take wins if none stands or the standing claim ended before it was made;
- * the holder's own later entry renews. Comments are ordered by the daemon, so every worker folds the same list to the same winner.
- */
-const standing = (
-	comments: readonly z.infer<typeof Comment>[],
-): ClaimEntry | undefined => {
-	let current: ClaimEntry | undefined;
+	if (reply.isError) throw new PermanentError(`${tool}: ${text.slice(0, 300)}`);
 
-	for (const comment of comments) {
-		const entry = claimOf(comment.body);
+	if (reply.structuredContent !== undefined) return reply.structuredContent;
 
-		if (!entry) continue;
+	const json = parseLooseJson(Json, text);
 
-		if (
-			!current ||
-			current.expiresAt <= entry.at ||
-			current.holder === entry.holder
-		)
-			current = entry;
-	}
-
-	return current;
+	return json === undefined ? text : json;
 };
 
 /** The stdio client: `rup mcp <agent>` on the Project's socket. Only a run roundup started has both. */
-export const stdioCall = ({
-	agent,
-	socket,
-}: RoundupOptions) => {
+export const stdioCall = ({ agent, socket }: RoundupOptions) => {
 	const who = agent ?? process.env.ROUNDUP_AGENT_ID;
 	const path = socket ?? process.env.RUPD_SOCKET;
 	let client: Promise<Client> | undefined;
 
-	if (!who || !path)
-		throw new PermanentError(
-			"the roundup adapter runs only in a run roundup started: ROUNDUP_AGENT_ID and RUPD_SOCKET are not both set",
-		);
+	if (!who || !path) throw new PermanentError("the roundup adapter runs only in a run roundup started: ROUNDUP_AGENT_ID and RUPD_SOCKET are not both set");
 
 	const connect = async () => {
 		const made = new Client({ name: "hum", version: "0" });
 
-		await made.connect(
-			new StdioClientTransport({
-				command: "rup",
-				args: ["mcp", who],
-				env: { ...environment(), RUPD_SOCKET: path },
-			}),
-		);
+		await made.connect(new StdioClientTransport({ command: "rup", args: ["mcp", who], env: { ...environment(), RUPD_SOCKET: path } }));
 
 		return made;
 	};
 
 	const call: ToolCall = async (tool, args) => {
-		const used = (client ??= connect());
-
-		const result = await used
+		const result = await (client ??= connect())
 			.then((live) => live.callTool({ name: tool, arguments: args }))
-			.catch((error: Error) => {
+			.catch((cause: unknown) => {
 				client = undefined;
 
-				throw error;
+				throw cause;
 			});
 
-		const reply = Reply.parse(result);
-		const text = reply.content?.find((part) => part.type === "text")?.text ?? "";
-
-		if (reply.isError)
-			throw new PermanentError(`${tool}: ${text.slice(0, 300)}`);
-
-		if (reply.structuredContent !== undefined) return reply.structuredContent;
-
-		try {
-			return text === "" ? null : Json.parse(JSON.parse(text));
-		} catch {
-			return text;
-		}
+		return replyValue(tool, result);
 	};
 
 	return {
@@ -177,6 +127,28 @@ export const stdioCall = ({
 	};
 };
 
+const claimEntryOf = (body: string): ClaimEntry | undefined => {
+	const split = splitMarker(body, CLAIM_OPEN);
+
+	return split && parseLooseJson(ClaimEntry, split.json);
+};
+
+/** A later entry takes over when no claim stands, the standing one ended before it was made, or its holder renews. */
+const takesOver = (current: ClaimEntry | undefined, entry: ClaimEntry): boolean => !current || current.expiresAt <= entry.at || current.holder === entry.holder;
+
+/** The claim that stands after the comments' order. The daemon orders comments, so every worker folds the same list to the same winner. */
+const standingEntry = (comments: readonly Comment[]): ClaimEntry | undefined =>
+	comments.reduce<ClaimEntry | undefined>((current, comment) => {
+		const entry = claimEntryOf(comment.body);
+
+		return entry && takesOver(current, entry) ? entry : current;
+	}, undefined);
+
+/** Open, unblocked and unassigned: a Todo nobody else has taken. */
+const isOpenToTake = (todo: Todo): boolean => !todo.done && !todo.blocked && !todo.owner;
+
+const fitsOneComment = (text: string): boolean => !text.includes("\n") && text.length <= COMMENT_LIMIT;
+
 type Whole = Adapter & {
 	readonly workSource: WorkSource;
 	readonly questions: Questions;
@@ -188,231 +160,105 @@ type Whole = Adapter & {
 
 /**
  * roundup as a work source, through its MCP server over stdio: Todos are items and their comments are the thread.
- * A Todo is ready while it is open, unblocked, unassigned and holds no live claim. A claim is a comment (`<!-- hum-claim {json} -->`),
- * so the daemon's comment order picks the winner. Roundup has no release step, so there is no `release`.
+ * A Todo is ready while it is open, unblocked, unassigned and holds no live claim. A claim is a comment, so the
+ * daemon's comment order picks the winner. roundup has no release step.
  */
-export const roundupAdapter = (
-	options: RoundupOptions,
-	{ now }: AdapterContext,
-): Whole => {
+export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext): Whole => {
 	const client = options.call ? { call: options.call, close: async () => {} } : stdioCall(options);
 	const { call } = client;
 
-	const numberOf = (id: string): number => {
-		ItemId.parse(id);
+	const comments = async (id: string) => Comment.array().parse(await call("todo_comments", { id: parseArgument(TodoId, id) }));
 
-		if (!/^(0|[1-9]\d*)$/.test(id))
-			throw new PermanentError(`"${id}" is no roundup Todo id`);
+	const todo = async (id: string) => Todo.parse(await call("todo_get", { id: parseArgument(TodoId, id) }));
 
-		return Number(id);
+	const todos = async () => Todos.parse(await call("todo_list", {}));
+
+	const post = async (id: string, text: string): Promise<void> => {
+		if (!fitsOneComment(text)) throw new PermanentError(`a roundup comment is one line of at most ${COMMENT_LIMIT} characters`);
+
+		await call("todo_comment", { id: parseArgument(TodoId, id), body: text });
 	};
 
-	const comments = async (id: string) =>
-		Comment.array().parse(await call("todo_comments", { id: numberOf(id) }));
+	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> => post(id, markedLine(marker, text, COMMENT_LIMIT));
 
-	const todo = async (id: string) =>
-		Todo.parse(await call("todo_get", { id: numberOf(id) }));
+	const standingClaim = (id: string, list: readonly Comment[]) => {
+		const entry = standingEntry(list);
 
-	const line = (marker: Marker, text: string) => markedLine(marker, text, COMMENT_LIMIT);
-
-	const post = (id: string, text: string) => {
-		if (text.includes("\n") || text.length > COMMENT_LIMIT)
-			throw new PermanentError(
-				`a roundup comment is one line of at most ${COMMENT_LIMIT} characters`,
-			);
-
-		return call("todo_comment", { id: numberOf(id), body: text });
+		return entry && { claim: { item: id, holder: entry.holder, expiresAt: entry.expiresAt } };
 	};
 
-	const live = (claim: ClaimEntry | undefined): claim is ClaimEntry =>
-		claim !== undefined && claim.expiresAt > now();
+	const isFree = (id: string, list: readonly Comment[]): boolean => !isLive(standingClaim(id, list)?.claim, now());
 
-	const asClaim = (id: string, entry: ClaimEntry): Claim => ({
-		item: id,
-		holder: entry.holder,
-		expiresAt: entry.expiresAt,
+	const take = claimer(
+		{
+			standing: async (id) => standingClaim(id, await comments(id)),
+			isReady: async (id) => isOpenToTake(await todo(id)),
+			write: async (claim) => {
+				const entry: ClaimEntry = { holder: claim.holder, at: now(), expiresAt: claim.expiresAt };
+
+				await post(claim.item, `${markerLine(ClaimEntry, entry, CLAIM_OPEN)} claimed by ${claim.holder}`);
+
+				return standingEntry(await comments(claim.item))?.holder === claim.holder;
+			},
+		},
+		now,
+	);
+
+	const threadOf = (list: readonly Comment[]) => list.flatMap((comment) => (claimEntryOf(comment.body) === undefined ? [parseComment(comment.body, comment.created_at)] : []));
+
+	/** What `watch` hashes for one Todo. Comments are no Todo change, so each open Todo's comment ids count too. */
+	const watchedParts = async (found: Todo): Promise<Json> => ({
+		id: found.id,
+		updatedAt: found.updated_at ?? null,
+		done: found.done,
+		owner: found.owner?.id ?? null,
+		comments: found.done ? [] : (await comments(String(found.id))).map((comment) => comment.id),
 	});
 
-	const take = async (
-		id: string,
-		holder: string,
-		ttlMs: number,
-		renew: boolean,
-	): Promise<ClaimResult> => {
-		if (!Number.isInteger(ttlMs) || ttlMs <= 0)
-			throw new PermanentError(
-				`a claim lasts a positive whole number of milliseconds, not ${ttlMs}`,
-			);
-
-		if (!/^[A-Za-z0-9][\w.@:-]{0,99}$/.test(holder))
-			throw new PermanentError(`holder "${holder}" is not a plain name`);
-
-		const found = await todo(id);
-		const current = standing(await comments(id));
-
-		if (live(current) && current.holder !== holder)
-			return { won: false, claim: asClaim(id, current) };
-
-		if (renew && current?.holder !== holder) {
-			if (current) return { won: false, claim: asClaim(id, current) };
-
-			throw new PermanentError(`"${holder}" holds no claim on "${id}"`);
-		}
-
-		if (!current && (found.done || found.blocked || found.owner))
-			throw new PermanentError(
-				`Todo ${id} is not open, unblocked and unassigned`,
-			);
-
-		const at = now();
-		const entry: ClaimEntry = { holder, at, expiresAt: at + ttlMs };
-
-		await post(
-			id,
-			`${CLAIM_OPEN}${JSON.stringify(entry)} --> claimed by ${holder}`,
-		);
-
-		const winner = standing(await comments(id));
-
-		if (!winner)
-			throw new PermanentError(
-				`claim on "${id}" vanished after it was written`,
-			);
-
-		return { won: winner.holder === holder, claim: asClaim(id, winner) };
-	};
-
-	const threadOf = (list: readonly z.infer<typeof Comment>[]) =>
-		list.flatMap((comment) => (claimOf(comment.body) === undefined ? [parseComment(comment.body, comment.created_at)] : []));
-
-	const adapter: Whole = {
+	return {
 		apiVersion: 1,
 		spent: () => 0,
 		close: client.close,
 		workSource: {
-			async listReady() {
-				const open = Todos.parse(await call("todo_list", {})).filter(
-					(found) => !found.done && !found.blocked && !found.owner,
-				);
+			listReady: async () => {
+				const open = (await todos()).filter(isOpenToTake);
+				const free = await Promise.all(open.map(async (found) => isFree(String(found.id), await comments(String(found.id)))));
 
-				const ready: ItemRef[] = [];
-
-				for (const found of open) {
-					const id = String(found.id);
-
-					if (!live(standing(await comments(id))))
-						ready.push({ id, title: found.title });
-				}
-
-				return ready;
+				return open.flatMap((found, index) => (free[index] ? [{ id: String(found.id), title: found.title }] : []));
 			},
-			async read(id): Promise<Item> {
-				const found = await todo(id);
-				const list = await comments(id);
+			read: async (id): Promise<Item> => {
+				const [found, list] = await Promise.all([todo(id), comments(id)]);
 
-				return {
-					id,
-					title: found.title,
-					body: found.body,
-					ready:
-						!found.done &&
-						!found.blocked &&
-						!found.owner &&
-						!live(standing(list)),
-					thread: threadOf(list),
-				};
+				return { id, title: found.title, body: found.body, ready: isOpenToTake(found) && isFree(id, list), thread: threadOf(list) };
 			},
-			claim: (id, holder, ttlMs) => take(id, holder, ttlMs, false),
-			renew: (id, holder, ttlMs) => take(id, holder, ttlMs, true),
-			async comment(id, text) {
-				await post(id, text.trim() === "" ? "(empty)" : text.trim());
-			},
-			async fileFollowUp(
-				from: string,
-				{ title, body }: FollowUp,
-			): Promise<ItemRef> {
-				const key = createHash("sha256")
-					.update(title)
-					.digest("hex")
-					.slice(0, 12);
+			claim: (id, holder, ttlMs) => take("claim", parseArgument(ItemId, id), holder, ttlMs),
+			renew: (id, holder, ttlMs) => take("renew", parseArgument(ItemId, id), holder, ttlMs),
+			comment: (id, text) => post(id, commentText(text)),
+			fileFollowUp: async (from, { title, body }) => {
+				const filed = filedFollowUp((await comments(from)).map((comment) => comment.body), title);
 
-				const filed = (await comments(from)).flatMap((comment) => {
-					const follow = markerOf(comment.body)?.followUp;
+				if (filed !== undefined) return { id: filed, title };
 
-					return follow?.key === key ? [follow.item] : [];
-				});
+				const made = Todo.parse(await call("todo_create", { title, body: followUpBody(body, `#${from}`) }));
+				const note = followUpNote(title, String(made.id));
 
-				if (filed[0] !== undefined) return { id: filed[0], title };
-
-				const made = Todo.parse(
-					await call("todo_create", {
-						title,
-						body: `${body.trim()}\n\nFiled from #${from}.`,
-					}),
-				);
-
-				await post(
-					from,
-					line(
-						{ kind: "comment", followUp: { key, item: String(made.id) } },
-						`Filed follow-up #${made.id}: ${title}`,
-					),
-				);
+				await postMarked(from, note.marker, note.text);
 
 				return { id: String(made.id), title };
 			},
 		},
 		questions: {
-			ask: async (id, { text, options }) =>
-				void (await post(
-					id,
-					line(
-						questionMarker(options),
-						options?.length
-							? `${text}\n\nOptions: ${options.join(", ")}`
-							: text,
-					),
-				)),
-			decide: async (id, text) =>
-				void (await post(id, line({ kind: "decision" }, text))),
+			ask: (id, question) => postMarked(id, questionMarker(question.options), questionText(question)),
+			decide: (id, text) => postMarked(id, { kind: "decision" }, text),
 		},
 		answers: {
-			answer: async (id, { text, option }) =>
-				void (await post(
-					id,
-					line(
-						answerMarker(option),
-						text,
-					),
-				)),
-			/** Comments are no Todo Change, so the token hashes each open Todo's `updated_at` and comment ids. The socket is local: none of it spends rate limit. */
-			async watch(since?: string): Promise<Watch> {
-				const open = Todos.parse(await call("todo_list", {}));
-				const parts: unknown[] = [];
-
-				for (const found of open) {
-					parts.push([
-						found.id,
-						found.updated_at,
-						found.done,
-						found.owner?.id ?? null,
-					]);
-
-					if (!found.done)
-						parts.push(
-							(await comments(String(found.id))).map((comment) => comment.id),
-						);
-				}
-
-				const token = createHash("sha256")
-					.update(JSON.stringify(parts))
-					.digest("hex")
-					.slice(0, 32);
+			answer: (id, { text, option }) => postMarked(id, answerMarker(option), text),
+			/** The socket is local: none of this spends rate limit. */
+			watch: async (since?: string): Promise<Watch> => {
+				const token = hashJson(await Promise.all((await todos()).map(watchedParts)));
 
 				return { token, changed: token !== since };
 			},
 		},
 	};
-
-	return adapter;
 };

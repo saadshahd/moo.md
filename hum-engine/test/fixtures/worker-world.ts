@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ClaudeRunner } from "../../src/adapters/claude-p.ts";
+import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
 import { serialized } from "../../src/adapters/serial.ts";
 import type { Config } from "../../src/config/load.ts";
@@ -30,7 +31,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const shim = makeShim(spec);
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-worker-")), { now });
 	const reports: string[] = [];
-	const markdown = markdownAdapter({ repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
+	const markdown = markdownAdapter({ claimPrefix: SHIPPED_DEFAULTS.claimPrefix, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
 	const adapter = serialized(markdown);
 	const config = options.config ?? configWith();
 	const results: { outcome: string; item?: string; detail?: string }[] = [];
@@ -78,7 +79,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 		worker: workerWith(),
 		/** An item that declares what it touches. */
 		item: (id: string, touches?: string) => repo.add(id, itemFile(id, "ready", touches ? `touches: ${touches}\n\nDo the work.` : "Do the work.")),
-		/** A file in the owner's checkout, which V2 watches. */
+		/** A file in the owner's checkout, which the update check watches. */
 		ownerFile: (path: string, content: string) => {
 			mkdirSync(dirname(join(repo.owner, path)), { recursive: true });
 			writeFileSync(join(repo.owner, path), content);

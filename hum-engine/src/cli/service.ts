@@ -3,7 +3,6 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Command, InvalidArgumentError, Option } from "commander";
 import { z } from "zod";
-import { runGit } from "../adapters/git.ts";
 import { listHopeSkills } from "../config/load.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
@@ -87,7 +86,7 @@ const openFor = (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 		where,
 		// The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow.
 		latestVersion: where === "mac" ? npmLatest : undefined,
-		ciTick: where === "mac" ? () => readCiTick(runGit, repo, "origin") : undefined,
+		ciTick: where === "mac" ? () => readCiTick(repo, "origin") : undefined,
 	});
 };
 
@@ -100,7 +99,7 @@ const onStop = (stop: () => void) => {
  * roles and machines never name them, so they stay out of the table `hum help --json` prints.
  */
 export const addServiceCommands = (root: Command, io: Io, done: (code: number) => void): void => {
-	withWorkOptions(root.command("work").description("Run the worker on this machine until it is stopped or an update arrives (V2); exits 75 for an update."))
+	withWorkOptions(root.command("work").description("Run the worker on this machine until it is stopped or an update arrives; exits 75 for an update."))
 		.action(async (flags: WorkFlags) => {
 			const abort = new AbortController();
 
@@ -115,7 +114,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 	root
 		.command("serve")
-		.description("The service unit's start script: run `hum work` with the arguments after `--`, start it again when it exits, and stop after too many crashes (R7).")
+		.description("The service unit's start script: run `hum work` with the arguments after `--`, start it again when it exits, and stop after too many crashes.")
 		.option("--max-crashes <n>", "crashes within the window that stop the restarts", whole, 5)
 		.option("--crash-window <minutes>", "the window for --max-crashes", whole, 10)
 		.argument("[work-args...]", "options of `hum work`, after `--`")
@@ -151,14 +150,14 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			done(0);
 		});
 
-	withWorkOptions(root.command("wake").description("One CI wake: tick until nothing more starts, record the tick when --event is schedule, and show the cards (R2, U6)."))
+	withWorkOptions(root.command("wake").description("One CI wake: tick until nothing more starts, record the tick when --event is schedule, and show the cards."))
 		.option("--event <name>", "the GitHub event that started this job")
 		.action(async (flags: WorkFlags & { event?: string }) => {
 			const worker = await openFor(io.cwd, flags, "ci");
 
 			await wakeUntilQuiet(worker);
 
-			if (flags.event === "schedule") await recordCiTick(runGit, io.cwd, "origin", Date.now());
+			if (flags.event === "schedule") await recordCiTick(io.cwd, "origin", Date.now());
 
 			const status = readStatus(join(defaultStateDir(io.cwd), "status.json"));
 			const cards = status.ok ? status.status.cards : [];

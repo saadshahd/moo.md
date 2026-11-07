@@ -141,6 +141,32 @@
 				"setUp"
 			],
 			"additionalProperties": false
+		},
+		"runBranchPrefix": {
+			"default": "hum/run/",
+			"type": "string",
+			"format": "ends_with",
+			"pattern": ".*\\/$"
+		},
+		"claimPrefix": {
+			"default": "hum/claim/",
+			"type": "string",
+			"format": "ends_with",
+			"pattern": ".*\\/$"
+		},
+		"readyLabel": {
+			"default": "hum:ready",
+			"type": "string",
+			"minLength": 1
+		},
+		"mergeMethod": {
+			"default": "squash",
+			"type": "string",
+			"enum": [
+				"merge",
+				"squash",
+				"rebase"
+			]
 		}
 	},
 	"required": [

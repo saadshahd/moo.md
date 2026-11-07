@@ -1,22 +1,15 @@
-import {
-	type Adapter,
-	type Answer,
-	type ClaimResult,
-	type FollowUp,
-	type Item,
-	type ItemRef,
-	PermanentError,
-	type Question,
-	type ThreadEntry,
-	type Watch,
-} from "../adapter-api.ts";
+import { type Adapter, type Claim, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { claimer, isLive } from "./claim.ts";
+import { questionText } from "./marked.ts";
 
-type Stored = { id: string; title: string; body: string; ready: boolean; thread: ThreadEntry[]; claim?: { holder: string; expiresAt: number }; from?: string };
+type Stored = { id: string; title: string; body: string; ready: boolean; thread: ThreadEntry[]; claim?: Claim; from?: string };
 
 /** A provider failure a retry can outlast, like a GitHub 502. */
 export class ProviderError extends Error {
 	override readonly name = "ProviderError";
 }
+
+const START_CLOCK = 1_000_000;
 
 /**
  * One in-memory provider behind all four integrations. Its controls stand in for the real provider's clock,
@@ -25,7 +18,7 @@ export class ProviderError extends Error {
 export class FakeProvider {
 	#items = new Map<string, Stored>();
 	#version = 0;
-	#clock = 1_000_000;
+	#clock = START_CLOCK;
 	#failures = 0;
 	#spent = 0;
 	#emptyList = false;
@@ -83,8 +76,8 @@ export class FakeProvider {
 		return found;
 	}
 
-	#live(item: Stored): boolean {
-		return item.claim !== undefined && item.claim.expiresAt > this.#clock;
+	#isReady(item: Stored): boolean {
+		return item.ready && !isLive(item.claim, this.#clock);
 	}
 
 	#push(id: string, entry: Omit<ThreadEntry, "at">): void {
@@ -92,47 +85,48 @@ export class FakeProvider {
 		this.#version++;
 	}
 
-	#take(id: string, holder: string, ttlMs: number, renew: boolean): ClaimResult {
-		if (!Number.isInteger(ttlMs) || ttlMs <= 0) throw new PermanentError(`a claim lasts a positive whole number of milliseconds, not ${ttlMs}`);
+	#take = claimer(
+		{
+			standing: async (id) => {
+				const { claim } = this.#get(id);
 
-		const item = this.#get(id);
-		const held = this.#live(item) ? item.claim : undefined;
+				return claim && { claim };
+			},
+			isReady: async (id) => this.#get(id).ready,
+			write: async (claim, over) => {
+				const item = this.#get(claim.item);
 
-		if (held && held.holder !== holder) return { won: false, claim: { item: id, ...held } };
+				if (item.claim !== over?.claim) return false;
 
-		if (renew && item.claim?.holder !== holder) {
-			if (item.claim) return { won: false, claim: { item: id, ...item.claim } };
+				item.claim = claim;
+				this.#version++;
 
-			throw new PermanentError(`"${holder}" holds no claim on "${id}"`);
-		}
-
-		if (!held && !item.ready) throw new PermanentError(`item "${id}" is not ready`);
-
-		item.claim = { holder, expiresAt: this.#clock + ttlMs };
-		this.#version++;
-
-		return { won: true, claim: { item: id, ...item.claim } };
-	}
+				return true;
+			},
+		},
+		this.now,
+	);
 
 	adapter(): Adapter {
-		const view = (item: Stored): Item => ({ id: item.id, title: item.title, body: item.body, ready: item.ready && !this.#live(item), thread: [...item.thread] });
-		const asRef = (item: Stored): ItemRef => ({ id: item.id, title: item.title });
+		const asRef = ({ id, title }: Stored): ItemRef => ({ id, title });
+		const spend = <T>(body: () => T) => this.#call(true, body);
 
 		return {
 			apiVersion: 1,
 			workSource: {
 				listReady: async () =>
-					this.#call(true, () => {
-						if (this.listReplacement) return this.listReplacement();
+					spend(() => this.listReplacement?.() ?? (this.#emptyList ? [] : [...this.#items.values()].flatMap((item) => (this.#isReady(item) ? [asRef(item)] : [])))),
+				read: async (id) =>
+					spend(() => {
+						const item = this.#get(id);
 
-						return this.#emptyList ? [] : [...this.#items.values()].flatMap((item) => (view(item).ready ? [asRef(item)] : []));
+						return { id: item.id, title: item.title, body: item.body, ready: this.#isReady(item), thread: [...item.thread] };
 					}),
-				read: async (id) => this.#call(true, () => view(this.#get(id))),
-				claim: async (id, holder, ttlMs) => this.#call(true, () => this.#take(id, holder, ttlMs, false)),
-				renew: async (id, holder, ttlMs) => this.#call(true, () => this.#take(id, holder, ttlMs, true)),
-				comment: async (id, text) => this.#call(true, () => this.#push(id, { kind: "comment", text })),
-				fileFollowUp: async (from, { title, body }: FollowUp) =>
-					this.#call(true, () => {
+				claim: async (id, holder, ttlMs) => spend(() => this.#take("claim", id, holder, ttlMs)),
+				renew: async (id, holder, ttlMs) => spend(() => this.#take("renew", id, holder, ttlMs)),
+				comment: async (id, text) => spend(() => this.#push(id, { kind: "comment", text })),
+				fileFollowUp: async (from, { title, body }) =>
+					spend(() => {
 						this.#get(from);
 
 						const known = [...this.#items.values()].find((item) => item.from === from && item.title === title);
@@ -147,16 +141,16 @@ export class FakeProvider {
 					}),
 			},
 			questions: {
-				ask: async (id, { text, options }: Question) => this.#call(true, () => this.#push(id, { kind: "question", text: options?.length ? `${text}\n\nOptions: ${options.join(", ")}` : text })),
-				decide: async (id, text) => this.#call(true, () => this.#push(id, { kind: "decision", text })),
+				ask: async (id, question) => spend(() => this.#push(id, { kind: "question", text: questionText(question) })),
+				decide: async (id, text) => spend(() => this.#push(id, { kind: "decision", text })),
 			},
 			answers: {
-				answer: async (id, { text, option }: Answer) => this.#call(true, () => this.#push(id, option === undefined ? { kind: "answer", text } : { kind: "answer", text, option })),
+				answer: async (id, { text, option }) => spend(() => this.#push(id, option === undefined ? { kind: "answer", text } : { kind: "answer", text, option })),
 				watch: async (since): Promise<Watch> => this.#call(false, () => ({ token: String(this.#version), changed: String(this.#version) !== since })),
 			},
 			release: {
-				publish: async (id, ref) => this.#call(true, () => void this.shipped.push(`publish ${id} ${ref}`)),
-				release: async (id, ref) => this.#call(true, () => void this.shipped.push(`release ${id} ${ref}`)),
+				publish: async (id, ref) => spend(() => void this.shipped.push(`publish ${id} ${ref}`)),
+				release: async (id, ref) => spend(() => void this.shipped.push(`release ${id} ${ref}`)),
 			},
 		};
 	}

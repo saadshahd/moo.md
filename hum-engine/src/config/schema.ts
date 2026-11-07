@@ -1,4 +1,6 @@
+import isGitRefNameValid from "is-git-ref-name-valid";
 import { z } from "zod";
+import shippedConfig from "../../defaults/hum.json" with { type: "json" };
 
 /** The `hum.json` schema version this engine writes. */
 export const SCHEMA_VERSION = 1;
@@ -35,6 +37,26 @@ export const STUCK_TAG = "stuck";
 
 const name = z.string().min(1);
 
+/** Any item id appended to a branch prefix; the prefix is valid when the branch it makes is. */
+const SAMPLE_ITEM_ID = "0";
+
+const isBranchPrefix = (prefix: string): boolean => isGitRefNameValid(`refs/heads/${prefix}${SAMPLE_ITEM_ID}`);
+
+const branchPrefix = z
+	.string()
+	.endsWith("/", "a branch prefix ends with '/'")
+	.refine(isBranchPrefix, "a branch prefix followed by an item id must make a valid git branch name");
+
+export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
+
+const Shipped = z.object({ runBranchPrefix: branchPrefix, claimPrefix: branchPrefix, readyLabel: name, mergeMethod: z.enum(MERGE_METHODS) });
+
+/** The defaults hum ships with, read from the default `hum.json`. */
+export const SHIPPED_DEFAULTS = Shipped.parse(shippedConfig);
+
+/** The branch prefixes: every branch hum writes starts with one of them. */
+export type Naming = Pick<z.infer<typeof Shipped>, "runBranchPrefix" | "claimPrefix">;
+
 export const Role = z.strictObject({
 	file: name,
 	purpose: z.enum(PURPOSES),
@@ -52,15 +74,23 @@ export const HumConfig = z.strictObject({
 	events: z.record(name, z.strictObject({ source: name })),
 	/** Kind names; each kind sits in `kinds/<name>.json`. */
 	kinds: z.array(name).min(1),
-	/** The owner's safety rule; slice 9 fixes its contents. */
+	/** The owner's safety rule. */
 	safety: z.record(z.string(), z.unknown()).optional(),
 	/** The cheap model call: the owner's decision model, else Haiku through `claude -p`. */
 	decisionModel: name.optional(),
 	dailyQuestionCap: z.number().int().positive().optional(),
 	/** Adapter slot → adapter name. */
 	integrations: z.record(name, name).optional(),
-	/** D6: the day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
+	/** The day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
 	ciToken: z.strictObject({ setUp: z.iso.date() }).optional(),
+	/** Each run builds on the branch this prefix and its item id make. */
+	runBranchPrefix: Shipped.shape.runBranchPrefix.default(SHIPPED_DEFAULTS.runBranchPrefix),
+	/** A claim is the first push of the branch this prefix and its item id make. */
+	claimPrefix: Shipped.shape.claimPrefix.default(SHIPPED_DEFAULTS.claimPrefix),
+	/** The label that marks an issue ready for hum. */
+	readyLabel: Shipped.shape.readyLabel.default(SHIPPED_DEFAULTS.readyLabel),
+	/** How a released pull request merges. */
+	mergeMethod: Shipped.shape.mergeMethod.default(SHIPPED_DEFAULTS.mergeMethod),
 });
 
 export type HumConfig = z.infer<typeof HumConfig>;
@@ -119,7 +149,7 @@ export const Kind = z.strictObject({
 	),
 	/** The token cap, and the machine state a run goes to when it passes the cap. */
 	tokenCap: z.strictObject({ tokens: z.number().int().positive(), overCap: name }),
-	/** Per earlier machine version: renamed or removed states, old name → new name (V3). */
+	/** Per earlier machine version: renamed or removed states, old name → new name. */
 	stateMap: z.record(name, z.record(name, name)).optional(),
 	machine: MachineJSON,
 });
@@ -127,7 +157,7 @@ export const Kind = z.strictObject({
 export type Kind = z.infer<typeof Kind>;
 
 /**
- * Every part the owner may change, with the `hum.json` key that holds it (C4).
+ * Every part the owner may change, with the `hum.json` key that holds it.
  * Machines and the kinds' tables sit in `kinds/<name>.json`, listed by `kinds`.
  */
 export const OWNER_CHANGEABLE = {
@@ -139,4 +169,8 @@ export const OWNER_CHANGEABLE = {
 	"cheap model call": "decisionModel",
 	"daily question cap": "dailyQuestionCap",
 	"kinds' tables": "kinds",
+	"run branch prefix": "runBranchPrefix",
+	"claim prefix": "claimPrefix",
+	"ready label": "readyLabel",
+	"merge method": "mergeMethod",
 } as const satisfies Record<string, string>;

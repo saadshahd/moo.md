@@ -9,7 +9,7 @@ const inOrder = <R extends object>(role: R | undefined, run: Queue): R | undefin
 
 /**
  * Runs an adapter's calls one at a time. Runs that go side by side share one adapter, and an adapter
- * that keeps a clone (the markdown source) must not take two writes into it at once.
+ * that keeps a clone, as the markdown source does, must not take two writes into it at once.
  */
 export const serialized = (adapter: Adapter): Adapter => {
 	const run: Queue = pLimit(1);

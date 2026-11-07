@@ -7,12 +7,12 @@ import type { Item, Questions, WorkSource } from "../adapter-api.ts";
 import { type ClaudeRunner, succeeded, TIER_MODELS } from "../adapters/claude-p.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
-import { type Git, HOOKS_OFF, pushHooksOff, runGit } from "../adapters/git.ts";
+import { type Git, gitIn, isAncestor, push } from "../adapters/git.ts";
+import { ITEMS_DIR } from "../adapters/markdown.ts";
 import { pickTier } from "../config/checks.ts";
-import { HUM_RUN_BRANCH_PREFIX } from "../config/change.ts";
 import type { Config } from "../config/load.ts";
 import { kindMachine } from "../config/machine.ts";
-import { type Kind, OWNER_WAIT_TAG, STUCK_TAG } from "../config/schema.ts";
+import { type Kind, type Naming, OWNER_WAIT_TAG, STUCK_TAG } from "../config/schema.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import type { PrefixGate } from "./scheduler.ts";
@@ -20,8 +20,7 @@ import type { PrefixGate } from "./scheduler.ts";
 /** A claim lasts this long unless its holder renews it. */
 export const DEFAULT_CLAIM_TTL_MS = 15 * 60_000;
 
-/** A run's branch. Not `hum/<id>`: an item named `claim` would clash with the `hum/claim/` claim refs. */
-export const runBranch = (id: string): string => `${HUM_RUN_BRANCH_PREFIX}run/${id}`;
+export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
 /** What the agent run hands back besides its commit. */
 export const RUN_SCHEMA = {
@@ -51,7 +50,6 @@ export type ThinPathOptions = {
 	/** Where runs clone to; a temp folder by default. */
 	readonly workDir?: string;
 	readonly dir?: string;
-	readonly git?: Git;
 	/** Runs of the fix role after a failed check, per item. */
 	readonly maxFixes?: number;
 	/** Take this item; default the first ready one. */
@@ -60,7 +58,7 @@ export type ThinPathOptions = {
 	readonly now?: () => number;
 	/** Aborted when the worker loses the claim or exits for an update; the run stops and the result is `lost`. */
 	readonly signal?: AbortSignal;
-	/** E4: lets the first run of a shared prompt prefix reach its first token before the rest start. */
+	/** Lets the first run of a shared prompt prefix reach its first token before the rest start. */
 	readonly gate?: PrefixGate;
 };
 
@@ -70,8 +68,6 @@ export type ThinResult =
 	| { readonly outcome: "merged" | "asked" | "stuck" | "review"; readonly item: string; readonly detail?: string }
 	| { readonly outcome: "limited"; readonly item: string; readonly until: number }
 	| { readonly outcome: "held"; readonly item: string; readonly why: string };
-
-const IDENTITY = { GIT_AUTHOR_NAME: "hum", GIT_AUTHOR_EMAIL: "hum@moo.md", GIT_COMMITTER_NAME: "hum", GIT_COMMITTER_EMAIL: "hum@moo.md" };
 
 /** The first failing check as its command, exit code and output; undefined when all pass. */
 const runChecks = async (commands: readonly string[], cwd: string): Promise<string | undefined> => {
@@ -93,7 +89,7 @@ const shellOut = async (command: string, cwd: string): Promise<{ code: number; o
 
 type Level = { readonly level: string | undefined; readonly unclear: boolean };
 
-/** Row 5, reduced to what the thin path needs: the highest level among the paths a change touches; a path no rule matches is unclear. Slice 9 owns the full rule. */
+/** The highest level among the paths a change touches; a path no rule matches is unclear. */
 export const levelOf = (paths: readonly string[], config: Config): Level => {
 	const { levels, paths: rules } = config.hum;
 	let top = -1;
@@ -109,7 +105,7 @@ export const levelOf = (paths: readonly string[], config: Config): Level => {
 	return { level: levels[top], unclear: paths.length === 0 };
 };
 
-/** Row 7, reduced: a clear change at the lowest level merges. Everything else waits for the review slice 9 adds. */
+/** A clear change at the lowest level merges; everything else holds. */
 export const mergeDecision = (level: Level, config: Config): "merge" | "hold" =>
 	!level.unclear && level.level === config.hum.levels[0] ? "merge" : "hold";
 
@@ -146,7 +142,7 @@ export const answerTo = (item: Item): Answered | undefined => {
 
 const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional() });
 
-/** V3: the kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
+/** The kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
 const earlierKinds = (state: State, kind: Kind) => (machineVersion: string) => state.kinds.get(`${kind.machine.id}@${machineVersion}`);
 
 /** Saves every kind under its machine version. Call it whenever a config is loaded. */
@@ -164,10 +160,10 @@ const stubSources = (kind: Kind) => {
 };
 
 /**
- * The thin path (slice 5): a ready markdown item is claimed, built by a `claude -p` run on `hum/run/<id>`,
+ * The thin path: a ready markdown item is claimed, built by a `claude -p` run on its run branch,
  * checked by the repo's own checks, and merged in one push that also sets the item's state to done, when its
  * paths are all at the lowest level. A run that needs the owner pushes its branch, asks on the item and
- * ends; the answer starts a fresh run on that branch (Q2). Never `--resume`.
+ * ends; the answer starts a fresh run on that branch. Never `--resume`.
  */
 export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const base = o.base ?? "main";
@@ -202,20 +198,14 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (asking && !answered) return { outcome: "waiting", item: id };
 
-	const git = o.git ?? runGit;
 	const clone = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-run-"));
-	const branch = runBranch(id);
+	const branch = runBranch(o.config.hum, id);
 
-	const g = async (args: readonly string[], cwd = clone): Promise<string> => {
-		const result = await git([...HOOKS_OFF, ...args], { cwd, env: IDENTITY });
-
-		if (result.code !== 0) throw new Error(`git ${args.join(" ")} failed (${result.code}): ${result.stderr.trim()}`);
-
-		return result.stdout;
-	};
+	const git = gitIn(clone);
+	const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 	try {
-		await g(["clone", "-q", "--branch", base, o.remote, clone], tmpdir());
+		await gitIn(tmpdir()).raw(["clone", "-q", "--branch", base, o.remote, clone]);
 
 		if ((await g(["ls-remote", "--heads", "origin", branch])).trim()) {
 			await g(["fetch", "-q", "origin", `${branch}:${branch}`]);
@@ -224,7 +214,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 			await g(["checkout", "-q", "-b", branch]);
 		}
 
-		return park(o, await drive({ ...o, base, dir: o.dir ?? ".hum/work", kindName: o.kind, kind, id, item, branch, clone, g, git, answered, resume: asking }));
+		return park(o, await drive({ ...o, base, dir: o.dir ?? ITEMS_DIR, kindName: o.kind, kind, id, item, branch, clone, g, git, answered, resume: asking }));
 	} finally {
 		rmSync(clone, { recursive: true, force: true });
 	}
@@ -239,7 +229,7 @@ type Driven = Omit<ThinPathOptions, "kind"> & {
 	readonly item: Item;
 	readonly branch: string;
 	readonly clone: string;
-	readonly g: (args: readonly string[], cwd?: string) => Promise<string>;
+	readonly g: (args: readonly string[]) => Promise<string>;
 	readonly git: Git;
 	readonly answered: Answered | undefined;
 	/** Restore the saved owner-wait snapshot instead of starting the machine. */
@@ -253,7 +243,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	// The worker lost the claim or is exiting for an update: the run stops, and its actor with it.
 	d.signal?.addEventListener("abort", () => result.resolve({ outcome: "lost", item: id }), { once: true });
-	// E1: the total over all runs is saved; the cap counts what the item spent since the owner last answered.
+	// The total over all runs is saved; the cap counts what the item spent since the owner last answered.
 	const tally = state.spent.get(id) ?? { item: id, total: 0, base: 0 };
 
 	if (d.answered) tally.base = tally.total;
@@ -313,7 +303,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return new Promise<never>(() => {});
 	};
 
-	/** The kinds reach their owner-wait state only through the over-cap event; a run's question uses it too, until slice 11 adds its own. */
+	/** The kinds reach their owner-wait state only through the over-cap event, so a run's question uses it too. */
 	const ask = (question: string, plan: string) => {
 		pending = { question, plan };
 		actor.send({ type: "token-cap" });
@@ -364,7 +354,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 				if (wants?.status === "needs-owner") return ask(wants.question ?? "The run needs an answer only you hold.", wants.plan ?? "");
 
-				// R6: done is a new commit on the branch, not the run's word.
+				// Done is a new commit on the branch, not the run's word.
 				if ((await g(["rev-parse", "HEAD"])).trim() === before) throw failed(`the ${purpose} run succeeded and committed nothing`);
 			},
 		});
@@ -437,9 +427,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	return result.promise.finally(() => actor.stop());
 };
 
-/** Q2: push the work branch, put the plan and the question on the item, and end. Each write runs once per key (E2). */
+/** Push the work branch, put the plan and the question on the item, and end. Each write runs once per key. */
 const handOff = async (d: Driven, question: string, plan: string) => {
-	const { state, id, g, branch, workSource, questions, git, clone } = d;
+	const { state, id, g, branch, workSource, questions, git } = d;
 	const attempt = state.runs.list(id).length;
 	const key = (op: string) => ({ itemId: id, run: "ask", attempt, op });
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource, questions }, state.ops, { run: "ask", attempt });
@@ -447,7 +437,7 @@ const handOff = async (d: Driven, question: string, plan: string) => {
 	await state.ops.once(key("push-branch"), {
 		holds: async () => (await g(["ls-remote", "--heads", "origin", branch])).startsWith((await g(["rev-parse", "HEAD"])).trim()),
 		run: async () => {
-			if ((await pushHooksOff(git, clone, ["--force", "origin", `HEAD:refs/heads/${branch}`])) !== "pushed") throw new Error(`could not push ${branch}`);
+			if ((await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`])) !== "pushed") throw new Error(`could not push ${branch}`);
 		},
 	});
 
@@ -461,11 +451,11 @@ class StaleMerge extends Error {
 	override name = "StaleMerge";
 }
 
-/** D5: every act that changes the world checks the claim first. */
+/** Every act that changes the world checks the claim first. */
 const stillMine = async (d: Pick<Driven, "workSource" | "id" | "holder" | "claimTtlMs">): Promise<boolean> =>
 	(await d.workSource.renew(d.id, d.holder, d.claimTtlMs ?? DEFAULT_CLAIM_TTL_MS)).won;
 
-/** Row 7, reduced. Low and clear: one pushed change carries the run's commits and `state: done`. */
+/** Low and clear: one pushed change carries the run's commits and `state: done`. */
 const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 	if (!(await stillMine(d))) return { outcome: "lost", item: d.id };
 
@@ -484,7 +474,7 @@ const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 				holds: async () => {
 					await g(["fetch", "-q", "origin", base]);
 	
-					return (await git([...HOOKS_OFF, "merge-base", "--is-ancestor", "HEAD", `origin/${base}`], { cwd: clone })).code === 0;
+					return isAncestor(git, "HEAD", `origin/${base}`);
 				},
 				run: async () => {
 					const file = join(clone, dir, `${id}.md`);
@@ -497,11 +487,11 @@ const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 						await g(["fetch", "-q", "origin", base]);
 	
 						// A merge is rechecked on the newest main: when main moved, rebase and run the checks again.
-						if ((await git([...HOOKS_OFF, "merge-base", "--is-ancestor", `origin/${base}`, "HEAD"], { cwd: clone })).code !== 0) {
-							const rebased = await git([...HOOKS_OFF, "rebase", "-q", `origin/${base}`], { cwd: clone, env: IDENTITY });
+						if (!(await isAncestor(git, `origin/${base}`, "HEAD"))) {
+							const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
 	
 							if (rebased.code !== 0) {
-								await git([...HOOKS_OFF, "rebase", "--abort"], { cwd: clone });
+								await git.run(["rebase", "--abort"]);
 	
 								throw new StaleMerge(`the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, 200)}`);
 							}
@@ -511,9 +501,9 @@ const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 							if (failure) throw new StaleMerge(`the checks fail on the newest ${base}: ${failure.slice(0, 200)}`);
 						}
 	
-						await pushHooksOff(git, clone, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+						await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
 	
-						if ((await pushHooksOff(git, clone, ["origin", `HEAD:refs/heads/${base}`])) === "pushed") return;
+						if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "pushed") return;
 					}
 	
 					throw new Error(`lost the race to ${base} three times`);

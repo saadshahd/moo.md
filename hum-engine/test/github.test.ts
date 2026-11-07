@@ -1,26 +1,33 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { z } from "zod";
-import { type Adapter, type AdapterContext, contractChecks, type ContractTarget, GitHubApi, githubAdapter, guarded, openState, parseComment, repoFromRemote } from "../src/index.ts";
-import { FakeGitHub } from "./fixtures/fake-github.ts";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-
-const Comments = z.array(z.looseObject({ body: z.string() }));
-const Created = z.looseObject({ node_id: z.string(), number: z.int() });
-const Errored = z.looseObject({ errors: z.array(z.looseObject({})).optional() });
+import { z } from "zod";
+import { type Adapter, type AdapterContext, contractChecks, type ContractTarget, type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, guarded, openState, parseComment, repoFromRemote } from "../src/index.ts";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { FakeGitHub } from "./fixtures/fake-github.ts";
 
 const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
 const context: AdapterContext = { report: () => {}, now };
 
-const fakeApi = (github: FakeGitHub) => new GitHubApi({ repo: github.repo, fetch: github.fetch, token: async () => "fake-token" });
+const fakeClient = (github: FakeGitHub, token = "fake-token"): GitHubClient => gitHubClient({ token, baseUrl: "https://fake.github", fetch: github.fetch, spaced: false });
+
+const settings = (repo: string, client: GitHubClient): GitHubOptions => ({
+	repo,
+	base: "main",
+	client,
+	claimPrefix: SHIPPED_DEFAULTS.claimPrefix,
+	readyLabel: SHIPPED_DEFAULTS.readyLabel,
+	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,
+});
+
+const onFake = (github: FakeGitHub, client = fakeClient(github)) => githubAdapter(settings(github.repo, client), context);
 
 describe("contract suite on a fake GitHub", () => {
 	const github = new FakeGitHub();
-	const api = fakeApi(github);
-	const primary = githubAdapter({ api }, context);
-	const secondary = githubAdapter({ api }, context);
+	const primary = onFake(github);
+	const secondary = onFake(github);
 
 	const target: ContractTarget = {
 		name: "github (fake)",
@@ -28,32 +35,32 @@ describe("contract suite on a fake GitHub", () => {
 		other: async () => secondary,
 		seed: async (title) => String(github.seed(title)),
 		advance: async (ms) => void (clock.offset += ms),
-		spent: () => api.spent(),
+		spent: () => primary.spent(),
 	};
 
 	for (const check of contractChecks(target)) test(check.name, check.run);
 
-	test("release: publish opens one pull request, and release merges it", async () => {
+	test("publish opens one pull request, and release merges it", async () => {
 		const id = String(github.seed("shipped"));
 
 		github.branch("hum/run/shipped");
-		await primary.release?.publish(id, "hum/run/shipped");
-		await primary.release?.publish(id, "hum/run/shipped");
+		await primary.release.publish(id, "hum/run/shipped");
+		await primary.release.publish(id, "hum/run/shipped");
 
 		expect(github.pulls().filter((pull) => pull.head === "hum/run/shipped")).toHaveLength(1);
 
-		await primary.release?.release(id, "hum/run/shipped");
-		await primary.release?.release(id, "hum/run/shipped");
+		await primary.release.release(id, "hum/run/shipped");
+		await primary.release.release(id, "hum/run/shipped");
 
-		expect(github.pulls().find((pull) => pull.head === "hum/run/shipped")?.merged_at).not.toBeNull();
-		await expect(primary.release?.release(id, "hum/run/none")).rejects.toThrow("no pull request");
+		expect(github.pulls().find((pull) => pull.head === "hum/run/shipped")?.state).toBe("MERGED");
+		await expect(primary.release.release(id, "hum/run/none")).rejects.toThrow("no pull request");
 	});
 });
 
-describe("U2a: idle watches spend no rate limit", () => {
-	test("304s leave the count unchanged, and a comment flips the next watch", async () => {
+describe("watch", () => {
+	test("idle watches spend no rate limit, and a comment flips the next one", async () => {
 		const github = new FakeGitHub();
-		const adapter = githubAdapter({ api: fakeApi(github) }, context);
+		const adapter = onFake(github);
 		const id = String(github.seed("watched"));
 		const first = await adapter.answers.watch();
 		const before = github.remaining;
@@ -73,15 +80,14 @@ describe("U2a: idle watches spend no rate limit", () => {
 });
 
 describe("claims", () => {
-	test("the claim is the branch hum/claim/<issue>, and the winner of an expiry is the first fast-forward", async () => {
+	test("a claim is a branch under the claim prefix, and an expired claim goes to the first writer on its head", async () => {
 		const github = new FakeGitHub();
-		const api = fakeApi(github);
-		const a = githubAdapter({ api }, context);
-		const b = githubAdapter({ api }, context);
+		const a = onFake(github);
+		const b = onFake(github);
 		const id = String(github.seed("branchy"));
 
 		expect((await a.workSource.claim(id, "a", 1000)).won).toBe(true);
-		expect(github.branches()).toContain(`hum/claim/${id}`);
+		expect(github.branches()).toContain(`${SHIPPED_DEFAULTS.claimPrefix}${id}`);
 
 		clock.offset += 2000;
 
@@ -90,46 +96,65 @@ describe("claims", () => {
 		expect(raced.filter((result) => result.won)).toHaveLength(1);
 	});
 
+	test("a claim prefix from the settings names the claim branch", async () => {
+		const github = new FakeGitHub();
+		const adapter = githubAdapter({ ...settings(github.repo, fakeClient(github)), claimPrefix: "bots/take/" }, context);
+		const id = String(github.seed("renamed"));
+
+		await adapter.workSource.claim(id, "a", 1000);
+
+		expect(github.branches()).toContain(`bots/take/${id}`);
+		expect((await adapter.workSource.listReady()).map((ref) => ref.id)).not.toContain(id);
+	});
+
 	test("an issue without the ready label cannot be claimed", async () => {
 		const github = new FakeGitHub();
-		const adapter = githubAdapter({ api: fakeApi(github) }, context);
 		const id = String(github.seed("plain", { label: "bug" }));
 
-		await expect(adapter.workSource.claim(id, "a", 1000)).rejects.toThrow("labelled hum:ready");
+		await expect(onFake(github).workSource.claim(id, "a", 1000)).rejects.toThrow("not ready to claim");
 	});
 });
 
 describe("the thread", () => {
-	test("hum's marker carries kind, option and options; a person's comment reads as a comment", async () => {
+	test("hum's marker carries kind and option; a person's comment reads as a comment", async () => {
 		const github = new FakeGitHub();
-		const adapter = githubAdapter({ api: fakeApi(github) }, context);
+		const adapter = onFake(github);
 		const id = String(github.seed("thread"));
 
 		await adapter.questions.ask(id, { text: "Which?", options: ["approve", "change"] });
 		await adapter.answers.answer(id, { text: "ok", option: "approve" });
-		github.say(Number(id), "a web reply <!-- hum {\"kind\":\"answer\"} -->");
+		github.say(Number(id), 'a web reply <!-- hum {"kind":"answer"} -->');
 
 		const { thread } = await adapter.workSource.read(id);
 
 		expect(thread.map((entry) => entry.kind)).toEqual(["question", "answer", "comment"]);
 		expect(thread[0]?.text).toContain("Options: approve, change");
 		expect(thread[1]?.option).toBe("approve");
-		expect(github.requests.some((request) => request.includes("/comments"))).toBe(true);
 	});
 
-	test("an ask posts the options in the hidden marker", async () => {
+	test("an ask posts its options in the hidden marker", async () => {
 		const github = new FakeGitHub();
-		const adapter = githubAdapter({ api: fakeApi(github) }, context);
-		const id = Number(github.seed("marked"));
+		const adapter = onFake(github);
+		const id = github.seed("marked");
 
 		await adapter.questions.ask(String(id), { text: "Which?", options: ["approve", "change"] });
 		await adapter.questions.decide(String(id), "went with approve");
 
-		const first = await fakeApi(github).call("GET", `/repos/${github.repo}/issues/${id}/comments`);
-		const bodies = Comments.parse(first.json).map((comment) => comment.body);
+		const bodies = github.comments(id).map((comment) => comment.body);
 
 		expect(bodies[0]?.split("\n")[0]).toBe('<!-- hum {"kind":"question","options":["approve","change"]} -->');
 		expect(parseComment(bodies[1] ?? "", 0).kind).toBe("decision");
+	});
+
+	test("one read is one GraphQL query, and one comment one mutation", async () => {
+		const github = new FakeGitHub();
+		const adapter = onFake(github);
+		const id = String(github.seed("counted"));
+
+		await adapter.workSource.read(id);
+		await adapter.workSource.comment(id, "once");
+
+		expect(github.requests).toEqual(["graphql Item", "graphql AddComment"]);
 	});
 
 	test("repoFromRemote reads https and ssh remotes, and refuses other hosts", () => {
@@ -143,8 +168,7 @@ describe("failures", () => {
 	test("a 502 is retried by the engine and shows no card inside the timeout", async () => {
 		const github = new FakeGitHub();
 		const state = openState(mkdtempSync(join(tmpdir(), "hum-gh-")), { now });
-		let time = 0;
-		const adapter: Adapter = guarded(githubAdapter({ api: fakeApi(github) }, context), { provider: "github", faults: state.faults, timeoutMs: 10_000, now: () => time, sleep: async (ms) => void (time += ms) });
+		const adapter: Adapter = guarded(onFake(github), { provider: "github", faults: state.faults, timeoutMs: 10_000 });
 
 		github.seed("flaky");
 		github.failures = 2;
@@ -155,9 +179,21 @@ describe("failures", () => {
 
 	test("a rejected login is permanent, not retried", async () => {
 		const github = new FakeGitHub();
-		const api = new GitHubApi({ repo: github.repo, fetch: github.fetch, token: async () => "wrong" });
 
-		await expect(githubAdapter({ api }, context).workSource.listReady()).rejects.toThrow("401");
+		await expect(onFake(github, fakeClient(github, "wrong")).workSource.listReady()).rejects.toThrow("Bad credentials");
+		expect(github.requests).toEqual([]);
+	});
+
+	test("a client on GitHub's own terms spaces its GraphQL requests", async () => {
+		const github = new FakeGitHub();
+		const adapter = githubAdapter(settings(github.repo, gitHubClient({ token: "fake-token", baseUrl: "https://fake.github", fetch: github.fetch })), context);
+		const id = String(github.seed("spaced"));
+		const started = Date.now();
+
+		await adapter.workSource.read(id);
+		await adapter.workSource.read(id);
+
+		expect(Date.now() - started).toBeGreaterThanOrEqual(900);
 	});
 });
 
@@ -166,31 +202,33 @@ const scratch = process.env.HUM_GITHUB_SCRATCH ?? "saadshahd/factory-smoke";
 
 if (!live) console.log("skip live GitHub contract: set HUM_LIVE=1 to run it on saadshahd/factory-smoke (writes issues, comments and claim branches, then deletes them)");
 
+const RateLimit = z.object({ resources: z.object({ core: z.object({ used: z.int() }) }) });
+const RepositoryReply = z.object({ repository: z.object({ id: z.string(), label: z.object({ id: z.string() }).nullable() }) });
+const Created = z.object({ createIssue: z.object({ issue: z.object({ number: z.int() }) }) });
+const IssueReply = z.object({ repository: z.object({ issue: z.object({ id: z.string() }) }) });
+
 describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
-	const made: string[] = [];
-	const claimed = new Set<string>();
+	const [owner = "", name = ""] = scratch.split("/");
+	const token = Bun.spawnSync(["gh", "auth", "token"]).stdout.toString().trim();
+	const client = gitHubClient({ token });
+	const otherClient = gitHubClient({ token });
+	const primary = githubAdapter(settings(scratch, client), context);
+	const secondary = githubAdapter(settings(scratch, otherClient), context);
 
-	// SAFETY: the recorder forwards the (url, init) calls the adapter makes; it is no full fetch (no preconnect).
-	const recording = (async (input: string | URL | Request, init?: RequestInit) => {
-		const response = await fetch(input, init);
-		const path = new URL(String(input)).pathname;
+	/** Every issue either client creates, seeded or filed as a follow-up, so cleanup deletes them all. */
+	const made = new Set<number>();
 
-		if ((init?.method ?? "GET") === "POST" && response.status === 201 && path === `/repos/${scratch}/issues`) {
-			const created = Created.parse(await response.clone().json());
+	for (const each of [client, otherClient]) {
+		each.hook.after("request", (response) => {
+			const created = z.object({ data: Created }).safeParse(response.data);
 
-			made.push(created.node_id);
-			claimed.add(String(created.number));
-		}
+			if (created.success) made.add(created.data.data.createIssue.issue.number);
+		});
+	}
 
-		return response;
-	}) as typeof fetch;
+	const used = async () => RateLimit.parse((await client.request("GET /rate_limit")).data).resources;
 
-	const api = new GitHubApi({ repo: scratch, fetch: recording });
-	const primary = githubAdapter({ api }, context);
-	const secondary = githubAdapter({ api }, context);
-	const r = `/repos/${scratch}`;
-
-	/** GitHub's cache lags a write by seconds, so a test polls for the effect instead of guessing. */
+	/** GitHub's reads lag its writes by seconds, so a test polls for the effect instead of guessing. */
 	const settle = async (until: () => Promise<boolean>) => {
 		for (let poll = 0; poll < 40; poll++) {
 			if (await until()) return;
@@ -215,54 +253,110 @@ describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
 		}
 	};
 
+	const seed = async (title: string): Promise<string> => {
+		const { repository } = RepositoryReply.parse(
+			await client.graphql(`query($owner: String!, $name: String!, $label: String!) { repository(owner: $owner, name: $name) { id label(name: $label) { id } } }`, { owner, name, label: SHIPPED_DEFAULTS.readyLabel }),
+		);
+
+		const label =
+			repository.label?.id ??
+			z.object({ createLabel: z.object({ label: z.object({ id: z.string() }) }) }).parse(
+				await client.graphql(`mutation($repository: ID!, $name: String!) { createLabel(input: { repositoryId: $repository, name: $name, color: "0e8a16" }) { label { id } } }`, { repository: repository.id, name: SHIPPED_DEFAULTS.readyLabel }),
+			).createLabel.label.id;
+
+		const { issue } = Created.parse(
+			await client.graphql(`mutation($repository: ID!, $title: String!, $label: ID!) { createIssue(input: { repositoryId: $repository, title: $title, body: "scratch", labelIds: [$label] }) { issue { id number } } }`, { repository: repository.id, title, label }),
+		).createIssue;
+
+		await settle(async () => (await primary.workSource.listReady()).some((ref) => ref.id === String(issue.number)));
+		await quiet();
+
+		return String(issue.number);
+	};
+
 	const target: ContractTarget = {
 		name: `github (${scratch})`,
 		adapter: { ...primary, release: undefined },
 		other: async () => secondary,
-		seed: async (title) => {
-			const label = await api.call("GET", `${r}/labels/hum%3Aready`, { allow: [404] });
-
-			if (label.status === 404) await api.call("POST", `${r}/labels`, { body: { name: "hum:ready", color: "0e8a16" }, allow: [422] });
-
-			const created = Created.parse((await api.call("POST", `${r}/issues`, { body: { title, body: `${title} body`, labels: ["hum:ready"] } })).json);
-
-			await settle(async () => (await primary.workSource.listReady()).some((ref) => ref.id === String(created.number)));
-			await quiet();
-
-			return String(created.number);
-		},
+		seed,
 		advance: async (ms) => void (clock.offset += ms),
-		spent: () => api.spent(),
+		spent: () => primary.spent(),
 		settle,
 	};
 
 	afterAll(async () => {
-		for (const number of claimed) await api.call("DELETE", `${r}/git/refs/heads/hum/claim/${number}`, { allow: [404, 422] });
+		for (const number of made) {
+			await client.request("DELETE /repos/{owner}/{repo}/git/refs/{ref}", { owner, repo: name, ref: `heads/${SHIPPED_DEFAULTS.claimPrefix}${number}` }).catch(() => undefined);
 
-		for (const id of made) {
-			const { json } = await api.call("POST", "/graphql", { body: { query: "mutation($id: ID!) { deleteIssue(input: { issueId: $id }) { clientMutationId } }", variables: { id } } });
+			const { id } = IssueReply.parse(await client.graphql(`query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) { id } } }`, { owner, name, number })).repository.issue;
 
-			if (Errored.parse(json).errors !== undefined) throw new Error(`could not delete scratch issue ${id}: ${JSON.stringify(json)}`);
+			await client.graphql(`mutation($id: ID!) { deleteIssue(input: { issueId: $id }) { clientMutationId } }`, { id });
 		}
-	}, 60_000);
+	}, 120_000);
 
-	for (const check of contractChecks(target)) test(check.name, check.run, 60_000);
+	for (const check of contractChecks(target)) test(check.name, check.run, 90_000);
 
-	test("U2a: 30 idle 304s spend none of the rate limit, and a write flips the next watch", async () => {
+	test("30 idle watches spend none of the rate limit", async () => {
 		await quiet();
 
 		const first = await primary.answers.watch();
 
-		await Bun.sleep(2000); // the rate-limit counter lags the request that spent it
+		await Bun.sleep(2000);
 
-		const before = await api.remaining();
-		const spent = api.spent();
+		const before = await used();
+		const spent = primary.spent();
 		const polls = await Promise.all(Array.from({ length: 30 }, () => primary.answers.watch(first.token)));
 
 		expect(polls.every((poll) => !poll.changed)).toBe(true);
-		expect(api.spent()).toBe(spent);
-
-		// Other tools spend this login's quota too (about one request a second here); 30 counted polls would cost 30.
-		expect(before - (await api.remaining())).toBeLessThan(10);
+		expect(primary.spent()).toBe(spent);
+		expect((await used()).core.used - before.core.used).toBeLessThan(10);
 	}, 60_000);
+
+	test("the points one worker tick spends, idle and busy", async () => {
+		const id = await seed("ticked");
+
+		await quiet();
+
+		const token = (await primary.answers.watch()).token;
+		const sent: ("query" | "mutation" | "rest" | "not-modified")[] = [];
+		const kindOf = (options: { url: string; query?: string }) => (options.url !== "/graphql" ? "rest" : /^\s*mutation/.test(options.query ?? "") ? "mutation" : "query");
+
+		client.hook.after("request", (_response, options) => void sent.push(kindOf(options)));
+		client.hook.error("request", (error, options) => {
+			sent.push("status" in error && error.status === 304 ? "not-modified" : kindOf(options));
+
+			throw error;
+		});
+
+		/**
+		 * Counts the requests one tick sends. GitHub's account-wide counters lag and count other clients, so the
+		 * client's own requests are the measure: each query hum sends costs one GraphQL point by GitHub's dry run.
+		 */
+		const measure = async <T>(tick: () => Promise<T>) => {
+			sent.length = 0;
+			await tick();
+
+			const count = (kind: string) => sent.filter((request) => request === kind).length;
+
+			return { queries: count("query"), mutations: count("mutation"), rest: count("rest"), notModified: count("not-modified") };
+		};
+
+		const idle = await measure(() => primary.answers.watch(token));
+
+		const claiming = await measure(async () => {
+			await primary.answers.watch(token);
+			await primary.workSource.listReady();
+			await primary.workSource.claim(id, "worker-a", 60_000);
+			await primary.workSource.read(id);
+		});
+
+		const renewing = await measure(async () => {
+			await primary.answers.watch(token);
+			await primary.workSource.listReady();
+			await primary.workSource.renew(id, "worker-a", 60_000);
+		});
+
+		console.log(`points per tick on ${scratch}: idle ${JSON.stringify(idle)}; claim and read ${JSON.stringify(claiming)}; renew ${JSON.stringify(renewing)}`);
+		expect(idle).toEqual({ queries: 0, mutations: 0, rest: 0, notModified: 1 });
+	}, 120_000);
 });

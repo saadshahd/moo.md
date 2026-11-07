@@ -75,5 +75,9 @@
 		"docs",
 		"hotfix",
 		"check"
-	]
+	],
+	"runBranchPrefix": "hum/run/",
+	"claimPrefix": "hum/claim/",
+	"readyLabel": "hum:ready",
+	"mergeMethod": "squash"
 }

@@ -86,7 +86,7 @@ test("once a fixture fills the timeouts, each default kind passes every check", 
 	for (const kind of Object.values(config.kinds)) expect(kindMachine(kind).id).toBe(kind.machine.id);
 });
 
-test("V3: a rename that strands a saved item is refused; with a map the item restores", async () => {
+test("a rename that strands a saved item is refused; with a map the item restores", async () => {
 	const before = loaded(withTimeouts(shipped()));
 	const machine = kindMachine(before.kinds.feature!);
 	const actor = createActor(machine).start();
@@ -131,7 +131,7 @@ test("V3: a rename that strands a saved item is refused; with a map the item res
 	expect(restored.getSnapshot().value).toBe("stuck");
 });
 
-test("V4: the previous schema migrates", () => {
+test("the previous schema migrates", () => {
 	const previous = { schemaVersion: 1, name: "old" };
 
 	const migrated = migrateConfig(previous, {
@@ -143,7 +143,7 @@ test("V4: the previous schema migrates", () => {
 	expect(migrated).toEqual({ ok: true, value: { schemaVersion: 2, title: "old" } });
 });
 
-test("V4: an unknown schema version is refused and names the step", () => {
+test("an unknown schema version is refused and names the step", () => {
 	const newer = loadConfig({ ...shipped(), hum: { schemaVersion: 99 } }, { env });
 	const older = loadConfig({ ...shipped(), hum: { schemaVersion: 0 } }, { env });
 
@@ -152,7 +152,7 @@ test("V4: an unknown schema version is refused and names the step", () => {
 	expect(!older.ok && older.refusal.message).toContain("/hum");
 });
 
-test("V4: a missing hope skill is refused, naming the skill and the role", () => {
+test("a missing hope skill is refused, naming the skill and the role", () => {
 	const fake = { hopeSkills: new Set(["intent", "shape"]) };
 	const result = loadConfig(withTimeouts(shipped()), { env: fake });
 
@@ -163,7 +163,7 @@ test("V4: a missing hope skill is refused, naming the skill and the role", () =>
 	expect(env.hopeSkills.has("judge")).toBe(true);
 });
 
-test("C2: an unreachable state and a wait with no timeout give one refusal naming both; the old config stays", () => {
+test("an unreachable state and a wait with no timeout give one refusal naming both; the old config stays", () => {
 	const good = loaded(withTimeouts(shipped()));
 	const bad = clone(withTimeouts(shipped()));
 	bad.kinds.feature.machine.states.orphan = { tags: ["stuck"] };
@@ -182,7 +182,7 @@ test("C2: an unreachable state and a wait with no timeout give one refusal namin
 	expect(refusal.message).toContain('wait "asking" has no timeout');
 });
 
-test("C2: a state that never reaches done or stuck is refused", () => {
+test("a state that never reaches done or stuck is refused", () => {
 	const bad = clone(withTimeouts(shipped()));
 	bad.kinds.feature.machine.states.trap = { on: { answered: { target: "trap" } } };
 	bad.kinds.feature.machine.states.fixing.on = { "token-cap": { target: "asking" }, "plan-ready": { target: "trap" } };
@@ -190,7 +190,7 @@ test("C2: a state that never reaches done or stuck is refused", () => {
 	expect(problemsOf(bad)).toContainEqual({ check: "C2", kind: "feature", problem: "dead-end-state", state: "trap" });
 });
 
-test("C3: a deleted role leaves an event with no source", () => {
+test("a deleted role leaves an event with no source", () => {
 	const bad = clone(withTimeouts(shipped()));
 	delete bad.hum.roles.plan;
 
@@ -199,7 +199,7 @@ test("C3: a deleted role leaves an event with no source", () => {
 	expect(problems).toContainEqual({ check: "C3", problem: "event-without-source", event: "plan-ready", source: "plan" });
 });
 
-test("C3: an event no machine handles, and a waited event nobody declares, are refused", () => {
+test("an event no machine handles, and a waited event nobody declares, are refused", () => {
 	const bad = clone(withTimeouts(shipped()));
 	bad.hum.events.ghost = { source: "owner" };
 	bad.kinds.docs.machine.states.asking.on.mystery = { target: "building" };
@@ -210,7 +210,7 @@ test("C3: an event no machine handles, and a waited event nobody declares, are r
 	expect(problems).toContainEqual({ check: "C3", problem: "event-without-source", event: "mystery", source: undefined });
 });
 
-test("D7: a state that starts a run and waits on the owner is refused", () => {
+test("a state that starts a run and waits on the owner is refused", () => {
 	const bad = clone(withTimeouts(shipped()));
 	bad.kinds.feature.machine.states.building.tags = ["owner-wait"];
 	bad.kinds.feature.machine.states.building.after = { [DAY]: { target: "stuck" } };
@@ -218,7 +218,7 @@ test("D7: a state that starts a run and waits on the owner is refused", () => {
 	expect(problemsOf(bad)).toContainEqual({ check: "D7", kind: "feature", problem: "run-and-owner-wait", state: "building" });
 });
 
-test("C4: every owner-changeable part maps to a key the hum.json schema holds", () => {
+test("every owner-changeable part maps to a key the hum.json schema holds", () => {
 	const keys = Object.keys(HumConfig.shape);
 	const properties = Object.keys(schemaFile.properties);
 
@@ -229,20 +229,53 @@ test("C4: every owner-changeable part maps to a key the hum.json schema holds", 
 });
 
 test("the committed schema file matches the schema in code", () => {
-	expect(schemaFile).toEqual(JSON.parse(JSON.stringify(z.toJSONSchema(HumConfig))));
+	expect(schemaFile).toEqual(JSON.parse(JSON.stringify(z.toJSONSchema(HumConfig, { io: "input" }))));
 });
 
-test("C1: a config change from a hum run's branch is refused and the last good config stays", () => {
+test("a config change from a branch hum writes is refused and the last good config stays", () => {
 	const good = loaded(withTimeouts(shipped()));
 	const edited = clone(withTimeouts(shipped()));
 	edited.hum.levels = ["low", "high"];
 	edited.hum.paths = [];
 
-	const fromRun = change(good, edited, { branch: "hum/run-7" });
+	const fromRun = change(good, edited, { branch: "hum/run/7" });
 
 	expect(fromRun.accepted).toBe(false);
 	expect(fromRun.config).toBe(good);
 	expect(!fromRun.accepted && fromRun.refusals[0]?.code).toBe("change-from-run");
+});
+
+test("a change from a claim branch is refused too, and the last good config's prefixes decide", () => {
+	const good = loaded(withTimeouts(shipped()));
+	const renamed = clone(withTimeouts(shipped()));
+	renamed.hum.runBranchPrefix = "bots/run/";
+
+	expect(change(good, renamed, { branch: "hum/claim/7" }).accepted).toBe(false);
+	expect(change(good, renamed, { branch: "hum/run/7" }).accepted).toBe(false);
+	expect(change(good, renamed, { branch: "main" }).accepted).toBe(true);
+});
+
+test("a hum.json without the branch and label keys gets the shipped names", () => {
+	const raw = withTimeouts(shipped());
+	const bare = clone(raw);
+	delete bare.hum.runBranchPrefix;
+	delete bare.hum.claimPrefix;
+	delete bare.hum.readyLabel;
+
+	expect(loaded(bare).hum).toMatchObject({ runBranchPrefix: "hum/run/", claimPrefix: "hum/claim/", readyLabel: "hum:ready" });
+});
+
+test("a branch prefix that makes no valid git branch, or two prefixes that overlap, are refused", () => {
+	const spaced = clone(withTimeouts(shipped()));
+	spaced.hum.claimPrefix = "hum claim/";
+	const nested = clone(withTimeouts(shipped()));
+	nested.hum.claimPrefix = "hum/run/claim/";
+
+	const malformed = change(undefined, spaced);
+	const overlapping = change(undefined, nested);
+
+	expect(!malformed.accepted && malformed.refusals[0]?.code).toBe("malformed-config");
+	expect(!overlapping.accepted && overlapping.refusals[0]?.message).toContain("overlap");
 });
 
 test("the hash ignores key order and changes with content", () => {

@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, PermanentError } from "../adapter-api.ts";
+import { HumConfig } from "../config/schema.ts";
 import type { Faults } from "../state/faults.ts";
+import type { Card } from "../status/format.ts";
 import { githubAdapter, repoFromRemote } from "./github.ts";
-import { runGit } from "./git.ts";
+import { gitIn } from "./git.ts";
 import { type GuardOptions, guarded } from "./guard.ts";
 import { markdownAdapter } from "./markdown.ts";
 import { roundupAdapter } from "./roundup.ts";
@@ -15,98 +17,116 @@ export const SLOTS = ["work-source", "questions", "answers", "release"] as const
 
 export type Slot = (typeof SLOTS)[number];
 
-/** Slots that default to the markdown source when `hum.json` names none. */
-const MARKDOWN_DEFAULT: readonly Slot[] = ["work-source", "questions", "answers"];
+const MARKDOWN = "markdown";
+const FALLBACK_BASE = "main";
 
-const Integrations = z.looseObject({ integrations: z.partialRecord(z.enum(SLOTS), z.string()).optional() });
+/** Slots that use the markdown source when `hum.json` names none; release has no default. */
+const MARKDOWN_SLOTS: readonly Slot[] = ["work-source", "questions", "answers"];
+
+/** What the adapters read from `hum.json`; every other key belongs to the worker. */
+const AdapterSettings = z.looseObject({
+	integrations: z.partialRecord(z.enum(SLOTS), z.string().min(1)).optional(),
+	claimPrefix: HumConfig.shape.claimPrefix,
+	readyLabel: HumConfig.shape.readyLabel,
+	mergeMethod: HumConfig.shape.mergeMethod,
+});
+
+type AdapterSettings = z.infer<typeof AdapterSettings>;
 
 const AdapterModule = z.looseObject({ default: z.custom<AdapterFactory>((value) => value instanceof Function, "must export an adapter factory as its default") });
 
-const defaultBase = async (cwd: string): Promise<string> => {
-	const head = await runGit(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], { cwd });
+/** The adapter a slot uses: the one `hum.json` names, else the markdown source where that is the default. */
+const adapterNameFor = (slot: Slot, integrations: AdapterSettings["integrations"]): string | undefined =>
+	integrations?.[slot] ?? (MARKDOWN_SLOTS.includes(slot) ? MARKDOWN : undefined);
 
-	return head.code === 0 ? head.stdout.trim().replace(/^origin\//, "") : "main";
+type Repo = { readonly path: string; readonly settings: AdapterSettings; readonly context: AdapterContext };
+
+const readSettings = (repo: string): AdapterSettings => {
+	const path = join(repo, ".hum", "hum.json");
+
+	return AdapterSettings.parse(existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {});
 };
 
-const githubRepo = async (cwd: string): Promise<string> => {
-	const remote = await runGit(["remote", "get-url", "origin"], { cwd });
-	const repo = remote.code === 0 ? repoFromRemote(remote.stdout) : undefined;
+const defaultBase = async (repo: string): Promise<string> => {
+	const head = await gitIn(repo)
+		.raw(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+		.catch(() => `origin/${FALLBACK_BASE}`);
 
-	if (!repo) throw new PermanentError("the github adapter needs an `origin` remote on github.com");
-
-	return repo;
+	return head.trim().replace(/^origin\//, "");
 };
 
-/** V11: an adapter written for another API version is refused with one card. */
-export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Faults): boolean => {
-	if (adapter.apiVersion === ADAPTER_API_VERSION) return false;
+const githubRepo = async (repo: string): Promise<string> => {
+	const found = repoFromRemote(await gitIn(repo).raw(["remote", "get-url", "origin"]));
 
-	faults.raise({
+	if (!found) throw new PermanentError("the github adapter needs an `origin` remote on github.com");
+
+	return found;
+};
+
+/** The adapters the engine ships, by the name `hum.json` gives them. */
+const BUILT_IN = {
+	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix }, context),
+	github: async ({ path, settings, context }) =>
+		githubAdapter({ repo: await githubRepo(path), base: await defaultBase(path), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod }, context),
+	roundup: async ({ context }) => roundupAdapter({}, context),
+} satisfies Readonly<Record<string, (repo: Repo) => Promise<Adapter>>>;
+
+const isBuiltIn = (name: string): name is keyof typeof BUILT_IN => Object.hasOwn(BUILT_IN, name);
+
+/** An owner's adapter: the default export of `adapters/<name>.ts` in the repo. */
+const ownerAdapter = async (name: string, { path, context }: Repo): Promise<Adapter> => {
+	const file = join(path, "adapters", `${name}.ts`);
+
+	if (!existsSync(file)) throw new PermanentError(`no adapter "${name}": the engine ships ${Object.keys(BUILT_IN).join(", ")}, and ${file} does not exist`);
+
+	const loaded = AdapterModule.safeParse(await import(pathToFileURL(file).href));
+
+	if (!loaded.success) throw new PermanentError(`${file}: ${loaded.error.issues[0]?.message}`);
+
+	return loaded.data.default(context);
+};
+
+/** The card that refuses an adapter written for another API version; undefined for one written for this engine. */
+export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Faults): Card | undefined => {
+	if (adapter.apiVersion === ADAPTER_API_VERSION) return undefined;
+
+	return faults.raise({
 		code: "adapter-api-mismatch",
 		item: name,
 		cause: `Adapter "${name}" implements adapter API ${adapter.apiVersion}; this engine runs ${ADAPTER_API_VERSION}.`,
 		fix: `Update ${name} to adapter API ${ADAPTER_API_VERSION}.`,
 	});
-
-	return true;
 };
 
 /**
- * The adapters `hum.json` names for each slot: the engine's own (markdown, github, roundup), else an owner's `adapters/<name>.ts`.
- * An integration with no entry uses the markdown source in `repo`, except release, which has no default.
+ * The adapter `hum.json` names for each slot, guarded: one the engine ships, else an owner's `adapters/<name>.ts`.
+ * A slot with no entry uses the markdown source in `repo`, except release, which has no default. Slots that name
+ * the same adapter share one instance.
  */
 export const resolveAdapters = async (
 	repo: string,
 	{ faults, guard, context }: { faults: Faults; guard: Omit<GuardOptions, "provider" | "faults">; context: AdapterContext },
 ): Promise<Partial<Record<Slot, Adapter>>> => {
-	const configPath = join(repo, ".hum", "hum.json");
-	const named = existsSync(configPath) ? (Integrations.parse(JSON.parse(readFileSync(configPath, "utf8"))).integrations ?? {}) : {};
-	const names = new Map<Slot, string>(MARKDOWN_DEFAULT.map((slot) => [slot, "markdown"]));
+	const settings = readSettings(repo);
 
-	for (const [slot, adapterName] of Object.entries(named)) {
-		const known = z.enum(SLOTS).safeParse(slot);
+	const slots = SLOTS.flatMap((slot) => {
+		const name = adapterNameFor(slot, settings.integrations);
 
-		if (!known.success) throw new PermanentError(`hum.json integrations names slot "${slot}"; the slots are ${SLOTS.join(", ")}`);
+		return name === undefined ? [] : [[slot, name] as const];
+	});
 
-		names.set(known.data, adapterName);
-	}
+	const source: Repo = { path: repo, settings, context };
 
-	const built = new Map<string, Adapter>();
-
-	const adapterNamed = async (name: string): Promise<Adapter> => {
-		const known = built.get(name);
-
-		if (known) return known;
-
-		let adapter: Adapter;
-
-		if (name === "markdown") adapter = markdownAdapter({ repo, base: await defaultBase(repo) }, context);
-		else if (name === "github") adapter = githubAdapter({ repo: await githubRepo(repo), base: await defaultBase(repo) }, context);
-		else if (name === "roundup") adapter = roundupAdapter({}, context);
-		else {
-			const file = join(repo, "adapters", `${name}.ts`);
-
-			if (!existsSync(file)) throw new PermanentError(`no adapter "${name}": the engine ships markdown, github and roundup, and ${file} does not exist`);
-
-			const loaded = AdapterModule.safeParse(await import(pathToFileURL(file).href));
-
-			if (!loaded.success) throw new PermanentError(`${file}: ${loaded.error.issues[0]?.message}`);
-
-			adapter = await loaded.data.default(context);
-		}
+	const build = async (name: string): Promise<Adapter> => {
+		const adapter = await (isBuiltIn(name) ? BUILT_IN[name](source) : ownerAdapter(name, source));
 
 		if (refuseOtherVersion(name, adapter, faults)) throw new PermanentError(`adapter "${name}" implements another adapter API version`);
 
-		const wrapped = guarded(adapter, { ...guard, provider: name, faults });
-
-		built.set(name, wrapped);
-
-		return wrapped;
+		return guarded(adapter, { ...guard, provider: name, faults });
 	};
 
-	const resolved: Partial<Record<Slot, Adapter>> = {};
+	const names = [...new Set(slots.map(([, name]) => name))];
+	const built = new Map(await Promise.all(names.map(async (name) => [name, await build(name)] as const)));
 
-	for (const [slot, name] of names) resolved[slot] = await adapterNamed(name);
-
-	return resolved;
+	return Object.fromEntries(slots.map(([slot, name]) => [slot, built.get(name)]));
 };

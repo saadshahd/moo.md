@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { ClaudeRunner } from "../../src/adapters/claude-p.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
 import type { Config } from "../../src/config/load.ts";
+import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { openState } from "../../src/state/open.ts";
 import { PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../src/worker/thin-path.ts";
 import { configWith } from "../fixtures/config.ts";
@@ -26,7 +27,7 @@ const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f
 	const shim = makeShim(spec);
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-thin-")), { now });
 	const reports: string[] = [];
-	const adapter = markdownAdapter({ repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
+	const adapter = markdownAdapter({ claimPrefix: SHIPPED_DEFAULTS.claimPrefix, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
 	const runner = new ClaudeRunner({ state, binary: shim.binary, env: shim.env, now, sleep: async () => {} });
 
 	cleanups.push(() => rmSync(repo.root, { recursive: true, force: true }), () => rmSync(state.dir, { recursive: true, force: true }));
@@ -68,7 +69,7 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	// The run branch and the claim branch are hum's, and distinct.
 	const heads = sh(w.repo.remote, ["for-each-ref", "--format=%(refname)", "refs/heads/hum"]).split("\n").filter(Boolean);
 
-	expect(heads.sort()).toEqual([`refs/heads/${runBranch(id)}`, `refs/heads/hum/claim/${id}`].sort());
+	expect(heads.sort()).toEqual([`refs/heads/${runBranch(SHIPPED_DEFAULTS, id)}`, `refs/heads/${SHIPPED_DEFAULTS.claimPrefix}${id}`].sort());
 
 	// The claude call: the item body on stdin, the session id saved ahead, no resume.
 	const [, run] = w.shim.calls();
@@ -136,14 +137,14 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
 });
 
-test("R6: a run that succeeds and commits nothing is not done", async () => {
+test("a run that succeeds and commits nothing is not done", async () => {
 	const w = await world({ script: [{}, {}] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.options())).toMatchObject({ outcome: "stuck", item: id });
 });
 
-test("R6: a commit with an error subtype is not done", async () => {
+test("a commit with an error subtype is not done", async () => {
 	const w = await world({ script: [{}, { ...NOTE, error: "tool failed" }] });
 	const id = w.repo.seed("Write the note");
 
@@ -161,7 +162,7 @@ test("a change to a path no rule matches is not merged by the thin path", async 
 	expect(w.repo.show(id)).toContain("state: ready");
 });
 
-test("R4: a limit refusal pauses the item with zero further calls", async () => {
+test("a limit refusal pauses the item with zero further calls", async () => {
 	const until = Math.floor(NOW / 1000) + 3600;
 	const w = await world({ script: [{}, { error: `Claude usage limit reached|${until}` }] });
 	const id = w.repo.seed("Write the note");
@@ -172,7 +173,7 @@ test("R4: a limit refusal pauses the item with zero further calls", async () => 
 	expect(w.shim.calls()).toHaveLength(2);
 });
 
-test("E1: the token cap stops the run mid-run and asks the owner; no claude process is left", async () => {
+test("the token cap stops the run mid-run and asks the owner; no claude process is left", async () => {
 	const config = configWith((raw) => {
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
@@ -192,7 +193,7 @@ test("E1: the token cap stops the run mid-run and asks the owner; no claude proc
 	expect(() => process.kill(w.shim.calls()[1]?.pid ?? 0, 0)).toThrow();
 });
 
-test("Q2: a run that needs the owner pushes its branch, asks, and ends; the answer starts a fresh run on that branch", async () => {
+test("a run that needs the owner pushes its branch, asks, and ends; the answer starts a fresh run on that branch", async () => {
 	const w = await world(
 		{
 			script: [
@@ -208,7 +209,7 @@ test("Q2: a run that needs the owner pushes its branch, asks, and ends; the answ
 	const asked = await runThinPath(w.options());
 
 	expect(asked).toEqual({ outcome: "asked", item: id, detail: "Which title?" });
-	expect(sh(w.repo.remote, ["show", `${runBranch(id)}:docs/part-one.md`])).toBe("one\n");
+	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/part-one.md`])).toBe("one\n");
 
 	const thread = (await w.adapter.workSource!.read(id)).thread;
 

@@ -1,92 +1,109 @@
+import pRetry, { AbortError, type RetryContext } from "p-retry";
 import { z } from "zod";
-import {
-	type Adapter,
-	Item,
-	ItemRef,
-	ClaimResult,
-	PermanentError,
-	Watch,
-} from "../adapter-api.ts";
+import { type Adapter, ClaimResult, Item, ItemRef, PermanentError, Watch, type WorkSource } from "../adapter-api.ts";
 import type { Faults } from "../state/faults.ts";
 
 export type GuardOptions = {
-	/** The integration's name; a fault card names it and is scoped to it (R1). */
+	/** The integration's name; each card names it and is scoped to it. */
 	readonly provider: string;
 	readonly faults: Faults;
 	/** A failure that outlasts this shows one card; a shorter one shows nothing. */
 	readonly timeoutMs: number;
-	readonly backoffMs?: number;
-	readonly now?: () => number;
-	readonly sleep?: (ms: number) => Promise<void>;
-	/** R3: where the last ready list is kept, so a restarted worker still sees an empty list that contradicts it. Memory only when absent. */
+	/** Where the last ready list is kept, so a restarted worker still sees an empty list that contradicts it. Memory only when absent. */
 	readonly lastReady?: { readonly load: () => string[]; readonly save: (ids: string[]) => void };
 };
 
+const FIRST_BACKOFF_MS = 500;
 const MAX_BACKOFF_MS = 30_000;
 
+const none = z.void();
+
+const messageOf = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
+
+/** A retry cannot fix a permanent failure, so it skips every retry. */
+const abortIfPermanent = (cause: unknown): never => {
+	throw cause instanceof PermanentError ? new AbortError(cause) : cause;
+};
+
 /**
- * R1, R3, V7: the engine's side of every adapter call.
+ * The engine's side of every adapter call.
+ * - A reply of the wrong shape is refused at once with one card, and never retried.
  * - A transient failure is retried inside the timeout; one that outlasts it raises one card and throws.
- * - A reply of the wrong shape is refused at once with one card, and never retried (V7).
- * - An empty list that contradicts the last read is a fault, not "no work" (R3).
- * A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key (E2).
+ * - An empty ready list that contradicts the last read is a fault, not "no work".
+ * - A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key.
  */
-export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = 500, now = Date.now, sleep = Bun.sleep, lastReady: remembered }: GuardOptions): Adapter => {
+export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, lastReady: remembered }: GuardOptions): Adapter => {
 	const unavailable = `provider-unavailable:${provider}`;
+	const contradicted = `empty-list:${provider}`;
 
 	const refuseChangedReply = (error: z.ZodError): never => {
+		const [issue] = error.issues;
+
 		faults.raise({
 			code: "integration-shape-changed",
 			item: provider,
-			cause: `${provider} replied in a shape hum does not know: ${error.issues[0]?.path.join(".") || "(root)"}: ${error.issues[0]?.message}`,
+			cause: `${provider} replied in a shape hum does not know: ${issue?.path.join(".") || "(root)"}: ${issue?.message}`,
 			fix: `Run /hum to set ${provider} up again, or update its adapter.`,
 		});
 
 		throw new PermanentError(`${provider} replied in a changed shape`);
 	};
 
-	const once = async <T>(call: () => Promise<T>, schema: z.ZodType<T>): Promise<T> => {
-		try {
-			return schema.parse(await call());
-		} catch (error) {
-			if (error instanceof z.ZodError) return refuseChangedReply(error);
+	const raiseWhenGivingUp = ({ error, attemptNumber, retryDelay }: RetryContext): void => {
+		if (retryDelay > 0) return;
 
-			throw error;
-		}
+		faults.raise({
+			code: "provider-unavailable",
+			item: provider,
+			cause: `${provider} failed ${attemptNumber} times in a row: ${messageOf(error)}`,
+			fix: "hum keeps retrying on its own; check the provider's status if this stays.",
+		});
+	};
+
+	const once = async <T>(call: () => Promise<T>, schema: z.ZodType<T>): Promise<T> => {
+		const reply = await call();
+		const parsed = schema.safeParse(reply);
+
+		return parsed.success ? parsed.data : refuseChangedReply(parsed.error);
 	};
 
 	const retried = async <T>(call: () => Promise<T>, schema: z.ZodType<T>): Promise<T> => {
-		const deadline = now() + timeoutMs;
+		const value = await pRetry(() => once(call, schema).catch(abortIfPermanent), {
+			retries: Number.POSITIVE_INFINITY,
+			maxRetryTime: timeoutMs,
+			minTimeout: FIRST_BACKOFF_MS,
+			maxTimeout: MAX_BACKOFF_MS,
+			onFailedAttempt: raiseWhenGivingUp,
+		});
 
-		for (let attempt = 0; ; attempt++) {
-			try {
-				const value = await once(call, schema);
+		faults.clear(unavailable);
 
-				faults.clear(unavailable);
-
-				return value;
-			} catch (error) {
-				if (error instanceof PermanentError) throw error;
-
-				if (now() >= deadline) {
-					faults.raise({
-						code: "provider-unavailable",
-						item: provider,
-						cause: `${provider} has failed for ${Math.round(timeoutMs / 1000)} s: ${error instanceof Error ? error.message : String(error)}`,
-						fix: "hum keeps retrying on its own; check the provider's status if this stays.",
-					});
-
-					throw error;
-				}
-
-				await sleep(Math.min(backoffMs * 2 ** attempt, MAX_BACKOFF_MS));
-			}
-		}
+		return value;
 	};
 
-	const none = z.void();
 	const { workSource, questions, answers, release } = adapter;
-	let lastReady: string[] = remembered?.load() ?? [];
+	let lastReadyIds: string[] = remembered?.load() ?? [];
+
+	const firstStillReady = async (source: WorkSource, ids: readonly string[]): Promise<string | undefined> => {
+		for (const id of ids) if ((await retried(() => source.read(id), Item)).ready) return id;
+
+		return undefined;
+	};
+
+	const refuseContradictingEmptyList = async (source: WorkSource): Promise<void> => {
+		const stillReady = await firstStillReady(source, lastReadyIds);
+
+		if (stillReady === undefined) return;
+
+		faults.raise({
+			code: "empty-list",
+			item: provider,
+			cause: `${provider} listed no ready items, yet "${stillReady}" is still ready`,
+			fix: "No item was marked gone; hum reads the list again on its next tick.",
+		});
+
+		throw new PermanentError(`${provider} returned an empty list that contradicts its last read`);
+	};
 
 	return {
 		apiVersion: adapter.apiVersion,
@@ -94,26 +111,11 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 			listReady: async () => {
 				const list = await retried(() => workSource.listReady(), ItemRef.array());
 
-				if (list.length === 0 && lastReady.length > 0) {
-					for (const id of lastReady) {
-						const item = await retried(() => workSource.read(id), Item);
+				if (list.length === 0) await refuseContradictingEmptyList(workSource);
 
-						if (item.ready) {
-							faults.raise({
-								code: "empty-list",
-								item: provider,
-								cause: `${provider} listed no ready items, yet "${id}" is still ready`,
-								fix: "No item was marked gone; hum reads the list again on its next tick.",
-							});
-
-							throw new PermanentError(`${provider} returned an empty list that contradicts its last read`);
-						}
-					}
-				}
-
-				faults.clear(`empty-list:${provider}`);
-				lastReady = list.map((ref) => ref.id);
-				remembered?.save(lastReady);
+				faults.clear(contradicted);
+				lastReadyIds = list.map((ref) => ref.id);
+				remembered?.save(lastReadyIds);
 
 				return list;
 			},

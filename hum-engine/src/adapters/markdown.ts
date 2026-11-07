@@ -1,336 +1,265 @@
-import { randomUUID, createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { z } from "zod";
-import {
-	type Adapter,
-	type AdapterContext,
-	type Answer,
-	type Claim,
-	type ClaimResult,
-	type FollowUp,
-	Item,
-	ItemId,
-	type ItemRef,
-	PermanentError,
-	type Question,
-	type ThreadEntry,
-	type Watch,
-} from "../adapter-api.ts";
-import { appendEntry, parseThread } from "./thread.ts";
-import { type Git, HOOKS_OFF, pushHooksOff, PushRefused, runGit } from "./git.ts";
+import slugify from "@sindresorhus/slugify";
+import pLimit from "p-limit";
+import pRetry from "p-retry";
+import { type Adapter, type AdapterContext, type Claim, type Item, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { parseArgument } from "./argument.ts";
+import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
+import { gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
+import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
+import { answerMarker, followUpKey, questionText } from "./marked.ts";
+
+/** Where items live in the work repo. */
+export const ITEMS_DIR = ".hum/work";
+
+const ITEM_EXTENSION = ".md";
+const BASE_REF = "refs/hum/base";
+const CLAIMS_REF = "refs/hum/claims";
+const NO_BASE_TOKEN = "none";
+const WRITE_RACE_RETRIES = 7;
+const WRITE_RACE_BACKOFF_MS = 50;
+const FOLLOW_UP_SLUG_LENGTH = 40;
+
+/** Each item read is a git process; this many run at once. */
+const ITEM_READS_AT_ONCE = 8;
+
+/** An item id holds at most this many characters. */
+const ITEM_ID_LENGTH = 100;
 
 export type MarkdownOptions = {
 	/** A clone of the work repo. The adapter never touches its working tree or its branches. */
 	readonly repo: string;
+	/** A claim is the first push of the branch this prefix and the item id make. */
+	readonly claimPrefix: string;
 	readonly remote?: string;
-	/** The branch whose `.hum/work/` holds the items; answers are pushed to it. */
+	/** The branch whose items folder holds the items; every write is pushed to it. */
 	readonly base?: string;
-	readonly dir?: string;
-	readonly git?: Git;
 };
 
-const BASE_REF = "refs/hum/base";
-const CLAIMS_REF = "refs/hum/claims";
+type StandingClaim = { readonly claim: Claim; readonly sha: string };
 
-/** A claim is the first push of this branch; C1 sees it as a hum branch. */
-const CLAIM_BRANCH = "hum/claim";
-const IDENTITY = { GIT_AUTHOR_NAME: "hum", GIT_AUTHOR_EMAIL: "hum@moo.md", GIT_COMMITTER_NAME: "hum", GIT_COMMITTER_EMAIL: "hum@moo.md" };
-const WRITE_ATTEMPTS = 8;
+type FileChange = { readonly path: string; readonly content: string };
 
-const FrontMatter = z.looseObject({ title: z.string().min(1), state: z.string().min(1) });
+/** Another writer moved the base branch between this write's read and its push. */
+class LostRace extends Error {
+	override name = "LostRace";
+}
 
-const HOLDER = /^[A-Za-z0-9][\w.@:-]{0,99}$/;
+const pathOf = (id: string): string => `${ITEMS_DIR}/${id}${ITEM_EXTENSION}`;
 
-type Parsed = { readonly title: string; readonly state: string; readonly body: string; readonly thread: ThreadEntry[] };
+const isItemFileName = (name: string): boolean => name.endsWith(ITEM_EXTENSION);
 
-/** An item file: front matter, a body, then thread entries each opened by a `<!-- hum {…} -->` line. */
-export const parseItemFile = (source: string): Parsed => {
-	const lines = source.split("\n");
-
-	if (lines[0] !== "---") throw new Error("front matter missing: the file must open with a '---' line");
-
-	const close = lines.indexOf("---", 1);
-
-	if (close < 0) throw new Error("front matter never closes with a '---' line");
-
-	const front = FrontMatter.parse(Bun.YAML.parse(lines.slice(1, close).join("\n")));
-
-	return { title: front.title, state: front.state, ...parseThread(lines.slice(close + 1)) };
-};
-
-const kebab = (title: string): string =>
-	title
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-|-$/g, "")
-		.slice(0, 40);
-
-type ClaimRef = { readonly sha: string; readonly claim: Claim };
+const followUpId = (from: string, title: string): string =>
+	[from, slugify(title).slice(0, FOLLOW_UP_SLUG_LENGTH) || "follow-up", followUpKey(title)].join("-").slice(0, ITEM_ID_LENGTH);
 
 /**
- * The default work source. Items are markdown files under `.hum/work/` on the base branch of a git remote.
- * Every write is a commit built from git plumbing, so the clone's working tree and branches stay untouched,
- * pushed with hooks off. A claim is the first push of `hum/claim/<id>`; a renewal is a fast-forward on top.
+ * The default work source: markdown files in the items folder on the base branch of a git remote.
+ * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
+ * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = (
-	{ repo, remote = "origin", base = "main", dir = ".hum/work", git = runGit }: MarkdownOptions,
-	{ report, now }: AdapterContext,
-) => {
-	let spent = 0;
-	const cwd = repo;
+export const markdownAdapter = ({ repo, claimPrefix, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+	const git = gitIn(repo);
 	const baseBranch = `refs/heads/${base}`;
+	let spent = 0;
 
-	const run = async (args: readonly string[], options: { env?: Record<string, string>; input?: string } = {}) => {
-		const result = await git([...HOOKS_OFF, ...args], { cwd, ...options });
-
-		if (result.code !== 0) throw new Error(`git ${args.join(" ")} failed (${result.code}): ${result.stderr.trim()}`);
-
-		return result.stdout;
-	};
-
-	const sync = async () => {
+	const sync = async (): Promise<void> => {
 		spent++;
-		await run(["fetch", "--prune", "--no-tags", "--quiet", remote, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${CLAIM_BRANCH}/*:${CLAIMS_REF}/*`]);
+		await git.raw(["fetch", "--prune", "--no-tags", "--quiet", remote, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]);
 	};
 
-	const claimsNow = async (): Promise<Map<string, ClaimRef>> => {
-		const out = await run(["for-each-ref", "--format=%(refname)%09%(objectname)%09%(contents:subject)", CLAIMS_REF]);
-		const found = new Map<string, ClaimRef>();
+	const pushCounted = (args: readonly string[]) => {
+		spent++;
 
-		for (const line of out.split("\n").filter(Boolean)) {
-			const [ref = "", sha = "", subject = ""] = line.split("\t");
-			const item = ref.slice(`${CLAIMS_REF}/`.length);
-			const match = /^hum-claim (\S+) (\d+)$/.exec(subject);
-
-			if (match) found.set(item, { sha, claim: { item, holder: match[1] ?? "", expiresAt: Number(match[2]) } });
-		}
-
-		return found;
+		return push(git, [remote, ...args]);
 	};
 
-	const fileNames = async (): Promise<string[]> => {
-		const listed = await git([...HOOKS_OFF, "ls-tree", "--name-only", `${BASE_REF}:${dir}`], { cwd });
+	const standingFromLine = (line: string): [string, StandingClaim][] => {
+		const [ref = "", sha = "", subject = ""] = line.split("\t");
+		const item = ref.slice(`${CLAIMS_REF}/`.length);
+		const claim = claimOfCommit(item, subject);
 
-		return listed.code === 0 ? listed.stdout.split("\n").filter((name) => name.endsWith(".md")) : [];
+		return claim ? [[item, { claim, sha }]] : [];
 	};
 
-	const readFile = async (id: string): Promise<string | undefined> => {
-		const shown = await git([...HOOKS_OFF, "show", `${BASE_REF}:${dir}/${id}.md`], { cwd });
+	const claimsNow = async (): Promise<ReadonlyMap<string, StandingClaim>> =>
+		new Map((await git.raw(["for-each-ref", "--format=%(refname)%09%(objectname)%09%(contents:subject)", CLAIMS_REF])).split("\n").filter(Boolean).flatMap(standingFromLine));
 
-		return shown.code === 0 ? shown.stdout : undefined;
-	};
+	const itemSource = (id: string) => readOrAbsent(git, ["show", `${BASE_REF}:${pathOf(id)}`]);
 
-	/** R1: one bad file raises one card and is skipped. The other items go on. */
-	const load = async (id: string, source: string): Promise<{ parsed: Parsed; ref: ItemRef } | undefined> => {
+	const itemFileNames = async (): Promise<string[]> => ((await readOrAbsent(git, ["ls-tree", "--name-only", `${BASE_REF}:${ITEMS_DIR}`])) ?? "").split("\n").filter(isItemFileName);
+
+	/** One bad file raises one card and is skipped; the other items go on. */
+	const parseOrReport = (id: string, source: string): ItemFile | undefined => {
 		try {
-			const parsed = parseItemFile(source);
-
-			return { parsed, ref: { id: ItemId.parse(id), title: parsed.title } };
+			return parseItemFile(source);
 		} catch (error) {
 			report({
 				code: "item-malformed",
 				item: id,
-				cause: `${dir}/${id}.md does not parse: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
-				fix: `Fix the front matter or thread markers in ${dir}/${id}.md.`,
+				cause: `${pathOf(id)} does not parse: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
+				fix: `Fix the front matter or thread markers in ${pathOf(id)}.`,
 			});
 
 			return undefined;
 		}
 	};
 
-	const live = (claim: ClaimRef | undefined): boolean => claim !== undefined && claim.claim.expiresAt > now();
+	const loadItem = async (id: string): Promise<ItemFile | undefined> => {
+		const source = await itemSource(id);
 
-	/** A commit on `parent` holding the base branch's tree, with `changes` applied through a throwaway index. */
-	const commitOn = async (parent: string, message: string, changes: ReadonlyMap<string, string>): Promise<string> => {
+		return source === undefined ? undefined : parseOrReport(id, source);
+	};
+
+	const isReady = (file: ItemFile | undefined, standing: StandingClaim | undefined): file is ItemFile => file?.state === READY_STATE && !isLive(standing?.claim, now());
+
+	const readyRef = async (name: string, claims: ReadonlyMap<string, StandingClaim>): Promise<ItemRef[]> => {
+		const id = name.slice(0, -ITEM_EXTENSION.length);
+
+		if (!ItemId.safeParse(id).success) {
+			report({ code: "item-malformed", item: id, cause: `${ITEMS_DIR}/${name} has a name that is no item id`, fix: `Rename ${ITEMS_DIR}/${name} to letters, digits, dot, dash or underscore.` });
+
+			return [];
+		}
+
+		const file = await loadItem(id);
+
+		return isReady(file, claims.get(id)) ? [{ id, title: file.title }] : [];
+	};
+
+	/** A commit on `parent` with the base branch's tree, and `change` applied through a scratch index when given. */
+	const commitOn = async (parent: string, message: string, change?: FileChange): Promise<string> => {
 		const scratch = mkdtempSync(join(tmpdir(), "hum-index-"));
-		const env = { ...IDENTITY, GIT_INDEX_FILE: join(scratch, "index") };
+		const indexed = gitIn(repo, { GIT_INDEX_FILE: join(scratch, "index") });
 
 		try {
-			await run(["read-tree", BASE_REF], { env });
-
-			for (const [path, content] of changes) {
-				const blob = (await run(["hash-object", "-w", "--stdin"], { input: content, env })).trim();
-
-				await run(["update-index", "--add", "--cacheinfo", `100644,${blob},${path}`], { env });
+			if (change) {
+				await indexed.raw(["read-tree", BASE_REF]);
+				await indexed.raw(["update-index", "--add", "--cacheinfo", `100644,${(await indexed.raw(["hash-object", "-w", "--stdin"], change.content)).trim()},${change.path}`]);
 			}
 
-			const tree = (await run(["write-tree"], { env })).trim();
+			const tree = change ? (await indexed.raw(["write-tree"])).trim() : `${BASE_REF}^{tree}`;
 
-			return (await run(["-c", "commit.gpgsign=false", "commit-tree", tree, "-p", parent, "-m", message], { env })).trim();
+			return (await indexed.raw(["-c", "commit.gpgsign=false", "commit-tree", tree, "-p", parent, "-m", message])).trim();
 		} finally {
 			rmSync(scratch, { recursive: true, force: true });
 		}
 	};
 
-	/** Q1: edit files on the remote base branch and push the commit with hooks off, retrying a lost race. */
-	const write = async (message: string, edit: (read: (id: string) => Promise<string | undefined>) => Promise<ReadonlyMap<string, string> | "unchanged">) => {
-		for (let attempt = 0; attempt < WRITE_ATTEMPTS; attempt++) {
-			await sync();
-
-			const changes = await edit(readFile);
-
-			if (changes === "unchanged") return;
-
-			const parent = (await run(["rev-parse", BASE_REF])).trim();
-			const sha = await commitOn(parent, message, changes);
-
-			try {
-				spent++;
-
-				if ((await pushHooksOff(git, cwd, [remote, `${sha}:${baseBranch}`])) === "pushed") return;
-			} catch (error) {
-				if (error instanceof PushRefused) {
-					report({
-						code: "push-refused",
-						item: base,
-						cause: `The remote refused the push to ${base}: ${error.message.slice(0, 300)}`,
-						fix: `Let this account push to ${base}, or point hum at a branch it may write.`,
-					});
-				}
-
-				throw error;
-			}
-		}
-
-		throw new PermanentError(`gave up after ${WRITE_ATTEMPTS} lost races pushing to ${base}`);
-	};
-
-	const entryWrite = (id: string, entry: Omit<ThreadEntry, "text" | "at">, text: string, message: string) =>
-		write(message, async (read) => {
-			const source = await read(id);
-
-			if (source === undefined) throw new PermanentError(`no item "${id}" under ${dir}/`);
-
-			return new Map([[`${dir}/${id}.md`, appendEntry(source, { ...entry, at: now() }, text)]]);
+	const reportRefusal = (error: PushRefused): never => {
+		report({
+			code: "push-refused",
+			item: base,
+			cause: `The remote refused the push to ${base}: ${error.message.slice(0, 300)}`,
+			fix: `Let this account push to ${base}, or point hum at a branch it may write.`,
 		});
 
-	const item = async (id: string): Promise<Item> => {
-		ItemId.parse(id);
-		await sync();
-
-		const source = await readFile(id);
-
-		if (source === undefined) throw new PermanentError(`no item "${id}" under ${dir}/`);
-
-		const loaded = await load(id, source);
-
-		if (!loaded) throw new PermanentError(`item "${id}" is malformed; see its fault card`);
-
-		const claim = (await claimsNow()).get(id);
-
-		return { ...loaded.ref, body: loaded.parsed.body, ready: loaded.parsed.state === "ready" && !live(claim), thread: loaded.parsed.thread };
+		throw error;
 	};
 
-	const take = async (id: string, holder: string, ttlMs: number, renew: boolean): Promise<ClaimResult> => {
-		ItemId.parse(id);
+	const pushToBase = async (sha: string): Promise<void> => {
+		const outcome = await pushCounted([`${sha}:${baseBranch}`]).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
 
-		if (!Number.isInteger(ttlMs) || ttlMs <= 0) throw new PermanentError(`a claim lasts a positive whole number of milliseconds, not ${ttlMs}`);
-
-		if (!HOLDER.test(holder)) throw new PermanentError(`holder "${holder}" is not a plain name`);
-
-		await sync();
-
-		const current = (await claimsNow()).get(id);
-
-		if (live(current) && current?.claim.holder !== holder) return { won: false, claim: current!.claim };
-
-		if (renew && current?.claim.holder !== holder) {
-			if (current) return { won: false, claim: current.claim };
-
-			throw new PermanentError(`"${holder}" holds no claim on "${id}"`);
-		}
-
-		if (!current) {
-			const source = await readFile(id);
-			const loaded = source === undefined ? undefined : await load(id, source);
-
-			if (!loaded || loaded.parsed.state !== "ready") throw new PermanentError(`item "${id}" is missing, malformed or not ready`);
-		}
-
-		const expiresAt = now() + ttlMs;
-		const parent = current?.sha ?? (await run(["rev-parse", BASE_REF])).trim();
-		const sha = await commitOn(parent, `hum-claim ${holder} ${expiresAt}\n\nnonce: ${randomUUID()}`, new Map());
-
-		spent++;
-
-		if ((await pushHooksOff(git, cwd, [remote, `${sha}:refs/heads/${CLAIM_BRANCH}/${id}`])) === "pushed") {
-			return { won: true, claim: { item: id, holder, expiresAt } };
-		}
-
-		await sync();
-
-		const winner = (await claimsNow()).get(id);
-
-		if (!winner) throw new PermanentError(`claim on "${id}" lost a race to a claim that has since vanished`);
-
-		return { won: false, claim: winner.claim };
+		if (outcome === "conflict") throw new LostRace(`another writer moved ${base} first`);
 	};
 
-	const adapter: Adapter & { readonly spent: () => number } = {
-		apiVersion: 1,
-		spent: () => spent,
-		workSource: {
-			async listReady() {
+	/** Changes one file on the remote base branch, reading it afresh after every lost race. */
+	const write = async (message: string, change: () => Promise<FileChange | undefined>): Promise<void> => {
+		const attempt = async () => {
+			await sync();
+
+			const next = await change();
+
+			if (next) await pushToBase(await commitOn((await git.raw(["rev-parse", BASE_REF])).trim(), message, next));
+		};
+
+		await pRetry(attempt, { retries: WRITE_RACE_RETRIES, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
+			throw cause instanceof LostRace ? new PermanentError(`gave up after ${WRITE_RACE_RETRIES + 1} lost races pushing to ${base}`) : cause;
+		});
+	};
+
+	const appendTo = (id: string, entry: Omit<ThreadEntry, "text" | "at">, text: string): Promise<void> =>
+		write(`hum: ${entry.kind} on ${id}`, async () => {
+			const source = await itemSource(id);
+
+			if (source === undefined) throw new PermanentError(`no item "${id}" under ${ITEMS_DIR}/`);
+
+			return { path: pathOf(id), content: appendEntry(source, { ...entry, at: now() }, text) };
+		});
+
+	const take = claimer<StandingClaim>(
+		{
+			standing: async (id) => {
 				await sync();
 
-				const claims = await claimsNow();
-				const ready: ItemRef[] = [];
-
-				for (const name of await fileNames()) {
-					const id = name.slice(0, -".md".length);
-					const idOk = ItemId.safeParse(id);
-
-					if (!idOk.success) {
-						report({ code: "item-malformed", item: id, cause: `${dir}/${name} has a name that is no item id`, fix: `Rename ${dir}/${name} to letters, digits, dot, dash or underscore.` });
-						continue;
-					}
-
-					const source = await readFile(id);
-					const loaded = source === undefined ? undefined : await load(id, source);
-
-					if (loaded && loaded.parsed.state === "ready" && !live(claims.get(id))) ready.push(loaded.ref);
-				}
-
-				return ready;
+				return (await claimsNow()).get(id);
 			},
-			read: item,
-			claim: (id, holder, ttlMs) => take(id, holder, ttlMs, false),
-			renew: (id, holder, ttlMs) => take(id, holder, ttlMs, true),
-			comment: (id, text) => entryWrite(id, { kind: "comment" }, text, `hum: comment on ${id}`),
-			async fileFollowUp(from: string, { title, body }: FollowUp) {
-				ItemId.parse(from);
+			isReady: async (id) => (await loadItem(id))?.state === READY_STATE,
+			write: async (claim, over) => {
+				const parent = over?.sha ?? (await git.raw(["rev-parse", BASE_REF])).trim();
+				const sha = await commitOn(parent, claimCommitMessage(claim));
 
-				const id = `${from}-${kebab(title) || "follow-up"}-${createHash("sha256").update(title).digest("hex").slice(0, 6)}`.slice(0, 100);
-				const path = `${dir}/${id}.md`;
+				return (await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`])) === "pushed";
+			},
+		},
+		now,
+	);
 
-				await write(`hum: file ${id}`, async (read) => {
-					if ((await read(id)) !== undefined) return "unchanged";
+	const read = async (id: string): Promise<Item> => {
+		const item = parseArgument(ItemId, id);
 
-					return new Map([[path, `---\ntitle: ${JSON.stringify(title)}\nstate: ready\n---\n\n${body.trim()}\n\nFiled from ${from}.\n`]]);
-				});
+		await sync();
 
-				return { id: ItemId.parse(id), title };
+		const [source, claims] = await Promise.all([itemSource(item), claimsNow()]);
+
+		if (source === undefined) throw new PermanentError(`no item "${item}" under ${ITEMS_DIR}/`);
+
+		const file = parseOrReport(item, source);
+
+		if (!file) throw new PermanentError(`item "${item}" is malformed; see its fault card`);
+
+		return { id: item, title: file.title, body: file.body, ready: isReady(file, claims.get(item)), thread: file.thread };
+	};
+
+	const adapter = {
+		apiVersion: 1,
+		/** Fetches and pushes so far. */
+		spent: () => spent,
+		workSource: {
+			listReady: async () => {
+				await sync();
+
+				const [claims, names] = await Promise.all([claimsNow(), itemFileNames()]);
+
+				return (await pLimit(ITEM_READS_AT_ONCE).map(names, (name) => readyRef(name, claims))).flat();
+			},
+			read,
+			claim: (id, holder, ttlMs) => take("claim", parseArgument(ItemId, id), holder, ttlMs),
+			renew: (id, holder, ttlMs) => take("renew", parseArgument(ItemId, id), holder, ttlMs),
+			comment: (id, text) => appendTo(id, { kind: "comment" }, text),
+			fileFollowUp: async (from, { title, body }) => {
+				const id = parseArgument(ItemId, followUpId(parseArgument(ItemId, from), title));
+
+				await write(`hum: file ${id}`, async () => ((await itemSource(id)) === undefined ? { path: pathOf(id), content: newItemFile(title, `${body.trim()}\n\nFiled from ${from}.`) } : undefined));
+
+				return { id, title };
 			},
 		},
 		questions: {
-			ask: (id, { text, options }: Question) =>
-				entryWrite(id, { kind: "question" }, options?.length ? `${text}\n\nOptions: ${options.join(", ")}` : text, `hum: question on ${id}`),
-			decide: (id, text) => entryWrite(id, { kind: "decision" }, text, `hum: decision on ${id}`),
+			ask: (id, question) => appendTo(id, { kind: "question" }, questionText(question)),
+			decide: (id, text) => appendTo(id, { kind: "decision" }, text),
 		},
 		answers: {
-			answer: (id, { text, option }: Answer) =>
-				entryWrite(id, option === undefined ? { kind: "answer" } : { kind: "answer", option }, text, `hum: answer on ${id}`),
-			/** Q1: the token is the remote base branch's tip. `ls-remote` is a read of one ref and counts toward no rate limit. */
-			async watch(since?: string): Promise<Watch> {
-				const out = await run(["ls-remote", remote, baseBranch]);
-				const token = out.split(/\s/)[0] || "none";
+			answer: (id, { text, option }) => appendTo(id, answerMarker(option), text),
+			/** The token is the remote base branch's tip; reading one ref spends no rate limit. */
+			watch: async (since?: string): Promise<Watch> => {
+				const [token = NO_BASE_TOKEN] = (await git.raw(["ls-remote", remote, baseBranch])).split(/\s/).filter(Boolean);
 
 				return { token, changed: token !== since };
 			},
 		},
-	};
+	} satisfies Adapter & { readonly spent: () => number };
 
 	return adapter;
 };

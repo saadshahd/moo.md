@@ -18,6 +18,7 @@ import {
 	sourceFiles,
 	type State,
 } from "../src/index.ts";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { itemFile, sh, WorkRepo } from "./fixtures/work-repo.ts";
 
 const cleanups: (() => void)[] = [];
@@ -55,7 +56,7 @@ describe("contract suite on markdown (a temp repo with a local bare remote)", ()
 	const clock = { offset: 0 };
 	const now = () => Date.now() + clock.offset;
 	const context: AdapterContext = { report: () => {}, now };
-	const options = (path: string) => ({ repo: path, base: "main" });
+	const options = (path: string) => ({ repo: path, base: "main", claimPrefix: SHIPPED_DEFAULTS.claimPrefix });
 	const primary = markdownAdapter(options(repo.worker("worker-1")), context);
 	const secondary = markdownAdapter(options(repo.worker("worker-2")), context);
 
@@ -71,11 +72,11 @@ describe("contract suite on markdown (a temp repo with a local bare remote)", ()
 	for (const check of contractChecks(target)) test(check.name, check.run, 30_000);
 });
 
-describe("R1: a malformed item file", () => {
+describe("a malformed item file", () => {
 	test("other items advance, and one card names the file", async () => {
 		const repo = new WorkRepo();
 		const reported: FaultInput[] = [];
-		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main" }, { report: (fault) => void reported.push(fault), now: Date.now });
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", claimPrefix: SHIPPED_DEFAULTS.claimPrefix }, { report: (fault) => void reported.push(fault), now: Date.now });
 
 		repo.add("good", itemFile("Good one"));
 		repo.add("broken", "no front matter at all\n");
@@ -89,9 +90,8 @@ describe("R1: a malformed item file", () => {
 	});
 });
 
-describe("R3: provider failures and empty lists", () => {
-	const guardWith = (provider: FakeProvider, state: State, timeoutMs = 10_000) =>
-		guarded(provider.adapter(), { provider: "fake", faults: state.faults, timeoutMs, now: provider.now, sleep: async (ms) => provider.advance(ms) });
+describe("provider failures and empty lists", () => {
+	const guardWith = (provider: FakeProvider, state: State, timeoutMs = 10_000) => guarded(provider.adapter(), { provider: "fake", faults: state.faults, timeoutMs });
 
 	test("502 twice then OK shows nothing", async () => {
 		const provider = new FakeProvider();
@@ -107,7 +107,7 @@ describe("R3: provider failures and empty lists", () => {
 	test("502 past the timeout shows one card, however often it is read", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);
-		const adapter = guardWith(provider, state, 5_000);
+		const adapter = guardWith(provider, state, 300);
 
 		provider.failNext(10_000);
 
@@ -152,10 +152,10 @@ describe("R3: provider failures and empty lists", () => {
 	});
 });
 
-describe("V7, V11, V12: the start check", () => {
-	const guard = (provider: FakeProvider) => ({ timeoutMs: 1_000, now: provider.now, sleep: async (ms: number) => provider.advance(ms) });
+describe("the start check", () => {
+	const guard = () => ({ timeoutMs: 1_000 });
 
-	test("V7: a reply whose shape changed is refused with one card, and the rest runs", async () => {
+	test("a reply whose shape changed is refused with one card, and the rest runs", async () => {
 		const drifted = new FakeProvider();
 		const fine = new FakeProvider();
 		const state = stateIn(drifted.now);
@@ -164,21 +164,21 @@ describe("V7, V11, V12: the start check", () => {
 		drifted.listReplacement = () => JSON.parse('[{"identifier":"x","name":"drifted"}]');
 		fine.seed("b");
 
-		const refused = await admit({ name: "drifted", adapter: drifted.adapter(), faults: state.faults, guard: guard(drifted) });
-		const kept = await admit({ name: "fine", adapter: fine.adapter(), faults: state.faults, guard: guard(fine) });
+		const refused = await admit({ name: "drifted", adapter: drifted.adapter(), faults: state.faults, guard: guard() });
+		const kept = await admit({ name: "fine", adapter: fine.adapter(), faults: state.faults, guard: guard() });
 
 		expect(refused.ok).toBe(false);
 		expect(kept.ok).toBe(true);
 		expect(state.faults.list().map((card) => card.key)).toEqual(["integration-shape-changed:drifted"]);
 	});
 
-	test("V11: an adapter written for another API version is refused with one card", async () => {
+	test("an adapter written for another API version is refused with one card", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);
 		const old: Adapter = { ...provider.adapter(), apiVersion: ADAPTER_API_VERSION - 1 };
 
-		const refused = await admit({ name: "old", adapter: old, faults: state.faults, guard: guard(provider) });
-		const again = await admit({ name: "old", adapter: old, faults: state.faults, guard: guard(provider) });
+		const refused = await admit({ name: "old", adapter: old, faults: state.faults, guard: guard() });
+		const again = await admit({ name: "old", adapter: old, faults: state.faults, guard: guard() });
 
 		expect(refused.ok).toBe(false);
 		expect(again.ok).toBe(false);
@@ -186,7 +186,7 @@ describe("V7, V11, V12: the start check", () => {
 		expect(state.faults.list()[0]?.cause).toContain(`API ${ADAPTER_API_VERSION - 1}`);
 	});
 
-	test("V12: an adapter that imports xstate is refused, and the card names the file", async () => {
+	test("an adapter that imports xstate is refused, and the card names the file", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);
 		const dir = tmp();
@@ -197,7 +197,7 @@ describe("V7, V11, V12: the start check", () => {
 		writeFileSync(bad, `import { createMachine } from "xstate";\nexport default () => createMachine;\n`);
 		writeFileSync(good, `import { ItemId } from "@moo.md/hum/adapter-api";\nexport default () => ItemId;\n`);
 
-		const refused = await admit({ name: "linear", adapter: provider.adapter(), files: sourceFiles(join(dir, "adapters")), root: dir, faults: state.faults, guard: guard(provider) });
+		const refused = await admit({ name: "linear", adapter: provider.adapter(), files: sourceFiles(join(dir, "adapters")), root: dir, faults: state.faults, guard: guard() });
 
 		expect(refused.ok).toBe(false);
 		expect(state.faults.list().map((card) => card.item)).toEqual(["adapters/linear.ts"]);
@@ -209,14 +209,14 @@ describe("V7, V11, V12: the start check", () => {
 		}
 	});
 
-	test("V12: the engine's own adapters import neither", () => {
+	test("the engine's own adapters import no engine module", () => {
 		const here = dirname(import.meta.dir);
 
 		expect(engineImporters([...sourceFiles(join(here, "src", "adapters")), join(here, "src", "adapter-api.ts")])).toEqual([]);
 	});
 });
 
-describe("Q1: answer writes, commits and pushes with hooks off", () => {
+describe("an answer writes, commits and pushes with hooks off", () => {
 	const hook = (dir: string, name: string, script: string) => {
 		const path = join(dir, "hooks", name);
 
@@ -233,7 +233,7 @@ describe("Q1: answer writes, commits and pushes with hooks off", () => {
 		for (const name of ["pre-push", "pre-commit", "commit-msg", "reference-transaction"]) hook(join(worker, ".git"), name, `touch ${ran}; exit 1`);
 
 		const id = repo.seed("asked");
-		const adapter = markdownAdapter({ repo: worker, base: "main" }, { report: () => {}, now: Date.now });
+		const adapter = markdownAdapter({ repo: worker, base: "main", claimPrefix: SHIPPED_DEFAULTS.claimPrefix }, { report: () => {}, now: Date.now });
 
 		await adapter.answers?.answer(id, { text: "ship it", option: "approve" });
 
@@ -249,7 +249,7 @@ describe("Q1: answer writes, commits and pushes with hooks off", () => {
 
 		hook(repo.remote, "pre-receive", `echo "GH006: Protected branch update failed for refs/heads/main" >&2; exit 1`);
 
-		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main" }, { report: (fault) => void reported.push(fault), now: Date.now });
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", claimPrefix: SHIPPED_DEFAULTS.claimPrefix }, { report: (fault) => void reported.push(fault), now: Date.now });
 
 		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toBeInstanceOf(PushRefused);
 		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toThrow("Protected branch");

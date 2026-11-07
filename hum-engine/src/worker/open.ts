@@ -3,27 +3,27 @@ import { z } from "zod";
 import type { Adapter } from "../adapter-api.ts";
 import { resolveAdapters } from "../adapters/registry.ts";
 import { ClaudeRunner } from "../adapters/claude-p.ts";
-import { runGit } from "../adapters/git.ts";
+import { gitIn } from "../adapters/git.ts";
 import { serialized } from "../adapters/serial.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
 export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote"> & {
-	/** Where saved state lives; default `<git common dir>/hum` (Q2). */
+	/** Where saved state lives; default `<git common dir>/hum`. */
 	readonly stateDir?: string;
-	/** The skill names of hope's installed copy; a role that names another is refused (V4). */
+	/** The skill names of hope's installed copy; a role that names another is refused. */
 	readonly hopeSkills: ReadonlySet<string>;
 	readonly remote?: string;
 	readonly binary?: string;
 	readonly env?: Readonly<Record<string, string>>;
-	/** A provider that fails longer than this shows one card (R1). */
+	/** A provider that fails longer than this shows one card. */
 	readonly providerTimeoutMs?: number;
 };
 
 const Latest = z.looseObject({ version: z.string().min(1) });
 
-/** V14: the newest `@moo.md/hum` on npm. */
+/** The newest `@moo.md/hum` on npm. */
 export const npmLatest = async (): Promise<string | undefined> => {
 	const reply = await fetch("https://registry.npmjs.org/@moo.md/hum/latest", { signal: AbortSignal.timeout(5000) });
 
@@ -32,7 +32,7 @@ export const npmLatest = async (): Promise<string | undefined> => {
 
 /**
  * Wires a worker for the owner's repo: state in the git common dir, the config in `.hum/`, the adapters
- * `hum.json` names (guarded, with R3's last-read list saved, and one call at a time), and a started runner.
+ * `hum.json` names (guarded, with the last ready list saved, and one call at a time), and a started runner.
  * Throws when the config is refused or the repo has no `origin`; the service unit shows that as a card.
  */
 export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => {
@@ -43,14 +43,13 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	if (!loaded.ok) throw new Error(loaded.refusal.message);
 
-	const found = await runGit(["remote", "get-url", "origin"], { cwd: repo });
-	const remote = options.remote ?? found.stdout.trim();
+	const remote = options.remote ?? (await gitIn(repo).raw(["remote", "get-url", "origin"])).trim();
 
 	if (!remote) throw new Error(`${repo} has no origin remote, and none was given`);
 
 	const adapters = await resolveAdapters(repo, {
 		faults: state.faults,
-		guard: { timeoutMs: providerTimeoutMs, now, lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
+		guard: { timeoutMs: providerTimeoutMs, lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
 		context: { report: (fault) => void state.faults.raise(fault), now },
 	});
 

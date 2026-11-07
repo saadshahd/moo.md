@@ -6,8 +6,7 @@ export {
 	applyConfigChange,
 	type ConfigChange,
 	type ConfigResult,
-	HUM_RUN_BRANCH_PREFIX,
-	isRunBranch,
+	isHumBranch,
 } from "./config/change.ts";
 
 export { hashJson } from "./config/hash.ts";
@@ -77,15 +76,17 @@ export { type Check, contractChecks, type ContractResult, type ContractTarget, r
 
 export { FakeProvider, ProviderError } from "./adapters/fake.ts";
 
-export { HOOKS_OFF, type Git, pushArgs, pushHooksOff, PushRefused, runGit } from "./adapters/git.ts";
+export { pushArgs, PushRefused } from "./adapters/git.ts";
 
 export { type GuardOptions, guarded } from "./adapters/guard.ts";
 
-export { GitHubApi, type GitHubApiOptions, githubAdapter, type GitHubOptions, repoFromRemote } from "./adapters/github.ts";
+export { type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, repoFromRemote } from "./adapters/github.ts";
 
 export { Marker, marked, markerOf, parseComment } from "./adapters/marked.ts";
 
-export { markdownAdapter, type MarkdownOptions, parseItemFile } from "./adapters/markdown.ts";
+export { ITEMS_DIR, markdownAdapter, type MarkdownOptions } from "./adapters/markdown.ts";
+
+export { parseItemFile } from "./adapters/item-file.ts";
 
 export { refuseOtherVersion, resolveAdapters, type Slot, SLOTS } from "./adapters/registry.ts";
 

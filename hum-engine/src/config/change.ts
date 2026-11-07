@@ -1,17 +1,17 @@
 import type { Refusal } from "./refusal.ts";
 import { type Config, type LoadOptions, loadConfig, type RawConfig } from "./load.ts";
+import { type Naming, SHIPPED_DEFAULTS } from "./schema.ts";
 import { type SavedItem, unmappedItems } from "./state-map.ts";
 
-/** The branch prefix of every hum run (C1). */
-export const HUM_RUN_BRANCH_PREFIX = "hum/";
-
-export const isRunBranch = (branch: string): boolean => branch.startsWith(HUM_RUN_BRANCH_PREFIX);
+/** A branch hum itself writes: a run's or a claim's. */
+export const isHumBranch = (branch: string, { runBranchPrefix, claimPrefix }: Naming): boolean =>
+	[runBranchPrefix, claimPrefix].some((prefix) => branch.startsWith(prefix));
 
 export type ConfigChange = {
 	readonly candidate: RawConfig;
 	/** The branch the change sits on. */
 	readonly branch: string;
-	/** Items saved now, so a removed or renamed state can be checked (V3). */
+	/** Items saved now, so a removed or renamed state can be checked. */
 	readonly saved?: readonly SavedItem[];
 };
 
@@ -21,17 +21,18 @@ export type ConfigResult =
 	| { readonly accepted: false; readonly config: Config | undefined; readonly refusals: readonly Refusal[] };
 
 /**
- * One path for start and for every change. Refuses a change from a hum run's branch (C1),
- * a config that fails a check (V4, C2, C3, D7) and a state map that strands a saved item (V3).
+ * One path for start and for every change. Refuses a change from a branch hum writes, judged by the last good
+ * config's prefixes so a change cannot rename its own way out; a config that fails a check; and a state map
+ * that strands a saved item.
  */
 export const applyConfigChange = (current: Config | undefined, change: ConfigChange, options: LoadOptions): ConfigResult => {
 	const refuse = (...refusals: Refusal[]): ConfigResult => ({ accepted: false, config: current, refusals });
 
-	if (isRunBranch(change.branch)) {
+	if (isHumBranch(change.branch, current?.hum ?? SHIPPED_DEFAULTS)) {
 		return refuse({
 			code: "change-from-run",
 			branch: change.branch,
-			message: `The config change came from a hum run's branch "${change.branch}". Only the owner changes hum; the last good config stays.`,
+			message: `The config change came from a branch hum writes, "${change.branch}". Only the owner changes hum; the last good config stays.`,
 		});
 	}
 

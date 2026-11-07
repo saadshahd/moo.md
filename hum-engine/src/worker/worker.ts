@@ -1,7 +1,6 @@
 import { mkdirSync, readFileSync, rmSync, watch } from "node:fs";
 import { ADAPTER_API_VERSION, type Answers, type Item, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { ClaudeRunner } from "../adapters/claude-p.ts";
-import type { Git } from "../adapters/git.ts";
 import type { Config } from "../config/load.ts";
 import { SCHEMA_VERSION } from "../config/schema.ts";
 import { createAsyncLogic } from "xstate";
@@ -18,14 +17,14 @@ import { answerTo, DEFAULT_CLAIM_TTL_MS, park, rememberKinds, runThinPath, type 
 import { OWNER_WAIT_TAG, STUCK_TAG, type Kind } from "../config/schema.ts";
 
 export type WorkerOptions = {
-	/** The owner's checkout: its lockfile, `.hum/` and `adapters/` are what V2 watches. */
+	/** The owner's checkout: its lockfile, `.hum/` and `adapters/` are what the update check watches. */
 	readonly repo: string;
 	readonly state: State;
 	readonly config: Config;
 	readonly adapters: { readonly workSource: WorkSource; readonly questions: Questions; readonly answers?: Answers };
 	/** Started: `runner.start()` has passed. */
 	readonly runner: ClaudeRunner;
-	/** The kind of an item; slice 10 replaces a fixed name with a rule. */
+	/** The kind of an item. */
 	readonly kind: (item: Item) => string;
 	readonly remote: string;
 	readonly base?: string;
@@ -34,7 +33,6 @@ export type WorkerOptions = {
 	readonly claimTtlMs?: number;
 	readonly workDir?: string;
 	readonly dir?: string;
-	readonly git?: Git;
 	readonly maxFixes?: number;
 	/** The most runs at once. */
 	readonly runners?: number;
@@ -43,11 +41,11 @@ export type WorkerOptions = {
 	readonly drainMs?: number;
 	readonly where?: "mac" | "ci";
 	readonly now?: () => number;
-	/** The engine this process runs; V2 compares the one installed in `repo` with the one at start. */
+	/** The engine this process runs; the update check compares the one installed in `repo` with the one at start. */
 	readonly engineVersion?: string;
-	/** V14: the newest published version. Read at most every six hours; a failure shows no version. */
+	/** The newest published version. Read at most every six hours; a failure shows no version. */
 	readonly latestVersion?: () => Promise<string | undefined>;
-	/** R2: when the scheduled workflow last ran, for the status file. Read at most every five minutes; a failure shows no time. */
+	/** When the scheduled workflow last ran, for the status file. Read at most every five minutes; a failure shows no time. */
 	readonly ciTick?: () => Promise<number | undefined>;
 	readonly gate?: PrefixGate;
 	readonly onResult?: (result: ThinResult) => void;
@@ -55,7 +53,7 @@ export type WorkerOptions = {
 
 export type TickResult =
 	| { readonly kind: "ran"; readonly started: readonly string[] }
-	/** V2: an update was seen; no new run starts, and the worker exits once its runs end. */
+	/** An update was seen; no new run starts, and the worker exits once its runs end. */
 	| { readonly kind: "draining"; readonly reason: string }
 	| { readonly kind: "exit"; readonly reason: string };
 
@@ -87,9 +85,9 @@ const neverSources = (kind: Kind) =>
 const hasTag = (kind: Kind, state: string | undefined, tag: string): boolean => (state !== undefined && kind.machine.states[state]?.tags?.includes(tag)) ?? false;
 
 /**
- * The worker (slice 7). Each tick reads its facts once, then decides: it checks deadlines (R2), renews claims
- * (D5), compares the engine and config with those at start (V2), picks which items start (E5, E4, row 4) and
- * writes a heartbeat and the status file. Runs go side by side, each a thin-path run on its own clone.
+ * The worker. Each tick reads its facts once, then decides: it checks deadlines, renews claims, compares the
+ * engine and config with those at start, picks which items start and writes a heartbeat and the status file.
+ * Runs go side by side, each a thin-path run on its own clone.
  */
 export class Worker {
 	readonly #o: WorkerOptions;
@@ -106,7 +104,7 @@ export class Worker {
 	#restarting: { reason: string; at: number } | undefined;
 	readonly #latest: (t: number) => Promise<string | undefined>;
 	readonly #ciTick: (t: number) => Promise<number | undefined>;
-	/** Ticks that picked: one per tick, whatever number of runs ended since the last (E5). */
+	/** Ticks that picked: one per tick, whatever number of runs ended since the last. */
 	picks = 0;
 
 	constructor(options: WorkerOptions) {
@@ -143,7 +141,7 @@ export class Worker {
 		return named !== undefined && hasTag(named.kind, saved.state, OWNER_WAIT_TAG);
 	}
 
-	/** R2: a saved wait whose deadline has passed fires now. The restored machine reschedules its timers from the clock below, and an overdue one fires at once. */
+	/** A saved wait whose deadline has passed fires now. The restored machine reschedules its timers from the clock below, and an overdue one fires at once. */
 	async #deadlines(t: number): Promise<void> {
 		const { state } = this.#o;
 
@@ -183,7 +181,7 @@ export class Worker {
 
 	}
 
-	/** U5: the item ids the answer hook dropped in the inbox folder. Each file is read once and removed. */
+	/** The item ids the answer hook dropped in the inbox folder. Each file is read once and removed. */
 	#inbox(): string[] {
 		return listFiles(this.#o.state.inbox).flatMap((file) => {
 			try {
@@ -214,7 +212,7 @@ export class Worker {
 		if (spent) state.spent.put(id, { ...spent, base: spent.total });
 	}
 
-	/** Reads the threads that can have changed, saves each new answer as an event (D4), and releases a parked item the owner answered. */
+	/** Reads the threads that can have changed, saves each new answer as an event, and releases a parked item the owner answered. */
 	async #answers(sleeping: readonly SavedSnapshot[]): Promise<void> {
 		const { state, adapters } = this.#o;
 		const inbox = this.#inbox();
@@ -260,7 +258,7 @@ export class Worker {
 		return learned;
 	}
 
-	/** D5: every claim in flight is renewed; a run whose claim is gone stops. */
+	/** Every claim in flight is renewed; a run whose claim is gone stops. */
 	async #renew(): Promise<void> {
 		const { adapters, holder, claimTtlMs } = this.#o;
 
@@ -291,7 +289,6 @@ export class Worker {
 			claimTtlMs: this.#o.claimTtlMs,
 			workDir: this.#o.workDir,
 			dir: this.#o.dir,
-			git: this.#o.git,
 			maxFixes: this.#o.maxFixes,
 			itemId: candidate.id,
 			signal: abort.signal,
@@ -329,7 +326,7 @@ export class Worker {
 		this.wake.signal();
 	}
 
-	/** R7, U1, V14: the heartbeat and the status file, both by temp file and rename. */
+	/** The heartbeat and the status file, both by temp file and rename. */
 	async #publish(t: number, signature: Signature): Promise<void> {
 		const { state, config, where = "mac" } = this.#o;
 		const intervalMs = this.#o.intervalMs ?? 30_000;
@@ -358,7 +355,7 @@ export class Worker {
 		});
 	}
 
-	/** V2: an update is seen when the installed engine, the lockfile, `.hum/` or `adapters/` differ from start. */
+	/** An update is seen when the installed engine, the lockfile, `.hum/` or `adapters/` differ from start. */
 	#updated(now: Signature): string | undefined {
 		if (now.engineVersion !== this.#start.engineVersion) return `the engine changed from ${this.#start.engineVersion} to ${now.engineVersion}`;
 
@@ -459,7 +456,7 @@ export class Worker {
 		return { kind: "ran", started };
 	}
 
-	/** Ticks until an update is seen and the runs have ended, or `abort` fires. An end of a run, an inbox file or a signal wakes it early (E5). */
+	/** Ticks until an update is seen and the runs have ended, or `abort` fires. An end of a run, an inbox file or a signal wakes it early. */
 	async serve(abort?: AbortSignal): Promise<Extract<TickResult, { kind: "exit" }>> {
 		const { state } = this.#o;
 

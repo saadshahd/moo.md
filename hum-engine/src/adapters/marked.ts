@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
-import { PermanentError, THREAD_KINDS, type ThreadEntry } from "../adapter-api.ts";
+import { PermanentError, type Question, THREAD_KINDS, type ThreadEntry } from "../adapter-api.ts";
 
-const MARKER = "<!-- hum ";
+const OPEN = "<!-- hum ";
+const CLOSE = " -->";
+const EMPTY_COMMENT = "(empty)";
+const FOLLOW_UP_KEY_LENGTH = 12;
 
-/** The hidden first line of a comment hum wrote (A16): its kind, the option an answer carries, the options a question offers. */
+/** The hidden first line of a comment hum writes: its kind, the option an answer carries, the options a question offers. */
 export const Marker = z.looseObject({
 	kind: z.enum(THREAD_KINDS),
 	option: z.string().min(1).optional(),
@@ -13,55 +17,82 @@ export const Marker = z.looseObject({
 
 export type Marker = z.infer<typeof Marker>;
 
-/** The marker of a question: the options it offers ride in it (A16). */
+/**
+ * One hidden line that carries `value`: an HTML comment opened by `open`. The value is checked against the schema
+ * its reader parses it with, and `>` is written as `>`, so a value can never close the comment that holds it.
+ */
+export const markerLine = <T>(schema: z.ZodType<T>, value: T, open: string = OPEN): string =>
+	`${open}${JSON.stringify(schema.parse(value)).replaceAll(">", "\\u003e")}${CLOSE}`;
+
+/** Whether `line` is one whole hidden line opened by `open`. */
+export const isMarkerLine = (line: string, open: string = OPEN): boolean => line.startsWith(open) && line.endsWith(CLOSE);
+
+/** The JSON of a text's leading hidden line and the text after it; undefined when the text opens with no such line. */
+export const splitMarker = (body: string, open: string = OPEN): { readonly json: string; readonly text: string } | undefined => {
+	const source = body.replaceAll("\r\n", "\n");
+	const end = source.indexOf(CLOSE);
+
+	return source.startsWith(open) && end >= 0 ? { json: source.slice(open.length, end), text: source.slice(end + CLOSE.length).trim() } : undefined;
+};
+
+/** JSON a person may have written by hand: anything that does not parse, or does not fit `schema`, reads as no value at all. */
+export const parseLooseJson = <T>(schema: z.ZodType<T>, json: string): T | undefined => {
+	try {
+		return schema.safeParse(JSON.parse(json)).data;
+	} catch {
+		return undefined;
+	}
+};
+
 export const questionMarker = (options?: readonly string[]): Marker => (options?.length ? { kind: "question", options: [...options] } : { kind: "question" });
 
-/** The marker of an answer: the option it carries rides in it (A16). */
 export const answerMarker = (option?: string): Marker => (option === undefined ? { kind: "answer" } : { kind: "answer", option });
 
-/** The text of a comment hum writes on a provider's thread. */
-export const marked = (marker: Marker, text: string): string => `${MARKER}${JSON.stringify(marker).replaceAll(">", "\\u003e")} -->\n\n${text.trim()}`;
+/** A question as a thread shows it: the options it offers follow on their own line. */
+export const questionText = ({ text, options }: Question): string => (options?.length ? `${text}\n\nOptions: ${options.join(", ")}` : text);
 
-/** The same entry on one line, for a provider whose comments hold one line of at most `limit` characters. Text that does not fit fails: nothing is cut silently. */
+/** A comment's text; a provider that refuses an empty comment gets a placeholder. */
+export const commentText = (text: string): string => text.trim() || EMPTY_COMMENT;
+
+/** The same follow-up title from the same item always has the same key, so filing it twice files it once. */
+export const followUpKey = (title: string): string => createHash("sha256").update(title).digest("hex").slice(0, FOLLOW_UP_KEY_LENGTH);
+
+/** A follow-up's body, which names the item it came from. */
+export const followUpBody = (body: string, from: string): string => `${body.trim()}\n\nFiled from ${from}.`;
+
+/** The note left on the item a follow-up came from; its marker carries the key that finds the follow-up again. */
+export const followUpNote = (title: string, item: string) => ({
+	marker: { kind: "comment", followUp: { key: followUpKey(title), item } } satisfies Marker,
+	text: `Filed follow-up #${item}: ${title}`,
+});
+
+/** The marker on a comment's first line, or undefined for a person's comment. */
+export const markerOf = (body: string): Marker | undefined => {
+	const split = splitMarker(body);
+
+	return split && parseLooseJson(Marker, split.json);
+};
+
+/** The item a follow-up with this title was filed as, read from the notes on the item it came from. */
+export const filedFollowUp = (bodies: readonly string[], title: string): string | undefined =>
+	bodies.map(markerOf).find((marker) => marker?.followUp?.key === followUpKey(title))?.followUp?.item;
+
+/** A comment hum writes on a provider's thread. */
+export const marked = (marker: Marker, text: string): string => `${markerLine(Marker, marker)}\n\n${text.trim()}`;
+
+/** The same comment on one line, for a provider whose comments hold one line of at most `limit` characters; text that does not fit is refused, never cut. */
 export const markedLine = (marker: Marker, text: string, limit: number): string => {
-	const line = `${MARKER}${JSON.stringify(marker).replaceAll(">", "\\u003e")} --> ${text.replaceAll(/\s+/g, " ").trim()}`;
+	const line = `${markerLine(Marker, marker)} ${text.replaceAll(/\s+/g, " ").trim()}`;
 
 	if (line.length > limit) throw new PermanentError(`this provider's comments hold ${limit} characters; this one needs ${line.length}`);
 
 	return line;
 };
 
-/** Splits a comment into its leading marker JSON and the text after it, or undefined when it opens with no marker. */
-export const splitMarker = (body: string | null, open: string): { json: string; text: string } | undefined => {
-	const source = (body ?? "").replaceAll("\r\n", "\n");
+/** A comment as a thread entry. One without hum's marker, or with nothing after it, is a person's and reads as a comment. */
+export const parseComment = (body: string, at: number): ThreadEntry => {
+	const marker = markerOf(body);
+	const text = splitMarker(body)?.text ?? "";
 
-	if (!source.startsWith(open)) return undefined;
-
-	const end = source.indexOf(" -->");
-
-	return end < 0 ? undefined : { json: source.slice(open.length, end), text: source.slice(end + " -->".length).trim() };
-};
-
-/** The marker on a comment's first line, or undefined for a person's comment. */
-export const markerOf = (body: string | null): Marker | undefined => {
-	const split = splitMarker(body, MARKER);
-
-	if (!split) return undefined;
-
-	try {
-		return Marker.parse(JSON.parse(split.json));
-	} catch {
-		return undefined; // a person's comment that happens to start this way
-	}
-};
-
-/** A comment is a thread entry. One without hum's marker, or with no text after it, is a person's and reads as a comment. */
-export const parseComment = (body: string | null, at: number): ThreadEntry => {
-	const source = (body ?? "").replaceAll("\r\n", "\n");
-	const marker = markerOf(source);
-	const text = splitMarker(source, MARKER)?.text ?? "";
-
-	if (marker && text !== "") return marker.option === undefined ? { kind: marker.kind, text, at } : { kind: marker.kind, text, at, option: marker.option };
-
-	return { kind: "comment", text: source.trim() === "" ? "(empty)" : source.trim(), at };
+	return marker && text !== "" ? { kind: marker.kind, text, at, option: marker.option } : { kind: "comment", text: commentText(body.replaceAll("\r\n", "\n")), at };
 };
