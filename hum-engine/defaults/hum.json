@@ -1,0 +1,79 @@
+{
+	"schemaVersion": 1,
+	"levels": [
+		"low",
+		"medium",
+		"high",
+		"critical"
+	],
+	"paths": [],
+	"roles": {
+		"plan": {
+			"file": "roles/plan.md",
+			"purpose": "plan",
+			"skills": [
+				"hope:intent",
+				"hope:shape"
+			]
+		},
+		"build": {
+			"file": "roles/build.md",
+			"purpose": "build",
+			"skills": []
+		},
+		"fix": {
+			"file": "roles/fix.md",
+			"purpose": "fix",
+			"skills": []
+		},
+		"review": {
+			"file": "roles/review.md",
+			"purpose": "review",
+			"skills": [
+				"hope:judge"
+			]
+		}
+	},
+	"events": {
+		"plan-ready": {
+			"source": "plan"
+		},
+		"needs-split": {
+			"source": "plan"
+		},
+		"plan-blocked": {
+			"source": "plan"
+		},
+		"token-cap": {
+			"source": "worker"
+		},
+		"approve": {
+			"source": "review"
+		},
+		"request-changes": {
+			"source": "review"
+		},
+		"needs-owner": {
+			"source": "review"
+		},
+		"answered": {
+			"source": "owner"
+		},
+		"owner-approved": {
+			"source": "owner"
+		},
+		"owner-rejected": {
+			"source": "owner"
+		},
+		"merged": {
+			"source": "work-source"
+		}
+	},
+	"kinds": [
+		"feature",
+		"fix",
+		"docs",
+		"hotfix",
+		"check"
+	]
+}

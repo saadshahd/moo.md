@@ -1,0 +1,141 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"schemaVersion": {
+			"type": "number",
+			"const": 1
+		},
+		"levels": {
+			"minItems": 1,
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			}
+		},
+		"paths": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"glob": {
+						"type": "string",
+						"minLength": 1
+					},
+					"level": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": [
+					"glob",
+					"level"
+				],
+				"additionalProperties": false
+			}
+		},
+		"roles": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "object",
+				"properties": {
+					"file": {
+						"type": "string",
+						"minLength": 1
+					},
+					"purpose": {
+						"type": "string",
+						"enum": [
+							"plan",
+							"build",
+							"fix",
+							"review"
+						]
+					},
+					"skills": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"minLength": 1
+						}
+					}
+				},
+				"required": [
+					"file",
+					"purpose",
+					"skills"
+				],
+				"additionalProperties": false
+			}
+		},
+		"events": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "object",
+				"properties": {
+					"source": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": [
+					"source"
+				],
+				"additionalProperties": false
+			}
+		},
+		"kinds": {
+			"minItems": 1,
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			}
+		},
+		"safety": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string"
+			},
+			"additionalProperties": {}
+		},
+		"decisionModel": {
+			"type": "string",
+			"minLength": 1
+		},
+		"dailyQuestionCap": {
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"integrations": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			}
+		}
+	},
+	"required": [
+		"schemaVersion",
+		"levels",
+		"paths",
+		"roles",
+		"events",
+		"kinds"
+	],
+	"additionalProperties": false
+}

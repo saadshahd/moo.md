@@ -1,0 +1,183 @@
+{
+	"tiers": [
+		{
+			"purpose": "plan",
+			"tier": "standard",
+			"effort": "high"
+		},
+		{
+			"purpose": "plan",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "plan",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "build",
+			"tier": "standard",
+			"effort": "medium"
+		},
+		{
+			"purpose": "build",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "build",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "fix",
+			"tier": "standard",
+			"effort": "medium"
+		},
+		{
+			"purpose": "fix",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "fix",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "review",
+			"tier": "standard",
+			"effort": "medium"
+		},
+		{
+			"purpose": "review",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "review",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		}
+	],
+	"tokenCap": {
+		"tokens": 500000,
+		"overCap": "asking"
+	},
+	"machine": {
+		"id": "fix",
+		"version": "1",
+		"initial": "building",
+		"states": {
+			"building": {
+				"invoke": {
+					"src": "build",
+					"onDone": {
+						"target": "checking"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"token-cap": {
+						"target": "asking"
+					}
+				}
+			},
+			"checking": {
+				"invoke": {
+					"src": "checks",
+					"onDone": {
+						"target": "reviewing"
+					},
+					"onError": {
+						"target": "fixing"
+					}
+				}
+			},
+			"fixing": {
+				"invoke": {
+					"src": "fix",
+					"onDone": {
+						"target": "checking"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"token-cap": {
+						"target": "asking"
+					}
+				}
+			},
+			"reviewing": {
+				"invoke": {
+					"src": "review",
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"approve": {
+						"target": "merging"
+					},
+					"request-changes": {
+						"target": "fixing"
+					},
+					"needs-owner": {
+						"target": "owner-review"
+					}
+				}
+			},
+			"owner-review": {
+				"tags": [
+					"owner-wait"
+				],
+				"on": {
+					"owner-approved": {
+						"target": "merging"
+					},
+					"owner-rejected": {
+						"target": "fixing"
+					}
+				}
+			},
+			"merging": {
+				"on": {
+					"merged": {
+						"target": "done"
+					}
+				}
+			},
+			"asking": {
+				"tags": [
+					"owner-wait"
+				],
+				"on": {
+					"answered": {
+						"target": "building"
+					}
+				}
+			},
+			"stuck": {
+				"tags": [
+					"stuck"
+				]
+			},
+			"done": {
+				"type": "final"
+			}
+		}
+	}
+}

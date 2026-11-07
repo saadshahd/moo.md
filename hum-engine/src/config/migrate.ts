@@ -1,0 +1,57 @@
+import { z } from "zod";
+import { Json } from "./json.ts";
+import { READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "./schema.ts";
+import type { Result } from "./refusal.ts";
+
+type ConfigJson = Readonly<Record<string, Json>>;
+
+/** Per earlier schema version: rewrites a config at that version into the next version's shape. */
+export type Migrations = Readonly<Record<number, (config: ConfigJson) => ConfigJson>>;
+
+/** One entry per earlier schema version. Empty while version 1 is the first. */
+export const MIGRATIONS: Migrations = {};
+
+const Raw = z.record(z.string(), Json);
+const Version = z.int();
+
+/** Reads `schemaVersion` and migrates the config up to `current`, or refuses a version it does not read. */
+export const migrateConfig = (
+	raw: Json,
+	{
+		current = SCHEMA_VERSION,
+		readable = READABLE_SCHEMA_VERSIONS,
+		migrations = MIGRATIONS,
+	}: { current?: number; readable?: readonly number[]; migrations?: Migrations } = {},
+): Result<ConfigJson> => {
+	const parsed = Raw.safeParse(raw);
+	const version = parsed.success ? Version.safeParse(parsed.data.schemaVersion) : undefined;
+	const found = version?.success ? version.data : undefined;
+
+	if (!parsed.success || found === undefined || !readable.includes(found)) {
+		const step =
+			found !== undefined && found > current
+				? "Update the engine: bun add --exact @moo.md/hum@latest."
+				: "Run /hum to rewrite it.";
+
+		return {
+			ok: false,
+			refusal: {
+				code: "unknown-schema-version",
+				found,
+				readable,
+				message: `hum.json schemaVersion ${found ?? "missing"} is not one this engine reads (reads ${readable.join(", ")}). ${step}`,
+			},
+		};
+	}
+
+	let config = parsed.data;
+
+	for (let at = found; at < current; at++) {
+		const step = migrations[at];
+
+		if (!step) throw new Error(`no migration from schema version ${at}; the engine ships a gap`);
+		config = { ...step(config), schemaVersion: at + 1 };
+	}
+
+	return { ok: true, value: config };
+};

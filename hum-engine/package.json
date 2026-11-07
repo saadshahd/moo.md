@@ -23,10 +23,13 @@
     ".": "./src/index.ts"
   },
   "files": [
-    "src"
+    "src",
+    "schema",
+    "defaults"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "schema": "bun scripts/write-schema.ts",
     "lint": "oxlint src test",
     "test": "bun test test"
   },
