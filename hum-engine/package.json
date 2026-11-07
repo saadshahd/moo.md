@@ -1,0 +1,44 @@
+{
+  "name": "@moo.md/hum",
+  "version": "0.1.0",
+  "description": "The hum engine: work items become Claude Code agent runs, the repo's checks decide what they can, and only what nothing settles becomes a question to the owner.",
+  "license": "MIT",
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saadshahd/moo.md.git",
+    "directory": "hum-engine"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "hum": "src/cli/main.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src test",
+    "test": "bun test test"
+  },
+  "dependencies": {
+    "@statelyai/agent": "2.0.0-alpha.37",
+    "xstate": "6.0.0-beta.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.89.0",
+    "@types/bun": "1.3.14",
+    "oxlint": "1.89.0",
+    "typescript": "5.9.2"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "hum",
+  "version": "0.1.0",
+  "description": "Work items become Claude Code agent runs, on your Mac or in CI. The repo's own checks decide what they can, a path's risk level decides who reviews, and only what nothing settles becomes a question to you.",
+  "keywords": ["hum", "work items", "agent runs", "checks", "background"],
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  },
+  "dependencies": ["hope@moo.md"]
+}

@@ -24,3 +24,5 @@ workspace/
 # Claude Code writes these beside each plugin whose hooks module it loads;
 # they extend .claude-plugin/types/, which ignores itself
 /*/tsconfig.json
+# hum-engine is a package, not a plugin; its tsconfig is ours
+!/hum-engine/tsconfig.json
