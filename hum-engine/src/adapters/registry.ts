@@ -4,9 +4,11 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, PermanentError } from "../adapter-api.ts";
 import type { Faults } from "../state/faults.ts";
+import { githubAdapter, repoFromRemote } from "./github.ts";
 import { runGit } from "./git.ts";
 import { type GuardOptions, guarded } from "./guard.ts";
 import { markdownAdapter } from "./markdown.ts";
+import { roundupAdapter } from "./roundup.ts";
 
 /** The integration slots `hum.json` `integrations` names, each to an adapter. */
 export const SLOTS = ["work-source", "questions", "answers", "release"] as const;
@@ -26,6 +28,15 @@ const defaultBase = async (cwd: string): Promise<string> => {
 	return head.code === 0 ? head.stdout.trim().replace(/^origin\//, "") : "main";
 };
 
+const githubRepo = async (cwd: string): Promise<string> => {
+	const remote = await runGit(["remote", "get-url", "origin"], { cwd });
+	const repo = remote.code === 0 ? repoFromRemote(remote.stdout) : undefined;
+
+	if (!repo) throw new PermanentError("the github adapter needs an `origin` remote on github.com");
+
+	return repo;
+};
+
 /** V11: an adapter written for another API version is refused with one card. */
 export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Faults): boolean => {
 	if (adapter.apiVersion === ADAPTER_API_VERSION) return false;
@@ -41,7 +52,7 @@ export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Fault
 };
 
 /**
- * The adapters `hum.json` names for each slot: the engine's own, else an owner's `adapters/<name>.ts`.
+ * The adapters `hum.json` names for each slot: the engine's own (markdown, github, roundup), else an owner's `adapters/<name>.ts`.
  * An integration with no entry uses the markdown source in `repo`, except release, which has no default.
  */
 export const resolveAdapters = async (
@@ -70,10 +81,12 @@ export const resolveAdapters = async (
 		let adapter: Adapter;
 
 		if (name === "markdown") adapter = markdownAdapter({ repo, base: await defaultBase(repo) }, context);
+		else if (name === "github") adapter = githubAdapter({ repo: await githubRepo(repo), base: await defaultBase(repo) }, context);
+		else if (name === "roundup") adapter = roundupAdapter({}, context);
 		else {
 			const file = join(repo, "adapters", `${name}.ts`);
 
-			if (!existsSync(file)) throw new PermanentError(`no adapter "${name}": the engine ships markdown, and ${file} does not exist`);
+			if (!existsSync(file)) throw new PermanentError(`no adapter "${name}": the engine ships markdown, github and roundup, and ${file} does not exist`);
 
 			const loaded = AdapterModule.safeParse(await import(pathToFileURL(file).href));
 

@@ -1,0 +1,70 @@
+import { z } from "zod";
+import type { ToolCall } from "../../src/index.ts";
+
+const Args = z.looseObject({ id: z.int().optional(), title: z.string().optional(), body: z.string().optional() });
+
+type Todo = { id: number; title: string; body: string; done: boolean; blocked: boolean; owner: { kind: string; id: string } | null; updated_at: number };
+
+type Comment = { id: number; body: string; created_at: number };
+
+/** An in-memory roundup MCP server for one Project: Todos and their comments, with comment ids that follow the order of writes. */
+export class FakeRoundup {
+	#todos: Todo[] = [];
+	#comments = new Map<number, Comment[]>();
+	#next = 1;
+	#clock = 0;
+	readonly calls: string[] = [];
+
+	seed(title: string, patch: Partial<Todo> = {}): number {
+		const todo: Todo = { id: this.#todos.length + 1, title, body: `${title} body`, done: false, blocked: false, owner: null, updated_at: ++this.#clock, ...patch };
+
+		this.#todos.push(todo);
+
+		return todo.id;
+	}
+
+	/** A person's comment. */
+	say(id: number, body: string): void {
+		this.#comment(id, body);
+	}
+
+	#comment(id: number, body: string): Comment {
+		const made = { id: this.#next++, body, created_at: ++this.#clock };
+		this.#comments.set(id, [...(this.#comments.get(id) ?? []), made]);
+
+		return made;
+	}
+
+	#todo(id: number | undefined): Todo {
+		const found = this.#todos.find((todo) => todo.id === id);
+
+		if (!found) throw new Error(`no Todo ${id}`);
+
+		return found;
+	}
+
+	call: ToolCall = async (tool, raw) => {
+		const args = Args.parse(raw);
+
+		this.calls.push(tool);
+
+		switch (tool) {
+			case "todo_list":
+				return structuredClone(this.#todos);
+			case "todo_get":
+				return structuredClone(this.#todo(args.id));
+			case "todo_comments":
+				return structuredClone(this.#comments.get(this.#todo(args.id).id) ?? []);
+			case "todo_comment":
+				return this.#comment(this.#todo(args.id).id, args.body ?? "");
+			case "todo_create": {
+				const id = this.seed(String(args.title), { body: String(args.body ?? "") });
+
+				return structuredClone(this.#todo(id));
+			}
+
+			default:
+				throw new Error(`the fake has no tool ${tool}`);
+		}
+	};
+}

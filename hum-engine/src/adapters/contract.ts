@@ -16,6 +16,8 @@ export type ContractTarget = {
 	readonly advance: (ms: number) => Promise<void>;
 	/** Requests so far that spent rate limit. */
 	readonly spent: () => number;
+	/** Polls `until` while the provider catches up with a write. A provider that lags, like GitHub's cache, sets it; it throws if `until` never holds. */
+	readonly settle?: (until: () => Promise<boolean>) => Promise<void>;
 };
 
 export type Check = { readonly name: string; readonly run: () => Promise<void> };
@@ -113,6 +115,7 @@ export const contractChecks = (target: ContractTarget): Check[] => {
 		const from = await target.seed("parent");
 		const first = ItemRef.parse(await source.fileFollowUp(from, { title: "Follow up A", body: "Do A." }));
 		const again = ItemRef.parse(await source.fileFollowUp(from, { title: "Follow up A", body: "Do A." }));
+		await target.settle?.(async () => (await ready()).some((ref) => ref.id === first.id));
 
 		assert.equal(again.id, first.id);
 		assert.equal((await ready()).filter((ref) => ref.id === first.id).length, 1);
@@ -158,6 +161,7 @@ export const contractChecks = (target: ContractTarget): Check[] => {
 			assert.equal(target.spent(), spent, "an idle watch spends no rate limit");
 
 			await answers.answer(id, { text: "flip" });
+			await target.settle?.(async () => (await answers.watch(first.token)).changed);
 
 			const flipped = Watch.parse(await answers.watch(first.token));
 

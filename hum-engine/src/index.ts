@@ -81,6 +81,10 @@ export { HOOKS_OFF, type Git, pushArgs, pushHooksOff, PushRefused, runGit } from
 
 export { type GuardOptions, guarded } from "./adapters/guard.ts";
 
+export { GitHubApi, type GitHubApiOptions, githubAdapter, type GitHubOptions, repoFromRemote } from "./adapters/github.ts";
+
+export { Marker, marked, markerOf, parseComment } from "./adapters/marked.ts";
+
 export { markdownAdapter, type MarkdownOptions, parseItemFile } from "./adapters/markdown.ts";
 
 export { refuseOtherVersion, resolveAdapters, type Slot, SLOTS } from "./adapters/registry.ts";
@@ -117,3 +121,5 @@ export {
 	type ThinPathOptions,
 	type ThinResult,
 } from "./worker/thin-path.ts";
+
+export { roundupAdapter, type RoundupOptions, stdioCall, type ToolCall } from "./adapters/roundup.ts";

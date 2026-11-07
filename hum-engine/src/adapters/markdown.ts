@@ -15,10 +15,10 @@ import {
 	type ItemRef,
 	PermanentError,
 	type Question,
-	THREAD_KINDS,
 	type ThreadEntry,
 	type Watch,
 } from "../adapter-api.ts";
+import { appendEntry, parseThread } from "./thread.ts";
 import { type Git, HOOKS_OFF, pushHooksOff, PushRefused, runGit } from "./git.ts";
 
 export type MarkdownOptions = {
@@ -36,13 +36,10 @@ const CLAIMS_REF = "refs/hum/claims";
 
 /** A claim is the first push of this branch; C1 sees it as a hum branch. */
 const CLAIM_BRANCH = "hum/claim";
-const MARKER = "<!-- hum ";
 const IDENTITY = { GIT_AUTHOR_NAME: "hum", GIT_AUTHOR_EMAIL: "hum@moo.md", GIT_COMMITTER_NAME: "hum", GIT_COMMITTER_EMAIL: "hum@moo.md" };
 const WRITE_ATTEMPTS = 8;
 
 const FrontMatter = z.looseObject({ title: z.string().min(1), state: z.string().min(1) });
-
-const Marker = z.strictObject({ kind: z.enum(THREAD_KINDS), at: z.int().nonnegative(), option: z.string().min(1).optional() });
 
 const HOLDER = /^[A-Za-z0-9][\w.@:-]{0,99}$/;
 
@@ -59,40 +56,8 @@ export const parseItemFile = (source: string): Parsed => {
 	if (close < 0) throw new Error("front matter never closes with a '---' line");
 
 	const front = FrontMatter.parse(Bun.YAML.parse(lines.slice(1, close).join("\n")));
-	const body: string[] = [];
-	const thread: ThreadEntry[] = [];
-	let open: { marker: z.infer<typeof Marker>; lines: string[] } | undefined;
 
-	const closeEntry = () => {
-		if (!open) return;
-
-		const text = open.lines.join("\n").trim();
-
-		if (text === "") throw new Error(`thread entry at ${open.marker.at} has no text`);
-
-		thread.push({ ...open.marker, text });
-		open = undefined;
-	};
-
-	for (const line of lines.slice(close + 1)) {
-		if (line.startsWith(MARKER) && line.endsWith(" -->")) {
-			closeEntry();
-			open = { marker: Marker.parse(JSON.parse(line.slice(MARKER.length, -" -->".length))), lines: [] };
-		} else if (open) open.lines.push(line);
-		else body.push(line);
-	}
-
-	closeEntry();
-
-	return { title: front.title, state: front.state, body: body.join("\n").trim(), thread };
-};
-
-const appendEntry = (source: string, entry: Omit<ThreadEntry, "text">, text: string): string => {
-	if (text.split("\n").some((line) => line.startsWith(MARKER))) throw new PermanentError(`text may not hold a line starting with "${MARKER}"`);
-
-	const marker = JSON.stringify(entry).replaceAll(">", "\\u003e");
-
-	return `${source.endsWith("\n") ? source : `${source}\n`}\n${MARKER}${marker} -->\n${text.trim()}\n`;
+	return { title: front.title, state: front.state, ...parseThread(lines.slice(close + 1)) };
 };
 
 const kebab = (title: string): string =>
