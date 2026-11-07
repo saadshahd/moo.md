@@ -45,3 +45,28 @@ export {
 } from "./config/schema.ts";
 
 export { migrateSnapshot, type SavedItem, unmappedItems } from "./config/state-map.ts";
+
+export { type Codec, Items, persistedSnapshot, type RestoreOptions } from "./state/items.ts";
+
+export { EventLog, type NewEvent, SavedEvent } from "./state/events.ts";
+
+export { Faults, type FaultInput, type Outcome } from "./state/faults.ts";
+
+export {
+	compareVersions,
+	ENGINE_VERSION,
+	ENVELOPE_FORMAT,
+	ENVELOPE_MIGRATIONS,
+	Envelope,
+	type EnvelopeMigrations,
+} from "./state/format.ts";
+
+export { OpKey, OpKeys, type OpProvider } from "./state/ops.ts";
+
+export { defaultStateDir, openState, type State, type StateOptions } from "./state/open.ts";
+
+export { type BegunRun, RunKey, RunRecord, RunRecords } from "./state/runs.ts";
+
+export { readStatus, type StatusRead, writeStatus } from "./status/file.ts";
+
+export { Action, Card, Choice, emptyStatus, InFlight, Measure, Merged, Question, Status, STATUS_FORMAT } from "./status/format.ts";
