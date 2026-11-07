@@ -79,5 +79,16 @@
 	"runBranchPrefix": "hum/run/",
 	"claimPrefix": "hum/claim/",
 	"readyLabel": "hum:ready",
-	"mergeMethod": "squash"
+	"mergeMethod": "squash",
+	"models": {
+		"light": "claude-haiku-5-5",
+		"standard": "claude-sonnet-5-5",
+		"top": "claude-opus-5-5"
+	},
+	"runners": 3,
+	"tickIntervalSeconds": 30,
+	"drainTimeoutSeconds": 300,
+	"claimExpirySeconds": 900,
+	"latestVersionCacheSeconds": 21600,
+	"maxFixRuns": 3
 }

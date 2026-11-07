@@ -1,32 +1,26 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { z } from "zod";
 import { isMissing } from "../state/fs.ts";
 
 const Package = z.looseObject({ version: z.string().min(1) });
 
-/** What V2 compares each tick. A change in either makes the worker save and exit. */
+/** What the worker compares each tick with the one at its start. A change in either makes it drain and exit. */
 export type Signature = { readonly engineVersion: string; readonly hash: string };
 
 const LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json", "pnpm-lock.yaml", "yarn.lock"];
 
 /** `.hum/work/` holds the items, which every claim, answer and merge changes; it is no config. */
-const SKIPPED = new Set([join(".hum", "work")]);
+const SKIPPED = join(".hum", "work");
 
-const filesUnder = (root: string, folder: string): string[] => {
-	if (!existsSync(join(root, folder))) return [];
+const isSkipped = (path: string): boolean => path === SKIPPED || path.startsWith(`${SKIPPED}/`);
 
-	return readdirSync(join(root, folder), { withFileTypes: true })
-		.flatMap((entry) => {
-			const path = join(folder, entry.name);
-
-			if (SKIPPED.has(path)) return [];
-
-			return entry.isDirectory() ? filesUnder(root, path) : [path];
-		})
-		.sort();
-};
+/** Every file under `folder` of `root`, hidden ones too, as paths from `root`, in a stable order. */
+const filesUnder = (root: string, folder: string): string[] =>
+	existsSync(join(root, folder))
+		? [...new Bun.Glob("**").scanSync({ cwd: join(root, folder), dot: true, onlyFiles: true })].flatMap((path) => (isSkipped(join(folder, path)) ? [] : [join(folder, path)])).sort()
+		: [];
 
 /** The engine version installed in the owner's repo, else `fallback` (the running one). */
 export const installedVersion = (repo: string, fallback: string): string => {

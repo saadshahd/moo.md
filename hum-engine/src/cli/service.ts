@@ -12,7 +12,7 @@ import { readStatus } from "../status/file.ts";
 import { npmLatest, openWorker } from "../worker/open.ts";
 import type { Io } from "./ops.ts";
 
-/** The time between worker ticks unless `--interval` says otherwise. */
+/** How often the supervisor checks the worker's heartbeat. */
 export const DEFAULT_INTERVAL_S = 30;
 
 const whole = (text: string): number => {
@@ -25,7 +25,7 @@ const whole = (text: string): number => {
 
 const collect = (value: string, seen: string[]): string[] => [...seen, value];
 
-type WorkFlags = { kind?: string; check: string[]; holder?: string; interval: number; runners?: number; base?: string };
+type WorkFlags = { kind?: string; check: string[]; holder?: string; base?: string };
 
 /**
  * What a worker needs to know that no file in the repo says yet: its kind, and the checks a change must pass.
@@ -36,8 +36,6 @@ const withWorkOptions = (cmd: Command): Command =>
 		.addOption(new Option("--kind <name>", "the kind every item runs as").env("HUM_KIND"))
 		.option("--check <command>", "a command the repo's checks run before a merge; repeat for more (HUM_CHECKS: a JSON array)", collect, [])
 		.option("--holder <name>", "the name this worker claims items by; default <where>@<host>")
-		.option("--interval <seconds>", "seconds between ticks", whole, DEFAULT_INTERVAL_S)
-		.option("--runners <n>", "most runs at once", whole)
 		.option("--base <branch>", "the branch items merge into; default main");
 
 const PluginList = z.array(z.looseObject({ id: z.string(), installPath: z.string() }));
@@ -80,8 +78,6 @@ const openFor = (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 		kind: () => kind,
 		checks,
 		holder: flags.holder ?? `${where}@${hostname()}`,
-		intervalMs: flags.interval * 1000,
-		runners: flags.runners,
 		base: flags.base,
 		where,
 		// The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow.

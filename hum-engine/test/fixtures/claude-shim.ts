@@ -62,6 +62,15 @@ type Emitted = { type: string } & Record<string, string | number | boolean | obj
 const out = (event: Emitted) =>
 	console.log(JSON.stringify({ session_id: session, ...event }));
 
+const outSplit = async (event: Emitted) => {
+	const line = `${JSON.stringify({ session_id: session, ...event })}\n`;
+	const half = Math.floor(line.length / 2);
+
+	await new Promise((resolve) => process.stdout.write(line.slice(0, half), resolve));
+	await new Promise((resolve) => process.stderr.write("noise on stderr\n", resolve));
+	await new Promise((resolve) => process.stdout.write(line.slice(half), resolve));
+};
+
 if (step.saveStdin) writeFileSync(step.saveStdin, stdin);
 
 out({
@@ -128,7 +137,7 @@ const tokens = step.modelTokens ?? 10;
 
 appendFileSync(`${log}.ends`, `${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`);
 
-out({
+await (step.stderrNoise ? outSplit : out)({
 	type: "result",
 	subtype: step.subtype ?? (step.error ? "error_during_execution" : "success"),
 	is_error: step.error !== undefined,

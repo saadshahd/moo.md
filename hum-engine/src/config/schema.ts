@@ -49,7 +49,21 @@ const branchPrefix = z
 
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
-const Shipped = z.object({ runBranchPrefix: branchPrefix, claimPrefix: branchPrefix, readyLabel: name, mergeMethod: z.enum(MERGE_METHODS) });
+const seconds = z.int().positive();
+
+const Shipped = z.object({
+	runBranchPrefix: branchPrefix,
+	claimPrefix: branchPrefix,
+	readyLabel: name,
+	mergeMethod: z.enum(MERGE_METHODS),
+	models: z.record(z.enum(TIERS), name),
+	runners: z.int().positive(),
+	tickIntervalSeconds: seconds,
+	drainTimeoutSeconds: seconds,
+	claimExpirySeconds: seconds,
+	latestVersionCacheSeconds: seconds,
+	maxFixRuns: z.int().nonnegative(),
+});
 
 /** The defaults hum ships with, read from the default `hum.json`. */
 export const SHIPPED_DEFAULTS = Shipped.parse(shippedConfig);
@@ -91,6 +105,20 @@ export const HumConfig = z.strictObject({
 	readyLabel: Shipped.shape.readyLabel.default(SHIPPED_DEFAULTS.readyLabel),
 	/** How a released pull request merges. */
 	mergeMethod: Shipped.shape.mergeMethod.default(SHIPPED_DEFAULTS.mergeMethod),
+	/** The model id each tier of a kind's table runs on. */
+	models: Shipped.shape.models.default(SHIPPED_DEFAULTS.models),
+	/** The most runs that go at once. */
+	runners: Shipped.shape.runners.default(SHIPPED_DEFAULTS.runners),
+	/** The time between worker ticks; each tick writes the heartbeat and renews the claims in flight. */
+	tickIntervalSeconds: Shipped.shape.tickIntervalSeconds.default(SHIPPED_DEFAULTS.tickIntervalSeconds),
+	/** How long a worker that has seen an update lets its runs finish before it stops them. */
+	drainTimeoutSeconds: Shipped.shape.drainTimeoutSeconds.default(SHIPPED_DEFAULTS.drainTimeoutSeconds),
+	/** How long a claim lasts unless its holder renews it. */
+	claimExpirySeconds: Shipped.shape.claimExpirySeconds.default(SHIPPED_DEFAULTS.claimExpirySeconds),
+	/** How long the newest published engine version is kept before it is read again. */
+	latestVersionCacheSeconds: Shipped.shape.latestVersionCacheSeconds.default(SHIPPED_DEFAULTS.latestVersionCacheSeconds),
+	/** Fix runs an item gets after failed checks before it ends stuck. */
+	maxFixRuns: Shipped.shape.maxFixRuns.default(SHIPPED_DEFAULTS.maxFixRuns),
 });
 
 export type HumConfig = z.infer<typeof HumConfig>;
@@ -173,4 +201,11 @@ export const OWNER_CHANGEABLE = {
 	"claim prefix": "claimPrefix",
 	"ready label": "readyLabel",
 	"merge method": "mergeMethod",
+	"model per tier": "models",
+	"runner count": "runners",
+	"tick interval": "tickIntervalSeconds",
+	"drain timeout": "drainTimeoutSeconds",
+	"claim expiry": "claimExpirySeconds",
+	"latest-version cache": "latestVersionCacheSeconds",
+	"fix runs": "maxFixRuns",
 } as const satisfies Record<string, string>;

@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { Adapter } from "../adapter-api.ts";
 import { resolveAdapters } from "../adapters/registry.ts";
-import { ClaudeRunner } from "../adapters/claude-p.ts";
+import { startRunner } from "../adapters/claude-p.ts";
 import { gitIn } from "../adapters/git.ts";
 import { serialized } from "../adapters/serial.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
@@ -23,9 +23,15 @@ export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" 
 
 const Latest = z.looseObject({ version: z.string().min(1) });
 
+const NPM_LATEST = "https://registry.npmjs.org/@moo.md/hum/latest";
+
+const NPM_TIMEOUT_MS = 5000;
+
+const PROVIDER_TIMEOUT_MS = 30_000;
+
 /** The newest `@moo.md/hum` on npm. */
 export const npmLatest = async (): Promise<string | undefined> => {
-	const reply = await fetch("https://registry.npmjs.org/@moo.md/hum/latest", { signal: AbortSignal.timeout(5000) });
+	const reply = await fetch(NPM_LATEST, { signal: AbortSignal.timeout(NPM_TIMEOUT_MS) });
 
 	return reply.ok ? Latest.safeParse(await reply.json()).data?.version : undefined;
 };
@@ -36,7 +42,7 @@ export const npmLatest = async (): Promise<string | undefined> => {
  * Throws when the config is refused or the repo has no `origin`; the service unit shows that as a card.
  */
 export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => {
-	const { stateDir, hopeSkills, binary, env, providerTimeoutMs = 30_000, ...rest } = options;
+	const { stateDir, hopeSkills, binary, env, providerTimeoutMs = PROVIDER_TIMEOUT_MS, ...rest } = options;
 	const now = rest.now ?? Date.now;
 	const state = openState(stateDir ?? defaultStateDir(repo), { now });
 	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { hopeSkills } });
@@ -46,6 +52,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	const remote = options.remote ?? (await gitIn(repo).raw(["remote", "get-url", "origin"])).trim();
 
 	if (!remote) throw new Error(`${repo} has no origin remote, and none was given`);
+
+	const config = loaded.value;
 
 	const adapters = await resolveAdapters(repo, {
 		faults: state.faults,
@@ -68,9 +76,7 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	if (!workSource || !questions) throw new Error("hum.json names no work source or no questions integration");
 
-	const runner = new ClaudeRunner({ state, binary, env, now });
+	const { runner } = await startRunner({ state, model: config.hum.models.light, binary, env, now });
 
-	await runner.start();
-
-	return new Worker({ ...rest, repo, state, config: loaded.value, adapters: { workSource, questions, answers }, runner, remote });
+	return new Worker({ ...rest, repo, state, config, adapters: { workSource, questions, answers }, runner, remote });
 };

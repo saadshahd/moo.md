@@ -96,7 +96,6 @@ export { type Io, runCli, runOp } from "./cli/ops.ts";
 
 export {
 	CLAUDE_FLOOR,
-	ClaudeRunner,
 	type Effort,
 	type Finished,
 	parseLimit,
@@ -104,11 +103,11 @@ export {
 	type RunOutcome,
 	type RunRequest,
 	type RunSpec,
+	type Runner,
 	type RunnerOptions,
 	runArgs,
+	startRunner,
 	succeeded,
-	TIER_MODELS,
-	type Tier,
 } from "./adapters/claude-p.ts";
 
 export {
@@ -139,15 +138,17 @@ export { Heartbeat } from "./status/format.ts";
 
 export { readHeartbeat, writeHeartbeat } from "./status/file.ts";
 
-export { type Candidate, type Footprint, footprintOf, overlaps, pick, type Picked, PrefixGate, Wake } from "./worker/scheduler.ts";
+export { type Candidate, type Footprint, footprintOf, overlaps, pick, type Picked, PrefixGate } from "./worker/scheduler.ts";
 
 export { installedVersion, type Signature, signatureOf } from "./worker/signature.ts";
 
 export { openWorker, type OpenWorkerOptions, npmLatest } from "./worker/open.ts";
 
-export { Worker, type WorkerOptions, type TickResult } from "./worker/worker.ts";
+export { Worker, type WorkerOptions } from "./worker/worker.ts";
 
-export { DEFAULT_CLAIM_TTL_MS, park, rememberKinds } from "./worker/thin-path.ts";
+export type { Exit, TickResult } from "./worker/lifecycle.ts";
+
+export { claimTtlMs, park, rememberKinds } from "./worker/thin-path.ts";
 
 export { CI_TICK_REF, readCiTick, recordCiTick } from "./service/ci-tick.ts";
 

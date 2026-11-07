@@ -1,10 +1,12 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import pRetry from "p-retry";
+import { x } from "tinyexec";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
 import type { Item, Questions, WorkSource } from "../adapter-api.ts";
-import { type ClaudeRunner, succeeded, TIER_MODELS } from "../adapters/claude-p.ts";
+import { type Runner, succeeded } from "../adapters/claude-p.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { type Git, gitIn, isAncestor, push } from "../adapters/git.ts";
@@ -17,8 +19,22 @@ import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import type { PrefixGate } from "./scheduler.ts";
 
-/** A claim lasts this long unless its holder renews it. */
-export const DEFAULT_CLAIM_TTL_MS = 15 * 60_000;
+const SECOND_MS = 1000;
+
+/** How long a claim lasts unless its holder renews it. */
+export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeconds * SECOND_MS;
+
+const DIFF_LIMIT = 100_000;
+
+const FAILURE_TAIL = 4000;
+
+const CARD_EXCERPT = 300;
+
+const SHORT_EXCERPT = 200;
+
+const ERROR_EXCERPT = 500;
+
+const MERGE_RACE_TRIES = 3;
 
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
@@ -36,8 +52,7 @@ export type ThinPathOptions = {
 	readonly workSource: WorkSource;
 	readonly questions: Questions;
 	readonly state: State;
-	/** Started: `runner.start()` has passed. */
-	readonly runner: ClaudeRunner;
+	readonly runner: Runner;
 	readonly config: Config;
 	readonly kind: string;
 	/** The work repo's remote: a URL or path. Runs clone it; nothing touches the owner's checkout. */
@@ -46,15 +61,11 @@ export type ThinPathOptions = {
 	/** The repo's checks as shell commands, run in the clone. All must exit 0. */
 	readonly checks: readonly string[];
 	readonly holder: string;
-	readonly claimTtlMs?: number;
 	/** Where runs clone to; a temp folder by default. */
 	readonly workDir?: string;
 	readonly dir?: string;
-	/** Runs of the fix role after a failed check, per item. */
-	readonly maxFixes?: number;
 	/** Take this item; default the first ready one. */
 	readonly itemId?: string;
-	/** The clock for saved times; default `Date.now`. */
 	readonly now?: () => number;
 	/** Aborted when the worker loses the claim or exits for an update; the run stops and the result is `lost`. */
 	readonly signal?: AbortSignal;
@@ -80,11 +91,11 @@ const runChecks = async (commands: readonly string[], cwd: string): Promise<stri
 	return undefined;
 };
 
-const shellOut = async (command: string, cwd: string): Promise<{ code: number; output: string }> => {
-	const proc = Bun.spawn(["sh", "-c", command], { cwd, stdout: "pipe", stderr: "pipe", env: process.env });
-	const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+/** A check runs with no stdin and the worker's own PATH, as in the owner's shell; the clone's `node_modules/.bin` is not added. */
+const shellOut = async (command: string, cwd: string): Promise<{ code: number | undefined; output: string }> => {
+	const { exitCode, stdout, stderr } = await x("sh", ["-c", command], { nodePath: false, nodeOptions: { cwd, stdio: ["ignore", "pipe", "pipe"] } });
 
-	return { code, output: `${out}${err}` };
+	return { code: exitCode, output: `${stdout}${stderr}` };
 };
 
 type Level = { readonly level: string | undefined; readonly unclear: boolean };
@@ -150,7 +161,12 @@ export const rememberKinds = (state: State, config: Config): void => {
 	for (const kind of Object.values(config.kinds)) state.kinds.put(`${kind.machine.id}@${kind.machine.version}`, kind);
 };
 
-const waitsOnOwner = (kind: Kind, value: string): boolean => kind.machine.states[value]?.tags?.includes(OWNER_WAIT_TAG) ?? false;
+/** Whether the kind's machine tags this state with `tag`. */
+const hasTag = (kind: Kind, state: string | undefined, tag: string): boolean => (state !== undefined && kind.machine.states[state]?.tags?.includes(tag)) ?? false;
+
+export const waitsOnOwner = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, OWNER_WAIT_TAG);
+
+export const endedStuck = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, STUCK_TAG);
 
 /** Placeholder sources: enough to restore a snapshot and read its state before the real sources exist. */
 const stubSources = (kind: Kind) => {
@@ -184,19 +200,21 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	// A parked item stays parked until the owner acts: its file still says ready, and a rerun would spend the same tokens again.
 	const parked = o.state.parked.get(id);
 
-	if (parked) return parked.why === "stuck" ? { outcome: "stuck", item: id, detail: parked.cause } : { outcome: "review", item: id, detail: parked.cause };
+	if (parked) return { outcome: parked.why, item: id, detail: parked.cause };
 
-	if (at !== undefined && kind.machine.states[at]?.tags?.includes(STUCK_TAG)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
+	if (endedStuck(kind, at)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
 
-	const asking = at !== undefined && waitsOnOwner(kind, at);
-	const claim = await o.workSource.claim(id, o.holder, o.claimTtlMs ?? DEFAULT_CLAIM_TTL_MS);
+	const asking = waitsOnOwner(kind, at);
+	const claim = await o.workSource.claim(id, o.holder, claimTtlMs(o.config));
 
 	if (!claim.won) return { outcome: "lost", item: id };
 
 	const item = await o.workSource.read(id);
 	const answered = asking ? answerTo(item) : undefined;
 
-	if (asking && !answered) return { outcome: "waiting", item: id };
+	const awaitsAnswer = asking && answered === undefined;
+
+	if (awaitsAnswer) return { outcome: "waiting", item: id };
 
 	const clone = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-run-"));
 	const branch = runBranch(o.config.hum, id);
@@ -238,7 +256,7 @@ type Driven = Omit<ThinPathOptions, "kind"> & {
 
 const drive = async (d: Driven): Promise<ThinResult> => {
 	const { state, runner, config, kind, id, item, branch, clone, g, base } = d;
-	const maxFixes = d.maxFixes ?? 3;
+	const maxFixes = config.hum.maxFixRuns;
 	const result = Promise.withResolvers<ThinResult>();
 
 	// The worker lost the claim or is exiting for an update: the run stops, and its actor with it.
@@ -260,6 +278,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	let pending: { question: string; plan: string } | undefined;
 	let actor: AnyActor;
 
+	const stuckCause = (): string | undefined => cause || lastFailure.slice(0, CARD_EXCERPT) || undefined;
+
 	const failed = (message: string): Error => {
 		cause = message;
 
@@ -271,7 +291,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 		if (!row) throw new Error(`the ${d.kindName} table has no ${purpose} row`);
 
-		return { model: TIER_MODELS[row.tier], effort: row.effort };
+		return { model: config.hum.models[row.tier], effort: row.effort };
 	};
 
 	const prompt = async (purpose: "build" | "fix"): Promise<string> => {
@@ -287,11 +307,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			const diff = await g(["diff", `origin/${base}...${branch}`]);
 
 			parts.push(
-				`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${diff.slice(0, 100_000)}`,
+				`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${diff.slice(0, DIFF_LIMIT)}`,
 			);
 		}
 
-		if (purpose === "fix") parts.push(`## The checks failed\n${lastFailure.slice(-4000)}\nFix the cause and commit.`);
+		if (purpose === "fix") parts.push(`## The checks failed\n${lastFailure.slice(-FAILURE_TAIL)}\nFix the cause and commit.`);
 
 		return parts.join("\n\n");
 	};
@@ -348,7 +368,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 				spend(outcome.tokens);
 
-				if (!succeeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, 300)}`);
+				if (!succeeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
 
 				const wants = Wants.safeParse(outcome.structured).data;
 
@@ -365,7 +385,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			if (failure) {
 				lastFailure = failure;
-				throw new Error(failure.slice(0, 500));
+				throw new Error(failure.slice(0, ERROR_EXCERPT));
 			}
 		},
 	});
@@ -391,7 +411,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 		handled = value;
 
-		if (kind.machine.states[value]?.tags?.includes(STUCK_TAG)) return result.resolve({ outcome: "stuck", item: id, detail: cause || lastFailure.slice(0, 300) || undefined });
+		if (endedStuck(kind, value)) return result.resolve({ outcome: "stuck", item: id, detail: stuckCause() });
 
 		if (waitsOnOwner(kind, value)) {
 			const note = pending ?? { question: "The run stopped for the owner.", plan: "" };
@@ -446,20 +466,47 @@ const handOff = async (d: Driven, question: string, plan: string) => {
 	await calls.questions?.ask(id, { text: question });
 };
 
-/** The change cannot merge on the newest main: it conflicts, or its checks fail there. */
+/** The change cannot merge on the newest base: it conflicts, or its checks fail there. */
 class StaleMerge extends Error {
 	override name = "StaleMerge";
 }
 
+/** Another writer moved the base between the fetch and the push. */
+class BaseMoved extends Error {
+	override name = "BaseMoved";
+}
+
 /** Every act that changes the world checks the claim first. */
-const stillMine = async (d: Pick<Driven, "workSource" | "id" | "holder" | "claimTtlMs">): Promise<boolean> =>
-	(await d.workSource.renew(d.id, d.holder, d.claimTtlMs ?? DEFAULT_CLAIM_TTL_MS)).won;
+const stillMine = async (d: Pick<Driven, "workSource" | "id" | "holder" | "config">): Promise<boolean> => (await d.workSource.renew(d.id, d.holder, claimTtlMs(d.config))).won;
+
+/** A merge is rechecked on the newest base: when the base moved, the change is rebased and the checks run again. */
+const pushOntoNewestBase = async ({ g, git, base, branch, clone, checks }: Driven): Promise<void> => {
+	await g(["fetch", "-q", "origin", base]);
+
+	if (!(await isAncestor(git, `origin/${base}`, "HEAD"))) {
+		const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
+
+		if (rebased.code !== 0) {
+			await git.run(["rebase", "--abort"]);
+
+			throw new StaleMerge(`the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}`);
+		}
+
+		const failure = await runChecks(checks, clone);
+
+		if (failure) throw new StaleMerge(`the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}`);
+	}
+
+	await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+
+	if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "conflict") throw new BaseMoved(`another push moved ${base} first`);
+};
 
 /** Low and clear: one pushed change carries the run's commits and `state: done`. */
 const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 	if (!(await stillMine(d))) return { outcome: "lost", item: d.id };
 
-	const { state, config, id, g, base, dir, branch, clone, git } = d;
+	const { state, config, id, g, base, dir, clone, git } = d;
 	const changed = (await g(["diff", "--name-only", `origin/${base}...HEAD`])).split("\n").filter(Boolean);
 	const level = levelOf(changed, config);
 
@@ -473,40 +520,16 @@ const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 			{
 				holds: async () => {
 					await g(["fetch", "-q", "origin", base]);
-	
+
 					return isAncestor(git, "HEAD", `origin/${base}`);
 				},
 				run: async () => {
 					const file = join(clone, dir, `${id}.md`);
-	
+
 					writeFileSync(file, markDone(readFileSync(file, "utf8")));
 					await g(["add", `${dir}/${id}.md`]);
 					await g(["commit", "-q", "-m", `hum: finish ${id}`]);
-	
-					for (let tries = 0; tries < 3; tries++) {
-						await g(["fetch", "-q", "origin", base]);
-	
-						// A merge is rechecked on the newest main: when main moved, rebase and run the checks again.
-						if (!(await isAncestor(git, `origin/${base}`, "HEAD"))) {
-							const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
-	
-							if (rebased.code !== 0) {
-								await git.run(["rebase", "--abort"]);
-	
-								throw new StaleMerge(`the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, 200)}`);
-							}
-	
-							const failure = await runChecks(d.checks, clone);
-	
-							if (failure) throw new StaleMerge(`the checks fail on the newest ${base}: ${failure.slice(0, 200)}`);
-						}
-	
-						await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
-	
-						if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "pushed") return;
-					}
-	
-					throw new Error(`lost the race to ${base} three times`);
+					await pRetry(() => pushOntoNewestBase(d), { retries: MERGE_RACE_TRIES - 1, minTimeout: 0, shouldRetry: ({ error }) => error instanceof BaseMoved });
 				},
 			},
 		);
@@ -524,19 +547,35 @@ const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 	return { outcome: "merged", item: id };
 };
 
+type Parking = { readonly outcome: "stuck" | "review"; readonly item: string; readonly detail?: string };
+
+const isParking = (result: ThinResult): result is ThinResult & Parking => result.outcome === "stuck" || result.outcome === "review";
+
+const PARKING = {
+	stuck: { code: "item-stuck", fallback: "a run failed", cause: (item: string, why: string) => `${item} ended stuck: ${why}`, fix: "Fix the cause, then run it again." },
+	review: {
+		code: "item-review",
+		fallback: "its change waits for a review",
+		cause: (item: string, why: string) => `${item} is ready to merge but needs your review: ${why}`,
+		fix: "Review the branch, then answer on the item to run it again.",
+	},
+} as const satisfies Record<Parking["outcome"], { code: string; fallback: string; cause: (item: string, why: string) => string; fix: string }>;
+
 /** An item that ended stuck, or whose change waits for a review, sits out until the owner acts. One card says why and how to run it again. */
 export const park = (o: Pick<ThinPathOptions, "state" | "now">, result: ThinResult): ThinResult => {
-	if (result.outcome !== "stuck" && result.outcome !== "review") return result;
+	if (!isParking(result)) return result;
 
-	const cause = result.detail ?? (result.outcome === "stuck" ? "a run failed" : "its change waits for a review");
+	const rule = PARKING[result.outcome];
+	const cause = result.detail ?? rule.fallback;
 
 	o.state.parked.put(result.item, { item: result.item, why: result.outcome, cause, since: (o.now ?? Date.now)() });
-
-	o.state.faults.raise(
-		result.outcome === "stuck"
-			? { code: "item-stuck", item: result.item, cause: `${result.item} ended stuck: ${cause.slice(0, 300)}`, fix: "Fix the cause, then run it again.", action: { label: "Run it again", command: `hum answer ${result.item} retry` } }
-			: { code: "item-review", item: result.item, cause: `${result.item} is ready to merge but needs your review: ${cause.slice(0, 300)}`, fix: "Review the branch, then answer on the item to run it again.", action: { label: "Run it again", command: `hum answer ${result.item} retry` } },
-	);
+	o.state.faults.raise({
+		code: rule.code,
+		item: result.item,
+		cause: rule.cause(result.item, cause.slice(0, CARD_EXCERPT)),
+		fix: rule.fix,
+		action: { label: "Run it again", command: `hum answer ${result.item} retry` },
+	});
 
 	return result;
 };

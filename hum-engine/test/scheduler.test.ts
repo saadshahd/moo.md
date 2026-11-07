@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { type Candidate, footprintOf, overlaps, pick, PrefixGate, Wake } from "../src/worker/scheduler.ts";
+import { type Candidate, footprintOf, overlaps, pick, PrefixGate } from "../src/worker/scheduler.ts";
 
 const c = (id: string, touches?: string[], answered = false): Candidate => ({ id, footprint: touches, answered });
 
@@ -38,23 +38,7 @@ test("pick: the queue stays under the runner count, answered items go first, and
 	expect(pick({ ...base, limitedUntil: 100, queue: [c("a", ["x"])] }).start.map((i) => i.id)).toEqual(["a"]);
 });
 
-test("E5: signals while nobody waits make one wake, and a wait after it sleeps again", async () => {
-	const wake = new Wake();
-
-	for (let end = 0; end < 20; end++) wake.signal();
-
-	const started = Date.now();
-
-	await wake.wait(10_000);
-	expect(Date.now() - started).toBeLessThan(500);
-
-	const slept = Date.now();
-
-	await wake.wait(120);
-	expect(Date.now() - slept).toBeGreaterThanOrEqual(100);
-});
-
-test("E4: of runs sharing a prefix the first goes at once and the rest wait for its first token; a warm prefix lets all go", async () => {
+test("of runs sharing a prefix the first goes at once and the rest wait for its first token; a warm prefix lets all go", async () => {
 	const clock = { at: 0 };
 	const gate = new PrefixGate({ now: () => clock.at, ttlMs: 1000 });
 	const order: string[] = [];
@@ -82,7 +66,7 @@ test("E4: of runs sharing a prefix the first goes at once and the rest wait for 
 	await waits;
 });
 
-test("E4: a first run that ends without a token hands the first place to the next", async () => {
+test("a first run that ends without a token hands the first place to the next", async () => {
 	const gate = new PrefixGate();
 	const first = await gate.enter("fix");
 	const next = gate.enter("fix");
@@ -91,7 +75,7 @@ test("E4: a first run that ends without a token hands the first place to the nex
 	(await next).release();
 });
 
-test("E4: a run stopped while it waits for the first token does not start", async () => {
+test("a run stopped while it waits for the first token does not start", async () => {
 	const gate = new PrefixGate();
 
 	await gate.enter("plan");

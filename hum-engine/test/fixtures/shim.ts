@@ -31,6 +31,8 @@ export type Behavior = {
 	beforeToken?: number;
 	/** Sleep this long after it, so the run overlaps another. */
 	sleep?: number;
+	/** Write to stderr in the middle of the result line, between two writes of it. */
+	stderrNoise?: boolean;
 };
 
 export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior> };

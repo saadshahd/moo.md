@@ -247,7 +247,7 @@ test("with the schedule off, a question past its deadline fires on the next even
 });
 
 test("CI wake: ticks until a tick starts nothing, so a run that frees another item is followed by that item's run", async () => {
-	const w = await world({ items: { a: { commitForItem: true }, b: { commitForItem: true } } }, { runners: 1, worker: { intervalMs: 1000 } });
+	const w = await world({ items: { a: { commitForItem: true }, b: { commitForItem: true } } }, { settings: { runners: 1 } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");

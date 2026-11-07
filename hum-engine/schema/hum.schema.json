@@ -167,6 +167,67 @@
 				"squash",
 				"rebase"
 			]
+		},
+		"models": {
+			"default": {
+				"light": "claude-haiku-5-5",
+				"standard": "claude-sonnet-5-5",
+				"top": "claude-opus-5-5"
+			},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"enum": [
+					"light",
+					"standard",
+					"top"
+				]
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"required": [
+				"light",
+				"standard",
+				"top"
+			]
+		},
+		"runners": {
+			"default": 3,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"tickIntervalSeconds": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"drainTimeoutSeconds": {
+			"default": 300,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"claimExpirySeconds": {
+			"default": 900,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"latestVersionCacheSeconds": {
+			"default": 21600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"maxFixRuns": {
+			"default": 3,
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 9007199254740991
 		}
 	},
 	"required": [

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ClaudeRunner } from "../../src/adapters/claude-p.ts";
+import { startRunner } from "../../src/adapters/claude-p.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
 import type { Config } from "../../src/config/load.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
@@ -13,7 +13,7 @@ import { itemFile, sh, WorkRepo } from "../fixtures/work-repo.ts";
 import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
 
 const NOW = 1_800_000_000_000;
-const TTL = 15 * 60_000;
+const TTL = SHIPPED_DEFAULTS.claimExpirySeconds * 1000;
 const cleanups: (() => void)[] = [];
 
 afterEach(() => {
@@ -28,11 +28,11 @@ const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-thin-")), { now });
 	const reports: string[] = [];
 	const adapter = markdownAdapter({ claimPrefix: SHIPPED_DEFAULTS.claimPrefix, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
-	const runner = new ClaudeRunner({ state, binary: shim.binary, env: shim.env, now, sleep: async () => {} });
+	const { check, runner } = await startRunner({ state, model: config.hum.models.light, binary: shim.binary, env: shim.env, now });
 
 	cleanups.push(() => rmSync(repo.root, { recursive: true, force: true }), () => rmSync(state.dir, { recursive: true, force: true }));
 
-	expect((await runner.start()).kind).toBe("finished");
+	expect(check.kind).toBe("finished");
 
 	const options = (over: Partial<ThinPathOptions> = {}): ThinPathOptions => ({
 		workSource: adapter.workSource!,
@@ -44,7 +44,6 @@ const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f
 		remote: repo.remote,
 		checks,
 		holder: "worker-1",
-		claimTtlMs: TTL,
 		workDir: mkdtempSync(join(tmpdir(), "hum-thin-work-")),
 		...over,
 	});
@@ -55,11 +54,17 @@ const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f
 const NOTE = { commit: { "docs/note.md": "hello\n" } };
 
 test("the thin path: item → claude -p shim commit → checks → low-risk merge, state done in the same change", async () => {
-	const w = await world({ script: [{}, NOTE] });
-	const id = w.repo.seed("Write the note");
+	const stdinCopy = join(tmpdir(), `hum-body-stdin-${process.pid}`);
+	const w = await world({ script: [{}, { ...NOTE, saveStdin: stdinCopy }] });
+	const body = `${"y".repeat(99)}\n`.repeat(2100);
+	const id = w.repo.add("big", itemFile("Write the note", "ready", body));
 	const result = await runThinPath(w.options());
 
 	expect(result).toEqual({ outcome: "merged", item: id });
+
+	// A body over 200 KB reaches the run on stdin whole.
+	expect(body.length).toBeGreaterThan(200_000);
+	expect(readFileSync(stdinCopy, "utf8")).toContain(body.trim());
 
 	// One change on main: the run's commit and the item's state.
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("hello\n");
@@ -71,7 +76,7 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 
 	expect(heads.sort()).toEqual([`refs/heads/${runBranch(SHIPPED_DEFAULTS, id)}`, `refs/heads/${SHIPPED_DEFAULTS.claimPrefix}${id}`].sort());
 
-	// The claude call: the item body on stdin, the session id saved ahead, no resume.
+	// The claude call: the session id saved ahead, no resume.
 	const [, run] = w.shim.calls();
 
 	expect(run?.argv).not.toContain("--resume");
@@ -100,18 +105,6 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(w.repo.show(id)).toContain("state: done");
 });
 
-test("contrast: without the state edit, a finished item turns ready again once its claim expires", async () => {
-	const w = await world({ script: [{}, NOTE] });
-	const id = w.repo.seed("Write the note");
-
-	expect((await w.adapter.workSource!.claim(id, "worker-1", TTL)).won).toBe(true);
-	expect(await w.adapter.workSource!.listReady()).toEqual([]);
-
-	w.clock.at += TTL + 1;
-
-	expect((await w.adapter.workSource!.listReady()).map((i) => i.id)).toEqual([id]);
-});
-
 test("failed checks go to a fix run, and the fix run gets the failure", async () => {
 	const w = await world({ script: [{}, { commit: { "docs/note.md": "BAD\n" } }, { commit: { "docs/note.md": "good\n" }, saveStdin: join(tmpdir(), `hum-fix-stdin-${process.pid}`) }] }, { checks: ["! grep -q BAD docs/note.md"] });
 	const id = w.repo.seed("Write the note");
@@ -123,11 +116,15 @@ test("failed checks go to a fix run, and the fix run gets the failure", async ()
 });
 
 test("checks that never pass end in stuck after the fix limit, and main is untouched", async () => {
-	const w = await world({ script: [{}, { commit: { "docs/note.md": "one\n" } }, { commit: { "docs/note.md": "two\n" } }, { commit: { "docs/note.md": "three\n" } }] }, { checks: ["false"] });
+	const config = configWith((raw) => {
+		raw.hum.maxFixRuns = 2;
+	});
+
+	const w = await world({ script: [{}, { commit: { "docs/note.md": "one\n" } }, { commit: { "docs/note.md": "two\n" } }, { commit: { "docs/note.md": "three\n" } }] }, { config, checks: ["false"] });
 	const id = w.repo.seed("Write the note");
 	const before = sh(w.repo.remote, ["rev-parse", "main"]);
 
-	expect(await runThinPath(w.options({ maxFixes: 2 }))).toMatchObject({ outcome: "stuck", item: id });
+	expect(await runThinPath(w.options())).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
 
 	// Stuck stays stuck, though the item file still says ready: no run, no claim.
@@ -160,37 +157,6 @@ test("a change to a path no rule matches is not merged by the thin path", async 
 	expect(result).toMatchObject({ outcome: "review", item: id });
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
 	expect(w.repo.show(id)).toContain("state: ready");
-});
-
-test("a limit refusal pauses the item with zero further calls", async () => {
-	const until = Math.floor(NOW / 1000) + 3600;
-	const w = await world({ script: [{}, { error: `Claude usage limit reached|${until}` }] });
-	const id = w.repo.seed("Write the note");
-
-	expect(await runThinPath(w.options())).toEqual({ outcome: "limited", item: id, until: until * 1000 });
-	expect(w.shim.calls()).toHaveLength(2);
-	expect(await runThinPath(w.options({ itemId: id }))).toEqual({ outcome: "limited", item: id, until: until * 1000 });
-	expect(w.shim.calls()).toHaveLength(2);
-});
-
-test("the token cap stops the run mid-run and asks the owner; no claude process is left", async () => {
-	const config = configWith((raw) => {
-		raw.kinds.docs.tokenCap.tokens = 1000;
-	});
-
-	const w = await world({ script: [{}, { spend: 5000, hang: true }] }, { config });
-	const id = w.repo.seed("Write the note");
-	const result = await runThinPath(w.options());
-
-	expect(result).toMatchObject({ outcome: "asked", item: id });
-
-	const thread = (await w.adapter.workSource!.read(id)).thread;
-
-	expect(thread.map((e) => e.kind)).toEqual(["question"]);
-	expect(thread[0]?.text).toContain("token cap");
-
-	await Bun.sleep(300);
-	expect(() => process.kill(w.shim.calls()[1]?.pid ?? 0, 0)).toThrow();
 });
 
 test("a run that needs the owner pushes its branch, asks, and ends; the answer starts a fresh run on that branch", async () => {
@@ -246,14 +212,4 @@ test("a claim another worker holds is lost, and no run starts", async () => {
 	expect((await w.adapter.workSource!.claim(id, "worker-2", TTL)).won).toBe(true);
 	expect(await runThinPath(w.options({ itemId: id }))).toEqual({ outcome: "lost", item: id });
 	expect(w.shim.calls()).toHaveLength(1);
-});
-
-test("the item body reaches the run on stdin whole", async () => {
-	const w = await world({ script: [{}, { ...NOTE, saveStdin: join(tmpdir(), `hum-body-stdin-${process.pid}`) }] });
-	const body = `${"y".repeat(99)}\n`.repeat(2100);
-	const id = w.repo.add("big", itemFile("Big", "ready", body));
-
-	expect(await runThinPath(w.options())).toEqual({ outcome: "merged", item: id });
-	expect(readFileSync(join(tmpdir(), `hum-body-stdin-${process.pid}`), "utf8")).toContain(body.trim());
-	expect(body.length).toBeGreaterThan(200_000);
 });

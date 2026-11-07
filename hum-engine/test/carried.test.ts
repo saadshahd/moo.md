@@ -56,7 +56,7 @@ const dying = (real: Adapter, writeFirst: boolean): Adapter => {
 };
 
 for (const write of WRITES) {
-	test(`E2: ${write.name} runs once per scope, and a retry after a crash reads the thread before it writes again`, async () => {
+	test(`${write.name} runs once per scope, and a retry after a crash reads the thread before it writes again`, async () => {
 		const w = await world({});
 		const id = w.repo.seed("An item");
 		const scope = { run: "t", attempt: 0 };
@@ -86,7 +86,7 @@ for (const write of WRITES) {
 
 const item = (id: string): Item => ({ id, title: id, body: "", ready: true, thread: [] });
 
-test("R3: the last-read list survives a restart: a fresh guard still sees an empty list that contradicts it", async () => {
+test("the last-read list survives a restart: a fresh guard still sees an empty list that contradicts it", async () => {
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-r3-")));
 
 	temp.push(state.dir);
@@ -123,7 +123,7 @@ test("R3: the last-read list survives a restart: a fresh guard still sees an emp
 	expect(await guarded(listing([]), { provider: "q", faults: state.faults, timeoutMs: 1000 }).workSource!.listReady()).toEqual([]);
 });
 
-test("V3: an item saved under an earlier machine version restores through the kinds the worker kept", async () => {
+test("an item saved under an earlier machine version restores through the kinds the worker kept", async () => {
 	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
@@ -150,7 +150,7 @@ test("V3: an item saved under an earlier machine version restores through the ki
 	expect(w.state.kinds.get("docs@2")).toBeDefined();
 });
 
-test("E1: an item's token total is saved over all its runs and restarts; the cap counts what it spent since the owner answered", async () => {
+test("an item's token total is saved over all its runs and restarts; the cap counts what it spent since the owner answered", async () => {
 	const config = configWith((raw) => {
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
@@ -175,12 +175,12 @@ test("E1: an item's token total is saved over all its runs and restarts; the cap
 	expect(w.state.spent.get("a")).toEqual({ item: "a", total: 1400, base: 700 });
 });
 
-test("E1: runs in one cycle add up across restarts: the second run of a cycle gets only what the first left", async () => {
+test("runs in one cycle add up across restarts: the second run of a cycle gets only what the first left, and passing it asks the owner", async () => {
 	const config = configWith((raw) => {
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await world({ items: { a: { commitForItem: true, modelTokens: 599 } } }, { config, checks: ["false"], worker: { maxFixes: 3 } });
+	const w = await world({ items: { a: { commitForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -189,9 +189,14 @@ test("E1: runs in one cycle add up across restarts: the second run of a cycle ge
 	// build 600, then the fix run is capped at the 400 left and goes over: the item asks the owner.
 	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
 	expect(w.state.spent.get("a")?.total).toBe(1200);
+
+	const thread = (await w.adapter.workSource!.read("a")).thread;
+
+	expect(thread.map((e) => e.kind)).toEqual(["question"]);
+	expect(thread[0]?.text).toContain("token cap");
 });
 
-test("E4: three items on one role start one after the other's first token, not together", async () => {
+test("three items on one role start one after the other's first token, not together", async () => {
 	const behavior = { commitForItem: true, spend: 5, beforeToken: 700, sleep: 100 };
 	const w = await world({ items: { a: behavior, b: behavior, c: behavior } });
 
@@ -247,7 +252,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 	expect(results).toEqual(["merged"]);
 	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
 
-	// Q2: on the Mac, saved state lives in .git/hum.
+	// On the Mac, saved state lives in .git/hum.
 	const folder = join(w.repo.owner, ".git", "hum");
 
 	expect(existsSync(join(folder, "heartbeat.json"))).toBe(true);

@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { ClaudeRunner } from "../../src/adapters/claude-p.ts";
-import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
+import { startRunner } from "../../src/adapters/claude-p.ts";
+import { type HumConfig, SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
 import { serialized } from "../../src/adapters/serial.ts";
 import type { Config } from "../../src/config/load.ts";
@@ -13,13 +13,13 @@ import { makeShim, type ShimSpec } from "./shim.ts";
 import { itemFile, WorkRepo } from "./work-repo.ts";
 
 export const NOW = 1_800_000_000_000;
-export const TTL = 15 * 60_000;
+export const TTL = SHIPPED_DEFAULTS.claimExpirySeconds * 1000;
 
 export type WorldOptions = {
 	readonly config?: Config;
+	/** hum.json keys over the config's own. */
+	readonly settings?: Partial<HumConfig>;
 	readonly checks?: readonly string[];
-	readonly runners?: number;
-	readonly claimTtlMs?: number;
 	readonly worker?: Partial<WorkerOptions>;
 };
 
@@ -33,15 +33,14 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const reports: string[] = [];
 	const markdown = markdownAdapter({ claimPrefix: SHIPPED_DEFAULTS.claimPrefix, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
 	const adapter = serialized(markdown);
-	const config = options.config ?? configWith();
+	const base = options.config ?? configWith();
+	const config: Config = { ...base, hum: { ...base.hum, ...options.settings } };
 	const results: { outcome: string; item?: string; detail?: string }[] = [];
 
-	const runnerFor = () => new ClaudeRunner({ state, binary: shim.binary, env: shim.env, now, sleep: async () => {} });
-	const runner = runnerFor();
+	const startedRunner = async () => (await startRunner({ state, model: config.hum.models.light, binary: shim.binary, env: shim.env, now, lockBackoffMs: 1 })).runner;
+	const runner = await startedRunner();
 
 	const cleanups = [() => rmSync(repo.root, { recursive: true, force: true }), () => rmSync(state.dir, { recursive: true, force: true })];
-
-	await runner.start();
 
 	const workerWith = (over: Partial<WorkerOptions> = {}): Worker =>
 		new Worker({
@@ -54,10 +53,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			remote: repo.remote,
 			checks: options.checks ?? ["true"],
 			holder: "worker-1",
-			claimTtlMs: options.claimTtlMs ?? TTL,
 			workDir: mkdtempSync(join(tmpdir(), "hum-worker-work-")),
-			runners: options.runners ?? 3,
-			intervalMs: 60_000,
 			now,
 			onResult: (result) => results.push(result),
 			...options.worker,
@@ -74,7 +70,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 		config,
 		reports,
 		results,
-		runnerFor,
+		startedRunner,
 		workerWith,
 		worker: workerWith(),
 		/** An item that declares what it touches. */
