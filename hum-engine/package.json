@@ -20,7 +20,8 @@
     "hum": "src/cli/main.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./adapter-api": "./src/adapter-api.ts"
   },
   "files": [
     "src",

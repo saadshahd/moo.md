@@ -1,6 +1,4 @@
-export { ADAPTER_API_VERSION } from "./adapter-api.ts";
-
-export type { Command } from "./cli/commands.ts";
+export { type Command, commands } from "./cli/commands.ts";
 
 export { type CheckEnv, pickTier } from "./config/checks.ts";
 
@@ -70,3 +68,23 @@ export { type BegunRun, RunKey, RunRecord, RunRecords } from "./state/runs.ts";
 export { readStatus, type StatusRead, writeStatus } from "./status/file.ts";
 
 export { Action, Card, Choice, emptyStatus, InFlight, Measure, Merged, Question, Status, STATUS_FORMAT } from "./status/format.ts";
+
+export * from "./adapter-api.ts";
+
+export { type Admission, admit, type AdmitInput, engineImporters, sourceFiles } from "./adapters/admit.ts";
+
+export { type Check, contractChecks, type ContractResult, type ContractTarget, runContract } from "./adapters/contract.ts";
+
+export { FakeProvider, ProviderError } from "./adapters/fake.ts";
+
+export { HOOKS_OFF, type Git, pushArgs, pushHooksOff, PushRefused, runGit } from "./adapters/git.ts";
+
+export { type GuardOptions, guarded } from "./adapters/guard.ts";
+
+export { markdownAdapter, type MarkdownOptions, parseItemFile } from "./adapters/markdown.ts";
+
+export { refuseOtherVersion, resolveAdapters, type Slot, SLOTS } from "./adapters/registry.ts";
+
+export { isOp, type OpName } from "./cli/commands.ts";
+
+export { type Io, runOp } from "./cli/ops.ts";
