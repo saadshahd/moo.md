@@ -89,9 +89,9 @@ export { markdownAdapter, type MarkdownOptions, parseItemFile } from "./adapters
 
 export { refuseOtherVersion, resolveAdapters, type Slot, SLOTS } from "./adapters/registry.ts";
 
-export { isOp, type OpName } from "./cli/commands.ts";
+export { type OpName } from "./cli/commands.ts";
 
-export { type Io, runOp } from "./cli/ops.ts";
+export { type Io, runCli, runOp } from "./cli/ops.ts";
 
 export {
 	CLAUDE_FLOOR,

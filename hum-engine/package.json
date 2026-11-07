@@ -35,8 +35,11 @@
     "test": "bun test test"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@statelyai/agent": "2.0.0-alpha.37",
+    "commander": "15.1.0",
+    "p-limit": "7.3.3",
+    "safe-stable-stringify": "3.0.0",
     "xstate": "6.0.0-beta.0",
     "zod": "4.6.7"
   },

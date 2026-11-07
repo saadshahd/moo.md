@@ -1,18 +1,7 @@
+import pLimit from "p-limit";
 import type { Adapter } from "../adapter-api.ts";
 
 type Queue = <T>(call: () => Promise<T>) => Promise<T>;
-
-const queue = (): Queue => {
-	let tail: Promise<unknown> = Promise.resolve();
-
-	return (call) => {
-		const next = tail.then(call, call);
-
-		tail = next.catch(() => {});
-
-		return next;
-	};
-};
 
 // SAFETY: every member of an integration role is an async method; each is replaced by one with the same signature.
 const inOrder = <R extends object>(role: R | undefined, run: Queue): R | undefined =>
@@ -23,7 +12,7 @@ const inOrder = <R extends object>(role: R | undefined, run: Queue): R | undefin
  * that keeps a clone (the markdown source) must not take two writes into it at once.
  */
 export const serialized = (adapter: Adapter): Adapter => {
-	const run = queue();
+	const run: Queue = pLimit(1);
 
 	return {
 		apiVersion: adapter.apiVersion,

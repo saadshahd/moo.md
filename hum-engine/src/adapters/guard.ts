@@ -31,7 +31,7 @@ const MAX_BACKOFF_MS = 30_000;
  * - An empty list that contradicts the last read is a fault, not "no work" (R3).
  * A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key (E2).
  */
-export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = 500, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), lastReady: remembered }: GuardOptions): Adapter => {
+export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = 500, now = Date.now, sleep = Bun.sleep, lastReady: remembered }: GuardOptions): Adapter => {
 	const unavailable = `provider-unavailable:${provider}`;
 
 	const refuseChangedReply = (error: z.ZodError): never => {

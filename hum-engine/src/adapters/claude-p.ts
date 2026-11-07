@@ -197,9 +197,6 @@ export const parseLimit = (text: string): number | undefined => {
 	return Number.isNaN(parsed) ? undefined : parsed;
 };
 
-const sleepFor = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 const CREDENTIALS = "credentials.json";
 
 /**
@@ -220,7 +217,7 @@ export class ClaudeRunner {
 			floor: CLAUDE_FLOOR,
 			plugin: "hope",
 			now: Date.now,
-			sleep: sleepFor,
+			sleep: Bun.sleep,
 			random: Math.random,
 			lockTries: 3,
 			lockBackoffMs: 2000,
