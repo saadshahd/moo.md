@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { atomicWrite, isMissing } from "../state/fs.ts";
-import { Heartbeat, Status } from "./format.ts";
+import { emptyStatus, Heartbeat, Status } from "./format.ts";
 
 export type StatusRead =
 	| { readonly ok: true; readonly status: Status }
@@ -40,4 +40,14 @@ export const readHeartbeat = (path: string): Heartbeat | undefined => {
 
 		throw error;
 	}
+};
+
+/**
+ * The service unit's write of the fault cards while no worker writes them (R7). The status file's other fields
+ * stay as they were, `writtenAt` included, so a dead worker still reads as stale.
+ */
+export const writeCards = (path: string, cards: Status["cards"], engineVersion: string, now: number): void => {
+	const read = readStatus(path);
+
+	writeStatus(path, { ...(read.ok ? read.status : emptyStatus(engineVersion, now)), cards });
 };

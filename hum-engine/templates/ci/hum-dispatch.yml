@@ -1,0 +1,20 @@
+# A tracker's webhook that calls GitHub's repository_dispatch with the event type hum-wake wakes a run.
+name: hum on dispatch
+
+on:
+  repository_dispatch:
+    types: [hum-wake]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: hum-wake
+  cancel-in-progress: false
+
+jobs:
+  wake:
+    uses: ./.github/workflows/hum-wake.yml
+    secrets: inherit

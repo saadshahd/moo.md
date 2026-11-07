@@ -9,6 +9,7 @@ import { listFiles } from "../state/fs.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
 import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
+import { checkTokenAge } from "../service/token.ts";
 import { readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
 import { emptyStatus, type Status } from "../status/format.ts";
 import { type Candidate, type Footprint, footprintOf, pick, PrefixGate, Wake } from "./scheduler.ts";
@@ -46,6 +47,8 @@ export type WorkerOptions = {
 	readonly engineVersion?: string;
 	/** V14: the newest published version. Read at most every six hours; a failure shows no version. */
 	readonly latestVersion?: () => Promise<string | undefined>;
+	/** R2: when the scheduled workflow last ran, for the status file. Read at most every five minutes; a failure shows no time. */
+	readonly ciTick?: () => Promise<number | undefined>;
 	readonly gate?: PrefixGate;
 	readonly onResult?: (result: ThinResult) => void;
 };
@@ -61,6 +64,21 @@ type Running = { readonly abort: AbortController; readonly since: number; readon
 type Known = { readonly footprint: Footprint; readonly kind: string; readonly title: string };
 
 const LATEST_EVERY_MS = 6 * 60 * 60_000;
+
+const CI_TICK_EVERY_MS = 5 * 60_000;
+
+/** Reads `read` at most every `everyMs`; a failed read shows no value. */
+const throttled = <T>(read: (() => Promise<T | undefined>) | undefined, everyMs: number) => {
+	let last: { value: T | undefined; at: number } | undefined;
+
+	return async (t: number): Promise<T | undefined> => {
+		if (!read) return undefined;
+
+		if (!last || t - last.at >= everyMs) last = { value: await read().catch(() => undefined), at: t };
+
+		return last.value;
+	};
+};
 
 /** Machine states never settle, so a restored item can be stepped by its timers without starting a run. */
 const neverSources = (kind: Kind) =>
@@ -86,7 +104,8 @@ export class Worker {
 	readonly wake = new Wake();
 	#token: string | undefined;
 	#restarting: { reason: string; at: number } | undefined;
-	#latest: { value: string | undefined; at: number } | undefined;
+	readonly #latest: (t: number) => Promise<string | undefined>;
+	readonly #ciTick: (t: number) => Promise<number | undefined>;
 	/** Ticks that picked: one per tick, whatever number of runs ended since the last (E5). */
 	picks = 0;
 
@@ -94,6 +113,8 @@ export class Worker {
 		this.#o = options;
 		this.#now = options.now ?? Date.now;
 		this.#gate = options.gate ?? new PrefixGate({ now: this.#now });
+		this.#latest = throttled(options.latestVersion, LATEST_EVERY_MS);
+		this.#ciTick = throttled(options.ciTick, CI_TICK_EVERY_MS);
 		this.#start = signatureOf(options.repo, options.engineVersion ?? ENGINE_VERSION);
 		rememberKinds(options.state, options.config);
 		options.runner.holdUntil(options.state.limit.get("runner")?.until ?? 0);
@@ -308,16 +329,6 @@ export class Worker {
 		this.wake.signal();
 	}
 
-	async #latestVersion(t: number): Promise<string | undefined> {
-		const read = this.#o.latestVersion;
-
-		if (!read) return undefined;
-
-		if (!this.#latest || t - this.#latest.at >= LATEST_EVERY_MS) this.#latest = { value: await read().catch(() => undefined), at: t };
-
-		return this.#latest.value;
-	}
-
 	/** R7, U1, V14: the heartbeat and the status file, both by temp file and rename. */
 	async #publish(t: number, signature: Signature): Promise<void> {
 		const { state, config, where = "mac" } = this.#o;
@@ -328,7 +339,8 @@ export class Worker {
 
 		const read = readStatus(state.statusPath);
 		const before = read.ok ? read.status : emptyStatus(signature.engineVersion, t);
-		const latest = await this.#latestVersion(t);
+		const latest = await this.#latest(t);
+		const ci = await this.#ciTick(t);
 		const engine: Status["engine"] = { version: signature.engineVersion, adapterApi: ADAPTER_API_VERSION, configSchema: SCHEMA_VERSION };
 
 		if (latest) engine.latest = latest;
@@ -338,7 +350,7 @@ export class Worker {
 		writeStatus(state.statusPath, {
 			...before,
 			writtenAt: t,
-			workers: { ...before.workers, [where]: t },
+			workers: { ...before.workers, ci: ci ?? before.workers.ci, [where]: t },
 			engine,
 			cards: state.faults.list(),
 			inFlight: [...this.#running].map(([item, run]) => ({ item, title: run.title, state: saved.get(item) ?? "starting", since: run.since, unclear: false })),
@@ -360,6 +372,8 @@ export class Worker {
 		const t = this.#now();
 
 		await this.#deadlines(t);
+
+		if (this.#o.config.hum.ciToken) checkTokenAge(state.faults, this.#o.config.hum.ciToken.setUp, t);
 
 		// One snapshot of the facts: everything below decides from these and from the runs in flight.
 		const signature = signatureOf(this.#o.repo, this.#o.engineVersion ?? ENGINE_VERSION);

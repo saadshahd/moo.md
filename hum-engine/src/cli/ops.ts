@@ -10,6 +10,7 @@ import { atomicWrite } from "../state/fs.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import pkg from "../../package.json" with { type: "json" };
 import { type OpName, commands, opSpecs } from "./commands.ts";
+import { addServiceCommands } from "./service.ts";
 
 type Printable = ItemRef[] | ItemRef | Item | ClaimResult | Watch | { readonly ok: true };
 
@@ -171,12 +172,19 @@ export const runCli = async (argv: readonly string[], io: Io): Promise<number> =
 		io.stdout(`${flags.json ? JSON.stringify(commands) : Object.values(commands).map((c) => c.usage).join("\n")}\n`);
 	});
 
+	addServiceCommands(root, io, (exit) => {
+		code = exit;
+	});
+
 	try {
 		await root.parseAsync([...argv], { from: "user" });
 	} catch (error) {
-		if (!(error instanceof CommanderError)) throw error;
+		if (error instanceof CommanderError) return error.exitCode === 0 ? 0 : 2;
 
-		return error.exitCode === 0 ? 0 : 2;
+		// A service command failed before it could run: say why and fail loud.
+		io.stderr(`hum ${argv[0] ?? ""}: ${error instanceof Error ? error.message : String(error)}\n`);
+
+		return 1;
 	}
 
 	return code;

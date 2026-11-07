@@ -59,6 +59,8 @@ export const HumConfig = z.strictObject({
 	dailyQuestionCap: z.number().int().positive().optional(),
 	/** Adapter slot → adapter name. */
 	integrations: z.record(name, name).optional(),
+	/** D6: the day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
+	ciToken: z.strictObject({ setUp: z.iso.date() }).optional(),
 });
 
 export type HumConfig = z.infer<typeof HumConfig>;

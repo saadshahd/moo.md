@@ -1,0 +1,44 @@
+# The job every hum wake runs (U6). The files beside it only choose what starts it.
+# Needs: the secret CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`), and the repository
+# variables HUM_KIND and HUM_CHECKS (a JSON array of commands). Nothing here saves a session:
+# a run that needs the owner has pushed its hum/run/<id> branch, asked on the item and ended,
+# and the owner's answer starts a fresh run on that branch (Q2).
+name: hum wake
+
+on:
+  workflow_call:
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      HUM_EVENT: ${{ github.event_name }}
+      HUM_KIND: ${{ vars.HUM_KIND }}
+      HUM_CHECKS: ${{ vars.HUM_CHECKS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: npm install --global @anthropic-ai/claude-code@2.1.316
+      - run: |
+          claude plugin marketplace add saadshahd/moo.md
+          claude plugin install hope@moo.md
+      - run: |
+          git config user.name "hum"
+          git config user.email "hum@users.noreply.github.com"
+      - run: ./node_modules/.bin/hum wake --event "$HUM_EVENT"

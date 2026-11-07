@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import type { EFFORTS, TIERS } from "../config/schema.ts";
+import { rejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import { compareVersions } from "../state/format.ts";
 import type { State } from "../state/open.ts";
@@ -211,17 +212,18 @@ export class ClaudeRunner {
 	#started = false;
 
 	constructor(options: RunnerOptions) {
+		// `??`, not a spread: an option passed as undefined, as `openWorker` and the CLI do, takes its default.
 		this.#o = {
-			binary: "claude",
-			env: {},
-			floor: CLAUDE_FLOOR,
-			plugin: "hope",
-			now: Date.now,
-			sleep: Bun.sleep,
-			random: Math.random,
-			lockTries: 3,
-			lockBackoffMs: 2000,
-			...options,
+			state: options.state,
+			binary: options.binary ?? "claude",
+			env: options.env ?? {},
+			floor: options.floor ?? CLAUDE_FLOOR,
+			plugin: options.plugin ?? "hope",
+			now: options.now ?? Date.now,
+			sleep: options.sleep ?? Bun.sleep,
+			random: options.random ?? Math.random,
+			lockTries: options.lockTries ?? 3,
+			lockBackoffMs: options.lockBackoffMs ?? 2000,
 		};
 	}
 
@@ -368,7 +370,16 @@ export class ClaudeRunner {
 		if (this.#o.now() < this.#limitedUntil)
 			return { kind: "limited", until: this.#limitedUntil };
 
-		return this.#attempt(request);
+		const outcome = await this.#attempt(request);
+
+		// D6: a rejected token holds the item where it is, with one card; the next run that gets through clears it.
+		if (outcome.kind === "finished" && outcome.isError && UNAUTHORIZED.test(outcome.text)) {
+			return { kind: "held", card: rejectedToken(this.#o.state.faults, outcome.text) };
+		}
+
+		if (outcome.kind === "finished") this.#o.state.faults.clear("token-rejected");
+
+		return outcome;
 	}
 
 	async #attempt(request: RunRequest): Promise<RunOutcome> {

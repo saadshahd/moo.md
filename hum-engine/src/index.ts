@@ -147,3 +147,15 @@ export { openWorker, type OpenWorkerOptions, npmLatest } from "./worker/open.ts"
 export { Worker, type WorkerOptions, type TickResult } from "./worker/worker.ts";
 
 export { DEFAULT_CLAIM_TTL_MS, park, rememberKinds } from "./worker/thin-path.ts";
+
+export { CI_TICK_REF, readCiTick, recordCiTick } from "./service/ci-tick.ts";
+
+export { type Child, EXIT_UPDATED, supervise, type Supervision } from "./service/supervise.ts";
+
+export { checkTokenAge, TOKEN_LIFE_DAYS, TOKEN_WARN_DAYS } from "./service/token.ts";
+
+export { renderUnit, type UnitKind, type UnitVars } from "./service/unit.ts";
+
+export { reportCards, wakeUntilQuiet } from "./service/wake.ts";
+
+export { writeCards } from "./status/file.ts";

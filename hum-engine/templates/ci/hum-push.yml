@@ -1,0 +1,21 @@
+# An answer committed to an item file (`hum answer` pushes it) wakes a run.
+name: hum on item push
+
+on:
+  push:
+    branches: [main]
+    paths: [".hum/work/**"]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: hum-wake
+  cancel-in-progress: false
+
+jobs:
+  wake:
+    uses: ./.github/workflows/hum-wake.yml
+    secrets: inherit
