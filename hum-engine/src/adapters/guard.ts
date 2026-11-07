@@ -18,6 +18,8 @@ export type GuardOptions = {
 	readonly backoffMs?: number;
 	readonly now?: () => number;
 	readonly sleep?: (ms: number) => Promise<void>;
+	/** R3: where the last ready list is kept, so a restarted worker still sees an empty list that contradicts it. Memory only when absent. */
+	readonly lastReady?: { readonly load: () => string[]; readonly save: (ids: string[]) => void };
 };
 
 const MAX_BACKOFF_MS = 30_000;
@@ -29,7 +31,7 @@ const MAX_BACKOFF_MS = 30_000;
  * - An empty list that contradicts the last read is a fault, not "no work" (R3).
  * A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key (E2).
  */
-export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = 500, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }: GuardOptions): Adapter => {
+export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = 500, now = Date.now, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), lastReady: remembered }: GuardOptions): Adapter => {
 	const unavailable = `provider-unavailable:${provider}`;
 
 	const refuseChangedReply = (error: z.ZodError): never => {
@@ -84,7 +86,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 
 	const none = z.void();
 	const { workSource, questions, answers, release } = adapter;
-	let lastReady: string[] = [];
+	let lastReady: string[] = remembered?.load() ?? [];
 
 	return {
 		apiVersion: adapter.apiVersion,
@@ -111,6 +113,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 
 				faults.clear(`empty-list:${provider}`);
 				lastReady = list.map((ref) => ref.id);
+				remembered?.save(lastReady);
 
 				return list;
 			},

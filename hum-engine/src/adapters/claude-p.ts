@@ -75,6 +75,7 @@ const ModelUsage = z.looseObject({
 	inputTokens: z.number().optional(),
 	outputTokens: z.number().optional(),
 	cacheCreationInputTokens: z.number().optional(),
+	cacheReadInputTokens: z.number().optional(),
 });
 
 /** Tokens a run adds to the item's bill: input, output and cache writes. Cache reads are not counted (E1). */
@@ -124,6 +125,8 @@ export type Finished = {
 	readonly structured: unknown;
 	/** Billed tokens, from the result's `modelUsage`. */
 	readonly tokens: number;
+	/** E4: tokens read from the prompt cache, which the bill does not count. */
+	readonly cacheReadTokens: number;
 	readonly plugins: readonly string[];
 	/** `apiKeySource` from the init event. */
 	readonly keySource: string | undefined;
@@ -153,6 +156,8 @@ export type RunRequest = {
 	readonly signal?: AbortSignal;
 	/** Called with the session id of each attempt, before its process starts. */
 	readonly onSession?: (sessionId: string) => void;
+	/** Called once, when the first model message arrives; the scheduler starts the runs that share this prefix after it (E4). */
+	readonly onFirstToken?: () => void;
 };
 
 export type RunnerOptions = {
@@ -226,6 +231,11 @@ export class ClaudeRunner {
 	/** Epoch ms until which every run is held, or 0. */
 	limitedUntil(): number {
 		return this.#limitedUntil;
+	}
+
+	/** R4: holds every run until `until`, as a restart restores a saved limit. Never shortens a hold. */
+	holdUntil(until: number): void {
+		this.#limitedUntil = Math.max(this.#limitedUntil, until);
 	}
 
 	#env() {
@@ -390,7 +400,7 @@ export class ClaudeRunner {
 	}
 
 	#spawn(request: RunRequest, sessionId: string): Promise<RunOutcome> {
-		const { prompt, cwd, model, effort, schema, tokenCap, signal } = request;
+		const { prompt, cwd, model, effort, schema, tokenCap, signal, onFirstToken } = request;
 
 		return new Promise((resolve) => {
 			const child = spawn(
@@ -407,6 +417,7 @@ export class ClaudeRunner {
 			let stderr = "";
 			let buffer = "";
 			let settled = false;
+			let tokenSeen = false;
 
 			const settle = (outcome: RunOutcome) => {
 				if (settled) return;
@@ -474,6 +485,11 @@ export class ClaudeRunner {
 				) {
 					const u = assistant.data.message.usage;
 
+					if (!tokenSeen) {
+						tokenSeen = true;
+						onFirstToken?.();
+					}
+
 					// One message streams several events; the last carries its final usage.
 					messages.set(
 						assistant.data.message.id,
@@ -526,6 +542,7 @@ export class ClaudeRunner {
 						text: stderr.trim().slice(-500),
 						structured: undefined,
 						tokens: 0,
+					cacheReadTokens: 0,
 						plugins,
 						keySource,
 					});
@@ -561,6 +578,8 @@ export class ClaudeRunner {
 					0,
 				);
 
+				const cacheReadTokens = Object.values(result.modelUsage).reduce((sum, u) => sum + (u.cacheReadInputTokens ?? 0), 0);
+
 				if (tokenCap !== undefined && tokens > tokenCap)
 					return settle({ kind: "over-cap", tokens });
 
@@ -572,6 +591,7 @@ export class ClaudeRunner {
 					text,
 					structured: result.structured_output,
 					tokens,
+					cacheReadTokens,
 					plugins,
 					keySource,
 				});

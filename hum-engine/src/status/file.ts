@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { atomicWrite, isMissing } from "../state/fs.ts";
-import { Status } from "./format.ts";
+import { Heartbeat, Status } from "./format.ts";
 
 export type StatusRead =
 	| { readonly ok: true; readonly status: Status }
@@ -22,5 +22,22 @@ export const readStatus = (path: string): StatusRead => {
 		if (error instanceof Error && isMissing(error)) return { ok: false, reason: "missing", message: `${path} does not exist` };
 
 		return { ok: false, reason: "unreadable", message: `${path} cannot be read: ${error instanceof Error ? error.message : "unknown error"}` };
+	}
+};
+
+/** R7: the worker's one write of its heartbeat each tick, by temp file and rename. */
+export const writeHeartbeat = (path: string, heartbeat: Heartbeat): void => {
+	atomicWrite(path, `${JSON.stringify(Heartbeat.parse(heartbeat))}\n`);
+};
+
+export const readHeartbeat = (path: string): Heartbeat | undefined => {
+	try {
+		const parsed = Heartbeat.safeParse(JSON.parse(readFileSync(path, "utf8")));
+
+		return parsed.success ? parsed.data : undefined;
+	} catch (error) {
+		if (error instanceof Error && isMissing(error)) return undefined;
+
+		throw error;
 	}
 };

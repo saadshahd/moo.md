@@ -7,37 +7,21 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import type { Behavior } from "./shim.ts";
 
 /**
  * A stand-in for the `claude` binary. HUM_SHIM holds JSON: `{version, log, script}`.
  * Each `-p` call takes the next behavior of `script` (the last one repeats) and logs one JSON line:
  * its argv, the SHA-256 and size of its stdin, and its pid.
  */
-type Behavior = {
-	/** Files to write and commit in the working directory. */
-	commit?: Record<string, string>;
-	/** A structured result. */
-	structured?: unknown;
-	plugins?: string[];
-	keySource?: string;
-	/** An error result with this text. */
-	error?: string;
-	/** A rate_limit_event that rejects, with `resetsAt` in epoch seconds. */
-	rejectUntil?: number;
-	/** One assistant message with this many output tokens, then the shim sleeps. */
-	spend?: number;
-	hang?: boolean;
-	modelTokens?: number;
-	/** A file the shim writes its stdin to. */
-	saveStdin?: string;
-	subtype?: string;
-};
 
 // SAFETY: the test that starts this shim wrote HUM_SHIM as JSON of this shape.
 const spec = JSON.parse(process.env.HUM_SHIM ?? "{}") as {
 	version?: string;
 	log?: string;
 	script?: Behavior[];
+	/** A behavior per item id, for runs that go at the same time and cannot be told apart by their order. */
+	items?: Record<string, Behavior>;
 };
 
 if (process.argv.includes("--version")) {
@@ -58,13 +42,16 @@ const calls = (() => {
 	}
 })();
 
+const prompt = new TextDecoder().decode(stdin);
+const itemId = /^# Item (\S+):/m.exec(prompt)?.[1];
+
 appendFileSync(
 	log,
-	`${JSON.stringify({ argv: process.argv.slice(2), stdinBytes: stdin.length, stdinSha: createHash("sha256").update(stdin).digest("hex"), pid: process.pid, cwd: process.cwd() })}\n`,
+	`${JSON.stringify({ at: Date.now(), itemId, argv: process.argv.slice(2), stdinBytes: stdin.length, stdinSha: createHash("sha256").update(stdin).digest("hex"), pid: process.pid, cwd: process.cwd() })}\n`,
 );
 
 const script = spec.script ?? [{}];
-const step = script[Math.min(calls, script.length - 1)] ?? {};
+const step = (itemId && spec.items?.[itemId]) || script[Math.min(calls, script.length - 1)] || {};
 
 const session =
 	process.argv[process.argv.indexOf("--session-id") + 1] ?? "no-session";
@@ -91,6 +78,8 @@ if (step.rejectUntil !== undefined) {
 	});
 }
 
+if (step.beforeToken) await new Promise((resolve) => setTimeout(resolve, step.beforeToken));
+
 if (step.spend !== undefined) {
 	out({
 		type: "assistant",
@@ -105,7 +94,16 @@ if (step.spend !== undefined) {
 	});
 }
 
+if (step.sleep) await new Promise((resolve) => setTimeout(resolve, step.sleep));
+
 if (step.hang) await new Promise((resolve) => setTimeout(resolve, 60_000));
+
+if (step.commitForItem && itemId) {
+	mkdirSync(join(process.cwd(), "docs"), { recursive: true });
+	appendFileSync(join(process.cwd(), "docs", `${itemId}.md`), `from ${itemId}\n`);
+	spawnSync("git", ["add", "-A"]);
+	spawnSync("git", ["-c", "user.name=shim", "-c", "user.email=shim@t", "commit", "-q", "-m", `shim: ${itemId}`]);
+}
 
 if (step.commit) {
 	for (const [path, content] of Object.entries(step.commit)) {
@@ -128,12 +126,14 @@ if (step.commit) {
 
 const tokens = step.modelTokens ?? 10;
 
+appendFileSync(`${log}.ends`, `${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`);
+
 out({
 	type: "result",
 	subtype: step.subtype ?? (step.error ? "error_during_execution" : "success"),
 	is_error: step.error !== undefined,
 	result: step.error ?? '{"ok":true}',
-	structured_output: step.structured ?? { ok: true },
+	structured_output: step.askUnlessAnswered && !prompt.includes("## The owner answered") ? { status: "needs-owner", question: step.askUnlessAnswered, plan: "Plan A" } : (step.structured ?? { ok: true }),
 	modelUsage: {
 		"claude-haiku-5-5": {
 			inputTokens: 1,

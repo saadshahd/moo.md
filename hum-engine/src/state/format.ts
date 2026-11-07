@@ -59,3 +59,12 @@ export const compareVersions = (a: string, b: string): -1 | 0 | 1 | undefined =>
 
 	return left[4] < right[4] ? -1 : 1;
 };
+
+/** The part of an envelope that names the item and its machine, enough to list what is saved without restoring it. */
+export const SavedHeader = z.looseObject({
+	itemId: z.string().min(1),
+	kind: z.string().min(1),
+	machineVersion: z.string().min(1),
+	savedAt: z.int().nonnegative(),
+	snapshot: z.looseObject({ value: z.string().optional().catch(undefined) }),
+});

@@ -1,0 +1,345 @@
+import { afterEach, expect, test } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { sh } from "./fixtures/work-repo.ts";
+import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
+import { readHeartbeat } from "../src/status/file.ts";
+import { readStatus } from "../src/status/file.ts";
+
+const worlds: WorkerWorld[] = [];
+
+const world = async (...args: Parameters<typeof workerWorld>) => {
+	const w = await workerWorld(...args);
+
+	worlds.push(w);
+
+	return w;
+};
+
+afterEach(() => {
+	for (const w of worlds.splice(0)) w.clean();
+});
+
+const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort();
+
+test("the thin path runs two items on different files side by side, and both merge", async () => {
+	const checkLog = join(tmpdir(), `hum-checks-${process.pid}-${Date.now()}`);
+	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 900 }, b: { commitForItem: true, spend: 5, sleep: 900 } } }, { checks: [`echo run >> ${checkLog}`] });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/b.md");
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a", "b"] });
+	expect(w.worker.running().sort()).toEqual(["a", "b"]);
+
+	await w.worker.idle();
+
+	expect(merged(w)).toEqual(["a", "b"]);
+	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
+	expect(sh(w.repo.remote, ["show", "main:docs/b.md"])).toBe("from b\n");
+
+	// Side by side: each claude process started before the other had ended.
+	const [first, second] = w.shim.calls().filter((c) => c.itemId);
+	const ends = new Map(w.shim.ends().map((e) => [e.pid, e.at]));
+
+	expect(first!.at).toBeLessThan(ends.get(second!.pid)!);
+	expect(second!.at).toBeLessThan(ends.get(first!.pid)!);
+
+	// Each merge is rechecked on the newest main: the later one reran the checks after the earlier one moved it.
+	expect(readFileSync(checkLog, "utf8").split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(3);
+});
+
+test("items that touch one file go one after the other, and an item that says nothing goes alone", async () => {
+	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 500 }, b: { commitForItem: true, spend: 5, sleep: 500 }, c: { commitForItem: true, spend: 5, sleep: 100 } } });
+
+	w.item("a", "docs/shared.md");
+	w.item("b", "docs/shared.md");
+	w.item("c");
+
+	// a goes first; b clashes with a; c declares nothing, so it clashes with everything.
+	expect((await w.worker.tick()).kind).toBe("ran");
+	expect(w.worker.running()).toEqual(["a"]);
+
+	await w.worker.idle();
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["b"] });
+	await w.worker.idle();
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["c"] });
+	await w.worker.idle();
+
+	expect(merged(w)).toEqual(["a", "b", "c"]);
+
+	const calls = w.shim.calls().filter((c) => c.itemId);
+	const ends = new Map(w.shim.ends().map((e) => [e.pid, e.at]));
+
+	expect(calls.map((c) => c.itemId)).toEqual(["a", "b", "c"]);
+	expect(calls[1]!.at).toBeGreaterThanOrEqual(ends.get(calls[0]!.pid)!);
+	expect(calls[2]!.at).toBeGreaterThanOrEqual(ends.get(calls[1]!.pid)!);
+});
+
+test("a merge is rechecked on the newest main: checks that passed on the old main and fail on the new one stop the merge", async () => {
+	// b's check passes in b's clone, taken before a merged; once a's file is on main it fails.
+	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 100 }, b: { commitForItem: true, spend: 5, sleep: 1500 } } }, { checks: ["! (test -f docs/a.md && test -f docs/b.md)"] });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/b.md");
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(merged(w)).toEqual(["a"]);
+
+	const stopped = w.results.find((r) => r.item === "b");
+
+	expect(stopped).toMatchObject({ outcome: "review" });
+	expect(stopped?.detail).toContain("the checks fail on the newest main");
+	expect(() => sh(w.repo.remote, ["show", "main:docs/b.md"])).toThrow();
+	expect(w.state.parked.get("b")?.why).toBe("review");
+});
+
+test("E5: twenty run ends while a tick is busy give one more tick, not twenty", async () => {
+	const w = await world({});
+	const gate = Promise.withResolvers<void>();
+	let listed = 0;
+
+	const slow = w.workerWith({
+		adapters: {
+			workSource: { ...w.adapter.workSource!, listReady: async () => (listed++ === 0 ? (await gate.promise, []) : []) },
+			questions: w.adapter.questions!,
+			answers: w.adapter.answers,
+		},
+	});
+
+	const stop = new AbortController();
+	const served = slow.serve(stop.signal);
+
+	// The first tick is stuck reading the list; twenty runs end in the meantime, a minute apart in all.
+	await Bun.sleep(50);
+
+	for (let end = 0; end < 20; end++) {
+		w.clock.at += 3000;
+		slow.wake.signal();
+	}
+
+	expect(slow.picks).toBe(0);
+	gate.resolve();
+	await Bun.sleep(300);
+
+	expect(slow.picks).toBe(2);
+	stop.abort();
+	await served;
+});
+
+test("V2: a new engine in node_modules, or an edit under .hum/ or adapters/, makes the worker exit within one tick; item files do not", async () => {
+	const w = await world({});
+
+	w.ownerFile("node_modules/@moo.md/hum/package.json", JSON.stringify({ version: "0.1.0" }));
+	const worker = w.workerWith({ latestVersion: async () => "0.2.0" });
+
+	expect(await worker.tick()).toEqual({ kind: "ran", started: [] });
+	w.ownerFile(".hum/work/new-item.md", "---\ntitle: x\nstate: ready\n---\n");
+	expect(await worker.tick()).toEqual({ kind: "ran", started: [] });
+
+	w.ownerFile("node_modules/@moo.md/hum/package.json", JSON.stringify({ version: "0.1.1" }));
+	expect(await worker.tick()).toEqual({ kind: "exit", reason: "the engine changed from 0.1.0 to 0.1.1" });
+
+	const beat = readHeartbeat(w.state.heartbeatPath);
+	const status = readStatus(w.state.statusPath);
+
+	expect(beat).toMatchObject({ engineVersion: "0.1.1", configHash: w.config.hash, restarting: "the engine changed from 0.1.0 to 0.1.1", inFlight: [] });
+	expect(status.ok && status.status.engine).toMatchObject({ version: "0.1.1", latest: "0.2.0" });
+
+	for (const [file, text] of [
+		[".hum/memory.md", "never touch vendor/\n"],
+		["adapters/mine.ts", "export default () => ({})\n"],
+		["bun.lock", "{}\n"],
+	] as const) {
+		const fresh = w.workerWith();
+
+		w.ownerFile(file, text);
+		expect(await fresh.tick(), file).toMatchObject({ kind: "exit" });
+	}
+});
+
+test("V2: a worker that sees an update runs nothing new and exits when its runs end", async () => {
+	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 600 } } });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/b.md");
+
+	const worker = w.workerWith({ runners: 1 });
+
+	await worker.tick();
+	expect(worker.running()).toEqual(["a"]);
+
+	w.ownerFile(".hum/memory.md", "a new rule\n");
+	expect(await worker.tick()).toMatchObject({ kind: "draining" });
+	expect(readHeartbeat(w.state.heartbeatPath)?.restarting).toBeDefined();
+
+	await worker.idle();
+	expect(await worker.tick()).toMatchObject({ kind: "exit" });
+	expect(merged(w)).toEqual(["a"]);
+	expect(w.shim.calls().filter((c) => c.itemId)).toHaveLength(1);
+});
+
+test("each tick writes a heartbeat and the status file for the view", async () => {
+	const w = await world({});
+	const worker = w.workerWith({ latestVersion: async () => "9.9.9" });
+
+	await worker.tick();
+
+	expect(readHeartbeat(w.state.heartbeatPath)).toMatchObject({ time: NOW, configHash: w.config.hash, inFlight: [], intervalMs: 60_000 });
+
+	const status = readStatus(w.state.statusPath);
+
+	expect(status.ok && status.status.workers.mac).toBe(NOW);
+	expect(status.ok && status.status.engine.latest).toBe("9.9.9");
+
+	w.state.faults.raise({ code: "x", cause: "a cause", fix: "a fix" });
+	w.clock.at += 1000;
+	await worker.tick();
+
+	const next = readStatus(w.state.statusPath);
+
+	expect(next.ok && next.status.cards.map((c) => c.code)).toEqual(["x"]);
+	expect(next.ok && next.status.workers.mac).toBe(NOW + 1000);
+});
+
+test("D5: the claim of a run in flight is renewed each tick, and a run whose claim is gone stops", async () => {
+	const w = await world({ items: { a: { commitForItem: true, spend: 5, hang: true } } }, { claimTtlMs: 5000 });
+	const id = w.item("a", "docs/a.md");
+	const worker = w.workerWith({ claimTtlMs: 5000 });
+
+	await worker.tick();
+	await Bun.sleep(1500);
+
+	// 3 s on: a tick renews to 8 s. At 6 s the first expiry has passed, yet nobody else can take it.
+	w.clock.at += 3000;
+	await worker.tick();
+	w.clock.at += 3000;
+	expect((await w.adapter.workSource!.claim(id, "worker-2", 5000)).won).toBe(false);
+
+	// 10 s on, with no renewal: worker-2 takes it, the next tick finds the claim gone and stops the run.
+	w.clock.at += 4000;
+	expect((await w.adapter.workSource!.claim(id, "worker-2", 5000)).won).toBe(true);
+
+	const pid = w.shim.calls().find((c) => c.itemId === id)!.pid;
+
+	await worker.tick();
+	await worker.idle();
+
+	expect(w.results.find((r) => r.item === id)).toMatchObject({ outcome: "lost" });
+	await Bun.sleep(300);
+	expect(() => process.kill(pid, 0)).toThrow();
+});
+
+test("U5: an item id in the inbox folder wakes a waiting item at once, with no change in the watch token", async () => {
+	const answersAdapter = (real: NonNullable<WorkerWorld["adapter"]["answers"]>) => ({ ...real, watch: async () => ({ token: "same", changed: false }) });
+	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+
+	w.item("a", "docs/a.md");
+
+	const worker = w.workerWith({ adapters: { workSource: w.adapter.workSource!, questions: w.adapter.questions!, answers: answersAdapter(w.adapter.answers!) } });
+
+	await worker.tick();
+	await worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+	await w.adapter.answers!.answer("a", { text: "Use Plain" });
+	w.clock.at += TTL + 1;
+
+	// Nothing says the answer arrived: the watch reports no change.
+	await worker.tick();
+	expect(worker.running()).toEqual([]);
+
+	mkdirSync(w.state.inbox, { recursive: true });
+	writeFileSync(join(w.state.inbox, "answer-1"), "a\n");
+	await worker.tick();
+	await worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(existsSync(join(w.state.inbox, "answer-1"))).toBe(false);
+	// D4: the answer was saved as an event before it was acted on.
+	expect(w.state.events.list("a").map((e) => e.type)).toContain("answered");
+});
+
+test("R2: a saved deadline fires on the next event, not only on a tick: a question the owner never answers ends stuck", async () => {
+	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
+
+	const calls = w.shim.calls().length;
+
+	w.clock.at += 86_400_001;
+	await w.worker.tick();
+
+	expect(w.state.parked.get("a")).toMatchObject({ why: "stuck" });
+	expect(w.state.faults.list().map((c) => c.code)).toContain("item-stuck");
+	expect(w.shim.calls()).toHaveLength(calls);
+});
+
+test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {
+	const flag = join(tmpdir(), `hum-flag-${process.pid}-${Date.now()}`);
+	const w = await world({ items: { a: { commitForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], worker: { maxFixes: 1 } });
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "a" });
+
+	const spent = w.shim.calls().length;
+
+	expect(w.state.parked.get("a")).toMatchObject({ why: "stuck" });
+	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 0 });
+
+	// The file still says ready and the claim lapses, yet no tick spends tokens on it.
+	for (let tick = 0; tick < 3; tick++) {
+		w.clock.at += TTL + 1;
+		expect(await w.worker.tick()).toEqual({ kind: "ran", started: [] });
+	}
+
+	expect(w.shim.calls()).toHaveLength(spent);
+
+	writeFileSync(flag, "");
+	w.clock.at += 1000;
+	await w.adapter.answers!.answer("a", { text: "retry" });
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(w.state.parked.get("a")).toBeUndefined();
+	expect(w.state.faults.list().map((c) => c.code)).not.toContain("item-stuck");
+	expect(w.state.spent.get("a")).toMatchObject({ total: 1203, base: 802 });
+});
+
+test("R4: a limit the runner hit is saved, and a restarted worker makes no call before it ends, then resumes", async () => {
+	const until = Math.floor(NOW / 1000) + 3600;
+	const w = await world({ items: { a: { error: `Claude usage limit reached|${until}` } } });
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "limited", until: until * 1000 });
+	expect(w.state.limit.get("runner")).toEqual({ until: until * 1000 });
+
+	// A fresh process: its own runner, the same saved state.
+	const runner = w.runnerFor();
+
+	await runner.start();
+
+	const calls = w.shim.calls().length;
+	const restarted = w.workerWith({ runner });
+
+	w.clock.at += TTL + 1;
+	expect(await restarted.tick()).toEqual({ kind: "ran", started: [] });
+	expect(w.shim.calls()).toHaveLength(calls);
+
+	w.clock.at = until * 1000 + 1;
+	expect(await restarted.tick()).toEqual({ kind: "ran", started: ["a"] });
+	await restarted.idle();
+	expect(w.shim.calls().length).toBeGreaterThan(calls);
+});

@@ -56,7 +56,13 @@ export const Status = z.strictObject({
 	writtenAt: time,
 	/** When each runner's worker last wrote; absent when it never has. */
 	workers: z.strictObject({ mac: time.optional(), ci: time.optional() }),
-	engine: z.strictObject({ version: name, adapterApi: z.int().nonnegative(), configSchema: z.int().positive() }),
+	engine: z.strictObject({
+		version: name,
+		adapterApi: z.int().nonnegative(),
+		configSchema: z.int().positive(),
+		/** V14: the newest published version, when the worker could read it. */
+		latest: name.optional(),
+	}),
 	questions: z.array(Question),
 	cards: z.array(Card),
 	inFlight: z.array(InFlight),
@@ -80,3 +86,18 @@ export const emptyStatus = (engineVersion: string, writtenAt: number): Status =>
 	choices: [],
 	measure: null,
 });
+
+/** R7: what the worker writes each tick. The service unit shows a card when it is three ticks old. */
+export const Heartbeat = z.strictObject({
+	time,
+	engineVersion: name,
+	configHash: name,
+	/** Items with a run going. */
+	inFlight: z.array(name),
+	/** The time between ticks, so a reader can tell three ticks old from fresh. */
+	intervalMs: z.int().positive(),
+	/** Set once the worker has seen an update and will exit when its runs end (V2). */
+	restarting: name.optional(),
+});
+
+export type Heartbeat = z.infer<typeof Heartbeat>;

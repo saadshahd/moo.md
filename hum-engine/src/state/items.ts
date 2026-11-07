@@ -7,7 +7,7 @@ import { migrateSnapshot } from "../config/state-map.ts";
 import { kindMachine } from "../config/machine.ts";
 import type { Kind } from "../config/schema.ts";
 import { type Faults, type Outcome } from "./faults.ts";
-import { atomicWrite, isMissing, slug } from "./fs.ts";
+import { atomicWrite, isMissing, listFiles, slug } from "./fs.ts";
 import {
 	compareVersions,
 	ENGINE_VERSION,
@@ -17,6 +17,7 @@ import {
 	ENVELOPE_MIGRATIONS,
 	type EnvelopeMigrations,
 	Header,
+	SavedHeader,
 } from "./format.ts";
 
 type ActorClock = NonNullable<Parameters<typeof restoreActor>[2]>["clock"];
@@ -33,6 +34,16 @@ export type RestoreOptions = {
 	readonly kindAt?: (machineVersion: string) => Kind | undefined;
 	readonly sources?: Readonly<Record<string, AnyActorLogic>>;
 	readonly clock?: ActorClock;
+};
+
+/** An item with a saved snapshot, from the envelope header. */
+export type SavedSnapshot = {
+	readonly itemId: string;
+	readonly kind: string;
+	readonly machineVersion: string;
+	readonly savedAt: number;
+	/** The machine's state, when it is a plain state name. */
+	readonly state: string | undefined;
 };
 
 /** The snapshot of a running item actor, as the JSON `saveItem` writes. */
@@ -84,6 +95,23 @@ export class Items {
 		this.#faults.clear(key);
 
 		return { ok: true, value: undefined };
+	}
+
+	/** The items with a saved snapshot, read from each envelope header. A damaged file is left to `restore`, which raises its card. */
+	saved(): SavedSnapshot[] {
+		return listFiles(this.#folder).flatMap((file) => {
+			try {
+				const header = SavedHeader.safeParse(JSON.parse(readFileSync(file, "utf8")));
+
+				if (!header.success) return [];
+
+				const { itemId, kind, machineVersion, savedAt, snapshot } = header.data;
+
+				return [{ itemId, kind, machineVersion, savedAt, state: snapshot.value }];
+			} catch {
+				return [];
+			}
+		});
 	}
 
 	/** Removes an item's snapshot once the item has finished. */

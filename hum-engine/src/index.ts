@@ -123,3 +123,27 @@ export {
 } from "./worker/thin-path.ts";
 
 export { roundupAdapter, type RoundupOptions, stdioCall, type ToolCall } from "./adapters/roundup.ts";
+
+export { type CallScope, onceCalls } from "./adapters/once.ts";
+
+export { serialized } from "./adapters/serial.ts";
+
+export { Records } from "./state/records.ts";
+
+export { Limit, Parked, ReadyList, Spent } from "./state/saved.ts";
+
+export type { SavedSnapshot } from "./state/items.ts";
+
+export { Heartbeat } from "./status/format.ts";
+
+export { readHeartbeat, writeHeartbeat } from "./status/file.ts";
+
+export { type Candidate, type Footprint, footprintOf, overlaps, pick, type Picked, PrefixGate, Wake } from "./worker/scheduler.ts";
+
+export { installedVersion, type Signature, signatureOf } from "./worker/signature.ts";
+
+export { openWorker, type OpenWorkerOptions, npmLatest } from "./worker/open.ts";
+
+export { Worker, type WorkerOptions, type TickResult } from "./worker/worker.ts";
+
+export { DEFAULT_CLAIM_TTL_MS, park, rememberKinds } from "./worker/thin-path.ts";

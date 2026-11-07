@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClaudeRunner } from "../../src/adapters/claude-p.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
-import { type Config, listHopeSkills, loadConfig, readConfigDir } from "../../src/config/load.ts";
+import type { Config } from "../../src/config/load.ts";
 import { openState } from "../../src/state/open.ts";
 import { PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../src/worker/thin-path.ts";
+import { configWith } from "../fixtures/config.ts";
 import { itemFile, sh, WorkRepo } from "../fixtures/work-repo.ts";
 import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
 
-const root = join(import.meta.dir, "..", "..");
 const NOW = 1_800_000_000_000;
 const TTL = 15 * 60_000;
 const cleanups: (() => void)[] = [];
@@ -18,30 +18,6 @@ const cleanups: (() => void)[] = [];
 afterEach(() => {
 	for (const clean of cleanups.splice(0)) clean();
 });
-
-/** A JSON tree the tests edit in place. */
-type Tree = any; // oxlint-disable-line typescript/no-explicit-any
-
-/** The shipped config with one path rule (docs are low risk) and what setup adds: every wait gets a timeout and a place to go. */
-const configWith = (edit: (raw: Tree) => void = () => {}): Config => {
-	const raw: Tree = structuredClone(readConfigDir(join(root, "defaults")));
-
-	raw.hum.paths = [{ glob: "docs/**", level: "low" }];
-
-	for (const kind of Object.values<Tree>(raw.kinds)) {
-		for (const node of Object.values<Tree>(kind.machine.states)) {
-			if (node.tags?.some((tag: string) => tag === "wait" || tag === "owner-wait")) node.after = { "86400000": { target: "stuck" } };
-		}
-	}
-
-	edit(raw);
-
-	const loaded = loadConfig(raw, { env: { hopeSkills: listHopeSkills(join(root, "../hope")) } });
-
-	if (!loaded.ok) throw new Error(JSON.stringify(loaded.refusal));
-
-	return loaded.value;
-};
 
 const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f docs/note.md"] }: { config?: Config; checks?: string[] } = {}) => {
 	const repo = new WorkRepo();
@@ -150,12 +126,12 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 	const id = w.repo.seed("Write the note");
 	const before = sh(w.repo.remote, ["rev-parse", "main"]);
 
-	expect(await runThinPath(w.options({ maxFixes: 2 }))).toEqual({ outcome: "stuck", item: id });
+	expect(await runThinPath(w.options({ maxFixes: 2 }))).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
 
 	// Stuck stays stuck, though the item file still says ready: no run, no claim.
 	w.clock.at += TTL + 1;
-	expect(await runThinPath(w.options({ itemId: id }))).toEqual({ outcome: "stuck", item: id });
+	expect(await runThinPath(w.options({ itemId: id }))).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
 });
@@ -164,14 +140,14 @@ test("R6: a run that succeeds and commits nothing is not done", async () => {
 	const w = await world({ script: [{}, {}] });
 	const id = w.repo.seed("Write the note");
 
-	expect(await runThinPath(w.options())).toEqual({ outcome: "stuck", item: id });
+	expect(await runThinPath(w.options())).toMatchObject({ outcome: "stuck", item: id });
 });
 
 test("R6: a commit with an error subtype is not done", async () => {
 	const w = await world({ script: [{}, { ...NOTE, error: "tool failed" }] });
 	const id = w.repo.seed("Write the note");
 
-	expect(await runThinPath(w.options())).toEqual({ outcome: "stuck", item: id });
+	expect(await runThinPath(w.options())).toMatchObject({ outcome: "stuck", item: id });
 });
 
 test("a change to a path no rule matches is not merged by the thin path", async () => {
