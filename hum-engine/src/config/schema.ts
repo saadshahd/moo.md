@@ -152,6 +152,7 @@ const Shipped = z.object({
 	hookPaths: z.array(name).describe("Globs of tracked git hooks; a change to one changes hum itself."),
 	diffLimit: count.describe("The most characters of a change's diff one prompt carries."),
 	failureTail: count.describe("The last characters of the checks' output a fix run reads."),
+	kindMeanings: z.record(name, z.string().min(1)).describe("One line per kind saying what work it holds; the cheap model call reads these to pick an item's kind."),
 	fallbackKind: name.describe("The kind an item runs as when neither its source nor the model call names one."),
 	docsOnly: z
 		.strictObject({ kind: name, paths: z.array(name) })
@@ -159,8 +160,9 @@ const Shipped = z.object({
 	decisionModel: name.describe("The model id of the cheap model call, made through claude -p."),
 	modelCallTimeoutSeconds: seconds.describe("How long a cheap model call may take before it counts as an abstention."),
 	measuredModels: z
-		.record(z.enum(BOUNDARIES), z.array(name))
-		.describe("Per model-judgment boundary, the model ids its labelled set was measured on; a pick from any other id counts as an abstention."),
+		.record(z.enum(BOUNDARIES), z.record(name, z.number().min(0).max(1)))
+		.describe("Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."),
+	minJudgeRate: z.number().min(0).max(1).describe("The lowest measured rate at which hum trusts a model's pick at a boundary; below it the call abstains."),
 	mergeRisk: z
 		.strictObject({
 			weights: z.record(z.enum(GRADED), z.number().positive()),
@@ -345,9 +347,11 @@ export const OWNER_CHANGEABLE = {
 	"hook paths": "hookPaths",
 	"diff limit": "diffLimit",
 	"failure tail": "failureTail",
+	"kind meanings": "kindMeanings",
 	"fallback kind": "fallbackKind",
 	"docs-only kind": "docsOnly",
 	"model call timeout": "modelCallTimeoutSeconds",
 	"measured models": "measuredModels",
+	"judge rate bar": "minJudgeRate",
 	"merge-risk weights": "mergeRisk",
 } as const satisfies Record<string, string>;

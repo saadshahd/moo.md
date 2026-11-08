@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { BOUNDARIES } from "../../src/config/schema.ts";
 import { type Config, listHopeSkills, loadConfig, readConfigDir } from "../../src/config/load.ts";
 
 export const root = join(import.meta.dir, "..", "..");
@@ -19,7 +20,7 @@ export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 
 	raw.hum.paths = [{ glob: "docs/**", level: "low" }];
 	raw.hum.docsOnly.paths = ["**"];
-	raw.hum.measuredModels = { kind: [SHIM_MODEL], alignment: [SHIM_MODEL], "plan-outcome": [SHIM_MODEL], "review-verdict": [SHIM_MODEL] };
+	raw.hum.measuredModels = Object.fromEntries(BOUNDARIES.map((boundary) => [boundary, { [SHIM_MODEL]: 1 }]));
 
 	for (const kind of Object.values<Tree>(raw.kinds)) {
 		for (const node of Object.values<Tree>(kind.machine.states)) {

@@ -23,10 +23,11 @@ export const declaredKind = (item: Pick<Item, "body" | "labels">, kinds: readonl
 };
 
 /** The cheap model call that picks a kind from the item's text, or says it is unsure. */
-export const kindQuestion = (item: Pick<Item, "title" | "body">, kinds: readonly string[]) => ({
+export const kindQuestion = (item: Pick<Item, "title" | "body">, { kinds, kindMeanings }: { readonly kinds: readonly string[]; readonly kindMeanings: Readonly<Record<string, string>> }) => ({
 	boundary: "kind" as const,
 	prompt: [
-		`Pick the kind of this work item: ${kinds.join(", ")}. Answer ${UNSURE} when none fits or you cannot tell.`,
+		`Pick the kind of this work item. Judge by the change the work makes, not by the area it touches. Answer ${UNSURE} when none fits or you cannot tell.`,
+		kinds.map((kind) => `- ${kind}: ${kindMeanings[kind] ?? "no meaning given"}`).join("\n"),
 		DATA_RULE,
 		fenced("item", `${item.title}\n\n${item.body}`),
 	].join("\n\n"),

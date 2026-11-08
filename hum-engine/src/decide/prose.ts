@@ -4,7 +4,7 @@ import parseDiff from "parse-diff";
 import stringify from "safe-stable-stringify";
 import { z } from "zod";
 import type { Finished } from "../adapters/claude-p.ts";
-import type { Boundary } from "../config/schema.ts";
+import type { Boundary, HumConfig } from "../config/schema.ts";
 
 const TAG_HASH = 12;
 
@@ -24,8 +24,9 @@ export const fenced = (label: string, text: string): string => {
 	return `<${tag}>\n${clean}\n</${tag}>`;
 };
 
-/** A model's pick counts only when every model id that answered was measured on the boundary's labelled set. */
-export const isMeasured = (models: readonly string[], measured: readonly string[]): boolean => models.length > 0 && models.every((model) => measured.includes(model));
+/** A model's pick counts only when every model id that answered has a measured rate at the boundary that meets the bar. */
+export const isTrusted = (models: readonly string[], boundary: Boundary, { measuredModels, minJudgeRate }: Pick<HumConfig, "measuredModels" | "minJudgeRate">): boolean =>
+	models.length > 0 && models.every((model) => (measuredModels[boundary]?.[model] ?? 0) >= minJudgeRate);
 
 export const Cite = z.strictObject({ file: z.string().min(1), line: z.int().positive() });
 

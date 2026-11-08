@@ -180,6 +180,13 @@
 	],
 	"diffLimit": 100000,
 	"failureTail": 4000,
+	"kindMeanings": {
+		"feature": "adds or changes what the product does or offers",
+		"fix": "corrects behaviour that is wrong, broken or inconsistent, with no new capability",
+		"docs": "changes only prose that explains the work: notes, changelog entries, guides, comments",
+		"hotfix": "an urgent correction to what is already live, named as urgent",
+		"check": "adds or repairs tests, benchmarks or other verification, with no change to behaviour"
+	},
 	"fallbackKind": "feature",
 	"docsOnly": {
 		"kind": "docs",
@@ -191,21 +198,23 @@
 	},
 	"decisionModel": "claude-haiku-5-5",
 	"modelCallTimeoutSeconds": 120,
+	"minJudgeRate": 0.8,
 	"measuredModels": {
-		"kind": [
-			"claude-haiku-5-5"
-		],
-		"alignment": [
-			"claude-haiku-5-5"
-		],
-		"plan-outcome": [
-			"claude-haiku-5-5",
-			"claude-sonnet-5-5"
-		],
-		"review-verdict": [
-			"claude-haiku-5-5",
-			"claude-sonnet-5-5"
-		]
+		"kind": {
+			"claude-haiku-5-5": 0.58,
+			"claude-sonnet-5-5": 0.63
+		},
+		"alignment": {
+			"claude-haiku-5-5": 0.8
+		},
+		"plan-outcome": {
+			"claude-haiku-5-5": 1,
+			"claude-sonnet-5-5": 1
+		},
+		"review-verdict": {
+			"claude-haiku-5-5": 0.92,
+			"claude-sonnet-5-5": 0.83
+		}
 	},
 	"mergeRisk": {
 		"weights": {

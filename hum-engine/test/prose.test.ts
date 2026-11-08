@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { AgentDecisionExhaustedError } from "@statelyai/agent";
 import { FakeProvider } from "../src/adapters/fake.ts";
 import type { Finished, Runner } from "../src/adapters/claude-p.ts";
-import { modelCallOver } from "../src/adapters/model-call.ts";
+import { configuredModelCall, modelCallOver } from "../src/adapters/model-call.ts";
 import { alignedPlacement, AlignmentAnswer, raisesLevel } from "../src/decide/alignment.ts";
 import { declaredKind } from "../src/decide/kind.ts";
 import { citesDiff, fenced, pickSchema, readPick } from "../src/decide/prose.ts";
@@ -89,9 +89,27 @@ test("a cheap model call that times out, or answers from a model id not measured
 
 	expect(await modelCallOver(answering(["claude-sonnet-5-5"]), { model: "m", timeoutMs: 1000, trusts: trustsHaiku })(question)).toEqual({
 		kind: "abstained",
-		why: "claude-sonnet-5-5 has no measured rate at alignment",
+		why: "claude-sonnet-5-5 has no measured rate at alignment that meets the bar",
 	});
 	expect(await modelCallOver(answering(["claude-haiku-5-5"]), { model: "m", timeoutMs: 1000, trusts: trustsHaiku })(question)).toMatchObject({ kind: "picked", value: SOUND });
+});
+
+test("a model id is trusted at a boundary only when its measured rate meets minJudgeRate; a lower or missing rate abstains", async () => {
+	const bar = configWith((raw) => {
+		raw.hum.minJudgeRate = 0.8;
+		raw.hum.measuredModels.alignment = { "claude-haiku-5-5": 0.8, "claude-sonnet-5-5": 0.79 };
+		raw.hum.measuredModels.kind = { "claude-haiku-5-5": 0.58 };
+	}).hum;
+
+	const asked = (models: string[]) => configuredModelCall(runnerOf(async () => finished(SOUND, models)), bar)({ boundary: "alignment", prompt: "grade", answer: AlignmentAnswer });
+
+	expect(await asked(["claude-haiku-5-5"])).toMatchObject({ kind: "picked" });
+	expect(await asked(["claude-sonnet-5-5"])).toMatchObject({ kind: "abstained" });
+	expect(await asked(["claude-opus-5-5"])).toMatchObject({ kind: "abstained" });
+
+	const belowBar = await configuredModelCall(runnerOf(async () => finished(SOUND)), bar)({ boundary: "kind", prompt: "kind", answer: AlignmentAnswer });
+
+	expect(belowBar).toMatchObject({ kind: "abstained" });
 });
 
 test("the alignment grades raise a level at most one step, only when they move the merge-risk score across a cut, and never lower it", () => {

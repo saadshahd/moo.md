@@ -124,7 +124,7 @@ export { type Approvals, isCleared, type Landing, landingOf, needsReviewRun, OWN
 
 export { reviewInput } from "./decide/review.ts";
 
-export { citesDiff, DATA_RULE, fenced, EventPick, isMeasured, PlanFile, planHash, PROSE_STATES, type ProsePurpose, readPick } from "./decide/prose.ts";
+export { citesDiff, DATA_RULE, fenced, EventPick, isTrusted, PlanFile, planHash, PROSE_STATES, type ProsePurpose, readPick } from "./decide/prose.ts";
 
 export { declaredKind, kindQuestion, leavesDocs, UNSURE } from "./decide/kind.ts";
 

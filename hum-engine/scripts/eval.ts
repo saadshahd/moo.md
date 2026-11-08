@@ -108,7 +108,7 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Verdict[]>> = {
 		const cases = (await read("kind", KindCase)).slice(0, limit);
 
 		return eachOf(cases, async (found) => {
-				const judged = await judge(kindQuestion(found, config.hum.kinds));
+				const judged = await judge(kindQuestion(found, config.hum));
 
 				return judged.kind === "abstained" ? "abstained" : scored(judged.value.kind, found.label);
 		});
@@ -153,4 +153,4 @@ for (const boundary of boundaries) {
 	console.log(`${boundary}: ${row}`);
 }
 
-console.log(`${calls} live calls, the start check included. Add ${model} to measuredModels for each boundary it should decide alone.`);
+console.log(`${calls} live calls, the start check included. Record each rate under measuredModels in defaults/hum.json; a model decides a boundary alone only at minJudgeRate or above.`);

@@ -1,7 +1,7 @@
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import type { Boundary, HumConfig } from "../config/schema.ts";
-import { isMeasured, jsonSchemaOf } from "../decide/prose.ts";
+import { isTrusted, jsonSchemaOf } from "../decide/prose.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type Runner, succeeded } from "./claude-p.ts";
 
@@ -49,7 +49,7 @@ export const modelCallOver =
 
 		if (!succeeded(outcome)) return abstained(`the call ended as ${outcome.subtype}`);
 
-		if (!trusts(boundary, outcome.models)) return abstained(`${outcome.models.join(", ") || "no model"} has no measured rate at ${boundary}`);
+		if (!trusts(boundary, outcome.models)) return abstained(`${outcome.models.join(", ") || "no model"} has no measured rate at ${boundary} that meets the bar`);
 
 		const parsed = answer.safeParse(outcome.structured);
 
@@ -57,9 +57,9 @@ export const modelCallOver =
 	};
 
 /** The model call a config sets up: its decision model, its timeout, and its record of measured model ids. */
-export const configuredModelCall = (runner: Runner, config: Pick<HumConfig, "decisionModel" | "modelCallTimeoutSeconds" | "measuredModels">): ModelCall =>
+export const configuredModelCall = (runner: Runner, config: Pick<HumConfig, "decisionModel" | "modelCallTimeoutSeconds" | "measuredModels" | "minJudgeRate">): ModelCall =>
 	modelCallOver(runner, {
 		model: config.decisionModel,
 		timeoutMs: config.modelCallTimeoutSeconds * SECOND_MS,
-		trusts: (boundary, models) => isMeasured(models, config.measuredModels[boundary] ?? []),
+		trusts: (boundary, models) => isTrusted(models, boundary, config),
 	});

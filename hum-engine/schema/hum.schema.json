@@ -704,6 +704,25 @@
 			"maximum": 9007199254740991,
 			"description": "The last characters of the checks' output a fix run reads."
 		},
+		"kindMeanings": {
+			"default": {
+				"feature": "adds or changes what the product does or offers",
+				"fix": "corrects behaviour that is wrong, broken or inconsistent, with no new capability",
+				"docs": "changes only prose that explains the work: notes, changelog entries, guides, comments",
+				"hotfix": "an urgent correction to what is already live, named as urgent",
+				"check": "adds or repairs tests, benchmarks or other verification, with no change to behaviour"
+			},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "One line per kind saying what work it holds; the cheap model call reads these to pick an item's kind."
+		},
 		"fallbackKind": {
 			"default": "feature",
 			"type": "string",
@@ -755,20 +774,21 @@
 		},
 		"measuredModels": {
 			"default": {
-				"kind": [
-					"claude-haiku-5-5"
-				],
-				"alignment": [
-					"claude-haiku-5-5"
-				],
-				"plan-outcome": [
-					"claude-haiku-5-5",
-					"claude-sonnet-5-5"
-				],
-				"review-verdict": [
-					"claude-haiku-5-5",
-					"claude-sonnet-5-5"
-				]
+				"kind": {
+					"claude-haiku-5-5": 0.58,
+					"claude-sonnet-5-5": 0.63
+				},
+				"alignment": {
+					"claude-haiku-5-5": 0.8
+				},
+				"plan-outcome": {
+					"claude-haiku-5-5": 1,
+					"claude-sonnet-5-5": 1
+				},
+				"review-verdict": {
+					"claude-haiku-5-5": 0.92,
+					"claude-sonnet-5-5": 0.83
+				}
 			},
 			"type": "object",
 			"propertyNames": {
@@ -781,10 +801,15 @@
 				]
 			},
 			"additionalProperties": {
-				"type": "array",
-				"items": {
+				"type": "object",
+				"propertyNames": {
 					"type": "string",
 					"minLength": 1
+				},
+				"additionalProperties": {
+					"type": "number",
+					"minimum": 0,
+					"maximum": 1
 				}
 			},
 			"required": [
@@ -793,7 +818,14 @@
 				"plan-outcome",
 				"review-verdict"
 			],
-			"description": "Per model-judgment boundary, the model ids its labelled set was measured on; a pick from any other id counts as an abstention."
+			"description": "Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."
+		},
+		"minJudgeRate": {
+			"default": 0.8,
+			"type": "number",
+			"minimum": 0,
+			"maximum": 1,
+			"description": "The lowest measured rate at which hum trusts a model's pick at a boundary; below it the call abstains."
 		},
 		"mergeRisk": {
 			"default": {

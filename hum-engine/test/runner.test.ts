@@ -31,7 +31,7 @@ const isGone = (pid: number): boolean => {
 	}
 };
 
-test("the flag set holds the five flags and never --bare, --resume or --continue; a model call adds hope's judge flags", () => {
+test("the flag set holds the five flags and never --bare, --resume or --continue; a model call adds hope's judge flags and loads no settings source or tool", () => {
 	const args = runArgs({ model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111" });
 
 	for (const flag of ["--model", "--effort", "--json-schema", "--settings", "--session-id"]) expect(args).toContain(flag);
@@ -42,6 +42,8 @@ test("the flag set holds the five flags and never --bare, --resume or --continue
 	const judging = runArgs({ model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111", call: "judgment" });
 
 	expect(judging).toContain("--no-session-persistence");
+	expect(judging.slice(judging.indexOf("--setting-sources"), judging.indexOf("--setting-sources") + 2)).toEqual(["--setting-sources", ""]);
+	expect(judging.slice(judging.indexOf("--tools"), judging.indexOf("--tools") + 2)).toEqual(["--tools", ""]);
 	expect(JSON.parse(judging[judging.indexOf("--settings") + 1] ?? "{}")).toMatchObject({ disableAllHooks: true, outputStyle: "default" });
 });
 

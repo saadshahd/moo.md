@@ -26,13 +26,15 @@ export const RUN_SETTINGS = JSON.stringify({
 
 /**
  * The two kinds of `claude -p` call. An agent run keeps its session. A model call runs as hope's judge does: no
- * session kept, no hooks, and the default output style, so the owner's style cannot reshape its answer.
+ * session kept, no hooks, and the default output style, so the owner's style cannot reshape its answer. It also loads
+ * no settings source (plugins, MCP servers, memory files) and no built-in tool: a question needs neither, and each
+ * one bills on every call.
  */
 export const CALLS = {
 	run: { settings: RUN_SETTINGS, flags: [] },
 	judgment: {
 		settings: JSON.stringify({ permissions: { defaultMode: "bypassPermissions" }, disableAllHooks: true, outputStyle: "default" }),
-		flags: ["--no-session-persistence"],
+		flags: ["--no-session-persistence", "--setting-sources", "", "--tools", ""],
 	},
 } as const satisfies Record<string, { settings: string; flags: readonly string[] }>;
 

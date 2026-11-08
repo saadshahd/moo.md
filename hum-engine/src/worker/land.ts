@@ -40,7 +40,7 @@ import {
 	type Unclear,
 	waitReason,
 } from "../decide/merge.ts";
-import { isMeasured } from "../decide/prose.ts";
+import { isTrusted } from "../decide/prose.ts";
 import {
 	type Change,
 	placeChange,
@@ -481,11 +481,11 @@ const verdictOn = async (ctx: LandContext, change: Parameters<LandContext["revie
 
 const abstained = (boundary: Boundary, why: string): Unclear => ({ cause: "abstained", boundary, why });
 
-const unmeasured = (models: readonly string[]): string => `${models.join(", ") || "no model"} has no measured rate`;
+const unmeasured = (models: readonly string[]): string => `${models.join(", ") || "no model"} has no measured rate that meets the bar`;
 
 /** Every model judgment behind the change that abstained, or came from a model id its boundary was not measured on. */
 const abstentionsOf = (ctx: LandContext, alignment: SavedLanding["alignment"], verdict: Verdict | undefined): Unclear[] => {
-	const measured = (boundary: Boundary, models: readonly string[]): boolean => isMeasured(models, ctx.config.hum.measuredModels[boundary] ?? []);
+	const measured = (boundary: Boundary, models: readonly string[]): boolean => isTrusted(models, boundary, ctx.config.hum);
 	const kind = ctx.state.itemKinds.get(ctx.id);
 	const plan = ctx.state.plans.get(ctx.id);
 
