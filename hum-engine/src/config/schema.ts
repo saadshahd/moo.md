@@ -62,7 +62,7 @@ export const RELEASES = ["at-once", "after-proof"] as const;
 export const BREAKS = ["follow-up", "block"] as const;
 
 /** Each place a model's judgment decides, measured on its own labelled set. */
-export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict", "reply-option", "repeat-pair"] as const;
+export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict", "reply-option", "repeat-pair", "taste"] as const;
 
 export type Boundary = (typeof BOUNDARIES)[number];
 
@@ -212,6 +212,7 @@ const Shipped = z.object({
 	ownerLogins: z.array(name).describe("GitHub logins whose pull request reviews and comments are the owner's review notes."),
 	repeatAt: count.describe("Review notes stating one rule at which hum files a check item for it."),
 	repeatPrecision: fraction.describe("The lowest precision on labelled pairs at which a model's call that two notes state one rule files a check item; below it the pair waits as a possible repeat."),
+	tasteRules: z.array(name).describe("The owner's taste rules that have no deterministic check. Each pull request hum opens gets a comment saying whether its diff keeps each rule; the comment reports only and gates nothing."),
 	memoryMaxBytes: count.describe("The most bytes memory.md holds; a new entry past it is refused."),
 	memoryUnusedRuns: count.describe("Runs without use after which a memory.md entry is listed for the owner."),
 	measureWindow: count.describe("Merged changes the per-merge numbers average over, and the window per path."),
@@ -425,6 +426,7 @@ export const OWNER_CHANGEABLE = {
 	"owner logins": "ownerLogins",
 	"repeat threshold": "repeatAt",
 	"repeat precision bar": "repeatPrecision",
+	"taste rules": "tasteRules",
 	"memory size cap": "memoryMaxBytes",
 	"memory unused runs": "memoryUnusedRuns",
 	"measure window": "measureWindow",

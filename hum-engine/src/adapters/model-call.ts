@@ -8,7 +8,9 @@ import { type RunOutcome, type Runner, succeeded } from "./claude-p.ts";
 /** One question to the cheap model: the boundary it is measured at, the prompt, and the typed answer. */
 export type Question<T> = { readonly boundary: Boundary; readonly prompt: string; readonly answer: z.ZodType<T>;
 	/** The item the call is for: the tokens it spends join that item's total. */
-	readonly item?: string
+	readonly item?: string;
+	/** The pick feeds a report that decides nothing, so it needs no measured rate; the caller says what the rate is. */
+	readonly reportOnly?: true;
 };
 
 /** An answer counts only as a pick; anything else is an abstention, which marks the item unclear and never raises a level. */
@@ -39,7 +41,7 @@ export type ModelCallOptions = {
 /** The cheap model call through `claude -p`, as hope's judge calls it, with a typed answer by JSON schema. */
 export const modelCallOver =
 	(runner: Runner, { model, timeoutMs, trusts, onSpent }: ModelCallOptions): ModelCall =>
-	async ({ boundary, prompt, answer, item }) => {
+	async ({ boundary, prompt, answer, item, reportOnly }) => {
 		const outcome = await runner.run({
 			prompt,
 			cwd: tmpdir(),
@@ -56,7 +58,7 @@ export const modelCallOver =
 
 		if (!succeeded(outcome)) return abstained(`the call ended as ${outcome.subtype}`);
 
-		if (!trusts(boundary, outcome.models)) return abstained(`${outcome.models.join(", ") || "no model"} has no measured rate at ${boundary} that meets the bar`);
+		if (reportOnly !== true && !trusts(boundary, outcome.models)) return abstained(`${outcome.models.join(", ") || "no model"} has no measured rate at ${boundary} that meets the bar`);
 
 		const parsed = answer.safeParse(outcome.structured);
 

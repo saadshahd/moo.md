@@ -29,6 +29,7 @@ import { reviewInput } from "../decide/review.ts";
 import { decideKind, forgetProgress, kindAnswered } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
 import { proveCheckItem } from "../loop/prove-item.ts";
 import { tallyOf } from "./tally.ts";
 import { decideProse } from "./prose-run.ts";
@@ -47,7 +48,7 @@ export const DEFAULT_BASE = "main";
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
 /** What the agent run hands back besides its commit. */
-export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional() }));
+export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
 export const PLAN_MARK = "hum plan:";
@@ -400,13 +401,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const attempt = state.runs.unended(id, purpose)?.attempt ?? state.runs.list(id).length;
 		const key = { itemId: id, run: purpose, attempt };
 		const begun = state.runs.begin(key, `hum ${id} ${purpose} #${attempt}`, crypto.randomUUID());
+		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md")) : [];
 		const prefix = config.hum.roles[purpose]?.file ?? purpose;
 
 		const lease = await d.gate?.enter(prefix, signal);
 
 		const outcome = await runner
 			.run({
-				prompt: text,
+				prompt: `${text}${memorySection(held)}`,
 				cwd: purpose === "review" ? tmpdir() : clone,
 				env: d.env,
 				...(await tierFor(purpose)),
@@ -421,7 +423,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			})
 			.finally(() => lease?.release());
 
-		state.runs.end(key);
+		state.runs.end(key, held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
 
 		if (outcome.kind === "limited") return pause({ outcome: "limited", item: id, until: outcome.until });
 

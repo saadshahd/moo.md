@@ -779,7 +779,7 @@
 					"claude-sonnet-5-5": 0.63
 				},
 				"alignment": {
-					"claude-haiku-5-5": 0.8
+					"claude-haiku-5-5": 0.68
 				},
 				"plan-outcome": {
 					"claude-haiku-5-5": 1,
@@ -794,7 +794,8 @@
 				},
 				"repeat-pair": {
 					"claude-haiku-5-5": 1
-				}
+				},
+				"taste": {}
 			},
 			"type": "object",
 			"propertyNames": {
@@ -805,7 +806,8 @@
 					"plan-outcome",
 					"review-verdict",
 					"reply-option",
-					"repeat-pair"
+					"repeat-pair",
+					"taste"
 				]
 			},
 			"additionalProperties": {
@@ -826,7 +828,8 @@
 				"plan-outcome",
 				"review-verdict",
 				"reply-option",
-				"repeat-pair"
+				"repeat-pair",
+				"taste"
 			],
 			"description": "Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."
 		},
@@ -1136,6 +1139,15 @@
 			"exclusiveMinimum": 0,
 			"exclusiveMaximum": 1,
 			"description": "The lowest precision on labelled pairs at which a model's call that two notes state one rule files a check item; below it the pair waits as a possible repeat."
+		},
+		"tasteRules": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "The owner's taste rules that have no deterministic check. Each pull request hum opens gets a comment saying whether its diff keeps each rule; the comment reports only and gates nothing."
 		},
 		"memoryMaxBytes": {
 			"default": 8000,

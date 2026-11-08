@@ -53,6 +53,7 @@ import { runChecks } from "./checks.ts";
 import { recordMerged } from "./merged.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { reportTaste } from "./taste.ts";
 import type { ThinResult } from "./thin-path.ts";
 
 const SHORT_EXCERPT = 200;
@@ -359,6 +360,8 @@ const throughPullRequest = async (
 			item: id,
 			detail: `its pull request was closed unmerged: ${pull.url}`,
 		};
+
+	await reportTaste(ctx, pulls, pull, ctx.state.landings.get(id)?.head ?? branch);
 
 	const armed = await pulls.autoMerge(
 		pull,

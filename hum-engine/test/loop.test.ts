@@ -8,7 +8,7 @@ import type { Finished, Runner } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { checkNameOf, fileChecks, filedFrom } from "../src/loop/check-item.ts";
 import { groupNotes } from "../src/loop/groups.ts";
-import { addEntry, MemoryFormatError, MemoryFull, parseMemory, renderMemory, unusedEntries, withoutCovered } from "../src/loop/memory.ts";
+import { addEntry, MemoryFormatError, MemoryFull, parseMemory, renderMemory, rulesUsed, unusedEntries, useOf, withoutCovered } from "../src/loop/memory.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "../src/loop/notes.ts";
 import { closeLoop, confirmChecks } from "../src/loop/pass.ts";
 import { trustsRepeats } from "../src/loop/pair.ts";
@@ -267,4 +267,30 @@ test("a model call tells what it spent for the item it served, whether it was tr
 
 	expect([picked.kind, refused.kind]).toEqual(["picked", "abstained"]);
 	expect(spent).toEqual([["a", 5000], ["a", 4000]]);
+});
+
+test("runs record the memory rules they applied, and a rule no run applied in the last runs is listed", () => {
+	const state = freshState();
+	const used = { rule: "Use Plain", source: "s" };
+	const idle = { rule: "Never touch vendor/", source: "s" };
+	const held = [used, idle];
+
+	const ended = (item: string, structured: { memoryUsed?: number[] }) => {
+		const key = { itemId: item, run: "build", attempt: 0 };
+
+		state.runs.begin(key, `hum ${item} build #0`);
+		state.runs.end(key, rulesUsed({ structured }, held));
+	};
+
+	ended("a", { memoryUsed: [1] });
+	ended("b", { memoryUsed: [1, 9] });
+	ended("c", {});
+	state.runs.begin({ itemId: "d", run: "plan", attempt: 0 }, "hum d plan #0");
+	state.runs.end({ itemId: "d", run: "plan", attempt: 0 });
+
+	const { runsSoFar, lastUsed } = useOf(state.runs.all());
+
+	expect(runsSoFar).toBe(3);
+	expect(unusedEntries(held, lastUsed, runsSoFar, 3)).toEqual([idle]);
+	expect(unusedEntries(held, lastUsed, runsSoFar, 4)).toEqual([]);
 });

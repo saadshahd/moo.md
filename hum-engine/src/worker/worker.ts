@@ -21,6 +21,7 @@ import { readHistory } from "../adapters/history.ts";
 import { gitIn, PATCH } from "../adapters/git.ts";
 import { join } from "node:path";
 import { configuredModelCall, modelCallOver } from "../adapters/model-call.ts";
+import { MemoryFormatError, readMemory, unusedEntries, useOf } from "../loop/memory.ts";
 import { runLoopPass, type LoopPass } from "../loop/pass.ts";
 import { modelProposer, trustsRepeats } from "../loop/pair.ts";
 import { measureOf } from "../measure/measure.ts";
@@ -440,6 +441,23 @@ export class Worker {
 		});
 	}
 
+	/** The memory.md rules the runs shown the file did not apply in the last `memoryUnusedRuns` of them. */
+	#unusedMemory(): string[] {
+		const { state, config, repo } = this.#o;
+
+		try {
+			const { runsSoFar, lastUsed } = useOf(state.runs.all());
+
+			return unusedEntries(readMemory(join(repo, ".hum", "memory.md")), lastUsed, runsSoFar, config.hum.memoryUnusedRuns).map(({ rule }) => rule);
+		} catch (error) {
+			if (!(error instanceof MemoryFormatError)) throw error;
+
+			state.faults.raise({ code: "memory-format", cause: error.message.slice(0, ERROR_EXCERPT), fix: "Give the line a source, as in - <rule> (source: <where you said it>)." });
+
+			return [];
+		}
+	}
+
 	/** The review-note loop runs once an interval, off the tick, so a slow model call never holds a tick. */
 	#loopIfDue(t: number): void {
 		const { state, config } = this.#o;
@@ -535,6 +553,7 @@ export class Worker {
 			})),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
 			possibleRepeats: state.possibleRepeats.list().map(({ a, b }) => ({ a, b })),
+			unusedMemory: this.#unusedMemory(),
 			measure: measureOf({ ...measureInputsOf(state), window: config.hum.measureWindow, globs: config.hum.paths.map(({ glob }) => glob) }) ?? null,
 			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
 		});

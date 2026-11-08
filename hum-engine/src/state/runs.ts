@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
-import { atomicWrite, createOnce, listRecords, orMissing, readJson, slug } from "./fs.ts";
+import { atomicWrite, createOnce, listFiles, listRecords, orMissing, readJson, slug } from "./fs.ts";
 
 export const RunKey = z.strictObject({ itemId: z.string().min(1), run: z.string().min(1), attempt: z.int().nonnegative() });
 
@@ -14,6 +14,8 @@ export const RunRecord = RunKey.extend({
 	savedAt: z.int().nonnegative(),
 	/** Set when the run's outcome has been taken; a record without it is a run a restart adopts. */
 	endedAt: z.int().nonnegative().optional(),
+	/** The rules of memory.md the run says it applied; absent when the run was shown none. */
+	memoryUsed: z.array(z.string()).optional(),
 });
 
 export type RunRecord = z.infer<typeof RunRecord>;
@@ -63,12 +65,12 @@ export class RunRecords {
 	}
 
 	/** Marks the run's outcome as taken, so a restart starts a new attempt and adopts nothing. */
-	end(key: RunKey): RunRecord {
+	end(key: RunKey, memoryUsed?: readonly string[]): RunRecord {
 		const record = this.get(key);
 
 		if (!record) throw new Error(`no saved run for ${key.itemId} ${key.run} #${key.attempt}; call begin before launch`);
 
-		const next = RunRecord.parse({ ...record, endedAt: this.#now() });
+		const next = RunRecord.parse({ ...record, endedAt: this.#now(), memoryUsed: memoryUsed && [...memoryUsed] });
 
 		atomicWrite(this.#path(next), `${JSON.stringify(next)}\n`);
 
@@ -78,6 +80,14 @@ export class RunRecords {
 	/** The item's run of this purpose that was begun and never ended: the one a restart adopts. */
 	unended(itemId: string, run: string): RunRecord | undefined {
 		return this.list(itemId).find((record) => record.run === run && record.endedAt === undefined);
+	}
+
+	/** Every item's saved runs, oldest first. */
+	all(): RunRecord[] {
+		return listFiles(this.#folder)
+			.flatMap(listRecords)
+			.map((file) => RunRecord.parse(readJson(file)))
+			.sort((a, b) => a.savedAt - b.savedAt);
 	}
 
 	/** The item's saved runs, oldest first. */

@@ -205,7 +205,7 @@
 			"claude-sonnet-5-5": 0.63
 		},
 		"alignment": {
-			"claude-haiku-5-5": 0.8
+			"claude-haiku-5-5": 0.68
 		},
 		"plan-outcome": {
 			"claude-haiku-5-5": 1,
@@ -220,7 +220,8 @@
 		},
 		"repeat-pair": {
 			"claude-haiku-5-5": 1
-		}
+		},
+		"taste": {}
 	},
 	"mergeRisk": {
 		"weights": {
@@ -282,6 +283,7 @@
 		]
 	},
 	"ownerLogins": [],
+	"tasteRules": [],
 	"repeatAt": 2,
 	"repeatPrecision": 0.9,
 	"memoryMaxBytes": 8000,

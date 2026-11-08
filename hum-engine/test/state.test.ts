@@ -373,7 +373,7 @@ test("the status file holds its sections, the engine versions and the measure sl
 	const read = readStatus(path);
 
 	expect(read.ok && read.status).toEqual(status);
-	expect(Object.keys(status)).toEqual(["format", "writtenAt", "workers", "engine", "questions", "cards", "inFlight", "merged", "choices", "rules", "possibleRepeats", "measure"]);
+	expect(Object.keys(status)).toEqual(["format", "writtenAt", "workers", "engine", "questions", "cards", "inFlight", "merged", "choices", "rules", "possibleRepeats", "unusedMemory", "measure"]);
 	expect(status.measure).toBeNull();
 	expect(status.engine.version).toBe(ENGINE_VERSION);
 	expect(() => writeStatus(path, { ...status, writtenAt: -1 })).toThrow();

@@ -12,6 +12,7 @@ import { BOUNDARIES, type Boundary, HumConfig } from "../src/config/schema.ts";
 import { alignmentQuestion, raisesLevel } from "../src/decide/alignment.ts";
 import { replyQuestion } from "../src/decide/answer.ts";
 import { kindQuestion } from "../src/decide/kind.ts";
+import { tasteQuestion } from "../src/decide/taste.ts";
 import { pairQuestion } from "../src/loop/pair.ts";
 import type { ReviewNote } from "../src/loop/records.ts";
 import { pairing, prepare } from "../src/loop/signals.ts";
@@ -28,7 +29,10 @@ import { SECOND_MS } from "../src/time.ts";
  */
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { model: { type: "string" }, limit: { type: "string" } } });
-const boundaries: readonly Boundary[] = positionals.length > 0 ? z.array(z.enum(BOUNDARIES)).parse(positionals) : BOUNDARIES;
+/** Boundaries whose labelled cases only the owner can give; they are measured when named, from the cases the owner puts in their evals folder. */
+const OWNER_LABELLED: readonly Boundary[] = ["taste"];
+
+const boundaries: readonly Boundary[] = positionals.length > 0 ? z.array(z.enum(BOUNDARIES)).parse(positionals) : BOUNDARIES.filter((boundary) => !OWNER_LABELLED.includes(boundary));
 const root = join(import.meta.dir, "..");
 const raw = readConfigDir(join(root, "defaults"));
 const config = { hum: HumConfig.parse(raw.hum), roles: raw.roles };
@@ -97,6 +101,7 @@ const PlanCase = z.object({ case: z.string(), label: z.string(), body: z.string(
 const ReplyCase = z.object({ case: z.string(), label: z.string(), question: z.string(), options: z.array(z.string()), reply: z.string() });
 const ReviewCase = z.object({ case: z.string(), label: z.string(), item: z.string(), diff: z.string() });
 const PairCase = z.object({ case: z.string(), label: z.enum(["same", "different"]), a: z.object({ text: z.string() }), b: z.object({ text: z.string() }) });
+const TasteCase = z.object({ case: z.string(), label: z.enum(["keeps", "breaks"]), rule: z.string(), diff: z.string() });
 
 /** Calls at once: enough to finish a set in minutes, few enough not to trip a rate limit. */
 const AT_ONCE = 4;
@@ -167,6 +172,15 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Verdict[]>> = {
 			pairCounts[said ? (truth ? "tp" : "fp") : truth ? "fn" : "tn"]++;
 
 			return said === truth ? "right" : "wrong";
+		});
+	},
+	taste: async () => {
+		const cases = (await read("taste", TasteCase)).slice(0, limit);
+
+		return eachOf(cases, async (found) => {
+			const judged = await judge(tasteQuestion(found.rule, found.diff, config.hum));
+
+			return judged.kind === "abstained" ? "abstained" : scored(judged.value.keeps ? "keeps" : "breaks", found.label);
 		});
 	},
 	"review-verdict": async () => {

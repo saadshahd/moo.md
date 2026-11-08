@@ -85,6 +85,8 @@ export const Status = z.strictObject({
 	rules: z.array(LearnedRule),
 	/** Pairs of review notes only a model found alike, waiting for its precision to reach the owner's bar. */
 	possibleRepeats: z.array(z.strictObject({ a: name, b: name })),
+	/** memory.md rules no run applied in the last runs; the owner decides whether to keep them. */
+	unusedMemory: z.array(z.string()),
 	measure: Measure.nullable(),
 });
 
@@ -103,6 +105,7 @@ export const emptyStatus = (engineVersion: string, writtenAt: number): Status =>
 	choices: [],
 	rules: [],
 	possibleRepeats: [],
+	unusedMemory: [],
 	measure: null,
 });
 

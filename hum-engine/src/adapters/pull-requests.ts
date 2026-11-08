@@ -47,6 +47,8 @@ export type PullRequests = {
 		method: MergeMethod,
 	) => Promise<"armed" | "merged" | "off">;
 	readonly update: (pull: Pull) => Promise<void>;
+	/** One comment on the pull request. */
+	readonly comment: (pull: Pull, body: string) => Promise<void>;
 };
 
 const Rule = z.looseObject({
@@ -92,6 +94,10 @@ const DISABLE_AUTO_MERGE = `mutation DisableAutoMerge($pull: ID!) {
 
 const MERGE_NOW = `mutation MergeNow($pull: ID!, $mergeMethod: PullRequestMergeMethod!) {
 	mergePullRequest(input: { pullRequestId: $pull, mergeMethod: $mergeMethod }) { clientMutationId }
+}`;
+
+const COMMENT = `mutation Comment($pull: ID!, $body: String!) {
+	addComment(input: { subjectId: $pull, body: $body }) { clientMutationId }
 }`;
 
 const UPDATE_BRANCH = `mutation UpdateBranch($pull: ID!) {
@@ -241,5 +247,7 @@ export const gitHubPullRequests = (
 		},
 		update: async (pull) =>
 			void (await graphql(Acknowledged, UPDATE_BRANCH, { pull: pull.id })),
+		comment: async (pull, body) =>
+			void (await graphql(Acknowledged, COMMENT, { pull: pull.id, body })),
 	};
 };
