@@ -225,7 +225,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 		writeFileSync(join(w.repo.owner, path), text);
 	};
 
-	put(".hum/hum.json", JSON.stringify(raw.hum));
+	put(".hum/hum.json", JSON.stringify({ ...raw.hum, backgroundPollSeconds: 0.05 }));
 
 	for (const [name, kind] of Object.entries(raw.kinds)) put(`.hum/kinds/${name}.json`, JSON.stringify(kind));
 

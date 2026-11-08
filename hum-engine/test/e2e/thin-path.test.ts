@@ -5,12 +5,13 @@ import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { startBackgroundRunner } from "../../src/adapters/claude-bg.ts";
 import { startRunner } from "../../src/adapters/claude-p.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
 import type { Config } from "../../src/config/load.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { openState } from "../../src/state/open.ts";
-import { PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../src/worker/thin-path.ts";
+import { type Checkout, PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../src/worker/thin-path.ts";
 import { configWith } from "../fixtures/config.ts";
 import { WorkRepo, itemFile, markdownSettings, sh } from "../fixtures/work-repo.ts";
 import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
@@ -24,7 +25,7 @@ afterEach(() => {
 	for (const clean of cleanups.splice(0)) clean();
 });
 
-const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f docs/note.md"] }: { config?: Config; checks?: string[] } = {}) => {
+const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f docs/note.md"], background = false }: { config?: Config; checks?: string[]; background?: boolean } = {}) => {
 	const repo = new WorkRepo();
 	const clock = { at: NOW };
 	const now = () => clock.at;
@@ -32,7 +33,8 @@ const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-thin-")), { now });
 	const reports: string[] = [];
 	const adapter = markdownAdapter({ ...markdownSettings, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
-	const { check, runner } = await startRunner({ state, model: config.hum.models.light, binary: shim.binary, env: shim.env, now });
+	const runnerOptions = { state, model: config.hum.models.light, binary: shim.binary, env: shim.env, now };
+	const { check, runner } = background ? await startBackgroundRunner({ ...runnerOptions, config: { ...config.hum, backgroundPollSeconds: 0.05 }, repo: repo.owner }) : await startRunner(runnerOptions);
 
 	cleanups.push(() => rmSync(repo.root, { recursive: true, force: true }), () => rmSync(state.dir, { recursive: true, force: true }));
 
@@ -91,6 +93,36 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	expect(w.state.events.get({ source: "work-source", sourceId: `merged:${tip}`, itemId: id }).type).toBe("merged");
 	// The finished item leaves no snapshot behind.
 	expect(existsSync(w.state.items.path(id))).toBe(false);
+});
+
+test("the thin path through a background run: the build is a named agent, its commit lands, and the run is stopped and removed", async () => {
+	const w = await world({ script: [{}, {}, NOTE] }, { background: true });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options())).toEqual({ outcome: "merged", item: id });
+	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("hello\n");
+
+	const [record] = w.state.runs.list(id);
+	const launches = w.shim.background().filter(({ cmd }) => cmd === "bg");
+
+	expect(launches.map(({ name }) => name)).toEqual(["hum start check", record?.name]);
+	expect(record?.sessionId).toBe(`aaaaaaa2-0000-4000-8000-000000000000`);
+	expect(w.shim.background().map(({ cmd }) => cmd)).toEqual(["bg", "stop", "rm", "bg", "stop", "rm"]);
+	expect(w.shim.agents()).toEqual([]);
+});
+
+test("a run's working copy comes from the checkout it is given, on the remote's base branch", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+	const sources: { folder: string; remote: string; base: string }[] = [];
+
+	const checkout: Checkout = async (folder, source) => {
+		sources.push({ folder, ...source });
+		await sh(tmpdir(), ["clone", "-q", "--branch", source.base, source.remote, folder]);
+	};
+
+	expect(await runThinPath(w.options({ checkout }))).toEqual({ outcome: "merged", item: id });
+	expect(sources).toMatchObject([{ remote: w.repo.remote, base: "main" }]);
 });
 
 test("a merged item is not picked up again after its claim expires", async () => {

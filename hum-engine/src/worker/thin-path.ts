@@ -64,6 +64,8 @@ export type ThinPathOptions = {
 	readonly holder: string;
 	/** Where runs clone to; a temp folder by default. */
 	readonly workDir?: string;
+	/** Makes the run's working copy in an empty folder, on the remote's base branch. By default a `git clone`. */
+	readonly checkout?: Checkout;
 	readonly dir?: string;
 	/** Take this item; default the first ready one. */
 	readonly itemId?: string;
@@ -220,7 +222,7 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 	const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 	try {
-		await gitIn(tmpdir()).raw(["clone", "-q", "--branch", base, o.remote, clone]);
+		await (o.checkout ?? cloneCheckout)(clone, { remote: o.remote, base });
 
 		if ((await g(["ls-remote", "--heads", "origin", branch])).trim()) {
 			await g(["fetch", "-q", "origin", `${branch}:${branch}`]);
@@ -240,6 +242,16 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 	} finally {
 		rmSync(clone, { recursive: true, force: true });
 	}
+};
+
+/** Where a run's working copy comes from: the remote and the branch it starts on. */
+export type Source = { readonly remote: string; readonly base: string };
+
+/** Makes a run's working copy in `folder`, an empty folder. A background run starts only in a repo the owner trusts, which a fresh clone is not. */
+export type Checkout = (folder: string, source: Source) => Promise<void>;
+
+const cloneCheckout: Checkout = async (folder, { remote, base }) => {
+	await gitIn(tmpdir()).raw(["clone", "-q", "--branch", base, remote, folder]);
 };
 
 /** The options with the clock every later step reads. */
@@ -346,7 +358,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	/** One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where the state can, and ends stuck where it cannot. */
 	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal): Promise<Finished> => {
-		const attempt = state.runs.list(id).length;
+		const attempt = state.runs.unended(id, purpose)?.attempt ?? state.runs.list(id).length;
 		const key = { itemId: id, run: purpose, attempt };
 		const begun = state.runs.begin(key, `hum ${id} ${purpose} #${attempt}`, crypto.randomUUID());
 		const prefix = config.hum.roles[purpose]?.file ?? purpose;
@@ -360,12 +372,16 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				...(await tierFor(purpose)),
 				schema,
 				tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
-				sessionId: begun.record.sessionId,
+				name: begun.record.name,
+				// A saved id already has a transcript under it; a fresh run mints its own.
+				sessionId: begun.adopted ? undefined : begun.record.sessionId,
 				signal,
 				onSession: (sessionId) => state.runs.saveSession(key, sessionId),
 				onFirstToken: () => lease?.opened(),
 			})
 			.finally(() => lease?.release());
+
+		state.runs.end(key);
 
 		if (outcome.kind === "limited") return pause({ outcome: "limited", item: id, until: outcome.until });
 

@@ -25,7 +25,7 @@ import type { PullRequests } from "../adapters/pull-requests.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, claimTtlMs, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, claimTtlMs, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -47,6 +47,8 @@ export type WorkerOptions = {
 	readonly checks: readonly string[];
 	readonly holder: string;
 	readonly workDir?: string;
+	/** Makes each run's working copy; by default a `git clone`. */
+	readonly checkout?: Checkout;
 	readonly dir?: string;
 	readonly where?: "mac" | "ci";
 	readonly now?: () => number;
@@ -379,6 +381,7 @@ export class Worker {
 				checks: this.#o.checks,
 				holder: this.#o.holder,
 				workDir: this.#o.workDir,
+				checkout: this.#o.checkout,
 				dir: this.#o.dir,
 				itemId: id,
 				signal: abort.signal,

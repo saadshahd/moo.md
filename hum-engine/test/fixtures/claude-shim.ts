@@ -26,10 +26,19 @@ const spec = JSON.parse(process.env.HUM_SHIM ?? "{}") as {
 	judgments?: { kind?: { kind: string }; alignment?: { alignment: string; verification: string } };
 	/** What plan and review runs pick, in order, logged apart; past the last, a plan is ready and a review approves. */
 	decisions?: Decided[];
+	/** Where background runs are kept; makeShim sets it. */
+	bg?: string;
+	/** `claude --bg` fails as when the background service is down. */
+	bgDown?: boolean;
 };
 
 if (process.argv.includes("--version")) {
 	console.log(`${spec.version ?? "2.1.316"} (Claude Code)`);
+	process.exit(0);
+}
+
+if (process.argv.includes("--bg") || ["agents", "stop", "rm"].includes(process.argv[2] ?? "")) {
+	await (await import("./claude-bg-shim.ts")).runBackground(process.argv.slice(2));
 	process.exit(0);
 }
 

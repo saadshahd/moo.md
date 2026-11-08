@@ -13,6 +13,7 @@ import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import type { Card } from "../status/format.ts";
+import { billed } from "./transcript.ts";
 
 export type Effort = (typeof EFFORTS)[number];
 
@@ -51,7 +52,7 @@ const savedLimitUntil = (state: Pick<State, "limit">): number => state.limit.get
 
 const CREDENTIALS = "credentials.json";
 
-const CARD_EXCERPT = 200;
+export const CARD_EXCERPT = 200;
 
 const STDERR_TAIL = 500;
 
@@ -66,6 +67,8 @@ export type RunSpec = {
 	readonly schema: object;
 	readonly sessionId: string;
 	readonly call?: Call;
+	/** The run's name in agent view and in `claude agents`. */
+	readonly name?: string;
 };
 
 /**
@@ -73,7 +76,7 @@ export type RunSpec = {
  * The prompt goes on stdin, never in argv. Never `--bare`, `--resume` or `--continue`: bare mode reads neither the
  * login nor the plan token, and a run never resumes a session.
  */
-export const runArgs = ({ model, effort, schema, sessionId, call = "run" }: RunSpec): string[] => [
+export const runArgs = ({ model, effort, schema, sessionId, call = "run", name }: RunSpec): string[] => [
 	"-p",
 	"--output-format",
 	"stream-json",
@@ -89,6 +92,7 @@ export const runArgs = ({ model, effort, schema, sessionId, call = "run" }: RunS
 	"--session-id",
 	sessionId,
 	...CALLS[call].flags,
+	...(name === undefined ? [] : ["-n", name]),
 ];
 
 const Usage = z.looseObject({
@@ -139,9 +143,6 @@ type Result = z.infer<typeof Result>;
 const StreamEvent = z.discriminatedUnion("type", [Init, Assistant, RateLimit, Result]);
 
 type StreamEvent = z.infer<typeof StreamEvent>;
-
-/** Tokens a run adds to the item's bill: input, output and cache writes. Cache reads are not counted. */
-const billed = (input: number, output: number, cacheWrite: number): number => input + output + cacheWrite;
 
 /** What the stream has said so far. */
 type Transcript = {
@@ -324,6 +325,8 @@ export type RunRequest = {
 	readonly effort: Effort;
 	readonly schema: object;
 	readonly call?: Call;
+	/** Saved before the run launches. A background run is found by it after a crash, and agent view lists it under it. */
+	readonly name?: string;
 	/** Tokens the item may still spend. */
 	readonly tokenCap?: number;
 	readonly sessionId?: string;
@@ -401,13 +404,16 @@ const recordCredential = (state: RunnerOptions["state"], credential: string): vo
 	});
 };
 
-const START_PROMPT = 'Reply with the JSON {"ok":true}.';
+export const START_PROMPT = 'Reply with the JSON {"ok":true}.';
 
-const START_SCHEMA = {
+export const START_SCHEMA = {
 	type: "object",
 	properties: { ok: { type: "boolean" } },
 	required: ["ok"],
 };
+
+/** What the start check's run must answer. */
+export const START_ANSWER = z.object({ ok: z.literal(true) });
 
 const VERSION = /\d+\.\d+\.\d+/;
 
@@ -436,14 +442,14 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 	});
 
 	/** One process, read line by line. The cap is checked on every streamed message, and the process is killed the moment it is passed. */
-	const spawnRun = async ({ prompt, cwd, model, effort, schema, call, tokenCap, signal, onFirstToken }: RunRequest, sessionId: string): Promise<Ended> => {
+	const spawnRun = async ({ prompt, cwd, model, effort, schema, call, name, tokenCap, signal, onFirstToken }: RunRequest, sessionId: string): Promise<Ended> => {
 		const stop = new AbortController();
 		const logs = mkdtempSync(join(tmpdir(), "hum-claude-"));
 		const stderrFile = join(logs, "stderr");
 		const stderrFd = openSync(stderrFile, "w");
 
 		try {
-			const proc = x(binary, runArgs({ model, effort, schema, sessionId, call }), {
+			const proc = x(binary, runArgs({ model, effort, schema, sessionId, call, name }), {
 				stdin: prompt,
 				signal: AbortSignal.any(signal ? [stop.signal, signal] : [stop.signal]),
 				nodePath: false,

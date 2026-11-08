@@ -93,6 +93,8 @@ export { type OpName } from "./cli/commands.ts";
 
 export { type Io, runCli, runOp } from "./cli/ops.ts";
 
+export { BACKGROUND_CHECK_CODE, FALLBACK_CODE, type BackgroundOptions, type BackgroundStartOptions, backgroundRunner, backgroundSettings, type StartedBackground, startBackgroundRunner } from "./adapters/claude-bg.ts";
+
 export {
 	CLAUDE_FLOOR,
 	type Effort,
@@ -114,6 +116,8 @@ export {
 	RUN_SCHEMA,
 	runBranch,
 	runThinPath,
+	type Checkout,
+	type Source,
 	type ThinPathOptions,
 	type ThinResult,
 } from "./worker/thin-path.ts";

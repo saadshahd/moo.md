@@ -324,6 +324,18 @@ test("the run's name is saved before launch and adopted after a restart", () => 
 	expect(after.list("#68")).toHaveLength(1);
 });
 
+test("a run is adopted until its outcome is taken, then the next attempt starts fresh", () => {
+	const key = { itemId: "#68", run: "build", attempt: 0 };
+	const runs = openState(dir).runs;
+
+	runs.begin(key, "hum #68 build #0");
+	expect(runs.unended("#68", "build")?.attempt).toBe(0);
+	expect(runs.unended("#68", "review")).toBeUndefined();
+	runs.end(key);
+	expect(runs.unended("#68", "build")).toBeUndefined();
+	expect(openState(dir).runs.get(key)?.endedAt).toBeNumber();
+});
+
 test("a reader never sees a partial status file", async () => {
 	const path = join(dir, "status.json");
 

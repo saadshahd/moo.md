@@ -38,7 +38,7 @@ export type Behavior = {
 /** What a plan or review run picks, as the run's answer. */
 export type Decided = { event: string; sure: boolean; reason: string; cites?: { file: string; line: number }[]; parts?: string[]; question?: string; plan?: { summary: string; steps: string[]; paths: string[] } };
 
-export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[] };
+export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean };
 
 export type Shim = {
 	/** The executable the runner calls instead of `claude`. */
@@ -51,6 +51,10 @@ export type Shim = {
 	readonly ends: () => { pid: number; at: number }[];
 	/** Each plan or review run: its purpose, the pick it gave, its prompt and its working folder. */
 	readonly decisions: () => { purpose: "plan" | "review"; answer: Decided; prompt: string; cwd: string }[];
+	/** Each `claude` call that concerns background runs, in order: `bg` launches (with name, prompt and settings), `stop` and `rm`. */
+	readonly background: () => { cmd: "bg" | "stop" | "rm"; name?: string; id?: string; prompt?: string; cwd?: string; settings?: string; argv?: string[] }[];
+	/** The runs `claude agents --json` lists now. */
+	readonly agents: () => { id: string; name: string; sessionId: string; state: string }[];
 };
 
 const lines = (file: string) => {
@@ -66,15 +70,24 @@ export const makeShim = (spec: ShimSpec = {}): Shim => {
 	const dir = mkdtempSync(join(tmpdir(), "hum-shim-"));
 	const binary = join(dir, "claude");
 	const log = join(dir, "calls.jsonl");
+	const bg = join(dir, "bg");
 
 	writeFileSync(binary, `#!/bin/sh\nexec bun ${JSON.stringify(SHIM)} "$@"\n`);
 	chmodSync(binary, 0o755);
 
 	return {
 		binary,
-		env: { HUM_SHIM: JSON.stringify({ ...spec, log }) },
+		env: { HUM_SHIM: JSON.stringify({ ...spec, log, bg }) },
 		calls: () => lines(log),
 		ends: () => lines(`${log}.ends`),
 		decisions: () => lines(`${log}.decisions`),
+		background: () => lines(join(bg, "calls.jsonl")),
+		agents: () => {
+			try {
+				return JSON.parse(readFileSync(join(bg, "agents.json"), "utf8"));
+			} catch {
+				return [];
+			}
+		},
 	};
 };

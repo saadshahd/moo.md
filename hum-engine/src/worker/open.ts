@@ -2,12 +2,14 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { Adapter } from "../adapter-api.ts";
 import { resolveAdapters } from "../adapters/registry.ts";
+import { startBackgroundRunner } from "../adapters/claude-bg.ts";
 import { startRunner } from "../adapters/claude-p.ts";
 import { gitIn } from "../adapters/git.ts";
 import { repoFromRemote } from "../adapters/github.ts";
 import { gitHubPullRequests } from "../adapters/pull-requests.ts";
 import { serialized } from "../adapters/serial.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
+import type { HumConfig } from "../config/schema.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
@@ -33,6 +35,9 @@ export const npmLatest = async (): Promise<string | undefined> => {
 
 	return reply.ok ? Latest.safeParse(await reply.json()).data?.version : undefined;
 };
+
+/** Runs are background agents where an owner can see agent view: on the Mac, and only when `hum.json` allows it. */
+const isInBackground = ({ backgroundRuns }: Pick<HumConfig, "backgroundRuns">, where: WorkerOptions["where"]): boolean => backgroundRuns && where !== "ci";
 
 /**
  * Wires a worker for the owner's repo: state in the git common dir, the config in `.hum/`, the adapters
@@ -75,7 +80,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	if (!workSource || !questions) throw new Error("hum.json names no work source or no questions integration");
 
-	const { runner } = await startRunner({ state, model: config.hum.models.light, binary, env, now });
+	const runnerOptions = { state, model: config.hum.models.light, binary, env, now };
+	const { runner } = isInBackground(config.hum, rest.where) ? await startBackgroundRunner({ ...runnerOptions, config: config.hum, repo }) : await startRunner(runnerOptions);
 
 	const github = repoFromRemote(remote);
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github);

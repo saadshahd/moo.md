@@ -172,6 +172,13 @@ const Shipped = z.object({
 	priorityLabels: z.array(name).describe("Item labels that put its question first under the daily cap, highest first."),
 	undoableLevels: z.array(name).describe("Levels at which a choice that touches only the change's own files is made without the owner."),
 	ownerBranchPrefix: branchPrefix.describe("The branch prefix of a pull request that lands a commit the owner wrote, such as an answer."),
+	backgroundRuns: z.boolean().describe("Whether a run on the Mac is a Claude Code background agent, listed in agent view, instead of a claude -p process."),
+	backgroundLaunchSeconds: z.number().positive().describe("How long a launch waits for the run it just started to appear in the agent list."),
+	backgroundPollSeconds: z.number().positive().describe("The time between reads of a background run's transcript and job state."),
+	deniedRunCommands: z.array(name).describe("Shell commands a background run may not run: each is denied as written, with any arguments."),
+	runAutoMode: z
+		.strictObject({ environment: z.array(z.string().min(1)), allow: z.array(z.string().min(1)), hardDeny: z.array(z.string().min(1)) })
+		.describe("What auto mode's classifier is told about a background run: the situation it is in, what it allows, and what it always refuses; '$defaults' keeps Claude Code's own rules."),
 	mergeRisk: z
 		.strictObject({
 			weights: z.record(z.enum(GRADED), z.number().positive()),
@@ -368,4 +375,9 @@ export const OWNER_CHANGEABLE = {
 	"priority labels": "priorityLabels",
 	"undoable levels": "undoableLevels",
 	"owner branch prefix": "ownerBranchPrefix",
+	"background runs": "backgroundRuns",
+	"background poll": "backgroundPollSeconds",
+	"background launch wait": "backgroundLaunchSeconds",
+	"denied run commands": "deniedRunCommands",
+	"run auto mode": "runAutoMode",
 } as const satisfies Record<string, string>;

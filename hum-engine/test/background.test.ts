@@ -1,0 +1,182 @@
+import { expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { x } from "tinyexec";
+import { BACKGROUND_CHECK_CODE, backgroundRunner, FALLBACK_CODE, backgroundSettings, HUM_PLUGIN, launchArgs, type Progress, progressOf, type Reading, startBackgroundRunner } from "../src/adapters/claude-bg.ts";
+import { type Runner, type RunRequest, startRunner } from "../src/adapters/claude-p.ts";
+import { readTranscript, billedTokens } from "../src/adapters/transcript.ts";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { openState } from "../src/state/open.ts";
+import { makeShim, type ShimSpec } from "./fixtures/shim.ts";
+
+const MODEL = SHIPPED_DEFAULTS.models.light;
+const CONFIG = { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.05 };
+const STRUCTURED = { ok: true };
+
+const setup = async (spec: ShimSpec = {}) => {
+	const shim = makeShim(spec);
+	const state = openState(mkdtempSync(join(tmpdir(), "hum-background-")));
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env });
+	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner });
+
+	return { shim, state, runner, background };
+};
+
+const ask = (runner: Runner, over: Partial<RunRequest> = {}) => runner.run({ name: "hum #68 build #0", prompt: "do it", cwd: tmpdir(), model: MODEL, effort: "low", schema: { type: "object" }, ...over });
+
+type Usage = { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number; iterations?: { type: string; input_tokens: number; output_tokens: number }[] };
+
+const assistant = (id: string, usage: Usage) => JSON.stringify({ type: "assistant", message: { id, model: "claude-haiku-5-5", usage } });
+
+const attachment = (timestamp: string) => JSON.stringify({ type: "attachment", timestamp, attachment: { type: "structured_output", data: STRUCTURED } });
+
+const apiError = (error: string) => JSON.stringify({ type: "assistant", isApiErrorMessage: true, error });
+
+test("a transcript sums tokens once per message id, counting the advisor's own calls, and reads the structured result and an API error", () => {
+	const transcript = readTranscript(
+		[
+			assistant("m1", { input_tokens: 1, output_tokens: 5, cache_creation_input_tokens: 100, cache_read_input_tokens: 9 }),
+			assistant("m1", { input_tokens: 1, output_tokens: 7, cache_creation_input_tokens: 100, cache_read_input_tokens: 9 }),
+			assistant("m2", { input_tokens: 2, output_tokens: 3, iterations: [{ type: "message", input_tokens: 2, output_tokens: 3 }, { type: "advisor_message", input_tokens: 1000, output_tokens: 20 }] }),
+			"not json, a row still being written",
+			attachment("2026-11-08T10:00:00.000Z"),
+			apiError("model_not_found"),
+		].join("\n"),
+	);
+
+	expect(billedTokens(transcript)).toBe(1 + 7 + 100 + 2 + 3 + 1020);
+	expect(transcript.structured).toEqual({ data: STRUCTURED, at: Date.parse("2026-11-08T10:00:00.000Z") });
+	expect(transcript.apiError).toBe("model_not_found");
+});
+
+const NOW_MS = Date.parse("2026-11-08T10:00:00.000Z");
+
+const reading = (over: Partial<Reading> & { structuredAt?: number; spent?: number }): Reading => ({
+	transcript: {
+		messages: over.spent === undefined ? {} : { m: { billed: over.spent, cacheRead: 0, model: "claude-haiku-5-5" } },
+		structured: over.structuredAt === undefined ? undefined : { data: STRUCTURED, at: over.structuredAt },
+		apiError: over.transcript?.apiError,
+	},
+	stops: over.stops ?? [],
+	job: "job" in over ? over.job : "working",
+});
+
+const PROGRESS: [string, Reading, number | undefined, Progress["kind"]][] = [
+	["a run still working", reading({ spent: 10 }), 100, "waiting"],
+	["the first Stop, before the structured result", reading({ structuredAt: NOW_MS, stops: [NOW_MS - 1] }), 100, "waiting"],
+	["a Stop after the structured result", reading({ structuredAt: NOW_MS, stops: [NOW_MS - 1, NOW_MS + 1] }), 100, "done"],
+	["tokens past the cap", reading({ spent: 101 }), 100, "over-cap"],
+	["a job in the failed state", reading({ job: "failed" }), 100, "failed"],
+	["an API error row", reading({ transcript: { messages: {}, structured: undefined, apiError: "model_not_found" } }), 100, "failed"],
+	["a job that ended with no structured result", reading({ job: "done" }), 100, "failed"],
+	["a run gone from the list with no result", reading({ job: undefined }), 100, "failed"],
+	["no cap set", reading({ spent: 1_000_000 }), undefined, "waiting"],
+];
+
+test.each(PROGRESS)("progress: %s", (_name, at, cap, expected) => {
+	expect(progressOf(at, cap).kind).toBe(expected);
+});
+
+test("run settings turn hum's plugin off, deny the GitHub writes and report the run to the stops folder, and the prompt stays out of the flags", () => {
+	const settings = backgroundSettings(CONFIG, "/tmp/it's here/stops");
+	const args = launchArgs({ name: "hum #68 build #0", model: MODEL, effort: "low", schema: { type: "object" }, settings });
+
+	expect(settings).toMatchObject({ enabledPlugins: { [HUM_PLUGIN]: false }, permissions: { deny: expect.arrayContaining(["Bash(git push *)"]) } });
+	expect(JSON.stringify(settings)).toContain(`cat > '/tmp/it'\\\\''s here/stops'/$$.json`);
+	expect(args.slice(0, 3)).toEqual(["--bg", "-n", "hum #68 build #0"]);
+	expect(args).not.toContain("do it");
+});
+
+test("a named run is a background agent: its prompt comes on stdin, its tokens are read from the transcript, and it is stopped and removed once its outcome is taken", async () => {
+	const { shim, background } = await setup({ script: [{}, { structured: { done: 1 }, spend: 7 }] });
+	const sessions: string[] = [];
+	const outcome = await ask(background, { prompt: "build the thing", onSession: (id) => sessions.push(id) });
+
+	expect(outcome).toMatchObject({ kind: "finished", structured: { done: 1 }, tokens: 8, isError: false, models: ["claude-haiku-5-5"] });
+	expect(sessions).toHaveLength(1);
+
+	const [launch, ...after] = shim.background();
+
+	expect(launch).toMatchObject({ cmd: "bg", name: "hum #68 build #0", prompt: "build the thing" });
+	expect(launch?.argv).not.toContain("build the thing");
+	expect(after.map(({ cmd }) => cmd)).toEqual(["stop", "rm"]);
+	expect(shim.agents()).toEqual([]);
+});
+
+test("a cheap model call and a run with no name are never background agents", async () => {
+	const { shim, background } = await setup();
+
+	await ask(background, { call: "judgment" });
+	await ask(background, { name: undefined });
+
+	expect(shim.background()).toEqual([]);
+	expect(shim.calls()).toHaveLength(2);
+});
+
+test("when the background service refuses a run it goes on as claude -p under the same name, with one card that says why", async () => {
+	const { shim, state, background } = await setup({ bgDown: true, script: [{}, { structured: { done: 1 } }] });
+
+	expect(await ask(background)).toMatchObject({ kind: "finished", structured: { done: 1 } });
+	expect(shim.calls().at(-1)?.argv).toContain("hum #68 build #0");
+	expect(state.faults.list().map(({ code }) => code)).toEqual([FALLBACK_CODE]);
+	expect(state.faults.list()[0]?.cause).toContain("background service is not running");
+});
+
+test("a run past its token cap is stopped partway, and the tokens it spent are reported", async () => {
+	const { shim, background } = await setup({ script: [{}, { spend: 500, hang: true }] });
+	const outcome = await ask(background, { tokenCap: 100 });
+
+	expect(outcome).toMatchObject({ kind: "over-cap", tokens: 501 });
+	expect(shim.background().map(({ cmd }) => cmd)).toEqual(["bg", "stop", "rm"]);
+	expect(shim.agents()).toEqual([]);
+});
+
+test("a run that fails is a finished error with the API's text", async () => {
+	const { background } = await setup({ script: [{}, { error: "model_not_found" }] });
+
+	expect(await ask(background)).toMatchObject({ kind: "finished", isError: true, subtype: "error_during_execution", text: "model_not_found" });
+});
+
+test("a worker killed after the launch and before the session id is saved finds its run by name on restart: one run, its id saved", async () => {
+	const shim = makeShim({ script: [{}, { structured: { done: 1 }, sleep: 400 }] });
+	const dir = mkdtempSync(join(tmpdir(), "hum-background-d1-"));
+	const name = "hum #68 build #0";
+	const key = { itemId: "#68", run: "build", attempt: 0 };
+
+	const died = await x(process.execPath, [join(import.meta.dir, "fixtures/launch-and-die.ts"), dir, shim.binary, name], { nodeOptions: { env: { ...process.env, ...shim.env } } });
+
+	expect(died.exitCode).not.toBe(0);
+
+	const state = openState(dir);
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env });
+	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner });
+
+	expect(state.runs.unended("#68", "build")?.sessionId).toBeUndefined();
+
+	const begun = state.runs.begin(key, name);
+	const outcome = await ask(background, { onSession: (id) => state.runs.saveSession(key, id) });
+
+	expect(begun.adopted).toBe(true);
+	expect(outcome).toMatchObject({ kind: "finished", structured: { done: 1 } });
+	expect(shim.background().filter(({ cmd }) => cmd === "bg")).toHaveLength(1);
+	expect(state.runs.get(key)?.sessionId).toBe(outcome.kind === "finished" ? outcome.sessionId : undefined);
+});
+
+test("the start check starts one background run and keeps it; a run that cannot start leaves one card and every run goes on as claude -p", async () => {
+	const good = makeShim();
+	const goodState = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
+	const started = await startBackgroundRunner({ state: goodState, model: MODEL, binary: good.binary, env: good.env, config: CONFIG, repo: tmpdir() });
+
+	expect(started.check).toMatchObject({ kind: "finished", structured: STRUCTURED });
+	expect(good.background().filter(({ cmd }) => cmd === "bg")).toHaveLength(1);
+	expect(goodState.faults.list().map(({ code }) => code)).toEqual([]);
+
+	const down = makeShim({ bgDown: true });
+	const downState = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
+	const fallen = await startBackgroundRunner({ state: downState, model: MODEL, binary: down.binary, env: down.env, config: CONFIG, repo: tmpdir() });
+
+	expect(downState.faults.list().map(({ code }) => code)).toEqual([BACKGROUND_CHECK_CODE]);
+	expect(downState.faults.list()[0]?.cause).toContain("background service is not running");
+	expect(await ask(fallen.runner)).toMatchObject({ kind: "finished" });
+});

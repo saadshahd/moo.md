@@ -894,6 +894,94 @@
 			"pattern": ".*\\/$",
 			"description": "The branch prefix of a pull request that lands a commit the owner wrote, such as an answer."
 		},
+		"backgroundRuns": {
+			"default": true,
+			"type": "boolean",
+			"description": "Whether a run on the Mac is a Claude Code background agent, listed in agent view, instead of a claude -p process."
+		},
+		"backgroundLaunchSeconds": {
+			"default": 30,
+			"type": "number",
+			"exclusiveMinimum": 0,
+			"description": "How long a launch waits for the run it just started to appear in the agent list."
+		},
+		"backgroundPollSeconds": {
+			"default": 1,
+			"type": "number",
+			"exclusiveMinimum": 0,
+			"description": "The time between reads of a background run's transcript and job state."
+		},
+		"deniedRunCommands": {
+			"default": [
+				"gh issue",
+				"gh label",
+				"gh api",
+				"gh auth",
+				"gh repo",
+				"gh pr create",
+				"gh pr comment",
+				"gh pr review",
+				"gh pr edit",
+				"gh pr merge",
+				"gh pr ready",
+				"gh pr close",
+				"git push"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Shell commands a background run may not run: each is denied as written, with any arguments."
+		},
+		"runAutoMode": {
+			"default": {
+				"environment": [
+					"A session named hum <item> <purpose> #<attempt> is an unattended hum run; nobody watches it, and its owner answers only the questions hum asks."
+				],
+				"allow": [
+					"$defaults",
+					"Running hum's own commands (hum comment, ask, file-follow-up, decide) is the run's routine work, GitHub writes included.",
+					"Reading the run's own PR and its checks on GitHub (gh pr checks, gh pr view, gh run view, --log-failed included) is routine: hum asks the run to read failed checks and fix them."
+				],
+				"hardDeny": [
+					"$defaults",
+					"Writing to GitHub other than through hum's own commands: commenting on, labelling, creating, editing or closing issues or PRs, submitting reviews, pushing, or reading a GitHub token (gh auth token, the keychain, ~/.config/gh).",
+					"Changing .hum/hum.json or any file under .github/workflows/."
+				]
+			},
+			"type": "object",
+			"properties": {
+				"environment": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"allow": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"hardDeny": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				}
+			},
+			"required": [
+				"environment",
+				"allow",
+				"hardDeny"
+			],
+			"additionalProperties": false,
+			"description": "What auto mode's classifier is told about a background run: the situation it is in, what it allows, and what it always refuses; '$defaults' keeps Claude Code's own rules."
+		},
 		"mergeRisk": {
 			"default": {
 				"weights": {

@@ -32,6 +32,8 @@ export const openState = (dir: string, { now = Date.now, ...codec }: StateOption
 		heartbeatPath: join(dir, "heartbeat.json"),
 		/** The answer hook drops one file here per posted answer; its content is the item id. */
 		inbox: join(dir, "inbox"),
+		/** A background run's Stop hook drops one file here per stop: the run's session id and transcript path. */
+		stops: join(dir, "stops"),
 		faults,
 		items: new Items(join(dir, "items"), faults, now, codec),
 		events: new EventLog(join(dir, "events"), now),

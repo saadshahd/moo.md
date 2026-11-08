@@ -12,6 +12,8 @@ export const RunRecord = RunKey.extend({
 	/** The Claude session id: set ahead in CI, learned after launch on the Mac. */
 	sessionId: z.string().min(1).optional(),
 	savedAt: z.int().nonnegative(),
+	/** Set when the run's outcome has been taken; a record without it is a run a restart adopts. */
+	endedAt: z.int().nonnegative().optional(),
 });
 
 export type RunRecord = z.infer<typeof RunRecord>;
@@ -58,6 +60,24 @@ export class RunRecords {
 		atomicWrite(this.#path(next), `${JSON.stringify(next)}\n`);
 
 		return next;
+	}
+
+	/** Marks the run's outcome as taken, so a restart starts a new attempt and adopts nothing. */
+	end(key: RunKey): RunRecord {
+		const record = this.get(key);
+
+		if (!record) throw new Error(`no saved run for ${key.itemId} ${key.run} #${key.attempt}; call begin before launch`);
+
+		const next = RunRecord.parse({ ...record, endedAt: this.#now() });
+
+		atomicWrite(this.#path(next), `${JSON.stringify(next)}\n`);
+
+		return next;
+	}
+
+	/** The item's run of this purpose that was begun and never ended: the one a restart adopts. */
+	unended(itemId: string, run: string): RunRecord | undefined {
+		return this.list(itemId).find((record) => record.run === run && record.endedAt === undefined);
 	}
 
 	/** The item's saved runs, oldest first. */

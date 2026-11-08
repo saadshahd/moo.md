@@ -244,5 +244,38 @@
 		"low",
 		"medium"
 	],
-	"ownerBranchPrefix": "hum/owner/"
+	"ownerBranchPrefix": "hum/owner/",
+	"backgroundRuns": true,
+	"backgroundPollSeconds": 1,
+	"backgroundLaunchSeconds": 30,
+	"deniedRunCommands": [
+		"gh issue",
+		"gh label",
+		"gh api",
+		"gh auth",
+		"gh repo",
+		"gh pr create",
+		"gh pr comment",
+		"gh pr review",
+		"gh pr edit",
+		"gh pr merge",
+		"gh pr ready",
+		"gh pr close",
+		"git push"
+	],
+	"runAutoMode": {
+		"environment": [
+			"A session named hum <item> <purpose> #<attempt> is an unattended hum run; nobody watches it, and its owner answers only the questions hum asks."
+		],
+		"allow": [
+			"$defaults",
+			"Running hum's own commands (hum comment, ask, file-follow-up, decide) is the run's routine work, GitHub writes included.",
+			"Reading the run's own PR and its checks on GitHub (gh pr checks, gh pr view, gh run view, --log-failed included) is routine: hum asks the run to read failed checks and fix them."
+		],
+		"hardDeny": [
+			"$defaults",
+			"Writing to GitHub other than through hum's own commands: commenting on, labelling, creating, editing or closing issues or PRs, submitting reviews, pushing, or reading a GitHub token (gh auth token, the keychain, ~/.config/gh).",
+			"Changing .hum/hum.json or any file under .github/workflows/."
+		]
+	}
 }
