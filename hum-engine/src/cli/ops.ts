@@ -167,10 +167,8 @@ const optionOf = ({ flag, repeats, parse }: Flag): Option => {
 	return parse ? option.argParser(parse) : option;
 };
 
-/** Runs `hum <argv>` (an op and its arguments) and returns its exit code: 0 done, 1 failed, 2 misused. */
-export const runCli = async (argv: readonly string[], io: Io): Promise<number> => {
-	let code = 0;
-
+/** The `hum` command tree. Each command reports its exit code through `exitWith`. */
+export const buildProgram = (io: Io, exitWith: (code: number) => void): Command => {
 	const root = new Command("hum")
 		.version(pkg.version)
 		.enablePositionalOptions()
@@ -187,7 +185,7 @@ export const runCli = async (argv: readonly string[], io: Io): Promise<number> =
 		if (name === "push") op.allowUnknownOption().allowExcessArguments().helpOption(false);
 
 		op.action(async () => {
-			code = await perform(name, op.processedArgs.flat(), op.opts(), io);
+			exitWith(await perform(name, op.processedArgs.flat(), op.opts(), io));
 		});
 	}
 
@@ -195,12 +193,19 @@ export const runCli = async (argv: readonly string[], io: Io): Promise<number> =
 		io.stdout(`${flags.json ? JSON.stringify(commands) : Object.values(commands).map((c) => c.usage).join("\n")}\n`);
 	});
 
-	const exitWith = (exit: number) => {
-		code = exit;
-	};
-
 	addServiceCommands(root, io, exitWith);
 	addSetupCommands(root, io, exitWith);
+
+	return root;
+};
+
+/** Runs `hum <argv>` (an op and its arguments) and returns its exit code: 0 done, 1 failed, 2 misused. */
+export const runCli = async (argv: readonly string[], io: Io): Promise<number> => {
+	let code = 0;
+
+	const root = buildProgram(io, (exit) => {
+		code = exit;
+	});
 
 	try {
 		await root.parseAsync([...argv], { from: "user" });

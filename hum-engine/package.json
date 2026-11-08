@@ -28,13 +28,16 @@
     "schema",
     "defaults",
     "evals",
-    "scripts/eval.ts"
+    "scripts/eval.ts",
+    "surface.json"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "schema": "bun scripts/write-schema.ts",
     "eval": "bun scripts/eval.ts",
-    "lint": "oxlint src test",
+    "release:check": "bun tools/release/main.ts check",
+    "release:surface": "bun tools/release/main.ts surface",
+    "lint": "oxlint src test tools/release",
     "test": "bun test test"
   },
   "dependencies": {
@@ -80,6 +83,7 @@
     "@types/proper-lockfile": "4.1.4",
     "@types/semver": "7.8.0",
     "@types/write-file-atomic": "4.0.3",
+    "microdiff": "1.6.0",
     "oxlint": "1.89.0",
     "typescript": "5.9.2"
   }
