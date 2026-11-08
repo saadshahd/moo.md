@@ -139,6 +139,8 @@ if (step.rejectUntil !== undefined) {
 	});
 }
 
+if (step.jobTokens !== undefined) out({ type: "job_state", tokens: step.jobTokens });
+
 if (step.beforeToken) await new Promise((resolve) => setTimeout(resolve, step.beforeToken));
 
 if (step.spend !== undefined) {

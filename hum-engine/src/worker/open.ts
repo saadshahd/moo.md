@@ -8,9 +8,11 @@ import { gitIn } from "../adapters/git.ts";
 import { repoFromRemote } from "../adapters/github.ts";
 import { gitHubPullRequests } from "../adapters/pull-requests.ts";
 import { serialized } from "../adapters/serial.ts";
+import { SlotPool } from "../slots/pool.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
 import type { HumConfig } from "../config/schema.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
+import { DEFAULT_BASE } from "./thin-path.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
 export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls"> & {
@@ -83,8 +85,10 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	const runnerOptions = { state, model: config.hum.models.light, binary, env, now };
 	const { runner } = isInBackground(config.hum, rest.where) ? await startBackgroundRunner({ ...runnerOptions, config: config.hum, repo }) : await startRunner(runnerOptions);
 
+	// A slot is a worktree a background run starts in, so the pool stands only where runs are background agents.
+	const slots = config.hum.runSlots.enabled && isInBackground(config.hum, rest.where) ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
 	const github = repoFromRemote(remote);
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github);
 
-	return new Worker({ ...rest, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls });
+	return new Worker({ ...rest, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls });
 };

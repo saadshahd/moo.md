@@ -13,6 +13,9 @@ const time = z.number().int().nonnegative();
 /** At most one action. A label is at most 14 cells, the width the view gives it. */
 export const Action = z.strictObject({ label: name.max(ACTION_LABEL_CELLS), command: name });
 
+/** The most characters of a tool's own words a card quotes. */
+export const CARD_EXCERPT = 200;
+
 /** The cause, the fix in one sentence, then at most one action. */
 export const Card = z.strictObject({
 	kind: z.enum(["waiting", "limited", "fault"]),

@@ -73,6 +73,8 @@ export type LandContext = {
 	readonly base: string;
 	readonly remote: string;
 	readonly clone: string;
+	/** What the run's folder adds to the environment of the repo's checks. */
+	readonly env: Readonly<Record<string, string>>;
 	readonly dir: string;
 	readonly git: Git;
 	readonly checks: readonly string[];
@@ -268,6 +270,7 @@ const pushOntoNewestBase = async ({
 	base,
 	branch,
 	clone,
+	env,
 	checks,
 }: LandContext): Promise<void> => {
 	await git.raw(["fetch", "-q", "origin", base]);
@@ -283,7 +286,7 @@ const pushOntoNewestBase = async ({
 			);
 		}
 
-		const failure = await runChecks(checks, clone);
+		const failure = await runChecks(checks, clone, { env });
 
 		if (failure)
 			throw new StaleMerge(

@@ -2,7 +2,7 @@ import { docsJudge, scriptedJudge, SOUND } from "../fixtures/judge.ts";
 import type { Runner } from "../../src/adapters/claude-p.ts";
 import { type ModelCall, modelCallOver } from "../../src/adapters/model-call.ts";
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startBackgroundRunner } from "../../src/adapters/claude-bg.ts";
@@ -10,11 +10,13 @@ import { startRunner } from "../../src/adapters/claude-p.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
 import type { Config } from "../../src/config/load.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
+import { SlotPool } from "../../src/slots/pool.ts";
 import { openState } from "../../src/state/open.ts";
 import { type Checkout, PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../src/worker/thin-path.ts";
 import { configWith } from "../fixtures/config.ts";
 import { WorkRepo, itemFile, markdownSettings, sh } from "../fixtures/work-repo.ts";
 import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
+import { BASE, poolConfig } from "../fixtures/slot-world.ts";
 import { FakePulls } from "../fixtures/fake-pulls.ts";
 
 const NOW = 1_800_000_000_000;
@@ -111,18 +113,45 @@ test("the thin path through a background run: the build is a named agent, its co
 	expect(w.shim.agents()).toEqual([]);
 });
 
+test("the thin path through a background run in a slot: the build starts in the slot with the slot's environment, the change lands, and the slot is returned", async () => {
+	const w = await world({ script: [{}, {}, NOTE] }, { background: true });
+	const id = w.repo.seed("Write the note");
+	const pool = mkdtempSync(join(tmpdir(), "hum-thin-pool-"));
+	const slots = new SlotPool({ repo: w.repo.owner, state: w.state, config: poolConfig(pool, { runners: 1 }), base: BASE });
+
+	cleanups.push(() => rmSync(pool, { recursive: true, force: true }));
+
+	expect(await runThinPath(w.options({ checkout: slots.checkout }))).toEqual({ outcome: "merged", item: id });
+	await slots.idle();
+
+	const [slot] = slots.list();
+	const [, build] = w.shim.background().filter(({ cmd }) => cmd === "bg");
+
+	expect(build?.cwd).toBe(realpathSync(slot?.folder ?? ""));
+	expect(JSON.parse(build?.settings ?? "{}").env).toMatchObject({ HUM_SLOT: "slot-1" });
+	expect(slot).toMatchObject({ status: "free" });
+	expect(sh(slot?.folder ?? "", ["branch", "--list", "hum/*"])).toBe("");
+	expect(w.state.faults.list()).toEqual([]);
+});
+
 test("a run's working copy comes from the checkout it is given, on the remote's base branch", async () => {
 	const w = await world({ script: [{}, NOTE] });
 	const id = w.repo.seed("Write the note");
-	const sources: { folder: string; remote: string; base: string }[] = [];
+	const asked: { item: string; remote: string; base: string }[] = [];
+	const given: string[] = [];
 
-	const checkout: Checkout = async (folder, source) => {
-		sources.push({ folder, ...source });
-		await sh(tmpdir(), ["clone", "-q", "--branch", source.base, source.remote, folder]);
+	const checkout: Checkout = async ({ item, remote, base }) => {
+		const folder = mkdtempSync(join(tmpdir(), "hum-given-"));
+
+		asked.push({ item, remote, base });
+		await sh(tmpdir(), ["clone", "-q", "--branch", base, remote, folder]);
+
+		return { folder, env: {}, giveBack: async () => void given.push(folder) };
 	};
 
 	expect(await runThinPath(w.options({ checkout }))).toEqual({ outcome: "merged", item: id });
-	expect(sources).toMatchObject([{ remote: w.repo.remote, base: "main" }]);
+	expect(asked).toEqual([{ item: id, remote: w.repo.remote, base: "main" }]);
+	expect(given).toHaveLength(1);
 });
 
 test("a merged item is not picked up again after its claim expires", async () => {

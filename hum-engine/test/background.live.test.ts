@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { stripVTControlCharacters } from "node:util";
 import { join } from "node:path";
@@ -12,12 +12,6 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { PROSE_STATES } from "../src/decide/prose.ts";
 import { openState } from "../src/state/open.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
-import { type Checkout, runThinPath } from "../src/worker/thin-path.ts";
-import { gitIn } from "../src/adapters/git.ts";
-import { markdownAdapter } from "../src/adapters/markdown.ts";
-import { configWith } from "./fixtures/config.ts";
-import { docsJudge } from "./fixtures/judge.ts";
-import { markdownSettings, WorkRepo } from "./fixtures/work-repo.ts";
 
 const repo = process.env.HUM_BG_REPO;
 const other = process.env.HUM_BG_OTHER;
@@ -174,49 +168,3 @@ test.skipIf(!live)("live: a stopped background run resumes from another worktree
 		}
 	}
 }, 300_000);
-
-/** The remote's branch as a worktree of the trusted repo: the one place a background run starts. The repo's `origin` is the remote while the run lasts. */
-const worktreeOf =
-	(trusted: string): Checkout =>
-	async (folder, { remote, base }) => {
-		const git = gitIn(trusted);
-
-		await git.raw(["remote", "add", "origin", remote]);
-		await git.raw(["fetch", "-q", "origin", base]);
-		await git.raw(["worktree", "add", "-q", "--detach", folder, "FETCH_HEAD"]);
-	};
-
-test.skipIf(!live)("live: the thin path builds an item in a background run started in a worktree of the trusted repo, and the change lands", async () => {
-	const trusted = gitIn(repo ?? "");
-	const config = configWith((raw) => void (raw.hum.models = { light: MODEL, standard: MODEL, top: MODEL }));
-	const work = new WorkRepo();
-	const adapter = markdownAdapter({ ...markdownSettings, repo: work.worker("w") }, { report: () => {}, now: Date.now });
-	const id = work.add("live-bg-1", "---\ntitle: Write the note\nstate: ready\n---\n\nCreate docs/note.md holding one line: hello. Commit it.\n");
-	const before = state.faults.list().length;
-
-	try {
-		const result = await runThinPath({
-			workSource: adapter.workSource!,
-			questions: adapter.questions!,
-			state,
-			runner,
-			config,
-			judge: docsJudge,
-			remote: work.remote,
-			checks: ["test -f docs/note.md"],
-			holder: "live",
-			workDir: mkdtempSync(join(tmpdir(), "hum-live-bg-work-")),
-			checkout: worktreeOf(repo ?? ""),
-		});
-
-		expect(result.outcome).toBe("merged");
-		expect(state.faults.list()).toHaveLength(before);
-		expect(state.runs.list(id).map(({ run, sessionId }) => [run, sessionId?.length])).toEqual([["build", 36]]);
-		expect(await leftOver()).toEqual([]);
-	} finally {
-		await trusted.raw(["worktree", "prune"]);
-		await trusted.raw(["remote", "remove", "origin"]);
-		await trusted.raw(["for-each-ref", "--format=%(refname:short)", "refs/heads/hum/"]).then((refs) => Promise.all(refs.split("\n").filter(Boolean).map((ref) => trusted.raw(["branch", "-D", ref]))));
-		rmSync(work.root, { recursive: true, force: true });
-	}
-}, 600_000);

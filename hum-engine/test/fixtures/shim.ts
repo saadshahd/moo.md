@@ -16,6 +16,8 @@ export type Behavior = {
 	error?: string;
 	/** A rate_limit_event that rejects, with `resetsAt` in epoch seconds. */
 	rejectUntil?: number;
+	/** The output tokens a background job reports in its state file, whatever its transcript holds. */
+	jobTokens?: number;
 	/** One assistant message with this many output tokens, then the shim sleeps. */
 	spend?: number;
 	hang?: boolean;
@@ -77,7 +79,7 @@ export const makeShim = (spec: ShimSpec = {}): Shim => {
 
 	return {
 		binary,
-		env: { HUM_SHIM: JSON.stringify({ ...spec, log, bg }) },
+		env: { HUM_SHIM: JSON.stringify({ ...spec, log, bg }), CLAUDE_CONFIG_DIR: join(dir, "config") },
 		calls: () => lines(log),
 		ends: () => lines(`${log}.ends`),
 		decisions: () => lines(`${log}.decisions`),

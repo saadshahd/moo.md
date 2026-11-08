@@ -12,7 +12,8 @@ import { rejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
-import type { Card } from "../status/format.ts";
+import { CARD_EXCERPT, type Card } from "../status/format.ts";
+import { LIMIT_TEXT, LIMIT_UNPARSED, type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { billed } from "./transcript.ts";
 
 export type Effort = (typeof EFFORTS)[number];
@@ -43,16 +44,7 @@ export type Call = keyof typeof CALLS;
 
 const REQUIRED_PLUGIN = "hope";
 
-const LIMIT_KEY = "runner";
-
-const LIMIT_UNPARSED = "limit-unparsed";
-
-/** Epoch ms until which the saved usage limit holds every run, or 0. */
-const savedLimitUntil = (state: Pick<State, "limit">): number => state.limit.get(LIMIT_KEY)?.until ?? 0;
-
 const CREDENTIALS = "credentials.json";
-
-export const CARD_EXCERPT = 200;
 
 const STDERR_TAIL = 500;
 
@@ -234,35 +226,11 @@ export type RunOutcome =
 	| { readonly kind: "stopped" };
 
 /** What one process ended as, before the runner acts on a limit it could not read. */
-type Ended = RunOutcome | { readonly kind: "limit-unparsed"; readonly text: string };
+type Ended = RunOutcome | LimitEnded;
 
 export const succeeded = (outcome: Finished): boolean => outcome.subtype === "success" && !outcome.isError;
 
-const LIMIT_TEXT = /usage limit|hit your limit|limit reached/i;
-
 const LOCK_TEXT = /refresh[^\n]*lock|lock[^\n]*refresh/i;
-
-const LIMIT_EPOCH = /limit reached\|(\d{9,13})/i;
-
-const LIMIT_ISO = /resets?(?: at)? (\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:\d\d))/i;
-
-/** Epoch values below this are seconds, at or above it milliseconds. */
-const FIRST_MS_EPOCH = 1e12;
-
-const epochMs = (value: number): number => (value < FIRST_MS_EPOCH ? value * SECOND_MS : value);
-
-const isoMs = (text: string | undefined): number | undefined => {
-	const parsed = text === undefined ? Number.NaN : Date.parse(text);
-
-	return Number.isNaN(parsed) ? undefined : parsed;
-};
-
-/** The reset time in a limit message, as epoch ms. Undefined when the message holds none this parser knows. */
-export const parseLimit = (text: string): number | undefined => {
-	const epoch = LIMIT_EPOCH.exec(text)?.[1];
-
-	return epoch === undefined ? isoMs(LIMIT_ISO.exec(text)?.[1]) : epochMs(Number(epoch));
-};
 
 const isLimitRefusal = (t: Transcript, result: Result): boolean => result.is_error && (t.rejectedUntil !== undefined || LIMIT_TEXT.test(result.result));
 
@@ -294,9 +262,7 @@ const endedAs = (t: Transcript, { sessionId, tokenCap, stderr }: { sessionId: st
 	}
 
 	if (isLimitRefusal(t, result)) {
-		const until = t.rejectedUntil ?? parseLimit(result.result);
-
-		return until === undefined ? { kind: "limit-unparsed", text: result.result } : { kind: "limited", until };
+		return limitOf(result.result, t.rejectedUntil);
 	}
 
 	const tokens = sumUsage(result, (usage) => billed(usage.inputTokens, usage.outputTokens, usage.cacheCreationInputTokens));
@@ -330,6 +296,8 @@ export type RunRequest = {
 	/** Tokens the item may still spend. */
 	readonly tokenCap?: number;
 	readonly sessionId?: string;
+	/** Added to the run's environment on top of the runner's own. */
+	readonly env?: Readonly<Record<string, string>>;
 	readonly signal?: AbortSignal;
 	/** Called with the session id of each attempt, before its process starts. */
 	readonly onSession?: (sessionId: string) => void;
@@ -342,6 +310,8 @@ export type Runner = {
 	readonly run: (request: RunRequest) => Promise<RunOutcome>;
 	/** Epoch ms until which every run is held, or 0. */
 	readonly limitedUntil: () => number;
+	/** The names of the runs alive outside this process: a background runner lists them, a `claude -p` runner has none. */
+	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
 };
 
 export type RunnerOptions = {
@@ -442,7 +412,7 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 	});
 
 	/** One process, read line by line. The cap is checked on every streamed message, and the process is killed the moment it is passed. */
-	const spawnRun = async ({ prompt, cwd, model, effort, schema, call, name, tokenCap, signal, onFirstToken }: RunRequest, sessionId: string): Promise<Ended> => {
+	const spawnRun = async ({ prompt, cwd, model, effort, schema, call, name, tokenCap, signal, onFirstToken, env: runEnv }: RunRequest, sessionId: string): Promise<Ended> => {
 		const stop = new AbortController();
 		const logs = mkdtempSync(join(tmpdir(), "hum-claude-"));
 		const stderrFile = join(logs, "stderr");
@@ -456,7 +426,7 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 				// stderr goes to a file, so the line reader sees stdout alone: one stream cannot split another's line.
 				nodeOptions: {
 					cwd,
-					env,
+					env: { ...env, ...runEnv },
 					killSignal: "SIGKILL",
 					stdio: ["pipe", "pipe", stderrFd],
 				},
@@ -497,22 +467,7 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 	};
 
 	/** The ended run, with a limit saved so no call is made before it ends, and an unreadable limit held with one card. */
-	const settle = (ended: Ended): RunOutcome => {
-		if (ended.kind === "limit-unparsed") {
-			return hold(
-				LIMIT_UNPARSED,
-				`claude refused with a usage limit and no reset time hum can read: ${ended.text.slice(0, CARD_EXCERPT)}`,
-				"Runs stay held. Tell hum's maintainer the message, or restart the worker once the limit has reset.",
-			);
-		}
-
-		if (ended.kind === "limited")
-			state.limit.put(LIMIT_KEY, {
-				until: Math.max(limitedUntil(), ended.until),
-			});
-
-		return ended;
-	};
+	const settle = (ended: Ended): RunOutcome => (ended.kind === "limited" || ended.kind === "limit-unparsed" ? settleLimit(state, ended) : ended);
 
 	/** A refresh-lock error is retried with growing, jittered waits, each try on a new session id. */
 	const attempt = (request: RunRequest): Promise<RunOutcome> =>

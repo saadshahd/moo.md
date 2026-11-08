@@ -22,6 +22,7 @@ import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
 import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
 import { type Signature, signatureOf } from "./signature.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
+import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
@@ -47,8 +48,10 @@ export type WorkerOptions = {
 	readonly checks: readonly string[];
 	readonly holder: string;
 	readonly workDir?: string;
-	/** Makes each run's working copy; by default a `git clone`. */
+	/** Gives each pass its working copy; by default a `git clone`. */
 	readonly checkout?: Checkout;
+	/** The run slots behind `checkout`, if any: each tick asks them to keep slots ready. */
+	readonly slots?: Pick<SlotPool, "keepReady">;
 	readonly dir?: string;
 	readonly where?: "mac" | "ci";
 	readonly now?: () => number;
@@ -553,6 +556,8 @@ export class Worker {
 		const sleeping = state.items.saved().filter((s) => this.#isAsleep(s));
 
 		await this.#renew();
+
+		this.#o.slots?.keepReady();
 
 		if (update !== undefined) {
 			await this.#publish(t, signature, update);

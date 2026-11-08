@@ -50,6 +50,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		base: "main",
 		remote: `https://github.com/${repo}.git`,
 		clone,
+		env: {},
 		dir: config.hum.itemsDir,
 		git,
 		checks: [],

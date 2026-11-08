@@ -93,13 +93,14 @@ export { type OpName } from "./cli/commands.ts";
 
 export { type Io, runCli, runOp } from "./cli/ops.ts";
 
+export { limitOf, type LimitEnded, parseLimit, settleLimit } from "./adapters/limit.ts";
+
 export { BACKGROUND_CHECK_CODE, FALLBACK_CODE, type BackgroundOptions, type BackgroundStartOptions, backgroundRunner, backgroundSettings, type StartedBackground, startBackgroundRunner } from "./adapters/claude-bg.ts";
 
 export {
 	CLAUDE_FLOOR,
 	type Effort,
 	type Finished,
-	parseLimit,
 	RUN_SETTINGS,
 	type RunOutcome,
 	type RunRequest,
@@ -191,3 +192,9 @@ export { reportCards, wakeUntilQuiet } from "./service/wake.ts";
 export { ciWorkflows, type WorkflowFile, type WorkflowSettings } from "./service/workflows.ts";
 
 export { writeCards } from "./status/file.ts";
+
+export { SLOT_ENV, slotEnv } from "./slots/env.ts";
+
+export { type PoolOptions, SLOT_KEPT_CODE, SLOT_MAINTENANCE_CODE, SLOT_OUT_CODE, SlotPool } from "./slots/pool.ts";
+
+export { proposeRecipe } from "./slots/scan.ts";

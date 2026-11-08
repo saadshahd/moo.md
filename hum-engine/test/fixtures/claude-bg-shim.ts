@@ -81,7 +81,17 @@ async function* linesOf(stream: ReadableStream<Uint8Array>): AsyncGenerator<stri
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const LIMIT_WORDS = /limit/i;
+
+const writeJob = (id: string, tokens: number) => {
+	const folder = join(process.env.CLAUDE_CONFIG_DIR ?? "", "jobs", id);
+
+	mkdirSync(folder, { recursive: true });
+	writeFileSync(join(folder, "state.json"), JSON.stringify({ tokens }));
+};
+
 const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = ""]: string[]) => {
+	let resetsAt: number | undefined;
 	const transcript = join(dir, `${sessionId}.jsonl`);
 	const rows = (row: Entry) => appendFileSync(transcript, `${JSON.stringify({ sessionId, ...row })}\n`);
 	const prompt = readFileSync(join(dir, `${id}.prompt`), "utf8");
@@ -99,12 +109,20 @@ const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = 
 	for await (const line of linesOf(proc.stdout)) {
 		const event = JSON.parse(line);
 
+		if (event.type === "job_state") writeJob(id, event.tokens);
+
+		if (event.type === "rate_limit_event") resetsAt = event.rate_limit_info.resetsAt;
+
 		if (event.type === "assistant") rows({ type: "assistant", message: { id: event.message.id, model: "claude-haiku-5-5", usage: event.message.usage } });
 
 		if (event.type !== "result") continue;
 
 		if (event.is_error) {
-			rows({ type: "assistant", isApiErrorMessage: true, error: event.result });
+			rows(
+				LIMIT_WORDS.test(event.result)
+					? { type: "assistant", isApiErrorMessage: true, error: "rate_limit", quotaLimits: resetsAt === undefined ? undefined : { status: "rejected", resetsAt }, message: { content: [{ type: "text", text: event.result }] } }
+					: { type: "assistant", isApiErrorMessage: true, error: event.result },
+			);
 			setState(id, "failed");
 
 			return;

@@ -40,6 +40,9 @@ const CARD_EXCERPT = 300;
 
 const ERROR_EXCERPT = 500;
 
+/** The branch runs start from when none is given. */
+export const DEFAULT_BASE = "main";
+
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
 /** What the agent run hands back besides its commit. */
@@ -64,7 +67,7 @@ export type ThinPathOptions = {
 	readonly holder: string;
 	/** Where runs clone to; a temp folder by default. */
 	readonly workDir?: string;
-	/** Makes the run's working copy in an empty folder, on the remote's base branch. By default a `git clone`. */
+	/** Gives the run its working copy on the remote's base branch, and takes it back when the item's pass ends. By default a `git clone` in a temp folder. */
 	readonly checkout?: Checkout;
 	readonly dir?: string;
 	/** Take this item; default the first ready one. */
@@ -161,7 +164,7 @@ const kindNamed = (config: Config, name: string): Kind => {
 
 export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult> => {
 	const o: WithNow = { ...options, now: options.now ?? Date.now };
-	const base = o.base ?? "main";
+	const base = o.base ?? DEFAULT_BASE;
 	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
 
 	if (id === undefined) return { outcome: "idle" };
@@ -215,23 +218,19 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 	if (asking && answered === undefined) return { outcome: "waiting", item: id };
 
 	const landing = o.state.landings.get(id);
-	const clone = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-run-"));
 	const branch = runBranch(o.config.hum, id);
+	const taken = await (o.checkout ?? clonesIn(o.workDir))({ remote: o.remote, base, item: id, signal: o.signal }).catch((error: Error) => (o.signal?.aborted ? undefined : Promise.reject(error)));
 
+	if (taken === undefined) return { outcome: "lost", item: id };
+
+	const { folder: clone, env } = taken;
 	const git = gitIn(clone, { identity: o.config.hum.commitIdentity });
 	const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 	try {
-		await (o.checkout ?? cloneCheckout)(clone, { remote: o.remote, base });
+		await onRunBranch(git, branch);
 
-		if ((await g(["ls-remote", "--heads", "origin", branch])).trim()) {
-			await g(["fetch", "-q", "origin", `${branch}:${branch}`]);
-			await g(["checkout", "-q", branch]);
-		} else {
-			await g(["checkout", "-q", "-b", branch]);
-		}
-
-		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, g, git, answered, resume: asking };
+		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, env, g, git, answered, resume: asking };
 
 		// A change already finished lands again from its pushed branch; no run is spent on it.
 		const result = park(o, landing ? await landAgain(driven) : await drive(driven));
@@ -240,18 +239,56 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 
 		return result;
 	} finally {
-		rmSync(clone, { recursive: true, force: true });
+		await taken.giveBack();
 	}
 };
 
 /** Where a run's working copy comes from: the remote and the branch it starts on. */
 export type Source = { readonly remote: string; readonly base: string };
 
-/** Makes a run's working copy in `folder`, an empty folder. A background run starts only in a repo the owner trusts, which a fresh clone is not. */
-export type Checkout = (folder: string, source: Source) => Promise<void>;
+/** What a checkout is asked for: a working copy of `source` for the item's pass, and the signal that ends the wait for one. */
+export type CheckoutRequest = Source & { readonly item: string; readonly signal: AbortSignal | undefined };
 
-const cloneCheckout: Checkout = async (folder, { remote, base }) => {
-	await gitIn(tmpdir()).raw(["clone", "-q", "--branch", base, remote, folder]);
+/** A run's working copy: its folder, the environment its runs and checks add, and the call that takes it back. */
+export type Checkedout = {
+	readonly folder: string;
+	readonly env: Readonly<Record<string, string>>;
+	readonly giveBack: () => Promise<void>;
+};
+
+/**
+ * Gives an item's pass its working copy, with the base branch's files. A background run starts only in a repo the
+ * owner trusts, which a fresh clone is not; a slot is a worktree of the owner's checkout.
+ */
+export type Checkout = (request: CheckoutRequest) => Promise<Checkedout>;
+
+/** A fresh `git clone` in a new folder under `workDir` (a temp folder by default), removed when the pass ends. */
+const clonesIn =
+	(workDir: string | undefined): Checkout =>
+	async ({ remote, base }) => {
+		const folder = mkdtempSync(join(workDir ?? tmpdir(), "hum-run-"));
+
+		await gitIn(tmpdir()).raw(["clone", "-q", "--branch", base, remote, folder]);
+
+		return { folder, env: {}, giveBack: async () => rmSync(folder, { recursive: true, force: true }) };
+	};
+
+/**
+ * Checks out the run branch: from the remote when it has it, from the folder when only the folder does (a pass that
+ * ended before it pushed), and new from the current commit when neither does. A folder and the remote that disagree
+ * throw: neither is dropped.
+ */
+const onRunBranch = async (git: Git, branch: string): Promise<void> => {
+	const onRemote = (await git.raw(["ls-remote", "--heads", "origin", branch])).trim() !== "";
+	const onFolder = (await git.run(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
+
+	if (onRemote) await git.raw(["fetch", "-q", "origin", branch]);
+
+	if (!onFolder) return void (await git.raw(onRemote ? ["checkout", "-q", "-b", branch, "FETCH_HEAD"] : ["checkout", "-q", "-b", branch]));
+
+	await git.raw(["checkout", "-q", branch]);
+
+	if (onRemote) await git.raw(["merge", "--ff-only", "-q", "FETCH_HEAD"]);
 };
 
 /** The options with the clock every later step reads. */
@@ -267,6 +304,7 @@ type Driven = WithNow & {
 	readonly item: Item;
 	readonly branch: string;
 	readonly clone: string;
+	readonly env: Readonly<Record<string, string>>;
 	readonly g: (args: readonly string[]) => Promise<string>;
 	readonly git: Git;
 	readonly answered: Answered | undefined;
@@ -369,6 +407,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			.run({
 				prompt: text,
 				cwd: purpose === "review" ? tmpdir() : clone,
+				env: d.env,
 				...(await tierFor(purpose)),
 				schema,
 				tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
@@ -460,7 +499,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const checksSource = createAsyncLogic({
 		run: async () => {
-			const failure = await runChecks(d.checks, clone);
+			const failure = await runChecks(d.checks, clone, { env: d.env });
 
 			if (failure) {
 				lastFailure = failure;
@@ -737,6 +776,7 @@ const landContext = (d: Driven): LandContext => ({
 	base: d.base,
 	remote: d.remote,
 	clone: d.clone,
+	env: d.env,
 	dir: d.dir,
 	git: d.git,
 	checks: d.checks,

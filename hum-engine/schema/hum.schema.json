@@ -982,6 +982,133 @@
 			"additionalProperties": false,
 			"description": "What auto mode's classifier is told about a background run: the situation it is in, what it allows, and what it always refuses; '$defaults' keeps Claude Code's own rules."
 		},
+		"runSlots": {
+			"default": {
+				"enabled": false,
+				"pool": "../.hum-slots",
+				"services": "per-slot",
+				"ports": {
+					"base": 20000,
+					"stride": 10
+				},
+				"projectPrefix": "hum",
+				"stepTimeoutSeconds": 600,
+				"recipe": {
+					"prepare": [],
+					"refresh": [],
+					"ready": []
+				}
+			},
+			"type": "object",
+			"properties": {
+				"enabled": {
+					"type": "boolean"
+				},
+				"pool": {
+					"type": "string",
+					"minLength": 1
+				},
+				"services": {
+					"type": "string",
+					"enum": [
+						"per-slot",
+						"shared"
+					]
+				},
+				"ports": {
+					"type": "object",
+					"properties": {
+						"base": {
+							"type": "integer",
+							"exclusiveMinimum": 0,
+							"maximum": 9007199254740991
+						},
+						"stride": {
+							"type": "integer",
+							"exclusiveMinimum": 0,
+							"maximum": 9007199254740991
+						}
+					},
+					"required": [
+						"base",
+						"stride"
+					],
+					"additionalProperties": false
+				},
+				"projectPrefix": {
+					"type": "string",
+					"minLength": 1
+				},
+				"stepTimeoutSeconds": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				},
+				"recipe": {
+					"type": "object",
+					"properties": {
+						"prepare": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"minLength": 1
+							},
+							"description": "Run once when a slot is made: install dependencies, start or attach services, seed data."
+						},
+						"refresh": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"run": {
+										"type": "string",
+										"minLength": 1
+									},
+									"when": {
+										"type": "string",
+										"enum": [
+											"always",
+											"lockfile-changed"
+										]
+									}
+								},
+								"required": [
+									"run",
+									"when"
+								],
+								"additionalProperties": false
+							},
+							"description": "Run after each return, once the slot is reset to the latest base: reinstall when a lockfile changed, reset the data."
+						},
+						"ready": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"minLength": 1
+							},
+							"description": "Run after prepare and each refresh; a slot where one fails leaves the pool."
+						}
+					},
+					"required": [
+						"prepare",
+						"refresh",
+						"ready"
+					],
+					"additionalProperties": false
+				}
+			},
+			"required": [
+				"enabled",
+				"pool",
+				"services",
+				"ports",
+				"projectPrefix",
+				"stepTimeoutSeconds",
+				"recipe"
+			],
+			"additionalProperties": false,
+			"description": "Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands."
+		},
 		"mergeRisk": {
 			"default": {
 				"weights": {

@@ -54,12 +54,14 @@ const NOW_MS = Date.parse("2026-11-08T10:00:00.000Z");
 
 const reading = (over: Partial<Reading> & { structuredAt?: number; spent?: number }): Reading => ({
 	transcript: {
-		messages: over.spent === undefined ? {} : { m: { billed: over.spent, cacheRead: 0, model: "claude-haiku-5-5" } },
+		messages: over.spent === undefined ? {} : { m: { billed: over.spent, output: 0, cacheRead: 0, model: "claude-haiku-5-5" } },
 		structured: over.structuredAt === undefined ? undefined : { data: STRUCTURED, at: over.structuredAt },
 		apiError: over.transcript?.apiError,
+		limit: over.transcript?.limit,
 	},
 	stops: over.stops ?? [],
 	job: "job" in over ? over.job : "working",
+	jobOutputTokens: over.jobOutputTokens ?? 0,
 });
 
 const PROGRESS: [string, Reading, number | undefined, Progress["kind"]][] = [
@@ -68,7 +70,9 @@ const PROGRESS: [string, Reading, number | undefined, Progress["kind"]][] = [
 	["a Stop after the structured result", reading({ structuredAt: NOW_MS, stops: [NOW_MS - 1, NOW_MS + 1] }), 100, "done"],
 	["tokens past the cap", reading({ spent: 101 }), 100, "over-cap"],
 	["a job in the failed state", reading({ job: "failed" }), 100, "failed"],
-	["an API error row", reading({ transcript: { messages: {}, structured: undefined, apiError: "model_not_found" } }), 100, "failed"],
+	["an API error row", reading({ transcript: { messages: {}, structured: undefined, apiError: "model_not_found", limit: undefined } }), 100, "failed"],
+	["a usage-limit row", reading({ transcript: { messages: {}, structured: undefined, apiError: "rate_limit", limit: { resetsAt: NOW_MS, text: "You've hit your weekly limit" } } }), 100, "limit"],
+	["output tokens only the job counts, past the cap", reading({ jobOutputTokens: 101 }), 100, "over-cap"],
 	["a job that ended with no structured result", reading({ job: "done" }), 100, "failed"],
 	["a run gone from the list with no result", reading({ job: undefined }), 100, "failed"],
 	["no cap set", reading({ spent: 1_000_000 }), undefined, "waiting"],
@@ -179,4 +183,44 @@ test("the start check starts one background run and keeps it; a run that cannot 
 	expect(downState.faults.list().map(({ code }) => code)).toEqual([BACKGROUND_CHECK_CODE]);
 	expect(downState.faults.list()[0]?.cause).toContain("background service is not running");
 	expect(await ask(fallen.runner)).toMatchObject({ kind: "finished" });
+});
+
+/** A usage-limit row as Claude Code writes it into a transcript. */
+const LIMIT_ROW = {
+	type: "assistant",
+	isApiErrorMessage: true,
+	error: "rate_limit",
+	message: { model: "<synthetic>", content: [{ type: "text", text: "You've hit your weekly limit · resets Oct 7 at 5pm (Europe/London)" }] },
+	quotaLimits: { status: "rejected", resetsAt: 1791388800, rateLimitType: "seven_day" },
+};
+
+test("a usage-limit row carries its reset time, read as epoch ms, and its words", () => {
+	expect(readTranscript(JSON.stringify(LIMIT_ROW)).limit).toEqual({ resetsAt: 1_791_388_800_000, text: "You've hit your weekly limit · resets Oct 7 at 5pm (Europe/London)" });
+});
+
+const HOUR_S = 3600;
+
+test("a background run that hits a usage limit ends limited at its reset time, and no named run starts before then", async () => {
+	const resetsAt = Math.floor(Date.now() / 1000) + HOUR_S;
+	const { shim, state, background } = await setup({ script: [{}, { rejectUntil: resetsAt, error: "You've hit your limit" }] });
+
+	expect(await ask(background)).toEqual({ kind: "limited", until: resetsAt * 1000 });
+	expect(state.limit.get("runner")).toEqual({ until: resetsAt * 1000 });
+	expect(await ask(background, { name: "hum #68 plan #0" })).toEqual({ kind: "limited", until: resetsAt * 1000 });
+	expect(shim.background().filter(({ cmd }) => cmd === "bg")).toHaveLength(1);
+	expect(shim.agents()).toEqual([]);
+});
+
+test("a background run's usage limit with no reset time hum can read holds every run with one card", async () => {
+	const { state, background } = await setup({ script: [{}, { error: "You've hit your limit" }] });
+
+	expect(await ask(background)).toMatchObject({ kind: "held", card: { code: "limit-unparsed" } });
+	expect(state.faults.list().map(({ code }) => code)).toEqual(["limit-unparsed"]);
+	expect(state.limit.list()).toEqual([]);
+});
+
+test("output tokens the job counts beyond its transcript are billed to the run", async () => {
+	const { background } = await setup({ script: [{}, { structured: { done: 1 }, spend: 7, jobTokens: 50 }] });
+
+	expect(await ask(background)).toMatchObject({ kind: "finished", tokens: 8 + (50 - 7) });
 });

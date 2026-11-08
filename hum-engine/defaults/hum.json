@@ -277,5 +277,21 @@
 			"Writing to GitHub other than through hum's own commands: commenting on, labelling, creating, editing or closing issues or PRs, submitting reviews, pushing, or reading a GitHub token (gh auth token, the keychain, ~/.config/gh).",
 			"Changing .hum/hum.json or any file under .github/workflows/."
 		]
+	},
+	"runSlots": {
+		"enabled": false,
+		"pool": "../.hum-slots",
+		"services": "per-slot",
+		"ports": {
+			"base": 20000,
+			"stride": 10
+		},
+		"projectPrefix": "hum",
+		"stepTimeoutSeconds": 600,
+		"recipe": {
+			"prepare": [],
+			"refresh": [],
+			"ready": []
+		}
 	}
 }

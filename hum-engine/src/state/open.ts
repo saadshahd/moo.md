@@ -7,7 +7,7 @@ import { type Codec, Items } from "./items.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { ItemKind, Landing, Learned, Limit, Parked, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Spent, Verdict } from "./saved.ts";
+import { ItemKind, Landing, Learned, Limit, Parked, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
 /** On the Mac and in a clone, state lives in the repo's git common dir, so every worktree shares it. */
 export const defaultStateDir = async (cwd: string): Promise<string> => {
@@ -45,6 +45,8 @@ export const openState = (dir: string, { now = Date.now, ...codec }: StateOption
 		kinds: new Records(join(dir, "kinds"), Kind),
 		limit: new Records(join(dir, "limit"), Limit),
 		ready: new Records(join(dir, "ready"), ReadyList),
+		/** The run slots, by name. */
+		slots: new Records(join(dir, "slots"), Slot),
 		landings: new Records(join(dir, "landings"), Landing),
 		/** Path rules by glob. */
 		learned: new Records(join(dir, "learned"), Learned),

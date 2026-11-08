@@ -95,3 +95,25 @@ export const SettledAnswer = z.strictObject({
 });
 
 export type SettledAnswer = z.infer<typeof SettledAnswer>;
+
+/**
+ * Where a run slot stands: made and not yet ready, ready, taken by an item's pass, returned and waiting to be
+ * refreshed, kept because its branch holds a commit the remote lacks, or out of the pool.
+ */
+export const SLOT_STATUSES = ["new", "free", "stale", "taken", "kept", "out"] as const;
+
+/** A prewarmed worktree of the owner's checkout that background runs work in. */
+export const Slot = z.strictObject({
+	name,
+	/** Which block of ports, among the slots, is this slot's. */
+	index: z.int().nonnegative(),
+	folder: name,
+	status: z.enum(SLOT_STATUSES),
+	/** The item whose pass holds the slot; set while it is taken or kept. */
+	item: name.optional(),
+	/** The hash of the lockfiles the slot's dependencies were last installed from. */
+	lockfiles: name.optional(),
+	since: time,
+});
+
+export type Slot = z.infer<typeof Slot>;

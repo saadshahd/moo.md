@@ -1,6 +1,6 @@
 import { docsJudge } from "./fixtures/judge.ts";
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Adapter, type Item, PermanentError } from "../src/adapter-api.ts";
@@ -263,4 +263,48 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 
 	expect(status.ok && status.status.workers.mac).toBe(NOW);
 	expect(serialized).toBeDefined();
+});
+
+test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
+	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } });
+	const raw = rawConfig();
+
+	const put = (path: string, text: string) => {
+		mkdirSync(dirname(join(w.repo.owner, path)), { recursive: true });
+		writeFileSync(join(w.repo.owner, path), text);
+	};
+
+	const pool = mkdtempSync(join(tmpdir(), "hum-open-pool-"));
+
+	put(".hum/hum.json", JSON.stringify({ ...raw.hum, backgroundPollSeconds: 0.05, runSlots: { ...raw.hum.runSlots, enabled: true, pool } }));
+
+	for (const [name, kind] of Object.entries(raw.kinds)) put(`.hum/kinds/${name}.json`, JSON.stringify(kind));
+
+	for (const [file, text] of Object.entries<string>(raw.roles)) put(`.hum/${file}`, text);
+
+	w.item("a", "docs/a.md");
+
+	const results: string[] = [];
+
+	const worker = await openWorker(w.repo.owner, {
+		hopeSkills: hopeSkills(),
+		judge: docsJudge,
+		checks: ["true"],
+		holder: "worker-1",
+		binary: w.shim.binary,
+		env: w.shim.env,
+		now: () => NOW,
+		workDir: mkdtempSync(join(tmpdir(), "hum-open-work-")),
+		onResult: (r) => results.push(r.outcome),
+	});
+
+	await worker.tick();
+	await worker.idle();
+
+	expect(results).toEqual(["merged"]);
+
+	const folders = w.shim.background().filter(({ cmd }) => cmd === "bg").map(({ cwd }) => cwd ?? "");
+
+	expect(folders.filter((folder) => folder.startsWith(realpathSync(pool)))).not.toEqual([]);
+	rmSync(pool, { recursive: true, force: true });
 });

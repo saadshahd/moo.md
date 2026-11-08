@@ -81,6 +81,21 @@ const pattern = z.string().min(1).refine(isRegExp, "a pattern is a valid regular
 
 const date = z.iso.date();
 
+/** When a refresh step runs: after every return, or only when a lockfile changed since the slot was last installed. */
+export const REFRESH_WHEN = ["always", "lockfile-changed"] as const;
+
+/** Whether a slot gets its own services, or every slot shares one set and gets its own database. */
+export const SLOT_SERVICES = ["per-slot", "shared"] as const;
+
+const RefreshStep = z.strictObject({ run: name, when: z.enum(REFRESH_WHEN) });
+
+/** The three commands that make a slot usable, each a shell command run in the slot with the slot's environment. */
+export const SlotRecipe = z.strictObject({
+	prepare: z.array(name).describe("Run once when a slot is made: install dependencies, start or attach services, seed data."),
+	refresh: z.array(RefreshStep).describe("Run after each return, once the slot is reset to the latest base: reinstall when a lockfile changed, reset the data."),
+	ready: z.array(name).describe("Run after prepare and each refresh; a slot where one fails leaves the pool."),
+});
+
 const seconds = z.int().positive();
 
 const count = z.int().positive();
@@ -103,6 +118,8 @@ const Launch = z.union([
 ]);
 
 export type Launch = z.infer<typeof Launch>;
+
+export type SlotRecipe = z.infer<typeof SlotRecipe>;
 
 /** Every setting an owner may change, each described for the schema's readers. `defaults/hum.json` holds the shipped value of each. */
 const Shipped = z.object({
@@ -179,6 +196,19 @@ const Shipped = z.object({
 	runAutoMode: z
 		.strictObject({ environment: z.array(z.string().min(1)), allow: z.array(z.string().min(1)), hardDeny: z.array(z.string().min(1)) })
 		.describe("What auto mode's classifier is told about a background run: the situation it is in, what it allows, and what it always refuses; '$defaults' keeps Claude Code's own rules."),
+	runSlots: z
+		.strictObject({
+			enabled: z.boolean(),
+			pool: z.string().min(1),
+			services: z.enum(SLOT_SERVICES),
+			ports: z.strictObject({ base: count, stride: count }),
+			projectPrefix: name,
+			stepTimeoutSeconds: seconds,
+			recipe: SlotRecipe,
+		})
+		.describe(
+			"Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands.",
+		),
 	mergeRisk: z
 		.strictObject({
 			weights: z.record(z.enum(GRADED), z.number().positive()),
@@ -380,4 +410,5 @@ export const OWNER_CHANGEABLE = {
 	"background launch wait": "backgroundLaunchSeconds",
 	"denied run commands": "deniedRunCommands",
 	"run auto mode": "runAutoMode",
+	"run slots": "runSlots",
 } as const satisfies Record<string, string>;
