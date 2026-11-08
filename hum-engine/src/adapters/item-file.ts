@@ -9,6 +9,9 @@ import { isMarkerLine, markerLine, splitMarker } from "./marked.ts";
 /** The front matter `state` of an item hum may take. */
 export const READY_STATE = "ready";
 
+/** The front matter `state` of a merged item. */
+const DONE_STATE = "done";
+
 const FrontMatter = z.looseObject({ title: z.string().min(1), state: z.string().min(1) });
 
 const EntryMarker = z.strictObject({ kind: z.enum(THREAD_KINDS), at: z.int().nonnegative(), option: z.string().min(1).optional() });
@@ -66,6 +69,18 @@ export const parseItemFile = (source: string): ItemFile => {
 
 /** A new ready item file. */
 export const newItemFile = (title: string, body: string): string => `---\n${Bun.YAML.stringify({ title, state: READY_STATE }, null, 2)}\n---\n\n${body.trim()}\n`;
+
+/** The file with `state: done` in its front matter, so the merged change itself takes the item off the ready list. */
+export const markDone = (source: string): string => {
+	const [head] = parseMarkdown(source).children;
+
+	if (head?.type !== "yaml") throw new Error("front matter missing: the file must open with a '---' block");
+
+	const { start, end } = spanOf(head);
+	const front = { ...FrontMatter.parse(Bun.YAML.parse(head.value)), state: DONE_STATE };
+
+	return `${source.slice(0, start)}---\n${Bun.YAML.stringify(front, null, 2)}\n---${source.slice(end)}`;
+};
 
 /** The file with one more thread entry. Text that would open an entry of its own is refused. */
 export const appendEntry = (source: string, entry: Omit<ThreadEntry, "text">, text: string): string => {

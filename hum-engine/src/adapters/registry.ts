@@ -27,6 +27,8 @@ const MARKDOWN_SLOTS: readonly Slot[] = ["work-source", "questions", "answers"];
 const AdapterSettings = z.looseObject({
 	integrations: z.partialRecord(z.enum(SLOTS), z.string().min(1)).optional(),
 	claimPrefix: HumConfig.shape.claimPrefix,
+	itemsDir: HumConfig.shape.itemsDir,
+	commitIdentity: HumConfig.shape.commitIdentity,
 	readyLabel: HumConfig.shape.readyLabel,
 	mergeMethod: HumConfig.shape.mergeMethod,
 });
@@ -65,7 +67,7 @@ const githubRepo = async (repo: string): Promise<string> => {
 
 /** The adapters the engine ships, by the name `hum.json` gives them. */
 const BUILT_IN = {
-	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix }, context),
+	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity }, context),
 	github: async ({ path, settings, context }) =>
 		githubAdapter({ repo: await githubRepo(path), base: await defaultBase(path), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod }, context),
 	roundup: async ({ context }) => roundupAdapter({}, context),

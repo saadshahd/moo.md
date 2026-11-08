@@ -2,6 +2,10 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
+
+/** The markdown adapter's settings as hum ships them. */
+export const markdownSettings = { claimPrefix: SHIPPED_DEFAULTS.claimPrefix, itemsDir: SHIPPED_DEFAULTS.itemsDir, identity: SHIPPED_DEFAULTS.commitIdentity };
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 

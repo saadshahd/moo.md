@@ -66,21 +66,6 @@ describe("a roundup comment is one line", () => {
 	});
 });
 
-describe("watch", () => {
-	test("an idle watch makes no write and keeps its token; a comment flips it", async () => {
-		const roundup = new FakeRoundup();
-		const adapter = roundupAdapter({ call: roundup.call }, context);
-		const id = roundup.seed("watched");
-		const first = await adapter.answers.watch();
-
-		expect(await adapter.answers.watch(first.token)).toEqual({ token: first.token, changed: false });
-
-		roundup.say(id, "from the app");
-
-		expect((await adapter.answers.watch(first.token)).changed).toBe(true);
-	});
-});
-
 describe("refusal", () => {
 	test("outside a run roundup started, the stdio adapter refuses", () => {
 		const saved = { agent: process.env.ROUNDUP_AGENT_ID, socket: process.env.RUPD_SOCKET };

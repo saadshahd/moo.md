@@ -11,10 +11,10 @@ export const MAIN = join(root, "src", "cli", "main.ts");
  * An owner's checkout set up for the `hum` binary: the shipped config written under `.hum/`, a bare remote as
  * `origin`, a stand-in `claude` first on PATH, and hope's folder named. Nothing leaves the temp folders.
  */
-export const ownerRepo = (spec: ShimSpec, env: Record<string, string> = {}) => {
+export const ownerRepo = (spec: ShimSpec, env: Record<string, string> = {}, edit: Parameters<typeof rawConfig>[0] = () => {}) => {
 	const repo = new WorkRepo();
 	const shim = makeShim(spec);
-	const raw = rawConfig();
+	const raw = rawConfig(edit);
 
 	writeFileSync(join(repo.owner, ".hum", "hum.json"), JSON.stringify(raw.hum));
 

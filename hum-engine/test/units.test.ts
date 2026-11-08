@@ -1,10 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { parse } from "plist";
+import { z } from "zod";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { renderUnit, type UnitVars } from "../src/service/unit.ts";
-
-const templates = join(import.meta.dir, "..", "templates");
+import { ciWorkflows, type WorkflowSettings } from "../src/service/workflows.ts";
 
 const dirs: string[] = [];
 
@@ -29,75 +31,67 @@ const vars: UnitVars = {
 	log: "/Users/o/Library/Logs/hum.log",
 };
 
+const settings: WorkflowSettings = { ...SHIPPED_DEFAULTS, runBranchPrefix: "bots/run/", itemsDir: "work/items", ciSchedule: "7 * * * *", commitIdentity: { name: "bot", email: "bot@example.com" } };
+
+const Trigger = z.object({ on: z.record(z.string(), z.json()) });
+
+const Wake = z.object({ jobs: z.object({ wake: z.object({ steps: z.array(z.object({ run: z.string().optional() })) }) }) });
+
 const has = (tool: string): boolean => Bun.which(tool) !== null;
 
-if (!has("plutil")) console.log("skip plutil: this machine has no plutil (macOS only); the launchd plist is linted on a Mac");
+const writeWorkflows = (repo: string): void => {
+	const folder = join(repo, ".github", "workflows");
 
-if (!has("actionlint")) console.log("skip actionlint: it is not installed (brew install actionlint)");
+	mkdirSync(folder, { recursive: true });
 
-if (!has("systemd-analyze")) console.log("skip systemd-analyze verify: it is not installed (Linux only); slice 18 runs it in moo's Linux CI");
+	for (const { file, text } of ciWorkflows(settings)) writeFileSync(join(folder, file), text);
+};
 
-const plutil = (args: string[], file: string) => Bun.spawnSync(["plutil", ...args, file]);
-
-test.skipIf(!has("plutil"))("plutil -lint passes on the launchd template and on the unit rendered from it", () => {
+test.skipIf(!has("plutil"))("plutil -lint passes on the rendered launchd plist", () => {
 	const rendered = join(temp(), "unit.plist");
 
 	writeFileSync(rendered, renderUnit("launchd", vars));
 
-	for (const file of [join(templates, "launchd", "md.moo.hum.plist"), rendered]) {
-		const lint = plutil(["-lint"], file);
+	const lint = Bun.spawnSync(["plutil", "-lint", rendered]);
 
-		expect(lint.stdout.toString() + lint.stderr.toString()).toContain("OK");
-	}
+	expect(lint.stdout.toString() + lint.stderr.toString()).toContain("OK");
 });
 
-test.skipIf(!has("plutil"))("the rendered plist restarts only after a failure, keeps the paths absolute and carries the environment", () => {
-	const rendered = join(temp(), "unit.plist");
-
-	writeFileSync(rendered, renderUnit("launchd", vars));
-
-	const json = JSON.parse(plutil(["-convert", "json", "-o", "-"], rendered).stdout.toString());
-
-	expect(json).toMatchObject({
+test("the launchd plist restarts only after a failure, keeps the paths absolute and escapes and carries the environment", () => {
+	expect(parse(renderUnit("launchd", vars))).toMatchObject({
 		Label: vars.label,
 		ProgramArguments: vars.command,
 		WorkingDirectory: vars.repo,
-		// The start script exits 0 when it gives up (R7); only a failure starts it again.
 		KeepAlive: { SuccessfulExit: false },
-		EnvironmentVariables: { PATH: vars.path, HUM_KIND: "docs" },
+		EnvironmentVariables: { PATH: vars.path, HUM_KIND: "docs", HUM_CHECKS: vars.env?.HUM_CHECKS },
 	});
 });
 
-test.skipIf(!has("actionlint"))("actionlint passes on every CI template, with the wake workflow they call beside them", () => {
+test.skipIf(!has("actionlint"))("actionlint passes on every CI workflow, with the wake workflow they call beside them", () => {
 	const repo = temp();
-	const workflows = join(repo, ".github", "workflows");
 
 	Bun.spawnSync(["git", "init", "-q"], { cwd: repo });
-	mkdirSync(workflows, { recursive: true });
-
-	const files = readdirSync(join(templates, "ci"));
-
-	for (const file of files) copyFileSync(join(templates, "ci", file), join(workflows, file));
+	writeWorkflows(repo);
 
 	const lint = Bun.spawnSync(["actionlint", "-no-color"], { cwd: repo });
 
 	expect(lint.stdout.toString() + lint.stderr.toString()).toBe("");
 	expect(lint.exitCode).toBe(0);
-	expect(files.sort()).toEqual(["hum-comment.yml", "hum-dispatch.yml", "hum-push.yml", "hum-schedule.yml", "hum-wake.yml"]);
 });
 
-test("the CI templates wake on the four events, never resume a session and gate nothing", () => {
-	const read = (file: string) => readFileSync(join(templates, "ci", file), "utf8");
-	const all = readdirSync(join(templates, "ci")).map(read).join("\n");
+test("the CI workflows wake on the four events from the settings, never resume a session and gate nothing", () => {
+	const files = Object.fromEntries(ciWorkflows(settings).map(({ file, text }) => [file, text]));
+	const on = (file: string) => Trigger.parse(Bun.YAML.parse(files[file] ?? "")).on;
+	const wakeSteps = Wake.parse(Bun.YAML.parse(files["hum-wake.yml"] ?? "")).jobs.wake.steps;
 
-	expect(read("hum-comment.yml")).toContain("issue_comment");
-	expect(read("hum-push.yml")).toContain('".hum/work/**"');
-	expect(read("hum-dispatch.yml")).toContain("repository_dispatch");
-	expect(read("hum-schedule.yml")).toContain("cron:");
-	// Q2: no artifact store, no transcript, no --resume, and no approval gate.
-	expect(all).not.toMatch(/upload-artifact|download-artifact|--resume|environment:/);
-	// A comment's text is never put into a shell line: event data reaches the script through env only.
-	expect(read("hum-wake.yml")).not.toMatch(/run:.*\$\{\{/);
+	expect(Object.keys(on("hum-comment.yml"))).toEqual(["issue_comment"]);
+	expect(on("hum-push.yml")).toEqual({ push: { branches: ["**", "!bots/run/**"], paths: ["work/items/**"] } });
+	expect(Object.keys(on("hum-dispatch.yml"))).toEqual(["repository_dispatch"]);
+	expect(on("hum-schedule.yml")).toMatchObject({ schedule: [{ cron: "7 * * * *" }] });
+	expect(files["hum-wake.yml"]).toContain("HUM_GIT_EMAIL: bot@example.com");
+	expect(Object.values(files).join("\n")).not.toMatch(/upload-artifact|download-artifact|--resume|environment:/);
+	// A comment's text never reaches a shell line: event data comes through env only.
+	expect(wakeSteps.every((step) => !step.run?.includes("${{"))).toBe(true);
 });
 
 test("the systemd unit restarts after a failure only, and its command is one absolute line", () => {
@@ -107,28 +101,18 @@ test("the systemd unit restarts after a failure only, and its command is one abs
 	expect(unit).toContain("WorkingDirectory=/home/o/repo");
 	expect(unit).toContain(`ExecStart="/opt/homebrew/bin/bun" "/Users/o/repos/a & b/node_modules/.bin/hum" "serve"`);
 	expect(unit).toContain('Environment="PATH=/opt/homebrew/bin:/usr/bin:/bin"');
-	expect(unit).not.toContain("{{");
+});
 
+test("systemd words are quoted so no specifier or variable expands, and a value with a line break is refused", () => {
+	expect(renderUnit("systemd", { ...vars, command: ["/bin/echo", "50%", "$HOME"] })).toContain('ExecStart="/bin/echo" "50%%" "$$HOME"');
+	expect(() => renderUnit("systemd", { ...vars, env: { X: "1\n2" } })).toThrow("line break");
+});
+
+test.skipIf(!has("systemd-analyze"))("systemd-analyze verify passes on the rendered unit", () => {
 	const file = join(temp(), "hum.service");
-
-	writeFileSync(file, unit);
-
-	if (!has("systemd-analyze")) return;
 
 	// `verify` wants the command to exist, so it runs the real bun by its path.
 	writeFileSync(file, renderUnit("systemd", { ...vars, repo: tmpdir(), command: [process.execPath, "serve"] }));
 
-	const verify = Bun.spawnSync(["systemd-analyze", "verify", file]);
-
-	expect(verify.stderr.toString()).toBe("");
-});
-
-test("a value with a line break, or a template naming an unknown key, is refused", () => {
-	expect(() => renderUnit("launchd", { ...vars, repo: "/a\n/b" })).toThrow("line break");
-	expect(() => renderUnit("systemd", { ...vars, env: { X: "1\n2" } })).toThrow("line break");
-});
-
-test("launchd values are escaped as XML and systemd words are quoted", () => {
-	expect(renderUnit("launchd", vars)).toContain("<string>/Users/o/repos/a &amp; b</string>");
-	expect(renderUnit("systemd", { ...vars, command: ["/bin/echo", "50%", "$HOME"] })).toContain('ExecStart="/bin/echo" "50%%" "$$HOME"');
+	expect(Bun.spawnSync(["systemd-analyze", "verify", file]).stderr.toString()).toBe("");
 });

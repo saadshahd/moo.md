@@ -228,6 +228,73 @@
 			"type": "integer",
 			"minimum": 0,
 			"maximum": 9007199254740991
+		},
+		"serviceLabel": {
+			"default": "md.moo.hum",
+			"type": "string",
+			"pattern": "^[A-Za-z0-9._-]+$"
+		},
+		"maxCrashes": {
+			"default": 5,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"crashWindowSeconds": {
+			"default": 600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"workerDownTicks": {
+			"default": 3,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"tokenWarnDays": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"ciSchedule": {
+			"default": "*/15 * * * *",
+			"type": "string",
+			"pattern": "^(\\S+\\s+){4}\\S+$"
+		},
+		"ciTickCacheSeconds": {
+			"default": 300,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"commitIdentity": {
+			"default": {
+				"name": "hum",
+				"email": "hum@moo.md"
+			},
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string",
+					"minLength": 1
+				},
+				"email": {
+					"type": "string",
+					"minLength": 1
+				}
+			},
+			"required": [
+				"name",
+				"email"
+			],
+			"additionalProperties": false
+		},
+		"itemsDir": {
+			"default": ".hum/work",
+			"type": "string",
+			"minLength": 1
 		}
 	},
 	"required": [

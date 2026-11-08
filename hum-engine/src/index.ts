@@ -84,9 +84,9 @@ export { type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, rep
 
 export { Marker, marked, markerOf, parseComment } from "./adapters/marked.ts";
 
-export { ITEMS_DIR, markdownAdapter, type MarkdownOptions } from "./adapters/markdown.ts";
+export { markdownAdapter, type MarkdownOptions } from "./adapters/markdown.ts";
 
-export { parseItemFile } from "./adapters/item-file.ts";
+export { markDone, parseItemFile } from "./adapters/item-file.ts";
 
 export { refuseOtherVersion, resolveAdapters, type Slot, SLOTS } from "./adapters/registry.ts";
 
@@ -112,7 +112,6 @@ export {
 
 export {
 	levelOf,
-	markDone,
 	mergeDecision,
 	PLAN_MARK,
 	RUN_SCHEMA,
@@ -154,10 +153,12 @@ export { CI_TICK_REF, readCiTick, recordCiTick } from "./service/ci-tick.ts";
 
 export { type Child, EXIT_UPDATED, supervise, type Supervision } from "./service/supervise.ts";
 
-export { checkTokenAge, TOKEN_LIFE_DAYS, TOKEN_WARN_DAYS } from "./service/token.ts";
+export { checkTokenAge, TOKEN_LIFE_DAYS } from "./service/token.ts";
 
 export { renderUnit, type UnitKind, type UnitVars } from "./service/unit.ts";
 
 export { reportCards, wakeUntilQuiet } from "./service/wake.ts";
+
+export { ciWorkflows, type WorkflowFile, type WorkflowSettings } from "./service/workflows.ts";
 
 export { writeCards } from "./status/file.ts";

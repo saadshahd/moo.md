@@ -263,7 +263,7 @@ test("an item id in the inbox folder wakes a waiting item at once, with no chang
 });
 
 test("a saved deadline fires on the next event, not only on a tick: a question the owner never answers ends stuck", async () => {
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } }, { worker: { ciTick: async () => NOW } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -278,6 +278,10 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 	expect(w.state.parked.get("a")).toMatchObject({ why: "stuck" });
 	expect(w.state.faults.list().map((c) => c.code)).toContain("item-stuck");
 	expect(w.shim.calls()).toHaveLength(calls);
+
+	const status = readStatus(w.state.statusPath);
+
+	expect(status.ok && w.clock.at - (status.status.workers.ci ?? 0)).toBe(86_400_001);
 });
 
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {

@@ -1,11 +1,9 @@
 import { x } from "tinyexec";
 import { PermanentError } from "../adapter-api.ts";
+import { SHIPPED_DEFAULTS } from "../config/schema.ts";
 
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
 const HOOKS_OFF = "core.hooksPath=/dev/null";
-
-/** Every commit hum makes itself carries this author and committer. */
-const IDENTITY = ["user.name=hum", "user.email=hum@moo.md"];
 
 const CONFLICT = /non-fast-forward|fetch first|already exists|stale info|failed to update ref|cannot lock ref/i;
 const REFUSED = /remote rejected|declined|protected|GH006|denied|not permitted/i;
@@ -16,7 +14,6 @@ const NOT_ANCESTOR = 1;
 
 export type GitResult = { readonly code: number; readonly stdout: string; readonly stderr: string };
 
-/** git in one folder. */
 export type Git = {
 	/** Runs git; a non-zero exit is a result, not a throw. `input` is its stdin, which is closed either way. */
 	readonly run: (args: readonly string[], input?: string) => Promise<GitResult>;
@@ -24,7 +21,6 @@ export type Git = {
 	readonly raw: (args: readonly string[], input?: string) => Promise<string>;
 };
 
-/** git exited non-zero. */
 export class GitFailed extends Error {
 	override name = "GitFailed";
 
@@ -43,10 +39,22 @@ export class PushRefused extends PermanentError {
 
 export type PushOutcome = "pushed" | "conflict";
 
-/** git in `cwd` with hooks off and hum's identity. `env` adds variables, such as a scratch index or a commit date. */
-export const gitIn = (cwd: string, env: Readonly<Record<string, string>> = {}): Git => {
+/** The author and committer of the commits hum makes. */
+export type GitIdentity = { readonly name: string; readonly email: string };
+
+export type GitOptions = {
+	/** The owner's `commitIdentity` setting; reads need none. */
+	readonly identity?: GitIdentity;
+	/** More variables, such as a scratch index or a commit date. */
+	readonly env?: Readonly<Record<string, string>>;
+};
+
+const identitySettings = ({ name, email }: GitIdentity): string[] => [`user.name=${name}`, `user.email=${email}`];
+
+/** git in `cwd` with hooks off. */
+export const gitIn = (cwd: string, { identity = SHIPPED_DEFAULTS.commitIdentity, env = {} }: GitOptions = {}): Git => {
 	const run = async (args: readonly string[], input = ""): Promise<GitResult> => {
-		const { exitCode, stdout, stderr } = await x("git", ["-c", HOOKS_OFF, ...IDENTITY.flatMap((setting) => ["-c", setting]), ...args], {
+		const { exitCode, stdout, stderr } = await x("git", ["-c", HOOKS_OFF, ...identitySettings(identity).flatMap((setting) => ["-c", setting]), ...args], {
 			nodeOptions: { cwd, env: { ...process.env, ...env } },
 			stdin: input,
 		});

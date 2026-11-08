@@ -57,6 +57,54 @@ test("a usage-limit message parses to limited(until), and no call is made until 
 	expect(shim.calls()).toHaveLength(3);
 });
 
+test("a runner started while a saved limit stands makes no call until the limit ends, then checks and runs", async () => {
+	const until = Math.floor(NOW / 1000) + 3600;
+	const first = await setup({ script: [{}, { error: `Claude usage limit reached|${until}` }, {}, {}] });
+
+	await ask(first.runner);
+
+	const restarted = await startRunner({ state: first.state, model: MODEL, binary: first.shim.binary, env: first.shim.env, now: () => first.clock.at });
+
+	expect(restarted.check).toEqual({ kind: "limited", until: until * 1000 });
+	expect(await ask(restarted.runner)).toEqual({ kind: "limited", until: until * 1000 });
+	expect(first.shim.calls()).toHaveLength(2);
+
+	first.clock.at = until * 1000 + 1;
+
+	const after = await ask(restarted.runner);
+
+	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(first.shim.calls()).toHaveLength(4);
+});
+
+test("a start check the limit refused is made again once the limit has ended, so runs resume without a restart", async () => {
+	const until = Math.floor(NOW / 1000) + 3600;
+	const { runner, shim, clock, check } = await setup({ script: [{ error: `Claude usage limit reached|${until}` }, {}, {}] });
+
+	expect(check).toEqual({ kind: "limited", until: until * 1000 });
+	expect(await ask(runner)).toEqual({ kind: "limited", until: until * 1000 });
+	expect(shim.calls()).toHaveLength(1);
+
+	clock.at = until * 1000 + 1;
+
+	const after = await ask(runner);
+
+	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(shim.calls()).toHaveLength(3);
+});
+
+test("a start check refused with a limit that has no readable reset time is made again on the next run", async () => {
+	const { runner, shim, state, check } = await setup({ script: [{ error: "You've hit your limit, try later" }, {}, {}] });
+
+	expect(check).toMatchObject({ kind: "held", card: { code: "limit-unparsed" } });
+
+	const after = await ask(runner);
+
+	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(shim.calls()).toHaveLength(3);
+	expect(state.faults.list()).toEqual([]);
+});
+
 test("a rejecting rate_limit_event also gives the reset time", async () => {
 	const until = Math.floor(NOW / 1000) + 60;
 	const { runner } = await setup({ script: [{}, { error: "You've hit your limit", rejectUntil: until }] });

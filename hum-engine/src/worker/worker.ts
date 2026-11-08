@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, rmSync, watch } from "node:fs";
+import ExpiryMap from "expiry-map";
 import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
@@ -65,9 +66,6 @@ type InFlight = {
 
 const SECOND_MS = 1000;
 
-/** Each read of the CI tick fetches a ref from the remote, so it is read at most this often. */
-const CI_TICK_CACHE_MS = 5 * 60 * SECOND_MS;
-
 /** A status read that takes longer shows no value, so a hung read never holds a tick. */
 const STATUS_READ_TIMEOUT_MS = 10 * SECOND_MS;
 
@@ -75,27 +73,11 @@ const MERGED_SHOWN = 50;
 
 const ERROR_EXCERPT = 300;
 
-/** Reads `read` at most every `everyMs` of the worker's clock; a failed or slow read shows no value. */
-const cachedRead = <T>(read: (() => Promise<T | undefined>) | undefined, everyMs: number) => {
-	let last: { readonly value: T | undefined; readonly at: number } | undefined;
-
-	const isStale = (t: number) => last === undefined || t - last.at >= everyMs;
-
-	return async (t: number): Promise<T | undefined> => {
-		if (read === undefined) return undefined;
-
-		if (isStale(t))
-			last = {
-				value: await pTimeout(read(), {
-					milliseconds: STATUS_READ_TIMEOUT_MS,
-					fallback: () => undefined,
-				}).catch(() => undefined),
-				at: t,
-			};
-
-		return last?.value;
-	};
-};
+/** Reads `read` at most once per `everyMs`; a failed or slow read shows no value, and that too is kept for the period. */
+const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, everyMs: number): (() => Promise<T | undefined>) =>
+	read === undefined
+		? async () => undefined
+		: pMemoize(() => pTimeout(read(), { milliseconds: STATUS_READ_TIMEOUT_MS, fallback: () => undefined }).catch(() => undefined), { cache: new ExpiryMap(everyMs) });
 
 /** Sources that never settle, so a restored item can be stepped by its timers without starting a run. */
 const neverSources = (kind: Kind) =>
@@ -134,18 +116,22 @@ export class Worker {
 	readonly #answered = new Set<string>();
 	readonly #merged: Status["merged"] = [];
 	readonly #wakes = new EventTarget();
-	readonly #latest: (t: number) => Promise<string | undefined>;
-	readonly #ciTick: (t: number) => Promise<number | undefined>;
+	readonly #latest: () => Promise<string | undefined>;
+	readonly #ciTick: () => Promise<number | undefined>;
 	readonly #learn: (id: string) => Promise<Known>;
 	#watchToken: string | undefined;
+
+	get config(): Config {
+		return this.#o.config;
+	}
 
 	constructor(options: WorkerOptions) {
 		this.#o = options;
 		this.#now = options.now ?? Date.now;
 		this.#gate = options.gate ?? new PrefixGate({ now: this.#now });
-		this.#latest = cachedRead(options.latestVersion, options.config.hum.latestVersionCacheSeconds * SECOND_MS);
-		this.#ciTick = cachedRead(options.ciTick, CI_TICK_CACHE_MS);
-		this.#start = signatureOf(options.repo, options.engineVersion ?? ENGINE_VERSION);
+		this.#latest = readEvery(options.latestVersion, options.config.hum.latestVersionCacheSeconds * SECOND_MS);
+		this.#ciTick = readEvery(options.ciTick, options.config.hum.ciTickCacheSeconds * SECOND_MS);
+		this.#start = signatureOf(options.repo, options.engineVersion ?? ENGINE_VERSION, options.config.hum.itemsDir);
 		this.#learn = pMemoize(async (id: string): Promise<Known> => {
 			const item = await options.adapters.workSource.read(id);
 
@@ -158,12 +144,10 @@ export class Worker {
 		rememberKinds(options.state, options.config);
 	}
 
-	/** Items with a run going. */
 	running(): string[] {
 		return [...this.#inFlight.keys()];
 	}
 
-	/** Resolves when no run is going. */
 	idle(): Promise<void> {
 		return this.#pool.onIdle();
 	}
@@ -399,7 +383,7 @@ export class Worker {
 
 		const read = readStatus(state.statusPath);
 		const before = read.ok ? read.status : emptyStatus(signature.engineVersion, t);
-		const [latest, ci] = await Promise.all([this.#latest(t), this.#ciTick(t)]);
+		const [latest, ci] = await Promise.all([this.#latest(), this.#ciTick()]);
 		const saved = new Map(state.items.saved().map((s) => [s.itemId, s.state]));
 
 		writeStatus(state.statusPath, {
@@ -497,9 +481,9 @@ export class Worker {
 
 		await Promise.all(this.#dueWaits(t).map((due) => this.#fireDue(due, t)));
 
-		if (config.hum.ciToken) checkTokenAge(state.faults, config.hum.ciToken.setUp, t);
+		if (config.hum.ciToken) checkTokenAge(state.faults, config.hum.ciToken.setUp, t, config.hum.tokenWarnDays);
 
-		const signature = signatureOf(this.#o.repo, this.#o.engineVersion ?? ENGINE_VERSION);
+		const signature = signatureOf(this.#o.repo, this.#o.engineVersion ?? ENGINE_VERSION, this.#o.config.hum.itemsDir);
 		const update = this.#updateSeen(signature);
 		const sleeping = state.items.saved().filter((s) => this.#isAsleep(s));
 

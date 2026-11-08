@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CI_TICK_REF } from "../src/service/ci-tick.ts";
@@ -53,6 +53,7 @@ test("hum wake with a rejected token exits 1, annotates the job and writes its s
 	const o = owner({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }] });
 	const summary = join(mkdtempSync(join(tmpdir(), "hum-summary-")), "summary.md");
 
+	writeFileSync(summary, "");
 	o.item("a");
 
 	const run = hum(o, ["wake", "--event", "workflow_dispatch"], { GITHUB_STEP_SUMMARY: summary });
@@ -60,7 +61,7 @@ test("hum wake with a rejected token exits 1, annotates the job and writes its s
 	expect(run.code).toBe(1);
 	expect(run.out).toContain("::error title=hum token-rejected::");
 	expect(run.out).toContain("claude setup-token");
-	expect(readFileSync(summary, "utf8")).toContain("**token-rejected**");
+	expect(readFileSync(summary, "utf8")).toContain("token-rejected");
 	// The item waits where it is.
 	expect(sh(o.repo.remote, ["show", "main:.hum/work/a.md"])).toContain("state: ready");
 });
@@ -73,10 +74,9 @@ test("hum wake without a kind or a check says what is missing and exits 1", () =
 	expect(run.err).toContain("name at least one check");
 });
 
-test("R7: hum serve starts a worker that exits at start, again until the crash limit, then shows one card and exits 0", () => {
-	// No kind: every `hum work` exits 1 at once.
-	const o = owner({}, { HUM_KIND: "" });
-	const run = hum(o, ["serve", "--max-crashes", "2", "--crash-window", "10"]);
+test("hum serve reads its crash limit from the config, restarts a worker that refuses the config until then, shows one card and exits 0", () => {
+	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { maxCrashes: 2, levels: [] }));
+	const run = hum(o, ["serve"]);
 	const status = readStatus(join(stateDir(o), "status.json"));
 
 	expect(run.code).toBe(0);

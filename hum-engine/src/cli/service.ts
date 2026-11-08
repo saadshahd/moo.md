@@ -1,9 +1,11 @@
-import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { type Command, InvalidArgumentError, Option } from "commander";
+import { type Command, Option } from "commander";
+import { x } from "tinyexec";
 import { z } from "zod";
 import { listHopeSkills } from "../config/load.ts";
+import { HumConfig } from "../config/schema.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
 import { reportCards, wakeUntilQuiet } from "../service/wake.ts";
@@ -12,16 +14,19 @@ import { readStatus } from "../status/file.ts";
 import { npmLatest, openWorker } from "../worker/open.ts";
 import type { Io } from "./ops.ts";
 
-/** How often the supervisor checks the worker's heartbeat. */
-export const DEFAULT_INTERVAL_S = 30;
+const SECOND_MS = 1000;
 
-const whole = (text: string): number => {
-	const n = Number(text);
+/** The pause before a supervised worker's first restart. */
+const RESTART_BACKOFF_MS = SECOND_MS;
 
-	if (!Number.isInteger(n) || n <= 0) throw new InvalidArgumentError("a positive whole number");
+const EXIT_OK = 0;
 
-	return n;
-};
+/** The start script's exit code when it gave up or was stopped: the unit restarts a script only after a failure. */
+const EXIT_STAY_DOWN = EXIT_OK;
+
+const EXIT_CARDS_SHOWN = 1;
+
+const SCHEDULE_EVENT = "schedule";
 
 const collect = (value: string, seen: string[]): string[] => [...seen, value];
 
@@ -41,15 +46,34 @@ const withWorkOptions = (cmd: Command): Command =>
 const PluginList = z.array(z.looseObject({ id: z.string(), installPath: z.string() }));
 
 /** The folder of the installed hope plugin: `HUM_HOPE_ROOT`, else the path `claude plugin list` gives. */
-const hopeRoot = (): string => {
+const hopeRoot = async (): Promise<string> => {
 	if (process.env.HUM_HOPE_ROOT) return process.env.HUM_HOPE_ROOT;
 
-	const listed = spawnSync("claude", ["plugin", "list", "--json"], { encoding: "utf8" });
-	const hope = listed.status === 0 ? PluginList.parse(JSON.parse(listed.stdout)).find((p) => p.id.startsWith("hope@")) : undefined;
+	const listed = await x("claude", ["plugin", "list", "--json"]);
+	const hope = listed.exitCode === 0 ? PluginList.parse(JSON.parse(listed.stdout)).find((plugin) => plugin.id.startsWith("hope@")) : undefined;
 
 	if (!hope) throw new Error("the hope plugin is not installed: run `claude plugin install hope@moo.md`, or set HUM_HOPE_ROOT to its folder");
 
 	return hope.installPath;
+};
+
+const ServiceSettings = z.looseObject({
+	tickIntervalSeconds: HumConfig.shape.tickIntervalSeconds,
+	workerDownTicks: HumConfig.shape.workerDownTicks,
+	maxCrashes: HumConfig.shape.maxCrashes,
+	crashWindowSeconds: HumConfig.shape.crashWindowSeconds,
+});
+
+/**
+ * The settings the start script needs, with the shipped default for any it cannot read. A config the worker
+ * refuses is the worker's to report: it exits, and the script counts the crash and shows the card.
+ */
+const serviceSettings = (repo: string): z.infer<typeof ServiceSettings> => {
+	try {
+		return ServiceSettings.parse(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")));
+	} catch {
+		return ServiceSettings.parse({});
+	}
 };
 
 /** HUM_CHECKS: a JSON array of check commands; unset is none. A value that is not that array fails loud. */
@@ -65,7 +89,8 @@ const envChecks = (): string[] => {
 	return parsed.data;
 };
 
-const openFor = (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
+/** The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow. */
+const openFor = async (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 	const checks = flags.check.length > 0 ? flags.check : envChecks();
 	const kind = flags.kind;
 
@@ -74,13 +99,12 @@ const openFor = (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 	if (!kind) throw new Error("name the kind: --kind, or HUM_KIND");
 
 	return openWorker(repo, {
-		hopeSkills: listHopeSkills(hopeRoot()),
+		hopeSkills: listHopeSkills(await hopeRoot()),
 		kind: () => kind,
 		checks,
 		holder: flags.holder ?? `${where}@${hostname()}`,
 		base: flags.base,
 		where,
-		// The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow.
 		latestVersion: where === "mac" ? npmLatest : undefined,
 		ciTick: where === "mac" ? () => readCiTick(repo, "origin") : undefined,
 	});
@@ -88,6 +112,13 @@ const openFor = (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 
 const onStop = (stop: () => void) => {
 	for (const signal of ["SIGTERM", "SIGINT"] as const) process.once(signal, stop);
+};
+
+/** `hum work` as a child process of this one, sharing its terminal. */
+const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
+	const child = x(process.execPath, [process.argv[1] ?? "", "work", ...workArgs], { nodeOptions: { cwd, stdio: "inherit" } });
+
+	return { exited: Promise.resolve(child).then(({ exitCode }) => exitCode ?? 1), kill: () => void child.kill("SIGTERM") };
 };
 
 /**
@@ -105,45 +136,33 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			const ended = await worker.serve(abort.signal);
 
 			io.stderr(`hum work: stopped, ${ended.reason}\n`);
-			done(ended.reason === "stopped" ? 0 : EXIT_UPDATED);
+			done(ended.reason === "stopped" ? EXIT_OK : EXIT_UPDATED);
 		});
 
 	root
 		.command("serve")
 		.description("The service unit's start script: run `hum work` with the arguments after `--`, start it again when it exits, and stop after too many crashes.")
-		.option("--max-crashes <n>", "crashes within the window that stop the restarts", whole, 5)
-		.option("--crash-window <minutes>", "the window for --max-crashes", whole, 10)
 		.argument("[work-args...]", "options of `hum work`, after `--`")
-		.action(async (workArgs: string[], flags: { maxCrashes: number; crashWindow: number }) => {
+		.action(async (workArgs: string[]) => {
 			const abort = new AbortController();
-			const state = openState(defaultStateDir(io.cwd));
+			const settings = serviceSettings(io.cwd);
 
 			onStop(() => abort.abort());
 
 			const ended = await supervise({
-				state,
-				spawn: () => {
-					const child = Bun.spawn([process.execPath, process.argv[1] ?? "", "work", ...workArgs], { cwd: io.cwd, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
-
-					return { exited: child.exited, kill: () => child.kill("SIGTERM") };
-				},
+				state: openState(defaultStateDir(io.cwd)),
+				spawn: () => spawnWorker(io.cwd, workArgs),
 				now: Date.now,
-				sleep: (ms, cancel) =>
-					new Promise((resolve) => {
-						const timer = setTimeout(resolve, ms);
-
-						cancel.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
-					}),
-				intervalMs: DEFAULT_INTERVAL_S * 1000,
-				maxCrashes: flags.maxCrashes,
-				crashWindowMs: flags.crashWindow * 60_000,
-				backoffMs: 1000,
+				intervalMs: settings.tickIntervalSeconds * SECOND_MS,
+				workerDownTicks: settings.workerDownTicks,
+				maxCrashes: settings.maxCrashes,
+				crashWindowMs: settings.crashWindowSeconds * SECOND_MS,
+				backoffMs: RESTART_BACKOFF_MS,
 				stop: abort.signal,
 			});
 
-			// Gave up or stopped on request: either way the unit must not start this script again, so the exit is 0.
 			io.stderr(`hum serve: ${ended}\n`);
-			done(0);
+			done(EXIT_STAY_DOWN);
 		});
 
 	withWorkOptions(root.command("wake").description("One CI wake: tick until nothing more starts, record the tick when --event is schedule, and show the cards."))
@@ -153,12 +172,12 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			await wakeUntilQuiet(worker);
 
-			if (flags.event === "schedule") await recordCiTick(io.cwd, "origin", Date.now());
+			if (flags.event === SCHEDULE_EVENT) await recordCiTick(io.cwd, "origin", Date.now(), worker.config.hum.commitIdentity);
 
 			const status = readStatus(join(defaultStateDir(io.cwd), "status.json"));
 			const cards = status.ok ? status.status.cards : [];
 
-			reportCards(cards, io.stdout);
-			done(cards.length > 0 ? 1 : 0);
+			await reportCards(cards);
+			done(cards.length > 0 ? EXIT_CARDS_SHOWN : EXIT_OK);
 		});
 };

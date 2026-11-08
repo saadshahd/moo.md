@@ -9,7 +9,7 @@ import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { openState } from "../../src/state/open.ts";
 import { PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../src/worker/thin-path.ts";
 import { configWith } from "../fixtures/config.ts";
-import { itemFile, sh, WorkRepo } from "../fixtures/work-repo.ts";
+import { WorkRepo, itemFile, markdownSettings, sh } from "../fixtures/work-repo.ts";
 import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
 
 const NOW = 1_800_000_000_000;
@@ -27,7 +27,7 @@ const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f
 	const shim = makeShim(spec);
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-thin-")), { now });
 	const reports: string[] = [];
-	const adapter = markdownAdapter({ claimPrefix: SHIPPED_DEFAULTS.claimPrefix, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
+	const adapter = markdownAdapter({ ...markdownSettings, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
 	const { check, runner } = await startRunner({ state, model: config.hum.models.light, binary: shim.binary, env: shim.env, now });
 
 	cleanups.push(() => rmSync(repo.root, { recursive: true, force: true }), () => rmSync(state.dir, { recursive: true, force: true }));

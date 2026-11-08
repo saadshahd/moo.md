@@ -7,12 +7,9 @@ import pRetry from "p-retry";
 import { type Adapter, type AdapterContext, type Claim, type Item, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
-import { gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
+import { type GitIdentity, gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
 import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
 import { answerMarker, followUpKey, questionText } from "./marked.ts";
-
-/** Where items live in the work repo. */
-export const ITEMS_DIR = ".hum/work";
 
 const ITEM_EXTENSION = ".md";
 const BASE_REF = "refs/hum/base";
@@ -33,6 +30,10 @@ export type MarkdownOptions = {
 	readonly repo: string;
 	/** A claim is the first push of the branch this prefix and the item id make. */
 	readonly claimPrefix: string;
+	/** The folder of the repo that holds the item files. */
+	readonly itemsDir: string;
+	/** The author and committer of the commits the adapter makes. */
+	readonly identity: GitIdentity;
 	readonly remote?: string;
 	/** The branch whose items folder holds the items; every write is pushed to it. */
 	readonly base?: string;
@@ -47,8 +48,6 @@ class LostRace extends Error {
 	override name = "LostRace";
 }
 
-const pathOf = (id: string): string => `${ITEMS_DIR}/${id}${ITEM_EXTENSION}`;
-
 const isItemFileName = (name: string): boolean => name.endsWith(ITEM_EXTENSION);
 
 const followUpId = (from: string, title: string): string =>
@@ -59,8 +58,9 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
-	const git = gitIn(repo);
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+	const git = gitIn(repo, { identity });
+	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
 	let spent = 0;
 
@@ -88,7 +88,7 @@ export const markdownAdapter = ({ repo, claimPrefix, remote = "origin", base = "
 
 	const itemSource = (id: string) => readOrAbsent(git, ["show", `${BASE_REF}:${pathOf(id)}`]);
 
-	const itemFileNames = async (): Promise<string[]> => ((await readOrAbsent(git, ["ls-tree", "--name-only", `${BASE_REF}:${ITEMS_DIR}`])) ?? "").split("\n").filter(isItemFileName);
+	const itemFileNames = async (): Promise<string[]> => ((await readOrAbsent(git, ["ls-tree", "--name-only", `${BASE_REF}:${itemsDir}`])) ?? "").split("\n").filter(isItemFileName);
 
 	/** One bad file raises one card and is skipped; the other items go on. */
 	const parseOrReport = (id: string, source: string): ItemFile | undefined => {
@@ -118,7 +118,7 @@ export const markdownAdapter = ({ repo, claimPrefix, remote = "origin", base = "
 		const id = name.slice(0, -ITEM_EXTENSION.length);
 
 		if (!ItemId.safeParse(id).success) {
-			report({ code: "item-malformed", item: id, cause: `${ITEMS_DIR}/${name} has a name that is no item id`, fix: `Rename ${ITEMS_DIR}/${name} to letters, digits, dot, dash or underscore.` });
+			report({ code: "item-malformed", item: id, cause: `${itemsDir}/${name} has a name that is no item id`, fix: `Rename ${itemsDir}/${name} to letters, digits, dot, dash or underscore.` });
 
 			return [];
 		}
@@ -131,7 +131,7 @@ export const markdownAdapter = ({ repo, claimPrefix, remote = "origin", base = "
 	/** A commit on `parent` with the base branch's tree, and `change` applied through a scratch index when given. */
 	const commitOn = async (parent: string, message: string, change?: FileChange): Promise<string> => {
 		const scratch = mkdtempSync(join(tmpdir(), "hum-index-"));
-		const indexed = gitIn(repo, { GIT_INDEX_FILE: join(scratch, "index") });
+		const indexed = gitIn(repo, { identity, env: { GIT_INDEX_FILE: join(scratch, "index") } });
 
 		try {
 			if (change) {
@@ -183,7 +183,7 @@ export const markdownAdapter = ({ repo, claimPrefix, remote = "origin", base = "
 		write(`hum: ${entry.kind} on ${id}`, async () => {
 			const source = await itemSource(id);
 
-			if (source === undefined) throw new PermanentError(`no item "${id}" under ${ITEMS_DIR}/`);
+			if (source === undefined) throw new PermanentError(`no item "${id}" under ${itemsDir}/`);
 
 			return { path: pathOf(id), content: appendEntry(source, { ...entry, at: now() }, text) };
 		});
@@ -213,7 +213,7 @@ export const markdownAdapter = ({ repo, claimPrefix, remote = "origin", base = "
 
 		const [source, claims] = await Promise.all([itemSource(item), claimsNow()]);
 
-		if (source === undefined) throw new PermanentError(`no item "${item}" under ${ITEMS_DIR}/`);
+		if (source === undefined) throw new PermanentError(`no item "${item}" under ${itemsDir}/`);
 
 		const file = parseOrReport(item, source);
 

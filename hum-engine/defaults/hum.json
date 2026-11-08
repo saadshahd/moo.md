@@ -90,5 +90,17 @@
 	"drainTimeoutSeconds": 300,
 	"claimExpirySeconds": 900,
 	"latestVersionCacheSeconds": 21600,
-	"maxFixRuns": 3
+	"maxFixRuns": 3,
+	"serviceLabel": "md.moo.hum",
+	"maxCrashes": 5,
+	"crashWindowSeconds": 600,
+	"workerDownTicks": 3,
+	"tokenWarnDays": 30,
+	"ciSchedule": "*/15 * * * *",
+	"ciTickCacheSeconds": 300,
+	"commitIdentity": {
+		"name": "hum",
+		"email": "hum@moo.md"
+	},
+	"itemsDir": ".hum/work"
 }

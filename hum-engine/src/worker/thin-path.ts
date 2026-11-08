@@ -10,7 +10,7 @@ import { type Runner, succeeded } from "../adapters/claude-p.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { type Git, gitIn, isAncestor, push } from "../adapters/git.ts";
-import { ITEMS_DIR } from "../adapters/markdown.ts";
+import { markDone } from "../adapters/item-file.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
 import { kindMachine } from "../config/machine.ts";
@@ -120,19 +120,6 @@ export const levelOf = (paths: readonly string[], config: Config): Level => {
 export const mergeDecision = (level: Level, config: Config): "merge" | "hold" =>
 	!level.unclear && level.level === config.hum.levels[0] ? "merge" : "hold";
 
-/** Sets `state: done` in an item file's front matter, so the merged change itself takes the item off the ready list. */
-export const markDone = (source: string): string => {
-	const lines = source.split("\n");
-	const close = lines.indexOf("---", 1);
-	const at = lines.findIndex((line, i) => i > 0 && i < close && line.startsWith('state:'));
-
-	if (lines[0] !== "---" || close < 0 || at < 0) throw new Error("item file has no front matter with a state line");
-
-	lines[at] = "state: done";
-
-	return lines.join("\n");
-};
-
 type Answered = { readonly question: string; readonly answer: string; readonly plan: string };
 
 /** The question, the answer to it and the plan, once the owner has answered the latest question. */
@@ -219,7 +206,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const clone = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-run-"));
 	const branch = runBranch(o.config.hum, id);
 
-	const git = gitIn(clone);
+	const git = gitIn(clone, { identity: o.config.hum.commitIdentity });
 	const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 	try {
@@ -232,7 +219,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 			await g(["checkout", "-q", "-b", branch]);
 		}
 
-		return park(o, await drive({ ...o, base, dir: o.dir ?? ITEMS_DIR, kindName: o.kind, kind, id, item, branch, clone, g, git, answered, resume: asking }));
+		return park(o, await drive({ ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName: o.kind, kind, id, item, branch, clone, g, git, answered, resume: asking }));
 	} finally {
 		rmSync(clone, { recursive: true, force: true });
 	}

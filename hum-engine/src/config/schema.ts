@@ -51,6 +51,16 @@ export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
 const seconds = z.int().positive();
 
+const count = z.int().positive();
+
+const SERVICE_LABEL = /^[A-Za-z0-9._-]+$/;
+
+const CRON_FIELDS = /^(\S+\s+){4}\S+$/;
+
+const isInsideRepo = (path: string): boolean => !path.startsWith("/") && !path.endsWith("/") && !path.split("/").includes("..");
+
+const commitIdentity = z.strictObject({ name, email: name });
+
 const Shipped = z.object({
 	runBranchPrefix: branchPrefix,
 	claimPrefix: branchPrefix,
@@ -63,6 +73,15 @@ const Shipped = z.object({
 	claimExpirySeconds: seconds,
 	latestVersionCacheSeconds: seconds,
 	maxFixRuns: z.int().nonnegative(),
+	serviceLabel: z.string().regex(SERVICE_LABEL, "a service label is letters, digits, dot, dash and underscore"),
+	maxCrashes: count,
+	crashWindowSeconds: seconds,
+	workerDownTicks: count,
+	tokenWarnDays: count,
+	ciSchedule: z.string().regex(CRON_FIELDS, "a cron schedule has five fields"),
+	ciTickCacheSeconds: seconds,
+	commitIdentity,
+	itemsDir: z.string().min(1).refine(isInsideRepo, "the items folder is a path inside the repo, without a leading or trailing '/'"),
 });
 
 /** The defaults hum ships with, read from the default `hum.json`. */
@@ -119,6 +138,23 @@ export const HumConfig = z.strictObject({
 	latestVersionCacheSeconds: Shipped.shape.latestVersionCacheSeconds.default(SHIPPED_DEFAULTS.latestVersionCacheSeconds),
 	/** Fix runs an item gets after failed checks before it ends stuck. */
 	maxFixRuns: Shipped.shape.maxFixRuns.default(SHIPPED_DEFAULTS.maxFixRuns),
+	/** The service unit's label, and the name its file takes. */
+	serviceLabel: Shipped.shape.serviceLabel.default(SHIPPED_DEFAULTS.serviceLabel),
+	/** Worker crashes within `crashWindowSeconds` that stop the service's restarts. */
+	maxCrashes: Shipped.shape.maxCrashes.default(SHIPPED_DEFAULTS.maxCrashes),
+	crashWindowSeconds: Shipped.shape.crashWindowSeconds.default(SHIPPED_DEFAULTS.crashWindowSeconds),
+	/** Ticks without a heartbeat before the worker-down card shows. */
+	workerDownTicks: Shipped.shape.workerDownTicks.default(SHIPPED_DEFAULTS.workerDownTicks),
+	/** Days before the CI token's year ends that the expiry card shows. */
+	tokenWarnDays: Shipped.shape.tokenWarnDays.default(SHIPPED_DEFAULTS.tokenWarnDays),
+	/** The cron schedule of the scheduled CI workflow. */
+	ciSchedule: Shipped.shape.ciSchedule.default(SHIPPED_DEFAULTS.ciSchedule),
+	/** How long the scheduled workflow's last tick is kept before the remote is read again. */
+	ciTickCacheSeconds: Shipped.shape.ciTickCacheSeconds.default(SHIPPED_DEFAULTS.ciTickCacheSeconds),
+	/** The author and committer of every commit hum makes itself. */
+	commitIdentity: Shipped.shape.commitIdentity.default(SHIPPED_DEFAULTS.commitIdentity),
+	/** The folder of the repo that holds the markdown items. */
+	itemsDir: Shipped.shape.itemsDir.default(SHIPPED_DEFAULTS.itemsDir),
 });
 
 export type HumConfig = z.infer<typeof HumConfig>;
@@ -208,4 +244,13 @@ export const OWNER_CHANGEABLE = {
 	"claim expiry": "claimExpirySeconds",
 	"latest-version cache": "latestVersionCacheSeconds",
 	"fix runs": "maxFixRuns",
+	"service label": "serviceLabel",
+	"crash limit": "maxCrashes",
+	"crash window": "crashWindowSeconds",
+	"worker-down age": "workerDownTicks",
+	"token warning lead": "tokenWarnDays",
+	"CI schedule": "ciSchedule",
+	"CI tick cache": "ciTickCacheSeconds",
+	"commit identity": "commitIdentity",
+	"items folder": "itemsDir",
 } as const satisfies Record<string, string>;

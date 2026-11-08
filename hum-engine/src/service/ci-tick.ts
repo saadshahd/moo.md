@@ -1,12 +1,12 @@
-import { gitIn, push } from "../adapters/git.ts";
+import { type GitIdentity, gitIn, push } from "../adapters/git.ts";
 
 /** Where the scheduled workflow leaves its last tick. A ref holds no file, so no branch or checkout changes. */
 export const CI_TICK_REF = "refs/hum/ticks/ci";
 
 /** The scheduled workflow records its tick as an empty commit dated now, force-pushed to `CI_TICK_REF`. */
-export const recordCiTick = async (repo: string, remote: string, at: number): Promise<void> => {
+export const recordCiTick = async (repo: string, remote: string, at: number, identity: GitIdentity): Promise<void> => {
 	const when = `${Math.floor(at / 1000)} +0000`;
-	const git = gitIn(repo, { GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when });
+	const git = gitIn(repo, { identity, env: { GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when } });
 	const tree = (await git.raw(["hash-object", "-w", "-t", "tree", "/dev/null"])).trim();
 	const commit = (await git.raw(["commit-tree", tree, "-m", `hum ci tick ${new Date(at).toISOString()}`])).trim();
 

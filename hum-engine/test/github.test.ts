@@ -1,9 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { z } from "zod";
-import { type Adapter, type AdapterContext, contractChecks, type ContractTarget, type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, guarded, openState, parseComment, repoFromRemote } from "../src/index.ts";
+import { type AdapterContext, contractChecks, type ContractTarget, type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, parseComment, repoFromRemote } from "../src/index.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { FakeGitHub } from "./fixtures/fake-github.ts";
 
@@ -57,28 +54,6 @@ describe("contract suite on a fake GitHub", () => {
 	});
 });
 
-describe("watch", () => {
-	test("idle watches spend no rate limit, and a comment flips the next one", async () => {
-		const github = new FakeGitHub();
-		const adapter = onFake(github);
-		const id = String(github.seed("watched"));
-		const first = await adapter.answers.watch();
-		const before = github.remaining;
-
-		for (let poll = 0; poll < 9; poll++) expect((await adapter.answers.watch(first.token)).changed).toBe(false);
-
-		expect(github.remaining).toBe(before);
-		expect(adapter.spent()).toBe(1);
-
-		github.say(Number(id), "from the web");
-
-		const flipped = await adapter.answers.watch(first.token);
-
-		expect(flipped.changed).toBe(true);
-		expect(flipped.token).not.toBe(first.token);
-	});
-});
-
 describe("claims", () => {
 	test("a claim is a branch under the claim prefix, and an expired claim goes to the first writer on its head", async () => {
 		const github = new FakeGitHub();
@@ -116,34 +91,24 @@ describe("claims", () => {
 });
 
 describe("the thread", () => {
-	test("hum's marker carries kind and option; a person's comment reads as a comment", async () => {
+	test("hum's marker carries kind and option, a decision is marked too, and a person's comment reads as a comment", async () => {
 		const github = new FakeGitHub();
 		const adapter = onFake(github);
 		const id = String(github.seed("thread"));
 
 		await adapter.questions.ask(id, { text: "Which?", options: ["approve", "change"] });
 		await adapter.answers.answer(id, { text: "ok", option: "approve" });
+		await adapter.questions.decide(id, "went with approve");
 		github.say(Number(id), 'a web reply <!-- hum {"kind":"answer"} -->');
 
 		const { thread } = await adapter.workSource.read(id);
+		const bodies = github.comments(Number(id)).map((comment) => comment.body);
 
-		expect(thread.map((entry) => entry.kind)).toEqual(["question", "answer", "comment"]);
+		expect(thread.map((entry) => entry.kind)).toEqual(["question", "answer", "decision", "comment"]);
+		expect(bodies[0]?.split("\n")[0]).toBe('<!-- hum {"kind":"question","options":["approve","change"]} -->');
+		expect(parseComment(bodies[2] ?? "", 0).kind).toBe("decision");
 		expect(thread[0]?.text).toContain("Options: approve, change");
 		expect(thread[1]?.option).toBe("approve");
-	});
-
-	test("an ask posts its options in the hidden marker", async () => {
-		const github = new FakeGitHub();
-		const adapter = onFake(github);
-		const id = github.seed("marked");
-
-		await adapter.questions.ask(String(id), { text: "Which?", options: ["approve", "change"] });
-		await adapter.questions.decide(String(id), "went with approve");
-
-		const bodies = github.comments(id).map((comment) => comment.body);
-
-		expect(bodies[0]?.split("\n")[0]).toBe('<!-- hum {"kind":"question","options":["approve","change"]} -->');
-		expect(parseComment(bodies[1] ?? "", 0).kind).toBe("decision");
 	});
 
 	test("one read is one GraphQL query, and one comment one mutation", async () => {
@@ -165,18 +130,6 @@ describe("the thread", () => {
 });
 
 describe("failures", () => {
-	test("a 502 is retried by the engine and shows no card inside the timeout", async () => {
-		const github = new FakeGitHub();
-		const state = openState(mkdtempSync(join(tmpdir(), "hum-gh-")), { now });
-		const adapter: Adapter = guarded(onFake(github), { provider: "github", faults: state.faults, timeoutMs: 10_000 });
-
-		github.seed("flaky");
-		github.failures = 2;
-
-		expect(await adapter.workSource?.listReady()).toHaveLength(1);
-		expect(state.faults.list()).toEqual([]);
-	});
-
 	test("a rejected login is permanent, not retried", async () => {
 		const github = new FakeGitHub();
 

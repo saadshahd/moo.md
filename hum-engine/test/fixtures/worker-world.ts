@@ -10,7 +10,7 @@ import { openState } from "../../src/state/open.ts";
 import { Worker, type WorkerOptions } from "../../src/worker/worker.ts";
 import { configWith } from "./config.ts";
 import { makeShim, type ShimSpec } from "./shim.ts";
-import { itemFile, WorkRepo } from "./work-repo.ts";
+import { WorkRepo, itemFile, markdownSettings } from "./work-repo.ts";
 
 export const NOW = 1_800_000_000_000;
 export const TTL = SHIPPED_DEFAULTS.claimExpirySeconds * 1000;
@@ -31,7 +31,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const shim = makeShim(spec);
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-worker-")), { now });
 	const reports: string[] = [];
-	const markdown = markdownAdapter({ claimPrefix: SHIPPED_DEFAULTS.claimPrefix, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
+	const markdown = markdownAdapter({ ...markdownSettings, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
 	const adapter = serialized(markdown);
 	const base = options.config ?? configWith();
 	const config: Config = { ...base, hum: { ...base.hum, ...options.settings } };

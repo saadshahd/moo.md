@@ -15,7 +15,7 @@ const launchctl = (...args: string[]) => Bun.spawnSync(["launchctl", ...args]);
 
 const alive = (pattern: string): boolean => Bun.spawnSync(["pgrep", "-f", "--", pattern]).exitCode === 0;
 
-test.skipIf(!live)("a scratch launchd unit rendered from the template starts the script, which runs the worker, and unloads clean", async () => {
+test.skipIf(!live)("a scratch launchd unit starts the script, which runs the worker, and unloads clean", async () => {
 	const label = `md.moo.hum.scratch.${process.pid}.${Date.now()}`;
 	const domain = `gui/${process.getuid?.() ?? 501}`;
 	const o = ownerRepo({ items: { a: { commitForItem: true } } });

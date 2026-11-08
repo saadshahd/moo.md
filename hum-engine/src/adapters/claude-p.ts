@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import pMemoize, { pMemoizeClear } from "p-memoize";
 import pRetry from "p-retry";
 import { x } from "tinyexec";
 import { z } from "zod";
@@ -25,6 +26,11 @@ export const RUN_SETTINGS = JSON.stringify({
 const REQUIRED_PLUGIN = "hope";
 
 const LIMIT_KEY = "runner";
+
+const LIMIT_UNPARSED = "limit-unparsed";
+
+/** Epoch ms until which the saved usage limit holds every run, or 0. */
+const savedLimitUntil = (state: Pick<State, "limit">): number => state.limit.get(LIMIT_KEY)?.until ?? 0;
 
 const CREDENTIALS = "credentials.json";
 
@@ -388,14 +394,16 @@ const isBelowFloor = (version: string | undefined): boolean => {
 	return order === undefined || order < 0;
 };
 
+type Started = { readonly check: RunOutcome; readonly runner: Runner };
+
 /**
  * Runs `claude -p` as the owner's own unmodified `claude` binary, on their login, their plan token or an API key.
  * No run starts until the version floor and the start check pass; until then every run is held with one card.
  */
-export const startRunner = async (options: RunnerOptions): Promise<{ readonly check: RunOutcome; readonly runner: Runner }> => {
+const startChecked = async (options: RunnerOptions): Promise<Started> => {
 	const { state, binary = "claude", now = Date.now, lockBackoffMs = LOCK_BACKOFF_MS } = options;
 	const env = { ...process.env, ...options.env };
-	const limitedUntil = () => state.limit.get(LIMIT_KEY)?.until ?? 0;
+	const limitedUntil = () => savedLimitUntil(state);
 
 	const hold = (code: string, cause: string, fix: string): Extract<RunOutcome, { kind: "held" }> => ({
 		kind: "held",
@@ -464,7 +472,7 @@ export const startRunner = async (options: RunnerOptions): Promise<{ readonly ch
 	const settle = (ended: Ended): RunOutcome => {
 		if (ended.kind === "limit-unparsed") {
 			return hold(
-				"limit-unparsed",
+				LIMIT_UNPARSED,
 				`claude refused with a usage limit and no reset time hum can read: ${ended.text.slice(0, CARD_EXCERPT)}`,
 				"Runs stay held. Tell hum's maintainer the message, or restart the worker once the limit has reset.",
 			);
@@ -540,6 +548,8 @@ export const startRunner = async (options: RunnerOptions): Promise<{ readonly ch
 
 	if (check.kind === "held") return held(check);
 
+	if (check.kind === "limited") return { check, runner: { run: async () => check, limitedUntil } };
+
 	if (check.kind !== "finished") return held(hold("start-check-failed", `The start check ended as ${check.kind}.`, "Run it again once the limit resets."));
 
 	const hasPlugin = check.plugins.includes(REQUIRED_PLUGIN);
@@ -556,5 +566,37 @@ export const startRunner = async (options: RunnerOptions): Promise<{ readonly ch
 
 	recordCredential(state, credentialOf(check.keySource, env));
 
+	state.faults.clear(LIMIT_UNPARSED);
+
 	return { check, runner: { run, limitedUntil } };
+};
+
+/** A start check that a usage limit refused says nothing about the install: it is made again once the limit has ended. */
+const isUnsettled = ({ check }: Started): boolean => check.kind === "limited" || (check.kind === "held" && check.card.code === LIMIT_UNPARSED);
+
+/**
+ * A runner. Its start check is made again on the next run for as long as a usage limit refuses it, and a saved
+ * limit that still stands defers the check, so no call is made before the limit ends and no restart is needed.
+ */
+export const startRunner = async (options: RunnerOptions): Promise<Started> => {
+	const { state, now = Date.now } = options;
+	const started = pMemoize(() => startChecked(options));
+
+	const settle = async (): Promise<Started> => {
+		const result = await started();
+
+		if (isUnsettled(result)) pMemoizeClear(started);
+
+		return result;
+	};
+
+	const isLimited = (): boolean => now() < savedLimitUntil(state);
+	const limited = (): RunOutcome => ({ kind: "limited", until: savedLimitUntil(state) });
+
+	const runner: Runner = {
+		run: async (request) => (isLimited() ? limited() : (await settle()).runner.run(request)),
+		limitedUntil: () => savedLimitUntil(state),
+	};
+
+	return { check: isLimited() ? limited() : (await settle()).check, runner };
 };
