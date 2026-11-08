@@ -42,11 +42,15 @@ const scriptCommand = (scan: RepoScan, script: string): string | undefined => {
 	return run !== undefined && script in scan.scripts ? `${run} ${script}` : undefined;
 };
 
-/** The commands the repo's own CI runs on a pull request to check a change; else its package scripts that check. */
+/**
+ * The commands the repo's own CI runs on a pull request to check a change; else its package scripts that check.
+ * A run checks a fresh clone, which has no dependencies yet, so the lockfile install comes first.
+ */
 export const checksOf = (scan: RepoScan): string[] => {
 	const fromCi = unique(scan.ci.filter(isPullRequestJob).flatMap(({ commands }) => commands.filter(isCheck)));
+	const checks = fromCi.length > 0 ? fromCi : CHECK_SCRIPTS.flatMap((script) => scriptCommand(scan, script) ?? []);
 
-	return fromCi.length > 0 ? fromCi : CHECK_SCRIPTS.flatMap((script) => scriptCommand(scan, script) ?? []);
+	return scan.packageManager === undefined || checks.length === 0 ? checks : [INSTALL_COMMANDS[scan.packageManager], ...checks];
 };
 
 const levelAt = (levels: HumConfig["levels"], rank: number): string => levels[Math.min(rank, levels.length - 1)]?.name ?? "";

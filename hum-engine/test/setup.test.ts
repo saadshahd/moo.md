@@ -65,13 +65,13 @@ const PINNED = JSON.stringify({ devDependencies: { "@moo.md/hum": "0.1.0" } });
 
 const shipped = shippedConfig();
 
-test("a scan reads the checks CI runs on a pull request, the compose services and the issue-template labels", async () => {
+test("a scan reads the checks CI runs on a pull request after the install a fresh clone needs, the compose services and the issue-template labels", async () => {
 	const scan = await scanRepo(repoWith(PROJECT), "main");
 	const proposal = proposeSetup(scan, shipped.hum, ["bug", "docs"]);
 
 	expect(scan.packageManager).toBe("bun");
 	expect(scan.composeServices).toEqual([{ name: "db", image: "mongo:7" }]);
-	expect(proposal.checks).toEqual(["bun run typecheck", "bun test"]);
+	expect(proposal.checks).toEqual(["bun install --frozen-lockfile", "bun run typecheck", "bun test"]);
 	expect(proposal.runSlots.recipe.prepare).toContain("bun install --frozen-lockfile");
 });
 

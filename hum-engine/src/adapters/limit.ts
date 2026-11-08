@@ -13,7 +13,7 @@ export const LIMIT_TEXT = /usage limit|hit your (?:\w+ )?limit|limit reached/i;
 
 const LIMIT_EPOCH = /limit reached\|(\d{9,13})/i;
 
-const LIMIT_ISO = /resets?(?: at)? (\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:\d\d))/i;
+const LIMIT_ISO = /resets?(?: at)? (\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d{2}:\d{2}))/i;
 
 /** Epoch values below this are seconds, at or above it milliseconds. */
 const FIRST_MS_EPOCH = 1e12;

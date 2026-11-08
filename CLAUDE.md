@@ -14,8 +14,6 @@ Authoring doctrine for this repo's own skills, hooks, and runtime files lives in
 
 **Hooks always fail open:** on any error, pass the event on and show the failure once. A hook that fails closed blocks what it wraps in every future session. The one exception is hum's answer hook: a failure while answer mode is on drops only that answer, puts the words back and shows the error once, because an answer that reaches Claude is acted on as an instruction. Every other prompt passes.
 
-> **Enforcement:** a factory run checks the `check` layer of `.claude/factory.json` before its PR; nothing checks a direct push.
-
 ## Philosophy
 
 moo drives toward four outcomes: **reduce decision regret**, **increase conceptual clarity**, **leave fewer but stronger artifacts**, **preserve the capacity to own what you produce**. Every change to this project must serve at least one.

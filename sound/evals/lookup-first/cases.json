@@ -304,7 +304,7 @@
  },
  {
   "id": "factory-blockers",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "Check each, then show the user every one that holds",
   "scout": "ask-first",
   "label": "proceed",
@@ -325,7 +325,7 @@
  },
  {
   "id": "factory-caps",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "- `atOnce`, `waitsPerDay`: ask.",
   "scout": "ask-first",
   "label": "proceed",
@@ -458,7 +458,7 @@
  },
  {
   "id": "factory-gap",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "The gap: `gh api",
   "scout": "hand-over",
   "label": "proceed",
@@ -478,7 +478,7 @@
  },
  {
   "id": "factory-workflows",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "- Repository permissions: Contents",
   "scout": "hand-over",
   "label": "proceed",
@@ -499,7 +499,7 @@
  },
  {
   "id": "factory-own-app",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "| the user's own (`false`)",
   "scout": "hand-over",
   "label": "ask-with-work-done",
@@ -517,7 +517,7 @@
  },
  {
   "id": "factory-org-app",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "| an organization's (`true`)",
   "scout": "hand-over",
   "label": "ask-with-work-done",
@@ -534,7 +534,7 @@
  },
  {
   "id": "factory-trust",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "- Unless `~/.claude.json` has",
   "scout": "hand-over",
   "label": "proceed",
@@ -610,7 +610,7 @@
  },
  {
   "id": "guard-app-login",
-  "skill": "factory/skills/setup",
+  "skill": "sound/evals/fixtures/factory-setup",
   "at": "| the user's own (`false`)",
   "scout": "guard",
   "label": "ask",

@@ -85,5 +85,5 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
+          git tag "hum@$VERSION"
+          git push origin "hum@$VERSION"

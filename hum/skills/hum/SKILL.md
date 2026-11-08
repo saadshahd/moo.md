@@ -17,7 +17,7 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | Ask | Proposal comes from | The answer sets |
 | --- | --- | --- |
 | Where runs happen: your Mac, CI, or both | the scan: CI workflows, a service unit | `runPlaces` |
-| Which commands a change must pass | CI jobs on pull requests, else package scripts | `checks` |
+| Which commands a change must pass | CI jobs on pull requests, else package scripts, after the lockfile install a fresh clone needs | `checks` |
 | For CI runs: the repo's setting "Allow GitHub Actions to create and approve pull requests" | `workflowsMayOpenPullRequests` in the scan; if off, ask the owner to turn it on and never change it yourself | nothing written |
 | For CI runs: how a pull request's required checks start | a pull request opened with the workflow token starts no workflows, and dispatching the check workflow does not satisfy the required check; ask for a GitHub App or fine-grained token as the repository secret `pullRequestTokenSecret` names | `pullRequestTokenSecret` |
 | One question per waiting state: after how many hours it ends stuck | `waits` in the scan | `waitHours` |
