@@ -66,6 +66,7 @@ export class FakePulls {
 		EnableAutoMerge: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { autoMerge: true }, "enablePullRequestAutoMerge"),
 		DisableAutoMerge: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { autoMerge: false }, "disablePullRequestAutoMerge"),
 		MergeNow: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { state: "MERGED" }, "mergePullRequest"),
+		Comment: () => ({ addComment: { clientMutationId: null } }),
 		UpdateBranch: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { status: "BLOCKED" }, "updatePullRequestBranch"),
 	};
 

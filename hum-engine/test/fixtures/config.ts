@@ -20,6 +20,7 @@ export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 
 	raw.hum.paths = [{ glob: "docs/**", level: "low" }];
 	raw.hum.docsOnly.paths = ["**"];
+	raw.hum.checks = ["true"];
 	raw.hum.measuredModels = Object.fromEntries(BOUNDARIES.map((boundary) => [boundary, { [SHIM_MODEL]: 1 }]));
 
 	for (const kind of Object.values<Tree>(raw.kinds)) {

@@ -238,7 +238,6 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 	const worker = await openWorker(w.repo.owner, {
 		hopeSkills: hopeSkills(),
 		judge: docsJudge,
-		checks: ["true"],
 		holder: "worker-1",
 		binary: w.shim.binary,
 		env: w.shim.env,
@@ -289,7 +288,6 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 	const worker = await openWorker(w.repo.owner, {
 		hopeSkills: hopeSkills(),
 		judge: docsJudge,
-		checks: ["true"],
 		holder: "worker-1",
 		binary: w.shim.binary,
 		env: w.shim.env,

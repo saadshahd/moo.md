@@ -104,3 +104,17 @@ test("an unknown op, an unknown flag and a bad ttl exit 2; a failure outside a r
 	expect(outside.code).toBe(1);
 	expect(outside.err).not.toContain("    at ");
 });
+
+test("a repo that runs only in CI leaves no wake file for an answer or a changed watch", () => {
+	const repo = new WorkRepo();
+	const worker = repo.worker("w");
+	const id = repo.seed("ci only");
+
+	mkdirSync(join(worker, ".hum"), { recursive: true });
+	writeFileSync(join(worker, ".hum", "hum.json"), JSON.stringify({ runPlaces: ["ci"] }));
+
+	json(worker, "watch");
+	json(worker, "answer", id, "go", "--option", "approve");
+
+	expect(existsSync(join(worker, ".git", "hum", "inbox")) ? readdirSync(join(worker, ".git", "hum", "inbox")) : []).toEqual([]);
+});

@@ -14,12 +14,12 @@ export type KindOf =
 	| { readonly kind: string; readonly from: "source" | "model" }
 	| { readonly kind: string; readonly from: "fallback"; readonly why: string };
 
-/** The kind an item names itself: one of its labels that is a kind's name, else its template field. */
-export const declaredKind = (item: Pick<Item, "body" | "labels">, kinds: readonly string[]): string | undefined => {
+/** The kind an item names itself: a label the owner mapped to a kind or that is a kind's name, else its template field. */
+export const declaredKind = (item: Pick<Item, "body" | "labels">, kinds: readonly string[], kindLabels: HumConfig["kindLabels"]): string | undefined => {
 	const field = TEMPLATE_FIELD.exec(item.body);
-	const named = [...(item.labels ?? []), field?.[1] ?? field?.[2]].map((name) => name?.toLowerCase());
+	const named = [...(item.labels ?? []), field?.[1] ?? field?.[2]].flatMap((name) => (name === undefined ? [] : [name.toLowerCase()]));
 
-	return named.find((name): name is string => name !== undefined && kinds.includes(name));
+	return named.map((name) => kindLabels[name] ?? name).find((name) => kinds.includes(name));
 };
 
 /** The cheap model call that picks a kind from the item's text, or says it is unsure. */

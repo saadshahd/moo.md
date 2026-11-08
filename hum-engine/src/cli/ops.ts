@@ -11,6 +11,7 @@ import { defaultStateDir, openState } from "../state/open.ts";
 import pkg from "../../package.json" with { type: "json" };
 import { type OpName, commands, type Flag, opSpecs } from "./commands.ts";
 import { addServiceCommands } from "./service.ts";
+import { addSetupCommands } from "./setup.ts";
 import { sharedWatch } from "./shared-watch.ts";
 import { SECOND_MS } from "../time.ts";
 
@@ -31,6 +32,7 @@ const CliSettings = z.looseObject({
 	claimExpirySeconds: HumConfig.shape.claimExpirySeconds,
 	watchCacheSeconds: HumConfig.shape.watchCacheSeconds,
 	watchLockSeconds: HumConfig.shape.watchLockSeconds,
+	runPlaces: HumConfig.shape.runPlaces,
 });
 
 type CliSettings = z.infer<typeof CliSettings>;
@@ -57,6 +59,11 @@ type Call = {
 	readonly slot: <T>(name: Slot, role: (adapter: NonNullable<Adapters[Slot]>) => T | undefined) => T;
 };
 
+/** Leaves a wake file in the inbox for the worker on this machine. A repo that runs only in CI has no such worker to read it, so no file is left. */
+const wakeWorker = ({ inbox, settings }: Pick<Call, "inbox" | "settings">, item: string): void => {
+	if (settings.runPlaces.includes("mac")) dropInto(inbox, item);
+};
+
 const performed = async (action: Promise<void>): Promise<Printable> => {
 	await action;
 
@@ -76,9 +83,9 @@ const handlers = {
 	read: ({ slot, item }) => slot("work-source", (a) => a.workSource).read(item),
 	comment: ({ slot, item, text }) => performed(slot("work-source", (a) => a.workSource).comment(item, text)),
 	ask: ({ slot, item, text, options }) => performed(slot("questions", (a) => a.questions).ask(item, { text: text, options: options.length > 0 ? options : undefined })),
-	answer: async ({ slot, item, text, options, inbox }) => {
+	answer: async ({ slot, item, text, options, inbox, settings }) => {
 		await slot("answers", (a) => a.answers).answer(item, { text, option: options[0] });
-		dropInto(inbox, item);
+		wakeWorker({ inbox, settings }, item);
 
 		return OK;
 	},
@@ -93,7 +100,7 @@ const handlers = {
 			cacheMs: settings.watchCacheSeconds * SECOND_MS,
 			lockMs: settings.watchLockSeconds * SECOND_MS,
 			read: async (since) => Watch.parse(await answers.watch(since)),
-			changed: () => dropInto(inbox, ""),
+			changed: () => wakeWorker({ inbox, settings }, ""),
 		});
 	},
 	"file-follow-up": ({ slot, item, second, flags }) => slot("work-source", (a) => a.workSource).fileFollowUp(item, { title: second, body: flags.body ?? "" }),
@@ -188,9 +195,12 @@ export const runCli = async (argv: readonly string[], io: Io): Promise<number> =
 		io.stdout(`${flags.json ? JSON.stringify(commands) : Object.values(commands).map((c) => c.usage).join("\n")}\n`);
 	});
 
-	addServiceCommands(root, io, (exit) => {
+	const exitWith = (exit: number) => {
 		code = exit;
-	});
+	};
+
+	addServiceCommands(root, io, exitWith);
+	addSetupCommands(root, io, exitWith);
 
 	try {
 		await root.parseAsync([...argv], { from: "user" });

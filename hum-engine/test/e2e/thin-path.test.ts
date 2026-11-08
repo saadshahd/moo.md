@@ -540,6 +540,22 @@ test("the alignment grade times out: the change is unclear and waits for the own
 	expect(w.shim.decisions()).toEqual([]);
 });
 
+test("an alignment call below the bar gates nothing: the change still lands by its level, the grades are a pull request comment", async () => {
+	const config = configWith((raw) => {
+		raw.hum.measuredModels.alignment = { [raw.hum.decisionModel]: 0.68 };
+	});
+
+	const judge = scriptedJudge({ kind: { kind: "docs" }, alignment: { alignment: "concern", verification: "concern" } });
+	const w = await world({ script: [{}, NOTE] }, { config });
+	const github = new FakePulls();
+	const id = w.repo.seed("Write the note");
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.options({ judge, pulls: github.client() }))).toMatchObject({ outcome: "landing", item: id });
+	expect(github.pulls).toMatchObject([{ autoMerge: true }]);
+	expect(github.requests).toContain("graphql Comment");
+});
+
 test("a review that leaves the change to the owner asks; the owner's approval lands it past its level's own review run, and a rejection sends it to a fix with the owner's words", async () => {
 	const toOwner = { event: "needs-owner", sure: true, reason: "A matter of tone.", question: "Is the tone right?" };
 	const ready = { event: "plan-ready", sure: true, reason: "Clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };

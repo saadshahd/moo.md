@@ -32,7 +32,7 @@ const noKind = async (o: KindContext, item: Item, kinds: readonly string[]): Pro
  */
 export const decideKind = async (o: KindContext, item: Item, except?: string): Promise<ItemKind> => {
 	const kinds = o.config.hum.kinds.filter((kind) => kind !== except);
-	const declared = declaredKind(item, kinds);
+	const declared = declaredKind(item, kinds, o.config.hum.kindLabels);
 	const picked = declared === undefined ? await noKind(o, item, kinds) : undefined;
 
 	const decided: ItemKind =

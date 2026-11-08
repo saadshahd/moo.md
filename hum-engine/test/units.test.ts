@@ -28,12 +28,12 @@ const vars: UnitVars = {
 	repo: "/Users/o/repos/a & b",
 	command: ["/opt/homebrew/bin/bun", "/Users/o/repos/a & b/node_modules/.bin/hum", "serve"],
 	path: "/opt/homebrew/bin:/usr/bin:/bin",
-	env: { HUM_CHECKS: JSON.stringify(["bun test", "bun run lint"]) },
+	env: { HUM_HOPE_ROOT: "/Users/o/.claude/plugins/hope" },
 	log: "/Users/o/Library/Logs/hum.log",
 	restartDelaySeconds: 42,
 };
 
-const settings: WorkflowSettings = { ...SHIPPED_DEFAULTS, runBranchPrefix: "bots/run/", itemsDir: "work/items", ciSchedule: "7 * * * *", commitIdentity: { name: "bot", email: "bot@example.com" }, ciWakeTimeoutMinutes: 15 };
+const settings: WorkflowSettings = { ...SHIPPED_DEFAULTS, runBranchPrefix: "bots/run/", itemsDir: "work/items", ciSchedule: "7 * * * *", commitIdentity: { name: "bot", email: "bot@example.com" }, ciWakeTimeoutMinutes: 15, pullRequestTokenSecret: "PR_TOKEN" };
 
 const Trigger = z.object({ on: z.record(z.string(), z.json()) });
 
@@ -66,7 +66,7 @@ test("the launchd plist restarts only after a failure, keeps the paths absolute 
 		WorkingDirectory: vars.repo,
 		KeepAlive: { SuccessfulExit: false },
 		ThrottleInterval: 42,
-		EnvironmentVariables: { PATH: vars.path, HUM_CHECKS: vars.env?.HUM_CHECKS },
+		EnvironmentVariables: { PATH: vars.path, HUM_HOPE_ROOT: vars.env?.HUM_HOPE_ROOT },
 	});
 });
 
@@ -93,6 +93,7 @@ test("the CI workflows wake on the four events from the settings, never resume a
 	expect(on("hum-schedule.yml")).toMatchObject({ schedule: [{ cron: "7 * * * *" }] });
 	expect(files["hum-wake.yml"]).toContain("HUM_GIT_EMAIL: bot@example.com");
 	expect(files["hum-wake.yml"]).toContain("timeout-minutes: 15");
+	expect(files["hum-wake.yml"]).toContain("secrets.PR_TOKEN || github.token");
 	expect(Object.values(files).join("\n")).not.toMatch(/upload-artifact|download-artifact|--resume|environment:/);
 	// A comment's text never reaches a shell line: event data comes through env only.
 	expect(wakeSteps.every((step) => !step.run?.includes("${{"))).toBe(true);

@@ -24,24 +24,18 @@ const EXIT_CARDS_SHOWN = 1;
 
 const SCHEDULE_EVENT = "schedule";
 
-const collect = (value: string, seen: string[]): string[] => [...seen, value];
+type WorkFlags = { holder?: string; base?: string };
 
-type WorkFlags = { check: string[]; holder?: string; base?: string };
-
-/**
- * What a worker needs to know that no file in the repo says yet: the checks a change must pass.
- * A unit or workflow sets them as HUM_CHECKS (a JSON array of commands), so its command line stays fixed.
- */
+/** What a worker needs to know that no file in the repo says: who it claims as, and where items merge. */
 const withWorkOptions = (cmd: Command): Command =>
 	cmd
-		.option("--check <command>", "a command the repo's checks run before a merge; repeat for more (HUM_CHECKS: a JSON array)", collect, [])
 		.option("--holder <name>", "the name this worker claims items by; default <where>@<host>")
 		.option("--base <branch>", "the branch items merge into; default main");
 
 const PluginList = z.array(z.looseObject({ id: z.string(), installPath: z.string() }));
 
 /** The folder of the installed hope plugin: `HUM_HOPE_ROOT`, else the path `claude plugin list` gives. */
-const hopeRoot = async (): Promise<string> => {
+export const hopeRoot = async (): Promise<string> => {
 	if (process.env.HUM_HOPE_ROOT) return process.env.HUM_HOPE_ROOT;
 
 	const listed = await x("claude", ["plugin", "list", "--json"]);
@@ -72,28 +66,10 @@ const serviceSettings = (repo: string): z.infer<typeof ServiceSettings> => {
 	}
 };
 
-/** HUM_CHECKS: a JSON array of check commands; unset is none. A value that is not that array fails loud. */
-const envChecks = (): string[] => {
-	const raw = process.env.HUM_CHECKS;
-
-	if (!raw) return [];
-
-	const parsed = z.array(z.string().min(1)).safeParse(JSON.parse(raw));
-
-	if (!parsed.success) throw new Error("HUM_CHECKS must be a JSON array of commands, such as [\"bun test\"]");
-
-	return parsed.data;
-};
-
 /** The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow. */
 const openFor = async (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
-	const checks = flags.check.length > 0 ? flags.check : envChecks();
-
-	if (checks.length === 0) throw new Error("name at least one check: --check, or HUM_CHECKS as a JSON array of commands");
-
 	return openWorker(repo, {
 		hopeSkills: listHopeSkills(await hopeRoot()),
-		checks,
 		holder: flags.holder ?? `${where}@${hostname()}`,
 		base: flags.base,
 		where,

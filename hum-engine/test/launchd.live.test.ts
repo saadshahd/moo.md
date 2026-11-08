@@ -34,7 +34,7 @@ test.skipIf(!live)("a scratch launchd unit starts the script, which runs the wor
 			repo: o.repo.owner,
 			command: [process.execPath, MAIN, "serve", "--", "--holder", label],
 			path: [dirname(o.shim.binary), dirname(process.execPath), "/usr/bin", "/bin"].join(":"),
-			env: { ...o.shim.env, HOME: o.home, HUM_HOPE_ROOT: o.env.HUM_HOPE_ROOT, HUM_CHECKS: o.env.HUM_CHECKS },
+			env: { ...o.shim.env, HOME: o.home, HUM_HOPE_ROOT: o.env.HUM_HOPE_ROOT },
 			log,
 			restartDelaySeconds: SHIPPED_DEFAULTS.restartDelaySeconds,
 		}),

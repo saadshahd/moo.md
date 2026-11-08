@@ -3,7 +3,7 @@ import { CLAUDE_FLOOR } from "../adapters/claude-p.ts";
 import type { HumConfig } from "../config/schema.ts";
 
 /** The settings the workflows are built from. */
-export type WorkflowSettings = Pick<HumConfig, "runBranchPrefix" | "itemsDir" | "ciSchedule" | "commitIdentity" | "ciWakeTimeoutMinutes">;
+export type WorkflowSettings = Pick<HumConfig, "runBranchPrefix" | "itemsDir" | "ciSchedule" | "commitIdentity" | "ciWakeTimeoutMinutes" | "pullRequestTokenSecret">;
 
 export const WAKE_FILE = "hum-wake.yml";
 
@@ -52,9 +52,9 @@ const trigger = (name: string, on: TriggerEvents, job: TriggerJob = {}) => ({
  * on the item and ended; the owner's answer starts a fresh run on that branch, so no session, artifact or approval
  * is kept between runs.
  */
-const wake = ({ commitIdentity, ciWakeTimeoutMinutes }: WorkflowSettings) => ({
+const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestTokenSecret }: WorkflowSettings) => ({
 	name: "hum wake",
-	on: { workflow_call: { secrets: { [TOKEN_SECRET]: { required: true } } } },
+	on: { workflow_call: { secrets: { [TOKEN_SECRET]: { required: true }, [pullRequestTokenSecret]: { required: false } } } },
 	permissions: PERMISSIONS,
 	jobs: {
 		wake: {
@@ -62,10 +62,8 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes }: WorkflowSettings) => ({
 			"timeout-minutes": ciWakeTimeoutMinutes,
 			env: {
 				[TOKEN_SECRET]: `\${{ secrets.${TOKEN_SECRET} }}`,
-				GH_TOKEN: "${{ github.token }}",
+				GH_TOKEN: `\${{ secrets.${pullRequestTokenSecret} || github.token }}`,
 				HUM_EVENT: "${{ github.event_name }}",
-
-				HUM_CHECKS: "${{ vars.HUM_CHECKS }}",
 			},
 			steps: [
 				{ uses: ACTIONS.checkout, with: { "fetch-depth": 0 } },

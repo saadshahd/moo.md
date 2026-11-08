@@ -44,8 +44,6 @@ export const ownerRepo = (spec: ShimSpec, env: Record<string, string> = {}, edit
 			PATH: `${dirname(shim.binary)}:${process.env.PATH}`,
 			HOME: home,
 			HUM_HOPE_ROOT: join(root, "..", "hope"),
-
-			HUM_CHECKS: JSON.stringify(["true"]),
 			...env,
 		},
 	};

@@ -203,6 +203,44 @@
 			],
 			"additionalProperties": false
 		},
+		"checks": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "The shell commands that must all exit 0 in a run's clone before its change merges, and on the base after a merge."
+		},
+		"kindLabels": {
+			"default": {},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Item label (lower case) → kind name: the kind an item takes from a label of the repo's own, such as { \"bug\": \"fix\" }."
+		},
+		"runPlaces": {
+			"default": [
+				"mac",
+				"ci"
+			],
+			"minItems": 1,
+			"type": "array",
+			"items": {
+				"type": "string",
+				"enum": [
+					"mac",
+					"ci"
+				]
+			},
+			"description": "Where hum runs: 'mac' is a service on the owner's machine, 'ci' a workflow. Only a 'mac' place reads the inbox, so an answer or a changed watch leaves a wake file there only when 'mac' is listed."
+		},
 		"runBranchPrefix": {
 			"default": "hum/run/",
 			"type": "string",
@@ -491,6 +529,12 @@
 			"exclusiveMinimum": 0,
 			"maximum": 9007199254740991,
 			"description": "Seconds the service manager waits before it starts a failed start script again."
+		},
+		"pullRequestTokenSecret": {
+			"default": "HUM_GITHUB_TOKEN",
+			"type": "string",
+			"minLength": 1,
+			"description": "The repository secret holding a GitHub App or fine-grained token for CI runs. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset."
 		},
 		"ciWakeTimeoutMinutes": {
 			"default": 60,
@@ -800,7 +844,8 @@
 					"claude-sonnet-5-5": 0.63
 				},
 				"alignment": {
-					"claude-haiku-5-5": 0.68
+					"claude-haiku-5-5": 0.68,
+					"claude-sonnet-5-5": 0.68
 				},
 				"plan-outcome": {
 					"claude-haiku-5-5": 1,

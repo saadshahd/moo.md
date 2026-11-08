@@ -16,7 +16,7 @@ import { defaultStateDir, openState } from "../state/open.ts";
 import { DEFAULT_BASE } from "./thin-path.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
-export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "loop"> & {
+export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "loop" | "checks"> & {
 	/** Where saved state lives; default `<git common dir>/hum`. */
 	readonly stateDir?: string;
 	/** The skill names of hope's installed copy; a role that names another is refused. */
@@ -62,6 +62,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	const config = loaded.value;
 
+	if (config.hum.checks.length === 0) throw new Error("hum.json names no checks: set \"checks\" to the commands a change must pass, or run /hum");
+
 	const adapters = await resolveAdapters(repo, {
 		faults: state.faults,
 		guard: { lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
@@ -92,5 +94,5 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github);
 	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, async () => gitHubClient({ token: await ownerToken() }));
 
-	return new Worker({ ...rest, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop });
+	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop });
 };

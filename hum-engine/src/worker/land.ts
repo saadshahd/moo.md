@@ -27,7 +27,7 @@ import {
 import type { ModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
 import type { Boundary } from "../config/schema.ts";
-import { alignedPlacement, alignmentQuestion } from "../decide/alignment.ts";
+import { alignedPlacement, alignmentQuestion, gatesAlignment } from "../decide/alignment.ts";
 import {
 	isCleared,
 	type Landing,
@@ -53,6 +53,7 @@ import { runChecks } from "./checks.ts";
 import { recordMerged } from "./merged.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { reportAlignment } from "./alignment-report.ts";
 import { reportTaste } from "./taste.ts";
 import type { ThinResult } from "./thin-path.ts";
 
@@ -361,7 +362,10 @@ const throughPullRequest = async (
 			detail: `its pull request was closed unmerged: ${pull.url}`,
 		};
 
-	await reportTaste(ctx, pulls, pull, ctx.state.landings.get(id)?.head ?? branch);
+	const head = ctx.state.landings.get(id)?.head ?? branch;
+
+	await reportTaste(ctx, pulls, pull, head);
+	await reportAlignment(ctx, pulls, pull, head);
 
 	const armed = await pulls.autoMerge(
 		pull,
@@ -448,7 +452,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	const diff = await ctx.git.raw(["diff", ...PATCH, `origin/${ctx.base}...${saved.head}`]);
 	const alignment = saved.change.paths.length > 0 ? await alignmentOf(ctx, saved, diff) : undefined;
-	const aligned = alignment && "graded" in alignment ? alignedPlacement(placement, alignment.graded, ctx.config.hum) : placement;
+	const aligned = gatesAlignment(ctx.config.hum) && alignment && "graded" in alignment ? alignedPlacement(placement, alignment.graded, ctx.config.hum) : placement;
 	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, alignment, verdict));
 	const placed = routeWith();
 	const reviewed = needsReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name }) : undefined;
@@ -495,7 +499,7 @@ const abstentionsOf = (ctx: LandContext, alignment: SavedLanding["alignment"], v
 
 	return [
 		...(kind?.from === "fallback" ? [abstained("kind", kind.why)] : []),
-		...(alignment && "abstained" in alignment ? [abstained("alignment", alignment.abstained)] : []),
+		...(gatesAlignment(ctx.config.hum) && alignment && "abstained" in alignment ? [abstained("alignment", alignment.abstained)] : []),
 		...(plan && !measured("plan-outcome", plan.models) ? [abstained("plan-outcome", unmeasured(plan.models))] : []),
 		...(verdict && !measured("review-verdict", verdict.models) ? [abstained("review-verdict", unmeasured(verdict.models))] : []),
 	];

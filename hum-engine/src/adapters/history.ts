@@ -26,6 +26,7 @@ const readLog = async (
 		"--first-parent",
 		"--diff-merges=first-parent",
 		"--numstat",
+		"--no-renames",
 		LOG_FORMAT,
 		"-n",
 		String(depth),

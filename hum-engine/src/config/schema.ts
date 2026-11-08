@@ -48,6 +48,11 @@ const branchPrefix = z
 	.endsWith("/", "a branch prefix ends with '/'")
 	.refine(isBranchPrefix, "a branch prefix followed by an item id must make a valid git branch name");
 
+/** Where hum runs: a service on the owner's Mac, and a scheduled and event-woken CI workflow. */
+export const RUN_PLACES = ["mac", "ci"] as const;
+
+export type RunPlace = (typeof RUN_PLACES)[number];
+
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
 export type MergeMethod = (typeof MERGE_METHODS)[number];
@@ -123,6 +128,9 @@ export type SlotRecipe = z.infer<typeof SlotRecipe>;
 
 /** Every setting an owner may change, each described for the schema's readers. `defaults/hum.json` holds the shipped value of each. */
 const Shipped = z.object({
+	checks: z.array(name).describe("The shell commands that must all exit 0 in a run's clone before its change merges, and on the base after a merge."),
+	kindLabels: z.record(name, name).describe("Item label (lower case) → kind name: the kind an item takes from a label of the repo's own, such as { \"bug\": \"fix\" }."),
+	runPlaces: z.array(z.enum(RUN_PLACES)).min(1).describe("Where hum runs: 'mac' is a service on the owner's machine, 'ci' a workflow. Only a 'mac' place reads the inbox, so an answer or a changed watch leaves a wake file there only when 'mac' is listed."),
 	runBranchPrefix: branchPrefix.describe("Each run builds on the branch this prefix and its item id make."),
 	claimPrefix: branchPrefix.describe("A claim is the first push of the branch this prefix and its item id make."),
 	readyLabel: name.describe("The label that marks an issue ready for hum."),
@@ -155,6 +163,7 @@ const Shipped = z.object({
 	itemReadsAtOnce: count.describe("Item files the markdown source reads at once; each read is a git process."),
 	restartBackoff: backoff.describe("The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."),
 	restartDelaySeconds: seconds.describe("Seconds the service manager waits before it starts a failed start script again."),
+	pullRequestTokenSecret: name.describe("The repository secret holding a GitHub App or fine-grained token for CI runs. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset."),
 	ciWakeTimeoutMinutes: count.describe("Minutes a CI wake may run before GitHub stops it."),
 	strictPaths: z.array(name).describe("Globs of data and secrets: a change touching one takes the strictest level."),
 	launches: z
@@ -400,6 +409,7 @@ export const OWNER_CHANGEABLE = {
 	"restart backoff": "restartBackoff",
 	"restart delay": "restartDelaySeconds",
 	"CI wake timeout": "ciWakeTimeoutMinutes",
+	"pull request token secret": "pullRequestTokenSecret",
 	"data and secrets paths": "strictPaths",
 	"path rules": "paths",
 	launches: "launches",
@@ -441,4 +451,7 @@ export const OWNER_CHANGEABLE = {
 	"kind floors": "kindFloors",
 	"check kind": "checkKind",
 	"break check": "breakCheck",
+	checks: "checks",
+	"kind labels": "kindLabels",
+	"run places": "runPlaces",
 } as const satisfies Record<string, string>;

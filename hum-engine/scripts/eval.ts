@@ -25,10 +25,12 @@ import { SECOND_MS } from "../src/time.ts";
 /**
  * Measures one model-judgment boundary on its labelled cases, through the same prompts and fences the engine runs,
  * and adds a row to its RESULTS.md. `bun run eval -- --model <id>` measures every boundary on that model id; naming
- * boundaries measures only those. A case the runner held or limited counts in no rate.
+ * boundaries measures only those. A case the runner held or limited counts in no rate. `--runs <n>` repeats each
+ * boundary and pools the runs, since one run proves little; `--write <folder>` records each pooled rate under
+ * `measuredModels` in that folder's `hum.json`, which is how setup measures an owner's own models.
  */
 
-const { values, positionals } = parseArgs({ allowPositionals: true, options: { model: { type: "string" }, limit: { type: "string" } } });
+const { values, positionals } = parseArgs({ allowPositionals: true, options: { model: { type: "string" }, limit: { type: "string" }, runs: { type: "string" }, write: { type: "string" } } });
 /** Boundaries whose labelled cases only the owner can give; they are measured when named, from the cases the owner puts in their evals folder. */
 const OWNER_LABELLED: readonly Boundary[] = ["taste"];
 
@@ -37,6 +39,7 @@ const root = join(import.meta.dir, "..");
 const raw = readConfigDir(join(root, "defaults"));
 const config = { hum: HumConfig.parse(raw.hum), roles: raw.roles };
 const model = values.model ?? config.hum.decisionModel;
+const runs = values.runs === undefined ? 1 : Number(values.runs);
 const limit = values.limit === undefined ? Number.POSITIVE_INFINITY : Number(values.limit);
 
 type Verdict = "right" | "wrong" | "abstained" | "halted";
@@ -199,19 +202,43 @@ const ratio = (part: number, whole: number): string => (whole === 0 ? "0.00" : (
 const pairRow = (day: string, abstained: number, used: number): string =>
 	`| ${day} | ${model} | ${pairCounts.tp + pairCounts.fp + pairCounts.fn + pairCounts.tn} | ${pairCounts.tp} | ${pairCounts.fp} | ${pairCounts.fn} | ${pairCounts.tn} | ${abstained} | ${pairCounts.pairedBySignals} | ${ratio(pairCounts.tp, pairCounts.tp + pairCounts.fp)} | ${ratio(pairCounts.tp, pairCounts.tp + pairCounts.fn)} | ${used} |`;
 
-for (const boundary of boundaries) {
-	const before = calls;
-	const verdicts = await BOUNDARY_RUNS[boundary]();
-	const count = (verdict: Verdict) => verdicts.filter((found) => found === verdict).length;
-	const measured = verdicts.length - count("halted");
-	const rate = measured === 0 ? 0 : count("right") / measured;
-	const day = new Date().toISOString().slice(0, 10);
-	const row = boundary === "repeat-pair" ? pairRow(day, count("abstained"), calls - before) : `| ${day} | ${model} | ${measured} | ${count("right")} | ${count("wrong")} | ${count("abstained")} | ${rate.toFixed(2)} | ${calls - before} |`;
-	const results = join(root, "evals", boundary, "RESULTS.md");
-	const earlier = (await Bun.file(results).exists()) ? await Bun.file(results).text() : boundary === "repeat-pair" ? pairHeader : header;
+const EMPTY_POOL = { right: 0, measured: 0 };
 
-	await Bun.write(results, `${earlier}${row}\n`);
-	console.log(`${boundary}: ${row}`);
+/** Sets one pooled rate in the owner's `hum.json`, where trust reads it. */
+const recordRate = async (folder: string, boundary: Boundary, rate: number): Promise<void> => {
+	const file = join(folder, "hum.json");
+	const written = z.looseObject({ measuredModels: z.record(z.string(), z.record(z.string(), z.number())).default({}) }).parse(JSON.parse(await Bun.file(file).text()));
+
+	await Bun.write(file, `${JSON.stringify({ ...written, measuredModels: { ...written.measuredModels, [boundary]: { ...written.measuredModels[boundary], [model]: Number(rate.toFixed(2)) } } }, null, "\t")}\n`);
+};
+
+for (const boundary of boundaries) {
+	const pool = { ...EMPTY_POOL };
+
+	Object.assign(pairCounts, { tp: 0, fp: 0, fn: 0, tn: 0, pairedBySignals: 0 });
+
+	for (let run = 1; run <= runs; run++) {
+		const before = calls;
+		const verdicts = await BOUNDARY_RUNS[boundary]();
+		const count = (verdict: Verdict) => verdicts.filter((found) => found === verdict).length;
+		const measured = verdicts.length - count("halted");
+		const rate = measured === 0 ? 0 : count("right") / measured;
+		const day = new Date().toISOString().slice(0, 10);
+		const row = boundary === "repeat-pair" ? pairRow(day, count("abstained"), calls - before) : `| ${day} | ${model} | ${measured} | ${count("right")} | ${count("wrong")} | ${count("abstained")} | ${rate.toFixed(2)} | ${calls - before} |`;
+		const results = join(values.write ?? root, "evals", boundary, "RESULTS.md");
+		const earlier = (await Bun.file(results).exists()) ? await Bun.file(results).text() : boundary === "repeat-pair" ? pairHeader : header;
+
+		pool.right += count("right");
+		pool.measured += measured;
+		await Bun.write(results, `${earlier}${row}\n`);
+		console.log(`${boundary}: ${row}`);
+	}
+
+	const pooled = boundary === "repeat-pair" ? pairCounts.tp / (pairCounts.tp + pairCounts.fp || 1) : pool.right / (pool.measured || 1);
+
+	console.log(`${boundary}: pooled over ${runs} run(s): ${pooled.toFixed(2)}`);
+
+	if (values.write !== undefined) await recordRate(values.write, boundary, pooled);
 }
 
 console.log(`${calls} live calls, the start check included. Record each rate under measuredModels in defaults/hum.json; a model decides a boundary alone only at minJudgeRate or above; repeat-pair takes its precision, against repeatPrecision.`);

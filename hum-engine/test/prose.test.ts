@@ -49,10 +49,11 @@ test("untrusted text sits inside a tag it cannot close, with its terminal escape
 });
 
 test("an item names its kind by a label, else by its template field; nothing else names it", () => {
-	expect(declaredKind({ body: "Kind: docs", labels: ["bug", "fix"] }, KINDS)).toBe("fix");
-	expect(declaredKind({ body: "Some text.\nKind: Docs\n" }, KINDS)).toBe("docs");
-	expect(declaredKind({ body: "### Kind\n\nhotfix\n\n### What" }, KINDS)).toBe("hotfix");
-	expect(declaredKind({ body: "A kind of fix for the docs.", labels: ["bug"] }, KINDS)).toBeUndefined();
+	expect(declaredKind({ body: "Kind: docs", labels: ["bug", "fix"] }, KINDS, {})).toBe("fix");
+	expect(declaredKind({ body: "Some text.\nKind: Docs\n" }, KINDS, {})).toBe("docs");
+	expect(declaredKind({ body: "### Kind\n\nhotfix\n\n### What" }, KINDS, {})).toBe("hotfix");
+	expect(declaredKind({ body: "A kind of fix for the docs.", labels: ["bug"] }, KINDS, {})).toBeUndefined();
+	expect(declaredKind({ body: "", labels: ["Bug"] }, KINDS, { bug: "fix" })).toBe("fix");
 });
 
 test("with no kind named, the model call picks it; an abstention runs the fallback kind, unclear, and asks once for the kind", async () => {
