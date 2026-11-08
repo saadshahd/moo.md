@@ -214,6 +214,9 @@
 		"review-verdict": {
 			"claude-haiku-5-5": 0.92,
 			"claude-sonnet-5-5": 0.83
+		},
+		"reply-option": {
+			"claude-haiku-5-5": 0.87
 		}
 	},
 	"mergeRisk": {
@@ -228,5 +231,18 @@
 			1.5,
 			2.25
 		]
-	}
+	},
+	"questionLimits": {
+		"cells": 80,
+		"wordCells": 40
+	},
+	"questionTimeoutHours": 24,
+	"priorityLabels": [
+		"priority:high"
+	],
+	"undoableLevels": [
+		"low",
+		"medium"
+	],
+	"ownerBranchPrefix": "hum/owner/"
 }

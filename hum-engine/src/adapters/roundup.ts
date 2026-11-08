@@ -13,6 +13,7 @@ import {
 	followUpBody,
 	followUpNote,
 	type Marker,
+	cutLine,
 	markedLine,
 	markerLine,
 	parseComment,
@@ -26,6 +27,9 @@ const CLAIM_OPEN = "<!-- hum-claim ";
 
 /** An Agent's comment on a Todo is one line of at most this many characters. */
 const COMMENT_LIMIT = 280;
+
+/** The digest in a Pad's name, so the same text posts to the same Pad name. */
+const PAD_DIGEST_LENGTH = 8;
 
 const TodoId = ItemId.pipe(z.string().regex(/^(0|[1-9]\d*)$/, "a roundup Todo id is a whole number")).transform(Number);
 
@@ -179,7 +183,30 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 		await call("todo_comment", { id: parseArgument(TodoId, id), body: text });
 	};
 
-	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> => post(id, markedLine(marker, text, COMMENT_LIMIT));
+	/** A text too long for one comment goes whole into a Pad; the comment holds its first words and the Pad's name. */
+	const postInPad = async (id: string, marker: Marker | undefined, text: string): Promise<void> => {
+		const name = `hum ${id} ${hashJson(text).slice(0, PAD_DIGEST_LENGTH)}`;
+
+		await call("pad_create", { name, text });
+		await post(id, cutLine(marker, text, ` … full text in Pad "${name}"`, COMMENT_LIMIT));
+	};
+
+	const fitsMarked = (marker: Marker, text: string): boolean => {
+		try {
+			markedLine(marker, text, COMMENT_LIMIT);
+
+			return true;
+		} catch (cause) {
+			if (cause instanceof PermanentError) return false;
+
+			throw cause;
+		}
+	};
+
+	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> =>
+		fitsMarked(marker, text) ? post(id, markedLine(marker, text, COMMENT_LIMIT)) : postInPad(id, marker, text);
+
+	const postPlain = async (id: string, text: string): Promise<void> => (fitsOneComment(text) ? post(id, text) : postInPad(id, undefined, text));
 
 	const standingClaim = (id: string, list: readonly Comment[]) => {
 		const entry = standingEntry(list);
@@ -233,7 +260,7 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 			},
 			claim: (id, holder, ttlMs) => take("claim", parseArgument(ItemId, id), holder, ttlMs),
 			renew: (id, holder, ttlMs) => take("renew", parseArgument(ItemId, id), holder, ttlMs),
-			comment: (id, text) => post(id, commentText(text)),
+			comment: (id, text) => postPlain(id, commentText(text)),
 			fileFollowUp: async (from, { title, body }) => {
 				const filed = filedFollowUp((await comments(from)).map((comment) => comment.body), title);
 

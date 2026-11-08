@@ -3,11 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
-import type { Item, Questions, WorkSource } from "../adapter-api.ts";
+import type { Item, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
 import { type Finished, type Runner, succeeded } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
+import { visibleText } from "../adapters/marked.ts";
 import { type Git, gitIn, PATCH, push } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
@@ -18,12 +19,17 @@ import { leavesDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
-import { SECOND_MS } from "../time.ts";
+import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { runChecks } from "./checks.ts";
 import { changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
+import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
+import type { Stage } from "../decide/answer.ts";
 import { reviewInput } from "../decide/review.ts";
 import { decideKind, forgetProgress, kindAnswered } from "./kind.ts";
+import { settleAnswers } from "./answers.ts";
+import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { tallyOf } from "./tally.ts";
 import { decideProse } from "./prose-run.ts";
 import { footprintOf, type PrefixGate } from "./scheduler.ts";
 
@@ -37,7 +43,7 @@ const ERROR_EXCERPT = 500;
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
 /** What the agent run hands back besides its commit. */
-export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional() }));
+export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
 export const PLAN_MARK = "hum plan:";
@@ -68,6 +74,8 @@ export type ThinPathOptions = {
 	readonly gate?: PrefixGate;
 	/** The remote's pull requests and branch rules, for a remote on GitHub. */
 	readonly pulls?: PullRequests;
+	/** The names, never the values, of the variables the runs have; a missing secret is checked against them. Default: this process's. */
+	readonly runnerVariables?: ReadonlySet<string>;
 	/** False while the worker drains for an update: a finished change is saved and pushed, and the next worker lands it under the config it starts with. */
 	readonly mayLand?: () => boolean;
 };
@@ -100,7 +108,18 @@ export const answerTo = (item: Item): Answered | undefined => {
 	};
 };
 
-const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional() });
+/** The question the item's latest hum question puts, when it is one the item waits on and no applied answer follows it. */
+export const unansweredQuestion = (item: Item): ThreadEntry | undefined => {
+	const last = item.thread.findLastIndex((e) => e.kind === "question" && e.author !== "person");
+	const question = item.thread[last];
+
+	return question && isWaitQuestion(visibleText(question.text)) && !item.thread.slice(last + 1).some((e) => e.kind === "answer") ? question : undefined;
+};
+
+/** Whether the kind's machine takes the owner's approval of a change in this state. */
+const isApprovalWait = (kind: Kind, state: string | undefined): boolean => state !== undefined && kind.machine.states[state]?.on?.[OWNER_APPROVED] !== undefined;
+
+const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional() });
 
 /** The kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
 const earlierKinds = (state: State, kind: Kind) => (machineVersion: string) => state.kinds.get(`${kind.machine.id}@${machineVersion}`);
@@ -138,7 +157,8 @@ const kindNamed = (config: Config, name: string): Kind => {
 	return kind;
 };
 
-export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
+export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult> => {
+	const o: WithNow = { ...options, now: options.now ?? Date.now };
 	const base = o.base ?? "main";
 	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
 
@@ -164,8 +184,12 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (!claim.won) return { outcome: "lost", item: id };
 
-	const item = await o.workSource.read(id);
 	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum);
+	const { now } = o;
+	const onSnapshot = saved.value !== undefined;
+	const waitingState = knownKind && waitsOnOwner(knownKind, at);
+	const stage: Stage = o.state.landings.get(id) ? "approval" : waitingState ? (knownKind && isApprovalWait(knownKind, at) ? "approval" : "waiting") : onSnapshot ? "running" : "waiting";
+	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, await o.workSource.read(id), { stage });
 	const named = known && kindAnswered(known, item, o.config.hum.kinds);
 
 	if (named) o.state.itemKinds.put(id, named);
@@ -176,14 +200,17 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 		return { outcome: "moved", item: id, kind: named.kind };
 	}
 
-	const kindName = (named ?? known ?? (await decideKind({ ...o, judge }, item))).kind;
+	// With no saved wait, the thread alone says whether the owner has been asked and has not answered; its age is the deadline.
+	const unanswered = onSnapshot ? undefined : unansweredQuestion(item);
+
+	if (unanswered) return unanswered.at + o.config.hum.questionTimeoutHours * HOUR_MS < now() ? park(o, { outcome: "stuck", item: id, detail: `no answer came within ${o.config.hum.questionTimeoutHours} hours` }) : { outcome: "waiting", item: id };
+
+	const kindName = (named ?? known ?? (await decideKind({ ...o, judge, now }, item))).kind;
 	const kind = kindNamed(o.config, kindName);
 	const asking = waitsOnOwner(kind, at);
-	const answered = asking ? answerTo(item) : undefined;
+	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
 
-	const awaitsAnswer = asking && answered === undefined;
-
-	if (awaitsAnswer) return { outcome: "waiting", item: id };
+	if (asking && answered === undefined) return { outcome: "waiting", item: id };
 
 	const landing = o.state.landings.get(id);
 	const clone = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-run-"));
@@ -215,7 +242,10 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	}
 };
 
-type Driven = ThinPathOptions & {
+/** The options with the clock every later step reads. */
+type WithNow = ThinPathOptions & { readonly now: () => number };
+
+type Driven = WithNow & {
 	readonly kindName: string;
 	readonly judge: ModelCall;
 	readonly base: string;
@@ -240,20 +270,15 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	// The worker lost the claim or is exiting for an update: the run stops, and its actor with it.
 	d.signal?.addEventListener("abort", () => result.resolve({ outcome: "lost", item: id }), { once: true });
 	// The total over all runs is saved; the cap counts what the item spent since the owner last answered.
-	const tally = state.spent.get(id) ?? { item: id, total: 0, base: 0 };
+	const tally = tallyOf(state, id);
 
-	if (d.answered) tally.base = tally.total;
-
-	const spend = (tokens: number) => {
-		tally.total += tokens;
-		state.spent.put(id, tally);
-	};
+	if (d.answered) tally.startAfresh();
 
 	let fixes = 0;
 	let lastFailure = "";
 	let cause = "";
 	let handled = "";
-	let pending: { question: string; plan: string } | undefined;
+	let pending: Pending | undefined;
 	let approvedByOwner = false;
 	let actor: AnyActor;
 
@@ -314,8 +339,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** The kinds reach their owner-wait state only through the over-cap event, so a run's question uses it too. */
-	const ask = (question: string, plan: string) => {
-		pending = { question, plan };
+	const ask = (note: Pending) => {
+		pending = note;
 		actor.send({ type: "token-cap" });
 	};
 
@@ -334,7 +359,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				cwd: purpose === "review" ? tmpdir() : clone,
 				...(await tierFor(purpose)),
 				schema,
-				tokenCap: kind.tokenCap.tokens - (tally.total - tally.base),
+				tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
 				sessionId: begun.record.sessionId,
 				signal,
 				onSession: (sessionId) => state.runs.saveSession(key, sessionId),
@@ -349,20 +374,43 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (outcome.kind === "stopped") return pause({ outcome: "lost", item: id });
 
 		if (outcome.kind === "over-cap") {
-			spend(outcome.tokens);
+			tally.spend(outcome.tokens);
 
-			const why = `The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.total - tally.base} tokens.`;
+			const why = `The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens.`;
 
 			if (!actor.getSnapshot().can({ type: "token-cap" })) throw failed(why);
 
-			ask(why, "");
+			ask({ question: { text: PLAIN_QUESTIONS["over-cap"], detail: why }, plain: "over-cap", plan: "" });
 
 			return new Promise<never>(() => {});
 		}
 
-		spend(outcome.tokens);
+		tally.spend(outcome.tokens);
 
 		return outcome;
+	};
+
+	/** The owner is asked, or the run's choice stands and is listed under the choices made without them. */
+	const settleNeed = async (wants: z.infer<typeof Wants>): Promise<{ asked: Pending } | { chose: string }> => {
+		const reason = wants.reason ?? { kind: "unsure" as const };
+		const change = await changeOn(landContext(d));
+		const { placement } = await placementOf(landContext(d), change);
+
+		const decision = askDecision(reason, {
+			runnerVariables: d.runnerVariables ?? new Set(Object.keys(process.env)),
+			changedPaths: change.paths,
+			level: placement.level.name,
+			undoableLevels: config.hum.undoableLevels,
+		});
+
+		if (decision.action === "ask") return { asked: { ...askedQuestion(reason, decision.confirmed, wants.question), plan: wants.plan ?? "" } };
+
+		const text = `Chose "${decision.choice}" over ${decision.over.filter((word) => word !== decision.choice).join(", ")} without you.`;
+		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: d.workSource, questions: d.questions }, state.ops, { run: "decide", attempt: state.runs.list(id).length });
+
+		await calls.questions?.decide(id, text);
+
+		return { chose: text };
 	};
 
 	const step = (purpose: "build" | "fix") =>
@@ -371,13 +419,23 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				if (purpose === "fix" && ++fixes > maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
 				const before = (await g(["rev-parse", "HEAD"])).trim();
-				const outcome = await runAgent(purpose, await prompt(purpose), RUN_SCHEMA, signal);
+				const chosen: string[] = [];
 
-				if (!succeeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
+				for (;;) {
+					const outcome = await runAgent(purpose, `${await prompt(purpose)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
 
-				const wants = Wants.safeParse(outcome.structured).data;
+					if (!succeeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
 
-				if (wants?.status === "needs-owner") return ask(wants.question ?? "The run needs an answer only you hold.", wants.plan ?? "");
+					const wants = Wants.safeParse(outcome.structured).data;
+
+					if (wants?.status !== "needs-owner") break;
+
+					const settled = await settleNeed(wants);
+
+					if ("asked" in settled) return ask(settled.asked);
+
+					chosen.push(settled.chose);
+				}
 
 				// Done is a new commit on the branch, not the run's word.
 				if ((await g(["rev-parse", "HEAD"])).trim() === before) throw failed(`the ${purpose} run succeeded and committed nothing`);
@@ -396,7 +454,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	});
 
 	const ownerQuestion = (pick: EventPick) => {
-		pending = { question: pick.question || pick.reason, plan: "" };
+		pending = { question: { text: pick.question || pick.reason }, plain: "unsure", plan: "" };
 	};
 
 	/** What a taken pick leaves behind before the machine moves on. */
@@ -465,13 +523,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (endedStuck(kind, value)) return result.resolve({ outcome: "stuck", item: id, detail: stuckCause() });
 
 		if (waitsOnOwner(kind, value)) {
-			const note = pending ?? { question: "The run stopped for the owner.", plan: "" };
+			const note = pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" };
 
 			if (!(await stillMine(d))) return result.resolve({ outcome: "lost", item: id });
 
-			await handOff(d, note.question, note.plan);
+			await handOff(d, isApprovalWait(kind, value) ? approvalQuestion(note) : note);
 
-			return result.resolve({ outcome: "asked", item: id, detail: note.question });
+			return result.resolve({ outcome: "asked", item: id, detail: note.question.text });
 		}
 
 		if (value === "merging") return result.resolve(await merge(d, () => actor.send({ type: "merged" }), approvedByOwner));
@@ -493,7 +551,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	actor.start();
 
-	if (d.answered) {
+	if (d.answered && d.resume) {
 		const resume = resumeEvent(actor.getSnapshot(), d.answered);
 
 		approvedByOwner = resume === OWNER_APPROVED;
@@ -505,6 +563,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	return result.promise.finally(() => actor.stop());
 };
+
+/** What a run left for the owner: the question, the plain one it falls back to, and the plan so far. */
+type Pending = { readonly question: Question; readonly plain: PlainQuestion; readonly plan: string };
+
+const chosenSection = (chosen: readonly string[]): string => (chosen.length === 0 ? "" : `\n\n## Decided without the owner\n${chosen.map((text) => `- ${text}`).join("\n")}\nGo on with these choices.`);
 
 const OWNER_APPROVED = "owner-approved";
 
@@ -563,6 +626,7 @@ class Halted extends Error {
 const HALTS = {
 	limited: (id: string, outcome: { until: number }): ThinResult => ({ outcome: "limited", item: id, until: outcome.until }),
 	held: (id: string, outcome: { card: { cause: string } }): ThinResult => ({ outcome: "held", item: id, why: outcome.card.cause }),
+	"over-cap": (id: string, cap: number, spent: number): ThinResult => ({ outcome: "review", item: id, detail: `the review run passed the item's token cap (${cap}) at ${spent} tokens` }),
 } as const;
 
 /** A fresh review run at landing, for a level that asks for one: it reads only the item and the diff, and its verdict is saved. */
@@ -574,13 +638,22 @@ const reviewAtLanding =
 		if (!row) throw new Error(`the ${d.kindName} table has no review row`);
 
 		const run = async (prompt: string, schema: JsonSchema): Promise<Finished> => {
-			const outcome = await d.runner.run({ prompt, cwd: tmpdir(), model: d.config.hum.models[row.tier], effort: row.effort, schema, signal: d.signal });
+			const tally = tallyOf(d.state, d.id);
+			const outcome = await d.runner.run({ prompt, cwd: tmpdir(), model: d.config.hum.models[row.tier], effort: row.effort, schema, signal: d.signal, tokenCap: d.kind.tokenCap.tokens - tally.sinceAnswer() });
 
 			if (outcome.kind === "limited") throw new Halted(HALTS.limited(d.id, outcome));
 
 			if (outcome.kind === "held") throw new Halted(HALTS.held(d.id, outcome));
 
+			if (outcome.kind === "over-cap") {
+				tally.spend(outcome.tokens);
+
+				throw new Halted(HALTS["over-cap"](d.id, d.kind.tokenCap.tokens, tally.sinceAnswer()));
+			}
+
 			if (outcome.kind !== "finished") throw new Halted({ outcome: "lost", item: d.id });
+
+			tally.spend(outcome.tokens);
 
 			return outcome;
 		};
@@ -608,8 +681,15 @@ const split = async (d: Driven, parts: readonly string[], onMerged: () => void):
 	return merge(d, onMerged);
 };
 
-/** Push the work branch, put the plan and the question on the item, and end. Each write runs once per key. */
-const handOff = async (d: Driven, question: string, plan: string) => {
+/** The owner-review wait asks for the change's approval, whatever the review run wrote. */
+const approvalQuestion = ({ question, plan }: Pending): Pending => ({
+	question: { text: PLAIN_QUESTIONS["owner-review"], detail: question.detail ?? question.text },
+	plain: "owner-review",
+	plan,
+});
+
+/** Push the work branch, put the plan on the item, queue the question for room under the daily cap, and end. Each write runs once per key. */
+const handOff = async (d: Driven, { question, plain, plan }: Pending) => {
 	const { state, id, g, branch, workSource, questions, git } = d;
 	const attempt = state.runs.list(id).length;
 	const key = (op: string) => ({ itemId: id, run: "ask", attempt, op });
@@ -624,7 +704,8 @@ const handOff = async (d: Driven, question: string, plan: string) => {
 
 	if (plan.trim()) await calls.workSource?.comment(id, `${PLAN_MARK}\n${plan.trim()}`);
 
-	await calls.questions?.ask(id, { text: question });
+	queueQuestion(d, d.item, question, plain);
+	await releaseQuestions(d);
 };
 
 /** Every act that changes the world checks the claim first. */

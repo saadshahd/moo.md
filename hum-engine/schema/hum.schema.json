@@ -788,6 +788,9 @@
 				"review-verdict": {
 					"claude-haiku-5-5": 0.92,
 					"claude-sonnet-5-5": 0.83
+				},
+				"reply-option": {
+					"claude-haiku-5-5": 0.87
 				}
 			},
 			"type": "object",
@@ -797,7 +800,8 @@
 					"kind",
 					"alignment",
 					"plan-outcome",
-					"review-verdict"
+					"review-verdict",
+					"reply-option"
 				]
 			},
 			"additionalProperties": {
@@ -816,7 +820,8 @@
 				"kind",
 				"alignment",
 				"plan-outcome",
-				"review-verdict"
+				"review-verdict",
+				"reply-option"
 			],
 			"description": "Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."
 		},
@@ -826,6 +831,68 @@
 			"minimum": 0,
 			"maximum": 1,
 			"description": "The lowest measured rate at which hum trusts a model's pick at a boundary; below it the call abstains."
+		},
+		"questionLimits": {
+			"default": {
+				"cells": 80,
+				"wordCells": 40
+			},
+			"type": "object",
+			"properties": {
+				"cells": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				},
+				"wordCells": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				}
+			},
+			"required": [
+				"cells",
+				"wordCells"
+			],
+			"additionalProperties": false,
+			"description": "The most terminal cells a question holds, and the most any one word of it holds; a longer question is replaced by a short one and its text rides folded."
+		},
+		"questionTimeoutHours": {
+			"default": 24,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Hours after a question that an item with no saved wait still counts as unanswered; past them the item ends stuck."
+		},
+		"priorityLabels": {
+			"default": [
+				"priority:high"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Item labels that put its question first under the daily cap, highest first."
+		},
+		"undoableLevels": {
+			"default": [
+				"low",
+				"medium"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Levels at which a choice that touches only the change's own files is made without the owner."
+		},
+		"ownerBranchPrefix": {
+			"default": "hum/owner/",
+			"type": "string",
+			"format": "ends_with",
+			"pattern": ".*\\/$",
+			"description": "The branch prefix of a pull request that lands a commit the owner wrote, such as an answer."
 		},
 		"mergeRisk": {
 			"default": {

@@ -54,15 +54,37 @@ describe("what a Todo needs to be ready", () => {
 });
 
 describe("a roundup comment is one line", () => {
-	test("text that is too long or spans lines is refused, never cut", async () => {
+	test("a question or reply that fits is one comment, whole", async () => {
 		const roundup = new FakeRoundup();
 		const adapter = roundupAdapter({ call: roundup.call }, context);
 		const id = String(roundup.seed("short"));
 
-		await expect(adapter.workSource.comment(id, "x".repeat(300))).rejects.toThrow("at most 280");
-		await expect(adapter.workSource.comment(id, "two\nlines")).rejects.toThrow("one line");
-		await expect(adapter.questions.ask(id, { text: "y".repeat(300) })).rejects.toThrow("hold 280 characters");
-		expect((await adapter.workSource.read(id)).thread).toEqual([]);
+		await adapter.questions.ask(id, { text: "Which title?", options: ["a", "b"] });
+		await adapter.workSource.comment(id, "Answer 1 applied: a.");
+
+		expect((await adapter.workSource.read(id)).thread.map((entry) => entry.text)).toEqual(["Which title? Options: a, b", "Answer 1 applied: a."]);
+		expect(roundup.pads.size).toBe(0);
+	});
+
+	test("one that is too long or spans lines goes whole into a Pad, and its comment names the Pad", async () => {
+		const roundup = new FakeRoundup();
+		const adapter = roundupAdapter({ call: roundup.call }, context);
+		const id = String(roundup.seed("short"));
+		const detail = "why ".repeat(120);
+
+		await adapter.questions.ask(id, { text: "Which title?", options: ["a", "b"], detail });
+		await adapter.workSource.comment(id, "two\nlines");
+
+		const [question, reply] = (await adapter.workSource.read(id)).thread;
+		const names = [...roundup.pads.keys()];
+
+		expect(names).toHaveLength(2);
+		expect(roundup.pads.get(names[0] ?? "")).toContain(detail.trim());
+		expect(question).toMatchObject({ kind: "question" });
+		expect(question?.text).toStartWith("Which title?");
+		expect(question?.text).toContain(names[0]);
+		expect(reply?.text).toContain(names[1]);
+		expect(roundup.pads.get(names[1] ?? "")).toBe("two\nlines");
 	});
 });
 

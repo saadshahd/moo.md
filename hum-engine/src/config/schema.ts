@@ -50,6 +50,8 @@ const branchPrefix = z
 
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
+export type MergeMethod = (typeof MERGE_METHODS)[number];
+
 /** Who reviews a change before it merges: no one, a fresh agent review run, or that run and then the owner. */
 export const REVIEWS = ["none", "agent", "owner"] as const;
 
@@ -60,7 +62,7 @@ export const RELEASES = ["at-once", "after-proof"] as const;
 export const BREAKS = ["follow-up", "block"] as const;
 
 /** Each place a model's judgment decides, measured on its own labelled set. */
-export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict"] as const;
+export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict", "reply-option"] as const;
 
 export type Boundary = (typeof BOUNDARIES)[number];
 
@@ -163,6 +165,13 @@ const Shipped = z.object({
 		.record(z.enum(BOUNDARIES), z.record(name, z.number().min(0).max(1)))
 		.describe("Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."),
 	minJudgeRate: z.number().min(0).max(1).describe("The lowest measured rate at which hum trusts a model's pick at a boundary; below it the call abstains."),
+	questionLimits: z
+		.strictObject({ cells: count, wordCells: count })
+		.describe("The most terminal cells a question holds, and the most any one word of it holds; a longer question is replaced by a short one and its text rides folded."),
+	questionTimeoutHours: count.describe("Hours after a question that an item with no saved wait still counts as unanswered; past them the item ends stuck."),
+	priorityLabels: z.array(name).describe("Item labels that put its question first under the daily cap, highest first."),
+	undoableLevels: z.array(name).describe("Levels at which a choice that touches only the change's own files is made without the owner."),
+	ownerBranchPrefix: branchPrefix.describe("The branch prefix of a pull request that lands a commit the owner wrote, such as an answer."),
 	mergeRisk: z
 		.strictObject({
 			weights: z.record(z.enum(GRADED), z.number().positive()),
@@ -354,4 +363,9 @@ export const OWNER_CHANGEABLE = {
 	"measured models": "measuredModels",
 	"judge rate bar": "minJudgeRate",
 	"merge-risk weights": "mergeRisk",
+	"question limits": "questionLimits",
+	"question timeout": "questionTimeoutHours",
+	"priority labels": "priorityLabels",
+	"undoable levels": "undoableLevels",
+	"owner branch prefix": "ownerBranchPrefix",
 } as const satisfies Record<string, string>;

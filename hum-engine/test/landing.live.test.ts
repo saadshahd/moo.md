@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { x } from "tinyexec";
 import { FakeProvider } from "../src/adapters/fake.ts";
 import { gitIn, push } from "../src/adapters/git.ts";
+import { landOwnerCommit } from "../src/adapters/owner-commit.ts";
 import { gitHubPullRequests, type PullRequests } from "../src/adapters/pull-requests.ts";
 import type { Config } from "../src/config/load.ts";
 import { openState } from "../src/state/open.ts";
@@ -99,5 +100,43 @@ test.skipIf(!live)("live: where main requires a pull request, a cleared change o
 		await closeAndDelete(alone.branch);
 		alone.cleanup();
 		owner.cleanup();
+	}
+}, MERGE_WAIT_MS + 120_000);
+
+// A commit the owner wrote lands the way the base asks: main requires a pull request, so it travels in one that merges itself.
+test.skipIf(!live)("live: an owner's commit goes through a pull request that auto-merges once the check passes", async () => {
+	const stamp = String(Date.now());
+	const config = configWith();
+	const clone = mkdtempSync(join(tmpdir(), "hum-live-owner-"));
+	const git = gitIn(clone, { identity: config.hum.commitIdentity });
+	const pulls = gitHubPullRequests(repo);
+	const file = `docs/owner-${stamp}.md`;
+
+	await gitIn(tmpdir()).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
+	mkdirSync(join(clone, "docs"), { recursive: true });
+	writeFileSync(join(clone, file), `An owner's commit, ${stamp}.\n`);
+	await git.raw(["add", file]);
+	await git.raw(["commit", "-q", "-m", `docs: owner ${stamp}`]);
+
+	const sha = (await git.raw(["rev-parse", "HEAD"])).trim();
+	const branch = `${config.hum.ownerBranchPrefix}live-${stamp}-${sha.slice(0, 12)}`;
+
+	try {
+		const landed = await landOwnerCommit({ sha, base: "main", label: `live-${stamp}`, title: `docs: owner ${stamp}`, body: "A live test of landing an owner's commit.", branchPrefix: config.hum.ownerBranchPrefix, mergeMethod: config.hum.mergeMethod, pulls, push: (refspecs) => push(git, ["origin", ...refspecs]) });
+
+		expect(landed).toMatchObject({ via: "pull-request" });
+
+		const deadline = Date.now() + MERGE_WAIT_MS;
+		let pull = await pulls.find(branch);
+
+		while (pull?.state === "OPEN" && Date.now() < deadline) {
+			await Bun.sleep(POLL_MS);
+			pull = await pulls.find(branch);
+		}
+
+		expect(pull).toMatchObject({ state: "MERGED" });
+	} finally {
+		await closeAndDelete(branch);
+		rmSync(clone, { recursive: true, force: true });
 	}
 }, MERGE_WAIT_MS + 120_000);

@@ -1,7 +1,10 @@
 import { z } from "zod";
 import type { ToolCall } from "../../src/index.ts";
 
-const Args = z.looseObject({ id: z.int().optional(), title: z.string().optional(), body: z.string().optional() });
+const Args = z.looseObject({ id: z.int().optional(), title: z.string().optional(), body: z.string().optional(), name: z.string().optional(), text: z.string().optional() });
+
+/** What roundup holds an Agent's comment to. */
+const COMMENT_LIMIT = 280;
 
 type Todo = { id: number; title: string; body: string; done: boolean; blocked: boolean; owner: { kind: string; id: string } | null; updated_at: number };
 
@@ -14,6 +17,8 @@ export class FakeRoundup {
 	#next = 1;
 	#clock = 0;
 	readonly calls: string[] = [];
+	/** Pads by name. */
+	readonly pads = new Map<string, string>();
 
 	seed(title: string, patch: Partial<Todo> = {}): number {
 		const todo: Todo = { id: this.#todos.length + 1, title, body: `${title} body`, done: false, blocked: false, owner: null, updated_at: ++this.#clock, ...patch };
@@ -55,8 +60,18 @@ export class FakeRoundup {
 				return structuredClone(this.#todo(args.id));
 			case "todo_comments":
 				return structuredClone(this.#comments.get(this.#todo(args.id).id) ?? []);
-			case "todo_comment":
-				return this.#comment(this.#todo(args.id).id, args.body ?? "");
+			case "todo_comment": {
+				const body = args.body ?? "";
+
+				if (body.includes("\n") || body.length > COMMENT_LIMIT) throw new Error("an Agent's comment is one line of at most 280 characters");
+
+				return this.#comment(this.#todo(args.id).id, body);
+			}
+
+			case "pad_create":
+				this.pads.set(String(args.name), args.text ?? "");
+
+				return { name: String(args.name) };
 			case "todo_create": {
 				const id = this.seed(String(args.title), { body: String(args.body ?? "") });
 

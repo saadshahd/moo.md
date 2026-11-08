@@ -48,8 +48,20 @@ export const questionMarker = (options?: readonly string[]): Marker => (options?
 
 export const answerMarker = (option?: string): Marker => (option === undefined ? { kind: "answer" } : { kind: "answer", option });
 
-/** A question as a thread shows it: the options it offers follow on their own line. */
-export const questionText = ({ text, options }: Question): string => (options?.length ? `${text}\n\nOptions: ${options.join(", ")}` : text);
+const FOLD_OPEN = "<details><summary>For Agents</summary>";
+const FOLD_CLOSE = "</details>";
+
+/** A question as a thread shows it: the options it offers follow on their own line, and its detail folds below. */
+export const questionText = ({ text, options, detail }: Question): string =>
+	[text, options?.length ? `Options: ${options.join(", ")}` : undefined, detail?.trim() ? `${FOLD_OPEN}\n\n${detail.trim()}\n\n${FOLD_CLOSE}` : undefined].filter(Boolean).join("\n\n");
+
+const OPTIONS_LINE = /^Options: (.+)$/m;
+
+/** The options a question's thread text offers, from its options line. */
+export const optionsIn = (text: string): string[] => (OPTIONS_LINE.exec(text)?.[1] ?? "").split(", ").filter(Boolean);
+
+/** The part of a thread entry's text the owner reads: what comes before the options line and the fold. */
+export const visibleText = (text: string): string => text.split(/\n\n(?:Options: |<details>)/)[0] ?? text;
 
 /** A comment's text; a provider that refuses an empty comment gets a placeholder. */
 export const commentText = (text: string): string => text.trim() || EMPTY_COMMENT;
@@ -89,10 +101,19 @@ export const markedLine = (marker: Marker, text: string, limit: number): string 
 	return line;
 };
 
+/** The first lines of `text` on one line, cut so the line with its optional marker and the closing `note` fits `limit`. */
+export const cutLine = (marker: Marker | undefined, text: string, note: string, limit: number): string => {
+	const prefix = marker ? `${markerLine(Marker, marker)} ` : "";
+	const room = limit - prefix.length - note.length;
+	const head = visibleText(text).replaceAll(/\s+/g, " ").trim();
+
+	return `${prefix}${head.length > room ? `${head.slice(0, room - 1)}…` : head}${note}`;
+};
+
 /** A comment as a thread entry. One without hum's marker, or with nothing after it, is a person's and reads as a comment. */
 export const parseComment = (body: string, at: number): ThreadEntry => {
 	const marker = markerOf(body);
 	const text = splitMarker(body)?.text ?? "";
 
-	return marker && text !== "" ? { kind: marker.kind, text, at, option: marker.option } : { kind: "comment", text: commentText(body.replaceAll("\r\n", "\n")), at };
+	return marker && text !== "" ? { kind: marker.kind, text, at, option: marker.option, author: "hum" } : { kind: "comment", text: commentText(body.replaceAll("\r\n", "\n")), at, author: "person" };
 };

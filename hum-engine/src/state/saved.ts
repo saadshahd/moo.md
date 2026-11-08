@@ -38,7 +38,7 @@ export const Landing = z.strictObject({
 export type Landing = z.infer<typeof Landing>;
 
 /** A path rule the owner's answer made, committed on the base; the view lists it with an undo. */
-export const Learned = z.strictObject({ glob: name, level: name, item: name, commit: name, at: time });
+export const Learned = z.strictObject({ glob: name, level: name, item: name, commit: name, pull: name.optional(), at: time });
 
 export type Learned = z.infer<typeof Learned>;
 
@@ -63,3 +63,35 @@ export type SavedPlan = z.infer<typeof SavedPlan>;
 export const Verdict = z.strictObject({ item: name, head: name, event: name, reason: z.string(), cites: z.array(Cite), models });
 
 export type Verdict = z.infer<typeof Verdict>;
+
+/** A question the run asked, waiting for room under the daily cap until `askedAt` is set; `askedAt` stays to count the day. */
+export const QueuedQuestion = z.strictObject({
+	item: name,
+	text: name,
+	options: z.array(name).optional(),
+	detail: z.string().optional(),
+	/** The index of the item's best priority label; no label is last. */
+	priority: z.int().nonnegative(),
+	/** The files the item declares it touches; none declared means it clashes with every item. */
+	footprint: z.array(name).optional(),
+	queuedAt: time,
+	askedAt: time.optional(),
+});
+
+export type QueuedQuestion = z.infer<typeof QueuedQuestion>;
+
+/** What became of one answer on an item's thread, saved before its reply is posted. */
+export const SettledAnswer = z.strictObject({
+	item: name,
+	/** The answer's number among the thread's answers and replies from people. */
+	ordinal: z.int().positive(),
+	text: name,
+	/** The option the answer picked, when it picked one. */
+	option: name.optional(),
+	source: z.enum(["marker", "free", "first-word", "model", "none-of-these", "abstained"]),
+	disposition: z.enum(["applied", "held", "dropped"]),
+	why: name,
+	at: time,
+});
+
+export type SettledAnswer = z.infer<typeof SettledAnswer>;

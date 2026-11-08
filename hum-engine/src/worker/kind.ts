@@ -1,10 +1,11 @@
-import { ADAPTER_API_VERSION, type Item, type Questions, type WorkSource } from "../adapter-api.ts";
+import type { Item, Questions, WorkSource } from "../adapter-api.ts";
 import type { ModelCall } from "../adapters/model-call.ts";
-import { onceCalls } from "../adapters/once.ts";
 import type { Config } from "../config/load.ts";
 import { declaredKind, kindQuestion, UNSURE } from "../decide/kind.ts";
+import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import type { State } from "../state/open.ts";
 import type { ItemKind } from "../state/saved.ts";
+import { queueQuestion, releaseQuestions } from "./questions.ts";
 
 export type KindContext = {
 	readonly state: State;
@@ -12,6 +13,7 @@ export type KindContext = {
 	readonly judge: ModelCall;
 	readonly workSource: WorkSource;
 	readonly questions: Questions;
+	readonly now: () => number;
 };
 
 /** Why the model call gave no kind it may use. */
@@ -43,9 +45,8 @@ export const decideKind = async (o: KindContext, item: Item, except?: string): P
 	o.state.itemKinds.put(item.id, decided);
 
 	if (decided.from === "fallback") {
-		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: o.workSource, questions: o.questions }, o.state.ops, { run: "kind", attempt: 0 });
-
-		await calls.questions?.ask(item.id, { text: `It runs as ${decided.kind} for now. Which kind is it?`, options: kinds });
+		queueQuestion(o, item, { text: PLAIN_QUESTIONS.kind, options: kinds, detail: `It runs as ${decided.kind} for now.` }, "kind");
+		await releaseQuestions(o);
 	}
 
 	return decided;

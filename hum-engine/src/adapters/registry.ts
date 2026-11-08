@@ -11,6 +11,7 @@ import { githubAdapter, repoFromRemote } from "./github.ts";
 import { gitIn } from "./git.ts";
 import { type GuardOptions, guardTimings, guarded } from "./guard.ts";
 import { markdownAdapter } from "./markdown.ts";
+import { gitHubPullRequests, type PullRequests } from "./pull-requests.ts";
 import { roundupAdapter } from "./roundup.ts";
 
 /** The integration slots `hum.json` `integrations` names, each to an adapter. */
@@ -32,6 +33,7 @@ const AdapterSettings = z.looseObject({
 	commitIdentity: HumConfig.shape.commitIdentity,
 	readyLabel: HumConfig.shape.readyLabel,
 	mergeMethod: HumConfig.shape.mergeMethod,
+	ownerBranchPrefix: HumConfig.shape.ownerBranchPrefix,
 	writeRaceRetries: HumConfig.shape.writeRaceRetries,
 	itemReadsAtOnce: HumConfig.shape.itemReadsAtOnce,
 	providerTimeoutSeconds: HumConfig.shape.providerTimeoutSeconds,
@@ -56,6 +58,13 @@ const defaultBase = async (repo: string): Promise<string> => {
 	return head.trim().replace(/^origin\//, "");
 };
 
+/** The pull requests of the repo's `origin` when it is on GitHub. */
+const originPulls = async (repo: string): Promise<PullRequests | undefined> => {
+	const found = repoFromRemote(await gitIn(repo).raw(["remote", "get-url", "origin"]).catch(() => ""));
+
+	return found === undefined ? undefined : gitHubPullRequests(found);
+};
+
 const githubRepo = async (repo: string): Promise<string> => {
 	const found = repoFromRemote(await gitIn(repo).raw(["remote", "get-url", "origin"]));
 
@@ -66,7 +75,7 @@ const githubRepo = async (repo: string): Promise<string> => {
 
 /** The adapters the engine ships, by the name `hum.json` gives them. */
 const BUILT_IN = {
-	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce }, context),
+	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce, pulls: await originPulls(path), mergeMethod: settings.mergeMethod, ownerBranchPrefix: settings.ownerBranchPrefix }, context),
 	github: async ({ path, settings, context }) =>
 		githubAdapter({ repo: await githubRepo(path), base: await defaultBase(path), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod }, context),
 	roundup: async ({ context }) => roundupAdapter({}, context),

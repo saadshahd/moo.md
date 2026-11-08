@@ -10,6 +10,7 @@ import { modelCallOver } from "../src/adapters/model-call.ts";
 import { readConfigDir } from "../src/config/load.ts";
 import { BOUNDARIES, type Boundary, HumConfig } from "../src/config/schema.ts";
 import { alignmentQuestion, raisesLevel } from "../src/decide/alignment.ts";
+import { replyQuestion } from "../src/decide/answer.ts";
 import { kindQuestion } from "../src/decide/kind.ts";
 import type { JsonSchema, ProsePurpose } from "../src/decide/prose.ts";
 import { openState } from "../src/state/open.ts";
@@ -90,6 +91,7 @@ const planRepo = (): string => {
 const KindCase = z.object({ case: z.string(), label: z.string(), title: z.string(), body: z.string() });
 const AlignmentCase = z.object({ case: z.string(), label: z.enum(["reverted", "fixed", "clean"]), subject: z.string(), diff: z.string() });
 const PlanCase = z.object({ case: z.string(), label: z.string(), body: z.string() });
+const ReplyCase = z.object({ case: z.string(), label: z.string(), question: z.string(), options: z.array(z.string()), reply: z.string() });
 const ReviewCase = z.object({ case: z.string(), label: z.string(), item: z.string(), diff: z.string() });
 
 /** Calls at once: enough to finish a set in minutes, few enough not to trip a rate limit. */
@@ -129,6 +131,15 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Verdict[]>> = {
 		const cases = (await read("plan-outcome", PlanCase)).slice(0, limit);
 
 		return eachOf(cases, async (found) => scored(await prosePick("plan", PROSE_PROMPTS.plan(config, { id: found.case, title: found.body.split("\n")[0] ?? "", body: found.body }), "", repo), found.label));
+	},
+	"reply-option": async () => {
+		const cases = (await read("reply-option", ReplyCase)).slice(0, limit);
+
+		return eachOf(cases, async (found) => {
+			const judged = await judge(replyQuestion(found.question, found.options, found.reply));
+
+			return judged.kind === "abstained" ? "abstained" : scored(judged.value.option, found.label);
+		});
 	},
 	"review-verdict": async () => {
 		const cases = (await read("review-verdict", ReviewCase)).slice(0, limit);

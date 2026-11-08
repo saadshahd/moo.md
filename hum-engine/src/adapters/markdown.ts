@@ -5,11 +5,14 @@ import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
 import { type Adapter, type AdapterContext, type Claim, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import type { MergeMethod } from "../config/schema.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
 import { type GitIdentity, gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
 import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
 import { answerMarker, followUpKey, questionText } from "./marked.ts";
+import { landOwnerCommit } from "./owner-commit.ts";
+import type { PullRequests } from "./pull-requests.ts";
 
 const ITEM_EXTENSION = ".md";
 const BASE_REF = "refs/hum/base";
@@ -34,6 +37,11 @@ export type MarkdownOptions = {
 	readonly itemReadsAtOnce: number;
 	/** The branch whose items folder holds the items; every write is pushed to it. */
 	readonly base?: string;
+	/** Pull requests of the repo on GitHub. An owner's answer goes through one when the base requires it. */
+	readonly pulls?: PullRequests;
+	readonly mergeMethod: MergeMethod;
+	/** The branch prefix of a pull request that lands an owner's answer. */
+	readonly ownerBranchPrefix: string;
 };
 
 type StandingClaim = { readonly claim: Claim; readonly sha: string };
@@ -55,7 +63,7 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
 	const git = gitIn(repo, { identity });
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
@@ -161,14 +169,35 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		if (outcome === "conflict") throw new LostRace(`another writer moved ${base} first`);
 	};
 
+	/** An owner's commit lands the way the base asks: a pull request that merges itself where one is required, a push elsewhere. */
+	const landOwned = async (sha: string, message: string, label: string): Promise<void> => {
+		const landed = await landOwnerCommit({
+			sha,
+			base,
+			label,
+			title: message,
+			body: `The owner answered on item ${label}.`,
+			branchPrefix: ownerBranchPrefix,
+			mergeMethod,
+			pulls,
+			push: pushCounted,
+		}).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
+
+		if (landed.via === "conflict") throw new LostRace(`another writer moved ${base} first`);
+	};
+
 	/** Changes one file on the remote base branch, reading it afresh after every lost race. */
-	const write = async (message: string, change: () => Promise<FileChange | undefined>): Promise<void> => {
+	const write = async (message: string, change: () => Promise<FileChange | undefined>, ownedBy?: string): Promise<void> => {
 		const attempt = async () => {
 			await sync();
 
 			const next = await change();
 
-			if (next) await pushToBase(await commitOn((await git.raw(["rev-parse", BASE_REF])).trim(), message, next));
+			if (!next) return;
+
+			const sha = await commitOn((await git.raw(["rev-parse", BASE_REF])).trim(), message, next);
+
+			await (ownedBy === undefined ? pushToBase(sha) : landOwned(sha, message, ownedBy));
 		};
 
 		await pRetry(attempt, { retries: writeRaceRetries, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
@@ -177,13 +206,17 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	};
 
 	const appendTo = (id: string, entry: Omit<ThreadEntry, "text" | "at">, text: string): Promise<void> =>
-		write(`hum: ${entry.kind} on ${id}`, async () => {
-			const source = await itemSource(id);
+		write(
+			`hum: ${entry.kind} on ${id}`,
+			async () => {
+				const source = await itemSource(id);
 
-			if (source === undefined) throw new PermanentError(`no item "${id}" under ${itemsDir}/`);
+				if (source === undefined) throw new PermanentError(`no item "${id}" under ${itemsDir}/`);
 
-			return { path: pathOf(id), content: appendEntry(source, { ...entry, at: now() }, text) };
-		});
+				return { path: pathOf(id), content: appendEntry(source, { ...entry, at: now() }, text) };
+			},
+			entry.kind === "answer" ? id : undefined,
+		);
 
 	const take = claimer<StandingClaim>(
 		{

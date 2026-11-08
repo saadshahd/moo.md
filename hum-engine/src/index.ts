@@ -140,6 +140,8 @@ export { labelChanges, type LabelRules, matchedSample, type PastChange } from ".
 
 export { changeOf, historiesOf, readHistory } from "./adapters/history.ts";
 
+export { type CommitLanded, landOwnerCommit, type OwnerCommit } from "./adapters/owner-commit.ts";
+
 export { type BranchRules, gitHubPullRequests, methodFor, type Pull, type PullRequests } from "./adapters/pull-requests.ts";
 
 export { land, type LandContext, prepareLanding, ruleGlobFor } from "./worker/land.ts";

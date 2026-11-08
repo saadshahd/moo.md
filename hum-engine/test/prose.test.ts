@@ -60,7 +60,7 @@ test("with no kind named, the model call picks it; an abstention runs the fallba
 	const adapter = provider.adapter();
 	const id = provider.seed("Tidy the log");
 	const item = { id, title: "Tidy the log", body: "It is noisy.", ready: true, thread: [] };
-	const context = (judge = scriptedJudge({ kind: { kind: "fix" } })) => ({ state: openState(mkdtempSync(join(tmpdir(), "hum-kind-"))), config, judge, workSource: adapter.workSource!, questions: adapter.questions! });
+	const context = (judge = scriptedJudge({ kind: { kind: "fix" } })) => ({ state: openState(mkdtempSync(join(tmpdir(), "hum-kind-"))), config, judge, workSource: adapter.workSource!, questions: adapter.questions!, now: provider.now });
 
 	expect(await decideKind(context(), item)).toEqual({ item: id, kind: "fix", from: "model" });
 
@@ -69,7 +69,7 @@ test("with no kind named, the model call picks it; an abstention runs the fallba
 	expect(await decideKind(abstaining, item)).toEqual({ item: id, kind: "feature", from: "fallback", why: "no scripted answer fits" });
 	await decideKind(abstaining, item);
 	expect(abstaining.state.itemKinds.get(id)?.from).toBe("fallback");
-	expect((await adapter.workSource!.read(id)).thread.filter((entry) => entry.kind === "question")).toEqual([expect.objectContaining({ text: expect.stringContaining("It runs as feature for now. Which kind is it?") })]);
+	expect((await adapter.workSource!.read(id)).thread.filter((entry) => entry.kind === "question")).toEqual([expect.objectContaining({ text: expect.stringContaining("Which kind of work is this?") })]);
 });
 
 test("a cheap model call that times out, or answers from a model id not measured at its boundary, abstains", async () => {

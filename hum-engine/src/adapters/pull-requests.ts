@@ -2,7 +2,7 @@ import { GraphqlResponseError } from "@octokit/graphql";
 import pMemoize from "p-memoize";
 import { z } from "zod";
 import type { Json } from "../config/json.ts";
-import { MERGE_METHODS } from "../config/schema.ts";
+import { MERGE_METHODS, type MergeMethod } from "../config/schema.ts";
 import {
 	type GitHubClient,
 	gitHubClient,
@@ -10,8 +10,6 @@ import {
 	ownerToken,
 	raise,
 } from "./github.ts";
-
-type MergeMethod = (typeof MERGE_METHODS)[number];
 
 /** What the target branch's rules ask of a change that lands on it. */
 export type BranchRules = {

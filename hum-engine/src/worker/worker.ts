@@ -7,6 +7,7 @@ import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
 import { ADAPTER_API_VERSION, type Answers, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
+import { configuredModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
 import { type Kind, SCHEMA_VERSION } from "../config/schema.ts";
 import { checkTokenAge } from "../service/token.ts";
@@ -21,6 +22,9 @@ import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
 import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
 import { type Signature, signatureOf } from "./signature.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
+import { type AnswerScope, settleAnswers } from "./answers.ts";
+import { recentlyAsked, releaseQuestions } from "./questions.ts";
+import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { answerTo, claimTtlMs, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
@@ -119,6 +123,7 @@ export class Worker {
 	readonly #latest: () => Promise<string | undefined>;
 	readonly #ciTick: () => Promise<number | undefined>;
 	readonly #learn: (id: string) => Promise<Known>;
+	readonly #judge: ModelCall;
 	#watchToken: string | undefined;
 	/** Set while the worker has seen an update; no change lands until a worker on the new config takes it. */
 	#updating: string | undefined;
@@ -145,6 +150,7 @@ export class Worker {
 				title: item.title,
 			};
 		});
+		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum);
 		rememberKinds(options.state, options.config);
 		this.#recheckLandings();
 	}
@@ -281,9 +287,25 @@ export class Worker {
 		if (spent) state.spent.put(id, { ...spent, base: spent.total });
 	}
 
-	/** Reads the threads that can have changed, saves each new answer as an event, and releases a parked item the owner answered. */
+	/** Where an item stands when its thread is read, for the disposition of an answer to it. */
+	#stageOf(id: string, ready: boolean, sleeping: ReadonlyMap<string, SavedSnapshot>): AnswerScope {
+		const parked = this.#o.state.parked.get(id);
+
+		if (this.#inFlight.has(id)) return { stage: "running" };
+
+		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: parked.why === "review" ? [OWNER_APPROVAL, RUN_AGAIN] : [RUN_AGAIN] };
+
+		const asleep = sleeping.get(id);
+		const kind = asleep && this.#kindNamed(asleep.kind)?.kind;
+
+		if (asleep && kind) return { stage: kind.machine.states[asleep.state ?? ""]?.on?.["owner-approved"] ? "approval" : "waiting" };
+
+		return { stage: ready ? "waiting" : "ended" };
+	}
+
+	/** Reads the threads that can have changed, settles each new answer, and releases a parked item the owner answered. */
 	async #readAnswers(sleeping: readonly SavedSnapshot[]): Promise<void> {
-		const { state, adapters } = this.#o;
+		const { state, adapters, config } = this.#o;
 		const inbox = this.#inbox();
 		const watched = adapters.answers ? await adapters.answers.watch(this.#watchToken) : { token: "", changed: true };
 
@@ -292,11 +314,14 @@ export class Worker {
 		if (!watched.changed && inbox.length === 0) return;
 
 		const waiting = new Set(sleeping.map((s) => s.itemId));
+		const asleep = new Map(sleeping.map((s) => [s.itemId, s]));
 		const parked = state.parked.list();
+		const asked = recentlyAsked({ state, config, now: this.#now });
 
 		await Promise.all(
-			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox])].map(async (id) => {
-				const item = await adapters.workSource.read(id);
+			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox, ...asked])].map(async (id) => {
+				const raw = await adapters.workSource.read(id);
+				const item = await settleAnswers({ state, workSource: adapters.workSource, judge: this.#judge, now: this.#now }, raw, this.#stageOf(id, raw.ready, asleep));
 				const held = parked.find((p) => p.item === id);
 				const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
 				const lastAnswerAt = lastAnswer?.at;
@@ -347,7 +372,7 @@ export class Worker {
 				questions: adapters.questions,
 				state,
 				runner: this.#o.runner,
-				judge: this.#o.judge,
+				judge: this.#judge,
 				config,
 				remote: this.#o.remote,
 				base: this.#o.base,
@@ -531,6 +556,10 @@ export class Worker {
 
 			return this.#inFlight.size === 0 ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
 		}
+
+		await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).catch((error: Error) => {
+			state.faults.raise({ code: "question-release", cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
+		});
 
 		const ready = await this.#readReady(sleeping);
 		const started = ready ? await this.#startPicked(t, ready, sleeping) : [];

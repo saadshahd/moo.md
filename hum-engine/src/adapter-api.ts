@@ -30,12 +30,17 @@ const time = z.int().nonnegative();
 
 export const THREAD_KINDS = ["comment", "question", "answer", "decision"] as const;
 
+/** Who wrote a thread entry: hum, which marks its comments, or a person typing without a marker. */
+export const THREAD_AUTHORS = ["hum", "person"] as const;
+
 /** One entry on an item's thread, oldest first. */
 export const ThreadEntry = z.strictObject({
 	kind: z.enum(THREAD_KINDS),
 	text,
 	at: time,
 	option: text.optional(),
+	/** A source that cannot tell leaves it out, and the entry reads as hum's. */
+	author: z.enum(THREAD_AUTHORS).optional(),
 });
 
 export type ThreadEntry = z.infer<typeof ThreadEntry>;
@@ -69,7 +74,8 @@ export const Watch = z.strictObject({ token: text, changed: z.boolean() });
 
 export type Watch = z.infer<typeof Watch>;
 
-export type Question = { readonly text: string; readonly options?: readonly string[] };
+/** `detail` rides folded on the thread, for agents; the owner reads `text` alone. */
+export type Question = { readonly text: string; readonly options?: readonly string[]; readonly detail?: string };
 
 export type Answer = { readonly text: string; readonly option?: string };
 

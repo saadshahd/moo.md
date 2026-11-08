@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 import pRetry from "p-retry";
 import { z } from "zod";
 import {
-	ADAPTER_API_VERSION,
 	type Item,
 	type Questions,
 	type WorkSource,
@@ -17,9 +16,9 @@ import {
 	push,
 	PushRefused,
 } from "../adapters/git.ts";
+import { type CommitLanded, landOwnerCommit } from "../adapters/owner-commit.ts";
 import { changeOf, historiesOf, readHistory } from "../adapters/history.ts";
 import { markDone } from "../adapters/item-file.ts";
-import { onceCalls } from "../adapters/once.ts";
 import {
 	type BranchRules,
 	methodFor,
@@ -49,7 +48,9 @@ import {
 } from "../decide/risk.ts";
 import type { State } from "../state/open.ts";
 import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
+import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import { runChecks } from "./checks.ts";
+import { queueQuestion, releaseQuestions } from "./questions.ts";
 import type { ThinResult } from "./thin-path.ts";
 
 const SHORT_EXCERPT = 200;
@@ -170,22 +171,11 @@ const answeredLevel = (
 			levels.includes(entry.option),
 	)?.option;
 
-const askUnclear = async (
-	{ state, workSource, questions, id, config }: LandContext,
-	unclear: readonly string[],
-): Promise<void> => {
+const askUnclear = async (ctx: LandContext, unclear: readonly string[]): Promise<void> => {
 	const globs = [...new Set(unclear.map(ruleGlobFor))];
 
-	const calls = onceCalls(
-		{ apiVersion: ADAPTER_API_VERSION, workSource, questions },
-		state.ops,
-		{ run: "unclear", attempt: 0 },
-	);
-
-	await calls.questions?.ask(id, {
-		text: `${globs.join(", ")} match no path rule. Which level do they belong to?`,
-		options: levelNames(config),
-	});
+	queueQuestion(ctx, ctx.item, { text: PLAIN_QUESTIONS.level, options: levelNames(ctx.config), detail: `${globs.join(", ")} match no path rule.` }, "level");
+	await releaseQuestions(ctx);
 };
 
 const RawPaths = z.looseObject({ paths: z.array(z.unknown()).default([]) });
@@ -195,7 +185,7 @@ const learnRules = async (
 	ctx: LandContext,
 	unclear: readonly string[],
 	level: string,
-): Promise<void> => {
+): Promise<CommitLanded> => {
 	const { state, config, id, base, remote, now } = ctx;
 	const globs = [...new Set(unclear.map(ruleGlobFor))];
 	const scratch = mkdtempSync(join(tmpdir(), "hum-rule-"));
@@ -230,15 +220,29 @@ const learnRules = async (
 			`The owner answered on item ${id}.`,
 		]);
 
-		if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "conflict")
+		const commit = (await git.raw(["rev-parse", "HEAD"])).trim();
+
+		const landed = await landOwnerCommit({
+			sha: commit,
+			base,
+			label: id,
+			title: `hum: ${globs.join(", ")} at level ${level}`,
+			body: `The owner answered on item ${id}: ${globs.join(", ")} at level ${level}.`,
+			branchPrefix: config.hum.ownerBranchPrefix,
+			mergeMethod: config.hum.mergeMethod,
+			pulls: ctx.pulls,
+			push: (refspecs) => push(git, ["origin", ...refspecs]),
+		});
+
+		if (landed.via === "conflict")
 			throw new Error(
 				`another push moved ${base} before the path rule for ${id} landed`,
 			);
 
-		const commit = (await git.raw(["rev-parse", "HEAD"])).trim();
-
 		for (const glob of globs)
-			state.learned.put(glob, { glob, level, item: id, commit, at: now() });
+			state.learned.put(glob, { glob, level, item: id, commit, pull: landed.via === "pull-request" ? landed.pull.url : undefined, at: now() });
+
+		return landed;
 	} finally {
 		rmSync(scratch, { recursive: true, force: true });
 	}

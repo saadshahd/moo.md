@@ -194,6 +194,34 @@ test("a change to a path no rule places runs, waits unmerged and asks one questi
 	expect(await questionsOn(w, next)).toEqual([]);
 });
 
+test("where the base needs a pull request, the answer's path rule travels in one, and a rerun waits on it without a second", async () => {
+	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
+	const github = new FakePulls();
+	const pulls = github.client();
+
+	w.repo.put(".hum/hum.json", OWNER_CONFIG);
+
+	const id = w.repo.seed("Write the note");
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.options({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+
+	await w.adapter.answers!.answer(id, { text: "low", option: "low" });
+	w.state.parked.remove(id);
+
+	const landing = await runThinPath(w.options({ pulls, itemId: id }));
+	const rulePull = github.pulls.find((pull) => pull.head.startsWith(SHIPPED_DEFAULTS.ownerBranchPrefix));
+
+	expect(landing).toMatchObject({ outcome: "landing", item: id });
+	expect(rulePull).toMatchObject({ base: "main", autoMerge: true });
+	expect(w.state.learned.get("src/**")?.pull).toContain("/pull/");
+	expect(JSON.parse(sh(w.repo.remote, ["show", "main:.hum/hum.json"])).paths).toEqual([{ glob: "docs/**", level: "low" }]);
+
+	w.state.parked.remove(id);
+	expect(await runThinPath(w.options({ pulls, itemId: id }))).toEqual(landing);
+	expect(github.pulls.filter((pull) => pull.head.startsWith(SHIPPED_DEFAULTS.ownerBranchPrefix))).toHaveLength(1);
+});
+
 test("a run that needs the owner pushes its branch, asks, and ends; the answer starts a fresh run on that branch", async () => {
 	const w = await world(
 		{
@@ -238,6 +266,18 @@ test("a run that needs the owner pushes its branch, asks, and ends; the answer s
 	expect(sh(w.repo.remote, ["show", "main:docs/part-one.md"])).toBe("one\n");
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("two\n");
 	expect(w.repo.show(id)).toContain("state: done");
+});
+
+test("a run that says a secret is missing asks about it only when the runner lacks the variable; otherwise the owner gets the plain question", async () => {
+	const needs = (variable: string) => ({ commit: { "docs/part.md": "one\n" }, structured: { status: "needs-owner", question: "Is it set?", plan: "Publish.", reason: { kind: "missing-secret", variable } } });
+	const w = await world({ script: [{}, needs("NPM_TOKEN"), needs("PATH")] });
+	const lacking = w.repo.seed("Publish the note");
+
+	expect(await runThinPath(w.options({ runnerVariables: new Set(["PATH"]) }))).toMatchObject({ outcome: "asked", item: lacking, detail: "Can you set NPM_TOKEN for the runner?" });
+
+	const present = w.repo.seed("Publish the other note");
+
+	expect(await runThinPath(w.options({ itemId: present, runnerVariables: new Set(["PATH"]) }))).toMatchObject({ outcome: "asked", item: present, detail: "Is it set?" });
 });
 
 test("a claim another worker holds is lost, and no run starts", async () => {
@@ -384,6 +424,21 @@ test("a medium change waits for a fresh review run at landing: a request for cha
 
 	expect(await runThinPath(w.options({ itemId: merged }))).toEqual({ outcome: "merged", item: merged });
 	expect(w.shim.decisions().map((d) => [d.purpose, d.answer.event])).toEqual([["review", "request-changes"], ["review", "approve"]]);
+});
+
+test("a review run at landing counts toward the item's total, and one that passes the kind's cap holds the change for the owner", async () => {
+	const approve = { event: "approve", sure: true, reason: "Fine." };
+
+	const config = configWith((raw) => {
+		raw.hum.paths = [{ glob: "docs/**", level: "medium" }];
+		raw.kinds.docs.tokenCap.tokens = 305;
+	});
+
+	const w = await world({ script: [{}, { ...NOTE, modelTokens: 300 }], decisions: [approve] }, { config });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options())).toMatchObject({ outcome: "review", item: id, detail: expect.stringContaining("the review run passed the item's token cap (305)") });
+	expect(w.state.spent.get(id)?.total).toBeGreaterThan(305);
 });
 
 test("a plan run that splits its item files each part as a ready item and lands the item as done with no change of its own", async () => {

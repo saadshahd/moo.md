@@ -11,6 +11,8 @@ export const markdownSettings = {
 	identity: SHIPPED_DEFAULTS.commitIdentity,
 	writeRaceRetries: SHIPPED_DEFAULTS.writeRaceRetries,
 	itemReadsAtOnce: SHIPPED_DEFAULTS.itemReadsAtOnce,
+	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,
+	ownerBranchPrefix: SHIPPED_DEFAULTS.ownerBranchPrefix,
 };
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
