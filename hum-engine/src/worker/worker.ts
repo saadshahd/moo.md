@@ -28,6 +28,7 @@ import { measureOf } from "../measure/measure.ts";
 import { measureInputsOf } from "../measure/inputs.ts";
 import { readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
 import { emptyStatus, type Status } from "../status/format.ts";
+import { newestChoices, openQuestions } from "../status/sections.ts";
 import { SECOND_MS } from "../time.ts";
 import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
 import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
@@ -543,6 +544,8 @@ export class Worker {
 				configSchema: SCHEMA_VERSION,
 				latest,
 			},
+			questions: openQuestions(state.questions.list(), state.answers.list()),
+			choices: newestChoices(state.choices.list(), config.hum.choicesShown),
 			cards: state.faults.list(),
 			inFlight: [...this.#inFlight].map(([item, run]) => ({
 				item,

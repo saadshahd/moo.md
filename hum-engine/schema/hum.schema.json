@@ -413,6 +413,13 @@
 			"maximum": 9007199254740991,
 			"description": "Merged changes the status file lists."
 		},
+		"choicesShown": {
+			"default": 50,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Choices made without the owner that the status file lists, newest first."
+		},
 		"statusReadTimeoutSeconds": {
 			"default": 10,
 			"type": "integer",

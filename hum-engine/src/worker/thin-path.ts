@@ -467,6 +467,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: d.workSource, questions: d.questions }, state.ops, { run: "decide", attempt: state.runs.list(id).length });
 
 		await calls.questions?.decide(id, text);
+		state.choices.put(`${id}@${text}`, { item: id, text, at: (d.now ?? Date.now)() });
 
 		return { chose: text };
 	};

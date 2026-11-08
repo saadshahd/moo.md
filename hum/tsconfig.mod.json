@@ -1,0 +1,5 @@
+{
+  "extends": "./.claude-plugin/types/tsconfig.json",
+  "compilerOptions": { "allowImportingTsExtensions": true },
+  "include": [".claude-plugin/types", "mod", "types", "hooks", "../hum-engine/src/config/git-ref-name.d.ts"]
+}

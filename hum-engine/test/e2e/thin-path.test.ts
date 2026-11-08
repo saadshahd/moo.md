@@ -563,3 +563,13 @@ test("a review that leaves the change to the owner asks; the owner's approval la
 	expect(await runThinPath(w.options({ judge: featureJudge, itemId: rejected }))).toEqual({ outcome: "merged", item: rejected });
 	expect(readFileSync(fixStdin, "utf8")).toContain("Make it softer.");
 });
+
+test("a cheap choice a run reports is made without the owner, listed with its time, and the run goes on", async () => {
+	const options = [{ word: "short", paths: ["docs/note.md"] }, { word: "long", paths: ["docs/note.md"] }];
+	const choice = { status: "needs-owner", question: "Short or long?", plan: "Write it.", reason: { kind: "choice", options, default: "short" } };
+	const w = await world({ script: [{}, { commit: { "docs/note.md": "one\n" }, structured: choice }, NOTE] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options())).toEqual({ outcome: "merged", item: id });
+	expect(w.state.choices.list()).toEqual([{ item: id, text: 'Chose "short" over long without you.', at: expect.any(Number) }]);
+});

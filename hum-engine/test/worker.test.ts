@@ -428,3 +428,17 @@ test("a path raised while its change's pull request is armed: the next worker di
 	expect(github.pulls).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
 	expect(w.shim.calls().filter((c) => c.itemId)).toHaveLength(1);
 });
+
+test("the status file lists the open questions and the newest choices from what the engine saved", async () => {
+	const w = await world({}, { settings: { choicesShown: 1 } });
+
+	w.state.questions.put("a@1", { item: "a", text: "Which title?", priority: 0, queuedAt: NOW - 2, askedAt: NOW - 1 });
+	w.state.choices.put("b@old", { item: "b", text: "old", at: 3 });
+	w.state.choices.put("b@new", { item: "b", text: "new", at: 4 });
+	await w.worker.tick();
+
+	const status = readStatus(w.state.statusPath);
+
+	expect(status.ok && status.status.questions).toEqual([{ item: "a", text: "Which title?", since: NOW - 1 }]);
+	expect(status.ok && status.status.choices).toEqual([{ item: "b", text: "new", at: 4 }]);
+});

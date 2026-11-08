@@ -129,6 +129,7 @@
 		"maxSeconds": 30
 	},
 	"mergedShown": 50,
+	"choicesShown": 50,
 	"statusReadTimeoutSeconds": 10,
 	"mergeTries": 3,
 	"writeRaceRetries": 7,

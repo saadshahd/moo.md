@@ -7,5 +7,22 @@
     "name": "Saad Shahd",
     "url": "https://saadshahd.github.io"
   },
-  "dependencies": ["hope@moo.md"]
+  "dependencies": ["hope@moo.md"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "pollSeconds": {
+      "type": "number",
+      "title": "Status poll",
+      "description": "Seconds between looks at the status file. The view redraws only when the file changed or a shown age changed.",
+      "default": 1,
+      "min": 1
+    },
+    "amberAfterSeconds": {
+      "type": "number",
+      "title": "Amber after",
+      "description": "Seconds after which a worker's age turns amber. The Mac worker writes the file once per tick.",
+      "default": 15,
+      "min": 1
+    }
+  }
 }

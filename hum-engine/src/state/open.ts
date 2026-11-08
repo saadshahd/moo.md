@@ -5,6 +5,7 @@ import { EventLog } from "./events.ts";
 import { Faults } from "./faults.ts";
 import { type Codec, Items } from "./items.ts";
 import { Break, Merge, PossibleRepeat, Proof, RepeatGroup, ReviewNote } from "../loop/records.ts";
+import { Choice } from "../status/format.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
@@ -57,6 +58,8 @@ export const openState = (dir: string, { now = Date.now, ...codec }: StateOption
 		verdicts: new Records(join(dir, "verdicts"), Verdict),
 		/** Questions by item, waiting for room under the daily cap or asked within the day. */
 		questions: new Records(join(dir, "questions"), QueuedQuestion),
+		/** Choices made without the owner, by item and time. */
+		choices: new Records(join(dir, "choices"), Choice),
 		/** Each answer's disposition, by item and ordinal. */
 		answers: new Records(join(dir, "answers"), SettledAnswer),
 		/** Review notes, by source and source id. */

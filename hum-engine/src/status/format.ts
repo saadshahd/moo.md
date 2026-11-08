@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { SCHEMA_VERSION } from "../config/schema.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
+import { STATUS_FORMAT } from "./version.ts";
 
-/** The status file's shape version. The view reads exactly this; a change here is public surface. */
-export const STATUS_FORMAT = 1;
+export { STATUS_FORMAT };
 
 const name = z.string().min(1);
 
@@ -39,11 +39,15 @@ export const InFlight = Row.extend({ unclear: z.boolean() });
 /** A question to the owner; the status file carries its text. */
 export const Question = z.strictObject({ item: name, text: name, since: time });
 
+export type Question = z.infer<typeof Question>;
+
 export const Merged = z.strictObject({ item: name, title: name, level: name.optional(), mergedAt: time });
 
 export const Choice = z.strictObject({ item: name, text: name, at: time });
 
 /** A path rule the owner's answer added, with the command that takes it back. */
+export type Choice = z.infer<typeof Choice>;
+
 export const LearnedRule = z.strictObject({ glob: name, level: name, item: name, at: time, undo: Action });
 
 const PerMerge = z.strictObject({
