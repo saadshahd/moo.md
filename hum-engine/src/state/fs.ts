@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
 import { Json } from "../config/json.ts";
@@ -12,7 +12,7 @@ const SLUG_LENGTH = 32;
 /** A file name for any string: the same string always names the same file, and no string escapes its folder. */
 export const slug = (text: string): string => createHash("sha256").update(text).digest("hex").slice(0, SLUG_LENGTH);
 
-const hasCode = (cause: unknown, code: string): boolean => cause instanceof Error && "code" in cause && cause.code === code;
+export const hasCode = (cause: unknown, code: string): boolean => cause instanceof Error && "code" in cause && cause.code === code;
 
 /** True when the error says the file or folder is not there. */
 export const isMissing = (cause: unknown): boolean => hasCode(cause, "ENOENT");
@@ -84,3 +84,17 @@ export const listFiles = (folder: string): string[] =>
 
 /** The record files in a folder, without the half-written temp files a crash leaves beside them. */
 export const listRecords = (folder: string): string[] => listFiles(folder).filter((file) => file.endsWith(RECORD_EXTENSION));
+
+/**
+ * Puts a new file holding `data` into `folder` whole: it is written beside the folder and renamed in, so a reader
+ * that lists the folder and removes what it read never meets a part, nor a temp file of the write.
+ */
+export const dropInto = (folder: string, data: string): void => {
+	const name = randomUUID();
+	const staged = join(`${folder}.staged`, name);
+
+	atomicWrite(staged, data);
+	mkdirSync(folder, { recursive: true });
+	renameSync(staged, join(folder, name));
+	syncFolder(folder);
+};

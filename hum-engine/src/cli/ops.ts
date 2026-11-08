@@ -1,5 +1,4 @@
 import { Command, CommanderError, Option } from "commander";
-import { join } from "node:path";
 import { x } from "tinyexec";
 import { z } from "zod";
 import { type ClaimResult, type Item, type ItemRef, PermanentError, Watch } from "../adapter-api.ts";
@@ -7,11 +6,12 @@ import { pushArgs } from "../adapters/git.ts";
 import { resolveAdapters, type Slot } from "../adapters/registry.ts";
 import { readSettings } from "../config/settings.ts";
 import { HumConfig } from "../config/schema.ts";
-import { atomicWrite, orMissing, readJson } from "../state/fs.ts";
+import { dropInto } from "../state/fs.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import pkg from "../../package.json" with { type: "json" };
 import { type OpName, commands, type Flag, opSpecs } from "./commands.ts";
 import { addServiceCommands } from "./service.ts";
+import { sharedWatch } from "./shared-watch.ts";
 import { SECOND_MS } from "../time.ts";
 
 type Printable = ItemRef[] | ItemRef | Item | ClaimResult | Watch | { readonly ok: true };
@@ -27,9 +27,13 @@ const EXIT_MISUSED = 2;
 
 const OK = { ok: true } as const;
 
-const CliSettings = z.looseObject({ claimExpirySeconds: HumConfig.shape.claimExpirySeconds });
+const CliSettings = z.looseObject({
+	claimExpirySeconds: HumConfig.shape.claimExpirySeconds,
+	watchCacheSeconds: HumConfig.shape.watchCacheSeconds,
+	watchLockSeconds: HumConfig.shape.watchLockSeconds,
+});
 
-const SavedWatch = z.object({ token: z.string() });
+type CliSettings = z.infer<typeof CliSettings>;
 
 type Flags = { ttl?: number; renew?: boolean; option?: string | string[]; since?: string; body?: string };
 
@@ -46,7 +50,9 @@ type Call = {
 	readonly flags: Flags;
 	readonly options: readonly string[];
 	readonly stateDir: string;
-	readonly claimExpirySeconds: number;
+	/** The folder the worker reads item ids from at once. */
+	readonly inbox: string;
+	readonly settings: CliSettings;
 	/** The integration role of a slot; throws when none is set up. */
 	readonly slot: <T>(name: Slot, role: (adapter: NonNullable<Adapters[Slot]>) => T | undefined) => T;
 };
@@ -59,29 +65,36 @@ const performed = async (action: Promise<void>): Promise<Printable> => {
 
 type Handler = (call: Call) => Promise<Printable>;
 
-const watchFile = (stateDir: string): string => join(stateDir, "watch.json");
-
-/** The token the last `hum watch` saw; none on the first call. */
-const savedToken = (stateDir: string): string | undefined => orMissing(() => SavedWatch.parse(readJson(watchFile(stateDir))).token, undefined);
-
 const handlers = {
 	"list-ready": ({ slot }) => slot("work-source", (a) => a.workSource).listReady(),
-	claim: ({ slot, item, second: holder, flags, claimExpirySeconds }) => {
+	claim: ({ slot, item, second: holder, flags, settings }) => {
 		const source = slot("work-source", (a) => a.workSource);
-		const ttlMs = (flags.ttl ?? claimExpirySeconds) * SECOND_MS;
+		const ttlMs = (flags.ttl ?? settings.claimExpirySeconds) * SECOND_MS;
 
 		return (flags.renew ? source.renew : source.claim)(item, holder, ttlMs);
 	},
 	read: ({ slot, item }) => slot("work-source", (a) => a.workSource).read(item),
 	comment: ({ slot, item, text }) => performed(slot("work-source", (a) => a.workSource).comment(item, text)),
 	ask: ({ slot, item, text, options }) => performed(slot("questions", (a) => a.questions).ask(item, { text: text, options: options.length > 0 ? options : undefined })),
-	answer: ({ slot, item, text, options }) => performed(slot("answers", (a) => a.answers).answer(item, { text: text, option: options[0] })),
-	watch: async ({ slot, stateDir, flags }) => {
-		const result = Watch.parse(await slot("answers", (a) => a.answers).watch(flags.since ?? savedToken(stateDir)));
+	answer: async ({ slot, item, text, options, inbox }) => {
+		await slot("answers", (a) => a.answers).answer(item, { text, option: options[0] });
+		dropInto(inbox, item);
 
-		atomicWrite(watchFile(stateDir), `${JSON.stringify({ token: result.token })}\n`);
+		return OK;
+	},
+	watch: ({ slot, stateDir, inbox, flags, settings }) => {
+		const answers = slot("answers", (a) => a.answers);
 
-		return result;
+		if (flags.since !== undefined) return answers.watch(flags.since).then((found) => Watch.parse(found));
+
+		return sharedWatch({
+			stateDir,
+			now: Date.now,
+			cacheMs: settings.watchCacheSeconds * SECOND_MS,
+			lockMs: settings.watchLockSeconds * SECOND_MS,
+			read: async (since) => Watch.parse(await answers.watch(since)),
+			changed: () => dropInto(inbox, ""),
+		});
 	},
 	"file-follow-up": ({ slot, item, second, flags }) => slot("work-source", (a) => a.workSource).fileFollowUp(item, { title: second, body: flags.body ?? "" }),
 	decide: ({ slot, item, text }) => performed(slot("questions", (a) => a.questions).decide(item, text)),
@@ -92,7 +105,7 @@ const handlers = {
 const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Promise<Call> => {
 	const stateDir = await defaultStateDir(io.cwd);
 	const state = openState(stateDir);
-	const { claimExpirySeconds } = readSettings(io.cwd, CliSettings);
+	const settings = readSettings(io.cwd, CliSettings);
 
 	const adapters = await resolveAdapters(io.cwd, {
 		faults: state.faults,
@@ -109,7 +122,8 @@ const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Pro
 		flags,
 		options: [flags.option ?? []].flat(),
 		stateDir,
-		claimExpirySeconds,
+		inbox: state.inbox,
+		settings,
 		slot: (name, role) => {
 			const adapter = adapters[name];
 			const found = adapter && role(adapter);

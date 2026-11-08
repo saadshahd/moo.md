@@ -110,6 +110,8 @@
 	"drainTimeoutSeconds": 300,
 	"claimExpirySeconds": 900,
 	"latestVersionCacheSeconds": 21600,
+	"watchCacheSeconds": 10,
+	"watchLockSeconds": 30,
 	"maxFixRuns": 3,
 	"serviceLabel": "md.moo.hum",
 	"maxCrashes": 5,

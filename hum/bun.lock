@@ -7,6 +7,7 @@
       "dependencies": {
         "semver": "7.8.6",
         "string-width": "8.3.0",
+        "xstate": "6.0.0-beta.0",
       },
       "devDependencies": {
         "@oxlint/plugins": "1.89.0",
@@ -81,5 +82,7 @@
     "typescript": ["typescript@5.9.2", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A=="],
 
     "undici-types": ["undici-types@8.9.0", "", {}, "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg=="],
+
+    "xstate": ["xstate@6.0.0-beta.0", "", { "bin": { "xstate": "./bin/xstate.js" } }, "sha512-u4pOGtFwkuoFCBUUWwUK3xbjLk/S8u/Ftxg2Ky0stk7Bo7D0z8ypw5fcBtIuzGPTjDGYNEchfItPOQyy9W54xg=="],
   }
 }

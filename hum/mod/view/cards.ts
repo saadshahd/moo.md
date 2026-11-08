@@ -1,4 +1,5 @@
 import type { Card, Question } from "../../../hum-engine/src/status/format.ts";
+import { buttonWords } from "../answer/fill.ts";
 import { ageSeconds, ageText } from "./freshness.ts";
 import { button, buttonRows } from "./buttons.ts";
 import { cells, ellipsize, wrap } from "./cells.ts";
@@ -25,10 +26,14 @@ const titleRule = (parts: readonly string[], width: number): Row => {
 
 const paragraph = (text: string, width: number, tone: Tone): Row[] => wrap(text, width).map((line) => [span(line, tone)]);
 
-/** A question card: the question is never cut, only wrapped. */
-export const questionCardRows = ({ item, text, since }: Question, now: number, width: number): Row[] => [
+/** A question card: the question is never cut, only wrapped; each button fills the prompt with an answer to finish. */
+export const questionCardRows = ({ item, text, options, since }: Question, now: number, width: number): Row[] => [
 	titleRule([displayId(item), ageText(ageSeconds(since, now))], width),
 	...paragraph(text, width, "plain"),
+	...buttonRows(
+		buttonWords({ options }).map((word, index) => button(word, { kind: "fill", item, word }, index === 0)),
+		width,
+	),
 ];
 
 const KIND_WORD: Readonly<Record<Card["kind"], string>> = { waiting: "waiting", limited: "limited", fault: "fault" };
@@ -38,7 +43,7 @@ export const noticeCardRows = ({ kind, item, code, cause, fix, action, since }: 
 	titleRule([displayId(item ?? code), KIND_WORD[kind], ageText(ageSeconds(since, now))], width),
 	...paragraph(cause, width, "plain"),
 	...paragraph(fix, width, "dim"),
-	...(action === undefined ? [] : buttonRows([button(action.label, { kind: "run", command: action.command }, true)], width)),
+	...(action === undefined || item === undefined ? [] : buttonRows([button(action.label, { kind: "fill", item, word: action.answer }, true)], width)),
 ];
 
 export const blankRow = (): Row => [span(" ", "plain")];

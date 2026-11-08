@@ -874,7 +874,7 @@ export const park = (o: Pick<ThinPathOptions, "state" | "now">, result: ThinResu
 		item: result.item,
 		cause: rule.cause(result.item, cause.slice(0, CARD_EXCERPT)),
 		fix: rule.fix,
-		action: { label: rule.action.label, command: `hum answer ${result.item} ${rule.action.answer}` },
+		action: rule.action,
 	});
 
 	return result;

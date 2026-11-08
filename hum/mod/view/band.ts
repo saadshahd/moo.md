@@ -1,11 +1,21 @@
+import type { Unread } from "../../types";
 import { cells, ellipsize, rowCells, spaces } from "./cells.ts";
+import { ageSeconds, ageText, isAmber } from "./freshness.ts";
 import { SEPARATOR } from "./glyphs.ts";
 import { RUNNERS, runnerPart } from "./ages.ts";
 import { type Row, type Span, span } from "./row.ts";
 import { statusWords } from "./summary.ts";
 import type { ViewRead } from "./read.ts";
 
-export type BandInput = { readonly read: ViewRead; readonly now: number; readonly amberAfterSeconds: number; readonly width: number };
+export type BandInput = {
+	readonly read: ViewRead;
+	readonly now: number;
+	readonly amberAfterSeconds: number;
+	readonly width: number;
+	/** The item whose thread Enter posts on, while answer mode is on. */
+	readonly answering?: string;
+	readonly unread?: Unread;
+};
 
 const NAME = "hum";
 const CONTROL = "open";
@@ -25,19 +35,32 @@ const shown = (parts: Parts, dropped: number): Span[] => {
 	return joined([...keep("name"), parts.status, ...keep("mac"), ...keep("ci"), ...keep("version")]);
 };
 
-const partsOf = ({ read, now, amberAfterSeconds }: BandInput): Parts => {
+/** What the status part says: answer mode first, then a read that keeps failing, then the engine's state. */
+const statusPart = ({ read, now, amberAfterSeconds, answering, unread }: BandInput): Span => {
+	if (answering !== undefined) return span(`Enter posts on ${answering}, not Claude`, "strong");
+
+	const unreadFor = unread === undefined ? 0 : ageSeconds(unread.since, now);
+
+	if (unread !== undefined && isAmber(unreadFor, amberAfterSeconds)) return span(`unread ${ageText(unreadFor)}${SEPARATOR}${unread.cause}`, "amber");
+
+	if (read.kind !== "status") return span(statusWords(read), "amber");
+
+	return span(statusWords(read), read.status.questions.length > 0 ? "strong" : "plain");
+};
+
+const partsOf = (input: BandInput): Parts => {
+	const { read, now, amberAfterSeconds } = input;
 	const name = span(NAME, "strong");
+	const status = statusPart(input);
 
-	if (read.kind !== "status") return { name, status: span(statusWords(read), "amber") };
-
-	const { status } = read;
+	if (read.kind !== "status") return { name, status };
 
 	return {
 		name,
-		status: span(statusWords(read), status.questions.length > 0 ? "strong" : "plain"),
-		mac: runnerPart(status, RUNNERS[0], now, amberAfterSeconds),
-		ci: runnerPart(status, RUNNERS[1], now, amberAfterSeconds),
-		version: span(status.engine.version, "dim"),
+		status,
+		mac: runnerPart(read.status, RUNNERS[0], now, amberAfterSeconds),
+		ci: runnerPart(read.status, RUNNERS[1], now, amberAfterSeconds),
+		version: span(read.status.engine.version, "dim"),
 	};
 };
 

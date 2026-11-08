@@ -1,13 +1,15 @@
 import type { EngineInterface, Register } from "claude-code";
 import { atom, read, update } from "claude-code";
+import { guardAnswer } from "./answer/guard.ts";
+import { answeringLabel, changedBox, editedBox, fillAnswer, isAnswering, restartAnswer, submitted } from "./answer/mode.ts";
 import { drawRows } from "./draw.tsx";
-import { type PressContext, openPane, runAction } from "./press.ts";
+import { type PressContext, openPane } from "./press.ts";
 import { viewSettings } from "./settings.ts";
 import { bandRow } from "./view/band.ts";
 import { paneRows } from "./view/pane.ts";
 import { readOf } from "./view/read.ts";
 import type { Press } from "./view/row.ts";
-import { locate, newWatch, poll } from "./watch.ts";
+import { locate, newWatch, poll, repoRoot, watchOnce } from "./watch.ts";
 
 const MS = 1000;
 const PANE = "hum";
@@ -16,25 +18,38 @@ const PANE = "hum";
 const source = atom({ plugin: "hum", key: "source" } as const, { kind: "waiting" }, { shape: "source-1" });
 
 const unfolded = atom({ plugin: "hum", key: "unfolded" } as const, [], { shape: "unfolded-1" });
+
+const unread = atom({ plugin: "hum", key: "unread" } as const, null, { shape: "unread-1" });
 /* oxlint-enable anti-slop/no-shape-in-symbol-names */
 
 const toggled = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter((one) => one !== id) : [...ids, id]);
 
 const pressed = ($: EngineInterface, context: PressContext) => async (press: Press): Promise<void> => {
-	if (press.kind === "fold") {
-		await update($, unfolded, (ids) => toggled(ids, press.id));
-	} else if (press.kind === "run") await runAction($, press.command);
-	else await openPane($, PANE, context);
+	switch (press.kind) {
+		case "fold":
+			await update($, unfolded, (ids) => toggled(ids, press.id));
+			break;
+		case "fill":
+			await fillAnswer($, press.item, press.word);
+			break;
+		case "open":
+			await openPane($, PANE, context);
+	}
 };
 
+/** A failure outside answer mode shows once and the event passes on. */
+const showOnce = ($: EngineInterface) => (error: Error): void => $.ui.toast(`hum: ${error.message}`);
+
 export const register: Register = (on, options) => {
-	const { pollSeconds, amberAfterSeconds } = viewSettings(options);
+	const { pollSeconds, amberAfterSeconds, watchSeconds } = viewSettings(options);
 	const watch = newWatch();
 
 	on("session.start", async ($, e, next) => {
 		if (!e.isInteractive) return next(e);
 
+		await restartAnswer($);
 		watch.path = await locate($, e.cwd);
+		watch.root = await repoRoot($, e.cwd);
 
 		const look = async (): Promise<void> => {
 			const found = await poll($, watch, amberAfterSeconds);
@@ -42,8 +57,40 @@ export const register: Register = (on, options) => {
 			if (found !== undefined) await update($, source, () => found);
 		};
 
-		await look();
+		const ask = async (): Promise<void> => {
+			const cause = await watchOnce($, watch.root);
+			const now = await $.clock.now();
+
+			await update($, unread, (before) => (cause === undefined ? null : { cause, since: before?.since ?? now }));
+		};
+
+		await Promise.all([look(), ask()]);
 		$.clock.every(pollSeconds * MS, () => void look());
+		$.clock.every(watchSeconds * MS, () => void ask());
+
+		return next(e);
+	});
+
+	on("prompt.submit", ($, e, next) =>
+		guardAnswer({
+			isAnswering: () => isAnswering($),
+			decide: () => submitted($, watch.root, e.origin.kind, e.text),
+			pass: () => next(e),
+			drop: (reason) => ({ drop: reason }),
+			show: (message) => $.ui.toast(message),
+		}),
+	);
+
+	on("prompt.edit", async ($, e, next) => {
+		const box = await next(e);
+
+		await editedBox($, box.text).catch(showOnce($));
+
+		return box;
+	});
+
+	on("prompt.change", async ($, e, next) => {
+		await changedBox($, e.origin.kind, e.text).catch(showOnce($));
 
 		return next(e);
 	});
@@ -54,7 +101,16 @@ export const register: Register = (on, options) => {
 		if (e.props.hasSurvey) return below;
 
 		const view = readOf(await read($, source));
-		const row = bandRow({ read: view, now: await $.clock.now(), amberAfterSeconds, width: e.props.bodyColumns });
+
+		const row = bandRow({
+			read: view,
+			now: await $.clock.now(),
+			amberAfterSeconds,
+			width: e.props.bodyColumns,
+			answering: await answeringLabel($),
+			unread: (await read($, unread)) ?? undefined,
+		});
+
 		const tags = $.ui.resolve(e);
 		const { Box } = tags;
 
@@ -71,6 +127,7 @@ export const register: Register = (on, options) => {
 	on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
 		const view = readOf(await read($, source));
 		const rows = paneRows({ read: view, now: await $.clock.now(), amberAfterSeconds, width: e.props.bodyColumns, unfolded: new Set(await read($, unfolded)) });
+
 
 		return drawRows($.ui.resolve(e), rows, pressed($, { width: e.props.bodyColumns, amberAfterSeconds, read: view }));
 	});

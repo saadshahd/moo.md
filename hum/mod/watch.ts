@@ -2,12 +2,15 @@ import type { EngineInterface } from "claude-code";
 import type { ViewSource } from "../types";
 import { agesShown } from "./view/ages.ts";
 import { type ViewRead, statusPathOf } from "./view/read.ts";
+import { failureOf, runHum } from "./press.ts";
 
 type Engine = EngineInterface;
 
 /** What one session's poller remembers between looks. A reload starts it over, which costs one extra read. */
 export type Watch = {
 	path: string;
+	/** The repo's root, where its pinned hum lives. */
+	root: string;
 	lastModified: number;
 	lastRead: ViewRead;
 	lastShown: string;
@@ -15,7 +18,7 @@ export type Watch = {
 
 const NEVER = -1;
 
-export const newWatch = (): Watch => ({ path: "", lastModified: NEVER, lastRead: { kind: "waiting" }, lastShown: "" });
+export const newWatch = (): Watch => ({ path: "", root: "", lastModified: NEVER, lastRead: { kind: "waiting" }, lastShown: "" });
 
 /** The engine rejects a missing path with the code at the end of the message, not on a `code` field. */
 const isMissing = (error: Error): boolean => error.message.endsWith("ENOENT");
@@ -62,4 +65,20 @@ export async function poll($: Engine, watch: Watch, amberAfterSeconds: number): 
 	}
 
 	return undefined;
+}
+
+/** The repo's root, where its pinned hum lives. */
+export async function repoRoot($: Engine, cwd: string): Promise<string> {
+	const found = await $.process.run(["git", "rev-parse", "--show-toplevel"], { cwd });
+
+	if (found.exitCode !== 0) throw new Error(`${cwd} is not inside a git repository`);
+
+	return found.stdout.trim();
+}
+
+/** Asks the repo's hum once whether anything changed; the engine shares one read among every session. Answers the failure's cause, or nothing when the read went through. */
+export async function watchOnce($: Engine, root: string): Promise<string | undefined> {
+	const ran = await runHum($, root, ["watch"]).catch((error: Error) => ({ exitCode: -1, stderr: error.message }));
+
+	return ran.exitCode === 0 ? undefined : failureOf(ran);
 }

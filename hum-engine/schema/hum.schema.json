@@ -294,6 +294,20 @@
 			"maximum": 9007199254740991,
 			"description": "How long the newest published engine version is kept before it is read again."
 		},
+		"watchCacheSeconds": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long one read of what changed serves every `hum watch` in the repo before the next one reads again."
+		},
+		"watchLockSeconds": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long the lock of the one `hum watch` that reads stays held before another may take it over."
+		},
 		"maxFixRuns": {
 			"default": 3,
 			"type": "integer",

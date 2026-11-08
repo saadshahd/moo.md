@@ -1,22 +1,21 @@
-import type { EngineInterface } from "claude-code";
+import type { EngineInterface, ProcessRunResult } from "claude-code";
 import { openingRows } from "./view/pane.ts";
 import type { ViewRead } from "./view/read.ts";
 
 type Engine = EngineInterface;
 
 const PANE_TITLE = "hum";
-const REPO_ENGINE = "./node_modules/.bin/hum";
+const REPO_ENGINE = "node_modules/.bin/hum";
 
 export type PressContext = { readonly width: number; readonly amberAfterSeconds: number; readonly read: ViewRead };
 
-
-/** A card's action runs the repo's pinned hum, never the plugin's copy, because the two update apart. */
-export async function runAction($: Engine, command: string): Promise<void> {
-	const [, ...args] = command.split(" ");
-	const ran = await $.process.run([REPO_ENGINE, ...args]);
-
-	if (ran.exitCode !== 0) $.ui.toast(`${command} failed: ${ran.stderr.trim()}`);
+/** Runs the repo's pinned hum at the repo's root, never the plugin's copy, because the two update apart. */
+export async function runHum($: Engine, root: string, args: readonly string[]): Promise<ProcessRunResult> {
+	return $.process.run([`${root}/${REPO_ENGINE}`, ...args], { cwd: root });
 }
+
+/** What a failed hum said, without its own `hum <op>:` lead. */
+export const failureOf = (ran: Pick<ProcessRunResult, "exitCode" | "stderr">): string => ran.stderr.trim().replace(/^hum [\w-]+: /, "") || `exited ${ran.exitCode}`;
 
 /** Opens the pane as tall as its header and first card need, so the first card's buttons are in view. */
 export async function openPane($: Engine, pane: string, context: PressContext): Promise<void> {

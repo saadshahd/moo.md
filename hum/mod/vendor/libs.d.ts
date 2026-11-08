@@ -6,3 +6,4 @@
 export { default as isNewer } from "semver/functions/gt.js";
 export { default as stringWidth } from "string-width";
 export { STATUS_FORMAT } from "../../../hum-engine/src/status/version.ts";
+export { createFSM } from "xstate/fsm";

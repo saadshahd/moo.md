@@ -10,8 +10,11 @@ const name = z.string().min(1);
 const ACTION_LABEL_CELLS = 14;
 const time = z.number().int().nonnegative();
 
-/** At most one action. A label is at most 14 cells, the width the view gives it. */
+/** A command the owner may run. A label is at most 14 cells, the width the view gives it. */
 export const Action = z.strictObject({ label: name.max(ACTION_LABEL_CELLS), command: name });
+
+/** A card's action: it fills the prompt with this answer to the card's item, and only the owner's Enter posts it. */
+export const CardAction = z.strictObject({ label: name.max(ACTION_LABEL_CELLS), answer: name });
 
 /** The most characters of a tool's own words a card quotes. */
 export const CARD_EXCERPT = 200;
@@ -25,9 +28,9 @@ export const Card = z.strictObject({
 	code: name,
 	cause: name,
 	fix: name.refine((fix) => !fix.includes("\n"), "the fix is one sentence on one line"),
-	action: Action.optional(),
+	action: CardAction.optional(),
 	since: time,
-});
+}).refine(({ item, action }) => action === undefined || item !== undefined, "a card's action answers its item, so a card with an action names one");
 
 export type Card = z.infer<typeof Card>;
 
@@ -36,8 +39,8 @@ const Row = z.strictObject({ item: name, title: name, level: name.optional(), st
 /** An unclear item carries the mark apart from its risk level. */
 export const InFlight = Row.extend({ unclear: z.boolean() });
 
-/** A question to the owner; the status file carries its text. */
-export const Question = z.strictObject({ item: name, text: name, since: time });
+/** A question to the owner: its text and the option words an answer may pick, none for a free answer. */
+export const Question = z.strictObject({ item: name, text: name, options: z.array(name), since: time });
 
 export type Question = z.infer<typeof Question>;
 

@@ -268,7 +268,7 @@ test("the claim of a run in flight is renewed each tick, and a run whose claim i
 	expect(() => process.kill(pid, 0)).toThrow();
 });
 
-test("an item id in the inbox folder wakes a waiting item at once, with no change in the watch token", async () => {
+test("an item id in the inbox folder wakes a waiting item at once and its question leaves the status file", async () => {
 	const answersAdapter = (real: NonNullable<WorkerWorld["adapter"]["answers"]>) => ({ ...real, watch: async () => ({ token: "same", changed: false }) });
 	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 
@@ -286,6 +286,9 @@ test("an item id in the inbox folder wakes a waiting item at once, with no chang
 	// Nothing says the answer arrived: the watch reports no change.
 	await worker.tick();
 	expect(worker.running()).toEqual([]);
+	const openBefore = readStatus(w.state.statusPath);
+
+	expect(openBefore.ok && openBefore.status.questions.map(({ item }) => item)).toEqual(["a"]);
 
 	mkdirSync(w.state.inbox, { recursive: true });
 	writeFileSync(join(w.state.inbox, "answer-1"), "a\n");
@@ -294,6 +297,9 @@ test("an item id in the inbox folder wakes a waiting item at once, with no chang
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(existsSync(join(w.state.inbox, "answer-1"))).toBe(false);
+	const openAfter = readStatus(w.state.statusPath);
+
+	expect(openAfter.ok && openAfter.status.questions).toEqual([]);
 	// The answer was saved as an event before it was acted on.
 	expect(w.state.events.list("a").map((e) => e.type)).toContain("answered");
 });
@@ -439,6 +445,6 @@ test("the status file lists the open questions and the newest choices from what 
 
 	const status = readStatus(w.state.statusPath);
 
-	expect(status.ok && status.status.questions).toEqual([{ item: "a", text: "Which title?", since: NOW - 1 }]);
+	expect(status.ok && status.status.questions).toEqual([{ item: "a", text: "Which title?", options: [], since: NOW - 1 }]);
 	expect(status.ok && status.status.choices).toEqual([{ item: "b", text: "new", at: 4 }]);
 });

@@ -7,7 +7,7 @@ const answersAfter = (answers: readonly SettledAnswer[], item: string, asked: nu
 /** A question stays open from the moment it is asked until an answer to its item is applied. */
 export const openQuestions = (queued: readonly QueuedQuestion[], answers: readonly SettledAnswer[]): Question[] =>
 	queued
-		.flatMap(({ item, text, askedAt }) => (askedAt !== undefined && !answersAfter(answers, item, askedAt) ? [{ item, text, since: askedAt }] : []))
+		.flatMap(({ item, text, options = [], askedAt }) => (askedAt !== undefined && !answersAfter(answers, item, askedAt) ? [{ item, text, options, since: askedAt }] : []))
 		.sort((a, b) => a.since - b.since);
 
 /** The newest `shown` choices, newest first. */

@@ -65,7 +65,7 @@ export { type BegunRun, RunKey, RunRecord, RunRecords } from "./state/runs.ts";
 
 export { readStatus, type StatusRead, writeStatus } from "./status/file.ts";
 
-export { Action, Card, Choice, emptyStatus, InFlight, Measure, Merged, Question, Status, STATUS_FORMAT } from "./status/format.ts";
+export { Action, Card, CardAction, Choice, emptyStatus, InFlight, Measure, Merged, Question, Status, STATUS_FORMAT } from "./status/format.ts";
 
 export * from "./adapter-api.ts";
 

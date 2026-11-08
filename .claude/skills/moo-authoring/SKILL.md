@@ -77,11 +77,11 @@ A cap counted in lines is a compression budget on a handed-back artifact — rep
 Every hook is a function hook: it reaches the human with no model turn. The API is early access; `plugin-authoring` and `/plugin-types` are the reference for every event and call.
 
 - A hook never starts a turn the human didn't ask for: no wake, no `$.prompt.submit` of its own.
-- What a hook finds waits where the human looks next, the band above the prompt, and appears there only while it holds something. Detail unfolds on a press and folds back.
+- What a hook finds waits where the human looks next, the band above the prompt, and appears there only while it holds something. Detail unfolds on a press and folds back. Exception: a band whose absence would read as "nothing running", as hum's does, is always one row.
 - A hook hands to Claude only on the human's Enter: `$.prompt.fill` a sentence start they finish, with any bulk added as `prompt.submit` context. The one exception is a rule every turn must hold: it rides whichever prompt enters while the conversation lacks it, as `reach.ts` does. Never a `prompt.compose` section: on Team, Enterprise and managed machines, Claude Code's built-in guard skips every installed plugin's hook there.
 - Work longer than one dispatch runs unawaited, so the turn's end is never held.
-- State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files. Module variables hold only what a hot reload may drop: it drops them.
-- A failure shows once, as a toast, and the event passes on.
+- State lives in `$.state` (this session) or `$.store` (across sessions), never in temp files. Module variables hold only what a hot reload may drop: it drops them. Exception: a read every session in a repo would repeat, as hum's work-source watch, runs once per repo and shares its result through a cache file under a lock with an expiry, kept in the repo's own state folder.
+- A failure shows once, as a toast, and the event passes on. Exception: CLAUDE.md's answer-hook rule.
 - A pane or band is verified on events copied from real session transcripts, one per shape it renders; a synthetic event alone never verifies it.
 - One hooks module per plugin; a second part composes into it. A second registration on the same event and matcher in one plugin fails the module's load: give one a matcher, as slop's `prompt.submit` does.
 

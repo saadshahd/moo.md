@@ -2,8 +2,8 @@ export type Tone = "plain" | "dim" | "strong" | "amber";
 
 /** What pressing a span does. */
 export type Press =
-	| { readonly kind: "run"; readonly command: string }
 	| { readonly kind: "fold"; readonly id: string }
+	| { readonly kind: "fill"; readonly item: string; readonly word: string }
 	| { readonly kind: "open" };
 
 export type Span = { readonly text: string; readonly tone: Tone; readonly press?: Press };

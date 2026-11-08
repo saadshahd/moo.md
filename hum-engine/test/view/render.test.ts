@@ -21,6 +21,7 @@ import {
 	statusPathOf,
 	type ViewRead,
 } from "../../../hum/mod/view/read.ts";
+import { STATUS_FORMAT } from "../../src/status/version.ts";
 import type { Row } from "../../../hum/mod/view/row.ts";
 import { span } from "../../../hum/mod/view/row.ts";
 
@@ -133,7 +134,7 @@ test("a question is never cut: every character comes back at every width", () =>
 	for (const text of AWKWARD) {
 		for (const width of WIDTHS) {
 			const rows = questionCardRows(
-				{ item: "68", text, since: NOW - 5_580_000 },
+				{ item: "68", text, options: [], since: NOW - 5_580_000 },
 				NOW,
 				width,
 			);
@@ -141,7 +142,7 @@ test("a question is never cut: every character comes back at every width", () =>
 			for (const row of rows)
 				expect(rowCells(row), `${text} at ${width}`).toBeLessThanOrEqual(width);
 
-			expect(withoutSpaces(rows.slice(1).map(textOf).join(""))).toBe(
+			expect(withoutSpaces(rows.slice(1, -1).map(textOf).join(""))).toBe(
 				withoutSpaces(text),
 			);
 			expect(rows.map(textOf).join("")).not.toContain("…");
@@ -158,7 +159,7 @@ test("a card's title loses parts from the end and keeps its item", () => {
 	expect(title(20)).not.toContain("5 m");
 });
 
-test("a notice card gives the cause, then the fix, then its one action whole, at every width", () => {
+test("a notice card gives the cause, then the fix, then its one action whole, which fills an answer to its item, at every width", () => {
 	for (const card of fullStatus.cards) {
 		for (const width of WIDTHS) {
 			const rows = noticeCardRows(card, NOW, width);
@@ -169,11 +170,11 @@ test("a notice card gives the cause, then the fix, then its one action whole, at
 				);
 
 			const actions = rows.flatMap((row) =>
-				row.filter(({ press }) => press?.kind === "run"),
+				row.filter(({ press }) => press !== undefined),
 			);
 
-			expect(actions.map(({ text }) => text)).toEqual(
-				card.action === undefined ? [] : [`[  ${card.action.label}  ]`],
+			expect(actions.map(({ text, press }) => ({ text, press }))).toEqual(
+				card.action === undefined ? [] : [{ text: `[  ${card.action.label}  ]`, press: { kind: "fill", item: card.item ?? "", word: card.action.answer } }],
 			);
 		}
 	}
@@ -188,7 +189,7 @@ test("buttons are whole, two cells apart and right-aligned; one that does not fi
 	];
 
 	const buttons = labels.map((label) =>
-		button(label, { kind: "run", command: label }, false),
+		button(label, { kind: "fill", item: "68", word: label }, false),
 	);
 
 	for (const width of WIDTHS) {
@@ -357,9 +358,9 @@ test("a redraw is due exactly when a shown age or its colour changes", () => {
 
 test("the status file's format number decides what the view reads", () => {
 	expect(parseStatus(JSON.stringify(fullStatus)).kind).toBe("status");
-	expect(parseStatus(JSON.stringify({ ...fullStatus, format: 2 }))).toEqual({
+	expect(parseStatus(JSON.stringify({ ...fullStatus, format: STATUS_FORMAT + 1 }))).toEqual({
 		kind: "unsupported",
-		format: 2,
+		format: STATUS_FORMAT + 1,
 	});
 	expect(parseStatus("null")).toEqual({ kind: "unsupported", format: "none" });
 	expect(parseStatus("{").kind).toBe("unreadable");

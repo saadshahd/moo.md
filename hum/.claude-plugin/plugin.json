@@ -23,6 +23,13 @@
       "description": "Seconds after which a worker's age turns amber. The Mac worker writes the file once per tick.",
       "default": 15,
       "min": 1
+    },
+    "watchSeconds": {
+      "type": "number",
+      "title": "Watch",
+      "description": "Seconds between asks of the work source whether anything changed. One read serves every session in the repo for the engine's watchCacheSeconds.",
+      "default": 10,
+      "min": 1
     }
   }
 }

@@ -390,7 +390,7 @@ test("a fault card gives the cause, a one-line fix and at most one action; one c
 
 	expect(faults.raise(input)).toBe(faults.raise(input));
 	expect(() => faults.raise({ ...input, code: "y", fix: "one\ntwo" })).toThrow();
-	expect(() => faults.raise({ ...input, code: "z", action: { label: "a label far over fourteen cells", command: "hum x" } })).toThrow();
+	expect(() => faults.raise({ ...input, code: "z", action: { label: "a label far over fourteen cells", answer: "retry" } })).toThrow();
 	expect(openState(dir).faults.list()).toHaveLength(1);
 	faults.clear("x:#1");
 	expect(openState(dir).faults.list()).toEqual([]);

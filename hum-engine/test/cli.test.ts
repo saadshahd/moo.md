@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
@@ -11,6 +11,13 @@ const hum = (cwd: string, ...args: string[]) => {
 	const result = spawnSync("bun", [MAIN, ...args], { cwd, encoding: "utf8" });
 
 	return { code: result.status, out: result.stdout, err: result.stderr };
+};
+
+/** What the worker will read at once: the ids in the inbox folder, the empty wake of a seen change included. */
+const inboxOf = (cwd: string): string[] => {
+	const folder = join(cwd, ".git", "hum", "inbox");
+
+	return readdirSync(folder).map((name) => readFileSync(join(folder, name), "utf8"));
 };
 
 const json = (cwd: string, ...args: string[]) => {
@@ -59,11 +66,14 @@ test("hum list-ready, claim, watch, answer and read work end to end on a temp re
 	expect(json(worker, "claim", id, "you")).toMatchObject({ won: false });
 	expect(json(worker, "list-ready")).toEqual([]);
 
-	expect(json(worker, "watch").changed).toBe(true);
-	expect(json(worker, "watch").changed).toBe(false);
+	const first = json(worker, "watch");
+
+	expect(first.changed).toBe(true);
+	expect(json(worker, "watch")).toEqual(first);
 
 	expect(json(worker, "answer", id, "looks", "good", "--option", "approve")).toEqual({ ok: true });
-	expect(json(worker, "watch").changed).toBe(true);
+	expect(json(worker, "watch", "--since", first.token).changed).toBe(true);
+	expect(inboxOf(worker)).toContain(id);
 	expect(json(worker, "read", id).thread).toMatchObject([{ kind: "answer", text: "looks good", option: "approve" }]);
 });
 

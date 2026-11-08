@@ -8,6 +8,6 @@ if (!path || !count) throw new Error("usage: status-writer.ts <status path> <cou
 for (let at = 1; at <= Number(count); at++) {
 	const status = emptyStatus("0.1.0", at);
 
-	status.questions = Array.from({ length: at % 400 }, (_, index) => ({ item: `#${index}`, text: `question ${index} `.repeat(20), since: at }));
+	status.questions = Array.from({ length: at % 400 }, (_, index) => ({ item: `#${index}`, text: `question ${index} `.repeat(20), options: [], since: at }));
 	writeStatus(path, status);
 }
