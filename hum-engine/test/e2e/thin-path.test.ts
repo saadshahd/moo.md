@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startRunner } from "../../src/adapters/claude-p.ts";
@@ -11,6 +11,7 @@ import { PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../s
 import { configWith } from "../fixtures/config.ts";
 import { WorkRepo, itemFile, markdownSettings, sh } from "../fixtures/work-repo.ts";
 import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
+import { FakePulls } from "../fixtures/fake-pulls.ts";
 
 const NOW = 1_800_000_000_000;
 const TTL = SHIPPED_DEFAULTS.claimExpirySeconds * 1000;
@@ -158,15 +159,36 @@ test("a commit with an error subtype is not done", async () => {
 	expect(await runThinPath(w.options())).toMatchObject({ outcome: "stuck", item: id });
 });
 
-test("a change to a path no rule matches is not merged by the thin path", async () => {
-	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
-	const id = w.repo.seed("Write the note");
-	const before = sh(w.repo.remote, ["rev-parse", "main"]);
-	const result = await runThinPath(w.options());
+const OWNER_CONFIG = `${JSON.stringify({ schemaVersion: 1, paths: [{ glob: "docs/**", level: "low" }] }, null, "\t")}\n`;
 
-	expect(result).toMatchObject({ outcome: "review", item: id });
-	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
+const questionsOn = async (w: Awaited<ReturnType<typeof world>>, id: string) => (await w.adapter.workSource!.read(id)).thread.filter((entry) => entry.kind === "question");
+
+test("a change to a path no rule places runs, waits unmerged and asks one question; the answer becomes a path rule, and the next change there is not unclear", async () => {
+	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }, { commit: { "src/y.ts": "y\n" } }] });
+
+	w.repo.put(".hum/hum.json", OWNER_CONFIG);
+
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options())).toMatchObject({ outcome: "review", item: id, detail: "a changed path matches no path rule" });
+	expect(() => sh(w.repo.remote, ["show", "main:src/x.ts"])).toThrow();
 	expect(w.repo.show(id)).toContain("state: ready");
+	expect((await questionsOn(w, id)).map((q) => q.text)).toEqual([expect.stringContaining("src/** match no path rule")]);
+
+	await w.adapter.answers!.answer(id, { text: "low", option: "low" });
+	w.state.parked.remove(id);
+
+	const runs = w.shim.calls().length;
+
+	expect(await runThinPath(w.options({ itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(w.shim.calls()).toHaveLength(runs);
+	expect(JSON.parse(sh(w.repo.remote, ["show", "main:.hum/hum.json"])).paths).toEqual([{ glob: "docs/**", level: "low" }, { glob: "src/**", level: "low" }]);
+	expect(sh(w.repo.remote, ["log", "-1", "--format=%B", w.state.learned.get("src/**")?.commit ?? "none"])).toContain(`The owner answered on item ${id}.`);
+
+	const next = w.repo.seed("Add y");
+
+	expect(await runThinPath(w.options({ itemId: next }))).toEqual({ outcome: "merged", item: next });
+	expect(await questionsOn(w, next)).toEqual([]);
 });
 
 test("a run that needs the owner pushes its branch, asks, and ends; the answer starts a fresh run on that branch", async () => {
@@ -222,4 +244,108 @@ test("a claim another worker holds is lost, and no run starts", async () => {
 	expect((await w.adapter.workSource!.claim(id, "worker-2", TTL)).won).toBe(true);
 	expect(await runThinPath(w.options({ itemId: id }))).toEqual({ outcome: "lost", item: id });
 	expect(w.shim.calls()).toHaveLength(1);
+});
+
+const GH013 = "remote: error: GH013: Repository rule violations found for refs/heads/main.";
+
+test("where the base requires a pull request, a cleared change opens one with auto-merge; once GitHub merges it, a lapsed claim lands it without another run", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const github = new FakePulls();
+	const pulls = github.client();
+	const id = w.repo.seed("Write the note");
+	const before = sh(w.repo.remote, ["rev-parse", "main"]);
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.options({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+	expect(github.pulls).toMatchObject([{ head: runBranch(SHIPPED_DEFAULTS, id), base: "main", autoMerge: true, state: "OPEN" }]);
+	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
+	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:.hum/work/${id}.md`])).toContain("state: done");
+
+	const runs = w.shim.calls().length;
+
+	github.checksPass(1);
+	w.clock.at += TTL;
+	expect(await runThinPath(w.options({ pulls, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(w.shim.calls()).toHaveLength(runs);
+	expect(w.state.landings.get(id)).toBeUndefined();
+	expect(github.requests.filter((r) => r.startsWith("GET"))).toHaveLength(1);
+});
+
+test("a change that waits for the owner runs on its level's tier and opens the same pull request without auto-merge; the owner's approval arms it", async () => {
+	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])) });
+	const github = new FakePulls();
+	const pulls = github.client();
+	const id = w.repo.add("note", itemFile("Write the note", "ready", "touches: docs/note.md"));
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.options({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+	expect(github.pulls).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
+	expect(w.shim.calls().at(-1)?.argv).toContain(SHIPPED_DEFAULTS.models.top);
+
+	await w.adapter.answers!.answer(id, { text: "approve", option: "approve" });
+	w.clock.at += TTL;
+	expect(await runThinPath(w.options({ pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
+	expect(github.pulls).toMatchObject([{ autoMerge: true }]);
+});
+
+test("a push the remote refuses goes through a pull request, after the branch's rules are read again", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const github = new FakePulls();
+	const pulls = github.client();
+	const id = w.repo.seed("Write the note");
+
+	expect(await pulls.rules("main")).toEqual({ requiresPullRequest: false, mergeMethods: undefined });
+	github.requiresPullRequest = true;
+
+	const refused = w.repo.refuseMainPushes(GH013);
+
+	expect(await runThinPath(w.options({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+	expect(refused()).toBe(1);
+	expect(github.requests.filter((r) => r.startsWith("GET"))).toHaveLength(2);
+	expect(github.pulls).toMatchObject([{ head: runBranch(SHIPPED_DEFAULTS, id), autoMerge: true }]);
+});
+
+test("a run that lowers its own level, bumps the engine pin and edits a workflow and a hook is held for the owner: no hook runs and the owner's config stays", async () => {
+	const templates = mkdtempSync(join(tmpdir(), "hum-templates-"));
+	const ran = join(templates, "pre-push-ran");
+	const previous = process.env.GIT_TEMPLATE_DIR;
+
+	mkdirSync(join(templates, "hooks"));
+	writeFileSync(join(templates, "hooks", "pre-push"), `#!/bin/sh\ntouch ${ran}\nexit 1\n`);
+	chmodSync(join(templates, "hooks", "pre-push"), 0o755);
+
+	const lowered = `${JSON.stringify({ schemaVersion: 1, paths: [{ glob: "**", level: "low" }] }, null, "\t")}\n`;
+
+	const w = await world({
+		script: [
+			{},
+			{
+				commit: {
+					".hum/hum.json": lowered,
+					"package.json": '{ "dependencies": { "@moo.md/hum": "9.9.9" } }\n',
+					".github/workflows/ci.yml": "on: push\n",
+					".husky/pre-push": "exit 0\n",
+					"docs/note.md": "hello\n",
+				},
+			},
+		],
+	});
+
+	const github = new FakePulls();
+	const id = w.repo.seed("Write the note");
+
+	w.repo.put(".hum/hum.json", OWNER_CONFIG);
+
+	// Every clone hum makes from here on carries a pre-push hook that would fail and leave a mark.
+	process.env.GIT_TEMPLATE_DIR = templates;
+	cleanups.push(() => {
+		process.env.GIT_TEMPLATE_DIR = previous;
+		rmSync(templates, { recursive: true, force: true });
+	});
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.options({ pulls: github.client() }))).toMatchObject({ outcome: "landing", item: id });
+	expect(github.pulls).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
+	expect(existsSync(ran)).toBe(false);
+	expect(() => sh(w.repo.remote, ["show", "main:docs/note.md"])).toThrow();
+	expect(sh(w.repo.remote, ["show", "main:.hum/hum.json"])).toBe(OWNER_CONFIG);
 });

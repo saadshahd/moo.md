@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sh } from "./fixtures/work-repo.ts";
+import { FakePulls } from "./fixtures/fake-pulls.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 
@@ -159,7 +160,7 @@ test("a new engine in node_modules, or an edit under .hum/ or adapters/, makes t
 	}
 });
 
-test("a worker that sees an update runs nothing new and exits when its runs end", async () => {
+test("a worker that sees an update starts nothing new, lands nothing and exits when its runs end; the next worker lands the change without a run", async () => {
 	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 400 } } }, { settings: { runners: 1 } });
 
 	w.item("a", "docs/a.md");
@@ -176,6 +177,13 @@ test("a worker that sees an update runs nothing new and exits when its runs end"
 
 	await worker.idle();
 	expect(await worker.tick()).toMatchObject({ kind: "exit" });
+	expect(merged(w)).toEqual([]);
+
+	const next = w.workerWith();
+
+	w.clock.at += w.config.hum.claimExpirySeconds * 1000;
+	await next.tick();
+	await next.idle();
 	expect(merged(w)).toEqual(["a"]);
 	expect(w.shim.calls().filter((c) => c.itemId)).toHaveLength(1);
 });
@@ -371,4 +379,52 @@ test("a limit the runner hit is saved, and a restarted worker makes no call befo
 	expect(await restarted.tick()).toEqual({ kind: "ran", started: ["a"] });
 	await restarted.idle();
 	expect(w.shim.calls().length).toBeGreaterThan(calls);
+});
+
+test("a level change re-checks a waiting change once a worker starts on the new config: it lands without another run", async () => {
+	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] } });
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.results).toMatchObject([{ outcome: "review", item: "a", detail: "level high waits for your review" }]);
+	expect(w.state.parked.get("a")?.why).toBe("review");
+
+	const lowered = w.workerWith({ config: { ...w.config, hum: { ...w.config.hum, paths: [{ glob: "docs/**", level: "low" }] } } });
+
+	w.clock.at += w.config.hum.claimExpirySeconds * 1000;
+	await lowered.tick();
+	await lowered.idle();
+	expect(merged(w)).toEqual(["a"]);
+	expect(w.shim.calls().filter((c) => c.itemId)).toHaveLength(1);
+});
+
+test("the status file lists each path rule the owner's answers added, with the command that takes it back", async () => {
+	const w = await world({});
+
+	w.state.learned.put("src/**", { glob: "src/**", level: "low", item: "a", commit: "abc1234", at: NOW });
+	await w.worker.tick();
+
+	const status = readStatus(w.state.statusPath);
+
+	expect(status.ok && status.status.rules).toEqual([{ glob: "src/**", level: "low", item: "a", at: NOW, undo: { label: "Undo", command: "git revert abc1234" } }]);
+});
+
+test("a path raised while its change's pull request is armed: the next worker disarms it at its first tick, without waiting for the claim and without a run", async () => {
+	const github = new FakePulls();
+	const pulls = github.client();
+	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } }, { worker: { pulls } });
+
+	github.requiresPullRequest = true;
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(github.pulls).toMatchObject([{ autoMerge: true, state: "OPEN" }]);
+
+	const raised = w.workerWith({ config: { ...w.config, hum: { ...w.config.hum, paths: [{ glob: "docs/**", level: "high" }] } } });
+
+	await raised.tick();
+	await raised.idle();
+	expect(github.pulls).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
+	expect(w.shim.calls().filter((c) => c.itemId)).toHaveLength(1);
 });

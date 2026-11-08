@@ -9,6 +9,9 @@ const CONFLICT = /non-fast-forward|fetch first|already exists|stale info|failed 
 const REFUSED = /remote rejected|declined|protected|GH006|denied|not permitted/i;
 const ABSENT = /does not exist|not a valid object name/i;
 
+/** Patch text as git writes it, whatever external diff tool or colour the environment sets: `GIT_EXTERNAL_DIFF` replaces it otherwise. */
+export const PATCH = ["--no-ext-diff", "--no-color"] as const;
+
 const ANCESTOR = 0;
 const NOT_ANCESTOR = 1;
 

@@ -50,6 +50,27 @@ const branchPrefix = z
 
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
+/** Who reviews a change before it merges: no one, a fresh agent review run, or that run and then the owner. */
+export const REVIEWS = ["none", "agent", "owner"] as const;
+
+/** When a merged change ships: at once, or once the proof its path names arrives. */
+export const RELEASES = ["at-once", "after-proof"] as const;
+
+/** What a break after merge becomes: follow-up work, or a block on the path. */
+export const BREAKS = ["follow-up", "block"] as const;
+
+const isRegExp = (source: string): boolean => {
+	try {
+		return new RegExp(source).source.length > 0;
+	} catch {
+		return false;
+	}
+};
+
+const pattern = z.string().min(1).refine(isRegExp, "a pattern is a valid regular expression");
+
+const date = z.iso.date();
+
 const seconds = z.int().positive();
 
 const count = z.int().positive();
@@ -63,6 +84,15 @@ const commitIdentity = z.strictObject({ name, email: name });
 const backoff = z
 	.strictObject({ firstSeconds: z.number().positive(), maxSeconds: z.number().positive() })
 	.refine(({ firstSeconds, maxSeconds }) => firstSeconds <= maxSeconds, "the first pause is at most the longest pause");
+
+const fraction = z.number().gt(0).lt(1);
+
+const Launch = z.union([
+	z.strictObject({ glob: name, level: name, from: date, until: date }).refine(({ from, until }) => from < until, "a launch ends after it starts"),
+	z.strictObject({ glob: name, level: name, base: name }),
+]);
+
+export type Launch = z.infer<typeof Launch>;
 
 /** Every setting an owner may change, each described for the schema's readers. `defaults/hum.json` holds the shipped value of each. */
 const Shipped = z.object({
@@ -96,6 +126,22 @@ const Shipped = z.object({
 	restartBackoff: backoff.describe("The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."),
 	restartDelaySeconds: seconds.describe("Seconds the service manager waits before it starts a failed start script again."),
 	ciWakeTimeoutMinutes: count.describe("Minutes a CI wake may run before GitHub stops it."),
+	strictPaths: z.array(name).describe("Globs of data and secrets: a change touching one takes the strictest level."),
+	launches: z
+		.array(Launch)
+		.describe("Raises a path to a level for a launch: between two dates, from 'from' up to 'until', or while the base branch matches 'base'."),
+	sizeRange: z
+		.strictObject({ changes: count, fewest: count, middle: fraction })
+		.describe("A path's usual size: the middle share of the lines its last 'changes' merged changes touched. A change above it goes one level up; a path with fewer than 'fewest' changes has no range."),
+	loosenedCheck: z
+		.strictObject({ added: z.array(pattern), removed: z.array(pattern) })
+		.describe("A change whose added or removed lines match one of these loosens a check and goes one level up; empty lists turn the rule off."),
+	changeLabels: z
+		.strictObject({ fixWindow: count, fixSubject: pattern, revertSubject: pattern, revertTrailer: pattern })
+		.describe("How hum labels a merged change from git: reverted by a commit whose trailer names it or whose subject reverts its subject; fixed by a fix commit within the next 'fixWindow' merged changes on its files that names it or changes its lines."),
+	historyDepth: count.describe("Commits of the base branch hum reads for size ranges and fix counts."),
+	lockfiles: z.array(name).describe("Lockfiles where a changed line naming the engine package changes hum itself."),
+	hookPaths: z.array(name).describe("Globs of tracked git hooks; a change to one changes hum itself."),
 });
 
 /** The defaults hum ships with, read from the default `hum.json`. */
@@ -116,12 +162,32 @@ export const Role = z.strictObject({
 	skills: z.array(name),
 });
 
+export const Level = z.strictObject({
+	name,
+	review: z.enum(REVIEWS),
+	release: z.enum(RELEASES),
+	onBreak: z.enum(BREAKS),
+});
+
+export type Level = z.infer<typeof Level>;
+
+export const PathRule = z.strictObject({
+	glob: name,
+	level: name,
+	/** By kind name, or `*` for every kind: what release waits for at a level that releases after proof. */
+	proofs: z.record(name, name).optional(),
+	/** At most `fixes` fixed or reverted changes among the path's last `of` merged changes; past it the path goes one level up. */
+	limit: z.strictObject({ fixes: z.int().nonnegative(), of: count }).optional(),
+});
+
+export type PathRule = z.infer<typeof PathRule>;
+
 export const HumConfig = z.strictObject({
 	schemaVersion: z.literal(SCHEMA_VERSION),
-	/** Risk levels, lowest first. */
-	levels: z.array(name).min(1),
+	/** Risk levels, lowest first; the last is the strictest. */
+	levels: z.array(Level).min(1),
 	/** Risk level per path glob. */
-	paths: z.array(z.strictObject({ glob: name, level: name })),
+	paths: z.array(PathRule),
 	roles: z.record(name, Role),
 	/** Each event type names the part that sends it. */
 	events: z.record(name, z.strictObject({ source: name })),
@@ -245,4 +311,13 @@ export const OWNER_CHANGEABLE = {
 	"restart backoff": "restartBackoff",
 	"restart delay": "restartDelaySeconds",
 	"CI wake timeout": "ciWakeTimeoutMinutes",
+	"data and secrets paths": "strictPaths",
+	"path rules": "paths",
+	launches: "launches",
+	"size range": "sizeRange",
+	"loosened-check rule": "loosenedCheck",
+	"change labels": "changeLabels",
+	"history depth": "historyDepth",
+	lockfiles: "lockfiles",
+	"hook paths": "hookPaths",
 } as const satisfies Record<string, string>;

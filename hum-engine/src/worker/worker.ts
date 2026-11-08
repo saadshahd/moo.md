@@ -19,7 +19,8 @@ import { SECOND_MS } from "../time.ts";
 import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
 import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
 import { type Signature, signatureOf } from "./signature.ts";
-import { answerTo, claimTtlMs, endedStuck, park, rememberKinds, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
+import type { PullRequests } from "../adapters/pull-requests.ts";
+import { answerTo, claimTtlMs, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -51,6 +52,8 @@ export type WorkerOptions = {
 	readonly ciTick?: () => Promise<number | undefined>;
 	readonly gate?: PrefixGate;
 	readonly onResult?: (result: ThinResult) => void;
+	/** The remote's pull requests and branch rules, for a remote on GitHub. */
+	readonly pulls?: PullRequests;
 };
 
 type Known = {
@@ -108,12 +111,16 @@ export class Worker {
 	readonly #inFlight = new Map<string, InFlight>();
 	/** Items the owner answered that have not started yet; kept across ticks, because the watch token moves on. */
 	readonly #answered = new Set<string>();
+	/** Saved changes that land again under this worker's config before anything else starts. */
+	readonly #relanding = new Set<string>();
 	readonly #merged: Status["merged"] = [];
 	readonly #wakes = new EventTarget();
 	readonly #latest: () => Promise<string | undefined>;
 	readonly #ciTick: () => Promise<number | undefined>;
 	readonly #learn: (id: string) => Promise<Known>;
 	#watchToken: string | undefined;
+	/** Set while the worker has seen an update; no change lands until a worker on the new config takes it. */
+	#updating: string | undefined;
 
 	get config(): Config {
 		return this.#o.config;
@@ -138,6 +145,21 @@ export class Worker {
 			};
 		});
 		rememberKinds(options.state, options.config);
+		this.#recheckLandings();
+	}
+
+	/**
+	 * A config can change a saved change's level, so each one lands again at this worker's first tick under the config
+	 * it started with, claimed or not: a pull request armed under the old level is disarmed before GitHub merges it.
+	 */
+	#recheckLandings(): void {
+		const { state } = this.#o;
+
+		for (const { item } of state.landings.list()) {
+			if (state.parked.get(item)?.why === "review") this.#unpark(item, undefined);
+
+			this.#relanding.add(item);
+		}
 	}
 
 	running(): string[] {
@@ -233,16 +255,25 @@ export class Worker {
 		});
 	}
 
-	/** Takes an item the owner acted on back from the parked: its saved state is dropped and its cap starts afresh. */
-	#unpark(id: string): void {
+	/**
+	 * Takes an item the owner acted on back from the parked. A finished change keeps its saved landing and lands again,
+	 * unless the owner asked to run it again; otherwise its saved state is dropped and its cap starts afresh.
+	 */
+	#unpark(id: string, option: string | undefined): void {
 		const { state } = this.#o;
 		const parked = state.parked.get(id);
 
 		if (!parked) return;
 
 		state.parked.remove(id);
-		state.items.remove(id);
 		state.faults.clear(`item-${parked.why}:${id}`);
+
+		const landsAgain = state.landings.get(id) !== undefined && option !== RUN_AGAIN;
+
+		if (landsAgain) return;
+
+		state.items.remove(id);
+		state.landings.remove(id);
 
 		const spent = state.spent.get(id);
 
@@ -266,10 +297,11 @@ export class Worker {
 			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox])].map(async (id) => {
 				const item = await adapters.workSource.read(id);
 				const held = parked.find((p) => p.item === id);
-				const lastAnswerAt = item.thread.findLast((e) => e.kind === "answer")?.at;
+				const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
+				const lastAnswerAt = lastAnswer?.at;
 
 				if (held) {
-					if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id);
+					if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer?.option);
 
 					return;
 				}
@@ -326,6 +358,8 @@ export class Worker {
 				signal: abort.signal,
 				gate: this.#gate,
 				now: this.#now,
+				pulls: this.#o.pulls,
+				mayLand: () => this.#updating === undefined,
 			}).then(
 				(result) => this.#ended(id, known, result),
 				(error: Error) => this.#failed(id, error),
@@ -401,6 +435,7 @@ export class Worker {
 				unclear: false,
 			})),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
+			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
 		});
 	}
 
@@ -441,7 +476,9 @@ export class Worker {
 			return isAnsweredAndIdle(s.itemId) ? [learned(s.itemId).then((known) => ({ id: s.itemId, answered: true, known: known && named && { ...known, kind: named.name } }))] : [];
 		});
 
-		const waiting = (await Promise.all([...fresh, ...answered])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
+		const relands = [...this.#relanding].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
+
+		const waiting = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
 		const knownOf = new Map(waiting.map((w) => [w.id, w.known]));
 
 		const { start } = pick({
@@ -465,6 +502,7 @@ export class Worker {
 			if (!known) return [];
 
 			this.#answered.delete(id);
+			this.#relanding.delete(id);
 			this.#begin(id, known, t);
 
 			return [id];
@@ -481,6 +519,8 @@ export class Worker {
 
 		const signature = signatureOf(this.#o.repo, this.#o.engineVersion ?? ENGINE_VERSION, this.#o.config.hum.itemsDir);
 		const update = this.#updateSeen(signature);
+
+		this.#updating = update;
 		const sleeping = state.items.saved().filter((s) => this.#isAsleep(s));
 
 		await this.#renew();

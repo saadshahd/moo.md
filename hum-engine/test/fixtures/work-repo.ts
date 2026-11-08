@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 
 /** The markdown adapter's settings as hum ships them. */
@@ -50,12 +50,18 @@ export class WorkRepo {
 
 	/** The owner commits an item file and pushes it. */
 	add(id: string, content: string): string {
-		writeFileSync(join(this.owner, ".hum", "work", `${id}.md`), content);
-		this.commit(`add ${id}`);
-		sh(this.owner, ["pull", "-q", "--rebase", "origin", "main"]);
-		sh(this.owner, ["push", "-q", "origin", "main"]);
+		this.put(`.hum/work/${id}.md`, content, `add ${id}`);
 
 		return id;
+	}
+
+	/** The owner commits a file and pushes it. */
+	put(path: string, content: string, message = `put ${path}`): void {
+		mkdirSync(join(this.owner, dirname(path)), { recursive: true });
+		writeFileSync(join(this.owner, path), content);
+		this.commit(message);
+		sh(this.owner, ["pull", "-q", "--rebase", "origin", "main"]);
+		sh(this.owner, ["push", "-q", "origin", "main"]);
 	}
 
 	seed(title: string): string {
@@ -71,13 +77,13 @@ export class WorkRepo {
 		return path;
 	}
 
-	/** The remote refuses every push to main as lost to another writer. Returns how many pushes it has refused. */
-	refuseMainPushes(): () => number {
+	/** The remote refuses every push to main, saying `said`: by default that another writer moved it. Returns how many pushes it has refused. */
+	refuseMainPushes(said = "fetch first"): () => number {
 		const refused = join(this.root, "refused-pushes");
 		const hook = join(this.remote, "hooks", "pre-receive");
 
 		mkdirSync(join(this.remote, "hooks"), { recursive: true });
-		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tif [ "$ref" = "refs/heads/main" ]; then echo x >> ${refused}; echo "fetch first" >&2; exit 1; fi\ndone\n`);
+		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tif [ "$ref" = "refs/heads/main" ]; then echo x >> ${refused}; echo "${said}" >&2; exit 1; fi\ndone\n`);
 		chmodSync(hook, 0o755);
 
 		return () => (existsSync(refused) ? readFileSync(refused, "utf8").split("\n").filter(Boolean).length : 0);

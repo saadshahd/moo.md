@@ -4,12 +4,14 @@ import type { Adapter } from "../adapter-api.ts";
 import { resolveAdapters } from "../adapters/registry.ts";
 import { startRunner } from "../adapters/claude-p.ts";
 import { gitIn } from "../adapters/git.ts";
+import { repoFromRemote } from "../adapters/github.ts";
+import { gitHubPullRequests } from "../adapters/pull-requests.ts";
 import { serialized } from "../adapters/serial.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
-export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote"> & {
+export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls"> & {
 	/** Where saved state lives; default `<git common dir>/hum`. */
 	readonly stateDir?: string;
 	/** The skill names of hope's installed copy; a role that names another is refused. */
@@ -34,7 +36,8 @@ export const npmLatest = async (): Promise<string | undefined> => {
 
 /**
  * Wires a worker for the owner's repo: state in the git common dir, the config in `.hum/`, the adapters
- * `hum.json` names (guarded, with the last ready list saved, and one call at a time), and a started runner.
+ * `hum.json` names (guarded, with the last ready list saved, and one call at a time), a started runner, and for a
+ * remote on GitHub its pull requests and branch rules, so landing follows what the target branch requires.
  * Throws when the config is refused or the repo has no `origin`; the service unit shows that as a card.
  */
 export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => {
@@ -74,5 +77,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	const { runner } = await startRunner({ state, model: config.hum.models.light, binary, env, now });
 
-	return new Worker({ ...rest, repo, state, config, adapters: { workSource, questions, answers }, runner, remote });
+	const github = repoFromRemote(remote);
+	const pulls = github === undefined ? undefined : gitHubPullRequests(github);
+
+	return new Worker({ ...rest, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls });
 };

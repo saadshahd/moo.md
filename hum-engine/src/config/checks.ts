@@ -7,6 +7,7 @@ import {
 	type Kind,
 	type Naming,
 	OWNER_WAIT_TAG,
+	type PathRule,
 	SIZES,
 	STUCK_TAG,
 	type StateNodeJSON,
@@ -97,14 +98,16 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 		}
 	}
 
+	const levels = levelNames(hum);
+
 	for (const row of config.tiers) {
-		if (row.level !== undefined && !hum.levels.includes(row.level)) {
+		if (row.level !== undefined && !levels.has(row.level)) {
 			problems.push({ problem: "unknown-level", level: row.level });
 		}
 	}
 
 	for (const purpose of purposes) {
-		for (const level of hum.levels) {
+		for (const level of levels) {
 			for (const size of SIZES) {
 				if (!pickTier(config, { purpose, level, size })) {
 					problems.push({ problem: "tier-table-gap", kind, purpose, level, size });
@@ -174,6 +177,29 @@ const prefixesOverlap = ({ runBranchPrefix, claimPrefix }: Naming): boolean =>
 const namingProblems = (hum: HumConfig): Problem[] =>
 	prefixesOverlap(hum) ? [{ problem: "overlapping-prefixes", run: hum.runBranchPrefix, claim: hum.claimPrefix }] : [];
 
+const levelNames = (hum: HumConfig): ReadonlySet<string> => new Set(hum.levels.map(({ name }) => name));
+
+const ALL_KINDS = "*";
+
+/** A path whose level releases only after proof names a proof for every kind, or for each kind there is. */
+const provesEveryKind = (rule: PathRule, kinds: readonly string[]): boolean =>
+	rule.proofs?.[ALL_KINDS] !== undefined || kinds.every((kind) => rule.proofs?.[kind] !== undefined);
+
+const pathProblems = (hum: HumConfig): Problem[] => {
+	const levels = levelNames(hum);
+	const afterProof = new Set(hum.levels.filter(({ release }) => release === "after-proof").map(({ name }) => name));
+
+	return [
+		...[...hum.paths, ...hum.launches].flatMap(({ level }): Problem[] => (levels.has(level) ? [] : [{ problem: "unknown-level", level }])),
+		...hum.paths.flatMap((rule): Problem[] =>
+			afterProof.has(rule.level) && !provesEveryKind(rule, hum.kinds) ? [{ problem: "path-without-proof", glob: rule.glob, level: rule.level }] : [],
+		),
+	];
+};
+
+/** The proof a path names for a kind: its own, else the one for every kind. */
+export const proofFor = (rule: PathRule, kind: string): string | undefined => rule.proofs?.[kind] ?? rule.proofs?.[ALL_KINDS];
+
 /** Every config check at start and on every change; returns all problems found. */
 export const checkConfig = (
 	hum: HumConfig,
@@ -183,7 +209,7 @@ export const checkConfig = (
 ): Problem[] => [
 	...Object.values(hum.roles)
 		.flatMap(({ file }): Problem[] => (roleFiles.has(file) ? [] : [{ problem: "missing-file", file }])),
-	...hum.paths.flatMap(({ level }): Problem[] => (hum.levels.includes(level) ? [] : [{ problem: "unknown-level", level }])),
+	...pathProblems(hum),
 	...Object.entries(kinds).flatMap(([name, kind]) => kindProblems(name, kind, hum)),
 	...eventProblems(hum, kinds),
 	...skillProblems(hum, env),

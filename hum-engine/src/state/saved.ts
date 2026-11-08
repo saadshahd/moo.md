@@ -18,3 +18,18 @@ export const Limit = z.strictObject({ until: time });
 
 /** The ids a provider last listed as ready, so a restart still sees an empty list that contradicts them. */
 export const ReadyList = z.strictObject({ ids: z.array(name) });
+
+/** A finished change on its way to the base: what its diff showed, so a retry lands it again without a run. */
+export const Landing = z.strictObject({
+	item: name,
+	branch: name,
+	since: time,
+	change: z.strictObject({ paths: z.array(name), size: z.int().nonnegative(), loosened: z.boolean(), pinChanged: z.boolean() }),
+});
+
+export type Landing = z.infer<typeof Landing>;
+
+/** A path rule the owner's answer made, committed on the base; the view lists it with an undo. */
+export const Learned = z.strictObject({ glob: name, level: name, item: name, commit: name, at: time });
+
+export type Learned = z.infer<typeof Learned>;

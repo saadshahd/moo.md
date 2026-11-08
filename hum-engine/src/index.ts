@@ -110,8 +110,6 @@ export {
 } from "./adapters/claude-p.ts";
 
 export {
-	levelOf,
-	mergeDecision,
 	PLAN_MARK,
 	RUN_SCHEMA,
 	runBranch,
@@ -119,6 +117,20 @@ export {
 	type ThinPathOptions,
 	type ThinResult,
 } from "./worker/thin-path.ts";
+
+export { type Change, type Histories, LABELS, type Label, type Moment, type PathHistory, type Placement, type Policy, placeChange, type Step, usualSize } from "./decide/risk.ts";
+
+export { isCleared, type Landing, landingOf, OWNER_APPROVAL, type Route, routeOf, waitReason } from "./decide/merge.ts";
+
+export { DIFF_LIMIT, reviewInput } from "./decide/review.ts";
+
+export { labelChanges, type LabelRules, matchedSample, type PastChange } from "./decide/labels.ts";
+
+export { changeOf, historiesOf, readHistory } from "./adapters/history.ts";
+
+export { type BranchRules, gitHubPullRequests, methodFor, type Pull, type PullRequests } from "./adapters/pull-requests.ts";
+
+export { land, type LandContext, prepareLanding, ruleGlobFor } from "./worker/land.ts";
 
 export { roundupAdapter, type RoundupOptions, stdioCall, type ToolCall } from "./adapters/roundup.ts";
 

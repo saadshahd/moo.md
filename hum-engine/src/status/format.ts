@@ -40,6 +40,9 @@ export const Merged = z.strictObject({ item: name, title: name, level: name.opti
 
 export const Choice = z.strictObject({ item: name, text: name, at: time });
 
+/** A path rule the owner's answer added, with the command that takes it back. */
+export const LearnedRule = z.strictObject({ glob: name, level: name, item: name, at: time, undo: Action });
+
 /** Per merged change over the last `window` merged changes. */
 export const Measure = z.strictObject({
 	window: z.int().positive(),
@@ -70,6 +73,7 @@ export const Status = z.strictObject({
 	inFlight: z.array(InFlight),
 	merged: z.array(Merged),
 	choices: z.array(Choice),
+	rules: z.array(LearnedRule),
 	measure: Measure.nullable(),
 });
 
@@ -86,6 +90,7 @@ export const emptyStatus = (engineVersion: string, writtenAt: number): Status =>
 	inFlight: [],
 	merged: [],
 	choices: [],
+	rules: [],
 	measure: null,
 });
 

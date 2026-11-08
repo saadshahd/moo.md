@@ -1,10 +1,30 @@
 {
 	"schemaVersion": 1,
 	"levels": [
-		"low",
-		"medium",
-		"high",
-		"critical"
+		{
+			"name": "low",
+			"review": "none",
+			"release": "at-once",
+			"onBreak": "follow-up"
+		},
+		{
+			"name": "medium",
+			"review": "agent",
+			"release": "at-once",
+			"onBreak": "follow-up"
+		},
+		{
+			"name": "high",
+			"review": "owner",
+			"release": "at-once",
+			"onBreak": "follow-up"
+		},
+		{
+			"name": "critical",
+			"review": "owner",
+			"release": "after-proof",
+			"onBreak": "block"
+		}
 	],
 	"paths": [],
 	"roles": {
@@ -118,5 +138,44 @@
 		"maxSeconds": 60
 	},
 	"restartDelaySeconds": 10,
-	"ciWakeTimeoutMinutes": 60
+	"ciWakeTimeoutMinutes": 60,
+	"strictPaths": [],
+	"launches": [],
+	"sizeRange": {
+		"changes": 50,
+		"fewest": 20,
+		"middle": 0.8
+	},
+	"loosenedCheck": {
+		"added": [
+			"\\.(skip|skipIf|todo)\\(",
+			"\\bx(it|test|describe)\\(",
+			"(eslint|oxlint|biome)[- ](disable|ignore)",
+			"@ts-(ignore|expect-error|nocheck)"
+		],
+		"removed": [
+			"^\\s*(test|it|describe)(\\.\\w+)?\\(",
+			"^\\s*\"[@\\w/-]+\"\\s*:\\s*\\[?\"(error|warn)\""
+		]
+	},
+	"changeLabels": {
+		"fixWindow": 10,
+		"fixSubject": "^fix(\\(.+\\))?!?:",
+		"revertSubject": "^Revert \"",
+		"revertTrailer": "This reverts commit ([0-9a-f]{7,40})"
+	},
+	"historyDepth": 1000,
+	"lockfiles": [
+		"bun.lock",
+		"bun.lockb",
+		"package-lock.json",
+		"yarn.lock",
+		"pnpm-lock.yaml"
+	],
+	"hookPaths": [
+		".husky/**",
+		".githooks/**",
+		"lefthook.yml",
+		".pre-commit-config.yaml"
+	]
 }

@@ -26,7 +26,7 @@ export type GitHubClient = InstanceType<typeof HumOctokit>;
 type Variables = Readonly<Record<string, Json>>;
 
 /** The GraphQL name of each merge method. */
-const MERGE_METHOD = { merge: "MERGE", squash: "SQUASH", rebase: "REBASE" } as const satisfies Record<(typeof MERGE_METHODS)[number], string>;
+export const MERGE_METHOD = { merge: "MERGE", squash: "SQUASH", rebase: "REBASE" } as const satisfies Record<(typeof MERGE_METHODS)[number], string>;
 
 const IssueNumber = ItemId.pipe(z.string().regex(/^[1-9]\d*$/, "a GitHub issue number is a whole number above 0")).transform(Number);
 
@@ -185,7 +185,7 @@ const failureOf = (cause: unknown): Failure => {
 };
 
 /** Throws `cause`, marked permanent when no retry can fix it. */
-const raise = (cause: unknown): never => {
+export const raise = (cause: unknown): never => {
 	const failure = failureOf(cause);
 
 	throw failure.kind === "permanent" ? new PermanentError(failure.message, { cause }) : cause;
@@ -199,7 +199,7 @@ export const repoFromRemote = (url: string): string | undefined => {
 };
 
 /** The owner's own login: `GH_TOKEN` or `GITHUB_TOKEN`, else the token `gh` holds. */
-const ownerToken = async (): Promise<string> => {
+export const ownerToken = async (): Promise<string> => {
 	const fromEnv = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
 
 	if (fromEnv) return fromEnv;

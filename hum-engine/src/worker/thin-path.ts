@@ -1,16 +1,14 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import pRetry from "p-retry";
-import { x } from "tinyexec";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
 import type { Item, Questions, WorkSource } from "../adapter-api.ts";
 import { type Runner, succeeded } from "../adapters/claude-p.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
-import { type Git, gitIn, isAncestor, push } from "../adapters/git.ts";
-import { markDone } from "../adapters/item-file.ts";
+import { type Git, gitIn, PATCH, push } from "../adapters/git.ts";
+import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
 import { kindMachine } from "../config/machine.ts";
@@ -18,18 +16,18 @@ import { type Kind, type Naming, OWNER_WAIT_TAG, STUCK_TAG } from "../config/sch
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
-import type { PrefixGate } from "./scheduler.ts";
+import { runChecks } from "./checks.ts";
+import { changeOn, type LandContext, land, placementOf, prepareLanding } from "./land.ts";
+import { OWNER_APPROVAL } from "../decide/merge.ts";
+import { DIFF_LIMIT } from "../decide/review.ts";
+import { footprintOf, type PrefixGate } from "./scheduler.ts";
 
 /** How long a claim lasts unless its holder renews it. */
 export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeconds * SECOND_MS;
 
-const DIFF_LIMIT = 100_000;
-
 const FAILURE_TAIL = 4000;
 
 const CARD_EXCERPT = 300;
-
-const SHORT_EXCERPT = 200;
 
 const ERROR_EXCERPT = 500;
 
@@ -68,54 +66,18 @@ export type ThinPathOptions = {
 	readonly signal?: AbortSignal;
 	/** Lets the first run of a shared prompt prefix reach its first token before the rest start. */
 	readonly gate?: PrefixGate;
+	/** The remote's pull requests and branch rules, for a remote on GitHub. */
+	readonly pulls?: PullRequests;
+	/** False while the worker drains for an update: a finished change is saved and pushed, and the next worker lands it under the config it starts with. */
+	readonly mayLand?: () => boolean;
 };
 
 export type ThinResult =
 	| { readonly outcome: "idle" }
 	| { readonly outcome: "lost" | "waiting"; readonly item: string }
-	| { readonly outcome: "merged" | "asked" | "stuck" | "review"; readonly item: string; readonly detail?: string }
+	| { readonly outcome: "merged" | "asked" | "stuck" | "review" | "landing"; readonly item: string; readonly detail?: string }
 	| { readonly outcome: "limited"; readonly item: string; readonly until: number }
 	| { readonly outcome: "held"; readonly item: string; readonly why: string };
-
-/** The first failing check as its command, exit code and output; undefined when all pass. */
-const runChecks = async (commands: readonly string[], cwd: string): Promise<string | undefined> => {
-	for (const command of commands) {
-		const ran = await shellOut(command, cwd);
-
-		if (ran.code !== 0) return `${command} exited ${ran.code}:\n${ran.output}`;
-	}
-
-	return undefined;
-};
-
-/** A check runs with no stdin and the worker's own PATH, as in the owner's shell; the clone's `node_modules/.bin` is not added. */
-const shellOut = async (command: string, cwd: string): Promise<{ code: number | undefined; output: string }> => {
-	const { exitCode, stdout, stderr } = await x("sh", ["-c", command], { nodePath: false, nodeOptions: { cwd, stdio: ["ignore", "pipe", "pipe"] } });
-
-	return { code: exitCode, output: `${stdout}${stderr}` };
-};
-
-type Level = { readonly level: string | undefined; readonly unclear: boolean };
-
-/** The highest level among the paths a change touches; a path no rule matches is unclear. */
-export const levelOf = (paths: readonly string[], config: Config): Level => {
-	const { levels, paths: rules } = config.hum;
-	let top = -1;
-
-	for (const path of paths) {
-		const matched = rules.filter((rule) => new Bun.Glob(rule.glob).match(path));
-
-		if (matched.length === 0) return { level: undefined, unclear: true };
-
-		top = Math.max(top, ...matched.map((rule) => levels.indexOf(rule.level)));
-	}
-
-	return { level: levels[top], unclear: paths.length === 0 };
-};
-
-/** A clear change at the lowest level merges; everything else holds. */
-export const mergeDecision = (level: Level, config: Config): "merge" | "hold" =>
-	!level.unclear && level.level === config.hum.levels[0] ? "merge" : "hold";
 
 type Answered = { readonly question: string; readonly answer: string; readonly plan: string };
 
@@ -200,6 +162,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (awaitsAnswer) return { outcome: "waiting", item: id };
 
+	const landing = o.state.landings.get(id);
 	const clone = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-run-"));
 	const branch = runBranch(o.config.hum, id);
 
@@ -216,7 +179,10 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 			await g(["checkout", "-q", "-b", branch]);
 		}
 
-		return park(o, await drive({ ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName: o.kind, kind, id, item, branch, clone, g, git, answered, resume: asking }));
+		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName: o.kind, kind, id, item, branch, clone, g, git, answered, resume: asking };
+
+		// A change already finished lands again from its pushed branch; no run is spent on it.
+		return park(o, landing ? await landAgain(driven) : await drive(driven));
 	} finally {
 		rmSync(clone, { recursive: true, force: true });
 	}
@@ -270,8 +236,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return new Error(message);
 	};
 
-	const tierFor = (purpose: "build" | "fix") => {
-		const row = pickTier(kind, { purpose, level: config.hum.levels[0] ?? "low", size: "small" });
+	/** A build is placed by the files its item declares; a fix by the branch's diff so far. */
+	const tierFor = async (purpose: "build" | "fix") => {
+		const declared = { paths: footprintOf(item) ?? [], size: 0, loosened: false, pinChanged: false };
+		const change = purpose === "fix" ? await changeOn(landContext(d)) : declared;
+		const { placement } = await placementOf(landContext(d), change);
+		const row = pickTier(kind, { purpose, level: placement.level.name, size: "small" });
 
 		if (!row) throw new Error(`the ${d.kindName} table has no ${purpose} row`);
 
@@ -288,7 +258,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		];
 
 		if (d.answered) {
-			const diff = await g(["diff", `origin/${base}...${branch}`]);
+			const diff = await g(["diff", ...PATCH, `origin/${base}...${branch}`]);
 
 			parts.push(
 				`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${diff.slice(0, DIFF_LIMIT)}`,
@@ -330,7 +300,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					.run({
 						prompt: await prompt(purpose),
 						cwd: clone,
-						...tierFor(purpose),
+						...(await tierFor(purpose)),
 						schema: RUN_SCHEMA,
 						tokenCap: kind.tokenCap.tokens - (tally.total - tally.base),
 						sessionId: begun.record.sessionId,
@@ -450,100 +420,79 @@ const handOff = async (d: Driven, question: string, plan: string) => {
 	await calls.questions?.ask(id, { text: question });
 };
 
-/** The change cannot merge on the newest base: it conflicts, or its checks fail there. */
-class StaleMerge extends Error {
-	override name = "StaleMerge";
-}
-
-/** Another writer moved the base between the fetch and the push. */
-class BaseMoved extends Error {
-	override name = "BaseMoved";
-}
-
 /** Every act that changes the world checks the claim first. */
 const stillMine = async (d: Pick<Driven, "workSource" | "id" | "holder" | "config">): Promise<boolean> => (await d.workSource.renew(d.id, d.holder, claimTtlMs(d.config))).won;
 
-/** A merge is rechecked on the newest base: when the base moved, the change is rebased and the checks run again. */
-const pushOntoNewestBase = async ({ g, git, base, branch, clone, checks }: Driven): Promise<void> => {
-	await g(["fetch", "-q", "origin", base]);
+const landContext = (d: Driven): LandContext => ({
+	state: d.state,
+	config: d.config,
+	kind: d.kindName,
+	id: d.id,
+	item: d.item,
+	branch: d.branch,
+	base: d.base,
+	remote: d.remote,
+	clone: d.clone,
+	dir: d.dir,
+	git: d.git,
+	checks: d.checks,
+	workSource: d.workSource,
+	questions: d.questions,
+	pulls: d.pulls,
+	now: d.now ?? Date.now,
+});
 
-	if (!(await isAncestor(git, `origin/${base}`, "HEAD"))) {
-		const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
+const DRAINING = "the worker restarts for an update; the next worker lands the change under its config";
 
-		if (rebased.code !== 0) {
-			await git.run(["rebase", "--abort"]);
-
-			throw new StaleMerge(`the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}`);
-		}
-
-		const failure = await runChecks(checks, clone);
-
-		if (failure) throw new StaleMerge(`the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}`);
-	}
-
-	await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
-
-	if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "conflict") throw new BaseMoved(`another push moved ${base} first`);
-};
-
-/** Low and clear: one pushed change carries the run's commits and `state: done`. */
+/** At `merging`: the change is saved and its branch pushed, then landed by its level unless the worker drains. */
 const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 	if (!(await stillMine(d))) return { outcome: "lost", item: d.id };
 
-	const { state, config, id, g, base, dir, clone, git } = d;
-	const changed = (await g(["diff", "--name-only", `origin/${base}...HEAD`])).split("\n").filter(Boolean);
-	const level = levelOf(changed, config);
+	await prepareLanding(landContext(d));
 
-	if (mergeDecision(level, config) === "hold") {
-		return { outcome: "review", item: id, detail: level.unclear ? "a changed path matches no rule" : `level ${level.level}` };
-	}
+	if (d.mayLand?.() === false) return { outcome: "held", item: d.id, why: DRAINING };
 
-	try {
-		await state.ops.once(
-			{ itemId: id, run: "merge", attempt: 0, op: "push-base" },
-			{
-				holds: async () => {
-					await g(["fetch", "-q", "origin", base]);
+	const result = await land(landContext(d));
 
-					return isAncestor(git, "HEAD", `origin/${base}`);
-				},
-				run: async () => {
-					const file = join(clone, dir, `${id}.md`);
+	if (result.outcome === "merged") actor.send({ type: "merged" });
 
-					writeFileSync(file, markDone(readFileSync(file, "utf8")));
-					await g(["add", `${dir}/${id}.md`]);
-					await g(["commit", "-q", "-m", `hum: finish ${id}`]);
-					await pRetry(() => pushOntoNewestBase(d), { retries: config.hum.mergeTries - 1, minTimeout: 0, shouldRetry: ({ error }) => error instanceof BaseMoved });
-				},
-			},
-		);
-	} catch (error) {
-		if (error instanceof StaleMerge) return { outcome: "review", item: id, detail: error.message };
-
-		throw error;
-	}
-
-	const sha = (await g(["rev-parse", "HEAD"])).trim();
-
-	state.events.add({ source: "work-source", sourceId: `merged:${sha}`, itemId: id, type: "merged", payload: {} });
-	actor.send({ type: "merged" });
-
-	return { outcome: "merged", item: id };
+	return result;
 };
+
+/** A finished change whose landing did not end: its pushed branch lands again, and once merged its saved state goes. */
+const landAgain = async (d: Driven): Promise<ThinResult> => {
+	if (d.mayLand?.() === false) return { outcome: "held", item: d.id, why: DRAINING };
+
+	const result = await land(landContext(d));
+
+	if (result.outcome === "merged") d.state.items.remove(d.id);
+
+	return result;
+};
+
+/** The answer option that runs a parked item again from the start. */
+export const RUN_AGAIN = "retry";
 
 type Parking = { readonly outcome: "stuck" | "review"; readonly item: string; readonly detail?: string };
 
 const isParking = (result: ThinResult): result is ThinResult & Parking => result.outcome === "stuck" || result.outcome === "review";
 
 const PARKING = {
-	stuck: { code: "item-stuck", fallback: "a run failed", cause: (item: string, why: string) => `${item} ended stuck: ${why}`, fix: "Fix the cause, then run it again." },
+	stuck: {
+		code: "item-stuck",
+		fallback: "a run failed",
+		cause: (item: string, why: string) => `${item} ended stuck: ${why}`,
+		fix: "Fix the cause, then run it again.",
+		action: { label: "Run it again", answer: RUN_AGAIN },
+	},
 	review: {
 		code: "item-review",
 		fallback: "its change waits for a review",
 		cause: (item: string, why: string) => `${item} is ready to merge but needs your review: ${why}`,
-		fix: "Review the branch, then answer on the item to run it again.",
+		fix: "Review the branch, then approve it on the item, or answer retry to run it again.",
+		action: { label: "Approve", answer: OWNER_APPROVAL },
 	},
-} as const satisfies Record<Parking["outcome"], { code: string; fallback: string; cause: (item: string, why: string) => string; fix: string }>;
+} as const satisfies Record<Parking["outcome"], { code: string; fallback: string; cause: (item: string, why: string) => string; fix: string; action: { label: string; answer: string } }>;
 
 /** An item that ended stuck, or whose change waits for a review, sits out until the owner acts. One card says why and how to run it again. */
 export const park = (o: Pick<ThinPathOptions, "state" | "now">, result: ThinResult): ThinResult => {
@@ -558,7 +507,7 @@ export const park = (o: Pick<ThinPathOptions, "state" | "now">, result: ThinResu
 		item: result.item,
 		cause: rule.cause(result.item, cause.slice(0, CARD_EXCERPT)),
 		fix: rule.fix,
-		action: { label: "Run it again", command: `hum answer ${result.item} retry` },
+		action: { label: rule.action.label, command: `hum answer ${result.item} ${rule.action.answer}` },
 	});
 
 	return result;
