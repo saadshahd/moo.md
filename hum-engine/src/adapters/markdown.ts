@@ -68,16 +68,28 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
 	let spent = 0;
+	/** Whether the local branches still match the remote as last fetched, with no push by this adapter since. */
+	let fetched = false;
 
 	const sync = async (): Promise<void> => {
 		spent++;
 		await git.raw(["fetch", "--prune", "--no-tags", "--quiet", remote, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]);
+		fetched = true;
 	};
 
-	const pushCounted = (args: readonly string[]) => {
+	/** A read shares the fetch of its tick; only a push by this adapter makes the copy stale before the next tick. */
+	const syncIfStale = async (): Promise<void> => {
+		if (!fetched) await sync();
+	};
+
+	const pushCounted = async (args: readonly string[]) => {
 		spent++;
 
-		return push(git, [remote, ...args]);
+		try {
+			return await push(git, [remote, ...args]);
+		} finally {
+			fetched = false;
+		}
 	};
 
 	const standingFromLine = (line: string): [string, StandingClaim][] => {
@@ -239,7 +251,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const read = async (id: string): Promise<Item> => {
 		const item = parseArgument(ItemId, id);
 
-		await sync();
+		await syncIfStale();
 
 		const [source, claims] = await Promise.all([itemSource(item), claimsNow()]);
 
