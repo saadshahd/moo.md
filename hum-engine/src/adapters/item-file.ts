@@ -18,14 +18,14 @@ const YAML_OPTIONS = { lineWidth: 0 };
 
 const FRONT_MATTER_FENCE = "---";
 
-const FrontMatter = z.looseObject({ title: z.string().min(1), state: z.string().min(1) });
+const FrontMatter = z.looseObject({ title: z.string().min(1), state: z.string().min(1), kind: z.string().min(1).optional() });
 
 const EntryMarker = z.strictObject({ kind: z.enum(THREAD_KINDS), at: z.int().nonnegative(), option: z.string().min(1).optional() });
 
 const Span = z.object({ start: z.object({ offset: z.int() }), end: z.object({ offset: z.int() }) });
 
 /** An item file: YAML front matter, a body, then thread entries, each opened by a hidden `<!-- hum {…} -->` line. */
-export type ItemFile = { readonly title: string; readonly state: string; readonly body: string; readonly thread: ThreadEntry[] };
+export type ItemFile = { readonly title: string; readonly state: string; readonly kind: string | undefined; readonly body: string; readonly thread: ThreadEntry[] };
 
 type EntryOpening = { readonly json: string; readonly start: number; readonly end: number };
 
@@ -68,6 +68,7 @@ export const parseItemFile = (source: string): ItemFile => {
 	return {
 		title: front.title,
 		state: front.state,
+		kind: front.kind,
 		body: source.slice(spanOf(head).end, openings[0]?.start ?? source.length).trim(),
 		thread: openings.map((opening, index) => parseEntry(source, opening, openings[index + 1])),
 	};

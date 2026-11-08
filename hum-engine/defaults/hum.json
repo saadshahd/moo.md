@@ -177,5 +177,47 @@
 		".githooks/**",
 		"lefthook.yml",
 		".pre-commit-config.yaml"
-	]
+	],
+	"diffLimit": 100000,
+	"failureTail": 4000,
+	"fallbackKind": "feature",
+	"docsOnly": {
+		"kind": "docs",
+		"paths": [
+			"**/*.md",
+			"**/*.mdx",
+			"docs/**"
+		]
+	},
+	"decisionModel": "claude-haiku-5-5",
+	"modelCallTimeoutSeconds": 120,
+	"measuredModels": {
+		"kind": [
+			"claude-haiku-5-5"
+		],
+		"alignment": [
+			"claude-haiku-5-5"
+		],
+		"plan-outcome": [
+			"claude-haiku-5-5",
+			"claude-sonnet-5-5"
+		],
+		"review-verdict": [
+			"claude-haiku-5-5",
+			"claude-sonnet-5-5"
+		]
+	},
+	"mergeRisk": {
+		"weights": {
+			"impact": 2,
+			"verification": 2,
+			"rollback": 1.5,
+			"errorDetection": 1,
+			"alignment": 1
+		},
+		"cuts": [
+			1.5,
+			2.25
+		]
+	}
 }

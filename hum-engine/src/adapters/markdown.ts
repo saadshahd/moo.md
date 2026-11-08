@@ -216,7 +216,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 		if (!file) throw new PermanentError(`item "${item}" is malformed; see its fault card`);
 
-		return { id: item, title: file.title, body: file.body, ready: isReady(file, claims.get(item)), thread: file.thread };
+		return { id: item, title: file.title, body: file.body, ready: isReady(file, claims.get(item)), thread: file.thread, labels: file.kind === undefined ? [] : [file.kind] };
 	};
 
 	const adapter = {

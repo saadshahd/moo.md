@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { type Command, Option } from "commander";
+import type { Command } from "commander";
 import { x } from "tinyexec";
 import { z } from "zod";
 import { listHopeSkills } from "../config/load.ts";
@@ -26,15 +26,14 @@ const SCHEDULE_EVENT = "schedule";
 
 const collect = (value: string, seen: string[]): string[] => [...seen, value];
 
-type WorkFlags = { kind?: string; check: string[]; holder?: string; base?: string };
+type WorkFlags = { check: string[]; holder?: string; base?: string };
 
 /**
- * What a worker needs to know that no file in the repo says yet: its kind, and the checks a change must pass.
- * A unit or workflow sets them as HUM_KIND and HUM_CHECKS (a JSON array of commands), so its command line stays fixed.
+ * What a worker needs to know that no file in the repo says yet: the checks a change must pass.
+ * A unit or workflow sets them as HUM_CHECKS (a JSON array of commands), so its command line stays fixed.
  */
 const withWorkOptions = (cmd: Command): Command =>
 	cmd
-		.addOption(new Option("--kind <name>", "the kind every item runs as").env("HUM_KIND"))
 		.option("--check <command>", "a command the repo's checks run before a merge; repeat for more (HUM_CHECKS: a JSON array)", collect, [])
 		.option("--holder <name>", "the name this worker claims items by; default <where>@<host>")
 		.option("--base <branch>", "the branch items merge into; default main");
@@ -89,15 +88,11 @@ const envChecks = (): string[] => {
 /** The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow. */
 const openFor = async (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 	const checks = flags.check.length > 0 ? flags.check : envChecks();
-	const kind = flags.kind;
 
 	if (checks.length === 0) throw new Error("name at least one check: --check, or HUM_CHECKS as a JSON array of commands");
 
-	if (!kind) throw new Error("name the kind: --kind, or HUM_KIND");
-
 	return openWorker(repo, {
 		hopeSkills: listHopeSkills(await hopeRoot()),
-		kind: () => kind,
 		checks,
 		holder: flags.holder ?? `${where}@${hostname()}`,
 		base: flags.base,

@@ -173,10 +173,6 @@
 			},
 			"additionalProperties": {}
 		},
-		"decisionModel": {
-			"type": "string",
-			"minLength": 1
-		},
 		"dailyQuestionCap": {
 			"type": "integer",
 			"exclusiveMinimum": 0,
@@ -693,6 +689,175 @@
 				"minLength": 1
 			},
 			"description": "Globs of tracked git hooks; a change to one changes hum itself."
+		},
+		"diffLimit": {
+			"default": 100000,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The most characters of a change's diff one prompt carries."
+		},
+		"failureTail": {
+			"default": 4000,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The last characters of the checks' output a fix run reads."
+		},
+		"fallbackKind": {
+			"default": "feature",
+			"type": "string",
+			"minLength": 1,
+			"description": "The kind an item runs as when neither its source nor the model call names one."
+		},
+		"docsOnly": {
+			"default": {
+				"kind": "docs",
+				"paths": [
+					"**/*.md",
+					"**/*.mdx",
+					"docs/**"
+				]
+			},
+			"type": "object",
+			"properties": {
+				"kind": {
+					"type": "string",
+					"minLength": 1
+				},
+				"paths": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				}
+			},
+			"required": [
+				"kind",
+				"paths"
+			],
+			"additionalProperties": false,
+			"description": "An item of this kind whose change touches a path outside these globs moves to its real kind."
+		},
+		"decisionModel": {
+			"default": "claude-haiku-5-5",
+			"type": "string",
+			"minLength": 1,
+			"description": "The model id of the cheap model call, made through claude -p."
+		},
+		"modelCallTimeoutSeconds": {
+			"default": 120,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a cheap model call may take before it counts as an abstention."
+		},
+		"measuredModels": {
+			"default": {
+				"kind": [
+					"claude-haiku-5-5"
+				],
+				"alignment": [
+					"claude-haiku-5-5"
+				],
+				"plan-outcome": [
+					"claude-haiku-5-5",
+					"claude-sonnet-5-5"
+				],
+				"review-verdict": [
+					"claude-haiku-5-5",
+					"claude-sonnet-5-5"
+				]
+			},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"enum": [
+					"kind",
+					"alignment",
+					"plan-outcome",
+					"review-verdict"
+				]
+			},
+			"additionalProperties": {
+				"type": "array",
+				"items": {
+					"type": "string",
+					"minLength": 1
+				}
+			},
+			"required": [
+				"kind",
+				"alignment",
+				"plan-outcome",
+				"review-verdict"
+			],
+			"description": "Per model-judgment boundary, the model ids its labelled set was measured on; a pick from any other id counts as an abstention."
+		},
+		"mergeRisk": {
+			"default": {
+				"weights": {
+					"impact": 2,
+					"verification": 2,
+					"rollback": 1.5,
+					"errorDetection": 1,
+					"alignment": 1
+				},
+				"cuts": [
+					1.5,
+					2.25
+				]
+			},
+			"type": "object",
+			"properties": {
+				"weights": {
+					"type": "object",
+					"propertyNames": {
+						"type": "string",
+						"enum": [
+							"impact",
+							"verification",
+							"rollback",
+							"errorDetection",
+							"alignment"
+						]
+					},
+					"additionalProperties": {
+						"type": "number",
+						"exclusiveMinimum": 0
+					},
+					"required": [
+						"impact",
+						"verification",
+						"rollback",
+						"errorDetection",
+						"alignment"
+					]
+				},
+				"cuts": {
+					"type": "array",
+					"prefixItems": [
+						{
+							"type": "number",
+							"exclusiveMinimum": 0
+						},
+						{
+							"type": "number",
+							"exclusiveMinimum": 0
+						}
+					],
+					"items": false,
+					"minItems": 2,
+					"maxItems": 2
+				}
+			},
+			"required": [
+				"weights",
+				"cuts"
+			],
+			"additionalProperties": false,
+			"description": "How the alignment grade raises a level: each category's grade, 1 to 3, times its weight, averaged; when the alignment call's grades move the average across a cut, the level goes one step up."
 		}
 	},
 	"required": [

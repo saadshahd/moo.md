@@ -1,3 +1,4 @@
+import { docsJudge } from "./fixtures/judge.ts";
 import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -34,7 +35,9 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 	await git.raw(["add", file]);
 	await git.raw(["commit", "-q", "-m", `docs: ${id}`]);
 	await push(git, ["origin", `HEAD:refs/heads/${branch}`]);
-	state.landings.put(id, { item: id, branch, since: Date.now(), change: { paths: [file], size: 1, loosened: false, pinChanged: false } });
+	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
+
+	state.landings.put(id, { item: id, branch, since: Date.now(), change: { paths: [file], size: 1, loosened: false, pinChanged: false }, head, ownerApproved: false });
 
 	const ctx: LandContext = {
 		state,
@@ -53,6 +56,10 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		questions: provider.questions!,
 		pulls,
 		now: Date.now,
+		judge: docsJudge,
+		reviewRun: () => {
+			throw new Error("a low docs change needs no review run");
+		},
 	};
 
 	return { ctx, branch, cleanup: () => [clone, state.dir].forEach((dir) => rmSync(dir, { recursive: true, force: true })) };

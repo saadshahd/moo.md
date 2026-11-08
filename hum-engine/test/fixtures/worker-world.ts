@@ -1,3 +1,4 @@
+import { docsJudge } from "./judge.ts";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -49,7 +50,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			config,
 			adapters: { workSource: adapter.workSource!, questions: adapter.questions!, answers: adapter.answers },
 			runner,
-			kind: () => "docs",
+			judge: docsJudge,
 			remote: repo.remote,
 			checks: options.checks ?? ["true"],
 			holder: "worker-1",

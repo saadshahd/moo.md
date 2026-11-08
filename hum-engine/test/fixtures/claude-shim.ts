@@ -7,7 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Behavior } from "./shim.ts";
+import type { Behavior, Decided } from "./shim.ts";
 
 /**
  * A stand-in for the `claude` binary. HUM_SHIM holds JSON: `{version, log, script}`.
@@ -22,6 +22,10 @@ const spec = JSON.parse(process.env.HUM_SHIM ?? "{}") as {
 	script?: Behavior[];
 	/** A behavior per item id, for runs that go at the same time and cannot be told apart by their order. */
 	items?: Record<string, Behavior>;
+	/** What a cheap model call answers, by the property its schema asks for; logged apart, so the script's order holds. */
+	judgments?: { kind?: { kind: string }; alignment?: { alignment: string; verification: string } };
+	/** What plan and review runs pick, in order, logged apart; past the last, a plan is ready and a review approves. */
+	decisions?: Decided[];
 };
 
 if (process.argv.includes("--version")) {
@@ -34,6 +38,18 @@ const log = spec.log ?? "/dev/null";
 
 mkdirSync(dirname(log), { recursive: true });
 
+const JUDGMENTS = { kind: { kind: "docs" }, alignment: { alignment: "sound", verification: "sound" }, ...spec.judgments };
+
+if (process.argv.includes("--no-session-persistence")) {
+	const schema = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
+	const asked = schema.includes('"alignment"') ? "alignment" : "kind";
+
+	appendFileSync(`${log}.judgments`, `${JSON.stringify({ asked })}\n`);
+	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [] }));
+	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: JUDGMENTS[asked], modelUsage: { "claude-haiku-5-5": { inputTokens: 1, outputTokens: 1 } } }));
+	process.exit(0);
+}
+
 const calls = (() => {
 	try {
 		return readFileSync(log, "utf8").split("\n").filter(Boolean).length;
@@ -44,6 +60,33 @@ const calls = (() => {
 
 const prompt = new TextDecoder().decode(stdin);
 const itemId = /^# Item (\S+):/m.exec(prompt)?.[1];
+
+const DECIDED: Record<"plan" | "review", Decided> = {
+	plan: { event: "plan-ready", sure: true, reason: "The item is clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } },
+	review: { event: "approve", sure: true, reason: "The change does what the item asks." },
+};
+
+const schemaArg = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
+
+if (schemaArg.includes('"sure"')) {
+	const decisionLog = `${log}.decisions`;
+
+	const made = (() => {
+		try {
+			return readFileSync(decisionLog, "utf8").split("\n").filter(Boolean).length;
+		} catch {
+			return 0;
+		}
+	})();
+
+	const purpose = schemaArg.includes('"plan-ready"') ? "plan" : "review";
+	const answer = spec.decisions?.[made] ?? DECIDED[purpose];
+
+	appendFileSync(decisionLog, `${JSON.stringify({ purpose, answer, prompt, cwd: process.cwd() })}\n`);
+	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [{ name: "hope" }] }));
+	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: answer, modelUsage: { "claude-haiku-5-5": { inputTokens: 1, outputTokens: 10 } } }));
+	process.exit(0);
+}
 
 appendFileSync(
 	log,

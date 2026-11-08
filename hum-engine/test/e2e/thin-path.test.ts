@@ -1,3 +1,6 @@
+import { docsJudge, scriptedJudge, SOUND } from "../fixtures/judge.ts";
+import type { Runner } from "../../src/adapters/claude-p.ts";
+import { type ModelCall, modelCallOver } from "../../src/adapters/model-call.ts";
 import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -41,7 +44,7 @@ const world = async (spec: ShimSpec, { config = configWith(), checks = ["test -f
 		state,
 		runner,
 		config,
-		kind: "docs",
+		judge: docsJudge,
 		remote: repo.remote,
 		checks,
 		holder: "worker-1",
@@ -122,7 +125,7 @@ test("failed checks go to a fix run, and the fix run gets the failure", async ()
 
 	expect(await runThinPath(w.options())).toEqual({ outcome: "merged", item: id });
 	expect(w.shim.calls()).toHaveLength(3);
-	expect(readFileSync(join(tmpdir(), `hum-fix-stdin-${process.pid}`), "utf8")).toContain("The checks failed");
+	expect(readFileSync(join(tmpdir(), `hum-fix-stdin-${process.pid}`), "utf8")).toContain("## What to fix");
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("good\n");
 });
 
@@ -348,4 +351,99 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 	expect(existsSync(ran)).toBe(false);
 	expect(() => sh(w.repo.remote, ["show", "main:docs/note.md"])).toThrow();
 	expect(sh(w.repo.remote, ["show", "main:.hum/hum.json"])).toBe(OWNER_CONFIG);
+});
+
+const featureJudge = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND });
+
+test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, and an approval merges it", async () => {
+	const fixStdin = join(tmpdir(), `hum-review-fix-${process.pid}`);
+	const cite = { event: "request-changes", sure: true, reason: "The note says nothing.", cites: [{ file: "docs/note.md", line: 1 }] };
+	const w = await world({ script: [{}, NOTE, { commit: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [{ event: "plan-ready", sure: true, reason: "Clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } }, cite] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+
+	const [plan, review, approval] = w.shim.decisions();
+
+	expect([plan?.purpose, review?.purpose, approval?.answer.event]).toEqual(["plan", "review", "approve"]);
+	expect(readFileSync(fixStdin, "utf8")).toContain("docs/note.md:1");
+	expect(w.shim.calls().find((call) => call.itemId === id)).toBeDefined();
+	expect(review?.cwd).not.toContain("hum-run-");
+	expect(review?.prompt).not.toContain("Write it.");
+	expect(w.repo.show(id)).toContain("state: done");
+});
+
+test("a medium change waits for a fresh review run at landing: a request for changes holds it for the owner, an approval merges it", async () => {
+	const cite = { event: "request-changes", sure: true, reason: "Wrong file.", cites: [{ file: "docs/note.md", line: 1 }] };
+	const w = await world({ script: [{}, NOTE], decisions: [cite] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }])) });
+	const held = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options())).toEqual({ outcome: "review", item: held, detail: "the review run answered request-changes: Wrong file." });
+
+	const merged = w.repo.seed("Write it again");
+
+	expect(await runThinPath(w.options({ itemId: merged }))).toEqual({ outcome: "merged", item: merged });
+	expect(w.shim.decisions().map((d) => [d.purpose, d.answer.event])).toEqual([["review", "request-changes"], ["review", "approve"]]);
+});
+
+test("a plan run that splits its item files each part as a ready item and lands the item as done with no change of its own", async () => {
+	const w = await world({ script: [{}], decisions: [{ event: "needs-split", sure: true, reason: "Two jobs.", parts: ["Write part one", "Write part two"] }] }, { checks: ["true"] });
+	const id = w.repo.seed("Write two parts");
+
+	expect(await runThinPath(w.options({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+	expect(w.repo.show(id)).toContain("state: done");
+	expect((await w.adapter.workSource!.listReady()).map((ref) => ref.title)).toEqual(["Write part one", "Write part two"]);
+	expect(w.shim.calls()).toHaveLength(1);
+});
+
+test("a docs item whose change touches code moves to its real kind and runs again from the plan, on the same branch", async () => {
+	const config = configWith((raw) => void (raw.hum.docsOnly.paths = ["**/*.md"]));
+	const asked: string[] = [];
+	const judge = scriptedJudge({ kind: { kind: "docs" }, alignment: SOUND }, asked);
+	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] }, { config });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options({ judge }))).toEqual({ outcome: "moved", item: id, kind: "feature" });
+	expect(w.state.itemKinds.get(id)).toMatchObject({ kind: "feature", from: "fallback" });
+	expect(asked).toEqual(["kind", "kind"]);
+
+	await runThinPath(w.options({ judge, itemId: id }));
+
+	expect(w.shim.decisions()[0]?.purpose).toBe("plan");
+});
+
+test("the alignment grade times out: the change is unclear and waits for the owner's review at its level, with no question", async () => {
+	const hanging: Runner = { run: (request) => new Promise((resolve) => request.signal?.addEventListener("abort", () => resolve({ kind: "stopped" }))), limitedUntil: () => 0 };
+	const alignment = modelCallOver(hanging, { model: "m", timeoutMs: 5, trusts: () => true });
+	const judge: ModelCall = (question) => (question.boundary === "alignment" ? alignment(question) : docsJudge(question));
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options({ judge }))).toEqual({ outcome: "review", item: id, detail: "the alignment call abstained: the call timed out" });
+	expect(await questionsOn(w, id)).toEqual([]);
+	expect(w.shim.decisions()).toEqual([]);
+});
+
+test("a review that leaves the change to the owner asks; the owner's approval lands it past its level's own review run, and a rejection sends it to a fix with the owner's words", async () => {
+	const toOwner = { event: "needs-owner", sure: true, reason: "A matter of tone.", question: "Is the tone right?" };
+	const ready = { event: "plan-ready", sure: true, reason: "Clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };
+	const fixStdin = join(tmpdir(), `hum-owner-fix-${process.pid}`);
+	const config = configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }]));
+	const w = await world({ script: [{}, NOTE, { commit: { "docs/other.md": "other\n" } }, { commit: { "docs/other.md": "other, softer\n" }, saveStdin: fixStdin }], decisions: [ready, toOwner, ready, toOwner] }, { config });
+	const approved = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.options({ judge: featureJudge }))).toEqual({ outcome: "asked", item: approved, detail: "Is the tone right?" });
+
+	await w.adapter.answers!.answer(approved, { text: "yes", option: "approve" });
+
+	expect(await runThinPath(w.options({ judge: featureJudge, itemId: approved }))).toEqual({ outcome: "merged", item: approved });
+
+	const rejected = w.repo.seed("Write another note");
+
+	expect(await runThinPath(w.options({ judge: featureJudge, itemId: rejected }))).toMatchObject({ outcome: "asked", item: rejected });
+
+	await w.adapter.answers!.answer(rejected, { text: "Make it softer." });
+
+	expect(await runThinPath(w.options({ judge: featureJudge, itemId: rejected }))).toEqual({ outcome: "merged", item: rejected });
+	expect(readFileSync(fixStdin, "utf8")).toContain("Make it softer.");
 });

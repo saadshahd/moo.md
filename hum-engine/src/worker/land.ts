@@ -25,16 +25,22 @@ import {
 	methodFor,
 	type PullRequests,
 } from "../adapters/pull-requests.ts";
+import type { ModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
+import type { Boundary } from "../config/schema.ts";
+import { alignedPlacement, alignmentQuestion } from "../decide/alignment.ts";
 import {
 	isCleared,
 	type Landing,
 	landingOf,
+	needsReviewRun,
 	OWNER_APPROVAL,
 	type Route,
 	routeOf,
+	type Unclear,
 	waitReason,
 } from "../decide/merge.ts";
+import { isMeasured } from "../decide/prose.ts";
 import {
 	type Change,
 	placeChange,
@@ -42,6 +48,7 @@ import {
 	type Policy,
 } from "../decide/risk.ts";
 import type { State } from "../state/open.ts";
+import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
 import { runChecks } from "./checks.ts";
 import type { ThinResult } from "./thin-path.ts";
 
@@ -73,7 +80,16 @@ export type LandContext = {
 	/** The remote's pull requests and branch rules; undefined for a remote that is not on GitHub. */
 	readonly pulls: PullRequests | undefined;
 	readonly now: () => number;
+	readonly judge: ModelCall;
+	/** A fresh review run on the change that ends at `head`, at its level's tier; it saves its verdict. */
+	readonly reviewRun: (change: { readonly head: string; readonly diff: string; readonly level: string }) => Promise<ReviewOutcome>;
 };
+
+/** What a review run at landing came to: its verdict, or the result that stopped it, such as a usage limit. */
+export type ReviewOutcome = { readonly verdict: Verdict } | { readonly halted: ThinResult };
+
+/** The review verdict that lets a change merge. */
+export const REVIEW_APPROVAL = "approve";
 
 /** The change cannot merge on the newest base: it conflicts, or its checks fail there. */
 class StaleMerge extends Error {
@@ -228,17 +244,18 @@ const learnRules = async (
 	}
 };
 
-/** Marks the item done on the run branch, pushes the branch and saves what its diff showed, so a retry lands it without a run. */
-export const prepareLanding = async (ctx: LandContext): Promise<void> => {
+/** Marks the item done on the run branch, pushes the branch and saves what its diff showed, so a retry lands it without a run. `ownerApproved` records that the owner approved this change in its review state. */
+export const prepareLanding = async (ctx: LandContext, ownerApproved = false): Promise<void> => {
 	const { git, clone, dir, id, branch, state, now } = ctx;
 	const change = await changeOn(ctx);
+	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
 	const file = join(clone, dir, `${id}.md`);
 
 	writeFileSync(file, markDone(readFileSync(file, "utf8")));
 	await git.raw(["add", `${dir}/${id}.md`]);
 	await git.raw(["commit", "-q", "-m", `hum: finish ${id}`]);
 	await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
-	state.landings.put(id, { item: id, branch, since: now(), change: { ...change, paths: [...change.paths] } });
+	state.landings.put(id, { item: id, branch, since: now(), change: { ...change, paths: [...change.paths] }, head, ownerApproved });
 };
 
 /** A merge is rechecked on the newest base: when the base moved, the change is rebased and the checks run again. */
@@ -280,6 +297,8 @@ const finish = async ({ state, git, id }: LandContext): Promise<ThinResult> => {
 	const sha = (await git.raw(["rev-parse", "HEAD"])).trim();
 
 	state.landings.remove(id);
+	state.plans.remove(id);
+	state.verdicts.remove(id);
 	state.events.add({
 		source: "work-source",
 		sourceId: `merged:${sha}`,
@@ -317,9 +336,10 @@ const throughPullRequest = async (
 	autoMerge: boolean,
 	route: Route,
 	rules: BranchRules,
+	why: string,
 ): Promise<ThinResult> => {
 	const { id, branch, base, item, config } = ctx;
-	const body = `${autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${waitReason(route)}.`}\n\nItem ${id}.`;
+	const body = `${autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`}\n\nItem ${id}.`;
 
 	const pull =
 		(await pulls.find(branch)) ??
@@ -357,6 +377,7 @@ const afterRefusal = async (
 	ctx: LandContext,
 	cleared: boolean,
 	route: Route,
+	why: string,
 ): Promise<ThinResult> => {
 	if (!ctx.pulls)
 		throw new PushRefused(
@@ -369,6 +390,7 @@ const afterRefusal = async (
 		cleared,
 		route,
 		await ctx.pulls.rules(ctx.base, true),
+		why,
 	);
 };
 
@@ -377,12 +399,13 @@ const landBy = async (
 	landing: Landing,
 	route: Route,
 	rules: BranchRules,
+	why: string,
 ): Promise<ThinResult> => {
 	if (landing.via === "wait")
-		return { outcome: "review", item: ctx.id, detail: waitReason(route) };
+		return { outcome: "review", item: ctx.id, detail: why };
 
 	if (landing.via === "pull-request" && ctx.pulls)
-		return throughPullRequest(ctx, ctx.pulls, landing.autoMerge, route, rules);
+		return throughPullRequest(ctx, ctx.pulls, landing.autoMerge, route, rules, why);
 
 	try {
 		await pushToBase(ctx);
@@ -392,7 +415,7 @@ const landBy = async (
 		if (error instanceof StaleMerge)
 			return { outcome: "review", item: ctx.id, detail: error.message };
 
-		if (error instanceof PushRefused) return afterRefusal(ctx, true, route);
+		if (error instanceof PushRefused) return afterRefusal(ctx, true, route, why);
 
 		throw error;
 	}
@@ -417,21 +440,59 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 		? await placementOf(ctx, saved.change)
 		: first;
 
-	const route = routeOf(placement, policy.paths, ctx.kind, saved.change.paths);
+	if (placement.unclear.length > 0) await askUnclear(ctx, placement.unclear);
 
-	if (route.unclear) await askUnclear(ctx, placement.unclear);
+	const diff = await ctx.git.raw(["diff", ...PATCH, `origin/${ctx.base}...${saved.head}`]);
+	const alignment = saved.change.paths.length > 0 ? await alignmentOf(ctx, saved, diff) : undefined;
+	const aligned = alignment && "graded" in alignment ? alignedPlacement(placement, alignment.graded, ctx.config.hum) : placement;
+	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, alignment, verdict));
+	const placed = routeWith();
+	const reviewed = needsReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name }) : undefined;
 
-	const cleared = isCleared(
-		route,
-		ctx.item.thread.some(isOwnerApproval(saved.since)),
-	);
+	if (reviewed && "halted" in reviewed) return reviewed.halted;
 
+	const verdict = reviewed?.verdict;
+	const route = routeWith(verdict);
+	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: saved.ownerApproved || ctx.item.thread.some(isOwnerApproval(saved.since)) };
+	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 
-	return landBy(
-		ctx,
-		landingOf(rules.requiresPullRequest, cleared),
-		route,
-		rules,
-	);
+	return landBy(ctx, landingOf(rules.requiresPullRequest, isCleared(route, approvals)), route, rules, why);
+};
+
+/** The alignment call's grades for a saved change, made once and kept with the landing. */
+const alignmentOf = async (ctx: LandContext, saved: SavedLanding, diff: string): Promise<NonNullable<SavedLanding["alignment"]>> => {
+	if (saved.alignment) return saved.alignment;
+
+	const judged = await ctx.judge(alignmentQuestion(ctx.item, diff, ctx.config.hum));
+	const alignment = judged.kind === "picked" ? { graded: judged.value } : { abstained: judged.why };
+
+	ctx.state.landings.put(ctx.id, { ...saved, alignment });
+
+	return alignment;
+};
+
+/** The verdict on the change at `head`: the one saved for it, else a fresh review run. */
+const verdictOn = async (ctx: LandContext, change: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
+	const saved = ctx.state.verdicts.get(ctx.id);
+
+	return saved?.head === change.head ? { verdict: saved } : ctx.reviewRun(change);
+};
+
+const abstained = (boundary: Boundary, why: string): Unclear => ({ cause: "abstained", boundary, why });
+
+const unmeasured = (models: readonly string[]): string => `${models.join(", ") || "no model"} has no measured rate`;
+
+/** Every model judgment behind the change that abstained, or came from a model id its boundary was not measured on. */
+const abstentionsOf = (ctx: LandContext, alignment: SavedLanding["alignment"], verdict: Verdict | undefined): Unclear[] => {
+	const measured = (boundary: Boundary, models: readonly string[]): boolean => isMeasured(models, ctx.config.hum.measuredModels[boundary] ?? []);
+	const kind = ctx.state.itemKinds.get(ctx.id);
+	const plan = ctx.state.plans.get(ctx.id);
+
+	return [
+		...(kind?.from === "fallback" ? [abstained("kind", kind.why)] : []),
+		...(alignment && "abstained" in alignment ? [abstained("alignment", alignment.abstained)] : []),
+		...(plan && !measured("plan-outcome", plan.models) ? [abstained("plan-outcome", unmeasured(plan.models))] : []),
+		...(verdict && !measured("review-verdict", verdict.models) ? [abstained("review-verdict", unmeasured(verdict.models))] : []),
+	];
 };

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
 import type { Item, Questions, WorkSource } from "../adapter-api.ts";
-import { type Runner, succeeded } from "../adapters/claude-p.ts";
+import { type Finished, type Runner, succeeded } from "../adapters/claude-p.ts";
+import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { type Git, gitIn, PATCH, push } from "../adapters/git.ts";
@@ -12,20 +13,22 @@ import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
 import { kindMachine } from "../config/machine.ts";
-import { type Kind, type Naming, OWNER_WAIT_TAG, STUCK_TAG } from "../config/schema.ts";
+import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
+import { leavesDocs } from "../decide/kind.ts";
+import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { runChecks } from "./checks.ts";
-import { changeOn, type LandContext, land, placementOf, prepareLanding } from "./land.ts";
+import { changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { DIFF_LIMIT } from "../decide/review.ts";
+import { reviewInput } from "../decide/review.ts";
+import { decideKind, forgetProgress, kindAnswered } from "./kind.ts";
+import { decideProse } from "./prose-run.ts";
 import { footprintOf, type PrefixGate } from "./scheduler.ts";
 
 /** How long a claim lasts unless its holder renews it. */
 export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeconds * SECOND_MS;
-
-const FAILURE_TAIL = 4000;
 
 const CARD_EXCERPT = 300;
 
@@ -34,11 +37,7 @@ const ERROR_EXCERPT = 500;
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
 /** What the agent run hands back besides its commit. */
-export const RUN_SCHEMA = {
-	type: "object",
-	properties: { status: { enum: ["done", "needs-owner"] }, question: { type: "string" }, plan: { type: "string" } },
-	required: ["status"],
-} as const;
+export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
 export const PLAN_MARK = "hum plan:";
@@ -49,7 +48,8 @@ export type ThinPathOptions = {
 	readonly state: State;
 	readonly runner: Runner;
 	readonly config: Config;
-	readonly kind: string;
+	/** The cheap model call; by default the config's decision model through the runner. */
+	readonly judge?: ModelCall;
 	/** The work repo's remote: a URL or path. Runs clone it; nothing touches the owner's checkout. */
 	readonly remote: string;
 	readonly base?: string;
@@ -75,11 +75,13 @@ export type ThinPathOptions = {
 export type ThinResult =
 	| { readonly outcome: "idle" }
 	| { readonly outcome: "lost" | "waiting"; readonly item: string }
+	/** The item's change showed it is another kind: it runs again from the start as that kind, on the same branch. */
+	| { readonly outcome: "moved"; readonly item: string; readonly kind: string }
 	| { readonly outcome: "merged" | "asked" | "stuck" | "review" | "landing"; readonly item: string; readonly detail?: string }
 	| { readonly outcome: "limited"; readonly item: string; readonly until: number }
 	| { readonly outcome: "held"; readonly item: string; readonly why: string };
 
-type Answered = { readonly question: string; readonly answer: string; readonly plan: string };
+type Answered = { readonly question: string; readonly answer: string; readonly option: string | undefined; readonly plan: string };
 
 /** The question, the answer to it and the plan, once the owner has answered the latest question. */
 export const answerTo = (item: Item): Answered | undefined => {
@@ -93,6 +95,7 @@ export const answerTo = (item: Item): Answered | undefined => {
 	return {
 		question: item.thread[lastQuestion]?.text ?? "",
 		answer: answer.option ? `${answer.option}: ${answer.text}` : answer.text,
+		option: answer.option,
 		plan: plan?.text.slice(PLAN_MARK.length).trim() ?? "",
 	};
 };
@@ -127,35 +130,55 @@ const stubSources = (kind: Kind) => {
  * paths are all at the lowest level. A run that needs the owner pushes its branch, asks on the item and
  * ends; the answer starts a fresh run on that branch. Never `--resume`.
  */
+const kindNamed = (config: Config, name: string): Kind => {
+	const kind = config.kinds[name];
+
+	if (!kind) throw new Error(`no kind "${name}" in the config`);
+
+	return kind;
+};
+
 export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const base = o.base ?? "main";
-	const kind = o.config.kinds[o.kind];
-
-	if (!kind) throw new Error(`no kind "${o.kind}" in the config`);
-
 	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
 
 	if (id === undefined) return { outcome: "idle" };
-
-	const saved = await o.state.items.restore(id, kind, { sources: stubSources(kind), kindAt: earlierKinds(o.state, kind) });
-
-	if (!saved.ok) return { outcome: "held", item: id, why: saved.fault.cause };
-
-	const at = saved.value === undefined ? undefined : String(saved.value.getSnapshot().value);
 
 	// A parked item stays parked until the owner acts: its file still says ready, and a rerun would spend the same tokens again.
 	const parked = o.state.parked.get(id);
 
 	if (parked) return { outcome: parked.why, item: id, detail: parked.cause };
 
-	if (endedStuck(kind, at)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
+	// An item gets its kind before its first snapshot, so an item with no saved kind has nothing to restore.
+	const known = o.state.itemKinds.get(id);
+	const knownKind = known && kindNamed(o.config, known.kind);
+	const saved = knownKind ? await o.state.items.restore(id, knownKind, { sources: stubSources(knownKind), kindAt: earlierKinds(o.state, knownKind) }) : ({ ok: true, value: undefined } as const);
 
-	const asking = waitsOnOwner(kind, at);
+	if (!saved.ok) return { outcome: "held", item: id, why: saved.fault.cause };
+
+	const at = saved.value === undefined ? undefined : String(saved.value.getSnapshot().value);
+
+	if (knownKind && endedStuck(knownKind, at)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
+
 	const claim = await o.workSource.claim(id, o.holder, claimTtlMs(o.config));
 
 	if (!claim.won) return { outcome: "lost", item: id };
 
 	const item = await o.workSource.read(id);
+	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum);
+	const named = known && kindAnswered(known, item, o.config.hum.kinds);
+
+	if (named) o.state.itemKinds.put(id, named);
+
+	if (named && named.kind !== known?.kind) {
+		forgetProgress(o.state, id);
+
+		return { outcome: "moved", item: id, kind: named.kind };
+	}
+
+	const kindName = (named ?? known ?? (await decideKind({ ...o, judge }, item))).kind;
+	const kind = kindNamed(o.config, kindName);
+	const asking = waitsOnOwner(kind, at);
 	const answered = asking ? answerTo(item) : undefined;
 
 	const awaitsAnswer = asking && answered === undefined;
@@ -179,17 +202,22 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 			await g(["checkout", "-q", "-b", branch]);
 		}
 
-		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName: o.kind, kind, id, item, branch, clone, g, git, answered, resume: asking };
+		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, g, git, answered, resume: asking };
 
 		// A change already finished lands again from its pushed branch; no run is spent on it.
-		return park(o, landing ? await landAgain(driven) : await drive(driven));
+		const result = park(o, landing ? await landAgain(driven) : await drive(driven));
+
+		if (result.outcome === "moved") forgetProgress(o.state, id);
+
+		return result;
 	} finally {
 		rmSync(clone, { recursive: true, force: true });
 	}
 };
 
-type Driven = Omit<ThinPathOptions, "kind"> & {
+type Driven = ThinPathOptions & {
 	readonly kindName: string;
+	readonly judge: ModelCall;
 	readonly base: string;
 	readonly dir: string;
 	readonly kind: Kind;
@@ -226,6 +254,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	let cause = "";
 	let handled = "";
 	let pending: { question: string; plan: string } | undefined;
+	let approvedByOwner = false;
 	let actor: AnyActor;
 
 	const stuckCause = (): string | undefined => cause || lastFailure.slice(0, CARD_EXCERPT) || undefined;
@@ -236,10 +265,10 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return new Error(message);
 	};
 
-	/** A build is placed by the files its item declares; a fix by the branch's diff so far. */
-	const tierFor = async (purpose: "build" | "fix") => {
+	/** A plan or build is placed by the files its item declares; a fix or review by the branch's diff so far. */
+	const tierFor = async (purpose: Purpose) => {
 		const declared = { paths: footprintOf(item) ?? [], size: 0, loosened: false, pinChanged: false };
-		const change = purpose === "fix" ? await changeOn(landContext(d)) : declared;
+		const change = PLACED_BY_DIFF[purpose] ? await changeOn(landContext(d)) : declared;
 		const { placement } = await placementOf(landContext(d), change);
 		const row = pickTier(kind, { purpose, level: placement.level.name, size: "small" });
 
@@ -248,27 +277,34 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return { model: config.hum.models[row.tier], effort: row.effort };
 	};
 
+
+	const branchDiff = (): Promise<string> => g(["diff", ...PATCH, `origin/${base}...HEAD`]);
+
 	const prompt = async (purpose: "build" | "fix"): Promise<string> => {
-		const role = config.hum.roles[purpose];
+		const plan = state.plans.get(id);
 
 		const parts = [
-			((role && config.roles[role.file]) ?? "").trim(),
+			roleOf(config, purpose),
 			`# Item ${id}: ${item.title}\n\n${item.body}`,
 			`Work on the branch ${branch}. Commit the change when it is whole. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
 		];
 
+		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
+
 		if (d.answered) {
-			const diff = await g(["diff", ...PATCH, `origin/${base}...${branch}`]);
+			const diff = await branchDiff();
 
 			parts.push(
-				`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${diff.slice(0, DIFF_LIMIT)}`,
+				`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${diff.slice(0, config.hum.diffLimit)}`,
 			);
 		}
 
-		if (purpose === "fix") parts.push(`## The checks failed\n${lastFailure.slice(-FAILURE_TAIL)}\nFix the cause and commit.`);
+		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause and commit.`);
 
 		return parts.join("\n\n");
 	};
+
+
 
 	/** Never settles: the driver stops the actor, so the saved snapshot stays at the state it was in. */
 	const pause = (outcome: ThinResult): Promise<never> => {
@@ -283,44 +319,59 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		actor.send({ type: "token-cap" });
 	};
 
+	/** One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where the state can, and ends stuck where it cannot. */
+	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal): Promise<Finished> => {
+		const attempt = state.runs.list(id).length;
+		const key = { itemId: id, run: purpose, attempt };
+		const begun = state.runs.begin(key, `hum ${id} ${purpose} #${attempt}`, crypto.randomUUID());
+		const prefix = config.hum.roles[purpose]?.file ?? purpose;
+
+		const lease = await d.gate?.enter(prefix, signal);
+
+		const outcome = await runner
+			.run({
+				prompt: text,
+				cwd: purpose === "review" ? tmpdir() : clone,
+				...(await tierFor(purpose)),
+				schema,
+				tokenCap: kind.tokenCap.tokens - (tally.total - tally.base),
+				sessionId: begun.record.sessionId,
+				signal,
+				onSession: (sessionId) => state.runs.saveSession(key, sessionId),
+				onFirstToken: () => lease?.opened(),
+			})
+			.finally(() => lease?.release());
+
+		if (outcome.kind === "limited") return pause({ outcome: "limited", item: id, until: outcome.until });
+
+		if (outcome.kind === "held") return pause({ outcome: "held", item: id, why: outcome.card.cause });
+
+		if (outcome.kind === "stopped") return pause({ outcome: "lost", item: id });
+
+		if (outcome.kind === "over-cap") {
+			spend(outcome.tokens);
+
+			const why = `The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.total - tally.base} tokens.`;
+
+			if (!actor.getSnapshot().can({ type: "token-cap" })) throw failed(why);
+
+			ask(why, "");
+
+			return new Promise<never>(() => {});
+		}
+
+		spend(outcome.tokens);
+
+		return outcome;
+	};
+
 	const step = (purpose: "build" | "fix") =>
 		createAsyncLogic({
 			run: async ({ signal }) => {
 				if (purpose === "fix" && ++fixes > maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
-				const attempt = state.runs.list(id).length;
-				const key = { itemId: id, run: purpose, attempt };
-				const begun = state.runs.begin(key, `hum ${id} ${purpose} #${attempt}`, crypto.randomUUID());
 				const before = (await g(["rev-parse", "HEAD"])).trim();
-				const prefix = config.hum.roles[purpose]?.file ?? purpose;
-
-				const lease = await d.gate?.enter(prefix, signal);
-
-				const outcome = await runner
-					.run({
-						prompt: await prompt(purpose),
-						cwd: clone,
-						...(await tierFor(purpose)),
-						schema: RUN_SCHEMA,
-						tokenCap: kind.tokenCap.tokens - (tally.total - tally.base),
-						sessionId: begun.record.sessionId,
-						signal,
-						onSession: (sessionId) => state.runs.saveSession(key, sessionId),
-						onFirstToken: () => lease?.opened(),
-					})
-					.finally(() => lease?.release());
-
-				if (outcome.kind === "limited") return pause({ outcome: "limited", item: id, until: outcome.until });
-
-				if (outcome.kind === "held") return pause({ outcome: "held", item: id, why: outcome.card.cause });
-
-				if (outcome.kind === "over-cap") {
-					spend(outcome.tokens);
-
-					return ask(`The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.total - tally.base} tokens.`, "");
-				}
-
-				spend(outcome.tokens);
+				const outcome = await runAgent(purpose, await prompt(purpose), RUN_SCHEMA, signal);
 
 				if (!succeeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
 
@@ -344,7 +395,53 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		},
 	});
 
-	const sources = { build: step("build"), checks: checksSource, fix: step("fix") };
+	const ownerQuestion = (pick: EventPick) => {
+		pending = { question: pick.question || pick.reason, plan: "" };
+	};
+
+	/** What a taken pick leaves behind before the machine moves on. */
+	const PICKED = new Map<string, (pick: EventPick, models: readonly string[]) => void>([
+		["plan-ready", (pick, models) => pick.plan && state.plans.put(id, { item: id, plan: pick.plan, hash: planHash(pick.plan), models: [...models] })],
+		["plan-blocked", ownerQuestion],
+		["needs-owner", ownerQuestion],
+		[
+			"request-changes",
+			(pick) => {
+				lastFailure = requestedChanges(pick);
+			},
+		],
+	]);
+
+	const saveVerdict = (pick: EventPick, models: readonly string[], head: string) =>
+		state.verdicts.put(id, { item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] });
+
+	/** A plan or review state: its run picks the next event, and a split files the parts and lands the item as done. */
+	const decision = (purpose: ProsePurpose) =>
+		createAsyncLogic({
+			run: async ({ signal }) => {
+				const diff = purpose === "review" ? await branchDiff() : "";
+				const head = (await g(["rev-parse", "HEAD"])).trim();
+
+				const { pick, models } = await decideProse({
+					purpose,
+					prompt: PROSE_PROMPTS[purpose](config, item, diff),
+					diff,
+					model: (await tierFor(purpose)).model,
+					run: (text, schema) => runAgent(purpose, text, schema, signal),
+					canTake: (type) => actor.getSnapshot().can({ type }),
+				});
+
+				if (purpose === "review") saveVerdict(pick, models, head);
+
+				PICKED.get(pick.event)?.(pick, models);
+
+				if (pick.event === SPLIT) return result.resolve(await split(d, pick.parts, () => actor.send({ type: SPLIT })));
+
+				actor.send({ type: pick.event });
+			},
+		});
+
+	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review") };
 
 	if (d.resume) {
 		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind) });
@@ -377,7 +474,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			return result.resolve({ outcome: "asked", item: id, detail: note.question });
 		}
 
-		if (value === "merging") return result.resolve(await merge(d, actor));
+		if (value === "merging") return result.resolve(await merge(d, () => actor.send({ type: "merged" }), approvedByOwner));
 	};
 
 	actor.subscribe((snapshot) => {
@@ -396,9 +493,119 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	actor.start();
 
-	if (d.answered) actor.send({ type: "answered" });
+	if (d.answered) {
+		const resume = resumeEvent(actor.getSnapshot(), d.answered);
+
+		approvedByOwner = resume === OWNER_APPROVED;
+
+		if (resume === OWNER_REJECTED) lastFailure = d.answered.answer;
+
+		actor.send({ type: resume });
+	}
 
 	return result.promise.finally(() => actor.stop());
+};
+
+const OWNER_APPROVED = "owner-approved";
+
+const OWNER_REJECTED = "owner-rejected";
+
+const ANSWERED = "answered";
+
+/** The event an owner's answer sends a saved wait: `answered` where the state takes it, else the owner's approval or rejection of the change. */
+const resumeEvent = (snapshot: { can: (event: { type: string }) => boolean }, answered: Answered) => {
+	if (snapshot.can({ type: ANSWERED })) return ANSWERED;
+
+	return answered.option === OWNER_APPROVAL ? OWNER_APPROVED : OWNER_REJECTED;
+};
+
+type Purpose = (typeof PURPOSES)[number];
+
+/** Which runs are placed by the branch's diff so far; the others by the files their item declares. */
+const PLACED_BY_DIFF = { plan: false, build: false, fix: true, review: true } as const satisfies Record<Purpose, boolean>;
+
+/** The event by which a plan run splits its item into parts. */
+const SPLIT = "needs-split";
+
+/** What a run reads from its config: the settings and the role files. */
+export type RunConfig = Pick<Config, "hum" | "roles">;
+
+const roleOf = (config: RunConfig, purpose: Purpose): string => {
+	const role = config.hum.roles[purpose];
+
+	return ((role && config.roles[role.file]) ?? "").trim();
+};
+
+type ItemText = Pick<Item, "id" | "title" | "body">;
+
+/** What a plan or review run reads. A plan run reads the repo too; a review run reads only the item and the diff, so no author's reasoning reaches it. */
+export const PROSE_PROMPTS = {
+	plan: (config: RunConfig, item: ItemText): string =>
+		[
+			roleOf(config, "plan"),
+			`# Item ${item.id}: ${item.title}\n\n${item.body}`,
+			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part as a title; a plan-blocked answer asks the owner one question.",
+		].join("\n\n"),
+	review: (config: RunConfig, item: ItemText, diff: string): string => [roleOf(config, "review"), reviewInput(item, diff, config.hum)].join("\n\n"),
+} as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string) => string>;
+
+const verdictOf = (id: string, head: string, pick: EventPick, models: readonly string[]) => ({ item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] });
+
+/** A run that ended with no answer to read, carried out of the decision as the result it comes to. */
+class Halted extends Error {
+	override name = "Halted";
+
+	constructor(readonly result: ThinResult) {
+		super(`the run halted: ${result.outcome}`);
+	}
+}
+
+const HALTS = {
+	limited: (id: string, outcome: { until: number }): ThinResult => ({ outcome: "limited", item: id, until: outcome.until }),
+	held: (id: string, outcome: { card: { cause: string } }): ThinResult => ({ outcome: "held", item: id, why: outcome.card.cause }),
+} as const;
+
+/** A fresh review run at landing, for a level that asks for one: it reads only the item and the diff, and its verdict is saved. */
+const reviewAtLanding =
+	(d: Driven) =>
+	async ({ head, diff, level }: { head: string; diff: string; level: string }): Promise<ReviewOutcome> => {
+		const row = pickTier(d.kind, { purpose: "review", level, size: "small" });
+
+		if (!row) throw new Error(`the ${d.kindName} table has no review row`);
+
+		const run = async (prompt: string, schema: JsonSchema): Promise<Finished> => {
+			const outcome = await d.runner.run({ prompt, cwd: tmpdir(), model: d.config.hum.models[row.tier], effort: row.effort, schema, signal: d.signal });
+
+			if (outcome.kind === "limited") throw new Halted(HALTS.limited(d.id, outcome));
+
+			if (outcome.kind === "held") throw new Halted(HALTS.held(d.id, outcome));
+
+			if (outcome.kind !== "finished") throw new Halted({ outcome: "lost", item: d.id });
+
+			return outcome;
+		};
+
+		try {
+			const { pick, models } = await decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(d.config, d.item, diff), diff, model: d.config.hum.models[row.tier], run });
+			const verdict = verdictOf(d.id, head, pick, models);
+
+			d.state.verdicts.put(d.id, verdict);
+
+			return { verdict };
+		} catch (error) {
+			if (error instanceof Halted) return { halted: error.result };
+
+			throw error;
+		}
+	};
+
+/** Files each part of a split item as its own item, then lands the item as done with no change of its own. */
+const split = async (d: Driven, parts: readonly string[], onMerged: () => void): Promise<ThinResult> => {
+	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: d.workSource, questions: d.questions }, d.state.ops, { run: SPLIT, attempt: 0 });
+
+	for (const title of parts) await calls.workSource?.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}` });
+
+	return merge(d, onMerged);
 };
 
 /** Push the work branch, put the plan and the question on the item, and end. Each write runs once per key. */
@@ -440,21 +647,34 @@ const landContext = (d: Driven): LandContext => ({
 	questions: d.questions,
 	pulls: d.pulls,
 	now: d.now ?? Date.now,
+	judge: d.judge,
+	reviewRun: reviewAtLanding(d),
 });
 
 const DRAINING = "the worker restarts for an update; the next worker lands the change under its config";
 
-/** At `merging`: the change is saved and its branch pushed, then landed by its level unless the worker drains. */
-const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
+/**
+ * At `merging`: the change is saved and its branch pushed, then landed by its level unless the worker drains. A
+ * docs-only item whose change reaches past its globs moves to its real kind first.
+ */
+const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Promise<ThinResult> => {
 	if (!(await stillMine(d))) return { outcome: "lost", item: d.id };
 
-	await prepareLanding(landContext(d));
+	const isDocsOnly = d.kindName === d.config.hum.docsOnly.kind;
+
+	if (isDocsOnly && leavesDocs((await changeOn(landContext(d))).paths, d.config.hum)) {
+		const real = await decideKind(d, d.item, d.kindName);
+
+		return { outcome: "moved", item: d.id, kind: real.kind };
+	}
+
+	await prepareLanding(landContext(d), ownerApproved);
 
 	if (d.mayLand?.() === false) return { outcome: "held", item: d.id, why: DRAINING };
 
 	const result = await land(landContext(d));
 
-	if (result.outcome === "merged") actor.send({ type: "merged" });
+	if (result.outcome === "merged") onMerged();
 
 	return result;
 };

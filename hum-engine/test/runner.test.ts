@@ -31,13 +31,18 @@ const isGone = (pid: number): boolean => {
 	}
 };
 
-test("the flag set holds the five flags and never --bare, --resume or --continue", () => {
+test("the flag set holds the five flags and never --bare, --resume or --continue; a model call adds hope's judge flags", () => {
 	const args = runArgs({ model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111" });
 
 	for (const flag of ["--model", "--effort", "--json-schema", "--settings", "--session-id"]) expect(args).toContain(flag);
 
 	for (const banned of ["--bare", "--resume", "--continue", "-r", "-c"]) expect(args).not.toContain(banned);
 	expect(args.slice(0, 4)).toEqual(["-p", "--output-format", "stream-json", "--verbose"]);
+
+	const judging = runArgs({ model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111", call: "judgment" });
+
+	expect(judging).toContain("--no-session-persistence");
+	expect(JSON.parse(judging[judging.indexOf("--settings") + 1] ?? "{}")).toMatchObject({ disableAllHooks: true, outputStyle: "default" });
 });
 
 test("a usage-limit message parses to limited(until), and no call is made until then", async () => {

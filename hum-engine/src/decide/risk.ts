@@ -55,7 +55,8 @@ export type Step =
 			readonly size: number;
 			readonly usual: number;
 		}
-	| { readonly step: "loosened-check" };
+	| { readonly step: "loosened-check" }
+	| { readonly step: "alignment" };
 
 type SetsLevel = Extract<Step, { level: string }>;
 

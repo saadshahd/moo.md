@@ -394,6 +394,7 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 					body: issue.body,
 					ready: isReadyIssue(issue) && !isLive(claimFrom(id, ref?.target), now()),
 					thread: issue.comments.nodes.map((found) => parseComment(found.body, Date.parse(found.createdAt))),
+					labels: issue.labels.nodes.map((label) => label.name),
 				};
 			},
 			claim: (id, holder, ttlMs) => take("claim", String(parseArgument(IssueNumber, id)), holder, ttlMs),

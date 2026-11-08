@@ -64,7 +64,7 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes }: WorkflowSettings) => ({
 				[TOKEN_SECRET]: `\${{ secrets.${TOKEN_SECRET} }}`,
 				GH_TOKEN: "${{ github.token }}",
 				HUM_EVENT: "${{ github.event_name }}",
-				HUM_KIND: "${{ vars.HUM_KIND }}",
+
 				HUM_CHECKS: "${{ vars.HUM_CHECKS }}",
 			},
 			steps: [

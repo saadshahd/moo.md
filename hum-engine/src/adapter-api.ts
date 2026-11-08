@@ -49,6 +49,8 @@ export const Item = ItemRef.extend({
 	/** True while the source lists the item as ready to claim. */
 	ready: z.boolean(),
 	thread: z.array(ThreadEntry),
+	/** Names the source tags the item with: its labels, or a markdown item's `kind`. One that names a kind sets the item's kind. */
+	labels: z.array(text).optional(),
 });
 
 export type Item = z.infer<typeof Item>;

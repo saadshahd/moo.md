@@ -1,10 +1,11 @@
+import type { ModelCall } from "../adapters/model-call.ts";
 import { mkdirSync, readFileSync, rmSync, watch } from "node:fs";
 import ExpiryMap from "expiry-map";
 import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
-import { ADAPTER_API_VERSION, type Answers, type Item, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Answers, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
 import { type Kind, SCHEMA_VERSION } from "../config/schema.ts";
@@ -35,7 +36,8 @@ export type WorkerOptions = {
 		readonly answers?: Answers;
 	};
 	readonly runner: Runner;
-	readonly kind: (item: Item) => string;
+	/** The cheap model call; by default the config's decision model through the runner. */
+	readonly judge?: ModelCall;
 	readonly remote: string;
 	readonly base?: string;
 	readonly checks: readonly string[];
@@ -58,7 +60,6 @@ export type WorkerOptions = {
 
 type Known = {
 	readonly footprint: Footprint;
-	readonly kind: string;
 	readonly title: string;
 };
 
@@ -140,7 +141,7 @@ export class Worker {
 
 			return {
 				footprint: footprintOf(item),
-				kind: options.kind(item),
+
 				title: item.title,
 			};
 		});
@@ -346,8 +347,8 @@ export class Worker {
 				questions: adapters.questions,
 				state,
 				runner: this.#o.runner,
+				judge: this.#o.judge,
 				config,
-				kind: known.kind,
 				remote: this.#o.remote,
 				base: this.#o.base,
 				checks: this.#o.checks,

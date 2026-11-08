@@ -40,8 +40,8 @@ test("prototyping, a low-risk UI tweak: merged on green, no question", () => {
 	const placed = place(change(["ui/button.tsx"]));
 	const route = routeOf(placed, policy().paths, "feature", ["ui/button.tsx"]);
 
-	expect(route).toMatchObject({ level: { name: "low" }, unclear: false, mergesAlone: true, proof: undefined });
-	expect(landingOf(false, isCleared(route, false))).toEqual({ via: "push" });
+	expect(route).toMatchObject({ level: { name: "low" }, unclear: [], mergesAlone: true, proof: undefined });
+	expect(landingOf(false, isCleared(route, { review: false, owner: false }))).toEqual({ via: "push" });
 });
 
 test("a break after merge on a low path becomes follow-up work that counts toward the limit, and blocks on a critical path", () => {
@@ -89,15 +89,15 @@ test("a launch raises a path between its dates or while the base matches, and on
 	expect(levelOf(change(["ui/a.tsx"]), onBranch, new Map(), { now: NOW, base: "release/2" })).toBe("high");
 });
 
-test.todo("the alignment grade times out: the change is unclear and waits for the owner's review, its level unchanged", () => {});
 
 test("a change touching a folder no rule places is unclear at the level of the rest, never merges alone, and its rule names the folder", () => {
 	const placed = place(change(["docs/a.md", "tools/gen/x.ts"]));
 	const route = routeOf(placed, policy().paths, "feature", ["docs/a.md", "tools/gen/x.ts"]);
 
 	expect(placed.unclear).toEqual(["tools/gen/x.ts"]);
-	expect(route).toMatchObject({ level: { name: "low" }, unclear: true, mergesAlone: false });
-	expect(isCleared(route, true)).toBe(true);
+	expect(route).toMatchObject({ level: { name: "low" }, unclear: [{ cause: "paths", paths: ["tools/gen/x.ts"] }], mergesAlone: false });
+	expect(isCleared(route, { review: true, owner: false })).toBe(false);
+	expect(isCleared(route, { review: false, owner: true })).toBe(true);
 	expect([ruleGlobFor("tools/gen/x.ts"), ruleGlobFor("README.md")]).toEqual(["tools/gen/**", "README.md"]);
 	expect(levelOf(change(["only/new.ts"]))).toBe("low");
 });
@@ -205,7 +205,7 @@ test("git history: a fix commit carries the commits whose lines it rewrote, and 
 
 test("a fresh review run reads the item and the diff, and none of the author's plan or answers", () => {
 	const item = { id: "7", title: "Add a button", body: "A blue one.", ready: true, thread: [{ kind: "comment" as const, text: "hum plan:\nuse the red theme", at: NOW }] };
-	const input = reviewInput(item, diff("ui/button.tsx", ["+<Button />"]));
+	const input = reviewInput(item, diff("ui/button.tsx", ["+<Button />"]), config.hum);
 
 	expect(input).toContain("# Item 7: Add a button");
 	expect(input).toContain("+<Button />");

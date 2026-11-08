@@ -1,3 +1,4 @@
+import { docsJudge } from "./fixtures/judge.ts";
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -236,7 +237,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 
 	const worker = await openWorker(w.repo.owner, {
 		hopeSkills: hopeSkills(),
-		kind: () => "docs",
+		judge: docsJudge,
 		checks: ["true"],
 		holder: "worker-1",
 		binary: w.shim.binary,

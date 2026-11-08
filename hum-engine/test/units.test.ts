@@ -28,7 +28,7 @@ const vars: UnitVars = {
 	repo: "/Users/o/repos/a & b",
 	command: ["/opt/homebrew/bin/bun", "/Users/o/repos/a & b/node_modules/.bin/hum", "serve"],
 	path: "/opt/homebrew/bin:/usr/bin:/bin",
-	env: { HUM_KIND: "docs", HUM_CHECKS: JSON.stringify(["bun test", "bun run lint"]) },
+	env: { HUM_CHECKS: JSON.stringify(["bun test", "bun run lint"]) },
 	log: "/Users/o/Library/Logs/hum.log",
 	restartDelaySeconds: 42,
 };
@@ -66,7 +66,7 @@ test("the launchd plist restarts only after a failure, keeps the paths absolute 
 		WorkingDirectory: vars.repo,
 		KeepAlive: { SuccessfulExit: false },
 		ThrottleInterval: 42,
-		EnvironmentVariables: { PATH: vars.path, HUM_KIND: "docs", HUM_CHECKS: vars.env?.HUM_CHECKS },
+		EnvironmentVariables: { PATH: vars.path, HUM_CHECKS: vars.env?.HUM_CHECKS },
 	});
 });
 

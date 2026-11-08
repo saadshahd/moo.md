@@ -26,11 +26,14 @@
   "files": [
     "src",
     "schema",
-    "defaults"
+    "defaults",
+    "evals",
+    "scripts/eval.ts"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "schema": "bun scripts/write-schema.ts",
+    "eval": "bun scripts/eval.ts",
     "lint": "oxlint src test",
     "test": "bun test test"
   },

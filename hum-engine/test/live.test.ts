@@ -1,10 +1,14 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startRunner, succeeded } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
+import { runThinPath } from "../src/worker/thin-path.ts";
+import { configWith } from "./fixtures/config.ts";
+import { markdownSettings, WorkRepo } from "./fixtures/work-repo.ts";
 
 const live = process.env.HUM_LIVE === "1";
 
@@ -30,3 +34,28 @@ test.skipIf(!live)("live: the start check passes on Haiku, and a run reports the
 	expect(run.kind).toBe("finished");
 	expect(run.kind === "finished" && run.sessionId).toBe(sessionId);
 }, 180_000);
+
+if (!live) console.log("skip live plan and review: set HUM_LIVE=1 to run a feature item's plan, build and review runs and its cheap calls on Haiku (about six calls)");
+
+test.skipIf(!live)("live: a feature item runs its plan and review states on Haiku, and the change lands or waits by the review's pick", async () => {
+	const config = configWith((raw) => void (raw.hum.models = { light: SHIPPED_DEFAULTS.models.light, standard: SHIPPED_DEFAULTS.models.light, top: SHIPPED_DEFAULTS.models.light }));
+	const repo = new WorkRepo();
+	const state = openState(mkdtempSync(join(tmpdir(), "hum-live-thin-")));
+	const adapter = markdownAdapter({ ...markdownSettings, repo: repo.worker("w") }, { report: () => {}, now: Date.now });
+	const { runner } = await startRunner({ state, model: config.hum.models.light });
+	const id = repo.add("live-1", `---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n`);
+
+	try {
+		const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote: repo.remote, checks: ["test -f docs/note.md"], holder: "live", workDir: mkdtempSync(join(tmpdir(), "hum-live-work-")) });
+		const runs = state.runs.list(id).map((record) => record.run);
+
+		expect(runs).toContain("plan");
+		expect(runs).toContain("build");
+		expect(runs).toContain("review");
+		expect(["merged", "review", "stuck"]).toContain(result.outcome);
+		console.log(`live plan and review: ${result.outcome}, runs ${runs.join(", ")}`);
+	} finally {
+		rmSync(repo.root, { recursive: true, force: true });
+		rmSync(state.dir, { recursive: true, force: true });
+	}
+}, 900_000);

@@ -120,9 +120,21 @@ export {
 
 export { type Change, type Histories, LABELS, type Label, type Moment, type PathHistory, type Placement, type Policy, placeChange, type Step, usualSize } from "./decide/risk.ts";
 
-export { isCleared, type Landing, landingOf, OWNER_APPROVAL, type Route, routeOf, waitReason } from "./decide/merge.ts";
+export { type Approvals, isCleared, type Landing, landingOf, needsReviewRun, OWNER_APPROVAL, type Route, routeOf, type Unclear, waitReason } from "./decide/merge.ts";
 
-export { DIFF_LIMIT, reviewInput } from "./decide/review.ts";
+export { reviewInput } from "./decide/review.ts";
+
+export { citesDiff, DATA_RULE, fenced, EventPick, isMeasured, PlanFile, planHash, PROSE_STATES, type ProsePurpose, readPick } from "./decide/prose.ts";
+
+export { declaredKind, kindQuestion, leavesDocs, UNSURE } from "./decide/kind.ts";
+
+export { AlignmentAnswer, alignedPlacement, alignmentQuestion, GRADES, raisesLevel } from "./decide/alignment.ts";
+
+export { configuredModelCall, type Judgment, type ModelCall, modelCallOver, type Question as ModelQuestion } from "./adapters/model-call.ts";
+
+export { decideProse, type ProseDecision } from "./worker/prose-run.ts";
+
+export { decideKind } from "./worker/kind.ts";
 
 export { labelChanges, type LabelRules, matchedSample, type PastChange } from "./decide/labels.ts";
 

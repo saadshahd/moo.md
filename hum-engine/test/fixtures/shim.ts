@@ -35,7 +35,10 @@ export type Behavior = {
 	stderrNoise?: boolean;
 };
 
-export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior> };
+/** What a plan or review run picks, as the run's answer. */
+export type Decided = { event: string; sure: boolean; reason: string; cites?: { file: string; line: number }[]; parts?: string[]; question?: string; plan?: { summary: string; steps: string[]; paths: string[] } };
+
+export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[] };
 
 export type Shim = {
 	/** The executable the runner calls instead of `claude`. */
@@ -46,6 +49,8 @@ export type Shim = {
 	readonly calls: () => { at: number; itemId: string | undefined; argv: string[]; stdinBytes: number; stdinSha: string; pid: number; cwd: string }[];
 	/** When each `-p` process wrote its result, by pid. */
 	readonly ends: () => { pid: number; at: number }[];
+	/** Each plan or review run: its purpose, the pick it gave, its prompt and its working folder. */
+	readonly decisions: () => { purpose: "plan" | "review"; answer: Decided; prompt: string; cwd: string }[];
 };
 
 const lines = (file: string) => {
@@ -70,5 +75,6 @@ export const makeShim = (spec: ShimSpec = {}): Shim => {
 		env: { HUM_SHIM: JSON.stringify({ ...spec, log }) },
 		calls: () => lines(log),
 		ends: () => lines(`${log}.ends`),
+		decisions: () => lines(`${log}.decisions`),
 	};
 };

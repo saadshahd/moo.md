@@ -59,6 +59,14 @@ export const RELEASES = ["at-once", "after-proof"] as const;
 /** What a break after merge becomes: follow-up work, or a block on the path. */
 export const BREAKS = ["follow-up", "block"] as const;
 
+/** Each place a model's judgment decides, measured on its own labelled set. */
+export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict"] as const;
+
+export type Boundary = (typeof BOUNDARIES)[number];
+
+/** The categories of a change's merge risk, each graded 1 (sound) to 3 (a concern). */
+export const GRADED = ["impact", "verification", "rollback", "errorDetection", "alignment"] as const;
+
 const isRegExp = (source: string): boolean => {
 	try {
 		return new RegExp(source).source.length > 0;
@@ -142,6 +150,23 @@ const Shipped = z.object({
 	historyDepth: count.describe("Commits of the base branch hum reads for size ranges and fix counts."),
 	lockfiles: z.array(name).describe("Lockfiles where a changed line naming the engine package changes hum itself."),
 	hookPaths: z.array(name).describe("Globs of tracked git hooks; a change to one changes hum itself."),
+	diffLimit: count.describe("The most characters of a change's diff one prompt carries."),
+	failureTail: count.describe("The last characters of the checks' output a fix run reads."),
+	fallbackKind: name.describe("The kind an item runs as when neither its source nor the model call names one."),
+	docsOnly: z
+		.strictObject({ kind: name, paths: z.array(name) })
+		.describe("An item of this kind whose change touches a path outside these globs moves to its real kind."),
+	decisionModel: name.describe("The model id of the cheap model call, made through claude -p."),
+	modelCallTimeoutSeconds: seconds.describe("How long a cheap model call may take before it counts as an abstention."),
+	measuredModels: z
+		.record(z.enum(BOUNDARIES), z.array(name))
+		.describe("Per model-judgment boundary, the model ids its labelled set was measured on; a pick from any other id counts as an abstention."),
+	mergeRisk: z
+		.strictObject({
+			weights: z.record(z.enum(GRADED), z.number().positive()),
+			cuts: z.tuple([z.number().positive(), z.number().positive()]),
+		})
+		.describe("How the alignment grade raises a level: each category's grade, 1 to 3, times its weight, averaged; when the alignment call's grades move the average across a cut, the level goes one step up."),
 });
 
 /** The defaults hum ships with, read from the default `hum.json`. */
@@ -195,8 +220,6 @@ export const HumConfig = z.strictObject({
 	kinds: z.array(name).min(1),
 	/** The owner's safety rule. */
 	safety: z.record(z.string(), z.unknown()).optional(),
-	/** The cheap model call: the owner's decision model, else Haiku through `claude -p`. */
-	decisionModel: name.optional(),
 	dailyQuestionCap: z.number().int().positive().optional(),
 	/** Adapter slot → adapter name. */
 	integrations: z.record(name, name).optional(),
@@ -320,4 +343,11 @@ export const OWNER_CHANGEABLE = {
 	"history depth": "historyDepth",
 	lockfiles: "lockfiles",
 	"hook paths": "hookPaths",
+	"diff limit": "diffLimit",
+	"failure tail": "failureTail",
+	"fallback kind": "fallbackKind",
+	"docs-only kind": "docsOnly",
+	"model call timeout": "modelCallTimeoutSeconds",
+	"measured models": "measuredModels",
+	"merge-risk weights": "mergeRisk",
 } as const satisfies Record<string, string>;

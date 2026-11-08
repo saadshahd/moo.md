@@ -66,9 +66,9 @@ test("hum wake with a rejected token exits 1, annotates the job and writes its s
 	expect(sh(o.repo.remote, ["show", "main:.hum/work/a.md"])).toContain("state: ready");
 });
 
-test("hum wake without a kind or a check says what is missing and exits 1", () => {
+test("hum wake without a check says what is missing and exits 1", () => {
 	const o = owner({});
-	const run = hum(o, ["wake"], { HUM_KIND: "", HUM_CHECKS: "" });
+	const run = hum(o, ["wake"], { HUM_CHECKS: "" });
 
 	expect(run.code).toBe(1);
 	expect(run.err).toContain("name at least one check");

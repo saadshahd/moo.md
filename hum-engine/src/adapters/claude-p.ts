@@ -24,6 +24,20 @@ export const RUN_SETTINGS = JSON.stringify({
 	permissions: { defaultMode: "bypassPermissions" },
 });
 
+/**
+ * The two kinds of `claude -p` call. An agent run keeps its session. A model call runs as hope's judge does: no
+ * session kept, no hooks, and the default output style, so the owner's style cannot reshape its answer.
+ */
+export const CALLS = {
+	run: { settings: RUN_SETTINGS, flags: [] },
+	judgment: {
+		settings: JSON.stringify({ permissions: { defaultMode: "bypassPermissions" }, disableAllHooks: true, outputStyle: "default" }),
+		flags: ["--no-session-persistence"],
+	},
+} as const satisfies Record<string, { settings: string; flags: readonly string[] }>;
+
+export type Call = keyof typeof CALLS;
+
 const REQUIRED_PLUGIN = "hope";
 
 const LIMIT_KEY = "runner";
@@ -49,6 +63,7 @@ export type RunSpec = {
 	/** The JSON Schema of the run's structured result. */
 	readonly schema: object;
 	readonly sessionId: string;
+	readonly call?: Call;
 };
 
 /**
@@ -56,7 +71,7 @@ export type RunSpec = {
  * The prompt goes on stdin, never in argv. Never `--bare`, `--resume` or `--continue`: bare mode reads neither the
  * login nor the plan token, and a run never resumes a session.
  */
-export const runArgs = ({ model, effort, schema, sessionId }: RunSpec): string[] => [
+export const runArgs = ({ model, effort, schema, sessionId, call = "run" }: RunSpec): string[] => [
 	"-p",
 	"--output-format",
 	"stream-json",
@@ -68,9 +83,10 @@ export const runArgs = ({ model, effort, schema, sessionId }: RunSpec): string[]
 	"--json-schema",
 	JSON.stringify(schema),
 	"--settings",
-	RUN_SETTINGS,
+	CALLS[call].settings,
 	"--session-id",
 	sessionId,
+	...CALLS[call].flags,
 ];
 
 const Usage = z.looseObject({
@@ -199,6 +215,8 @@ export type Finished = {
 	readonly cacheReadTokens: number;
 	readonly plugins: readonly string[];
 	readonly keySource: string | undefined;
+	/** The model ids that answered, as the result names them. */
+	readonly models: readonly string[];
 };
 
 export type RunOutcome =
@@ -208,7 +226,9 @@ export type RunOutcome =
 	/** No run started or no verdict could be read; `card` says why. */
 	| { readonly kind: "held"; readonly card: Card }
 	/** The run was stopped at the item's token cap. */
-	| { readonly kind: "over-cap"; readonly tokens: number };
+	| { readonly kind: "over-cap"; readonly tokens: number }
+	/** The caller's signal stopped the run. */
+	| { readonly kind: "stopped" };
 
 /** What one process ended as, before the runner acts on a limit it could not read. */
 type Ended = RunOutcome | { readonly kind: "limit-unparsed"; readonly text: string };
@@ -266,6 +286,7 @@ const endedAs = (t: Transcript, { sessionId, tokenCap, stderr }: { sessionId: st
 			cacheReadTokens: 0,
 			plugins: t.plugins,
 			keySource: t.keySource,
+			models: [],
 		};
 	}
 
@@ -290,6 +311,7 @@ const endedAs = (t: Transcript, { sessionId, tokenCap, stderr }: { sessionId: st
 		cacheReadTokens: sumUsage(result, (usage) => usage.cacheReadInputTokens),
 		plugins: t.plugins,
 		keySource: t.keySource,
+		models: Object.keys(result.modelUsage),
 	};
 };
 
@@ -299,6 +321,7 @@ export type RunRequest = {
 	readonly model: string;
 	readonly effort: Effort;
 	readonly schema: object;
+	readonly call?: Call;
 	/** Tokens the item may still spend. */
 	readonly tokenCap?: number;
 	readonly sessionId?: string;
@@ -411,14 +434,14 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 	});
 
 	/** One process, read line by line. The cap is checked on every streamed message, and the process is killed the moment it is passed. */
-	const spawnRun = async ({ prompt, cwd, model, effort, schema, tokenCap, signal, onFirstToken }: RunRequest, sessionId: string): Promise<Ended> => {
+	const spawnRun = async ({ prompt, cwd, model, effort, schema, call, tokenCap, signal, onFirstToken }: RunRequest, sessionId: string): Promise<Ended> => {
 		const stop = new AbortController();
 		const logs = mkdtempSync(join(tmpdir(), "hum-claude-"));
 		const stderrFile = join(logs, "stderr");
 		const stderrFd = openSync(stderrFile, "w");
 
 		try {
-			const proc = x(binary, runArgs({ model, effort, schema, sessionId }), {
+			const proc = x(binary, runArgs({ model, effort, schema, sessionId, call }), {
 				stdin: prompt,
 				signal: AbortSignal.any(signal ? [stop.signal, signal] : [stop.signal]),
 				nodePath: false,
@@ -456,6 +479,8 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 				stderr: readFileSync(stderrFile, "utf8"),
 			});
 		} catch (error) {
+			if (signal?.aborted) return { kind: "stopped" };
+
 			return hold("claude-not-found", `claude could not start: ${error instanceof Error ? error.message : String(error)}`, "Install Claude Code and sign in.");
 		} finally {
 			closeSync(stderrFd);

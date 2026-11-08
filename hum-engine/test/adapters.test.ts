@@ -89,12 +89,12 @@ describe("item files", () => {
 		expect(created.split("\n")[1]).toBe(`title: ${title}`);
 		expect(parseItemFile(created)).toMatchObject({ title, state: "ready", body: "The body." });
 
-		const owned = "---\n# the owner's note\ntitle: A title\nstate: ready\nowner: me\n---\n\nThe body.\n";
+		const owned = "---\n# the owner's note\ntitle: A title\nstate: ready\nkind: fix\nowner: me\n---\n\nThe body.\n";
 		const finished = markDone(owned);
 
 		expect(finished).toContain("# the owner's note");
 		expect(finished).toContain("owner: me");
-		expect(parseItemFile(finished)).toMatchObject({ title: "A title", state: "done", body: "The body." });
+		expect(parseItemFile(finished)).toMatchObject({ title: "A title", state: "done", kind: "fix", body: "The body." });
 	});
 });
 
