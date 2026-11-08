@@ -1,7 +1,7 @@
-import { readFileSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { Card } from "../status/format.ts";
-import { atomicWrite, listFiles, slug } from "./fs.ts";
+import { atomicWrite, listRecords, readJson, slug } from "./fs.ts";
 
 /** The fault card for one failure. `key` makes it one card per cause and item. */
 export type FaultInput = {
@@ -14,7 +14,7 @@ export type FaultInput = {
 
 export type Outcome<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly fault: Card };
 
-/** T5: the fault cards currently raised. One card per cause, kept in memory and, when the disk allows, on it. */
+/** The fault cards currently raised. One card per cause, kept in memory and, when the disk allows, on it. */
 export class Faults {
 	readonly #folder: string;
 	readonly #now: () => number;
@@ -24,9 +24,9 @@ export class Faults {
 		this.#folder = folder;
 		this.#now = now;
 
-		for (const file of listFiles(folder)) {
+		for (const file of listRecords(folder)) {
 			try {
-				const card = Card.safeParse(JSON.parse(readFileSync(file, "utf8")));
+				const card = Card.safeParse(readJson(file));
 
 				if (card.success) this.#cards.set(card.data.key, card.data);
 			} catch {
@@ -41,7 +41,7 @@ export class Faults {
 
 	/**
 	 * Raises the card, or returns the one already raised for this cause. A card that cannot be
-	 * written (D3: the disk is full) still stands in memory, and the caller puts it in the status file.
+	 * written because the disk is full still stands in memory, and the caller puts it in the status file.
 	 */
 	raise({ code, item, cause, fix, action }: FaultInput): Card {
 		const key = item === undefined ? code : `${code}:${item}`;

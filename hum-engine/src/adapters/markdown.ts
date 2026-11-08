@@ -2,9 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import slugify from "@sindresorhus/slugify";
-import pLimit from "p-limit";
+import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { type Adapter, type AdapterContext, type Claim, type Item, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { type Adapter, type AdapterContext, type Claim, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
 import { type GitIdentity, gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
@@ -15,15 +15,8 @@ const ITEM_EXTENSION = ".md";
 const BASE_REF = "refs/hum/base";
 const CLAIMS_REF = "refs/hum/claims";
 const NO_BASE_TOKEN = "none";
-const WRITE_RACE_RETRIES = 7;
 const WRITE_RACE_BACKOFF_MS = 50;
 const FOLLOW_UP_SLUG_LENGTH = 40;
-
-/** Each item read is a git process; this many run at once. */
-const ITEM_READS_AT_ONCE = 8;
-
-/** An item id holds at most this many characters. */
-const ITEM_ID_LENGTH = 100;
 
 export type MarkdownOptions = {
 	/** A clone of the work repo. The adapter never touches its working tree or its branches. */
@@ -35,6 +28,10 @@ export type MarkdownOptions = {
 	/** The author and committer of the commits the adapter makes. */
 	readonly identity: GitIdentity;
 	readonly remote?: string;
+	/** Retries of a write that another writer's push beat. */
+	readonly writeRaceRetries: number;
+	/** Item files read at once; each read is a git process. */
+	readonly itemReadsAtOnce: number;
 	/** The branch whose items folder holds the items; every write is pushed to it. */
 	readonly base?: string;
 };
@@ -58,7 +55,7 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
 	const git = gitIn(repo, { identity });
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
@@ -174,8 +171,8 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, remote 
 			if (next) await pushToBase(await commitOn((await git.raw(["rev-parse", BASE_REF])).trim(), message, next));
 		};
 
-		await pRetry(attempt, { retries: WRITE_RACE_RETRIES, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
-			throw cause instanceof LostRace ? new PermanentError(`gave up after ${WRITE_RACE_RETRIES + 1} lost races pushing to ${base}`) : cause;
+		await pRetry(attempt, { retries: writeRaceRetries, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
+			throw cause instanceof LostRace ? new PermanentError(`gave up after ${writeRaceRetries + 1} lost races pushing to ${base}`) : cause;
 		});
 	};
 
@@ -232,7 +229,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, remote 
 
 				const [claims, names] = await Promise.all([claimsNow(), itemFileNames()]);
 
-				return (await pLimit(ITEM_READS_AT_ONCE).map(names, (name) => readyRef(name, claims))).flat();
+				return (await new PQueue({ concurrency: itemReadsAtOnce }).addAll(names.map((name) => () => readyRef(name, claims)))).flat();
 			},
 			read,
 			claim: (id, holder, ttlMs) => take("claim", parseArgument(ItemId, id), holder, ttlMs),

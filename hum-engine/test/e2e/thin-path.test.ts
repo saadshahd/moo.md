@@ -105,6 +105,16 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(w.repo.show(id)).toContain("state: done");
 });
 
+test("a merge that keeps losing the race to the base stops after mergeTries pushes", async () => {
+	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => (raw.hum.mergeTries = 2)) });
+
+	w.repo.seed("Write the note");
+	const refused = w.repo.refuseMainPushes();
+
+	await expect(runThinPath(w.options())).rejects.toThrow("another push moved main first");
+	expect(refused()).toBe(2);
+});
+
 test("failed checks go to a fix run, and the fix run gets the failure", async () => {
 	const w = await world({ script: [{}, { commit: { "docs/note.md": "BAD\n" } }, { commit: { "docs/note.md": "good\n" }, saveStdin: join(tmpdir(), `hum-fix-stdin-${process.pid}`) }] }, { checks: ["! grep -q BAD docs/note.md"] });
 	const id = w.repo.seed("Write the note");

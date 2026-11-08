@@ -17,8 +17,6 @@ export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" 
 	readonly remote?: string;
 	readonly binary?: string;
 	readonly env?: Readonly<Record<string, string>>;
-	/** A provider that fails longer than this shows one card. */
-	readonly providerTimeoutMs?: number;
 };
 
 const Latest = z.looseObject({ version: z.string().min(1) });
@@ -26,8 +24,6 @@ const Latest = z.looseObject({ version: z.string().min(1) });
 const NPM_LATEST = "https://registry.npmjs.org/@moo.md/hum/latest";
 
 const NPM_TIMEOUT_MS = 5000;
-
-const PROVIDER_TIMEOUT_MS = 30_000;
 
 /** The newest `@moo.md/hum` on npm. */
 export const npmLatest = async (): Promise<string | undefined> => {
@@ -42,9 +38,9 @@ export const npmLatest = async (): Promise<string | undefined> => {
  * Throws when the config is refused or the repo has no `origin`; the service unit shows that as a card.
  */
 export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => {
-	const { stateDir, hopeSkills, binary, env, providerTimeoutMs = PROVIDER_TIMEOUT_MS, ...rest } = options;
+	const { stateDir, hopeSkills, binary, env, ...rest } = options;
 	const now = rest.now ?? Date.now;
-	const state = openState(stateDir ?? defaultStateDir(repo), { now });
+	const state = openState(stateDir ?? (await defaultStateDir(repo)), { now });
 	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { hopeSkills } });
 
 	if (!loaded.ok) throw new Error(loaded.refusal.message);
@@ -57,7 +53,7 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	const adapters = await resolveAdapters(repo, {
 		faults: state.faults,
-		guard: { timeoutMs: providerTimeoutMs, lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
+		guard: { lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
 		context: { report: (fault) => void state.faults.raise(fault), now },
 	});
 

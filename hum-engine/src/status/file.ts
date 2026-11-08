@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
-import { atomicWrite, isMissing } from "../state/fs.ts";
+import { atomicWrite, isMissing, orMissing } from "../state/fs.ts";
 import { emptyStatus, Heartbeat, Status } from "./format.ts";
 
 export type StatusRead =
 	| { readonly ok: true; readonly status: Status }
 	| { readonly ok: false; readonly reason: "missing" | "unreadable"; readonly message: string };
 
-/** U1: the engine's one write of the status file. Validates first, then temp file and rename, so no reader sees a part. */
+/** The engine's one write of the status file. Validates first, then writes atomically, so no reader sees a part. */
 export const writeStatus = (path: string, status: Status): void => {
 	atomicWrite(path, `${JSON.stringify(Status.parse(status))}\n`);
 };
@@ -25,25 +25,21 @@ export const readStatus = (path: string): StatusRead => {
 	}
 };
 
-/** R7: the worker's one write of its heartbeat each tick, by temp file and rename. */
+/** The worker's one write of its heartbeat each tick. */
 export const writeHeartbeat = (path: string, heartbeat: Heartbeat): void => {
 	atomicWrite(path, `${JSON.stringify(Heartbeat.parse(heartbeat))}\n`);
 };
 
 export const readHeartbeat = (path: string): Heartbeat | undefined => {
-	try {
+	return orMissing(() => {
 		const parsed = Heartbeat.safeParse(JSON.parse(readFileSync(path, "utf8")));
 
 		return parsed.success ? parsed.data : undefined;
-	} catch (error) {
-		if (error instanceof Error && isMissing(error)) return undefined;
-
-		throw error;
-	}
+	}, undefined);
 };
 
 /**
- * The service unit's write of the fault cards while no worker writes them (R7). The status file's other fields
+ * The service unit's write of the fault cards while no worker writes them. The status file's other fields
  * stay as they were, `writtenAt` included, so a dead worker still reads as stale.
  */
 export const writeCards = (path: string, cards: Status["cards"], engineVersion: string, now: number): void => {

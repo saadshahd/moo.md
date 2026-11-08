@@ -1,19 +1,19 @@
 /** One thing a config check found wrong. */
 export type Problem =
-	| { readonly check: "C2"; readonly kind: string; readonly problem: "unreachable-state"; readonly state: string }
-	| { readonly check: "C2"; readonly kind: string; readonly problem: "dead-end-state"; readonly state: string }
-	| { readonly check: "C2"; readonly kind: string; readonly problem: "wait-without-timeout"; readonly state: string }
-	| { readonly check: "C3"; readonly problem: "event-without-source"; readonly event: string; readonly source: string | undefined }
-	| { readonly check: "C3"; readonly problem: "event-without-handler"; readonly event: string }
-	| { readonly check: "D7"; readonly kind: string; readonly problem: "run-and-owner-wait"; readonly state: string }
-	| { readonly check: "V4"; readonly problem: "missing-hope-skill"; readonly skill: string; readonly role: string }
-	| { readonly check: "shape"; readonly kind: string; readonly problem: "unknown-state"; readonly state: string; readonly why: string }
-	| { readonly check: "shape"; readonly kind: string; readonly problem: "unknown-run-source"; readonly state: string; readonly src: string }
-	| { readonly check: "shape"; readonly kind: string; readonly problem: "tier-table-gap"; readonly purpose: string; readonly level: string; readonly size: string }
-	| { readonly check: "shape"; readonly kind: string; readonly problem: "machine-rejected"; readonly why: string }
-	| { readonly check: "shape"; readonly problem: "missing-file"; readonly file: string }
-	| { readonly check: "shape"; readonly problem: "unknown-level"; readonly level: string }
-	| { readonly check: "shape"; readonly problem: "overlapping-prefixes"; readonly run: string; readonly claim: string };
+	| { readonly problem: "unreachable-state"; readonly kind: string; readonly state: string }
+	| { readonly problem: "dead-end-state"; readonly kind: string; readonly state: string }
+	| { readonly problem: "wait-without-timeout"; readonly kind: string; readonly state: string }
+	| { readonly problem: "event-without-source"; readonly event: string; readonly source: string | undefined }
+	| { readonly problem: "event-without-handler"; readonly event: string }
+	| { readonly problem: "run-and-owner-wait"; readonly kind: string; readonly state: string }
+	| { readonly problem: "missing-hope-skill"; readonly skill: string; readonly role: string }
+	| { readonly problem: "unknown-state"; readonly kind: string; readonly state: string; readonly why: string }
+	| { readonly problem: "unknown-run-source"; readonly kind: string; readonly state: string; readonly src: string }
+	| { readonly problem: "tier-table-gap"; readonly kind: string; readonly purpose: string; readonly level: string; readonly size: string }
+	| { readonly problem: "machine-rejected"; readonly kind: string; readonly why: string }
+	| { readonly problem: "missing-file"; readonly file: string }
+	| { readonly problem: "unknown-level"; readonly level: string }
+	| { readonly problem: "overlapping-prefixes"; readonly run: string; readonly claim: string };
 
 /** A config change the engine will not take. The caller keeps the last good config. */
 export type Refusal =
@@ -25,40 +25,28 @@ export type Refusal =
 
 export type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly refusal: Refusal };
 
-export const describeProblem = (p: Problem): string => {
-	switch (p.problem) {
-		case "unreachable-state":
-			return `${p.kind}: state "${p.state}" cannot be reached from the start`;
-		case "dead-end-state":
-			return `${p.kind}: state "${p.state}" never reaches done or stuck`;
-		case "wait-without-timeout":
-			return `${p.kind}: wait "${p.state}" has no timeout and timeout action`;
-		case "event-without-source":
-			return p.source === undefined
-				? `event "${p.event}" is waited on but declared nowhere`
-				: `event "${p.event}" has no source: "${p.source}" is not a part or role`;
-		case "event-without-handler":
-			return `event "${p.event}" has no handler in any kind`;
-		case "run-and-owner-wait":
-			return `${p.kind}: state "${p.state}" starts a run and waits on the owner`;
-		case "missing-hope-skill":
-			return `role "${p.role}" names hope skill "${p.skill}", which hope's installed copy lacks`;
-		case "unknown-state":
-			return `${p.kind}: ${p.why} names state "${p.state}", which does not exist`;
-		case "unknown-run-source":
-			return `${p.kind}: state "${p.state}" invokes "${p.src}", which is neither a role nor a part`;
-		case "tier-table-gap":
-			return `${p.kind}: no tier for purpose "${p.purpose}", level "${p.level}", size "${p.size}"`;
-		case "machine-rejected":
-			return `${p.kind}: the machine does not load: ${p.why}`;
-		case "missing-file":
-			return `file "${p.file}" is missing`;
-		case "unknown-level":
-			return `risk level "${p.level}" is not in levels`;
-		case "overlapping-prefixes":
-			return `the run branch prefix "${p.run}" and the claim prefix "${p.claim}" overlap: one starts with the other`;
-	}
-};
+type Describe = { readonly [Name in Problem["problem"]]: (problem: Extract<Problem, { problem: Name }>) => string };
+
+const DESCRIPTIONS = {
+	"unreachable-state": (p) => `${p.kind}: state "${p.state}" cannot be reached from the start`,
+	"dead-end-state": (p) => `${p.kind}: state "${p.state}" never reaches done or stuck`,
+	"wait-without-timeout": (p) => `${p.kind}: wait "${p.state}" has no timeout and timeout action`,
+	"event-without-source": (p) =>
+		p.source === undefined ? `event "${p.event}" is waited on but declared nowhere` : `event "${p.event}" has no source: "${p.source}" is not a part or role`,
+	"event-without-handler": (p) => `event "${p.event}" has no handler in any kind`,
+	"run-and-owner-wait": (p) => `${p.kind}: state "${p.state}" starts a run and waits on the owner`,
+	"missing-hope-skill": (p) => `role "${p.role}" names hope skill "${p.skill}", which hope's installed copy lacks`,
+	"unknown-state": (p) => `${p.kind}: ${p.why} names state "${p.state}", which does not exist`,
+	"unknown-run-source": (p) => `${p.kind}: state "${p.state}" invokes "${p.src}", which is neither a role nor a part`,
+	"tier-table-gap": (p) => `${p.kind}: no tier for purpose "${p.purpose}", level "${p.level}", size "${p.size}"`,
+	"machine-rejected": (p) => `${p.kind}: the machine does not load: ${p.why}`,
+	"missing-file": (p) => `file "${p.file}" is missing`,
+	"unknown-level": (p) => `risk level "${p.level}" is not in levels`,
+	"overlapping-prefixes": (p) => `the run branch prefix "${p.run}" and the claim prefix "${p.claim}" overlap: one starts with the other`,
+} as const satisfies Describe;
+
+// SAFETY: each description is keyed by the problem name it reads, so the lookup by `problem.problem` takes its own variant.
+export const describeProblem = (problem: Problem): string => (DESCRIPTIONS[problem.problem] as (problem: Problem) => string)(problem);
 
 export const invalidConfig = (problems: readonly Problem[]): Refusal => ({
 	code: "invalid-config",

@@ -1,3 +1,4 @@
+import { isValidCron } from "cron-validator";
 import isGitRefNameValid from "is-git-ref-name-valid";
 import { z } from "zod";
 import shippedConfig from "../../defaults/hum.json" with { type: "json" };
@@ -55,33 +56,46 @@ const count = z.int().positive();
 
 const SERVICE_LABEL = /^[A-Za-z0-9._-]+$/;
 
-const CRON_FIELDS = /^(\S+\s+){4}\S+$/;
-
 const isInsideRepo = (path: string): boolean => !path.startsWith("/") && !path.endsWith("/") && !path.split("/").includes("..");
 
 const commitIdentity = z.strictObject({ name, email: name });
 
+const backoff = z
+	.strictObject({ firstSeconds: z.number().positive(), maxSeconds: z.number().positive() })
+	.refine(({ firstSeconds, maxSeconds }) => firstSeconds <= maxSeconds, "the first pause is at most the longest pause");
+
+/** Every setting an owner may change, each described for the schema's readers. `defaults/hum.json` holds the shipped value of each. */
 const Shipped = z.object({
-	runBranchPrefix: branchPrefix,
-	claimPrefix: branchPrefix,
-	readyLabel: name,
-	mergeMethod: z.enum(MERGE_METHODS),
-	models: z.record(z.enum(TIERS), name),
-	runners: z.int().positive(),
-	tickIntervalSeconds: seconds,
-	drainTimeoutSeconds: seconds,
-	claimExpirySeconds: seconds,
-	latestVersionCacheSeconds: seconds,
-	maxFixRuns: z.int().nonnegative(),
-	serviceLabel: z.string().regex(SERVICE_LABEL, "a service label is letters, digits, dot, dash and underscore"),
-	maxCrashes: count,
-	crashWindowSeconds: seconds,
-	workerDownTicks: count,
-	tokenWarnDays: count,
-	ciSchedule: z.string().regex(CRON_FIELDS, "a cron schedule has five fields"),
-	ciTickCacheSeconds: seconds,
-	commitIdentity,
-	itemsDir: z.string().min(1).refine(isInsideRepo, "the items folder is a path inside the repo, without a leading or trailing '/'"),
+	runBranchPrefix: branchPrefix.describe("Each run builds on the branch this prefix and its item id make."),
+	claimPrefix: branchPrefix.describe("A claim is the first push of the branch this prefix and its item id make."),
+	readyLabel: name.describe("The label that marks an issue ready for hum."),
+	mergeMethod: z.enum(MERGE_METHODS).describe("How a released pull request merges."),
+	models: z.record(z.enum(TIERS), name).describe("The model id each tier of a kind's table runs on."),
+	runners: count.describe("The most runs that go at once."),
+	tickIntervalSeconds: seconds.describe("The time between worker ticks; each tick writes the heartbeat and renews the claims in flight."),
+	drainTimeoutSeconds: seconds.describe("How long a worker that has seen an update lets its runs finish before it stops them."),
+	claimExpirySeconds: seconds.describe("How long a claim lasts unless its holder renews it."),
+	latestVersionCacheSeconds: seconds.describe("How long the newest published engine version is kept before it is read again."),
+	maxFixRuns: z.int().nonnegative().describe("Fix runs an item gets after failed checks before it ends stuck."),
+	serviceLabel: z.string().regex(SERVICE_LABEL, "a service label is letters, digits, dot, dash and underscore").describe("The service unit's label, and the name its file takes."),
+	maxCrashes: count.describe("Worker crashes within crashWindowSeconds that stop the service's restarts."),
+	crashWindowSeconds: seconds.describe("The window in which maxCrashes crashes stop the service's restarts."),
+	workerDownTicks: count.describe("Ticks without a heartbeat before the worker-down card shows."),
+	tokenWarnDays: count.describe("Days before the CI token's year ends that the expiry card shows."),
+	ciSchedule: z.string().refine((schedule) => isValidCron(schedule), "a cron schedule has five valid fields").describe("The cron schedule of the scheduled CI workflow."),
+	ciTickCacheSeconds: seconds.describe("How long the scheduled workflow's last tick is kept before the remote is read again."),
+	commitIdentity: commitIdentity.describe("The author and committer of every commit hum makes itself."),
+	itemsDir: z.string().min(1).refine(isInsideRepo, "the items folder is a path inside the repo, without a leading or trailing '/'").describe("The folder of the repo that holds the markdown items."),
+	providerTimeoutSeconds: seconds.describe("How long a failing provider call is retried before one card shows."),
+	providerBackoff: backoff.describe("The pause before a provider call's first retry, doubled each retry up to the longest pause."),
+	mergedShown: count.describe("Merged changes the status file lists."),
+	statusReadTimeoutSeconds: seconds.describe("How long a read for the status file, such as the newest published version, may take before it is left out."),
+	mergeTries: count.describe("Tries to merge a change when the base branch moves under it."),
+	writeRaceRetries: z.int().nonnegative().describe("Retries of a markdown write that another writer's push beat."),
+	itemReadsAtOnce: count.describe("Item files the markdown source reads at once; each read is a git process."),
+	restartBackoff: backoff.describe("The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."),
+	restartDelaySeconds: seconds.describe("Seconds the service manager waits before it starts a failed start script again."),
+	ciWakeTimeoutMinutes: count.describe("Minutes a CI wake may run before GitHub stops it."),
 });
 
 /** The defaults hum ships with, read from the default `hum.json`. */
@@ -89,6 +103,12 @@ export const SHIPPED_DEFAULTS = Shipped.parse(shippedConfig);
 
 /** The branch prefixes: every branch hum writes starts with one of them. */
 export type Naming = Pick<z.infer<typeof Shipped>, "runBranchPrefix" | "claimPrefix">;
+
+type Settings = typeof Shipped extends z.ZodObject<infer Fields> ? Fields : never;
+
+const withShippedDefaults = (settings: Settings): { [Key in keyof Settings]: z.ZodDefault<Settings[Key]> } =>
+	// SAFETY: `Object.fromEntries` loses the per-key types; each entry is its setting with its own shipped default.
+	Object.fromEntries(Object.entries<z.ZodType>(settings).map(([key, setting]) => [key, setting.default(SHIPPED_DEFAULTS[key as keyof Settings])])) as never;
 
 export const Role = z.strictObject({
 	file: name,
@@ -116,45 +136,7 @@ export const HumConfig = z.strictObject({
 	integrations: z.record(name, name).optional(),
 	/** The day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
 	ciToken: z.strictObject({ setUp: z.iso.date() }).optional(),
-	/** Each run builds on the branch this prefix and its item id make. */
-	runBranchPrefix: Shipped.shape.runBranchPrefix.default(SHIPPED_DEFAULTS.runBranchPrefix),
-	/** A claim is the first push of the branch this prefix and its item id make. */
-	claimPrefix: Shipped.shape.claimPrefix.default(SHIPPED_DEFAULTS.claimPrefix),
-	/** The label that marks an issue ready for hum. */
-	readyLabel: Shipped.shape.readyLabel.default(SHIPPED_DEFAULTS.readyLabel),
-	/** How a released pull request merges. */
-	mergeMethod: Shipped.shape.mergeMethod.default(SHIPPED_DEFAULTS.mergeMethod),
-	/** The model id each tier of a kind's table runs on. */
-	models: Shipped.shape.models.default(SHIPPED_DEFAULTS.models),
-	/** The most runs that go at once. */
-	runners: Shipped.shape.runners.default(SHIPPED_DEFAULTS.runners),
-	/** The time between worker ticks; each tick writes the heartbeat and renews the claims in flight. */
-	tickIntervalSeconds: Shipped.shape.tickIntervalSeconds.default(SHIPPED_DEFAULTS.tickIntervalSeconds),
-	/** How long a worker that has seen an update lets its runs finish before it stops them. */
-	drainTimeoutSeconds: Shipped.shape.drainTimeoutSeconds.default(SHIPPED_DEFAULTS.drainTimeoutSeconds),
-	/** How long a claim lasts unless its holder renews it. */
-	claimExpirySeconds: Shipped.shape.claimExpirySeconds.default(SHIPPED_DEFAULTS.claimExpirySeconds),
-	/** How long the newest published engine version is kept before it is read again. */
-	latestVersionCacheSeconds: Shipped.shape.latestVersionCacheSeconds.default(SHIPPED_DEFAULTS.latestVersionCacheSeconds),
-	/** Fix runs an item gets after failed checks before it ends stuck. */
-	maxFixRuns: Shipped.shape.maxFixRuns.default(SHIPPED_DEFAULTS.maxFixRuns),
-	/** The service unit's label, and the name its file takes. */
-	serviceLabel: Shipped.shape.serviceLabel.default(SHIPPED_DEFAULTS.serviceLabel),
-	/** Worker crashes within `crashWindowSeconds` that stop the service's restarts. */
-	maxCrashes: Shipped.shape.maxCrashes.default(SHIPPED_DEFAULTS.maxCrashes),
-	crashWindowSeconds: Shipped.shape.crashWindowSeconds.default(SHIPPED_DEFAULTS.crashWindowSeconds),
-	/** Ticks without a heartbeat before the worker-down card shows. */
-	workerDownTicks: Shipped.shape.workerDownTicks.default(SHIPPED_DEFAULTS.workerDownTicks),
-	/** Days before the CI token's year ends that the expiry card shows. */
-	tokenWarnDays: Shipped.shape.tokenWarnDays.default(SHIPPED_DEFAULTS.tokenWarnDays),
-	/** The cron schedule of the scheduled CI workflow. */
-	ciSchedule: Shipped.shape.ciSchedule.default(SHIPPED_DEFAULTS.ciSchedule),
-	/** How long the scheduled workflow's last tick is kept before the remote is read again. */
-	ciTickCacheSeconds: Shipped.shape.ciTickCacheSeconds.default(SHIPPED_DEFAULTS.ciTickCacheSeconds),
-	/** The author and committer of every commit hum makes itself. */
-	commitIdentity: Shipped.shape.commitIdentity.default(SHIPPED_DEFAULTS.commitIdentity),
-	/** The folder of the repo that holds the markdown items. */
-	itemsDir: Shipped.shape.itemsDir.default(SHIPPED_DEFAULTS.itemsDir),
+	...withShippedDefaults(Shipped.shape),
 });
 
 export type HumConfig = z.infer<typeof HumConfig>;
@@ -253,4 +235,14 @@ export const OWNER_CHANGEABLE = {
 	"CI tick cache": "ciTickCacheSeconds",
 	"commit identity": "commitIdentity",
 	"items folder": "itemsDir",
+	"provider timeout": "providerTimeoutSeconds",
+	"provider backoff": "providerBackoff",
+	"merged changes shown": "mergedShown",
+	"status read timeout": "statusReadTimeoutSeconds",
+	"merge tries": "mergeTries",
+	"write race retries": "writeRaceRetries",
+	"item reads at once": "itemReadsAtOnce",
+	"restart backoff": "restartBackoff",
+	"restart delay": "restartDelaySeconds",
+	"CI wake timeout": "ciWakeTimeoutMinutes",
 } as const satisfies Record<string, string>;

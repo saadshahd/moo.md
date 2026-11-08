@@ -4,13 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pMemoize, { pMemoizeClear } from "p-memoize";
 import pRetry from "p-retry";
+import semver from "semver";
 import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
 import { rejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
-import { compareVersions } from "../state/format.ts";
 import type { State } from "../state/open.ts";
+import { SECOND_MS } from "../time.ts";
 import type { Card } from "../status/format.ts";
 
 export type Effort = (typeof EFFORTS)[number];
@@ -145,8 +146,6 @@ const EMPTY_TRANSCRIPT: Transcript = {
 const isRejection = (info: z.infer<typeof RateLimit>["rate_limit_info"]): info is { status: "rejected"; resetsAt: number } =>
 	info.status === "rejected" && info.resetsAt !== undefined;
 
-const EPOCH_SECONDS_MS = 1000;
-
 const readEvent = {
 	system: (t, { plugins, apiKeySource }) => ({
 		...t,
@@ -160,7 +159,7 @@ const readEvent = {
 			[id]: billed(usage.input_tokens, usage.output_tokens, usage.cache_creation_input_tokens),
 		},
 	}),
-	rate_limit_event: (t, { rate_limit_info }) => (isRejection(rate_limit_info) ? { ...t, rejectedUntil: rate_limit_info.resetsAt * EPOCH_SECONDS_MS } : t),
+	rate_limit_event: (t, { rate_limit_info }) => (isRejection(rate_limit_info) ? { ...t, rejectedUntil: rate_limit_info.resetsAt * SECOND_MS } : t),
 	result: (t, result) => ({ ...t, result }),
 } satisfies { readonly [K in StreamEvent["type"]]: (t: Transcript, event: Extract<StreamEvent, { type: K }>) => Transcript };
 
@@ -227,7 +226,7 @@ const LIMIT_ISO = /resets?(?: at)? (\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:\d\d))/
 /** Epoch values below this are seconds, at or above it milliseconds. */
 const FIRST_MS_EPOCH = 1e12;
 
-const epochMs = (value: number): number => (value < FIRST_MS_EPOCH ? value * EPOCH_SECONDS_MS : value);
+const epochMs = (value: number): number => (value < FIRST_MS_EPOCH ? value * SECOND_MS : value);
 
 const isoMs = (text: string | undefined): number | undefined => {
 	const parsed = text === undefined ? Number.NaN : Date.parse(text);
@@ -388,11 +387,7 @@ const START_SCHEMA = {
 const VERSION = /\d+\.\d+\.\d+/;
 
 /** A version that is missing, unreadable or older than the floor starts no run. */
-const isBelowFloor = (version: string | undefined): boolean => {
-	const order = version === undefined ? undefined : compareVersions(version, CLAUDE_FLOOR);
-
-	return order === undefined || order < 0;
-};
+const isBelowFloor = (version: string | undefined): boolean => version === undefined || semver.valid(version) === null || semver.lt(version, CLAUDE_FLOOR);
 
 type Started = { readonly check: RunOutcome; readonly runner: Runner };
 

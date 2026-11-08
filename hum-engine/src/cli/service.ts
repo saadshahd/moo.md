@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { type Command, Option } from "commander";
@@ -6,18 +5,15 @@ import { x } from "tinyexec";
 import { z } from "zod";
 import { listHopeSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
+import { readSettings } from "../config/settings.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
 import { reportCards, wakeUntilQuiet } from "../service/wake.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
+import { SECOND_MS } from "../time.ts";
 import { readStatus } from "../status/file.ts";
 import { npmLatest, openWorker } from "../worker/open.ts";
 import type { Io } from "./ops.ts";
-
-const SECOND_MS = 1000;
-
-/** The pause before a supervised worker's first restart. */
-const RESTART_BACKOFF_MS = SECOND_MS;
 
 const EXIT_OK = 0;
 
@@ -62,6 +58,7 @@ const ServiceSettings = z.looseObject({
 	workerDownTicks: HumConfig.shape.workerDownTicks,
 	maxCrashes: HumConfig.shape.maxCrashes,
 	crashWindowSeconds: HumConfig.shape.crashWindowSeconds,
+	restartBackoff: HumConfig.shape.restartBackoff,
 });
 
 /**
@@ -70,7 +67,7 @@ const ServiceSettings = z.looseObject({
  */
 const serviceSettings = (repo: string): z.infer<typeof ServiceSettings> => {
 	try {
-		return ServiceSettings.parse(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")));
+		return readSettings(repo, ServiceSettings);
 	} catch {
 		return ServiceSettings.parse({});
 	}
@@ -150,14 +147,15 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			onStop(() => abort.abort());
 
 			const ended = await supervise({
-				state: openState(defaultStateDir(io.cwd)),
+				state: openState(await defaultStateDir(io.cwd)),
 				spawn: () => spawnWorker(io.cwd, workArgs),
 				now: Date.now,
 				intervalMs: settings.tickIntervalSeconds * SECOND_MS,
 				workerDownTicks: settings.workerDownTicks,
 				maxCrashes: settings.maxCrashes,
 				crashWindowMs: settings.crashWindowSeconds * SECOND_MS,
-				backoffMs: RESTART_BACKOFF_MS,
+				backoffMs: settings.restartBackoff.firstSeconds * SECOND_MS,
+				maxBackoffMs: settings.restartBackoff.maxSeconds * SECOND_MS,
 				stop: abort.signal,
 			});
 
@@ -174,7 +172,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			if (flags.event === SCHEDULE_EVENT) await recordCiTick(io.cwd, "origin", Date.now(), worker.config.hum.commitIdentity);
 
-			const status = readStatus(join(defaultStateDir(io.cwd), "status.json"));
+			const status = readStatus(join(await defaultStateDir(io.cwd), "status.json"));
 			const cards = status.ok ? status.status.cards : [];
 
 			await reportCards(cards);

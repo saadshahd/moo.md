@@ -1,11 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 
 /** The markdown adapter's settings as hum ships them. */
-export const markdownSettings = { claimPrefix: SHIPPED_DEFAULTS.claimPrefix, itemsDir: SHIPPED_DEFAULTS.itemsDir, identity: SHIPPED_DEFAULTS.commitIdentity };
+export const markdownSettings = {
+	claimPrefix: SHIPPED_DEFAULTS.claimPrefix,
+	itemsDir: SHIPPED_DEFAULTS.itemsDir,
+	identity: SHIPPED_DEFAULTS.commitIdentity,
+	writeRaceRetries: SHIPPED_DEFAULTS.writeRaceRetries,
+	itemReadsAtOnce: SHIPPED_DEFAULTS.itemReadsAtOnce,
+};
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 
@@ -63,6 +69,18 @@ export class WorkRepo {
 		sh(this.root, ["clone", "-q", this.remote, path]);
 
 		return path;
+	}
+
+	/** The remote refuses every push to main as lost to another writer. Returns how many pushes it has refused. */
+	refuseMainPushes(): () => number {
+		const refused = join(this.root, "refused-pushes");
+		const hook = join(this.remote, "hooks", "pre-receive");
+
+		mkdirSync(join(this.remote, "hooks"), { recursive: true });
+		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tif [ "$ref" = "refs/heads/main" ]; then echo x >> ${refused}; echo "fetch first" >&2; exit 1; fi\ndone\n`);
+		chmodSync(hook, 0o755);
+
+		return () => (existsSync(refused) ? readFileSync(refused, "utf8").split("\n").filter(Boolean).length : 0);
 	}
 
 	/** The item file as the remote holds it on main. */

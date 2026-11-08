@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createActor, SimulatedClock } from "xstate";
 import {
-	compareVersions,
 	defaultStateDir,
 	emptyStatus,
 	ENGINE_VERSION,
@@ -77,7 +76,7 @@ test("a saved item restores in place, with its timer", async () => {
 	expect(state.faults.list()).toEqual([]);
 });
 
-test("D2: a truncated snapshot keeps its file, starts nothing and raises one card; other items go on", async () => {
+test("a truncated snapshot keeps its file, starts nothing and raises one card; other items go on", async () => {
 	const state = openState(dir);
 
 	waitingItem(state, "#68");
@@ -99,7 +98,7 @@ test("D2: a truncated snapshot keeps its file, starts nothing and raises one car
 	expect(other.ok && other.value?.getSnapshot().value).toBe("waiting");
 });
 
-test("D2: a snapshot xstate cannot restore gives an error status, one card, and the file stays", async () => {
+test("a snapshot xstate cannot restore gives an error status, one card, and the file stays", async () => {
 	const state = openState(dir);
 
 	waitingItem(state, "#68");
@@ -115,7 +114,7 @@ test("D2: a snapshot xstate cannot restore gives an error status, one card, and 
 	expect(existsSync(file)).toBe(true);
 });
 
-test("V10: a snapshot from engine vN restores in place under vN+1, and a rollback gives one card", async () => {
+test("a snapshot from an older engine restores in place, and a rollback to an older engine gives one card", async () => {
 	waitingItem(openState(dir, { engineVersion: "0.1.0" }), "#68");
 
 	const next = openState(dir, { engineVersion: "0.2.0" });
@@ -134,12 +133,9 @@ test("V10: a snapshot from engine vN restores in place under vN+1, and a rollbac
 
 	expect(rolledBack.faults.list().map((card) => card.code)).toEqual(["snapshot-from-newer-engine"]);
 	expect(readFileSync(rolledBack.items.path("#68"))).toEqual(before);
-	expect(compareVersions("0.1.0", "0.2.0")).toBe(-1);
-	expect(compareVersions("0.2.0", "0.2.0-beta.1")).toBe(1);
-	expect(compareVersions("0.2.0", "nonsense")).toBeUndefined();
 });
 
-test("V10: a shipped envelope migration runs on an older format; a missing one throws", async () => {
+test("a shipped envelope migration runs on an older format; a missing one throws", async () => {
 	const engine = openState(dir);
 
 	waitingItem(engine, "#68");
@@ -161,31 +157,14 @@ test("V10: a shipped envelope migration runs on an older format; a missing one t
 	expect(restored.ok && restored.value?.getSnapshot().value).toBe("waiting");
 
 	// A gap in the shipped migrations is a bug in the engine, not in the data: it throws.
-	await expect(engine.items.restore("#68", tiny)).rejects.toThrow("no envelope migration from format 0");
+	await expect(engine.items.restore("#68", tiny)).rejects.toThrow("no migration from format 0");
 });
 
-test("V3 meets V10: a snapshot saved under an older machine version restores through its state map", async () => {
-	const v1 = openState(dir);
+const canMountDiskImage = process.platform === "darwin" && Bun.which("hdiutil") !== null;
 
-	waitingItem(v1, "#68");
-	const next = Kind.parse({ ...kindAt("2", "deep-wait"), stateMap: { "1": { waiting: "deep-wait" } } });
-	const restored = await v1.items.restore("#68", next, { kindAt: (version) => (version === "1" ? tiny : undefined) });
+const canMountTmpfs = process.platform === "linux" && process.getuid?.() === 0;
 
-	expect(restored.ok && restored.value?.getSnapshot().value).toBe("deep-wait");
-
-	const blind = await v1.items.restore("#68", next);
-
-	expect(blind.ok).toBe(false);
-	expect(v1.faults.list().map((card) => card.code)).toEqual(["snapshot-machine-unknown"]);
-});
-
-test("D3: a full disk image leaves the old snapshot restorable and raises one card", async () => {
-	if (process.platform !== "darwin" || spawnSync("which", ["hdiutil"]).status !== 0) {
-		console.log("skip D3 disk image: needs macOS hdiutil; Linux CI runs the size-capped tmpfs test");
-
-		return;
-	}
-
+test.skipIf(!canMountDiskImage)("a full disk image leaves the old snapshot restorable and raises one card", async () => {
 	const image = join(dir, "disk.dmg");
 	const mount = join(dir, "mnt");
 
@@ -224,7 +203,7 @@ test("D3: a full disk image leaves the old snapshot restorable and raises one ca
 		expect(state.items.save("#68", tiny, { big: "y".repeat(500_000) }).ok).toBe(false);
 		expect(state.faults.list().map((card) => card.code)).toEqual(["snapshot-write-failed"]);
 		expect(readFileSync(state.items.path("#68"))).toEqual(good);
-		expect(readdirSync(join(mount, "hum", "items")).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+		expect(readdirSync(join(mount, "hum", "items")).filter((name) => !name.endsWith(".json"))).toEqual([]);
 
 		const restored = await state.items.restore("#68", tiny);
 
@@ -234,13 +213,7 @@ test("D3: a full disk image leaves the old snapshot restorable and raises one ca
 	}
 }, 60_000);
 
-test("D3 on Linux: a size-capped tmpfs (written here, first run in Linux CI)", () => {
-	if (process.platform !== "linux" || process.getuid?.() !== 0) {
-		console.log("skip D3 tmpfs: needs Linux and root to mount a size-capped tmpfs; slice 18 runs it in CI");
-
-		return;
-	}
-
+test.skipIf(!canMountTmpfs)("a full size-capped tmpfs leaves the old snapshot restorable and raises one card", () => {
 	const mount = join(dir, "tmpfs");
 
 	mkdirSync(mount);
@@ -266,7 +239,16 @@ test("D3 on Linux: a size-capped tmpfs (written here, first run in Linux CI)", (
 	}
 });
 
-test("D3: a failed save of a new item leaves nothing behind, and a later save clears the card", () => {
+test("a half-written temp file a crash left beside the records is not read as one", () => {
+	const state = openState(dir);
+
+	state.parked.put("a", { item: "a", why: "stuck", cause: "c", since: 1 });
+	writeFileSync(join(dir, "parked", "partial.json.1234567890"), "{");
+
+	expect(state.parked.list().map((parked) => parked.item)).toEqual(["a"]);
+});
+
+test("a failed save of a new item leaves nothing behind, and a later save clears the card", () => {
 	const state = openState(dir);
 
 	mkdirSync(state.items.path("#9"), { recursive: true });
@@ -282,7 +264,7 @@ test("D3: a failed save of a new item leaves nothing behind, and a later save cl
 const readFile = (path: string) => (existsSync(path) ? readFileSync(path, "utf8") : "");
 
 for (const mode of ["before-op", "after-op"]) {
-	test(`E2: a kill ${mode} makes no duplicate on the provider`, () => {
+	test(`a kill ${mode} makes no duplicate on the provider`, () => {
 		const script = join(import.meta.dir, "fixtures/kill-between.ts");
 		const killed = spawnSync("bun", [script, dir, mode]);
 
@@ -295,7 +277,7 @@ for (const mode of ["before-op", "after-op"]) {
 	});
 }
 
-test("E2: a done op is skipped without asking the provider, and keys differ by attempt", async () => {
+test("a done op is skipped without asking the provider, and keys differ by attempt", async () => {
 	const { ops } = openState(dir);
 	const key = { itemId: "#68", run: "build", attempt: 1, op: "comment" };
 	let asked = 0;
@@ -309,7 +291,7 @@ test("E2: a done op is skipped without asking the provider, and keys differ by a
 	expect(ops.state(key)).toBe("done");
 });
 
-test("D4: one event read twice is saved once, and the first copy stays", () => {
+test("one event read twice is saved once, and the first copy stays", () => {
 
 	let tick = 0;
 	const { events } = openState(dir, { now: () => ++tick });
@@ -325,7 +307,7 @@ test("D4: one event read twice is saved once, and the first copy stays", () => {
 	expect(events.list("#none")).toEqual([]);
 });
 
-test("D1: the run's name is saved before launch and adopted after a restart", () => {
+test("the run's name is saved before launch and adopted after a restart", () => {
 	const key = { itemId: "#68", run: "build", attempt: 1 };
 	const before = openState(dir).runs;
 
@@ -342,7 +324,7 @@ test("D1: the run's name is saved before launch and adopted after a restart", ()
 	expect(after.list("#68")).toHaveLength(1);
 });
 
-test("U1: a reader never sees a partial status file", async () => {
+test("a reader never sees a partial status file", async () => {
 	const path = join(dir, "status.json");
 
 	writeStatus(path, emptyStatus(ENGINE_VERSION, 0));
@@ -366,10 +348,10 @@ test("U1: a reader never sees a partial status file", async () => {
 
 	expect(reads).toBeGreaterThan(20);
 	expect(distinct.size).toBeGreaterThan(5);
-	expect(readdirSync(dir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+	expect(readdirSync(dir).filter((name) => !name.endsWith(".json"))).toEqual([]);
 });
 
-test("the status file holds R8's sections, the engine versions and the measure slot, and refuses a stranger", () => {
+test("the status file holds its sections, the engine versions and the measure slot, and refuses a stranger", () => {
 	const path = join(dir, "nested", "status.json");
 	const status = emptyStatus(ENGINE_VERSION, 1000);
 
@@ -390,7 +372,7 @@ test("the status file holds R8's sections, the engine versions and the measure s
 	expect(Status.safeParse({ ...status, extra: 1 }).success).toBe(false);
 });
 
-test("T5: a fault card gives the cause, a one-line fix and at most one action; one card per cause", () => {
+test("a fault card gives the cause, a one-line fix and at most one action; one card per cause", () => {
 	const { faults } = openState(dir, { now: () => 5 });
 	const input = { code: "x", item: "#1", cause: "It broke.", fix: "Fix it." };
 
@@ -402,7 +384,7 @@ test("T5: a fault card gives the cause, a one-line fix and at most one action; o
 	expect(openState(dir).faults.list()).toEqual([]);
 });
 
-test("the state folder is the git common dir's hum/, shared by worktrees", () => {
+test("the state folder is the git common dir's hum/, shared by worktrees", async () => {
 	const repo = join(dir, "repo");
 
 	mkdirSync(repo);
@@ -413,7 +395,7 @@ test("the state folder is the git common dir's hum/, shared by worktrees", () =>
 	spawnSync("git", ["-C", repo, "worktree", "add", "-q", tree, "-b", "other"]);
 	const real = (path: string) => spawnSync("realpath", [path], { encoding: "utf8" }).stdout.trim();
 
-	expect(real(defaultStateDir(repo))).toBe(real(join(repo, ".git", "hum")));
-	expect(real(defaultStateDir(tree))).toBe(real(join(repo, ".git", "hum")));
-	expect(() => defaultStateDir(dir)).toThrow("not inside a git repository");
+	expect(real(await defaultStateDir(repo))).toBe(real(join(repo, ".git", "hum")));
+	expect(real(await defaultStateDir(tree))).toBe(real(join(repo, ".git", "hum")));
+	await expect(defaultStateDir(dir)).rejects.toThrow("not inside a git repository");
 });

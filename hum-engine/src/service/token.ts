@@ -1,7 +1,6 @@
 import type { Faults } from "../state/faults.ts";
+import { DAY_MS } from "../time.ts";
 import { CARD_CODES, CARD_KINDS } from "./cards.ts";
-
-const DAY_MS = 86_400_000;
 
 /** `claude setup-token` makes a one-year token. */
 export const TOKEN_LIFE_DAYS = 365;

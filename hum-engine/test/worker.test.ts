@@ -180,6 +180,34 @@ test("a worker that sees an update runs nothing new and exits when its runs end"
 	expect(w.shim.calls().filter((c) => c.itemId)).toHaveLength(1);
 });
 
+test("the status file lists only the newest mergedShown merged changes", async () => {
+	const w = await world({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 } } }, { settings: { mergedShown: 1 } });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/b.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	await w.worker.tick();
+
+	const status = readStatus(w.state.statusPath);
+
+	expect(merged(w)).toEqual(["a", "b"]);
+	expect(status.ok && status.status.merged).toHaveLength(1);
+});
+
+test("a status read that outlasts statusReadTimeoutSeconds shows no value and never holds the tick", async () => {
+	const w = await world({}, { settings: { statusReadTimeoutSeconds: 1 } });
+	const worker = w.workerWith({ latestVersion: () => new Promise<never>(() => {}) });
+	const began = Date.now();
+
+	await worker.tick();
+
+	const status = readStatus(w.state.statusPath);
+
+	expect(Date.now() - began).toBeLessThan(5000);
+	expect(status.ok && status.status.engine.latest).toBeUndefined();
+});
+
 test("each tick writes a heartbeat and the status file for the view", async () => {
 	const w = await world({});
 	const worker = w.workerWith({ latestVersion: async () => "9.9.9" });

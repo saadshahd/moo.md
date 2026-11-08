@@ -3,7 +3,7 @@ import { CLAUDE_FLOOR } from "../adapters/claude-p.ts";
 import type { HumConfig } from "../config/schema.ts";
 
 /** The settings the workflows are built from. */
-export type WorkflowSettings = Pick<HumConfig, "runBranchPrefix" | "itemsDir" | "ciSchedule" | "commitIdentity">;
+export type WorkflowSettings = Pick<HumConfig, "runBranchPrefix" | "itemsDir" | "ciSchedule" | "commitIdentity" | "ciWakeTimeoutMinutes">;
 
 export const WAKE_FILE = "hum-wake.yml";
 
@@ -15,8 +15,6 @@ const WAKE_PATH = `./.github/workflows/${WAKE_FILE}`;
 const TOKEN_SECRET = "CLAUDE_CODE_OAUTH_TOKEN";
 
 const HOPE_MARKETPLACE = "saadshahd/moo.md";
-
-const WAKE_TIMEOUT_MINUTES = 60;
 
 /** The Bun that builds the workflows is the one the owner's repo runs, so CI installs with the same lockfile reader. */
 const BUN_VERSION = Bun.version;
@@ -54,14 +52,14 @@ const trigger = (name: string, on: TriggerEvents, job: TriggerJob = {}) => ({
  * on the item and ended; the owner's answer starts a fresh run on that branch, so no session, artifact or approval
  * is kept between runs.
  */
-const wake = ({ commitIdentity }: WorkflowSettings) => ({
+const wake = ({ commitIdentity, ciWakeTimeoutMinutes }: WorkflowSettings) => ({
 	name: "hum wake",
 	on: { workflow_call: { secrets: { [TOKEN_SECRET]: { required: true } } } },
 	permissions: PERMISSIONS,
 	jobs: {
 		wake: {
 			"runs-on": "ubuntu-latest",
-			"timeout-minutes": WAKE_TIMEOUT_MINUTES,
+			"timeout-minutes": ciWakeTimeoutMinutes,
 			env: {
 				[TOKEN_SECRET]: `\${{ secrets.${TOKEN_SECRET} }}`,
 				GH_TOKEN: "${{ github.token }}",

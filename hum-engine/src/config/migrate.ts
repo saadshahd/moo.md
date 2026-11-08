@@ -5,8 +5,21 @@ import type { Result } from "./refusal.ts";
 
 type ConfigJson = Readonly<Record<string, Json>>;
 
+/** Per earlier version: rewrites a value at that version into the next version's shape. */
+export type Steps<T> = Readonly<Record<number, (value: T) => T>>;
+
+/** Applies each step from version `from` up to `to`, stamping the version under `versionKey`. A missing step is an engine bug and throws. */
+export const climb = <T extends object>(value: T, from: number, to: number, steps: Steps<T>, versionKey: string): T =>
+	Array.from({ length: Math.max(to - from, 0) }, (_, offset) => from + offset).reduce((current, at) => {
+		const step = steps[at];
+
+		if (!step) throw new Error(`no migration from ${versionKey} ${at}; the engine ships a gap`);
+
+		return { ...step(current), [versionKey]: at + 1 };
+	}, value);
+
 /** Per earlier schema version: rewrites a config at that version into the next version's shape. */
-export type Migrations = Readonly<Record<number, (config: ConfigJson) => ConfigJson>>;
+export type Migrations = Steps<ConfigJson>;
 
 /** One entry per earlier schema version. Empty while version 1 is the first. */
 export const MIGRATIONS: Migrations = {};
@@ -44,14 +57,5 @@ export const migrateConfig = (
 		};
 	}
 
-	let config = parsed.data;
-
-	for (let at = found; at < current; at++) {
-		const step = migrations[at];
-
-		if (!step) throw new Error(`no migration from schema version ${at}; the engine ships a gap`);
-		config = { ...step(config), schemaVersion: at + 1 };
-	}
-
-	return { ok: true, value: config };
+	return { ok: true, value: climb(parsed.data, found, current, migrations, "schemaVersion") };
 };

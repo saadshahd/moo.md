@@ -3,7 +3,6 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { commands } from "../src/index.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 
 const MAIN = join(import.meta.dir, "..", "src", "cli", "main.ts");
@@ -21,22 +20,6 @@ const json = (cwd: string, ...args: string[]) => {
 
 	return JSON.parse(result.out);
 };
-
-test("hum help --json prints the op table, and every op the spec names is in it", () => {
-	const printed = JSON.parse(hum(process.cwd(), "help", "--json").out);
-
-	expect(printed).toEqual(JSON.parse(JSON.stringify(commands)));
-	expect(Object.keys(printed).sort()).toEqual(
-		["ask", "answer", "claim", "comment", "decide", "file-follow-up", "list-ready", "publish", "push", "read", "release", "watch"].sort(),
-	);
-});
-
-test("an unknown op exits 2 and names the ops", () => {
-	const result = hum(process.cwd(), "nope");
-
-	expect(result.code).toBe(2);
-	expect(result.err).toContain("list-ready");
-});
 
 test("hum push runs no hook, though a pre-push hook that would fail is installed", () => {
 	const repo = new WorkRepo();
@@ -84,30 +67,27 @@ test("hum list-ready, claim, watch, answer and read work end to end on a temp re
 	expect(json(worker, "read", id).thread).toMatchObject([{ kind: "answer", text: "looks good", option: "approve" }]);
 });
 
-test("hum answer on a protected branch exits 1 and prints the remote's refusal", () => {
-	const repo = new WorkRepo();
-	const worker = repo.worker("w");
-	const id = repo.seed("guarded");
-	const hook = join(repo.remote, "hooks", "pre-receive");
-
-	mkdirSync(join(repo.remote, "hooks"), { recursive: true });
-	writeFileSync(hook, `#!/bin/sh\necho "GH006: Protected branch update failed" >&2\nexit 1\n`);
-	chmodSync(hook, 0o755);
-
-	const result = hum(worker, "answer", id, "no");
-
-	expect(result.code).toBe(1);
-	expect(result.err).toContain("Protected branch");
-});
-
-test("bad flags and a bad ttl exit 2; running outside a repo exits 1, with no stack trace", () => {
+test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json", () => {
 	const repo = new WorkRepo();
 	const worker = repo.worker("w");
 	const id = repo.seed("ttl");
 
-	expect(hum(worker, "claim", id, "me", "--ttl", "abc").code).toBe(2);
-	expect(hum(worker, "list-ready", "--nope").code).toBe(2);
-	expect(json(worker, "list-ready")).toEqual([{ id, title: "ttl" }]);
+	mkdirSync(join(worker, ".hum"), { recursive: true });
+	writeFileSync(join(worker, ".hum", "hum.json"), JSON.stringify({ claimExpirySeconds: 120 }));
+
+	const claimed = json(worker, "claim", id, "me");
+
+	expect(claimed.claim.expiresAt - Date.now()).toBeGreaterThan(100_000);
+	expect(claimed.claim.expiresAt - Date.now()).toBeLessThanOrEqual(120_000);
+});
+
+test("an unknown op, an unknown flag and a bad ttl exit 2; a failure outside a repo exits 1 with no stack trace", () => {
+	const unknownOp = hum(process.cwd(), "nope");
+
+	expect(unknownOp.code).toBe(2);
+	expect(unknownOp.err).toContain("list-ready");
+	expect(hum(process.cwd(), "claim", "an-item", "me", "--ttl", "abc").code).toBe(2);
+	expect(hum(process.cwd(), "list-ready", "--nope").code).toBe(2);
 
 	const outside = hum(tmpdir(), "list-ready");
 

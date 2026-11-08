@@ -146,18 +146,21 @@
 			"default": "hum/run/",
 			"type": "string",
 			"format": "ends_with",
-			"pattern": ".*\\/$"
+			"pattern": ".*\\/$",
+			"description": "Each run builds on the branch this prefix and its item id make."
 		},
 		"claimPrefix": {
 			"default": "hum/claim/",
 			"type": "string",
 			"format": "ends_with",
-			"pattern": ".*\\/$"
+			"pattern": ".*\\/$",
+			"description": "A claim is the first push of the branch this prefix and its item id make."
 		},
 		"readyLabel": {
 			"default": "hum:ready",
 			"type": "string",
-			"minLength": 1
+			"minLength": 1,
+			"description": "The label that marks an issue ready for hum."
 		},
 		"mergeMethod": {
 			"default": "squash",
@@ -166,7 +169,8 @@
 				"merge",
 				"squash",
 				"rebase"
-			]
+			],
+			"description": "How a released pull request merges."
 		},
 		"models": {
 			"default": {
@@ -191,83 +195,96 @@
 				"light",
 				"standard",
 				"top"
-			]
+			],
+			"description": "The model id each tier of a kind's table runs on."
 		},
 		"runners": {
 			"default": 3,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "The most runs that go at once."
 		},
 		"tickIntervalSeconds": {
 			"default": 30,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "The time between worker ticks; each tick writes the heartbeat and renews the claims in flight."
 		},
 		"drainTimeoutSeconds": {
 			"default": 300,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "How long a worker that has seen an update lets its runs finish before it stops them."
 		},
 		"claimExpirySeconds": {
 			"default": 900,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "How long a claim lasts unless its holder renews it."
 		},
 		"latestVersionCacheSeconds": {
 			"default": 21600,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "How long the newest published engine version is kept before it is read again."
 		},
 		"maxFixRuns": {
 			"default": 3,
 			"type": "integer",
 			"minimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "Fix runs an item gets after failed checks before it ends stuck."
 		},
 		"serviceLabel": {
 			"default": "md.moo.hum",
 			"type": "string",
-			"pattern": "^[A-Za-z0-9._-]+$"
+			"pattern": "^[A-Za-z0-9._-]+$",
+			"description": "The service unit's label, and the name its file takes."
 		},
 		"maxCrashes": {
 			"default": 5,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "Worker crashes within crashWindowSeconds that stop the service's restarts."
 		},
 		"crashWindowSeconds": {
 			"default": 600,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "The window in which maxCrashes crashes stop the service's restarts."
 		},
 		"workerDownTicks": {
 			"default": 3,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "Ticks without a heartbeat before the worker-down card shows."
 		},
 		"tokenWarnDays": {
 			"default": 30,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "Days before the CI token's year ends that the expiry card shows."
 		},
 		"ciSchedule": {
 			"default": "*/15 * * * *",
 			"type": "string",
-			"pattern": "^(\\S+\\s+){4}\\S+$"
+			"description": "The cron schedule of the scheduled CI workflow."
 		},
 		"ciTickCacheSeconds": {
 			"default": 300,
 			"type": "integer",
 			"exclusiveMinimum": 0,
-			"maximum": 9007199254740991
+			"maximum": 9007199254740991,
+			"description": "How long the scheduled workflow's last tick is kept before the remote is read again."
 		},
 		"commitIdentity": {
 			"default": {
@@ -289,12 +306,116 @@
 				"name",
 				"email"
 			],
-			"additionalProperties": false
+			"additionalProperties": false,
+			"description": "The author and committer of every commit hum makes itself."
 		},
 		"itemsDir": {
 			"default": ".hum/work",
 			"type": "string",
-			"minLength": 1
+			"minLength": 1,
+			"description": "The folder of the repo that holds the markdown items."
+		},
+		"providerTimeoutSeconds": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a failing provider call is retried before one card shows."
+		},
+		"providerBackoff": {
+			"default": {
+				"firstSeconds": 0.5,
+				"maxSeconds": 30
+			},
+			"type": "object",
+			"properties": {
+				"firstSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"maxSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				}
+			},
+			"required": [
+				"firstSeconds",
+				"maxSeconds"
+			],
+			"additionalProperties": false,
+			"description": "The pause before a provider call's first retry, doubled each retry up to the longest pause."
+		},
+		"mergedShown": {
+			"default": 50,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Merged changes the status file lists."
+		},
+		"statusReadTimeoutSeconds": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a read for the status file, such as the newest published version, may take before it is left out."
+		},
+		"mergeTries": {
+			"default": 3,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Tries to merge a change when the base branch moves under it."
+		},
+		"writeRaceRetries": {
+			"default": 7,
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Retries of a markdown write that another writer's push beat."
+		},
+		"itemReadsAtOnce": {
+			"default": 8,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Item files the markdown source reads at once; each read is a git process."
+		},
+		"restartBackoff": {
+			"default": {
+				"firstSeconds": 1,
+				"maxSeconds": 60
+			},
+			"type": "object",
+			"properties": {
+				"firstSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"maxSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				}
+			},
+			"required": [
+				"firstSeconds",
+				"maxSeconds"
+			],
+			"additionalProperties": false,
+			"description": "The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."
+		},
+		"restartDelaySeconds": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Seconds the service manager waits before it starts a failed start script again."
+		},
+		"ciWakeTimeoutMinutes": {
+			"default": 60,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Minutes a CI wake may run before GitHub stops it."
 		}
 	},
 	"required": [

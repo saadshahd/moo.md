@@ -1,14 +1,13 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { atomicWrite, createOnce, isMissing, listFiles, slug } from "./fs.ts";
+import { atomicWrite, createOnce, listRecords, orMissing, readJson, slug } from "./fs.ts";
 
 export const RunKey = z.strictObject({ itemId: z.string().min(1), run: z.string().min(1), attempt: z.int().nonnegative() });
 
 export type RunKey = z.infer<typeof RunKey>;
 
 export const RunRecord = RunKey.extend({
-	/** On the Mac the run's name is saved before launch and found by it after a crash (D1). */
+	/** On the Mac the run's name is saved before launch and found by it after a crash. */
 	name: z.string().min(1),
 	/** The Claude session id: set ahead in CI, learned after launch on the Mac. */
 	sessionId: z.string().min(1).optional(),
@@ -19,7 +18,7 @@ export type RunRecord = z.infer<typeof RunRecord>;
 
 export type BegunRun = { readonly record: RunRecord; readonly adopted: boolean };
 
-/** D1: the run's name, then its session id, saved so a restart adopts the run and never starts it twice. */
+/** The run's name, then its session id, saved so a restart adopts the run and never starts it twice. */
 export class RunRecords {
 	readonly #folder: string;
 	readonly #now: () => number;
@@ -34,13 +33,7 @@ export class RunRecords {
 	}
 
 	get(key: RunKey): RunRecord | undefined {
-		try {
-			return RunRecord.parse(JSON.parse(readFileSync(this.#path(RunKey.parse(key)), "utf8")));
-		} catch (error) {
-			if (error instanceof Error && isMissing(error)) return undefined;
-
-			throw error;
-		}
+		return orMissing(() => RunRecord.parse(readJson(this.#path(RunKey.parse(key)))), undefined);
 	}
 
 	/** Saves the run before it launches. When one is already saved for this key, returns it unchanged, so the caller adopts it. */
@@ -69,8 +62,8 @@ export class RunRecords {
 
 	/** The item's saved runs, oldest first. */
 	list(itemId: string): RunRecord[] {
-		return listFiles(join(this.#folder, slug(itemId)))
-			.map((file) => RunRecord.parse(JSON.parse(readFileSync(file, "utf8"))))
+		return listRecords(join(this.#folder, slug(itemId)))
+			.map((file) => RunRecord.parse(readJson(file)))
 			.sort((a, b) => a.savedAt - b.savedAt || a.attempt - b.attempt);
 	}
 }

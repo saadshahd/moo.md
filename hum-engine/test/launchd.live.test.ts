@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { renderUnit } from "../src/service/unit.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
@@ -35,6 +36,7 @@ test.skipIf(!live)("a scratch launchd unit starts the script, which runs the wor
 			path: [dirname(o.shim.binary), dirname(process.execPath), "/usr/bin", "/bin"].join(":"),
 			env: { ...o.shim.env, HOME: o.home, HUM_HOPE_ROOT: o.env.HUM_HOPE_ROOT, HUM_KIND: o.env.HUM_KIND, HUM_CHECKS: o.env.HUM_CHECKS },
 			log,
+			restartDelaySeconds: SHIPPED_DEFAULTS.restartDelaySeconds,
 		}),
 	);
 

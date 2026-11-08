@@ -26,7 +26,7 @@ const isTerminal = (node: StateNodeJSON) => node.type === "final" || node.tags?.
 const settles = (value: Transitions) =>
 	(value ?? []).some((t) => t.target !== undefined || (t.actions?.length ?? 0) > 0);
 
-/** C2 for one kind: every state is reachable and reaches done or stuck; every wait has a timeout and an action. */
+/** Every state is reachable and reaches done or stuck; every wait has a timeout and an action. */
 const graphProblems = (kind: string, config: Kind): Problem[] => {
 	const { states, initial } = config.machine;
 	const graph = toDirectedGraph(kindMachine(config));
@@ -64,10 +64,10 @@ const graphProblems = (kind: string, config: Kind): Problem[] => {
 	);
 
 	return Object.entries(states).flatMap(([state, node]): Problem[] => [
-		...(reachable.has(state) ? [] : [{ check: "C2", kind, problem: "unreachable-state", state } as const]),
-		...(finishing.has(state) ? [] : [{ check: "C2", kind, problem: "dead-end-state", state } as const]),
+		...(reachable.has(state) ? [] : [{ problem: "unreachable-state", kind, state } as const]),
+		...(finishing.has(state) ? [] : [{ problem: "dead-end-state", kind, state } as const]),
 		...(isWait(node) && !(settles(node.onTimeout) && node.timeout !== undefined) && !Object.values(node.after ?? {}).some(settles)
-			? [{ check: "C2", kind, problem: "wait-without-timeout", state } as const]
+			? [{ problem: "wait-without-timeout", kind, state } as const]
 			: []),
 	]);
 };
@@ -77,7 +77,7 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 	const problems: Problem[] = [];
 
 	if (!(config.tokenCap.overCap in states)) {
-		problems.push({ check: "shape", kind, problem: "unknown-state", state: config.tokenCap.overCap, why: "tokenCap.overCap" });
+		problems.push({ problem: "unknown-state", kind, state: config.tokenCap.overCap, why: "tokenCap.overCap" });
 	}
 
 	const purposes = new Set<string>();
@@ -88,18 +88,18 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 
 			if (role) purposes.add(role.purpose);
 			else if (!FIXED.has(node.invoke.src)) {
-				problems.push({ check: "shape", kind, problem: "unknown-run-source", state, src: node.invoke.src });
+				problems.push({ problem: "unknown-run-source", kind, state, src: node.invoke.src });
 			}
 
 			if (role && node.tags?.includes(OWNER_WAIT_TAG)) {
-				problems.push({ check: "D7", kind, problem: "run-and-owner-wait", state });
+				problems.push({ problem: "run-and-owner-wait", kind, state });
 			}
 		}
 	}
 
 	for (const row of config.tiers) {
 		if (row.level !== undefined && !hum.levels.includes(row.level)) {
-			problems.push({ check: "shape", problem: "unknown-level", level: row.level });
+			problems.push({ problem: "unknown-level", level: row.level });
 		}
 	}
 
@@ -107,7 +107,7 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 		for (const level of hum.levels) {
 			for (const size of SIZES) {
 				if (!pickTier(config, { purpose, level, size })) {
-					problems.push({ check: "shape", kind, problem: "tier-table-gap", purpose, level, size });
+					problems.push({ problem: "tier-table-gap", kind, purpose, level, size });
 				}
 			}
 		}
@@ -116,7 +116,7 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 	try {
 		kindMachine(config);
 	} catch (error) {
-		return [...problems, { check: "shape", kind, problem: "machine-rejected", why: error instanceof Error ? error.message : String(error) }];
+		return [...problems, { problem: "machine-rejected", kind, why: error instanceof Error ? error.message : String(error) }];
 	}
 
 	return [...problems, ...graphProblems(kind, config)];
@@ -133,7 +133,7 @@ export const pickTier = (kind: Pick<Kind, "tiers">, key: { purpose: string; leve
 		)
 		.sort((a, b) => Number(b.level !== undefined) + Number(b.size !== undefined) - (Number(a.level !== undefined) + Number(a.size !== undefined)))[0];
 
-/** C3: every event has a source and a handler, and every event a machine waits on has a source. */
+/** Every event has a source and a handler, and every event a machine waits on has a source. */
 const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): Problem[] => {
 	const parts = new Set<string>([...FIXED_PARTS, ...Object.keys(hum.roles)]);
 	const handled = new Set<string>();
@@ -146,35 +146,35 @@ const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): P
 
 	return [
 		...Object.entries(hum.events).flatMap(([event, { source }]): Problem[] => [
-			...(parts.has(source) ? [] : [{ check: "C3", problem: "event-without-source", event, source } as const]),
-			...(handled.has(event) ? [] : [{ check: "C3", problem: "event-without-handler", event } as const]),
+			...(parts.has(source) ? [] : [{ problem: "event-without-source", event, source } as const]),
+			...(handled.has(event) ? [] : [{ problem: "event-without-handler", event } as const]),
 		]),
 		...[...handled].flatMap((event): Problem[] =>
 			event in hum.events || event.startsWith("xstate.") || event.startsWith("@xstate.")
 				? []
-				: [{ check: "C3", problem: "event-without-source", event, source: undefined }],
+				: [{ problem: "event-without-source", event, source: undefined }],
 		),
 	];
 };
 
-/** V4: each `hope:<skill>` a role names exists in hope's installed copy. */
+/** Each `hope:<skill>` a role names exists in hope's installed copy. */
 const skillProblems = (hum: HumConfig, env: CheckEnv): Problem[] =>
 	Object.entries(hum.roles).flatMap(([role, { skills }]) =>
 		skills.flatMap((skill): Problem[] =>
 			skill.startsWith("hope:") && !env.hopeSkills.has(skill.slice("hope:".length))
-				? [{ check: "V4", problem: "missing-hope-skill", skill, role }]
+				? [{ problem: "missing-hope-skill", skill, role }]
 				: [],
 		),
 	);
 
-/** Every config check at start and on every change; returns all problems found. */
 /** A run branch could then share a name, or a folder, with a claim branch. */
 const prefixesOverlap = ({ runBranchPrefix, claimPrefix }: Naming): boolean =>
 	runBranchPrefix.startsWith(claimPrefix) || claimPrefix.startsWith(runBranchPrefix);
 
 const namingProblems = (hum: HumConfig): Problem[] =>
-	prefixesOverlap(hum) ? [{ check: "shape", problem: "overlapping-prefixes", run: hum.runBranchPrefix, claim: hum.claimPrefix }] : [];
+	prefixesOverlap(hum) ? [{ problem: "overlapping-prefixes", run: hum.runBranchPrefix, claim: hum.claimPrefix }] : [];
 
+/** Every config check at start and on every change; returns all problems found. */
 export const checkConfig = (
 	hum: HumConfig,
 	kinds: Readonly<Record<string, Kind>>,
@@ -182,8 +182,8 @@ export const checkConfig = (
 	env: CheckEnv,
 ): Problem[] => [
 	...Object.values(hum.roles)
-		.flatMap(({ file }): Problem[] => (roleFiles.has(file) ? [] : [{ check: "shape", problem: "missing-file", file }])),
-	...hum.paths.flatMap(({ level }): Problem[] => (hum.levels.includes(level) ? [] : [{ check: "shape", problem: "unknown-level", level }])),
+		.flatMap(({ file }): Problem[] => (roleFiles.has(file) ? [] : [{ problem: "missing-file", file }])),
+	...hum.paths.flatMap(({ level }): Problem[] => (hum.levels.includes(level) ? [] : [{ problem: "unknown-level", level }])),
 	...Object.entries(kinds).flatMap(([name, kind]) => kindProblems(name, kind, hum)),
 	...eventProblems(hum, kinds),
 	...skillProblems(hum, env),

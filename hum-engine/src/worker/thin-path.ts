@@ -17,9 +17,8 @@ import { kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, STUCK_TAG } from "../config/schema.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
+import { SECOND_MS } from "../time.ts";
 import type { PrefixGate } from "./scheduler.ts";
-
-const SECOND_MS = 1000;
 
 /** How long a claim lasts unless its holder renews it. */
 export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeconds * SECOND_MS;
@@ -33,8 +32,6 @@ const CARD_EXCERPT = 300;
 const SHORT_EXCERPT = 200;
 
 const ERROR_EXCERPT = 500;
-
-const MERGE_RACE_TRIES = 3;
 
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
@@ -516,7 +513,7 @@ const merge = async (d: Driven, actor: AnyActor): Promise<ThinResult> => {
 					writeFileSync(file, markDone(readFileSync(file, "utf8")));
 					await g(["add", `${dir}/${id}.md`]);
 					await g(["commit", "-q", "-m", `hum: finish ${id}`]);
-					await pRetry(() => pushOntoNewestBase(d), { retries: MERGE_RACE_TRIES - 1, minTimeout: 0, shouldRetry: ({ error }) => error instanceof BaseMoved });
+					await pRetry(() => pushOntoNewestBase(d), { retries: config.hum.mergeTries - 1, minTimeout: 0, shouldRetry: ({ error }) => error instanceof BaseMoved });
 				},
 			},
 		);

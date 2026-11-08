@@ -22,7 +22,7 @@ const serialize = (sections: Sections): string =>
 		.join("\n\n")}\n`;
 
 /** A user service that restarts after a failure only: the start script exits 0 when it gives up. */
-export const systemdUnit: UnitBuilder = ({ repo, command, path, env }, restartDelaySeconds) => {
+export const systemdUnit: UnitBuilder = ({ repo, command, path, env, restartDelaySeconds }) => {
 	const environment = { PATH: path, ...env };
 
 	assertOneLine([repo, ...command, ...Object.values(environment)]);

@@ -1,14 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, PermanentError } from "../adapter-api.ts";
+import { readSettings } from "../config/settings.ts";
 import { HumConfig } from "../config/schema.ts";
 import type { Faults } from "../state/faults.ts";
 import type { Card } from "../status/format.ts";
 import { githubAdapter, repoFromRemote } from "./github.ts";
 import { gitIn } from "./git.ts";
-import { type GuardOptions, guarded } from "./guard.ts";
+import { type GuardOptions, guardTimings, guarded } from "./guard.ts";
 import { markdownAdapter } from "./markdown.ts";
 import { roundupAdapter } from "./roundup.ts";
 
@@ -31,6 +32,10 @@ const AdapterSettings = z.looseObject({
 	commitIdentity: HumConfig.shape.commitIdentity,
 	readyLabel: HumConfig.shape.readyLabel,
 	mergeMethod: HumConfig.shape.mergeMethod,
+	writeRaceRetries: HumConfig.shape.writeRaceRetries,
+	itemReadsAtOnce: HumConfig.shape.itemReadsAtOnce,
+	providerTimeoutSeconds: HumConfig.shape.providerTimeoutSeconds,
+	providerBackoff: HumConfig.shape.providerBackoff,
 });
 
 type AdapterSettings = z.infer<typeof AdapterSettings>;
@@ -42,12 +47,6 @@ const adapterNameFor = (slot: Slot, integrations: AdapterSettings["integrations"
 	integrations?.[slot] ?? (MARKDOWN_SLOTS.includes(slot) ? MARKDOWN : undefined);
 
 type Repo = { readonly path: string; readonly settings: AdapterSettings; readonly context: AdapterContext };
-
-const readSettings = (repo: string): AdapterSettings => {
-	const path = join(repo, ".hum", "hum.json");
-
-	return AdapterSettings.parse(existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {});
-};
 
 const defaultBase = async (repo: string): Promise<string> => {
 	const head = await gitIn(repo)
@@ -67,7 +66,7 @@ const githubRepo = async (repo: string): Promise<string> => {
 
 /** The adapters the engine ships, by the name `hum.json` gives them. */
 const BUILT_IN = {
-	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity }, context),
+	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce }, context),
 	github: async ({ path, settings, context }) =>
 		githubAdapter({ repo: await githubRepo(path), base: await defaultBase(path), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod }, context),
 	roundup: async ({ context }) => roundupAdapter({}, context),
@@ -107,9 +106,9 @@ export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Fault
  */
 export const resolveAdapters = async (
 	repo: string,
-	{ faults, guard, context }: { faults: Faults; guard: Omit<GuardOptions, "provider" | "faults">; context: AdapterContext },
+	{ faults, guard, context }: { faults: Faults; guard: Pick<GuardOptions, "lastReady">; context: AdapterContext },
 ): Promise<Partial<Record<Slot, Adapter>>> => {
-	const settings = readSettings(repo);
+	const settings = readSettings(repo, AdapterSettings);
 
 	const slots = SLOTS.flatMap((slot) => {
 		const name = adapterNameFor(slot, settings.integrations);
@@ -124,7 +123,12 @@ export const resolveAdapters = async (
 
 		if (refuseOtherVersion(name, adapter, faults)) throw new PermanentError(`adapter "${name}" implements another adapter API version`);
 
-		return guarded(adapter, { ...guard, provider: name, faults });
+		return guarded(adapter, {
+			...guard,
+			provider: name,
+			faults,
+			...guardTimings(settings),
+		});
 	};
 
 	const names = [...new Set(slots.map(([, name]) => name))];

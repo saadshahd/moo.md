@@ -50,7 +50,6 @@ export { EventLog, type NewEvent, SavedEvent } from "./state/events.ts";
 export { Faults, type FaultInput, type Outcome } from "./state/faults.ts";
 
 export {
-	compareVersions,
 	ENGINE_VERSION,
 	ENVELOPE_FORMAT,
 	ENVELOPE_MIGRATIONS,

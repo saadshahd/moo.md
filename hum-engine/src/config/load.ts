@@ -1,10 +1,11 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import { type CheckEnv, checkConfig } from "./checks.ts";
 import { hashJson } from "./hash.ts";
 import { type Migrations, migrateConfig } from "./migrate.ts";
 import { invalidConfig, type Problem, type Result } from "./refusal.ts";
+import { orMissing, readJson } from "../state/fs.ts";
 import { Json } from "./json.ts";
 import { HumConfig, Kind } from "./schema.ts";
 
@@ -50,7 +51,7 @@ export const loadConfig = (raw: RawConfig, { env, ...migration }: LoadOptions): 
 		const file = raw.kinds[name];
 
 		if (file === undefined) {
-			missing.push({ check: "shape", problem: "missing-file", file: `kinds/${name}.json` });
+			missing.push({ problem: "missing-file", file: `kinds/${name}.json` });
 			continue;
 		}
 
@@ -71,23 +72,17 @@ export const loadConfig = (raw: RawConfig, { env, ...migration }: LoadOptions): 
 	};
 };
 
-const readJson = (path: string): Json => Json.parse(JSON.parse(readFileSync(path, "utf8")));
+const scan = (pattern: string, cwd: string): string[] => orMissing(() => [...new Bun.Glob(pattern).scanSync({ cwd, onlyFiles: true })].sort(), []);
+
+const filesIn = (folder: string, extension: string): string[] => scan(`*${extension}`, folder);
 
 /** Reads `hum.json`, `kinds/*.json` and `roles/*.md` from a `.hum/`-shaped folder. */
-export const readConfigDir = (dir: string): RawConfig => {
-	const files = (sub: string, ext: string) =>
-		existsSync(join(dir, sub)) ? readdirSync(join(dir, sub)).filter((f) => f.endsWith(ext)).sort() : [];
-
-	return {
-		hum: readJson(join(dir, "hum.json")),
-		kinds: Object.fromEntries(files("kinds", ".json").map((f) => [f.slice(0, -".json".length), readJson(join(dir, "kinds", f))])),
-		roles: Object.fromEntries(files("roles", ".md").map((f) => [`roles/${f}`, readFileSync(join(dir, "roles", f), "utf8")])),
-	};
-};
+export const readConfigDir = (dir: string): RawConfig => ({
+	hum: readJson(join(dir, "hum.json")),
+	kinds: Object.fromEntries(filesIn(join(dir, "kinds"), ".json").map((file) => [basename(file, ".json"), readJson(join(dir, "kinds", file))])),
+	roles: Object.fromEntries(filesIn(join(dir, "roles"), ".md").map((file) => [`roles/${file}`, readFileSync(join(dir, "roles", file), "utf8")])),
+});
 
 /** The skill names (`intent`, not `hope:intent`) in a hope plugin folder's `skills/*\/SKILL.md`. */
-export const listHopeSkills = (hopeRoot: string): ReadonlySet<string> => {
-	const skills = join(hopeRoot, "skills");
-
-	return new Set(existsSync(skills) ? readdirSync(skills).filter((name) => existsSync(join(skills, name, "SKILL.md"))) : []);
-};
+export const listHopeSkills = (hopeRoot: string): ReadonlySet<string> =>
+	new Set(scan("*/SKILL.md", join(hopeRoot, "skills")).map((file) => dirname(file)));

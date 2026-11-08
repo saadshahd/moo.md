@@ -50,6 +50,7 @@ const unit = (over: Partial<Supervision> & { spawn: () => Child }) => {
 		maxCrashes: SHIPPED_DEFAULTS.maxCrashes,
 		crashWindowMs: 10 * 60_000,
 		backoffMs: 1,
+		maxBackoffMs: 60_000,
 		stop: stop.signal,
 		...over,
 	};
@@ -102,6 +103,7 @@ test("crashes spread over more than the window do not stop the restarts", async 
 	const u = unit({
 		crashWindowMs: TICK_MS,
 		backoffMs: 4 * TICK_MS,
+		maxBackoffMs: 4 * TICK_MS,
 		spawn: () => {
 			if (++spawns === 2 * SHIPPED_DEFAULTS.maxCrashes) u.stop.abort();
 
@@ -112,6 +114,30 @@ test("crashes spread over more than the window do not stop the restarts", async 
 	expect(await u.run()).toBe("stopped");
 	expect(spawns).toBe(2 * SHIPPED_DEFAULTS.maxCrashes);
 	expect(u.cardsInStatus().map((c) => c.cause).join()).not.toContain("Restarts have stopped");
+});
+
+test("restarts never wait longer than maxBackoffMs", async () => {
+	const spawnedAt: number[] = [];
+
+	const u = unit({
+		crashWindowMs: 60_000,
+		maxCrashes: 10,
+		backoffMs: 20,
+		maxBackoffMs: 20,
+		spawn: () => {
+			spawnedAt.push(Date.now());
+
+			if (spawnedAt.length === 6) u.stop.abort();
+
+			return exited(1);
+		},
+	});
+
+	await u.run();
+
+	const gaps = spawnedAt.slice(1).map((at, index) => at - spawnedAt[index]!);
+
+	expect(Math.max(...gaps)).toBeLessThan(150);
 });
 
 test("a worker that exits to take an update is started again and never counts as a crash", async () => {

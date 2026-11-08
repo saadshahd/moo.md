@@ -8,7 +8,6 @@ import {
 	applyConfigChange,
 	type Config,
 	HumConfig,
-	hashJson,
 	kindMachine,
 	listHopeSkills,
 	loadConfig,
@@ -21,6 +20,7 @@ import {
 	type RawConfig,
 	readConfigDir,
 } from "../src/index.ts";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 
 const root = join(import.meta.dir, "..");
 const env = { hopeSkills: listHopeSkills(join(root, "../hope")) };
@@ -68,12 +68,12 @@ const problemsOf = (raw: RawConfig): readonly Problem[] => {
 const change = (current: Config | undefined, candidate: RawConfig, extra: { branch?: string; saved?: { kind: string; state: string }[] } = {}) =>
 	applyConfigChange(current, { candidate, branch: "main", ...extra }, { env });
 
-test("as shipped, each default kind fails C2 on its waits and nothing else", () => {
+test("as shipped, each default kind fails only on its waits having no timeout", () => {
 	const problems = problemsOf(shipped());
 	const kinds = new Set(Object.keys(shipped().kinds));
 
 	expect(problems.length).toBeGreaterThan(0);
-	expect(problems.every((p) => p.check === "C2" && p.problem === "wait-without-timeout")).toBe(true);
+	expect(problems.every((p) => p.problem === "wait-without-timeout")).toBe(true);
 
 	for (const kind of kinds) expect(problems.some((p) => "kind" in p && p.kind === kind)).toBe(true);
 });
@@ -158,7 +158,7 @@ test("a missing hope skill is refused, naming the skill and the role", () => {
 
 	expect(result.ok).toBe(false);
 	expect(!result.ok && result.refusal.code === "invalid-config" && result.refusal.problems).toEqual([
-		{ check: "V4", problem: "missing-hope-skill", skill: "hope:judge", role: "review" },
+		{ problem: "missing-hope-skill", skill: "hope:judge", role: "review" },
 	]);
 	expect(env.hopeSkills.has("judge")).toBe(true);
 });
@@ -187,7 +187,7 @@ test("a state that never reaches done or stuck is refused", () => {
 	bad.kinds.feature.machine.states.trap = { on: { answered: { target: "trap" } } };
 	bad.kinds.feature.machine.states.fixing.on = { "token-cap": { target: "asking" }, "plan-ready": { target: "trap" } };
 
-	expect(problemsOf(bad)).toContainEqual({ check: "C2", kind: "feature", problem: "dead-end-state", state: "trap" });
+	expect(problemsOf(bad)).toContainEqual({ kind: "feature", problem: "dead-end-state", state: "trap" });
 });
 
 test("a deleted role leaves an event with no source", () => {
@@ -196,7 +196,7 @@ test("a deleted role leaves an event with no source", () => {
 
 	const problems = problemsOf(bad);
 
-	expect(problems).toContainEqual({ check: "C3", problem: "event-without-source", event: "plan-ready", source: "plan" });
+	expect(problems).toContainEqual({ problem: "event-without-source", event: "plan-ready", source: "plan" });
 });
 
 test("an event no machine handles, and a waited event nobody declares, are refused", () => {
@@ -206,8 +206,8 @@ test("an event no machine handles, and a waited event nobody declares, are refus
 
 	const problems = problemsOf(bad);
 
-	expect(problems).toContainEqual({ check: "C3", problem: "event-without-handler", event: "ghost" });
-	expect(problems).toContainEqual({ check: "C3", problem: "event-without-source", event: "mystery", source: undefined });
+	expect(problems).toContainEqual({ problem: "event-without-handler", event: "ghost" });
+	expect(problems).toContainEqual({ problem: "event-without-source", event: "mystery", source: undefined });
 });
 
 test("a state that starts a run and waits on the owner is refused", () => {
@@ -215,7 +215,7 @@ test("a state that starts a run and waits on the owner is refused", () => {
 	bad.kinds.feature.machine.states.building.tags = ["owner-wait"];
 	bad.kinds.feature.machine.states.building.after = { [DAY]: { target: "stuck" } };
 
-	expect(problemsOf(bad)).toContainEqual({ check: "D7", kind: "feature", problem: "run-and-owner-wait", state: "building" });
+	expect(problemsOf(bad)).toContainEqual({ kind: "feature", problem: "run-and-owner-wait", state: "building" });
 });
 
 test("every owner-changeable part maps to a key the hum.json schema holds", () => {
@@ -225,6 +225,38 @@ test("every owner-changeable part maps to a key the hum.json schema holds", () =
 	for (const [part, key] of Object.entries(OWNER_CHANGEABLE)) {
 		expect(keys, part).toContain(key);
 		expect(properties, part).toContain(key);
+	}
+
+	const mapped: string[] = Object.values(OWNER_CHANGEABLE);
+
+	for (const setting of Object.keys(SHIPPED_DEFAULTS)) expect(mapped, setting).toContain(setting);
+});
+
+test("settings an owner changes load as given, and a value that breaks its rule is refused", () => {
+	const changed = {
+		providerTimeoutSeconds: 12,
+		providerBackoff: { firstSeconds: 1.5, maxSeconds: 20 },
+		mergedShown: 5,
+		statusReadTimeoutSeconds: 3,
+		mergeTries: 2,
+		writeRaceRetries: 0,
+		itemReadsAtOnce: 2,
+		restartBackoff: { firstSeconds: 2, maxSeconds: 30 },
+		restartDelaySeconds: 20,
+		ciWakeTimeoutMinutes: 30,
+		ciSchedule: "0 6 * * 1-5",
+	};
+
+	const raw = clone(withTimeouts(shipped()));
+
+	Object.assign(raw.hum, changed);
+	expect(loaded(raw).hum).toMatchObject(changed);
+
+	for (const refused of [{ providerBackoff: { firstSeconds: 40, maxSeconds: 20 } }, { mergedShown: 0 }, { mergeTries: 0 }, { ciSchedule: "61 * * * *" }, { restartDelaySeconds: 0.5 }]) {
+		const bad = clone(withTimeouts(shipped()));
+
+		Object.assign(bad.hum, refused);
+		expect(loadConfig(bad, { env }).ok, JSON.stringify(refused)).toBe(false);
 	}
 });
 
@@ -286,7 +318,6 @@ test("the hash ignores key order and changes with content", () => {
 
 	expect(loaded(reordered).hash).toBe(loaded(raw).hash);
 	expect(loaded(edited).hash).not.toBe(loaded(raw).hash);
-	expect(hashJson({ a: 1, b: 2 })).toBe(hashJson({ b: 2, a: 1 }));
 });
 
 test("a tier table with a gap is refused, and the most specific row wins", () => {
@@ -294,7 +325,7 @@ test("a tier table with a gap is refused, and the most specific row wins", () =>
 	bad.kinds.docs.tiers = bad.kinds.docs.tiers.filter((row: Tree) => !(row.purpose === "build" && row.level === undefined));
 	const tiers = loaded(withTimeouts(shipped())).kinds.feature!;
 
-	expect(problemsOf(bad)).toContainEqual({ check: "shape", kind: "docs", problem: "tier-table-gap", purpose: "build", level: "low", size: "small" });
+	expect(problemsOf(bad)).toContainEqual({ kind: "docs", problem: "tier-table-gap", purpose: "build", level: "low", size: "small" });
 	expect(pickTier(tiers, { purpose: "build", level: "critical", size: "small" })).toMatchObject({ tier: "top", effort: "high" });
 	expect(pickTier(tiers, { purpose: "build", level: "low", size: "small" })).toMatchObject({ tier: "standard", effort: "medium" });
 });

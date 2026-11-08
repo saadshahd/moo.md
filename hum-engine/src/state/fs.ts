@@ -1,13 +1,38 @@
-import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
+import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import writeFileAtomic from "write-file-atomic";
+import { Json } from "../config/json.ts";
+
+const RECORD_EXTENSION = ".json";
+
+/** Hex characters of the hash a slug keeps. A change renames every saved file. */
+const SLUG_LENGTH = 32;
 
 /** A file name for any string: the same string always names the same file, and no string escapes its folder. */
-export const slug = (text: string): string => createHash("sha256").update(text).digest("hex").slice(0, 32);
+export const slug = (text: string): string => createHash("sha256").update(text).digest("hex").slice(0, SLUG_LENGTH);
 
-const TEMP_SUFFIX = ".tmp";
+const hasCode = (cause: unknown, code: string): boolean => cause instanceof Error && "code" in cause && cause.code === code;
 
-const fsyncFolder = (folder: string) => {
+/** True when the error says the file or folder is not there. */
+export const isMissing = (cause: unknown): boolean => hasCode(cause, "ENOENT");
+
+/** What `read` returns, or `absent` when it finds no file. Any other failure throws. */
+export const orMissing = <T, Absent>(read: () => T, absent: Absent): T | Absent => {
+	try {
+		return read();
+	} catch (error) {
+		if (isMissing(error)) return absent;
+
+		throw error;
+	}
+};
+
+/** The JSON in a file; the caller parses it with its schema. */
+export const readJson = (path: string): Json => Json.parse(JSON.parse(readFileSync(path, "utf8")));
+
+/** write-file-atomic renames a synced temp file over the target; the rename itself reaches disk only once its folder is synced. */
+const syncFolder = (folder: string): void => {
 	const fd = openSync(folder, "r");
 
 	try {
@@ -17,52 +42,29 @@ const fsyncFolder = (folder: string) => {
 	}
 };
 
-/** Writes `data` to a new temp file beside `path` and fsyncs it. Removes the temp file and throws when the write fails. */
-const writeTemp = (path: string, data: string): string => {
+/** A reader sees the old file or the new one, never a part; when any step throws, the old file stays as it was. */
+export const atomicWrite = (path: string, data: string): void => {
 	mkdirSync(dirname(path), { recursive: true });
-	const temp = `${path}.${process.pid}.${randomUUID()}${TEMP_SUFFIX}`;
-	const fd = openSync(temp, "w");
-
-	try {
-		writeFileSync(fd, data);
-		fsyncSync(fd);
-	} catch (error) {
-		rmSync(temp, { force: true });
-		throw error;
-	} finally {
-		closeSync(fd);
-	}
-
-	return temp;
+	writeFileAtomic.sync(path, data);
+	syncFolder(dirname(path));
 };
 
 /**
- * D3, U1: temp file, fsync, rename. A reader sees the old file or the new one, never a part,
- * and when any step throws the old file stays as it was.
+ * Creates `path` whole or not at all: the data is written to a temp file, then linked into place, which fails
+ * when `path` exists. Returns false, changing nothing, in that case.
  */
-export const atomicWrite = (path: string, data: string): void => {
-	const temp = writeTemp(path, data);
-
-	try {
-		renameSync(temp, path);
-		fsyncFolder(dirname(path));
-	} catch (error) {
-		rmSync(temp, { force: true });
-		throw error;
-	}
-};
-
-/** D4, E2: creates `path` whole or not at all. Returns false, changing nothing, when `path` exists. */
 export const createOnce = (path: string, data: string): boolean => {
-	const temp = writeTemp(path, data);
+	const temp = `${path}.${randomUUID()}`;
+
+	atomicWrite(temp, data);
 
 	try {
 		linkSync(temp, path);
-		fsyncFolder(dirname(path));
+		syncFolder(dirname(path));
 
 		return true;
 	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "EEXIST") return false;
+		if (hasCode(error, "EEXIST")) return false;
 
 		throw error;
 	} finally {
@@ -70,19 +72,15 @@ export const createOnce = (path: string, data: string): boolean => {
 	}
 };
 
-/** The files in a folder, without temp files; empty when the folder does not exist. */
-export const listFiles = (folder: string): string[] => {
-	try {
-		return readdirSync(folder)
-			.filter((name) => !name.endsWith(TEMP_SUFFIX))
-			.sort()
-			.map((name) => join(folder, name));
-	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+/** The files in a folder; empty when the folder does not exist. */
+export const listFiles = (folder: string): string[] =>
+	orMissing(
+		() =>
+			readdirSync(folder)
+				.sort()
+				.map((name) => join(folder, name)),
+		[],
+	);
 
-		throw error;
-	}
-};
-
-/** True when the error says the file or folder is not there. */
-export const isMissing = (error: Error): boolean => "code" in error && error.code === "ENOENT";
+/** The record files in a folder, without the half-written temp files a crash leaves beside them. */
+export const listRecords = (folder: string): string[] => listFiles(folder).filter((file) => file.endsWith(RECORD_EXTENSION));

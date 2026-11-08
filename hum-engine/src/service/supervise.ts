@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ENGINE_VERSION } from "../state/format.ts";
 import type { State } from "../state/open.ts";
 import { readHeartbeat, writeCards } from "../status/file.ts";
+import { MINUTE_MS, SECOND_MS } from "../time.ts";
 import { CARD_CODES, CARD_KINDS } from "./cards.ts";
 
 /** The exit code of a worker that stopped because an update arrived. `EX_TEMPFAIL`: the supervisor starts it again without counting a crash. */
@@ -20,14 +21,13 @@ export type Supervision = {
 	readonly workerDownTicks: number;
 	readonly maxCrashes: number;
 	readonly crashWindowMs: number;
-	/** The pause before the first restart, doubled for each crash still inside the window. */
+	/** The pause before the first restart, doubled for each crash still inside the window, up to `maxBackoffMs`. */
 	readonly backoffMs: number;
+	readonly maxBackoffMs: number;
 	readonly stop: AbortSignal;
 };
 
 export type Ended = "stopped" | "gave-up";
-
-const BACKOFF_CEILING_MS = 60_000;
 
 const Context = z.object({
 	crashes: z.array(z.number()),
@@ -48,10 +48,6 @@ const showWorkerDown = ({ faults, statusPath }: Supervision["state"], card: Card
 	writeCards(statusPath, faults.list(), ENGINE_VERSION, now);
 };
 
-const SECOND_MS = 1000;
-
-const MINUTE_MS = 60 * SECOND_MS;
-
 const isUpdateExit = (exitCode: number): boolean => exitCode === EXIT_UPDATED;
 
 const crashesInWindow = (crashes: readonly number[], at: number, windowMs: number): number[] => [...crashes.filter((crashed) => at - crashed < windowMs), at];
@@ -66,7 +62,7 @@ const silenceOf = (quietSince: number, beat: { readonly time: number; readonly i
 	return { quietSince: lastSeen, silentMs, isSilent: silentMs >= o.workerDownTicks * (beat?.intervalMs ?? o.intervalMs) };
 };
 
-const backoffFor = (crashes: number, startMs: number): number => Math.min(startMs * 2 ** (crashes - 1), BACKOFF_CEILING_MS);
+const backoffFor = (crashes: number, { backoffMs, maxBackoffMs }: Pick<Supervision, "backoffMs" | "maxBackoffMs">): number => Math.min(backoffMs * 2 ** (crashes - 1), maxBackoffMs);
 
 /**
  * The start script as a machine. It runs the worker and starts it again when it exits, looks at the heartbeat once
@@ -76,7 +72,7 @@ const backoffFor = (crashes: number, startMs: number): number => Math.min(startM
 const supervisorMachine = (o: Supervision, current: { child?: Child }) => {
 	const supervisor = setup({
 		schemas: { context: Context, events: { stop: z.object({}) } },
-		delays: { tick: o.intervalMs, backoff: ({ context }) => backoffFor(context.crashes.length, o.backoffMs) },
+		delays: { tick: o.intervalMs, backoff: ({ context }) => backoffFor(context.crashes.length, o) },
 		actors: {
 			worker: createAsyncLogic({ run: () => (current.child = o.spawn()).exited }),
 			exit: createAsyncLogic({ run: () => current.child?.exited ?? Promise.resolve(0) }),

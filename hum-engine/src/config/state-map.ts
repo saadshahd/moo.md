@@ -5,7 +5,7 @@ import type { Config } from "./load.ts";
 import { kindMachine } from "./machine.ts";
 import type { Kind } from "./schema.ts";
 
-/** A work item saved in a state of a kind. Slice 3 owns the saved form; V3 needs only this pair. */
+/** A work item saved in a state of a kind. */
 export type SavedItem = { readonly kind: string; readonly state: string };
 
 /** Where a saved state goes under the new kind: itself, its mapped name, or nowhere. */
@@ -16,7 +16,7 @@ const mappedState = (previous: Kind, next: Kind, state: string): string | undefi
 	return to !== undefined && to in next.machine.states ? to : undefined;
 };
 
-/** V3: the saved items whose state the new config neither keeps nor maps. */
+/** The saved items whose state the new config neither keeps nor maps. */
 export const unmappedItems = (current: Config, next: Config, saved: readonly SavedItem[]): SavedItem[] =>
 	saved.filter(({ kind, state }) => {
 		const previous = current.kinds[kind];

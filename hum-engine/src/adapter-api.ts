@@ -3,7 +3,7 @@ import type { FaultInput } from "./state/faults.ts";
 
 export type { FaultInput };
 
-/** V11: bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
+/** Bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
 export const ADAPTER_API_VERSION = 1;
 
 /** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once. */
@@ -11,10 +11,16 @@ export class PermanentError extends Error {
 	override name: string = "PermanentError";
 }
 
+/** The most characters an item id holds. */
+export const ITEM_ID_LENGTH = 100;
+
+const ITEM_ID_MESSAGE = "an item id is letters, digits, dot, dash or underscore";
+
 /** An item id is safe as a file name and as a git ref component. */
 export const ItemId = z
 	.string()
-	.regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/, "an item id is letters, digits, dot, dash or underscore")
+	.max(ITEM_ID_LENGTH, ITEM_ID_MESSAGE)
+	.regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, ITEM_ID_MESSAGE)
 	.refine((id) => !id.includes("..") && !id.endsWith(".lock"), "an item id has no '..' and does not end in '.lock'");
 
 export type ItemId = z.infer<typeof ItemId>;

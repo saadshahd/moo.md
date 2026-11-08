@@ -1,15 +1,15 @@
-import { readFileSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { type AnyActor, type AnyActorLogic } from "xstate";
 import { restoreActor } from "xstate/persist";
 import { Json } from "../config/json.ts";
+import { climb } from "../config/migrate.ts";
 import { migrateSnapshot } from "../config/state-map.ts";
 import { kindMachine } from "../config/machine.ts";
 import type { Kind } from "../config/schema.ts";
 import { type Faults, type Outcome } from "./faults.ts";
-import { atomicWrite, isMissing, listFiles, slug } from "./fs.ts";
+import { atomicWrite, isMissing, listRecords, readJson, slug } from "./fs.ts";
 import {
-	compareVersions,
 	ENGINE_VERSION,
 	Envelope,
 	EnvelopeJson,
@@ -17,6 +17,7 @@ import {
 	ENVELOPE_MIGRATIONS,
 	type EnvelopeMigrations,
 	Header,
+	isFromNewerEngine,
 	SavedHeader,
 } from "./format.ts";
 
@@ -49,7 +50,9 @@ export type SavedSnapshot = {
 /** The snapshot of a running item actor, as the JSON `saveItem` writes. */
 export const persistedSnapshot = (actor: AnyActor): Json => Json.parse(JSON.parse(JSON.stringify(actor.getPersistedSnapshot())));
 
-const reason = (error: Error | string): string => (error instanceof Error ? error.message : error);
+const reason = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
+
+const DAMAGED_FIX = "Restore the file from a backup, or delete it to start the item over; the other items go on.";
 
 /** Per-item snapshots under `items/`. Every failure becomes one fault card; nothing is thrown for bad data. */
 export class Items {
@@ -73,7 +76,7 @@ export class Items {
 		return join(this.#folder, `${slug(itemId)}.json`);
 	}
 
-	/** D3: temp file, fsync, rename. A failed write leaves the old snapshot and raises one card. */
+	/** A failed write leaves the old snapshot and raises one card. */
 	save(itemId: string, kind: Kind, snapshot: Json): Outcome<void> {
 		const key = `snapshot-write-failed:${itemId}`;
 		const envelope = { format: this.#format, engineVersion: this.#engineVersion, itemId, kind: kind.machine.id, machineVersion: kind.machine.version, savedAt: this.#now(), snapshot };
@@ -86,7 +89,7 @@ export class Items {
 				fault: this.#faults.raise({
 					code: "snapshot-write-failed",
 					item: itemId,
-					cause: `The state of ${itemId} could not be saved: ${reason(error instanceof Error ? error : String(error))}. The last saved state is kept.`,
+					cause: `The state of ${itemId} could not be saved: ${reason(error)}. The last saved state is kept.`,
 					fix: "Free disk space where hum keeps its state; the next change saves it again.",
 				}),
 			};
@@ -99,9 +102,9 @@ export class Items {
 
 	/** The items with a saved snapshot, read from each envelope header. A damaged file is left to `restore`, which raises its card. */
 	saved(): SavedSnapshot[] {
-		return listFiles(this.#folder).flatMap((file) => {
+		return listRecords(this.#folder).flatMap((file) => {
 			try {
-				const header = SavedHeader.safeParse(JSON.parse(readFileSync(file, "utf8")));
+				const header = SavedHeader.safeParse(readJson(file));
 
 				if (!header.success) return [];
 
@@ -124,53 +127,34 @@ export class Items {
 	}
 
 	/**
-	 * D2, V10: reads the item's snapshot and restores its actor, not started. Returns `undefined`
-	 * when nothing is saved. A snapshot that cannot be restored stays on disk, and the caller starts
-	 * nothing for that item.
+	 * Reads the item's snapshot and restores its actor, not started. Returns `undefined` when nothing is saved.
+	 * A snapshot that cannot be restored stays on disk, and the caller starts nothing for that item.
 	 */
 	async restore(itemId: string, kind: Kind, { kindAt, sources = {}, clock }: RestoreOptions = {}): Promise<Outcome<AnyActor | undefined>> {
 		const file = this.path(itemId);
-		let text: string;
-
-		try {
-			text = readFileSync(file, "utf8");
-		} catch (error) {
-			if (error instanceof Error && isMissing(error)) return { ok: true, value: undefined };
-
-			return this.#fault(itemId, "snapshot-unreadable", `The saved state of ${itemId} at ${file} cannot be read: ${reason(error instanceof Error ? error : String(error))}.`, "Fix the file's permissions or restore it from a backup; the other items go on.");
-		}
-
-		const unreadable = (why: string) =>
-			this.#fault(itemId, "snapshot-unreadable", `The saved state of ${itemId} at ${file} is damaged: ${why}.`, "Restore the file from a backup, or delete it to start the item over; the other items go on.");
-
+		const unreadable = (why: string) => this.#fault(itemId, "snapshot-unreadable", `The saved state of ${itemId} at ${file} is damaged: ${why}.`, DAMAGED_FIX);
+		const unrestorable = (why: string) => this.#fault(itemId, "snapshot-restore-error", `The saved state of ${itemId} does not restore: ${why}.`, DAMAGED_FIX);
 		let parsed: Json;
 
 		try {
-			parsed = Json.parse(JSON.parse(text));
+			parsed = readJson(file);
 		} catch (error) {
-			return unreadable(reason(error instanceof Error ? error : String(error)));
+			if (isMissing(error)) return { ok: true, value: undefined };
+
+			if (error instanceof SyntaxError) return unreadable(error.message);
+
+			return this.#fault(itemId, "snapshot-unreadable", `The saved state of ${itemId} at ${file} cannot be read: ${reason(error)}.`, "Fix the file's permissions or restore it from a backup; the other items go on.");
 		}
 
 		const header = Header.safeParse(parsed);
 
 		if (!header.success) return unreadable("it has no format or engine version");
 
-		const order = compareVersions(header.data.engineVersion, this.#engineVersion);
-
-		if (header.data.format > this.#format || order === undefined || order > 0) {
+		if (header.data.format > this.#format || isFromNewerEngine(header.data.engineVersion, this.#engineVersion)) {
 			return this.#fault(itemId, "snapshot-from-newer-engine", `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, "Update the engine to that version or later: bun add --exact @moo.md/hum@latest.");
 		}
 
-		let envelopeJson = EnvelopeJson.parse(parsed);
-
-		for (let at = header.data.format; at < this.#format; at++) {
-			const step = this.#migrations[at];
-
-			if (!step) throw new Error(`no envelope migration from format ${at}; the engine ships a gap`);
-			envelopeJson = { ...step(envelopeJson), format: at + 1 };
-		}
-
-		const envelope = Envelope.safeParse(envelopeJson);
+		const envelope = Envelope.safeParse(climb(EnvelopeJson.parse(parsed), header.data.format, this.#format, this.#migrations, "format"));
 
 		if (!envelope.success) return unreadable(envelope.error.message);
 
@@ -187,7 +171,7 @@ export class Items {
 			try {
 				current = await migrateSnapshot(previous, kind, snapshot, sources);
 			} catch (error) {
-				return this.#fault(itemId, "snapshot-restore-error", `${itemId} could not move from machine version ${machineVersion} to ${kind.machine.version}: ${reason(error instanceof Error ? error : String(error))}.`, "Map the state in the kind's stateMap, or delete the item's saved state.");
+				return this.#fault(itemId, "snapshot-restore-error", `${itemId} could not move from machine version ${machineVersion} to ${kind.machine.version}: ${reason(error)}.`, "Map the state in the kind's stateMap, or delete the item's saved state.");
 			}
 		}
 
@@ -197,13 +181,9 @@ export class Items {
 			const actor = restoreActor(kindMachine(kind, sources), restored, clock ? { clock } : undefined);
 			const status = actor.getSnapshot();
 
-			if (status.status === "error") {
-				return this.#fault(itemId, "snapshot-restore-error", `The saved state of ${itemId} does not restore: ${reason(status.error instanceof Error ? status.error : String(status.error))}.`, "Restore the file from a backup, or delete it to start the item over; the other items go on.");
-			}
-
-			return { ok: true, value: actor };
+			return status.status === "error" ? unrestorable(reason(status.error)) : { ok: true, value: actor };
 		} catch (error) {
-			return this.#fault(itemId, "snapshot-restore-error", `The saved state of ${itemId} does not restore: ${reason(error instanceof Error ? error : String(error))}.`, "Restore the file from a backup, or delete it to start the item over; the other items go on.");
+			return unrestorable(reason(error));
 		}
 	}
 }

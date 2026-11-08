@@ -1,9 +1,8 @@
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { atomicWrite, createOnce, slug } from "./fs.ts";
+import { atomicWrite, createOnce, orMissing, readJson, slug } from "./fs.ts";
 
-/** E2: one external op of one attempt of one run of one item. */
+/** One external op of one attempt of one run of one item. */
 export const OpKey = z.strictObject({
 	itemId: z.string().min(1),
 	run: z.string().min(1),
@@ -21,7 +20,7 @@ export type OpProvider = {
 	readonly run: () => Promise<void>;
 };
 
-/** E2: the key is saved before the op, so a restart after a kill finds the op started and asks the provider before it runs it again. */
+/** The key is saved before the op, so a restart after a kill finds the op started and asks the provider before it runs it again. */
 export class OpKeys {
 	readonly #folder: string;
 	readonly #now: () => number;
@@ -46,13 +45,7 @@ export class OpKeys {
 	}
 
 	state(key: OpKey): "started" | "done" | undefined {
-		try {
-			return Record.parse(JSON.parse(readFileSync(this.#path(OpKey.parse(key)), "utf8"))).state;
-		} catch (error) {
-			if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
-
-			throw error;
-		}
+		return orMissing(() => Record.parse(readJson(this.#path(OpKey.parse(key)))).state, undefined);
 	}
 
 	/** Runs the op once per key, across restarts: `skipped` when it is done or the provider already holds it. */

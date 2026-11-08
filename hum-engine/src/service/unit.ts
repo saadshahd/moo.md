@@ -15,16 +15,15 @@ export type UnitVars = {
 	readonly env?: Readonly<Record<string, string>>;
 	/** Where launchd writes the output. */
 	readonly log: string;
+	/** The seconds a service manager waits before it starts a failed script again. */
+	readonly restartDelaySeconds: number;
 };
 
 export type UnitKind = "launchd" | "systemd";
 
-/** The seconds a service manager waits before it starts a failed script again. */
-const RESTART_DELAY_SECONDS = 10;
-
-export type UnitBuilder = (vars: UnitVars, restartDelaySeconds: number) => string;
+export type UnitBuilder = (vars: UnitVars) => string;
 
 const UNITS = { launchd: launchdUnit, systemd: systemdUnit } as const satisfies Record<UnitKind, UnitBuilder>;
 
 /** The unit file of one service manager. Throws when a value would break the file. */
-export const renderUnit = (kind: UnitKind, vars: UnitVars): string => UNITS[kind](vars, RESTART_DELAY_SECONDS);
+export const renderUnit = (kind: UnitKind, vars: UnitVars): string => UNITS[kind](vars);

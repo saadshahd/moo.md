@@ -15,6 +15,7 @@ import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
 import { emptyStatus, type Status } from "../status/format.ts";
+import { SECOND_MS } from "../time.ts";
 import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
 import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
 import { type Signature, signatureOf } from "./signature.ts";
@@ -64,20 +65,13 @@ type InFlight = {
 	readonly known: Known;
 };
 
-const SECOND_MS = 1000;
-
-/** A status read that takes longer shows no value, so a hung read never holds a tick. */
-const STATUS_READ_TIMEOUT_MS = 10 * SECOND_MS;
-
-const MERGED_SHOWN = 50;
-
 const ERROR_EXCERPT = 300;
 
-/** Reads `read` at most once per `everyMs`; a failed or slow read shows no value, and that too is kept for the period. */
-const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, everyMs: number): (() => Promise<T | undefined>) =>
+/** Reads `read` at most once per `everyMs`; a failed read, or one slower than `timeoutMs`, shows no value, and that too is kept for the period. */
+const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyMs, timeoutMs }: { everyMs: number; timeoutMs: number }): (() => Promise<T | undefined>) =>
 	read === undefined
 		? async () => undefined
-		: pMemoize(() => pTimeout(read(), { milliseconds: STATUS_READ_TIMEOUT_MS, fallback: () => undefined }).catch(() => undefined), { cache: new ExpiryMap(everyMs) });
+		: pMemoize(() => pTimeout(read(), { milliseconds: timeoutMs, fallback: () => undefined }).catch(() => undefined), { cache: new ExpiryMap(everyMs) });
 
 /** Sources that never settle, so a restored item can be stepped by its timers without starting a run. */
 const neverSources = (kind: Kind) =>
@@ -129,8 +123,10 @@ export class Worker {
 		this.#o = options;
 		this.#now = options.now ?? Date.now;
 		this.#gate = options.gate ?? new PrefixGate({ now: this.#now });
-		this.#latest = readEvery(options.latestVersion, options.config.hum.latestVersionCacheSeconds * SECOND_MS);
-		this.#ciTick = readEvery(options.ciTick, options.config.hum.ciTickCacheSeconds * SECOND_MS);
+		const timeoutMs = options.config.hum.statusReadTimeoutSeconds * SECOND_MS;
+
+		this.#latest = readEvery(options.latestVersion, { everyMs: options.config.hum.latestVersionCacheSeconds * SECOND_MS, timeoutMs });
+		this.#ciTick = readEvery(options.ciTick, { everyMs: options.config.hum.ciTickCacheSeconds * SECOND_MS, timeoutMs });
 		this.#start = signatureOf(options.repo, options.engineVersion ?? ENGINE_VERSION, options.config.hum.itemsDir);
 		this.#learn = pMemoize(async (id: string): Promise<Known> => {
 			const item = await options.adapters.workSource.read(id);
@@ -404,7 +400,7 @@ export class Worker {
 				since: run.since,
 				unclear: false,
 			})),
-			merged: [...this.#merged.splice(0), ...before.merged].slice(0, MERGED_SHOWN),
+			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
 		});
 	}
 

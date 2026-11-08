@@ -18,6 +18,8 @@ import {
 	sourceFiles,
 	type State,
 } from "../src/index.ts";
+import { guardTimings } from "../src/adapters/guard.ts";
+import { markDone, newItemFile, parseItemFile } from "../src/adapters/item-file.ts";
 import { WorkRepo, itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
 
 const cleanups: (() => void)[] = [];
@@ -57,6 +59,45 @@ describe("contract suite on markdown (a temp repo with a local bare remote)", ()
 	for (const check of contractChecks(target)) test(check.name, check.run, 30_000);
 });
 
+describe("markdown settings", () => {
+	const context: AdapterContext = { report: () => {}, now: Date.now };
+
+	test("a write that keeps losing the race gives up after writeRaceRetries retries", async () => {
+		const repo = new WorkRepo();
+		const id = repo.seed("raced");
+		const pushes = repo.refuseMainPushes();
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, writeRaceRetries: 2 }, context);
+
+		await expect(adapter.workSource?.comment(id, "hello")).rejects.toThrow("gave up after 3 lost races");
+		expect(pushes()).toBe(3);
+	});
+
+	test("every ready item is listed, whatever itemReadsAtOnce is", async () => {
+		const repo = new WorkRepo();
+		const ids = [repo.seed("one"), repo.seed("two"), repo.seed("three")];
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, itemReadsAtOnce: 1 }, context);
+
+		expect((await adapter.workSource?.listReady())?.map((ref) => ref.id).sort()).toEqual(ids);
+	});
+});
+
+describe("item files", () => {
+	test("a new item file keeps a long title on one line, and finishing an item changes only its state", () => {
+		const title = `${"word ".repeat(40)}end`;
+		const created = newItemFile(title, "The body.");
+
+		expect(created.split("\n")[1]).toBe(`title: ${title}`);
+		expect(parseItemFile(created)).toMatchObject({ title, state: "ready", body: "The body." });
+
+		const owned = "---\n# the owner's note\ntitle: A title\nstate: ready\nowner: me\n---\n\nThe body.\n";
+		const finished = markDone(owned);
+
+		expect(finished).toContain("# the owner's note");
+		expect(finished).toContain("owner: me");
+		expect(parseItemFile(finished)).toMatchObject({ title: "A title", state: "done", body: "The body." });
+	});
+});
+
 describe("a malformed item file", () => {
 	test("other items advance, and one card names the file", async () => {
 		const repo = new WorkRepo();
@@ -76,6 +117,10 @@ describe("a malformed item file", () => {
 });
 
 describe("provider failures and empty lists", () => {
+	test("the guard's timings follow the provider settings", () => {
+		expect(guardTimings({ providerTimeoutSeconds: 7, providerBackoff: { firstSeconds: 0.25, maxSeconds: 2 } })).toEqual({ timeoutMs: 7000, backoffMs: { first: 250, max: 2000 } });
+	});
+
 	const guardWith = (provider: FakeProvider, state: State, timeoutMs = 10_000) => guarded(provider.adapter(), { provider: "fake", faults: state.faults, timeoutMs });
 
 	test("502 twice then OK shows nothing", async () => {
@@ -87,6 +132,29 @@ describe("provider failures and empty lists", () => {
 
 		expect((await guardWith(provider, state).workSource?.listReady())?.length).toBe(1);
 		expect(state.faults.list()).toEqual([]);
+	});
+
+	test("a failing provider is retried at the pace backoffMs sets", async () => {
+		const provider = new FakeProvider();
+		const state = stateIn(provider.now);
+		const inner = provider.adapter();
+		let attempts = 0;
+
+		const counted = {
+			...inner,
+			workSource: {
+				...inner.workSource!,
+				listReady: () => {
+					attempts++;
+
+					return inner.workSource!.listReady();
+				},
+			},
+		};
+
+		provider.failNext(10_000);
+		await expect(guarded(counted, { provider: "fake", faults: state.faults, timeoutMs: 300, backoffMs: { first: 5, max: 5 } }).workSource?.listReady()).rejects.toThrow("502");
+		expect(attempts).toBeGreaterThan(10);
 	});
 
 	test("502 past the timeout shows one card, however often it is read", async () => {

@@ -1,7 +1,11 @@
 import pRetry, { AbortError, type RetryContext } from "p-retry";
 import { z } from "zod";
 import { type Adapter, ClaimResult, Item, ItemRef, PermanentError, Watch, type WorkSource } from "../adapter-api.ts";
+import { type HumConfig, SHIPPED_DEFAULTS } from "../config/schema.ts";
 import type { Faults } from "../state/faults.ts";
+import { SECOND_MS } from "../time.ts";
+
+type Backoff = { readonly first: number; readonly max: number };
 
 export type GuardOptions = {
 	/** The integration's name; each card names it and is scoped to it. */
@@ -9,12 +13,19 @@ export type GuardOptions = {
 	readonly faults: Faults;
 	/** A failure that outlasts this shows one card; a shorter one shows nothing. */
 	readonly timeoutMs: number;
+	/** The pause before the first retry, doubled each retry up to the longest pause. */
+	readonly backoffMs?: Backoff;
 	/** Where the last ready list is kept, so a restarted worker still sees an empty list that contradicts it. Memory only when absent. */
 	readonly lastReady?: { readonly load: () => string[]; readonly save: (ids: string[]) => void };
 };
 
-const FIRST_BACKOFF_MS = 500;
-const MAX_BACKOFF_MS = 30_000;
+/** The guard's timings from the owner's provider settings. */
+export const guardTimings = ({ providerTimeoutSeconds, providerBackoff }: Pick<HumConfig, "providerTimeoutSeconds" | "providerBackoff">): Pick<Required<GuardOptions>, "timeoutMs" | "backoffMs"> => ({
+	timeoutMs: providerTimeoutSeconds * SECOND_MS,
+	backoffMs: { first: providerBackoff.firstSeconds * SECOND_MS, max: providerBackoff.maxSeconds * SECOND_MS },
+});
+
+const SHIPPED_BACKOFF_MS = guardTimings(SHIPPED_DEFAULTS).backoffMs;
 
 const none = z.void();
 
@@ -32,7 +43,7 @@ const abortIfPermanent = (cause: unknown): never => {
  * - An empty ready list that contradicts the last read is a fault, not "no work".
  * - A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key.
  */
-export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, lastReady: remembered }: GuardOptions): Adapter => {
+export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = SHIPPED_BACKOFF_MS, lastReady: remembered }: GuardOptions): Adapter => {
 	const unavailable = `provider-unavailable:${provider}`;
 	const contradicted = `empty-list:${provider}`;
 
@@ -71,8 +82,8 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, lastRea
 		const value = await pRetry(() => once(call, schema).catch(abortIfPermanent), {
 			retries: Number.POSITIVE_INFINITY,
 			maxRetryTime: timeoutMs,
-			minTimeout: FIRST_BACKOFF_MS,
-			maxTimeout: MAX_BACKOFF_MS,
+			minTimeout: backoffMs.first,
+			maxTimeout: backoffMs.max,
 			onFailedAttempt: raiseWhenGivingUp,
 		});
 
