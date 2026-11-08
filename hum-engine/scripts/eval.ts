@@ -12,6 +12,9 @@ import { BOUNDARIES, type Boundary, HumConfig } from "../src/config/schema.ts";
 import { alignmentQuestion, raisesLevel } from "../src/decide/alignment.ts";
 import { replyQuestion } from "../src/decide/answer.ts";
 import { kindQuestion } from "../src/decide/kind.ts";
+import { pairQuestion } from "../src/loop/pair.ts";
+import type { ReviewNote } from "../src/loop/records.ts";
+import { pairing, prepare } from "../src/loop/signals.ts";
 import type { JsonSchema, ProsePurpose } from "../src/decide/prose.ts";
 import { openState } from "../src/state/open.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
@@ -93,6 +96,7 @@ const AlignmentCase = z.object({ case: z.string(), label: z.enum(["reverted", "f
 const PlanCase = z.object({ case: z.string(), label: z.string(), body: z.string() });
 const ReplyCase = z.object({ case: z.string(), label: z.string(), question: z.string(), options: z.array(z.string()), reply: z.string() });
 const ReviewCase = z.object({ case: z.string(), label: z.string(), item: z.string(), diff: z.string() });
+const PairCase = z.object({ case: z.string(), label: z.enum(["same", "different"]), a: z.object({ text: z.string() }), b: z.object({ text: z.string() }) });
 
 /** Calls at once: enough to finish a set in minutes, few enough not to trip a rate limit. */
 const AT_ONCE = 4;
@@ -104,6 +108,11 @@ const read = async <T>(boundary: Boundary, schema: z.ZodType<T>, file = "cases.j
 		.split("\n")
 		.filter(Boolean)
 		.map((line) => schema.parse(JSON.parse(line)));
+
+/** The confusion counts of the review-note boundary: its rate is precision, and recall is recorded beside it. */
+const pairCounts = { tp: 0, fp: 0, fn: 0, tn: 0, pairedBySignals: 0 };
+
+const noteOf = (text: string, sourceId: string): ReviewNote => ({ source: "review-comment", sourceId, change: sourceId, hunk: "", text, at: 0 });
 
 const BOUNDARY_RUNS: Record<Boundary, () => Promise<Verdict[]>> = {
 	kind: async () => {
@@ -141,6 +150,25 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Verdict[]>> = {
 			return judged.kind === "abstained" ? "abstained" : scored(judged.value.option, found.label);
 		});
 	},
+	"repeat-pair": async () => {
+		const cases = (await read("repeat-pair", PairCase)).slice(0, limit);
+		const open = cases.filter((found) => pairing(prepare(noteOf(found.a.text, "a")), prepare(noteOf(found.b.text, "b"))).signal === undefined);
+
+		pairCounts.pairedBySignals = cases.length - open.length;
+
+		return eachOf(open, async (found) => {
+			const judged = await judge(pairQuestion(noteOf(found.a.text, "a"), noteOf(found.b.text, "b")));
+
+			if (judged.kind === "abstained") return "abstained";
+
+			const said = judged.value.same;
+			const truth = found.label === "same";
+
+			pairCounts[said ? (truth ? "tp" : "fp") : truth ? "fn" : "tn"]++;
+
+			return said === truth ? "right" : "wrong";
+		});
+	},
 	"review-verdict": async () => {
 		const cases = (await read("review-verdict", ReviewCase)).slice(0, limit);
 
@@ -150,18 +178,26 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Verdict[]>> = {
 
 const header = "| Date | Model id | n | Right | Wrong | Abstained | Rate | Live calls |\n|---|---|---|---|---|---|---|---|\n";
 
+const pairHeader = "| Date | Model id | n | TP | FP | FN | TN | Abstained | Paired by signals | Precision | Recall | Live calls |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n";
+
+const ratio = (part: number, whole: number): string => (whole === 0 ? "0.00" : (part / whole).toFixed(2));
+
+const pairRow = (day: string, abstained: number, used: number): string =>
+	`| ${day} | ${model} | ${pairCounts.tp + pairCounts.fp + pairCounts.fn + pairCounts.tn} | ${pairCounts.tp} | ${pairCounts.fp} | ${pairCounts.fn} | ${pairCounts.tn} | ${abstained} | ${pairCounts.pairedBySignals} | ${ratio(pairCounts.tp, pairCounts.tp + pairCounts.fp)} | ${ratio(pairCounts.tp, pairCounts.tp + pairCounts.fn)} | ${used} |`;
+
 for (const boundary of boundaries) {
 	const before = calls;
 	const verdicts = await BOUNDARY_RUNS[boundary]();
 	const count = (verdict: Verdict) => verdicts.filter((found) => found === verdict).length;
 	const measured = verdicts.length - count("halted");
 	const rate = measured === 0 ? 0 : count("right") / measured;
-	const row = `| ${new Date().toISOString().slice(0, 10)} | ${model} | ${measured} | ${count("right")} | ${count("wrong")} | ${count("abstained")} | ${rate.toFixed(2)} | ${calls - before} |`;
+	const day = new Date().toISOString().slice(0, 10);
+	const row = boundary === "repeat-pair" ? pairRow(day, count("abstained"), calls - before) : `| ${day} | ${model} | ${measured} | ${count("right")} | ${count("wrong")} | ${count("abstained")} | ${rate.toFixed(2)} | ${calls - before} |`;
 	const results = join(root, "evals", boundary, "RESULTS.md");
-	const earlier = (await Bun.file(results).exists()) ? await Bun.file(results).text() : header;
+	const earlier = (await Bun.file(results).exists()) ? await Bun.file(results).text() : boundary === "repeat-pair" ? pairHeader : header;
 
 	await Bun.write(results, `${earlier}${row}\n`);
 	console.log(`${boundary}: ${row}`);
 }
 
-console.log(`${calls} live calls, the start check included. Record each rate under measuredModels in defaults/hum.json; a model decides a boundary alone only at minJudgeRate or above.`);
+console.log(`${calls} live calls, the start check included. Record each rate under measuredModels in defaults/hum.json; a model decides a boundary alone only at minJudgeRate or above; repeat-pair takes its precision, against repeatPrecision.`);

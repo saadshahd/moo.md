@@ -622,7 +622,7 @@
 			"default": {
 				"fixWindow": 10,
 				"fixSubject": "^fix(\\(.+\\))?!?:",
-				"revertSubject": "^Revert \"",
+				"revertSubject": "^(Revert \"|[Rr]evert(\\(.+\\))?!?:)",
 				"revertTrailer": "This reverts commit ([0-9a-f]{7,40})"
 			},
 			"type": "object",
@@ -791,6 +791,9 @@
 				},
 				"reply-option": {
 					"claude-haiku-5-5": 0.87
+				},
+				"repeat-pair": {
+					"claude-haiku-5-5": 1
 				}
 			},
 			"type": "object",
@@ -801,7 +804,8 @@
 					"alignment",
 					"plan-outcome",
 					"review-verdict",
-					"reply-option"
+					"reply-option",
+					"repeat-pair"
 				]
 			},
 			"additionalProperties": {
@@ -821,7 +825,8 @@
 				"alignment",
 				"plan-outcome",
 				"review-verdict",
-				"reply-option"
+				"reply-option",
+				"repeat-pair"
 			],
 			"description": "Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."
 		},
@@ -1108,6 +1113,88 @@
 			],
 			"additionalProperties": false,
 			"description": "Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands."
+		},
+		"ownerLogins": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "GitHub logins whose pull request reviews and comments are the owner's review notes."
+		},
+		"repeatAt": {
+			"default": 2,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Review notes stating one rule at which hum files a check item for it."
+		},
+		"repeatPrecision": {
+			"default": 0.9,
+			"type": "number",
+			"exclusiveMinimum": 0,
+			"exclusiveMaximum": 1,
+			"description": "The lowest precision on labelled pairs at which a model's call that two notes state one rule files a check item; below it the pair waits as a possible repeat."
+		},
+		"memoryMaxBytes": {
+			"default": 8000,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The most bytes memory.md holds; a new entry past it is refused."
+		},
+		"memoryUnusedRuns": {
+			"default": 20,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Runs without use after which a memory.md entry is listed for the owner."
+		},
+		"measureWindow": {
+			"default": 20,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Merged changes the per-merge numbers average over, and the window per path."
+		},
+		"loopIntervalSeconds": {
+			"default": 3600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The time between passes that collect review notes, file check items and confirm CI ran their checks."
+		},
+		"proofTimeoutSeconds": {
+			"default": 900,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long running a new check on one note's commit may take before the proof fails."
+		},
+		"kindFloors": {
+			"default": {},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "A kind's lowest risk level: its changes take at least this level, as in { \"check\": \"high\" }."
+		},
+		"checkKind": {
+			"default": "check",
+			"type": "string",
+			"minLength": 1,
+			"description": "The kind of the work item filed for a rule that review notes repeat: it turns the notes into one check."
+		},
+		"breakCheck": {
+			"default": true,
+			"type": "boolean",
+			"description": "Whether the repo's checks run on the base after each merge, so a test that breaks there files a follow-up item."
 		},
 		"mergeRisk": {
 			"default": {

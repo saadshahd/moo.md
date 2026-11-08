@@ -46,14 +46,20 @@ export const Choice = z.strictObject({ item: name, text: name, at: time });
 /** A path rule the owner's answer added, with the command that takes it back. */
 export const LearnedRule = z.strictObject({ glob: name, level: name, item: name, at: time, undo: Action });
 
-/** Per merged change over the last `window` merged changes. */
-export const Measure = z.strictObject({
-	window: z.int().positive(),
+const PerMerge = z.strictObject({
 	merges: z.int().nonnegative(),
+	/** Items that never merged in the window; their costs are in the numbers. */
+	abandoned: z.int().nonnegative(),
 	notes: z.number().nonnegative(),
 	questions: z.number().nonnegative(),
 	tokens: z.number().nonnegative(),
 });
+
+/** Per merged change over the last `window` merged changes, and over each path's own last `window`. */
+export const Measure = PerMerge.extend({
+	window: z.int().positive(),
+	byPath: z.array(PerMerge.extend({ glob: name })),
+}).strict();
 
 export type Measure = z.infer<typeof Measure>;
 
@@ -77,6 +83,8 @@ export const Status = z.strictObject({
 	merged: z.array(Merged),
 	choices: z.array(Choice),
 	rules: z.array(LearnedRule),
+	/** Pairs of review notes only a model found alike, waiting for its precision to reach the owner's bar. */
+	possibleRepeats: z.array(z.strictObject({ a: name, b: name })),
 	measure: Measure.nullable(),
 });
 
@@ -94,6 +102,7 @@ export const emptyStatus = (engineVersion: string, writtenAt: number): Status =>
 	merged: [],
 	choices: [],
 	rules: [],
+	possibleRepeats: [],
 	measure: null,
 });
 

@@ -6,7 +6,10 @@ import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type Runner, succeeded } from "./claude-p.ts";
 
 /** One question to the cheap model: the boundary it is measured at, the prompt, and the typed answer. */
-export type Question<T> = { readonly boundary: Boundary; readonly prompt: string; readonly answer: z.ZodType<T> };
+export type Question<T> = { readonly boundary: Boundary; readonly prompt: string; readonly answer: z.ZodType<T>;
+	/** The item the call is for: the tokens it spends join that item's total. */
+	readonly item?: string
+};
 
 /** An answer counts only as a pick; anything else is an abstention, which marks the item unclear and never raises a level. */
 export type Judgment<T> =
@@ -29,12 +32,14 @@ export type ModelCallOptions = {
 	readonly timeoutMs: number;
 	/** Whether picks from these model ids count at this boundary. */
 	readonly trusts: (boundary: Boundary, models: readonly string[]) => boolean;
+	/** Told the tokens every call spends, whatever it answers, with the item it was for. */
+	readonly onSpent?: (item: string, tokens: number) => void;
 };
 
 /** The cheap model call through `claude -p`, as hope's judge calls it, with a typed answer by JSON schema. */
 export const modelCallOver =
-	(runner: Runner, { model, timeoutMs, trusts }: ModelCallOptions): ModelCall =>
-	async ({ boundary, prompt, answer }) => {
+	(runner: Runner, { model, timeoutMs, trusts, onSpent }: ModelCallOptions): ModelCall =>
+	async ({ boundary, prompt, answer, item }) => {
 		const outcome = await runner.run({
 			prompt,
 			cwd: tmpdir(),
@@ -44,6 +49,8 @@ export const modelCallOver =
 			call: "judgment",
 			signal: AbortSignal.timeout(timeoutMs),
 		});
+
+		if (item !== undefined && (outcome.kind === "finished" || outcome.kind === "over-cap")) onSpent?.(item, outcome.tokens);
 
 		if (outcome.kind !== "finished") return abstained(NOT_ANSWERED[outcome.kind]);
 
@@ -57,9 +64,10 @@ export const modelCallOver =
 	};
 
 /** The model call a config sets up: its decision model, its timeout, and its record of measured model ids. */
-export const configuredModelCall = (runner: Runner, config: Pick<HumConfig, "decisionModel" | "modelCallTimeoutSeconds" | "measuredModels" | "minJudgeRate">): ModelCall =>
+export const configuredModelCall = (runner: Runner, config: Pick<HumConfig, "decisionModel" | "modelCallTimeoutSeconds" | "measuredModels" | "minJudgeRate">, onSpent?: ModelCallOptions["onSpent"]): ModelCall =>
 	modelCallOver(runner, {
 		model: config.decisionModel,
 		timeoutMs: config.modelCallTimeoutSeconds * SECOND_MS,
 		trusts: (boundary, models) => isTrusted(models, boundary, config),
+		onSpent,
 	});

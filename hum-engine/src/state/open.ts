@@ -4,6 +4,7 @@ import { Kind } from "../config/schema.ts";
 import { EventLog } from "./events.ts";
 import { Faults } from "./faults.ts";
 import { type Codec, Items } from "./items.ts";
+import { Break, Merge, PossibleRepeat, Proof, RepeatGroup, ReviewNote } from "../loop/records.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
@@ -58,6 +59,17 @@ export const openState = (dir: string, { now = Date.now, ...codec }: StateOption
 		questions: new Records(join(dir, "questions"), QueuedQuestion),
 		/** Each answer's disposition, by item and ordinal. */
 		answers: new Records(join(dir, "answers"), SettledAnswer),
+		/** Review notes, by source and source id. */
+		notes: new Records(join(dir, "notes"), ReviewNote),
+		/** Notes that state one rule, by the key of the first. */
+		repeats: new Records(join(dir, "repeats"), RepeatGroup),
+		possibleRepeats: new Records(join(dir, "possible-repeats"), PossibleRepeat),
+		/** Merged changes, by item. */
+		merges: new Records(join(dir, "merges"), Merge),
+		/** Tests of the base that failed after a merge, by item. */
+		breaks: new Records(join(dir, "breaks"), Break),
+		/** What proving a check item cost, by item. */
+		proofs: new Records(join(dir, "proofs"), Proof),
 	};
 };
 

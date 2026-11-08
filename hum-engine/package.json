@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@actions/core": "3.0.1",
+    "@ast-grep/napi": "0.51.1",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@octokit/core": "7.0.8",
     "@octokit/graphql": "9.0.5",

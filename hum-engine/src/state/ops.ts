@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
-import { atomicWrite, createOnce, orMissing, readJson, slug } from "./fs.ts";
+import { atomicWrite, createOnce, listRecords, orMissing, readJson, slug } from "./fs.ts";
 
 /** One external op of one attempt of one run of one item. */
 export const OpKey = z.strictObject({
@@ -42,6 +42,11 @@ export class OpKeys {
 		atomicWrite(this.#path(key), text);
 
 		return true;
+	}
+
+	/** Every op saved. */
+	list(): z.infer<typeof Record>[] {
+		return listRecords(this.#folder).map((file) => Record.parse(readJson(file)));
 	}
 
 	state(key: OpKey): "started" | "done" | undefined {

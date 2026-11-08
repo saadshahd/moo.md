@@ -18,7 +18,7 @@ export type KindContext = {
 
 /** Why the model call gave no kind it may use. */
 const noKind = async (o: KindContext, item: Item, kinds: readonly string[]): Promise<{ kind: string } | { why: string }> => {
-	const judged = await o.judge(kindQuestion(item, { kinds, kindMeanings: o.config.hum.kindMeanings }));
+	const judged = await o.judge({ ...kindQuestion(item, { kinds, kindMeanings: o.config.hum.kindMeanings }), item: item.id });
 
 	if (judged.kind === "abstained") return { why: judged.why };
 

@@ -161,7 +161,7 @@
 	"changeLabels": {
 		"fixWindow": 10,
 		"fixSubject": "^fix(\\(.+\\))?!?:",
-		"revertSubject": "^Revert \"",
+		"revertSubject": "^(Revert \"|[Rr]evert(\\(.+\\))?!?:)",
 		"revertTrailer": "This reverts commit ([0-9a-f]{7,40})"
 	},
 	"historyDepth": 1000,
@@ -217,6 +217,9 @@
 		},
 		"reply-option": {
 			"claude-haiku-5-5": 0.87
+		},
+		"repeat-pair": {
+			"claude-haiku-5-5": 1
 		}
 	},
 	"mergeRisk": {
@@ -278,6 +281,17 @@
 			"Changing .hum/hum.json or any file under .github/workflows/."
 		]
 	},
+	"ownerLogins": [],
+	"repeatAt": 2,
+	"repeatPrecision": 0.9,
+	"memoryMaxBytes": 8000,
+	"memoryUnusedRuns": 20,
+	"measureWindow": 20,
+	"loopIntervalSeconds": 3600,
+	"proofTimeoutSeconds": 900,
+	"kindFloors": {},
+	"checkKind": "check",
+	"breakCheck": true,
 	"runSlots": {
 		"enabled": false,
 		"pool": "../.hum-slots",

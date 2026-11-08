@@ -29,6 +29,7 @@ import { reviewInput } from "../decide/review.ts";
 import { decideKind, forgetProgress, kindAnswered } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { proveCheckItem } from "../loop/prove-item.ts";
 import { tallyOf } from "./tally.ts";
 import { decideProse } from "./prose-run.ts";
 import { footprintOf, type PrefixGate } from "./scheduler.ts";
@@ -189,7 +190,7 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 
 	if (!claim.won) return { outcome: "lost", item: id };
 
-	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum);
+	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum, (item, tokens) => tallyOf(o.state, item).spend(tokens));
 	const { now } = o;
 	const onSnapshot = saved.value !== undefined;
 	const waitingState = knownKind && waitsOnOwner(knownKind, at);
@@ -796,6 +797,12 @@ const DRAINING = "the worker restarts for an update; the next worker lands the c
  */
 const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Promise<ThinResult> => {
 	if (!(await stillMine(d))) return { outcome: "lost", item: d.id };
+
+	if (d.kindName === d.config.hum.checkKind) {
+		const proof = await proveCheckItem({ state: d.state, config: d.config, git: d.git, item: d.id, base: d.base, checks: d.checks, now: d.now ?? Date.now });
+
+		if (proof && !proof.passed) return { outcome: "stuck", item: d.id, detail: proof.reason };
+	}
 
 	const isDocsOnly = d.kindName === d.config.hum.docsOnly.kind;
 

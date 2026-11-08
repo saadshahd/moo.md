@@ -190,7 +190,7 @@ const pathProblems = (hum: HumConfig): Problem[] => {
 	const afterProof = new Set(hum.levels.filter(({ release }) => release === "after-proof").map(({ name }) => name));
 
 	return [
-		...[...hum.paths, ...hum.launches].flatMap(({ level }): Problem[] => (levels.has(level) ? [] : [{ problem: "unknown-level", level }])),
+		...[...hum.paths, ...hum.launches, ...Object.values(hum.kindFloors).map((level) => ({ level }))].flatMap(({ level }): Problem[] => (levels.has(level) ? [] : [{ problem: "unknown-level", level }])),
 		...hum.paths.flatMap((rule): Problem[] =>
 			afterProof.has(rule.level) && !provesEveryKind(rule, hum.kinds) ? [{ problem: "path-without-proof", glob: rule.glob, level: rule.level }] : [],
 		),

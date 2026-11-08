@@ -9,7 +9,7 @@ import { type Git, PATCH } from "./git.ts";
 
 const FIELD = "\u0000";
 const RECORD = "\u0001";
-const LOG_FORMAT = "--format=%x01%H%x00%s%x00%b%x00";
+const LOG_FORMAT = "--format=%x01%H%x00%s%x00%ct%x00%b%x00";
 const NUMSTAT_LINE = /^(\d+|-)\t(\d+|-)\t(.+)$/;
 const BLAME_HEADER = /^([0-9a-f]{40}) \d+ \d+/;
 const BLAMES_AT_ONCE = 8;
@@ -36,8 +36,7 @@ const readLog = async (
 		.split(RECORD)
 		.filter(Boolean)
 		.map((record): PastChange => {
-			const [sha = "", subject = "", body = "", stats = ""] =
-				record.split(FIELD);
+			const [sha = "", subject = "", committed = "", body = "", stats = ""] = record.split(FIELD);
 
 			const counted = stats.split("\n").flatMap((line) => {
 				const [, added, deleted, file] = NUMSTAT_LINE.exec(line) ?? [];
@@ -50,6 +49,7 @@ const readLog = async (
 			return {
 				sha,
 				subject,
+				committedAt: Number(committed) * 1000,
 				body: body.trim(),
 				files: counted.map(({ file }) => file),
 				size: counted.reduce((sum, { lines }) => sum + lines, 0),
@@ -123,14 +123,14 @@ export const readHistory = async (
 ): Promise<PastChange[]> => {
 	const changes = await readLog(git, base, historyDepth);
 
-	const isFix = (change: PastChange): boolean =>
-		new RegExp(changeLabels.fixSubject).test(change.subject);
+	const rewrites = (change: PastChange): boolean =>
+		[changeLabels.fixSubject, changeLabels.revertSubject].some((subject) => new RegExp(subject).test(change.subject));
 
 	const queue = new PQueue({ concurrency: BLAMES_AT_ONCE });
 
 	return Promise.all(
 		changes.map(async (change) =>
-			isFix(change)
+			rewrites(change)
 				? {
 						...change,
 						blamed: (await queue.add(() => blame(git, change.sha))) ?? [],
@@ -144,8 +144,9 @@ export const readHistory = async (
 export const historiesOf = (
 	changes: readonly PastChange[],
 	{ paths, changeLabels }: Pick<HumConfig, "paths" | "changeLabels">,
+	broken: ReadonlySet<string> = new Set(),
 ): Histories => {
-	const labels = labelChanges(changes, changeLabels);
+	const labels = labelChanges(changes, changeLabels, broken);
 	const newestFirst = changes.toReversed();
 
 	return new Map(

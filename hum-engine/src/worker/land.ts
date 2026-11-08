@@ -50,6 +50,8 @@ import type { State } from "../state/open.ts";
 import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import { runChecks } from "./checks.ts";
+import { recordMerged } from "./merged.ts";
+import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
 import type { ThinResult } from "./thin-path.ts";
 
@@ -125,20 +127,23 @@ const policyOf = ({
 
 /** The change's level under the current policy and the base's own history. */
 export const placementOf = async (
-	ctx: Pick<LandContext, "config" | "state" | "git" | "base" | "now">,
+	ctx: Pick<LandContext, "config" | "state" | "git" | "base" | "now"> & { readonly kind?: string },
 	change: Change,
 ): Promise<{ placement: Placement; policy: Policy }> => {
 	const policy = policyOf(ctx);
 
 	const histories = historiesOf(
 		await readHistory(ctx.git, `origin/${ctx.base}`, ctx.config.hum),
-		{ ...ctx.config.hum, paths: policy.paths },
+			{ ...ctx.config.hum, paths: policy.paths },
+		brokenCommits(ctx.state),
 	);
 
 	return {
 		placement: placeChange(change, policy, histories, {
 			now: ctx.now(),
 			base: ctx.base,
+			kindFloor: ctx.kind === undefined ? undefined : ctx.config.hum.kindFloors[ctx.kind],
+			blocked: blockedPaths(ctx.state),
 		}),
 		policy,
 	};
@@ -300,19 +305,8 @@ const pushOntoNewestBase = async ({
 		throw new BaseMoved(`another push moved ${base} first`);
 };
 
-const finish = async ({ state, git, id }: LandContext): Promise<ThinResult> => {
-	const sha = (await git.raw(["rev-parse", "HEAD"])).trim();
-
-	state.landings.remove(id);
-	state.plans.remove(id);
-	state.verdicts.remove(id);
-	state.events.add({
-		source: "work-source",
-		sourceId: `merged:${sha}`,
-		itemId: id,
-		type: "merged",
-		payload: {},
-	});
+const finish = async ({ state, git, id, now }: LandContext): Promise<ThinResult> => {
+	recordMerged(state, id, (await git.raw(["rev-parse", "HEAD"])).trim(), now());
 
 	return { outcome: "merged", item: id };
 };
@@ -471,7 +465,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 const alignmentOf = async (ctx: LandContext, saved: SavedLanding, diff: string): Promise<NonNullable<SavedLanding["alignment"]>> => {
 	if (saved.alignment) return saved.alignment;
 
-	const judged = await ctx.judge(alignmentQuestion(ctx.item, diff, ctx.config.hum));
+	const judged = await ctx.judge({ ...alignmentQuestion(ctx.item, diff, ctx.config.hum), item: ctx.id });
 	const alignment = judged.kind === "picked" ? { graded: judged.value } : { abstained: judged.why };
 
 	ctx.state.landings.put(ctx.id, { ...saved, alignment });

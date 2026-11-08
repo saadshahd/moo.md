@@ -62,7 +62,7 @@ export const RELEASES = ["at-once", "after-proof"] as const;
 export const BREAKS = ["follow-up", "block"] as const;
 
 /** Each place a model's judgment decides, measured on its own labelled set. */
-export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict", "reply-option"] as const;
+export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict", "reply-option", "repeat-pair"] as const;
 
 export type Boundary = (typeof BOUNDARIES)[number];
 
@@ -209,6 +209,17 @@ const Shipped = z.object({
 		.describe(
 			"Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands.",
 		),
+	ownerLogins: z.array(name).describe("GitHub logins whose pull request reviews and comments are the owner's review notes."),
+	repeatAt: count.describe("Review notes stating one rule at which hum files a check item for it."),
+	repeatPrecision: fraction.describe("The lowest precision on labelled pairs at which a model's call that two notes state one rule files a check item; below it the pair waits as a possible repeat."),
+	memoryMaxBytes: count.describe("The most bytes memory.md holds; a new entry past it is refused."),
+	memoryUnusedRuns: count.describe("Runs without use after which a memory.md entry is listed for the owner."),
+	measureWindow: count.describe("Merged changes the per-merge numbers average over, and the window per path."),
+	loopIntervalSeconds: seconds.describe("The time between passes that collect review notes, file check items and confirm CI ran their checks."),
+	proofTimeoutSeconds: seconds.describe("How long running a new check on one note's commit may take before the proof fails."),
+	kindFloors: z.record(name, name).describe("A kind's lowest risk level: its changes take at least this level, as in { \"check\": \"high\" }."),
+	checkKind: name.describe("The kind of the work item filed for a rule that review notes repeat: it turns the notes into one check."),
+	breakCheck: z.boolean().describe("Whether the repo's checks run on the base after each merge, so a test that breaks there files a follow-up item."),
 	mergeRisk: z
 		.strictObject({
 			weights: z.record(z.enum(GRADED), z.number().positive()),
@@ -411,4 +422,15 @@ export const OWNER_CHANGEABLE = {
 	"denied run commands": "deniedRunCommands",
 	"run auto mode": "runAutoMode",
 	"run slots": "runSlots",
+	"owner logins": "ownerLogins",
+	"repeat threshold": "repeatAt",
+	"repeat precision bar": "repeatPrecision",
+	"memory size cap": "memoryMaxBytes",
+	"memory unused runs": "memoryUnusedRuns",
+	"measure window": "measureWindow",
+	"loop interval": "loopIntervalSeconds",
+	"proof timeout": "proofTimeoutSeconds",
+	"kind floors": "kindFloors",
+	"check kind": "checkKind",
+	"break check": "breakCheck",
 } as const satisfies Record<string, string>;

@@ -5,6 +5,8 @@ import type { Label } from "./risk.ts";
 export type PastChange = {
 	readonly sha: string;
 	readonly subject: string;
+	/** When the change landed on the base, in ms. */
+	readonly committedAt?: number;
 	readonly body: string;
 	readonly files: readonly string[];
 	/** Lines added plus lines deleted. */
@@ -43,7 +45,9 @@ const revertsByTitle = (
 	{ revertSubject }: LabelRules,
 ): boolean =>
 	new RegExp(revertSubject).test(later.subject) &&
-	later.subject.includes(`"${earlier.subject}"`);
+	(later.subject.includes(`"${earlier.subject}"`) ||
+		names(later, earlier) ||
+		later.blamed.includes(earlier.sha));
 
 const isRevertOf = (
 	later: PastChange,
@@ -61,30 +65,43 @@ const isFixOf = (
 	new RegExp(fixSubject).test(later.subject) &&
 	(names(later, earlier) || later.blamed.includes(earlier.sha));
 
+/** The later change that breaks `changes[at]`, and how: a revert of it, else a fix among the next `fixWindow` changes on its files. */
+export const breakOf = (
+	changes: readonly PastChange[],
+	at: number,
+	rules: LabelRules,
+): { readonly by: PastChange; readonly label: Exclude<Label, "clean"> } | undefined => {
+	const change = changes[at];
+
+	if (!change) return undefined;
+
+	const later = changes.slice(at + 1);
+	const reverting = later.find((next) => isRevertOf(next, change, rules));
+
+	if (reverting) return { by: reverting, label: "reverted" };
+
+	const fixing = later
+		.filter((next) => sharesAFile(next, change))
+		.slice(0, rules.fixWindow)
+		.find((next) => isFixOf(next, change, rules));
+
+	return fixing ? { by: fixing, label: "fixed" } : undefined;
+};
+
 /**
- * Each change's label: reverted when a later change reverts it; fixed when a fix lands among the next `fixWindow`
- * changes on its files and names it or changes its lines; clean otherwise. `changes` runs oldest first.
+ * Each change's label: reverted or fixed by `breakOf`, fixed when it is in `broken` (a test of the base failed after
+ * it merged), clean otherwise. `changes` runs oldest first.
  */
 export const labelChanges = (
 	changes: readonly PastChange[],
 	rules: LabelRules,
+	broken: ReadonlySet<string> = new Set(),
 ): ReadonlyMap<string, Label> =>
 	new Map(
-		changes.map((change, at): [string, Label] => {
-			const later = changes.slice(at + 1);
-
-			const window = later
-				.filter((next) => sharesAFile(next, change))
-				.slice(0, rules.fixWindow);
-
-			if (later.some((next) => isRevertOf(next, change, rules)))
-				return [change.sha, "reverted"];
-
-			return [
-				change.sha,
-				window.some((next) => isFixOf(next, change, rules)) ? "fixed" : "clean",
-			];
-		}),
+		changes.map((change, at): [string, Label] => [
+			change.sha,
+			breakOf(changes, at, rules)?.label ?? (broken.has(change.sha) ? "fixed" : "clean"),
+		]),
 	);
 
 const topFolders = (change: PastChange): string =>

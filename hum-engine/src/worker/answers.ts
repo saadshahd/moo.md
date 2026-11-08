@@ -43,12 +43,12 @@ const repliesOn = (thread: readonly ThreadEntry[], afterQuestion: number): Reply
 	});
 };
 
-const resolveReply = async (ctx: AnswerContext, question: string, options: readonly string[], { entry }: Reply): Promise<Resolution> => {
+const resolveReply = async (ctx: AnswerContext, itemId: string, question: string, options: readonly string[], { entry }: Reply): Promise<Resolution> => {
 	const matched = matchOption(entry, options);
 
 	if (matched) return matched;
 
-	const judged = await ctx.judge(replyQuestion(question, options, entry.text));
+	const judged = await ctx.judge({ ...replyQuestion(question, options, entry.text), item: itemId });
 
 	if (judged.kind === "abstained") return { source: "abstained", why: judged.why };
 
@@ -95,7 +95,7 @@ type Settling = { readonly ctx: AnswerContext; readonly item: Item; readonly que
 /** One reply's record: kept once final, else decided again from where the item stands now. */
 const settleOne = async ({ ctx, item, question, options, stage }: Settling, reply: Reply, answeredBefore: boolean): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
 	const saved = ctx.state.answers.get(keyOf(item.id, reply.ordinal));
-	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, question, options, reply);
+	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, item.id, question, options, reply);
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 

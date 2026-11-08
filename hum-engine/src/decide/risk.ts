@@ -33,7 +33,14 @@ export type Policy = Pick<
 >;
 
 /** When the change is placed, and onto which base: launches depend on both. */
-export type Moment = { readonly now: number; readonly base: string };
+export type Moment = {
+	readonly now: number;
+	readonly base: string;
+	/** The lowest level the change's kind takes. */
+	readonly kindFloor?: string;
+	/** Globs of paths with a break the owner's level blocks until its follow-up merges. */
+	readonly blocked?: readonly string[];
+};
 
 /** One reason the level is what it is. */
 export type Step =
@@ -48,6 +55,8 @@ export type Step =
 		}
 	| { readonly step: "data-or-secret"; readonly path: string }
 	| { readonly step: "own-config"; readonly path: string }
+	| { readonly step: "kind-floor"; readonly level: string }
+	| { readonly step: "blocked-path"; readonly path: string }
 	| { readonly step: "engine-pin" }
 	| {
 			readonly step: "size";
@@ -149,6 +158,8 @@ export const placeChange = (
 		];
 	});
 
+	const kindFloorSteps: SetsLevel[] = moment.kindFloor === undefined ? [] : [{ step: "kind-floor", level: moment.kindFloor }];
+
 	const launchSteps = policy.launches.flatMap((launch): SetsLevel[] =>
 		isLaunchOn(launch, moment) &&
 		change.paths.some((path) => matches(launch.glob, path))
@@ -164,6 +175,9 @@ export const placeChange = (
 			isOwn(path) ? [{ step: "own-config", path }] : [],
 		),
 		...(change.pinChanged ? [{ step: "engine-pin" } as const] : []),
+		...change.paths.flatMap((path): Step[] =>
+			(moment.blocked ?? []).some((glob) => matches(glob, path)) ? [{ step: "blocked-path", path }] : [],
+		),
 	];
 
 	const oversized = touched.flatMap((rule): Step[] => {
@@ -184,7 +198,7 @@ export const placeChange = (
 
 	const highest = Math.max(
 		0,
-		...[...ruleSteps, ...launchSteps].map(({ level }) => rank(level)),
+		...[...ruleSteps, ...launchSteps, ...kindFloorSteps].map(({ level }) => rank(level)),
 	);
 
 	const floored = floors.length > 0 ? strictest : highest;
@@ -197,6 +211,6 @@ export const placeChange = (
 		unclear: change.paths.filter(
 			(path) => rulesOn(path).length === 0 && !isStrict(path) && !isOwn(path),
 		),
-		steps: [...ruleSteps, ...launchSteps, ...floors, ...bumps],
+		steps: [...ruleSteps, ...launchSteps, ...kindFloorSteps, ...floors, ...bumps],
 	};
 };

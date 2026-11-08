@@ -7,7 +7,6 @@ import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
 import { ADAPTER_API_VERSION, type Answers, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
-import { configuredModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
 import { type Kind, SCHEMA_VERSION } from "../config/schema.ts";
 import { checkTokenAge } from "../service/token.ts";
@@ -15,6 +14,17 @@ import { listFiles } from "../state/fs.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
 import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
+import { tallyOf } from "./tally.ts";
+import { checkBaseAfterMerge } from "./base-check.ts";
+import { settleMergedPulls } from "./merged.ts";
+import { readHistory } from "../adapters/history.ts";
+import { gitIn, PATCH } from "../adapters/git.ts";
+import { join } from "node:path";
+import { configuredModelCall, modelCallOver } from "../adapters/model-call.ts";
+import { runLoopPass, type LoopPass } from "../loop/pass.ts";
+import { modelProposer, trustsRepeats } from "../loop/pair.ts";
+import { measureOf } from "../measure/measure.ts";
+import { measureInputsOf } from "../measure/inputs.ts";
 import { readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
 import { emptyStatus, type Status } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
@@ -26,9 +36,12 @@ import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, claimTtlMs, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, claimTtlMs, DEFAULT_BASE, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
+
+/** Where the loop keeps the base it read, so a fetch elsewhere cannot move it mid-pass. */
+const LOOP_REF = "refs/hum/loop-base";
 
 export type WorkerOptions = {
 	/** The owner's checkout: its lockfile, `.hum/` and `adapters/` are what the update check watches. */
@@ -65,6 +78,8 @@ export type WorkerOptions = {
 	readonly onResult?: (result: ThinResult) => void;
 	/** The remote's pull requests and branch rules, for a remote on GitHub. */
 	readonly pulls?: PullRequests;
+	/** What the review-note loop reads from the review surface and CI; without it the loop reads only git and the owner's answers. */
+	readonly loop?: Partial<Pick<LoopPass, "comments" | "ciLogs">>;
 };
 
 type Known = {
@@ -118,6 +133,7 @@ export class Worker {
 	readonly #start: Signature;
 	readonly #gate: PrefixGate;
 	readonly #pool = new PQueue();
+	#loopAt = Number.NEGATIVE_INFINITY;
 	readonly #inFlight = new Map<string, InFlight>();
 	/** Items the owner answered that have not started yet; kept across ticks, because the watch token moves on. */
 	readonly #answered = new Set<string>();
@@ -155,7 +171,7 @@ export class Worker {
 				title: item.title,
 			};
 		});
-		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum);
+		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
 		rememberKinds(options.state, options.config);
 		this.#recheckLandings();
 	}
@@ -409,8 +425,59 @@ export class Worker {
 				mergedAt: this.#now(),
 			});
 
+		if (result.outcome === "merged") void this.#pool.add(() => this.#checkBase(id));
+
 		this.#o.onResult?.(result);
 		this.wake();
+	}
+
+	/** After a merge, the repo's checks run on the base; a failure there files a follow-up and joins the fix limit. */
+	async #checkBase(item: string): Promise<void> {
+		const { state, config, adapters, repo, remote, base = DEFAULT_BASE, checks } = this.#o;
+
+		await checkBaseAfterMerge({ state, config, workSource: adapters.workSource, git: gitIn(repo), remote, base, checks, now: this.#now, item }).catch((error: Error) => {
+			state.faults.raise({ code: "base-check", item, cause: `The checks on ${base} after ${item} merged did not run: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum does not look at that merge again; run the checks on the base yourself." });
+		});
+	}
+
+	/** The review-note loop runs once an interval, off the tick, so a slow model call never holds a tick. */
+	#loopIfDue(t: number): void {
+		const { state, config } = this.#o;
+
+		if (t - this.#loopAt < config.hum.loopIntervalSeconds * SECOND_MS) return;
+
+		this.#loopAt = t;
+		void this.#pool.add(() =>
+			this.#runLoop().catch((error: Error) => {
+				state.faults.raise({ code: "review-loop", cause: `The review-note loop failed: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "It runs again next interval; look at the cause if this card stays." });
+			}),
+		);
+	}
+
+	async #runLoop(): Promise<void> {
+		const { state, config, adapters, repo, remote, base = DEFAULT_BASE, runner, pulls, loop } = this.#o;
+		const git = gitIn(repo);
+		const call = modelCallOver(runner, { model: config.hum.decisionModel, timeoutMs: config.hum.modelCallTimeoutSeconds * SECOND_MS, trusts: () => true, onSpent: (item, tokens) => tallyOf(state, item).spend(tokens) });
+
+		await git.raw(["fetch", "-q", remote, `+refs/heads/${base}:${LOOP_REF}`]);
+
+		const tip = (await git.raw(["rev-parse", LOOP_REF])).trim();
+
+		if (pulls) await settleMergedPulls(state, pulls, this.#now());
+
+		await runLoopPass({
+			state,
+			config,
+			workSource: adapters.workSource,
+			now: this.#now,
+			comments: loop?.comments ?? (async () => []),
+			ciLogs: loop?.ciLogs ?? (async () => []),
+			history: () => readHistory(git, tip, config.hum),
+			hunkOf: async (sha, file) => (await git.run(["show", ...PATCH, "-U3", "--format=", sha, ...(file === undefined ? [] : ["--", file])])).stdout,
+			propose: modelProposer(call),
+			trusts: (models) => trustsRepeats(models, config.hum),
+			memoryPath: join(repo, ".hum", "memory.md"),
+		});
 	}
 
 	#failed(id: string, error: Error): void {
@@ -467,6 +534,8 @@ export class Worker {
 				unclear: false,
 			})),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
+			possibleRepeats: state.possibleRepeats.list().map(({ a, b }) => ({ a, b })),
+			measure: measureOf({ ...measureInputsOf(state), window: config.hum.measureWindow, globs: config.hum.paths.map(({ glob }) => glob) }) ?? null,
 			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
 		});
 	}
@@ -568,6 +637,8 @@ export class Worker {
 		await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).catch((error: Error) => {
 			state.faults.raise({ code: "question-release", cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
 		});
+
+		this.#loopIfDue(t);
 
 		const ready = await this.#readReady(sleeping);
 		const started = ready ? await this.#startPicked(t, ready, sleeping) : [];
