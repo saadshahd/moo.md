@@ -103,6 +103,6 @@ export class FakePulls {
 	}
 
 	client(): PullRequests {
-		return gitHubPullRequests("me/scratch", { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false }) });
+		return gitHubPullRequests("me/scratch", { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }) });
 	}
 }

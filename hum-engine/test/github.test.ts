@@ -9,7 +9,7 @@ const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
 const context: AdapterContext = { report: () => {}, now };
 
-const fakeClient = (github: FakeGitHub, token = "fake-token"): GitHubClient => gitHubClient({ token, baseUrl: "https://fake.github", fetch: github.fetch, spaced: false });
+const fakeClient = (github: FakeGitHub, token = "fake-token"): GitHubClient => gitHubClient({ token, baseUrl: "https://fake.github", fetch: github.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 const settings = (repo: string, client: GitHubClient): GitHubOptions => ({
 	repo,
@@ -139,9 +139,16 @@ describe("failures", () => {
 		expect(github.requests).toEqual([]);
 	});
 
+	test("a request GitHub never answers fails at the client's time limit", async () => {
+		const silent = (_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)));
+		const client = gitHubClient({ token: "fake-token", baseUrl: "https://fake.github", fetch: silent, spaced: false, timeoutMs: 50 });
+
+		await expect(client.request("GET /rate_limit")).rejects.toThrow();
+	});
+
 	test("a client on GitHub's own terms spaces its GraphQL requests", async () => {
 		const github = new FakeGitHub();
-		const adapter = githubAdapter(settings(github.repo, gitHubClient({ token: "fake-token", baseUrl: "https://fake.github", fetch: github.fetch })), context);
+		const adapter = githubAdapter(settings(github.repo, gitHubClient({ token: "fake-token", baseUrl: "https://fake.github", fetch: github.fetch, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })), context);
 		const id = String(github.seed("spaced"));
 		const started = Date.now();
 
@@ -165,8 +172,8 @@ const IssueReply = z.object({ repository: z.object({ issue: z.object({ id: z.str
 describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
 	const [owner = "", name = ""] = scratch.split("/");
 	const token = Bun.spawnSync(["gh", "auth", "token"]).stdout.toString().trim();
-	const client = gitHubClient({ token });
-	const otherClient = gitHubClient({ token });
+	const client = gitHubClient({ token, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const otherClient = gitHubClient({ token, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const primary = githubAdapter(settings(scratch, client), context);
 	const secondary = githubAdapter(settings(scratch, otherClient), context);
 

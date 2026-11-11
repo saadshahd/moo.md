@@ -94,7 +94,7 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	const slots = config.hum.runSlots.enabled && isInBackground(config.hum, rest.where) ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
 	const github = repoFromRemote(remote);
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs });
-	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, async () => gitHubClient({ token: await ownerToken(timeoutMs) }));
+	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, async () => gitHubClient({ token: await ownerToken(timeoutMs), timeoutMs }));
 
 	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop });
 };

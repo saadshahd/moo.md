@@ -147,7 +147,7 @@ export const gitHubPullRequests = (
 	const [owner = "", name = ""] = repo.split("/");
 
 	const connect = pMemoize(
-		async () => client ?? gitHubClient({ token: await ownerToken(timeoutMs) }),
+		async () => client ?? gitHubClient({ token: await ownerToken(timeoutMs), timeoutMs }),
 	);
 
 	const rulesCache = new Map<string, BranchRules>();

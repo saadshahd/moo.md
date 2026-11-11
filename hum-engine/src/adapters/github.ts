@@ -214,22 +214,31 @@ export const ownerToken = async (timeoutMs: number): Promise<string> => {
 
 const retryOnce: NonNullable<ThrottlingOptions["onRateLimit"]> = (_retryAfter, _options, _octokit, retryCount) => retryCount < RATE_LIMIT_RETRIES;
 
+type Send = (url: string, init?: RequestInit) => Promise<Response>;
+
 export type GitHubClientOptions = {
 	readonly token: string;
 	readonly baseUrl?: string;
 	/** Replaces `fetch`, for a GitHub that is not github.com. */
-	readonly fetch?: typeof fetch;
+	readonly fetch?: Send;
 	/** Whether writes are spaced as GitHub asks; only a GitHub with no secondary rate limit may go without. */
 	readonly spaced?: boolean;
+	/** The owner's `commandTimeoutSeconds` in milliseconds: how long one request may wait for GitHub's answer. */
+	readonly timeoutMs: number;
 };
 
-/** A GitHub client that waits out rate limits and spaces its writes as GitHub asks. */
-export const gitHubClient = ({ token, baseUrl, fetch, spaced = true }: GitHubClientOptions): GitHubClient =>
+const bounded =
+	(send: Send, timeoutMs: number): Send =>
+	(url, init) =>
+		send(url, { ...init, signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(init?.signal ? [init.signal] : [])]) });
+
+/** A GitHub client that waits out rate limits, spaces its writes as GitHub asks, and gives up on a request GitHub has not answered within `timeoutMs`. */
+export const gitHubClient = ({ token, baseUrl, fetch = globalThis.fetch, spaced = true, timeoutMs }: GitHubClientOptions): GitHubClient =>
 	new HumOctokit({
 		auth: token,
 		userAgent: "hum",
 		baseUrl,
-		request: { fetch },
+		request: { fetch: bounded(fetch, timeoutMs) },
 		throttle: { enabled: spaced, onRateLimit: retryOnce, onSecondaryRateLimit: retryOnce },
 	});
 
@@ -276,7 +285,7 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 	let spent = 0;
 
 	const client = pMemoize(async () => {
-		const made = options.client ?? gitHubClient({ token: await ownerToken(timeoutMs) });
+		const made = options.client ?? gitHubClient({ token: await ownerToken(timeoutMs), timeoutMs });
 
 		made.hook.after("request", () => void spent++);
 		made.hook.error("request", (error) => {
