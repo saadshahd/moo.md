@@ -21,7 +21,7 @@ import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planH
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
-import { runChecks } from "./checks.ts";
+import { checksTimeoutMs, runChecks } from "./checks.ts";
 import { changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
@@ -508,7 +508,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const checksSource = createAsyncLogic({
 		run: async () => {
-			const failure = await runChecks(d.checks, clone, { env: d.env });
+			const failure = await runChecks(d.checks, clone, { env: d.env, timeoutMs: checksTimeoutMs(d.config.hum) });
 
 			if (failure) {
 				lastFailure = failure;

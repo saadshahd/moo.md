@@ -50,7 +50,7 @@ import {
 import type { State } from "../state/open.ts";
 import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
-import { runChecks } from "./checks.ts";
+import { checksTimeoutMs, runChecks } from "./checks.ts";
 import { recordMerged } from "./merged.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
@@ -281,6 +281,7 @@ const pushOntoNewestBase = async ({
 	clone,
 	env,
 	checks,
+	config,
 }: LandContext): Promise<void> => {
 	await git.raw(["fetch", "-q", "origin", base]);
 
@@ -295,7 +296,7 @@ const pushOntoNewestBase = async ({
 			);
 		}
 
-		const failure = await runChecks(checks, clone, { env });
+		const failure = await runChecks(checks, clone, { env, timeoutMs: checksTimeoutMs(config.hum) });
 
 		if (failure)
 			throw new StaleMerge(

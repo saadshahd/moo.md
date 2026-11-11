@@ -3,8 +3,7 @@ import { type Git } from "../adapters/git.ts";
 import type { Config } from "../config/load.ts";
 import { inWorktreeAt } from "../loop/proof.ts";
 import type { State } from "../state/open.ts";
-import { SECOND_MS } from "../time.ts";
-import { runChecks } from "./checks.ts";
+import { checksTimeoutMs, runChecks } from "./checks.ts";
 import { placementOf } from "./land.ts";
 
 export type BaseCheckOptions = {
@@ -34,7 +33,7 @@ export const checkBaseAfterMerge = async ({ state, config, workSource, git, remo
 
 	await git.raw(["fetch", "-q", remote, base]);
 
-	const failure = await inWorktreeAt(git, merge.sha, (folder) => runChecks(checks, folder, { timeoutMs: config.hum.proofTimeoutSeconds * SECOND_MS }));
+	const failure = await inWorktreeAt(git, merge.sha, (folder) => runChecks(checks, folder, { timeoutMs: checksTimeoutMs(config.hum) }));
 
 	if (failure === undefined) return;
 
