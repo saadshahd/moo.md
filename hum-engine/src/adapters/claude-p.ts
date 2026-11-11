@@ -320,7 +320,7 @@ export type RunnerOptions = {
 	/** The model the start check runs on. */
 	readonly model: string;
 	readonly binary?: string;
-	/** The limit of `claude --version`, which the version floor reads; the owner's `commandTimeoutSeconds` in milliseconds. */
+	/** The limit of `claude --version`, which the version floor reads, and of the start check; the owner's `commandTimeoutSeconds` in milliseconds. */
 	readonly timeoutMs?: number;
 	/** Added to the process environment. An API key in the environment is passed on untouched. */
 	readonly env?: Readonly<Record<string, string>>;
@@ -376,6 +376,8 @@ const recordCredential = (state: RunnerOptions["state"], credential: string): vo
 		fix: `Runs go on. Delete ${file} to record ${credential} as the choice.`,
 	});
 };
+
+const START_TIMED_OUT = "start-check-timed-out";
 
 export const START_PROMPT = 'Reply with the JSON {"ok":true}.';
 
@@ -535,7 +537,10 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 		model: options.model,
 		effort: "low",
 		schema: START_SCHEMA,
+		signal: AbortSignal.timeout(timeoutMs),
 	});
+
+	if (check.kind === "stopped") return held(hold(START_TIMED_OUT, `The start check got no answer within ${timeoutMs / SECOND_MS} seconds and was stopped.`, "hum makes the check again on the next run; if this card stays, check that claude -p answers in a terminal."));
 
 	if (check.kind === "held") return held(check);
 
@@ -558,12 +563,13 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 	recordCredential(state, credentialOf(check.keySource, env));
 
 	state.faults.clear(LIMIT_UNPARSED);
+	state.faults.clear(START_TIMED_OUT);
 
 	return { check, runner: { run, limitedUntil } };
 };
 
-/** A start check that a usage limit refused says nothing about the install: it is made again once the limit has ended. */
-const isUnsettled = ({ check }: Started): boolean => check.kind === "limited" || (check.kind === "held" && check.card.code === LIMIT_UNPARSED);
+/** A start check that a usage limit refused or that got no answer says nothing about the install: it is made again on the next run. */
+const isUnsettled = ({ check }: Started): boolean => check.kind === "limited" || (check.kind === "held" && (check.card.code === LIMIT_UNPARSED || check.card.code === START_TIMED_OUT));
 
 /**
  * A runner. Its start check is made again on the next run for as long as a usage limit refuses it, and a saved

@@ -113,6 +113,18 @@ test("a start check refused with a limit that has no readable reset time is made
 	expect(state.faults.list()).toEqual([]);
 });
 
+test("a start check that never answers is stopped at the limit, held with a card that says so, and made again on the next run", async () => {
+	const { runner, shim, state, check } = await setup({ script: [{ hang: true }, {}, {}] }, { timeoutMs: 1000 });
+
+	expect(check).toMatchObject({ kind: "held", card: { code: "start-check-timed-out" } });
+
+	const after = await ask(runner);
+
+	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(shim.calls()).toHaveLength(3);
+	expect(state.faults.list()).toEqual([]);
+});
+
 test("a rejecting rate_limit_event also gives the reset time", async () => {
 	const until = Math.floor(NOW / 1000) + 60;
 	const { runner } = await setup({ script: [{}, { error: "You've hit your limit", rejectUntil: until }] });

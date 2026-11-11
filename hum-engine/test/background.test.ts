@@ -185,6 +185,15 @@ test("the start check starts one background run and keeps it; a run that cannot 
 	expect(await ask(fallen.runner)).toMatchObject({ kind: "finished" });
 });
 
+test("a background start check that never answers is stopped at commandTimeoutSeconds and leaves one card that says so", async () => {
+	const shim = makeShim({ script: [{}, { hang: true }] });
+	const state = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
+	const started = await startBackgroundRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, config: { ...CONFIG, commandTimeoutSeconds: 2 }, repo: tmpdir() });
+
+	expect(started.check.kind).toBe("stopped");
+	expect(state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: BACKGROUND_CHECK_CODE, cause: expect.stringContaining("no result within 2 seconds") }]);
+});
+
 /** A usage-limit row as Claude Code writes it into a transcript. */
 const LIMIT_ROW = {
 	type: "assistant",

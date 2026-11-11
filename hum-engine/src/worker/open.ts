@@ -87,7 +87,7 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	if (!workSource || !questions) throw new Error("hum.json names no work source or no questions integration");
 
-	const runnerOptions = { state, model: config.hum.models.light, binary, env, now };
+	const runnerOptions = { state, model: config.hum.models.light, binary, env, now, timeoutMs };
 	const { runner } = isInBackground(config.hum, rest.where) ? await startBackgroundRunner({ ...runnerOptions, config: config.hum, repo }) : await startRunner(runnerOptions);
 
 	// A slot is a worktree a background run starts in, so the pool stands only where runs are background agents.

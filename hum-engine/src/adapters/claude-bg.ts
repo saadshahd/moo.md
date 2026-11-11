@@ -336,8 +336,10 @@ const refusalCard = ({ faults }: Pick<BackgroundOptions, "state">["state"]): Car
 	return card;
 };
 
-const whyNot = (outcome: RunOutcome): string => {
+const whyNot = (outcome: RunOutcome, timeoutMs: number): string => {
 	if (outcome.kind === "finished") return outcome.text.slice(0, CARD_EXCERPT);
+
+	if (outcome.kind === "stopped") return `no result within ${timeoutMs / SECOND_MS} seconds`;
 
 	return outcome.kind === "held" ? outcome.card.cause : outcome.kind;
 };
@@ -357,7 +359,8 @@ export const startBackgroundRunner = async (options: BackgroundStartOptions): Pr
 	// The check's own fall-back holds with the card that says why the service refused.
 	const refuse: Runner = { run: async () => ({ kind: "held", card: refusalCard(state) }), limitedUntil: started.runner.limitedUntil };
 	const checker = backgroundRunner({ binary, env, state, config, fallback: refuse });
-	const check = await checker.run({ name: START_NAME, prompt: START_PROMPT, cwd: repo, model: options.model, effort: "low", schema: START_SCHEMA });
+	const timeoutMs = commandTimeoutMs(config);
+	const check = await checker.run({ name: START_NAME, prompt: START_PROMPT, cwd: repo, model: options.model, effort: "low", schema: START_SCHEMA, signal: AbortSignal.timeout(timeoutMs) });
 
 	if (isOk(check)) {
 		state.faults.clear(BACKGROUND_CHECK_CODE);
@@ -366,7 +369,7 @@ export const startBackgroundRunner = async (options: BackgroundStartOptions): Pr
 	}
 
 	// The start check's card says why for every run, so the card for the check's own fall-back would only repeat it.
-const why = whyNot(check);
+	const why = whyNot(check, timeoutMs);
 
 	state.faults.clear(FALLBACK_CODE);
 	state.faults.raise(startCheckFault(repo, why));
