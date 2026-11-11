@@ -4,7 +4,8 @@ import { exec } from "../exec.ts";
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
 const HOOKS_OFF = "core.hooksPath=/dev/null";
 
-const CONFLICT = /non-fast-forward|fetch first|already exists|stale info|failed to update ref|cannot lock ref/i;
+/** The words git uses when another push moved the ref first; git 2.50 and later say `incorrect old value provided` when two pushes race at the update. */
+const CONFLICT = /non-fast-forward|fetch first|already exists|stale info|failed to update ref|cannot lock ref|incorrect old value/i;
 const REFUSED = /remote rejected|declined|protected|GH006|denied|not permitted/i;
 const ABSENT = /does not exist|not a valid object name/i;
 
