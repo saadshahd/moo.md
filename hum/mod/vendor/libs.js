@@ -798,6 +798,7 @@ function createFSM(config) {
 var export_isNewer = import_gt.default;
 
 export {
+  stripAnsi,
   stringWidth,
   export_isNewer as isNewer,
   createFSM,

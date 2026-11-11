@@ -67,6 +67,20 @@ export async function poll($: Engine, watch: Watch, amberAfterSeconds: number): 
 	return undefined;
 }
 
+/** A timer's callback that starts `run` only once its last run has ended, so a slow `hum watch` is never started again on top of itself. */
+export const exclusive = (run: () => Promise<void>): (() => void) => {
+	let isRunning = false;
+
+	return () => {
+		if (isRunning) return;
+
+		isRunning = true;
+		void run().finally(() => {
+			isRunning = false;
+		});
+	};
+};
+
 /** The repo's root, where its pinned hum lives. */
 export async function repoRoot($: Engine, cwd: string): Promise<string> {
 	const found = await $.process.run(["git", "rev-parse", "--show-toplevel"], { cwd });

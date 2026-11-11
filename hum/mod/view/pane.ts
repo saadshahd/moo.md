@@ -1,9 +1,11 @@
 import type { Card, Status } from "../../../hum-engine/src/status/format.ts";
-import { blankRow, noticeCardRows, questionCardRows } from "./cards.ts";
+import type { Unread } from "../../types";
+import { blankRow, noticeCardRows, questionCardRows, unreadCardRows } from "./cards.ts";
+import { reportedUnread } from "./freshness.ts";
 import { headerRow, measureRow } from "./header.ts";
 import { type ListEntry, listRows, sinceText } from "./lists.ts";
 import type { ViewRead } from "./read.ts";
-import { type Row, span } from "./row.ts";
+import { innerWidth, padded, type Row, span } from "./row.ts";
 import { problemWords } from "./summary.ts";
 import { wrap } from "./cells.ts";
 
@@ -15,6 +17,8 @@ export type PaneInput = {
 	readonly width: number;
 	/** The ids of the list rows the owner unfolded. */
 	readonly unfolded: ReadonlySet<string>;
+	/** A read of the work source that keeps failing; it shows as the first card once it is past the amber limit. */
+	readonly unread?: Unread;
 };
 
 /** Notice cards in the order the pane lists them. */
@@ -52,8 +56,15 @@ const mergedEntries = ({ merged }: Status, now: number): ListEntry[] =>
 const choiceEntries = ({ choices }: Status, now: number): ListEntry[] =>
 	choices.map(({ item, text, at }) => ({ foldId: `choice:${item}:${at}`, item, title: text, meta: [span(sinceText(at, now), "dim")] }));
 
-/** The cards, question cards first and then waiting, limited and fault. */
-const cardBlocks = (status: Status, now: number, width: number): Row[][] => [
+const unreadBlocks = (unread: Unread | undefined, now: number, amberAfterSeconds: number, width: number): Row[][] => {
+	const reported = reportedUnread(unread, now, amberAfterSeconds);
+
+	return reported === undefined ? [] : [unreadCardRows(reported, now, width)];
+};
+
+/** The cards, the unread read first, then question cards and then waiting, limited and fault. */
+const cardBlocks = (status: Status, now: number, width: number, unreadFirst: readonly Row[][]): Row[][] => [
+	...unreadFirst,
 	...status.questions.map((question) => questionCardRows(question, now, width)),
 	...NOTICE_ORDER.flatMap((kind) => status.cards.filter((card) => card.kind === kind).map((card) => noticeCardRows(card, now, width))),
 ];
@@ -61,29 +72,33 @@ const cardBlocks = (status: Status, now: number, width: number): Row[][] => [
 /** The rows above the first card: the header's two lines and a blank. */
 export const headerRows = (status: Status, now: number, amberAfterSeconds: number, width: number): Row[] => [headerRow(status, now, amberAfterSeconds, width), measureRow(status.measure, width)];
 
-/** The whole pane: header, then question cards, notice cards, in flight, merged, and choices made without the owner. */
-export const paneRows = (input: PaneInput): Row[] => {
+const bodyRows = (input: PaneInput): Row[] => {
 	const { read, now, amberAfterSeconds, width } = input;
+	const unread = unreadBlocks(input.unread, now, amberAfterSeconds, width);
 
-	if (read.kind !== "status") return wrap(problemWords(read) ?? "Reading the status file.", width).map((line) => [span(line, "amber")]);
+	if (read.kind !== "status") return separated([...unread, wrap(problemWords(read) ?? "Reading the status file.", width).map((line): Row => [span(line, "amber")])]);
 
 	const { status } = read;
 
 	return separated([
 		headerRows(status, now, amberAfterSeconds, width),
-		...cardBlocks(status, now, width),
+		...cardBlocks(status, now, width, unread),
 		listSection("in flight", inFlightEntries(status, now), input),
 		listSection("merged", mergedEntries(status, now), input),
 		listSection("choices made without you", choiceEntries(status, now), input),
 	]);
 };
 
+/** The whole pane: header, then question cards, notice cards, in flight, merged, and choices made without the owner; each row has its padding. */
+export const paneRows = (input: PaneInput): Row[] => bodyRows({ ...input, width: innerWidth(input.width) }).map(padded);
+
 /** The rows an inline pane opens with: the header and the first card, so its buttons are in view. */
-export const openingRows = (read: ViewRead, now: number, amberAfterSeconds: number, width: number): number => {
-	if (read.kind !== "status") return paneRows({ read, now, amberAfterSeconds, width, unfolded: new Set() }).length;
+export const openingRows = (read: ViewRead, now: number, amberAfterSeconds: number, width: number, unread?: Unread): number => {
+	if (read.kind !== "status") return paneRows({ read, now, amberAfterSeconds, width, unfolded: new Set(), unread }).length;
 
-	const first = cardBlocks(read.status, now, width)[0] ?? [];
+	const inner = innerWidth(width);
+	const first = cardBlocks(read.status, now, inner, unreadBlocks(unread, now, amberAfterSeconds, inner))[0] ?? [];
 
-	return headerRows(read.status, now, amberAfterSeconds, width).length + (first.length === 0 ? 0 : first.length + 1);
+	return headerRows(read.status, now, amberAfterSeconds, inner).length + (first.length === 0 ? 0 : first.length + 1);
 };
 

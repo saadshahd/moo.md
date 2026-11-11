@@ -10,9 +10,13 @@ const MILLION = THOUSAND * THOUSAND;
 
 /** `950`, `310k`, `1.2M`. */
 export const tokensText = (tokens: number): string => {
-	if (tokens < THOUSAND) return String(Math.round(tokens));
+	const whole = Math.round(tokens);
 
-	return tokens < MILLION ? `${Math.round(tokens / THOUSAND)}k` : `${(tokens / MILLION).toFixed(1)}M`;
+	if (whole < THOUSAND) return String(whole);
+
+	const thousands = Math.round(tokens / THOUSAND);
+
+	return thousands < THOUSAND ? `${thousands}k` : `${(tokens / MILLION).toFixed(1)}M`;
 };
 
 const perMerge = (value: number): string => String(Number(value.toFixed(1)));

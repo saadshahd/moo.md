@@ -1,4 +1,5 @@
 import type { Card, Question } from "../../../hum-engine/src/status/format.ts";
+import type { Unread } from "../../types";
 import { buttonWords } from "../answer/fill.ts";
 import { ageSeconds, ageText } from "./freshness.ts";
 import { button, buttonRows } from "./buttons.ts";
@@ -19,7 +20,7 @@ const titleRule = (parts: readonly string[], width: number): Row => {
 	const room = width - RULE_LEAD - RULE_TAIL_MIN - 2;
 	const fitting = parts.map((_, index) => parts.slice(0, parts.length - index).join(SEPARATOR)).find((title) => cells(title) <= room);
 	const title = fitting ?? ellipsize(parts.join(SEPARATOR), room);
-	const tail = width - RULE_LEAD - cells(title) - 2;
+	const tail = Math.max(0, width - RULE_LEAD - cells(title) - 2);
 
 	return [span(GLYPHS.rule.repeat(RULE_LEAD), "dim"), span(` ${title} `, "strong"), span(GLYPHS.rule.repeat(tail), "dim")];
 };
@@ -45,5 +46,8 @@ export const noticeCardRows = ({ kind, item, code, cause, fix, action, since }: 
 	...paragraph(fix, width, "dim"),
 	...(action === undefined || item === undefined ? [] : buttonRows([button(action.label, { kind: "fill", item, word: action.answer }, true)], width)),
 ];
+
+/** The card for a work source the view cannot read: what the read said, wrapped whole where the band has no room for it. */
+export const unreadCardRows = ({ cause, since }: Unread, now: number, width: number): Row[] => [titleRule(["work source", "unread", ageText(ageSeconds(since, now))], width), ...paragraph(cause, width, "amber")];
 
 export const blankRow = (): Row => [span(" ", "plain")];

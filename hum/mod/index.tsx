@@ -9,7 +9,7 @@ import { bandRow } from "./view/band.ts";
 import { paneRows } from "./view/pane.ts";
 import { readOf } from "./view/read.ts";
 import type { Press } from "./view/row.ts";
-import { locate, newWatch, poll, repoRoot, watchOnce } from "./watch.ts";
+import { exclusive, locate, newWatch, poll, repoRoot, watchOnce } from "./watch.ts";
 
 const MS = 1000;
 const PANE = "hum";
@@ -64,9 +64,12 @@ export const register: Register = (on, options) => {
 			await update($, unread, (before) => (cause === undefined ? null : { cause, since: before?.since ?? now }));
 		};
 
-		await Promise.all([look(), ask()]);
-		$.clock.every(pollSeconds * MS, () => void look());
-		$.clock.every(watchSeconds * MS, () => void ask());
+		const asking = exclusive(ask);
+
+		await look();
+		asking();
+		$.clock.every(pollSeconds * MS, exclusive(look));
+		$.clock.every(watchSeconds * MS, asking);
 
 		return next(e);
 	});
@@ -102,13 +105,15 @@ export const register: Register = (on, options) => {
 
 		const view = readOf(await read($, source));
 
+		const unreadNow = (await read($, unread)) ?? undefined;
+
 		const row = bandRow({
 			read: view,
 			now: await $.clock.now(),
 			amberAfterSeconds,
 			width: e.props.bodyColumns,
 			answering: await answeringLabel($),
-			unread: (await read($, unread)) ?? undefined,
+			unread: unreadNow,
 		});
 
 		const tags = $.ui.resolve(e);
@@ -118,7 +123,7 @@ export const register: Register = (on, options) => {
 
 		return (
 			<Box flexDirection="column">
-				{drawRows(tags, [row], pressed($, { width: e.props.bodyColumns, amberAfterSeconds, read: view }))}
+				{drawRows(tags, [row], pressed($, { width: e.props.bodyColumns, amberAfterSeconds, read: view, unread: unreadNow }))}
 				{below}
 			</Box>
 		);
@@ -126,9 +131,9 @@ export const register: Register = (on, options) => {
 
 	on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
 		const view = readOf(await read($, source));
-		const rows = paneRows({ read: view, now: await $.clock.now(), amberAfterSeconds, width: e.props.bodyColumns, unfolded: new Set(await read($, unfolded)) });
+		const unreadNow = (await read($, unread)) ?? undefined;
+		const rows = paneRows({ read: view, now: await $.clock.now(), amberAfterSeconds, width: e.props.bodyColumns, unfolded: new Set(await read($, unfolded)), unread: unreadNow });
 
-
-		return drawRows($.ui.resolve(e), rows, pressed($, { width: e.props.bodyColumns, amberAfterSeconds, read: view }));
+		return drawRows($.ui.resolve(e), rows, pressed($, { width: e.props.bodyColumns, amberAfterSeconds, read: view, unread: unreadNow }));
 	});
 };

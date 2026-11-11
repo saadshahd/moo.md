@@ -7,7 +7,7 @@ const cardsOf = (status: Status, kind: Status["cards"][number]["kind"]): number 
 
 /** Which count names the engine's state, most pressing first. The first with something in it speaks. */
 const STATE_WORDS: readonly { readonly count: (status: Status) => number; readonly words: (count: number) => string }[] = [
-	{ count: (status) => status.questions.length, words: (count) => `${count} need you` },
+	{ count: (status) => status.questions.length, words: (count) => `${count} ${count === 1 ? "needs" : "need"} you` },
 	{ count: (status) => cardsOf(status, "fault"), words: (count) => plural(count, "fault") },
 	{ count: (status) => cardsOf(status, "limited"), words: () => "limited" },
 	{ count: (status) => cardsOf(status, "waiting"), words: (count) => `${count} waiting` },

@@ -1,9 +1,9 @@
 import type { Unread } from "../../types";
 import { cells, ellipsize, rowCells, spaces } from "./cells.ts";
-import { ageSeconds, ageText, isAmber } from "./freshness.ts";
+import { ageSeconds, ageText, reportedUnread } from "./freshness.ts";
 import { SEPARATOR } from "./glyphs.ts";
 import { RUNNERS, runnerPart } from "./ages.ts";
-import { type Row, type Span, span } from "./row.ts";
+import { innerWidth, padded, type Row, type Span, span } from "./row.ts";
 import { statusWords } from "./summary.ts";
 import type { ViewRead } from "./read.ts";
 
@@ -39,9 +39,9 @@ const shown = (parts: Parts, dropped: number): Span[] => {
 const statusPart = ({ read, now, amberAfterSeconds, answering, unread }: BandInput): Span => {
 	if (answering !== undefined) return span(`Enter posts on ${answering}, not Claude`, "strong");
 
-	const unreadFor = unread === undefined ? 0 : ageSeconds(unread.since, now);
+	const reported = reportedUnread(unread, now, amberAfterSeconds);
 
-	if (unread !== undefined && isAmber(unreadFor, amberAfterSeconds)) return span(`unread ${ageText(unreadFor)}${SEPARATOR}${unread.cause}`, "amber");
+	if (reported !== undefined) return span(`work source unread ${ageText(ageSeconds(reported.since, now))}`, "amber");
 
 	if (read.kind !== "status") return span(statusWords(read), "amber");
 
@@ -64,8 +64,7 @@ const partsOf = (input: BandInput): Parts => {
 	};
 };
 
-/** The band: one row, the control at the right end. The status and the control stay whole from 40 cells; name, ages and version drop from the end. */
-export const bandRow = (input: BandInput): Row => {
+const bodyRow = (input: BandInput): Row => {
 	const { width } = input;
 	const parts = partsOf(input);
 	const control = span(CONTROL, "strong", { kind: "open" });
@@ -76,3 +75,6 @@ export const bandRow = (input: BandInput): Row => {
 
 	return [...left, span(spaces(width - rowCells(left) - cells(CONTROL)), "plain"), control];
 };
+
+/** The band: one padded row, the control at the right end. The status and the control stay whole from 42 cells; name, ages and version drop from the end. */
+export const bandRow = (input: BandInput): Row => padded(bodyRow({ ...input, width: innerWidth(input.width) }));

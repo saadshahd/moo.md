@@ -79,12 +79,12 @@ test("the band is one row that never passes its width, from 20 to 200 cells, for
 	}
 });
 
-test("from 40 cells the band keeps its status whole and the control at the right end", () => {
-	for (const width of WIDTHS.filter((one) => one >= 40)) {
+test("from 42 cells the band keeps its status whole and the control one cell from the right end", () => {
+	for (const width of WIDTHS.filter((one) => one >= 42)) {
 		const row = bandRow(inputOf(statusRead, width));
 
 		expect(textOf(row), String(width)).toContain("2 need you");
-		expect(row.at(-1)?.text).toBe("open");
+		expect(row.at(-2)?.text).toBe("open");
 		expect(rowCells(row)).toBe(width);
 	}
 });

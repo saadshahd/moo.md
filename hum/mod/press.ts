@@ -1,4 +1,5 @@
 import type { EngineInterface, ProcessRunResult } from "claude-code";
+import type { Unread } from "../types";
 import { openingRows } from "./view/pane.ts";
 import type { ViewRead } from "./view/read.ts";
 
@@ -7,7 +8,7 @@ type Engine = EngineInterface;
 const PANE_TITLE = "hum";
 const REPO_ENGINE = "node_modules/.bin/hum";
 
-export type PressContext = { readonly width: number; readonly amberAfterSeconds: number; readonly read: ViewRead };
+export type PressContext = { readonly width: number; readonly amberAfterSeconds: number; readonly read: ViewRead; readonly unread?: Unread };
 
 /** Runs the repo's pinned hum at the repo's root, never the plugin's copy, because the two update apart. */
 export async function runHum($: Engine, root: string, args: readonly string[]): Promise<ProcessRunResult> {
@@ -19,7 +20,7 @@ export const failureOf = (ran: Pick<ProcessRunResult, "exitCode" | "stderr">): s
 
 /** Opens the pane as tall as its header and first card need, so the first card's buttons are in view. */
 export async function openPane($: Engine, pane: string, context: PressContext): Promise<void> {
-	const rows = openingRows(context.read, await $.clock.now(), context.amberAfterSeconds, context.width);
+	const rows = openingRows(context.read, await $.clock.now(), context.amberAfterSeconds, context.width, context.unread);
 
 	await $.ui.open({ id: pane, title: PANE_TITLE, rows });
 }

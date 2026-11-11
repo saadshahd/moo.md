@@ -63,3 +63,28 @@ test("a status file that is not there yet reads as missing, not unreadable", asy
 	expect(await ui.find({ type: "Text", text: /no status yet/ })).toBeDefined();
 	await ui.unmount();
 });
+
+const HOUR_MS = 3_600_000;
+const FIVE_MINUTES_MS = 300_000;
+
+test("a hum watch that does not answer is not started again while it runs", async ($, on) => {
+	const clock = mock.clock(on, { now: NOW });
+	let started = 0;
+
+	on("process.run", async (_, e) => {
+		const isWatch = e.argv.at(-1) === "watch";
+
+		if (isWatch) {
+			started++;
+			await clock.sleep(HOUR_MS);
+		}
+
+		return { value: { exitCode: 0, stdout: `${REPO}/.git\n`, stderr: "", isStdoutTruncated: false, isStderrTruncated: false } };
+	});
+	on("session.start", (_, e) => ({ cwd: e.cwd }));
+	on("fs.stat", () => ({ deny: "ENOENT" }));
+	await start($);
+	await clock.advance(FIVE_MINUTES_MS);
+
+	expect(started).toBe(1);
+});
