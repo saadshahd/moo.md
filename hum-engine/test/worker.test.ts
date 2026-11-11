@@ -55,7 +55,8 @@ test("a tick that claims, runs and merges an item fetches from the remote once",
 	const reads = join(w.repo.root, "upload-pack.log");
 	const uploadPack = join(w.repo.root, "upload-pack");
 
-	writeFileSync(uploadPack, `#!/bin/sh\nps -o command= -p $PPID >> ${reads}\nexec git-upload-pack "$@"\n`);
+	// Git starts upload-pack through `sh -c`, and the dash that is Linux's sh keeps that shell, so the git command is the parent or the grandparent.
+	writeFileSync(uploadPack, `#!/bin/sh\nps -o command= -p "$PPID,$(ps -o ppid= -p $PPID | tr -d ' ')" >> ${reads}\nexec git-upload-pack "$@"\n`);
 	chmodSync(uploadPack, 0o755);
 	sh(w.clone, ["config", "remote.origin.uploadpack", uploadPack]);
 	w.item("a", "docs/a.md");
@@ -64,7 +65,7 @@ test("a tick that claims, runs and merges an item fetches from the remote once",
 	await w.worker.idle();
 
 	expect(merged(w)).toEqual(["a"]);
-	expect(readFileSync(reads, "utf8").split("\n").filter((command) => / fetch /.test(command))).toHaveLength(1);
+	expect(readFileSync(reads, "utf8").split("\n").filter((command) => /^git .* fetch /.test(command))).toHaveLength(1);
 });
 
 test("items that touch one file go one after the other, and an item that says nothing goes alone", async () => {

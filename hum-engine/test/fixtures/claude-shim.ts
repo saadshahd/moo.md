@@ -7,16 +7,16 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Behavior, Decided } from "./shim.ts";
+import { type Behavior, type Decided, shimSpecJson } from "./shim.ts";
 
 /**
- * A stand-in for the `claude` binary. HUM_SHIM holds JSON: `{version, log, script}`.
+ * A stand-in for the `claude` binary. HUM_SHIM names a JSON file: `{version, log, script}`.
  * Each `-p` call takes the next behavior of `script` (the last one repeats) and logs one JSON line:
  * its argv, the SHA-256 and size of its stdin, and its pid.
  */
 
-// SAFETY: the test that starts this shim wrote HUM_SHIM as JSON of this shape.
-const spec = JSON.parse(process.env.HUM_SHIM ?? "{}") as {
+// SAFETY: makeShim wrote the spec file as JSON of this shape.
+const spec = JSON.parse(shimSpecJson()) as {
 	version?: string;
 	log?: string;
 	script?: Behavior[];

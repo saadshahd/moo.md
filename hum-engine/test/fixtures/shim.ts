@@ -4,6 +4,15 @@ import { join } from "node:path";
 
 const SHIM = join(import.meta.dir, "claude-shim.ts");
 
+/** The JSON spec a shim process runs by, from the file HUM_SHIM names: Linux refuses one environment variable over 128 KB, and a spec can hold a longer output. */
+export const shimSpecJson = (): string => {
+	const file = process.env.HUM_SHIM;
+
+	if (file === undefined) throw new Error("HUM_SHIM names no spec file: start the shim through makeShim");
+
+	return readFileSync(file, "utf8");
+};
+
 /** What one `-p` call does. */
 export type Behavior = {
 	/** Files to write and commit in the working directory. */
@@ -75,13 +84,15 @@ export const makeShim = (spec: ShimSpec = {}): Shim => {
 	const binary = join(dir, "claude");
 	const log = join(dir, "calls.jsonl");
 	const bg = join(dir, "bg");
+	const specFile = join(dir, "spec.json");
 
 	writeFileSync(binary, `#!/bin/sh\nexec bun ${JSON.stringify(SHIM)} "$@"\n`);
 	chmodSync(binary, 0o755);
+	writeFileSync(specFile, JSON.stringify({ ...spec, log, bg }));
 
 	return {
 		binary,
-		env: { HUM_SHIM: JSON.stringify({ ...spec, log, bg }), CLAUDE_CONFIG_DIR: join(dir, "config") },
+		env: { HUM_SHIM: specFile, CLAUDE_CONFIG_DIR: join(dir, "config") },
 		calls: () => lines(log),
 		ends: () => lines(`${log}.ends`),
 		tokens: () => lines(`${log}.tokens`),

@@ -120,5 +120,6 @@ test.skipIf(!has("systemd-analyze"))("systemd-analyze verify passes on the rende
 	// `verify` wants the command to exist, so it runs the real bun by its path.
 	writeFileSync(file, renderUnit("systemd", { ...vars, repo: tmpdir(), command: [process.execPath, "serve"] }));
 
-	expect(Bun.spawnSync(["systemd-analyze", "verify", file]).stderr.toString()).toBe("");
+	// `--recursive-errors=no` keeps the warnings of the host's own units, which `verify` loads as dependencies, out of stderr.
+	expect(Bun.spawnSync(["systemd-analyze", "verify", "--recursive-errors=no", file]).stderr.toString()).toBe("");
 });

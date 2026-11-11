@@ -31,11 +31,16 @@ export type ExecOptions = Partial<Omit<Options, "timeout" | "signal" | "persist"
 	readonly graceMs?: number;
 };
 
+/**
+ * Signals every process in the group, and answers false once none is left to signal. macOS answers EPERM, not ESRCH,
+ * while the group holds only processes that have exited and wait to be reaped, as the command itself does until Bun
+ * reaps it.
+ */
 const signalGroup = (group: number, signal: "SIGTERM" | "SIGKILL" | 0): boolean => {
 	try {
 		return process.kill(-group, signal);
 	} catch (error) {
-		if (error instanceof Error && "code" in error && error.code === "ESRCH") return false;
+		if (error instanceof Error && "code" in error && (error.code === "ESRCH" || error.code === "EPERM")) return false;
 
 		throw error;
 	}

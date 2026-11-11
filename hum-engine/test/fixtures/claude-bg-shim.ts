@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { shimSpecJson } from "./shim.ts";
 
 /**
  * The background half of the `claude` stand-in: `--bg`, `agents --json`, `stop` and `rm`. A launched run is the
@@ -13,8 +14,8 @@ const AFTER_ROW_MS = 40;
 
 type Agent = { id: string; kind: "background"; name: string; sessionId: string; cwd: string; state: string; pid: number };
 
-// SAFETY: the test that starts this shim wrote HUM_SHIM as JSON, and makeShim added the folder `bg`.
-const spec = JSON.parse(process.env.HUM_SHIM ?? "{}") as { bg: string; bgDown?: boolean };
+// SAFETY: makeShim wrote the spec file as JSON, with the folder `bg` added.
+const spec = JSON.parse(shimSpecJson()) as { bg: string; bgDown?: boolean };
 
 const dir = spec.bg;
 
