@@ -13,9 +13,10 @@ const BAND = { plugin: "hum", component: "AbovePrompt", props: { hasSurvey: fals
 
 type Disk = { status: string | undefined; modified: number };
 
-/** The engine beneath the plugin: a git repo at /repo, and a disk the test changes. */
-const engineWith = (on: On, disk: Disk): void => {
-	mock.clock(on, { now: NOW });
+/** The engine beneath the plugin: a git repo at /repo, a disk the test changes, and the clock that moves it on. */
+const engineWith = (on: On, disk: Disk) => {
+	const clock = mock.clock(on, { now: NOW });
+
 	on("process.run", () => ({ value: { exitCode: 0, stdout: `${REPO}/.git\n`, stderr: "", isStdoutTruncated: false, isStderrTruncated: false } }));
 	on("session.start", (_, e) => ({ cwd: e.cwd }));
 	on("fs.stat", () => (disk.status === undefined ? { deny: "ENOENT" } : { value: { kind: "file", size: disk.status.length, mtimeMs: disk.modified, isLink: false } }));
@@ -25,6 +26,8 @@ const engineWith = (on: On, disk: Disk): void => {
 
 		return <Text>other plugin's band</Text>;
 	});
+
+	return clock;
 };
 
 const start = async ($: Engine): Promise<void> => {
@@ -64,6 +67,9 @@ test("a status file that is not there yet reads as missing, not unreadable", asy
 	expect(await ui.find({ type: "Text", text: /no status yet/ })).toBeDefined();
 	await ui.unmount();
 });
+
+const HOUR_MS = 3_600_000;
+const FIVE_MINUTES_MS = 300_000;
 
 const NARROW = 44;
 const INLINE_BODY = 40;
@@ -106,8 +112,26 @@ test("every card's main action is drawn filled between two caps in the accent co
 	await ui.unmount();
 });
 
-const HOUR_MS = 3_600_000;
-const FIVE_MINUTES_MS = 300_000;
+test("a card drawn above a question keeps the address of the question's buttons, so the focus stays on the same answer", async ($, on) => {
+	const disk = written(fullStatus);
+	const clock = engineWith(on, disk);
+
+	await start($);
+
+	const before = await $.ui.mount({ ...PANE, surface: "terminal" });
+	const short = await before.find({ type: "Button", text: /short/ });
+
+	await before.unmount();
+	disk.status = JSON.stringify({ ...fullStatus, questions: [{ item: "80", text: "Which name?", options: ["a", "b"], since: NOW - 9_000_000 }, ...fullStatus.questions] });
+	disk.modified = 2;
+	await clock.advance(FIVE_MINUTES_MS);
+
+	const after = await $.ui.mount({ ...PANE, surface: "terminal" });
+
+	expect(await after.find({ type: "Text", text: /Which name\?/ })).toBeDefined();
+	expect((await after.find({ type: "Button", text: /short/ }))?.key).toBe(short?.key);
+	await after.unmount();
+});
 
 test("a hum watch that does not answer is not started again while it runs", async ($, on) => {
 	const clock = mock.clock(on, { now: NOW });
