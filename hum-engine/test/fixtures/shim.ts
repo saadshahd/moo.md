@@ -49,7 +49,7 @@ export type Behavior = {
 /** What a plan or review run picks, as the run's answer. */
 export type Decided = { event: string; sure: boolean; reason: string; cites?: { file: string; line: number }[]; parts?: string[]; question?: string; plan?: { summary: string; steps: string[]; paths: string[] } };
 
-export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean };
+export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean; agentsWrapped?: boolean };
 
 export type Shim = {
 	/** The executable the runner calls instead of `claude`. */

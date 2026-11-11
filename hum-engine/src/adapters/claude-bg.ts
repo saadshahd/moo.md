@@ -11,6 +11,7 @@ import { CARD_EXCERPT, type Card } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
 import { type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, succeeded } from "./claude-p.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
+import { parseLooseJson } from "./marked.ts";
 import { billedTokens, cacheReadTokens, modelsOf, outputTokens, type RunTranscript, readTranscript } from "./transcript.ts";
 
 /** The plugin a background run turns off, so no run draws the band or polls. */
@@ -23,6 +24,8 @@ const HOOK_EVENTS = ["UserPromptSubmit", "Stop"] as const;
 const SHORT_ID = /backgrounded\W+([0-9a-f]{8})\b/u;
 
 const AGENT_VIEW_KIND = "background";
+
+const AGENTS_UNREAD = "agents-unread";
 
 const SINGLE_QUOTE = /'/g;
 
@@ -176,11 +179,22 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 	const claude = (args: readonly string[], options: { stdin?: string; cwd?: string } = {}) =>
 		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env: { ...process.env, ...env } } });
 
+	/** The background runs Claude Code lists. A list hum cannot read throws, with one card: read as empty, it would start a run that is already going. */
 	const agents = async (): Promise<Agent[]> => {
 		const { stdout } = await claude(["agents", "--json"]);
-		const parsed = z.array(Listed).safeParse(JSON.parse(stdout));
+		const found = parseLooseJson(z.array(Listed), stdout);
 
-		return parsed.success ? parsed.data.flatMap(({ kind, id, name, sessionId, state }) => (kind === AGENT_VIEW_KIND && id !== undefined ? [{ id, name, sessionId, state }] : [])) : [];
+		if (found === undefined) {
+			const cause = `claude agents --json replied in a shape hum does not read: ${stdout.slice(0, CARD_EXCERPT)}`;
+
+			state.faults.raise({ code: AGENTS_UNREAD, cause, fix: "No background run starts until hum reads the list again; update hum to a version that reads this Claude Code's list." });
+
+			throw new Error(cause);
+		}
+
+		state.faults.clear(AGENTS_UNREAD);
+
+		return found.flatMap(({ kind, id, name, sessionId, state }) => (kind === AGENT_VIEW_KIND && id !== undefined ? [{ id, name, sessionId, state }] : []));
 	};
 
 	const reportsOf = (sessionId: string): { at: number; event: string; transcriptPath: string | undefined }[] =>
@@ -190,7 +204,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 			return reported?.success && reported.data.session_id === sessionId ? [{ at: statSync(file).mtimeMs, event: reported.data.hook_event_name, transcriptPath: reported.data.transcript_path }] : [];
 		});
 
-	const jobTokens = (id: string): number => orMissing(() => JobFile.safeParse(JSON.parse(readFileSync(join(jobsFolder, id, JOB_STATE_FILE), "utf8"))).data?.tokens ?? 0, 0);
+	const jobTokens = (id: string): number => orMissing(() => JobFile.parse(JSON.parse(readFileSync(join(jobsFolder, id, JOB_STATE_FILE), "utf8"))).tokens ?? 0, 0);
 
 	const readRun = async (id: string, sessionId: string): Promise<Reading> => {
 		// The job is read before the transcript: whatever put it in its state is already written.

@@ -15,7 +15,7 @@ const AFTER_ROW_MS = 40;
 type Agent = { id: string; kind: "background"; name: string; sessionId: string; cwd: string; state: string; pid: number };
 
 // SAFETY: makeShim wrote the spec file as JSON, with the folder `bg` added.
-const spec = JSON.parse(shimSpecJson()) as { bg: string; bgDown?: boolean };
+const spec = JSON.parse(shimSpecJson()) as { bg: string; bgDown?: boolean; agentsWrapped?: boolean };
 
 const dir = spec.bg;
 
@@ -170,7 +170,7 @@ export const runBackground = async (argv: string[]) => {
 	const [first, second] = argv;
 
 	if (first === "agents") {
-		console.log(JSON.stringify(readAgents()));
+		console.log(JSON.stringify(spec.agentsWrapped ? { agents: readAgents() } : readAgents()));
 
 		return;
 	}

@@ -194,6 +194,14 @@ test("a background start check that never answers is stopped at commandTimeoutSe
 	expect(state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: BACKGROUND_CHECK_CODE, cause: expect.stringContaining("no result within 2 seconds") }]);
 });
 
+test("a claude agents list in a shape hum does not read fails the run with a card, and no run starts", async () => {
+	const { background, shim, state } = await setup({ agentsWrapped: true });
+
+	await expect(ask(background)).rejects.toThrow("claude agents --json");
+	expect(shim.background().filter(({ cmd }) => cmd === "bg")).toHaveLength(0);
+	expect(state.faults.list().map(({ code }) => code)).toEqual(["agents-unread"]);
+});
+
 /** A usage-limit row as Claude Code writes it into a transcript. */
 const LIMIT_ROW = {
 	type: "assistant",
