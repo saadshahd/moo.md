@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
@@ -17,8 +17,10 @@ export const markdownSettings = {
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 
+const git = (cwd: string, args: string[]) => spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...ENV } });
+
 export const sh = (cwd: string, args: string[]): string => {
-	const result = spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...ENV } });
+	const result = git(cwd, args);
 
 	if (result.status !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr}`);
 
@@ -26,6 +28,29 @@ export const sh = (cwd: string, args: string[]): string => {
 };
 
 export const itemFile = (title: string, state = "ready", body = "body") => `---\ntitle: ${JSON.stringify(title)}\nstate: ${state}\n---\n\n${body}\n`;
+
+let built: string | undefined;
+
+/** A bare remote and its owner's clone holding the first commit, built once per process: a copy costs a tenth of the init, clone, commit and push it stands for. */
+const firstWorld = (): string => (built ??= buildFirstWorld());
+
+const buildFirstWorld = (): string => {
+	const world = mkdtempSync(join(tmpdir(), "hum-work-first-"));
+	const remote = join(world, "remote.git");
+	const owner = join(world, "owner");
+
+	sh(world, ["init", "--bare", "-b", "main", remote]);
+	sh(world, ["clone", "-q", remote, owner]);
+	sh(owner, ["checkout", "-q", "-b", "main"]);
+	mkdirSync(join(owner, ".hum", "work"), { recursive: true });
+	writeFileSync(join(owner, ".hum", "work", ".gitkeep"), "");
+	sh(owner, ["add", "-A"]);
+	sh(owner, ["commit", "-q", "-m", "init"]);
+	sh(owner, ["push", "-q", "origin", "main"]);
+	sh(remote, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+
+	return world;
+};
 
 /** A temp bare remote, one seeding clone that plays the owner, and worker clones. Nothing leaves the temp folder. */
 export class WorkRepo {
@@ -35,14 +60,8 @@ export class WorkRepo {
 	#count = 0;
 
 	constructor() {
-		sh(this.root, ["init", "--bare", "-b", "main", this.remote]);
-		sh(this.root, ["clone", "-q", this.remote, this.owner]);
-		sh(this.owner, ["checkout", "-q", "-b", "main"]);
-		mkdirSync(join(this.owner, ".hum", "work"), { recursive: true });
-		writeFileSync(join(this.owner, ".hum", "work", ".gitkeep"), "");
-		this.commit("init");
-		sh(this.owner, ["push", "-q", "origin", "main"]);
-		sh(this.remote, ["symbolic-ref", "HEAD", "refs/heads/main"]);
+		cpSync(firstWorld(), this.root, { recursive: true });
+		sh(this.owner, ["remote", "set-url", "origin", this.remote]);
 	}
 
 	commit(message: string): void {
@@ -57,13 +76,16 @@ export class WorkRepo {
 		return id;
 	}
 
-	/** The owner commits a file and pushes it. */
+	/** The owner commits a file and pushes it, rebasing onto the remote's main first only when a worker moved it. */
 	put(path: string, content: string, message = `put ${path}`): void {
 		mkdirSync(join(this.owner, dirname(path)), { recursive: true });
 		writeFileSync(join(this.owner, path), content);
 		this.commit(message);
-		sh(this.owner, ["pull", "-q", "--rebase", "origin", "main"]);
-		sh(this.owner, ["push", "-q", "origin", "main"]);
+
+		if (git(this.owner, ["push", "-q", "origin", "main"]).status !== 0) {
+			sh(this.owner, ["pull", "-q", "--rebase", "origin", "main"]);
+			sh(this.owner, ["push", "-q", "origin", "main"]);
+		}
 	}
 
 	seed(title: string): string {

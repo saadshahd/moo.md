@@ -198,7 +198,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 });
 
 test("three items on one role start one after the other's first token, not together", async () => {
-	const behavior = { commitForItem: true, spend: 5, beforeToken: 700, sleep: 100 };
+	const behavior = { commitForItem: true, spend: 5, beforeToken: 300 };
 	const w = await world({ items: { a: behavior, b: behavior, c: behavior } });
 
 	w.item("a", "docs/a.md");
@@ -207,12 +207,13 @@ test("three items on one role start one after the other's first token, not toget
 	await w.worker.tick();
 	await w.worker.idle();
 
-	const starts = w.shim.calls().filter((call) => call.itemId).map((call) => call.at).sort();
+	const [first, second, third] = w.shim.calls().filter((call) => call.itemId).sort((a, b) => a.at - b.at);
+	const tokens = new Map(w.shim.tokens().map(({ pid, at }) => [pid, at]));
 
-	expect(starts).toHaveLength(3);
-	// The second and third waited for the first one's token (700 ms in), and then went together.
-	expect(starts[1]! - starts[0]!).toBeGreaterThanOrEqual(600);
-	expect(starts[2]! - starts[1]!).toBeLessThan(600);
+	// The second and third waited for the first one's token, and then went together: the third started before the second's own token.
+	expect(second!.at).toBeGreaterThanOrEqual(tokens.get(first!.pid)!);
+	expect(third!.at).toBeGreaterThanOrEqual(tokens.get(first!.pid)!);
+	expect(third!.at).toBeLessThan(tokens.get(second!.pid)!);
 	expect(w.results.filter((r) => r.outcome === "merged")).toHaveLength(3);
 });
 

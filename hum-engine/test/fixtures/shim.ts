@@ -51,6 +51,8 @@ export type Shim = {
 	readonly calls: () => { at: number; itemId: string | undefined; argv: string[]; stdinBytes: number; stdinSha: string; pid: number; cwd: string }[];
 	/** When each `-p` process wrote its result, by pid. */
 	readonly ends: () => { pid: number; at: number }[];
+	/** When each `-p` process wrote its first assistant message, by pid. */
+	readonly tokens: () => { pid: number; at: number }[];
 	/** Each plan or review run: its purpose, the pick it gave, its prompt and its working folder. */
 	readonly decisions: () => { purpose: "plan" | "review"; answer: Decided; prompt: string; cwd: string }[];
 	/** Each `claude` call that concerns background runs, in order: `bg` launches (with name, prompt and settings), `stop` and `rm`. */
@@ -82,6 +84,7 @@ export const makeShim = (spec: ShimSpec = {}): Shim => {
 		env: { HUM_SHIM: JSON.stringify({ ...spec, log, bg }), CLAUDE_CONFIG_DIR: join(dir, "config") },
 		calls: () => lines(log),
 		ends: () => lines(`${log}.ends`),
+		tokens: () => lines(`${log}.tokens`),
 		decisions: () => lines(`${log}.decisions`),
 		background: () => lines(join(bg, "calls.jsonl")),
 		agents: () => {

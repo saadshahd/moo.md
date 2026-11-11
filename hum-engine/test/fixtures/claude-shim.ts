@@ -144,6 +144,7 @@ if (step.jobTokens !== undefined) out({ type: "job_state", tokens: step.jobToken
 if (step.beforeToken) await new Promise((resolve) => setTimeout(resolve, step.beforeToken));
 
 if (step.spend !== undefined) {
+	appendFileSync(`${log}.tokens`, `${JSON.stringify({ pid: process.pid, at: Date.now() })}\n`);
 	out({
 		type: "assistant",
 		message: {

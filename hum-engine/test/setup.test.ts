@@ -162,7 +162,8 @@ test("proving a written setup on a scratch copy passes its checks and contract, 
 test("proving fails the checks step when a check command fails", async () => {
 	const repo = repoWith({ "package.json": PINNED });
 
-	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"] }, waitHours: {} }, { hopeSkills: hopeSkills() });
+	// A work source that is not markdown skips the contract step, which the proving test above covers.
+	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"], integrations: { workSource: "github" } }, waitHours: {} }, { hopeSkills: hopeSkills() });
 
 	const steps = await proveSetup(repo, { hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished" });
 

@@ -121,7 +121,7 @@ describe("provider failures and empty lists", () => {
 		expect(guardTimings({ providerTimeoutSeconds: 7, providerBackoff: { firstSeconds: 0.25, maxSeconds: 2 } })).toEqual({ timeoutMs: 7000, backoffMs: { first: 250, max: 2000 } });
 	});
 
-	const guardWith = (provider: FakeProvider, state: State, timeoutMs = 10_000) => guarded(provider.adapter(), { provider: "fake", faults: state.faults, timeoutMs });
+	const guardWith = (provider: FakeProvider, state: State, timeoutMs = 10_000) => guarded(provider.adapter(), { provider: "fake", faults: state.faults, timeoutMs, backoffMs: { first: 5, max: 5 } });
 
 	test("502 twice then OK shows nothing", async () => {
 		const provider = new FakeProvider();
