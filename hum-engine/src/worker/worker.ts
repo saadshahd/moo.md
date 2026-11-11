@@ -103,6 +103,7 @@ type InFlight = {
 };
 
 const ERROR_EXCERPT = 300;
+const UNREAD_CODE = "item-unread";
 
 /** Reads `read` at most once per `everyMs`; a failed read, or one slower than `timeoutMs`, shows no value, and that too is kept for the period. */
 const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyMs, timeoutMs }: { everyMs: number; timeoutMs: number }): (() => Promise<T | undefined>) =>
@@ -148,6 +149,8 @@ export class Worker {
 	readonly #answered = new Set<string>();
 	/** Saved changes that land again under this worker's config before anything else starts. */
 	readonly #relanding = new Set<string>();
+	/** Items whose thread a tick failed to read; the next tick reads them again whatever the watch says. */
+	readonly #unread = new Set<string>();
 	readonly #merged: Status["merged"] = [];
 	readonly #wakes = new EventTarget();
 	readonly #latest: () => Promise<string | undefined>;
@@ -352,12 +355,15 @@ export class Worker {
 		}
 	}
 
-	/** Reads the threads that can have changed, settles each new answer, and releases a parked item the owner answered. */
+	/**
+	 * Reads the threads that can have changed, settles each new answer, and releases a parked item the owner answered.
+	 * Each item is read on its own: one that fails raises a card naming it and is read again next tick, and the rest go on.
+	 */
 	async #readAnswers(sleeping: readonly SavedSnapshot[], changed: boolean): Promise<void> {
 		const { state, adapters, config } = this.#o;
 		const inbox = this.#inbox();
 
-		if (!changed && inbox.length === 0) return;
+		if (!changed && inbox.length === 0 && this.#unread.size === 0) return;
 
 		const waiting = new Set(sleeping.map((s) => s.itemId));
 		const asleep = new Map(sleeping.map((s) => [s.itemId, s]));
@@ -365,33 +371,49 @@ export class Worker {
 		const asked = recentlyAsked({ state, config, now: this.#now });
 
 		await Promise.all(
-			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox, ...asked])].map(async (id) => {
-				const raw = await adapters.workSource.read(id);
-				const item = await settleAnswers({ state, workSource: adapters.workSource, judge: this.#judge, now: this.#now }, raw, this.#stageOf(id, raw.ready, asleep));
-				const held = parked.find((p) => p.item === id);
-				const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
-				const lastAnswerAt = lastAnswer?.at;
+			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox, ...asked, ...this.#unread])].map((id) =>
+				this.#readThread(id, async () => {
+					const raw = await adapters.workSource.read(id);
+					const item = await settleAnswers({ state, workSource: adapters.workSource, judge: this.#judge, now: this.#now }, raw, this.#stageOf(id, raw.ready, asleep));
+					const held = parked.find((p) => p.item === id);
+					const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
+					const lastAnswerAt = lastAnswer?.at;
 
-				if (held) {
-					if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer?.option);
+					if (held) {
+						if (isAnsweredSince(lastAnswerAt, held.since)) this.#unpark(id, lastAnswer?.option);
 
-					return;
-				}
+						return;
+					}
 
-				const hasNewAnswer = waiting.has(id) && answerTo(item) !== undefined && lastAnswerAt !== undefined;
+					const hasNewAnswer = waiting.has(id) && answerTo(item) !== undefined && lastAnswerAt !== undefined;
 
-				if (hasNewAnswer) {
-					state.events.add({
-						source: "thread",
-						sourceId: `answer:${lastAnswerAt}`,
-						itemId: id,
-						type: "answered",
-						payload: {},
-					});
-					this.#answered.add(id);
-				}
-			}),
+					if (hasNewAnswer) {
+						state.events.add({
+							source: "thread",
+							sourceId: `answer:${lastAnswerAt}`,
+							itemId: id,
+							type: "answered",
+							payload: {},
+						});
+						this.#answered.add(id);
+					}
+				}),
+			),
 		);
+	}
+
+	/** Runs one item's read; a failure raises the card that names the item, and the item is read again next tick. */
+	async #readThread(id: string, read: () => Promise<void>): Promise<void> {
+		const { faults } = this.#o.state;
+
+		try {
+			await read();
+			this.#unread.delete(id);
+			faults.clear(`${UNREAD_CODE}:${id}`);
+		} catch (error) {
+			this.#unread.add(id);
+			faults.raise({ code: UNREAD_CODE, item: id, cause: `The thread of ${id} could not be read: ${error instanceof Error ? error.message : String(error)}`.slice(0, ERROR_EXCERPT), fix: "hum reads it again each tick and goes on with the other items." });
+		}
 	}
 
 	/** Every claim in flight is renewed; a run whose claim is gone stops. */

@@ -68,6 +68,18 @@ test("a tick that claims, runs and merges an item fetches from the remote once",
 	expect(readFileSync(reads, "utf8").split("\n").filter((command) => /^git .* fetch /.test(command))).toHaveLength(1);
 });
 
+test("an item whose thread cannot be read raises a card naming it, and the other items still start", async () => {
+	const w = await world({ items: { a: { commitForItem: true } } });
+
+	w.item("a", "docs/a.md");
+	w.state.parked.put("gone", { item: "gone", why: "stuck", cause: "c", since: NOW });
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a"] });
+	expect(w.state.faults.list().map(({ code, item }) => ({ code, item }))).toContainEqual({ code: "item-unread", item: "gone" });
+
+	await w.worker.idle();
+});
+
 test("items that touch one file go one after the other, and an item that says nothing goes alone", async () => {
 	const w = await world({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 }, c: { commitForItem: true, spend: 5 } } });
 
