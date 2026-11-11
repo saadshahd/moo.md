@@ -17,6 +17,8 @@ export class FakeRoundup {
 	#next = 1;
 	#clock = 0;
 	readonly calls: string[] = [];
+	/** Tools whose next call throws. */
+	readonly failsOnce = new Set<string>();
 	/** Pads by name. */
 	readonly pads = new Map<string, string>();
 
@@ -52,6 +54,8 @@ export class FakeRoundup {
 		const args = Args.parse(raw);
 
 		this.calls.push(tool);
+
+		if (this.failsOnce.delete(tool)) throw new Error(`${tool} failed`);
 
 		switch (tool) {
 			case "todo_list":

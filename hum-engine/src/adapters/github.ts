@@ -12,7 +12,7 @@ import type { MERGE_METHODS } from "../config/schema.ts";
 import { exec } from "../exec.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommit, claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
-import { answerMarker, commentText, filedFollowUp, followUpBody, followUpNote, type Marker, marked, parseComment, questionMarker, questionText } from "./marked.ts";
+import { answerMarker, commentText, filedFollowUp, followUpBody, followUpNote, isFollowUpOf, type Marker, marked, parseComment, questionMarker, questionText } from "./marked.ts";
 
 const RATE_LIMIT_RETRIES = 1;
 const NOT_MODIFIED = 304;
@@ -68,6 +68,8 @@ const LabelReply = z.object({ repository: z.object({ id: z.string(), label: z.ob
 const CreatedLabel = z.object({ createLabel: z.object({ label: z.object({ id: z.string() }) }) });
 
 const CreatedIssue = z.object({ createIssue: z.object({ issue: z.object({ number: z.int().positive() }) }) });
+
+const RecentIssuesReply = z.object({ repository: z.object({ issues: z.object({ nodes: z.array(z.object({ number: z.int().positive(), title: z.string(), body: z.string() })) }) }) });
 
 const PullsReply = z.object({
 	repository: z.object({
@@ -141,6 +143,11 @@ const COMMIT_ON_BRANCH = `mutation CommitOnBranch($branch: CommittableBranch!, $
 
 const CREATE_LABEL = `mutation CreateLabel($repository: ID!, $name: String!, $color: String!, $description: String!) {
 	createLabel(input: { repositoryId: $repository, name: $name, color: $color, description: $description }) { label { id } }
+}`;
+
+/** The newest issues: a follow-up whose note was never written is among them, since the note is written right after it. */
+const RECENT_ISSUES = `query RecentIssues($owner: String!, $name: String!) {
+	repository(owner: $owner, name: $name) { issues(first: 20, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { number title body } } }
 }`;
 
 const CREATE_ISSUE = `mutation CreateIssue($repository: ID!, $title: String!, $body: String!, $labels: [ID!]!) {
@@ -417,13 +424,19 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 
 				if (filed !== undefined) return { id: filed, title };
 
-				const { repository, label } = await labelled();
-				const made = await mutate(CreatedIssue, CREATE_ISSUE, { repository, title, body: followUpBody(body, `#${from}`), labels: [label] });
-				const note = followUpNote(title, String(made.createIssue.issue.number));
+				const created = async () => {
+					const { repository, label } = await labelled();
+
+					return (await mutate(CreatedIssue, CREATE_ISSUE, { repository, title, body: followUpBody(body, `#${from}`), labels: [label] })).createIssue.issue.number;
+				};
+
+				const recent = (await query(RecentIssuesReply, RECENT_ISSUES, {})).repository.issues.nodes;
+				const id = String(recent.find(isFollowUpOf(`#${from}`, title))?.number ?? (await created()));
+				const note = followUpNote(title, id);
 
 				await commentMarked(from, note.marker, note.text);
 
-				return { id: String(made.createIssue.issue.number), title };
+				return { id, title };
 			},
 		},
 		questions: {

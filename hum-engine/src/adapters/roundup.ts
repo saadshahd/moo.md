@@ -12,6 +12,7 @@ import {
 	filedFollowUp,
 	followUpBody,
 	followUpNote,
+	isFollowUpOf,
 	type Marker,
 	cutLine,
 	markedLine,
@@ -266,12 +267,13 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 
 				if (filed !== undefined) return { id: filed, title };
 
-				const made = Todo.parse(await call("todo_create", { title, body: followUpBody(body, `#${from}`) }));
-				const note = followUpNote(title, String(made.id));
+				const created = async () => Todo.parse(await call("todo_create", { title, body: followUpBody(body, `#${from}`) })).id;
+				const id = String((await todos()).find(isFollowUpOf(`#${from}`, title))?.id ?? (await created()));
+				const note = followUpNote(title, id);
 
 				await postMarked(from, note.marker, note.text);
 
-				return { id: String(made.id), title };
+				return { id, title };
 			},
 		},
 		questions: {

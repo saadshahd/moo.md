@@ -139,6 +139,21 @@ describe("failures", () => {
 		expect(github.requests).toEqual([]);
 	});
 
+	test("a follow-up filed again after its note failed to post is the issue already created", async () => {
+		const github = new FakeGitHub();
+		const adapter = onFake(github);
+		const from = String(github.seed("origin"));
+
+		github.failsOnce.add("AddComment");
+
+		await expect(adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." })).rejects.toThrow();
+
+		const again = await adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." });
+
+		expect(github.requests.filter((request) => request === "graphql CreateIssue")).toHaveLength(1);
+		expect(github.comments(Number(from)).map(({ body }) => body)).toEqual([expect.stringContaining(`Filed follow-up #${again.id}: Fix it`)]);
+	});
+
 	test("a request GitHub never answers fails at the client's time limit", async () => {
 		const silent = (_url: string, init?: RequestInit) => new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal?.reason)));
 		const client = gitHubClient({ token: "fake-token", baseUrl: "https://fake.github", fetch: silent, spaced: false, timeoutMs: 50 });

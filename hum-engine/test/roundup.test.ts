@@ -53,6 +53,23 @@ describe("what a Todo needs to be ready", () => {
 	});
 });
 
+describe("follow-ups", () => {
+	test("a follow-up filed again after its note failed to post is the Todo already created", async () => {
+		const roundup = new FakeRoundup();
+		const adapter = roundupAdapter({ call: roundup.call }, context);
+		const from = String(roundup.seed("origin"));
+
+		roundup.failsOnce.add("todo_comment");
+
+		await expect(adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." })).rejects.toThrow();
+
+		const again = await adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." });
+
+		expect(roundup.calls.filter((tool) => tool === "todo_create")).toHaveLength(1);
+		expect(await adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." })).toEqual(again);
+	});
+});
+
 describe("a roundup comment is one line", () => {
 	test("a question or reply that fits is one comment, whole", async () => {
 		const roundup = new FakeRoundup();

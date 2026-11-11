@@ -74,6 +74,8 @@ export class FakeGitHub {
 	readonly requests: string[] = [];
 	/** The next `count` requests answer 502. */
 	failures = 0;
+	/** GraphQL operations whose next request answers 502. */
+	readonly failsOnce = new Set<string>();
 
 	// SAFETY: the fake answers the (url, init) calls Octokit makes; it is no full fetch (no preconnect).
 	fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -218,6 +220,7 @@ export class FakeGitHub {
 
 			return { createLabel: { label: { id: `L_${v.name}` } } };
 		},
+		RecentIssues: () => ({ repository: { issues: { nodes: this.#issues.toReversed().slice(0, 20).map(({ number, title, body }) => ({ number, title, body })) } } }),
 		CreateIssue: (v) => {
 			const number = this.seed(v.title ?? "", { label: (v.labels?.[0] ?? "").slice("L_".length) });
 
@@ -245,6 +248,8 @@ export class FakeGitHub {
 		const run = Object.entries(this.#operations).find(([name]) => name === operation)?.[1] ?? failed("UNKNOWN", `the fake knows no operation "${operation}"`);
 
 		this.requests.push(`graphql ${operation}`);
+
+		if (this.failsOnce.delete(operation)) return new Response("bad gateway", { status: 502 });
 
 		try {
 			return json(200, { data: run(Vars.parse(variables)) });

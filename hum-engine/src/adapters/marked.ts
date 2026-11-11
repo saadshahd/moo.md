@@ -69,8 +69,16 @@ export const commentText = (text: string): string => text.trim() || EMPTY_COMMEN
 /** The same follow-up title from the same item always has the same key, so filing it twice files it once. */
 export const followUpKey = (title: string): string => createHash("sha256").update(title).digest("hex").slice(0, FOLLOW_UP_KEY_LENGTH);
 
+const filedFrom = (from: string): string => `Filed from ${from}.`;
+
 /** A follow-up's body, which names the item it came from. */
-export const followUpBody = (body: string, from: string): string => `${body.trim()}\n\nFiled from ${from}.`;
+export const followUpBody = (body: string, from: string): string => `${body.trim()}\n\n${filedFrom(from)}`;
+
+/** Whether an item is the follow-up with this title filed from `from`, read from the item itself: it finds a follow-up whose note on `from` was never written. */
+export const isFollowUpOf =
+	(from: string, title: string) =>
+	(found: { readonly title: string; readonly body: string }): boolean =>
+		found.title === title && found.body.trimEnd().endsWith(filedFrom(from));
 
 /** The note left on the item a follow-up came from; its marker carries the key that finds the follow-up again. */
 export const followUpNote = (title: string, item: string) => ({
