@@ -14,6 +14,7 @@ import { SlotPool } from "../../src/slots/pool.ts";
 import { openState } from "../../src/state/open.ts";
 import { type Checkout, PLAN_MARK, runBranch, runThinPath, type ThinPathOptions } from "../../src/worker/thin-path.ts";
 import { configWith } from "../fixtures/config.ts";
+import { OWNER } from "../fixtures/identity.ts";
 import { WorkRepo, itemFile, markdownSettings, sh } from "../fixtures/work-repo.ts";
 import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
 import { BASE, poolConfig } from "../fixtures/slot-world.ts";
@@ -78,6 +79,11 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("hello\n");
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(sh(w.repo.remote, ["log", "--format=%s", "-3", "main"]).split("\n")).toEqual(["hum: finish " + id, "shim: the change", `add ${id}`, ""]);
+
+	// Hum's commit and the agent's, whatever git config the clone holds, are credited to the owner and no one else.
+	const credited = `${OWNER.name} <${OWNER.email}> | ${OWNER.name} <${OWNER.email}>`;
+
+	expect(sh(w.repo.remote, ["log", "--format=%an <%ae> | %cn <%ce>", "-2", "main"]).split("\n")).toEqual([credited, credited, ""]);
 
 	// The run branch and the claim branch are hum's, and distinct.
 	const heads = sh(w.repo.remote, ["for-each-ref", "--format=%(refname)", "refs/heads/hum"]).split("\n").filter(Boolean);

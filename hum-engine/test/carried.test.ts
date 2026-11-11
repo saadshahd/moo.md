@@ -265,6 +265,16 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 	expect(serialized).toBeDefined();
 });
 
+test("openWorker refuses a repo whose hum.json names no commit identity, saying which setting", async () => {
+	const w = await world({});
+	const { hum } = rawConfig((raw) => void delete raw.hum.commitIdentity);
+
+	mkdirSync(join(w.repo.owner, ".hum"), { recursive: true });
+	writeFileSync(join(w.repo.owner, ".hum", "hum.json"), JSON.stringify(hum));
+
+	await expect(openWorker(w.repo.owner, { hopeSkills: hopeSkills(), judge: docsJudge, holder: "worker-1", binary: w.shim.binary, env: w.shim.env, now: () => NOW })).rejects.toThrow("commitIdentity");
+});
+
 test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
 	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } });
 	const raw = rawConfig();

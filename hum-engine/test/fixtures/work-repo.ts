@@ -3,12 +3,13 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, wr
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
+import { OWNER } from "./identity.ts";
 
 /** The markdown adapter's settings as hum ships them. */
 export const markdownSettings = {
 	claimPrefix: SHIPPED_DEFAULTS.claimPrefix,
 	itemsDir: SHIPPED_DEFAULTS.itemsDir,
-	identity: SHIPPED_DEFAULTS.commitIdentity,
+	identity: OWNER,
 	writeRaceRetries: SHIPPED_DEFAULTS.writeRaceRetries,
 	itemReadsAtOnce: SHIPPED_DEFAULTS.itemReadsAtOnce,
 	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,

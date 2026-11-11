@@ -120,10 +120,6 @@
 	"tokenWarnDays": 30,
 	"ciSchedule": "*/15 * * * *",
 	"ciTickCacheSeconds": 300,
-	"commitIdentity": {
-		"name": "hum",
-		"email": "hum@moo.md"
-	},
 	"itemsDir": ".hum/work",
 	"providerTimeoutSeconds": 30,
 	"providerBackoff": {

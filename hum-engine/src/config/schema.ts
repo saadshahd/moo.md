@@ -109,7 +109,7 @@ const SERVICE_LABEL = /^[A-Za-z0-9._-]+$/;
 
 const isInsideRepo = (path: string): boolean => !path.startsWith("/") && !path.endsWith("/") && !path.split("/").includes("..");
 
-const commitIdentity = z.strictObject({ name, email: name });
+const commitIdentity = z.strictObject({ name, email: name }, { error: "the owner's own { name, email }; run /hum to write them from your git config" });
 
 const backoff = z
 	.strictObject({ firstSeconds: z.number().positive(), maxSeconds: z.number().positive() })
@@ -151,7 +151,6 @@ const Shipped = z.object({
 	tokenWarnDays: count.describe("Days before the CI token's year ends that the expiry card shows."),
 	ciSchedule: z.string().refine((schedule) => isValidCron(schedule), "a cron schedule has five valid fields").describe("The cron schedule of the scheduled CI workflow."),
 	ciTickCacheSeconds: seconds.describe("How long the scheduled workflow's last tick is kept before the remote is read again."),
-	commitIdentity: commitIdentity.describe("The author and committer of every commit hum makes itself."),
 	itemsDir: z.string().min(1).refine(isInsideRepo, "the items folder is a path inside the repo, without a leading or trailing '/'").describe("The folder of the repo that holds the markdown items."),
 	providerTimeoutSeconds: seconds.describe("How long a failing provider call is retried before one card shows."),
 	providerBackoff: backoff.describe("The pause before a provider call's first retry, doubled each retry up to the longest pause."),
@@ -297,10 +296,17 @@ export const HumConfig = z.strictObject({
 	integrations: z.record(name, name).optional(),
 	/** The day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
 	ciToken: z.strictObject({ setUp: z.iso.date() }).optional(),
+	/** No default: a commit is credited to whichever account lists its email, so only the owner's own is safe. */
+	commitIdentity: commitIdentity.describe("The owner's own name and email: the author and committer of every commit hum makes. Setup writes them from git config; hum ships none."),
 	...withShippedDefaults(Shipped.shape),
 });
 
 export type HumConfig = z.infer<typeof HumConfig>;
+
+/** `HumConfig` without the owner's identity, which hum cannot ship: what `defaults/` parses to. */
+export const DefaultsConfig = HumConfig.omit({ commitIdentity: true });
+
+export type DefaultsConfig = z.infer<typeof DefaultsConfig>;
 
 const Transition = z.strictObject({
 	target: name.optional(),

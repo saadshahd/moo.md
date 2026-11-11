@@ -10,6 +10,7 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
 import { readStatus, writeHeartbeat } from "../src/status/file.ts";
 import { configWith } from "./fixtures/config.ts";
+import { OWNER } from "./fixtures/identity.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 
@@ -232,10 +233,10 @@ test("the scheduled workflow's tick is a ref on the remote; the Mac reads its ti
 
 	expect(await readCiTick(mac, "origin")).toBeUndefined();
 
-	await recordCiTick(repo.owner, "origin", NOW, SHIPPED_DEFAULTS.commitIdentity);
+	await recordCiTick(repo.owner, "origin", NOW, OWNER);
 	expect(await readCiTick(mac, "origin")).toBe(NOW);
 
-	await recordCiTick(repo.owner, "origin", NOW + 900_000, SHIPPED_DEFAULTS.commitIdentity);
+	await recordCiTick(repo.owner, "origin", NOW + 900_000, OWNER);
 	expect(await readCiTick(mac, "origin")).toBe(NOW + 900_000);
 	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe(CI_TICK_REF);
 	// The tick is no branch and no file: main is as it was.

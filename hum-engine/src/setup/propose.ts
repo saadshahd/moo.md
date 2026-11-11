@@ -1,7 +1,7 @@
 import type { Item } from "../adapter-api.ts";
 import { declaredKind } from "../decide/kind.ts";
 import { usualSize } from "../decide/risk.ts";
-import type { HumConfig, PathRule, RunPlace, SlotRecipe } from "../config/schema.ts";
+import type { DefaultsConfig, HumConfig, PathRule, RunPlace, SlotRecipe } from "../config/schema.ts";
 import type { CiJob, RepoScan } from "./scan.ts";
 import {
 	CHECK_COMMAND,
@@ -104,7 +104,7 @@ const recipeOf = (scan: RepoScan, checks: readonly string[]): SlotRecipe => {
 };
 
 /** Everything setup proposes from a scan, before it asks. */
-export const proposeSetup = (scan: RepoScan, shipped: HumConfig, repoLabels: readonly string[] = []): Proposal => {
+export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, repoLabels: readonly string[] = []): Proposal => {
 	const checks = checksOf(scan);
 
 	return {

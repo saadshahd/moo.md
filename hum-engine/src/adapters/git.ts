@@ -1,6 +1,5 @@
 import { x } from "tinyexec";
 import { PermanentError } from "../adapter-api.ts";
-import { SHIPPED_DEFAULTS } from "../config/schema.ts";
 
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
 const HOOKS_OFF = "core.hooksPath=/dev/null";
@@ -46,19 +45,44 @@ export type PushOutcome = "pushed" | "conflict";
 export type GitIdentity = { readonly name: string; readonly email: string };
 
 export type GitOptions = {
-	/** The owner's `commitIdentity` setting; reads need none. */
+	/** The owner's `commitIdentity` setting. Without it git commits as its own config says, so every call that commits passes it. */
 	readonly identity?: GitIdentity;
 	/** More variables, such as a scratch index or a commit date. */
 	readonly env?: Readonly<Record<string, string>>;
 };
 
-const identitySettings = ({ name, email }: GitIdentity): string[] => [`user.name=${name}`, `user.email=${email}`];
+/** The variables that make git credit a commit to `identity`, over any git config the clone or the machine holds. */
+export const identityEnv = ({ name, email }: GitIdentity) => ({
+	GIT_AUTHOR_NAME: name,
+	GIT_AUTHOR_EMAIL: email,
+	GIT_COMMITTER_NAME: name,
+	GIT_COMMITTER_EMAIL: email,
+});
+
+const NAME_KEY = "user.name";
+const EMAIL_KEY = "user.email";
+
+export type GitIdentityRead =
+	| { readonly found: true; readonly identity: GitIdentity }
+	/** `missing` names each git config key that holds nothing. */
+	| { readonly found: false; readonly missing: readonly string[] };
+
+const configValue = async (git: Git, key: string): Promise<string> => (await git.run(["config", "--get", key])).stdout.trim();
+
+/** The owner's name and email from git config, the repo's own over the user's. Read with a `git` that has no identity of its own. */
+export const readGitIdentity = async (git: Git): Promise<GitIdentityRead> => {
+	const name = await configValue(git, NAME_KEY);
+	const email = await configValue(git, EMAIL_KEY);
+	const missing = [...(name === "" ? [NAME_KEY] : []), ...(email === "" ? [EMAIL_KEY] : [])];
+
+	return missing.length === 0 ? { found: true, identity: { name, email } } : { found: false, missing };
+};
 
 /** git in `cwd` with hooks off. */
-export const gitIn = (cwd: string, { identity = SHIPPED_DEFAULTS.commitIdentity, env = {} }: GitOptions = {}): Git => {
+export const gitIn = (cwd: string, { identity, env = {} }: GitOptions = {}): Git => {
 	const run = async (args: readonly string[], input = ""): Promise<GitResult> => {
-		const { exitCode, stdout, stderr } = await x("git", ["-c", HOOKS_OFF, ...identitySettings(identity).flatMap((setting) => ["-c", setting]), ...args], {
-			nodeOptions: { cwd, env: { ...process.env, ...env } },
+		const { exitCode, stdout, stderr } = await x("git", ["-c", HOOKS_OFF, ...args], {
+			nodeOptions: { cwd, env: { ...process.env, ...(identity && identityEnv(identity)), ...env } },
 			stdin: input,
 		});
 

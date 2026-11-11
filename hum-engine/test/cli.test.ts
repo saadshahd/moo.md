@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { HumConfig } from "../src/config/schema.ts";
+import { OWNER } from "./fixtures/identity.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 
 const MAIN = join(import.meta.dir, "..", "src", "cli", "main.ts");
@@ -11,6 +13,12 @@ const hum = (cwd: string, ...args: string[]) => {
 	const result = spawnSync("bun", [MAIN, ...args], { cwd, encoding: "utf8" });
 
 	return { code: result.status, out: result.stdout, err: result.stderr };
+};
+
+/** The settings every command that reaches the work source needs: the owner's identity, and the settings a test sets. */
+const writeSettings = (repo: string, settings: Partial<HumConfig> = {}): void => {
+	mkdirSync(join(repo, ".hum"), { recursive: true });
+	writeFileSync(join(repo, ".hum", "hum.json"), JSON.stringify({ commitIdentity: OWNER, ...settings }));
 };
 
 /** What the worker will read at once: the ids in the inbox folder, the empty wake of a seen change included. */
@@ -61,6 +69,8 @@ test("hum list-ready, claim, watch, answer and read work end to end on a temp re
 	const worker = repo.worker("w");
 	const id = repo.seed("end to end");
 
+	writeSettings(worker);
+
 	expect(json(worker, "list-ready")).toEqual([{ id, title: "end to end" }]);
 	expect(json(worker, "claim", id, "me")).toMatchObject({ won: true });
 	expect(json(worker, "claim", id, "you")).toMatchObject({ won: false });
@@ -82,8 +92,7 @@ test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json"
 	const worker = repo.worker("w");
 	const id = repo.seed("ttl");
 
-	mkdirSync(join(worker, ".hum"), { recursive: true });
-	writeFileSync(join(worker, ".hum", "hum.json"), JSON.stringify({ claimExpirySeconds: 120 }));
+	writeSettings(worker, { claimExpirySeconds: 120 });
 
 	const claimed = json(worker, "claim", id, "me");
 
@@ -110,8 +119,7 @@ test("a repo that runs only in CI leaves no wake file for an answer or a changed
 	const worker = repo.worker("w");
 	const id = repo.seed("ci only");
 
-	mkdirSync(join(worker, ".hum"), { recursive: true });
-	writeFileSync(join(worker, ".hum", "hum.json"), JSON.stringify({ runPlaces: ["ci"] }));
+	writeSettings(worker, { runPlaces: ["ci"] });
 
 	json(worker, "watch");
 	json(worker, "answer", id, "go", "--option", "approve");

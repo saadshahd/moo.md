@@ -8,7 +8,7 @@ Read first, then ask. Every question leads with what the repo showed and a propo
 
 ## Read
 
-Run `bunx hum setup scan` (the pinned engine: `bun add --exact @moo.md/hum@<version>` first if `package.json` has none). It prints the scan, a proposal for each setting, the waiting states, and how many open issues the label map covers. Answer nothing from it that the repo already says.
+Run `bunx hum setup scan` (the pinned engine: `bun add --exact @moo.md/hum@<version>` first if `package.json` has none). It prints the scan, a proposal for each setting, the waiting states, how many open issues the label map covers, and `gitIdentity`: the name and email hum will commit as, read from your git config. If `gitIdentity.found` is false, stop: tell the owner to set the `missing` keys with `git config --global <key> "<value>"` and ask nothing more. Answer nothing from the scan that the repo already says.
 
 ## Ask
 

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createActor, SimulatedClock, waitFor } from "xstate";
 import { restoreActor } from "xstate/persist";
@@ -21,6 +22,7 @@ import {
 	readConfigDir,
 } from "../src/index.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { OWNER } from "./fixtures/identity.ts";
 
 const root = join(import.meta.dir, "..");
 const env = { hopeSkills: listHopeSkills(join(root, "../hope")) };
@@ -29,8 +31,16 @@ const DAY = 86_400_000;
 /** A JSON tree the tests edit in place. */
 type Tree = any; // oxlint-disable-line typescript/no-explicit-any
 
-const shipped = (): RawConfig => readConfigDir(join(root, "defaults"));
 const clone = (raw: RawConfig): Tree => structuredClone(raw);
+
+/** The defaults and the one setting only the owner holds: who their commits are credited to. */
+const shipped = (): RawConfig => {
+	const raw: Tree = clone(readConfigDir(join(root, "defaults")));
+
+	raw.hum.commitIdentity = OWNER;
+
+	return raw;
+};
 
 /** What setup does: give every wait a timeout and a place to go. */
 const withTimeouts = (raw: RawConfig): RawConfig => {
@@ -150,6 +160,32 @@ test("an unknown schema version is refused and names the step", () => {
 	expect(!newer.ok && newer.refusal.code).toBe("unknown-schema-version");
 	expect(!newer.ok && newer.refusal.message).toContain("Update the engine");
 	expect(!older.ok && older.refusal.message).toContain("/hum");
+});
+
+test("a config with no commit identity, or an empty name or email, is refused, naming the setting", () => {
+	const refusals = [undefined, { name: "", email: OWNER.email }, { name: OWNER.name, email: "" }].map((identity) => {
+		const raw: Tree = clone(withTimeouts(shipped()));
+
+		if (identity === undefined) delete raw.hum.commitIdentity;
+		else raw.hum.commitIdentity = identity;
+
+		const result = loadConfig(raw, { env });
+
+		return result.ok ? undefined : result.refusal;
+	});
+
+	for (const refusal of refusals) {
+		expect(refusal?.code).toBe("malformed-config");
+		expect(refusal?.message).toContain("commitIdentity");
+	}
+});
+
+test("hum ships no email address: its defaults and its schema hold none", () => {
+	const shippedText = [...new Bun.Glob("**/*").scanSync({ cwd: join(root, "defaults"), onlyFiles: true })].map((file) => readFileSync(join(root, "defaults", file), "utf8"));
+
+	for (const text of [...shippedText, JSON.stringify(schemaFile)]) expect(text).not.toMatch(/[\w.+-]+@[\w-]+\.[A-Za-z]{2,}/);
+	expect(schemaFile.required).toContain("commitIdentity");
+	expect(schemaFile.properties.commitIdentity).not.toHaveProperty("default");
 });
 
 test("a missing hope skill is refused, naming the skill and the role", () => {

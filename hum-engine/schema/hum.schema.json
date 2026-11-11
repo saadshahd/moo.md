@@ -203,6 +203,25 @@
 			],
 			"additionalProperties": false
 		},
+		"commitIdentity": {
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string",
+					"minLength": 1
+				},
+				"email": {
+					"type": "string",
+					"minLength": 1
+				}
+			},
+			"required": [
+				"name",
+				"email"
+			],
+			"additionalProperties": false,
+			"description": "The owner's own name and email: the author and committer of every commit hum makes. Setup writes them from git config; hum ships none."
+		},
 		"checks": {
 			"default": [],
 			"type": "array",
@@ -398,29 +417,6 @@
 			"exclusiveMinimum": 0,
 			"maximum": 9007199254740991,
 			"description": "How long the scheduled workflow's last tick is kept before the remote is read again."
-		},
-		"commitIdentity": {
-			"default": {
-				"name": "hum",
-				"email": "hum@moo.md"
-			},
-			"type": "object",
-			"properties": {
-				"name": {
-					"type": "string",
-					"minLength": 1
-				},
-				"email": {
-					"type": "string",
-					"minLength": 1
-				}
-			},
-			"required": [
-				"name",
-				"email"
-			],
-			"additionalProperties": false,
-			"description": "The author and committer of every commit hum makes itself."
 		},
 		"itemsDir": {
 			"default": ".hum/work",
@@ -1345,7 +1341,8 @@
 		"paths",
 		"roles",
 		"events",
-		"kinds"
+		"kinds",
+		"commitIdentity"
 	],
 	"additionalProperties": false
 }

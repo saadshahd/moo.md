@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import { x } from "tinyexec";
 import { z } from "zod";
 import type { Item } from "../adapter-api.ts";
+import { gitIn, readGitIdentity } from "../adapters/git.ts";
 import { listHopeSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
 import { readSettings } from "../config/settings.ts";
@@ -87,8 +88,9 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 			const proposal = proposeSetup(scan, shipped.hum, facts?.labels);
 			const { tracked, folders, ...shown } = scan;
 			const coverage = facts && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
+			const gitIdentity = await readGitIdentity(gitIn(io.cwd));
 
-			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts?.workflowsMayOpenPullRequests ?? null }, null, "\t")}\n`);
+			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts?.workflowsMayOpenPullRequests ?? null, gitIdentity }, null, "\t")}\n`);
 		});
 
 	setup
@@ -97,7 +99,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.requiredOption("--answers <file>", 'JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 1 }')
 		.option("--home <folder>", "where the service unit goes; default the user's home")
 		.action(async ({ answers, home }: { answers: string; home?: string }) => {
-			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home });
+			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home, gitIdentity: await readGitIdentity(gitIn(io.cwd)) });
 
 			io.stdout(`${JSON.stringify(result.ok ? { written: result.written } : { refused: result.refusal.message }, null, "\t")}\n`);
 			done(result.ok ? EXIT_OK : EXIT_FAILED);

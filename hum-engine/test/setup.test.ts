@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
 import { declaredKind } from "../src/decide/kind.ts";
 import { kindCoverage, proposeSetup } from "../src/setup/propose.ts";
@@ -9,8 +10,9 @@ import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
 import { waitsOf, withTimeouts } from "../src/setup/waits.ts";
-import { writeSetup } from "../src/setup/write.ts";
+import { SetupAnswers, writeSetup } from "../src/setup/write.ts";
 import { hopeSkills } from "./fixtures/config.ts";
+import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
 
 /** A git repo on `main` holding the files, with its remote as `origin`. */
@@ -65,6 +67,9 @@ const PINNED = JSON.stringify({ devDependencies: { "@moo.md/hum": "0.1.0" } });
 
 const shipped = shippedConfig();
 
+/** What git config holds for the owner. */
+const OWNER_GIT: GitIdentityRead = { found: true, identity: OWNER };
+
 test("a scan reads the checks CI runs on a pull request after the install a fresh clone needs, the compose services and the issue-template labels", async () => {
 	const scan = await scanRepo(repoWith(PROJECT), "main");
 	const proposal = proposeSetup(scan, shipped.hum, ["bug", "docs"]);
@@ -112,23 +117,60 @@ test("the shipped kinds alone do not load, because their waits have no timeout",
 
 test("writing setup answers writes a config that loads and carries only the settings that differ from the defaults", () => {
 	const repo = repoWith({ "README.md": "x" });
-	const result = writeSetup(repo, { hum: { checks: ["true"], kindLabels: { bug: "fix" }, runPlaces: ["ci"] }, waitHours: {} }, { hopeSkills: hopeSkills(), home: join(repo, "home") });
+	const result = writeSetup(repo, { hum: { checks: ["true"], kindLabels: { bug: "fix" }, runPlaces: ["ci"] }, waitHours: {} }, { hopeSkills: hopeSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
 
 	expect(result.ok).toBe(true);
 
 	const written = JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8"));
 
-	expect(written).toMatchObject({ checks: ["true"], kindLabels: { bug: "fix" } });
+	expect(written).toMatchObject({ checks: ["true"], kindLabels: { bug: "fix" }, commitIdentity: OWNER });
 	expect(written.claimExpirySeconds).toBeUndefined();
 	expect(existsSync(join(repo, ".github", "workflows"))).toBe(true);
 	expect(existsSync(join(repo, "home"))).toBe(false);
 	expect(loadConfig(readConfigDir(join(repo, ".hum")), { env: { hopeSkills: hopeSkills() } }).ok).toBe(true);
 });
 
+test("setup keeps the commit identity hum.json already names over the one git config holds", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
+	const later: GitIdentityRead = { found: true, identity: { name: "Later", email: "later@example.com" } };
+
+	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: later }).ok).toBe(true);
+	expect(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")).commitIdentity).toEqual(OWNER);
+});
+
+test("setup answers cannot name a commit identity, because they come from a model", () => {
+	const answers = SetupAnswers.safeParse({ hum: { commitIdentity: { name: "hum", email: "hum@example.com" } } });
+
+	expect(answers.success).toBe(false);
+	expect(!answers.success && answers.error.message).toContain("commitIdentity is never an answer");
+});
+
+test("setup writes nothing and says what to set when git config holds no name or email", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: { found: false, missing: ["user.email"] } });
+
+	expect(!result.ok && result.refusal.code).toBe("no-git-identity");
+	expect(!result.ok && result.refusal.message).toContain('git config --global user.email "<yours>"');
+	expect(existsSync(join(repo, ".hum"))).toBe(false);
+});
+
+test("the owner's identity is read from git config, and each key it lacks is named", async () => {
+	const repo = repoWith({ "README.md": "x" });
+	const git = gitIn(repo, { env: { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" } });
+
+	expect(await readGitIdentity(git)).toEqual({ found: false, missing: ["user.name", "user.email"] });
+	sh(repo, ["config", "user.name", OWNER.name]);
+	expect(await readGitIdentity(git)).toEqual({ found: false, missing: ["user.email"] });
+	sh(repo, ["config", "user.email", OWNER.email]);
+	expect(await readGitIdentity(git)).toEqual({ found: true, identity: OWNER });
+});
+
 test("setup writes nothing when the repo's hum.json is a schema this engine does not read", () => {
 	const repo = repoWith({ ".hum/hum.json": JSON.stringify({ schemaVersion: 99 }) });
 	const before = readFileSync(join(repo, ".hum", "hum.json"), "utf8");
-	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {} }, { hopeSkills: hopeSkills(), home: join(repo, "home") });
+	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {} }, { hopeSkills: hopeSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
 
 	expect(result.ok).toBe(false);
 	expect(!result.ok && result.refusal.message).toContain("bun add --exact @moo.md/hum@latest");
@@ -138,7 +180,7 @@ test("setup writes nothing when the repo's hum.json is a schema this engine does
 
 test("setup writes nothing when the schema it would write is one this engine does not read", () => {
 	const repo = repoWith({ "README.md": "x" });
-	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {}, schemaVersion: 99 }, { hopeSkills: hopeSkills() });
+	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {}, schemaVersion: 99 }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT });
 
 	expect(result.ok).toBe(false);
 	expect(existsSync(join(repo, ".hum"))).toBe(false);
@@ -147,7 +189,7 @@ test("setup writes nothing when the schema it would write is one this engine doe
 test("proving a written setup on a scratch copy passes its checks and contract, and skips the item without --item", async () => {
 	const repo = repoWith({ "package.json": PINNED });
 
-	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"] }, waitHours: {} }, { hopeSkills: hopeSkills() }).ok).toBe(true);
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"] }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
 	sh(repo, ["add", "-A"]);
 	sh(repo, ["commit", "-q", "-m", "setup"]);
 	sh(repo, ["push", "-q", "origin", "main"]);
@@ -163,7 +205,7 @@ test("proving fails the checks step when a check command fails", async () => {
 	const repo = repoWith({ "package.json": PINNED });
 
 	// A work source that is not markdown skips the contract step, which the proving test above covers.
-	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"], integrations: { workSource: "github" } }, waitHours: {} }, { hopeSkills: hopeSkills() });
+	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"], integrations: { workSource: "github" } }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT });
 
 	const steps = await proveSetup(repo, { hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished" });
 

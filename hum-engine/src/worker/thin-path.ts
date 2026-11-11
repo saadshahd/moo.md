@@ -9,7 +9,7 @@ import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, PATCH, push } from "../adapters/git.ts";
+import { type Git, gitIn, identityEnv, PATCH, push } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -225,8 +225,11 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 
 	if (taken === undefined) return { outcome: "lost", item: id };
 
-	const { folder: clone, env } = taken;
-	const git = gitIn(clone, { identity: o.config.hum.commitIdentity });
+	const { folder: clone } = taken;
+	const { commitIdentity } = o.config.hum;
+	/** The agent's own commits take the owner's identity too: a fresh clone holds none of the repo's local git config. */
+	const env = { ...identityEnv(commitIdentity), ...taken.env };
+	const git = gitIn(clone, { identity: commitIdentity });
 	const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 	try {

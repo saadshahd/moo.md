@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { BOUNDARIES } from "../../src/config/schema.ts";
 import { type Config, listHopeSkills, loadConfig, readConfigDir } from "../../src/config/load.ts";
+import { OWNER } from "./identity.ts";
 
 export const root = join(import.meta.dir, "..", "..");
 
@@ -11,13 +12,14 @@ export type Tree = any; // oxlint-disable-line typescript/no-explicit-any
 export const SHIM_MODEL = "claude-haiku-5-5";
 
 /**
- * The shipped config as raw JSON, with one path rule (docs are low risk) and what setup adds: every wait gets a
- * timeout and a place to go. Tests run items as docs, the kind with the fewest states, on changes of any path, and
- * trust the shim's model at every boundary.
+ * The shipped config as raw JSON, with one path rule (docs are low risk) and what setup adds: the owner's identity, and
+ * every wait gets a timeout and a place to go. Tests run items as docs, the kind with the fewest states, on changes of
+ * any path, and trust the shim's model at every boundary.
  */
 export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 	const raw: Tree = structuredClone(readConfigDir(join(root, "defaults")));
 
+	raw.hum.commitIdentity = OWNER;
 	raw.hum.paths = [{ glob: "docs/**", level: "low" }];
 	raw.hum.docsOnly.paths = ["**"];
 	raw.hum.checks = ["true"];
