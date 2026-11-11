@@ -3,6 +3,8 @@ export const GLYPHS = {
 	separator: "·",
 	ellipsis: "…",
 	rule: "─",
+	capLeft: "▐",
+	capRight: "▌",
 } as const;
 
 export const SEPARATOR = ` ${GLYPHS.separator} `;

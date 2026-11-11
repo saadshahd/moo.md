@@ -1,6 +1,7 @@
 import { plain, spaces } from "./cells.ts";
 
-export type Tone = "plain" | "dim" | "strong" | "amber";
+/** `filled` is a label between two cap glyphs: the caps in the accent colour and the label on it. */
+export type Tone = "plain" | "dim" | "strong" | "amber" | "filled";
 
 /** What pressing a span does. */
 export type Press =

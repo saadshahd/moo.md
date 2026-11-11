@@ -174,7 +174,7 @@ test("a notice card gives the cause, then the fix, then its one action whole, wh
 			);
 
 			expect(actions.map(({ text, press }) => ({ text, press }))).toEqual(
-				card.action === undefined ? [] : [{ text: `[  ${card.action.label}  ]`, press: { kind: "fill", item: card.item ?? "", word: card.action.answer } }],
+				card.action === undefined ? [] : [{ text: `▐ ${card.action.label} ▌`, press: { kind: "fill", item: card.item ?? "", word: card.action.answer } }],
 			);
 		}
 	}
@@ -188,9 +188,13 @@ test("buttons are whole, two cells apart and right-aligned; one that does not fi
 		"x".repeat(14),
 	];
 
-	const buttons = labels.map((label) =>
-		button(label, { kind: "fill", item: "68", word: label }, false),
+	const buttons = labels.map((label, index) =>
+		button(label, { kind: "fill", item: "68", word: label }, index === 0),
 	);
+
+	expect(buttons.map(({ tone }) => tone)).toEqual(["filled", "dim", "dim", "dim"]);
+	expect(buttons[0]?.text).toBe("▐ approve ▌");
+	expect(buttons[1]?.text).toBe(" change the plan ");
 
 	for (const width of WIDTHS) {
 		const rows = buttonRows(buttons, width);

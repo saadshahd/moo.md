@@ -1,10 +1,12 @@
 import { cells, ellipsize, rowCells, spaces } from "./cells.ts";
+import { GLYPHS } from "./glyphs.ts";
 import { type Press, type Row, type Span, span } from "./row.ts";
 
 export const BUTTON_GAP = 2;
 
-/** `[ label ]`; the primary action is filled, which pads it by one cell on each side. */
-export const button = (label: string, press: Press, isPrimary: boolean): Span => span(isPrimary ? `[  ${label}  ]` : `[ ${label} ]`, "strong", press);
+/** The primary action is filled and capped, `▐ label ▌`; any other is its label in dim text, one cell clear on each side. */
+export const button = (label: string, press: Press, isPrimary: boolean): Span =>
+	isPrimary ? span(`${GLYPHS.capLeft} ${label} ${GLYPHS.capRight}`, "filled", press) : span(` ${label} `, "dim", press);
 
 /**
  * Buttons whole, right-aligned and two cells apart. A button that does not fit the rest of the row starts a new row,

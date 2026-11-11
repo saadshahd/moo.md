@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
@@ -20,7 +20,24 @@ export const markdownSettings = {
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 
-const git = (cwd: string, args: string[]) => spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...ENV } });
+/**
+ * Git with its stdout in a file that is read after it exits. Bun's spawnSync can return before it has read the last of a pipe, and `git log` writes one piece per
+ * commit, so a log read through a pipe came back with its first commit alone and exit status 0.
+ */
+const git = (cwd: string, args: string[]) => {
+	const folder = mkdtempSync(join(tmpdir(), "hum-git-out-"));
+	const file = join(folder, "stdout");
+	const out = openSync(file, "w");
+
+	try {
+		const { status, stderr } = spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...ENV }, stdio: ["ignore", out, "pipe"] });
+
+		return { status, stderr, stdout: readFileSync(file, "utf8") };
+	} finally {
+		closeSync(out);
+		rmSync(folder, { recursive: true, force: true });
+	}
+};
 
 export const sh = (cwd: string, args: string[]): string => {
 	const result = git(cwd, args);

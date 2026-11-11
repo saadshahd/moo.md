@@ -2,6 +2,7 @@ import type { On } from "claude-code";
 import { type Engine, expect, mock, test } from "claude-code/testing";
 import type { Status } from "../../hum-engine/src/status/format.ts";
 import { NOW, fullStatus } from "../fixtures/status.ts";
+import { openingRows } from "./view/pane.ts";
 
 const COLUMNS = 45;
 const ROWS = 24;
@@ -61,6 +62,47 @@ test("a status file that is not there yet reads as missing, not unreadable", asy
 	const ui = await $.ui.mount({ ...BAND, surface: "terminal" });
 
 	expect(await ui.find({ type: "Text", text: /no status yet/ })).toBeDefined();
+	await ui.unmount();
+});
+
+const NARROW = 44;
+const INLINE_BODY = 40;
+
+test("the band's open control asks for the rows the first card needs at the inline pane's own width, four cells under the band's", async ($, on) => {
+	const asked: (number | undefined)[] = [];
+
+	engineWith(on, written(fullStatus));
+	on("ui.open", (_, e) => {
+		asked.push(e.rows);
+
+		return { value: { isPlaced: true } };
+	});
+	await start($);
+
+	const ui = await $.ui.mount({ ...BAND, props: { ...BAND.props, bodyColumns: NARROW }, surface: "terminal" });
+	const control = await ui.find({ type: "Button", text: /open/ });
+
+	await ui.press({ key: control?.key ?? "" });
+
+	const read = { kind: "status", status: fullStatus } as const;
+	const bandRows = openingRows(read, NOW, 300, NARROW);
+
+	expect(asked).toEqual([openingRows(read, NOW, 300, INLINE_BODY)]);
+	expect(asked).not.toEqual([bandRows]);
+	await ui.unmount();
+});
+
+test("every card's main action is drawn filled between two caps in the accent colour", async ($, on) => {
+	engineWith(on, written(fullStatus));
+	await start($);
+
+	const ui = await $.ui.mount({ ...PANE, surface: "terminal" });
+	const caps = await ui.findAll({ type: "Text", text: /^[▐▌]$/ });
+	const filled = (await ui.findAll({ type: "Text" })).filter(({ props }) => props.backgroundColor !== undefined);
+
+	expect(filled.length).toBeGreaterThan(0);
+	expect(caps.map(({ props }) => props.color)).toEqual(filled.flatMap(() => ["suggestion", "suggestion"]));
+	expect(new Set(filled.map(({ props }) => `${props.backgroundColor} ${props.color}`))).toEqual(new Set(["suggestion inverseText"]));
 	await ui.unmount();
 });
 
