@@ -8,13 +8,8 @@ const LIMIT_MS = 500;
 const GRACE_MS = 100;
 const FAR_SOONER_THAN_THE_COMMAND_ENDS_MS = 5000;
 
-const isAlive = (pid: number): boolean => {
-	try {
-		return process.kill(pid, 0);
-	} catch {
-		return false;
-	}
-};
+/** A process that has exited is dead, though it answers `kill(pid, 0)` until its new parent reaps it. */
+const isAlive = (pid: number): boolean => /^[^Z]/.test(Bun.spawnSync(["ps", "-o", "stat=", "-p", String(pid)]).stdout.toString().trim());
 
 test("a command that ignores the stop signal fails at its limit, naming itself, and takes its own child with it", async () => {
 	const folder = mkdtempSync(join(tmpdir(), "hum-exec-"));
