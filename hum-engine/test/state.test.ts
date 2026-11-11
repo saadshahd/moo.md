@@ -135,7 +135,7 @@ test("a snapshot from an older engine restores in place, and a rollback to an ol
 	expect(readFileSync(rolledBack.items.path("#68"))).toEqual(before);
 });
 
-test("a shipped envelope migration runs on an older format; a missing one throws", async () => {
+test("a shipped envelope migration runs on an older format; a format with no migration reads as damaged, with one card", async () => {
 	const engine = openState(dir);
 
 	waitingItem(engine, "#68");
@@ -156,8 +156,9 @@ test("a shipped envelope migration runs on an older format; a missing one throws
 
 	expect(restored.ok && restored.value?.getSnapshot().value).toBe("waiting");
 
-	// A gap in the shipped migrations is a bug in the engine, not in the data: it throws.
-	await expect(engine.items.restore("#68", tiny)).rejects.toThrow("no migration from format 0");
+	// A format with no migration, from a hand edit or a damaged file, would throw on every tick: it is refused like any damaged file.
+	expect((await engine.items.restore("#68", tiny)).ok).toBe(false);
+	expect(engine.faults.list().map((card) => card.code)).toEqual(["snapshot-unreadable"]);
 });
 
 const canMountDiskImage = process.platform === "darwin" && Bun.which("hdiutil") !== null;

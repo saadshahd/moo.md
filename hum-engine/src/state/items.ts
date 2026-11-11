@@ -154,7 +154,13 @@ export class Items {
 			return this.#fault(itemId, "snapshot-from-newer-engine", `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, "Update the engine to that version or later: bun add --exact @moo.md/hum@latest.");
 		}
 
-		const envelope = Envelope.safeParse(climb(EnvelopeJson.parse(parsed), header.data.format, this.#format, this.#migrations, "format"));
+		let envelope: ReturnType<typeof Envelope.safeParse>;
+
+		try {
+			envelope = Envelope.safeParse(climb(EnvelopeJson.parse(parsed), header.data.format, this.#format, this.#migrations, "format"));
+		} catch (error) {
+			return unreadable(reason(error));
+		}
 
 		if (!envelope.success) return unreadable(envelope.error.message);
 
@@ -162,13 +168,13 @@ export class Items {
 		let current = snapshot;
 
 		if (machineVersion !== kind.machine.version) {
-			const previous = kindAt?.(machineVersion);
-
-			if (!previous) {
-				return this.#fault(itemId, "snapshot-machine-unknown", `${itemId} was saved under version ${machineVersion} of its machine, and this config holds no map from it.`, "Add a stateMap for that version to the kind file, or delete the item's saved state.");
-			}
-
 			try {
+				const previous = kindAt?.(machineVersion);
+
+				if (!previous) {
+					return this.#fault(itemId, "snapshot-machine-unknown", `${itemId} was saved under version ${machineVersion} of its machine, and this config holds no map from it.`, "Add a stateMap for that version to the kind file, or delete the item's saved state.");
+				}
+
 				current = await migrateSnapshot(previous, kind, snapshot, sources);
 			} catch (error) {
 				return this.#fault(itemId, "snapshot-restore-error", `${itemId} could not move from machine version ${machineVersion} to ${kind.machine.version}: ${reason(error)}.`, "Map the state in the kind's stateMap, or delete the item's saved state.");
