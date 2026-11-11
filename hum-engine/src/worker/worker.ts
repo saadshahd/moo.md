@@ -29,6 +29,7 @@ import { measureInputsOf } from "../measure/inputs.ts";
 import { readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
 import { emptyStatus, type Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
+import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
 import { type Exit, runLifecycle, type TickResult } from "./lifecycle.ts";
 import { type Footprint, footprintOf, pick, PrefixGate } from "./scheduler.ts";
@@ -459,7 +460,7 @@ export class Worker {
 	async #checkBase(item: string): Promise<void> {
 		const { state, config, adapters, repo, remote, base = DEFAULT_BASE, checks } = this.#o;
 
-		await checkBaseAfterMerge({ state, config, workSource: adapters.workSource, git: gitIn(repo), remote, base, checks, now: this.#now, item }).catch((error: Error) => {
+		await checkBaseAfterMerge({ state, config, workSource: adapters.workSource, git: gitIn(repo, { timeoutMs: commandTimeoutMs(config.hum) }), remote, base, checks, now: this.#now, item }).catch((error: Error) => {
 			state.faults.raise({ code: "base-check", item, cause: `The checks on ${base} after ${item} merged did not run: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum does not look at that merge again; run the checks on the base yourself." });
 		});
 	}
@@ -497,7 +498,7 @@ export class Worker {
 
 	async #runLoop(): Promise<void> {
 		const { state, config, adapters, repo, remote, base = DEFAULT_BASE, runner, pulls, loop } = this.#o;
-		const git = gitIn(repo);
+		const git = gitIn(repo, { timeoutMs: commandTimeoutMs(config.hum) });
 		const call = modelCallOver(runner, { model: config.hum.decisionModel, timeoutMs: config.hum.modelCallTimeoutSeconds * SECOND_MS, trusts: () => true, onSpent: (item, tokens) => tallyOf(state, item).spend(tokens) });
 
 		await git.raw(["fetch", "-q", remote, `+refs/heads/${base}:${LOOP_REF}`]);

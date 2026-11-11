@@ -2,6 +2,7 @@ import { z } from "zod";
 import { gitHubClient } from "../../src/adapters/github.ts";
 import { gitHubPullRequests, type PullRequests } from "../../src/adapters/pull-requests.ts";
 import type { Json } from "../../src/config/json.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 
 type FakePull = { id: string; number: number; head: string; base: string; title: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND" };
 
@@ -102,6 +103,6 @@ export class FakePulls {
 	}
 
 	client(): PullRequests {
-		return gitHubPullRequests("me/scratch", gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false }));
+		return gitHubPullRequests("me/scratch", { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false }) });
 	}
 }

@@ -129,6 +129,7 @@
 	"mergedShown": 50,
 	"choicesShown": 50,
 	"statusReadTimeoutSeconds": 10,
+	"commandTimeoutSeconds": 600,
 	"mergeTries": 3,
 	"writeRaceRetries": 7,
 	"itemReadsAtOnce": 8,

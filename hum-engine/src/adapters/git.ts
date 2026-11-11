@@ -1,5 +1,5 @@
-import { x } from "tinyexec";
 import { PermanentError } from "../adapter-api.ts";
+import { exec } from "../exec.ts";
 
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
 const HOOKS_OFF = "core.hooksPath=/dev/null";
@@ -17,7 +17,7 @@ const NOT_ANCESTOR = 1;
 export type GitResult = { readonly code: number; readonly stdout: string; readonly stderr: string };
 
 export type Git = {
-	/** Runs git; a non-zero exit is a result, not a throw. `input` is its stdin, which is closed either way. */
+	/** Runs git; a non-zero exit is a result, not a throw, but a run past its time limit throws `CommandTimedOut`. `input` is its stdin, which is closed either way. */
 	readonly run: (args: readonly string[], input?: string) => Promise<GitResult>;
 	/** Runs git and returns what it printed; a non-zero exit throws `GitFailed` with git's own words. */
 	readonly raw: (args: readonly string[], input?: string) => Promise<string>;
@@ -34,6 +34,15 @@ export class GitFailed extends Error {
 	}
 }
 
+/** For `.catch`: git failing with its own words is the fallback; a call that ran out of time stays an error. */
+export const whenGitFailed =
+	<T>(fallback: T) =>
+	(error: Error): T => {
+		if (error instanceof GitFailed) return fallback;
+
+		throw error;
+	};
+
 /** The remote refused the push: a protected branch, a hook, a permission. Retrying cannot help. */
 export class PushRefused extends PermanentError {
 	override name = "PushRefused";
@@ -45,6 +54,8 @@ export type PushOutcome = "pushed" | "conflict";
 export type GitIdentity = { readonly name: string; readonly email: string };
 
 export type GitOptions = {
+	/** The owner's `commandTimeoutSeconds` in milliseconds; a call that runs longer is stopped and throws `CommandTimedOut`. */
+	readonly timeoutMs: number;
 	/** The owner's `commitIdentity` setting. Without it git commits as its own config says, so every call that commits passes it. */
 	readonly identity?: GitIdentity;
 	/** More variables, such as a scratch index or a commit date. */
@@ -79,9 +90,10 @@ export const readGitIdentity = async (git: Git): Promise<GitIdentityRead> => {
 };
 
 /** git in `cwd` with hooks off. */
-export const gitIn = (cwd: string, { identity, env = {} }: GitOptions = {}): Git => {
+export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions): Git => {
 	const run = async (args: readonly string[], input = ""): Promise<GitResult> => {
-		const { exitCode, stdout, stderr } = await x("git", ["-c", HOOKS_OFF, ...args], {
+		const { exitCode, stdout, stderr } = await exec("git", ["-c", HOOKS_OFF, ...args], {
+			timeoutMs,
 			nodeOptions: { cwd, env: { ...process.env, ...(identity && identityEnv(identity)), ...env } },
 			stdin: input,
 		});

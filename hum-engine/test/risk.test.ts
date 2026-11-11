@@ -13,6 +13,7 @@ import { type Change, type Histories, type Label, placeChange, type Policy, usua
 import { ruleGlobFor } from "../src/worker/land.ts";
 import { configWith } from "./fixtures/config.ts";
 import { sh } from "./fixtures/work-repo.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
 const config = configWith();
 const NOW = Date.parse("2026-11-08");
@@ -192,7 +193,7 @@ test("git history: a fix commit carries the commits whose lines it rewrote, and 
 		writeFileSync(join(repo, "a.ts"), "one\nTWO\nthree\n");
 		sh(repo, ["commit", "-q", "-am", "fix: two"]);
 
-		const changes = await readHistory(gitIn(repo), "main", config.hum);
+		const changes = await readHistory(gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), "main", config.hum);
 		const [first, fix] = changes;
 		const histories = historiesOf(changes, { paths: [{ glob: "*.ts", level: "low" }], changeLabels: config.hum.changeLabels });
 

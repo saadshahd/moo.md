@@ -2,9 +2,9 @@ import { mkdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
-import { x } from "tinyexec";
 import { z } from "zod";
 import type { HumConfig } from "../config/schema.ts";
+import { commandTimeoutMs, exec } from "../exec.ts";
 import { listRecords, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
@@ -158,7 +158,7 @@ export const FALLBACK_CODE = "background-run-fell-back";
 
 export type BackgroundOptions = Pick<RunnerOptions, "binary" | "env" | "now"> & {
 	readonly state: Pick<State, "stops" | "faults" | "limit">;
-	readonly config: Pick<HumConfig, "deniedRunCommands" | "runAutoMode" | "backgroundPollSeconds" | "backgroundLaunchSeconds">;
+	readonly config: Pick<HumConfig, "deniedRunCommands" | "runAutoMode" | "backgroundPollSeconds" | "backgroundLaunchSeconds" | "commandTimeoutSeconds">;
 	/** The runner for everything that is not a named agent run, and for the runs a missing background service cannot take. */
 	readonly fallback: Runner;
 };
@@ -174,7 +174,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 	const jobsFolder = join({ ...process.env, ...env }.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), JOBS_FOLDER);
 
 	const claude = (args: readonly string[], options: { stdin?: string; cwd?: string } = {}) =>
-		x(binary, [...args], { stdin: options.stdin, nodePath: false, nodeOptions: { cwd: options.cwd, env: { ...process.env, ...env } } });
+		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env: { ...process.env, ...env } } });
 
 	const agents = async (): Promise<Agent[]> => {
 		const { stdout } = await claude(["agents", "--json"]);

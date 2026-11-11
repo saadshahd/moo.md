@@ -1,10 +1,13 @@
 import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gitIn } from "../adapters/git.ts";
+import { type Git, gitIn } from "../adapters/git.ts";
 import { newItemFile } from "../adapters/item-file.ts";
 import type { HumConfig } from "../config/schema.ts";
+import { commandTimeoutMs } from "../exec.ts";
 import { atomicWrite } from "../state/fs.ts";
+
+type ScratchSettings = Pick<HumConfig, "commitIdentity" | "itemsDir" | "commandTimeoutSeconds">;
 
 /** What the owner's checkout contributes to a scratch copy beyond its commits: setup's files, which may not be committed yet. */
 const SETUP_FILES = [".hum", ".github/workflows"] as const;
@@ -18,17 +21,17 @@ export class Scratch {
 	readonly remote = join(this.root, "remote.git");
 	readonly owner = join(this.root, "owner");
 	readonly #base: string;
-	readonly #settings: Pick<HumConfig, "commitIdentity" | "itemsDir">;
+	readonly #settings: ScratchSettings;
 	#workers = 0;
 
-	private constructor(base: string, settings: Pick<HumConfig, "commitIdentity" | "itemsDir">) {
+	private constructor(base: string, settings: ScratchSettings) {
 		this.#base = base;
 		this.#settings = settings;
 	}
 
-	static async from(repo: string, base: string, settings: Pick<HumConfig, "commitIdentity" | "itemsDir">): Promise<Scratch> {
+	static async from(repo: string, base: string, settings: ScratchSettings): Promise<Scratch> {
 		const scratch = new Scratch(base, settings);
-		const git = gitIn(scratch.root, { identity: settings.commitIdentity });
+		const git = scratch.#git(scratch.root);
 
 		await git.raw(["clone", "-q", "--bare", repo, scratch.remote]);
 		await git.raw(["clone", "-q", scratch.remote, scratch.owner]);
@@ -42,8 +45,12 @@ export class Scratch {
 		return scratch;
 	}
 
+	#git(folder: string): Git {
+		return gitIn(folder, { identity: this.#settings.commitIdentity, timeoutMs: commandTimeoutMs(this.#settings) });
+	}
+
 	async publish(message: string): Promise<void> {
-		const git = gitIn(this.owner, { identity: this.#settings.commitIdentity });
+		const git = this.#git(this.owner);
 
 		await git.raw(["add", "-A"]);
 		await git.raw(["commit", "-q", "--allow-empty", "-m", message]);
@@ -63,7 +70,7 @@ export class Scratch {
 	async worker(): Promise<string> {
 		const folder = join(this.root, `worker-${++this.#workers}`);
 
-		await gitIn(this.root).raw(["clone", "-q", this.remote, folder]);
+		await this.#git(this.root).raw(["clone", "-q", this.remote, folder]);
 
 		return folder;
 	}

@@ -1,13 +1,13 @@
-import { type GitIdentity, gitIn, push } from "../adapters/git.ts";
+import { type GitIdentity, gitIn, push, whenGitFailed } from "../adapters/git.ts";
 import { SECOND_MS } from "../time.ts";
 
 /** Where the scheduled workflow leaves its last tick. A ref holds no file, so no branch or checkout changes. */
 export const CI_TICK_REF = "refs/hum/ticks/ci";
 
 /** The scheduled workflow records its tick as an empty commit dated now, force-pushed to `CI_TICK_REF`. */
-export const recordCiTick = async (repo: string, remote: string, at: number, identity: GitIdentity): Promise<void> => {
+export const recordCiTick = async (repo: string, remote: string, at: number, identity: GitIdentity, timeoutMs: number): Promise<void> => {
 	const when = `${Math.floor(at / SECOND_MS)} +0000`;
-	const git = gitIn(repo, { identity, env: { GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when } });
+	const git = gitIn(repo, { identity, timeoutMs, env: { GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when } });
 	const tree = (await git.raw(["hash-object", "-w", "-t", "tree", "/dev/null"])).trim();
 	const commit = (await git.raw(["commit-tree", tree, "-m", `hum ci tick ${new Date(at).toISOString()}`])).trim();
 
@@ -15,13 +15,10 @@ export const recordCiTick = async (repo: string, remote: string, at: number, ide
 };
 
 /** The time of the last recorded tick, or undefined when the scheduled workflow has never run or the remote cannot be read. */
-export const readCiTick = async (repo: string, remote: string): Promise<number | undefined> => {
-	const git = gitIn(repo);
+export const readCiTick = async (repo: string, remote: string, timeoutMs: number): Promise<number | undefined> => {
+	const git = gitIn(repo, { timeoutMs });
 
-	const fetched = await git.raw(["fetch", "--quiet", "--no-tags", remote, `+${CI_TICK_REF}:${CI_TICK_REF}`]).then(
-		() => true,
-		() => false,
-	);
+	const fetched = await git.raw(["fetch", "--quiet", "--no-tags", remote, `+${CI_TICK_REF}:${CI_TICK_REF}`]).then(() => true, whenGitFailed(false));
 
 	if (!fetched) return undefined;
 

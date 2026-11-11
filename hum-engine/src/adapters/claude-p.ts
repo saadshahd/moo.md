@@ -8,6 +8,7 @@ import semver from "semver";
 import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
+import { CommandTimedOut, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { rejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
@@ -319,6 +320,8 @@ export type RunnerOptions = {
 	/** The model the start check runs on. */
 	readonly model: string;
 	readonly binary?: string;
+	/** The limit of `claude --version`, which the version floor reads; the owner's `commandTimeoutSeconds` in milliseconds. */
+	readonly timeoutMs?: number;
 	/** Added to the process environment. An API key in the environment is passed on untouched. */
 	readonly env?: Readonly<Record<string, string>>;
 	readonly now?: () => number;
@@ -397,7 +400,7 @@ type Started = { readonly check: RunOutcome; readonly runner: Runner };
  * No run starts until the version floor and the start check pass; until then every run is held with one card.
  */
 const startChecked = async (options: RunnerOptions): Promise<Started> => {
-	const { state, binary = "claude", now = Date.now, lockBackoffMs = LOCK_BACKOFF_MS } = options;
+	const { state, binary = "claude", now = Date.now, lockBackoffMs = LOCK_BACKOFF_MS, timeoutMs = SHIPPED_COMMAND_TIMEOUT_MS } = options;
 	const env = { ...process.env, ...options.env };
 	const limitedUntil = () => savedLimitUntil(state);
 
@@ -509,12 +512,17 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 		return outcome;
 	};
 
-	const version = await x(binary, ["--version"], {
+	const version = await exec(binary, ["--version"], {
 		nodePath: false,
+		timeoutMs,
 		nodeOptions: { env },
 	}).then(
 		({ stdout }) => VERSION.exec(stdout)?.[0],
-		() => undefined,
+		(error: Error) => {
+			if (error instanceof CommandTimedOut) throw error;
+
+			return undefined;
+		},
 	);
 
 	if (isBelowFloor(version)) {

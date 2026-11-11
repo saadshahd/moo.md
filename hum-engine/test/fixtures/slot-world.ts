@@ -24,6 +24,7 @@ export type SlotSettings = {
 export const poolConfig = (pool: string, { runners = 2, recipe = {}, services, ports, projectPrefix }: Omit<SlotSettings, "recipe" | "seed"> & { readonly recipe?: Partial<SlotRecipe> } = {}): PoolOptions["config"] => ({
 	runners,
 	lockfiles: SHIPPED_DEFAULTS.lockfiles,
+	commandTimeoutSeconds: SHIPPED_DEFAULTS.commandTimeoutSeconds,
 	runSlots: { ...SHIPPED_DEFAULTS.runSlots, enabled: true, pool, services: services ?? SHIPPED_DEFAULTS.runSlots.services, ports: ports ?? SHIPPED_DEFAULTS.runSlots.ports, projectPrefix: projectPrefix ?? SHIPPED_DEFAULTS.runSlots.projectPrefix, recipe: { ...SHIPPED_DEFAULTS.runSlots.recipe, ...recipe } },
 });
 

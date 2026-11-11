@@ -17,6 +17,7 @@ import {
 	PushRefused,
 } from "../adapters/git.ts";
 import { type CommitLanded, landOwnerCommit } from "../adapters/owner-commit.ts";
+import { commandTimeoutMs } from "../exec.ts";
 import { changeOf, historiesOf, readHistory } from "../adapters/history.ts";
 import { markDone } from "../adapters/item-file.ts";
 import {
@@ -198,10 +199,11 @@ const learnRules = async (
 	const { state, config, id, base, remote, now } = ctx;
 	const globs = [...new Set(unclear.map(ruleGlobFor))];
 	const scratch = mkdtempSync(join(tmpdir(), "hum-rule-"));
-	const git = gitIn(scratch, { identity: config.hum.commitIdentity });
+	const timeoutMs = commandTimeoutMs(config.hum);
+	const git = gitIn(scratch, { identity: config.hum.commitIdentity, timeoutMs });
 
 	try {
-		await gitIn(tmpdir()).raw([
+		await gitIn(tmpdir(), { timeoutMs }).raw([
 			"clone",
 			"-q",
 			"--depth",

@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { type AdapterContext, contractChecks, type ContractTarget, type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, parseComment, repoFromRemote } from "../src/index.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { FakeGitHub } from "./fixtures/fake-github.ts";
 
 const clock = { offset: 0 };
@@ -17,6 +18,7 @@ const settings = (repo: string, client: GitHubClient): GitHubOptions => ({
 	claimPrefix: SHIPPED_DEFAULTS.claimPrefix,
 	readyLabel: SHIPPED_DEFAULTS.readyLabel,
 	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,
+	timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS,
 });
 
 const onFake = (github: FakeGitHub, client = fakeClient(github)) => githubAdapter(settings(github.repo, client), context);

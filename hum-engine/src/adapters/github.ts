@@ -5,11 +5,11 @@ import { type ThrottlingOptions, throttling } from "@octokit/plugin-throttling";
 import { RequestError } from "@octokit/request-error";
 import hostedGitInfo from "hosted-git-info";
 import pMemoize from "p-memoize";
-import { x } from "tinyexec";
 import { z } from "zod";
 import { type Adapter, type AdapterContext, type Answers, type Claim, type Item, ItemId, PermanentError, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
 import type { Json } from "../config/json.ts";
 import type { MERGE_METHODS } from "../config/schema.ts";
+import { exec } from "../exec.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommit, claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
 import { answerMarker, commentText, filedFollowUp, followUpBody, followUpNote, type Marker, marked, parseComment, questionMarker, questionText } from "./marked.ts";
@@ -199,12 +199,12 @@ export const repoFromRemote = (url: string): string | undefined => {
 };
 
 /** The owner's own login: `GH_TOKEN` or `GITHUB_TOKEN`, else the token `gh` holds. */
-export const ownerToken = async (): Promise<string> => {
+export const ownerToken = async (timeoutMs: number): Promise<string> => {
 	const fromEnv = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
 
 	if (fromEnv) return fromEnv;
 
-	const gh = await x("gh", ["auth", "token"], { stdin: "" });
+	const gh = await exec("gh", ["auth", "token"], { stdin: "", timeoutMs });
 	const token = gh.stdout.trim();
 
 	if (gh.exitCode !== 0 || token === "") throw new PermanentError("no GitHub login: run `gh auth login`, or set GH_TOKEN");
@@ -245,6 +245,8 @@ export type GitHubOptions = {
 	readonly mergeMethod: (typeof MERGE_METHODS)[number];
 	/** The client to use; by default one on the owner's own login. */
 	readonly client?: GitHubClient;
+	/** The owner's `commandTimeoutSeconds` in milliseconds: the limit of the `gh auth token` that reads the owner's login. */
+	readonly timeoutMs: number;
 };
 
 type Whole = Adapter & {
@@ -265,7 +267,7 @@ type StandingClaim = { readonly claim: Claim; readonly sha: string };
  * read. `watch` is one REST request with `If-None-Match`, because GitHub answers 304 free of rate limit.
  */
 export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): Whole => {
-	const { base, claimPrefix, readyLabel, mergeMethod } = options;
+	const { base, claimPrefix, readyLabel, mergeMethod, timeoutMs } = options;
 	const repo = parseArgument(Repo, options.repo);
 	const [owner = "", name = ""] = repo.split("/");
 	const where = { owner, name };
@@ -274,7 +276,7 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 	let spent = 0;
 
 	const client = pMemoize(async () => {
-		const made = options.client ?? gitHubClient({ token: await ownerToken() });
+		const made = options.client ?? gitHubClient({ token: await ownerToken(timeoutMs) });
 
 		made.hook.after("request", () => void spent++);
 		made.hook.error("request", (error) => {

@@ -6,6 +6,7 @@ import type { Item } from "../adapter-api.ts";
 import { gitIn, readGitIdentity } from "../adapters/git.ts";
 import { listHopeSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
+import { CommandTimedOut, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { readSettings } from "../config/settings.ts";
 import { kindCoverage, proposeSetup } from "../setup/propose.ts";
 import { proveSetup, type Step } from "../setup/prove.ts";
@@ -38,10 +39,16 @@ type GithubFacts = {
 
 const WorkflowPermissions = z.object({ can_approve_pull_request_reviews: z.boolean() });
 
+/** Setup reads before any `hum.json` is written, so its commands run on the shipped time limit. */
+const setupGit = (repo: string) => gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+
+/** `gh` in the repo, or nothing where `gh` is not installed; a `gh` that outruns its limit is an error. */
 const gh = async (repo: string, args: readonly string[]) => {
 	try {
-		return await x("gh", [...args], { throwOnError: false, nodeOptions: { cwd: repo } });
-	} catch {
+		return await exec("gh", args, { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, nodeOptions: { cwd: repo } });
+	} catch (error) {
+		if (error instanceof CommandTimedOut) throw error;
+
 		return undefined;
 	}
 };
@@ -88,7 +95,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 			const proposal = proposeSetup(scan, shipped.hum, facts?.labels);
 			const { tracked, folders, ...shown } = scan;
 			const coverage = facts && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
-			const gitIdentity = await readGitIdentity(gitIn(io.cwd));
+			const gitIdentity = await readGitIdentity(setupGit(io.cwd));
 
 			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts?.workflowsMayOpenPullRequests ?? null, gitIdentity }, null, "\t")}\n`);
 		});
@@ -99,7 +106,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.requiredOption("--answers <file>", 'JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 1 }')
 		.option("--home <folder>", "where the service unit goes; default the user's home")
 		.action(async ({ answers, home }: { answers: string; home?: string }) => {
-			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home, gitIdentity: await readGitIdentity(gitIn(io.cwd)) });
+			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)) });
 
 			io.stdout(`${JSON.stringify(result.ok ? { written: result.written } : { refused: result.refusal.message }, null, "\t")}\n`);
 			done(result.ok ? EXIT_OK : EXIT_FAILED);

@@ -1,12 +1,12 @@
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { x } from "tinyexec";
 import { z } from "zod";
 import type { AdapterContext } from "../adapter-api.ts";
 import { runContract } from "../adapters/contract.ts";
 import { markdownAdapter } from "../adapters/markdown.ts";
 import { type Config, loadConfig, readConfigDir } from "../config/load.ts";
+import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { SlotPool } from "../slots/pool.ts";
 import { orMissing } from "../state/fs.ts";
 import { openState } from "../state/open.ts";
@@ -57,11 +57,11 @@ const LOCAL_PIN = /^(file|link):/;
 
 /** What the registry says about the pinned version: found, or the package exists without it, or the package is not published. */
 export const npmPublished = async (pin: string): Promise<"found" | "missing-version" | "unpublished"> => {
-	const viewed = await x("npm", ["view", `${ENGINE}@${pin}`, "version"], { throwOnError: false });
+	const viewed = await exec("npm", ["view", `${ENGINE}@${pin}`, "version"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	if (viewed.exitCode === 0) return "found";
 
-	const package_ = await x("npm", ["view", ENGINE, "name"], { throwOnError: false });
+	const package_ = await exec("npm", ["view", ENGINE, "name"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	return package_.exitCode === 0 ? "missing-version" : "unpublished";
 };
@@ -91,7 +91,7 @@ const checksStep = async (repo: string, config: Config): Promise<Outcome> => {
 };
 
 const markdownOver = (repo: string, base: string, hum: Config["hum"], context: AdapterContext) =>
-	markdownAdapter({ repo, base, claimPrefix: hum.claimPrefix, itemsDir: hum.itemsDir, identity: hum.commitIdentity, writeRaceRetries: hum.writeRaceRetries, itemReadsAtOnce: hum.itemReadsAtOnce, mergeMethod: hum.mergeMethod, ownerBranchPrefix: hum.ownerBranchPrefix }, context);
+	markdownAdapter({ repo, base, claimPrefix: hum.claimPrefix, itemsDir: hum.itemsDir, identity: hum.commitIdentity, writeRaceRetries: hum.writeRaceRetries, itemReadsAtOnce: hum.itemReadsAtOnce, mergeMethod: hum.mergeMethod, ownerBranchPrefix: hum.ownerBranchPrefix, timeoutMs: commandTimeoutMs(hum) }, context);
 
 const contractStep = async (config: Config, scratch: Scratch, base: string): Promise<Outcome> => {
 	const others = Object.entries(config.hum.integrations ?? {}).filter(([, adapter]) => adapter !== "markdown");

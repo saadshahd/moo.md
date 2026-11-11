@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Git, gitIn } from "../adapters/git.ts";
+import type { Git } from "../adapters/git.ts";
 import { runChecks } from "../worker/checks.ts";
 import type { ReviewNote } from "./records.ts";
 
@@ -67,7 +67,7 @@ export const proveCheck = async ({ git, head, base, notes, checks, timeoutMs, no
 	for (const sha of provable) {
 		const failure = await inWorktreeAt(git, sha, async (folder) => {
 			worktrees++;
-			await gitIn(folder).raw(["checkout", head, "--", ...files]);
+			await git.raw(["-C", folder, "checkout", head, "--", ...files]);
 
 			return runChecks(checks, folder, { timeoutMs });
 		});

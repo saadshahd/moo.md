@@ -12,6 +12,7 @@ import { serialized } from "../adapters/serial.ts";
 import { SlotPool } from "../slots/pool.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
 import type { HumConfig } from "../config/schema.ts";
+import { commandTimeoutMs } from "../exec.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import { DEFAULT_BASE } from "./thin-path.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
@@ -56,7 +57,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	if (!loaded.ok) throw new Error(loaded.refusal.message);
 
-	const remote = options.remote ?? (await gitIn(repo).raw(["remote", "get-url", "origin"])).trim();
+	const timeoutMs = commandTimeoutMs(loaded.value.hum);
+	const remote = options.remote ?? (await gitIn(repo, { timeoutMs }).raw(["remote", "get-url", "origin"])).trim();
 
 	if (!remote) throw new Error(`${repo} has no origin remote, and none was given`);
 
@@ -91,8 +93,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	// A slot is a worktree a background run starts in, so the pool stands only where runs are background agents.
 	const slots = config.hum.runSlots.enabled && isInBackground(config.hum, rest.where) ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
 	const github = repoFromRemote(remote);
-	const pulls = github === undefined ? undefined : gitHubPullRequests(github);
-	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, async () => gitHubClient({ token: await ownerToken() }));
+	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs });
+	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, async () => gitHubClient({ token: await ownerToken(timeoutMs) }));
 
 	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop });
 };

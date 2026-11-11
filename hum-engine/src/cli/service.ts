@@ -6,6 +6,7 @@ import { z } from "zod";
 import { listHopeSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
 import { readSettings } from "../config/settings.ts";
+import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
 import { reportCards, wakeUntilQuiet } from "../service/wake.ts";
@@ -38,7 +39,7 @@ const PluginList = z.array(z.looseObject({ id: z.string(), installPath: z.string
 export const hopeRoot = async (): Promise<string> => {
 	if (process.env.HUM_HOPE_ROOT) return process.env.HUM_HOPE_ROOT;
 
-	const listed = await x("claude", ["plugin", "list", "--json"]);
+	const listed = await exec("claude", ["plugin", "list", "--json"], { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const hope = listed.exitCode === 0 ? PluginList.parse(JSON.parse(listed.stdout)).find((plugin) => plugin.id.startsWith("hope@")) : undefined;
 
 	if (!hope) throw new Error("the hope plugin is not installed: run `claude plugin install hope@moo.md`, or set HUM_HOPE_ROOT to its folder");
@@ -52,6 +53,7 @@ const ServiceSettings = z.looseObject({
 	maxCrashes: HumConfig.shape.maxCrashes,
 	crashWindowSeconds: HumConfig.shape.crashWindowSeconds,
 	restartBackoff: HumConfig.shape.restartBackoff,
+	commandTimeoutSeconds: HumConfig.shape.commandTimeoutSeconds,
 });
 
 /**
@@ -68,13 +70,15 @@ const serviceSettings = (repo: string): z.infer<typeof ServiceSettings> => {
 
 /** The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow. */
 const openFor = async (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
+	const timeoutMs = commandTimeoutMs(serviceSettings(repo));
+
 	return openWorker(repo, {
 		hopeSkills: listHopeSkills(await hopeRoot()),
 		holder: flags.holder ?? `${where}@${hostname()}`,
 		base: flags.base,
 		where,
 		latestVersion: where === "mac" ? npmLatest : undefined,
-		ciTick: where === "mac" ? () => readCiTick(repo, "origin") : undefined,
+		ciTick: where === "mac" ? () => readCiTick(repo, "origin", timeoutMs) : undefined,
 	});
 };
 
@@ -141,7 +145,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			await wakeUntilQuiet(worker);
 
-			if (flags.event === SCHEDULE_EVENT) await recordCiTick(io.cwd, "origin", Date.now(), worker.config.hum.commitIdentity);
+			if (flags.event === SCHEDULE_EVENT) await recordCiTick(io.cwd, "origin", Date.now(), worker.config.hum.commitIdentity, commandTimeoutMs(worker.config.hum));
 
 			const status = readStatus(join(await defaultStateDir(io.cwd), "status.json"));
 			const cards = status.ok ? status.status.cards : [];

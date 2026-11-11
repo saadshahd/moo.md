@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { gitIn } from "../adapters/git.ts";
 import { Kind } from "../config/schema.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { EventLog } from "./events.ts";
 import { Faults } from "./faults.ts";
 import { type Codec, Items } from "./items.ts";
@@ -13,7 +14,7 @@ import { ItemKind, Landing, Learned, Limit, Parked, QueuedQuestion, ReadyList, S
 
 /** On the Mac and in a clone, state lives in the repo's git common dir, so every worktree shares it. */
 export const defaultStateDir = async (cwd: string): Promise<string> => {
-	const found = await gitIn(cwd).run(["rev-parse", "--git-common-dir"]);
+	const found = await gitIn(cwd, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).run(["rev-parse", "--git-common-dir"]);
 
 	if (found.code !== 0) throw new Error(`${cwd} is not inside a git repository: ${found.stderr.trim()}`);
 

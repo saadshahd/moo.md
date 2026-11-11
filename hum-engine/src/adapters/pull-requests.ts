@@ -139,15 +139,15 @@ export const methodFor = (
 		? preferred
 		: (allowed[0] ?? preferred);
 
-/** Pull requests and branch rules of a GitHub repo, on the owner's own login unless a client is given. */
+/** Pull requests and branch rules of a GitHub repo, on the owner's own login unless a client is given. `timeoutMs` bounds the `gh auth token` that reads that login. */
 export const gitHubPullRequests = (
 	repo: string,
-	client?: GitHubClient,
+	{ timeoutMs, client }: { readonly timeoutMs: number; readonly client?: GitHubClient },
 ): PullRequests => {
 	const [owner = "", name = ""] = repo.split("/");
 
 	const connect = pMemoize(
-		async () => client ?? gitHubClient({ token: await ownerToken() }),
+		async () => client ?? gitHubClient({ token: await ownerToken(timeoutMs) }),
 	);
 
 	const rulesCache = new Map<string, BranchRules>();

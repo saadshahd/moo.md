@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { gitIn } from "../src/adapters/git.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
 /**
  * Writes the labelled cases of three model-judgment boundaries, each from a label source no model wrote:
@@ -14,7 +15,7 @@ const KIND_OF_TYPE = { feat: "feature", fix: "fix", docs: "docs" } as const;
 
 const CONVENTIONAL = /^(feat|fix|docs)(\([^)]*\))?!?:\s*(.+)$/;
 
-const git = gitIn(".");
+const git = gitIn(".", { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 const head = (await git.raw(["rev-parse", "main"])).trim();
 const log = (await git.raw(["log", "main", "--no-merges", "--format=%H%x1f%s%x1f%b%x1e"])).split("\x1e").map((entry) => entry.trim().split("\x1f"));
 

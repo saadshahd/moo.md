@@ -5,6 +5,7 @@ import { z } from "zod";
 import { gitIn } from "../adapters/git.ts";
 import { readHistory } from "../adapters/history.ts";
 import { SHIPPED_DEFAULTS } from "../config/schema.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { orMissing } from "../state/fs.ts";
 import { ENV_SCRIPTS } from "../slots/scan.ts";
 import {
@@ -131,13 +132,13 @@ const templatesOf = (repo: string): RepoScan["issueTemplates"] =>
 		return parsed.success ? [{ file: basename(file), labels: [parsed.data.labels].flat().flatMap((label) => label.split(",").map((one) => one.trim()).filter(Boolean)) }] : [];
 	});
 
-const trackedOf = async (repo: string): Promise<string[]> => (await gitIn(repo).raw(["ls-files"])).split("\n").filter(Boolean).slice(0, TRACKED_FILE_LIMIT);
+const trackedOf = async (repo: string): Promise<string[]> => (await gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["ls-files"])).split("\n").filter(Boolean).slice(0, TRACKED_FILE_LIMIT);
 
 const topFolder = (path: string): string => (path.includes("/") ? (path.split("/")[0] ?? path) : "");
 
 /** Each top-level folder's merged changes on the base, from the history setup reads. */
 const foldersOf = async (repo: string, base: string): Promise<FolderHistory[]> => {
-	const git = gitIn(repo);
+	const git = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const log = await git.run(["rev-parse", "--verify", "-q", base]);
 
 	if (log.code !== 0) return [];

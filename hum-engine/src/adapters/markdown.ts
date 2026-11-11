@@ -42,6 +42,8 @@ export type MarkdownOptions = {
 	readonly mergeMethod: MergeMethod;
 	/** The branch prefix of a pull request that lands an owner's answer. */
 	readonly ownerBranchPrefix: string;
+	/** The owner's `commandTimeoutSeconds` in milliseconds: the limit of every git call the adapter makes. */
+	readonly timeoutMs: number;
 };
 
 type StandingClaim = { readonly claim: Claim; readonly sha: string };
@@ -77,8 +79,8 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
-	const git = gitIn(repo, { identity });
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, timeoutMs, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+	const git = gitIn(repo, { identity, timeoutMs });
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
 	let spent = 0;
@@ -201,7 +203,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	/** A commit on `parent` with the base branch's tree, and `change` applied through a scratch index when given. */
 	const commitOn = async (parent: string, message: string, change?: FileChange): Promise<string> => {
 		const scratch = mkdtempSync(join(tmpdir(), "hum-index-"));
-		const indexed = gitIn(repo, { identity, env: { GIT_INDEX_FILE: join(scratch, "index") } });
+		const indexed = gitIn(repo, { identity, timeoutMs, env: { GIT_INDEX_FILE: join(scratch, "index") } });
 
 		try {
 			if (change) {

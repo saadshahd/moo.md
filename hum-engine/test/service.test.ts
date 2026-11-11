@@ -13,6 +13,7 @@ import { configWith } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
 const DAY = 86_400_000;
 const WARN_DAYS = SHIPPED_DEFAULTS.tokenWarnDays;
@@ -231,13 +232,13 @@ test("the scheduled workflow's tick is a ref on the remote; the Mac reads its ti
 
 	const mac = repo.worker("mac");
 
-	expect(await readCiTick(mac, "origin")).toBeUndefined();
+	expect(await readCiTick(mac, "origin", SHIPPED_COMMAND_TIMEOUT_MS)).toBeUndefined();
 
-	await recordCiTick(repo.owner, "origin", NOW, OWNER);
-	expect(await readCiTick(mac, "origin")).toBe(NOW);
+	await recordCiTick(repo.owner, "origin", NOW, OWNER, SHIPPED_COMMAND_TIMEOUT_MS);
+	expect(await readCiTick(mac, "origin", SHIPPED_COMMAND_TIMEOUT_MS)).toBe(NOW);
 
-	await recordCiTick(repo.owner, "origin", NOW + 900_000, OWNER);
-	expect(await readCiTick(mac, "origin")).toBe(NOW + 900_000);
+	await recordCiTick(repo.owner, "origin", NOW + 900_000, OWNER, SHIPPED_COMMAND_TIMEOUT_MS);
+	expect(await readCiTick(mac, "origin", SHIPPED_COMMAND_TIMEOUT_MS)).toBe(NOW + 900_000);
 	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe(CI_TICK_REF);
 	// The tick is no branch and no file: main is as it was.
 	expect(sh(repo.remote, ["rev-list", "--count", "main"]).trim()).toBe("1");

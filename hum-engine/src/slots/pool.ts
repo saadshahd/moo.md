@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import PQueue from "p-queue";
-import { gitIn } from "../adapters/git.ts";
+import { type Git, gitIn, whenGitFailed } from "../adapters/git.ts";
 import { hashJson } from "../config/hash.ts";
 import type { HumConfig } from "../config/schema.ts";
+import { commandTimeoutMs } from "../exec.ts";
 import type { State } from "../state/open.ts";
 import type { Slot } from "../state/saved.ts";
 import { SECOND_MS } from "../time.ts";
@@ -26,7 +27,7 @@ export type PoolOptions = {
 	/** The owner's checkout: the repo every slot is a worktree of. */
 	readonly repo: string;
 	readonly state: Pick<State, "slots" | "faults" | "runs">;
-	readonly config: Pick<HumConfig, "runners" | "runSlots" | "lockfiles">;
+	readonly config: Pick<HumConfig, "runners" | "runSlots" | "lockfiles" | "commandTimeoutSeconds">;
 	readonly base: string;
 	/** The names of the runs alive outside this process; a taken slot whose item has none of them is returned. */
 	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
@@ -99,6 +100,10 @@ export class SlotPool {
 		return runChecks(commands, slot.folder, { env: this.#envOf(slot), timeoutMs: this.#settings.stepTimeoutSeconds * SECOND_MS });
 	}
 
+	#git(folder: string): Git {
+		return gitIn(folder, { timeoutMs: commandTimeoutMs(this.#o.config) });
+	}
+
 	#lockfiles(folder: string): string {
 		const present = this.#o.config.lockfiles.filter((file) => existsSync(join(folder, file)));
 
@@ -120,12 +125,12 @@ export class SlotPool {
 		const { repo, base } = this.#o;
 
 		if (existsSync(slot.folder)) {
-			if (!(await isWorktreeOf(repo, slot.folder).catch(() => false)))
+			if (!(await isWorktreeOf(repo, slot.folder, commandTimeoutMs(this.#o.config)).catch(whenGitFailed(false))))
 				return this.#out(slot, `${slot.folder} is not a git worktree of ${repo}.`, "A slot is a worktree of the checkout: Claude Code trusts a worktree of a trusted repo and refuses a repo of its own. Remove the folder; hum makes the slot again at its next start.");
 		} else {
 			mkdirSync(dirname(slot.folder), { recursive: true });
-			await gitIn(repo).raw(["fetch", "-q", "origin"]);
-			await gitIn(repo).raw(["worktree", "add", "-q", "--detach", slot.folder, `origin/${base}`]);
+			await this.#git(repo).raw(["fetch", "-q", "origin"]);
+			await this.#git(repo).raw(["worktree", "add", "-q", "--detach", slot.folder, `origin/${base}`]);
 		}
 
 		const { prepare, ready } = this.#settings.recipe;
@@ -145,7 +150,7 @@ export class SlotPool {
 	/** Resets the returned slot to the latest base, runs the steps its lockfile change calls for, then the ready check. */
 	async #refresh(slot: Slot): Promise<void> {
 		const { base } = this.#o;
-		const git = gitIn(slot.folder);
+		const git = this.#git(slot.folder);
 
 		await git.raw(["fetch", "-q", "origin"]);
 		await git.raw(["reset", "-q", "--hard"]);
@@ -178,7 +183,7 @@ export class SlotPool {
 		this.#active.delete(slot.name);
 
 		try {
-			const git = gitIn(slot.folder);
+			const git = this.#git(slot.folder);
 
 			await git.raw(["fetch", "-q", "origin"]);
 
@@ -300,14 +305,14 @@ export class SlotPool {
 	/** The seam a thin-path pass takes its working copy from: a slot, at the latest base, with its own ports and database. */
 	readonly checkout: Checkout = async (request): Promise<Checkedout> => {
 		const { repo, base } = this.#o;
-		const origin = (await gitIn(repo).raw(["remote", "get-url", "origin"])).trim();
+		const origin = (await this.#git(repo).raw(["remote", "get-url", "origin"])).trim();
 
 		if (request.remote !== origin) throw new Error(`run slots work from origin (${origin}), and this pass asks for ${request.remote}`);
 
 		if (request.base !== base) throw new Error(`run slots keep ${base} ready, and this pass asks for ${request.base}`);
 
 		const { slot, held } = await this.#take(request);
-		const git = gitIn(slot.folder);
+		const git = this.#git(slot.folder);
 
 		try {
 			await git.raw(["fetch", "-q", "origin"]);

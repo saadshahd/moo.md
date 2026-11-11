@@ -15,6 +15,7 @@ import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
 import { kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
+import { commandTimeoutMs } from "../exec.ts";
 import { leavesDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
@@ -221,7 +222,8 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 
 	const landing = o.state.landings.get(id);
 	const branch = runBranch(o.config.hum, id);
-	const taken = await (o.checkout ?? clonesIn(o.workDir))({ remote: o.remote, base, item: id, signal: o.signal }).catch((error: Error) => (o.signal?.aborted ? undefined : Promise.reject(error)));
+	const timeoutMs = commandTimeoutMs(o.config.hum);
+	const taken = await (o.checkout ?? clonesIn(o.workDir, timeoutMs))({ remote: o.remote, base, item: id, signal: o.signal }).catch((error: Error) => (o.signal?.aborted ? undefined : Promise.reject(error)));
 
 	if (taken === undefined) return { outcome: "lost", item: id };
 
@@ -229,7 +231,7 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 	const { commitIdentity } = o.config.hum;
 	/** The agent's own commits take the owner's identity too: a fresh clone holds none of the repo's local git config. */
 	const env = { ...identityEnv(commitIdentity), ...taken.env };
-	const git = gitIn(clone, { identity: commitIdentity });
+	const git = gitIn(clone, { identity: commitIdentity, timeoutMs });
 	const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 	try {
@@ -269,11 +271,11 @@ export type Checkout = (request: CheckoutRequest) => Promise<Checkedout>;
 
 /** A fresh `git clone` in a new folder under `workDir` (a temp folder by default), removed when the pass ends. */
 const clonesIn =
-	(workDir: string | undefined): Checkout =>
+	(workDir: string | undefined, timeoutMs: number): Checkout =>
 	async ({ remote, base }) => {
 		const folder = mkdtempSync(join(workDir ?? tmpdir(), "hum-run-"));
 
-		await gitIn(tmpdir()).raw(["clone", "-q", "--branch", base, remote, folder]);
+		await gitIn(tmpdir(), { timeoutMs }).raw(["clone", "-q", "--branch", base, remote, folder]);
 
 		return { folder, env: {}, giveBack: async () => rmSync(folder, { recursive: true, force: true }) };
 	};

@@ -14,6 +14,7 @@ import { openState } from "../src/state/open.ts";
 import { checkBaseAfterMerge } from "../src/worker/base-check.ts";
 import { configWith } from "./fixtures/config.ts";
 import { sh } from "./fixtures/work-repo.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
 const folders: string[] = [];
 
@@ -56,7 +57,7 @@ const checkItemHead = (dir: string, forbidden: string): string => {
 const prove = (dir: string, head: string, notes: ReviewNote[]) => {
 	const timeMs = 0;
 
-	return proveCheck({ git: gitIn(dir), head, base: "main", notes, checks: ["sh check.sh"], timeoutMs: 20_000, now: () => timeMs + Date.now() });
+	return proveCheck({ git: gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), head, base: "main", notes, checks: ["sh check.sh"], timeoutMs: 20_000, now: () => timeMs + Date.now() });
 };
 
 test("a check is real when it fails on the commit a note points at and passes on the base; one that misses the violation is refused, and no worktree stays", async () => {
@@ -106,7 +107,7 @@ test("a check that fails on the base after a merge is a break: saved, its follow
 	const { filed, workSource } = followUps();
 	const config = configWith((raw) => (raw.hum.paths = [{ glob: "src/**", level: "critical", proofs: { "*": "canary" }, limit: { fixes: 0, of: 5 } }]));
 
-	await checkBaseAfterMerge({ state, config, workSource, git: gitIn(dir), remote: "origin", base: "main", checks: ["false"], now: () => 7, item: "item-a" });
+	await checkBaseAfterMerge({ state, config, workSource, git: gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), remote: "origin", base: "main", checks: ["false"], now: () => 7, item: "item-a" });
 
 	expect(state.breaks.get("item-a")).toMatchObject({ sha: merged, level: "critical", onBreak: "block", followUp: "item-a-fix" });
 	expect(filed.map(({ followUp }) => followUp.body.split("\n")[0])).toEqual(["Kind: fix"]);
@@ -115,7 +116,7 @@ test("a check that fails on the base after a merge is a break: saved, its follow
 	state.merges.put("item-a-fix", { item: "item-a-fix", sha: "f", at: 9, paths: [] });
 	expect(blockedPaths(state)).toEqual([]);
 
-	await checkBaseAfterMerge({ state, config, workSource, git: gitIn(dir), remote: "origin", base: "main", checks: ["true"], now: () => 8, item: "item-a" }).then(() => expect(filed).toHaveLength(1));
+	await checkBaseAfterMerge({ state, config, workSource, git: gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), remote: "origin", base: "main", checks: ["true"], now: () => 8, item: "item-a" }).then(() => expect(filed).toHaveLength(1));
 	expect([...brokenCommits(state)]).toEqual([merged]);
 });
 

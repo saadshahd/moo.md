@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { OWNER } from "./identity.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 
 /** The markdown adapter's settings as hum ships them. */
 export const markdownSettings = {
@@ -14,6 +15,7 @@ export const markdownSettings = {
 	itemReadsAtOnce: SHIPPED_DEFAULTS.itemReadsAtOnce,
 	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,
 	ownerBranchPrefix: SHIPPED_DEFAULTS.ownerBranchPrefix,
+	timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS,
 };
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };

@@ -12,6 +12,7 @@ import type { Config } from "../src/config/load.ts";
 import { openState } from "../src/state/open.ts";
 import { type LandContext, land } from "../src/worker/land.ts";
 import { configWith } from "./fixtures/config.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
 const live = process.env.HUM_LIVE === "1";
 const repo = process.env.HUM_GITHUB_SCRATCH ?? "saadshahd/factory-smoke";
@@ -22,14 +23,14 @@ if (!live) console.log(`skip live landing: set HUM_LIVE=1 to open pull requests 
 
 const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 	const clone = mkdtempSync(join(tmpdir(), "hum-live-landing-"));
-	const git = gitIn(clone, { identity: config.hum.commitIdentity });
+	const git = gitIn(clone, { identity: config.hum.commitIdentity, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const id = `live-${stamp}`;
 	const branch = `${config.hum.runBranchPrefix}${id}`;
 	const file = `docs/${id}.md`;
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-live-state-")));
 	const provider = new FakeProvider().adapter();
 
-	await gitIn(tmpdir()).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
+	await gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
 	await git.raw(["checkout", "-q", "-b", branch]);
 	mkdirSync(join(clone, "docs"), { recursive: true });
 	writeFileSync(join(clone, file), `A landing test, ${stamp}.\n`);
@@ -75,7 +76,7 @@ const closeAndDelete = async (branch: string) => {
 // The owner's own login may bypass the ruleset, so a push would land; hum reads the rules and opens a pull request.
 test.skipIf(!live)("live: where main requires a pull request, a cleared change opens one with auto-merge that merges once the check passes; a change for the owner waits unarmed", async () => {
 	const stamp = String(Date.now());
-	const pulls = gitHubPullRequests(repo);
+	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const alone = await landing(configWith(), pulls, `${stamp}-a`);
 	const owner = await landing(configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])), pulls, `${stamp}-b`);
 
@@ -109,11 +110,11 @@ test.skipIf(!live)("live: an owner's commit goes through a pull request that aut
 	const stamp = String(Date.now());
 	const config = configWith();
 	const clone = mkdtempSync(join(tmpdir(), "hum-live-owner-"));
-	const git = gitIn(clone, { identity: config.hum.commitIdentity });
-	const pulls = gitHubPullRequests(repo);
+	const git = gitIn(clone, { identity: config.hum.commitIdentity, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const file = `docs/owner-${stamp}.md`;
 
-	await gitIn(tmpdir()).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
+	await gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
 	mkdirSync(join(clone, "docs"), { recursive: true });
 	writeFileSync(join(clone, file), `An owner's commit, ${stamp}.\n`);
 	await git.raw(["add", file]);

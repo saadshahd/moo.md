@@ -5,10 +5,11 @@ import { z } from "zod";
 import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, PermanentError } from "../adapter-api.ts";
 import { readSettings } from "../config/settings.ts";
 import { HumConfig } from "../config/schema.ts";
+import { commandTimeoutMs } from "../exec.ts";
 import type { Faults } from "../state/faults.ts";
 import type { Card } from "../status/format.ts";
 import { githubAdapter, repoFromRemote } from "./github.ts";
-import { gitIn } from "./git.ts";
+import { gitIn, whenGitFailed } from "./git.ts";
 import { type GuardOptions, guardTimings, guarded } from "./guard.ts";
 import { markdownAdapter } from "./markdown.ts";
 import { gitHubPullRequests, type PullRequests } from "./pull-requests.ts";
@@ -38,6 +39,7 @@ const AdapterSettings = z.looseObject({
 	itemReadsAtOnce: HumConfig.shape.itemReadsAtOnce,
 	providerTimeoutSeconds: HumConfig.shape.providerTimeoutSeconds,
 	providerBackoff: HumConfig.shape.providerBackoff,
+	commandTimeoutSeconds: HumConfig.shape.commandTimeoutSeconds,
 });
 
 type AdapterSettings = z.infer<typeof AdapterSettings>;
@@ -50,23 +52,23 @@ const adapterNameFor = (slot: Slot, integrations: AdapterSettings["integrations"
 
 type Repo = { readonly path: string; readonly settings: AdapterSettings; readonly context: AdapterContext };
 
-const defaultBase = async (repo: string): Promise<string> => {
-	const head = await gitIn(repo)
+const defaultBase = async (repo: string, timeoutMs: number): Promise<string> => {
+	const head = await gitIn(repo, { timeoutMs })
 		.raw(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
-		.catch(() => `origin/${FALLBACK_BASE}`);
+		.catch(whenGitFailed(`origin/${FALLBACK_BASE}`));
 
 	return head.trim().replace(/^origin\//, "");
 };
 
 /** The pull requests of the repo's `origin` when it is on GitHub. */
-const originPulls = async (repo: string): Promise<PullRequests | undefined> => {
-	const found = repoFromRemote(await gitIn(repo).raw(["remote", "get-url", "origin"]).catch(() => ""));
+const originPulls = async (repo: string, timeoutMs: number): Promise<PullRequests | undefined> => {
+	const found = repoFromRemote(await gitIn(repo, { timeoutMs }).raw(["remote", "get-url", "origin"]).catch(whenGitFailed("")));
 
-	return found === undefined ? undefined : gitHubPullRequests(found);
+	return found === undefined ? undefined : gitHubPullRequests(found, { timeoutMs });
 };
 
-const githubRepo = async (repo: string): Promise<string> => {
-	const found = repoFromRemote(await gitIn(repo).raw(["remote", "get-url", "origin"]));
+const githubRepo = async (repo: string, timeoutMs: number): Promise<string> => {
+	const found = repoFromRemote(await gitIn(repo, { timeoutMs }).raw(["remote", "get-url", "origin"]));
 
 	if (!found) throw new PermanentError("the github adapter needs an `origin` remote on github.com");
 
@@ -75,9 +77,16 @@ const githubRepo = async (repo: string): Promise<string> => {
 
 /** The adapters the engine ships, by the name `hum.json` gives them. */
 const BUILT_IN = {
-	[MARKDOWN]: async ({ path, settings, context }) => markdownAdapter({ repo: path, base: await defaultBase(path), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce, pulls: await originPulls(path), mergeMethod: settings.mergeMethod, ownerBranchPrefix: settings.ownerBranchPrefix }, context),
-	github: async ({ path, settings, context }) =>
-		githubAdapter({ repo: await githubRepo(path), base: await defaultBase(path), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod }, context),
+	[MARKDOWN]: async ({ path, settings, context }) => {
+		const timeoutMs = commandTimeoutMs(settings);
+
+		return markdownAdapter({ repo: path, base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce, pulls: await originPulls(path, timeoutMs), mergeMethod: settings.mergeMethod, ownerBranchPrefix: settings.ownerBranchPrefix, timeoutMs }, context);
+	},
+	github: async ({ path, settings, context }) => {
+		const timeoutMs = commandTimeoutMs(settings);
+
+		return githubAdapter({ repo: await githubRepo(path, timeoutMs), base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod, timeoutMs }, context);
+	},
 	roundup: async ({ context }) => roundupAdapter({}, context),
 } satisfies Readonly<Record<string, (repo: Repo) => Promise<Adapter>>>;
 

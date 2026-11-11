@@ -14,6 +14,7 @@ import { SetupAnswers, writeSetup } from "../src/setup/write.ts";
 import { hopeSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
 /** A git repo on `main` holding the files, with its remote as `origin`. */
 const repoWith = (files: Record<string, string>): string => {
@@ -158,7 +159,7 @@ test("setup writes nothing and says what to set when git config holds no name or
 
 test("the owner's identity is read from git config, and each key it lacks is named", async () => {
 	const repo = repoWith({ "README.md": "x" });
-	const git = gitIn(repo, { env: { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" } });
+	const git = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, env: { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" } });
 
 	expect(await readGitIdentity(git)).toEqual({ found: false, missing: ["user.name", "user.email"] });
 	sh(repo, ["config", "user.name", OWNER.name]);

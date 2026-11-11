@@ -11,6 +11,7 @@ import type { Slot } from "../src/state/saved.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { type SlotSettings, slotWorld, type SlotWorld } from "./fixtures/slot-world.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
 const worlds: SlotWorld[] = [];
 
@@ -95,7 +96,7 @@ test.each<[string, ReadonlySet<string>, Slot["status"]]>([
 test("a pass that ends with a commit the remote lacks keeps its slot taken, with one card naming the branch, and the commit survives", async () => {
 	const w = world({ runners: 1 });
 	const taken = await w.ask("a");
-	const git = gitIn(taken.folder, { identity: OWNER });
+	const git = gitIn(taken.folder, { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	await git.raw(["checkout", "-q", "-b", "hum/run/a"]);
 	writeFileSync(join(taken.folder, "work.txt"), "unpushed\n");

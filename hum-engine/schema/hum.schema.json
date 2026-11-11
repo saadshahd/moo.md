@@ -475,6 +475,13 @@
 			"maximum": 9007199254740991,
 			"description": "How long a read for the status file, such as the newest published version, may take before it is left out."
 		},
+		"commandTimeoutSeconds": {
+			"default": 600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long one git, gh, npm or Claude Code management command may run before it is stopped and its call fails naming it. A run's agent and a repo's checks have their own limits."
+		},
 		"mergeTries": {
 			"default": 3,
 			"type": "integer",
