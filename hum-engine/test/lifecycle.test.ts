@@ -11,12 +11,15 @@ const HOUR_MS = 3_600_000;
 
 test("wakes that arrive during a tick make one more tick, however many arrive", async () => {
 	const busy = Promise.withResolvers<void>();
+	const secondTick = Promise.withResolvers<void>();
 	const ticks: number[] = [];
 
 	const tick = async (): Promise<TickResult> => {
 		ticks.push(ticks.length);
 
 		if (ticks.length === 1) await busy.promise;
+
+		if (ticks.length === 2) secondTick.resolve();
 
 		return RAN;
 	};
@@ -26,7 +29,9 @@ test("wakes that arrive during a tick make one more tick, however many arrive", 
 
 	for (let wake = 0; wake < 20; wake++) life.wake();
 	busy.resolve();
-	await Bun.sleep(20);
+	await secondTick.promise;
+	// A third tick would start in the microtasks that end the second; one macrotask later every one of them has run.
+	await new Promise((resolve) => setImmediate(resolve));
 
 	expect(ticks).toHaveLength(2);
 

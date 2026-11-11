@@ -11,6 +11,7 @@ import { openState } from "../src/state/open.ts";
 import { readStatus, writeHeartbeat } from "../src/status/file.ts";
 import { configWith } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
+import { until } from "./fixtures/process.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
@@ -66,16 +67,6 @@ const unit = (over: Partial<Supervision> & { spawn: () => Child }) => {
 	};
 
 	return { state, stop, run: () => supervise(supervision), cardsInStatus };
-};
-
-const until = async (condition: () => boolean, timeoutMs = 2000): Promise<void> => {
-	const deadline = Date.now() + timeoutMs;
-
-	while (!condition()) {
-		if (Date.now() > deadline) throw new Error("timed out waiting for the condition");
-
-		await Bun.sleep(5);
-	}
 };
 
 const exited = (code: number): Child => ({ exited: Promise.resolve(code), kill: () => {} });

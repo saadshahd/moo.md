@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isAlive, until } from "./fixtures/process.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { FakePulls } from "./fixtures/fake-pulls.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
@@ -126,36 +127,39 @@ test("a merge is rechecked on the newest main: checks that passed on the old mai
 	expect(w.state.parked.get("b")?.why).toBe("review");
 });
 
-test("twenty run ends while a tick is busy give one more tick, not twenty", async () => {
-	const w = await world({});
+test("a run's end while a tick is busy brings the next tick once that tick ends", async () => {
+	const w = await world({}, { settings: { tickIntervalSeconds: 3600 } });
+	const reading = Promise.withResolvers<void>();
+	const nextTick = Promise.withResolvers<void>();
 	const gate = Promise.withResolvers<void>();
 	let listed = 0;
 
-	const slow = w.workerWith({
-		adapters: {
-			workSource: { ...w.adapter.workSource!, listReady: async () => (listed++ === 0 ? (await gate.promise, []) : []) },
-			questions: w.adapter.questions!,
-			answers: w.adapter.answers,
-		},
-	});
+	const listReady = async () => {
+		listed++;
 
+		if (listed === 1) {
+			reading.resolve();
+			await gate.promise;
+		}
+
+		if (listed === 2) nextTick.resolve();
+
+		return [];
+	};
+
+	const slow = w.workerWith({ adapters: { workSource: { ...w.adapter.workSource!, listReady }, questions: w.adapter.questions!, answers: w.adapter.answers } });
 	const stop = new AbortController();
 	const served = slow.serve(stop.signal);
 
-	// The first tick is stuck reading the list; twenty runs end in the meantime, a minute apart in all.
-	await Bun.sleep(50);
-
-	for (let end = 0; end < 20; end++) {
-		w.clock.at += 3000;
+	try {
+		await reading.promise;
 		slow.wake();
+		gate.resolve();
+		await nextTick.promise;
+	} finally {
+		stop.abort();
 	}
 
-	expect(listed).toBe(1);
-	gate.resolve();
-	await Bun.sleep(100);
-
-	expect(listed).toBe(2);
-	stop.abort();
 	expect(await served).toEqual({ reason: "stopped" });
 });
 
@@ -276,7 +280,7 @@ test("the claim of a run in flight is renewed each tick, and a run whose claim i
 
 	await worker.tick();
 
-	while (!w.shim.calls().some((c) => c.itemId === id)) await Bun.sleep(10);
+	await until(() => w.shim.calls().some((c) => c.itemId === id));
 
 	// 3 s on: a tick renews to 8 s. At 6 s the first expiry has passed, yet nobody else can take it.
 	w.clock.at += 3000;
@@ -294,8 +298,7 @@ test("the claim of a run in flight is renewed each tick, and a run whose claim i
 	await worker.idle();
 
 	expect(w.results.find((r) => r.item === id)).toMatchObject({ outcome: "lost" });
-	await Bun.sleep(100);
-	expect(() => process.kill(pid, 0)).toThrow();
+	await until(() => !isAlive(pid));
 });
 
 test("an item id in the inbox folder wakes a waiting item at once and its question leaves the status file", async () => {

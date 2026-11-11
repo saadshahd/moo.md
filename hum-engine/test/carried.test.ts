@@ -210,10 +210,9 @@ test("three items on one role start one after the other's first token, not toget
 	const [first, second, third] = w.shim.calls().filter((call) => call.itemId).sort((a, b) => a.at - b.at);
 	const tokens = new Map(w.shim.tokens().map(({ pid, at }) => [pid, at]));
 
-	// The second and third waited for the first one's token, and then went together: the third started before the second's own token.
+	// The second and third waited for the first one's token; that they then go together, scheduler.test.ts proves on the gate itself.
 	expect(second!.at).toBeGreaterThanOrEqual(tokens.get(first!.pid)!);
 	expect(third!.at).toBeGreaterThanOrEqual(tokens.get(first!.pid)!);
-	expect(third!.at).toBeLessThan(tokens.get(second!.pid)!);
 	expect(w.results.filter((r) => r.outcome === "merged")).toHaveLength(3);
 });
 

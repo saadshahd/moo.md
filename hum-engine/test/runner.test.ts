@@ -6,6 +6,7 @@ import { type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner,
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
+import { isAlive, until } from "./fixtures/process.ts";
 import { makeShim, type ShimSpec } from "./fixtures/shim.ts";
 
 const NOW = 1_800_000_000_000;
@@ -21,16 +22,6 @@ const setup = async (spec: ShimSpec = {}, extra: Partial<RunnerOptions> & { cloc
 };
 
 const ask = (runner: Runner, over: Partial<RunRequest> = {}) => runner.run({ prompt: "do it", cwd: tmpdir(), model: MODEL, effort: "low", schema: { type: "object" }, ...over });
-
-const isGone = (pid: number): boolean => {
-	try {
-		process.kill(pid, 0);
-
-		return false;
-	} catch {
-		return true;
-	}
-};
 
 test("the flag set holds the five flags and never --bare, --resume or --continue; a model call adds hope's judge flags and loads no settings source or tool", () => {
 	const args = runArgs({ model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111" });
@@ -213,16 +204,14 @@ test("a run past the token cap, or aborted, is killed mid-run and leaves no clau
 	const controller = new AbortController();
 	const pending = ask(aborted.runner, { signal: controller.signal });
 
-	while (aborted.shim.calls().length < 2) await Bun.sleep(10);
+	await until(() => aborted.shim.calls().length >= 2);
 	controller.abort();
 
 	const outcome = await pending;
 
 	expect(outcome.kind === "finished" && outcome.subtype).toBe("no-result");
 
-	await Bun.sleep(100);
-
-	for (const shim of [capped.shim, aborted.shim]) expect(isGone(shim.calls()[1]?.pid ?? 0)).toBe(true);
+	for (const shim of [capped.shim, aborted.shim]) await until(() => !isAlive(shim.calls()[1]?.pid ?? 0));
 });
 
 test("a 200 KB body goes on stdin whole, and argv stays small", async () => {
