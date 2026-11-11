@@ -2,11 +2,12 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
 import { HOUR_MS } from "../src/time.ts";
 import { queueQuestion, releaseQuestions } from "../src/worker/questions.ts";
 import { workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
-import { itemFile, sh } from "./fixtures/work-repo.ts";
+import { itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
 
 const worlds: WorkerWorld[] = [];
 
@@ -77,6 +78,26 @@ test("every answer is saved first and gets a reply: applied, then a second answe
 	await w.worker.tick();
 	await w.worker.idle();
 	expect(await repliesOn(w, "a")).toEqual(replies);
+});
+
+test("an answer pushed from another clone after a quiet tick starts the run on the next tick", async () => {
+	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+
+	w.item("a", "docs/a.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
+
+	await w.worker.tick();
+
+	const elsewhere = markdownAdapter({ ...markdownSettings, repo: w.repo.worker("elsewhere") }, { report: () => {}, now: () => w.clock.at });
+
+	await elsewhere.answers.answer("a", { text: "Use Plain" });
+	w.clock.at += 2 * HOUR_MS;
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 });
 
 test("an answer two hours after the question starts a fresh run on the pushed branch, with no session resumed", async () => {

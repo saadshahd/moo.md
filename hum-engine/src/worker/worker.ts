@@ -84,6 +84,12 @@ export type WorkerOptions = {
 	readonly loop?: Partial<Pick<LoopPass, "comments" | "ciLogs">>;
 };
 
+/** What the tick read of its sources: whether the watch saw a change, and the ready list. */
+type Sources = {
+	readonly changed: boolean;
+	readonly ready: ItemRef[];
+};
+
 type Known = {
 	readonly footprint: Footprint;
 	readonly title: string;
@@ -326,15 +332,31 @@ export class Worker {
 		return { stage: ready ? "waiting" : "ended" };
 	}
 
+	/**
+	 * The tick's read of its sources: the watch first, so the ready list read after it holds every change the token
+	 * names, then the ready list, whose read every later call of the tick shares. Undefined when a source could not be
+	 * read, and its guard has raised the card.
+	 */
+	async #readSources(): Promise<Sources | undefined> {
+		const { adapters } = this.#o;
+
+		try {
+			const watched = adapters.answers ? await adapters.answers.watch(this.#watchToken) : { token: "", changed: true };
+
+			this.#watchToken = watched.token;
+
+			return { changed: watched.changed, ready: await adapters.workSource.listReady() };
+		} catch {
+			return undefined;
+		}
+	}
+
 	/** Reads the threads that can have changed, settles each new answer, and releases a parked item the owner answered. */
-	async #readAnswers(sleeping: readonly SavedSnapshot[]): Promise<void> {
+	async #readAnswers(sleeping: readonly SavedSnapshot[], changed: boolean): Promise<void> {
 		const { state, adapters, config } = this.#o;
 		const inbox = this.#inbox();
-		const watched = adapters.answers ? await adapters.answers.watch(this.#watchToken) : { token: "", changed: true };
 
-		this.#watchToken = watched.token;
-
-		if (!watched.changed && inbox.length === 0) return;
+		if (!changed && inbox.length === 0) return;
 
 		const waiting = new Set(sleeping.map((s) => s.itemId));
 		const asleep = new Map(sleeping.map((s) => [s.itemId, s]));
@@ -571,12 +593,14 @@ export class Worker {
 		return undefined;
 	}
 
-	/** The ready list, after the threads that changed were read; undefined when the provider could not be read, and its guard has raised the card. */
-	async #readReady(sleeping: readonly SavedSnapshot[]): Promise<ItemRef[] | undefined> {
-		try {
-			await this.#readAnswers(sleeping);
+	/** The ready list, once the threads that changed were read; undefined when a source could not be read, and its guard has raised the card. */
+	async #readReady(sources: Sources | undefined, sleeping: readonly SavedSnapshot[]): Promise<ItemRef[] | undefined> {
+		if (sources === undefined) return undefined;
 
-			return await this.#o.adapters.workSource.listReady();
+		try {
+			await this.#readAnswers(sleeping, sources.changed);
+
+			return sources.ready;
 		} catch {
 			return undefined;
 		}
@@ -656,13 +680,15 @@ export class Worker {
 			return this.#inFlight.size === 0 ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
 		}
 
+		const sources = await this.#readSources();
+
 		await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).catch((error: Error) => {
 			state.faults.raise({ code: "question-release", cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
 		});
 
 		this.#loopIfDue(t);
 
-		const ready = await this.#readReady(sleeping);
+		const ready = await this.#readReady(sources, sleeping);
 		const started = ready ? await this.#startPicked(t, ready, sleeping) : [];
 
 		await this.#publish(t, signature, undefined);

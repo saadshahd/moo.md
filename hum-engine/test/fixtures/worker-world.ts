@@ -32,7 +32,8 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const shim = makeShim(spec);
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-worker-")), { now });
 	const reports: string[] = [];
-	const markdown = markdownAdapter({ ...markdownSettings, repo: repo.worker("w") }, { report: (f) => reports.push(f.code), now });
+	const clone = repo.worker("w");
+	const markdown = markdownAdapter({ ...markdownSettings, repo: clone }, { report: (f) => reports.push(f.code), now });
 	const adapter = serialized(markdown);
 	const base = options.config ?? configWith();
 	const config: Config = { ...base, hum: { ...base.hum, ...options.settings } };
@@ -63,6 +64,8 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 
 	return {
 		repo,
+		/** The work source's clone of the remote. */
+		clone,
 		clock,
 		shim,
 		state,

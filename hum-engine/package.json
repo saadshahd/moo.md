@@ -38,7 +38,7 @@
     "release:check": "bun tools/release/main.ts check",
     "release:surface": "bun tools/release/main.ts surface",
     "lint": "oxlint src test tools/release",
-    "test": "bun test --parallel=8 --timeout 30000 test"
+    "test": "n=$(getconf _NPROCESSORS_ONLN); seq 1 $n | xargs -P $n -I{} bun test --shard={}/$n --timeout 30000 test"
   },
   "dependencies": {
     "@actions/core": "3.0.1",

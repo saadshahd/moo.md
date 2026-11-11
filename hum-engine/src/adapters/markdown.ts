@@ -11,7 +11,7 @@ import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
 import { type GitIdentity, gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
 import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
 import { answerMarker, followUpKey, questionText } from "./marked.ts";
-import { landOwnerCommit } from "./owner-commit.ts";
+import { type CommitLanded, landOwnerCommit } from "./owner-commit.ts";
 import type { PullRequests } from "./pull-requests.ts";
 
 const ITEM_EXTENSION = ".md";
@@ -48,6 +48,20 @@ type StandingClaim = { readonly claim: Claim; readonly sha: string };
 
 type FileChange = { readonly path: string; readonly content: string };
 
+/**
+ * The remote as the last fetch saw it, with this adapter's own pushes since laid over it. Every read until the next
+ * fetch shares it: `listReady` fetches, and so does a read after a push that did not land as written.
+ */
+type View = {
+	/** The standing claims, read from the fetched refs at most once. */
+	claims?: Promise<ReadonlyMap<string, StandingClaim>>;
+	/** Each item file's source by path, read at most once. */
+	readonly sources: Map<string, Promise<string | undefined>>;
+};
+
+/** How a write reached the base: a push of its own commit, or a pull request that merges it as a commit of GitHub's. */
+type Landed = Exclude<CommitLanded["via"], "conflict">;
+
 /** Another writer moved the base branch between this write's read and its push. */
 class LostRace extends Error {
 	override name = "LostRace";
@@ -68,28 +82,37 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
 	let spent = 0;
-	/** Whether the local branches still match the remote as last fetched, with no push by this adapter since. */
-	let fetched = false;
+	/** One fetch serves every read that waits on it; a failed one leaves none. */
+	let view: Promise<View> | undefined;
 
-	const sync = async (): Promise<void> => {
+	const refetch = (): Promise<View> => {
 		spent++;
-		await git.raw(["fetch", "--prune", "--no-tags", "--quiet", remote, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]);
-		fetched = true;
+
+		const fetched = git.raw(["fetch", "--prune", "--no-tags", "--quiet", remote, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]).then((): View => ({ sources: new Map() }));
+
+		view = fetched;
+		fetched.catch(() => {
+			if (view === fetched) view = undefined;
+		});
+
+		return fetched;
 	};
 
-	/** A read shares the fetch of its tick; only a push by this adapter makes the copy stale before the next tick. */
-	const syncIfStale = async (): Promise<void> => {
-		if (!fetched) await sync();
-	};
+	const current = (): Promise<View> => view ?? refetch();
 
+	/** A push that did not land leaves the remote unknown, so the next read fetches. */
 	const pushCounted = async (args: readonly string[]) => {
 		spent++;
 
-		try {
-			return await push(git, [remote, ...args]);
-		} finally {
-			fetched = false;
-		}
+		const outcome = await push(git, [remote, ...args]).catch((cause: unknown) => {
+			view = undefined;
+
+			throw cause;
+		});
+
+		if (outcome === "conflict") view = undefined;
+
+		return outcome;
 	};
 
 	const standingFromLine = (line: string): [string, StandingClaim][] => {
@@ -100,10 +123,40 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		return claim ? [[item, { claim, sha }]] : [];
 	};
 
-	const claimsNow = async (): Promise<ReadonlyMap<string, StandingClaim>> =>
+	const readClaims = async (): Promise<ReadonlyMap<string, StandingClaim>> =>
 		new Map((await git.raw(["for-each-ref", "--format=%(refname)%09%(objectname)%09%(contents:subject)", CLAIMS_REF])).split("\n").filter(Boolean).flatMap(standingFromLine));
 
-	const itemSource = (id: string) => readOrAbsent(git, ["show", `${BASE_REF}:${pathOf(id)}`]);
+	const claimsNow = async (): Promise<ReadonlyMap<string, StandingClaim>> => {
+		const seen = await current();
+
+		return (seen.claims ??= readClaims());
+	};
+
+	const sourceIn = (seen: View, path: string): Promise<string | undefined> => {
+		const source = seen.sources.get(path) ?? readOrAbsent(git, ["show", `${BASE_REF}:${path}`]);
+
+		seen.sources.set(path, source);
+
+		return source;
+	};
+
+	/** An item file the view lacks is looked for once more after a fetch: a view holds only what was there when it was fetched. */
+	const itemSource = async (id: string): Promise<string | undefined> => (await sourceIn(await current(), pathOf(id))) ?? sourceIn(await refetch(), pathOf(id));
+
+	/** The local copy of the base takes a commit this adapter pushed to it, so reads after the write see it without a fetch. */
+	const mirrorBase = async (sha: string, { path, content }: FileChange): Promise<void> => {
+		await git.raw(["update-ref", BASE_REF, sha]);
+		(await current()).sources.set(path, Promise.resolve(content));
+	};
+
+	/** The local copy of a claim takes the claim this adapter pushed. */
+	const mirrorClaim = async (claim: Claim, sha: string): Promise<void> => {
+		await git.raw(["update-ref", `${CLAIMS_REF}/${claim.item}`, sha]);
+
+		const seen = await current();
+
+		if (seen.claims) seen.claims = seen.claims.then((claims) => new Map(claims).set(claim.item, { claim, sha }));
+	};
 
 	const itemFileNames = async (): Promise<string[]> => ((await readOrAbsent(git, ["ls-tree", "--name-only", `${BASE_REF}:${itemsDir}`])) ?? "").split("\n").filter(isItemFileName);
 
@@ -175,14 +228,16 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		throw error;
 	};
 
-	const pushToBase = async (sha: string): Promise<void> => {
+	const pushToBase = async (sha: string): Promise<Landed> => {
 		const outcome = await pushCounted([`${sha}:${baseBranch}`]).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
 
 		if (outcome === "conflict") throw new LostRace(`another writer moved ${base} first`);
+
+		return "push";
 	};
 
 	/** An owner's commit lands the way the base asks: a pull request that merges itself where one is required, a push elsewhere. */
-	const landOwned = async (sha: string, message: string, label: string): Promise<void> => {
+	const landOwned = async (sha: string, message: string, label: string): Promise<Landed> => {
 		const landed = await landOwnerCommit({
 			sha,
 			base,
@@ -196,20 +251,24 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		}).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
 
 		if (landed.via === "conflict") throw new LostRace(`another writer moved ${base} first`);
+
+		return landed.via;
 	};
 
 	/** Changes one file on the remote base branch, reading it afresh after every lost race. */
 	const write = async (message: string, change: () => Promise<FileChange | undefined>, ownedBy?: string): Promise<void> => {
 		const attempt = async () => {
-			await sync();
+			await current();
 
 			const next = await change();
 
 			if (!next) return;
 
 			const sha = await commitOn((await git.raw(["rev-parse", BASE_REF])).trim(), message, next);
+			const landed = ownedBy === undefined ? await pushToBase(sha) : await landOwned(sha, message, ownedBy);
 
-			await (ownedBy === undefined ? pushToBase(sha) : landOwned(sha, message, ownedBy));
+			if (landed === "push") await mirrorBase(sha, next);
+			else view = undefined;
 		};
 
 		await pRetry(attempt, { retries: writeRaceRetries, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
@@ -232,17 +291,17 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 	const take = claimer<StandingClaim>(
 		{
-			standing: async (id) => {
-				await sync();
-
-				return (await claimsNow()).get(id);
-			},
+			standing: async (id) => (await claimsNow()).get(id),
 			isReady: async (id) => (await loadItem(id))?.state === READY_STATE,
 			write: async (claim, over) => {
 				const parent = over?.sha ?? (await git.raw(["rev-parse", BASE_REF])).trim();
 				const sha = await commitOn(parent, claimCommitMessage(claim));
 
-				return (await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`])) === "pushed";
+				if ((await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`])) === "conflict") return false;
+
+				await mirrorClaim(claim, sha);
+
+				return true;
 			},
 		},
 		now,
@@ -250,9 +309,6 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 	const read = async (id: string): Promise<Item> => {
 		const item = parseArgument(ItemId, id);
-
-		await syncIfStale();
-
 		const [source, claims] = await Promise.all([itemSource(item), claimsNow()]);
 
 		if (source === undefined) throw new PermanentError(`no item "${item}" under ${itemsDir}/`);
@@ -270,7 +326,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		spent: () => spent,
 		workSource: {
 			listReady: async () => {
-				await sync();
+				await refetch();
 
 				const [claims, names] = await Promise.all([claimsNow(), itemFileNames()]);
 

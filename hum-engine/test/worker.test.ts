@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sh } from "./fixtures/work-repo.ts";
@@ -48,6 +48,23 @@ test("the thin path runs two items on different files side by side, and both mer
 
 	// Each merge is rechecked on the newest main: the later one reran the checks after the earlier one moved it.
 	expect(readFileSync(checkLog, "utf8").split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(3);
+});
+
+test("a tick that claims, runs and merges an item fetches from the remote once", async () => {
+	const w = await world({ items: { a: { commitForItem: true } } });
+	const reads = join(w.repo.root, "upload-pack.log");
+	const uploadPack = join(w.repo.root, "upload-pack");
+
+	writeFileSync(uploadPack, `#!/bin/sh\nps -o command= -p $PPID >> ${reads}\nexec git-upload-pack "$@"\n`);
+	chmodSync(uploadPack, 0o755);
+	sh(w.clone, ["config", "remote.origin.uploadpack", uploadPack]);
+	w.item("a", "docs/a.md");
+
+	await w.worker.tick();
+	await w.worker.idle();
+
+	expect(merged(w)).toEqual(["a"]);
+	expect(readFileSync(reads, "utf8").split("\n").filter((command) => / fetch /.test(command))).toHaveLength(1);
 });
 
 test("items that touch one file go one after the other, and an item that says nothing goes alone", async () => {
