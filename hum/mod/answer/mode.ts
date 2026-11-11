@@ -13,6 +13,9 @@ const mode = atom({ plugin: "hum", key: "answerMode" } as const, answerMachine.i
 
 const PASS: Decision = { kind: "pass" };
 
+/** The engine's longest wait for a command. A post still running then is stopped, and may have landed. */
+const POST_LIMIT_MS = 10 * 60 * 1000;
+
 /** Steps answer mode by one event and applies what it decided for the box and the owner's eyes. */
 async function send($: Engine, event: AnswerEvent): Promise<AnswerSnapshot> {
 	const after = await update($, mode, (before) => answerMachine.transition(before, event)[0]);
@@ -56,12 +59,18 @@ export async function changedBox($: Engine, origin: string, box: string): Promis
 
 const optionArgs = ({ option }: Answering): string[] => (option === undefined ? [] : ["--option", option]);
 
-/** Posts the answer through the repo's hum, then tells answer mode how it went. Runs past the hook's return. */
-async function post($: Engine, root: string, answering: Answering): Promise<void> {
-	const ran = await runHum($, root, ["answer", ...optionArgs(answering), "--", answering.item, postedText(answering)]).catch((error: Error) => ({ exitCode: -1, stderr: error.message }));
-	const box = (await $.prompt.read()).text;
+/** How a post ended: hum exited 0 or not, or it never reported, so the answer may be on the thread. */
+async function postEvent($: Engine, root: string, answering: Answering, box: () => Promise<string>): Promise<AnswerEvent> {
+	const ran = await runHum($, root, ["answer", ...optionArgs(answering), "--", answering.item, postedText(answering)], { timeoutMs: POST_LIMIT_MS }).catch((error: Error) => error);
 
-	await send($, ran.exitCode === 0 ? { type: "postOk", box } : { type: "postFail", cause: failureOf(ran), box });
+	if (ran instanceof Error) return { type: "postUnknown", cause: ran.message, box: await box() };
+
+	return ran.exitCode === 0 ? { type: "postOk", box: await box() } : { type: "postFail", cause: failureOf(ran), box: await box() };
+}
+
+/** Posts the answer through the repo's hum, then tells answer mode how it went, so it always leaves posting. Runs past the hook's return. */
+async function post($: Engine, root: string, answering: Answering): Promise<void> {
+	await send($, await postEvent($, root, answering, () => $.prompt.read().then(({ text }) => text, () => "")));
 }
 
 /** The owner's Enter: in answer mode it posts on the item's thread and keeps the prompt from Claude. */

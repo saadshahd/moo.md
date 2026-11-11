@@ -11,8 +11,8 @@ const REPO_ENGINE = "node_modules/.bin/hum";
 export type PressContext = { readonly width: number; readonly amberAfterSeconds: number; readonly read: ViewRead; readonly unread?: Unread };
 
 /** Runs the repo's pinned hum at the repo's root, never the plugin's copy, because the two update apart. */
-export async function runHum($: Engine, root: string, args: readonly string[]): Promise<ProcessRunResult> {
-	return $.process.run([`${root}/${REPO_ENGINE}`, ...args], { cwd: root });
+export async function runHum($: Engine, root: string, args: readonly string[], { timeoutMs }: { readonly timeoutMs?: number } = {}): Promise<ProcessRunResult> {
+	return $.process.run([`${root}/${REPO_ENGINE}`, ...args], { cwd: root, timeoutMs });
 }
 
 /** What a failed hum said, without its own `hum <op>:` lead. */

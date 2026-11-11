@@ -78,6 +78,7 @@ const SAMPLES = {
 	submit: someOf(["composer", "peer"].flatMap((origin) => [OPEN.filled, WRITTEN, WHOLE.filled, "#11: what is this?"].map((text) => ({ origin, text })))),
 	postOk: someOf([WRITTEN, ""].map((box) => ({ box }))),
 	postFail: someOf([WRITTEN, "", "something else"].map((box) => ({ cause: "GitHub 502", box }))),
+	postUnknown: someOf([WRITTEN, "", "something else"].map((box) => ({ cause: "timed out", box }))),
 	restart: someOf([{}]),
 };
 
@@ -149,7 +150,7 @@ describe("every event from every reachable state", () => {
 		for (const { event, after } of steps.filter(
 			({ before }) => before.value === "posting",
 		))
-			if (event.type === "postOk" || event.type === "postFail")
+			if (event.type === "postOk" || event.type === "postFail" || event.type === "postUnknown")
 				expect(after.value).not.toBe("posting");
 
 		for (const { after } of steps.filter(
@@ -229,6 +230,20 @@ describe("the six cases found live", () => {
 			box: { kind: "set", text: WRITTEN },
 			say: SAY.failed("#68", "404"),
 		});
+	});
+});
+
+test("a post that may have landed leaves the box empty, so Enter cannot post it twice, and ends answer mode", () => {
+	const after = run([
+		{ type: "fill", answer: OPEN, box: "" },
+		{ type: "submit", origin: "composer", text: WRITTEN },
+		{ type: "postUnknown", cause: "timed out", box: "" },
+	]);
+
+	expect(after.value).toBe("off");
+	expect(after.context).toMatchObject({
+		box: { kind: "keep" },
+		say: SAY.unknown("#68", "timed out"),
 	});
 });
 

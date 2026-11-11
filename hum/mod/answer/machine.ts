@@ -11,6 +11,8 @@ export type AnswerEvent =
 	| { readonly type: "submit"; readonly origin: string; readonly text: string }
 	| { readonly type: "postOk"; readonly box: string }
 	| { readonly type: "postFail"; readonly cause: string; readonly box: string }
+	/** The post ran past its limit or never reported: the answer may be on the thread. */
+	| { readonly type: "postUnknown"; readonly cause: string; readonly box: string }
 	| { readonly type: "restart" };
 
 export type AnswerEventType = AnswerEvent["type"];
@@ -22,6 +24,7 @@ export const ANSWER_EVENTS = [
 	"submit",
 	"postOk",
 	"postFail",
+	"postUnknown",
 	"restart",
 ] as const satisfies readonly AnswerEventType[];
 
@@ -39,6 +42,7 @@ export const SAY = {
 	empty: (label: string) => `${label}: nothing written, nothing posted.`,
 	posted: (label: string) => `Posted on ${label}'s thread.`,
 	failed: (label: string, cause: string) => `${label}: not posted, ${cause}`,
+	unknown: (label: string, cause: string) => `${label}: may have posted, ${cause}. Read its thread before you post again.`,
 } as const;
 
 const KEEP: BoxWrite = { kind: "keep" };
@@ -107,6 +111,7 @@ export const answerMachine = createFSM<AnswerContext, AnswerEvent, { readonly [S
 				submit: { context: outcome({ enter: "claude" }) },
 				postOk: { context: outcome({}) },
 				postFail: { context: outcome({}) },
+				postUnknown: { context: outcome({}) },
 				restart: toOff,
 			},
 		},
@@ -157,6 +162,9 @@ export const answerMachine = createFSM<AnswerContext, AnswerEvent, { readonly [S
 					context: outcome({ answering: context.answering }),
 				}),
 				postFail: ({ context }) => ({
+					context: outcome({ answering: context.answering }),
+				}),
+				postUnknown: ({ context }) => ({
 					context: outcome({ answering: context.answering }),
 				}),
 				restart: toOff,
@@ -225,6 +233,14 @@ export const answerMachine = createFSM<AnswerContext, AnswerEvent, { readonly [S
 						context: { ...followed.context, say },
 					};
 				},
+				postUnknown: ({ context, event }) => ({
+					target: "off",
+					context: outcome({
+						answering: undefined,
+						box: event.box === context.answering?.posted ? setBox("") : KEEP,
+						say: SAY.unknown(labelOf(context.answering), event.cause),
+					}),
+				}),
 				restart: toOff,
 			},
 		},
