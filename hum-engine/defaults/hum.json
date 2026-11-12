@@ -1,0 +1,321 @@
+{
+	"schemaVersion": 1,
+	"levels": [
+		{
+			"name": "low",
+			"review": "none",
+			"release": "at-once",
+			"onBreak": "follow-up"
+		},
+		{
+			"name": "medium",
+			"review": "agent",
+			"release": "at-once",
+			"onBreak": "follow-up"
+		},
+		{
+			"name": "high",
+			"review": "owner",
+			"release": "at-once",
+			"onBreak": "follow-up"
+		},
+		{
+			"name": "critical",
+			"review": "owner",
+			"release": "after-proof",
+			"onBreak": "block"
+		}
+	],
+	"paths": [],
+	"roles": {
+		"plan": {
+			"file": "roles/plan.md",
+			"purpose": "plan",
+			"skills": [
+				"hope:intent",
+				"hope:shape"
+			]
+		},
+		"build": {
+			"file": "roles/build.md",
+			"purpose": "build",
+			"skills": []
+		},
+		"fix": {
+			"file": "roles/fix.md",
+			"purpose": "fix",
+			"skills": []
+		},
+		"review": {
+			"file": "roles/review.md",
+			"purpose": "review",
+			"skills": [
+				"hope:judge"
+			]
+		}
+	},
+	"events": {
+		"plan-ready": {
+			"source": "plan"
+		},
+		"needs-split": {
+			"source": "plan"
+		},
+		"plan-blocked": {
+			"source": "plan"
+		},
+		"token-cap": {
+			"source": "worker"
+		},
+		"approve": {
+			"source": "review"
+		},
+		"request-changes": {
+			"source": "review"
+		},
+		"needs-owner": {
+			"source": "review"
+		},
+		"answered": {
+			"source": "owner"
+		},
+		"owner-approved": {
+			"source": "owner"
+		},
+		"owner-rejected": {
+			"source": "owner"
+		},
+		"merged": {
+			"source": "work-source"
+		}
+	},
+	"kinds": [
+		"feature",
+		"fix",
+		"docs",
+		"hotfix",
+		"check"
+	],
+	"runBranchPrefix": "hum/run/",
+	"claimPrefix": "hum/claim/",
+	"readyLabel": "hum:ready",
+	"mergeMethod": "squash",
+	"models": {
+		"light": "claude-haiku-5-5",
+		"standard": "claude-sonnet-5-5",
+		"top": "claude-opus-5-5"
+	},
+	"runners": 3,
+	"tickIntervalSeconds": 30,
+	"drainTimeoutSeconds": 300,
+	"claimExpirySeconds": 900,
+	"latestVersionCacheSeconds": 21600,
+	"watchCacheSeconds": 10,
+	"watchLockSeconds": 30,
+	"maxFixRuns": 3,
+	"serviceLabel": "md.moo.hum",
+	"maxCrashes": 5,
+	"crashWindowSeconds": 600,
+	"workerDownTicks": 3,
+	"tokenWarnDays": 30,
+	"ciSchedule": "*/15 * * * *",
+	"ciTickCacheSeconds": 300,
+	"itemsDir": ".hum/work",
+	"providerTimeoutSeconds": 30,
+	"providerBackoff": {
+		"firstSeconds": 0.5,
+		"maxSeconds": 30
+	},
+	"mergedShown": 50,
+	"choicesShown": 50,
+	"statusReadTimeoutSeconds": 10,
+	"commandTimeoutSeconds": 600,
+	"mergeTries": 3,
+	"writeRaceRetries": 7,
+	"itemReadsAtOnce": 8,
+	"restartBackoff": {
+		"firstSeconds": 1,
+		"maxSeconds": 60
+	},
+	"restartDelaySeconds": 10,
+	"ciWakeTimeoutMinutes": 60,
+	"pullRequestTokenSecret": "HUM_GITHUB_TOKEN",
+	"strictPaths": [],
+	"launches": [],
+	"sizeRange": {
+		"changes": 50,
+		"fewest": 20,
+		"middle": 0.8
+	},
+	"loosenedCheck": {
+		"added": [
+			"\\.(skip|skipIf|todo)\\(",
+			"\\bx(it|test|describe)\\(",
+			"(eslint|oxlint|biome)[- ](disable|ignore)",
+			"@ts-(ignore|expect-error|nocheck)"
+		],
+		"removed": [
+			"^\\s*(test|it|describe)(\\.\\w+)?\\(",
+			"^\\s*\"[@\\w/-]+\"\\s*:\\s*\\[?\"(error|warn)\""
+		]
+	},
+	"changeLabels": {
+		"fixWindow": 10,
+		"fixSubject": "^fix(\\(.+\\))?!?:",
+		"revertSubject": "^(Revert \"|[Rr]evert(\\(.+\\))?!?:)",
+		"revertTrailer": "This reverts commit ([0-9a-f]{7,40})"
+	},
+	"historyDepth": 1000,
+	"lockfiles": [
+		"bun.lock",
+		"bun.lockb",
+		"package-lock.json",
+		"yarn.lock",
+		"pnpm-lock.yaml"
+	],
+	"hookPaths": [
+		".husky/**",
+		".githooks/**",
+		"lefthook.yml",
+		".pre-commit-config.yaml"
+	],
+	"diffLimit": 100000,
+	"failureTail": 4000,
+	"kindMeanings": {
+		"feature": "adds or changes what the product does or offers",
+		"fix": "corrects behaviour that is wrong, broken or inconsistent, with no new capability",
+		"docs": "changes only prose that explains the work: notes, changelog entries, guides, comments",
+		"hotfix": "an urgent correction to what is already live, named as urgent",
+		"check": "adds or repairs tests, benchmarks or other verification, with no change to behaviour"
+	},
+	"fallbackKind": "feature",
+	"docsOnly": {
+		"kind": "docs",
+		"paths": [
+			"**/*.md",
+			"**/*.mdx",
+			"docs/**"
+		]
+	},
+	"decisionModel": "claude-haiku-5-5",
+	"modelCallTimeoutSeconds": 120,
+	"minJudgeRate": 0.8,
+	"measuredModels": {
+		"kind": {
+			"claude-haiku-5-5": 0.58,
+			"claude-sonnet-5-5": 0.63
+		},
+		"alignment": {
+			"claude-haiku-5-5": 0.68,
+			"claude-sonnet-5-5": 0.68
+		},
+		"plan-outcome": {
+			"claude-haiku-5-5": 1,
+			"claude-sonnet-5-5": 1
+		},
+		"review-verdict": {
+			"claude-haiku-5-5": 0.92,
+			"claude-sonnet-5-5": 0.83
+		},
+		"reply-option": {
+			"claude-haiku-5-5": 0.87
+		},
+		"repeat-pair": {
+			"claude-haiku-5-5": 1
+		},
+		"taste": {}
+	},
+	"mergeRisk": {
+		"weights": {
+			"impact": 2,
+			"verification": 2,
+			"rollback": 1.5,
+			"errorDetection": 1,
+			"alignment": 1
+		},
+		"cuts": [
+			1.5,
+			2.25
+		]
+	},
+	"questionLimits": {
+		"cells": 80,
+		"wordCells": 40
+	},
+	"questionTimeoutHours": 24,
+	"priorityLabels": [
+		"priority:high"
+	],
+	"undoableLevels": [
+		"low",
+		"medium"
+	],
+	"ownerBranchPrefix": "hum/owner/",
+	"backgroundRuns": true,
+	"backgroundPollSeconds": 1,
+	"backgroundLaunchSeconds": 30,
+	"deniedRunCommands": [
+		"gh issue",
+		"gh label",
+		"gh api",
+		"gh auth",
+		"gh repo",
+		"gh pr create",
+		"gh pr comment",
+		"gh pr review",
+		"gh pr edit",
+		"gh pr merge",
+		"gh pr ready",
+		"gh pr close",
+		"git push"
+	],
+	"runAutoMode": {
+		"environment": [
+			"A session named hum <item> <purpose> #<attempt> is an unattended hum run; nobody watches it, and its owner answers only the questions hum asks."
+		],
+		"allow": [
+			"$defaults",
+			"Running hum's own commands (hum comment, ask, file-follow-up, decide) is the run's routine work, GitHub writes included.",
+			"Reading the run's own PR and its checks on GitHub (gh pr checks, gh pr view, gh run view, --log-failed included) is routine: hum asks the run to read failed checks and fix them."
+		],
+		"hardDeny": [
+			"$defaults",
+			"Writing to GitHub other than through hum's own commands: commenting on, labelling, creating, editing or closing issues or PRs, submitting reviews, pushing, or reading a GitHub token (gh auth token, the keychain, ~/.config/gh).",
+			"Changing .hum/hum.json or any file under .github/workflows/."
+		]
+	},
+	"ownerLogins": [],
+	"tasteRules": [],
+	"repeatAt": 2,
+	"repeatPrecision": 0.9,
+	"memoryMaxBytes": 8000,
+	"memoryUnusedRuns": 20,
+	"measureWindow": 20,
+	"loopIntervalSeconds": 3600,
+	"proofTimeoutSeconds": 900,
+	"kindFloors": {},
+	"checkKind": "check",
+	"breakCheck": true,
+	"runSlots": {
+		"enabled": false,
+		"pool": "../.hum-slots",
+		"services": "per-slot",
+		"ports": {
+			"base": 20000,
+			"stride": 10
+		},
+		"projectPrefix": "hum",
+		"stepTimeoutSeconds": 600,
+		"recipe": {
+			"prepare": [],
+			"refresh": [],
+			"ready": []
+		}
+	},
+	"checks": [],
+	"kindLabels": {},
+	"runPlaces": [
+		"mac",
+		"ci"
+	]
+}

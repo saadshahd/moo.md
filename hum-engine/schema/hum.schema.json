@@ -1,0 +1,1355 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"schemaVersion": {
+			"type": "number",
+			"const": 1
+		},
+		"levels": {
+			"minItems": 1,
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"name": {
+						"type": "string",
+						"minLength": 1
+					},
+					"review": {
+						"type": "string",
+						"enum": [
+							"none",
+							"agent",
+							"owner"
+						]
+					},
+					"release": {
+						"type": "string",
+						"enum": [
+							"at-once",
+							"after-proof"
+						]
+					},
+					"onBreak": {
+						"type": "string",
+						"enum": [
+							"follow-up",
+							"block"
+						]
+					}
+				},
+				"required": [
+					"name",
+					"review",
+					"release",
+					"onBreak"
+				],
+				"additionalProperties": false
+			}
+		},
+		"paths": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"glob": {
+						"type": "string",
+						"minLength": 1
+					},
+					"level": {
+						"type": "string",
+						"minLength": 1
+					},
+					"proofs": {
+						"type": "object",
+						"propertyNames": {
+							"type": "string",
+							"minLength": 1
+						},
+						"additionalProperties": {
+							"type": "string",
+							"minLength": 1
+						}
+					},
+					"limit": {
+						"type": "object",
+						"properties": {
+							"fixes": {
+								"type": "integer",
+								"minimum": 0,
+								"maximum": 9007199254740991
+							},
+							"of": {
+								"type": "integer",
+								"exclusiveMinimum": 0,
+								"maximum": 9007199254740991
+							}
+						},
+						"required": [
+							"fixes",
+							"of"
+						],
+						"additionalProperties": false
+					}
+				},
+				"required": [
+					"glob",
+					"level"
+				],
+				"additionalProperties": false
+			}
+		},
+		"roles": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "object",
+				"properties": {
+					"file": {
+						"type": "string",
+						"minLength": 1
+					},
+					"purpose": {
+						"type": "string",
+						"enum": [
+							"plan",
+							"build",
+							"fix",
+							"review"
+						]
+					},
+					"skills": {
+						"type": "array",
+						"items": {
+							"type": "string",
+							"minLength": 1
+						}
+					}
+				},
+				"required": [
+					"file",
+					"purpose",
+					"skills"
+				],
+				"additionalProperties": false
+			}
+		},
+		"events": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "object",
+				"properties": {
+					"source": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"required": [
+					"source"
+				],
+				"additionalProperties": false
+			}
+		},
+		"kinds": {
+			"minItems": 1,
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			}
+		},
+		"safety": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string"
+			},
+			"additionalProperties": {}
+		},
+		"dailyQuestionCap": {
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991
+		},
+		"integrations": {
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			}
+		},
+		"ciToken": {
+			"type": "object",
+			"properties": {
+				"setUp": {
+					"type": "string",
+					"format": "date",
+					"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+				}
+			},
+			"required": [
+				"setUp"
+			],
+			"additionalProperties": false
+		},
+		"commitIdentity": {
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string",
+					"minLength": 1
+				},
+				"email": {
+					"type": "string",
+					"minLength": 1
+				}
+			},
+			"required": [
+				"name",
+				"email"
+			],
+			"additionalProperties": false,
+			"description": "The owner's own name and email: the author and committer of every commit hum makes. Setup writes them from git config; hum ships none."
+		},
+		"checks": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "The shell commands that must all exit 0 in a run's clone before its change merges, and on the base after a merge."
+		},
+		"kindLabels": {
+			"default": {},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Item label (lower case) → kind name: the kind an item takes from a label of the repo's own, such as { \"bug\": \"fix\" }."
+		},
+		"runPlaces": {
+			"default": [
+				"mac",
+				"ci"
+			],
+			"minItems": 1,
+			"type": "array",
+			"items": {
+				"type": "string",
+				"enum": [
+					"mac",
+					"ci"
+				]
+			},
+			"description": "Where hum runs: 'mac' is a service on the owner's machine, 'ci' a workflow. Only a 'mac' place reads the inbox, so an answer or a changed watch leaves a wake file there only when 'mac' is listed."
+		},
+		"runBranchPrefix": {
+			"default": "hum/run/",
+			"type": "string",
+			"format": "ends_with",
+			"pattern": ".*\\/$",
+			"description": "Each run builds on the branch this prefix and its item id make."
+		},
+		"claimPrefix": {
+			"default": "hum/claim/",
+			"type": "string",
+			"format": "ends_with",
+			"pattern": ".*\\/$",
+			"description": "A claim is the first push of the branch this prefix and its item id make."
+		},
+		"readyLabel": {
+			"default": "hum:ready",
+			"type": "string",
+			"minLength": 1,
+			"description": "The label that marks an issue ready for hum."
+		},
+		"mergeMethod": {
+			"default": "squash",
+			"type": "string",
+			"enum": [
+				"merge",
+				"squash",
+				"rebase"
+			],
+			"description": "How a released pull request merges."
+		},
+		"models": {
+			"default": {
+				"light": "claude-haiku-5-5",
+				"standard": "claude-sonnet-5-5",
+				"top": "claude-opus-5-5"
+			},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"enum": [
+					"light",
+					"standard",
+					"top"
+				]
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"required": [
+				"light",
+				"standard",
+				"top"
+			],
+			"description": "The model id each tier of a kind's table runs on."
+		},
+		"runners": {
+			"default": 3,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The most runs that go at once."
+		},
+		"tickIntervalSeconds": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The time between worker ticks; each tick writes the heartbeat and renews the claims in flight."
+		},
+		"drainTimeoutSeconds": {
+			"default": 300,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a worker that has seen an update lets its runs finish before it stops them."
+		},
+		"claimExpirySeconds": {
+			"default": 900,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a claim lasts unless its holder renews it."
+		},
+		"latestVersionCacheSeconds": {
+			"default": 21600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long the newest published engine version is kept before it is read again."
+		},
+		"watchCacheSeconds": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long one read of what changed serves every `hum watch` in the repo before the next one reads again."
+		},
+		"watchLockSeconds": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long the lock of the one `hum watch` that reads stays held before another may take it over."
+		},
+		"maxFixRuns": {
+			"default": 3,
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Fix runs an item gets after failed checks before it ends stuck."
+		},
+		"serviceLabel": {
+			"default": "md.moo.hum",
+			"type": "string",
+			"pattern": "^[A-Za-z0-9._-]+$",
+			"description": "The service unit's label, and the name its file takes."
+		},
+		"maxCrashes": {
+			"default": 5,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Worker crashes within crashWindowSeconds that stop the service's restarts."
+		},
+		"crashWindowSeconds": {
+			"default": 600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The window in which maxCrashes crashes stop the service's restarts."
+		},
+		"workerDownTicks": {
+			"default": 3,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Ticks without a heartbeat before the worker-down card shows."
+		},
+		"tokenWarnDays": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Days before the CI token's year ends that the expiry card shows."
+		},
+		"ciSchedule": {
+			"default": "*/15 * * * *",
+			"type": "string",
+			"description": "The cron schedule of the scheduled CI workflow."
+		},
+		"ciTickCacheSeconds": {
+			"default": 300,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long the scheduled workflow's last tick is kept before the remote is read again."
+		},
+		"itemsDir": {
+			"default": ".hum/work",
+			"type": "string",
+			"minLength": 1,
+			"description": "The folder of the repo that holds the markdown items."
+		},
+		"providerTimeoutSeconds": {
+			"default": 30,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a failing provider call is retried before one card shows."
+		},
+		"providerBackoff": {
+			"default": {
+				"firstSeconds": 0.5,
+				"maxSeconds": 30
+			},
+			"type": "object",
+			"properties": {
+				"firstSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"maxSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				}
+			},
+			"required": [
+				"firstSeconds",
+				"maxSeconds"
+			],
+			"additionalProperties": false,
+			"description": "The pause before a provider call's first retry, doubled each retry up to the longest pause."
+		},
+		"mergedShown": {
+			"default": 50,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Merged changes the status file lists."
+		},
+		"choicesShown": {
+			"default": 50,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Choices made without the owner that the status file lists, newest first."
+		},
+		"statusReadTimeoutSeconds": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a read for the status file, such as the newest published version, may take before it is left out."
+		},
+		"commandTimeoutSeconds": {
+			"default": 600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long one git, gh, npm or Claude Code management command, one GitHub request or one start check may run before it is stopped and its call fails naming it. A run's agent and a repo's checks have their own limits."
+		},
+		"mergeTries": {
+			"default": 3,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Tries to merge a change when the base branch moves under it."
+		},
+		"writeRaceRetries": {
+			"default": 7,
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Retries of a markdown write that another writer's push beat."
+		},
+		"itemReadsAtOnce": {
+			"default": 8,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Item files the markdown source reads at once; each read is a git process."
+		},
+		"restartBackoff": {
+			"default": {
+				"firstSeconds": 1,
+				"maxSeconds": 60
+			},
+			"type": "object",
+			"properties": {
+				"firstSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				},
+				"maxSeconds": {
+					"type": "number",
+					"exclusiveMinimum": 0
+				}
+			},
+			"required": [
+				"firstSeconds",
+				"maxSeconds"
+			],
+			"additionalProperties": false,
+			"description": "The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."
+		},
+		"restartDelaySeconds": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Seconds the service manager waits before it starts a failed start script again."
+		},
+		"pullRequestTokenSecret": {
+			"default": "HUM_GITHUB_TOKEN",
+			"type": "string",
+			"minLength": 1,
+			"description": "The repository secret holding a GitHub App or fine-grained token for CI runs. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset."
+		},
+		"ciWakeTimeoutMinutes": {
+			"default": 60,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Minutes a CI wake may run before GitHub stops it."
+		},
+		"strictPaths": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Globs of data and secrets: a change touching one takes the strictest level."
+		},
+		"launches": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"anyOf": [
+					{
+						"type": "object",
+						"properties": {
+							"glob": {
+								"type": "string",
+								"minLength": 1
+							},
+							"level": {
+								"type": "string",
+								"minLength": 1
+							},
+							"from": {
+								"type": "string",
+								"format": "date",
+								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+							},
+							"until": {
+								"type": "string",
+								"format": "date",
+								"pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+							}
+						},
+						"required": [
+							"glob",
+							"level",
+							"from",
+							"until"
+						],
+						"additionalProperties": false
+					},
+					{
+						"type": "object",
+						"properties": {
+							"glob": {
+								"type": "string",
+								"minLength": 1
+							},
+							"level": {
+								"type": "string",
+								"minLength": 1
+							},
+							"base": {
+								"type": "string",
+								"minLength": 1
+							}
+						},
+						"required": [
+							"glob",
+							"level",
+							"base"
+						],
+						"additionalProperties": false
+					}
+				]
+			},
+			"description": "Raises a path to a level for a launch: between two dates, from 'from' up to 'until', or while the base branch matches 'base'."
+		},
+		"sizeRange": {
+			"default": {
+				"changes": 50,
+				"fewest": 20,
+				"middle": 0.8
+			},
+			"type": "object",
+			"properties": {
+				"changes": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				},
+				"fewest": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				},
+				"middle": {
+					"type": "number",
+					"exclusiveMinimum": 0,
+					"exclusiveMaximum": 1
+				}
+			},
+			"required": [
+				"changes",
+				"fewest",
+				"middle"
+			],
+			"additionalProperties": false,
+			"description": "A path's usual size: the middle share of the lines its last 'changes' merged changes touched. A change above it goes one level up; a path with fewer than 'fewest' changes has no range."
+		},
+		"loosenedCheck": {
+			"default": {
+				"added": [
+					"\\.(skip|skipIf|todo)\\(",
+					"\\bx(it|test|describe)\\(",
+					"(eslint|oxlint|biome)[- ](disable|ignore)",
+					"@ts-(ignore|expect-error|nocheck)"
+				],
+				"removed": [
+					"^\\s*(test|it|describe)(\\.\\w+)?\\(",
+					"^\\s*\"[@\\w/-]+\"\\s*:\\s*\\[?\"(error|warn)\""
+				]
+			},
+			"type": "object",
+			"properties": {
+				"added": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"removed": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				}
+			},
+			"required": [
+				"added",
+				"removed"
+			],
+			"additionalProperties": false,
+			"description": "A change whose added or removed lines match one of these loosens a check and goes one level up; empty lists turn the rule off."
+		},
+		"changeLabels": {
+			"default": {
+				"fixWindow": 10,
+				"fixSubject": "^fix(\\(.+\\))?!?:",
+				"revertSubject": "^(Revert \"|[Rr]evert(\\(.+\\))?!?:)",
+				"revertTrailer": "This reverts commit ([0-9a-f]{7,40})"
+			},
+			"type": "object",
+			"properties": {
+				"fixWindow": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				},
+				"fixSubject": {
+					"type": "string",
+					"minLength": 1
+				},
+				"revertSubject": {
+					"type": "string",
+					"minLength": 1
+				},
+				"revertTrailer": {
+					"type": "string",
+					"minLength": 1
+				}
+			},
+			"required": [
+				"fixWindow",
+				"fixSubject",
+				"revertSubject",
+				"revertTrailer"
+			],
+			"additionalProperties": false,
+			"description": "How hum labels a merged change from git: reverted by a commit whose trailer names it or whose subject reverts its subject; fixed by a fix commit within the next 'fixWindow' merged changes on its files that names it or changes its lines."
+		},
+		"historyDepth": {
+			"default": 1000,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Commits of the base branch hum reads for size ranges and fix counts."
+		},
+		"lockfiles": {
+			"default": [
+				"bun.lock",
+				"bun.lockb",
+				"package-lock.json",
+				"yarn.lock",
+				"pnpm-lock.yaml"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Lockfiles where a changed line naming the engine package changes hum itself."
+		},
+		"hookPaths": {
+			"default": [
+				".husky/**",
+				".githooks/**",
+				"lefthook.yml",
+				".pre-commit-config.yaml"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Globs of tracked git hooks; a change to one changes hum itself."
+		},
+		"diffLimit": {
+			"default": 100000,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The most characters of a change's diff one prompt carries."
+		},
+		"failureTail": {
+			"default": 4000,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The last characters of the checks' output a fix run reads."
+		},
+		"kindMeanings": {
+			"default": {
+				"feature": "adds or changes what the product does or offers",
+				"fix": "corrects behaviour that is wrong, broken or inconsistent, with no new capability",
+				"docs": "changes only prose that explains the work: notes, changelog entries, guides, comments",
+				"hotfix": "an urgent correction to what is already live, named as urgent",
+				"check": "adds or repairs tests, benchmarks or other verification, with no change to behaviour"
+			},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "One line per kind saying what work it holds; the cheap model call reads these to pick an item's kind."
+		},
+		"fallbackKind": {
+			"default": "feature",
+			"type": "string",
+			"minLength": 1,
+			"description": "The kind an item runs as when neither its source nor the model call names one."
+		},
+		"docsOnly": {
+			"default": {
+				"kind": "docs",
+				"paths": [
+					"**/*.md",
+					"**/*.mdx",
+					"docs/**"
+				]
+			},
+			"type": "object",
+			"properties": {
+				"kind": {
+					"type": "string",
+					"minLength": 1
+				},
+				"paths": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				}
+			},
+			"required": [
+				"kind",
+				"paths"
+			],
+			"additionalProperties": false,
+			"description": "An item of this kind whose change touches a path outside these globs moves to its real kind."
+		},
+		"decisionModel": {
+			"default": "claude-haiku-5-5",
+			"type": "string",
+			"minLength": 1,
+			"description": "The model id of the cheap model call, made through claude -p."
+		},
+		"modelCallTimeoutSeconds": {
+			"default": 120,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long a cheap model call may take before it counts as an abstention."
+		},
+		"measuredModels": {
+			"default": {
+				"kind": {
+					"claude-haiku-5-5": 0.58,
+					"claude-sonnet-5-5": 0.63
+				},
+				"alignment": {
+					"claude-haiku-5-5": 0.68,
+					"claude-sonnet-5-5": 0.68
+				},
+				"plan-outcome": {
+					"claude-haiku-5-5": 1,
+					"claude-sonnet-5-5": 1
+				},
+				"review-verdict": {
+					"claude-haiku-5-5": 0.92,
+					"claude-sonnet-5-5": 0.83
+				},
+				"reply-option": {
+					"claude-haiku-5-5": 0.87
+				},
+				"repeat-pair": {
+					"claude-haiku-5-5": 1
+				},
+				"taste": {}
+			},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"enum": [
+					"kind",
+					"alignment",
+					"plan-outcome",
+					"review-verdict",
+					"reply-option",
+					"repeat-pair",
+					"taste"
+				]
+			},
+			"additionalProperties": {
+				"type": "object",
+				"propertyNames": {
+					"type": "string",
+					"minLength": 1
+				},
+				"additionalProperties": {
+					"type": "number",
+					"minimum": 0,
+					"maximum": 1
+				}
+			},
+			"required": [
+				"kind",
+				"alignment",
+				"plan-outcome",
+				"review-verdict",
+				"reply-option",
+				"repeat-pair",
+				"taste"
+			],
+			"description": "Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."
+		},
+		"minJudgeRate": {
+			"default": 0.8,
+			"type": "number",
+			"minimum": 0,
+			"maximum": 1,
+			"description": "The lowest measured rate at which hum trusts a model's pick at a boundary; below it the call abstains."
+		},
+		"questionLimits": {
+			"default": {
+				"cells": 80,
+				"wordCells": 40
+			},
+			"type": "object",
+			"properties": {
+				"cells": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				},
+				"wordCells": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				}
+			},
+			"required": [
+				"cells",
+				"wordCells"
+			],
+			"additionalProperties": false,
+			"description": "The most terminal cells a question holds, and the most any one word of it holds; a longer question is replaced by a short one and its text rides folded."
+		},
+		"questionTimeoutHours": {
+			"default": 24,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Hours after a question that an item with no saved wait still counts as unanswered; past them the item ends stuck."
+		},
+		"priorityLabels": {
+			"default": [
+				"priority:high"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Item labels that put its question first under the daily cap, highest first."
+		},
+		"undoableLevels": {
+			"default": [
+				"low",
+				"medium"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Levels at which a choice that touches only the change's own files is made without the owner."
+		},
+		"ownerBranchPrefix": {
+			"default": "hum/owner/",
+			"type": "string",
+			"format": "ends_with",
+			"pattern": ".*\\/$",
+			"description": "The branch prefix of a pull request that lands a commit the owner wrote, such as an answer."
+		},
+		"backgroundRuns": {
+			"default": true,
+			"type": "boolean",
+			"description": "Whether a run on the Mac is a Claude Code background agent, listed in agent view, instead of a claude -p process."
+		},
+		"backgroundLaunchSeconds": {
+			"default": 30,
+			"type": "number",
+			"exclusiveMinimum": 0,
+			"description": "How long a launch waits for the run it just started to appear in the agent list."
+		},
+		"backgroundPollSeconds": {
+			"default": 1,
+			"type": "number",
+			"exclusiveMinimum": 0,
+			"description": "The time between reads of a background run's transcript and job state."
+		},
+		"deniedRunCommands": {
+			"default": [
+				"gh issue",
+				"gh label",
+				"gh api",
+				"gh auth",
+				"gh repo",
+				"gh pr create",
+				"gh pr comment",
+				"gh pr review",
+				"gh pr edit",
+				"gh pr merge",
+				"gh pr ready",
+				"gh pr close",
+				"git push"
+			],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "Shell commands a background run may not run: each is denied as written, with any arguments."
+		},
+		"runAutoMode": {
+			"default": {
+				"environment": [
+					"A session named hum <item> <purpose> #<attempt> is an unattended hum run; nobody watches it, and its owner answers only the questions hum asks."
+				],
+				"allow": [
+					"$defaults",
+					"Running hum's own commands (hum comment, ask, file-follow-up, decide) is the run's routine work, GitHub writes included.",
+					"Reading the run's own PR and its checks on GitHub (gh pr checks, gh pr view, gh run view, --log-failed included) is routine: hum asks the run to read failed checks and fix them."
+				],
+				"hardDeny": [
+					"$defaults",
+					"Writing to GitHub other than through hum's own commands: commenting on, labelling, creating, editing or closing issues or PRs, submitting reviews, pushing, or reading a GitHub token (gh auth token, the keychain, ~/.config/gh).",
+					"Changing .hum/hum.json or any file under .github/workflows/."
+				]
+			},
+			"type": "object",
+			"properties": {
+				"environment": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"allow": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				},
+				"hardDeny": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					}
+				}
+			},
+			"required": [
+				"environment",
+				"allow",
+				"hardDeny"
+			],
+			"additionalProperties": false,
+			"description": "What auto mode's classifier is told about a background run: the situation it is in, what it allows, and what it always refuses; '$defaults' keeps Claude Code's own rules."
+		},
+		"runSlots": {
+			"default": {
+				"enabled": false,
+				"pool": "../.hum-slots",
+				"services": "per-slot",
+				"ports": {
+					"base": 20000,
+					"stride": 10
+				},
+				"projectPrefix": "hum",
+				"stepTimeoutSeconds": 600,
+				"recipe": {
+					"prepare": [],
+					"refresh": [],
+					"ready": []
+				}
+			},
+			"type": "object",
+			"properties": {
+				"enabled": {
+					"type": "boolean"
+				},
+				"pool": {
+					"type": "string",
+					"minLength": 1
+				},
+				"services": {
+					"type": "string",
+					"enum": [
+						"per-slot",
+						"shared"
+					]
+				},
+				"ports": {
+					"type": "object",
+					"properties": {
+						"base": {
+							"type": "integer",
+							"exclusiveMinimum": 0,
+							"maximum": 9007199254740991
+						},
+						"stride": {
+							"type": "integer",
+							"exclusiveMinimum": 0,
+							"maximum": 9007199254740991
+						}
+					},
+					"required": [
+						"base",
+						"stride"
+					],
+					"additionalProperties": false
+				},
+				"projectPrefix": {
+					"type": "string",
+					"minLength": 1
+				},
+				"stepTimeoutSeconds": {
+					"type": "integer",
+					"exclusiveMinimum": 0,
+					"maximum": 9007199254740991
+				},
+				"recipe": {
+					"type": "object",
+					"properties": {
+						"prepare": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"minLength": 1
+							},
+							"description": "Run once when a slot is made: install dependencies, start or attach services, seed data."
+						},
+						"refresh": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"run": {
+										"type": "string",
+										"minLength": 1
+									},
+									"when": {
+										"type": "string",
+										"enum": [
+											"always",
+											"lockfile-changed"
+										]
+									}
+								},
+								"required": [
+									"run",
+									"when"
+								],
+								"additionalProperties": false
+							},
+							"description": "Run after each return, once the slot is reset to the latest base: reinstall when a lockfile changed, reset the data."
+						},
+						"ready": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"minLength": 1
+							},
+							"description": "Run after prepare and each refresh; a slot where one fails leaves the pool."
+						}
+					},
+					"required": [
+						"prepare",
+						"refresh",
+						"ready"
+					],
+					"additionalProperties": false
+				}
+			},
+			"required": [
+				"enabled",
+				"pool",
+				"services",
+				"ports",
+				"projectPrefix",
+				"stepTimeoutSeconds",
+				"recipe"
+			],
+			"additionalProperties": false,
+			"description": "Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands."
+		},
+		"ownerLogins": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "GitHub logins whose pull request reviews and comments are the owner's review notes."
+		},
+		"repeatAt": {
+			"default": 2,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Review notes stating one rule at which hum files a check item for it."
+		},
+		"repeatPrecision": {
+			"default": 0.9,
+			"type": "number",
+			"exclusiveMinimum": 0,
+			"exclusiveMaximum": 1,
+			"description": "The lowest precision on labelled pairs at which a model's call that two notes state one rule files a check item; below it the pair waits as a possible repeat."
+		},
+		"tasteRules": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "The owner's taste rules that have no deterministic check. Each pull request hum opens gets a comment saying whether its diff keeps each rule; the comment reports only and gates nothing."
+		},
+		"memoryMaxBytes": {
+			"default": 8000,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The most bytes memory.md holds; a new entry past it is refused."
+		},
+		"memoryUnusedRuns": {
+			"default": 20,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Runs without use after which a memory.md entry is listed for the owner."
+		},
+		"measureWindow": {
+			"default": 20,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Merged changes the per-merge numbers average over, and the window per path."
+		},
+		"loopIntervalSeconds": {
+			"default": 3600,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "The time between passes that collect review notes, file check items and confirm CI ran their checks."
+		},
+		"proofTimeoutSeconds": {
+			"default": 900,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "How long the repo's checks may run, on a run's branch, on the base after a merge or as a new check on one note's commit, before they are stopped and fail."
+		},
+		"kindFloors": {
+			"default": {},
+			"type": "object",
+			"propertyNames": {
+				"type": "string",
+				"minLength": 1
+			},
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			},
+			"description": "A kind's lowest risk level: its changes take at least this level, as in { \"check\": \"high\" }."
+		},
+		"checkKind": {
+			"default": "check",
+			"type": "string",
+			"minLength": 1,
+			"description": "The kind of the work item filed for a rule that review notes repeat: it turns the notes into one check."
+		},
+		"breakCheck": {
+			"default": true,
+			"type": "boolean",
+			"description": "Whether the repo's checks run on the base after each merge, so a test that breaks there files a follow-up item."
+		},
+		"mergeRisk": {
+			"default": {
+				"weights": {
+					"impact": 2,
+					"verification": 2,
+					"rollback": 1.5,
+					"errorDetection": 1,
+					"alignment": 1
+				},
+				"cuts": [
+					1.5,
+					2.25
+				]
+			},
+			"type": "object",
+			"properties": {
+				"weights": {
+					"type": "object",
+					"propertyNames": {
+						"type": "string",
+						"enum": [
+							"impact",
+							"verification",
+							"rollback",
+							"errorDetection",
+							"alignment"
+						]
+					},
+					"additionalProperties": {
+						"type": "number",
+						"exclusiveMinimum": 0
+					},
+					"required": [
+						"impact",
+						"verification",
+						"rollback",
+						"errorDetection",
+						"alignment"
+					]
+				},
+				"cuts": {
+					"type": "array",
+					"prefixItems": [
+						{
+							"type": "number",
+							"exclusiveMinimum": 0
+						},
+						{
+							"type": "number",
+							"exclusiveMinimum": 0
+						}
+					],
+					"items": false,
+					"minItems": 2,
+					"maxItems": 2
+				}
+			},
+			"required": [
+				"weights",
+				"cuts"
+			],
+			"additionalProperties": false,
+			"description": "How the alignment grade raises a level: each category's grade, 1 to 3, times its weight, averaged; when the alignment call's grades move the average across a cut, the level goes one step up."
+		}
+	},
+	"required": [
+		"schemaVersion",
+		"levels",
+		"paths",
+		"roles",
+		"events",
+		"kinds",
+		"commitIdentity"
+	],
+	"additionalProperties": false
+}

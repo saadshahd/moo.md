@@ -17,7 +17,7 @@ On 2026-10-31 the user ruled on every `disputed` case, and the field went (cases
 
 Case fields: `skill` (path from repo root), `at` (opening text of the passage; found by text so line
 drift fails loud), `scout` (the scout's class), `label` (`proceed`, `ask`, or `ask-with-work-done`),
-`request`, `files`, `expect`, and optionally `env` and `allow` (extra tools) for the run, and `disputed`: why the label may be wrong, for the user to rule; the report gives totals with and without these cases. A case with no `skill` sends the request alone, to measure what holds outside any skill. The answer lives only in `files`; the runner fails setup if an expected
+`request`, `files`, `expect`, and optionally `env` and `allow` (extra tools) for the run, and `disputed`: why the label may be wrong, for the user to rule; the report gives totals with and without these cases. The eight `factory-*` cases read a frozen copy of the retired factory setup skill as the baseline ran it (commit 86dbbbf), `sound/evals/fixtures/factory-setup/`, so their results stay comparable. A case with no `skill` sends the request alone, to measure what holds outside any skill. The answer lives only in `files`; the runner fails setup if an expected
 string appears in the prompt.
 
 Checks (all deterministic): the reply turns to the user or not (`turned()`, a text heuristic), the

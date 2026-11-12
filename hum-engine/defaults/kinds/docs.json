@@ -1,0 +1,151 @@
+{
+	"tiers": [
+		{
+			"purpose": "plan",
+			"tier": "light",
+			"effort": "low"
+		},
+		{
+			"purpose": "plan",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "plan",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "build",
+			"tier": "light",
+			"effort": "low"
+		},
+		{
+			"purpose": "build",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "build",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "fix",
+			"tier": "light",
+			"effort": "low"
+		},
+		{
+			"purpose": "fix",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "fix",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "review",
+			"tier": "light",
+			"effort": "low"
+		},
+		{
+			"purpose": "review",
+			"level": "high",
+			"tier": "top",
+			"effort": "high"
+		},
+		{
+			"purpose": "review",
+			"level": "critical",
+			"tier": "top",
+			"effort": "high"
+		}
+	],
+	"tokenCap": {
+		"tokens": 200000,
+		"overCap": "asking"
+	},
+	"machine": {
+		"id": "docs",
+		"version": "1",
+		"initial": "building",
+		"states": {
+			"building": {
+				"invoke": {
+					"src": "build",
+					"onDone": {
+						"target": "checking"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"token-cap": {
+						"target": "asking"
+					}
+				}
+			},
+			"checking": {
+				"invoke": {
+					"src": "checks",
+					"onDone": {
+						"target": "merging"
+					},
+					"onError": {
+						"target": "fixing"
+					}
+				}
+			},
+			"fixing": {
+				"invoke": {
+					"src": "fix",
+					"onDone": {
+						"target": "checking"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"token-cap": {
+						"target": "asking"
+					}
+				}
+			},
+			"merging": {
+				"on": {
+					"merged": {
+						"target": "done"
+					}
+				}
+			},
+			"asking": {
+				"tags": [
+					"owner-wait"
+				],
+				"on": {
+					"answered": {
+						"target": "building"
+					}
+				}
+			},
+			"stuck": {
+				"tags": [
+					"stuck"
+				]
+			},
+			"done": {
+				"type": "final"
+			}
+		}
+	}
+}

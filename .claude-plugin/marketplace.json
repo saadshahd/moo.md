@@ -59,15 +59,16 @@
       ]
     },
     {
-      "name": "factory",
-      "source": "./factory",
-      "description": "A GitHub agent factory that runs on your own machine. Issues labelled factory become background Claude Code runs with hope; you see plans, calls, stuck runs and cost per merged PR in /factory.",
+      "name": "hum",
+      "source": "./hum",
+      "description": "Work items become Claude Code agent runs, on your Mac or in CI. The repo's own checks decide what they can, a path's risk level decides who reviews, and only what nothing settles becomes a question to you.",
       "category": "automation",
       "keywords": [
-        "factory",
-        "issues",
-        "background",
-        "worker"
+        "hum",
+        "work items",
+        "agent runs",
+        "checks",
+        "background"
       ]
     }
   ]

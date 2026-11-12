@@ -1,3 +1,0 @@
-# `bun test` runs the worker's specs only; `claude plugin test factory` runs the hooks' *.test.ts.
-[test]
-root = "worker"

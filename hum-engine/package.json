@@ -1,0 +1,90 @@
+{
+  "name": "@moo.md/hum",
+  "version": "0.1.0",
+  "description": "The hum engine: work items become Claude Code agent runs, the repo's checks decide what they can, and only what nothing settles becomes a question to the owner.",
+  "license": "MIT",
+  "author": {
+    "name": "Saad Shahd",
+    "url": "https://saadshahd.github.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/saadshahd/moo.md.git",
+    "directory": "hum-engine"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "hum": "src/cli/main.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapter-api": "./src/adapter-api.ts"
+  },
+  "files": [
+    "src",
+    "schema",
+    "defaults",
+    "evals",
+    "scripts/eval.ts",
+    "surface.json"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "schema": "bun scripts/write-schema.ts",
+    "eval": "bun scripts/eval.ts",
+    "release:check": "bun tools/release/main.ts check",
+    "release:surface": "bun tools/release/main.ts surface",
+    "lint": "oxlint src test tools/release",
+    "test": "n=$(getconf _NPROCESSORS_ONLN); seq 1 $n | xargs -P $n -I{} bun test --shard={}/$n --timeout 30000 test"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "@ast-grep/napi": "0.51.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@octokit/core": "7.0.8",
+    "@octokit/graphql": "9.0.5",
+    "@octokit/plugin-paginate-graphql": "6.0.0",
+    "@octokit/plugin-throttling": "11.0.5",
+    "@octokit/request-error": "7.1.2",
+    "@sindresorhus/slugify": "4.0.0",
+    "@statelyai/agent": "2.0.0-alpha.37",
+    "commander": "15.1.0",
+    "cron-validator": "1.4.0",
+    "expiry-map": "2.0.0",
+    "hosted-git-info": "10.1.1",
+    "is-git-ref-name-valid": "1.0.0",
+    "mdast-util-from-markdown": "2.1.0",
+    "mdast-util-frontmatter": "2.0.1",
+    "micromark-extension-frontmatter": "2.0.0",
+    "p-memoize": "9.0.0",
+    "p-queue": "10.0.0",
+    "p-retry": "9.0.0",
+    "p-timeout": "8.1.0",
+    "parse-diff": "0.12.0",
+    "plist": "5.1.0",
+    "proper-lockfile": "4.1.2",
+    "safe-stable-stringify": "3.0.0",
+    "semver": "7.8.6",
+    "simple-statistics": "8.0.0",
+    "tinyexec": "1.3.1",
+    "write-file-atomic": "8.0.0",
+    "xstate": "6.0.0-beta.0",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.89.0",
+    "@types/bun": "1.3.14",
+    "@types/hosted-git-info": "3.0.5",
+    "@types/mdast": "4.0.4",
+    "@types/proper-lockfile": "4.1.4",
+    "@types/semver": "7.8.0",
+    "@types/write-file-atomic": "4.0.3",
+    "microdiff": "1.6.0",
+    "oxlint": "1.89.0",
+    "typescript": "5.9.2"
+  }
+}
