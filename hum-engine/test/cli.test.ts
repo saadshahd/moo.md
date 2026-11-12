@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type HumConfig, SCHEMA_VERSION } from "../src/config/schema.ts";
 import { OWNER } from "./fixtures/identity.ts";
+import { MAIN } from "./fixtures/owner-repo.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 
-const MAIN = join(import.meta.dir, "..", "src", "cli", "main.ts");
 
 const hum = (cwd: string, ...args: string[]) => {
 	const result = spawnSync("bun", [MAIN, ...args], { cwd, encoding: "utf8" });

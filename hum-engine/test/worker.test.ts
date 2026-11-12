@@ -7,6 +7,8 @@ import { sh } from "./fixtures/work-repo.ts";
 import { FakePulls } from "./fixtures/fake-pulls.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
+import { WAIT_HOURS } from "../src/setup/tables.ts";
+import { HOUR_MS } from "../src/time.ts";
 
 const worlds: WorkerWorld[] = [];
 
@@ -347,7 +349,9 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 
 	const calls = w.shim.calls().length;
 
-	w.clock.at += 86_400_001;
+	const pastTheWait = WAIT_HOURS.owner * HOUR_MS + 1;
+
+	w.clock.at += pastTheWait;
 	await w.worker.tick();
 
 	expect(w.state.parked.get("a")).toMatchObject({ why: "stuck" });
@@ -356,7 +360,7 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 
 	const status = readStatus(w.state.statusPath);
 
-	expect(status.ok && w.clock.at - (status.status.workers.ci ?? 0)).toBe(86_400_001);
+	expect(status.ok && w.clock.at - (status.status.workers.ci ?? 0)).toBe(pastTheWait);
 });
 
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {

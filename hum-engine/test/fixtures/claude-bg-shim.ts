@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { shimSpecJson } from "./shim.ts";
+import { SHIM_MODEL, shimSpecJson } from "./shim.ts";
 
 /**
  * The background half of the `claude` stand-in: `--bg`, `agents --json`, `stop` and `rm`. A launched run is the
@@ -114,7 +114,7 @@ const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = 
 
 		if (event.type === "rate_limit_event") resetsAt = event.rate_limit_info.resetsAt;
 
-		if (event.type === "assistant") rows({ type: "assistant", message: { id: event.message.id, model: "claude-haiku-5-5", usage: event.message.usage } });
+		if (event.type === "assistant") rows({ type: "assistant", message: { id: event.message.id, model: SHIM_MODEL, usage: event.message.usage } });
 
 		if (event.type !== "result") continue;
 

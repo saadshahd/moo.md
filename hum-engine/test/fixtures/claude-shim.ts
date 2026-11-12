@@ -7,7 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { type Behavior, type Decided, shimSpecJson } from "./shim.ts";
+import { type Behavior, type Decided, READY_PLAN, SHIM_MODEL, shimSpecJson } from "./shim.ts";
 
 /**
  * A stand-in for the `claude` binary. HUM_SHIM names a JSON file: `{version, log, script}`.
@@ -55,7 +55,7 @@ if (process.argv.includes("--no-session-persistence")) {
 
 	appendFileSync(`${log}.judgments`, `${JSON.stringify({ asked })}\n`);
 	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [] }));
-	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: JUDGMENTS[asked], modelUsage: { "claude-haiku-5-5": { inputTokens: 1, outputTokens: 1 } } }));
+	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: JUDGMENTS[asked], modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 1 } } }));
 	process.exit(0);
 }
 
@@ -71,7 +71,7 @@ const prompt = new TextDecoder().decode(stdin);
 const itemId = /^# Item (\S+):/m.exec(prompt)?.[1];
 
 const DECIDED: Record<"plan" | "review", Decided> = {
-	plan: { event: "plan-ready", sure: true, reason: "The item is clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } },
+	plan: READY_PLAN,
 	review: { event: "approve", sure: true, reason: "The change does what the item asks." },
 };
 
@@ -93,7 +93,7 @@ if (schemaArg.includes('"sure"')) {
 
 	appendFileSync(decisionLog, `${JSON.stringify({ purpose, answer, prompt, cwd: process.cwd() })}\n`);
 	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [{ name: "hope" }] }));
-	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: answer, modelUsage: { "claude-haiku-5-5": { inputTokens: 1, outputTokens: 10 } } }));
+	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: answer, modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 10 } } }));
 	process.exit(0);
 }
 
@@ -199,7 +199,7 @@ await (step.stderrNoise ? outSplit : out)({
 	result: step.error ?? '{"ok":true}',
 	structured_output: step.askUnlessAnswered && !prompt.includes("## The owner answered") ? { status: "needs-owner", question: step.askUnlessAnswered, plan: "Plan A" } : (step.structured ?? { ok: true }),
 	modelUsage: {
-		"claude-haiku-5-5": {
+		[SHIM_MODEL]: {
 			inputTokens: 1,
 			outputTokens: tokens,
 			cacheCreationInputTokens: 0,

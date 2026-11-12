@@ -16,7 +16,7 @@ import { type Checkout, PLAN_MARK, runBranch, runThinPath, type ThinPathOptions 
 import { configWith } from "../fixtures/config.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { WorkRepo, itemFile, markdownSettings, sh } from "../fixtures/work-repo.ts";
-import { makeShim, type ShimSpec } from "../fixtures/shim.ts";
+import { makeShim, READY_PLAN, type ShimSpec } from "../fixtures/shim.ts";
 import { BASE, poolConfig } from "../fixtures/slot-world.ts";
 import { FakePulls } from "../fixtures/fake-pulls.ts";
 
@@ -463,7 +463,7 @@ const featureJudge = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND
 test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, and an approval merges it", async () => {
 	const [buildStdin, fixStdin] = [join(tmpdir(), `hum-review-build-${process.pid}`), join(tmpdir(), `hum-review-fix-${process.pid}`)];
 	const cite = { event: "request-changes", sure: true, reason: "The note says nothing.", cites: [{ file: "docs/note.md", line: 1 }] };
-	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { commit: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [{ event: "plan-ready", sure: true, reason: "Clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } }, cite] });
+	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { commit: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, cite] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.options({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
@@ -563,10 +563,9 @@ test("an alignment call below the bar gates nothing: the change still lands by i
 
 test("a review that leaves the change to the owner asks; the owner's approval lands it past its level's own review run, and a rejection sends it to a fix with the owner's words", async () => {
 	const toOwner = { event: "needs-owner", sure: true, reason: "A matter of tone.", question: "Is the tone right?" };
-	const ready = { event: "plan-ready", sure: true, reason: "Clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };
 	const fixStdin = join(tmpdir(), `hum-owner-fix-${process.pid}`);
 	const config = configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }]));
-	const w = await world({ script: [{}, NOTE, { commit: { "docs/other.md": "other\n" } }, { commit: { "docs/other.md": "other, softer\n" }, saveStdin: fixStdin }], decisions: [ready, toOwner, ready, toOwner] }, { config });
+	const w = await world({ script: [{}, NOTE, { commit: { "docs/other.md": "other\n" } }, { commit: { "docs/other.md": "other, softer\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, toOwner, READY_PLAN, toOwner] }, { config });
 	const approved = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.options({ judge: featureJudge }))).toEqual({ outcome: "asked", item: approved, detail: "Is the tone right?" });

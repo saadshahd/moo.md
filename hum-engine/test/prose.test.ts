@@ -12,9 +12,10 @@ import { reviewInput } from "../src/decide/review.ts";
 import { openState } from "../src/state/open.ts";
 import { decideKind } from "../src/worker/kind.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
-import { configWith, SHIM_MODEL } from "./fixtures/config.ts";
+import { configWith } from "./fixtures/config.ts";
 import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { finished, runnerOf } from "./fixtures/records.ts";
+import { SHIM_MODEL } from "./fixtures/shim.ts";
 
 const config = configWith();
 const levels = config.hum.levels;

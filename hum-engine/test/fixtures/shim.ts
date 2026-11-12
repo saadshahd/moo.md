@@ -4,6 +4,9 @@ import { join } from "node:path";
 
 const SHIM = join(import.meta.dir, "claude-shim.ts");
 
+/** The model id the shim answers as. */
+export const SHIM_MODEL = "claude-haiku-5-5";
+
 /** The JSON spec a shim process runs by, from the file HUM_SHIM names: Linux refuses one environment variable over 128 KB, and a spec can hold a longer output. */
 export const shimSpecJson = (): string => {
 	const file = process.env.HUM_SHIM;
@@ -48,6 +51,9 @@ export type Behavior = {
 
 /** What a plan or review run picks, as the run's answer. */
 export type Decided = { event: string; sure: boolean; reason: string; cites?: { file: string; line: number }[]; parts?: string[]; question?: string; plan?: { summary: string; steps: string[]; paths: string[] } };
+
+/** A plan run's pick of a clear item: write docs/note.md in one step. */
+export const READY_PLAN: Decided = { event: "plan-ready", sure: true, reason: "The item is clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };
 
 export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean; agentsWrapped?: boolean };
 

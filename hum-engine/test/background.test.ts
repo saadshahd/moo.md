@@ -8,7 +8,7 @@ import { type Runner, type RunRequest, startRunner } from "../src/adapters/claud
 import { readTranscript, billedTokens } from "../src/adapters/transcript.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
-import { makeShim, type ShimSpec } from "./fixtures/shim.ts";
+import { makeShim, SHIM_MODEL, type ShimSpec } from "./fixtures/shim.ts";
 
 const MODEL = SHIPPED_DEFAULTS.models.light;
 const CONFIG = { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.05 };
@@ -27,7 +27,7 @@ const ask = (runner: Runner, over: Partial<RunRequest> = {}) => runner.run({ nam
 
 type Usage = { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number; iterations?: { type: string; input_tokens: number; output_tokens: number }[] };
 
-const assistant = (id: string, usage: Usage) => JSON.stringify({ type: "assistant", message: { id, model: "claude-haiku-5-5", usage } });
+const assistant = (id: string, usage: Usage) => JSON.stringify({ type: "assistant", message: { id, model: SHIM_MODEL, usage } });
 
 const attachment = (timestamp: string) => JSON.stringify({ type: "attachment", timestamp, attachment: { type: "structured_output", data: STRUCTURED } });
 
@@ -54,7 +54,7 @@ const NOW_MS = Date.parse("2026-11-08T10:00:00.000Z");
 
 const reading = (over: Partial<Reading> & { structuredAt?: number; spent?: number }): Reading => ({
 	transcript: {
-		messages: over.spent === undefined ? {} : { m: { billed: over.spent, output: 0, cacheRead: 0, model: "claude-haiku-5-5" } },
+		messages: over.spent === undefined ? {} : { m: { billed: over.spent, output: 0, cacheRead: 0, model: SHIM_MODEL } },
 		structured: over.structuredAt === undefined ? undefined : { data: STRUCTURED, at: over.structuredAt },
 		apiError: over.transcript?.apiError,
 		limit: over.transcript?.limit,
@@ -97,7 +97,7 @@ test("a named run is a background agent: its prompt comes on stdin, its tokens a
 	const sessions: string[] = [];
 	const outcome = await ask(background, { prompt: "build the thing", onSession: (id) => sessions.push(id) });
 
-	expect(outcome).toMatchObject({ kind: "finished", structured: { done: 1 }, tokens: 8, isError: false, models: ["claude-haiku-5-5"] });
+	expect(outcome).toMatchObject({ kind: "finished", structured: { done: 1 }, tokens: 8, isError: false, models: [SHIM_MODEL] });
 	expect(sessions).toHaveLength(1);
 
 	const [launch, ...after] = shim.background();

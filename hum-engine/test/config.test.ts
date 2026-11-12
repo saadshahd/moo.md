@@ -11,7 +11,6 @@ import {
 	type Config,
 	HumConfig,
 	kindMachine,
-	listHopeSkills,
 	loadConfig,
 	migrateConfig,
 	Json,
@@ -20,44 +19,20 @@ import {
 	pickTier,
 	type Problem,
 	type RawConfig,
-	readConfigDir,
 } from "../src/index.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { readSettings } from "../src/config/settings.ts";
+import { WAIT_HOURS } from "../src/setup/tables.ts";
+import { DAY_MS, HOUR_MS } from "../src/time.ts";
+import { hopeSkills, root, shippedRaw, type Tree, withProposedTimeouts } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 
-const root = join(import.meta.dir, "..");
-const env = { hopeSkills: listHopeSkills(join(root, "../hope")) };
-const DAY = 86_400_000;
-
-/** A JSON tree the tests edit in place. */
-type Tree = any; // oxlint-disable-line typescript/no-explicit-any
+const env = { hopeSkills: hopeSkills() };
 
 const clone = (raw: RawConfig): Tree => structuredClone(raw);
 
-/** The defaults and the one setting only the owner holds: who their commits are credited to. */
-const shipped = (): RawConfig => {
-	const raw: Tree = clone(readConfigDir(join(root, "defaults")));
-
-	raw.hum.commitIdentity = OWNER;
-
-	return raw;
-};
-
-/** What setup does: give every wait a timeout and a place to go. */
-const withTimeouts = (raw: RawConfig): RawConfig => {
-	const next = clone(raw);
-
-	for (const kind of Object.values<Tree>(next.kinds)) {
-		for (const node of Object.values<Tree>(kind.machine.states)) {
-			if (node.tags?.some((t: string) => t === "wait" || t === "owner-wait")) {
-				node.after = { [DAY]: { target: "stuck" } };
-			}
-		}
-	}
-
-	return next;
-};
+/** The shipped config as setup writes it when no wait is answered. */
+const setUp = (): RawConfig => withProposedTimeouts(shippedRaw());
 
 const loaded = (raw: RawConfig): Config => {
 	const result = loadConfig(raw, { env });
@@ -81,8 +56,8 @@ const change = (current: Config | undefined, candidate: RawConfig, extra: { bran
 	applyConfigChange(current, { candidate, branch: "main", ...extra }, { env });
 
 test("as shipped, each default kind fails only on its waits having no timeout", () => {
-	const problems = problemsOf(shipped());
-	const kinds = new Set(Object.keys(shipped().kinds));
+	const problems = problemsOf(shippedRaw());
+	const kinds = new Set(Object.keys(shippedRaw().kinds));
 
 	expect(problems.length).toBeGreaterThan(0);
 	expect(problems.every((p) => p.problem === "wait-without-timeout")).toBe(true);
@@ -91,7 +66,7 @@ test("as shipped, each default kind fails only on its waits having no timeout", 
 });
 
 test("once a fixture fills the timeouts, each default kind passes every check", () => {
-	const config = loaded(withTimeouts(shipped()));
+	const config = loaded(setUp());
 
 	expect(Object.keys(config.kinds).sort()).toEqual(["check", "docs", "feature", "fix", "hotfix"]);
 
@@ -99,7 +74,7 @@ test("once a fixture fills the timeouts, each default kind passes every check", 
 });
 
 test("a rename that strands a saved item is refused; with a map the item restores", async () => {
-	const before = loaded(withTimeouts(shipped()));
+	const before = loaded(setUp());
 	const machine = kindMachine(before.kinds.feature!);
 	const actor = createActor(machine).start();
 	actor.send({ type: "plan-ready" });
@@ -110,7 +85,7 @@ test("a rename that strands a saved item is refused; with a map the item restore
 	actor.stop();
 
 	const renamed = (map: boolean): RawConfig => {
-		const next = clone(withTimeouts(shipped()));
+		const next = clone(setUp());
 		const text = JSON.stringify(next.kinds.feature).replaceAll("owner-review", "deep-review");
 		next.kinds.feature = JSON.parse(text);
 		next.kinds.feature.machine.version = "2";
@@ -138,25 +113,25 @@ test("a rename that strands a saved item is refused; with a map the item restore
 	const restored = restoreActor(kindMachine(next), migrated as never, { clock }).start();
 	expect(restored.getSnapshot().status).toBe("active");
 	expect(restored.getSnapshot().value).toBe("deep-review");
-	clock.increment(DAY);
+	clock.increment(WAIT_HOURS.owner * HOUR_MS);
 	expect(restored.getSnapshot().value).toBe("stuck");
 });
 
 test("a saved item names its kind by machine id, so a kind whose id differs from its file name still strands it", () => {
-	const named = (raw: RawConfig): Tree => {
-		const next = clone(withTimeouts(raw));
+	const named = (): Tree => {
+		const next = clone(setUp());
 
 		next.kinds.feature.machine.id = "feature-machine";
 
 		return next;
 	};
 
-	const renamed = named(shipped());
+	const renamed = named();
 
 	renamed.kinds.feature = JSON.parse(JSON.stringify(renamed.kinds.feature).replaceAll("owner-review", "deep-review"));
 	renamed.kinds.feature.machine.version = "2";
 
-	const refused = change(loaded(named(shipped())), renamed, { saved: [{ kind: "feature-machine", state: "owner-review" }] });
+	const refused = change(loaded(named()), renamed, { saved: [{ kind: "feature-machine", state: "owner-review" }] });
 
 	expect(!refused.accepted && refused.refusals[0]?.code).toBe("unmapped-state");
 });
@@ -174,8 +149,8 @@ test("the previous schema migrates", () => {
 });
 
 test("an unknown schema version is refused and names the step", () => {
-	const newer = loadConfig({ ...shipped(), hum: { schemaVersion: 99 } }, { env });
-	const older = loadConfig({ ...shipped(), hum: { schemaVersion: 0 } }, { env });
+	const newer = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 99 } }, { env });
+	const older = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 0 } }, { env });
 
 	expect(!newer.ok && newer.refusal.code).toBe("unknown-schema-version");
 	expect(!newer.ok && newer.refusal.message).toContain("Update the engine");
@@ -197,7 +172,7 @@ test("a setting read outside the full config refuses a hum.json of a schema vers
 
 test("a config with no commit identity, or an empty name or email, is refused, naming the setting", () => {
 	const refusals = [undefined, { name: "", email: OWNER.email }, { name: OWNER.name, email: "" }].map((identity) => {
-		const raw: Tree = clone(withTimeouts(shipped()));
+		const raw: Tree = clone(setUp());
 
 		if (identity === undefined) delete raw.hum.commitIdentity;
 		else raw.hum.commitIdentity = identity;
@@ -223,7 +198,7 @@ test("hum ships no email address: its defaults and its schema hold none", () => 
 
 test("a missing hope skill is refused, naming the skill and the role", () => {
 	const fake = { hopeSkills: new Set(["intent", "shape"]) };
-	const result = loadConfig(withTimeouts(shipped()), { env: fake });
+	const result = loadConfig(setUp(), { env: fake });
 
 	expect(result.ok).toBe(false);
 	expect(!result.ok && result.refusal.code === "invalid-config" && result.refusal.problems).toEqual([
@@ -233,8 +208,8 @@ test("a missing hope skill is refused, naming the skill and the role", () => {
 });
 
 test("an unreachable state and a wait with no timeout give one refusal naming both; the old config stays", () => {
-	const good = loaded(withTimeouts(shipped()));
-	const bad = clone(withTimeouts(shipped()));
+	const good = loaded(setUp());
+	const bad = clone(setUp());
 	bad.kinds.feature.machine.states.orphan = { tags: ["stuck"] };
 	delete bad.kinds.feature.machine.states.asking.after;
 
@@ -252,7 +227,7 @@ test("an unreachable state and a wait with no timeout give one refusal naming bo
 });
 
 test("a state that never reaches done or stuck is refused", () => {
-	const bad = clone(withTimeouts(shipped()));
+	const bad = clone(setUp());
 	bad.kinds.feature.machine.states.trap = { on: { answered: { target: "trap" } } };
 	bad.kinds.feature.machine.states.fixing.on = { "token-cap": { target: "asking" }, "plan-ready": { target: "trap" } };
 
@@ -260,7 +235,7 @@ test("a state that never reaches done or stuck is refused", () => {
 });
 
 test("a deleted role leaves an event with no source", () => {
-	const bad = clone(withTimeouts(shipped()));
+	const bad = clone(setUp());
 	delete bad.hum.roles.plan;
 
 	const problems = problemsOf(bad);
@@ -269,7 +244,7 @@ test("a deleted role leaves an event with no source", () => {
 });
 
 test("an event no machine handles, and a waited event nobody declares, are refused", () => {
-	const bad = clone(withTimeouts(shipped()));
+	const bad = clone(setUp());
 	bad.hum.events.ghost = { source: "owner" };
 	bad.kinds.docs.machine.states.asking.on.mystery = { target: "building" };
 
@@ -280,9 +255,9 @@ test("an event no machine handles, and a waited event nobody declares, are refus
 });
 
 test("a state that starts a run and waits on the owner is refused", () => {
-	const bad = clone(withTimeouts(shipped()));
+	const bad = clone(setUp());
 	bad.kinds.feature.machine.states.building.tags = ["owner-wait"];
-	bad.kinds.feature.machine.states.building.after = { [DAY]: { target: "stuck" } };
+	bad.kinds.feature.machine.states.building.after = { [DAY_MS]: { target: "stuck" } };
 
 	expect(problemsOf(bad)).toContainEqual({ kind: "feature", problem: "run-and-owner-wait", state: "building" });
 });
@@ -316,13 +291,13 @@ test("settings an owner changes load as given, and a value that breaks its rule 
 		ciSchedule: "0 6 * * 1-5",
 	};
 
-	const raw = clone(withTimeouts(shipped()));
+	const raw = clone(setUp());
 
 	Object.assign(raw.hum, changed);
 	expect(loaded(raw).hum).toMatchObject(changed);
 
 	for (const refused of [{ providerBackoff: { firstSeconds: 40, maxSeconds: 20 } }, { mergedShown: 0 }, { mergeTries: 0 }, { ciSchedule: "61 * * * *" }, { restartDelaySeconds: 0.5 }]) {
-		const bad = clone(withTimeouts(shipped()));
+		const bad = clone(setUp());
 
 		Object.assign(bad.hum, refused);
 		expect(loadConfig(bad, { env }).ok, JSON.stringify(refused)).toBe(false);
@@ -334,8 +309,8 @@ test("the committed schema file matches the schema in code", () => {
 });
 
 test("a config change from a branch hum writes is refused and the last good config stays", () => {
-	const good = loaded(withTimeouts(shipped()));
-	const edited = clone(withTimeouts(shipped()));
+	const good = loaded(setUp());
+	const edited = clone(setUp());
 	edited.hum.levels = ["low", "high"];
 	edited.hum.paths = [];
 
@@ -347,8 +322,8 @@ test("a config change from a branch hum writes is refused and the last good conf
 });
 
 test("a change from a claim branch is refused too, and the last good config's prefixes decide", () => {
-	const good = loaded(withTimeouts(shipped()));
-	const renamed = clone(withTimeouts(shipped()));
+	const good = loaded(setUp());
+	const renamed = clone(setUp());
 	renamed.hum.runBranchPrefix = "bots/run/";
 
 	expect(change(good, renamed, { branch: "hum/claim/7" }).accepted).toBe(false);
@@ -357,7 +332,7 @@ test("a change from a claim branch is refused too, and the last good config's pr
 });
 
 test("a hum.json without the branch and label keys gets the shipped names", () => {
-	const raw = withTimeouts(shipped());
+	const raw = setUp();
 	const bare = clone(raw);
 	delete bare.hum.runBranchPrefix;
 	delete bare.hum.claimPrefix;
@@ -367,9 +342,9 @@ test("a hum.json without the branch and label keys gets the shipped names", () =
 });
 
 test("a branch prefix that makes no valid git branch, or two prefixes that overlap, are refused", () => {
-	const spaced = clone(withTimeouts(shipped()));
+	const spaced = clone(setUp());
 	spaced.hum.claimPrefix = "hum claim/";
-	const nested = clone(withTimeouts(shipped()));
+	const nested = clone(setUp());
 	nested.hum.claimPrefix = "hum/run/claim/";
 
 	const malformed = change(undefined, spaced);
@@ -380,7 +355,7 @@ test("a branch prefix that makes no valid git branch, or two prefixes that overl
 });
 
 test("the hash ignores key order and changes with content", () => {
-	const raw = withTimeouts(shipped());
+	const raw = setUp();
 	const reordered = JSON.parse(JSON.stringify(raw, (_key, v) => (v && Object(v) === v && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).reverse()) : v)));
 	const edited = clone(raw);
 	edited.roles["roles/build.md"] += "\nAlso run the linter.";
@@ -390,9 +365,9 @@ test("the hash ignores key order and changes with content", () => {
 });
 
 test("a tier table with a gap is refused, and the most specific row wins", () => {
-	const bad = clone(withTimeouts(shipped()));
+	const bad = clone(setUp());
 	bad.kinds.docs.tiers = bad.kinds.docs.tiers.filter((row: Tree) => !(row.purpose === "build" && row.level === undefined));
-	const tiers = loaded(withTimeouts(shipped())).kinds.feature!;
+	const tiers = loaded(setUp()).kinds.feature!;
 
 	expect(problemsOf(bad)).toContainEqual({ kind: "docs", problem: "tier-table-gap", purpose: "build", level: "low", size: "small" });
 	expect(pickTier(tiers, { purpose: "build", level: "critical", size: "small" })).toMatchObject({ tier: "top", effort: "high" });
