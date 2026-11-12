@@ -2,7 +2,7 @@ import type { EngineInterface } from "claude-code";
 import type { ViewSource } from "../types";
 import { agesShown } from "./view/ages.ts";
 import { readOf, statusPathOf, type ViewRead } from "./view/read.ts";
-import { failureOf, runHum } from "./press.ts";
+import { failureOf, runHum } from "./hum.ts";
 
 type Engine = EngineInterface;
 

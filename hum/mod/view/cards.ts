@@ -1,16 +1,11 @@
 import type { Card, Question } from "../../../hum-engine/src/status/format.ts";
 import type { Unread } from "../../types";
-import { buttonWords } from "../answer/fill.ts";
+import { buttonWords, displayId } from "../item.ts";
 import { ageSeconds, ageText } from "./freshness.ts";
 import { button, buttonRows } from "./buttons.ts";
 import { cells, ellipsize, wrap } from "./cells.ts";
 import { GLYPHS, SEPARATOR } from "./glyphs.ts";
 import { type Row, type Tone, span } from "./row.ts";
-
-const ITEM_ID = /^\d+$/;
-
-/** A numeric item id reads as an issue number. */
-export const displayId = (item: string): string => (ITEM_ID.test(item) ? `#${item}` : item);
 
 const RULE_LEAD = 2;
 const RULE_TAIL_MIN = 2;

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { adjacencyMapToArray, getAdjacencyMap } from "xstate/graph";
-import { FREE_ANSWER, answerOf, buttonWords } from "../../../hum/mod/answer/fill.ts";
+import { answerOf } from "../../../hum/mod/answer/fill.ts";
+import { buttonWords, FREE_ANSWER } from "../../../hum/mod/item.ts";
 import {
 	ANSWER_EVENTS,
 	ANSWER_STATES,

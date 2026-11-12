@@ -1,6 +1,6 @@
 import { cells, ellipsize, rowCells, spaces, wrap } from "./cells.ts";
 import { ageSeconds, ageText } from "./freshness.ts";
-import { displayId } from "./cards.ts";
+import { displayId } from "../item.ts";
 import { joinParts } from "./fit.ts";
 import { type Row, type Span, span } from "./row.ts";
 
