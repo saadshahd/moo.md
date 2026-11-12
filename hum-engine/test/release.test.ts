@@ -103,6 +103,14 @@ test("the surface holds the five parts, read from the sources a release publishe
 	expect(JSON.stringify(extracted.config.schema)).not.toContain('"description"');
 });
 
+test("the surface shows a class's public method signatures and what a type alias points at", async () => {
+	const symbols = (await extractSurface()).exportedTypes.symbols["src/index.ts"];
+
+	expect(symbols?.Faults?.type).toContain("clear: (");
+	expect(symbols?.Faults?.type).not.toContain("#");
+	expect(symbols?.Slot?.type).toContain('"work-source"');
+});
+
 test("the engine's lockfile resolves one xstate, so an owner's install holds one", async () => {
 	const lock = Lockfile.parse(Bun.JSONC.parse(await Bun.file(join(import.meta.dir, "../bun.lock")).text()));
 	const resolved = Object.values(lock.packages).filter(([id]) => id.startsWith("xstate@"));

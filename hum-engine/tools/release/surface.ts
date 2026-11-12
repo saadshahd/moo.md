@@ -75,12 +75,37 @@ const isTypeDeclaration = (declaration: ts.Declaration): boolean => ts.isInterfa
 const declarationText = (symbol: ts.Symbol): string =>
 	(symbol.declarations ?? []).filter(isTypeDeclaration).map((declaration) => printer.printNode(ts.EmitHint.Unspecified, declaration, declaration.getSourceFile())).join("\n");
 
+/** The compiler orders a union's members by when it first met each one, which an unrelated edit can change; sorted, the text changes only with the members. */
+const expandedText = (checker: ts.TypeChecker, type: ts.Type): string =>
+	type.isUnion() ? type.types.map((member) => checker.typeToString(member, undefined, TYPE_FLAGS)).toSorted().join(" | ") : checker.typeToString(type, undefined, TYPE_FLAGS | ts.TypeFormatFlags.InTypeAlias);
+
+/** What a type alias points at, written out, so a change to its target shows even where the alias's own text stays. */
+const aliasTarget = (checker: ts.TypeChecker, symbol: ts.Symbol): string => (symbol.flags & ts.SymbolFlags.TypeAlias ? `= ${expandedText(checker, checker.getDeclaredTypeOfSymbol(symbol))}` : "");
+
+const HIDDEN_MODIFIERS = ts.ModifierFlags.Private | ts.ModifierFlags.Protected;
+
+/** A member a user of the class can reach: not a `#` field, not `private` or `protected`. */
+const isPublicMember = (member: ts.Symbol): boolean =>
+	(member.declarations ?? []).every((declaration) => !(ts.getCombinedModifierFlags(declaration) & HIDDEN_MODIFIERS) && !(ts.isClassElement(declaration) && declaration.name !== undefined && ts.isPrivateIdentifier(declaration.name)));
+
+const PROTOTYPE = "prototype";
+
+const membersText = (checker: ts.TypeChecker, type: ts.Type, prefix: string): string[] =>
+	checker
+		.getPropertiesOfType(type)
+		.filter((member) => member.name !== PROTOTYPE && isPublicMember(member))
+		.map((member) => `${prefix}${member.name}: ${checker.typeToString(checker.getTypeOfSymbol(member), undefined, TYPE_FLAGS)}`);
+
+/** A class's public members, static and instance, so a change to a method's signature shows as a change to the class. */
+const classMembers = (checker: ts.TypeChecker, symbol: ts.Symbol): string =>
+	symbol.flags & ts.SymbolFlags.Class ? [...membersText(checker, checker.getTypeOfSymbol(symbol), "static "), ...membersText(checker, checker.getDeclaredTypeOfSymbol(symbol), "")].join("; ") : "";
+
 const compilerType = (checker: ts.TypeChecker, exported: ts.Symbol): string => {
 	const symbol = exported.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported;
 	const typePart = symbol.flags & TYPE_ONLY_SYMBOLS ? declarationText(symbol) : "";
 	const valuePart = symbol.flags & ts.SymbolFlags.Value ? typeText(checker, symbol) : "";
 
-	return withoutRoot([typePart, valuePart].filter(Boolean).join("\n"));
+	return withoutRoot([typePart, aliasTarget(checker, symbol), valuePart, classMembers(checker, symbol)].filter(Boolean).join("\n"));
 };
 
 const JsonValue = z.json();
