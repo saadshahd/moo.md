@@ -7,6 +7,7 @@ import type { State } from "../state/open.ts";
 import type { QueuedQuestion } from "../state/saved.ts";
 import { DAY_MS, HOUR_MS } from "../time.ts";
 import { footprintOf, overlaps } from "./scheduler.ts";
+import { openQuestion } from "./thread.ts";
 
 export type QuestionContext = {
 	readonly state: State;
@@ -17,10 +18,9 @@ export type QuestionContext = {
 };
 
 const isOpenQuestion = (thread: readonly ThreadEntry[], text: string): boolean => {
-	const last = thread.findLastIndex((entry) => entry.kind === "question" && entry.author !== "person");
-	const reply = thread.findIndex((entry, index) => index > last && (entry.kind === "answer" || (entry.kind === "comment" && entry.author === "person")));
+	const open = openQuestion(thread);
 
-	return last >= 0 && reply < 0 && visibleText(thread[last]?.text ?? "") === text;
+	return open !== undefined && visibleText(open.text) === text;
 };
 
 const keyOf = ({ item, queuedAt }: Pick<QueuedQuestion, "item" | "queuedAt">): string => `${item}@${queuedAt}`;
@@ -34,7 +34,7 @@ const isKept = (askedAt: number, config: Config, now: number): boolean => now - 
 const isWaiting = ({ askedAt }: QueuedQuestion): boolean => askedAt === undefined;
 
 /** A question to the owner, checked against the question rules and queued for room under the daily cap. One already open, or already queued, is not asked twice. */
-export const queueQuestion = (ctx: QuestionContext, item: Item, draft: Question, plain: PlainQuestion): void => {
+export const queueQuestion = (ctx: Pick<QuestionContext, "state" | "config" | "now">, item: Item, draft: Question, plain: PlainQuestion): void => {
 	const { state, config, now } = ctx;
 	const question = composeQuestion(draft, plain, item.id, config.hum.questionLimits);
 	const known = state.questions.list().some((queued) => queued.item === item.id && isWaiting(queued) && queued.text === question.text);

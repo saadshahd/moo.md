@@ -6,6 +6,7 @@ import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import type { State } from "../state/open.ts";
 import type { ItemKind } from "../state/saved.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { pickedAnswer } from "./thread.ts";
 
 export type KindContext = {
 	readonly state: State;
@@ -54,7 +55,7 @@ export const decideKind = async (o: KindContext, item: Item, except?: string): P
 
 /** The kind the owner named in answer to the kind question, for an item still on its fallback kind. */
 export const kindAnswered = (known: ItemKind, item: Item, kinds: readonly string[]): ItemKind | undefined => {
-	const answer = known.from === "fallback" ? item.thread.findLast((entry) => entry.kind === "answer" && entry.option !== undefined && kinds.includes(entry.option)) : undefined;
+	const answer = known.from === "fallback" ? pickedAnswer(item.thread, kinds) : undefined;
 
 	return answer?.option === undefined ? undefined : { item: item.id, kind: answer.option, from: "source" };
 };

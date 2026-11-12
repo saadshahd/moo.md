@@ -54,6 +54,7 @@ import { checksTimeoutMs, runChecks } from "./checks.ts";
 import { recordMerged } from "./merged.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { pickedAnswer } from "./thread.ts";
 import { reportAlignment } from "./alignment-report.ts";
 import { reportTaste } from "./taste.ts";
 import type { ThinResult } from "./thin-path.ts";
@@ -160,26 +161,8 @@ export const changeOn = async ({
 }: Pick<LandContext, "git" | "base" | "config">): Promise<Change> =>
 	changeOf(await git.raw(["diff", ...PATCH, `origin/${base}...HEAD`]), config.hum);
 
-const isOwnerApproval =
-	(since: number) =>
-	(entry: Item["thread"][number]): boolean =>
-		entry.kind === "answer" &&
-		entry.option === OWNER_APPROVAL &&
-		entry.at >= since;
-
 /** The level the owner picked for unclear paths, answered since the change was saved. */
-const answeredLevel = (
-	item: Item,
-	since: number,
-	levels: readonly string[],
-): string | undefined =>
-	item.thread.findLast(
-		(entry) =>
-			entry.kind === "answer" &&
-			entry.at >= since &&
-			entry.option !== undefined &&
-			levels.includes(entry.option),
-	)?.option;
+const answeredLevel = (item: Item, since: number, levels: readonly string[]): string | undefined => pickedAnswer(item.thread, levels, since)?.option;
 
 const askUnclear = async (ctx: LandContext, unclear: readonly string[]): Promise<void> => {
 	const globs = [...new Set(unclear.map(ruleGlobFor))];
@@ -464,7 +447,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	const verdict = reviewed?.verdict;
 	const route = routeWith(verdict);
-	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: saved.ownerApproved || ctx.item.thread.some(isOwnerApproval(saved.since)) };
+	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: saved.ownerApproved || pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 

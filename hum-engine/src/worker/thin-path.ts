@@ -30,6 +30,7 @@ import { reviewInput } from "../decide/review.ts";
 import { decideKind, forgetProgress, kindAnswered } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { answerToLatest, latestQuestionAt, openQuestion } from "./thread.ts";
 import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
 import { proveCheckItem } from "../loop/prove-item.ts";
 import { tallyOf } from "./tally.ts";
@@ -101,15 +102,14 @@ type Answered = { readonly question: string; readonly answer: string; readonly o
 
 /** The question, the answer to it and the plan, once the owner has answered the latest question. */
 export const answerTo = (item: Item): Answered | undefined => {
-	const lastQuestion = item.thread.findLastIndex((e) => e.kind === "question");
-	const answer = item.thread.slice(lastQuestion + 1).find((e) => e.kind === "answer");
+	const answer = answerToLatest(item.thread);
 
-	if (lastQuestion < 0 || !answer) return undefined;
+	if (!answer) return undefined;
 
 	const plan = item.thread.findLast((e) => e.kind === "comment" && e.text.startsWith(PLAN_MARK));
 
 	return {
-		question: item.thread[lastQuestion]?.text ?? "",
+		question: item.thread[latestQuestionAt(item.thread)]?.text ?? "",
 		answer: answer.option ? `${answer.option}: ${answer.text}` : answer.text,
 		option: answer.option,
 		plan: plan?.text.slice(PLAN_MARK.length).trim() ?? "",
@@ -118,10 +118,9 @@ export const answerTo = (item: Item): Answered | undefined => {
 
 /** The question the item's latest hum question puts, when it is one the item waits on and no applied answer follows it. */
 export const unansweredQuestion = (item: Item): ThreadEntry | undefined => {
-	const last = item.thread.findLastIndex((e) => e.kind === "question" && e.author !== "person");
-	const question = item.thread[last];
+	const question = openQuestion(item.thread);
 
-	return question && isWaitQuestion(visibleText(question.text)) && !item.thread.slice(last + 1).some((e) => e.kind === "answer") ? question : undefined;
+	return question && isWaitQuestion(visibleText(question.text)) ? question : undefined;
 };
 
 /** Whether the kind's machine takes the owner's approval of a change in this state. */

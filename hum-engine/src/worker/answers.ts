@@ -6,6 +6,7 @@ import { dispose, type Disposition, matchOption, NONE_OF_THESE, replyQuestion, r
 import { visibleText } from "../adapters/marked.ts";
 import type { State } from "../state/open.ts";
 import type { SettledAnswer } from "../state/saved.ts";
+import { isFromHum, latestQuestionAt } from "./thread.ts";
 
 export type AnswerContext = {
 	readonly state: State;
@@ -20,10 +21,6 @@ export type AnswerScope = {
 	/** The options a card offers when no question does, such as the parked item's actions. */
 	readonly options?: readonly string[];
 };
-
-const isFromHum = (entry: ThreadEntry): boolean => entry.author !== "person";
-
-const isQuestion = (entry: ThreadEntry): boolean => entry.kind === "question" && isFromHum(entry);
 
 /** A marked answer, or a person's reply typed without a marker. */
 const isReply = (entry: ThreadEntry): boolean => entry.kind === "answer" || (entry.kind === "comment" && !isFromHum(entry));
@@ -124,7 +121,7 @@ const dropSuperseded = async ({ ctx, item }: Settling, current: ReadonlySet<numb
  * other is a comment.
  */
 export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, options: cardOptions }: AnswerScope): Promise<Item> => {
-	const asked = item.thread.findLastIndex(isQuestion);
+	const asked = latestQuestionAt(item.thread);
 	const questionText = asked < 0 ? "" : (item.thread[asked]?.text ?? "");
 	const settling: Settling = { ctx, item, question: visibleText(questionText), options: cardOptions ?? optionsIn(questionText), stage };
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource }, ctx.state.ops, { run: "answer-reply", attempt: 0 });

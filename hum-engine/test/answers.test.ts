@@ -1,11 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
 import { HOUR_MS } from "../src/time.ts";
 import { queueQuestion, releaseQuestions } from "../src/worker/questions.ts";
+import { configWith } from "./fixtures/config.ts";
 import { workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
 
@@ -51,6 +52,24 @@ test("with 50 items ready and a cap of 3, three are asked and the rest wait for 
 	w.clock.at += 25 * HOUR_MS;
 	expect(await releaseQuestions(ctx)).toHaveLength(3);
 	expect(await asked()).toHaveLength(6);
+});
+
+test("a question still open is not queued again after the owner's reply that was not taken as an answer", () => {
+	const dir = mkdtempSync(join(tmpdir(), "hum-open-question-"));
+	const ctx = { state: openState(dir, { now: () => 0 }), config: configWith(), now: () => 0 };
+
+	const thread = [
+		{ kind: "question" as const, text: "Which title?", at: 1, author: "hum" as const },
+		{ kind: "comment" as const, text: "not sure yet", at: 2, author: "person" as const },
+	];
+
+	try {
+		queueQuestion(ctx, { id: "a", title: "a", body: "", ready: true, thread }, { text: "Which title?" }, "unsure");
+
+		expect(ctx.state.questions.list()).toEqual([]);
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 test("every answer is saved first and gets a reply: applied, then a second answer to the same question dropped with its reason", async () => {
