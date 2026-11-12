@@ -130,6 +130,26 @@ test("a model id counts for repeats only at the owner's precision bar", () => {
 	expect([doesTrustRepeats(["good"], config), doesTrustRepeats(["good", "weak"], config), doesTrustRepeats(["unmeasured"], config), doesTrustRepeats([], config)]).toEqual([true, false, false, false]);
 });
 
+test("a note that pairs groups merges the unfiled ones into the oldest group with a filed item, and leaves another filed group whole", async () => {
+	const state = freshState();
+	const unfiled = reviewNote({ sourceId: "1", at: 1, text: "Prefer `isReady` here." });
+	const filed = reviewNote({ sourceId: "2", at: 2, text: "Avoid `flagBag` there." });
+	const alsoFiled = reviewNote({ sourceId: "3", at: 3, text: "Drop `deadCode` now." });
+	const pairsAll = reviewNote({ sourceId: "4", at: 4, text: "Prefer `isReady` over `flagBag` and `deadCode`." });
+	const groupOf = (note: ReviewNote, item?: string) => ({ key: noteKey(note), notes: [noteKey(note)], item, commented: item === undefined ? [] : [noteKey(note)], misses: [] });
+
+	saveNotes(state, [unfiled, filed, alsoFiled, pairsAll]);
+
+	for (const made of [groupOf(unfiled), groupOf(filed, "filed-item"), groupOf(alsoFiled, "also-filed-item")]) state.repeats.put(made.key, made);
+
+	await groupNotes({ state, propose: async () => undefined, trusts: () => true, onUnapplied: () => {} }, [pairsAll]);
+
+	expect(state.repeats.list().toSorted((a, b) => (a.key < b.key ? -1 : 1))).toEqual([
+		{ ...groupOf(filed, "filed-item"), notes: [noteKey(filed), noteKey(unfiled), noteKey(pairsAll)] },
+		groupOf(alsoFiled, "also-filed-item"),
+	]);
+});
+
 const fakeSource = () => {
 	const filed: { from: string; followUp: FollowUp }[] = [];
 	const commented: { id: string; text: string }[] = [];
