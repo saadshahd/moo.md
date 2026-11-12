@@ -1,4 +1,5 @@
 import type { Unread } from "../../types";
+import type { AgeInput } from "./input.ts";
 
 const SECOND_MS = 1000;
 const MINUTE = 60;
@@ -12,7 +13,7 @@ export const ageSeconds = (at: number, now: number): number => Math.max(0, Math.
 export const isAmber = (age: number, amberAfterSeconds: number): boolean => age > amberAfterSeconds;
 
 /** The failing read the view reports: one that has gone on past the amber limit. */
-export const reportedUnread = (unread: Unread | undefined, now: number, amberAfterSeconds: number): Unread | undefined => (unread !== undefined && isAmber(ageSeconds(unread.since, now), amberAfterSeconds) ? unread : undefined);
+export const reportedUnread = (unread: Unread | undefined, { now, amberAfterSeconds }: AgeInput): Unread | undefined => (unread !== undefined && isAmber(ageSeconds(unread.since, now), amberAfterSeconds) ? unread : undefined);
 
 const UNITS = [
 	{ from: DAY, big: "d", small: "h", smallEvery: HOUR },

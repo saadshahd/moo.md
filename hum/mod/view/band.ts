@@ -1,20 +1,14 @@
-import type { Unread } from "../../types";
 import { cells, ellipsize, rowCells, spaces } from "./cells.ts";
 import { fitting, joinParts, shortenings } from "./fit.ts";
 import { reportedUnread, sinceText } from "./freshness.ts";
 import { RUNNERS, runnerPart } from "./ages.ts";
+import type { ViewInput } from "./input.ts";
 import { innerWidth, padded, type Row, type Span, span } from "./row.ts";
 import { statusWords } from "./summary.ts";
-import type { ViewRead } from "./read.ts";
 
-export type BandInput = {
-	readonly read: ViewRead;
-	readonly now: number;
-	readonly amberAfterSeconds: number;
-	readonly width: number;
+export type BandInput = ViewInput & {
 	/** The item whose thread Enter posts on, while answer mode is on. */
 	readonly answering?: string;
-	readonly unread?: Unread;
 };
 
 const NAME = "hum";
@@ -35,10 +29,12 @@ const shown = (parts: Parts, kept: readonly Droppable[]): Row => {
 };
 
 /** What the status part says: answer mode first, then a read that keeps failing, then the engine's state. */
-const statusPart = ({ read, now, amberAfterSeconds, answering, unread }: BandInput): Span => {
+const statusPart = (input: BandInput): Span => {
+	const { read, now, answering } = input;
+
 	if (answering !== undefined) return span(`Enter posts on ${answering}, not Claude`, "strong");
 
-	const reported = reportedUnread(unread, now, amberAfterSeconds);
+	const reported = reportedUnread(input.unread, input);
 
 	if (reported !== undefined) return span(`work source unread ${sinceText(reported.since, now)}`, "amber");
 
@@ -48,7 +44,7 @@ const statusPart = ({ read, now, amberAfterSeconds, answering, unread }: BandInp
 };
 
 const partsOf = (input: BandInput): Parts => {
-	const { read, now, amberAfterSeconds } = input;
+	const { read } = input;
 	const name = span(NAME, "strong");
 	const status = statusPart(input);
 
@@ -57,8 +53,8 @@ const partsOf = (input: BandInput): Parts => {
 	return {
 		name,
 		status,
-		mac: runnerPart(read.status, RUNNERS[0], now, amberAfterSeconds),
-		ci: runnerPart(read.status, RUNNERS[1], now, amberAfterSeconds),
+		mac: runnerPart(read.status, RUNNERS[0], input),
+		ci: runnerPart(read.status, RUNNERS[1], input),
 		version: span(read.status.engine.version, "dim"),
 	};
 };

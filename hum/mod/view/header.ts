@@ -2,6 +2,7 @@ import type { Measure, Status } from "../../../hum-engine/src/status/format.ts";
 import { isNewer } from "../vendor/libs.js";
 import { RUNNERS, runnerPart } from "./ages.ts";
 import { droppingFromEnd, firstFitting, joinParts } from "./fit.ts";
+import type { ViewInput } from "./input.ts";
 import type { Row, Span } from "./row.ts";
 import { span } from "./row.ts";
 
@@ -24,10 +25,10 @@ const perMerge = (value: number): string => String(Number(value.toFixed(1)));
 const engineText = ({ version, latest }: Status["engine"]): string => (latest !== undefined && isNewer(latest, version) ? `engine ${version} (${latest} available)` : `engine ${version}`);
 
 /** Mac and CI ages, then the engine version, dropping from the end. One row. */
-export const headerRow = (status: Status, now: number, amberAfterSeconds: number, width: number): Row => {
-	const ages = RUNNERS.flatMap((runner) => runnerPart(status, runner, now, amberAfterSeconds, " ago") ?? []);
+export const headerRow = (status: Status, input: Pick<ViewInput, "now" | "amberAfterSeconds" | "width">): Row => {
+	const ages = RUNNERS.flatMap((runner) => runnerPart(status, runner, input, " ago") ?? []);
 
-	return firstFitting(droppingFromEnd([...ages, span(engineText(status.engine), "dim")]), width);
+	return firstFitting(droppingFromEnd([...ages, span(engineText(status.engine), "dim")]), input.width);
 };
 
 const NO_MEASURE = "per merge: no merged change yet";

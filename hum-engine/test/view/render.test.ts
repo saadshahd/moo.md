@@ -106,7 +106,7 @@ test("the band drops its version, then the CI age, then the Mac age, then its na
 test("the header and the measure line are one row each at every width, and the notes stay", () => {
 	for (const width of WIDTHS) {
 		expect(
-			rowCells(headerRow(fullStatus, NOW, AMBER_AFTER, width)),
+			rowCells(headerRow(fullStatus, { now: NOW, amberAfterSeconds: AMBER_AFTER, width: width })),
 			String(width),
 		).toBeLessThanOrEqual(width);
 
@@ -135,8 +135,7 @@ test("a question is never cut: every character comes back at every width", () =>
 		for (const width of WIDTHS) {
 			const rows = questionCardRows(
 				{ item: "68", text, options: [], since: NOW - 5_580_000 },
-				NOW,
-				width,
+				{ now: NOW, width },
 			);
 
 			for (const row of rows)
@@ -152,7 +151,7 @@ test("a question is never cut: every character comes back at every width", () =>
 
 test("a card's title loses parts from the end and keeps its item", () => {
 	const card = fullStatus.cards[0];
-	const title = (width: number) => textOf(card === undefined ? [] : (noticeCardRows(card, NOW, width)[0] ?? []));
+	const title = (width: number) => textOf(card === undefined ? [] : (noticeCardRows(card, { now: NOW, width })[0] ?? []));
 
 	expect(title(60)).toContain("71 · fault · 5 m");
 	expect(title(20)).toContain("71 · fault");
@@ -162,7 +161,7 @@ test("a card's title loses parts from the end and keeps its item", () => {
 test("a notice card gives the cause, then the fix, then its one action whole, which fills an answer to its item, at every width", () => {
 	for (const card of fullStatus.cards) {
 		for (const width of WIDTHS) {
-			const rows = noticeCardRows(card, NOW, width);
+			const rows = noticeCardRows(card, { now: NOW, width });
 
 			for (const row of rows)
 				expect(rowCells(row), `${card.key} at ${width}`).toBeLessThanOrEqual(
@@ -305,7 +304,7 @@ test("an inline pane opens as tall as its header and first card", () => {
 			(row, index) => index > 0 && textOf(row).includes("May the run publish"),
 		) - 2;
 
-	expect(openingRows(statusRead, NOW, AMBER_AFTER, 45)).toBe(firstCardEnd);
+	expect(openingRows(inputOf(statusRead, 45))).toBe(firstCardEnd);
 });
 
 test("an age is never negative, grows with the clock, and is amber exactly past the limit", () => {
@@ -354,10 +353,10 @@ test("an age reads in its two biggest units", () => {
 });
 
 test("a redraw is due exactly when a shown age or its colour changes", () => {
-	const shown = (now: number) => agesShown(fullStatus, now, AMBER_AFTER);
+	const shown = (now: number) => agesShown(fullStatus, { now: now, amberAfterSeconds: AMBER_AFTER });
 
 	expect(shown(NOW)).not.toBe(shown(NOW + 1_000));
-	expect(shown(NOW)).toBe(agesShown(fullStatus, NOW + 100, AMBER_AFTER));
+	expect(shown(NOW)).toBe(agesShown(fullStatus, { now: NOW + 100, amberAfterSeconds: AMBER_AFTER }));
 });
 
 test("the status file's format number decides what the view reads", () => {

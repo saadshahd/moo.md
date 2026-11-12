@@ -90,10 +90,10 @@ test("the band's open control asks for the rows the first card needs at the inli
 
 	await ui.press({ key: control?.key ?? "" });
 
-	const read = { kind: "status", status: fullStatus } as const;
-	const bandRows = openingRows(read, NOW, 300, NARROW);
+	const opened = { read: { kind: "status", status: fullStatus }, now: NOW, amberAfterSeconds: 300 } as const;
+	const bandRows = openingRows({ ...opened, width: NARROW });
 
-	expect(asked).toEqual([openingRows(read, NOW, 300, INLINE_BODY)]);
+	expect(asked).toEqual([openingRows({ ...opened, width: INLINE_BODY })]);
 	expect(asked).not.toEqual([bandRows]);
 	await ui.unmount();
 });

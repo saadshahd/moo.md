@@ -46,7 +46,7 @@ const panesAt = (width: number): Row[] =>
 		...paneRows({ read, now: NOW, amberAfterSeconds: AMBER_AFTER, width, unfolded: new Set(), unread: UNREAD }),
 	]);
 
-const headersAt = (width: number): Row[] => [headerRow(worstStatus, NOW, AMBER_AFTER, width), measureRow(worstStatus.measure, width), measureRow(null, width)];
+const headersAt = (width: number): Row[] => [headerRow(worstStatus, { now: NOW, amberAfterSeconds: AMBER_AFTER, width: width }), measureRow(worstStatus.measure, width), measureRow(null, width)];
 
 const NOT_DRAWABLE = /\p{Cc}/u;
 const PRINTED_JUNK = /NaN|undefined|null|Infinity|\[object/;
@@ -78,7 +78,7 @@ test("every pane and band row has one empty cell at each side, inside its width"
 test("a view narrower than any it is built for still draws and does not throw", () => {
 	for (const width of BELOW_THE_SMALLEST_WIDTH) {
 		expect(() => [...bandsAt(width), ...panesAt(width), ...headersAt(width)]).not.toThrow();
-		expect(() => openingRows(READS[0] ?? { kind: "waiting" }, NOW, AMBER_AFTER, width)).not.toThrow();
+		expect(() => openingRows({ read: READS[0] ?? { kind: "waiting" }, now: NOW, amberAfterSeconds: AMBER_AFTER, width })).not.toThrow();
 	}
 });
 
@@ -87,12 +87,11 @@ test("a tool's newline, tab and colour codes in a question or a card show as the
 
 	const [cause] = noticeCardRows(
 		{ kind: "fault", key: "k", item: "72", code: "check-failed", cause: "\u001b[31mFAIL\u001b[0m test/a.test.ts > renders the pane\u001b[2K\r expected 1 to be 2", fix: "Fix it.", since: NOW },
-		NOW,
-		200,
+		{ now: NOW, width: 200 },
 	).slice(1);
 
 	for (const width of WIDTHS) {
-		const asked = questionCardRows(question, NOW, width)
+		const asked = questionCardRows(question, { now: NOW, width })
 			.slice(1)
 			.filter((row) => !row.some(({ press }) => press !== undefined))
 			.map(drawn);
@@ -125,7 +124,7 @@ test("a read of the work source that keeps failing says so in a few words in the
 test("the opening rows of an inline pane end where its first card ends, with or without an unread read", () => {
 	for (const unread of [undefined, UNREAD]) {
 		const rows = paneRows({ read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unfolded: new Set(), unread });
-		const opening = openingRows(STATUS_READ, NOW, AMBER_AFTER, 80, unread);
+		const opening = openingRows({ read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unread });
 
 		expect([drawn(rows[opening - 1] ?? []).trim() === "", drawn(rows[opening] ?? []).trim() === ""]).toEqual([false, true]);
 	}

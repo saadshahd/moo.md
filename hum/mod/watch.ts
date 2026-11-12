@@ -52,7 +52,7 @@ export async function poll($: Engine, path: string, seen: Seen, amberAfterSecond
 		return { found, seen: { ...seen, modified: stat.mtimeMs, read: readOf(found) } };
 	}
 
-	const shown = seen.read.kind === "status" ? agesShown(seen.read.status, now, amberAfterSeconds) : "";
+	const shown = seen.read.kind === "status" ? agesShown(seen.read.status, { now, amberAfterSeconds }) : "";
 
 	if (shown === seen.shown) return { seen };
 
