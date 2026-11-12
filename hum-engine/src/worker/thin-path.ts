@@ -9,7 +9,7 @@ import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, identityEnv, PATCH, push } from "../adapters/git.ts";
+import { type Git, gitIn, identityEnv, PATCH, pushOrRefuse } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -762,7 +762,7 @@ const handOff = async (d: Driven, { question, plain, plan }: Pending) => {
 	await state.ops.once(key("push-branch"), {
 		holds: async () => (await g(["ls-remote", "--heads", "origin", branch])).startsWith((await g(["rev-parse", "HEAD"])).trim()),
 		run: async () => {
-			if ((await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`])) !== "pushed") throw new Error(`could not push ${branch}`);
+			if ((await pushOrRefuse(git, ["--force", "origin", `HEAD:refs/heads/${branch}`])) !== "pushed") throw new Error(`could not push ${branch}`);
 		},
 	});
 

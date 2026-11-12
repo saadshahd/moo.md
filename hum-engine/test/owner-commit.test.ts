@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
+import { landOwnerCommit } from "../src/adapters/owner-commit.ts";
 import { FakePulls } from "./fixtures/fake-pulls.ts";
 import { markdownSettings, sh, WorkRepo } from "./fixtures/work-repo.ts";
 
@@ -57,4 +58,11 @@ test("a push the remote refuses goes through a pull request when the repo is on 
 
 	expect(github.pulls).toHaveLength(1);
 	expect(branches(repo.remote)).toHaveLength(1);
+});
+
+test("off GitHub, a push the remote refuses lands nothing and hands back the remote's words", async () => {
+	const commit = { sha: "0123456789abcdef", base: "main", label: "7", title: "t", body: "b", branchPrefix: "hum/owner/", mergeMethod: "squash" as const };
+	const refused = { kind: "refused" as const, said: "git push refused: GH006: Protected branch update failed" };
+
+	expect(await landOwnerCommit({ ...commit, push: async () => refused })).toEqual({ via: "refused", said: refused.said });
 });

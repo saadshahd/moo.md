@@ -49,7 +49,8 @@ export class PushRefused extends PermanentError {
 	override name = "PushRefused";
 }
 
-export type PushOutcome = "pushed" | "conflict";
+/** `conflict`: another writer moved the ref first, and a retry can win. `refused`: the remote said no, in `said`, and no retry helps. */
+export type PushOutcome = { readonly kind: "pushed" } | { readonly kind: "conflict" } | { readonly kind: "refused"; readonly said: string };
 
 /** The author and committer of the commits hum makes. */
 export type GitIdentity = { readonly name: string; readonly email: string };
@@ -116,22 +117,28 @@ export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions
 /** The arguments for `git push` with hooks off, for a command line handed straight to git. */
 export const pushArgs = (rest: readonly string[]): string[] => ["-c", HOOKS_OFF, "push", "--no-verify", ...rest];
 
-/**
- * Pushes. `conflict` means another writer moved the ref first and a retry can win.
- * A refusal throws `PushRefused` with the remote's own words; any other failure throws `GitFailed`.
- */
+/** Pushes. A refusal is an outcome that carries the remote's own words; any other failure throws `GitFailed`. */
 export const push = async (git: Git, rest: readonly string[]): Promise<PushOutcome> => {
 	const args = ["push", "--no-verify", ...rest];
 	const result = await git.run(args);
 	const said = `${result.stderr}${result.stdout}`.trim();
 
-	if (result.code === 0) return "pushed";
+	if (result.code === 0) return { kind: "pushed" };
 
-	if (CONFLICT.test(said)) return "conflict";
+	if (CONFLICT.test(said)) return { kind: "conflict" };
 
-	if (REFUSED.test(said)) throw new PushRefused(`git push refused: ${said}`);
+	if (REFUSED.test(said)) return { kind: "refused", said: `git push refused: ${said}` };
 
 	throw new GitFailed(args, result);
+};
+
+/** Pushes where a refusal leaves no other way: it throws `PushRefused` with the remote's own words. */
+export const pushOrRefuse = async (git: Git, rest: readonly string[]): Promise<"pushed" | "conflict"> => {
+	const outcome = await push(git, rest);
+
+	if (outcome.kind === "refused") throw new PushRefused(outcome.said);
+
+	return outcome.kind;
 };
 
 /** Whether `ancestor` is reachable from `descendant`. git answers by exit code alone. */

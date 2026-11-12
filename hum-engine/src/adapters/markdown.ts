@@ -114,7 +114,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			throw cause;
 		});
 
-		if (outcome === "conflict") view = undefined;
+		if (outcome.kind !== "pushed") view = undefined;
 
 		return outcome;
 	};
@@ -221,21 +221,23 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		}
 	};
 
-	const reportRefusal = (error: PushRefused): never => {
+	const reportRefusal = (said: string): never => {
 		report({
 			code: "push-refused",
 			item: base,
-			cause: `The remote refused the push to ${base}: ${error.message.slice(0, 300)}`,
+			cause: `The remote refused the push to ${base}: ${said.slice(0, 300)}`,
 			fix: `Let this account push to ${base}, or point hum at a branch it may write.`,
 		});
 
-		throw error;
+		throw new PushRefused(said);
 	};
 
 	const pushToBase = async (sha: string): Promise<Landed> => {
-		const outcome = await pushCounted([`${sha}:${baseBranch}`]).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
+		const outcome = await pushCounted([`${sha}:${baseBranch}`]);
 
-		if (outcome === "conflict") throw new LostRace(`another writer moved ${base} first`);
+		if (outcome.kind === "refused") return reportRefusal(outcome.said);
+
+		if (outcome.kind === "conflict") throw new LostRace(`another writer moved ${base} first`);
 
 		return "push";
 	};
@@ -252,7 +254,9 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			mergeMethod,
 			pulls,
 			push: pushCounted,
-		}).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
+		});
+
+		if (landed.via === "refused") return reportRefusal(landed.said);
 
 		if (landed.via === "conflict") throw new LostRace(`another writer moved ${base} first`);
 
@@ -301,7 +305,11 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 				const parent = over?.sha ?? (await git.raw(["rev-parse", BASE_REF])).trim();
 				const sha = await commitOn(parent, claimCommitMessage(claim));
 
-				if ((await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`])) === "conflict") return false;
+				const pushed = await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`]);
+
+				if (pushed.kind === "refused") throw new PushRefused(pushed.said);
+
+				if (pushed.kind === "conflict") return false;
 
 				await mirrorClaim(claim, sha);
 

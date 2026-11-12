@@ -14,6 +14,7 @@ import {
 	isAncestor,
 	PATCH,
 	push,
+	pushOrRefuse,
 	PushRefused,
 } from "../adapters/git.ts";
 import { type CommitLanded, landOwnerCommit } from "../adapters/owner-commit.ts";
@@ -226,6 +227,8 @@ const learnRules = async (
 			push: (refspecs) => push(git, ["origin", ...refspecs]),
 		});
 
+		if (landed.via === "refused") throw new PushRefused(landed.said);
+
 		if (landed.via === "conflict")
 			throw new Error(
 				`another push moved ${base} before the path rule for ${id} landed`,
@@ -250,7 +253,7 @@ export const prepareLanding = async (ctx: LandContext, ownerApproved = false): P
 	writeFileSync(file, markDone(readFileSync(file, "utf8")));
 	await git.raw(["add", `${dir}/${id}.md`]);
 	await git.raw(["commit", "-q", "-m", `hum: finish ${id}`]);
-	await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+	await pushOrRefuse(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
 	state.landings.put(id, { item: id, branch, since: now(), change, head, ownerApproved });
 };
 
@@ -281,9 +284,9 @@ const ontoNewestBase = async ({ git, base, clone, env, checks, config }: LandCon
 };
 
 const pushBranchAndBase = async ({ git, base, branch }: LandContext): Promise<void> => {
-	await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+	await pushOrRefuse(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
 
-	if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "conflict") throw new BaseMoved(`another push moved ${base} first`);
+	if ((await pushOrRefuse(git, ["origin", `HEAD:refs/heads/${base}`])) === "conflict") throw new BaseMoved(`another push moved ${base} first`);
 };
 
 const finish = async ({ state, git, id, now }: LandContext): Promise<ThinResult> => {
