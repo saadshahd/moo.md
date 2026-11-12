@@ -78,7 +78,6 @@ export class Items {
 
 	/** A failed write leaves the old snapshot and raises one card. */
 	save(itemId: string, kind: Kind, snapshot: Json): Outcome<void> {
-		const key = `snapshot-write-failed:${itemId}`;
 		const envelope = { format: this.#format, engineVersion: this.#engineVersion, itemId, kind: kind.machine.id, machineVersion: kind.machine.version, savedAt: this.#now(), snapshot };
 
 		try {
@@ -95,7 +94,7 @@ export class Items {
 			};
 		}
 
-		this.#faults.clear(key);
+		this.#faults.clear({ code: "snapshot-write-failed", item: itemId });
 
 		return { ok: true, value: undefined };
 	}

@@ -352,7 +352,7 @@ test("the run's name is saved before launch and adopted after a restart", () => 
 
 	expect(found.adopted).toBe(true);
 	expect(found.record.sessionId).toBeUndefined();
-	expect(after.saveSession(key, "session-1").sessionId).toBe("session-1");
+	expect(found.saveSession("session-1").sessionId).toBe("session-1");
 	expect(openState(dir).runs.begin(key, "hum #68 build 1").record.sessionId).toBe("session-1");
 	expect(after.list("#68")).toHaveLength(1);
 });
@@ -361,10 +361,11 @@ test("a run is adopted until its outcome is taken, then the next attempt starts 
 	const key = { itemId: "#68", run: "build", attempt: 0 };
 	const runs = openState(dir).runs;
 
-	runs.begin(key, "hum #68 build #0");
+	const begun = runs.begin(key, "hum #68 build #0");
+
 	expect(runs.unended("#68", "build")?.attempt).toBe(0);
 	expect(runs.unended("#68", "review")).toBeUndefined();
-	runs.end(key);
+	begun.end();
 	expect(runs.unended("#68", "build")).toBeUndefined();
 	expect(openState(dir).runs.get(key)?.endedAt).toBeNumber();
 });
@@ -425,7 +426,7 @@ test("a fault card gives the cause, a one-line fix and at most one action; one c
 	expect(() => faults.raise({ ...input, code: "y", fix: "one\ntwo" })).toThrow();
 	expect(() => faults.raise({ ...input, code: "z", action: { label: "a label far over fourteen cells", answer: "retry" } })).toThrow();
 	expect(openState(dir).faults.list()).toHaveLength(1);
-	faults.clear("x:#1");
+	faults.clear({ code: "x", item: "#1" });
 	expect(openState(dir).faults.list()).toEqual([]);
 });
 

@@ -9,7 +9,7 @@ import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
 import { CommandTimedOut, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
-import { rejectedToken, UNAUTHORIZED } from "../service/token.ts";
+import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
@@ -364,7 +364,7 @@ const recordCredential = (state: RunnerOptions["state"], credential: string): vo
 		return;
 	}
 
-	if (recorded === credential) return state.faults.clear("credential-changed");
+	if (recorded === credential) return state.faults.clear({ code: "credential-changed" });
 
 	state.faults.raise({
 		code: "credential-changed",
@@ -503,9 +503,9 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 
 		if (outcome.kind !== "finished") return outcome;
 
-		if (isUnauthorized(outcome)) return { kind: "held", card: rejectedToken(state.faults, outcome.text) };
+		if (isUnauthorized(outcome)) return { kind: "held", card: raiseRejectedToken(state.faults, outcome.text) };
 
-		state.faults.clear("token-rejected");
+		state.faults.clear({ code: "token-rejected" });
 
 		return outcome;
 	};
@@ -558,8 +558,8 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 
 	recordCredential(state, credentialOf(check.keySource, env));
 
-	state.faults.clear(LIMIT_UNPARSED);
-	state.faults.clear(START_TIMED_OUT);
+	state.faults.clear({ code: LIMIT_UNPARSED });
+	state.faults.clear({ code: START_TIMED_OUT });
 
 	return { check, runner: { run, limitedUntil } };
 };

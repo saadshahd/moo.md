@@ -419,12 +419,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				// A saved id already has a transcript under it; a fresh run mints its own.
 				sessionId: begun.adopted ? undefined : begun.record.sessionId,
 				signal,
-				onSession: (sessionId) => state.runs.saveSession(key, sessionId),
+				onSession: (sessionId) => begun.saveSession(sessionId),
 				onFirstToken: () => lease?.opened(),
 			})
 			.finally(() => lease?.release());
 
-		state.runs.end(key, held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
+		begun.end(held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
 
 		if (outcome.kind === "limited") return pause({ outcome: "limited", item: id, until: outcome.until });
 

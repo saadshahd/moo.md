@@ -44,8 +44,8 @@ const abortIfPermanent = (cause: unknown): never => {
  * - A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key.
  */
 export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = SHIPPED_BACKOFF_MS, lastReady: remembered }: GuardOptions): Adapter => {
-	const unavailable = `provider-unavailable:${provider}`;
-	const contradicted = `empty-list:${provider}`;
+	const unavailable = { code: "provider-unavailable", item: provider };
+	const contradicted = { code: "empty-list", item: provider };
 
 	const refuseChangedReply = (error: z.ZodError): never => {
 		const [issue] = error.issues;

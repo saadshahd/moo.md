@@ -12,7 +12,13 @@ export type FaultInput = {
 	readonly action?: Card["action"];
 };
 
-export type Outcome<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly fault: Card };
+export type Outcome<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly fault: Readonly<Card> };
+
+/** What names one card: its cause, and the item or provider it is about. */
+export type FaultKey = Pick<FaultInput, "code" | "item">;
+
+/** One card per cause and item. A card file is named by this key, so a change orphans every card on disk. */
+const faultKey = ({ code, item }: FaultKey): string => (item === undefined ? code : `${code}:${item}`);
 
 /** The fault cards currently raised. One card per cause, kept in memory and, when the disk allows, on it. */
 export class Faults {
@@ -43,8 +49,8 @@ export class Faults {
 	 * Raises the card, or returns the one already raised for this cause. A card that cannot be
 	 * written because the disk is full still stands in memory, and the caller puts it in the status file.
 	 */
-	raise({ code, item, cause, fix, action }: FaultInput): Card {
-		const key = item === undefined ? code : `${code}:${item}`;
+	raise({ code, item, cause, fix, action }: FaultInput): Readonly<Card> {
+		const key = faultKey({ code, item });
 		const raised = this.#cards.get(key);
 
 		if (raised) return raised;
@@ -63,11 +69,13 @@ export class Faults {
 	}
 
 	/** Removes the card once its cause is gone. */
-	clear(key: string): void {
+	clear(fault: FaultKey): void {
+		const key = faultKey(fault);
+
 		if (this.#cards.delete(key)) rmSync(this.#path(key), { force: true });
 	}
 
-	list(): Card[] {
+	list(): Readonly<Card>[] {
 		return [...this.#cards.values()].sort((a, b) => a.since - b.since || (a.key < b.key ? -1 : 1));
 	}
 }

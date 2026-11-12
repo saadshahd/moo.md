@@ -119,7 +119,7 @@ export class SlotPool {
 	}
 
 	#ready(slot: Slot, lockfiles: string): void {
-		this.#o.state.faults.clear(`${SLOT_OUT_CODE}:${slot.name}`);
+		this.#o.state.faults.clear({ code: SLOT_OUT_CODE, item: slot.name });
 		this.#save({ ...freed(slot, "free"), lockfiles });
 	}
 
@@ -201,7 +201,7 @@ export class SlotPool {
 
 			if (branch) await git.raw(["branch", "-q", "-D", branch]);
 
-			this.#o.state.faults.clear(`${SLOT_KEPT_CODE}:${slot.name}`);
+			this.#o.state.faults.clear({ code: SLOT_KEPT_CODE, item: slot.name });
 			this.#save(freed(slot, "stale"));
 		} catch (error) {
 			this.#keep(slot, `it could not be returned: ${error instanceof Error ? error.message : String(error)}`, "Fix what git reports in the slot; hum returns the slot at its next tick.");
@@ -251,7 +251,7 @@ export class SlotPool {
 			const slot = recheck && listed.status === "out" ? this.#save(freed(listed, "new")) : listed;
 
 			await this.#settle(slot).then(
-				() => state.faults.clear(`${SLOT_MAINTENANCE_CODE}:${slot.name}`),
+				() => state.faults.clear({ code: SLOT_MAINTENANCE_CODE, item: slot.name }),
 				(error: Error) => this.#maintenanceFailed(slot.name, error),
 			);
 		}

@@ -306,7 +306,7 @@ export class Worker {
 		if (!parked) return;
 
 		state.parked.remove(id);
-		state.faults.clear(`item-${parked.why}:${id}`);
+		state.faults.clear({ code: `item-${parked.why}`, item: id });
 
 		const landsAgain = state.landings.get(id) !== undefined && option !== RUN_AGAIN;
 
@@ -409,7 +409,7 @@ export class Worker {
 		try {
 			await read();
 			this.#unread.delete(id);
-			faults.clear(`${UNREAD_CODE}:${id}`);
+			faults.clear({ code: UNREAD_CODE, item: id });
 		} catch (error) {
 			this.#unread.add(id);
 			faults.raise({ code: UNREAD_CODE, item: id, cause: `The thread of ${id} could not be read: ${error instanceof Error ? error.message : String(error)}`.slice(0, ERROR_EXCERPT), fix: "hum reads it again each tick and goes on with the other items." });

@@ -41,7 +41,7 @@ type Card = ReturnType<(typeof CARD_KINDS)["workerSilent"]> | undefined;
 
 /** Shows `card` as the only worker-down card, or none; the status file is written here because no worker is there to write it. */
 const showWorkerDown = ({ faults, statusPath }: Supervision["state"], card: Card, now: number): void => {
-	faults.clear(CARD_CODES.workerDown);
+	faults.clear({ code: CARD_CODES.workerDown });
 
 	if (card) faults.raise(card);
 

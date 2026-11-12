@@ -277,15 +277,13 @@ test("runs record the memory rules they applied, and a rule no run applied in th
 	const ended = (item: string, structured: { memoryUsed?: number[] }) => {
 		const key = { itemId: item, run: "build", attempt: 0 };
 
-		state.runs.begin(key, `hum ${item} build #0`);
-		state.runs.end(key, rulesUsed({ structured }, held));
+		state.runs.begin(key, `hum ${item} build #0`).end(rulesUsed({ structured }, held));
 	};
 
 	ended("a", { memoryUsed: [1] });
 	ended("b", { memoryUsed: [1, 9] });
 	ended("c", {});
-	state.runs.begin({ itemId: "d", run: "plan", attempt: 0 }, "hum d plan #0");
-	state.runs.end({ itemId: "d", run: "plan", attempt: 0 });
+	state.runs.begin({ itemId: "d", run: "plan", attempt: 0 }, "hum d plan #0").end();
 
 	const { runsSoFar, lastUsed } = useOf(state.runs.all());
 

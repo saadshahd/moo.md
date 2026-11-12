@@ -26,7 +26,16 @@ export const RunRecord = z.union([
 
 export type RunRecord = z.infer<typeof RunRecord>;
 
-export type BegunRun = { readonly record: RunRecord; readonly adopted: boolean };
+/** A run saved before its launch, and the two writes that follow it. */
+export type BegunRun = {
+	readonly record: RunRecord;
+	/** A record was already saved for this key, so the caller adopts that run. */
+	readonly adopted: boolean;
+	/** Saves the session id once the launch has reported it. */
+	readonly saveSession: (sessionId: string) => RunRecord;
+	/** Marks the run's outcome as taken, so a restart starts a new attempt and adopts nothing. */
+	readonly end: (memoryUsed?: readonly string[]) => RunRecord;
+};
 
 /** The run's name, then its session id, saved so a restart adopts the run and never starts it twice. */
 export class RunRecords {
@@ -54,29 +63,21 @@ export class RunRecords {
 
 		if (!saved) throw new Error(`run record for ${key.itemId} ${key.run} #${key.attempt} vanished after it was found`);
 
-		return { record: saved, adopted: !created };
+		return {
+			record: saved,
+			adopted: !created,
+			saveSession: (sessionId) => this.#rewrite(key, { sessionId }),
+			end: (memoryUsed) => this.#rewrite(key, { endedAt: this.#now(), memoryUsed: memoryUsed && [...memoryUsed] }),
+		};
 	}
 
-	/** Saves the session id once the launch has reported it. */
-	saveSession(key: RunKey, sessionId: string): RunRecord {
+	/** Rewrites a begun run's record. Nothing removes a record, so one gone since `begin` saved it throws. */
+	#rewrite(key: RunKey, change: { readonly sessionId?: string; readonly endedAt?: number; readonly memoryUsed?: string[] }): RunRecord {
 		const record = this.get(key);
 
-		if (!record) throw new Error(`no saved run for ${key.itemId} ${key.run} #${key.attempt}; call begin before launch`);
+		if (!record) throw new Error(`the run record of ${key.itemId} ${key.run} #${key.attempt} is gone since begin saved it`);
 
-		const next = RunRecord.parse({ ...record, sessionId });
-
-		atomicWrite(this.#path(next), `${JSON.stringify(next)}\n`);
-
-		return next;
-	}
-
-	/** Marks the run's outcome as taken, so a restart starts a new attempt and adopts nothing. */
-	end(key: RunKey, memoryUsed?: readonly string[]): RunRecord {
-		const record = this.get(key);
-
-		if (!record) throw new Error(`no saved run for ${key.itemId} ${key.run} #${key.attempt}; call begin before launch`);
-
-		const next = RunRecord.parse({ ...record, endedAt: this.#now(), memoryUsed: memoryUsed && [...memoryUsed] });
+		const next = RunRecord.parse({ ...record, ...change });
 
 		atomicWrite(this.#path(next), `${JSON.stringify(next)}\n`);
 

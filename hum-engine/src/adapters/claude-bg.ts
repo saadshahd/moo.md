@@ -192,7 +192,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 			throw new Error(cause);
 		}
 
-		state.faults.clear(AGENTS_UNREAD);
+		state.faults.clear({ code: AGENTS_UNREAD });
 
 		return found.flatMap(({ kind, id, name, sessionId, state }) => (kind === AGENT_VIEW_KIND && id !== undefined ? [{ id, name, sessionId, state }] : []));
 	};
@@ -304,7 +304,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 
 		if (session === undefined) return request.signal?.aborted ? { kind: "stopped" } : fellBack(request, "the run never appeared in claude agents");
 
-		state.faults.clear(FALLBACK_CODE);
+		state.faults.clear({ code: FALLBACK_CODE });
 
 		request.onSession?.(session.sessionId);
 
@@ -377,7 +377,7 @@ export const startBackgroundRunner = async (options: BackgroundStartOptions): Pr
 	const check = await checker.run({ name: START_NAME, prompt: START_PROMPT, cwd: repo, model: options.model, effort: "low", schema: START_SCHEMA, signal: AbortSignal.timeout(timeoutMs) });
 
 	if (isOk(check)) {
-		state.faults.clear(BACKGROUND_CHECK_CODE);
+		state.faults.clear({ code: BACKGROUND_CHECK_CODE });
 
 		return { check, runner: backgroundRunner({ binary, env, state, config, fallback: started.runner }) };
 	}
@@ -385,7 +385,7 @@ export const startBackgroundRunner = async (options: BackgroundStartOptions): Pr
 	// The start check's card says why for every run, so the card for the check's own fall-back would only repeat it.
 	const why = whyNot(check, timeoutMs);
 
-	state.faults.clear(FALLBACK_CODE);
+	state.faults.clear({ code: FALLBACK_CODE });
 	state.faults.raise(startCheckFault(repo, why));
 
 	return { check, runner: started.runner };
