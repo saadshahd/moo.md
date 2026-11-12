@@ -497,3 +497,17 @@ test("memory.md lines with no source or past the byte cap each raise a card nami
 	await w.workerWith().tick();
 	expect(memoryCards()).toEqual([]);
 });
+
+test("an item waiting behind a run on the same file starts once the owner moves its touches: elsewhere", async () => {
+	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 400 }, b: { commitForItem: true, spend: 5 } } });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/a.md");
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a"] });
+
+	w.item("b", "docs/b.md");
+	w.clock.at += 1000;
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["b"] });
+	await w.worker.idle();
+});

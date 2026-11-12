@@ -172,7 +172,6 @@ export class Worker {
 	readonly #wakes = new EventTarget();
 	readonly #latest: () => Promise<string | undefined>;
 	readonly #ciTick: () => Promise<number | undefined>;
-	readonly #learn: (id: string) => Promise<Known>;
 	readonly #judge: ModelCall;
 	#watchToken: string | undefined;
 	/** Set while the worker has seen an update; no change lands until a worker on the new config takes it. */
@@ -191,15 +190,6 @@ export class Worker {
 		this.#latest = readEvery(options.latestVersion, { everyMs: options.config.hum.latestVersionCacheSeconds * SECOND_MS, timeoutMs });
 		this.#ciTick = readEvery(options.ciTick, { everyMs: options.config.hum.ciTickCacheSeconds * SECOND_MS, timeoutMs });
 		this.#start = signatureOf(options.repo, options.engineVersion ?? ENGINE_VERSION, options.config.hum.itemsDir);
-		this.#learn = pMemoize(async (id: string): Promise<Known> => {
-			const item = await options.adapters.workSource.read(id);
-
-			return {
-				footprint: footprintOf(item),
-
-				title: item.title,
-			};
-		});
 		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
 		rememberKinds(options.state, options.config);
 		this.#recheckLandings();
@@ -652,6 +642,13 @@ export class Worker {
 		} catch {
 			return undefined;
 		}
+	}
+
+	/** What the scheduler needs of an item, read fresh each tick so an owner's edit to its `touches:` counts. */
+	async #learn(id: string): Promise<Known> {
+		const item = await this.#o.adapters.workSource.read(id);
+
+		return { footprint: footprintOf(item), title: item.title };
 	}
 
 	/** Which waiting items start now, by the scheduler's rules, and starts them. */
