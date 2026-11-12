@@ -28,7 +28,6 @@ test("the thin path runs two items on different files side by side, and both mer
 	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
 	expect(sh(w.repo.remote, ["show", "main:docs/b.md"])).toBe("from b\n");
 
-	// Side by side: each claude process started before the other had ended.
 	const [first, second] = w.shim.calls().filter((c) => c.itemId);
 	const ends = new Map(w.shim.ends().map((e) => [e.pid, e.at]));
 
@@ -322,7 +321,6 @@ test("an item id in the inbox folder wakes a waiting item at once and its questi
 	const openAfter = readStatus(w.state.statusPath);
 
 	expect(openAfter.ok && openAfter.status.questions).toEqual([]);
-	// The answer was saved as an event before it was acted on.
 	expect(w.state.events.list("a").map((e) => e.type)).toContain("answered");
 });
 
@@ -396,7 +394,6 @@ test("a limit the runner hit is saved, and a restarted worker makes no call befo
 	expect(w.results.at(-1)).toMatchObject({ outcome: "limited", until: until * 1000 });
 	expect(w.state.limit.get("runner")).toEqual({ until: until * 1000 });
 
-	// A fresh process: its own runner, the same saved state.
 	const runner = await w.startedRunner();
 	const calls = w.shim.calls().length;
 	const restarted = w.workerWith({ runner });

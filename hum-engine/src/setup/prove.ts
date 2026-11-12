@@ -27,9 +27,9 @@ const failed = (detail: string): Outcome => ({ status: "failed", detail });
 
 const skipped = (detail: string): Outcome => ({ status: "skipped", detail });
 
-/** Runs one step; a throw is the step failing, in the error's own words. */
 const stepOf = (name: string, outcome: Outcome, started: number): Step => ({ name, status: outcome.status, detail: outcome.detail, ms: Math.round(performance.now() - started) });
 
+/** Runs one step; a throw is the step failing, in the error's own words. */
 const timed = async (name: string, run: () => Promise<Outcome>): Promise<Step> => {
 	const started = performance.now();
 

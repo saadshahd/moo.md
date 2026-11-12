@@ -181,7 +181,6 @@ test.skipIf(!canMountDiskImage)("a full disk image leaves the old snapshot resto
 		waitingItem(state, "#68");
 		const good = readFileSync(state.items.path("#68"));
 
-		// Fill the volume.
 		const chunk = "x".repeat(65_536);
 
 		for (let at = 0; ; at++) {

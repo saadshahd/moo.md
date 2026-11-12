@@ -1,10 +1,10 @@
 import type { State } from "../state/open.ts";
 import type { Counted } from "./measure.ts";
 
-/** Spent records of work outside any item carry this prefix. */
 /** The prefix of the op key every question to the owner is written under. */
 const QUESTION_OP = "question:";
 
+/** Spent records of work outside any item carry this prefix. */
 export const LOOP_SPEND_PREFIX = "loop:";
 
 /** Reads what each item cost from what the engine saved: notes, question events and the item's token total. */

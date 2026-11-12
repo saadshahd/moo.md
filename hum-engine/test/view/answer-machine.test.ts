@@ -62,7 +62,6 @@ const BOX_ORIGINS = [
 
 const BOXES = ["", OPEN.filled, WRITTEN, "#11: what is this?", "a draft"];
 
-/** Samples for every event, chosen so each guard in the machine meets both of its answers. */
 /** At least one sample per event, as the graph walk requires. */
 const someOf = <T,>(items: readonly T[]): [T, ...T[]] => {
 	const [first, ...rest] = items;
@@ -72,6 +71,7 @@ const someOf = <T,>(items: readonly T[]): [T, ...T[]] => {
 	return [first, ...rest];
 };
 
+/** Samples for every event, chosen so each guard in the machine meets both of its answers. */
 const SAMPLES = {
 	filled: someOf([OPEN, WHOLE].flatMap((answer) => ["", "a draft"].map((box) => ({ answer, box })))),
 	edited: someOf(BOXES.map((box) => ({ box }))),
