@@ -100,10 +100,8 @@ export type ReviewOutcome = { readonly verdict: Verdict } | { readonly halted: T
 /** The review verdict that lets a change merge. */
 export const REVIEW_APPROVAL = "approve";
 
-/** The change cannot merge on the newest base: it conflicts, or its checks fail there. */
-class StaleMerge extends Error {
-	override name = "StaleMerge";
-}
+/** Why the change cannot merge on the newest base: it conflicts there, or its checks fail there. */
+type Stale = { readonly stale: string };
 
 /** Another writer moved the base between the fetch and the push. */
 class BaseMoved extends Error {
@@ -256,41 +254,36 @@ export const prepareLanding = async (ctx: LandContext, ownerApproved = false): P
 	state.landings.put(id, { item: id, branch, since: now(), change, head, ownerApproved });
 };
 
-/** A merge is rechecked on the newest base: when the base moved, the change is rebased and the checks run again. */
-const pushOntoNewestBase = async ({
-	git,
-	base,
-	branch,
-	clone,
-	env,
-	checks,
-	config,
-}: LandContext): Promise<void> => {
+/** Whether the base already holds the change, as after a push whose op was not marked done. */
+const isOnBase = async ({ git, base }: LandContext): Promise<boolean> => {
 	await git.raw(["fetch", "-q", "origin", base]);
 
-	if (!(await isAncestor(git, `origin/${base}`, "HEAD"))) {
-		const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
+	return isAncestor(git, "HEAD", `origin/${base}`);
+};
 
-		if (rebased.code !== 0) {
-			await git.run(["rebase", "--abort"]);
+/** The change on the newest base: when the base moved it is rebased and the checks run again; else why it cannot merge there. */
+const ontoNewestBase = async ({ git, base, clone, env, checks, config }: LandContext): Promise<Stale | undefined> => {
+	await git.raw(["fetch", "-q", "origin", base]);
 
-			throw new StaleMerge(
-				`the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}`,
-			);
-		}
+	if (await isAncestor(git, `origin/${base}`, "HEAD")) return undefined;
 
-		const failure = await runChecks(checks, clone, { env, timeoutMs: checksTimeoutMs(config.hum) });
+	const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
 
-		if (failure)
-			throw new StaleMerge(
-				`the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}`,
-			);
+	if (rebased.code !== 0) {
+		await git.run(["rebase", "--abort"]);
+
+		return { stale: `the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}` };
 	}
 
+	const failure = await runChecks(checks, clone, { env, timeoutMs: checksTimeoutMs(config.hum) });
+
+	return failure ? { stale: `the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}` } : undefined;
+};
+
+const pushBranchAndBase = async ({ git, base, branch }: LandContext): Promise<void> => {
 	await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
 
-	if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "conflict")
-		throw new BaseMoved(`another push moved ${base} first`);
+	if ((await push(git, ["origin", `HEAD:refs/heads/${base}`])) === "conflict") throw new BaseMoved(`another push moved ${base} first`);
 };
 
 const finish = async ({ state, git, id, now }: LandContext): Promise<ThinResult> => {
@@ -299,22 +292,21 @@ const finish = async ({ state, git, id, now }: LandContext): Promise<ThinResult>
 	return { outcome: "merged", item: id };
 };
 
-const pushToBase = async (ctx: LandContext): Promise<void> => {
-	await ctx.state.ops.once(
-		{ itemId: ctx.id, run: "merge", attempt: 0, op: "push-base" },
-		{
-			holds: async () => {
-				await ctx.git.raw(["fetch", "-q", "origin", ctx.base]);
+/** Pushes the change to the base once, rechecked on the newest base before each try; a base another push moved first is tried again. */
+const pushToBase = async (ctx: LandContext): Promise<Stale | undefined> => {
+	if (await isOnBase(ctx)) return undefined;
 
-				return isAncestor(ctx.git, "HEAD", `origin/${ctx.base}`);
-			},
-			run: () =>
-				pRetry(() => pushOntoNewestBase(ctx), {
-					retries: ctx.config.hum.mergeTries - 1,
-					minTimeout: 0,
-					shouldRetry: ({ error }) => error instanceof BaseMoved,
-				}),
+	return pRetry(
+		async () => {
+			const stale = await ontoNewestBase(ctx);
+
+			if (stale) return stale;
+
+			await ctx.state.ops.once({ itemId: ctx.id, run: "merge", attempt: 0, op: "push-base" }, { holds: () => isOnBase(ctx), run: () => pushBranchAndBase(ctx) });
+
+			return undefined;
 		},
+		{ retries: ctx.config.hum.mergeTries - 1, minTimeout: 0, shouldRetry: ({ error }) => error instanceof BaseMoved },
 	);
 };
 
@@ -402,13 +394,10 @@ const landBy = async (
 		return throughPullRequest(ctx, ctx.pulls, landing.autoMerge, route, rules, why);
 
 	try {
-		await pushToBase(ctx);
+		const stale = await pushToBase(ctx);
 
-		return await finish(ctx);
+		return stale ? { outcome: "review", item: ctx.id, detail: stale.stale } : await finish(ctx);
 	} catch (error) {
-		if (error instanceof StaleMerge)
-			return { outcome: "review", item: ctx.id, detail: error.message };
-
 		if (error instanceof PushRefused) return afterRefusal(ctx, true, route, why);
 
 		throw error;

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
 import type { Item, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
-import { type Finished, type Runner, succeeded } from "../adapters/claude-p.ts";
+import { type Finished, type Runner, type RunOutcome, succeeded } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
@@ -430,11 +430,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 		begun.end(held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
 
-		if (outcome.kind === "limited") return pause({ outcome: "limited", item: id, until: outcome.until });
-
-		if (outcome.kind === "held") return pause({ outcome: "held", item: id, why: outcome.card.cause });
-
-		if (outcome.kind === "stopped") return pause({ outcome: "lost", item: id });
+		if (isPaused(outcome)) return pause(pauseOf(id, outcome));
 
 		if (outcome.kind === "over-cap") {
 			tally.spend(outcome.tokens);
@@ -677,20 +673,24 @@ export const PROSE_PROMPTS = {
 
 const verdictOf = (id: string, head: string, pick: EventPick, models: readonly string[]) => ({ item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] });
 
-/** A run that ended with no answer to read, carried out of the decision as the result it comes to. */
-class Halted extends Error {
-	override name = "Halted";
+/** A run that ended with no answer and no token to count: a usage limit, a hold, or a stop. */
+type Paused = Extract<RunOutcome, { kind: "limited" | "held" | "stopped" }>;
 
-	constructor(readonly result: ThinResult) {
-		super(`the run halted: ${result.outcome}`);
+const PAUSED_KINDS: readonly string[] = ["limited", "held", "stopped"] satisfies readonly Paused["kind"][];
+
+const isPaused = (outcome: RunOutcome): outcome is Paused => PAUSED_KINDS.includes(outcome.kind);
+
+/** What a paused run comes to for its item. */
+const pauseOf = (id: string, outcome: Paused): ThinResult => {
+	switch (outcome.kind) {
+		case "limited":
+			return { outcome: "limited", item: id, until: outcome.until };
+		case "held":
+			return { outcome: "held", item: id, why: outcome.card.cause };
+		case "stopped":
+			return { outcome: "lost", item: id };
 	}
-}
-
-const HALTS = {
-	limited: (id: string, outcome: { until: number }): ThinResult => ({ outcome: "limited", item: id, until: outcome.until }),
-	held: (id: string, outcome: { card: { cause: string } }): ThinResult => ({ outcome: "held", item: id, why: outcome.card.cause }),
-	"over-cap": (id: string, cap: number, spent: number): ThinResult => ({ outcome: "review", item: id, detail: `the review run passed the item's token cap (${cap}) at ${spent} tokens` }),
-} as const;
+};
 
 /** A fresh review run at landing, for a level that asks for one: it reads only the item and the diff, and its verdict is saved. */
 const reviewAtLanding =
@@ -700,39 +700,40 @@ const reviewAtLanding =
 
 		if (!row) throw new Error(`the ${d.kindName} table has no review row`);
 
+		const tally = tallyOf(d.state, d.id);
+
+		let halt: (result: ThinResult) => void = () => {};
+
+		const halted = new Promise<ReviewOutcome>((resolve) => {
+			halt = (result) => resolve({ halted: result });
+		});
+
+		/** A run with no answer never settles, as AnswerRun requires; the review comes to `halted` instead. */
 		const run = async (prompt: string, schema: JsonSchema): Promise<Finished> => {
-			const tally = tallyOf(d.state, d.id);
 			const outcome = await d.runner.run({ prompt, cwd: tmpdir(), model: d.config.hum.models[row.tier], effort: row.effort, schema, signal: d.signal, tokenCap: d.kind.tokenCap.tokens - tally.sinceAnswer() });
 
-			if (outcome.kind === "limited") throw new Halted(HALTS.limited(d.id, outcome));
-
-			if (outcome.kind === "held") throw new Halted(HALTS.held(d.id, outcome));
-
-			if (outcome.kind === "over-cap") {
+			if (outcome.kind === "finished") {
 				tally.spend(outcome.tokens);
 
-				throw new Halted(HALTS["over-cap"](d.id, d.kind.tokenCap.tokens, tally.sinceAnswer()));
+				return outcome;
 			}
 
-			if (outcome.kind !== "finished") throw new Halted({ outcome: "lost", item: d.id });
+			if (outcome.kind === "over-cap") tally.spend(outcome.tokens);
 
-			tally.spend(outcome.tokens);
+			halt(isPaused(outcome) ? pauseOf(d.id, outcome) : { outcome: "review", item: d.id, detail: `the review run passed the item's token cap (${d.kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens` });
 
-			return outcome;
+			return new Promise<never>(() => {});
 		};
 
-		try {
-			const { pick, models } = await decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(d.config, d.item, diff), diff, model: d.config.hum.models[row.tier], run });
+		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(d.config, d.item, diff), diff, model: d.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => {
 			const verdict = verdictOf(d.id, head, pick, models);
 
 			d.state.verdicts.put(d.id, verdict);
 
 			return { verdict };
-		} catch (error) {
-			if (error instanceof Halted) return { halted: error.result };
+		});
 
-			throw error;
-		}
+		return Promise.race([decided, halted]);
 	};
 
 /** Files each part of a split item as its own item, then lands the item as done with no change of its own. */
