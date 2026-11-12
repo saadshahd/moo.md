@@ -32,7 +32,7 @@
     "surface.json"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "test -d ../hum/node_modules || { echo \"hum-engine: the view tests import hum/mod, whose types come from hum's packages; run bun install in hum first\" >&2; exit 1; }; tsc --noEmit",
     "schema": "bun scripts/write-schema.ts",
     "eval": "bun scripts/eval.ts",
     "release:check": "bun tools/release/main.ts check",
