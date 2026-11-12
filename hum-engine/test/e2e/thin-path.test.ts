@@ -13,7 +13,7 @@ import { OWNER } from "../fixtures/identity.ts";
 import { itemFile, sh } from "../fixtures/work-repo.ts";
 import { READY_PLAN, type ShimSpec } from "../fixtures/shim.ts";
 import { BASE, poolConfig } from "../fixtures/slot-world.ts";
-import { FakePulls } from "../fixtures/fake-pulls.ts";
+import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
 import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
 
@@ -229,7 +229,7 @@ test("a change to a path no rule places runs, waits unmerged and asks one questi
 
 test("where the base needs a pull request, the answer's path rule travels in one, and a rerun waits on it without a second", async () => {
 	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const pulls = github.client();
 
 	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
@@ -243,7 +243,7 @@ test("where the base needs a pull request, the answer's path rule travels in one
 	w.state.parked.remove(id);
 
 	const landing = await runThinPath(w.thinPath({ pulls, itemId: id }));
-	const rulePull = github.pulls.find((pull) => pull.head.startsWith(SHIPPED_DEFAULTS.ownerBranchPrefix));
+	const rulePull = github.pulls().find((pull) => pull.head.startsWith(SHIPPED_DEFAULTS.ownerBranchPrefix));
 
 	expect(landing).toMatchObject({ outcome: "landing", item: id });
 	expect(rulePull).toMatchObject({ base: "main", autoMerge: true });
@@ -252,7 +252,7 @@ test("where the base needs a pull request, the answer's path rule travels in one
 
 	w.state.parked.remove(id);
 	expect(await runThinPath(w.thinPath({ pulls, itemId: id }))).toEqual(landing);
-	expect(github.pulls.filter((pull) => pull.head.startsWith(SHIPPED_DEFAULTS.ownerBranchPrefix))).toHaveLength(1);
+	expect(github.pulls().filter((pull) => pull.head.startsWith(SHIPPED_DEFAULTS.ownerBranchPrefix))).toHaveLength(1);
 });
 
 test("a run that needs the owner pushes its branch, asks, and ends; the answer starts a fresh run on that branch", async () => {
@@ -328,14 +328,14 @@ const GH013 = "remote: error: GH013: Repository rule violations found for refs/h
 
 test("where the base requires a pull request, a cleared change opens one with auto-merge; once GitHub merges it, a lapsed claim lands it without another run", async () => {
 	const w = await world({ script: [{}, NOTE] });
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const pulls = github.client();
 	const id = w.repo.seed("Write the note");
 	const before = sh(w.repo.remote, ["rev-parse", "main"]);
 
 	github.requiresPullRequest = true;
 	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
-	expect(github.pulls).toMatchObject([{ head: runBranch(SHIPPED_DEFAULTS, id), base: "main", autoMerge: true, state: "OPEN" }]);
+	expect(github.pulls()).toMatchObject([{ head: runBranch(SHIPPED_DEFAULTS, id), base: "main", autoMerge: true, state: "OPEN" }]);
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
 	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:.hum/work/${id}.md`])).toContain("state: done");
 
@@ -351,24 +351,24 @@ test("where the base requires a pull request, a cleared change opens one with au
 
 test("a change that waits for the owner runs on its level's tier and opens the same pull request without auto-merge; the owner's approval arms it", async () => {
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])) });
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const pulls = github.client();
 	const id = w.repo.add("note", itemFile("Write the note", { state: "ready", body: "touches: docs/note.md" }));
 
 	github.requiresPullRequest = true;
 	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
-	expect(github.pulls).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
 	expect(w.shim.calls().at(-1)?.argv).toContain(SHIPPED_DEFAULTS.models.top);
 
 	await w.adapter.answers!.answer(id, { text: "approve", option: "approve" });
 	w.clock.at += TTL;
 	expect(await runThinPath(w.thinPath({ pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
-	expect(github.pulls).toMatchObject([{ autoMerge: true }]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: true }]);
 });
 
 test("a push the remote refuses goes through a pull request, after the branch's rules are read again", async () => {
 	const w = await world({ script: [{}, NOTE] });
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const pulls = github.client();
 	const id = w.repo.seed("Write the note");
 
@@ -380,7 +380,7 @@ test("a push the remote refuses goes through a pull request, after the branch's 
 	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
 	expect(refused()).toBe(1);
 	expect(github.requests.filter((r) => r.startsWith("GET"))).toHaveLength(2);
-	expect(github.pulls).toMatchObject([{ head: runBranch(SHIPPED_DEFAULTS, id), autoMerge: true }]);
+	expect(github.pulls()).toMatchObject([{ head: runBranch(SHIPPED_DEFAULTS, id), autoMerge: true }]);
 });
 
 test("a run that lowers its own level, bumps the engine pin and edits a workflow and a hook is held for the owner: no hook runs and the owner's config stays", async () => {
@@ -409,7 +409,7 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 		],
 	});
 
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const id = w.repo.seed("Write the note");
 
 	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
@@ -424,7 +424,7 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 		process.env.GIT_TEMPLATE_DIR = previous;
 	}
 
-	expect(github.pulls).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
 	expect(existsSync(ran)).toBe(false);
 	expect(() => sh(w.repo.remote, ["show", "main:docs/note.md"])).toThrow();
 	expect(sh(w.repo.remote, ["show", "main:.hum/hum.json"])).toBe(OWNER_CONFIG);
@@ -524,13 +524,13 @@ test("an alignment call below the bar gates nothing: the change still lands by i
 
 	const judge = scriptedJudge({ kind: { kind: "docs" }, alignment: { alignment: "concern", verification: "concern" } });
 	const w = await world({ script: [{}, NOTE] }, { config });
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const id = w.repo.seed("Write the note");
 
 	github.requiresPullRequest = true;
 	expect(await runThinPath(w.thinPath({ judge, pulls: github.client() }))).toMatchObject({ outcome: "landing", item: id });
-	expect(github.pulls).toMatchObject([{ autoMerge: true }]);
-	expect(github.comments).toEqual([expect.stringContaining("alignment concern, verification concern")]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: true }]);
+	expect(github.pullComments()).toEqual([expect.stringContaining("alignment concern, verification concern")]);
 });
 
 const TO_OWNER = { event: "needs-owner", sure: true, reason: "A matter of tone.", question: "Is the tone right?" };

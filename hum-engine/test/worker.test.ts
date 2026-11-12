@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { join } from "node:path";
 import { isAlive, until } from "./fixtures/process.ts";
 import { sh } from "./fixtures/work-repo.ts";
-import { FakePulls } from "./fixtures/fake-pulls.ts";
+import { FakeGitHub } from "./fixtures/fake-github.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -438,7 +438,7 @@ test("the status file lists each path rule the owner's answers added, with the c
 });
 
 test("a path raised while its change's pull request is armed: the next worker disarms it at its first tick, without waiting for the claim and without a run", async () => {
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const pulls = github.client();
 	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } }, { worker: { pulls } });
 
@@ -446,13 +446,13 @@ test("a path raised while its change's pull request is armed: the next worker di
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
 	await w.worker.idle();
-	expect(github.pulls).toMatchObject([{ autoMerge: true, state: "OPEN" }]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: true, state: "OPEN" }]);
 
 	const raised = w.workerWith({ config: { ...w.config, hum: { ...w.config.hum, paths: [{ glob: "docs/**", level: "high" }] } } });
 
 	await raised.tick();
 	await raised.idle();
-	expect(github.pulls).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: false, state: "OPEN" }]);
 	expect(w.shim.calls().filter((c) => c.itemId)).toHaveLength(1);
 });
 

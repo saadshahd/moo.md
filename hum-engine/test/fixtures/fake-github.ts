@@ -1,11 +1,14 @@
 import { z } from "zod";
+import { gitHubClient } from "../../src/adapters/github-client.ts";
+import { gitHubPullRequests, type PullRequests } from "../../src/adapters/pull-requests.ts";
 import type { Json } from "../../src/config/json.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 
 type Issue = { number: number; title: string; body: string; state: "OPEN" | "CLOSED"; labels: string[] };
 
 type Comment = { body: string; createdAt: string };
 
-type Pull = { id: string; head: string; base: string; title: string; state: "OPEN" | "MERGED" };
+type Pull = { id: string; number: number; head: string; base: string; title: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND" };
 
 type Commit = { message: string; tree: string; parents: string[] };
 
@@ -40,8 +43,15 @@ const Posted = z.object({ message: z.string(), tree: z.string(), parents: z.arra
 const REPOSITORY_ID = "R_fake";
 const TOKENS = new Set(["token fake-token", "bearer fake-token"]);
 
-/** A pull request as GitHub's GraphQL answers it; its number is the one its id ends in. */
-const pullNode = ({ id, state }: Pull): Json => ({ id, number: Number(id.slice("PR_".length)), url: `https://github.com/me/scratch/pull/${id.slice("PR_".length)}`, state, mergeStateStatus: "CLEAN", autoMergeRequest: null });
+/** A pull request as GitHub's GraphQL answers it. */
+const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
+	id,
+	number,
+	url: `https://github.com/me/scratch/pull/${number}`,
+	state,
+	mergeStateStatus: status,
+	autoMergeRequest: autoMerge ? { enabledAt: "2026-11-08T00:00:00Z" } : null,
+});
 
 const json = (status: number, value: Json, headers: Record<string, string> = {}) =>
 	new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", ...headers } });
@@ -56,7 +66,8 @@ const refused = (type: string, message: string): Refused => new Refused({ type, 
 /**
  * An in-memory GitHub for one repo, behind a `fetch`: the GraphQL operations the adapter sends, by name, and the two
  * REST calls it keeps. It keeps what the adapter leans on: an issue list ETag that moves on any write, 304s that
- * spend no rate limit, refs that refuse a second create, and commits on a branch that refuse a stale head.
+ * spend no rate limit, refs that refuse a second create, and commits on a branch that refuse a stale head. A new pull
+ * request waits on its required checks (`BLOCKED`); `checksPass` makes it `CLEAN`, and merges it when auto-merge is on, as GitHub does.
  */
 export class FakeGitHub {
 	readonly repo = "me/scratch";
@@ -67,6 +78,10 @@ export class FakeGitHub {
 	#refs = new Map<string, string>([["refs/heads/main", "c0"]]);
 	#commits = new Map<string, Commit>([["c0", { message: "base", tree: "t0", parents: [] }]]);
 	#pulls: Pull[] = [];
+	#pullComments: string[] = [];
+	/** The base branch's rules ask for a pull request with passing checks. */
+	requiresPullRequest = false;
+	allowAutoMerge = true;
 	#version = 1;
 	#tick = 0;
 	/** Each request: `GET /path?query` for REST, `graphql <operation>` for GraphQL. */
@@ -134,6 +149,40 @@ export class FakeGitHub {
 
 	comments(number: number): readonly Comment[] {
 		return this.#comments.get(number) ?? [];
+	}
+
+	/** The body of each pull request comment, in order. */
+	pullComments(): readonly string[] {
+		return this.#pullComments;
+	}
+
+	/** The required checks pass: an armed pull request merges, any other may merge now. */
+	checksPass(number: number): void {
+		const pull = this.#pulls.find((found) => found.number === number);
+
+		if (pull) Object.assign(pull, pull.autoMerge ? { state: "MERGED" } : { status: "CLEAN" });
+	}
+
+	client(): PullRequests {
+		const client = gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+
+		return gitHubPullRequests(this.repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: async () => client });
+	}
+
+	#pull(id: string | undefined, change: Partial<Pull>, mutation: string): Json | Refused {
+		const pull = this.#pulls.find((found) => found.id === id);
+
+		if (!pull) return refused("NOT_FOUND", `no pull ${id}`);
+
+		Object.assign(pull, change);
+
+		return { [mutation]: { clientMutationId: null } };
+	}
+
+	#armRefusal(id: string | undefined): Refused | undefined {
+		if (!this.allowAutoMerge) return refused("UNPROCESSABLE", "Pull request Auto merge is not allowed for this repository");
+
+		return this.#pulls.find((found) => found.id === id)?.status === "CLEAN" ? refused("UNPROCESSABLE", "Pull request Pull request is in clean status") : undefined;
 	}
 
 	#issue(number: number | undefined): Issue | Refused {
@@ -242,21 +291,18 @@ export class FakeGitHub {
 			return { createIssue: { issue: { number } } };
 		},
 		OpenPull: (v) => {
-			const pull: Pull = { id: `PR_${this.#pulls.length + 1}`, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", state: "OPEN" };
+			const number = this.#pulls.length + 1;
+			const pull: Pull = { id: `PR_${number}`, number, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", state: "OPEN", autoMerge: false, status: "BLOCKED" };
 
 			this.#pulls.push(pull);
 
 			return { createPullRequest: { pullRequest: pullNode(pull) } };
 		},
-		MergeNow: (v) => {
-			const pull = this.#pulls.find((found) => found.id === v.pull);
-
-			if (!pull) return refused("NOT_FOUND", `no pull ${v.pull}`);
-
-			pull.state = "MERGED";
-
-			return { mergePullRequest: { clientMutationId: null } };
-		},
+		MergeNow: (v) => this.#pull(v.pull, { state: "MERGED" }, "mergePullRequest"),
+		EnableAutoMerge: (v) => this.#armRefusal(v.pull) ?? this.#pull(v.pull, { autoMerge: true }, "enablePullRequestAutoMerge"),
+		DisableAutoMerge: (v) => this.#pull(v.pull, { autoMerge: false }, "disablePullRequestAutoMerge"),
+		UpdateBranch: (v) => this.#pull(v.pull, { status: "BLOCKED" }, "updatePullRequestBranch"),
+		Comment: (v) => (this.#pullComments.push(v.body ?? ""), { addComment: { clientMutationId: null } }),
 	} satisfies Readonly<Record<string, (v: Vars) => Json | Refused>>;
 
 	#graphql(raw: string): Response {
@@ -281,6 +327,9 @@ export class FakeGitHub {
 		this.requests.push(`${method} ${url.pathname}${url.search}`);
 
 		if (url.pathname === "/rate_limit") return json(200, { resources: { core: { remaining: this.remaining } } });
+
+		if (method === "GET" && path.startsWith("/rules/branches/"))
+			return json(200, this.requiresPullRequest ? [{ type: "pull_request", parameters: { allowed_merge_methods: ["squash"] } }, { type: "required_status_checks" }] : [{ type: "deletion" }]);
 
 		if (method === "GET" && path === "/issues") {
 			const etag = `W/"v${this.#version}"`;
