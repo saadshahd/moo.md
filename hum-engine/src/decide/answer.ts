@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ThreadEntry } from "../adapter-api.ts";
 import { OWNER_APPROVAL } from "./merge.ts";
 import { DATA_RULE, fenced } from "./prose.ts";
+import { bareWord } from "./question.ts";
 
 /** What the model call answers when none of the question's options fits the reply. */
 export const NONE_OF_THESE = "none of these";
@@ -15,10 +16,7 @@ export type Resolution =
 	| { readonly source: "none-of-these" }
 	| { readonly source: "abstained"; readonly why: string };
 
-const WORD_EDGES = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
-
-const firstWordOf = (text: string): string =>
-	(text.trim().split(/\s+/)[0] ?? "").replaceAll(WORD_EDGES, "").toLowerCase();
+const firstWordOf = (text: string): string => bareWord(text.trim().split(/\s+/)[0] ?? "").toLowerCase();
 
 /** The option an answer picks by its hidden marker, else by its first word matching an option exactly. */
 export const matchOption = (

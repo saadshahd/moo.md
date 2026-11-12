@@ -60,7 +60,7 @@ export const routeOf = (
 	return {
 		level,
 		unclear,
-		mergesAlone: unclear.length === 0 && CLEARED_BY[level.review](NO_APPROVALS),
+		mergesAlone: isCleared({ level, unclear }, NO_APPROVALS),
 		proof:
 			level.release === "after-proof"
 				? proofs.join("; ") || STRICTEST_PROOF
@@ -69,7 +69,7 @@ export const routeOf = (
 };
 
 /** A route merges once nothing waits: on its own, once a fresh review approved a clear change at an agent-reviewed level, or once the owner approved it. */
-export const isCleared = (route: Route, approvals: Approvals): boolean =>
+export const isCleared = (route: Pick<Route, "level" | "unclear">, approvals: Approvals): boolean =>
 	approvals.owner || (route.unclear.length === 0 && CLEARED_BY[route.level.review](approvals));
 
 /** Every level that asks for a review gets a fresh review run first; the owner's review comes after it. */

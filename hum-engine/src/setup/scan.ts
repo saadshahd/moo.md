@@ -151,14 +151,13 @@ const foldersOf = async (repo: string, base: string): Promise<FolderHistory[]> =
 
 	if (log.code !== 0) return [];
 
-	const changes = await readHistory(git, base, SHIPPED_DEFAULTS);
-	const folders = new Map<string, number[]>();
+	const touches = (await readHistory(git, base, SHIPPED_DEFAULTS)).flatMap(({ files, size }) => [...new Set(files.map(topFolder).filter(Boolean))].map((folder) => ({ folder, size })));
 
-	for (const change of changes) {
-		for (const folder of new Set(change.files.map(topFolder).filter(Boolean))) folders.set(folder, [...(folders.get(folder) ?? []), change.size]);
-	}
+	return [...new Set(touches.map(({ folder }) => folder))].map((folder) => {
+		const sizes = touches.flatMap((touch) => (touch.folder === folder ? [touch.size] : []));
 
-	return [...folders].map(([folder, sizes]) => ({ folder, changes: sizes.length, sizes: sizes.toReversed() }));
+		return { folder, changes: sizes.length, sizes: sizes.toReversed() };
+	});
 };
 
 const humSchemaOf = (repo: string): number | undefined => {

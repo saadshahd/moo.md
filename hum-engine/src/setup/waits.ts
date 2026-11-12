@@ -1,5 +1,6 @@
 import { OWNER_WAIT_TAG, STUCK_TAG, WAIT_TAG, type Kind, type StateNodeJSON } from "../config/schema.ts";
-import { HOUR_MS, WAIT_HOURS } from "./tables.ts";
+import { HOUR_MS } from "../time.ts";
+import { WAIT_HOURS } from "./tables.ts";
 
 /** A state a kind's machine waits in, with the hours its timeout proposes. */
 export type Wait = { readonly kind: string; readonly state: string; readonly waitsOn: "owner" | "other"; readonly hours: number };

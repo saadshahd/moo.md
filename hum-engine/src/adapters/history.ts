@@ -3,6 +3,7 @@ import parseDiff from "parse-diff";
 import PQueue from "p-queue";
 import pkg from "../../package.json" with { type: "json" };
 import type { HumConfig } from "../config/schema.ts";
+import { SECOND_MS } from "../time.ts";
 import { labelChanges, type PastChange } from "../decide/labels.ts";
 import type { Change, Histories, Label } from "../decide/risk.ts";
 import { type Git, PATCH } from "./git.ts";
@@ -50,7 +51,7 @@ const readLog = async (
 			return {
 				sha,
 				subject,
-				committedAt: Number(committed) * 1000,
+				committedAt: Number(committed) * SECOND_MS,
 				body: body.trim(),
 				files: counted.map(({ file }) => file),
 				size: counted.reduce((sum, { lines }) => sum + lines, 0),

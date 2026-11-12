@@ -95,7 +95,5 @@ export const KIND_LABEL_WORDS = {
 /** Hours a wait gets before it ends stuck, by who it waits on. */
 export const WAIT_HOURS = { owner: 72, other: 24 } as const;
 
-export const HOUR_MS = 3_600_000;
-
 /** Tracked files setup reads the repo's shape from, at most. */
 export const TRACKED_FILE_LIMIT = 50_000;

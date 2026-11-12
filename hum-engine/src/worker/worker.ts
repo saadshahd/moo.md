@@ -8,6 +8,7 @@ import { createAsyncLogic } from "xstate";
 import { ADAPTER_API_VERSION, type Answers, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
+import { invokedSources } from "../config/machine.ts";
 import { type Kind, SCHEMA_VERSION } from "../config/schema.ts";
 import { checkTokenAge } from "../service/token.ts";
 import { listFiles } from "../state/fs.ts";
@@ -112,8 +113,7 @@ const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyM
 		: pMemoize(() => pTimeout(read(), { milliseconds: timeoutMs, fallback: () => undefined }).catch(() => undefined), { cache: new ExpiryMap(everyMs) });
 
 /** Sources that never settle, so a restored item can be stepped by its timers without starting a run. */
-const neverSources = (kind: Kind) =>
-	Object.fromEntries(Object.values(kind.machine.states).flatMap((node) => (node.invoke ? [[node.invoke.src, createAsyncLogic({ run: () => new Promise<never>(() => {}) })]] : [])));
+const neverSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: () => new Promise<never>(() => {}) }));
 
 /** The declared delays of the state an item was saved in, shortest first. */
 const delaysOf = (kind: Kind, saved: SavedSnapshot): number[] =>

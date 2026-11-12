@@ -13,7 +13,7 @@ import { type Git, gitIn, identityEnv, PATCH, push } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { kindMachine } from "../config/machine.ts";
+import { invokedSources, kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { leavesDocs } from "../decide/kind.ts";
@@ -145,11 +145,7 @@ export const waitsOnOwner = (kind: Kind, state: string | undefined): boolean => 
 export const endedStuck = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, STUCK_TAG);
 
 /** Placeholder sources: enough to restore a snapshot and read its state before the real sources exist. */
-const stubSources = (kind: Kind) => {
-	const idle = createAsyncLogic({ run: async () => {} });
-
-	return Object.fromEntries(Object.values(kind.machine.states).flatMap((node) => (node.invoke ? [[node.invoke.src, idle]] : [])));
-};
+const stubSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: async () => {} }));
 
 /**
  * The thin path: a ready markdown item is claimed, built by a `claude -p` run on its run branch,
@@ -534,8 +530,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		],
 	]);
 
-	const saveVerdict = (pick: EventPick, models: readonly string[], head: string) =>
-		state.verdicts.put(id, { item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] });
+	const saveVerdict = (pick: EventPick, models: readonly string[], head: string) => state.verdicts.put(id, verdictOf(id, head, pick, models));
 
 	/** A plan or review state: its run picks the next event, and a split files the parts and lands the item as done. */
 	const decision = (purpose: ProsePurpose) =>

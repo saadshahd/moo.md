@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { stripVTControlCharacters } from "node:util";
 import parseDiff from "parse-diff";
-import stringify from "safe-stable-stringify";
 import { z } from "zod";
 import type { Finished } from "../adapters/claude-p.ts";
+import { hashJson } from "../config/hash.ts";
 import type { Boundary, HumConfig } from "../config/schema.ts";
 
 const TAG_HASH = 12;
@@ -41,7 +41,7 @@ export const PlanFile = z.strictObject({
 export type PlanFile = z.infer<typeof PlanFile>;
 
 /** A plan's identity: a later run reads the plan with this hash, and any other text is not the approved plan. */
-export const planHash = (plan: PlanFile): string => createHash("sha256").update(stringify(plan)).digest("hex");
+export const planHash = (plan: PlanFile): string => hashJson(plan);
 
 /** The two states whose outcome is prose: the events each may pick, and the safer pick an unsure run takes. */
 export const PROSE_STATES = {

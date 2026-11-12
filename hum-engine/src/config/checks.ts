@@ -139,13 +139,7 @@ export const pickTier = (kind: Pick<Kind, "tiers">, key: { purpose: string; leve
 /** Every event has a source and a handler, and every event a machine waits on has a source. */
 const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): Problem[] => {
 	const parts = new Set<string>([...FIXED_PARTS, ...Object.keys(hum.roles)]);
-	const handled = new Set<string>();
-
-	for (const kind of Object.values(kinds)) {
-		for (const node of Object.values(kind.machine.states)) {
-			for (const event of Object.keys(node.on ?? {})) handled.add(event);
-		}
-	}
+	const handled = new Set(Object.values(kinds).flatMap((kind) => Object.values(kind.machine.states).flatMap((node) => Object.keys(node.on ?? {}))));
 
 	return [
 		...Object.entries(hum.events).flatMap(([event, { source }]): Problem[] => [

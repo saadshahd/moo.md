@@ -28,6 +28,9 @@ const keyOf = ({ item, queuedAt }: Pick<QueuedQuestion, "item" | "queuedAt">): s
 /** How long an asked question is kept: long enough to count the day, and to read late answers to it. */
 const keptFor = ({ hum }: Config): number => Math.max(DAY_MS, hum.questionTimeoutHours * HOUR_MS);
 
+/** Whether a question asked at `askedAt` is recent enough that an answer may still come for it. */
+const isKept = (askedAt: number, config: Config, now: number): boolean => now - askedAt <= keptFor(config);
+
 const isWaiting = ({ askedAt }: QueuedQuestion): boolean => askedAt === undefined;
 
 /** A question to the owner, checked against the question rules and queued for room under the daily cap. One already open, or already queued, is not asked twice. */
@@ -68,7 +71,7 @@ export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> 
 	const { state, config, workSource, questions, now } = ctx;
 	const all = state.questions.list();
 
-	for (const old of all) if (old.askedAt !== undefined && now() - old.askedAt > keptFor(config)) state.questions.remove(keyOf(old));
+	for (const old of all) if (old.askedAt !== undefined && !isKept(old.askedAt, config, now())) state.questions.remove(keyOf(old));
 
 	const room = roomToAsk(all.flatMap(({ askedAt }) => (askedAt === undefined ? [] : [askedAt])), config.hum.dailyQuestionCap, now());
 	const released: string[] = [];
@@ -86,4 +89,4 @@ export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> 
 
 /** Items whose question was asked recently enough that an answer may still come for it. */
 export const recentlyAsked = ({ state, config, now }: Pick<QuestionContext, "state" | "config" | "now">): string[] =>
-	state.questions.list().flatMap(({ item, askedAt }) => (askedAt !== undefined && now() - askedAt <= keptFor(config) ? [item] : []));
+	state.questions.list().flatMap(({ item, askedAt }) => (askedAt !== undefined && isKept(askedAt, config, now()) ? [item] : []));

@@ -4,7 +4,7 @@ import { epochMs } from "./limit.ts";
 /** Tokens a run adds to the item's bill: input, output and cache writes. Cache reads are not counted. */
 export const billed = (input: number, output: number, cacheWrite: number): number => input + output + cacheWrite;
 
-const Counts = {
+export const Counts = {
 	input_tokens: z.number().default(0),
 	output_tokens: z.number().default(0),
 	cache_creation_input_tokens: z.number().default(0),

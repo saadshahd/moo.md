@@ -15,7 +15,7 @@ import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
 import { LIMIT_TEXT, LIMIT_UNPARSED, type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
-import { billed } from "./transcript.ts";
+import { billed, Counts } from "./transcript.ts";
 
 export type Effort = (typeof EFFORTS)[number];
 
@@ -88,11 +88,7 @@ export const runArgs = ({ model, effort, schema, sessionId, call = "run", name }
 	...(name === undefined ? [] : ["-n", name]),
 ];
 
-const Usage = z.looseObject({
-	input_tokens: z.number().default(0),
-	output_tokens: z.number().default(0),
-	cache_creation_input_tokens: z.number().default(0),
-});
+const Usage = z.looseObject(Counts);
 
 const ModelUsage = z.looseObject({
 	inputTokens: z.number().default(0),

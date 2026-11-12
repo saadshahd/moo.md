@@ -10,7 +10,7 @@ import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
 import { type GitIdentity, gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
 import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
-import { answerMarker, followUpKey, questionText } from "./marked.ts";
+import { answerMarker, followUpBody, followUpKey, questionText } from "./marked.ts";
 import { type CommitLanded, landOwnerCommit } from "./owner-commit.ts";
 import type { PullRequests } from "./pull-requests.ts";
 
@@ -341,7 +341,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			fileFollowUp: async (from, { title, body }) => {
 				const id = parseArgument(ItemId, followUpId(parseArgument(ItemId, from), title));
 
-				await write(`hum: file ${id}`, async () => ((await itemSource(id)) === undefined ? { path: pathOf(id), content: newItemFile(title, `${body.trim()}\n\nFiled from ${from}.`) } : undefined));
+				await write(`hum: file ${id}`, async () => ((await itemSource(id)) === undefined ? { path: pathOf(id), content: newItemFile(title, followUpBody(body, from)) } : undefined));
 
 				return { id, title };
 			},
