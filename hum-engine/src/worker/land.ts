@@ -380,21 +380,17 @@ const afterRefusal = async (
 	);
 };
 
-/** The card of a base that other pushes kept moving through every one of `mergeTries` pushes. */
-const BASE_CONTENDED = "base-contended";
+/** The card of a base that other pushes kept moving through every one of `mergeTries` pushes. It stands while the item stays held; the pass that decides the item another way clears it. */
+export const BASE_CONTENDED = "base-contended";
 
-/** One card while the item's pushes to the base keep losing the race, however many passes that lasts; gone once a push does not lose it. */
-const markContention = ({ state, id, base, config }: LandContext, landed: BaseLanding): void => {
-	const card = { code: BASE_CONTENDED, item: id };
-
-	if (landed.kind !== "conflict") return state.faults.clear(card);
-
-	state.faults.raise({
-		...card,
+/** One card while the item's pushes to the base keep losing the race, however many passes that lasts. */
+const raiseContention = ({ state, id, base, config }: LandContext): void =>
+	void state.faults.raise({
+		code: BASE_CONTENDED,
+		item: id,
 		cause: `${id} lost the race to ${base} on all ${config.hum.mergeTries} pushes of a pass: another push moved ${base} first each time`,
 		fix: `hum tries again each pass. If this card stays, find what keeps pushing to ${base}, or raise mergeTries in .hum/hum.json.`,
 	});
-};
 
 const landBy = async (
 	ctx: LandContext,
@@ -411,11 +407,13 @@ const landBy = async (
 
 	const landed = await pushToBase(ctx);
 
-	markContention(ctx, landed);
-
 	if (landed.kind === "refused") return afterRefusal(ctx, { cleared: true, route, why, said: landed.said });
 
-	if (landed.kind === "conflict") return unpushed(ctx.id, ctx.base, landed);
+	if (landed.kind === "conflict") {
+		raiseContention(ctx);
+
+		return unpushed(ctx.id, ctx.base, landed);
+	}
 
 	return landed.kind === "stale" ? { outcome: "review", item: ctx.id, detail: landed.why } : finish(ctx);
 };

@@ -22,7 +22,7 @@ import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
-import { changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome, unpushed } from "./land.ts";
+import { BASE_CONTENDED, changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome, unpushed } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
@@ -165,7 +165,23 @@ const kindNamed = (config: Config, name: string): Kind => {
 	return kind;
 };
 
+/** The outcomes that decide nothing about the item: it stays where its pass found it. */
+type Undecided = Extract<ThinResult, { outcome: "idle" | "lost" | "waiting" | "limited" | "held" }>;
+
+const UNDECIDED_OUTCOMES: readonly string[] = ["idle", "lost", "waiting", "limited", "held"] satisfies readonly Undecided["outcome"][];
+
+const isUndecided = (result: ThinResult): result is Undecided => UNDECIDED_OUTCOMES.includes(result.outcome);
+
+/** One pass of an item. A pass that decides the item, by any path, ends its hold on the base. */
 export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
+	const result = await pass(o);
+
+	if (!isUndecided(result)) o.state.faults.clear({ code: BASE_CONTENDED, item: result.item });
+
+	return result;
+};
+
+const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const base = o.base ?? DEFAULT_BASE;
 	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
 

@@ -136,11 +136,6 @@ export class WorkRepo {
 		return () => (existsSync(refused) ? readFileSync(refused, "utf8").split("\n").filter(Boolean).length : 0);
 	}
 
-	/** The remote takes every push again. */
-	allowPushes(): void {
-		rmSync(join(this.remote, "hooks", "pre-receive"), { force: true });
-	}
-
 	/** The item file as the remote holds it on main. */
 	show(id: string): string {
 		return sh(this.remote, ["show", `main:.hum/work/${id}.md`]);

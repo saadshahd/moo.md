@@ -142,7 +142,7 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(w.repo.show(id)).toContain("state: done");
 });
 
-test("a merge that keeps losing the race to the base stops after mergeTries pushes, with one card while it stays held, gone once it lands", async () => {
+test("a merge that keeps losing the race to the base stops after mergeTries pushes, with one card while it stays held, gone once the item leaves the base by a pull request", async () => {
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => (raw.hum.mergeTries = 2)) });
 	const id = w.repo.seed("Write the note");
 	const refused = w.repo.refusePushes();
@@ -159,10 +159,11 @@ test("a merge that keeps losing the race to the base stops after mergeTries push
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held" });
 	expect(w.state.faults.list()).toEqual(cards);
 
-	w.repo.allowPushes();
+	const github = new FakeGitHub();
 
-	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "merged", item: id });
-	expect(w.state.faults.list()).toEqual([]);
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.thinPath({ pulls: github.client(), itemId: id }))).toMatchObject({ outcome: "landing", item: id });
+	expect(w.state.faults.list().filter(({ code }) => code === "base-contended")).toEqual([]);
 });
 
 test("a base the remote refuses off GitHub ends the item stuck, in the remote's own words", async () => {
