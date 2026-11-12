@@ -11,16 +11,16 @@ const ACTION_LABEL_CELLS = 14;
 const time = z.number().int().nonnegative();
 
 /** A command the owner may run. A label is at most 14 cells, the width the view gives it. */
-export const Action = z.strictObject({ label: name.max(ACTION_LABEL_CELLS), command: name });
+export const Action = z.object({ label: name.max(ACTION_LABEL_CELLS), command: name });
 
 /** A card's action: it fills the prompt with this answer to the card's item, and only the owner's Enter posts it. */
-export const CardAction = z.strictObject({ label: name.max(ACTION_LABEL_CELLS), answer: name });
+export const CardAction = z.object({ label: name.max(ACTION_LABEL_CELLS), answer: name });
 
 /** The most characters of a tool's own words a card quotes. */
 export const CARD_EXCERPT = 200;
 
 /** The cause, the fix in one sentence, then at most one action. */
-export const Card = z.strictObject({
+export const Card = z.object({
 	kind: z.enum(["waiting", "limited", "fault"]),
 	/** One card per key: a failure code plus the item it hit. */
 	key: name,
@@ -34,26 +34,26 @@ export const Card = z.strictObject({
 
 export type Card = z.infer<typeof Card>;
 
-const Row = z.strictObject({ item: name, title: name, level: name.optional(), state: name, since: time });
+const Row = z.object({ item: name, title: name, level: name.optional(), state: name, since: time });
 
 /** An unclear item carries the mark apart from its risk level. */
 export const InFlight = Row.extend({ unclear: z.boolean() });
 
 /** A question to the owner: its text and the option words an answer may pick, none for a free answer. */
-export const Question = z.strictObject({ item: name, text: name, options: z.array(name), since: time });
+export const Question = z.object({ item: name, text: name, options: z.array(name), since: time });
 
 export type Question = z.infer<typeof Question>;
 
-export const Merged = z.strictObject({ item: name, title: name, level: name.optional(), mergedAt: time });
+export const Merged = z.object({ item: name, title: name, level: name.optional(), mergedAt: time });
 
-export const Choice = z.strictObject({ item: name, text: name, at: time });
+export const Choice = z.object({ item: name, text: name, at: time });
 
 /** A path rule the owner's answer added, with the command that takes it back. */
 export type Choice = z.infer<typeof Choice>;
 
-export const LearnedRule = z.strictObject({ glob: name, level: name, item: name, at: time, undo: Action });
+export const LearnedRule = z.object({ glob: name, level: name, item: name, at: time, undo: Action });
 
-const PerMerge = z.strictObject({
+const PerMerge = z.object({
 	merges: z.int().nonnegative(),
 	/** Items that never merged in the window; their costs are in the numbers. */
 	abandoned: z.int().nonnegative(),
@@ -66,18 +66,18 @@ const PerMerge = z.strictObject({
 export const Measure = PerMerge.extend({
 	window: z.int().positive(),
 	byPath: z.array(PerMerge.extend({ glob: name })),
-}).strict();
+});
 
 export type Measure = z.infer<typeof Measure>;
 
 /** One file per repo; the view shows the sections in this order. */
-export const Status = z.strictObject({
+export const Status = z.object({
 	format: z.literal(STATUS_FORMAT),
 	/** Freshness is a pure function of these timestamps and the clock. */
 	writtenAt: time,
 	/** When each runner's worker last wrote; absent when it never has. */
-	workers: z.strictObject({ mac: time.optional(), ci: time.optional() }),
-	engine: z.strictObject({
+	workers: z.object({ mac: time.optional(), ci: time.optional() }),
+	engine: z.object({
 		version: name,
 		adapterApi: z.int().nonnegative(),
 		configSchema: z.int().positive(),
@@ -91,7 +91,7 @@ export const Status = z.strictObject({
 	choices: z.array(Choice),
 	rules: z.array(LearnedRule),
 	/** Pairs of review notes only a model found alike, waiting for its precision to reach the owner's bar. */
-	possibleRepeats: z.array(z.strictObject({ a: name, b: name })),
+	possibleRepeats: z.array(z.object({ a: name, b: name })),
 	/** memory.md rules no run applied in the last runs; the owner decides whether to keep them. */
 	unusedMemory: z.array(z.string()),
 	measure: Measure.nullable(),
@@ -117,7 +117,7 @@ export const emptyStatus = (engineVersion: string, writtenAt: number): Status =>
 });
 
 /** What the worker writes each tick. The service unit shows a card when it is three ticks old. */
-export const Heartbeat = z.strictObject({
+export const Heartbeat = z.object({
 	time,
 	engineVersion: name,
 	configHash: name,

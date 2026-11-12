@@ -24,4 +24,10 @@ export const SAVED_0_1_0 = {
 	events: { source: "thread", sourceId: "c1", itemId: "7", type: "answer", receivedAt: 1_700_000_000_000, payload: { text: "alpha" } },
 	ops: { itemId: "7", run: "build", attempt: 0, op: "comment", state: "done", at: 1_700_000_000_000 },
 	proofs: { item: "7", at: 1_700_000_000_000, passed: false, reason: "the check passes on 0123456, the commit a note points at", worktrees: 2, ms: 900 },
+	choices: { item: "7", text: 'Chose "short" over long without you.', at: 1_700_000_000_000 },
+	notes: { source: "review-comment", sourceId: "r1", change: "0123456789abcdef", item: "7", file: "src/a.ts", line: 3, hunk: "@@ -1 +1 @@", text: "Name it for what it holds.", at: 1_700_000_000_000 },
+	repeats: { key: "review-comment:r1", notes: ["review-comment:r1", "review-comment:r2"], item: "9", commented: ["review-comment:r2"], checked: { at: 1_700_000_000_000, check: "names" }, misses: [] },
+	"possible-repeats": { a: "review-comment:r1", b: "review-comment:r3", models: ["claude-haiku-5-5"], at: 1_700_000_000_000 },
+	merges: { item: "7", sha: "0123456789abcdef", at: 1_700_000_000_000, paths: ["src/a.ts"] },
+	breaks: { item: "7", sha: "0123456789abcdef", at: 1_700_000_000_000, paths: ["src/a.ts"], level: "auto", failure: "1 test failed", onBreak: "follow-up", followUp: "10" },
 } as const;

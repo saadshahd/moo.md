@@ -14,7 +14,7 @@ export const ENVELOPE_FORMAT = 1;
 export const Header = z.looseObject({ format: z.int().nonnegative(), engineVersion: z.string().min(1) });
 
 /** One saved item: the machine's persisted snapshot and what is needed to restore it later. */
-export const Envelope = z.strictObject({
+export const Envelope = z.object({
 	format: z.literal(ENVELOPE_FORMAT),
 	engineVersion: z.string().min(1),
 	itemId: z.string().min(1),

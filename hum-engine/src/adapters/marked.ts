@@ -12,7 +12,7 @@ export const Marker = z.looseObject({
 	kind: z.enum(THREAD_KINDS),
 	option: z.string().min(1).optional(),
 	options: z.array(z.string()).optional(),
-	followUp: z.strictObject({ key: z.string(), item: z.string().min(1) }).optional(),
+	followUp: z.object({ key: z.string(), item: z.string().min(1) }).optional(),
 });
 
 export type Marker = z.infer<typeof Marker>;

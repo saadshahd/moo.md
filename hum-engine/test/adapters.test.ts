@@ -19,6 +19,7 @@ import {
 } from "../src/index.ts";
 import { guardTimings } from "../src/adapters/guard.ts";
 import { markDone, newItemFile, parseItemFile } from "../src/adapters/item-file.ts";
+import { filedFollowUp, followUpKey } from "../src/adapters/marked.ts";
 import { WorkRepo, itemFile, markdownSettings } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -312,4 +313,10 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		expect(reported[0]?.code).toBe("push-refused");
 		expect(repo.show(id)).not.toContain('"kind":"answer"');
 	});
+});
+
+test("a follow-up note whose marker carries a field a newer engine added still names the filed item", () => {
+	const marker = { kind: "comment", followUp: { key: followUpKey("Split the parser"), item: "12", addedLater: true } };
+
+	expect(filedFollowUp([`<!-- hum ${JSON.stringify(marker)} -->\nFiled follow-up #12: Split the parser`], "Split the parser")).toBe("12");
 });

@@ -20930,9 +20930,9 @@ var Watch = exports_external.strictObject({ token: text, changed: exports_extern
 var name2 = exports_external.string().min(1);
 var ACTION_LABEL_CELLS = 14;
 var time4 = exports_external.number().int().nonnegative();
-var Action = exports_external.strictObject({ label: name2.max(ACTION_LABEL_CELLS), command: name2 });
-var CardAction = exports_external.strictObject({ label: name2.max(ACTION_LABEL_CELLS), answer: name2 });
-var Card = exports_external.strictObject({
+var Action = exports_external.object({ label: name2.max(ACTION_LABEL_CELLS), command: name2 });
+var CardAction = exports_external.object({ label: name2.max(ACTION_LABEL_CELLS), answer: name2 });
+var Card = exports_external.object({
   kind: exports_external.enum(["waiting", "limited", "fault"]),
   key: name2,
   item: name2.optional(),
@@ -20943,13 +20943,13 @@ var Card = exports_external.strictObject({
   action: CardAction.optional(),
   since: time4
 }).refine(({ item, action }) => action === undefined || item !== undefined, "a card's action answers its item, so a card with an action names one");
-var Row = exports_external.strictObject({ item: name2, title: name2, level: name2.optional(), state: name2, since: time4 });
+var Row = exports_external.object({ item: name2, title: name2, level: name2.optional(), state: name2, since: time4 });
 var InFlight = Row.extend({ unclear: exports_external.boolean() });
-var Question = exports_external.strictObject({ item: name2, text: name2, options: exports_external.array(name2), since: time4 });
-var Merged = exports_external.strictObject({ item: name2, title: name2, level: name2.optional(), mergedAt: time4 });
-var Choice = exports_external.strictObject({ item: name2, text: name2, at: time4 });
-var LearnedRule = exports_external.strictObject({ glob: name2, level: name2, item: name2, at: time4, undo: Action });
-var PerMerge = exports_external.strictObject({
+var Question = exports_external.object({ item: name2, text: name2, options: exports_external.array(name2), since: time4 });
+var Merged = exports_external.object({ item: name2, title: name2, level: name2.optional(), mergedAt: time4 });
+var Choice = exports_external.object({ item: name2, text: name2, at: time4 });
+var LearnedRule = exports_external.object({ glob: name2, level: name2, item: name2, at: time4, undo: Action });
+var PerMerge = exports_external.object({
   merges: exports_external.int().nonnegative(),
   abandoned: exports_external.int().nonnegative(),
   notes: exports_external.number().nonnegative(),
@@ -20959,12 +20959,12 @@ var PerMerge = exports_external.strictObject({
 var Measure = PerMerge.extend({
   window: exports_external.int().positive(),
   byPath: exports_external.array(PerMerge.extend({ glob: name2 }))
-}).strict();
-var Status = exports_external.strictObject({
+});
+var Status = exports_external.object({
   format: exports_external.literal(STATUS_FORMAT),
   writtenAt: time4,
-  workers: exports_external.strictObject({ mac: time4.optional(), ci: time4.optional() }),
-  engine: exports_external.strictObject({
+  workers: exports_external.object({ mac: time4.optional(), ci: time4.optional() }),
+  engine: exports_external.object({
     version: name2,
     adapterApi: exports_external.int().nonnegative(),
     configSchema: exports_external.int().positive(),
@@ -20976,11 +20976,11 @@ var Status = exports_external.strictObject({
   merged: exports_external.array(Merged),
   choices: exports_external.array(Choice),
   rules: exports_external.array(LearnedRule),
-  possibleRepeats: exports_external.array(exports_external.strictObject({ a: name2, b: name2 })),
+  possibleRepeats: exports_external.array(exports_external.object({ a: name2, b: name2 })),
   unusedMemory: exports_external.array(exports_external.string()),
   measure: Measure.nullable()
 });
-var Heartbeat = exports_external.strictObject({
+var Heartbeat = exports_external.object({
   time: time4,
   engineVersion: name2,
   configHash: name2,

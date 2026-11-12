@@ -11,9 +11,9 @@ import {
 	Kind,
 	openState,
 	persistedSnapshot,
+	readHeartbeat,
 	readStatus,
 	type State,
-	Status,
 	writeStatus,
 } from "../src/index.ts";
 import { kindMachine } from "../src/index.ts";
@@ -265,6 +265,12 @@ const readsOf = (state: State) =>
 		events: () => state.events.list(SAVED_0_1_0.events.itemId),
 		ops: () => state.ops.list(),
 		proofs: () => state.proofs.list(),
+		choices: () => state.choices.list(),
+		notes: () => state.notes.list(),
+		repeats: () => state.repeats.list(),
+		"possible-repeats": () => state.possibleRepeats.list(),
+		merges: () => state.merges.list(),
+		breaks: () => state.breaks.list(),
 	}) satisfies Record<keyof typeof SAVED_0_1_0, () => unknown[]>;
 
 /** Runs and events live one folder deeper, under the item's slug. */
@@ -430,10 +436,36 @@ test("a status file that does not parse reads as unreadable, and one that is not
 	expect(readStatus(join(dir, "none.json"))).toMatchObject({ ok: false, reason: "missing" });
 });
 
-test("a status with a field the schema does not know is refused", () => {
-	const { status } = statusFile();
+test("a status file with fields a newer engine added reads, without those fields", () => {
+	const { path, status } = statusFile();
+	const card = { kind: "fault", key: "x:#1", item: "#1", code: "x", cause: "It broke.", fix: "Fix it.", since: 5 } as const;
+	const choice = { item: "#1", text: "Chose short.", at: 5 };
 
-	expect(Status.safeParse({ ...status, extra: 1 }).success).toBe(false);
+	writeFileSync(path, JSON.stringify({ ...status, addedLater: 1, engine: { ...status.engine, addedLater: 1 }, cards: [{ ...card, addedLater: 1 }], choices: [{ ...choice, addedLater: 1 }] }));
+
+	expect(readStatus(path)).toEqual({ ok: true, status: { ...status, cards: [card], choices: [choice] } });
+});
+
+test("a heartbeat with a field a newer engine added reads, without that field", () => {
+	const path = join(dir, "heartbeat.json");
+	const heartbeat = { time: 5, engineVersion: "0.1.0", configHash: "h", inFlight: [], intervalMs: 600_000 };
+
+	writeFileSync(path, JSON.stringify({ ...heartbeat, addedLater: true }));
+
+	expect(readHeartbeat(path)).toEqual(heartbeat);
+});
+
+test("a saved item whose envelope carries a field a newer engine added restores", async () => {
+	const state = openState(dir);
+
+	waitingItem(state, "#68");
+	const file = state.items.path("#68");
+
+	writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), addedLater: true }));
+
+	const restored = await openState(dir).items.restore("#68", tiny);
+
+	expect(restored.ok && restored.value?.getSnapshot().value).toBe("waiting");
 });
 
 const FAULT = { code: "x", item: "#1", cause: "It broke.", fix: "Fix it." };
