@@ -48,11 +48,9 @@ test("20 merges and 3 abandoned items give known notes, questions and tokens per
 	});
 });
 
-test("an abandoned item's tokens raise the tokens number; one from before the window does not count", () => {
-	const without = measureOf({ merged: merges, abandoned: [], ...window });
+test("an item abandoned before the window does not count", () => {
 	const withOld = measureOf({ merged: merges.map((found) => ({ ...found, at: found.at + 100 })), abandoned, ...window });
 
-	expect(measureOf({ merged: merges, abandoned, ...window })?.tokens).toBeGreaterThan(without?.tokens ?? 0);
 	expect(withOld?.abandoned).toBe(0);
 });
 

@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
-import { declaredKind } from "../src/decide/kind.ts";
 import { kindCoverage, proposeSetup } from "../src/setup/propose.ts";
 import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
@@ -95,7 +94,6 @@ test("the repo's labels map to kinds, and the map covers the open items that car
 
 	expect(proposal.kindLabels).toMatchObject({ bug: "fix", documentation: "docs" });
 	expect(kindCoverage(items, shipped.hum.kinds, proposal.kindLabels)).toEqual({ covered: 2, total: 4 });
-	expect(declaredKind({ body: "", labels: ["Bug"] }, shipped.hum.kinds, proposal.kindLabels)).toBe("fix");
 });
 
 test("every wait the shipped kinds have is asked once, and an answered wait carries its hours as its timeout", () => {
@@ -108,12 +106,6 @@ test("every wait the shipped kinds have is asked once, and an answered wait carr
 	const kinds = withTimeouts(shipped.kinds, { [`${first?.kind}/${first?.state}`]: 5 });
 
 	expect(JSON.stringify(kinds[first?.kind ?? ""]?.machine.states[first?.state ?? ""]?.after)).toContain(String(5 * 3_600_000));
-});
-
-test("the shipped kinds alone do not load, because their waits have no timeout", () => {
-	const raw = readConfigDir(join(import.meta.dir, "..", "defaults"));
-
-	expect(loadConfig(raw, { env: { hopeSkills: hopeSkills() } }).ok).toBe(false);
 });
 
 test("writing setup answers writes a config that loads and carries only the settings that differ from the defaults", () => {

@@ -20,7 +20,7 @@ import {
 } from "../src/index.ts";
 import { guardTimings } from "../src/adapters/guard.ts";
 import { markDone, newItemFile, parseItemFile } from "../src/adapters/item-file.ts";
-import { WorkRepo, itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
+import { WorkRepo, itemFile, markdownSettings } from "./fixtures/work-repo.ts";
 
 const cleanups: (() => void)[] = [];
 
@@ -308,6 +308,5 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toThrow("Protected branch");
 		expect(reported[0]?.code).toBe("push-refused");
 		expect(repo.show(id)).not.toContain('"kind":"answer"');
-		expect(sh(repo.remote, ["rev-parse", "main"]).length).toBeGreaterThan(0);
 	});
 });

@@ -100,7 +100,6 @@ test("a rename that strands a saved item is refused; with a map the item restore
 	const before = loaded(withTimeouts(shipped()));
 	const machine = kindMachine(before.kinds.feature!);
 	const actor = createActor(machine).start();
-	await waitFor(actor, (s) => s.matches("planning") === false || s.value === "planning");
 	actor.send({ type: "plan-ready" });
 	await waitFor(actor, (s) => s.value === "reviewing");
 	actor.send({ type: "needs-owner" });

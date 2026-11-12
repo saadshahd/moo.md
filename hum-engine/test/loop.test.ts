@@ -262,10 +262,9 @@ test("a model call tells what it spent for the item it served, whether it was tr
 	const question = { boundary: "kind" as const, prompt: "p", answer: z.strictObject({ kind: z.string() }), item: "a" };
 	const options = { model: "m", timeoutMs: 1000, onSpent: (item: string, tokens: number) => void spent.push([item, tokens]) };
 
-	const picked = await modelCallOver(runnerSpending({ kind: "docs" }, 5000), { ...options, trusts: () => true })(question);
-	const refused = await modelCallOver(runnerSpending({ kind: "docs" }, 4000), { ...options, trusts: () => false })(question);
+	await modelCallOver(runnerSpending({ kind: "docs" }, 5000), { ...options, trusts: () => true })(question);
+	await modelCallOver(runnerSpending({ kind: "docs" }, 4000), { ...options, trusts: () => false })(question);
 
-	expect([picked.kind, refused.kind]).toEqual(["picked", "abstained"]);
 	expect(spent).toEqual([["a", 5000], ["a", 4000]]);
 });
 

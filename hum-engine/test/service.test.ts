@@ -146,13 +146,16 @@ test("one card shows when the heartbeat is old and clears when the worker writes
 	const u = unit({ spawn: hangs });
 	const run = u.run();
 
-	await until(() => u.cardsInStatus().length === 1);
-	expect(u.cardsInStatus()[0]).toMatchObject({ code: "worker-down" });
+	try {
+		await until(() => u.cardsInStatus().length === 1);
+		expect(u.cardsInStatus()[0]).toMatchObject({ code: "worker-down" });
 
-	writeHeartbeat(u.state.heartbeatPath, { time: Date.now(), engineVersion: "0.1.0", configHash: "h", inFlight: [], intervalMs: 10 * 60_000 });
-	await until(() => u.cardsInStatus().length === 0);
+		writeHeartbeat(u.state.heartbeatPath, { time: Date.now(), engineVersion: "0.1.0", configHash: "h", inFlight: [], intervalMs: 10 * 60_000 });
+		await until(() => u.cardsInStatus().length === 0);
+	} finally {
+		u.stop.abort();
+	}
 
-	u.stop.abort();
 	expect(await run).toBe("stopped");
 });
 

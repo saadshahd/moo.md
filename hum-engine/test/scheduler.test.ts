@@ -41,38 +41,37 @@ test("pick: the queue stays under the runner count, answered items go first, and
 test("of runs sharing a prefix the first goes at once and the rest wait for its first token; a warm prefix lets all go", async () => {
 	const clock = { at: 0 };
 	const gate = new PrefixGate({ now: () => clock.at, ttlMs: 1000 });
-	const order: string[] = [];
 
 	const first = await gate.enter("build");
-	const second = gate.enter("build").then((lease) => (order.push("second"), lease));
-	const third = gate.enter("build").then((lease) => (order.push("third"), lease));
+	const rest = [gate.enter("build"), gate.enter("build")];
 
-	await Bun.sleep(30);
-	expect(order).toEqual([]);
+	expect(rest.map((lease) => Bun.peek.status(lease))).toEqual(["pending", "pending"]);
 
 	first.opened();
-	await Promise.all([second, third]);
-	expect(order.sort()).toEqual(["second", "third"]);
+	await Promise.all(rest);
 
-	// Within the cache TTL the prefix is warm; after it, the next run is first again.
-	await gate.enter("build");
+	expect(Bun.peek.status(gate.enter("build"))).toBe("fulfilled");
+
 	clock.at = 1001;
+	await gate.enter("build");
 
-	const cold = await gate.enter("build");
-	const waits = gate.enter("build");
-
-	await Bun.sleep(20);
-	cold.release();
-	await waits;
+	expect(Bun.peek.status(gate.enter("build"))).toBe("pending");
 });
 
-test("a first run that ends without a token hands the first place to the next", async () => {
+test("a first run that ends without a token hands the first place to the next, and the run after waits on it", async () => {
 	const gate = new PrefixGate();
 	const first = await gate.enter("fix");
 	const next = gate.enter("fix");
 
 	first.release();
-	(await next).release();
+
+	const second = await next;
+	const third = gate.enter("fix");
+
+	expect(Bun.peek.status(third)).toBe("pending");
+
+	second.release();
+	await third;
 });
 
 test("a run stopped while it waits for the first token does not start", async () => {

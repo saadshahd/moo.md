@@ -128,6 +128,6 @@ test.skipIf(!live)("live: a feature item runs its plan, build and review in a sl
 	console.log(`live slot thin path: ${result.outcome}, runs ${runs.join(", ")}`);
 
 	expect(runs).toEqual(expect.arrayContaining(["plan", "build", "review"]));
-	expect(["merged", "review", "stuck"]).toContain(result.outcome);
+	expect(["merged", "review"]).toContain(result.outcome);
 	expect(slots.list()).toMatchObject([{ status: "free" }]);
 }, 900_000);

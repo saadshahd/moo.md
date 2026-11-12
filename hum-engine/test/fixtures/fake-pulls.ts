@@ -8,7 +8,7 @@ type FakePull = { id: string; number: number; head: string; base: string; title:
 
 const Request = z.object({ query: z.string(), variables: z.record(z.string(), z.unknown()).default({}) });
 
-const Vars = z.looseObject({ head: z.string().optional(), base: z.string().optional(), title: z.string().optional(), pull: z.string().optional() });
+const Vars = z.looseObject({ head: z.string().optional(), base: z.string().optional(), title: z.string().optional(), pull: z.string().optional(), body: z.string().optional() });
 
 const json = (status: number, value: Json) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 
@@ -31,6 +31,8 @@ export class FakePulls {
 	readonly pulls: FakePull[] = [];
 	/** Each request: `GET /path` for REST, `graphql <operation>` for GraphQL. */
 	readonly requests: string[] = [];
+	/** The body of each pull request comment, in order. */
+	readonly comments: string[] = [];
 
 	// SAFETY: the fake answers the (url, init) calls Octokit makes; it is no full fetch (no preconnect).
 	readonly fetch = (async (input: string | URL | Request, init?: RequestInit) => {
@@ -67,7 +69,7 @@ export class FakePulls {
 		EnableAutoMerge: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { autoMerge: true }, "enablePullRequestAutoMerge"),
 		DisableAutoMerge: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { autoMerge: false }, "disablePullRequestAutoMerge"),
 		MergeNow: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { state: "MERGED" }, "mergePullRequest"),
-		Comment: () => ({ addComment: { clientMutationId: null } }),
+		Comment: (v: z.infer<typeof Vars>) => (this.comments.push(v.body ?? ""), { addComment: { clientMutationId: null } }),
 		UpdateBranch: (v: z.infer<typeof Vars>) => this.#acknowledge(v, { status: "BLOCKED" }, "updatePullRequestBranch"),
 	};
 

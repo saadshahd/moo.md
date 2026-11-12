@@ -6,7 +6,6 @@ import { dirname, join } from "node:path";
 import { type Adapter, type Item, PermanentError } from "../src/adapter-api.ts";
 import { guarded } from "../src/adapters/guard.ts";
 import { onceCalls } from "../src/adapters/once.ts";
-import { serialized } from "../src/adapters/serial.ts";
 import { openState } from "../src/state/open.ts";
 import { openWorker } from "../src/worker/open.ts";
 import { configWith, hopeSkills, rawConfig } from "./fixtures/config.ts";
@@ -261,7 +260,6 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 	const status = readStatus(join(folder, "status.json"));
 
 	expect(status.ok && status.status.workers.mac).toBe(NOW);
-	expect(serialized).toBeDefined();
 });
 
 test("openWorker refuses a repo whose hum.json names no commit identity, saying which setting", async () => {

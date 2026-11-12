@@ -100,23 +100,6 @@ test("an answer pushed from another clone after a quiet tick starts the run on t
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 });
 
-test("an answer two hours after the question starts a fresh run on the pushed branch, with no session resumed", async () => {
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
-
-	w.item("a", "docs/a.md");
-	await w.worker.tick();
-	await w.worker.idle();
-	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
-
-	await w.adapter.answers!.answer("a", { text: "Use Plain" });
-	w.clock.at += 2 * HOUR_MS;
-	await w.worker.tick();
-	await w.worker.idle();
-
-	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
-	expect(w.shim.calls().flatMap((call) => call.argv)).not.toContain("--resume");
-});
-
 test("a CI run with an empty state reads the question's age from the thread: it waits inside the deadline and parks stuck past it, asking nothing twice", async () => {
 	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 

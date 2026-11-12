@@ -52,7 +52,7 @@ test.skipIf(!live)("live: a feature item runs its plan and review states on Haik
 		expect(runs).toContain("plan");
 		expect(runs).toContain("build");
 		expect(runs).toContain("review");
-		expect(["merged", "review", "stuck"]).toContain(result.outcome);
+		expect(["merged", "review"]).toContain(result.outcome);
 		console.log(`live plan and review: ${result.outcome}, runs ${runs.join(", ")}`);
 	} finally {
 		rmSync(repo.root, { recursive: true, force: true });

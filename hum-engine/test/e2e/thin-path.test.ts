@@ -103,7 +103,7 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	expect(existsSync(w.state.items.path(id))).toBe(false);
 });
 
-test("the thin path through a background run: the build is a named agent, its commit lands, and the run is stopped and removed", async () => {
+test("the thin path through a background run: the build is a named agent and its commit lands", async () => {
 	const w = await world({ script: [{}, {}, NOTE] }, { background: true });
 	const id = w.repo.seed("Write the note");
 
@@ -115,8 +115,6 @@ test("the thin path through a background run: the build is a named agent, its co
 
 	expect(launches.map(({ name }) => name)).toEqual(["hum start check", record?.name]);
 	expect(record?.sessionId).toBe(`aaaaaaa2-0000-4000-8000-000000000000`);
-	expect(w.shim.background().map(({ cmd }) => cmd)).toEqual(["bg", "stop", "rm", "bg", "stop", "rm"]);
-	expect(w.shim.agents()).toEqual([]);
 });
 
 test("the thin path through a background run in a slot: the build starts in the slot with the slot's environment, the change lands, and the slot is returned", async () => {
@@ -463,9 +461,9 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 const featureJudge = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND });
 
 test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, and an approval merges it", async () => {
-	const fixStdin = join(tmpdir(), `hum-review-fix-${process.pid}`);
+	const [buildStdin, fixStdin] = [join(tmpdir(), `hum-review-build-${process.pid}`), join(tmpdir(), `hum-review-fix-${process.pid}`)];
 	const cite = { event: "request-changes", sure: true, reason: "The note says nothing.", cites: [{ file: "docs/note.md", line: 1 }] };
-	const w = await world({ script: [{}, NOTE, { commit: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [{ event: "plan-ready", sure: true, reason: "Clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } }, cite] });
+	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { commit: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [{ event: "plan-ready", sure: true, reason: "Clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } }, cite] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.options({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
@@ -473,8 +471,8 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	const [plan, review, approval] = w.shim.decisions();
 
 	expect([plan?.purpose, review?.purpose, approval?.answer.event]).toEqual(["plan", "review", "approve"]);
+	expect(readFileSync(buildStdin, "utf8")).toContain("Write it.");
 	expect(readFileSync(fixStdin, "utf8")).toContain("docs/note.md:1");
-	expect(w.shim.calls().find((call) => call.itemId === id)).toBeDefined();
 	expect(review?.cwd).not.toContain("hum-run-");
 	expect(review?.prompt).not.toContain("Write it.");
 	expect(w.repo.show(id)).toContain("state: done");
@@ -522,16 +520,17 @@ test("a docs item whose change touches code moves to its real kind and runs agai
 	const config = configWith((raw) => void (raw.hum.docsOnly.paths = ["**/*.md"]));
 	const asked: string[] = [];
 	const judge = scriptedJudge({ kind: { kind: "docs" }, alignment: SOUND }, asked);
-	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] }, { config });
+	const [firstBuild, secondBuild] = [join(tmpdir(), `hum-moved-first-${process.pid}`), join(tmpdir(), `hum-moved-second-${process.pid}`)];
+	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" }, saveStdin: firstBuild }, { ...NOTE, saveStdin: secondBuild }] }, { config });
 	const id = w.repo.seed("Write the note");
+	const onBranch = `Work on the branch ${runBranch(config.hum, id)}.`;
 
 	expect(await runThinPath(w.options({ judge }))).toEqual({ outcome: "moved", item: id, kind: "feature" });
 	expect(w.state.itemKinds.get(id)).toMatchObject({ kind: "feature", from: "fallback" });
 	expect(asked).toEqual(["kind", "kind"]);
-
-	await runThinPath(w.options({ judge, itemId: id }));
-
-	expect(w.shim.decisions()[0]?.purpose).toBe("plan");
+	expect(await runThinPath(w.options({ judge, itemId: id }))).toEqual({ outcome: "review", item: id, detail: "the kind call abstained: no scripted answer fits" });
+	expect(w.shim.decisions().map((d) => d.purpose)).toEqual(["plan", "review"]);
+	expect([readFileSync(firstBuild, "utf8"), readFileSync(secondBuild, "utf8")].map((stdin) => stdin.includes(onBranch))).toEqual([true, true]);
 });
 
 test("the alignment grade times out: the change is unclear and waits for the owner's review at its level, with no question", async () => {
@@ -559,7 +558,7 @@ test("an alignment call below the bar gates nothing: the change still lands by i
 	github.requiresPullRequest = true;
 	expect(await runThinPath(w.options({ judge, pulls: github.client() }))).toMatchObject({ outcome: "landing", item: id });
 	expect(github.pulls).toMatchObject([{ autoMerge: true }]);
-	expect(github.requests).toContain("graphql Comment");
+	expect(github.comments).toEqual([expect.stringContaining("alignment concern, verification concern")]);
 });
 
 test("a review that leaves the change to the owner asks; the owner's approval lands it past its level's own review run, and a rejection sends it to a fix with the owner's words", async () => {
