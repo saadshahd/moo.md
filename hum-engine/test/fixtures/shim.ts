@@ -45,6 +45,8 @@ export type Behavior = {
 	beforeToken?: number;
 	/** Sleep this long after it, so the run overlaps another. */
 	sleep?: number;
+	/** After it, wait until this many runs have written theirs, so the runs overlap; runs that never overlap hang the test. */
+	meet?: number;
 	/** Write to stderr in the middle of the result line, between two writes of it. */
 	stderrNoise?: boolean;
 };

@@ -158,6 +158,10 @@ if (step.spend !== undefined) {
 	});
 }
 
+const tokenLines = () => readFileSync(`${log}.tokens`, "utf8").split("\n").filter(Boolean).length;
+
+while (step.meet !== undefined && tokenLines() < step.meet) await Bun.sleep(5);
+
 if (step.sleep) await new Promise((resolve) => setTimeout(resolve, step.sleep));
 
 if (step.hang) await new Promise((resolve) => setTimeout(resolve, 60_000));

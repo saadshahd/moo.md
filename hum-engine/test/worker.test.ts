@@ -14,7 +14,7 @@ const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged
 
 test("the thin path runs two items on different files side by side, and both merge", async () => {
 	const checkLog = join(tempDir("checks"), "log");
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, sleep: 300 }, b: { commitForItem: true, spend: 5, sleep: 300 } } }, { checks: [`echo run >> ${checkLog}`] });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, meet: 2 }, b: { commitForItem: true, spend: 5, meet: 2 } } }, { checks: [`echo run >> ${checkLog}`] });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -27,12 +27,6 @@ test("the thin path runs two items on different files side by side, and both mer
 	expect(merged(w)).toEqual(["a", "b"]);
 	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
 	expect(sh(w.repo.remote, ["show", "main:docs/b.md"])).toBe("from b\n");
-
-	const [first, second] = w.shim.calls().filter((c) => c.itemId);
-	const ends = new Map(w.shim.ends().map((e) => [e.pid, e.at]));
-
-	expect(first!.at).toBeLessThan(ends.get(second!.pid)!);
-	expect(second!.at).toBeLessThan(ends.get(first!.pid)!);
 
 	// Each merge is rechecked on the newest main: the later one reran the checks after the earlier one moved it.
 	expect(readFileSync(checkLog, "utf8").split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(3);
