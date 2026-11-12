@@ -5,7 +5,7 @@ import { noteKey, type RepeatGroup, type ReviewNote } from "./records.ts";
 import { type Pairing, pairing, prepare } from "./signals.ts";
 
 /** A model's answer to whether two notes state one rule; `undefined` when it abstained. */
-export type Proposal = { readonly same: boolean; readonly models: readonly string[] } | undefined;
+type Proposal = { readonly same: boolean; readonly models: readonly string[] } | undefined;
 
 export type Proposer = (a: ReviewNote, b: ReviewNote) => Promise<Proposal>;
 

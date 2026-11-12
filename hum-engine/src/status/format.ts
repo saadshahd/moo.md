@@ -51,7 +51,7 @@ export const Choice = z.object({ item: name, text: name, at: time });
 /** A path rule the owner's answer added, with the command that takes it back. */
 export type Choice = z.infer<typeof Choice>;
 
-export const LearnedRule = z.object({ glob: name, level: name, item: name, at: time, undo: Action });
+const LearnedRule = z.object({ glob: name, level: name, item: name, at: time, undo: Action });
 
 const PerMerge = z.object({
 	merges: z.int().nonnegative(),

@@ -10,7 +10,7 @@ const PANE_TITLE = "hum";
 export type PressContext = Omit<ViewInput, "now">;
 
 /** The cells an inline pane's frame takes from the band's width: its border and one cell of its own padding at each side. */
-export const INLINE_FRAME_CELLS = 4;
+const INLINE_FRAME_CELLS = 4;
 
 /** Opens the pane as tall as its header and first card need at the width the inline pane will have, so the first card's buttons are in view. */
 export async function openPane($: Engine, pane: string, context: PressContext): Promise<void> {

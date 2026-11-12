@@ -4,7 +4,7 @@ import { droppingFromEnd, fitting } from "./fit.ts";
 import { type Row, type Span, span } from "./row.ts";
 
 /** Under this many cells a title has no room beside its id and metadata, so it goes under them. */
-export const MIN_TITLE_CELLS = 12;
+const MIN_TITLE_CELLS = 12;
 const COLUMN_GAP = 2;
 
 export type ListEntry = {

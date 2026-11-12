@@ -9,7 +9,7 @@ export type Wait = { readonly kind: string; readonly state: string; readonly wai
 export type WaitAnswers = Readonly<Record<string, number>>;
 
 /** The key a wait's answer sits under. */
-export const waitKey = ({ kind, state }: Pick<Wait, "kind" | "state">): string => `${kind}/${state}`;
+const waitKey = ({ kind, state }: Pick<Wait, "kind" | "state">): string => `${kind}/${state}`;
 
 const isOwnerWait = (tags: readonly string[] | undefined): boolean => tags?.includes(OWNER_WAIT_TAG) ?? false;
 

@@ -3,9 +3,9 @@ import type { HumConfig } from "../config/schema.ts";
 import { DATA_RULE, fenced } from "./prose.ts";
 
 /** Whether the diff keeps one taste rule, and the line of the diff that shows it. */
-export const TasteAnswer = z.strictObject({ keeps: z.boolean(), evidence: z.string() });
+const TasteAnswer = z.strictObject({ keeps: z.boolean(), evidence: z.string() });
 
-export type TasteAnswer = z.infer<typeof TasteAnswer>;
+type TasteAnswer = z.infer<typeof TasteAnswer>;
 
 /** The cheap model call that checks a diff against one taste rule. Its pick is for a report and decides nothing. */
 export const tasteQuestion = (rule: string, diff: string, { diffLimit }: Pick<HumConfig, "diffLimit">) => ({

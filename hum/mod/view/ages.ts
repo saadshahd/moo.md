@@ -9,7 +9,7 @@ export const RUNNERS = [
 	{ key: "ci", label: "CI" },
 ] as const;
 
-export type Runner = (typeof RUNNERS)[number];
+type Runner = (typeof RUNNERS)[number];
 
 /** `Mac 40 s`, amber when stale; `suffix` follows the age. A runner that never wrote has no age and no part. */
 export const runnerPart = (status: Status, { key, label }: Runner, { now, amberAfterSeconds }: AgeInput, suffix = ""): Span | undefined => {

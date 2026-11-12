@@ -17,7 +17,7 @@ const segmenter = new Intl.Segmenter();
 const graphemes = (text: string): string[] => Array.from(segmenter.segment(text), ({ segment }) => segment);
 
 /** The longest start of `text` that fits `width` cells, always at a character boundary and never empty for a non-empty text. */
-export const clip = (text: string, width: number): string => {
+const clip = (text: string, width: number): string => {
 	const [first = "", ...rest] = graphemes(plain(text));
 	let taken = first;
 	let used = cells(first);

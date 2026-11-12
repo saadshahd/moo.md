@@ -5,7 +5,7 @@ import { type EventPick, type JsonSchema, PROSE_STATES, type ProsePurpose, pickS
 const RESULT_EXCERPT = 300;
 
 /** One agent run answering in `schema`. It settles only with a finished run; a limit, a hold or a stop never settles it. */
-export type AnswerRun = (prompt: string, schema: JsonSchema) => Promise<Finished>;
+type AnswerRun = (prompt: string, schema: JsonSchema) => Promise<Finished>;
 
 export type ProseDecision = { readonly pick: EventPick; readonly models: readonly string[] };
 

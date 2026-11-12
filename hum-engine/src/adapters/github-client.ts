@@ -55,7 +55,7 @@ export const raise = (cause: unknown): never => {
 };
 
 /** The owner's own login: `GH_TOKEN` or `GITHUB_TOKEN`, else the token `gh` holds. */
-export const ownerToken = async (timeoutMs: number): Promise<string> => {
+const ownerToken = async (timeoutMs: number): Promise<string> => {
 	const fromEnv = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
 
 	if (fromEnv) return fromEnv;

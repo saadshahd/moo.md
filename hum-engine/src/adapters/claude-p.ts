@@ -33,7 +33,7 @@ export const RUN_SETTINGS = JSON.stringify({
  * no settings source (plugins, MCP servers, memory files) and no built-in tool: a question needs neither, and each
  * one bills on every call.
  */
-export const CALLS = {
+const CALLS = {
 	run: { settings: RUN_SETTINGS, flags: [] },
 	judgment: {
 		settings: JSON.stringify({ permissions: { defaultMode: "bypassPermissions" }, disableAllHooks: true, outputStyle: "default" }),
@@ -41,7 +41,7 @@ export const CALLS = {
 	},
 } as const satisfies Record<string, { settings: string; flags: readonly string[] }>;
 
-export type Call = keyof typeof CALLS;
+type Call = keyof typeof CALLS;
 
 const REQUIRED_PLUGIN = "hope";
 

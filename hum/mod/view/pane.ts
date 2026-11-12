@@ -8,7 +8,7 @@ import { innerWidth, padded, type Row, span } from "./row.ts";
 import { problemWords } from "./summary.ts";
 import { wrap } from "./cells.ts";
 
-export type PaneInput = ViewInput & {
+type PaneInput = ViewInput & {
 	/** The ids of the list rows the owner unfolded. */
 	readonly unfolded: ReadonlySet<string>;
 };

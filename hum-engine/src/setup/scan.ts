@@ -25,7 +25,7 @@ import {
 /** One job of a CI workflow: when it runs and the shell commands its steps run. */
 export type CiJob = { readonly file: string; readonly job: string; readonly triggers: readonly string[]; readonly commands: readonly string[] };
 
-export type FolderHistory = { readonly folder: string; readonly changes: number; readonly sizes: readonly number[] };
+type FolderHistory = { readonly folder: string; readonly changes: number; readonly sizes: readonly number[] };
 
 /** What a repo already holds that setup reads before it asks. */
 export type RepoScan = {

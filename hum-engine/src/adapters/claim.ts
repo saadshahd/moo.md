@@ -34,7 +34,7 @@ const isHeldByAnother = (standing: Claim, holder: string, now: number): boolean 
  * Who may write a claim, given the one standing. An unclaimed or expired item goes to whoever writes first;
  * the holder claiming again renews; a renewal by anyone else loses to the standing claim.
  */
-export const decideClaim = (mode: ClaimMode, holder: string, standing: Claim | undefined, now: number): ClaimDecision => {
+const decideClaim = (mode: ClaimMode, holder: string, standing: Claim | undefined, now: number): ClaimDecision => {
 	if (standing && isHeldByAnother(standing, holder, now)) return { kind: "held", claim: standing };
 
 	if (mode === "renew" && standing?.holder !== holder) return standing ? { kind: "held", claim: standing } : { kind: "unheld" };

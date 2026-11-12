@@ -15,7 +15,7 @@ export const PATCH = ["--no-ext-diff", "--no-color"] as const;
 const ANCESTOR = 0;
 const NOT_ANCESTOR = 1;
 
-export type GitResult = { readonly code: number; readonly stdout: string; readonly stderr: string };
+type GitResult = { readonly code: number; readonly stdout: string; readonly stderr: string };
 
 export type Git = {
 	/** Runs git; a non-zero exit is a result, not a throw, but a run past its time limit throws `CommandTimedOut`. `input` is its stdin, which is closed either way. */
@@ -24,7 +24,7 @@ export type Git = {
 	readonly raw: (args: readonly string[], input?: string) => Promise<string>;
 };
 
-export class GitFailed extends Error {
+class GitFailed extends Error {
 	override name = "GitFailed";
 
 	constructor(

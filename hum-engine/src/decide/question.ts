@@ -4,9 +4,9 @@ import type { HumConfig } from "../config/schema.ts";
 import { DAY_MS } from "../time.ts";
 
 /** The reasons a run gives for needing the owner, each with the facts code checks it against. */
-export const ASK_REASONS = ["missing-secret", "past-undoing", "spends-money", "publishes", "choice", "unsure"] as const;
+const ASK_REASONS = ["missing-secret", "past-undoing", "spends-money", "publishes", "choice", "unsure"] as const;
 
-export type AskReason = (typeof ASK_REASONS)[number];
+type AskReason = (typeof ASK_REASONS)[number];
 
 const ChoiceOption = z.strictObject({ word: z.string().min(1), paths: z.array(z.string().min(1)) });
 
@@ -33,7 +33,7 @@ export type AskFacts = {
 	readonly undoableLevels: readonly string[];
 };
 
-export type AskDecision =
+type AskDecision =
 	/** `confirmed`: the facts bear the reason out, so its own question is asked; otherwise the owner gets the plain one. */
 	| { readonly action: "ask"; readonly reason: AskReason; readonly confirmed: boolean }
 	| { readonly action: "decide"; readonly choice: string; readonly over: readonly string[] };
@@ -86,7 +86,7 @@ const ASKED = {
 	unsure: () => PLAIN_QUESTIONS.unsure,
 } as const satisfies Record<AskReason, (reason: RunReason) => string>;
 
-export type AskedQuestion = { readonly question: Question; readonly plain: PlainQuestion };
+type AskedQuestion = { readonly question: Question; readonly plain: PlainQuestion };
 
 /** The question a run's need becomes. A reason the facts bear out asks its own question with the run's words folded; any other asks in the run's words. */
 export const askedQuestion = (reason: RunReason, confirmed: boolean, runsWords: string | undefined): AskedQuestion => {
@@ -105,7 +105,7 @@ const SIDE_QUESTIONS: readonly string[] = [PLAIN_QUESTIONS.kind, PLAIN_QUESTIONS
 export const isWaitQuestion = (text: string): boolean => !SIDE_QUESTIONS.includes(text);
 
 /** Why a question text is refused. */
-export type QuestionIssue = "too-wide" | "no-question-mark" | "names-item" | "long-word";
+type QuestionIssue = "too-wide" | "no-question-mark" | "names-item" | "long-word";
 
 const QUESTION_MARK = "?";
 

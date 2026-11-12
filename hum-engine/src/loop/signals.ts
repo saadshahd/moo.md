@@ -48,7 +48,7 @@ const codePatternOf = (hunk: string): string =>
 		.replace(/\s+/g, "");
 
 /** The glob that holds a file's folder and kind: its siblings of the same extension. */
-export const globOf = (file: string): string => `${dirname(file)}/*${extname(file)}`;
+const globOf = (file: string): string => `${dirname(file)}/*${extname(file)}`;
 
 const parsedOf = (note: ReviewNote): { identifiers: Set<string>; declared: Set<string> } | undefined => {
 	if (note.hunk === "") return { identifiers: new Set(), declared: new Set() };
@@ -106,7 +106,7 @@ type Signal = {
 };
 
 /** The deterministic signals, checked in order. */
-export const SIGNALS: readonly Signal[] = [
+const SIGNALS: readonly Signal[] = [
 	{ name: "same-text", parsed: false, pairs: (a, b) => a.text === b.text },
 	{ name: "same-code", parsed: false, pairs: (a, b) => shares(a.suggestions, b.suggestions) || shares(a.spans, b.spans) },
 	{ name: "shared-identifier", parsed: true, pairs: (a, b) => isAnotherChange(a, b) && shares(a.named, b.named) },

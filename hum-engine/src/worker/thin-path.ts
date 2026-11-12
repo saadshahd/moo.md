@@ -117,7 +117,7 @@ export const answerTo = (item: Item): Answered | undefined => {
 };
 
 /** The question the item's latest hum question puts, when it is one the item waits on and no applied answer follows it. */
-export const unansweredQuestion = (item: Item): ThreadEntry | undefined => {
+const unansweredQuestion = (item: Item): ThreadEntry | undefined => {
 	const question = openQuestion(item.thread);
 
 	return question && isWaitQuestion(visibleText(question.text)) ? question : undefined;
@@ -253,7 +253,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 export type Source = { readonly remote: string; readonly base: string };
 
 /** What a checkout is asked for: a working copy of `source` for the item's pass, and the signal that ends the wait for one. */
-export type CheckoutRequest = Source & { readonly item: string; readonly signal: AbortSignal | undefined };
+type CheckoutRequest = Source & { readonly item: string; readonly signal: AbortSignal | undefined };
 
 /** A run's working copy: its folder, the environment its runs and checks add, and the call that takes it back. */
 export type Checkedout = {

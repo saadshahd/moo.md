@@ -3,7 +3,7 @@ import { type RawConfig, readConfigDir } from "../config/load.ts";
 import { DefaultsConfig, Kind } from "../config/schema.ts";
 
 /** Where the shipped defaults sit, in the package or in the owner's `node_modules`. */
-export const DEFAULTS_DIR = join(import.meta.dir, "..", "..", "defaults");
+const DEFAULTS_DIR = join(import.meta.dir, "..", "..", "defaults");
 
 export const shippedRaw = (): RawConfig => readConfigDir(DEFAULTS_DIR);
 

@@ -24,7 +24,7 @@ export const FIXED_PARTS = [
 
 export const PURPOSES = ["plan", "build", "fix", "review"] as const;
 export const SIZES = ["small", "medium", "large"] as const;
-export const TIERS = ["light", "standard", "top"] as const;
+const TIERS = ["light", "standard", "top"] as const;
 export const EFFORTS = ["low", "medium", "high"] as const;
 
 /** A machine state tagged with either of these waits on something outside the run. */
@@ -49,7 +49,7 @@ const branchPrefix = z
 	.refine(isBranchPrefix, "a branch prefix followed by an item id must make a valid git branch name");
 
 /** Where hum runs: a service on the owner's Mac, and a scheduled and event-woken CI workflow. */
-export const RUN_PLACES = ["mac", "ci"] as const;
+const RUN_PLACES = ["mac", "ci"] as const;
 
 export type RunPlace = (typeof RUN_PLACES)[number];
 
@@ -61,10 +61,10 @@ export type MergeMethod = (typeof MERGE_METHODS)[number];
 export const REVIEWS = ["none", "agent", "owner"] as const;
 
 /** When a merged change ships: at once, or once the proof its path names arrives. */
-export const RELEASES = ["at-once", "after-proof"] as const;
+const RELEASES = ["at-once", "after-proof"] as const;
 
 /** What a break after merge becomes: follow-up work, or a block on the path. */
-export const BREAKS = ["follow-up", "block"] as const;
+const BREAKS = ["follow-up", "block"] as const;
 
 /** Each place a model's judgment decides, measured on its own labelled set. */
 export const BOUNDARIES = ["kind", "alignment", "plan-outcome", "review-verdict", "reply-option", "repeat-pair", "taste"] as const;
@@ -87,10 +87,10 @@ const pattern = z.string().min(1).refine(isRegExp, "a pattern is a valid regular
 const date = z.iso.date();
 
 /** When a refresh step runs: after every return, or only when a lockfile changed since the slot was last installed. */
-export const REFRESH_WHEN = ["always", "lockfile-changed"] as const;
+const REFRESH_WHEN = ["always", "lockfile-changed"] as const;
 
 /** Whether a slot gets its own services, or every slot shares one set and gets its own database. */
-export const SLOT_SERVICES = ["per-slot", "shared"] as const;
+const SLOT_SERVICES = ["per-slot", "shared"] as const;
 
 const RefreshStep = z.strictObject({ run: name, when: z.enum(REFRESH_WHEN) });
 
@@ -253,7 +253,7 @@ const withShippedDefaults = (settings: Settings): { [Key in keyof Settings]: z.Z
 	// SAFETY: `Object.fromEntries` loses the per-key types; each entry is its setting with its own shipped default.
 	Object.fromEntries(Object.entries<z.ZodType>(settings).map(([key, setting]) => [key, setting.default(SHIPPED_DEFAULTS[key as keyof Settings])])) as never;
 
-export const Role = z.strictObject({
+const Role = z.strictObject({
 	file: name,
 	purpose: z.enum(PURPOSES),
 	skills: z.array(name),

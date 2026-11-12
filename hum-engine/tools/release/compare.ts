@@ -4,7 +4,7 @@ import type { Surface } from "./surface.ts";
 
 const LEVELS = ["none", "patch", "minor", "major"] as const;
 
-export type Level = (typeof LEVELS)[number];
+type Level = (typeof LEVELS)[number];
 
 const rank = (level: Level): number => LEVELS.indexOf(level);
 
@@ -43,9 +43,9 @@ const levelAt = (version: string, level: Level): Level => (semver.major(version)
 export const PLACEHOLDER_VERSION = "0.0.0";
 
 /** One difference between two surfaces, with the smallest bump that may carry it. */
-export type Finding = { readonly part: string; readonly path: string; readonly difference: Difference["type"]; readonly requires: Level };
+type Finding = { readonly part: string; readonly path: string; readonly difference: Difference["type"]; readonly requires: Level };
 
-export const findingsBetween = (published: Surface, next: Surface, version: string): Finding[] =>
+const findingsBetween = (published: Surface, next: Surface, version: string): Finding[] =>
 	diff(published, next).map((difference) => ({
 		part: String(difference.path[0]),
 		path: difference.path.slice(1).join("."),

@@ -11,13 +11,13 @@ const Outcome = z.discriminatedUnion("kind", [
 ]);
 
 /** The last read of what changed, kept for every `hum watch` in the repo. The token is the last one a read returned. */
-export const SavedWatch = z.strictObject({
+const SavedWatch = z.strictObject({
 	token: z.string().optional(),
 	checkedAt: z.number().int().nonnegative(),
 	outcome: Outcome,
 });
 
-export type SavedWatch = z.infer<typeof SavedWatch>;
+type SavedWatch = z.infer<typeof SavedWatch>;
 
 export type SharedWatchOptions = {
 	readonly stateDir: string;
@@ -36,7 +36,7 @@ const cachePath = (stateDir: string): string => join(stateDir, "watch.json");
 
 const lockPath = (stateDir: string): string => join(stateDir, "watch.lock");
 
-export const loadSavedWatch = (stateDir: string): SavedWatch | undefined =>
+const loadSavedWatch = (stateDir: string): SavedWatch | undefined =>
 	orMissing(() => SavedWatch.parse(readJson(cachePath(stateDir))), undefined);
 
 const save = (stateDir: string, saved: SavedWatch): void =>

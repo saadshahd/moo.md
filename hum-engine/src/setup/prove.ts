@@ -14,7 +14,7 @@ import { checksTimeoutMs, runChecks } from "../worker/checks.ts";
 import { openWorker } from "../worker/open.ts";
 import { Scratch } from "./scratch.ts";
 
-export type StepStatus = "passed" | "failed" | "skipped";
+type StepStatus = "passed" | "failed" | "skipped";
 
 /** One thing setup proved, with how long it took. A skip says why, so nothing passes silently. */
 export type Step = { readonly name: string; readonly status: StepStatus; readonly detail: string; readonly ms: number };
@@ -57,7 +57,7 @@ const ENGINE = "@moo.md/hum";
 const LOCAL_PIN = /^(file|link):/;
 
 /** What the registry says about the pinned version: found, or the package exists without it, or the package is not published. */
-export const npmPublished = async (pin: string): Promise<"found" | "missing-version" | "unpublished"> => {
+const npmPublished = async (pin: string): Promise<"found" | "missing-version" | "unpublished"> => {
 	const viewed = await exec("npm", ["view", `${ENGINE}@${pin}`, "version"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	if (viewed.exitCode === 0) return "found";

@@ -103,7 +103,7 @@ export type LandContext = {
 export type ReviewOutcome = { readonly verdict: Verdict } | { readonly halted: ThinResult };
 
 /** The review verdict that lets a change merge. */
-export const REVIEW_APPROVAL = "approve";
+const REVIEW_APPROVAL = "approve";
 
 /** Why the change cannot merge on the newest base: it conflicts there, or its checks fail there. */
 type Stale = { readonly stale: string };

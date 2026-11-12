@@ -42,7 +42,7 @@ const unappliedCard = (state: State) => (extension: string, signals: readonly st
 };
 
 /** Step 1: the owner's notes from each source, saved once. Returns the ones this pass added. */
-export const collectNotes = async ({ state, config, comments, history, hunkOf }: LoopPass): Promise<ReviewNote[]> =>
+const collectNotes = async ({ state, config, comments, history, hunkOf }: LoopPass): Promise<ReviewNote[]> =>
 	saveNotes(state, [
 		...ownerNotes(await comments(sinceOfLastComment(state)), config.hum.ownerLogins),
 		...planChangingNotes(state.answers.list()),

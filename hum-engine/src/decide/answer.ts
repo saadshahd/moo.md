@@ -80,7 +80,7 @@ export type Disposition = {
 	readonly why: string;
 };
 
-export type DisposeFacts = {
+type DisposeFacts = {
 	readonly resolution: Resolution;
 	/** An earlier answer to the same question was applied. */
 	readonly answeredBefore: boolean;

@@ -4,7 +4,7 @@ const name = z.string().min(1);
 const time = z.int().nonnegative();
 
 /** Where a review note comes from. */
-export const NOTE_SOURCES = ["review-comment", "review-body", "plan-answer", "revert", "fix"] as const;
+const NOTE_SOURCES = ["review-comment", "review-body", "plan-answer", "revert", "fix"] as const;
 
 export type NoteSource = (typeof NOTE_SOURCES)[number];
 

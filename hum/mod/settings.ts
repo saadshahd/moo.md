@@ -1,7 +1,7 @@
 import type { PluginOptions } from "claude-code";
 import { humSays } from "./says.ts";
 
-export type ViewSettings = { readonly pollSeconds: number; readonly amberAfterSeconds: number; readonly watchSeconds: number };
+type ViewSettings = { readonly pollSeconds: number; readonly amberAfterSeconds: number; readonly watchSeconds: number };
 
 const numberOption = (options: PluginOptions, key: keyof ViewSettings): number => {
 	const seconds = Number(options[key]);

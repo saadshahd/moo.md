@@ -30,7 +30,7 @@ export const ownerNotes = (raw: readonly RawComment[], owners: readonly string[]
 	);
 
 /** The option that approves a plan; every other answer changed it. */
-export const APPROVAL_OPTION = "approve";
+const APPROVAL_OPTION = "approve";
 
 /** An answer that changed the plan: one applied, and not an approval. */
 export const planChangingNotes = (answers: readonly SettledAnswer[]): ReviewNote[] =>

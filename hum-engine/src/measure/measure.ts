@@ -6,7 +6,7 @@ export type MergedChange = Counted & { readonly item: string; readonly at: numbe
 /** An item that never merged. Its cost counts all the same, so dropping work never lowers a number. */
 export type AbandonedItem = Counted & { readonly item: string; readonly since: number; readonly paths: readonly string[] };
 
-export type PerMerge = { readonly merges: number; readonly abandoned: number; readonly notes: number; readonly questions: number; readonly tokens: number };
+type PerMerge = { readonly merges: number; readonly abandoned: number; readonly notes: number; readonly questions: number; readonly tokens: number };
 
 export type MeasureInput = {
 	readonly merged: readonly MergedChange[];

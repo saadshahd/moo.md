@@ -3,7 +3,7 @@ import { humSays } from "../says.ts";
 /** What answering a prompt decided: pass it on, or keep it from Claude with a reason. */
 export type Decision = { readonly kind: "pass" } | { readonly kind: "drop"; readonly reason: string };
 
-export type GuardSteps<R> = {
+type GuardSteps<R> = {
 	/** Whether answer mode is on as the prompt arrives. */
 	readonly isAnswering: () => Promise<boolean>;
 	readonly decide: () => Promise<Decision>;

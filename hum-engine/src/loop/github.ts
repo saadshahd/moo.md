@@ -35,7 +35,7 @@ const pagesOf = async <T>(read: (page: number) => Promise<T[]>): Promise<T[]> =>
 };
 
 /** Every pull request review comment on the repo since a time, as raw comments. */
-export const reviewComments = async (client: Requester, repo: string, since: number): Promise<RawComment[]> =>
+const reviewComments = async (client: Requester, repo: string, since: number): Promise<RawComment[]> =>
 	(
 		await pagesOf(async (page) =>
 			z.array(ReviewComment).parse((await client.request(`GET /repos/${repo}/pulls/comments`, { per_page: PAGE_SIZE, page, since: new Date(since).toISOString(), sort: "created", direction: "asc" })).data),
@@ -54,7 +54,7 @@ export const reviewComments = async (client: Requester, repo: string, since: num
 	}));
 
 /** The logs of the newest runs on the base branch that started after a time, one text per job. */
-export const ciLogsOf =
+const ciLogsOf =
 	(client: Requester, repo: string, base: string, runsRead: number) =>
 	async (since: number): Promise<string[]> => {
 		const { workflow_runs: runs } = Runs.parse((await client.request(`GET /repos/${repo}/actions/runs`, { branch: base, per_page: runsRead, created: `>=${new Date(since).toISOString()}` })).data);
