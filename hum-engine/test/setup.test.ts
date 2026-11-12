@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -209,7 +210,7 @@ test("proving a written setup on a scratch copy passes its checks and contract, 
 	sh(repo, ["commit", "-q", "-m", "setup"]);
 	sh(repo, ["push", "-q", "origin", "main"]);
 
-	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished" });
+	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
 	const byName = Object.fromEntries(steps.map((step) => [step.name, step.status]));
 
 	expect(byName).toMatchObject({ config: "passed", checks: "passed", contract: "passed", "engine pin": "skipped", item: "skipped" });
@@ -222,7 +223,7 @@ test("proving fails the checks step when a check command fails", async () => {
 	// A work source that is not markdown skips the contract step, which the proving test above covers.
 	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"], integrations: { workSource: "github" } }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT });
 
-	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished" });
+	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
 
 	expect(steps.find(({ name }) => name === "checks")?.status).toBe("failed");
 });

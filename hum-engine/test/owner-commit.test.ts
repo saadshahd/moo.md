@@ -11,7 +11,7 @@ const ANSWER = '"kind":"answer"';
 const world = () => {
 	const repo = new WorkRepo();
 	const github = new FakeGitHub();
-	const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, pulls: github.client() }, { report: () => {}, now: Date.now });
+	const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, pulls: github.client() }, { report: () => {}, now: Date.now, env: process.env });
 
 	return { repo, github, adapter, id: repo.seed("asked") };
 };

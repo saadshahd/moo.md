@@ -98,7 +98,7 @@ const followUps = () => {
 /** A merge of `src/a.ts` under the path rule `rule`, and a check of the base after it that `checks` decide. */
 const mergedUnder = (rule: Omit<PathRule, "glob">) => {
 	const dir = scratch();
-	const state = openState(tempDir("state"));
+	const state = openState(tempDir("state"), { now: Date.now });
 
 	commit(dir, { "src/a.ts": "export const x = 1;\n" }, "init");
 	const merged = violating(dir);

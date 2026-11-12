@@ -5,7 +5,7 @@ import { FakeRoundup } from "./fixtures/fake-roundup.ts";
 
 const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
-const context: AdapterContext = { report: () => {}, now };
+const context: AdapterContext = { report: () => {}, now, env: process.env };
 
 describe("contract suite on a fake roundup", () => {
 	const roundup = new FakeRoundup();
@@ -147,7 +147,7 @@ describe.skipIf(!env.success)("contract suite on the scratch roundup Project (li
 	const client = () => {
 		if (!env.success) throw new Error("the live roundup test needs its environment");
 
-		return (stdio ??= stdioCall({ socket: env.data.HUM_ROUNDUP_SOCKET, agent: env.data.HUM_ROUNDUP_AGENT }));
+		return (stdio ??= stdioCall({ socket: env.data.HUM_ROUNDUP_SOCKET, agent: env.data.HUM_ROUNDUP_AGENT }, process.env));
 	};
 
 	const call: ToolCall = async (name, args) => {

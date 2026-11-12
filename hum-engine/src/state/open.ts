@@ -21,10 +21,10 @@ export const defaultStateDir = async (cwd: string): Promise<string> => {
 	return join(resolve(cwd, found.stdout.trim()), "hum");
 };
 
-export type StateOptions = Codec & { readonly now?: () => number };
+export type StateOptions = Codec & { readonly now: () => number };
 
 /** Everything the engine saves between runs, under one folder. */
-export const openState = (dir: string, { now = Date.now, ...codec }: StateOptions = {}) => {
+export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 	const faults = new Faults(join(dir, "faults"), now);
 
 	return {

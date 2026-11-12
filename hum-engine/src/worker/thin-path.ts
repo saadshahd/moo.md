@@ -83,8 +83,10 @@ export type ThinPathOptions = {
 	readonly gate?: PrefixGate;
 	/** The remote's pull requests and branch rules, for a remote on GitHub. */
 	readonly pulls?: PullRequests;
-	/** The names, never the values, of the variables the runs have; a missing secret is checked against them. Default: this process's. */
-	readonly runnerVariables?: ReadonlySet<string>;
+	/** The names, never the values, of the variables the runs have; a missing secret is checked against them. */
+	readonly runnerVariables: ReadonlySet<string>;
+	/** A fresh id for each run's session. */
+	readonly newSessionId: () => string;
 	/** False while the worker drains for an update: a finished change is saved and pushed, and the next worker lands it under the config it starts with. */
 	readonly mayLand?: () => boolean;
 };
@@ -402,7 +404,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal): Promise<Finished> => {
 		const attempt = state.runs.unended(id, purpose)?.attempt ?? state.runs.list(id).length;
 		const key = { itemId: id, run: purpose, attempt };
-		const begun = state.runs.begin(key, { name: `hum ${id} ${purpose} #${attempt}`, sessionId: crypto.randomUUID() });
+		const begun = state.runs.begin(key, { name: `hum ${id} ${purpose} #${attempt}`, sessionId: d.newSessionId() });
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[purpose]?.file ?? purpose;
 
@@ -453,7 +455,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const { placement } = await placementOf(landContext(d), change);
 
 		const decision = askDecision(reason, {
-			runnerVariables: d.runnerVariables ?? new Set(Object.keys(process.env)),
+			runnerVariables: d.runnerVariables,
 			changedPaths: change.paths,
 			level: placement.level.name,
 			undoableLevels: config.hum.undoableLevels,

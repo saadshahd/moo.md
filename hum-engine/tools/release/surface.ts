@@ -158,7 +158,7 @@ const commandSurface = (command: Command): CommandSurface => ({
 	commands: Object.fromEntries(command.commands.map((child) => [child.name(), commandSurface(child)])),
 });
 
-const SILENT_IO = { cwd: PACKAGE_ROOT, stdout: () => undefined, stderr: () => undefined };
+const SILENT_IO = { cwd: PACKAGE_ROOT, env: {}, stdout: () => undefined, stderr: () => undefined };
 
 /** The surface of the package as it sits in this tree. */
 export const extractSurface = async (): Promise<Surface> => {

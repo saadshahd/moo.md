@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { docsJudge } from "./judge.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -37,7 +38,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const state = openState(tempDir("worker"), { now });
 	const reports: string[] = [];
 	const clone = repo.worker("w");
-	const markdown = markdownAdapter({ ...markdownSettings, repo: clone }, { report: (f) => reports.push(f.code), now });
+	const markdown = markdownAdapter({ ...markdownSettings, repo: clone }, { report: (f) => reports.push(f.code), now, env: process.env });
 	const adapter = serialized(markdown);
 	const base = options.config ?? configWith();
 	const config: Config = { ...base, hum: { ...base.hum, ...options.settings } };
@@ -62,6 +63,8 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			holder: "worker-1",
 			workDir: tempDir("worker-work"),
 			now,
+			runnerVariables: new Set(Object.keys(process.env)),
+			newSessionId: randomUUID,
 			onResult: (result) => results.push(result),
 			...options.worker,
 			...over,
@@ -108,6 +111,8 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			holder: "worker-1",
 			workDir: tempDir("thin-work"),
 			now: Date.now,
+			runnerVariables: new Set(Object.keys(process.env)),
+			newSessionId: randomUUID,
 			...over,
 		}),
 	};

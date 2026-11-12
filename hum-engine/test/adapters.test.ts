@@ -29,7 +29,7 @@ describe("contract suite on markdown (a temp repo with a local bare remote)", ()
 	const repo = new WorkRepo();
 	const clock = { offset: 0 };
 	const now = () => Date.now() + clock.offset;
-	const context: AdapterContext = { report: () => {}, now };
+	const context: AdapterContext = { report: () => {}, now, env: process.env };
 	const options = (path: string) => ({ repo: path, base: "main", ...markdownSettings });
 	const primary = markdownAdapter(options(repo.worker("worker-1")), context);
 	const secondary = markdownAdapter(options(repo.worker("worker-2")), context);
@@ -47,7 +47,7 @@ describe("contract suite on markdown (a temp repo with a local bare remote)", ()
 });
 
 describe("markdown settings", () => {
-	const context: AdapterContext = { report: () => {}, now: Date.now };
+	const context: AdapterContext = { report: () => {}, now: Date.now, env: process.env };
 
 	test("a write that keeps losing the race gives up after writeRaceRetries retries", async () => {
 		const repo = new WorkRepo();
@@ -97,7 +97,7 @@ describe("a malformed item file", () => {
 	test("other items advance, and one card names the file", async () => {
 		const repo = new WorkRepo();
 		const reported: FaultInput[] = [];
-		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now });
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now, env: process.env });
 
 		repo.add("good", itemFile("Good one"));
 		repo.add("broken", "no front matter at all\n");
@@ -290,7 +290,7 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		for (const name of ["pre-push", "pre-commit", "commit-msg", "reference-transaction"]) hook({ dir: join(worker, ".git"), name, script: `touch ${ran}; exit 1` });
 
 		const id = repo.seed("asked");
-		const adapter = markdownAdapter({ repo: worker, base: "main", ...markdownSettings }, { report: () => {}, now: Date.now });
+		const adapter = markdownAdapter({ repo: worker, base: "main", ...markdownSettings }, { report: () => {}, now: Date.now, env: process.env });
 
 		await adapter.answers?.answer(id, { text: "ship it", option: "approve" });
 
@@ -306,7 +306,7 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 
 		hook({ dir: repo.remote, name: "pre-receive", script: `echo "GH006: Protected branch update failed for refs/heads/main" >&2; exit 1` });
 
-		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now });
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now, env: process.env });
 
 		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toBeInstanceOf(PushRefused);
 		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toThrow("Protected branch");

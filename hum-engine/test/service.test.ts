@@ -23,7 +23,7 @@ const TICK_MS = 20;
 
 /** The service unit's start script over a state folder in a temp dir, on short real intervals. */
 const unit = (over: Partial<Supervision> & { spawn: () => Child }) => {
-	const state = openState(tempDir("unit"));
+	const state = openState(tempDir("unit"), { now: Date.now });
 	const stop = new AbortController();
 
 	const supervision: Supervision = {
@@ -141,7 +141,7 @@ test("one card shows when the heartbeat is old and clears when the worker writes
 });
 
 test("the token card shows the warning lead before the year ends, once, and clears when the date moves", () => {
-	const { faults } = openState(tempDir("token"));
+	const { faults } = openState(tempDir("token"), { now: Date.now });
 	const madeAgo = (days: number) => new Date(NOW - days * DAY).toISOString().slice(0, 10);
 
 	checkTokenAge(faults, { setUp: madeAgo(300), now: NOW, warnDays: WARN_DAYS });

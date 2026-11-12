@@ -44,7 +44,7 @@ test("with no kind named, the model call picks it; an abstention runs the fallba
 	const adapter = provider.adapter();
 	const id = provider.seed("Tidy the log");
 	const item = { id, title: "Tidy the log", body: "It is noisy.", ready: true, thread: [] };
-	const context = (judge = scriptedJudge({ kind: { kind: "fix" } })) => ({ state: openState(tempDir("kind")), config, judge, workSource: adapter.workSource!, questions: adapter.questions!, now: provider.now });
+	const context = (judge = scriptedJudge({ kind: { kind: "fix" } })) => ({ state: openState(tempDir("kind"), { now: Date.now }), config, judge, workSource: adapter.workSource!, questions: adapter.questions!, now: provider.now });
 
 	expect(await pickKind(context(), item)).toEqual({ item: id, kind: "fix", from: "model" });
 

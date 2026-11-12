@@ -8,7 +8,7 @@ import semver from "semver";
 import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
-import { CommandTimedOut, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
@@ -318,9 +318,9 @@ export type RunnerOptions = {
 	readonly binary?: string;
 	/** The limit of `claude --version`, which the version floor reads, and of the start check; the owner's `commandTimeoutSeconds` in milliseconds. */
 	readonly timeoutMs?: number;
-	/** Added to the process environment. An API key in the environment is passed on untouched. */
-	readonly env?: Readonly<Record<string, string>>;
-	readonly now?: () => number;
+	/** The environment `claude` runs with, the process's own from the root. An API key in it is passed on untouched. */
+	readonly env: Env;
+	readonly now: () => number;
 	/** The first wait before a run that hit the refresh-lock error runs again; later waits grow from it. */
 	readonly lockBackoffMs?: number;
 };
@@ -398,8 +398,7 @@ type Started = { readonly check: RunOutcome; readonly runner: Runner };
  * No run starts until the version floor and the start check pass; until then every run is held with one card.
  */
 const startChecked = async (options: RunnerOptions): Promise<Started> => {
-	const { state, binary = "claude", now = Date.now, lockBackoffMs = LOCK_BACKOFF_MS, timeoutMs = SHIPPED_COMMAND_TIMEOUT_MS } = options;
-	const env = { ...process.env, ...options.env };
+	const { state, binary = "claude", env, now, lockBackoffMs = LOCK_BACKOFF_MS, timeoutMs = SHIPPED_COMMAND_TIMEOUT_MS } = options;
 	const limitedUntil = () => savedLimitUntil(state);
 
 	const hold = (code: string, cause: string, fix: string): Extract<RunOutcome, { kind: "held" }> => ({
@@ -572,7 +571,7 @@ const isUnsettled = ({ check }: Started): boolean => check.kind === "limited" ||
  * limit that still stands defers the check, so no call is made before the limit ends and no restart is needed.
  */
 export const startRunner = async (options: RunnerOptions): Promise<Started> => {
-	const { state, now = Date.now } = options;
+	const { state, now } = options;
 	const started = pMemoize(() => startChecked(options));
 
 	const settle = async (): Promise<Started> => {

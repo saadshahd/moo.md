@@ -16,7 +16,7 @@ import { z } from "zod";
 import { finished, pastChange, reviewNote, runnerOf } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
-const freshState = () => openState(tempDir("loop"));
+const freshState = () => openState(tempDir("loop"), { now: Date.now });
 
 const hunk = (...lines: string[]): string => ["@@ -1,2 +1,2 @@", ...lines].join("\n");
 

@@ -6,7 +6,7 @@ import { RequestError } from "@octokit/request-error";
 import pMemoize from "p-memoize";
 import { PermanentError } from "../adapter-api.ts";
 import type { MERGE_METHODS } from "../config/schema.ts";
-import { exec } from "../exec.ts";
+import { type Env, exec } from "../exec.ts";
 
 const RATE_LIMIT_RETRIES = 1;
 const NOT_MODIFIED = 304;
@@ -55,8 +55,8 @@ export const raise = (cause: unknown): never => {
 };
 
 /** The owner's own login: `GH_TOKEN` or `GITHUB_TOKEN`, else the token `gh` holds. */
-const ownerToken = async (timeoutMs: number): Promise<string> => {
-	const fromEnv = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+const ownerToken = async (timeoutMs: number, env: Env): Promise<string> => {
+	const fromEnv = env.GH_TOKEN || env.GITHUB_TOKEN;
 
 	if (fromEnv) return fromEnv;
 
@@ -99,4 +99,4 @@ export const gitHubClient = ({ token, baseUrl, fetch = globalThis.fetch, spaced 
 	});
 
 /** The client on the owner's own login, made once per process and `timeoutMs`, so every reader and writer shares its rate-limit spacing. */
-export const ownerGitHub = pMemoize(async (timeoutMs: number): Promise<GitHubClient> => gitHubClient({ token: await ownerToken(timeoutMs), timeoutMs }));
+export const ownerGitHub = pMemoize(async (timeoutMs: number, env: Env): Promise<GitHubClient> => gitHubClient({ token: await ownerToken(timeoutMs, env), timeoutMs }), { cacheKey: ([timeoutMs]) => timeoutMs });

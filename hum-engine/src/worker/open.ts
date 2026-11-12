@@ -13,19 +13,20 @@ import { serialized } from "../adapters/serial.ts";
 import { SlotPool } from "../slots/pool.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
 import type { HumConfig } from "../config/schema.ts";
-import { commandTimeoutMs } from "../exec.ts";
+import { commandTimeoutMs, type Env } from "../exec.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import { DEFAULT_BASE } from "./thin-path.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
-export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "loop" | "checks"> & {
+export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "loop" | "checks" | "runnerVariables"> & {
 	/** Where saved state lives; default `<git common dir>/hum`. */
 	readonly stateDir?: string;
 	/** The skill names of hope's installed copy; a role that names another is refused. */
 	readonly hopeSkills: ReadonlySet<string>;
 	readonly remote?: string;
 	readonly binary?: string;
-	readonly env?: Readonly<Record<string, string>>;
+	/** The process environment: runs start with it, and the GitHub login and adapters read it. */
+	readonly env: Env;
 };
 
 const Latest = z.looseObject({ version: z.string().min(1) });
@@ -70,7 +71,7 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	const adapters = await resolveAdapters(repo, {
 		faults: state.faults,
 		guard: { lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
-		context: { report: (fault) => void state.faults.raise(fault), now },
+		context: { report: (fault) => void state.faults.raise(fault), now, env },
 	});
 
 	// One adapter serves several slots; its calls go one at a time whichever slot they come through.
@@ -94,8 +95,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	// A slot is a worktree a background run starts in, so the pool stands only where runs are background agents.
 	const slots = config.hum.runSlots.enabled && isInBackground(config.hum, rest.where) ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
 	const github = repoFromRemote(remote);
-	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs });
-	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, () => ownerGitHub(timeoutMs));
+	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs, env });
+	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, () => ownerGitHub(timeoutMs, env));
 
-	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop });
+	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop, runnerVariables: new Set(Object.keys(env)) });
 };

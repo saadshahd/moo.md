@@ -15,7 +15,7 @@ const MODEL = SHIPPED_DEFAULTS.models.light;
 
 const setup = async (spec: ShimSpec = {}, extra: Partial<RunnerOptions> & { clock?: { at: number } } = {}) => {
 	const shim = makeShim(spec);
-	const state = openState(tempDir("runner"));
+	const state = openState(tempDir("runner"), { now: Date.now });
 	const { clock = { at: NOW }, ...rest } = extra;
 	const { check, runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, now: () => clock.at, lockBackoffMs: 1, ...rest });
 
@@ -202,7 +202,7 @@ test("an API key in the environment is passed on and allowed; a changed credenti
 	expect(login.state.faults.list()).toHaveLength(0);
 
 	const shim = makeShim({ script: [{ keySource: "ANTHROPIC_API_KEY" }] });
-	const keyed = await startRunner({ state: login.state, model: MODEL, binary: shim.binary, env: { ...shim.env, ANTHROPIC_API_KEY: "sk-test" } });
+	const keyed = await startRunner({ state: login.state, model: MODEL, binary: shim.binary, env: { ...shim.env, ANTHROPIC_API_KEY: "sk-test" }, now: Date.now });
 
 	expect(keyed.check.kind).toBe("finished");
 	expect(login.state.faults.list().map((c) => c.code)).toEqual(["credential-changed"]);

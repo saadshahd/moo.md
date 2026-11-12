@@ -96,7 +96,7 @@ export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions
 	const run = async (args: readonly string[], input = ""): Promise<GitResult> => {
 		const { exitCode, stdout, stderr } = await exec("git", ["-c", HOOKS_OFF, ...args], {
 			timeoutMs,
-			nodeOptions: { cwd, env: { ...process.env, ...(identity && identityEnv(identity)), ...env } },
+			nodeOptions: { cwd, env: { ...(identity && identityEnv(identity)), ...env } },
 			stdin: input,
 		});
 

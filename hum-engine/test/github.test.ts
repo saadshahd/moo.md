@@ -10,7 +10,7 @@ import { tempDir } from "./fixtures/temp.ts";
 
 const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
-const context: AdapterContext = { report: () => {}, now };
+const context: AdapterContext = { report: () => {}, now, env: process.env };
 
 const fakeClient = (github: FakeGitHub, token = "fake-token"): GitHubClient => gitHubClient({ token, baseUrl: "https://fake.github", fetch: github.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
@@ -134,7 +134,7 @@ describe("the thread", () => {
 describe("failures", () => {
 	test("a rejected login is permanent, not retried", async () => {
 		const github = new FakeGitHub();
-		const adapter = guarded(onFake(github, fakeClient(github, "wrong")), { provider: "github", faults: openState(tempDir("github")).faults, timeoutMs: 1000, backoffMs: { first: 5, max: 5 } });
+		const adapter = guarded(onFake(github, fakeClient(github, "wrong")), { provider: "github", faults: openState(tempDir("github"), { now: Date.now }).faults, timeoutMs: 1000, backoffMs: { first: 5, max: 5 } });
 
 		await expect(adapter.workSource!.listReady()).rejects.toThrow("Bad credentials");
 		expect(github.fetched).toBe(1);

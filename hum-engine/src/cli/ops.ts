@@ -4,7 +4,7 @@ import { type ClaimResult, type Item, type ItemRef, PermanentError, Watch } from
 import { pushArgs } from "../adapters/git.ts";
 import { resolveAdapters, type Slot } from "../adapters/registry.ts";
 import { readSettings } from "../config/settings.ts";
-import { CommandTimedOut, commandTimeoutMs, exec } from "../exec.ts";
+import { CommandTimedOut, commandTimeoutMs, type Env, exec } from "../exec.ts";
 import { HumConfig } from "../config/schema.ts";
 import { dropInto } from "../state/fs.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
@@ -19,6 +19,7 @@ type Printable = ItemRef[] | ItemRef | Item | ClaimResult | Watch | { readonly o
 
 export type Io = {
 	readonly cwd: string;
+	readonly env: Env;
 	readonly stdout: (text: string) => void;
 	readonly stderr: (text: string) => void;
 };
@@ -112,13 +113,13 @@ const handlers = {
 
 const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Promise<Call> => {
 	const stateDir = await defaultStateDir(io.cwd);
-	const state = openState(stateDir);
+	const state = openState(stateDir, { now: Date.now });
 	const settings = readSettings(io.cwd, CliSettings);
 
 	const adapters = await resolveAdapters(io.cwd, {
 		faults: state.faults,
 		guard: {},
-		context: { report: (fault) => void state.faults.raise(fault), now: Date.now },
+		context: { report: (fault) => void state.faults.raise(fault), now: Date.now, env: io.env },
 	});
 
 	const [item = "", ...rest] = positionals;

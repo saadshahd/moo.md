@@ -4,6 +4,7 @@ import { z } from "zod";
 import { type Adapter, type AdapterContext, type Answers, type Item, ItemId, PermanentError, type Questions, type Watch, type WorkSource } from "../adapter-api.ts";
 import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
+import type { Env } from "../exec.ts";
 import { parseArgument } from "./argument.ts";
 import { claimer, isLive } from "./claim.ts";
 import {
@@ -77,7 +78,7 @@ export type RoundupOptions = {
 	readonly socket?: string;
 };
 
-const environment = (): Record<string, string> => Object.fromEntries(Object.entries(process.env).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])));
+const defined = (env: Env): Record<string, string> => Object.fromEntries(Object.entries(env).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])));
 
 /** A tool's reply: its structured content, else its text as JSON, else the text itself. */
 const replyValue = (tool: string, result: Awaited<ReturnType<Client["callTool"]>>): Json => {
@@ -94,9 +95,9 @@ const replyValue = (tool: string, result: Awaited<ReturnType<Client["callTool"]>
 };
 
 /** The stdio client: `rup mcp <agent>` on the Project's socket. Only a run roundup started has both. */
-export const stdioCall = ({ agent, socket }: RoundupOptions) => {
-	const who = agent ?? process.env.ROUNDUP_AGENT_ID;
-	const path = socket ?? process.env.RUPD_SOCKET;
+export const stdioCall = ({ agent, socket }: RoundupOptions, env: Env) => {
+	const who = agent ?? env.ROUNDUP_AGENT_ID;
+	const path = socket ?? env.RUPD_SOCKET;
 	let client: Promise<Client> | undefined;
 
 	if (!who || !path) throw new PermanentError("the roundup adapter runs only in a run roundup started: ROUNDUP_AGENT_ID and RUPD_SOCKET are not both set");
@@ -104,7 +105,7 @@ export const stdioCall = ({ agent, socket }: RoundupOptions) => {
 	const connect = async () => {
 		const made = new Client({ name: "hum", version: "0" });
 
-		await made.connect(new StdioClientTransport({ command: "rup", args: ["mcp", who], env: { ...environment(), RUPD_SOCKET: path } }));
+		await made.connect(new StdioClientTransport({ command: "rup", args: ["mcp", who], env: { ...defined(env), RUPD_SOCKET: path } }));
 
 		return made;
 	};
@@ -168,8 +169,8 @@ type Whole = Adapter & {
  * A Todo is ready while it is open, unblocked, unassigned and holds no live claim. A claim is a comment, so the
  * daemon's comment order picks the winner. roundup has no release step.
  */
-export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext): Whole => {
-	const client = options.call ? { call: options.call, close: async () => {} } : stdioCall(options);
+export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterContext): Whole => {
+	const client = options.call ? { call: options.call, close: async () => {} } : stdioCall(options, env);
 	const { call } = client;
 
 	const comments = async (id: string) => Comment.array().parse(await call("todo_comments", { id: parseArgument(TodoId, id) }));

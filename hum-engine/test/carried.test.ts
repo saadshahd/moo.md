@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { docsJudge } from "./fixtures/judge.ts";
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
@@ -78,7 +79,7 @@ for (const write of WRITES) {
 const item = (id: string): Item => ({ id, title: id, body: "", ready: true, thread: [] });
 
 test("the last-read list survives a restart: a fresh guard still sees an empty list that contradicts it", async () => {
-	const state = openState(tempDir("r3"));
+	const state = openState(tempDir("r3"), { now: Date.now });
 
 	const store = { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids: string[]) => state.ready.put("work-source", { ids }) };
 
@@ -220,6 +221,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 		binary: w.shim.binary,
 		env: w.shim.env,
 		now: () => NOW,
+		newSessionId: randomUUID,
 		workDir: tempDir("open-work"),
 		onResult: (r) => results.push(r.outcome),
 	});
@@ -248,7 +250,7 @@ test("openWorker refuses a repo whose hum.json names no commit identity, saying 
 	mkdirSync(join(w.repo.owner, ".hum"), { recursive: true });
 	writeFileSync(join(w.repo.owner, ".hum", "hum.json"), JSON.stringify(hum));
 
-	await expect(openWorker(w.repo.owner, { hopeSkills: hopeSkills(), judge: docsJudge, holder: "worker-1", binary: w.shim.binary, env: w.shim.env, now: () => NOW })).rejects.toThrow("commitIdentity");
+	await expect(openWorker(w.repo.owner, { hopeSkills: hopeSkills(), judge: docsJudge, holder: "worker-1", binary: w.shim.binary, env: w.shim.env, now: () => NOW, newSessionId: randomUUID })).rejects.toThrow("commitIdentity");
 });
 
 test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
@@ -274,6 +276,7 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 		binary: w.shim.binary,
 		env: w.shim.env,
 		now: () => NOW,
+		newSessionId: randomUUID,
 		workDir: tempDir("open-work"),
 		onResult: (r) => results.push(r.outcome),
 	});

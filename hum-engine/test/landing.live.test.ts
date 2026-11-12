@@ -28,7 +28,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 	const id = `live-${stamp}`;
 	const branch = `${config.hum.runBranchPrefix}${id}`;
 	const file = `docs/${id}.md`;
-	const state = openState(tempDir("live-state"));
+	const state = openState(tempDir("live-state"), { now: Date.now });
 	const provider = new FakeProvider().adapter();
 
 	await gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
@@ -77,7 +77,7 @@ const closeAndDelete = async (branch: string) => {
 // The owner's own login may bypass the ruleset, so a push would land; hum reads the rules and opens a pull request.
 test.skipIf(!live)("live: where main requires a pull request, a cleared change opens one with auto-merge that merges once the check passes; a change for the owner waits unarmed", async () => {
 	const stamp = String(Date.now());
-	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, env: process.env });
 	const alone = await landing(configWith(), pulls, `${stamp}-a`);
 	const owner = await landing(configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])), pulls, `${stamp}-b`);
 
@@ -110,7 +110,7 @@ test.skipIf(!live)("live: an owner's commit goes through a pull request that aut
 	const config = configWith();
 	const clone = tempDir("live-owner");
 	const git = gitIn(clone, { identity: config.hum.commitIdentity, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
-	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, env: process.env });
 	const file = `docs/owner-${stamp}.md`;
 
 	await gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);

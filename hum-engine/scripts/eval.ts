@@ -55,8 +55,8 @@ const limit = values.limit === undefined ? Number.POSITIVE_INFINITY : Count.pars
 
 type Verdict = "right" | "wrong" | "abstained" | "halted";
 
-const state = openState(mkdtempSync(join(tmpdir(), "hum-eval-")));
-const started = await startRunner({ state, model });
+const state = openState(mkdtempSync(join(tmpdir(), "hum-eval-")), { now: Date.now });
+const started = await startRunner({ state, model, now: Date.now, env: process.env });
 
 if (started.check.kind !== "finished") throw new Error(`the start check ended as ${started.check.kind}`);
 

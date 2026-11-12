@@ -28,7 +28,7 @@ const SLOW_TURN = 'Run `echo one`, then `echo two`, then `echo three`, each as i
 const ADVISOR_TURN = 'Call the advisor tool exactly once (it takes no parameters), then reply {"ok":true}.';
 const RUNS_NAMED = "hum live";
 
-const state = openState(tempDir("live-bg"));
+const state = openState(tempDir("live-bg"), { now: Date.now });
 let runner: Runner;
 let check: Awaited<ReturnType<typeof startBackgroundRunner>>["check"];
 
@@ -50,7 +50,7 @@ const leftOver = async (): Promise<string[]> =>
 beforeAll(async () => {
 	if (!live) return;
 
-	({ check, runner } = await startBackgroundRunner({ state, model: MODEL, config: CONFIG, repo }));
+	({ check, runner } = await startBackgroundRunner({ state, model: MODEL, config: CONFIG, repo, now: Date.now, env: process.env }));
 }, 300_000);
 
 afterAll(async () => {

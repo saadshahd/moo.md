@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Env } from "./exec.ts";
 import type { FaultInput } from "./state/faults.ts";
 
 export type { FaultInput };
@@ -128,6 +129,8 @@ export type AdapterContext = {
 	/** Raise a fault card, scoped to one item or provider. */
 	readonly report: (fault: FaultInput) => void;
 	readonly now: () => number;
+	/** The process environment, for the tokens and addresses an adapter reads. */
+	readonly env: Env;
 };
 
 /** The default export of an owner's `adapters/<name>.ts`. */

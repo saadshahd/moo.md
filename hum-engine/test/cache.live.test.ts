@@ -12,9 +12,9 @@ if (!live) console.log("skip live prompt-cache check: set HUM_LIVE=1 to make fou
 const SCHEMA = { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] };
 
 test.skipIf(!live)("live: the runs that wait for the first token read the shared prefix from the cache", async () => {
-	const state = openState(tempDir("cache"));
+	const state = openState(tempDir("cache"), { now: Date.now });
 	const model = SHIPPED_DEFAULTS.models.light;
-	const { runner } = await startRunner({ state, model });
+	const { runner } = await startRunner({ state, model, now: Date.now, env: process.env });
 	expect(state.faults.list()).toEqual([]);
 
 	const gate = new PrefixGate({ now: Date.now });

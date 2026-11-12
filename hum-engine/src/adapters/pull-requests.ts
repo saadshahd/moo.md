@@ -3,6 +3,7 @@ import pMemoize from "p-memoize";
 import { z } from "zod";
 import type { Json } from "../config/json.ts";
 import { MERGE_METHODS, type MergeMethod } from "../config/schema.ts";
+import type { Env } from "../exec.ts";
 import { type GitHubClient, MERGE_METHOD, ownerGitHub, raise } from "./github-client.ts";
 
 /** What the target branch's rules ask of a change that lands on it. */
@@ -138,10 +139,10 @@ export const methodFor = (
 /** Pull requests and branch rules of a GitHub repo, on the owner's own login unless a client is given. `timeoutMs` bounds the `gh auth token` that reads that login. */
 export const gitHubPullRequests = (
 	repo: string,
-	{ timeoutMs, client }: { readonly timeoutMs: number; readonly client?: () => Promise<GitHubClient> },
+	options: { readonly timeoutMs: number } & ({ readonly client: () => Promise<GitHubClient> } | { readonly env: Env }),
 ): PullRequests => {
 	const [owner = "", name = ""] = repo.split("/");
-	const connect = client ?? (() => ownerGitHub(timeoutMs));
+	const connect = "client" in options ? options.client : () => ownerGitHub(options.timeoutMs, options.env);
 
 	const rulesCache = new Map<string, BranchRules>();
 

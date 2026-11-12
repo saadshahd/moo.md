@@ -170,7 +170,7 @@ type StandingClaim = { readonly claim: Claim; readonly sha: string };
  * bare commit, and created with `createRef`; a renewal or an expired take is `createCommitOnBranch` on the head it
  * read. `watch` is one REST request with `If-None-Match`, because GitHub answers 304 free of rate limit.
  */
-export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): Whole => {
+export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterContext): Whole => {
 	const { base, claimPrefix, readyLabel, mergeMethod, timeoutMs } = options;
 	const repo = parseArgument(Repo, options.repo);
 	const [owner = "", name = ""] = repo.split("/");
@@ -180,7 +180,7 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 	let spent = 0;
 
 	const client = pMemoize(async () => {
-		const made = options.client ?? (await ownerGitHub(timeoutMs));
+		const made = options.client ?? (await ownerGitHub(timeoutMs, env));
 
 		made.hook.after("request", () => void spent++);
 		made.hook.error("request", (error) => {

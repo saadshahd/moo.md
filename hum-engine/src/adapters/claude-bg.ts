@@ -179,12 +179,12 @@ export type BackgroundOptions = Pick<RunnerOptions, "binary" | "env" | "now"> & 
  * transcript, enforces the token cap by `claude stop`, and stops and removes the run once its outcome is taken.
  * A cheap model call, a run with no name, and a run the background service cannot take go to `fallback`.
  */
-export const backgroundRunner = ({ binary = "claude", env, state, config, fallback, now = Date.now }: BackgroundOptions): Runner => {
+export const backgroundRunner = ({ binary = "claude", env, state, config, fallback, now }: BackgroundOptions): Runner => {
 	const pollMs = config.backgroundPollSeconds * SECOND_MS;
-	const jobsFolder = join({ ...process.env, ...env }.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), JOBS_FOLDER);
+	const jobsFolder = join(env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), JOBS_FOLDER);
 
 	const claude = (args: readonly string[], options: { stdin?: string; cwd?: string } = {}) =>
-		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env: { ...process.env, ...env } } });
+		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env } });
 
 	/** The background runs Claude Code lists. A list hum cannot read throws, with one card: read as empty, it would start a run that is already going. */
 	const agents = async (): Promise<Agent[]> => {
@@ -253,9 +253,9 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 	};
 
 	const listed = async (id: string, signal: AbortSignal | undefined): Promise<Agent | undefined> => {
-		const until = Date.now() + config.backgroundLaunchSeconds * SECOND_MS;
+		const until = now() + config.backgroundLaunchSeconds * SECOND_MS;
 
-		while (Date.now() < until && !signal?.aborted) {
+		while (now() < until && !signal?.aborted) {
 			const found = (await agents()).find((agent) => agent.id === id);
 
 			if (found) return found;
@@ -382,21 +382,21 @@ const whyNot = (outcome: RunOutcome, timeoutMs: number): string => {
  * missing from agent view.
  */
 export const startBackgroundRunner = async (options: BackgroundStartOptions): Promise<StartedBackground> => {
-	const { config, repo, state, binary, env } = options;
+	const { config, repo, state, binary, env, now } = options;
 	const started = await startRunner(options);
 
 	if (started.check.kind !== "finished") return started;
 
 	// The check's own fall-back holds with the card that says why the service refused.
 	const refuse: Runner = { run: async () => ({ kind: "held", card: refusalCard(state) }), limitedUntil: started.runner.limitedUntil };
-	const checker = backgroundRunner({ binary, env, state, config, fallback: refuse });
+	const checker = backgroundRunner({ binary, env, state, config, fallback: refuse, now });
 	const timeoutMs = commandTimeoutMs(config);
 	const check = await checker.run({ name: START_NAME, prompt: START_PROMPT, cwd: repo, model: options.model, effort: "low", schema: START_SCHEMA, signal: AbortSignal.timeout(timeoutMs) });
 
 	if (isOk(check)) {
 		state.faults.clear({ code: BACKGROUND_CHECK_CODE });
 
-		return { check, runner: backgroundRunner({ binary, env, state, config, fallback: started.runner }) };
+		return { check, runner: backgroundRunner({ binary, env, state, config, fallback: started.runner, now }) };
 	}
 
 	// The start check's card says why for every run, so the card for the check's own fall-back would only repeat it.

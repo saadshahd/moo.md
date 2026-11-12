@@ -11,7 +11,7 @@ import { tempDir } from "./fixtures/temp.ts";
 import { rateOf } from "../src/measure/rate.ts";
 
 
-const freshState = () => openState(tempDir("measure"));
+const freshState = () => openState(tempDir("measure"), { now: Date.now });
 
 const merge = (n: number): MergedChange => ({ item: `m${n}`, at: n, paths: [n < 10 ? "ui/x.ts" : "api/y.ts"], notes: n % 5 === 0 ? 2 : 0, questions: n % 4 === 0 ? 1 : 0, tokens: 1000 });
 

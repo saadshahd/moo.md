@@ -35,12 +35,12 @@ export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["l
 
 	const { recipe } = settings;
 	const config = poolConfig(pool, { ...settings, recipe: recipe instanceof Function ? recipe(repo.owner) : recipe });
-	const state = openState(stateDir);
+	const state = openState(stateDir, { now: Date.now });
 	const options: PoolOptions = { repo: repo.owner, state, config, base: BASE, liveRuns, now: Date.now };
 	const slots = new SlotPool(options);
 
 	/** A pool over the same saved state, as a restarted worker would open it. */
-	const reopened = (alive?: PoolOptions["liveRuns"]) => new SlotPool({ ...options, state: openState(stateDir), liveRuns: alive });
+	const reopened = (alive?: PoolOptions["liveRuns"]) => new SlotPool({ ...options, state: openState(stateDir, { now: Date.now }), liveRuns: alive });
 
 	const ask = (item: string, over: { signal?: AbortSignal; pool?: SlotPool } = {}) => (over.pool ?? slots).checkout({ remote: repo.remote, base: BASE, item, signal: over.signal });
 

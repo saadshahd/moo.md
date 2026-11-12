@@ -88,7 +88,7 @@ test("an answer pushed from another clone after a quiet tick starts the run on t
 
 	await w.worker.tick();
 
-	const elsewhere = markdownAdapter({ ...markdownSettings, repo: w.repo.worker("elsewhere") }, { report: () => {}, now: () => w.clock.at });
+	const elsewhere = markdownAdapter({ ...markdownSettings, repo: w.repo.worker("elsewhere") }, { report: () => {}, now: () => w.clock.at, env: process.env });
 
 	await elsewhere.answers.answer("a", { text: "Use Plain" });
 	w.clock.at += 2 * HOUR_MS;

@@ -19,9 +19,9 @@ const STRUCTURED = { ok: true };
 
 const setup = async (spec: ShimSpec = {}) => {
 	const shim = makeShim(spec);
-	const state = openState(tempDir("background"));
-	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env });
-	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner });
+	const state = openState(tempDir("background"), { now: Date.now });
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, now: Date.now });
+	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner, now: Date.now });
 
 	return { shim, state, runner, background };
 };
@@ -174,9 +174,9 @@ test("a worker killed after the launch and before the session id is saved finds 
 
 	expect(died.exitCode).not.toBe(0);
 
-	const state = openState(dir);
-	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env });
-	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner });
+	const state = openState(dir, { now: Date.now });
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, now: Date.now });
+	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner, now: Date.now });
 
 	expect(state.runs.unended("#68", "build")?.sessionId).toBeUndefined();
 
@@ -191,8 +191,8 @@ test("a worker killed after the launch and before the session id is saved finds 
 
 test("the start check starts one background run and keeps it", async () => {
 	const good = makeShim();
-	const goodState = openState(tempDir("background-check"));
-	const started = await startBackgroundRunner({ state: goodState, model: MODEL, binary: good.binary, env: good.env, config: CONFIG, repo: tmpdir() });
+	const goodState = openState(tempDir("background-check"), { now: Date.now });
+	const started = await startBackgroundRunner({ state: goodState, model: MODEL, binary: good.binary, env: good.env, config: CONFIG, repo: tmpdir(), now: Date.now });
 
 	expect(started.check).toMatchObject({ kind: "finished", structured: STRUCTURED });
 	expect(good.background().filter(({ cmd }) => cmd === "bg")).toHaveLength(1);
@@ -201,8 +201,8 @@ test("the start check starts one background run and keeps it", async () => {
 
 test("a start check that cannot start a background run leaves one card, and every run goes on as claude -p", async () => {
 	const down = makeShim({ bgDown: true });
-	const downState = openState(tempDir("background-check"));
-	const fallen = await startBackgroundRunner({ state: downState, model: MODEL, binary: down.binary, env: down.env, config: CONFIG, repo: tmpdir() });
+	const downState = openState(tempDir("background-check"), { now: Date.now });
+	const fallen = await startBackgroundRunner({ state: downState, model: MODEL, binary: down.binary, env: down.env, config: CONFIG, repo: tmpdir(), now: Date.now });
 
 	expect(downState.faults.list().map(({ code }) => code)).toEqual([BACKGROUND_CHECK_CODE]);
 	expect(downState.faults.list()[0]?.cause).toContain("background service is not running");
@@ -211,8 +211,8 @@ test("a start check that cannot start a background run leaves one card, and ever
 
 test("a background start check that never answers is stopped at commandTimeoutSeconds and leaves one card that says so", async () => {
 	const shim = makeShim({ script: [{}, { hang: true }] });
-	const state = openState(tempDir("background-check"));
-	const started = await startBackgroundRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, config: { ...CONFIG, commandTimeoutSeconds: 2 }, repo: tmpdir() });
+	const state = openState(tempDir("background-check"), { now: Date.now });
+	const started = await startBackgroundRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, config: { ...CONFIG, commandTimeoutSeconds: 2 }, repo: tmpdir(), now: Date.now });
 
 	expect(started.check.kind).toBe("stopped");
 	expect(state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: BACKGROUND_CHECK_CODE, cause: expect.stringContaining("no result within 2 seconds") }]);

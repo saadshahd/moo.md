@@ -72,6 +72,10 @@ export type WorkerOptions = {
 	readonly dir?: string;
 	readonly where?: "mac" | "ci";
 	readonly now: () => number;
+	/** The names of the variables the runs have, for the missing-secret check. */
+	readonly runnerVariables: ReadonlySet<string>;
+	/** A fresh id for each run's session. */
+	readonly newSessionId: () => string;
 	/** The engine this process runs; the update check compares the one installed in `repo` with it. */
 	readonly engineVersion?: string;
 	/** The newest published version; a failed or slow read shows no version. */
@@ -460,6 +464,8 @@ export class Worker {
 				signal: abort.signal,
 				gate: this.#gate,
 				now: this.#now,
+				runnerVariables: this.#o.runnerVariables,
+				newSessionId: this.#o.newSessionId,
 				pulls: this.#o.pulls,
 				mayLand: () => this.#updating === undefined,
 			}).then(
