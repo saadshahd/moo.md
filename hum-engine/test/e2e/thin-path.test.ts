@@ -148,8 +148,17 @@ test("a merge that keeps losing the race to the base stops after mergeTries push
 	w.repo.seed("Write the note");
 	const refused = w.repo.refusePushes();
 
-	await expect(runThinPath(w.thinPath())).rejects.toThrow("another push moved main first");
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "held", why: "another push moved main first" });
 	expect(refused()).toBe(2);
+});
+
+test("a base the remote refuses off GitHub ends the item stuck, in the remote's own words", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+
+	w.repo.refusePushes({ said: "the branch is protected" });
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("the branch is protected") });
 });
 
 test("a run branch the remote refuses ends the item stuck, in the remote's own words", async () => {
@@ -235,6 +244,23 @@ test("a change to a path no rule places runs, waits unmerged and asks one questi
 
 	expect(await runThinPath(w.thinPath({ itemId: next }))).toEqual({ outcome: "merged", item: next });
 	expect(await questionsOn(w, next)).toEqual([]);
+});
+
+test("an answer whose path rule the remote refuses off GitHub ends the item stuck, in the remote's own words", async () => {
+	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
+
+	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
+
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "review", item: id });
+
+	await w.adapter.answers!.answer(id, { text: "low", option: "low" });
+	w.state.parked.remove(id);
+	w.repo.refusePushes({ said: "the branch is protected", touching: ".hum/hum.json" });
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("the branch is protected") });
+	expect(w.state.learned.list()).toEqual([]);
 });
 
 test("where the base needs a pull request, the answer's path rule travels in one, and a rerun waits on it without a second", async () => {

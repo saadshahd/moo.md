@@ -14,9 +14,8 @@ import {
 	PATCH,
 	push,
 	type PushOutcome,
-	PushRefused,
 } from "../adapters/git.ts";
-import { type CommitLanded, landOwnerCommit } from "../adapters/owner-commit.ts";
+import { landOwnerCommit } from "../adapters/owner-commit.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { changeOf, historiesOf, readHistory } from "../adapters/history.ts";
 import { markDone } from "../adapters/item-file.ts";
@@ -107,8 +106,15 @@ const REVIEW_APPROVAL = "approve";
 /** Why the change cannot merge on the newest base: it conflicts there, or its checks fail there. */
 type Stale = { readonly kind: "stale"; readonly why: string };
 
-/** How a push to the base ended: the base holds the change, it cannot merge on the newest base, or the remote refused it in `said`. */
-type BaseLanding = { readonly kind: "landed" } | Stale | Extract<PushOutcome, { kind: "refused" }>;
+/** A push that did not land: the remote refused it in `said`, or another writer moved the ref first. */
+type Unpushed = Exclude<PushOutcome, { kind: "pushed" }>;
+
+/** A push that did not land, as the pass's result: the remote's refusal ends the item stuck in its words; a push another writer beat waits for the next pass. */
+export const unpushed = (id: string, ref: string, outcome: Unpushed): ThinResult =>
+	outcome.kind === "refused" ? { outcome: "stuck", item: id, detail: outcome.said } : { outcome: "held", item: id, why: `another push moved ${ref} first` };
+
+/** How a push to the base ended: the base holds the change, it cannot merge on the newest base, or the push did not land. */
+type BaseLanding = { readonly kind: "landed" } | Stale | Unpushed;
 
 const LANDED: BaseLanding = { kind: "landed" };
 
@@ -175,12 +181,12 @@ const askUnclear = async (ctx: LandContext, unclear: readonly string[]): Promise
 
 const RawPaths = z.looseObject({ paths: z.array(z.unknown()).default([]) });
 
-/** Commits the owner's answer as path rules in the base's `hum.json`, with hooks off, and saves them for the view's undo. */
+/** Commits the owner's answer as path rules in the base's `hum.json`, with hooks off, and saves them for the view's undo. Returns why the rules did not land, or nothing once they did. */
 const learnRules = async (
 	ctx: LandContext,
 	unclear: readonly string[],
 	level: string,
-): Promise<CommitLanded> => {
+): Promise<Unpushed | undefined> => {
 	const { state, config, id, base, remote, now } = ctx;
 	const globs = [...new Set(unclear.map(ruleGlobFor))];
 	const scratch = mkdtempSync(join(tmpdir(), "hum-rule-"));
@@ -230,17 +236,14 @@ const learnRules = async (
 			push: (refspecs) => push(git, ["origin", ...refspecs]),
 		});
 
-		if (landed.via === "refused") throw new PushRefused(landed.said);
+		if (landed.via === "refused") return { kind: "refused", said: landed.said };
 
-		if (landed.via === "conflict")
-			throw new Error(
-				`another push moved ${base} before the path rule for ${id} landed`,
-			);
+		if (landed.via === "conflict") return { kind: "conflict" };
 
 		for (const glob of globs)
 			state.learned.put(glob, { glob, level, item: id, commit, pull: landed.via === "pull-request" ? landed.pull.url : undefined, at: now() });
 
-		return landed;
+		return undefined;
 	} finally {
 		rmSync(scratch, { recursive: true, force: true });
 	}
@@ -317,7 +320,7 @@ const pushToBase = async (ctx: LandContext): Promise<BaseLanding> => {
 		if (pushed.value.kind === "refused") return pushed.value;
 	}
 
-	throw new Error(`another push moved ${ctx.base} first, ${ctx.config.hum.mergeTries} times`);
+	return { kind: "conflict" };
 };
 
 /** One pull request from the run branch: it merges itself once GitHub's required checks pass when the change is cleared, and waits for the owner otherwise. */
@@ -364,15 +367,12 @@ const throughPullRequest = async (
 	return { outcome: "landing", item: id, detail: pull.url };
 };
 
-/** A push the remote refused, on GitHub: the rules are read again and the change goes through a pull request. */
+/** A push the remote refused: on GitHub the rules are read again and the change goes through a pull request; elsewhere the item ends stuck in the remote's words. */
 const afterRefusal = async (
 	ctx: LandContext,
-	{ cleared, route, why }: { readonly cleared: boolean; readonly route: Route; readonly why: string },
+	{ cleared, route, why, said }: { readonly cleared: boolean; readonly route: Route; readonly why: string; readonly said: string },
 ): Promise<ThinResult> => {
-	if (!ctx.pulls)
-		throw new PushRefused(
-			`the remote refused the push of ${ctx.id} to ${ctx.base}, and it is not on GitHub`,
-		);
+	if (!ctx.pulls) return unpushed(ctx.id, ctx.base, { kind: "refused", said: `${said}; ${ctx.base} is not on GitHub, so no pull request can land it` });
 
 	return throughPullRequest(
 		ctx,
@@ -395,7 +395,9 @@ const landBy = async (
 
 	const landed = await pushToBase(ctx);
 
-	if (landed.kind === "refused") return afterRefusal(ctx, { cleared: true, route, why });
+	if (landed.kind === "refused") return afterRefusal(ctx, { cleared: true, route, why, said: landed.said });
+
+	if (landed.kind === "conflict") return unpushed(ctx.id, ctx.base, landed);
 
 	return landed.kind === "stale" ? { outcome: "review", item: ctx.id, detail: landed.why } : finish(ctx);
 };
@@ -413,7 +415,9 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const answered = answeredLevel(ctx.item, saved.since, levelNames(ctx.config));
 	const learns = first.placement.unclear.length > 0 && answered !== undefined;
 
-	if (learns) await learnRules(ctx, first.placement.unclear, answered);
+	const unlearned = learns ? await learnRules(ctx, first.placement.unclear, answered) : undefined;
+
+	if (unlearned) return unpushed(ctx.id, ctx.base, unlearned);
 
 	const { placement, policy } = learns
 		? await placementOf(ctx, saved.change)

@@ -9,7 +9,7 @@ import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, identityEnv, PATCH, push, type PushOutcome } from "../adapters/git.ts";
+import { type Git, gitIn, identityEnv, PATCH, push } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -22,7 +22,7 @@ import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
-import { changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome } from "./land.ts";
+import { changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome, unpushed } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
@@ -757,10 +757,6 @@ const approvalQuestion = ({ question, plan }: Pending): Pending => ({
 	plain: "owner-review",
 	plan,
 });
-
-/** A run branch push that did not land: the remote's refusal ends the item stuck in its words; a push another writer beat waits for the next pass. */
-const unpushed = (id: string, branch: string, outcome: Exclude<PushOutcome, { kind: "pushed" }>): ThinResult =>
-	outcome.kind === "refused" ? { outcome: "stuck", item: id, detail: outcome.said } : { outcome: "held", item: id, why: `another push moved ${branch} first` };
 
 /** Push the work branch, put the plan on the item, queue the question for room under the daily cap, and end. Each write runs once per key. A push that did not land ends the pass with its result instead. */
 const handOff = async (d: Driven, { question, plain, plan }: Pending): Promise<ThinResult | undefined> => {
