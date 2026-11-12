@@ -9,6 +9,7 @@ import { measureInputsOf } from "../src/measure/inputs.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
 import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
+import { pastChange } from "./fixtures/records.ts";
 
 const folders: string[] = [];
 
@@ -99,11 +100,9 @@ test("a change merged through a pull request after the worker moved on is record
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
 });
 
-const change = (sha: string, subject: string, over: Partial<PastChange> = {}): PastChange => ({ sha, subject, body: "", files: ["a.md"], size: 1, blamed: [], ...over });
-
 test("a revert titled revert!: that names a change's commit marks that change reverted; one that names none marks nothing", () => {
-	const labels = (revert: PastChange) => labelChanges([change("3028506abcdef", "feat: skills"), revert], SHIPPED_DEFAULTS.changeLabels);
+	const labels = (revert: PastChange) => labelChanges([pastChange({ sha: "3028506abcdef", subject: "feat: skills" }), revert], SHIPPED_DEFAULTS.changeLabels);
 
-	expect(labels(change("54e7809", "revert!: roll back to router skills pattern (pre-3028506)")).get("3028506abcdef")).toBe("reverted");
-	expect(labels(change("54e7809", "revert!: roll back to router skills pattern")).get("3028506abcdef")).toBe("clean");
+	expect(labels(pastChange({ sha: "54e7809", subject: "revert!: roll back to router skills pattern (pre-3028506)" })).get("3028506abcdef")).toBe("reverted");
+	expect(labels(pastChange({ sha: "54e7809", subject: "revert!: roll back to router skills pattern" })).get("3028506abcdef")).toBe("clean");
 });

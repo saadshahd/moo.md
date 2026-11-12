@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { dispose, matchOption, NONE_OF_THESE, replyText } from "../src/decide/answer.ts";
+import { dispose, matchOption, replyText } from "../src/decide/answer.ts";
 import { type AskFacts, askDecision, composeQuestion, PLAIN_QUESTIONS, priorityOf, questionIssues, questionOrder, roomToAsk } from "../src/decide/question.ts";
 import { DAY_MS } from "../src/time.ts";
 
@@ -95,5 +95,4 @@ test("a dropped reply gives its reason and the options to answer with; an applie
 	const applied = dispose({ resolution: { source: "first-word", option: "change" }, answeredBefore: false, stage: "waiting" });
 
 	expect(replyText(1, applied, { source: "first-word", option: "change" }, OPTIONS, "change it")).toStartWith("Answer 1 applied: change.");
-	expect(NONE_OF_THESE).toBe("none of these");
 });

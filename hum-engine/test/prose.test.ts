@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentDecisionExhaustedError } from "@statelyai/agent";
 import { FakeProvider } from "../src/adapters/fake.ts";
-import type { Finished, Runner } from "../src/adapters/claude-p.ts";
 import { configuredModelCall, modelCallOver } from "../src/adapters/model-call.ts";
 import { alignedPlacement, AlignmentAnswer, raisesLevel } from "../src/decide/alignment.ts";
 import { declaredKind } from "../src/decide/kind.ts";
@@ -13,28 +12,13 @@ import { reviewInput } from "../src/decide/review.ts";
 import { openState } from "../src/state/open.ts";
 import { decideKind } from "../src/worker/kind.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
-import { configWith } from "./fixtures/config.ts";
+import { configWith, SHIM_MODEL } from "./fixtures/config.ts";
 import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
+import { finished, runnerOf } from "./fixtures/records.ts";
 
 const config = configWith();
 const levels = config.hum.levels;
 const KINDS = config.hum.kinds;
-
-const finished = (structured: Finished["structured"], models = ["claude-haiku-5-5"]): Finished => ({
-	kind: "finished",
-	subtype: "success",
-	isError: false,
-	sessionId: "s",
-	text: "",
-	structured,
-	tokens: 1,
-	cacheReadTokens: 0,
-	plugins: [],
-	keySource: undefined,
-	models,
-});
-
-const runnerOf = (run: Runner["run"]): Runner => ({ run, limitedUntil: () => 0 });
 
 const DIFF = ["diff --git a/src/a.ts b/src/a.ts", "--- a/src/a.ts", "+++ b/src/a.ts", "@@ -10,2 +10,3 @@", " keep", "+added", " keep", ""].join("\n");
 
@@ -86,7 +70,7 @@ test("a cheap model call that times out, or answers from a model id not measured
 
 	expect(await modelCallOver(hanging, { model: "m", timeoutMs: 5, trusts: trustsHaiku })(question)).toEqual({ kind: "abstained", why: "the call timed out" });
 
-	const answering = (models: string[]) => runnerOf(async () => finished(SOUND, models));
+	const answering = (models: string[]) => runnerOf(async () => finished({ structured: SOUND, models }));
 
 	expect(await modelCallOver(answering(["claude-sonnet-5-5"]), { model: "m", timeoutMs: 1000, trusts: trustsHaiku })(question)).toEqual({
 		kind: "abstained",
@@ -102,13 +86,13 @@ test("a model id is trusted at a boundary only when its measured rate meets minJ
 		raw.hum.measuredModels.kind = { "claude-haiku-5-5": 0.58 };
 	}).hum;
 
-	const asked = (models: string[]) => configuredModelCall(runnerOf(async () => finished(SOUND, models)), bar)({ boundary: "alignment", prompt: "grade", answer: AlignmentAnswer });
+	const asked = (models: string[]) => configuredModelCall(runnerOf(async () => finished({ structured: SOUND, models })), bar)({ boundary: "alignment", prompt: "grade", answer: AlignmentAnswer });
 
 	expect(await asked(["claude-haiku-5-5"])).toMatchObject({ kind: "picked" });
 	expect(await asked(["claude-sonnet-5-5"])).toMatchObject({ kind: "abstained" });
 	expect(await asked(["claude-opus-5-5"])).toMatchObject({ kind: "abstained" });
 
-	const belowBar = await configuredModelCall(runnerOf(async () => finished(SOUND)), bar)({ boundary: "kind", prompt: "kind", answer: AlignmentAnswer });
+	const belowBar = await configuredModelCall(runnerOf(async () => finished({ structured: SOUND, models: [SHIM_MODEL] })), bar)({ boundary: "kind", prompt: "kind", answer: AlignmentAnswer });
 
 	expect(belowBar).toMatchObject({ kind: "abstained" });
 });
@@ -129,15 +113,15 @@ test("the alignment grades raise a level at most one step, only when they move t
 
 test("a review asks for changes only by citing a changed line, a plan is ready only with a plan, and an unsure run takes the safer event", () => {
 	const cite = (file: string, line: number) => ({ file, line });
-	const review = (cites: { file: string; line: number }[], sure = true) => finished({ event: "request-changes", sure, reason: "It breaks the log.", cites });
+	const review = (cites: { file: string; line: number }[], sure = true) => finished({ structured: { event: "request-changes", sure, reason: "It breaks the log.", cites } });
 
 	expect(citesDiff([cite("src/a.ts", 11)], DIFF)).toBe(true);
 	expect(readPick("review", review([cite("src/a.ts", 11)]), DIFF)).toMatchObject({ ok: true, pick: { event: "request-changes" } });
 	expect(readPick("review", review([cite("src/a.ts", 40)]), DIFF)).toEqual({ ok: false, why: "request-changes must cite a file and a line the diff changes" });
 	expect(readPick("review", review([]), DIFF).ok).toBe(false);
-	expect(readPick("plan", finished({ event: "plan-ready", sure: true, reason: "clear" }), "")).toMatchObject({ ok: false });
-	expect(readPick("plan", finished({ event: "plan-ready", sure: false, reason: "two readings" }), "")).toMatchObject({ ok: true, pick: { event: "plan-blocked" } });
-	expect(readPick("review", finished({ event: "approve", sure: false, reason: "unsure" }), DIFF)).toMatchObject({ ok: true, pick: { event: "request-changes" } });
+	expect(readPick("plan", finished({ structured: { event: "plan-ready", sure: true, reason: "clear" } }), "")).toMatchObject({ ok: false });
+	expect(readPick("plan", finished({ structured: { event: "plan-ready", sure: false, reason: "two readings" } }), "")).toMatchObject({ ok: true, pick: { event: "plan-blocked" } });
+	expect(readPick("review", finished({ structured: { event: "approve", sure: false, reason: "unsure" } }), DIFF)).toMatchObject({ ok: true, pick: { event: "request-changes" } });
 });
 
 test("a pick that fails its check is refused twice with the reason fed back, then the decision throws for the machine's error path", async () => {
@@ -146,7 +130,7 @@ test("a pick that fails its check is refused twice with the reason fed back, the
 	const run = async (prompt: string) => {
 		prompts.push(prompt);
 
-		return finished({ event: "request-changes", sure: true, reason: "bad", cites: [{ file: "src/b.ts", line: 1 }] });
+		return finished({ structured: { event: "request-changes", sure: true, reason: "bad", cites: [{ file: "src/b.ts", line: 1 }] } });
 	};
 
 	await expect(decideProse({ purpose: "review", prompt: "Review it.", diff: DIFF, model: "m", run })).rejects.toBeInstanceOf(AgentDecisionExhaustedError);

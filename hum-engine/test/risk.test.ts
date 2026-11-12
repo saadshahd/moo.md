@@ -5,13 +5,16 @@ import { join } from "node:path";
 import { gitIn } from "../src/adapters/git.ts";
 import { changeOf, historiesOf, readHistory } from "../src/adapters/history.ts";
 
+import { createActor, waitFor } from "xstate";
+import { kindMachine } from "../src/config/machine.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
-import { labelChanges, matchedSample, type PastChange } from "../src/decide/labels.ts";
+import { labelChanges, matchedSample } from "../src/decide/labels.ts";
 import { isCleared, landingOf, routeOf } from "../src/decide/merge.ts";
 import { reviewInput } from "../src/decide/review.ts";
 import { type Change, type Histories, type Label, placeChange, type Policy, usualSize } from "../src/decide/risk.ts";
 import { ruleGlobFor } from "../src/worker/land.ts";
 import { configWith } from "./fixtures/config.ts";
+import { pastChange } from "./fixtures/records.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 
@@ -45,10 +48,7 @@ test("prototyping, a low-risk UI tweak: merged on green, no question", () => {
 	expect(landingOf(false, isCleared(route, { review: false, owner: false }))).toEqual({ via: "push" });
 });
 
-test("a break after merge on a low path becomes follow-up work that counts toward the limit, and blocks on a critical path", () => {
-	const [low, , , critical] = config.hum.levels;
-
-	expect([low?.onBreak, critical?.onBreak]).toEqual(["follow-up", "block"]);
+test("follow-ups up to a path's limit leave its level", () => {
 	expect(levelOf(change(["ui/a.tsx"]), undefined, labelled("ui/**", ["fixed", "clean", "clean", "clean"]))).toBe("low");
 });
 
@@ -103,11 +103,16 @@ test("a change touching a folder no rule places is unclear at the level of the r
 	expect(levelOf(change(["only/new.ts"]))).toBe("low");
 });
 
-test("an urgent security fix on a critical path runs the hotfix kind's own states, straight to the owner's review", () => {
-	const { states } = config.kinds.hotfix!.machine;
+test("an urgent security fix on a critical path runs the hotfix kind's own states, straight to the owner's review", async () => {
+	const visited = new Set<string>();
+	const hotfix = createActor(kindMachine(config.kinds.hotfix!));
 
-	expect(states.checking?.invoke?.onDone).toEqual([{ target: "owner-review" }]);
-	expect(Object.keys(states)).not.toContain("reviewing");
+	hotfix.subscribe((snapshot) => void visited.add(String(snapshot.value)));
+	hotfix.start();
+	await waitFor(hotfix, (snapshot) => snapshot.value === "owner-review");
+	hotfix.stop();
+
+	expect([...visited]).toEqual(["building", "checking", "owner-review"]);
 	expect(routeOf(place(change(["billing/tax.ts"])), policy().paths, "hotfix", ["billing/tax.ts"]).mergesAlone).toBe(false);
 });
 
@@ -146,37 +151,38 @@ test("a diff loosens a check by an added skip or lint disable, or a removed test
 	expect(facts(diff("docs/a.md", ["+one", "-two"]))).toMatchObject({ paths: ["docs/a.md"], size: 2 });
 });
 
-const past = (sha: string, subject: string, files: string[], over: Partial<PastChange> = {}): PastChange => ({ sha: sha.repeat(40).slice(0, 40), subject, body: "", files, size: 10, blamed: [], ...over });
+/** A full commit sha of one repeated character, as a revert trailer names it. */
+const sha = (char: string): string => char.repeat(40);
 
 test("a change is reverted by a trailer or a title, fixed by a fix in its window that names it or rewrites its lines, and clean otherwise", () => {
-	const a = past("a", "feat: a", ["x.ts"]);
-	const b = past("b", "feat: b", ["y.ts"]);
-	const c = past("c", "feat: c", ["z.ts"]);
-	const d = past("d", "feat: d", ["w.ts"]);
+	const a = pastChange({ sha: sha("a"), subject: "feat: a", files: ["x.ts"] });
+	const b = pastChange({ sha: sha("b"), subject: "feat: b", files: ["y.ts"] });
+	const c = pastChange({ sha: sha("c"), subject: "feat: c", files: ["z.ts"] });
+	const d = pastChange({ sha: sha("d"), subject: "feat: d", files: ["w.ts"] });
 
 	const later = [
-		past("1", "Revert \"feat: a\"", ["x.ts"]),
-		past("2", "chore: undo", ["y.ts"], { body: `This reverts commit ${"b".repeat(40)}.` }),
-		past("3", "fix: z again", ["z.ts"], { body: `After ${"c".repeat(7)}.` }),
-		past("4", "fix(w): edge", ["w.ts"], { blamed: [d.sha] }),
+		pastChange({ sha: sha("1"), subject: "Revert \"feat: a\"", files: ["x.ts"] }),
+		pastChange({ sha: sha("2"), subject: "chore: undo", files: ["y.ts"], body: `This reverts commit ${sha("b")}.` }),
+		pastChange({ sha: sha("3"), subject: "fix: z again", files: ["z.ts"], body: `After ${"c".repeat(7)}.` }),
+		pastChange({ sha: sha("4"), subject: "fix(w): edge", files: ["w.ts"], blamed: [d.sha] }),
 	];
 
 	const labels = labelChanges([a, b, c, d, ...later], SHIPPED_DEFAULTS.changeLabels);
 
 	expect([a, b, c, d].map((x) => labels.get(x.sha))).toEqual(["reverted", "reverted", "fixed", "fixed"]);
 
-	const busy = Array.from({ length: 10 }, (_, i) => past(String(i), `feat: ${i}`, ["w.ts"]));
-	const late = labelChanges([d, ...busy, past("e", "fix: late", ["w.ts"], { blamed: [d.sha] })], SHIPPED_DEFAULTS.changeLabels);
-	const notAFix = labelChanges([d, past("f", "feat: rework", ["w.ts"], { blamed: [d.sha] })], SHIPPED_DEFAULTS.changeLabels);
+	const busy = Array.from({ length: 10 }, (_, i) => pastChange({ sha: sha(String(i)), subject: `feat: ${i}`, files: ["w.ts"] }));
+	const late = labelChanges([d, ...busy, pastChange({ sha: sha("e"), subject: "fix: late", files: ["w.ts"], blamed: [d.sha] })], SHIPPED_DEFAULTS.changeLabels);
+	const notAFix = labelChanges([d, pastChange({ sha: sha("f"), subject: "feat: rework", files: ["w.ts"], blamed: [d.sha] })], SHIPPED_DEFAULTS.changeLabels);
 
 	expect([late.get(d.sha), notAFix.get(d.sha)]).toEqual(["clean", "clean"]);
 });
 
 test("the sample is every broken change plus, for each, the clean change on the same top folders nearest in size, each taken once", () => {
-	const broken = past("a", "feat: a", ["ui/x.ts"], { size: 40 });
-	const near = past("b", "feat: b", ["ui/y.ts"], { size: 38 });
-	const far = past("c", "feat: c", ["ui/z.ts"], { size: 400 });
-	const elsewhere = past("d", "feat: d", ["docs/x.md"], { size: 40 });
+	const broken = pastChange({ sha: sha("a"), subject: "feat: a", files: ["ui/x.ts"], size: 40 });
+	const near = pastChange({ sha: sha("b"), subject: "feat: b", files: ["ui/y.ts"], size: 38 });
+	const far = pastChange({ sha: sha("c"), subject: "feat: c", files: ["ui/z.ts"], size: 400 });
+	const elsewhere = pastChange({ sha: sha("d"), subject: "feat: d", files: ["docs/x.md"], size: 40 });
 	const labels = new Map<string, Label>([[broken.sha, "fixed"], [near.sha, "clean"], [far.sha, "clean"], [elsewhere.sha, "clean"]]);
 
 	expect(matchedSample([broken, near, far, elsewhere], labels).map(({ sha }) => sha[0])).toEqual(["a", "b"]);

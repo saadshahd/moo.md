@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FollowUp, ItemRef, WorkSource } from "../src/adapter-api.ts";
 import { modelCallOver } from "../src/adapters/model-call.ts";
-import type { Finished, Runner } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { checkNameOf, fileChecks, filedFrom } from "../src/loop/check-item.ts";
 import { groupNotes } from "../src/loop/groups.ts";
@@ -16,7 +15,7 @@ import { noteKey, type ReviewNote } from "../src/loop/records.ts";
 import { pairing, prepare } from "../src/loop/signals.ts";
 import { openState } from "../src/state/open.ts";
 import { z } from "zod";
-import type { PastChange } from "../src/decide/labels.ts";
+import { finished, pastChange, reviewNote, runnerOf } from "./fixtures/records.ts";
 
 const folders: string[] = [];
 
@@ -32,7 +31,6 @@ afterEach(() => {
 	for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const note = (over: Partial<ReviewNote> = {}): ReviewNote => ({ source: "review-comment", sourceId: "1", change: "c1", hunk: "", text: "Use a lookup table.", at: 1, ...over });
 
 const hunk = (...lines: string[]): string => ["@@ -1,2 +1,2 @@", ...lines].join("\n");
 
@@ -58,10 +56,8 @@ test("an applied answer other than an approval is a note; an approval and a drop
 });
 
 test("a revert and a fix are notes about the change they break, with the hunk they made", async () => {
-	const change = (sha: string, subject: string, files: string[], extra: Partial<PastChange> = {}): PastChange => ({ sha, subject, body: "", files, size: 1, blamed: [], ...extra });
-
 	const notes = await breakNotes(
-		[change("aaaaaaa", "feat: a", ["src/a.ts"]), change("bbbbbbb", 'Revert "feat: a"', ["src/a.ts"], { committedAt: 5 }), change("ccccccc", "feat: c", ["src/c.ts"])],
+		[pastChange({ sha: "aaaaaaa", subject: "feat: a", files: ["src/a.ts"] }), pastChange({ sha: "bbbbbbb", subject: 'Revert "feat: a"', files: ["src/a.ts"], committedAt: 5 }), pastChange({ sha: "ccccccc", subject: "feat: c", files: ["src/c.ts"] })],
 		SHIPPED_DEFAULTS.changeLabels,
 		async (sha) => `hunk of ${sha}`,
 	);
@@ -72,22 +68,22 @@ test("a revert and a fix are notes about the change they break, with the hunk th
 test("a note is saved once: reading the same source id again adds nothing", () => {
 	const state = freshState();
 
-	expect(saveNotes(state, [note({ sourceId: "1" }), note({ sourceId: "2" })])).toHaveLength(2);
-	expect(saveNotes(state, [note({ sourceId: "1" }), note({ sourceId: "3" })]).map(({ sourceId }) => sourceId)).toEqual(["3"]);
+	expect(saveNotes(state, [reviewNote({ sourceId: "1" }), reviewNote({ sourceId: "2" })])).toHaveLength(2);
+	expect(saveNotes(state, [reviewNote({ sourceId: "1" }), reviewNote({ sourceId: "3" })]).map(({ sourceId }) => sourceId)).toEqual(["3"]);
 });
 
 test("each signal pairs the notes it should, and names itself", () => {
 	const user = hunk("-const user = fetchUser(id);", "+const user = await fetchUser(id);");
 	const declare = hunk("+export const parseThing = (text: string) => text.trim();");
 
-	expect(signalOf(note({ text: "Use a lookup table." }), note({ text: "use a  lookup-table" }))).toBe("same-text");
-	expect(signalOf(note({ text: "Prefer `isReady` here" }), note({ text: "Same: `isReady`, not a flag" }))).toBe("same-code");
-	expect(signalOf(note({ text: "Wrap fetchUser in a retry.", file: "src/a.ts", hunk: user }), note({ sourceId: "2", change: "c2", text: "fetchUser needs a timeout.", file: "src/b.ts", hunk: user }))).toBe("shared-identifier");
-	expect(signalOf(note({ text: "Name this better.", file: "src/a.ts", hunk: declare }), note({ sourceId: "2", change: "c2", text: "Too clever.", file: "src/b.ts", hunk: declare }))).toBe("same-glob-symbol");
+	expect(signalOf(reviewNote({ text: "Use a lookup table." }), reviewNote({ text: "use a  lookup-table" }))).toBe("same-text");
+	expect(signalOf(reviewNote({ text: "Prefer `isReady` here" }), reviewNote({ text: "Same: `isReady`, not a flag" }))).toBe("same-code");
+	expect(signalOf(reviewNote({ text: "Wrap fetchUser in a retry.", file: "src/a.ts", hunk: user }), reviewNote({ sourceId: "2", change: "c2", text: "fetchUser needs a timeout.", file: "src/b.ts", hunk: user }))).toBe("shared-identifier");
+	expect(signalOf(reviewNote({ text: "Name this better.", file: "src/a.ts", hunk: declare }), reviewNote({ sourceId: "2", change: "c2", text: "Too clever.", file: "src/b.ts", hunk: declare }))).toBe("same-glob-symbol");
 	expect(
 		signalOf(
-			note({ source: "fix", text: "fix: a", file: "src/a.ts", hunk: hunk("-const a = load(1);", "+const a = load(2);") }),
-			note({ source: "revert", sourceId: "2", text: "undo that", file: "src/b.ts", hunk: hunk("-const b = read(3);", "+const b = read(4);") }),
+			reviewNote({ source: "fix", text: "fix: a", file: "src/a.ts", hunk: hunk("-const a = load(1);", "+const a = load(2);") }),
+			reviewNote({ source: "revert", sourceId: "2", text: "undo that", file: "src/b.ts", hunk: hunk("-const b = read(3);", "+const b = read(4);") }),
 		),
 	).toBe("same-code-pattern");
 });
@@ -95,11 +91,11 @@ test("each signal pairs the notes it should, and names itself", () => {
 test("different notes on the same file pair under no signal", () => {
 	const same = { file: "src/a.ts", hunk: hunk("+const total = add(a, b);") };
 
-	expect(signalOf(note({ ...same, text: "Add a test for add." }), note({ ...same, sourceId: "2", text: "This name hides what it does." }))).toBeUndefined();
+	expect(signalOf(reviewNote({ ...same, text: "Add a test for add." }), reviewNote({ ...same, sourceId: "2", text: "This name hides what it does." }))).toBeUndefined();
 });
 
 test("a hunk in a language the parser cannot read leaves the signals that need a parse visibly unapplied", () => {
-	const found = pairing(prepare(note({ file: "README.md", hunk: hunk("+text"), text: "One." })), prepare(note({ file: "README.md", hunk: hunk("+text"), text: "Two." })));
+	const found = pairing(prepare(reviewNote({ file: "README.md", hunk: hunk("+text"), text: "One." })), prepare(reviewNote({ file: "README.md", hunk: hunk("+text"), text: "Two." })));
 
 	expect(found.unapplied).toEqual(["shared-identifier", "same-glob-symbol"]);
 });
@@ -121,21 +117,21 @@ const group = async (notes: ReviewNote[], answer: Parameters<typeof proposer>[0]
 };
 
 test("the model sees only notes no signal pairs; a trusted proposal joins the group", async () => {
-	const { state, asked } = await group([note({ sourceId: "1", at: 1, text: "Use a lookup table." }), note({ sourceId: "2", at: 2, text: "use a lookup-table" }), note({ sourceId: "3", at: 3, text: "Cache the result." })], { same: true, models: ["m"] }, true);
+	const { state, asked } = await group([reviewNote({ sourceId: "1", at: 1, text: "Use a lookup table." }), reviewNote({ sourceId: "2", at: 2, text: "use a lookup-table" }), reviewNote({ sourceId: "3", at: 3, text: "Cache the result." })], { same: true, models: ["m"] }, true);
 
 	expect(asked).toEqual(["1~3"]);
 	expect(state.repeats.list().map(({ notes }) => notes.length)).toEqual([3]);
 });
 
 test("a proposal from a model below the owner's bar waits as a possible repeat and files nothing", async () => {
-	const { state } = await group([note({ sourceId: "1", at: 1, text: "Use a lookup table." }), note({ sourceId: "2", at: 2, text: "Cache the result." })], { same: true, models: ["m"] }, false);
+	const { state } = await group([reviewNote({ sourceId: "1", at: 1, text: "Use a lookup table." }), reviewNote({ sourceId: "2", at: 2, text: "Cache the result." })], { same: true, models: ["m"] }, false);
 
 	expect(state.repeats.list()).toHaveLength(2);
 	expect(state.possibleRepeats.list()).toHaveLength(1);
 });
 
 test("a model that abstains proposes nothing", async () => {
-	const { state } = await group([note({ sourceId: "1", at: 1 }), note({ sourceId: "2", at: 2, text: "Cache the result." })], undefined, true);
+	const { state } = await group([reviewNote({ sourceId: "1", at: 1 }), reviewNote({ sourceId: "2", at: 2, text: "Cache the result." })], undefined, true);
 
 	expect(state.possibleRepeats.list()).toHaveLength(0);
 	expect(state.repeats.list()).toHaveLength(2);
@@ -153,7 +149,7 @@ const fakeSource = () => {
 
 	const workSource = {
 		fileFollowUp: async (from: string, followUp: FollowUp): Promise<ItemRef> => {
-			if (!filed.some((found) => found.from === from && found.followUp.title === followUp.title)) filed.push({ from, followUp });
+			filed.push({ from, followUp });
 
 			return { id: `${from}-item`, title: followUp.title };
 		},
@@ -168,7 +164,7 @@ const filing = { repeatAt: 2, checkKind: "check" };
 test("two matching notes file one check item, a third joins it as a comment, and a rerun files nothing", async () => {
 	const state = freshState();
 	const { workSource, filed, commented } = fakeSource();
-	const notes = [note({ sourceId: "1", at: 1 }), note({ sourceId: "2", at: 2 })];
+	const notes = [reviewNote({ sourceId: "1", at: 1 }), reviewNote({ sourceId: "2", at: 2 })];
 
 	saveNotes(state, notes);
 	await groupNotes({ state, propose: async () => undefined, trusts: () => true, onUnapplied: () => {} }, notes);
@@ -177,9 +173,9 @@ test("two matching notes file one check item, a third joins it as a comment, and
 
 	expect(filed).toHaveLength(1);
 	expect(filed[0]?.followUp.body).toContain("Kind: check");
-	expect(filed[0]?.followUp.body).toContain(checkNameOf(noteKey(note({ sourceId: "1" }))));
+	expect(filed[0]?.followUp.body).toContain(checkNameOf(noteKey(reviewNote({ sourceId: "1" }))));
 
-	const third = note({ sourceId: "3", at: 3, text: "use a lookup table" });
+	const third = reviewNote({ sourceId: "3", at: 3, text: "use a lookup table" });
 
 	saveNotes(state, [third]);
 	await groupNotes({ state, propose: async () => undefined, trusts: () => true, onUnapplied: () => {} }, [third]);
@@ -187,13 +183,13 @@ test("two matching notes file one check item, a third joins it as a comment, and
 	await fileChecks({ state, workSource, ...filing });
 
 	expect(filed).toHaveLength(1);
-	expect(commented.map(({ id }) => id)).toEqual([`${filedFrom(noteKey(note({ sourceId: "1" })))}-item`]);
+	expect(commented.map(({ id }) => id)).toEqual([`${filedFrom(noteKey(reviewNote({ sourceId: "1" })))}-item`]);
 });
 
 const filedGroup = async () => {
 	const state = freshState();
 	const { workSource, filed } = fakeSource();
-	const notes = [note({ sourceId: "1", at: 1 }), note({ sourceId: "2", at: 2 })];
+	const notes = [reviewNote({ sourceId: "1", at: 1 }), reviewNote({ sourceId: "2", at: 2 })];
 
 	saveNotes(state, notes);
 	await groupNotes({ state, propose: async () => undefined, trusts: () => true, onUnapplied: () => {} }, notes);
@@ -226,14 +222,14 @@ test("a note that comes after the check ran reopens it as a miss, once, and memo
 	folders.push(dir);
 	const memoryPath = join(dir, "memory.md");
 
-	await Bun.write(memoryPath, `- Use a lookup table (source: ${noteKey(note({ sourceId: "1" }))})\n- a rule with no source\n- Name things (source: elsewhere)\n`);
+	await Bun.write(memoryPath, `- Use a lookup table (source: ${noteKey(reviewNote({ sourceId: "1" }))})\n- a rule with no source\n- Name things (source: elsewhere)\n`);
 	state.repeats.put(held.key, { ...held, checked: { at: 5, check: checkNameOf(held.key) } });
-	saveNotes(state, [note({ sourceId: "9", at: 9, text: "use a lookup table again" })]);
+	saveNotes(state, [reviewNote({ sourceId: "9", at: 9, text: "use a lookup table again" })]);
 	const current = state.repeats.get(held.key);
 
 	if (!current) throw new Error("the group is gone");
 
-	state.repeats.put(held.key, { ...current, notes: [...held.notes, noteKey(note({ sourceId: "9" }))] });
+	state.repeats.put(held.key, { ...current, notes: [...held.notes, noteKey(reviewNote({ sourceId: "9" }))] });
 
 	await closeLoop({ state, workSource, memoryPath });
 	await closeLoop({ state, workSource, memoryPath });
@@ -256,18 +252,13 @@ test("memory.md shows runs its entries while they fit its byte cap, refuses a li
 	expect(unusedEntries([...held, { rule: "Fresh", source: "s" }], new Map([["Fresh", 95]]), 100, 20)).toEqual(held);
 });
 
-const runnerSpending = (structured: { kind: string }, tokens: number): Runner => ({
-	limitedUntil: () => 0,
-	run: async () => ({ kind: "finished", subtype: "success", isError: false, sessionId: "s", text: "", structured, tokens, cacheReadTokens: 0, plugins: [], keySource: undefined, models: ["m"] }) satisfies Finished,
-});
-
 test("a model call tells what it spent for the item it served, whether it was trusted or not", async () => {
 	const spent: [string, number][] = [];
 	const question = { boundary: "kind" as const, prompt: "p", answer: z.strictObject({ kind: z.string() }), item: "a" };
 	const options = { model: "m", timeoutMs: 1000, onSpent: (item: string, tokens: number) => void spent.push([item, tokens]) };
 
-	await modelCallOver(runnerSpending({ kind: "docs" }, 5000), { ...options, trusts: () => true })(question);
-	await modelCallOver(runnerSpending({ kind: "docs" }, 4000), { ...options, trusts: () => false })(question);
+	await modelCallOver(runnerOf(async () => finished({ structured: { kind: "docs" }, tokens: 5000 })), { ...options, trusts: () => true })(question);
+	await modelCallOver(runnerOf(async () => finished({ structured: { kind: "docs" }, tokens: 4000 })), { ...options, trusts: () => false })(question);
 
 	expect(spent).toEqual([["a", 5000], ["a", 4000]]);
 });
