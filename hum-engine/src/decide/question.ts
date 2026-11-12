@@ -38,9 +38,9 @@ export type AskDecision =
 	| { readonly action: "ask"; readonly reason: AskReason; readonly confirmed: boolean }
 	| { readonly action: "decide"; readonly choice: string; readonly over: readonly string[] };
 
-/** A choice is cheap to undo when every option touches only the change's own files, on a level where that is safe. */
-const isCheapChoice = ({ options = [], default: chosen }: RunReason, { changedPaths, level, undoableLevels }: AskFacts): boolean =>
-	options.some(({ word }) => word === chosen) && undoableLevels.includes(level) && options.every(({ paths }) => paths.every((path) => changedPaths.includes(path)));
+/** The run's own pick, when the choice is cheap to undo: every option touches only the change's own files, on a level where that is safe. */
+const cheapPick = ({ options = [], default: chosen }: RunReason, { changedPaths, level, undoableLevels }: AskFacts): string | undefined =>
+	undoableLevels.includes(level) && options.every(({ paths }) => paths.every((path) => changedPaths.includes(path))) ? options.find(({ word }) => word === chosen)?.word : undefined;
 
 const CONFIRMS: Readonly<Record<AskReason, (reason: RunReason, facts: AskFacts) => boolean>> = {
 	"missing-secret": ({ variable }, { runnerVariables }) => variable !== undefined && !runnerVariables.has(variable),
@@ -53,9 +53,9 @@ const CONFIRMS: Readonly<Record<AskReason, (reason: RunReason, facts: AskFacts) 
 
 /** Whether the owner is asked: a reason the facts cannot confirm still asks, and a cheap choice is made without them. */
 export const askDecision = (reason: RunReason, facts: AskFacts): AskDecision => {
-	if (reason.kind === "choice" && isCheapChoice(reason, facts)) {
-		return { action: "decide", choice: reason.default ?? "", over: (reason.options ?? []).map(({ word }) => word) };
-	}
+	const choice = reason.kind === "choice" ? cheapPick(reason, facts) : undefined;
+
+	if (choice !== undefined) return { action: "decide", choice, over: (reason.options ?? []).map(({ word }) => word) };
 
 	return { action: "ask", reason: reason.kind, confirmed: CONFIRMS[reason.kind](reason, facts) };
 };
