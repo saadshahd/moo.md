@@ -2,10 +2,10 @@ import { cells, ellipsize, rowCells, spaces } from "./cells.ts";
 import { GLYPHS } from "./glyphs.ts";
 import { type Press, type Row, type Span, span } from "./row.ts";
 
-export const BUTTON_GAP = 2;
+const BUTTON_GAP = 2;
 
 /** The primary action is filled and capped, `▐ label ▌`; any other is its label in dim text, one cell clear on each side. */
-export const button = (label: string, press: Press, isPrimary: boolean): Span =>
+export const button = ({ label, press, isPrimary }: { readonly label: string; readonly press: Press; readonly isPrimary: boolean }): Span =>
 	isPrimary ? span(`${GLYPHS.capLeft} ${label} ${GLYPHS.capRight}`, "filled", press) : span(` ${label} `, "dim", press);
 
 /**

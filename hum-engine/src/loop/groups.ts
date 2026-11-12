@@ -5,7 +5,7 @@ import { noteKey, type RepeatGroup, type ReviewNote } from "./records.ts";
 import { type Pairing, pairing, prepare } from "./signals.ts";
 
 /** A model's answer to whether two notes state one rule; `undefined` when it abstained. */
-export type Proposal = { readonly same: boolean; readonly models: readonly string[] } | undefined;
+type Proposal = { readonly same: boolean; readonly models: readonly string[] } | undefined;
 
 export type Proposer = (a: ReviewNote, b: ReviewNote) => Promise<Proposal>;
 
@@ -56,15 +56,22 @@ const join = (state: State, group: RepeatGroup, key: string): RepeatGroup => {
 	return joined;
 };
 
-/** Joins the groups the note pairs with into the oldest one. */
+const isFiled = (group: RepeatGroup): boolean => group.item !== undefined;
+
+/**
+ * Joins the groups the note pairs with into one: the oldest with a filed check item, else the oldest. Only groups
+ * with no item merge into it; a group whose item is filed stays whole, so no filed item loses the group it proves.
+ */
 const mergeInto = (state: State, groups: readonly RepeatGroup[], key: string): void => {
-	const [oldest, ...rest] = groups.toSorted(byAge(state));
+	const oldestFirst = groups.toSorted(byAge(state));
+	const target = oldestFirst.find(isFiled) ?? oldestFirst[0];
 
-	if (!oldest) return;
+	if (!target) return;
 
-	const merged = { ...oldest, notes: [...new Set([oldest, ...rest].flatMap(({ notes }) => notes))], commented: [...new Set([oldest, ...rest].flatMap(({ commented }) => commented))] };
+	const absorbed = oldestFirst.filter((group) => group !== target && !isFiled(group));
+	const merged = { ...target, notes: [...new Set([target, ...absorbed].flatMap(({ notes }) => notes))] };
 
-	for (const other of rest) state.repeats.remove(other.key);
+	for (const other of absorbed) state.repeats.remove(other.key);
 
 	join(state, merged, key);
 };

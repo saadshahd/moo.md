@@ -1,11 +1,14 @@
 import { z } from "zod";
+import { gitHubClient } from "../../src/adapters/github-client.ts";
+import { gitHubPullRequests, type PullRequests } from "../../src/adapters/pull-requests.ts";
 import type { Json } from "../../src/config/json.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 
 type Issue = { number: number; title: string; body: string; state: "OPEN" | "CLOSED"; labels: string[] };
 
 type Comment = { body: string; createdAt: string };
 
-type Pull = { id: string; head: string; base: string; title: string; state: "OPEN" | "MERGED" };
+type Pull = { id: string; number: number; head: string; base: string; title: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND" };
 
 type Commit = { message: string; tree: string; parents: string[] };
 
@@ -40,24 +43,31 @@ const Posted = z.object({ message: z.string(), tree: z.string(), parents: z.arra
 const REPOSITORY_ID = "R_fake";
 const TOKENS = new Set(["token fake-token", "bearer fake-token"]);
 
+/** A pull request as GitHub's GraphQL answers it. */
+const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
+	id,
+	number,
+	url: `https://github.com/me/scratch/pull/${number}`,
+	state,
+	mergeStateStatus: status,
+	autoMergeRequest: autoMerge ? { enabledAt: "2026-11-08T00:00:00Z" } : null,
+});
+
 const json = (status: number, value: Json, headers: Record<string, string> = {}) =>
 	new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", ...headers } });
 
-/** A GraphQL error GitHub would report in the reply's `errors`. */
-class GraphqlFailure extends Error {
-	constructor(readonly graphql: GraphqlError) {
-		super(graphql.message);
-	}
+/** A GraphQL error GitHub would report in the reply's `errors`, which an operation answers in place of its data. */
+class Refused {
+	constructor(readonly graphql: GraphqlError) {}
 }
 
-const failed = (type: string, message: string): never => {
-	throw new GraphqlFailure({ type, message });
-};
+const refused = (type: string, message: string): Refused => new Refused({ type, message });
 
 /**
  * An in-memory GitHub for one repo, behind a `fetch`: the GraphQL operations the adapter sends, by name, and the two
  * REST calls it keeps. It keeps what the adapter leans on: an issue list ETag that moves on any write, 304s that
- * spend no rate limit, refs that refuse a second create, and commits on a branch that refuse a stale head.
+ * spend no rate limit, refs that refuse a second create, and commits on a branch that refuse a stale head. A new pull
+ * request waits on its required checks (`BLOCKED`); `checksPass` makes it `CLEAN`, and merges it when auto-merge is on, as GitHub does.
  */
 export class FakeGitHub {
 	readonly repo = "me/scratch";
@@ -68,10 +78,16 @@ export class FakeGitHub {
 	#refs = new Map<string, string>([["refs/heads/main", "c0"]]);
 	#commits = new Map<string, Commit>([["c0", { message: "base", tree: "t0", parents: [] }]]);
 	#pulls: Pull[] = [];
+	#pullComments: string[] = [];
+	/** The base branch's rules ask for a pull request with passing checks. */
+	requiresPullRequest = false;
+	allowAutoMerge = true;
 	#version = 1;
 	#tick = 0;
 	/** Each request: `GET /path?query` for REST, `graphql <operation>` for GraphQL. */
 	readonly requests: string[] = [];
+	/** Every call to `fetch`, a refused or failed one too. */
+	fetched = 0;
 	/** The next `count` requests answer 502. */
 	failures = 0;
 	/** GraphQL operations whose next request answers 502. */
@@ -82,6 +98,8 @@ export class FakeGitHub {
 		const url = new URL(String(input));
 		const method = init?.method ?? "GET";
 		const headers = new Headers(init?.headers);
+
+		this.fetched++;
 
 		if (this.failures > 0) {
 			this.failures--;
@@ -111,7 +129,9 @@ export class FakeGitHub {
 
 	/** A person's comment on an issue. */
 	say(number: number, text: string): void {
-		this.#commentOn(number, text);
+		const refusal = this.#commentOn(number, text);
+
+		if (refusal) throw new Error(refusal.graphql.message);
 	}
 
 	/** A branch, as `git push` would make it. */
@@ -131,14 +151,53 @@ export class FakeGitHub {
 		return this.#comments.get(number) ?? [];
 	}
 
-	#issue(number: number | undefined): Issue {
-		return this.#issues.find((found) => found.number === number) ?? failed("NOT_FOUND", `Could not resolve to an Issue with the number of ${number}.`);
+	/** The body of each pull request comment, in order. */
+	pullComments(): readonly string[] {
+		return this.#pullComments;
 	}
 
-	#commentOn(number: number, text: string): void {
-		this.#issue(number);
+	/** The required checks pass: an armed pull request merges, any other may merge now. */
+	checksPass(number: number): void {
+		const pull = this.#pulls.find((found) => found.number === number);
+
+		if (pull) Object.assign(pull, pull.autoMerge ? { state: "MERGED" } : { status: "CLEAN" });
+	}
+
+	client(): PullRequests {
+		const client = gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+
+		return gitHubPullRequests(this.repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: async () => client });
+	}
+
+	#pull(id: string | undefined, change: Partial<Pull>, mutation: string): Json | Refused {
+		const pull = this.#pulls.find((found) => found.id === id);
+
+		if (!pull) return refused("NOT_FOUND", `no pull ${id}`);
+
+		Object.assign(pull, change);
+
+		return { [mutation]: { clientMutationId: null } };
+	}
+
+	#armRefusal(id: string | undefined): Refused | undefined {
+		if (!this.allowAutoMerge) return refused("UNPROCESSABLE", "Pull request Auto merge is not allowed for this repository");
+
+		return this.#pulls.find((found) => found.id === id)?.status === "CLEAN" ? refused("UNPROCESSABLE", "Pull request Pull request is in clean status") : undefined;
+	}
+
+	#issue(number: number | undefined): Issue | Refused {
+		return this.#issues.find((found) => found.number === number) ?? refused("NOT_FOUND", `Could not resolve to an Issue with the number of ${number}.`);
+	}
+
+	#commentOn(number: number, text: string): Refused | undefined {
+		const issue = this.#issue(number);
+
+		if (issue instanceof Refused) return issue;
+
 		this.#comments.set(number, [...this.comments(number), { body: text, createdAt: new Date(1_700_000_000_000 + ++this.#tick * 1000).toISOString() }]);
 		this.#version++;
+
+		return undefined;
 	}
 
 	#commitTarget(ref: string | undefined) {
@@ -174,30 +233,30 @@ export class FakeGitHub {
 				refs: this.#claims(v.claimRefs ?? ""),
 			},
 		}),
-		Item: (v) => ({
-			repository: {
-				issue: { ...this.#issueNode(this.#issue(v.number)), comments: { nodes: [...this.comments(v.number ?? 0)], pageInfo: { hasNextPage: false, endCursor: null } } },
-				ref: this.#commitTarget(v.claimRef),
-			},
-		}),
+		Item: (v) => {
+			const issue = this.#issue(v.number);
+
+			return issue instanceof Refused
+				? issue
+				: {
+						repository: {
+							issue: { ...this.#issueNode(issue), comments: { nodes: [...this.comments(issue.number)], pageInfo: { hasNextPage: false, endCursor: null } } },
+							ref: this.#commitTarget(v.claimRef),
+						},
+					};
+		},
 		Claim: (v) => ({ repository: { ref: this.#commitTarget(v.claimRef) } }),
-		IssueState: (v) => ({ repository: { issue: this.#issueNode(this.#issue(v.number)) } }),
+		IssueState: (v) => {
+			const issue = this.#issue(v.number);
+
+			return issue instanceof Refused ? issue : { repository: { issue: this.#issueNode(issue) } };
+		},
 		Base: (v) => ({ repository: { id: REPOSITORY_ID, ref: this.#commitTarget(v.baseRef) } }),
 		Label: (v) => ({ repository: { id: REPOSITORY_ID, label: this.#labels.has(v.label ?? "") ? { id: `L_${v.label}` } : null } }),
-		Pulls: (v) => ({
-			repository: {
-				id: REPOSITORY_ID,
-				issue: { title: this.#issue(v.number).title },
-				pullRequests: { nodes: this.#pulls.filter((pull) => pull.head === v.head).map(({ id, state }) => ({ id, state })) },
-			},
-		}),
-		AddComment: (v) => {
-			this.#commentOn(Number(v.subject?.slice("I_".length)), v.body ?? "");
-
-			return { addComment: { clientMutationId: null } };
-		},
+		PullsFrom: (v) => ({ repository: { id: REPOSITORY_ID, pullRequests: { nodes: this.#pulls.filter((pull) => pull.head === v.head).toReversed().slice(0, 1).map(pullNode) } } }),
+		AddComment: (v) => this.#commentOn(Number(v.subject?.slice("I_".length)), v.body ?? "") ?? { addComment: { clientMutationId: null } },
 		CreateRef: (v) => {
-			if (this.#refs.has(v.name ?? "")) failed("UNPROCESSABLE", `A ref named "${v.name}" already exists in the repository.`);
+			if (this.#refs.has(v.name ?? "")) return refused("UNPROCESSABLE", `A ref named "${v.name}" already exists in the repository.`);
 
 			this.#refs.set(v.name ?? "", v.oid ?? "");
 
@@ -207,7 +266,7 @@ export class FakeGitHub {
 			const ref = `refs/heads/${v.branch?.branchName}`;
 			const head = this.#refs.get(ref);
 
-			if (head !== v.expected) failed("STALE_DATA", `Expected branch to point to "${v.expected}" but it did not.  Pull and try again.`);
+			if (head !== v.expected) return refused("STALE_DATA", `Expected branch to point to "${v.expected}" but it did not.  Pull and try again.`);
 
 			const message = [v.message?.headline, v.message?.body].filter(Boolean).join("\n\n");
 
@@ -223,41 +282,43 @@ export class FakeGitHub {
 		RecentIssues: () => ({ repository: { issues: { nodes: this.#issues.toReversed().slice(0, 20).map(({ number, title, body }) => ({ number, title, body })) } } }),
 		CreateIssue: (v) => {
 			const number = this.seed(v.title ?? "", { label: (v.labels?.[0] ?? "").slice("L_".length) });
+			const issue = this.#issue(number);
 
-			Object.assign(this.#issue(number), { body: v.body ?? "" });
+			if (issue instanceof Refused) return issue;
+
+			issue.body = v.body ?? "";
 
 			return { createIssue: { issue: { number } } };
 		},
-		CreatePull: (v) => {
-			this.#pulls.push({ id: `PR_${this.#pulls.length + 1}`, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", state: "OPEN" });
+		OpenPull: (v) => {
+			const number = this.#pulls.length + 1;
+			const pull: Pull = { id: `PR_${number}`, number, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", state: "OPEN", autoMerge: false, status: "BLOCKED" };
 
-			return { createPullRequest: { clientMutationId: null } };
+			this.#pulls.push(pull);
+
+			return { createPullRequest: { pullRequest: pullNode(pull) } };
 		},
-		MergePull: (v) => {
-			const pull = this.#pulls.find((found) => found.id === v.pull) ?? failed("NOT_FOUND", `no pull ${v.pull}`);
-
-			pull.state = "MERGED";
-
-			return { mergePullRequest: { clientMutationId: null } };
-		},
-	} satisfies Readonly<Record<string, (v: Vars) => Json>>;
+		MergeNow: (v) => this.#pull(v.pull, { state: "MERGED" }, "mergePullRequest"),
+		EnableAutoMerge: (v) => this.#armRefusal(v.pull) ?? this.#pull(v.pull, { autoMerge: true }, "enablePullRequestAutoMerge"),
+		DisableAutoMerge: (v) => this.#pull(v.pull, { autoMerge: false }, "disablePullRequestAutoMerge"),
+		UpdateBranch: (v) => this.#pull(v.pull, { status: "BLOCKED" }, "updatePullRequestBranch"),
+		Comment: (v) => (this.#pullComments.push(v.body ?? ""), { addComment: { clientMutationId: null } }),
+	} satisfies Readonly<Record<string, (v: Vars) => Json | Refused>>;
 
 	#graphql(raw: string): Response {
 		const { query, variables } = Request.parse(JSON.parse(raw));
 		const operation = /^\s*(?:query|mutation)\s+(\w+)/.exec(query)?.[1] ?? "";
-		const run = Object.entries(this.#operations).find(([name]) => name === operation)?.[1] ?? failed("UNKNOWN", `the fake knows no operation "${operation}"`);
+		const run = Object.entries(this.#operations).find(([name]) => name === operation)?.[1];
+
+		if (!run) throw new Error(`the fake knows no operation "${operation}"`);
 
 		this.requests.push(`graphql ${operation}`);
 
 		if (this.failsOnce.delete(operation)) return new Response("bad gateway", { status: 502 });
 
-		try {
-			return json(200, { data: run(Vars.parse(variables)) });
-		} catch (error) {
-			if (!(error instanceof GraphqlFailure)) throw error;
+		const answer = run(Vars.parse(variables));
 
-			return json(200, { data: null, errors: [error.graphql] });
-		}
+		return answer instanceof Refused ? json(200, { data: null, errors: [answer.graphql] }) : json(200, { data: answer });
 	}
 
 	#rest(method: string, url: URL, body: RequestInit["body"], headers: Headers): Response {
@@ -266,6 +327,9 @@ export class FakeGitHub {
 		this.requests.push(`${method} ${url.pathname}${url.search}`);
 
 		if (url.pathname === "/rate_limit") return json(200, { resources: { core: { remaining: this.remaining } } });
+
+		if (method === "GET" && path.startsWith("/rules/branches/"))
+			return json(200, this.requiresPullRequest ? [{ type: "pull_request", parameters: { allowed_merge_methods: ["squash"] } }, { type: "required_status_checks" }] : [{ type: "deletion" }]);
 
 		if (method === "GET" && path === "/issues") {
 			const etag = `W/"v${this.#version}"`;

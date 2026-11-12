@@ -57,15 +57,15 @@ export {
 	type EnvelopeMigrations,
 } from "./state/format.ts";
 
-export { OpKey, OpKeys, type OpProvider } from "./state/ops.ts";
+export { OpKey, OpKeys, type OpProvider, type OpRun } from "./state/ops.ts";
 
 export { defaultStateDir, openState, type State, type StateOptions } from "./state/open.ts";
 
 export { type BegunRun, RunKey, RunRecord, RunRecords } from "./state/runs.ts";
 
-export { readStatus, type StatusRead, writeStatus } from "./status/file.ts";
+export { emptyStatus, readStatus, type StatusRead, writeStatus } from "./status/file.ts";
 
-export { Action, Card, CardAction, Choice, emptyStatus, InFlight, Measure, Merged, Question, Status, STATUS_FORMAT } from "./status/format.ts";
+export { Action, Card, CardAction, Choice, InFlight, Measure, Merged, Question, Status, STATUS_FORMAT } from "./status/format.ts";
 
 export * from "./adapter-api.ts";
 
@@ -75,11 +75,13 @@ export { type Check, contractChecks, type ContractResult, type ContractTarget, r
 
 export { FakeProvider, ProviderError } from "./adapters/fake.ts";
 
-export { pushArgs, PushRefused } from "./adapters/git.ts";
+export { pushArgs } from "./adapters/git.ts";
 
 export { type GuardOptions, guarded } from "./adapters/guard.ts";
 
-export { type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, repoFromRemote } from "./adapters/github.ts";
+export { githubAdapter, type GitHubOptions, repoFromRemote } from "./adapters/github.ts";
+
+export { type GitHubClient, gitHubClient } from "./adapters/github-client.ts";
 
 export { Marker, marked, markerOf, parseComment } from "./adapters/marked.ts";
 
@@ -109,7 +111,7 @@ export {
 	type RunnerOptions,
 	runArgs,
 	startRunner,
-	succeeded,
+	hasSucceeded,
 } from "./adapters/claude-p.ts";
 
 export {
@@ -125,21 +127,21 @@ export {
 
 export { type Change, type Histories, LABELS, type Label, type Moment, type PathHistory, type Placement, type Policy, placeChange, type Step, usualSize } from "./decide/risk.ts";
 
-export { type Approvals, isCleared, type Landing, landingOf, needsReviewRun, OWNER_APPROVAL, type Route, routeOf, type Unclear, waitReason } from "./decide/merge.ts";
+export { type Approvals, isCleared, type Landing, landingOf, doesNeedReviewRun, OWNER_APPROVAL, type Route, routeOf, type Unclear, waitReason } from "./decide/merge.ts";
 
 export { reviewInput } from "./decide/review.ts";
 
-export { citesDiff, DATA_RULE, fenced, EventPick, isTrusted, PlanFile, planHash, PROSE_STATES, type ProsePurpose, readPick } from "./decide/prose.ts";
+export { doesCiteDiff, DATA_RULE, fenced, EventPick, isTrusted, PlanFile, planHash, PROSE_STATES, type ProsePurpose, readPick } from "./decide/prose.ts";
 
-export { declaredKind, kindQuestion, leavesDocs, UNSURE } from "./decide/kind.ts";
+export { declaredKind, kindQuestion, doesLeaveDocs, UNSURE } from "./decide/kind.ts";
 
-export { AlignmentAnswer, alignedPlacement, alignmentQuestion, GRADES, raisesLevel } from "./decide/alignment.ts";
+export { AlignmentAnswer, alignedPlacement, alignmentQuestion, GRADES, doesRaiseLevel } from "./decide/alignment.ts";
 
 export { configuredModelCall, type Judgment, type ModelCall, modelCallOver, type Question as ModelQuestion } from "./adapters/model-call.ts";
 
 export { decideProse, type ProseDecision } from "./worker/prose-run.ts";
 
-export { decideKind } from "./worker/kind.ts";
+export { keepKind, pickKind } from "./worker/kind.ts";
 
 export { labelChanges, type LabelRules, matchedSample, type PastChange } from "./decide/labels.ts";
 
@@ -167,7 +169,7 @@ export { Heartbeat } from "./status/format.ts";
 
 export { readHeartbeat, writeHeartbeat } from "./status/file.ts";
 
-export { type Candidate, type Footprint, footprintOf, overlaps, pick, type Picked, PrefixGate } from "./worker/scheduler.ts";
+export { type Candidate, type Footprint, footprintOf, doOverlap, pick, type Picked, PrefixGate } from "./worker/scheduler.ts";
 
 export { installedVersion, type Signature, signatureOf } from "./worker/signature.ts";
 
@@ -197,4 +199,3 @@ export { SLOT_ENV, slotEnv } from "./slots/env.ts";
 
 export { type PoolOptions, SLOT_KEPT_CODE, SLOT_MAINTENANCE_CODE, SLOT_OUT_CODE, SlotPool } from "./slots/pool.ts";
 
-export { proposeRecipe } from "./slots/scan.ts";

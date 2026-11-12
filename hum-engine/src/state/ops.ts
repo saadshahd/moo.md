@@ -3,7 +3,7 @@ import { z } from "zod";
 import { atomicWrite, createOnce, listRecords, orMissing, readJson, slug } from "./fs.ts";
 
 /** One external op of one attempt of one run of one item. */
-export const OpKey = z.strictObject({
+export const OpKey = z.object({
 	itemId: z.string().min(1),
 	run: z.string().min(1),
 	attempt: z.int().nonnegative(),
@@ -14,11 +14,16 @@ export type OpKey = z.infer<typeof OpKey>;
 
 const Record = OpKey.extend({ state: z.enum(["started", "done"]), at: z.int().nonnegative() });
 
-export type OpProvider = {
+export type OpProvider<T> = {
 	/** True when the provider already holds the effect of this op, found by its key. */
 	readonly holds: () => Promise<boolean>;
-	readonly run: () => Promise<void>;
+	readonly run: () => Promise<T>;
+	/** Whether the run's value finished the op; an op left unfinished runs again on the next call. Every value finishes it unless this says otherwise. */
+	readonly isDone?: (value: T) => boolean;
 };
+
+/** `skipped` when the op was done or the provider held it; else the value its run returned. */
+export type OpRun<T> = { readonly kind: "skipped" } | { readonly kind: "ran"; readonly value: T };
 
 /** The key is saved before the op, so a restart after a kill finds the op started and asks the provider before it runs it again. */
 export class OpKeys {
@@ -53,24 +58,25 @@ export class OpKeys {
 		return orMissing(() => Record.parse(readJson(this.#path(OpKey.parse(key)))).state, undefined);
 	}
 
-	/** Runs the op once per key, across restarts: `skipped` when it is done or the provider already holds it. */
-	async once(key: OpKey, { holds, run }: OpProvider): Promise<"ran" | "skipped"> {
+	/** Runs the op once per key, across restarts. */
+	async once<T>(key: OpKey, { holds, run, isDone = () => true }: OpProvider<T>): Promise<OpRun<T>> {
 		const checked = OpKey.parse(key);
 		const fresh = this.#write(checked, "started", true);
 
 		if (!fresh) {
-			if (this.state(checked) === "done") return "skipped";
+			if (this.state(checked) === "done") return { kind: "skipped" };
 
 			if (await holds()) {
 				this.#write(checked, "done", false);
 
-				return "skipped";
+				return { kind: "skipped" };
 			}
 		}
 
-		await run();
-		this.#write(checked, "done", false);
+		const value = await run();
 
-		return "ran";
+		if (isDone(value)) this.#write(checked, "done", false);
+
+		return { kind: "ran", value };
 	}
 }

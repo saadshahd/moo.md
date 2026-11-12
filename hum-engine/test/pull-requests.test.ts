@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
 import { PermanentError } from "../src/adapter-api.ts";
 import { methodFor } from "../src/adapters/pull-requests.ts";
-import { FakePulls } from "./fixtures/fake-pulls.ts";
+import { FakeGitHub } from "./fixtures/fake-github.ts";
 
 const change = { head: "hum/run/1", base: "main", title: "hum: one", body: "Item 1." };
 
 test("a pull request whose checks already passed takes no auto-merge, so it merges now", async () => {
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const pulls = github.client();
 	const opened = await pulls.open(change);
 
@@ -15,11 +15,11 @@ test("a pull request whose checks already passed takes no auto-merge, so it merg
 	const ready = await pulls.find(change.head);
 
 	expect(ready && (await pulls.autoMerge(ready, true, "squash"))).toBe("merged");
-	expect(github.pulls).toMatchObject([{ state: "MERGED" }]);
+	expect(github.pulls()).toMatchObject([{ state: "MERGED" }]);
 });
 
 test("a repo that allows no auto-merge refuses it for good, and turning it off on an unarmed pull request asks nothing", async () => {
-	const github = new FakePulls();
+	const github = new FakeGitHub();
 	const pulls = github.client();
 	const opened = await pulls.open(change);
 

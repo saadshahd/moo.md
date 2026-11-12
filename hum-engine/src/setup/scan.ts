@@ -1,17 +1,17 @@
 import { accessSync, constants, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { parse as parseYaml } from "yaml";
+import { parseDocument } from "yaml";
 import { z } from "zod";
 import { gitIn } from "../adapters/git.ts";
 import { readHistory } from "../adapters/history.ts";
 import { SHIPPED_DEFAULTS } from "../config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { orMissing } from "../state/fs.ts";
-import { ENV_SCRIPTS } from "../slots/scan.ts";
 import {
 	CODEOWNERS_FILES,
 	COMPOSE_FILES,
 	ENV_EXAMPLE_FILES,
+	ENV_SCRIPTS,
 	ENV_TOOLING_FILES,
 	ISSUE_TEMPLATE_FOLDER,
 	LOCKFILES,
@@ -25,7 +25,7 @@ import {
 /** One job of a CI workflow: when it runs and the shell commands its steps run. */
 export type CiJob = { readonly file: string; readonly job: string; readonly triggers: readonly string[]; readonly commands: readonly string[] };
 
-export type FolderHistory = { readonly folder: string; readonly changes: number; readonly sizes: readonly number[] };
+type FolderHistory = { readonly folder: string; readonly changes: number; readonly sizes: readonly number[] };
 
 /** What a repo already holds that setup reads before it asks. */
 export type RepoScan = {
@@ -49,7 +49,7 @@ export type RepoScan = {
 
 const textOf = (repo: string, path: string): string => (path === "" ? "" : orMissing(() => readFileSync(join(repo, path), "utf8"), ""));
 
-const exists = (repo: string, path: string): boolean => orMissing(() => (accessSync(join(repo, path)), true), false);
+const doesExist = (repo: string, path: string): boolean => orMissing(() => (accessSync(join(repo, path)), true), false);
 
 const isRunnable = (repo: string, path: string): boolean => orMissing(() => (accessSync(join(repo, path), constants.X_OK), true), false);
 
@@ -72,6 +72,14 @@ const Template = z.looseObject({ labels: z.union([z.string(), z.array(z.string()
 
 const TEMPLATE_FRONT_MATTER = /^---\n([\s\S]*?)\n---/;
 
+/** A YAML file read through `schema`, or undefined when the file does not parse or does not fit it. */
+const yamlOf = <Schema extends z.ZodType>(schema: Schema, text: string): z.output<Schema> | undefined => {
+	const document = parseDocument(text);
+	const parsed = document.errors.length === 0 ? schema.safeParse(document.toJS()) : undefined;
+
+	return parsed?.success ? parsed.data : undefined;
+};
+
 const commandsOf = (run: string): string[] =>
 	run
 		.split("\n")
@@ -81,13 +89,13 @@ const commandsOf = (run: string): string[] =>
 /** The CI workflows' jobs. A workflow that does not parse is skipped, because the owner's CI is not setup's to judge. */
 const ciJobsOf = (repo: string): CiJob[] =>
 	filesIn(repo, `${WORKFLOW_FOLDER}/*.{yml,yaml}`).flatMap((file) => {
-		const parsed = Workflow.safeParse(parseYaml(textOf(repo, file)));
+		const workflow = yamlOf(Workflow, textOf(repo, file));
 
-		if (!parsed.success) return [];
+		if (workflow === undefined) return [];
 
-		const triggers = parsed.data.on;
+		const triggers = workflow.on;
 
-		return Object.entries(parsed.data.jobs).map(([job, { steps }]) => ({
+		return Object.entries(workflow.jobs).map(([job, { steps }]) => ({
 			file: basename(file),
 			job,
 			triggers,
@@ -96,7 +104,7 @@ const ciJobsOf = (repo: string): CiJob[] =>
 	});
 
 const codeownersOf = (repo: string): RepoScan["codeowners"] => {
-	const file = CODEOWNERS_FILES.find((candidate) => exists(repo, candidate));
+	const file = CODEOWNERS_FILES.find((candidate) => doesExist(repo, candidate));
 
 	return textOf(repo, file ?? "")
 		.split("\n")
@@ -105,10 +113,10 @@ const codeownersOf = (repo: string): RepoScan["codeowners"] => {
 };
 
 const composeOf = (repo: string): RepoScan["composeServices"] => {
-	const file = COMPOSE_FILES.find((candidate) => exists(repo, candidate));
-	const parsed = Compose.safeParse(parseYaml(textOf(repo, file ?? "")));
+	const file = COMPOSE_FILES.find((candidate) => doesExist(repo, candidate));
+	const compose = yamlOf(Compose, textOf(repo, file ?? ""));
 
-	return parsed.success ? Object.entries(parsed.data.services).map(([name, { image }]) => ({ name, image })) : [];
+	return compose ? Object.entries(compose.services).map(([name, { image }]) => ({ name, image })) : [];
 };
 
 /** The environment scripts a repo is built to run: executable files in the usual places. */
@@ -127,9 +135,9 @@ const templatesOf = (repo: string): RepoScan["issueTemplates"] =>
 	filesIn(repo, `${ISSUE_TEMPLATE_FOLDER}/*`).flatMap((file) => {
 		const text = textOf(repo, file);
 		const front = file.endsWith(".md") ? TEMPLATE_FRONT_MATTER.exec(text)?.[1] ?? "" : text;
-		const parsed = Template.safeParse(parseYaml(front));
+		const template = yamlOf(Template, front);
 
-		return parsed.success ? [{ file: basename(file), labels: [parsed.data.labels].flat().flatMap((label) => label.split(",").map((one) => one.trim()).filter(Boolean)) }] : [];
+		return template ? [{ file: basename(file), labels: [template.labels].flat().flatMap((label) => label.split(",").map((one) => one.trim()).filter(Boolean)) }] : [];
 	});
 
 const trackedOf = async (repo: string): Promise<string[]> => (await gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["ls-files"])).split("\n").filter(Boolean).slice(0, TRACKED_FILE_LIMIT);
@@ -143,14 +151,13 @@ const foldersOf = async (repo: string, base: string): Promise<FolderHistory[]> =
 
 	if (log.code !== 0) return [];
 
-	const changes = await readHistory(git, base, SHIPPED_DEFAULTS);
-	const folders = new Map<string, number[]>();
+	const touches = (await readHistory(git, base, SHIPPED_DEFAULTS)).flatMap(({ files, size }) => [...new Set(files.map(topFolder).filter(Boolean))].map((folder) => ({ folder, size })));
 
-	for (const change of changes) {
-		for (const folder of new Set(change.files.map(topFolder).filter(Boolean))) folders.set(folder, [...(folders.get(folder) ?? []), change.size]);
-	}
+	return [...new Set(touches.map(({ folder }) => folder))].map((folder) => {
+		const sizes = touches.flatMap((touch) => (touch.folder === folder ? [touch.size] : []));
 
-	return [...folders].map(([folder, sizes]) => ({ folder, changes: sizes.length, sizes: sizes.toReversed() }));
+		return { folder, changes: sizes.length, sizes: sizes.toReversed() };
+	});
 };
 
 const humSchemaOf = (repo: string): number | undefined => {
@@ -164,7 +171,7 @@ export const scanRepo = async (repo: string, base: string): Promise<RepoScan> =>
 	const manifest = PackageJson.safeParse(orMissing(() => JSON.parse(textOf(repo, "package.json") || "null"), null));
 	const scripts = manifest.success ? manifest.data.scripts : {};
 	const pinned = manifest.success ? { ...manifest.data.dependencies, ...manifest.data.devDependencies }["@moo.md/hum"] : undefined;
-	const lockfile = Object.entries(LOCKFILES).find(([file]) => exists(repo, file));
+	const lockfile = Object.entries(LOCKFILES).find(([file]) => doesExist(repo, file));
 
 	return {
 		packageManager: lockfile?.[1],
@@ -174,9 +181,9 @@ export const scanRepo = async (repo: string, base: string): Promise<RepoScan> =>
 		composeServices: composeOf(repo),
 		envScripts: envScriptsOf(repo),
 		setupTargets: setupTargetsOf(repo, scripts),
-		toolVersions: TOOL_VERSION_FILES.filter((file) => exists(repo, file)),
-		envExamples: ENV_EXAMPLE_FILES.filter((file) => exists(repo, file)),
-		envTooling: ENV_TOOLING_FILES.filter((file) => exists(repo, file)),
+		toolVersions: TOOL_VERSION_FILES.filter((file) => doesExist(repo, file)),
+		envExamples: ENV_EXAMPLE_FILES.filter((file) => doesExist(repo, file)),
+		envTooling: ENV_TOOLING_FILES.filter((file) => doesExist(repo, file)),
 		issueTemplates: templatesOf(repo),
 		tracked: await trackedOf(repo),
 		folders: await foldersOf(repo, base),

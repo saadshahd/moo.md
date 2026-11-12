@@ -4,9 +4,9 @@ import type { Config } from "../config/load.ts";
 import type { PastChange } from "../decide/labels.ts";
 import type { State } from "../state/open.ts";
 import { checkNameOf, fileChecks, filedFrom } from "./check-item.ts";
-import { type CiLogs, logNames } from "./ci.ts";
+import { type CiLogs, doesLogName } from "./ci.ts";
 import { type Proposer, groupNotes } from "./groups.ts";
-import { parseMemory, renderMemory, withoutCovered } from "./memory.ts";
+import { withoutCovered } from "./memory.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "./notes.ts";
 import { type RepeatGroup, type ReviewNote, noteKey } from "./records.ts";
 
@@ -42,7 +42,7 @@ const unappliedCard = (state: State) => (extension: string, signals: readonly st
 };
 
 /** Step 1: the owner's notes from each source, saved once. Returns the ones this pass added. */
-export const collectNotes = async ({ state, config, comments, history, hunkOf }: LoopPass): Promise<ReviewNote[]> =>
+const collectNotes = async ({ state, config, comments, history, hunkOf }: LoopPass): Promise<ReviewNote[]> =>
 	saveNotes(state, [
 		...ownerNotes(await comments(sinceOfLastComment(state)), config.hum.ownerLogins),
 		...planChangingNotes(state.answers.list()),
@@ -51,15 +51,19 @@ export const collectNotes = async ({ state, config, comments, history, hunkOf }:
 
 /** Step 6: a landed check item whose name the next CI run's log shows. */
 export const confirmChecks = async ({ state, ciLogs, now }: Pick<LoopPass, "state" | "ciLogs" | "now">): Promise<void> => {
-	for (const group of state.repeats.list()) {
+	const unconfirmed = state.repeats.list().flatMap((group) => {
 		const merge = group.item === undefined ? undefined : state.merges.get(group.item);
 
-		if (group.checked || !merge) continue;
+		return group.checked || !merge ? [] : [{ group, merge }];
+	});
 
-		const logs = await ciLogs(merge.at);
+	await Promise.all(
+		unconfirmed.map(async ({ group, merge }) => {
+			const logs = await ciLogs(merge.at);
 
-		if (logs.some((log) => logNames(log, group.key))) state.repeats.put(group.key, { ...group, checked: { at: now(), check: checkNameOf(group.key) } });
-	}
+			if (logs.some((log) => doesLogName(log, group.key))) state.repeats.put(group.key, { ...group, checked: { at: now(), check: checkNameOf(group.key) } });
+		}),
+	);
 };
 
 const missesOf = (state: State, group: RepeatGroup): ReviewNote[] =>
@@ -69,11 +73,13 @@ const missesOf = (state: State, group: RepeatGroup): ReviewNote[] =>
 export const closeLoop = async ({ state, workSource, memoryPath }: Pick<LoopPass, "state" | "workSource" | "memoryPath">): Promise<void> => {
 	const covered = new Set(state.repeats.list().flatMap((group) => (group.checked ? group.notes : [])));
 
-	if (memoryPath !== undefined && covered.size > 0 && existsSync(memoryPath)) {
-		const held = parseMemory(readFileSync(memoryPath, "utf8"));
-		const kept = withoutCovered(held, covered);
+	const hasEntriesToDrop = memoryPath !== undefined && covered.size > 0 && existsSync(memoryPath);
 
-		if (kept.length < held.length) writeFileSync(memoryPath, renderMemory(kept));
+	if (hasEntriesToDrop) {
+		const text = readFileSync(memoryPath, "utf8");
+		const kept = withoutCovered(text, covered);
+
+		if (kept !== text) writeFileSync(memoryPath, kept);
 	}
 
 	for (const group of state.repeats.list()) {

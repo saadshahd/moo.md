@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
@@ -9,7 +9,7 @@ import { listRecords, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
-import { type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, succeeded } from "./claude-p.ts";
+import { type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, hasSucceeded } from "./claude-p.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { parseLooseJson } from "./marked.ts";
 import { billedTokens, cacheReadTokens, modelsOf, outputTokens, type RunTranscript, readTranscript } from "./transcript.ts";
@@ -31,8 +31,15 @@ const SINGLE_QUOTE = /'/g;
 
 const shellQuote = (text: string): string => `'${text.replace(SINGLE_QUOTE, `'\\''`)}'`;
 
-/** A hook command that saves the hook's input, which names the session and its transcript, as a file of its own. */
-const dropInto = (folder: string): string => `cat > ${shellQuote(folder)}/$$.json`;
+/**
+ * A hook command that saves the hook's input, which names the session and its transcript, as a file of its own. It
+ * writes a temp file the folder's reader skips and renames it in, so a reader never meets half a report.
+ */
+const dropInto = (folder: string): string => {
+	const at = shellQuote(folder);
+
+	return `cat > ${at}/$$.part && mv ${at}/$$.part ${at}/$$.json`;
+};
 
 /** The settings every background run starts with: hum's plugin off, the deny rules and auto mode's rules, and a hook that reports the run. */
 export const backgroundSettings = ({ deniedRunCommands, runAutoMode }: Pick<HumConfig, "deniedRunCommands" | "runAutoMode">, stopsFolder: string, env: Readonly<Record<string, string>> = {}) => ({
@@ -172,12 +179,12 @@ export type BackgroundOptions = Pick<RunnerOptions, "binary" | "env" | "now"> & 
  * transcript, enforces the token cap by `claude stop`, and stops and removes the run once its outcome is taken.
  * A cheap model call, a run with no name, and a run the background service cannot take go to `fallback`.
  */
-export const backgroundRunner = ({ binary = "claude", env, state, config, fallback, now = Date.now }: BackgroundOptions): Runner => {
+export const backgroundRunner = ({ binary = "claude", env, state, config, fallback, now }: BackgroundOptions): Runner => {
 	const pollMs = config.backgroundPollSeconds * SECOND_MS;
-	const jobsFolder = join({ ...process.env, ...env }.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), JOBS_FOLDER);
+	const jobsFolder = join(env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), JOBS_FOLDER);
 
 	const claude = (args: readonly string[], options: { stdin?: string; cwd?: string } = {}) =>
-		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env: { ...process.env, ...env } } });
+		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env } });
 
 	/** The background runs Claude Code lists. A list hum cannot read throws, with one card: read as empty, it would start a run that is already going. */
 	const agents = async (): Promise<Agent[]> => {
@@ -192,17 +199,22 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 			throw new Error(cause);
 		}
 
-		state.faults.clear(AGENTS_UNREAD);
+		state.faults.clear({ code: AGENTS_UNREAD });
 
 		return found.flatMap(({ kind, id, name, sessionId, state }) => (kind === AGENT_VIEW_KIND && id !== undefined ? [{ id, name, sessionId, state }] : []));
 	};
 
-	const reportsOf = (sessionId: string): { at: number; event: string; transcriptPath: string | undefined }[] =>
+	const reportsOf = (sessionId: string): { file: string; at: number; event: string; transcriptPath: string | undefined }[] =>
 		listRecords(state.stops).flatMap((file) => {
 			const reported = orMissing(() => Reported.safeParse(JSON.parse(readFileSync(file, "utf8"))), undefined);
 
-			return reported?.success && reported.data.session_id === sessionId ? [{ at: statSync(file).mtimeMs, event: reported.data.hook_event_name, transcriptPath: reported.data.transcript_path }] : [];
+			return reported?.success && reported.data.session_id === sessionId ? [{ file, at: statSync(file).mtimeMs, event: reported.data.hook_event_name, transcriptPath: reported.data.transcript_path }] : [];
 		});
+
+	/** Drops the session's hook reports, so the stops folder holds only runs still going. */
+	const forget = (sessionId: string): void => {
+		for (const { file } of reportsOf(sessionId)) rmSync(file, { force: true });
+	};
 
 	const jobTokens = (id: string): number => orMissing(() => JobFile.parse(JSON.parse(readFileSync(join(jobsFolder, id, JOB_STATE_FILE), "utf8"))).tokens ?? 0, 0);
 
@@ -246,9 +258,9 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 	};
 
 	const listed = async (id: string, signal: AbortSignal | undefined): Promise<Agent | undefined> => {
-		const until = Date.now() + config.backgroundLaunchSeconds * SECOND_MS;
+		const until = now() + config.backgroundLaunchSeconds * SECOND_MS;
 
-		while (Date.now() < until && !signal?.aborted) {
+		while (now() < until && !signal?.aborted) {
 			const found = (await agents()).find((agent) => agent.id === id);
 
 			if (found) return found;
@@ -257,6 +269,22 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 		}
 
 		return undefined;
+	};
+
+	/** The outcome a reading ends the run with, or `waiting` while it goes on. */
+	const endOf = (progress: Progress, sessionId: string, reading: Reading): RunOutcome | "waiting" => {
+		switch (progress.kind) {
+			case "waiting":
+				return "waiting";
+			case "over-cap":
+				return progress;
+			case "limit":
+				return settleLimit(state, progress.ended);
+			case "done":
+				return finishedOf(sessionId, reading, succeededWith(progress.structured));
+			case "failed":
+				return finishedOf(sessionId, reading, failedWith(progress.why));
+		}
 	};
 
 	const watch = async (request: RunRequest, id: string, sessionId: string): Promise<RunOutcome> => {
@@ -272,15 +300,9 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 				request.onFirstToken?.();
 			}
 
-			const progress = progressOf(reading, request.tokenCap);
+			const ended = endOf(progressOf(reading, request.tokenCap), sessionId, reading);
 
-			if (progress.kind === "over-cap") return progress;
-
-			if (progress.kind === "limit") return settleLimit(state, progress.ended);
-
-			if (progress.kind === "done") return finishedOf(sessionId, reading, succeededWith(progress.structured));
-
-			if (progress.kind === "failed") return finishedOf(sessionId, reading, failedWith(progress.why));
+			if (ended !== "waiting") return ended;
 
 			await Bun.sleep(pollMs);
 		}
@@ -304,7 +326,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 
 		if (session === undefined) return request.signal?.aborted ? { kind: "stopped" } : fellBack(request, "the run never appeared in claude agents");
 
-		state.faults.clear(FALLBACK_CODE);
+		state.faults.clear({ code: FALLBACK_CODE });
 
 		request.onSession?.(session.sessionId);
 
@@ -312,6 +334,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 			return await watch(request, id, session.sessionId);
 		} finally {
 			await end(id);
+			forget(session.sessionId);
 		}
 	};
 
@@ -334,7 +357,7 @@ export type BackgroundStartOptions = Omit<RunnerOptions, "state"> &
 		readonly repo: string;
 	};
 
-const isOk = (outcome: RunOutcome): boolean => outcome.kind === "finished" && succeeded(outcome) && START_ANSWER.safeParse(outcome.structured).success;
+const isOk = (outcome: RunOutcome): boolean => outcome.kind === "finished" && hasSucceeded(outcome) && START_ANSWER.safeParse(outcome.structured).success;
 
 const startCheckFault = (repo: string, why: string) => ({
 	code: BACKGROUND_CHECK_CODE,
@@ -365,27 +388,27 @@ const whyNot = (outcome: RunOutcome, timeoutMs: number): string => {
  * missing from agent view.
  */
 export const startBackgroundRunner = async (options: BackgroundStartOptions): Promise<StartedBackground> => {
-	const { config, repo, state, binary, env } = options;
+	const { config, repo, state, binary, env, now } = options;
 	const started = await startRunner(options);
 
 	if (started.check.kind !== "finished") return started;
 
 	// The check's own fall-back holds with the card that says why the service refused.
 	const refuse: Runner = { run: async () => ({ kind: "held", card: refusalCard(state) }), limitedUntil: started.runner.limitedUntil };
-	const checker = backgroundRunner({ binary, env, state, config, fallback: refuse });
+	const checker = backgroundRunner({ binary, env, state, config, fallback: refuse, now });
 	const timeoutMs = commandTimeoutMs(config);
 	const check = await checker.run({ name: START_NAME, prompt: START_PROMPT, cwd: repo, model: options.model, effort: "low", schema: START_SCHEMA, signal: AbortSignal.timeout(timeoutMs) });
 
 	if (isOk(check)) {
-		state.faults.clear(BACKGROUND_CHECK_CODE);
+		state.faults.clear({ code: BACKGROUND_CHECK_CODE });
 
-		return { check, runner: backgroundRunner({ binary, env, state, config, fallback: started.runner }) };
+		return { check, runner: backgroundRunner({ binary, env, state, config, fallback: started.runner, now }) };
 	}
 
 	// The start check's card says why for every run, so the card for the check's own fall-back would only repeat it.
 	const why = whyNot(check, timeoutMs);
 
-	state.faults.clear(FALLBACK_CODE);
+	state.faults.clear({ code: FALLBACK_CODE });
 	state.faults.raise(startCheckFault(repo, why));
 
 	return { check, runner: started.runner };

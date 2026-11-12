@@ -1,8 +1,8 @@
-import { type Adapter, type Claim, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Claim, type Integrations, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import { claimer, isLive } from "./claim.ts";
 import { questionText } from "./marked.ts";
 
-type Stored = { id: string; title: string; body: string; ready: boolean; thread: ThreadEntry[]; claim?: Claim; from?: string };
+type Stored = { id: ItemId; title: string; body: string; ready: boolean; thread: ThreadEntry[]; claim?: Claim; from?: string };
 
 /** A provider failure a retry can outlast, like a GitHub 502. */
 export class ProviderError extends Error {
@@ -48,8 +48,8 @@ export class FakeProvider {
 		this.#emptyList = value;
 	}
 
-	seed(title: string, { ready = true }: { ready?: boolean } = {}): string {
-		const id = `item-${this.#items.size + 1}`;
+	seed(title: string, { ready = true }: { ready?: boolean } = {}): ItemId {
+		const id = ItemId.parse(`item-${this.#items.size + 1}`);
 
 		this.#items.set(id, { id, title, body: `${title} body`, ready, thread: [] });
 		this.#version++;
@@ -107,12 +107,12 @@ export class FakeProvider {
 		this.now,
 	);
 
-	adapter(): Adapter {
+	adapter(): Integrations {
 		const asRef = ({ id, title }: Stored): ItemRef => ({ id, title });
 		const spend = <T>(body: () => T) => this.#call(true, body);
 
 		return {
-			apiVersion: 1,
+			apiVersion: ADAPTER_API_VERSION,
 			workSource: {
 				listReady: async () =>
 					spend(() => this.listReplacement?.() ?? (this.#emptyList ? [] : [...this.#items.values()].flatMap((item) => (this.#isReady(item) ? [asRef(item)] : [])))),

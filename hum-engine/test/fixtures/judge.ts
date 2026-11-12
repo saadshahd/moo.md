@@ -11,11 +11,9 @@ export type Scripted = { readonly kind?: { readonly kind: string }; readonly ali
 export const scriptedJudge =
 	(answers: Scripted, asked: string[] = []): ModelCall =>
 	async (question) => {
-		const value = question.boundary === "kind" ? answers.kind : question.boundary === "alignment" ? answers.alignment : undefined;
-
 		asked.push(question.boundary);
 
-		const parsed = question.answer.safeParse(value);
+		const parsed = question.answer.safeParse(new Map(Object.entries(answers)).get(question.boundary));
 
 		return parsed.success ? { kind: "picked", value: parsed.data, models: ["fake-model"] } : { kind: "abstained", why: "no scripted answer fits" };
 	};

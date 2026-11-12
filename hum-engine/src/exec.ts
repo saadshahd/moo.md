@@ -3,6 +3,9 @@ import { type Options, type Output, x } from "tinyexec";
 import { type HumConfig, SHIPPED_DEFAULTS } from "./config/schema.ts";
 import { SECOND_MS } from "./time.ts";
 
+/** A process environment: the root reads `process.env` once and hands it down. */
+export type Env = Readonly<Record<string, string | undefined>>;
+
 /** A command ran past its limit and was told to stop. */
 export class CommandTimedOut extends Error {
 	override name = "CommandTimedOut";
@@ -47,9 +50,7 @@ const signalGroup = (group: number, signal: "SIGTERM" | "SIGKILL" | 0): boolean 
 };
 
 const isGone = async (group: number, graceMs: number): Promise<boolean> => {
-	const deadline = Date.now() + graceMs;
-
-	while (signalGroup(group, 0) && Date.now() < deadline) await Bun.sleep(POLL_MS);
+	for (let waited = 0; waited < graceMs && signalGroup(group, 0); waited += POLL_MS) await Bun.sleep(POLL_MS);
 
 	return !signalGroup(group, 0);
 };

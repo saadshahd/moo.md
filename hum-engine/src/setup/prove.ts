@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import type { AdapterContext } from "../adapter-api.ts";
+import { type AdapterContext, Holder, ItemId } from "../adapter-api.ts";
 import { runContract } from "../adapters/contract.ts";
 import { markdownAdapter } from "../adapters/markdown.ts";
 import { type Config, loadConfig, readConfigDir } from "../config/load.ts";
-import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { commandTimeoutMs, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { SlotPool } from "../slots/pool.ts";
 import { orMissing } from "../state/fs.ts";
 import { openState } from "../state/open.ts";
@@ -14,7 +14,7 @@ import { checksTimeoutMs, runChecks } from "../worker/checks.ts";
 import { openWorker } from "../worker/open.ts";
 import { Scratch } from "./scratch.ts";
 
-export type StepStatus = "passed" | "failed" | "skipped";
+type StepStatus = "passed" | "failed" | "skipped";
 
 /** One thing setup proved, with how long it took. A skip says why, so nothing passes silently. */
 export type Step = { readonly name: string; readonly status: StepStatus; readonly detail: string; readonly ms: number };
@@ -27,9 +27,9 @@ const failed = (detail: string): Outcome => ({ status: "failed", detail });
 
 const skipped = (detail: string): Outcome => ({ status: "skipped", detail });
 
-/** Runs one step; a throw is the step failing, in the error's own words. */
 const stepOf = (name: string, outcome: Outcome, started: number): Step => ({ name, status: outcome.status, detail: outcome.detail, ms: Math.round(performance.now() - started) });
 
+/** Runs one step; a throw is the step failing, in the error's own words. */
 const timed = async (name: string, run: () => Promise<Outcome>): Promise<Step> => {
 	const started = performance.now();
 
@@ -37,6 +37,9 @@ const timed = async (name: string, run: () => Promise<Outcome>): Promise<Step> =
 };
 
 export type ProveEnv = {
+	readonly now: () => number;
+	readonly processEnv: Env;
+	readonly newSessionId: () => string;
 	readonly hopeSkills: ReadonlySet<string>;
 	readonly base: string;
 	/** Whether to run one item end to end through the real `claude`; each run spends live calls. */
@@ -56,7 +59,7 @@ const ENGINE = "@moo.md/hum";
 const LOCAL_PIN = /^(file|link):/;
 
 /** What the registry says about the pinned version: found, or the package exists without it, or the package is not published. */
-export const npmPublished = async (pin: string): Promise<"found" | "missing-version" | "unpublished"> => {
+const npmPublished = async (pin: string): Promise<"found" | "missing-version" | "unpublished"> => {
 	const viewed = await exec("npm", ["view", `${ENGINE}@${pin}`, "version"], { throwOnError: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	if (viewed.exitCode === 0) return "found";
@@ -93,7 +96,7 @@ const checksStep = async (repo: string, config: Config): Promise<Outcome> => {
 const markdownOver = (repo: string, base: string, hum: Config["hum"], context: AdapterContext) =>
 	markdownAdapter({ repo, base, claimPrefix: hum.claimPrefix, itemsDir: hum.itemsDir, identity: hum.commitIdentity, writeRaceRetries: hum.writeRaceRetries, itemReadsAtOnce: hum.itemReadsAtOnce, mergeMethod: hum.mergeMethod, ownerBranchPrefix: hum.ownerBranchPrefix, timeoutMs: commandTimeoutMs(hum) }, context);
 
-const contractStep = async (config: Config, scratch: Scratch, base: string): Promise<Outcome> => {
+const contractStep = async (config: Config, scratch: Scratch, { base, now, processEnv }: Pick<ProveEnv, "base" | "now" | "processEnv">): Promise<Outcome> => {
 	const others = Object.entries(config.hum.integrations ?? {}).filter(([, adapter]) => adapter !== "markdown");
 
 	if (others.length > 0) return skipped(`${others.map(([slot, adapter]) => `${slot}: ${adapter}`).join(", ")} write to a live target; run its contract suite there`);
@@ -101,7 +104,7 @@ const contractStep = async (config: Config, scratch: Scratch, base: string): Pro
 	let skew = 0;
 	let count = 0;
 
-	const context: AdapterContext = { report: () => {}, now: () => Date.now() + skew };
+	const context: AdapterContext = { report: () => {}, now: () => now() + skew, env: processEnv };
 	const first = markdownOver(await scratch.worker(), base, config.hum, context);
 	const second = markdownOver(await scratch.worker(), base, config.hum, context);
 
@@ -109,7 +112,7 @@ const contractStep = async (config: Config, scratch: Scratch, base: string): Pro
 		name: "markdown",
 		adapter: first,
 		other: async () => second,
-		seed: (title) => scratch.seed(`contract-${++count}`, title, "body"),
+		seed: async (title) => ItemId.parse(await scratch.seed(`contract-${++count}`, title, "body")),
 		advance: async (ms) => void (skew += ms),
 		spent: () => first.spent(),
 	});
@@ -137,8 +140,8 @@ const slotStep = async (config: Config, scratch: Scratch, env: ProveEnv): Promis
 	if (!config.hum.runSlots.enabled) return skipped("run slots are off in hum.json");
 
 	const pool = mkdtempSync(join(tmpdir(), "hum-prove-slots-"));
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-prove-state-")));
-	const slots = new SlotPool({ repo: scratch.owner, state, config: { ...config.hum, runners: 1, runSlots: { ...config.hum.runSlots, pool } }, base: env.base });
+	const state = openState(mkdtempSync(join(tmpdir(), "hum-prove-state-")), { now: env.now });
+	const slots = new SlotPool({ repo: scratch.owner, state, config: { ...config.hum, runners: 1, runSlots: { ...config.hum.runSlots, pool } }, base: env.base, now: env.now });
 	const started = performance.now();
 
 	await slots.maintain();
@@ -172,8 +175,11 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 	const results: string[] = [];
 
 	const worker = await openWorker(scratch.owner, {
+		now: env.now,
+		env: env.processEnv,
+		newSessionId: env.newSessionId,
 		hopeSkills: env.hopeSkills,
-		holder: "setup-proof",
+		holder: Holder.parse("setup-proof"),
 		base: env.base,
 		where: "ci",
 		stateDir: mkdtempSync(join(tmpdir(), "hum-prove-state-")),
@@ -205,7 +211,7 @@ export const proveSetup = async (repo: string, env: ProveEnv): Promise<Step[]> =
 		return [
 			configured,
 			await timed("checks", () => checksStep(repo, config)),
-			await timed("contract", () => contractStep(config, scratch, env.base)),
+			await timed("contract", () => contractStep(config, scratch, env)),
 			await timed("engine pin", () => pinStep(repo, env)),
 			await timed("slot", () => slotStep(config, scratch, env)),
 			await timed("item", () => itemStep(repo, config, env)),

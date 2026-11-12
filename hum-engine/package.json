@@ -1,6 +1,6 @@
 {
   "name": "@moo.md/hum",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The hum engine: work items become Claude Code agent runs, the repo's checks decide what they can, and only what nothing settles becomes a question to the owner.",
   "license": "MIT",
   "author": {
@@ -32,7 +32,7 @@
     "surface.json"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "test -d ../hum/node_modules || { echo \"hum-engine: the view tests import hum/mod, whose types come from hum's packages; run bun install in hum first\" >&2; exit 1; }; tsc --noEmit",
     "schema": "bun scripts/write-schema.ts",
     "eval": "bun scripts/eval.ts",
     "release:check": "bun tools/release/main.ts check",

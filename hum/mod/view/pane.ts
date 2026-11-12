@@ -1,24 +1,16 @@
 import type { Card, Status } from "../../../hum-engine/src/status/format.ts";
-import type { Unread } from "../../types";
 import { blankRow, noticeCardRows, questionCardRows, unreadCardRows } from "./cards.ts";
-import { reportedUnread } from "./freshness.ts";
+import { reportedUnread, sinceText } from "./freshness.ts";
 import { headerRow, measureRow } from "./header.ts";
-import { type ListEntry, listRows, sinceText } from "./lists.ts";
-import type { ViewRead } from "./read.ts";
+import type { ViewInput } from "./input.ts";
+import { type ListEntry, listRows } from "./lists.ts";
 import { innerWidth, padded, type Row, span } from "./row.ts";
 import { problemWords } from "./summary.ts";
 import { wrap } from "./cells.ts";
 
-export type PaneInput = {
-	readonly read: ViewRead;
-	readonly now: number;
-	readonly amberAfterSeconds: number;
-	/** The width the surface gives the body. */
-	readonly width: number;
+type PaneInput = ViewInput & {
 	/** The ids of the list rows the owner unfolded. */
 	readonly unfolded: ReadonlySet<string>;
-	/** A read of the work source that keeps failing; it shows as the first card once it is past the amber limit. */
-	readonly unread?: Unread;
 };
 
 /** Notice cards in the order the pane lists them. */
@@ -33,7 +25,7 @@ const listSection = (title: string, entries: readonly ListEntry[], input: PaneIn
 	section(
 		title,
 		entries.length,
-		entries.flatMap((entry) => listRows(entry, input.unfolded.has(entry.foldId), input.width)),
+		entries.flatMap((entry) => listRows(entry, { isUnfolded: input.unfolded.has(entry.foldId), width: input.width })),
 		input.width,
 	);
 
@@ -56,49 +48,50 @@ const mergedEntries = ({ merged }: Status, now: number): ListEntry[] =>
 const choiceEntries = ({ choices }: Status, now: number): ListEntry[] =>
 	choices.map(({ item, text, at }) => ({ foldId: `choice:${item}:${at}`, item, title: text, meta: [span(sinceText(at, now), "dim")] }));
 
-const unreadBlocks = (unread: Unread | undefined, now: number, amberAfterSeconds: number, width: number): Row[][] => {
-	const reported = reportedUnread(unread, now, amberAfterSeconds);
+const unreadBlocks = (input: ViewInput): Row[][] => {
+	const reported = reportedUnread(input.unread, input);
 
-	return reported === undefined ? [] : [unreadCardRows(reported, now, width)];
+	return reported === undefined ? [] : [unreadCardRows(reported, input)];
 };
 
 /** The cards, the unread read first, then question cards and then waiting, limited and fault. */
-const cardBlocks = (status: Status, now: number, width: number, unreadFirst: readonly Row[][]): Row[][] => [
-	...unreadFirst,
-	...status.questions.map((question) => questionCardRows(question, now, width)),
-	...NOTICE_ORDER.flatMap((kind) => status.cards.filter((card) => card.kind === kind).map((card) => noticeCardRows(card, now, width))),
+const cardBlocks = (status: Status, input: ViewInput): Row[][] => [
+	...unreadBlocks(input),
+	...status.questions.map((question) => questionCardRows(question, input)),
+	...NOTICE_ORDER.flatMap((kind) => status.cards.filter((card) => card.kind === kind).map((card) => noticeCardRows(card, input))),
 ];
 
-/** The rows above the first card: the header's two lines and a blank. */
-export const headerRows = (status: Status, now: number, amberAfterSeconds: number, width: number): Row[] => [headerRow(status, now, amberAfterSeconds, width), measureRow(status.measure, width)];
+/** The rows above the first card: the header's two lines. */
+const headerRows = (status: Status, input: ViewInput): Row[] => [headerRow(status, input), measureRow(status.measure, input.width)];
 
-const bodyRows = (input: PaneInput): Row[] => {
-	const { read, now, amberAfterSeconds, width } = input;
-	const unread = unreadBlocks(input.unread, now, amberAfterSeconds, width);
+/** The pane's blocks in order, split where an inline pane opens: the header and the first card lead, and a status file it cannot show leads with all it has. */
+const blocksOf = (input: PaneInput) => {
+	const { read, now, width } = input;
 
-	if (read.kind !== "status") return separated([...unread, wrap(problemWords(read) ?? "Reading the status file.", width).map((line): Row => [span(line, "amber")])]);
+	if (read.kind !== "status") return { lead: [...unreadBlocks(input), wrap(problemWords(read) ?? "Reading the status file.", width).map((line): Row => [span(line, "amber")])], rest: [] };
 
 	const { status } = read;
+	const [first = [], ...cards] = cardBlocks(status, input);
 
-	return separated([
-		headerRows(status, now, amberAfterSeconds, width),
-		...cardBlocks(status, now, width, unread),
-		listSection("in flight", inFlightEntries(status, now), input),
-		listSection("merged", mergedEntries(status, now), input),
-		listSection("choices made without you", choiceEntries(status, now), input),
-	]);
+	return {
+		lead: [headerRows(status, input), first],
+		rest: [
+			...cards,
+			listSection("in flight", inFlightEntries(status, now), input),
+			listSection("merged", mergedEntries(status, now), input),
+			listSection("choices made without you", choiceEntries(status, now), input),
+		],
+	};
 };
+
+const innerBlocksOf = (input: PaneInput) => blocksOf({ ...input, width: innerWidth(input.width) });
 
 /** The whole pane: header, then question cards, notice cards, in flight, merged, and choices made without the owner; each row has its padding. */
-export const paneRows = (input: PaneInput): Row[] => bodyRows({ ...input, width: innerWidth(input.width) }).map(padded);
+export const paneRows = (input: PaneInput): Row[] => {
+	const { lead, rest } = innerBlocksOf(input);
 
-/** The rows an inline pane opens with: the header and the first card, so its buttons are in view. */
-export const openingRows = (read: ViewRead, now: number, amberAfterSeconds: number, width: number, unread?: Unread): number => {
-	if (read.kind !== "status") return paneRows({ read, now, amberAfterSeconds, width, unfolded: new Set(), unread }).length;
-
-	const inner = innerWidth(width);
-	const first = cardBlocks(read.status, now, inner, unreadBlocks(unread, now, amberAfterSeconds, inner))[0] ?? [];
-
-	return headerRows(read.status, now, amberAfterSeconds, inner).length + (first.length === 0 ? 0 : first.length + 1);
+	return separated([...lead, ...rest]).map(padded);
 };
 
+/** The rows an inline pane opens with: the header and the first card, so its buttons are in view. */
+export const openingRows = (input: ViewInput): number => separated(innerBlocksOf({ ...input, unfolded: new Set() }).lead).length;

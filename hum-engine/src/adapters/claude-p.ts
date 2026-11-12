@@ -8,14 +8,14 @@ import semver from "semver";
 import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
-import { CommandTimedOut, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
-import { rejectedToken, UNAUTHORIZED } from "../service/token.ts";
+import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
 import { LIMIT_TEXT, LIMIT_UNPARSED, type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
-import { billed } from "./transcript.ts";
+import { billed, Counts } from "./transcript.ts";
 
 export type Effort = (typeof EFFORTS)[number];
 
@@ -33,7 +33,7 @@ export const RUN_SETTINGS = JSON.stringify({
  * no settings source (plugins, MCP servers, memory files) and no built-in tool: a question needs neither, and each
  * one bills on every call.
  */
-export const CALLS = {
+const CALLS = {
 	run: { settings: RUN_SETTINGS, flags: [] },
 	judgment: {
 		settings: JSON.stringify({ permissions: { defaultMode: "bypassPermissions" }, disableAllHooks: true, outputStyle: "default" }),
@@ -41,7 +41,7 @@ export const CALLS = {
 	},
 } as const satisfies Record<string, { settings: string; flags: readonly string[] }>;
 
-export type Call = keyof typeof CALLS;
+type Call = keyof typeof CALLS;
 
 const REQUIRED_PLUGIN = "hope";
 
@@ -88,11 +88,7 @@ export const runArgs = ({ model, effort, schema, sessionId, call = "run", name }
 	...(name === undefined ? [] : ["-n", name]),
 ];
 
-const Usage = z.looseObject({
-	input_tokens: z.number().default(0),
-	output_tokens: z.number().default(0),
-	cache_creation_input_tokens: z.number().default(0),
-});
+const Usage = z.looseObject(Counts);
 
 const ModelUsage = z.looseObject({
 	inputTokens: z.number().default(0),
@@ -229,7 +225,7 @@ export type RunOutcome =
 /** What one process ended as, before the runner acts on a limit it could not read. */
 type Ended = RunOutcome | LimitEnded;
 
-export const succeeded = (outcome: Finished): boolean => outcome.subtype === "success" && !outcome.isError;
+export const hasSucceeded = (outcome: Finished): boolean => outcome.subtype === "success" && !outcome.isError;
 
 const LOCK_TEXT = /refresh[^\n]*lock|lock[^\n]*refresh/i;
 
@@ -322,9 +318,9 @@ export type RunnerOptions = {
 	readonly binary?: string;
 	/** The limit of `claude --version`, which the version floor reads, and of the start check; the owner's `commandTimeoutSeconds` in milliseconds. */
 	readonly timeoutMs?: number;
-	/** Added to the process environment. An API key in the environment is passed on untouched. */
-	readonly env?: Readonly<Record<string, string>>;
-	readonly now?: () => number;
+	/** The environment `claude` runs with, the process's own from the root. An API key in it is passed on untouched. */
+	readonly env: Env;
+	readonly now: () => number;
 	/** The first wait before a run that hit the refresh-lock error runs again; later waits grow from it. */
 	readonly lockBackoffMs?: number;
 };
@@ -368,7 +364,7 @@ const recordCredential = (state: RunnerOptions["state"], credential: string): vo
 		return;
 	}
 
-	if (recorded === credential) return state.faults.clear("credential-changed");
+	if (recorded === credential) return state.faults.clear({ code: "credential-changed" });
 
 	state.faults.raise({
 		code: "credential-changed",
@@ -402,8 +398,7 @@ type Started = { readonly check: RunOutcome; readonly runner: Runner };
  * No run starts until the version floor and the start check pass; until then every run is held with one card.
  */
 const startChecked = async (options: RunnerOptions): Promise<Started> => {
-	const { state, binary = "claude", now = Date.now, lockBackoffMs = LOCK_BACKOFF_MS, timeoutMs = SHIPPED_COMMAND_TIMEOUT_MS } = options;
-	const env = { ...process.env, ...options.env };
+	const { state, binary = "claude", env, now, lockBackoffMs = LOCK_BACKOFF_MS, timeoutMs = SHIPPED_COMMAND_TIMEOUT_MS } = options;
 	const limitedUntil = () => savedLimitUntil(state);
 
 	const hold = (code: string, cause: string, fix: string): Extract<RunOutcome, { kind: "held" }> => ({
@@ -507,9 +502,9 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 
 		if (outcome.kind !== "finished") return outcome;
 
-		if (isUnauthorized(outcome)) return { kind: "held", card: rejectedToken(state.faults, outcome.text) };
+		if (isUnauthorized(outcome)) return { kind: "held", card: raiseRejectedToken(state.faults, outcome.text) };
 
-		state.faults.clear("token-rejected");
+		state.faults.clear({ code: "token-rejected" });
 
 		return outcome;
 	};
@@ -550,7 +545,7 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 
 	const hasPlugin = check.plugins.includes(REQUIRED_PLUGIN);
 
-	if (!succeeded(check) || !hasPlugin) {
+	if (!hasSucceeded(check) || !hasPlugin) {
 		return held(
 			hold(
 				"start-check-failed",
@@ -562,8 +557,8 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 
 	recordCredential(state, credentialOf(check.keySource, env));
 
-	state.faults.clear(LIMIT_UNPARSED);
-	state.faults.clear(START_TIMED_OUT);
+	state.faults.clear({ code: LIMIT_UNPARSED });
+	state.faults.clear({ code: START_TIMED_OUT });
 
 	return { check, runner: { run, limitedUntil } };
 };
@@ -576,7 +571,7 @@ const isUnsettled = ({ check }: Started): boolean => check.kind === "limited" ||
  * limit that still stands defers the check, so no call is made before the limit ends and no restart is needed.
  */
 export const startRunner = async (options: RunnerOptions): Promise<Started> => {
-	const { state, now = Date.now } = options;
+	const { state, now } = options;
 	const started = pMemoize(() => startChecked(options));
 
 	const settle = async (): Promise<Started> => {

@@ -3,6 +3,7 @@ import parseDiff from "parse-diff";
 import PQueue from "p-queue";
 import pkg from "../../package.json" with { type: "json" };
 import type { HumConfig } from "../config/schema.ts";
+import { SECOND_MS } from "../time.ts";
 import { labelChanges, type PastChange } from "../decide/labels.ts";
 import type { Change, Histories, Label } from "../decide/risk.ts";
 import { type Git, PATCH } from "./git.ts";
@@ -50,7 +51,7 @@ const readLog = async (
 			return {
 				sha,
 				subject,
-				committedAt: Number(committed) * 1000,
+				committedAt: Number(committed) * SECOND_MS,
 				body: body.trim(),
 				files: counted.map(({ file }) => file),
 				size: counted.reduce((sum, { lines }) => sum + lines, 0),
@@ -79,7 +80,7 @@ const rewrittenRanges = (
 		}),
 	);
 
-/** The changes that wrote the lines `sha` deleted or rewrote: git blame at its parent. */
+/** The changes that wrote the lines `sha` deleted or rewrote: git blame at its parent. A root commit deletes nothing, so it blames nothing; a blame git fails throws. */
 const blame = async (git: Git, sha: string): Promise<readonly string[]> => {
 	const diff = await git.raw([
 		"show",
@@ -92,7 +93,7 @@ const blame = async (git: Git, sha: string): Promise<readonly string[]> => {
 
 	const found = await Promise.all(
 		rewrittenRanges(diff).map(async ({ file, from, to }) => {
-			const result = await git.run([
+			const blamed = await git.raw([
 				"blame",
 				"--porcelain",
 				"-L",
@@ -102,11 +103,7 @@ const blame = async (git: Git, sha: string): Promise<readonly string[]> => {
 				file,
 			]);
 
-			return result.code === 0
-				? result.stdout
-						.split("\n")
-						.flatMap((line) => BLAME_HEADER.exec(line)?.[1] ?? [])
-				: [];
+			return blamed.split("\n").flatMap((line) => BLAME_HEADER.exec(line)?.[1] ?? []);
 		}),
 	);
 
@@ -124,14 +121,14 @@ export const readHistory = async (
 ): Promise<PastChange[]> => {
 	const changes = await readLog(git, base, historyDepth);
 
-	const rewrites = (change: PastChange): boolean =>
+	const doesRewrite = (change: PastChange): boolean =>
 		[changeLabels.fixSubject, changeLabels.revertSubject].some((subject) => new RegExp(subject).test(change.subject));
 
 	const queue = new PQueue({ concurrency: BLAMES_AT_ONCE });
 
 	return Promise.all(
 		changes.map(async (change) =>
-			rewrites(change)
+			doesRewrite(change)
 				? {
 						...change,
 						blamed: (await queue.add(() => blame(git, change.sha))) ?? [],
@@ -167,7 +164,7 @@ export const historiesOf = (
 	);
 };
 
-const matchesAny = (sources: readonly string[], line: string): boolean =>
+const doesMatchAny = (sources: readonly string[], line: string): boolean =>
 	sources.some((source) => new RegExp(source).test(line));
 
 /** What a diff tells the risk level: the paths, the size, a loosened check and a change to the engine's pin. */
@@ -187,7 +184,7 @@ export const changeOf = (
 		),
 	);
 
-	const holdsPin = (file: parseDiff.File): boolean =>
+	const doesHoldPin = (file: parseDiff.File): boolean =>
 		[MANIFEST, ...lockfiles].includes(basename(file.to ?? file.from ?? ""));
 
 	return {
@@ -204,12 +201,12 @@ export const changeOf = (
 		size: files.reduce((sum, file) => sum + file.additions + file.deletions, 0),
 		loosened: lines.some(
 			({ change, text }) =>
-				(change.type === "add" && matchesAny(loosenedCheck.added, text)) ||
-				(change.type === "del" && matchesAny(loosenedCheck.removed, text)),
+				(change.type === "add" && doesMatchAny(loosenedCheck.added, text)) ||
+				(change.type === "del" && doesMatchAny(loosenedCheck.removed, text)),
 		),
 		pinChanged: lines.some(
 			({ file, change, text }) =>
-				change.type !== "normal" && holdsPin(file) && text.includes(pkg.name),
+				change.type !== "normal" && doesHoldPin(file) && text.includes(pkg.name),
 		),
 	};
 };

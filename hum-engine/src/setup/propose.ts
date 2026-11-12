@@ -46,7 +46,7 @@ const scriptCommand = (scan: RepoScan, script: string): string | undefined => {
  * The commands the repo's own CI runs on a pull request to check a change; else its package scripts that check.
  * A run checks a fresh clone, which has no dependencies yet, so the lockfile install comes first.
  */
-export const checksOf = (scan: RepoScan): string[] => {
+const checksOf = (scan: RepoScan): string[] => {
 	const fromCi = unique(scan.ci.filter(isPullRequestJob).flatMap(({ commands }) => commands.filter(isCheck)));
 	const checks = fromCi.length > 0 ? fromCi : CHECK_SCRIPTS.flatMap((script) => scriptCommand(scan, script) ?? []);
 
@@ -60,14 +60,14 @@ const rankOfFolder = (folder: string): number => FOLDER_RANKS.find((row) => row.
 const topFolders = (tracked: readonly string[]): string[] => unique(tracked.flatMap((path) => (path.includes("/") ? [path.split("/")[0] ?? ""] : []))).sort();
 
 /** A rule per top-level folder, one for markdown at the root and one for the other root files, so no path is left unplaced. */
-export const pathRulesOf = (tracked: readonly string[], levels: HumConfig["levels"]): PathRule[] => [
+const pathRulesOf = (tracked: readonly string[], levels: HumConfig["levels"]): PathRule[] => [
 	...topFolders(tracked).map((folder) => ({ glob: `${folder}/**`, level: levelAt(levels, rankOfFolder(folder)) })),
 	{ glob: "*.md", level: levelAt(levels, ROOT_MARKDOWN_RANK) },
 	{ glob: "*", level: levelAt(levels, DEFAULT_FOLDER_RANK) },
 ];
 
 /** The data and secrets globs that match a tracked file; a file that only shows the shape of a secret does not count. */
-export const strictGlobsOf = (tracked: readonly string[]): string[] =>
+const strictGlobsOf = (tracked: readonly string[]): string[] =>
 	DATA_AND_SECRET_GLOBS.filter((glob) => tracked.some((path) => new Bun.Glob(glob).match(path) && !SECRET_TEMPLATE.test(path)));
 
 const mapLabels = (labels: readonly string[], kinds: readonly string[]): Record<string, string> =>
@@ -80,7 +80,7 @@ const mapLabels = (labels: readonly string[], kinds: readonly string[]): Record<
 	);
 
 /** Label → kind for the labels the repo uses: those on its issue templates and the ones it lists. A label the table does not know is left out. */
-export const kindLabelsOf = (scan: RepoScan, repoLabels: readonly string[], kinds: readonly string[]): Record<string, string> =>
+const kindLabelsOf = (scan: RepoScan, repoLabels: readonly string[], kinds: readonly string[]): Record<string, string> =>
 	mapLabels([...scan.issueTemplates.flatMap(({ labels }) => labels), ...repoLabels], kinds);
 
 /** How many of the open items name their kind through the map, a kind's own name or a template field. */

@@ -17,7 +17,7 @@ export type Row = readonly Span[];
 export const span = (text: string, tone: Tone = "plain", press?: Press): Span => ({ text: plain(text), tone, press });
 
 /** The empty cells at each side of every row the view draws. */
-export const PADDING = 1;
+const PADDING = 1;
 
 /** The width a row's content has inside the padding. */
 export const innerWidth = (width: number): number => Math.max(0, width - 2 * PADDING);

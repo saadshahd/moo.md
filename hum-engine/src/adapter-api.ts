@@ -1,12 +1,13 @@
 import { z } from "zod";
+import type { Env } from "./exec.ts";
 import type { FaultInput } from "./state/faults.ts";
 
 export type { FaultInput };
 
 /** Bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
-export const ADAPTER_API_VERSION = 1;
+export const ADAPTER_API_VERSION = 2;
 
-/** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once. */
+/** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once, as it does a `failed: "now"` answer. */
 export class PermanentError extends Error {
 	override name: string = "PermanentError";
 }
@@ -21,9 +22,18 @@ export const ItemId = z
 	.string()
 	.max(ITEM_ID_LENGTH, ITEM_ID_MESSAGE)
 	.regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, ITEM_ID_MESSAGE)
-	.refine((id) => !id.includes("..") && !id.endsWith(".lock"), "an item id has no '..' and does not end in '.lock'");
+	.refine((id) => !id.includes("..") && !id.endsWith(".lock"), "an item id has no '..' and does not end in '.lock'")
+	.brand<"ItemId">();
 
 export type ItemId = z.infer<typeof ItemId>;
+
+/** Who holds a claim: a plain name, never an item id. */
+export const Holder = z
+	.string()
+	.regex(/^[A-Za-z0-9][\w.@:-]{0,99}$/, "a holder is a plain name: letters, digits and . _ @ : -")
+	.brand<"Holder">();
+
+export type Holder = z.infer<typeof Holder>;
 
 const text = z.string().min(1);
 const time = z.int().nonnegative();
@@ -60,7 +70,7 @@ export const Item = ItemRef.extend({
 
 export type Item = z.infer<typeof Item>;
 
-export const Claim = z.strictObject({ item: ItemId, holder: text, expiresAt: time });
+export const Claim = z.strictObject({ item: ItemId, holder: Holder, expiresAt: time });
 
 export type Claim = z.infer<typeof Claim>;
 
@@ -84,39 +94,59 @@ export type FollowUp = { readonly title: string; readonly body: string };
 /** The work source: the queue, the claims and the item threads. */
 export interface WorkSource {
 	listReady(): Promise<ItemRef[]>;
-	read(id: string): Promise<Item>;
+	read(id: ItemId): Promise<Item>;
 	/** An atomic take. An unclaimed or expired item goes to the first caller; the same holder renews. */
-	claim(id: string, holder: string, ttlMs: number): Promise<ClaimResult>;
+	claim(id: ItemId, holder: Holder, ttlMs: number): Promise<ClaimResult>;
 	/** Extends the holder's own claim; `won: false` when another worker holds it now. */
-	renew(id: string, holder: string, ttlMs: number): Promise<ClaimResult>;
-	comment(id: string, text: string): Promise<void>;
+	renew(id: ItemId, holder: Holder, ttlMs: number): Promise<ClaimResult>;
+	comment(id: ItemId, text: string): Promise<void>;
 	/** Files a ready item. Filing the same `title` from the same `from` twice returns the first item. */
-	fileFollowUp(from: string, followUp: FollowUp): Promise<ItemRef>;
+	fileFollowUp(from: ItemId, followUp: FollowUp): Promise<ItemRef>;
 }
 
 /** Where a run's questions and the choices made without the owner land. */
 export interface Questions {
-	ask(id: string, question: Question): Promise<void>;
+	ask(id: ItemId, question: Question): Promise<void>;
 	/** Records a choice made without the owner. */
-	decide(id: string, text: string): Promise<void>;
+	decide(id: ItemId, text: string): Promise<void>;
 }
 
 /** Where the owner's answers arrive. */
 export interface Answers {
-	answer(id: string, answer: Answer): Promise<void>;
+	answer(id: ItemId, answer: Answer): Promise<void>;
 	/** The one cheap read: has anything changed since `since`. An idle call costs no rate limit. */
 	watch(since?: string): Promise<Watch>;
 }
 
 export interface Release {
 	/** Puts the item's artifact where reviewers see it. */
-	publish(id: string, ref: string): Promise<void>;
+	publish(id: ItemId, ref: string): Promise<void>;
 	/** Ships a published artifact. */
-	release(id: string, ref: string): Promise<void>;
+	release(id: ItemId, ref: string): Promise<void>;
 }
+
+/**
+ * A call an adapter could not complete, answered in place of its value. `retry`: a later attempt may work, and the
+ * engine tries again within the provider timeout. `now`: no attempt will, and the engine raises one card and stops.
+ */
+export const Failed = z.strictObject({ failed: z.enum(["retry", "now"]), why: text });
+
+export type Failed = z.infer<typeof Failed>;
+
+/** An integration as an adapter implements it: every call may answer `Failed` in place of its value. */
+export type Fallible<I> = { readonly [K in keyof I]: I[K] extends (...args: infer A) => Promise<infer R> ? (...args: A) => Promise<R | Failed> : I[K] };
 
 /** An adapter declares the API version it implements and the integrations it provides. */
 export type Adapter = {
+	readonly apiVersion: number;
+	readonly workSource?: Fallible<WorkSource>;
+	readonly questions?: Fallible<Questions>;
+	readonly answers?: Fallible<Answers>;
+	readonly release?: Fallible<Release>;
+};
+
+/** The integrations with plain replies: the engine calls them so behind the guard, which retries or throws on `Failed`, and an adapter that never answers `Failed` may implement them so. */
+export type Integrations = {
 	readonly apiVersion: number;
 	readonly workSource?: WorkSource;
 	readonly questions?: Questions;
@@ -128,6 +158,8 @@ export type AdapterContext = {
 	/** Raise a fault card, scoped to one item or provider. */
 	readonly report: (fault: FaultInput) => void;
 	readonly now: () => number;
+	/** The process environment, for the tokens and addresses an adapter reads. */
+	readonly env: Env;
 };
 
 /** The default export of an owner's `adapters/<name>.ts`. */

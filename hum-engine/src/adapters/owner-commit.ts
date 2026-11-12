@@ -1,5 +1,5 @@
 import type { MergeMethod } from "../config/schema.ts";
-import { type PushOutcome, PushRefused } from "./git.ts";
+import type { PushOutcome } from "./git.ts";
 import { methodFor, type Pull, type PullRequests } from "./pull-requests.ts";
 
 export type OwnerCommit = {
@@ -22,13 +22,17 @@ export type CommitLanded =
 	| { readonly via: "push" }
 	| { readonly via: "pull-request"; readonly pull: Pull; readonly merged: boolean }
 	/** Another writer moved the base first; the caller builds the commit again. */
-	| { readonly via: "conflict" };
+	| { readonly via: "conflict" }
+	/** The remote refused the push, in `said`, and the repo is not on GitHub, so no pull request can land it. */
+	| { readonly via: "refused"; readonly said: string };
 
 const throughPullRequest = async (commit: OwnerCommit, pulls: PullRequests): Promise<CommitLanded> => {
 	const branch = `${commit.branchPrefix}${commit.label}-${commit.sha.slice(0, 12)}`;
 	const rules = await pulls.rules(commit.base);
 
-	await commit.push([`${commit.sha}:refs/heads/${branch}`]);
+	const pushed = await commit.push([`${commit.sha}:refs/heads/${branch}`]);
+
+	if (pushed.kind === "refused") return { via: "refused", said: pushed.said };
 
 	const pull = (await pulls.find(branch)) ?? (await pulls.open({ head: branch, base: commit.base, title: commit.title, body: commit.body }));
 	const armed = pull.state === "MERGED" ? "merged" : await pulls.autoMerge(pull, true, methodFor(commit.mergeMethod, rules.mergeMethods));
@@ -46,15 +50,13 @@ export const landOwnerCommit = async (commit: OwnerCommit): Promise<CommitLanded
 
 	if (pulls && (await pulls.rules(commit.base)).requiresPullRequest) return throughPullRequest(commit, pulls);
 
-	try {
-		const outcome = await commit.push([`${commit.sha}:refs/heads/${commit.base}`]);
+	const outcome = await commit.push([`${commit.sha}:refs/heads/${commit.base}`]);
 
-		return outcome === "pushed" ? { via: "push" } : { via: "conflict" };
-	} catch (error) {
-		if (!(error instanceof PushRefused) || !pulls) throw error;
+	if (outcome.kind !== "refused") return { via: outcome.kind === "pushed" ? "push" : "conflict" };
 
-		await pulls.rules(commit.base, true);
+	if (!pulls) return { via: "refused", said: outcome.said };
 
-		return throughPullRequest(commit, pulls);
-	}
+	await pulls.rules(commit.base, true);
+
+	return throughPullRequest(commit, pulls);
 };

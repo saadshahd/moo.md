@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { stripVTControlCharacters } from "node:util";
 import parseDiff from "parse-diff";
-import stringify from "safe-stable-stringify";
 import { z } from "zod";
 import type { Finished } from "../adapters/claude-p.ts";
+import { hashJson } from "../config/hash.ts";
 import type { Boundary, HumConfig } from "../config/schema.ts";
 
 const TAG_HASH = 12;
@@ -41,7 +41,7 @@ export const PlanFile = z.strictObject({
 export type PlanFile = z.infer<typeof PlanFile>;
 
 /** A plan's identity: a later run reads the plan with this hash, and any other text is not the approved plan. */
-export const planHash = (plan: PlanFile): string => createHash("sha256").update(stringify(plan)).digest("hex");
+export const planHash = (plan: PlanFile): string => hashJson(plan);
 
 /** The two states whose outcome is prose: the events each may pick, and the safer pick an unsure run takes. */
 export const PROSE_STATES = {
@@ -75,7 +75,7 @@ export const pickSchema = (events: readonly string[]): JsonSchema => jsonSchemaO
 const isInHunk = (line: number, { newStart, newLines }: { newStart: number; newLines: number }): boolean => line >= newStart && line < newStart + Math.max(newLines, 1);
 
 /** At least one cite, and each names a file the diff changes and a line inside one of its hunks. */
-export const citesDiff = (cites: readonly Cite[], diff: string): boolean => {
+export const doesCiteDiff = (cites: readonly Cite[], diff: string): boolean => {
 	const files = parseDiff(diff);
 	const isChanged = ({ file, line }: Cite): boolean => files.some((changed) => changed.to === file && changed.chunks.some((hunk) => isInHunk(line, hunk)));
 
@@ -84,7 +84,7 @@ export const citesDiff = (cites: readonly Cite[], diff: string): boolean => {
 
 /** Code's check on the artifact behind a pick: why it fails, or undefined when it holds. */
 const FENCES = new Map<string, (pick: EventPick, diff: string) => string | undefined>([
-	["request-changes", (pick, diff) => (citesDiff(pick.cites, diff) ? undefined : "request-changes must cite a file and a line the diff changes")],
+	["request-changes", (pick, diff) => (doesCiteDiff(pick.cites, diff) ? undefined : "request-changes must cite a file and a line the diff changes")],
 	["plan-ready", (pick) => (pick.plan ? undefined : "plan-ready must hold a plan: a summary, at least one step and the paths it touches")],
 ]);
 

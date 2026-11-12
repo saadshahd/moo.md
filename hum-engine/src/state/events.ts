@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Json } from "../config/json.ts";
 import { createOnce, listRecords, readJson, slug } from "./fs.ts";
 
-export const SavedEvent = z.strictObject({
+export const SavedEvent = z.object({
 	/** Where the event came from, such as a thread comment id: a second read of it adds nothing. */
 	source: z.string().min(1),
 	sourceId: z.string().min(1),

@@ -78,7 +78,6 @@ export class Items {
 
 	/** A failed write leaves the old snapshot and raises one card. */
 	save(itemId: string, kind: Kind, snapshot: Json): Outcome<void> {
-		const key = `snapshot-write-failed:${itemId}`;
 		const envelope = { format: this.#format, engineVersion: this.#engineVersion, itemId, kind: kind.machine.id, machineVersion: kind.machine.version, savedAt: this.#now(), snapshot };
 
 		try {
@@ -95,7 +94,7 @@ export class Items {
 			};
 		}
 
-		this.#faults.clear(key);
+		this.#faults.clear({ code: "snapshot-write-failed", item: itemId });
 
 		return { ok: true, value: undefined };
 	}
@@ -122,7 +121,7 @@ export class Items {
 		rmSync(this.path(itemId), { force: true });
 	}
 
-	#fault(itemId: string, code: string, cause: string, fix: string): Outcome<never> {
+	#fault({ itemId, code, cause, fix }: { readonly itemId: string; readonly code: string; readonly cause: string; readonly fix: string }): Outcome<never> {
 		return { ok: false, fault: this.#faults.raise({ code, item: itemId, cause, fix }) };
 	}
 
@@ -132,8 +131,8 @@ export class Items {
 	 */
 	async restore(itemId: string, kind: Kind, { kindAt, sources = {}, clock }: RestoreOptions = {}): Promise<Outcome<AnyActor | undefined>> {
 		const file = this.path(itemId);
-		const unreadable = (why: string) => this.#fault(itemId, "snapshot-unreadable", `The saved state of ${itemId} at ${file} is damaged: ${why}.`, DAMAGED_FIX);
-		const unrestorable = (why: string) => this.#fault(itemId, "snapshot-restore-error", `The saved state of ${itemId} does not restore: ${why}.`, DAMAGED_FIX);
+		const unreadable = (why: string) => this.#fault({ itemId, code: "snapshot-unreadable", cause: `The saved state of ${itemId} at ${file} is damaged: ${why}.`, fix: DAMAGED_FIX });
+		const unrestorable = (why: string) => this.#fault({ itemId, code: "snapshot-restore-error", cause: `The saved state of ${itemId} does not restore: ${why}.`, fix: DAMAGED_FIX });
 		let parsed: Json;
 
 		try {
@@ -143,15 +142,15 @@ export class Items {
 
 			if (error instanceof SyntaxError) return unreadable(error.message);
 
-			return this.#fault(itemId, "snapshot-unreadable", `The saved state of ${itemId} at ${file} cannot be read: ${reason(error)}.`, "Fix the file's permissions or restore it from a backup; the other items go on.");
+			return this.#fault({ itemId, code: "snapshot-unreadable", cause: `The saved state of ${itemId} at ${file} cannot be read: ${reason(error)}.`, fix: "Fix the file's permissions or restore it from a backup; the other items go on." });
 		}
 
 		const header = Header.safeParse(parsed);
 
 		if (!header.success) return unreadable("it has no format or engine version");
 
-		if (header.data.format > this.#format || isFromNewerEngine(header.data.engineVersion, this.#engineVersion)) {
-			return this.#fault(itemId, "snapshot-from-newer-engine", `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, "Update the engine to that version or later: bun add --exact @moo.md/hum@latest.");
+		if (header.data.format > this.#format || isFromNewerEngine({ written: header.data.engineVersion, running: this.#engineVersion })) {
+			return this.#fault({ itemId, code: "snapshot-from-newer-engine", cause: `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, fix: "Update the engine to that version or later: bun add --exact @moo.md/hum@latest." });
 		}
 
 		let envelope: ReturnType<typeof Envelope.safeParse>;
@@ -172,12 +171,12 @@ export class Items {
 				const previous = kindAt?.(machineVersion);
 
 				if (!previous) {
-					return this.#fault(itemId, "snapshot-machine-unknown", `${itemId} was saved under version ${machineVersion} of its machine, and this config holds no map from it.`, "Add a stateMap for that version to the kind file, or delete the item's saved state.");
+					return this.#fault({ itemId, code: "snapshot-machine-unknown", cause: `${itemId} was saved under version ${machineVersion} of its machine, and this config holds no map from it.`, fix: "Add a stateMap for that version to the kind file, or delete the item's saved state." });
 				}
 
 				current = await migrateSnapshot(previous, kind, snapshot, sources);
 			} catch (error) {
-				return this.#fault(itemId, "snapshot-restore-error", `${itemId} could not move from machine version ${machineVersion} to ${kind.machine.version}: ${reason(error)}.`, "Map the state in the kind's stateMap, or delete the item's saved state.");
+				return this.#fault({ itemId, code: "snapshot-restore-error", cause: `${itemId} could not move from machine version ${machineVersion} to ${kind.machine.version}: ${reason(error)}.`, fix: "Map the state in the kind's stateMap, or delete the item's saved state." });
 			}
 		}
 

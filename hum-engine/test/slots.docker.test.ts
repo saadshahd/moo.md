@@ -12,9 +12,11 @@ const dockerUp = await x("docker", ["info"]).then(
 
 if (!dockerUp) console.log("skip run-slot service tests: docker is not running");
 
-const PREFIX = "humslot";
-const SHARED_SERVER = "humslot-shared-pg";
-const PORTS = { base: 38600, stride: 10 };
+/** Suites that run at once on one docker share its names, so each run names its own from its pid. */
+const RUN_PREFIX = "humslot";
+const PREFIX = `${RUN_PREFIX}${process.pid}`;
+const OWNING_RUN = new RegExp(`^${RUN_PREFIX}(\\d+)-`);
+const SHARED_SERVER = `${PREFIX}-shared-pg`;
 const SERVER_WAIT_MS = 500;
 const SERVER_TRIES = 60;
 
@@ -23,7 +25,7 @@ const docker = (args: string[], env: Record<string, string> = {}) => x("docker",
 const worlds: SlotWorld[] = [];
 
 const world = (settings: SlotSettings): SlotWorld => {
-	const made = slotWorld({ projectPrefix: PREFIX, ports: PORTS, ...settings });
+	const made = slotWorld({ projectPrefix: PREFIX, ...settings });
 
 	worlds.push(made);
 
@@ -33,17 +35,17 @@ const world = (settings: SlotSettings): SlotWorld => {
 afterEach(async () => {
 	for (const made of worlds.splice(0)) {
 		await made.slots.idle();
-		made.dispose();
 	}
 });
 
 const composeProjects = async (): Promise<string[]> => {
 	const { stdout } = await docker(["ps", "--filter", `label=com.docker.compose.project`, "--format", '{{.Label "com.docker.compose.project"}}']);
 
-	return [...new Set(stdout.split("\n").filter((name) => name.startsWith(PREFIX)))].sort();
+	return [...new Set(stdout.split("\n").filter((name) => name.startsWith(`${PREFIX}-`)))].sort();
 };
 
-const COMPOSE = "services:\n  cache:\n    image: redis:7-alpine\n    ports:\n      - '127.0.0.1:${HUM_SLOT_PORT_BASE}:6379'\n";
+/** Docker picks each free host port, so runs at once never ask for the same one. */
+const COMPOSE = "services:\n  cache:\n    image: redis:7-alpine\n    ports:\n      - '127.0.0.1::6379'\n";
 
 test.skipIf(!dockerUp)("two slots prepared from one compose file run at once under two project names, on two ports", async () => {
 	const w = world({
@@ -62,7 +64,8 @@ test.skipIf(!dockerUp)("two slots prepared from one compose file run at once und
 		const ports = await Promise.all([first, second].map(async ({ env }) => (await docker(["compose", "port", "cache", "6379"], env)).stdout.trim()));
 
 		expect(await composeProjects()).toEqual([`${PREFIX}-slot-1`, `${PREFIX}-slot-2`]);
-		expect(ports.sort()).toEqual([`127.0.0.1:${PORTS.base}`, `127.0.0.1:${PORTS.base + PORTS.stride}`]);
+		expect(ports).toEqual([expect.stringMatching(/^127\.0\.0\.1:\d+$/), expect.stringMatching(/^127\.0\.0\.1:\d+$/)]);
+		expect(new Set(ports).size).toBe(2);
 	} finally {
 		for (const name of [`${PREFIX}-slot-1`, `${PREFIX}-slot-2`]) await docker(["compose", "-p", name, "down", "-v", "--remove-orphans"], { COMPOSE_PROJECT_NAME: name });
 	}
@@ -70,9 +73,39 @@ test.skipIf(!dockerUp)("two slots prepared from one compose file run at once und
 
 const psql = (database: string, ...commands: string[]) => docker(["exec", SHARED_SERVER, "psql", "-U", "postgres", "-d", database, "-tA", ...commands.flatMap((command) => ["-c", command])]);
 
+const isRunning = (pid: number): boolean => {
+	try {
+		process.kill(pid, 0);
+
+		return true;
+	} catch (error) {
+		return error instanceof Error && "code" in error && error.code === "EPERM";
+	}
+};
+
+/** A run that crashed left its containers; those of a run still going stay. */
+const removeOrphans = async (): Promise<void> => {
+	const { stdout } = await docker(["ps", "-a", "--filter", `name=^${RUN_PREFIX}`, "--format", '{{.Names}}\t{{.Label "com.docker.compose.project"}}']);
+
+	const orphans = stdout
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => {
+			const [name = "", project = ""] = line.split("\t");
+
+			return { name, project, owner: OWNING_RUN.exec(project || name)?.[1] };
+		})
+		.filter(({ owner }) => owner !== undefined && !isRunning(Number(owner)));
+
+	for (const project of new Set(orphans.flatMap(({ project }) => project || []))) await docker(["compose", "-p", project, "down", "-v", "--remove-orphans"]);
+
+	for (const { name } of orphans.filter(({ project }) => !project)) await docker(["rm", "-f", "-v", name]);
+};
+
 beforeAll(async () => {
 	if (!dockerUp) return;
 
+	await removeOrphans();
 	await docker(["rm", "-f", SHARED_SERVER]);
 	await docker(["run", "-d", "--name", SHARED_SERVER, "-e", "POSTGRES_PASSWORD=hum", "postgres:16-alpine"]);
 
@@ -112,15 +145,17 @@ test.skipIf(!dockerUp)("on one shared set of services each slot gets its own dat
 	);
 
 	const rowsOf = async (taken: typeof first) => (await psql(taken.env.HUM_SLOT_DATABASE ?? "", "select v from marker")).stdout.trim();
+	const slotOf = (taken: typeof first): string => taken.env.HUM_SLOT ?? "";
 
 	expect(first.env.HUM_SLOT_DATABASE).not.toBe(second.env.HUM_SLOT_DATABASE);
-	expect(await rowsOf(first)).toBe("slot-1");
-	expect(await rowsOf(second)).toBe("slot-2");
-	expect(Object.values(first.env).join(" ")).not.toContain("slot-2");
+	expect([slotOf(first), slotOf(second)].sort()).toEqual(["slot-1", "slot-2"]);
+	expect(await rowsOf(first)).toBe(slotOf(first));
+	expect(await rowsOf(second)).toBe(slotOf(second));
+	expect(Object.values(first.env).join(" ")).not.toContain(slotOf(second));
 
 	await first.giveBack();
 	await w.slots.idle();
 
 	expect((await psql(first.env.HUM_SLOT_DATABASE ?? "", "select v from marker")).exitCode).not.toBe(0);
-	expect(await rowsOf(second)).toBe("slot-2");
+	expect(await rowsOf(second)).toBe(slotOf(second));
 }, 120_000);

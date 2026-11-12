@@ -106,7 +106,7 @@ test("the band drops its version, then the CI age, then the Mac age, then its na
 test("the header and the measure line are one row each at every width, and the notes stay", () => {
 	for (const width of WIDTHS) {
 		expect(
-			rowCells(headerRow(fullStatus, NOW, AMBER_AFTER, width)),
+			rowCells(headerRow(fullStatus, { now: NOW, amberAfterSeconds: AMBER_AFTER, width: width })),
 			String(width),
 		).toBeLessThanOrEqual(width);
 
@@ -135,8 +135,7 @@ test("a question is never cut: every character comes back at every width", () =>
 		for (const width of WIDTHS) {
 			const rows = questionCardRows(
 				{ item: "68", text, options: [], since: NOW - 5_580_000 },
-				NOW,
-				width,
+				{ now: NOW, width },
 			);
 
 			for (const row of rows)
@@ -152,7 +151,7 @@ test("a question is never cut: every character comes back at every width", () =>
 
 test("a card's title loses parts from the end and keeps its item", () => {
 	const card = fullStatus.cards[0];
-	const title = (width: number) => textOf(card === undefined ? [] : (noticeCardRows(card, NOW, width)[0] ?? []));
+	const title = (width: number) => textOf(card === undefined ? [] : (noticeCardRows(card, { now: NOW, width })[0] ?? []));
 
 	expect(title(60)).toContain("71 · fault · 5 m");
 	expect(title(20)).toContain("71 · fault");
@@ -162,7 +161,7 @@ test("a card's title loses parts from the end and keeps its item", () => {
 test("a notice card gives the cause, then the fix, then its one action whole, which fills an answer to its item, at every width", () => {
 	for (const card of fullStatus.cards) {
 		for (const width of WIDTHS) {
-			const rows = noticeCardRows(card, NOW, width);
+			const rows = noticeCardRows(card, { now: NOW, width });
 
 			for (const row of rows)
 				expect(rowCells(row), `${card.key} at ${width}`).toBeLessThanOrEqual(
@@ -180,33 +179,26 @@ test("a notice card gives the cause, then the fix, then its one action whole, wh
 	}
 });
 
-test("buttons are whole, two cells apart and right-aligned; one that does not fit starts a new row", () => {
-	const labels = [
-		"approve",
-		"change the plan",
-		"file follow-up",
-		"x".repeat(14),
-	];
+const BUTTONS = ["approve", "change the plan", "file follow-up", "x".repeat(14)].map((label, index) =>
+	button({ label, press: { kind: "fill", item: "68", word: label }, isPrimary: index === 0 }),
+);
 
-	const buttons = labels.map((label, index) =>
-		button(label, { kind: "fill", item: "68", word: label }, index === 0),
+test("the first button is drawn filled and the rest dim", () => {
+	expect(BUTTONS.map(({ tone }) => tone)).toEqual(["filled", "dim", "dim", "dim"]);
+	expect(BUTTONS[0]?.text).toBe("▐ approve ▌");
+	expect(BUTTONS[1]?.text).toBe(" change the plan ");
+});
+
+test.each(WIDTHS)("buttons are whole and fill each row to width %p, and one that does not fit starts a new row", (width) => {
+	const rows = buttonRows(BUTTONS, width);
+
+	const shown = rows.flatMap((row) =>
+		row.filter(({ press }) => press !== undefined).map(({ text }) => text),
 	);
 
-	expect(buttons.map(({ tone }) => tone)).toEqual(["filled", "dim", "dim", "dim"]);
-	expect(buttons[0]?.text).toBe("▐ approve ▌");
-	expect(buttons[1]?.text).toBe(" change the plan ");
+	for (const row of rows) expect(rowCells(row)).toBe(width);
 
-	for (const width of WIDTHS) {
-		const rows = buttonRows(buttons, width);
-
-		const shown = rows.flatMap((row) =>
-			row.filter(({ press }) => press !== undefined).map(({ text }) => text),
-		);
-
-		for (const row of rows) expect(rowCells(row), String(width)).toBe(width);
-
-		expect(shown).toEqual(buttons.map(({ text }) => text));
-	}
+	expect(shown).toEqual(BUTTONS.map(({ text }) => text));
 });
 
 const LONG_TITLE = `Rename the release script and update every workflow that calls it ${"and then some ".repeat(6)}`;
@@ -222,37 +214,39 @@ const ENTRY = {
 	],
 };
 
-test("a list row is one line while its title has room, ends a cut title in an ellipsis that unfolds, and goes under the id when narrow", () => {
-	for (const width of WIDTHS) {
-		const folded = listRows(ENTRY, false, width);
+test.each(WIDTHS)("a folded list row fits width %p and ends a cut title in an ellipsis that unfolds", (width) => {
+	const folded = listRows(ENTRY, { isUnfolded: false, width });
 
-		for (const row of folded)
-			expect(rowCells(row), String(width)).toBeLessThanOrEqual(width);
+	for (const row of folded) expect(rowCells(row)).toBeLessThanOrEqual(width);
 
-		const cut = folded.flatMap((row) =>
-			row.filter(({ text }) => text.endsWith("…")),
-		);
+	const cut = folded.flatMap((row) =>
+		row.filter(({ text }) => text.endsWith("…")),
+	);
 
-		for (const part of cut)
-			expect(part.press).toEqual({ kind: "fold", id: ENTRY.foldId });
+	for (const part of cut)
+		expect(part.press).toEqual({ kind: "fold", id: ENTRY.foldId });
+});
 
-		const unfolded = listRows(ENTRY, true, width);
+test.each(WIDTHS)("an unfolded list row fits width %p and shows the whole title", (width) => {
+	const unfolded = listRows(ENTRY, { isUnfolded: true, width });
 
-		for (const row of unfolded)
-			expect(rowCells(row)).toBeLessThanOrEqual(width);
+	for (const row of unfolded) expect(rowCells(row)).toBeLessThanOrEqual(width);
 
-		expect(unfolded.map(textOf).join("")).not.toContain("…");
-		expect(withoutSpaces(unfolded.slice(1).map(textOf).join(""))).toBe(
-			withoutSpaces(LONG_TITLE),
-		);
-	}
+	expect(unfolded.map(textOf).join("")).not.toContain("…");
+	expect(withoutSpaces(unfolded.slice(1).map(textOf).join(""))).toBe(
+		withoutSpaces(LONG_TITLE),
+	);
+});
 
-	expect(listRows(ENTRY, false, 120)).toHaveLength(1);
-	expect(listRows(ENTRY, false, 30)).toHaveLength(2);
+test.each([
+	[120, 1],
+	[30, 2],
+])("a list row at width %p takes %p lines: one while its title has room, the title under the id when narrow", (width, lines) => {
+	expect(listRows(ENTRY, { isUnfolded: false, width })).toHaveLength(lines);
 });
 
 test("an unclear item carries the word beside its level", () => {
-	expect(listRows(ENTRY, false, 120).map(textOf).join("")).toContain(
+	expect(listRows(ENTRY, { isUnfolded: false, width: 120 }).map(textOf).join("")).toContain(
 		"medium unclear",
 	);
 });
@@ -305,10 +299,10 @@ test("an inline pane opens as tall as its header and first card", () => {
 			(row, index) => index > 0 && textOf(row).includes("May the run publish"),
 		) - 2;
 
-	expect(openingRows(statusRead, NOW, AMBER_AFTER, 45)).toBe(firstCardEnd);
+	expect(openingRows(inputOf(statusRead, 45))).toBe(firstCardEnd);
 });
 
-test("an age is never negative, grows with the clock, and is amber exactly past the limit", () => {
+test("an age is never negative, grows with the clock, and is amber only past the limit", () => {
 	for (const at of [0, 1_000, NOW - 14_000, NOW]) {
 		let previous = -1;
 
@@ -331,9 +325,13 @@ test("an age is never negative, grows with the clock, and is amber exactly past 
 			expect(isAmber(age, AMBER_AFTER)).toBe(age > AMBER_AFTER);
 		}
 	}
+});
 
-	expect(isAmber(15, AMBER_AFTER)).toBe(false);
-	expect(isAmber(16, AMBER_AFTER)).toBe(true);
+test.each([
+	[15, false],
+	[16, true],
+])("an age of %p seconds is amber: %p", (age, amber) => {
+	expect(isAmber(age, AMBER_AFTER)).toBe(amber);
 });
 
 test("an age reads in its two biggest units", () => {
@@ -354,10 +352,10 @@ test("an age reads in its two biggest units", () => {
 });
 
 test("a redraw is due exactly when a shown age or its colour changes", () => {
-	const shown = (now: number) => agesShown(fullStatus, now, AMBER_AFTER);
+	const shown = (now: number) => agesShown(fullStatus, { now: now, amberAfterSeconds: AMBER_AFTER });
 
 	expect(shown(NOW)).not.toBe(shown(NOW + 1_000));
-	expect(shown(NOW)).toBe(agesShown(fullStatus, NOW + 100, AMBER_AFTER));
+	expect(shown(NOW)).toBe(agesShown(fullStatus, { now: NOW + 100, amberAfterSeconds: AMBER_AFTER }));
 });
 
 test("the status file's format number decides what the view reads", () => {
@@ -370,10 +368,18 @@ test("the status file's format number decides what the view reads", () => {
 	expect(parseStatus("{").kind).toBe("unreadable");
 });
 
+test("a status file of this format in another shape reads as unreadable, naming the field", () => {
+	const { questions: _, ...withoutQuestions } = fullStatus;
+	const read = parseStatus(JSON.stringify(withoutQuestions));
+
+	expect(read.kind).toBe("unreadable");
+	expect(read.kind === "unreadable" && read.message).toContain("questions");
+});
+
 test("the status file sits in the repo's git common dir, from the main checkout and from a worktree", () => {
-	expect(statusPathOf("/repo", ".git")).toBe("/repo/.git/hum/status.json");
-	expect(statusPathOf("/repo", ".")).toBe("/repo/hum/status.json");
-	expect(statusPathOf("/repo/.worktrees/a", "/repo/.git")).toBe(
+	expect(statusPathOf({ cwd: "/repo", commonDir: ".git" })).toBe("/repo/.git/hum/status.json");
+	expect(statusPathOf({ cwd: "/repo", commonDir: "." })).toBe("/repo/hum/status.json");
+	expect(statusPathOf({ cwd: "/repo/.worktrees/a", commonDir: "/repo/.git" })).toBe(
 		"/repo/.git/hum/status.json",
 	);
 });

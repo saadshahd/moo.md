@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
 	type AdapterContext,
@@ -14,35 +13,23 @@ import {
 	guarded,
 	markdownAdapter,
 	openState,
-	PushRefused,
 	sourceFiles,
 	type State,
 } from "../src/index.ts";
 import { guardTimings } from "../src/adapters/guard.ts";
 import { markDone, newItemFile, parseItemFile } from "../src/adapters/item-file.ts";
-import { WorkRepo, itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
+import { filedFollowUp, followUpKey } from "../src/adapters/marked.ts";
+import { WorkRepo, itemFile, markdownSettings } from "./fixtures/work-repo.ts";
+import { tempDir } from "./fixtures/temp.ts";
+import { type Failed, type Fallible, Holder, ItemId, type WorkSource } from "../src/adapter-api.ts";
 
-const cleanups: (() => void)[] = [];
-
-const tmp = (): string => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-adapter-"));
-
-	cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-
-	return dir;
-};
-
-afterEach(() => {
-	for (const clean of cleanups.splice(0)) clean();
-});
-
-const stateIn = (now: () => number): State => openState(tmp(), { now });
+const stateIn = (now: () => number): State => openState(tempDir("adapter"), { now });
 
 describe("contract suite on markdown (a temp repo with a local bare remote)", () => {
 	const repo = new WorkRepo();
 	const clock = { offset: 0 };
 	const now = () => Date.now() + clock.offset;
-	const context: AdapterContext = { report: () => {}, now };
+	const context: AdapterContext = { report: () => {}, now, env: process.env };
 	const options = (path: string) => ({ repo: path, base: "main", ...markdownSettings });
 	const primary = markdownAdapter(options(repo.worker("worker-1")), context);
 	const secondary = markdownAdapter(options(repo.worker("worker-2")), context);
@@ -60,12 +47,12 @@ describe("contract suite on markdown (a temp repo with a local bare remote)", ()
 });
 
 describe("markdown settings", () => {
-	const context: AdapterContext = { report: () => {}, now: Date.now };
+	const context: AdapterContext = { report: () => {}, now: Date.now, env: process.env };
 
 	test("a write that keeps losing the race gives up after writeRaceRetries retries", async () => {
 		const repo = new WorkRepo();
 		const id = repo.seed("raced");
-		const pushes = repo.refuseMainPushes();
+		const pushes = repo.refusePushes();
 		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, writeRaceRetries: 2 }, context);
 
 		await expect(adapter.workSource?.comment(id, "hello")).rejects.toThrow("gave up after 3 lost races");
@@ -82,13 +69,15 @@ describe("markdown settings", () => {
 });
 
 describe("item files", () => {
-	test("a new item file keeps a long title on one line, and finishing an item changes only its state", () => {
+	test("a new item file keeps a long title on one line", () => {
 		const title = `${"word ".repeat(40)}end`;
 		const created = newItemFile(title, "The body.");
 
 		expect(created.split("\n")[1]).toBe(`title: ${title}`);
 		expect(parseItemFile(created)).toMatchObject({ title, state: "ready", body: "The body." });
+	});
 
+	test("finishing an item changes only its state", () => {
 		const owned = "---\n# the owner's note\ntitle: A title\nstate: ready\nkind: fix\nowner: me\n---\n\nThe body.\n";
 		const finished = markDone(owned);
 
@@ -96,13 +85,19 @@ describe("item files", () => {
 		expect(finished).toContain("owner: me");
 		expect(parseItemFile(finished)).toMatchObject({ title: "A title", state: "done", kind: "fix", body: "The body." });
 	});
+
+	test("a thread entry a newer engine marked with a field this one does not know still reads", () => {
+		const source = `${newItemFile("A title", "The body.")}\n<!-- hum {"kind":"answer","at":5,"option":"yes","addedLater":true} -->\nyes\n`;
+
+		expect(parseItemFile(source).thread).toEqual([{ kind: "answer", at: 5, option: "yes", text: "yes" }]);
+	});
 });
 
 describe("a malformed item file", () => {
 	test("other items advance, and one card names the file", async () => {
 		const repo = new WorkRepo();
 		const reported: FaultInput[] = [];
-		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now });
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now, env: process.env });
 
 		repo.add("good", itemFile("Good one"));
 		repo.add("broken", "no front matter at all\n");
@@ -110,7 +105,7 @@ describe("a malformed item file", () => {
 
 		const ready = await adapter.workSource?.listReady();
 
-		expect(ready?.map((ref) => ref.id)).toEqual(["good"]);
+		expect(ready?.map((ref) => ref.id)).toEqual([ItemId.parse("good")]);
 		expect(reported.map((fault) => fault.item).sort()).toEqual(["bad-marker", "broken"]);
 		expect(reported[0]?.cause).toContain(".hum/work/");
 	});
@@ -157,6 +152,37 @@ describe("provider failures and empty lists", () => {
 		expect(attempts).toBeGreaterThan(10);
 	});
 
+	/** The fake's adapter, whose `read` answers each of `replies` in turn before it reads for real. */
+	const answering = (provider: FakeProvider, replies: readonly Failed[]) => {
+		const inner = provider.adapter();
+		let calls = 0;
+		const read: Fallible<WorkSource>["read"] = async (id) => replies[calls++] ?? (await inner.workSource!.read(id));
+
+		return { adapter: { ...inner, workSource: { ...inner.workSource!, read } }, calls: () => calls };
+	};
+
+	test("a read the adapter answers failed now fails at once with one card, and is not tried again", async () => {
+		const provider = new FakeProvider();
+		const state = stateIn(provider.now);
+		const id = provider.seed("one");
+		const { adapter, calls } = answering(provider, [{ failed: "now", why: "the item was deleted" }]);
+
+		await expect(guarded(adapter, { provider: "fake", faults: state.faults, timeoutMs: 10_000, backoffMs: { first: 5, max: 5 } }).workSource?.read(id)).rejects.toThrow("the item was deleted");
+		expect(calls()).toBe(1);
+		expect(state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: "provider-failed", cause: expect.stringContaining("the item was deleted") }]);
+	});
+
+	test("a read the adapter answers failed retry is tried again, and the answer after it stands", async () => {
+		const provider = new FakeProvider();
+		const state = stateIn(provider.now);
+		const id = provider.seed("one");
+		const { adapter, calls } = answering(provider, [{ failed: "retry", why: "busy" }, { failed: "retry", why: "busy" }]);
+
+		expect((await guarded(adapter, { provider: "fake", faults: state.faults, timeoutMs: 10_000, backoffMs: { first: 5, max: 5 } }).workSource?.read(id))?.title).toBe("one");
+		expect(calls()).toBe(3);
+		expect(state.faults.list()).toEqual([]);
+	});
+
 	test("502 past the timeout shows one card, however often it is read", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);
@@ -198,7 +224,7 @@ describe("provider failures and empty lists", () => {
 		const id = provider.seed("a");
 
 		await adapter.workSource?.listReady();
-		await adapter.workSource?.claim(id, "w", 60_000);
+		await adapter.workSource?.claim(id, Holder.parse("w"), 60_000);
 
 		expect(await adapter.workSource?.listReady()).toEqual([]);
 		expect(state.faults.list()).toEqual([]);
@@ -242,24 +268,33 @@ describe("the start check", () => {
 	test("an adapter that imports xstate is refused, and the card names the file", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);
-		const dir = tmp();
+		const dir = tempDir("adapter");
 		const bad = join(dir, "adapters", "linear.ts");
-		const good = join(dir, "adapters", "clean.ts");
 
 		mkdirSync(dirname(bad), { recursive: true });
 		writeFileSync(bad, `import { createMachine } from "xstate";\nexport default () => createMachine;\n`);
-		writeFileSync(good, `import { ItemId } from "@moo.md/hum/adapter-api";\nexport default () => ItemId;\n`);
+		writeFileSync(join(dir, "adapters", "clean.ts"), `import { ItemId } from "@moo.md/hum/adapter-api";\nexport default () => ItemId;\n`);
 
 		const refused = await admit({ name: "linear", adapter: provider.adapter(), files: sourceFiles(join(dir, "adapters")), root: dir, faults: state.faults, guard: guard() });
 
 		expect(refused.ok).toBe(false);
 		expect(state.faults.list().map((card) => card.item)).toEqual(["adapters/linear.ts"]);
-		expect(engineImporters([good])).toEqual([]);
+	});
 
-		for (const line of [`import("xstate/graph")`, `require("@statelyai/agent")`, `import "xstate"`, `export * from "xstate"`]) {
-			writeFileSync(bad, `${line};\n`);
-			expect(engineImporters([bad]).length).toBe(1);
-		}
+	test("an adapter that imports only the adapter API imports no engine module", () => {
+		const good = join(tempDir("adapter"), "clean.ts");
+
+		writeFileSync(good, `import { ItemId } from "@moo.md/hum/adapter-api";\nexport default () => ItemId;\n`);
+
+		expect(engineImporters([good])).toEqual([]);
+	});
+
+	test.each([`import("xstate/graph")`, `require("@statelyai/agent")`, `import "xstate"`, `export * from "xstate"`])("%s is an engine import", (line) => {
+		const bad = join(tempDir("adapter"), "linear.ts");
+
+		writeFileSync(bad, `${line};\n`);
+
+		expect(engineImporters([bad])).toHaveLength(1);
 	});
 
 	test("the engine's own adapters import no engine module", () => {
@@ -270,7 +305,7 @@ describe("the start check", () => {
 });
 
 describe("an answer writes, commits and pushes with hooks off", () => {
-	const hook = (dir: string, name: string, script: string) => {
+	const hook = ({ dir, name, script }: { readonly dir: string; readonly name: string; readonly script: string }) => {
 		const path = join(dir, "hooks", name);
 
 		mkdirSync(dirname(path), { recursive: true });
@@ -283,10 +318,10 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		const worker = repo.worker("w");
 		const ran = join(repo.root, "hook-ran");
 
-		for (const name of ["pre-push", "pre-commit", "commit-msg", "reference-transaction"]) hook(join(worker, ".git"), name, `touch ${ran}; exit 1`);
+		for (const name of ["pre-push", "pre-commit", "commit-msg", "reference-transaction"]) hook({ dir: join(worker, ".git"), name, script: `touch ${ran}; exit 1` });
 
 		const id = repo.seed("asked");
-		const adapter = markdownAdapter({ repo: worker, base: "main", ...markdownSettings }, { report: () => {}, now: Date.now });
+		const adapter = markdownAdapter({ repo: worker, base: "main", ...markdownSettings }, { report: () => {}, now: Date.now, env: process.env });
 
 		await adapter.answers?.answer(id, { text: "ship it", option: "approve" });
 
@@ -295,19 +330,34 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		expect(existsSync(ran)).toBe(false);
 	});
 
-	test("a protected branch refuses the push, loudly", async () => {
+	test("a protected branch refuses the answer's push, and the answer is a failure in the remote's words that no retry fixes", async () => {
 		const repo = new WorkRepo();
 		const reported: FaultInput[] = [];
 		const id = repo.seed("asked");
 
-		hook(repo.remote, "pre-receive", `echo "GH006: Protected branch update failed for refs/heads/main" >&2; exit 1`);
+		hook({ dir: repo.remote, name: "pre-receive", script: `echo "GH006: Protected branch update failed for refs/heads/main" >&2; exit 1` });
 
-		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now });
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now, env: process.env });
 
-		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toBeInstanceOf(PushRefused);
-		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toThrow("Protected branch");
-		expect(reported[0]?.code).toBe("push-refused");
+		expect(await adapter.answers?.answer(id, { text: "no" })).toEqual({ failed: "now", why: expect.stringContaining("Protected branch") });
+		expect(reported).toEqual([]);
 		expect(repo.show(id)).not.toContain('"kind":"answer"');
-		expect(sh(repo.remote, ["rev-parse", "main"]).length).toBeGreaterThan(0);
 	});
+
+	test("a claim the remote refuses is a failure in the remote's words that no retry fixes", async () => {
+		const repo = new WorkRepo();
+		const id = repo.seed("claimed");
+
+		repo.refusePushes({ refs: `refs/heads/${markdownSettings.claimPrefix}*`, said: "GH013: claim branches are protected" });
+
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: () => {}, now: Date.now, env: process.env });
+
+		expect(await adapter.workSource?.claim(id, Holder.parse("w"), 60_000)).toEqual({ failed: "now", why: expect.stringContaining("GH013") });
+	});
+});
+
+test("a follow-up note whose marker carries a field a newer engine added still names the filed item", () => {
+	const marker = { kind: "comment", followUp: { key: followUpKey("Split the parser"), item: "12", addedLater: true } };
+
+	expect(filedFollowUp([`<!-- hum ${JSON.stringify(marker)} -->\nFiled follow-up #12: Split the parser`], "Split the parser")).toBe(ItemId.parse("12"));
 });

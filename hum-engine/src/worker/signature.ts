@@ -14,7 +14,7 @@ const LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json", "pnpm-lock.yaml
 const isInside = (path: string, folder: string): boolean => path === folder || path.startsWith(`${folder}/`);
 
 /** Every file under `folder` of `root`, hidden ones too, as paths from `root` in a stable order, without the items folder: every claim, answer and merge changes it, and it is no config. */
-const filesUnder = (root: string, folder: string, itemsDir: string): string[] =>
+const filesUnder = ({ root, folder, itemsDir }: { readonly root: string; readonly folder: string; readonly itemsDir: string }): string[] =>
 	existsSync(join(root, folder))
 		? [...new Bun.Glob("**").scanSync({ cwd: join(root, folder), dot: true, onlyFiles: true })].flatMap((path) => (isInside(join(folder, path), itemsDir) ? [] : [join(folder, path)])).sort()
 		: [];
@@ -31,9 +31,9 @@ export const installedVersion = (repo: string, fallback: string): string => {
 };
 
 /** The installed engine version and one hash of the lockfile, `.hum/` (without its items) and `adapters/`. */
-export const signatureOf = (repo: string, fallbackVersion: string, itemsDir: string): Signature => {
+export const signatureOf = ({ repo, fallbackVersion, itemsDir }: { readonly repo: string; readonly fallbackVersion: string; readonly itemsDir: string }): Signature => {
 	const hash = createHash("sha256");
-	const files = [...LOCKFILES.filter((name) => existsSync(join(repo, name))), ...filesUnder(repo, ".hum", itemsDir), ...filesUnder(repo, "adapters", itemsDir)];
+	const files = [...LOCKFILES.filter((name) => existsSync(join(repo, name))), ...filesUnder({ root: repo, folder: ".hum", itemsDir }), ...filesUnder({ root: repo, folder: "adapters", itemsDir })];
 
 	for (const file of files) hash.update(relative(repo, join(repo, file))).update("\0").update(readFileSync(join(repo, file))).update("\0");
 

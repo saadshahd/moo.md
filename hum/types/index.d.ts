@@ -17,15 +17,16 @@ export type Answering = {
 	/** An open sentence waits for the owner's words; a whole answer is complete as filled. */
 	readonly isOpen: boolean;
 	readonly option?: string;
-	/** The box as Enter took it, while its post is in flight. */
-	readonly posted?: string;
 };
+
+/** An answer whose post is in flight, with the box as Enter took it. */
+export type Posting = Answering & { readonly posted: string };
 
 /** What the box should hold after an event. */
 export type BoxWrite = { readonly kind: "keep" } | { readonly kind: "set"; readonly text: string };
 
-export type AnswerContext = {
-	readonly answering?: Answering;
+/** What one event decided, in every state. */
+export type AnswerOutcome = {
 	/** Where the owner's Enter went. */
 	readonly enter: "claude" | "thread" | "nowhere" | "untouched";
 	readonly box: BoxWrite;
@@ -33,10 +34,16 @@ export type AnswerContext = {
 	readonly say?: string;
 };
 
-export type AnswerState = "off" | "on" | "posting";
+/** One state of answer mode, as its machine keeps it. */
+export type AnswerSnapshotIn<State extends string, Context> = { status: "active"; value: State; context: AnswerOutcome & Context; output: undefined; error: undefined };
 
-/** Answer mode as its machine keeps it between events. */
-export type AnswerSnapshot = { status: "active"; value: AnswerState; context: AnswerContext; output: undefined; error: undefined };
+/** Answer mode as its machine keeps it between events: off holds no answer, on holds the answer the box is filling, posting holds the answer in flight. */
+export type AnswerSnapshot =
+	| AnswerSnapshotIn<"off", { readonly answering?: undefined }>
+	| AnswerSnapshotIn<"on", { readonly answering: Answering }>
+	| AnswerSnapshotIn<"posting", { readonly answering: Posting }>;
+
+export type AnswerState = AnswerSnapshot["value"];
 
 /** A read of what changed that keeps failing: its cause and when the failures began. */
 export type Unread = { readonly cause: string; readonly since: number };

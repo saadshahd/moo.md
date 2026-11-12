@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { shimSpecJson } from "./shim.ts";
+import { z } from "zod";
+import { SHIM_MODEL, shimSpecJson } from "./shim.ts";
 
 /**
  * The background half of the `claude` stand-in: `--bg`, `agents --json`, `stop` and `rm`. A launched run is the
@@ -56,10 +57,13 @@ const readLog = (): { cmd: string }[] => {
 
 const valueOf = (argv: string[], flag: string): string => argv[argv.indexOf(flag) + 1] ?? "";
 
-const hookFolder = (settings: string): string => /cat > '(.*?)'\/\$\$\.json/.exec(settings)?.[1] ?? "";
+const hookCommand = (settings: string): string => z.object({ hooks: z.object({ Stop: z.tuple([z.object({ hooks: z.tuple([z.object({ command: z.string() })]) })]) }) }).parse(JSON.parse(settings)).hooks.Stop[0].hooks[0].command;
 
-const dropHook = (folder: string, event: string, sessionId: string, transcriptPath: string) => {
-	writeFileSync(join(folder, `${process.pid}-${Date.now()}-${event}.json`), JSON.stringify({ hook_event_name: event, session_id: sessionId, transcript_path: transcriptPath }));
+/** Runs the run's own hook command with the input Claude Code gives a hook. */
+const dropHook = ({ command, event, sessionId, transcriptPath }: { readonly command: string; readonly event: string; readonly sessionId: string; readonly transcriptPath: string }) => {
+	const ran = Bun.spawnSync(["sh", "-c", command], { stdin: Buffer.from(JSON.stringify({ hook_event_name: event, session_id: sessionId, transcript_path: transcriptPath })) });
+
+	if (ran.exitCode !== 0) throw new Error(`the ${event} hook failed: ${ran.stderr.toString()}`);
 };
 
 const setState = (id: string, state: string) => writeAgents(readAgents().map((agent) => (agent.id === id ? { ...agent, state } : agent)));
@@ -91,14 +95,14 @@ const writeJob = (id: string, tokens: number) => {
 	writeFileSync(join(folder, "state.json"), JSON.stringify({ tokens }));
 };
 
-const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = ""]: string[]) => {
+const finish = async ([id = "", sessionId = "", cwd = "", hook = "", schema = ""]: string[]) => {
 	let resetsAt: number | undefined;
 	const transcript = join(dir, `${sessionId}.jsonl`);
 	const rows = (row: Entry) => appendFileSync(transcript, `${JSON.stringify({ sessionId, ...row })}\n`);
 	const prompt = readFileSync(join(dir, `${id}.prompt`), "utf8");
 
 	writeFileSync(transcript, "");
-	dropHook(folder, "UserPromptSubmit", sessionId, transcript);
+	dropHook({ command: hook, event: "UserPromptSubmit", sessionId, transcriptPath: transcript });
 
 	const proc = Bun.spawn([process.execPath, SHIM, "-p", "--json-schema", schema, "--session-id", sessionId], { cwd, stdin: new TextEncoder().encode(prompt), stdout: "pipe", env: process.env });
 
@@ -114,7 +118,7 @@ const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = 
 
 		if (event.type === "rate_limit_event") resetsAt = event.rate_limit_info.resetsAt;
 
-		if (event.type === "assistant") rows({ type: "assistant", message: { id: event.message.id, model: "claude-haiku-5-5", usage: event.message.usage } });
+		if (event.type === "assistant") rows({ type: "assistant", message: { id: event.message.id, model: SHIM_MODEL, usage: event.message.usage } });
 
 		if (event.type !== "result") continue;
 
@@ -129,11 +133,11 @@ const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = 
 			return;
 		}
 
-		dropHook(folder, "Stop", sessionId, transcript);
+		dropHook({ command: hook, event: "Stop", sessionId, transcriptPath: transcript });
 		await wait(AFTER_ROW_MS);
 		rows({ type: "attachment", timestamp: new Date().toISOString(), attachment: { type: "structured_output", data: event.structured_output } });
 		await wait(AFTER_ROW_MS);
-		dropHook(folder, "Stop", sessionId, transcript);
+		dropHook({ command: hook, event: "Stop", sessionId, transcriptPath: transcript });
 	}
 };
 
@@ -155,7 +159,7 @@ const launch = async (argv: string[]) => {
 
 	writeFileSync(join(dir, `${id}.prompt`), prompt);
 
-	const child = Bun.spawn([process.execPath, import.meta.path, "finish", id, sessionId, process.cwd(), hookFolder(settings), valueOf(argv, "--json-schema")], {
+	const child = Bun.spawn([process.execPath, import.meta.path, "finish", id, sessionId, process.cwd(), hookCommand(settings), valueOf(argv, "--json-schema")], {
 		cwd: process.cwd(),
 		env: process.env,
 		stdio: ["ignore", "ignore", "ignore"],

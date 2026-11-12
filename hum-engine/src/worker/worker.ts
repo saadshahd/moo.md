@@ -5,9 +5,10 @@ import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
-import { ADAPTER_API_VERSION, type Answers, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Answers, type Holder, ItemId, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
+import { invokedSources } from "../config/machine.ts";
 import { type Kind, SCHEMA_VERSION } from "../config/schema.ts";
 import { checkTokenAge } from "../service/token.ts";
 import { listFiles } from "../state/fs.ts";
@@ -21,13 +22,13 @@ import { readHistory } from "../adapters/history.ts";
 import { gitIn, PATCH } from "../adapters/git.ts";
 import { join } from "node:path";
 import { configuredModelCall, modelCallOver } from "../adapters/model-call.ts";
-import { MemoryFormatError, readMemory, unusedEntries, useOf } from "../loop/memory.ts";
+import { type MemoryEntry, readMemory, type RefusedLine, unusedEntries, useOf } from "../loop/memory.ts";
 import { runLoopPass, type LoopPass } from "../loop/pass.ts";
-import { modelProposer, trustsRepeats } from "../loop/pair.ts";
+import { modelProposer, doesTrustRepeats } from "../loop/pair.ts";
 import { measureOf } from "../measure/measure.ts";
 import { measureInputsOf } from "../measure/inputs.ts";
-import { readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
-import { emptyStatus, type Status } from "../status/format.ts";
+import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
+import type { Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
@@ -39,7 +40,7 @@ import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, claimTtlMs, DEFAULT_BASE, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, hasEndedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -62,15 +63,19 @@ export type WorkerOptions = {
 	readonly remote: string;
 	readonly base?: string;
 	readonly checks: readonly string[];
-	readonly holder: string;
+	readonly holder: Holder;
 	readonly workDir?: string;
 	/** Gives each pass its working copy; by default a `git clone`. */
 	readonly checkout?: Checkout;
-	/** The run slots behind `checkout`, if any: each tick asks them to keep slots ready. */
-	readonly slots?: Pick<SlotPool, "keepReady">;
+	/** The run slots behind `checkout`, if any: each tick asks them to keep slots ready, and the worker is idle once their upkeep ends. */
+	readonly slots?: Pick<SlotPool, "keepReady" | "idle">;
 	readonly dir?: string;
 	readonly where?: "mac" | "ci";
-	readonly now?: () => number;
+	readonly now: () => number;
+	/** The names of the variables the runs have, for the missing-secret check. */
+	readonly runnerVariables: ReadonlySet<string>;
+	/** A fresh id for each run's session. */
+	readonly newSessionId: () => string;
 	/** The engine this process runs; the update check compares the one installed in `repo` with it. */
 	readonly engineVersion?: string;
 	/** The newest published version; a failed or slow read shows no version. */
@@ -103,7 +108,24 @@ type InFlight = {
 };
 
 const ERROR_EXCERPT = 300;
+
 const UNREAD_CODE = "item-unread";
+
+const linesText = (lines: readonly number[]): string => `${lines.length === 1 ? "line" : "lines"} ${lines.join(", ")}`;
+
+/** The card for each reason memory.md lines are refused. */
+const MEMORY_CARDS = {
+	"no-source": {
+		code: "memory-format",
+		cause: (lines: readonly number[]) => `Runs skip memory.md ${linesText(lines)}: no "(source: …)".`,
+		fix: "Give the line a source, as in - <rule> (source: <where you said it>).",
+	},
+	"past-cap": {
+		code: "memory-full",
+		cause: (lines: readonly number[], maxBytes: number) => `Runs skip memory.md ${linesText(lines)}: past memoryMaxBytes (${maxBytes}).`,
+		fix: "Remove entries you no longer need, or raise memoryMaxBytes in .hum/hum.json.",
+	},
+} as const satisfies Record<RefusedLine["why"], { code: string; cause: (lines: readonly number[], maxBytes: number) => string; fix: string }>;
 
 /** Reads `read` at most once per `everyMs`; a failed read, or one slower than `timeoutMs`, shows no value, and that too is kept for the period. */
 const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyMs, timeoutMs }: { everyMs: number; timeoutMs: number }): (() => Promise<T | undefined>) =>
@@ -112,8 +134,7 @@ const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyM
 		: pMemoize(() => pTimeout(read(), { milliseconds: timeoutMs, fallback: () => undefined }).catch(() => undefined), { cache: new ExpiryMap(everyMs) });
 
 /** Sources that never settle, so a restored item can be stepped by its timers without starting a run. */
-const neverSources = (kind: Kind) =>
-	Object.fromEntries(Object.values(kind.machine.states).flatMap((node) => (node.invoke ? [[node.invoke.src, createAsyncLogic({ run: () => new Promise<never>(() => {}) })]] : [])));
+const neverSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: () => new Promise<never>(() => {}) }));
 
 /** The declared delays of the state an item was saved in, shortest first. */
 const delaysOf = (kind: Kind, saved: SavedSnapshot): number[] =>
@@ -155,7 +176,6 @@ export class Worker {
 	readonly #wakes = new EventTarget();
 	readonly #latest: () => Promise<string | undefined>;
 	readonly #ciTick: () => Promise<number | undefined>;
-	readonly #learn: (id: string) => Promise<Known>;
 	readonly #judge: ModelCall;
 	#watchToken: string | undefined;
 	/** Set while the worker has seen an update; no change lands until a worker on the new config takes it. */
@@ -167,22 +187,13 @@ export class Worker {
 
 	constructor(options: WorkerOptions) {
 		this.#o = options;
-		this.#now = options.now ?? Date.now;
+		this.#now = options.now;
 		this.#gate = options.gate ?? new PrefixGate({ now: this.#now });
 		const timeoutMs = options.config.hum.statusReadTimeoutSeconds * SECOND_MS;
 
 		this.#latest = readEvery(options.latestVersion, { everyMs: options.config.hum.latestVersionCacheSeconds * SECOND_MS, timeoutMs });
 		this.#ciTick = readEvery(options.ciTick, { everyMs: options.config.hum.ciTickCacheSeconds * SECOND_MS, timeoutMs });
-		this.#start = signatureOf(options.repo, options.engineVersion ?? ENGINE_VERSION, options.config.hum.itemsDir);
-		this.#learn = pMemoize(async (id: string): Promise<Known> => {
-			const item = await options.adapters.workSource.read(id);
-
-			return {
-				footprint: footprintOf(item),
-
-				title: item.title,
-			};
-		});
+		this.#start = signatureOf({ repo: options.repo, fallbackVersion: options.engineVersion ?? ENGINE_VERSION, itemsDir: options.config.hum.itemsDir });
 		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
 		rememberKinds(options.state, options.config);
 		this.#recheckLandings();
@@ -206,8 +217,10 @@ export class Worker {
 		return [...this.#inFlight.keys()];
 	}
 
-	idle(): Promise<void> {
-		return this.#pool.onIdle();
+	/** Resolves when no pass runs and no slot upkeep a pass asked for is left: a returned slot is ready again. */
+	async idle(): Promise<void> {
+		await this.#pool.onIdle();
+		await this.#o.slots?.idle();
 	}
 
 	/** Asks a serving worker for a tick now: a run ended, or an answer arrived. */
@@ -225,7 +238,7 @@ export class Worker {
 	#isAsleep(saved: SavedSnapshot): boolean {
 		const kind = this.#kindNamed(saved.kind)?.kind;
 
-		return kind !== undefined && waitsOnOwner(kind, saved.state);
+		return kind !== undefined && isWaitingOnOwner(kind, saved.state);
 	}
 
 	#dueWaits(t: number): DueWait[] {
@@ -266,7 +279,7 @@ export class Worker {
 		if (value !== saved.state) {
 			state.items.save(saved.itemId, kind, persistedSnapshot(actor));
 
-			if (endedStuck(kind, value))
+			if (hasEndedStuck(kind, value))
 				park(
 					{ state, now: this.#now },
 					{
@@ -306,7 +319,7 @@ export class Worker {
 		if (!parked) return;
 
 		state.parked.remove(id);
-		state.faults.clear(`item-${parked.why}:${id}`);
+		state.faults.clear({ code: `item-${parked.why}`, item: id });
 
 		const landsAgain = state.landings.get(id) !== undefined && option !== RUN_AGAIN;
 
@@ -331,7 +344,7 @@ export class Worker {
 		const asleep = sleeping.get(id);
 		const kind = asleep && this.#kindNamed(asleep.kind)?.kind;
 
-		if (asleep && kind) return { stage: kind.machine.states[asleep.state ?? ""]?.on?.["owner-approved"] ? "approval" : "waiting" };
+		if (asleep && kind) return { stage: ownerWaitStage(kind, asleep.state) };
 
 		return { stage: ready ? "waiting" : "ended" };
 	}
@@ -373,7 +386,7 @@ export class Worker {
 		await Promise.all(
 			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox, ...asked, ...this.#unread])].map((id) =>
 				this.#readThread(id, async () => {
-					const raw = await adapters.workSource.read(id);
+					const raw = await adapters.workSource.read(ItemId.parse(id));
 					const item = await settleAnswers({ state, workSource: adapters.workSource, judge: this.#judge, now: this.#now }, raw, this.#stageOf(id, raw.ready, asleep));
 					const held = parked.find((p) => p.item === id);
 					const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
@@ -409,7 +422,7 @@ export class Worker {
 		try {
 			await read();
 			this.#unread.delete(id);
-			faults.clear(`${UNREAD_CODE}:${id}`);
+			faults.clear({ code: UNREAD_CODE, item: id });
 		} catch (error) {
 			this.#unread.add(id);
 			faults.raise({ code: UNREAD_CODE, item: id, cause: `The thread of ${id} could not be read: ${error instanceof Error ? error.message : String(error)}`.slice(0, ERROR_EXCERPT), fix: "hum reads it again each tick and goes on with the other items." });
@@ -422,7 +435,7 @@ export class Worker {
 
 		await Promise.all(
 			[...this.#inFlight].map(async ([id, run]) => {
-				const claim = await adapters.workSource.renew(id, holder, claimTtlMs(config)).catch(() => undefined);
+				const claim = await adapters.workSource.renew(ItemId.parse(id), holder, claimTtlMs(config)).catch(() => undefined);
 
 				if (claim?.won === false) run.abort.abort();
 			}),
@@ -449,10 +462,12 @@ export class Worker {
 				workDir: this.#o.workDir,
 				checkout: this.#o.checkout,
 				dir: this.#o.dir,
-				itemId: id,
+				itemId: ItemId.parse(id),
 				signal: abort.signal,
 				gate: this.#gate,
 				now: this.#now,
+				runnerVariables: this.#o.runnerVariables,
+				newSessionId: this.#o.newSessionId,
 				pulls: this.#o.pulls,
 				mayLand: () => this.#updating === undefined,
 			}).then(
@@ -488,19 +503,24 @@ export class Worker {
 	}
 
 	/** The memory.md rules the runs shown the file did not apply in the last `memoryUnusedRuns` of them. */
-	#unusedMemory(): string[] {
-		const { state, config, repo } = this.#o;
+	#unusedMemory(entries: readonly MemoryEntry[]): string[] {
+		const { state, config } = this.#o;
+		const { runsSoFar, lastUsed } = useOf(state.runs.all());
 
-		try {
-			const { runsSoFar, lastUsed } = useOf(state.runs.all());
+		return unusedEntries({ entries, lastUsed, runsSoFar, limit: config.hum.memoryUnusedRuns }).map(({ rule }) => rule);
+	}
 
-			return unusedEntries(readMemory(join(repo, ".hum", "memory.md")), lastUsed, runsSoFar, config.hum.memoryUnusedRuns).map(({ rule }) => rule);
-		} catch (error) {
-			if (!(error instanceof MemoryFormatError)) throw error;
+	/** One card for each reason memory.md lines are refused, naming the lines as they stand; a reason no line has any more clears its card. */
+	#showRefusedMemory(refused: readonly RefusedLine[]): void {
+		const { faults } = this.#o.state;
 
-			state.faults.raise({ code: "memory-format", cause: error.message.slice(0, ERROR_EXCERPT), fix: "Give the line a source, as in - <rule> (source: <where you said it>)." });
+		for (const [why, { code, cause, fix }] of Object.entries(MEMORY_CARDS)) {
+			const lines = refused.flatMap((line) => (line.why === why ? [line.line] : []));
+			const now = lines.length === 0 ? undefined : cause(lines, this.#o.config.hum.memoryMaxBytes);
 
-			return [];
+			if (faults.list().some((card) => card.code === code && card.cause !== now)) faults.clear({ code });
+
+			if (now !== undefined) faults.raise({ code, cause: now, fix });
 		}
 	}
 
@@ -539,7 +559,7 @@ export class Worker {
 			history: () => readHistory(git, tip, config.hum),
 			hunkOf: async (sha, file) => (await git.run(["show", ...PATCH, "-U3", "--format=", sha, ...(file === undefined ? [] : ["--", file])])).stdout,
 			propose: modelProposer(call),
-			trusts: (models) => trustsRepeats(models, config.hum),
+			trusts: (models) => doesTrustRepeats(models, config.hum),
 			memoryPath: join(repo, ".hum", "memory.md"),
 		});
 	}
@@ -576,6 +596,9 @@ export class Worker {
 
 		const read = readStatus(state.statusPath);
 		const before = read.ok ? read.status : emptyStatus(signature.engineVersion, t);
+		const memory = readMemory(join(this.#o.repo, ".hum", "memory.md"), config.hum.memoryMaxBytes);
+
+		this.#showRefusedMemory(memory.refused);
 		const [latest, ci] = await Promise.all([this.#latest(), this.#ciTick()]);
 		const saved = new Map(state.items.saved().map((s) => [s.itemId, s.state]));
 
@@ -601,7 +624,7 @@ export class Worker {
 			})),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
 			possibleRepeats: state.possibleRepeats.list().map(({ a, b }) => ({ a, b })),
-			unusedMemory: this.#unusedMemory(),
+			unusedMemory: this.#unusedMemory(memory.entries),
 			measure: measureOf({ ...measureInputsOf(state), window: config.hum.measureWindow, globs: config.hum.paths.map(({ glob }) => glob) }) ?? null,
 			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
 		});
@@ -627,6 +650,13 @@ export class Worker {
 		} catch {
 			return undefined;
 		}
+	}
+
+	/** What the scheduler needs of an item, read fresh each tick so an owner's edit to its `touches:` counts. */
+	async #learn(id: string): Promise<Known> {
+		const item = await this.#o.adapters.workSource.read(ItemId.parse(id));
+
+		return { footprint: footprintOf(item), title: item.title };
 	}
 
 	/** Which waiting items start now, by the scheduler's rules, and starts them. */
@@ -685,9 +715,9 @@ export class Worker {
 
 		await Promise.all(this.#dueWaits(t).map((due) => this.#fireDue(due, t)));
 
-		if (config.hum.ciToken) checkTokenAge(state.faults, config.hum.ciToken.setUp, t, config.hum.tokenWarnDays);
+		if (config.hum.ciToken) checkTokenAge(state.faults, { setUp: config.hum.ciToken.setUp, now: t, warnDays: config.hum.tokenWarnDays });
 
-		const signature = signatureOf(this.#o.repo, this.#o.engineVersion ?? ENGINE_VERSION, this.#o.config.hum.itemsDir);
+		const signature = signatureOf({ repo: this.#o.repo, fallbackVersion: this.#o.engineVersion ?? ENGINE_VERSION, itemsDir: this.#o.config.hum.itemsDir });
 		const update = this.#updateSeen(signature);
 
 		this.#updating = update;

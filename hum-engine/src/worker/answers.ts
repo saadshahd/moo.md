@@ -5,7 +5,8 @@ import { onceCalls } from "../adapters/once.ts";
 import { dispose, type Disposition, matchOption, NONE_OF_THESE, replyQuestion, replyStem, replyText, type Resolution, type Stage } from "../decide/answer.ts";
 import { visibleText } from "../adapters/marked.ts";
 import type { State } from "../state/open.ts";
-import type { SettledAnswer } from "../state/saved.ts";
+import { optionOf, type SettledAnswer } from "../state/saved.ts";
+import { isFromHum, latestQuestionAt } from "./thread.ts";
 
 export type AnswerContext = {
 	readonly state: State;
@@ -20,10 +21,6 @@ export type AnswerScope = {
 	/** The options a card offers when no question does, such as the parked item's actions. */
 	readonly options?: readonly string[];
 };
-
-const isFromHum = (entry: ThreadEntry): boolean => entry.author !== "person";
-
-const isQuestion = (entry: ThreadEntry): boolean => entry.kind === "question" && isFromHum(entry);
 
 /** A marked answer, or a person's reply typed without a marker. */
 const isReply = (entry: ThreadEntry): boolean => entry.kind === "answer" || (entry.kind === "comment" && !isFromHum(entry));
@@ -43,12 +40,12 @@ const repliesOn = (thread: readonly ThreadEntry[], afterQuestion: number): Reply
 	});
 };
 
-const resolveReply = async (ctx: AnswerContext, itemId: string, question: string, options: readonly string[], { entry }: Reply): Promise<Resolution> => {
+const resolveReply = async (ctx: AnswerContext, { itemId, question, options, reply: { entry } }: { readonly itemId: string; readonly question: string; readonly options: readonly string[]; readonly reply: Reply }): Promise<Resolution> => {
 	const matched = matchOption(entry, options);
 
 	if (matched) return matched;
 
-	const judged = await ctx.judge({ ...replyQuestion(question, options, entry.text), item: itemId });
+	const judged = await ctx.judge({ ...replyQuestion({ question, options, reply: entry.text }), item: itemId });
 
 	if (judged.kind === "abstained") return { source: "abstained", why: judged.why };
 
@@ -57,27 +54,32 @@ const resolveReply = async (ctx: AnswerContext, itemId: string, question: string
 
 const keyOf = (item: string, ordinal: number): string => `${item}#${ordinal}`;
 
-const optionOf = (resolution: Resolution): { option?: string } => ("option" in resolution && resolution.option !== undefined ? { option: resolution.option } : {});
+/** A resolution as its settled answer saves it; an abstention's own why gives way to the disposition's. */
+const savedResolution = (resolution: Resolution) => (resolution.source === "abstained" ? { source: resolution.source } : resolution);
 
 const recordOf = (item: string, { entry, ordinal }: Reply, resolution: Resolution, outcome: Disposition, at: number): SettledAnswer => ({
 	item,
 	ordinal,
 	text: entry.text,
-	...optionOf(resolution),
-	source: resolution.source,
 	disposition: outcome.disposition,
 	why: outcome.why,
 	at,
+	...savedResolution(resolution),
 });
 
-const resolutionOf = ({ source, option, why }: SettledAnswer): Resolution => {
-	if (source === "abstained") return { source, why };
-
-	if (source === "marker") return { source, option };
-
-	if (source === "free" || source === "none-of-these") return { source };
-
-	return { source, option: option ?? "" };
+const resolutionOf = (record: SettledAnswer): Resolution => {
+	switch (record.source) {
+		case "abstained":
+			return { source: record.source, why: record.why };
+		case "marker":
+			return { source: record.source, option: record.option };
+		case "first-word":
+		case "model":
+			return { source: record.source, option: record.option };
+		case "free":
+		case "none-of-these":
+			return { source: record.source };
+	}
 };
 
 const isFinal = ({ disposition }: SettledAnswer): boolean => disposition !== "held";
@@ -85,17 +87,17 @@ const isFinal = ({ disposition }: SettledAnswer): boolean => disposition !== "he
 const hasReplyOn = (thread: readonly ThreadEntry[], stem: string): boolean => thread.some((entry) => isFromHum(entry) && entry.kind === "comment" && entry.text.startsWith(stem));
 
 /** The answer as the engine reads it from here on: the option it picked, or no longer an answer at all. */
-const normalized = (entry: ThreadEntry, { disposition, option }: SettledAnswer): ThreadEntry =>
-	disposition === "applied" ? { ...entry, kind: "answer", option } : { ...entry, kind: "comment", option: undefined };
+const normalized = (entry: ThreadEntry, record: SettledAnswer): ThreadEntry =>
+	record.disposition === "applied" ? { ...entry, kind: "answer", option: optionOf(record) } : { ...entry, kind: "comment", option: undefined };
 
 const SUPERSEDED: Disposition = { disposition: "dropped", why: "A newer question replaced the one this answered." };
 
 type Settling = { readonly ctx: AnswerContext; readonly item: Item; readonly question: string; readonly options: readonly string[]; readonly stage: Stage };
 
 /** One reply's record: kept once final, else decided again from where the item stands now. */
-const settleOne = async ({ ctx, item, question, options, stage }: Settling, reply: Reply, answeredBefore: boolean): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
+const settleOne = async ({ ctx, item, question, options, stage }: Settling, { reply, answeredBefore }: { readonly reply: Reply; readonly answeredBefore: boolean }): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
 	const saved = ctx.state.answers.get(keyOf(item.id, reply.ordinal));
-	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, item.id, question, options, reply);
+	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, { itemId: item.id, question, options, reply });
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 
@@ -124,7 +126,7 @@ const dropSuperseded = async ({ ctx, item }: Settling, current: ReadonlySet<numb
  * other is a comment.
  */
 export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, options: cardOptions }: AnswerScope): Promise<Item> => {
-	const asked = item.thread.findLastIndex(isQuestion);
+	const asked = latestQuestionAt(item.thread);
 	const questionText = asked < 0 ? "" : (item.thread[asked]?.text ?? "");
 	const settling: Settling = { ctx, item, question: visibleText(questionText), options: cardOptions ?? optionsIn(questionText), stage };
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: ctx.workSource }, ctx.state.ops, { run: "answer-reply", attempt: 0 });
@@ -133,7 +135,7 @@ export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, opt
 
 	for (const reply of replies) {
 		const answeredBefore = [...settled.values()].some(({ disposition }) => disposition === "applied");
-		const { record, resolution } = await settleOne(settling, reply, answeredBefore);
+		const { record, resolution } = await settleOne(settling, { reply, answeredBefore });
 		const outcome = { disposition: record.disposition, why: record.why };
 
 		settled.set(reply.index, record);

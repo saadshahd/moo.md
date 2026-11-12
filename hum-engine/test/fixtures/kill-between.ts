@@ -12,7 +12,7 @@ const key = { itemId: "#68", run: "build", attempt: 1, op: "comment" };
 const marker = `hum-op ${JSON.stringify(key)}`;
 const kill = () => process.kill(process.pid, "SIGKILL");
 
-await openState(dir).ops.once(key, {
+await openState(dir, { now: Date.now }).ops.once(key, {
 	holds: async () => existsSync(provider) && readFileSync(provider, "utf8").includes(marker),
 	run: async () => {
 		if (mode === "before-op") kill();

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import type { Command } from "commander";
@@ -15,6 +16,8 @@ import { SECOND_MS } from "../time.ts";
 import { readStatus } from "../status/file.ts";
 import { npmLatest, openWorker } from "../worker/open.ts";
 import type { Io } from "./ops.ts";
+import { Holder } from "../adapter-api.ts";
+import { parseArgument } from "../adapters/argument.ts";
 
 const EXIT_OK = 0;
 
@@ -69,16 +72,19 @@ const serviceSettings = (repo: string): z.infer<typeof ServiceSettings> => {
 };
 
 /** The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow. */
-const openFor = async (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
+const openFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac" | "ci") => {
 	const timeoutMs = commandTimeoutMs(serviceSettings(repo));
 
 	return openWorker(repo, {
+		now: Date.now,
+		env,
+		newSessionId: randomUUID,
 		hopeSkills: listHopeSkills(await hopeRoot()),
-		holder: flags.holder ?? `${where}@${hostname()}`,
+		holder: parseArgument(Holder, flags.holder ?? `${where}@${hostname()}`),
 		base: flags.base,
 		where,
 		latestVersion: where === "mac" ? npmLatest : undefined,
-		ciTick: where === "mac" ? () => readCiTick(repo, "origin", timeoutMs) : undefined,
+		ciTick: where === "mac" ? () => readCiTick({ repo, remote: "origin", timeoutMs }) : undefined,
 	});
 };
 
@@ -104,7 +110,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			onStop(() => abort.abort());
 
-			const worker = await openFor(io.cwd, flags, "mac");
+			const worker = await openFor(io, flags, "mac");
 			const ended = await worker.serve(abort.signal);
 
 			io.stderr(`hum work: stopped, ${ended.reason}\n`);
@@ -122,7 +128,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			onStop(() => abort.abort());
 
 			const ended = await supervise({
-				state: openState(await defaultStateDir(io.cwd)),
+				state: openState(await defaultStateDir(io.cwd), { now: Date.now }),
 				spawn: () => spawnWorker(io.cwd, workArgs),
 				now: Date.now,
 				intervalMs: settings.tickIntervalSeconds * SECOND_MS,
@@ -141,16 +147,16 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 	withWorkOptions(root.command("wake").description("One CI wake: tick until nothing more starts, record the tick when --event is schedule, and show the cards."))
 		.option("--event <name>", "the GitHub event that started this job")
 		.action(async (flags: WorkFlags & { event?: string }) => {
-			const worker = await openFor(io.cwd, flags, "ci");
+			const worker = await openFor(io, flags, "ci");
 
 			await wakeUntilQuiet(worker);
 
-			if (flags.event === SCHEDULE_EVENT) await recordCiTick(io.cwd, "origin", Date.now(), worker.config.hum.commitIdentity, commandTimeoutMs(worker.config.hum));
+			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: worker.config.hum.commitIdentity, timeoutMs: commandTimeoutMs(worker.config.hum) });
 
 			const status = readStatus(join(await defaultStateDir(io.cwd), "status.json"));
 			const cards = status.ok ? status.status.cards : [];
 
-			await reportCards(cards);
+			await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });
 			done(cards.length > 0 ? EXIT_CARDS_SHOWN : EXIT_OK);
 		});
 };

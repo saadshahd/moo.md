@@ -3,11 +3,11 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HumConfig } from "../src/config/schema.ts";
+import { type HumConfig, SCHEMA_VERSION } from "../src/config/schema.ts";
 import { OWNER } from "./fixtures/identity.ts";
+import { MAIN } from "./fixtures/owner-repo.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 
-const MAIN = join(import.meta.dir, "..", "src", "cli", "main.ts");
 
 const hum = (cwd: string, ...args: string[]) => {
 	const result = spawnSync("bun", [MAIN, ...args], { cwd, encoding: "utf8" });
@@ -18,7 +18,7 @@ const hum = (cwd: string, ...args: string[]) => {
 /** The settings every command that reaches the work source needs: the owner's identity, and the settings a test sets. */
 const writeSettings = (repo: string, settings: Partial<HumConfig> = {}): void => {
 	mkdirSync(join(repo, ".hum"), { recursive: true });
-	writeFileSync(join(repo, ".hum", "hum.json"), JSON.stringify({ commitIdentity: OWNER, ...settings }));
+	writeFileSync(join(repo, ".hum", "hum.json"), JSON.stringify({ schemaVersion: SCHEMA_VERSION, commitIdentity: OWNER, ...settings }));
 };
 
 /** What the worker will read at once: the ids in the inbox folder, the empty wake of a seen change included. */
@@ -64,6 +64,17 @@ test("hum push runs no hook, though a pre-push hook that would fail is installed
 	expect(sh(repo.remote, ["log", "-1", "--format=%s", "main"]).trim()).toBe("g");
 });
 
+test("a hum push that outruns the repo's command time limit is stopped and fails", () => {
+	const worker = new WorkRepo().worker("w");
+
+	writeSettings(worker, { commandTimeoutSeconds: 1 });
+
+	const pushed = hum(worker, "push", "--receive-pack=sleep 30; git-receive-pack", "origin", "main");
+
+	expect(pushed.code).toBe(1);
+	expect(pushed.err).toContain("ran longer than 1 seconds");
+});
+
 test("hum list-ready, claim, watch, answer and read work end to end on a temp repo", () => {
 	const repo = new WorkRepo();
 	const worker = repo.worker("w");
@@ -100,14 +111,21 @@ test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json"
 	expect(claimed.claim.expiresAt - Date.now()).toBeLessThanOrEqual(120_000);
 });
 
-test("an unknown op, an unknown flag and a bad ttl exit 2; a failure outside a repo exits 1 with no stack trace", () => {
+test("an unknown op exits 2 and lists the ops", () => {
 	const unknownOp = hum(process.cwd(), "nope");
 
 	expect(unknownOp.code).toBe(2);
 	expect(unknownOp.err).toContain("list-ready");
-	expect(hum(process.cwd(), "claim", "an-item", "me", "--ttl", "abc").code).toBe(2);
-	expect(hum(process.cwd(), "list-ready", "--nope").code).toBe(2);
+});
 
+test.each([
+	["a bad ttl", ["claim", "an-item", "me", "--ttl", "abc"]],
+	["an unknown flag", ["list-ready", "--nope"]],
+])("%s exits 2", (_, args) => {
+	expect(hum(process.cwd(), ...args).code).toBe(2);
+});
+
+test("a failure outside a repo exits 1 with no stack trace", () => {
 	const outside = hum(tmpdir(), "list-ready");
 
 	expect(outside.code).toBe(1);

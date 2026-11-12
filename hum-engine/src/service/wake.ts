@@ -23,8 +23,8 @@ const line = (card: Card): string => `${card.cause} ${card.fix}`;
  * Shows the cards where a CI job's reader looks: one error annotation each, and the job's step summary when the
  * runner gives one. The job's status file dies with the job, so this is the only place CI shows a card.
  */
-export const reportCards = async (cards: readonly Card[]): Promise<void> => {
+export const reportCards = async (cards: readonly Card[], { hasStepSummary }: { readonly hasStepSummary: boolean }): Promise<void> => {
 	for (const card of cards) core.error(line(card), { title: `hum ${card.code}` });
 
-	if (process.env.GITHUB_STEP_SUMMARY && cards.length > 0) await core.summary.addHeading("hum", 2).addList(cards.map((card) => `${card.code}: ${line(card)}`)).write();
+	if (hasStepSummary && cards.length > 0) await core.summary.addHeading("hum", 2).addList(cards.map((card) => `${card.code}: ${line(card)}`)).write();
 };

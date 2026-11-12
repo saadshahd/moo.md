@@ -1,7 +1,6 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createActor, SimulatedClock } from "xstate";
 import {
@@ -12,12 +11,15 @@ import {
 	Kind,
 	openState,
 	persistedSnapshot,
+	readHeartbeat,
 	readStatus,
 	type State,
-	Status,
 	writeStatus,
 } from "../src/index.ts";
 import { kindMachine } from "../src/index.ts";
+import { slug } from "../src/state/fs.ts";
+import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const DAY = 86_400_000;
 
@@ -44,11 +46,7 @@ const tiny = kindAt("1");
 let dir: string;
 
 beforeEach(() => {
-	dir = mkdtempSync(join(tmpdir(), "hum-state-"));
-});
-
-afterEach(() => {
-	rmSync(dir, { recursive: true, force: true });
+	dir = tempDir("state");
 });
 
 const waitingItem = (state: State, itemId: string) => {
@@ -60,7 +58,7 @@ const waitingItem = (state: State, itemId: string) => {
 };
 
 test("a saved item restores in place, with its timer", async () => {
-	const state = openState(dir);
+	const state = openState(dir, { now: Date.now });
 
 	waitingItem(state, "#68");
 	const clock = new SimulatedClock();
@@ -77,7 +75,7 @@ test("a saved item restores in place, with its timer", async () => {
 });
 
 test("a truncated snapshot keeps its file, starts nothing and raises one card; other items go on", async () => {
-	const state = openState(dir);
+	const state = openState(dir, { now: Date.now });
 
 	waitingItem(state, "#68");
 	waitingItem(state, "#69");
@@ -99,7 +97,7 @@ test("a truncated snapshot keeps its file, starts nothing and raises one card; o
 });
 
 test("a snapshot xstate cannot restore gives an error status, one card, and the file stays", async () => {
-	const state = openState(dir);
+	const state = openState(dir, { now: Date.now });
 
 	waitingItem(state, "#68");
 	const file = state.items.path("#68");
@@ -114,19 +112,22 @@ test("a snapshot xstate cannot restore gives an error status, one card, and the 
 	expect(existsSync(file)).toBe(true);
 });
 
-test("a snapshot from an older engine restores in place, and a rollback to an older engine gives one card", async () => {
-	waitingItem(openState(dir, { engineVersion: "0.1.0" }), "#68");
+test("a snapshot from an older engine restores in place and saves under the newer engine", async () => {
+	waitingItem(openState(dir, { engineVersion: "0.1.0", now: Date.now }), "#68");
 
-	const next = openState(dir, { engineVersion: "0.2.0" });
+	const next = openState(dir, { engineVersion: "0.2.0", now: Date.now });
 	const restored = await next.items.restore("#68", tiny);
 
 	expect(restored.ok && restored.value?.getSnapshot().value).toBe("waiting");
 
 	if (restored.ok && restored.value) next.items.save("#68", tiny, persistedSnapshot(restored.value));
 	expect(JSON.parse(readFileSync(next.items.path("#68"), "utf8")).engineVersion).toBe("0.2.0");
+});
 
-	// Rollback: the 0.1.0 engine meets a 0.2.0 file. One card, however often it looks; the file stays and the item does not start over.
-	const rolledBack = openState(dir, { engineVersion: "0.1.0" });
+test("an older engine that meets a newer engine's snapshot gives one card however often it looks, keeps the file, and does not start the item over", async () => {
+	waitingItem(openState(dir, { engineVersion: "0.2.0", now: Date.now }), "#68");
+
+	const rolledBack = openState(dir, { engineVersion: "0.1.0", now: Date.now });
 	const before = readFileSync(rolledBack.items.path("#68"));
 
 	for (let times = 0; times < 3; times++) expect((await rolledBack.items.restore("#68", tiny)).ok).toBe(false);
@@ -136,7 +137,7 @@ test("a snapshot from an older engine restores in place, and a rollback to an ol
 });
 
 test("a shipped envelope migration runs on an older format; a format with no migration reads as damaged, with one card", async () => {
-	const engine = openState(dir);
+	const engine = openState(dir, { now: Date.now });
 
 	waitingItem(engine, "#68");
 	const file = engine.items.path("#68");
@@ -152,7 +153,7 @@ test("a shipped envelope migration runs on an older format; a format with no mig
 		0: ({ at, ...rest }) => ({ ...rest, savedAt: at ?? 0 }),
 	};
 
-	const restored = await openState(dir, { migrations }).items.restore("#68", tiny);
+	const restored = await openState(dir, { migrations, now: Date.now }).items.restore("#68", tiny);
 
 	expect(restored.ok && restored.value?.getSnapshot().value).toBe("waiting");
 
@@ -178,12 +179,11 @@ test.skipIf(!canMountDiskImage)("a full disk image leaves the old snapshot resto
 	if (attached.status !== 0) throw new Error(`hdiutil attach failed: ${attached.stderr}`);
 
 	try {
-		const state = openState(join(mount, "hum"));
+		const state = openState(join(mount, "hum"), { now: Date.now });
 
 		waitingItem(state, "#68");
 		const good = readFileSync(state.items.path("#68"));
 
-		// Fill the volume.
 		const chunk = "x".repeat(65_536);
 
 		for (let at = 0; ; at++) {
@@ -221,7 +221,7 @@ test.skipIf(!canMountTmpfs)("a full size-capped tmpfs leaves the old snapshot re
 	expect(spawnSync("mount", ["-t", "tmpfs", "-o", "size=2m", "tmpfs", mount]).status).toBe(0);
 
 	try {
-		const state = openState(join(mount, "hum"));
+		const state = openState(join(mount, "hum"), { now: Date.now });
 
 		waitingItem(state, "#68");
 
@@ -241,7 +241,7 @@ test.skipIf(!canMountTmpfs)("a full size-capped tmpfs leaves the old snapshot re
 });
 
 test("a half-written temp file a crash left beside the records is not read as one", () => {
-	const state = openState(dir);
+	const state = openState(dir, { now: Date.now });
 
 	state.parked.put("a", { item: "a", why: "stuck", cause: "c", since: 1 });
 	writeFileSync(join(dir, "parked", "partial.json.1234567890"), "{");
@@ -249,8 +249,45 @@ test("a half-written temp file a crash left beside the records is not read as on
 	expect(state.parked.list().map((parked) => parked.item)).toEqual(["a"]);
 });
 
+const readsOf = (state: State) =>
+	({
+		parked: () => state.parked.list(),
+		spent: () => state.spent.list(),
+		limit: () => state.limit.list(),
+		ready: () => state.ready.list(),
+		landings: () => state.landings.list(),
+		learned: () => state.learned.list(),
+		"item-kinds": () => state.itemKinds.list(),
+		plans: () => state.plans.list(),
+		verdicts: () => state.verdicts.list(),
+		questions: () => state.questions.list(),
+		answers: () => state.answers.list(),
+		slots: () => state.slots.list(),
+		runs: () => state.runs.all(),
+		events: () => state.events.list(SAVED_0_1_0.events.itemId),
+		ops: () => state.ops.list(),
+		proofs: () => state.proofs.list(),
+		choices: () => state.choices.list(),
+		notes: () => state.notes.list(),
+		repeats: () => state.repeats.list(),
+		"possible-repeats": () => state.possibleRepeats.list(),
+		merges: () => state.merges.list(),
+		breaks: () => state.breaks.list(),
+	}) satisfies Record<keyof typeof SAVED_0_1_0, () => unknown[]>;
+
+/** Runs and events live one folder deeper, under the item's slug. */
+const folderOf = (store: keyof typeof SAVED_0_1_0): string => (store === "runs" || store === "events" ? join(dir, store, slug(SAVED_0_1_0[store].itemId)) : join(dir, store));
+
+// SAFETY: Object.keys of a literal object lists exactly the keys its type names.
+test.each(Object.keys(SAVED_0_1_0) as (keyof typeof SAVED_0_1_0)[])("a %s record hum 0.1.0 wrote reads, with a field a newer engine added", (store) => {
+	mkdirSync(folderOf(store), { recursive: true });
+	writeFileSync(join(folderOf(store), "record.json"), JSON.stringify({ ...SAVED_0_1_0[store], addedLater: true }));
+
+	expect(readsOf(openState(dir, { now: Date.now }))[store]()).toEqual([expect.objectContaining(SAVED_0_1_0[store])]);
+});
+
 test("a failed save of a new item leaves nothing behind, and a later save clears the card", () => {
-	const state = openState(dir);
+	const state = openState(dir, { now: Date.now });
 
 	mkdirSync(state.items.path("#9"), { recursive: true });
 	const blocked = state.items.save("#9", tiny, {});
@@ -279,16 +316,28 @@ for (const mode of ["before-op", "after-op"]) {
 }
 
 test("a done op is skipped without asking the provider, and keys differ by attempt", async () => {
-	const { ops } = openState(dir);
+	const { ops } = openState(dir, { now: Date.now });
 	const key = { itemId: "#68", run: "build", attempt: 1, op: "comment" };
 	let asked = 0;
 	let ran = 0;
 	const provider = { holds: async () => (asked++, false), run: async () => void ran++ };
 
-	expect(await ops.once(key, provider)).toBe("ran");
-	expect(await ops.once(key, provider)).toBe("skipped");
-	expect(await ops.once({ ...key, attempt: 2 }, provider)).toBe("ran");
+	expect(await ops.once(key, provider)).toEqual({ kind: "ran", value: undefined });
+	expect(await ops.once(key, provider)).toEqual({ kind: "skipped" });
+	expect(await ops.once({ ...key, attempt: 2 }, provider)).toEqual({ kind: "ran", value: undefined });
 	expect([asked, ran]).toEqual([0, 2]);
+	expect(ops.state(key)).toBe("done");
+});
+
+test("an op whose run returns a value that did not finish it stays started, and the next call runs it again", async () => {
+	const { ops } = openState(dir, { now: Date.now });
+	const key = { itemId: "#68", run: "merge", attempt: 0, op: "push-base" };
+	const outcomes = ["conflict", "pushed"];
+	const provider = { holds: async () => false, run: async () => outcomes.shift(), isDone: (outcome: string | undefined) => outcome === "pushed" };
+
+	expect(await ops.once(key, provider)).toEqual({ kind: "ran", value: "conflict" });
+	expect(ops.state(key)).toBe("started");
+	expect(await ops.once(key, provider)).toEqual({ kind: "ran", value: "pushed" });
 	expect(ops.state(key)).toBe("done");
 });
 
@@ -310,31 +359,32 @@ test("one event read twice is saved once, and the first copy stays", () => {
 
 test("the run's name is saved before launch and adopted after a restart", () => {
 	const key = { itemId: "#68", run: "build", attempt: 1 };
-	const before = openState(dir).runs;
+	const before = openState(dir, { now: Date.now }).runs;
 
-	expect(before.begin(key, "hum #68 build 1").adopted).toBe(false);
+	expect(before.begin(key, { name: "hum #68 build 1" }).adopted).toBe(false);
 
 	// The worker died before it learned the session id. The next one finds the name.
-	const after = openState(dir).runs;
-	const found = after.begin(key, "hum #68 build 1");
+	const after = openState(dir, { now: Date.now }).runs;
+	const found = after.begin(key, { name: "hum #68 build 1" });
 
 	expect(found.adopted).toBe(true);
 	expect(found.record.sessionId).toBeUndefined();
-	expect(after.saveSession(key, "session-1").sessionId).toBe("session-1");
-	expect(openState(dir).runs.begin(key, "hum #68 build 1").record.sessionId).toBe("session-1");
+	expect(found.saveSession("session-1").sessionId).toBe("session-1");
+	expect(openState(dir, { now: Date.now }).runs.begin(key, { name: "hum #68 build 1" }).record.sessionId).toBe("session-1");
 	expect(after.list("#68")).toHaveLength(1);
 });
 
 test("a run is adopted until its outcome is taken, then the next attempt starts fresh", () => {
 	const key = { itemId: "#68", run: "build", attempt: 0 };
-	const runs = openState(dir).runs;
+	const runs = openState(dir, { now: Date.now }).runs;
 
-	runs.begin(key, "hum #68 build #0");
+	const begun = runs.begin(key, { name: "hum #68 build #0" });
+
 	expect(runs.unended("#68", "build")?.attempt).toBe(0);
 	expect(runs.unended("#68", "review")).toBeUndefined();
-	runs.end(key);
+	begun.end();
 	expect(runs.unended("#68", "build")).toBeUndefined();
-	expect(openState(dir).runs.get(key)?.endedAt).toBeNumber();
+	expect(openState(dir, { now: Date.now }).runs.get(key)?.endedAt).toBeNumber();
 });
 
 test("a reader never sees a partial status file", async () => {
@@ -364,37 +414,92 @@ test("a reader never sees a partial status file", async () => {
 	expect(readdirSync(dir).filter((name) => !name.endsWith(".json"))).toEqual([]);
 });
 
-test("the status file holds its sections, the engine versions and the measure slot, and refuses a stranger", () => {
+const statusFile = () => {
 	const path = join(dir, "nested", "status.json");
 	const status = emptyStatus(ENGINE_VERSION, 1000);
 
 	status.workers = { mac: 990 };
 	status.inFlight = [{ item: "#68", title: "Fix it", level: "low", state: "building", since: 900, unclear: true }];
 	writeStatus(path, status);
+
+	return { path, status };
+};
+
+test("the status file reads back as written, with every section, the engine version and an empty measure slot", () => {
+	const { path, status } = statusFile();
 	const read = readStatus(path);
 
 	expect(read.ok && read.status).toEqual(status);
 	expect(Object.keys(status)).toEqual(["format", "writtenAt", "workers", "engine", "questions", "cards", "inFlight", "merged", "choices", "rules", "possibleRepeats", "unusedMemory", "measure"]);
 	expect(status.measure).toBeNull();
 	expect(status.engine.version).toBe(ENGINE_VERSION);
+});
+
+test("a status that breaks its schema is not written, and the file keeps the last good one", () => {
+	const { path, status } = statusFile();
+
 	expect(() => writeStatus(path, { ...status, writtenAt: -1 })).toThrow();
 	expect(readStatus(path).ok).toBe(true);
+});
+
+test("a status file that does not parse reads as unreadable, and one that is not there as missing", () => {
+	const { path } = statusFile();
+
 	writeFileSync(path, "{");
 	expect(readStatus(path)).toMatchObject({ ok: false, reason: "unreadable" });
 	expect(readStatus(join(dir, "none.json"))).toMatchObject({ ok: false, reason: "missing" });
-	expect(Status.safeParse({ ...status, extra: 1 }).success).toBe(false);
 });
 
-test("a fault card gives the cause, a one-line fix and at most one action; one card per cause", () => {
-	const { faults } = openState(dir, { now: () => 5 });
-	const input = { code: "x", item: "#1", cause: "It broke.", fix: "Fix it." };
+test("a status file with fields a newer engine added reads, without those fields", () => {
+	const { path, status } = statusFile();
+	const card = { kind: "fault", key: "x:#1", item: "#1", code: "x", cause: "It broke.", fix: "Fix it.", since: 5 } as const;
+	const choice = { item: "#1", text: "Chose short.", at: 5 };
 
-	expect(faults.raise(input)).toBe(faults.raise(input));
-	expect(() => faults.raise({ ...input, code: "y", fix: "one\ntwo" })).toThrow();
-	expect(() => faults.raise({ ...input, code: "z", action: { label: "a label far over fourteen cells", answer: "retry" } })).toThrow();
-	expect(openState(dir).faults.list()).toHaveLength(1);
-	faults.clear("x:#1");
-	expect(openState(dir).faults.list()).toEqual([]);
+	writeFileSync(path, JSON.stringify({ ...status, addedLater: 1, engine: { ...status.engine, addedLater: 1 }, cards: [{ ...card, addedLater: 1 }], choices: [{ ...choice, addedLater: 1 }] }));
+
+	expect(readStatus(path)).toEqual({ ok: true, status: { ...status, cards: [card], choices: [choice] } });
+});
+
+test("a heartbeat with a field a newer engine added reads, without that field", () => {
+	const path = join(dir, "heartbeat.json");
+	const heartbeat = { time: 5, engineVersion: "0.1.0", configHash: "h", inFlight: [], intervalMs: 600_000 };
+
+	writeFileSync(path, JSON.stringify({ ...heartbeat, addedLater: true }));
+
+	expect(readHeartbeat(path)).toEqual(heartbeat);
+});
+
+test("a saved item whose envelope carries a field a newer engine added restores", async () => {
+	const state = openState(dir, { now: Date.now });
+
+	waitingItem(state, "#68");
+	const file = state.items.path("#68");
+
+	writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), addedLater: true }));
+
+	const restored = await openState(dir, { now: Date.now }).items.restore("#68", tiny);
+
+	expect(restored.ok && restored.value?.getSnapshot().value).toBe("waiting");
+});
+
+const FAULT = { code: "x", item: "#1", cause: "It broke.", fix: "Fix it." };
+
+test("a fault raised twice is one saved card, and clearing it removes it", () => {
+	const { faults } = openState(dir, { now: () => 5 });
+
+	expect(faults.raise(FAULT)).toBe(faults.raise(FAULT));
+	expect(openState(dir, { now: Date.now }).faults.list()).toHaveLength(1);
+	faults.clear({ code: "x", item: "#1" });
+	expect(openState(dir, { now: Date.now }).faults.list()).toEqual([]);
+});
+
+test.each([
+	["a fix of two lines", { code: "y", fix: "one\ntwo" }],
+	["an action label too wide for its button", { code: "z", action: { label: "a label far over fourteen cells", answer: "retry" } }],
+])("a fault card with %s is refused", (_, over) => {
+	const { faults } = openState(dir, { now: () => 5 });
+
+	expect(() => faults.raise({ ...FAULT, ...over })).toThrow();
 });
 
 test("the state folder is the git common dir's hum/, shared by worktrees", async () => {

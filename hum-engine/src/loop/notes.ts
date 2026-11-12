@@ -1,6 +1,6 @@
 import type { PastChange } from "../decide/labels.ts";
 import { breakOf, type LabelRules } from "../decide/labels.ts";
-import type { SettledAnswer } from "../state/saved.ts";
+import { optionOf, type SettledAnswer } from "../state/saved.ts";
 import type { State } from "../state/open.ts";
 import { type NoteSource, noteKey, type ReviewNote } from "./records.ts";
 
@@ -19,7 +19,7 @@ export type RawComment = {
 	readonly at: number;
 };
 
-const SOURCE_OF_KIND: Readonly<Record<RawComment["kind"], NoteSource>> = { comment: "review-comment", review: "review-body" };
+const SOURCE_OF_KIND = { comment: "review-comment", review: "review-body" } as const satisfies Record<RawComment["kind"], NoteSource>;
 
 /** The owner's comments and review bodies; a bot's, another person's and an empty body are not review notes. */
 export const ownerNotes = (raw: readonly RawComment[], owners: readonly string[]): ReviewNote[] =>
@@ -30,13 +30,13 @@ export const ownerNotes = (raw: readonly RawComment[], owners: readonly string[]
 	);
 
 /** The option that approves a plan; every other answer changed it. */
-export const APPROVAL_OPTION = "approve";
+const APPROVAL_OPTION = "approve";
 
 /** An answer that changed the plan: one applied, and not an approval. */
 export const planChangingNotes = (answers: readonly SettledAnswer[]): ReviewNote[] =>
 	answers
-		.flatMap(({ item, ordinal, text, at, disposition, option }): ReviewNote[] =>
-		disposition === "applied" && option !== APPROVAL_OPTION ? [{ source: "plan-answer", sourceId: `${item}:${ordinal}`, change: item, item, hunk: "", text, at }] : [],
+		.flatMap((answer): ReviewNote[] =>
+		answer.disposition === "applied" && optionOf(answer) !== APPROVAL_OPTION ? [{ source: "plan-answer", sourceId: `${answer.item}:${answer.ordinal}`, change: answer.item, item: answer.item, hunk: "", text: answer.text, at: answer.at }] : [],
 	);
 
 /** The revert or fix commit behind each broken change, with the hunk it made. */

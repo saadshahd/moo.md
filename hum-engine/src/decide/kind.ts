@@ -9,11 +9,6 @@ const TEMPLATE_FIELD = /^(?:kind:[ \t]*(\S+)|#{1,6}[ \t]*kind[ \t]*\n+[ \t]*(\S+
 /** The answer a model call gives when no kind fits. */
 export const UNSURE = "unsure";
 
-/** Where an item's kind came from. A fallback is an abstention: the item is unclear and runs on the fallback kind. */
-export type KindOf =
-	| { readonly kind: string; readonly from: "source" | "model" }
-	| { readonly kind: string; readonly from: "fallback"; readonly why: string };
-
 /** The kind an item names itself: a label the owner mapped to a kind or that is a kind's name, else its template field. */
 export const declaredKind = (item: Pick<Item, "body" | "labels">, kinds: readonly string[], kindLabels: HumConfig["kindLabels"]): string | undefined => {
 	const field = TEMPLATE_FIELD.exec(item.body);
@@ -35,5 +30,5 @@ export const kindQuestion = (item: Pick<Item, "title" | "body">, { kinds, kindMe
 });
 
 /** A change of the docs-only kind that touches a path outside its globs is not docs. */
-export const leavesDocs = (paths: readonly string[], { docsOnly }: Pick<HumConfig, "docsOnly">): boolean =>
+export const doesLeaveDocs = (paths: readonly string[], { docsOnly }: Pick<HumConfig, "docsOnly">): boolean =>
 	paths.some((path) => !docsOnly.paths.some((glob) => new Bun.Glob(glob).match(path)));

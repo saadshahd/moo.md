@@ -1,4 +1,3 @@
-import { PermanentError } from "../adapter-api.ts";
 import { exec } from "../exec.ts";
 
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
@@ -15,7 +14,7 @@ export const PATCH = ["--no-ext-diff", "--no-color"] as const;
 const ANCESTOR = 0;
 const NOT_ANCESTOR = 1;
 
-export type GitResult = { readonly code: number; readonly stdout: string; readonly stderr: string };
+type GitResult = { readonly code: number; readonly stdout: string; readonly stderr: string };
 
 export type Git = {
 	/** Runs git; a non-zero exit is a result, not a throw, but a run past its time limit throws `CommandTimedOut`. `input` is its stdin, which is closed either way. */
@@ -24,7 +23,7 @@ export type Git = {
 	readonly raw: (args: readonly string[], input?: string) => Promise<string>;
 };
 
-export class GitFailed extends Error {
+class GitFailed extends Error {
 	override name = "GitFailed";
 
 	constructor(
@@ -44,12 +43,8 @@ export const whenGitFailed =
 		throw error;
 	};
 
-/** The remote refused the push: a protected branch, a hook, a permission. Retrying cannot help. */
-export class PushRefused extends PermanentError {
-	override name = "PushRefused";
-}
-
-export type PushOutcome = "pushed" | "conflict";
+/** `conflict`: another writer moved the ref first, and a retry can win. `refused`: the remote said no, in `said`, and no retry helps. */
+export type PushOutcome = { readonly kind: "pushed" } | { readonly kind: "conflict" } | { readonly kind: "refused"; readonly said: string };
 
 /** The author and committer of the commits hum makes. */
 export type GitIdentity = { readonly name: string; readonly email: string };
@@ -95,7 +90,7 @@ export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions
 	const run = async (args: readonly string[], input = ""): Promise<GitResult> => {
 		const { exitCode, stdout, stderr } = await exec("git", ["-c", HOOKS_OFF, ...args], {
 			timeoutMs,
-			nodeOptions: { cwd, env: { ...process.env, ...(identity && identityEnv(identity)), ...env } },
+			nodeOptions: { cwd, env: { ...(identity && identityEnv(identity)), ...env } },
 			stdin: input,
 		});
 
@@ -116,26 +111,23 @@ export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions
 /** The arguments for `git push` with hooks off, for a command line handed straight to git. */
 export const pushArgs = (rest: readonly string[]): string[] => ["-c", HOOKS_OFF, "push", "--no-verify", ...rest];
 
-/**
- * Pushes. `conflict` means another writer moved the ref first and a retry can win.
- * A refusal throws `PushRefused` with the remote's own words; any other failure throws `GitFailed`.
- */
+/** Pushes. A refusal is an outcome that carries the remote's own words; any other failure throws `GitFailed`. */
 export const push = async (git: Git, rest: readonly string[]): Promise<PushOutcome> => {
 	const args = ["push", "--no-verify", ...rest];
 	const result = await git.run(args);
 	const said = `${result.stderr}${result.stdout}`.trim();
 
-	if (result.code === 0) return "pushed";
+	if (result.code === 0) return { kind: "pushed" };
 
-	if (CONFLICT.test(said)) return "conflict";
+	if (CONFLICT.test(said)) return { kind: "conflict" };
 
-	if (REFUSED.test(said)) throw new PushRefused(`git push refused: ${said}`);
+	if (REFUSED.test(said)) return { kind: "refused", said: `git push refused: ${said}` };
 
 	throw new GitFailed(args, result);
 };
 
 /** Whether `ancestor` is reachable from `descendant`. git answers by exit code alone. */
-export const isAncestor = async (git: Git, ancestor: string, descendant: string): Promise<boolean> => {
+export const isAncestor = async (git: Git, { ancestor, descendant }: { readonly ancestor: string; readonly descendant: string }): Promise<boolean> => {
 	const args = ["merge-base", "--is-ancestor", ancestor, descendant];
 	const result = await git.run(args);
 

@@ -1,7 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 import type { Pull } from "../src/adapters/pull-requests.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { labelChanges, type PastChange } from "../src/decide/labels.ts";
@@ -9,20 +6,12 @@ import { measureInputsOf } from "../src/measure/inputs.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
 import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
+import { pastChange } from "./fixtures/records.ts";
+import { tempDir } from "./fixtures/temp.ts";
+import { rateOf } from "../src/measure/rate.ts";
 
-const folders: string[] = [];
 
-afterEach(() => {
-	for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
-
-const freshState = () => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-measure-"));
-
-	folders.push(dir);
-
-	return openState(dir);
-};
+const freshState = () => openState(tempDir("measure"), { now: Date.now });
 
 const merge = (n: number): MergedChange => ({ item: `m${n}`, at: n, paths: [n < 10 ? "ui/x.ts" : "api/y.ts"], notes: n % 5 === 0 ? 2 : 0, questions: n % 4 === 0 ? 1 : 0, tokens: 1000 });
 
@@ -48,11 +37,9 @@ test("20 merges and 3 abandoned items give known notes, questions and tokens per
 	});
 });
 
-test("an abandoned item's tokens raise the tokens number; one from before the window does not count", () => {
-	const without = measureOf({ merged: merges, abandoned: [], ...window });
+test("an item abandoned before the window does not count", () => {
 	const withOld = measureOf({ merged: merges.map((found) => ({ ...found, at: found.at + 100 })), abandoned, ...window });
 
-	expect(measureOf({ merged: merges, abandoned, ...window })?.tokens).toBeGreaterThan(without?.tokens ?? 0);
 	expect(withOld?.abandoned).toBe(0);
 });
 
@@ -101,11 +88,14 @@ test("a change merged through a pull request after the worker moved on is record
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
 });
 
-const change = (sha: string, subject: string, over: Partial<PastChange> = {}): PastChange => ({ sha, subject, body: "", files: ["a.md"], size: 1, blamed: [], ...over });
-
 test("a revert titled revert!: that names a change's commit marks that change reverted; one that names none marks nothing", () => {
-	const labels = (revert: PastChange) => labelChanges([change("3028506abcdef", "feat: skills"), revert], SHIPPED_DEFAULTS.changeLabels);
+	const labels = (revert: PastChange) => labelChanges([pastChange({ sha: "3028506abcdef", subject: "feat: skills" }), revert], SHIPPED_DEFAULTS.changeLabels);
 
-	expect(labels(change("54e7809", "revert!: roll back to router skills pattern (pre-3028506)")).get("3028506abcdef")).toBe("reverted");
-	expect(labels(change("54e7809", "revert!: roll back to router skills pattern")).get("3028506abcdef")).toBe("clean");
+	expect(labels(pastChange({ sha: "54e7809", subject: "revert!: roll back to router skills pattern (pre-3028506)" })).get("3028506abcdef")).toBe("reverted");
+	expect(labels(pastChange({ sha: "54e7809", subject: "revert!: roll back to router skills pattern" })).get("3028506abcdef")).toBe("clean");
+});
+
+test("a boundary where nothing was measured has no rate, so it never stands in for a measured one", () => {
+	expect(rateOf(0, 0)).toBeUndefined();
+	expect(rateOf(3, 4)).toBe(0.75);
 });

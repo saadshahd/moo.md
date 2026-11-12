@@ -1,10 +1,10 @@
 import { join } from "node:path";
 import { rmSync } from "node:fs";
-import type { z } from "zod";
+import { z } from "zod";
 import { atomicWrite, listRecords, orMissing, readJson, slug } from "./fs.ts";
 
 /** One JSON file per key under a folder, written whole. The schema checks every read. */
-export class Records<S extends z.ZodType> {
+export class Records<S extends z.core.$ZodType> {
 	readonly #folder: string;
 	readonly #schema: S;
 
@@ -18,11 +18,11 @@ export class Records<S extends z.ZodType> {
 	}
 
 	get(key: string): z.output<S> | undefined {
-		return orMissing(() => this.#schema.parse(readJson(this.#path(key))), undefined);
+		return orMissing(() => z.parse(this.#schema, readJson(this.#path(key))), undefined);
 	}
 
 	put(key: string, value: z.input<S>): void {
-		atomicWrite(this.#path(key), `${JSON.stringify(this.#schema.parse(value))}\n`);
+		atomicWrite(this.#path(key), `${JSON.stringify(z.parse(this.#schema, value))}\n`);
 	}
 
 	remove(key: string): void {
@@ -30,6 +30,6 @@ export class Records<S extends z.ZodType> {
 	}
 
 	list(): z.output<S>[] {
-		return listRecords(this.#folder).map((file) => this.#schema.parse(readJson(file)));
+		return listRecords(this.#folder).map((file) => z.parse(this.#schema, readJson(file)));
 	}
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { ThreadEntry } from "../adapter-api.ts";
 import { OWNER_APPROVAL } from "./merge.ts";
 import { DATA_RULE, fenced } from "./prose.ts";
+import { bareWord } from "./question.ts";
 
 /** What the model call answers when none of the question's options fits the reply. */
 export const NONE_OF_THESE = "none of these";
@@ -15,10 +16,17 @@ export type Resolution =
 	| { readonly source: "none-of-these" }
 	| { readonly source: "abstained"; readonly why: string };
 
-const WORD_EDGES = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
+/** Each way an answer comes to pick its option, by the name its settled answer is saved under. */
+export const RESOLUTION_SOURCES = {
+	marker: "marker",
+	free: "free",
+	"first-word": "first-word",
+	model: "model",
+	"none-of-these": "none-of-these",
+	abstained: "abstained",
+} as const satisfies { readonly [S in Resolution["source"]]: S };
 
-const firstWordOf = (text: string): string =>
-	(text.trim().split(/\s+/)[0] ?? "").replaceAll(WORD_EDGES, "").toLowerCase();
+const firstWordOf = (text: string): string => bareWord(text.trim().split(/\s+/)[0] ?? "").toLowerCase();
 
 /** The option an answer picks by its hidden marker, else by its first word matching an option exactly. */
 export const matchOption = (
@@ -39,9 +47,7 @@ export const matchOption = (
 
 /** The cheap model call that picks one of a question's options for a reply no marker or exact word settles. */
 export const replyQuestion = (
-	question: string,
-	options: readonly string[],
-	reply: string,
+	{ question, options, reply }: { readonly question: string; readonly options: readonly string[]; readonly reply: string },
 ) => ({
 	boundary: "reply-option" as const,
 	prompt: [
@@ -65,12 +71,14 @@ export type Stage =
 	/** It has merged, or otherwise ended. */
 	| "ended";
 
+export const DISPOSITIONS = ["applied", "held", "dropped"] as const;
+
 export type Disposition = {
-	readonly disposition: "applied" | "held" | "dropped";
+	readonly disposition: (typeof DISPOSITIONS)[number];
 	readonly why: string;
 };
 
-export type DisposeFacts = {
+type DisposeFacts = {
 	readonly resolution: Resolution;
 	/** An earlier answer to the same question was applied. */
 	readonly answeredBefore: boolean;
@@ -78,6 +86,11 @@ export type DisposeFacts = {
 };
 
 const dropped = (why: string): Disposition => ({ disposition: "dropped", why });
+
+const isUnmatched = ({ source }: Resolution): boolean => source === "none-of-these" || source === "abstained";
+
+/** Whether a model call, not the owner's own word, picked the approval. */
+const isModelApproval = (resolution: Resolution): boolean => resolution.source === "model" && resolution.option === OWNER_APPROVAL;
 
 /** D4: every answer is applied, held for the next state, or dropped with its reason. A model's pick never approves a change that waits for the owner's approval. */
 export const dispose = ({
@@ -87,20 +100,9 @@ export const dispose = ({
 }: DisposeFacts): Disposition => {
 	if (answeredBefore) return dropped("The question already has an answer.");
 
-	if (
-		resolution.source === "none-of-these" ||
-		resolution.source === "abstained"
-	)
-		return dropped("No option matched the reply.");
+	if (isUnmatched(resolution)) return dropped("No option matched the reply.");
 
-	if (
-		resolution.source === "model" &&
-		resolution.option === OWNER_APPROVAL &&
-		stage === "approval"
-	)
-		return dropped(
-			`a model cannot approve it; reply with the word ${OWNER_APPROVAL}`,
-		);
+	if (isModelApproval(resolution) && stage === "approval") return dropped(`a model cannot approve it; reply with the word ${OWNER_APPROVAL}`);
 
 	if (stage === "ended") return dropped("The item has ended.");
 

@@ -1,9 +1,10 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { z } from "zod";
-import { type Adapter, type AdapterContext, type Answers, type Item, ItemId, PermanentError, type Questions, type Watch, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Answers, Holder, type Integrations, type Item, ItemId, PermanentError, type Questions, type Watch, type WorkSource } from "../adapter-api.ts";
 import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
+import type { Env } from "../exec.ts";
 import { parseArgument } from "./argument.ts";
 import { claimer, isLive } from "./claim.ts";
 import {
@@ -32,7 +33,7 @@ const COMMENT_LIMIT = 280;
 /** The digest in a Pad's name, so the same text posts to the same Pad name. */
 const PAD_DIGEST_LENGTH = 8;
 
-const TodoId = ItemId.pipe(z.string().regex(/^(0|[1-9]\d*)$/, "a roundup Todo id is a whole number")).transform(Number);
+const TodoId = ItemId.refine((id) => /^(0|[1-9]\d*)$/.test(id), "a roundup Todo id is a whole number").transform(Number);
 
 const Actor = z.looseObject({ kind: z.string(), id: z.string() });
 
@@ -61,7 +62,7 @@ const Reply = z.looseObject({
 });
 
 /** One take or renewal of an item's claim, written as a comment. */
-const ClaimEntry = z.strictObject({ holder: z.string().min(1), at: z.int().nonnegative(), expiresAt: z.int().nonnegative() });
+const ClaimEntry = z.object({ holder: Holder, at: z.int().nonnegative(), expiresAt: z.int().nonnegative() });
 
 type ClaimEntry = z.infer<typeof ClaimEntry>;
 
@@ -77,7 +78,7 @@ export type RoundupOptions = {
 	readonly socket?: string;
 };
 
-const environment = (): Record<string, string> => Object.fromEntries(Object.entries(process.env).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])));
+const defined = (env: Env): Record<string, string> => Object.fromEntries(Object.entries(env).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])));
 
 /** A tool's reply: its structured content, else its text as JSON, else the text itself. */
 const replyValue = (tool: string, result: Awaited<ReturnType<Client["callTool"]>>): Json => {
@@ -94,9 +95,9 @@ const replyValue = (tool: string, result: Awaited<ReturnType<Client["callTool"]>
 };
 
 /** The stdio client: `rup mcp <agent>` on the Project's socket. Only a run roundup started has both. */
-export const stdioCall = ({ agent, socket }: RoundupOptions) => {
-	const who = agent ?? process.env.ROUNDUP_AGENT_ID;
-	const path = socket ?? process.env.RUPD_SOCKET;
+export const stdioCall = ({ agent, socket }: RoundupOptions, env: Env) => {
+	const who = agent ?? env.ROUNDUP_AGENT_ID;
+	const path = socket ?? env.RUPD_SOCKET;
 	let client: Promise<Client> | undefined;
 
 	if (!who || !path) throw new PermanentError("the roundup adapter runs only in a run roundup started: ROUNDUP_AGENT_ID and RUPD_SOCKET are not both set");
@@ -104,7 +105,7 @@ export const stdioCall = ({ agent, socket }: RoundupOptions) => {
 	const connect = async () => {
 		const made = new Client({ name: "hum", version: "0" });
 
-		await made.connect(new StdioClientTransport({ command: "rup", args: ["mcp", who], env: { ...environment(), RUPD_SOCKET: path } }));
+		await made.connect(new StdioClientTransport({ command: "rup", args: ["mcp", who], env: { ...defined(env), RUPD_SOCKET: path } }));
 
 		return made;
 	};
@@ -139,22 +140,22 @@ const claimEntryOf = (body: string): ClaimEntry | undefined => {
 };
 
 /** A later entry takes over when no claim stands, the standing one ended before it was made, or its holder renews. */
-const takesOver = (current: ClaimEntry | undefined, entry: ClaimEntry): boolean => !current || current.expiresAt <= entry.at || current.holder === entry.holder;
+const doesTakeOver = (current: ClaimEntry | undefined, entry: ClaimEntry): boolean => !current || current.expiresAt <= entry.at || current.holder === entry.holder;
 
 /** The claim that stands after the comments' order. The daemon orders comments, so every worker folds the same list to the same winner. */
 const standingEntry = (comments: readonly Comment[]): ClaimEntry | undefined =>
 	comments.reduce<ClaimEntry | undefined>((current, comment) => {
 		const entry = claimEntryOf(comment.body);
 
-		return entry && takesOver(current, entry) ? entry : current;
+		return entry && doesTakeOver(current, entry) ? entry : current;
 	}, undefined);
 
 /** Open, unblocked and unassigned: a Todo nobody else has taken. */
 const isOpenToTake = (todo: Todo): boolean => !todo.done && !todo.blocked && !todo.owner;
 
-const fitsOneComment = (text: string): boolean => !text.includes("\n") && text.length <= COMMENT_LIMIT;
+const doesFitOneComment = (text: string): boolean => !text.includes("\n") && text.length <= COMMENT_LIMIT;
 
-type Whole = Adapter & {
+type Whole = Integrations & {
 	readonly workSource: WorkSource;
 	readonly questions: Questions;
 	readonly answers: Answers;
@@ -168,8 +169,8 @@ type Whole = Adapter & {
  * A Todo is ready while it is open, unblocked, unassigned and holds no live claim. A claim is a comment, so the
  * daemon's comment order picks the winner. roundup has no release step.
  */
-export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext): Whole => {
-	const client = options.call ? { call: options.call, close: async () => {} } : stdioCall(options);
+export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterContext): Whole => {
+	const client = options.call ? { call: options.call, close: async () => {} } : stdioCall(options, env);
 	const { call } = client;
 
 	const comments = async (id: string) => Comment.array().parse(await call("todo_comments", { id: parseArgument(TodoId, id) }));
@@ -179,7 +180,7 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 	const todos = async () => Todos.parse(await call("todo_list", {}));
 
 	const post = async (id: string, text: string): Promise<void> => {
-		if (!fitsOneComment(text)) throw new PermanentError(`a roundup comment is one line of at most ${COMMENT_LIMIT} characters`);
+		if (!doesFitOneComment(text)) throw new PermanentError(`a roundup comment is one line of at most ${COMMENT_LIMIT} characters`);
 
 		await call("todo_comment", { id: parseArgument(TodoId, id), body: text });
 	};
@@ -192,30 +193,21 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 		await post(id, cutLine(marker, text, ` … full text in Pad "${name}"`, COMMENT_LIMIT));
 	};
 
-	const fitsMarked = (marker: Marker, text: string): boolean => {
-		try {
-			markedLine(marker, text, COMMENT_LIMIT);
+	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> => {
+		const line = markedLine(marker, text);
 
-			return true;
-		} catch (cause) {
-			if (cause instanceof PermanentError) return false;
-
-			throw cause;
-		}
+		return line.length <= COMMENT_LIMIT ? post(id, line) : postInPad(id, marker, text);
 	};
 
-	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> =>
-		fitsMarked(marker, text) ? post(id, markedLine(marker, text, COMMENT_LIMIT)) : postInPad(id, marker, text);
+	const postPlain = async (id: string, text: string): Promise<void> => (doesFitOneComment(text) ? post(id, text) : postInPad(id, undefined, text));
 
-	const postPlain = async (id: string, text: string): Promise<void> => (fitsOneComment(text) ? post(id, text) : postInPad(id, undefined, text));
-
-	const standingClaim = (id: string, list: readonly Comment[]) => {
+	const standingClaim = (id: ItemId, list: readonly Comment[]) => {
 		const entry = standingEntry(list);
 
 		return entry && { claim: { item: id, holder: entry.holder, expiresAt: entry.expiresAt } };
 	};
 
-	const isFree = (id: string, list: readonly Comment[]): boolean => !isLive(standingClaim(id, list)?.claim, now());
+	const isFree = (id: ItemId, list: readonly Comment[]): boolean => !isLive(standingClaim(id, list)?.claim, now());
 
 	const take = claimer(
 		{
@@ -244,15 +236,15 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 	});
 
 	return {
-		apiVersion: 1,
+		apiVersion: ADAPTER_API_VERSION,
 		spent: () => 0,
 		close: client.close,
 		workSource: {
 			listReady: async () => {
-				const open = (await todos()).filter(isOpenToTake);
-				const free = await Promise.all(open.map(async (found) => isFree(String(found.id), await comments(String(found.id)))));
+				const open = (await todos()).filter(isOpenToTake).map((found) => ({ id: ItemId.parse(String(found.id)), title: found.title }));
+				const free = await Promise.all(open.map(async ({ id }) => isFree(id, await comments(id))));
 
-				return open.flatMap((found, index) => (free[index] ? [{ id: String(found.id), title: found.title }] : []));
+				return open.filter((_, index) => free[index]);
 			},
 			read: async (id): Promise<Item> => {
 				const [found, list] = await Promise.all([todo(id), comments(id)]);
@@ -268,7 +260,7 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 				if (filed !== undefined) return { id: filed, title };
 
 				const created = async () => Todo.parse(await call("todo_create", { title, body: followUpBody(body, `#${from}`) })).id;
-				const id = String((await todos()).find(isFollowUpOf(`#${from}`, title))?.id ?? (await created()));
+				const id = ItemId.parse(String((await todos()).find(isFollowUpOf(`#${from}`, title))?.id ?? (await created())));
 				const note = followUpNote(title, id);
 
 				await postMarked(from, note.marker, note.text);

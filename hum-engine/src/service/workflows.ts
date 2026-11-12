@@ -5,10 +5,10 @@ import type { HumConfig } from "../config/schema.ts";
 /** The settings the workflows are built from. */
 export type WorkflowSettings = Pick<HumConfig, "runBranchPrefix" | "itemsDir" | "ciSchedule" | "commitIdentity" | "ciWakeTimeoutMinutes" | "pullRequestTokenSecret">;
 
-export const WAKE_FILE = "hum-wake.yml";
+const WAKE_FILE = "hum-wake.yml";
 
 /** The type of the `repository_dispatch` event a tracker's webhook sends. */
-export const DISPATCH_EVENT = "hum-wake";
+const DISPATCH_EVENT = "hum-wake";
 
 const WAKE_PATH = `./.github/workflows/${WAKE_FILE}`;
 

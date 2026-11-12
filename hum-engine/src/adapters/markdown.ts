@@ -4,13 +4,13 @@ import { join } from "node:path";
 import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { type Adapter, type AdapterContext, type Claim, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import type { MergeMethod } from "../config/schema.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
-import { type GitIdentity, gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
+import { type GitIdentity, gitIn, push, readOrAbsent } from "./git.ts";
 import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
-import { answerMarker, followUpKey, questionText } from "./marked.ts";
+import { answerMarker, followUpBody, followUpKey, questionText } from "./marked.ts";
 import { type CommitLanded, landOwnerCommit } from "./owner-commit.ts";
 import type { PullRequests } from "./pull-requests.ts";
 
@@ -18,6 +18,9 @@ const ITEM_EXTENSION = ".md";
 const BASE_REF = "refs/hum/base";
 const CLAIMS_REF = "refs/hum/claims";
 const NO_BASE_TOKEN = "none";
+
+/** The remote the adapter fetches from and pushes to. */
+const REMOTE = "origin";
 const WRITE_RACE_BACKOFF_MS = 50;
 const FOLLOW_UP_SLUG_LENGTH = 40;
 
@@ -30,7 +33,6 @@ export type MarkdownOptions = {
 	readonly itemsDir: string;
 	/** The author and committer of the commits the adapter makes. */
 	readonly identity: GitIdentity;
-	readonly remote?: string;
 	/** Retries of a write that another writer's push beat. */
 	readonly writeRaceRetries: number;
 	/** Item files read at once; each read is a git process. */
@@ -62,7 +64,7 @@ type View = {
 };
 
 /** How a write reached the base: a push of its own commit, or a pull request that merges it as a commit of GitHub's. */
-type Landed = Exclude<CommitLanded["via"], "conflict">;
+type Landed = Extract<CommitLanded["via"], "push" | "pull-request">;
 
 /** Another writer moved the base branch between this write's read and its push. */
 class LostRace extends Error {
@@ -79,7 +81,7 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, timeoutMs, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, timeoutMs, base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
 	const git = gitIn(repo, { identity, timeoutMs });
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
@@ -90,7 +92,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const refetch = (): Promise<View> => {
 		spent++;
 
-		const fetched = git.raw(["fetch", "--prune", "--no-tags", "--quiet", remote, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]).then((): View => ({ sources: new Map() }));
+		const fetched = git.raw(["fetch", "--prune", "--no-tags", "--quiet", REMOTE, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]).then((): View => ({ sources: new Map() }));
 
 		view = fetched;
 		fetched.catch(() => {
@@ -106,23 +108,23 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const pushCounted = async (args: readonly string[]) => {
 		spent++;
 
-		const outcome = await push(git, [remote, ...args]).catch((cause: unknown) => {
+		const outcome = await push(git, [REMOTE, ...args]).catch((cause: unknown) => {
 			view = undefined;
 
 			throw cause;
 		});
 
-		if (outcome === "conflict") view = undefined;
+		if (outcome.kind !== "pushed") view = undefined;
 
 		return outcome;
 	};
 
 	const standingFromLine = (line: string): [string, StandingClaim][] => {
 		const [ref = "", sha = "", subject = ""] = line.split("\t");
-		const item = ref.slice(`${CLAIMS_REF}/`.length);
-		const claim = claimOfCommit(item, subject);
+		const item = ItemId.safeParse(ref.slice(`${CLAIMS_REF}/`.length));
+		const claim = item.success ? claimOfCommit(item.data, subject) : undefined;
 
-		return claim ? [[item, { claim, sha }]] : [];
+		return claim ? [[claim.item, { claim, sha }]] : [];
 	};
 
 	const readClaims = async (): Promise<ReadonlyMap<string, StandingClaim>> =>
@@ -187,14 +189,16 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const isReady = (file: ItemFile | undefined, standing: StandingClaim | undefined): file is ItemFile => file?.state === READY_STATE && !isLive(standing?.claim, now());
 
 	const readyRef = async (name: string, claims: ReadonlyMap<string, StandingClaim>): Promise<ItemRef[]> => {
-		const id = name.slice(0, -ITEM_EXTENSION.length);
+		const raw = name.slice(0, -ITEM_EXTENSION.length);
+		const parsed = ItemId.safeParse(raw);
 
-		if (!ItemId.safeParse(id).success) {
-			report({ code: "item-malformed", item: id, cause: `${itemsDir}/${name} has a name that is no item id`, fix: `Rename ${itemsDir}/${name} to letters, digits, dot, dash or underscore.` });
+		if (!parsed.success) {
+			report({ code: "item-malformed", item: raw, cause: `${itemsDir}/${name} has a name that is no item id`, fix: `Rename ${itemsDir}/${name} to letters, digits, dot, dash or underscore.` });
 
 			return [];
 		}
 
+		const id = parsed.data;
 		const file = await loadItem(id);
 
 		return isReady(file, claims.get(id)) ? [{ id, title: file.title }] : [];
@@ -219,27 +223,21 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		}
 	};
 
-	const reportRefusal = (error: PushRefused): never => {
-		report({
-			code: "push-refused",
-			item: base,
-			cause: `The remote refused the push to ${base}: ${error.message.slice(0, 300)}`,
-			fix: `Let this account push to ${base}, or point hum at a branch it may write.`,
-		});
+	/** No retry gets past a remote that said no, so the call fails now, in the remote's words. */
+	const refused = (ref: string, said: string): Failed => ({ failed: "now", why: `${said}; let this account push to ${ref}` });
 
-		throw error;
-	};
+	const pushToBase = async (sha: string): Promise<Landed | Failed> => {
+		const outcome = await pushCounted([`${sha}:${baseBranch}`]);
 
-	const pushToBase = async (sha: string): Promise<Landed> => {
-		const outcome = await pushCounted([`${sha}:${baseBranch}`]).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
+		if (outcome.kind === "refused") return refused(base, outcome.said);
 
-		if (outcome === "conflict") throw new LostRace(`another writer moved ${base} first`);
+		if (outcome.kind === "conflict") throw new LostRace(`another writer moved ${base} first`);
 
 		return "push";
 	};
 
 	/** An owner's commit lands the way the base asks: a pull request that merges itself where one is required, a push elsewhere. */
-	const landOwned = async (sha: string, message: string, label: string): Promise<Landed> => {
+	const landOwned = async (sha: string, message: string, label: string): Promise<Landed | Failed> => {
 		const landed = await landOwnerCommit({
 			sha,
 			base,
@@ -250,35 +248,40 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			mergeMethod,
 			pulls,
 			push: pushCounted,
-		}).catch((cause: unknown) => (cause instanceof PushRefused ? reportRefusal(cause) : Promise.reject(cause)));
+		});
+
+		if (landed.via === "refused") return refused(base, landed.said);
 
 		if (landed.via === "conflict") throw new LostRace(`another writer moved ${base} first`);
 
 		return landed.via;
 	};
 
-	/** Changes one file on the remote base branch, reading it afresh after every lost race. */
-	const write = async (message: string, change: () => Promise<FileChange | undefined>, ownedBy?: string): Promise<void> => {
-		const attempt = async () => {
+	/** Changes one file on the remote base branch, reading it afresh after every lost race; a write the remote refused answers why. */
+	const write = async (message: string, change: () => Promise<FileChange | undefined>, ownedBy?: string): Promise<Failed | undefined> => {
+		const attempt = async (): Promise<Failed | undefined> => {
 			await current();
 
 			const next = await change();
 
-			if (!next) return;
+			if (!next) return undefined;
 
 			const sha = await commitOn((await git.raw(["rev-parse", BASE_REF])).trim(), message, next);
 			const landed = ownedBy === undefined ? await pushToBase(sha) : await landOwned(sha, message, ownedBy);
 
 			if (landed === "push") await mirrorBase(sha, next);
-			else view = undefined;
+			else if (landed === "pull-request") view = undefined;
+			else return landed;
+
+			return undefined;
 		};
 
-		await pRetry(attempt, { retries: writeRaceRetries, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
+		return pRetry(attempt, { retries: writeRaceRetries, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
 			throw cause instanceof LostRace ? new PermanentError(`gave up after ${writeRaceRetries + 1} lost races pushing to ${base}`) : cause;
 		});
 	};
 
-	const appendTo = (id: string, entry: Omit<ThreadEntry, "text" | "at">, text: string): Promise<void> =>
+	const appendTo = (id: string, entry: Omit<ThreadEntry, "text" | "at">, text: string): Promise<Failed | undefined> =>
 		write(
 			`hum: ${entry.kind} on ${id}`,
 			async () => {
@@ -291,7 +294,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			entry.kind === "answer" ? id : undefined,
 		);
 
-	const take = claimer<StandingClaim>(
+	const take = claimer<StandingClaim, Failed>(
 		{
 			standing: async (id) => (await claimsNow()).get(id),
 			isReady: async (id) => (await loadItem(id))?.state === READY_STATE,
@@ -299,7 +302,11 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 				const parent = over?.sha ?? (await git.raw(["rev-parse", BASE_REF])).trim();
 				const sha = await commitOn(parent, claimCommitMessage(claim));
 
-				if ((await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`])) === "conflict") return false;
+				const pushed = await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`]);
+
+				if (pushed.kind === "refused") return refused(`${claimPrefix}${claim.item}`, pushed.said);
+
+				if (pushed.kind === "conflict") return false;
 
 				await mirrorClaim(claim, sha);
 
@@ -323,7 +330,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	};
 
 	const adapter = {
-		apiVersion: 1,
+		apiVersion: ADAPTER_API_VERSION,
 		/** Fetches and pushes so far. */
 		spent: () => spent,
 		workSource: {
@@ -341,9 +348,9 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			fileFollowUp: async (from, { title, body }) => {
 				const id = parseArgument(ItemId, followUpId(parseArgument(ItemId, from), title));
 
-				await write(`hum: file ${id}`, async () => ((await itemSource(id)) === undefined ? { path: pathOf(id), content: newItemFile(title, `${body.trim()}\n\nFiled from ${from}.`) } : undefined));
+				const failed = await write(`hum: file ${id}`, async () => ((await itemSource(id)) === undefined ? { path: pathOf(id), content: newItemFile(title, followUpBody(body, from)) } : undefined));
 
-				return { id, title };
+				return failed ?? { id, title };
 			},
 		},
 		questions: {
@@ -354,7 +361,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			answer: (id, { text, option }) => appendTo(id, answerMarker(option), text),
 			/** The token is the remote base branch's tip; reading one ref spends no rate limit. */
 			watch: async (since?: string): Promise<Watch> => {
-				const [token = NO_BASE_TOKEN] = (await git.raw(["ls-remote", remote, baseBranch])).split(/\s/).filter(Boolean);
+				const [token = NO_BASE_TOKEN] = (await git.raw(["ls-remote", REMOTE, baseBranch])).split(/\s/).filter(Boolean);
 
 				return { token, changed: token !== since };
 			},

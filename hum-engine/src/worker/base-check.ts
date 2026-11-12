@@ -1,4 +1,4 @@
-import type { WorkSource } from "../adapter-api.ts";
+import { ItemId, type WorkSource } from "../adapter-api.ts";
 import { type Git } from "../adapters/git.ts";
 import type { Config } from "../config/load.ts";
 import { inWorktreeAt } from "../loop/proof.ts";
@@ -38,7 +38,7 @@ export const checkBaseAfterMerge = async ({ state, config, workSource, git, remo
 	if (failure === undefined) return;
 
 	const { placement } = await placementOf({ config, state, git, base, now }, { paths: merge.paths, size: 0, loosened: false, pinChanged: false });
-	const followUp = await workSource.fileFollowUp(item, { title: `Fix the checks that fail on ${base} after ${item} merged`, body: `Kind: fix\n\nThe repo's checks fail on ${base} at ${merge.sha}, the commit that merged ${item}.\n\n\`\`\`\n${failure.slice(0, FAILURE_EXCERPT)}\n\`\`\`` });
+	const followUp = await workSource.fileFollowUp(ItemId.parse(item), { title: `Fix the checks that fail on ${base} after ${item} merged`, body: `Kind: fix\n\nThe repo's checks fail on ${base} at ${merge.sha}, the commit that merged ${item}.\n\n\`\`\`\n${failure.slice(0, FAILURE_EXCERPT)}\n\`\`\`` });
 
 	state.breaks.put(item, { item, sha: merge.sha, at: now(), paths: merge.paths, level: placement.level.name, failure: failure.slice(0, FAILURE_EXCERPT), onBreak: placement.level.onBreak, followUp: followUp.id });
 };

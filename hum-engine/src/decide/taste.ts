@@ -3,9 +3,9 @@ import type { HumConfig } from "../config/schema.ts";
 import { DATA_RULE, fenced } from "./prose.ts";
 
 /** Whether the diff keeps one taste rule, and the line of the diff that shows it. */
-export const TasteAnswer = z.strictObject({ keeps: z.boolean(), evidence: z.string() });
+const TasteAnswer = z.strictObject({ keeps: z.boolean(), evidence: z.string() });
 
-export type TasteAnswer = z.infer<typeof TasteAnswer>;
+type TasteAnswer = z.infer<typeof TasteAnswer>;
 
 /** The cheap model call that checks a diff against one taste rule. Its pick is for a report and decides nothing. */
 export const tasteQuestion = (rule: string, diff: string, { diffLimit }: Pick<HumConfig, "diffLimit">) => ({
@@ -24,7 +24,7 @@ export const tasteQuestion = (rule: string, diff: string, { diffLimit }: Pick<Hu
 export type TasteResult = { readonly rule: string; readonly answer: TasteAnswer | { readonly abstained: string } };
 
 /** The pull request comment. It only reports; `measured` says whether the model's rate at this boundary meets the bar. */
-export const tasteComment = (results: readonly TasteResult[], measured: boolean): string => {
+export const tasteComment = (results: readonly TasteResult[], { measured }: { readonly measured: boolean }): string => {
 	const lines = results.map(({ rule, answer }) => {
 		if ("abstained" in answer) return `- ? ${rule} (not checked: ${answer.abstained})`;
 

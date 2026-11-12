@@ -51,6 +51,13 @@ const DESCRIPTIONS = {
 // SAFETY: each description is keyed by the problem name it reads, so the lookup by `problem.problem` takes its own variant.
 export const describeProblem = (problem: Problem): string => (DESCRIPTIONS[problem.problem] as (problem: Problem) => string)(problem);
 
+/** hum commits as the owner and invents no identity: this names each git config key that holds none, and how to set it. */
+export const noGitIdentity = (missing: readonly string[]): Refusal => ({
+	code: "no-git-identity",
+	missing,
+	message: `hum commits as you, and git config holds no ${missing.join(" or ")}. Set ${missing.length === 1 ? "it" : "each"}, then run again: ${missing.map((key) => `git config --global ${key} "<yours>"`).join("; ")}.`,
+});
+
 export const invalidConfig = (problems: readonly Problem[]): Refusal => ({
 	code: "invalid-config",
 	problems,

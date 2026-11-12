@@ -1,17 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { x } from "tinyexec";
 import { gitIn } from "../src/adapters/git.ts";
-import { slotFolder } from "../src/slots/env.ts";
+import { SLOT_ENV, slotEnv, slotFolder, slotName } from "../src/slots/env.ts";
 import { SLOT_KEPT_CODE, SLOT_OUT_CODE } from "../src/slots/pool.ts";
-import { proposeRecipe } from "../src/slots/scan.ts";
 import type { Slot } from "../src/state/saved.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { type SlotSettings, slotWorld, type SlotWorld } from "./fixtures/slot-world.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const worlds: SlotWorld[] = [];
 
@@ -26,7 +25,6 @@ const world = (settings?: SlotSettings, liveRuns?: Parameters<typeof slotWorld>[
 afterEach(async () => {
 	for (const made of worlds.splice(0)) {
 		await made.slots.idle();
-		made.dispose();
 	}
 });
 
@@ -34,7 +32,15 @@ const statuses = (w: SlotWorld): string[] => w.slots.list().map(({ status }) => 
 
 const WAITED_MS = 150;
 
-const stillWaiting = async (pending: Promise<unknown>): Promise<boolean> => (await Promise.race([pending.then(() => false), Bun.sleep(WAITED_MS).then(() => true)]));
+const isStillWaiting = async (pending: Promise<unknown>): Promise<boolean> => (await Promise.race([pending.then(() => false), Bun.sleep(WAITED_MS).then(() => true)]));
+
+test("each slot's ports start at its own block, and on one shared set of services every slot's start at the first", () => {
+	const portBases = (services: "per-slot" | "shared") =>
+		[0, 1].map((index) => slotEnv({ services, ports: { base: 4000, stride: 10 }, projectPrefix: "hum" }, { name: slotName(index), index, folder: "slot" })[SLOT_ENV.portBase]);
+
+	expect(portBases("per-slot")).toEqual(["4000", "4010"]);
+	expect(portBases("shared")).toEqual(["4000", "4000"]);
+});
 
 test("with more passes than slots, the extra pass waits and starts in the first slot returned", async () => {
 	const w = world({ runners: 2 });
@@ -43,7 +49,7 @@ test("with more passes than slots, the extra pass waits and starts in the first 
 	const extra = w.ask("c");
 
 	expect(first.folder).not.toBe(second.folder);
-	expect(await stillWaiting(extra)).toBe(true);
+	expect(await isStillWaiting(extra)).toBe(true);
 
 	await first.giveBack();
 
@@ -70,11 +76,12 @@ test("a slot taken by a worker that died before its run started is returned", as
 	expect(died.exitCode).not.toBe(0);
 	const restarted = w.reopened();
 
-	expect(restarted.list().map(({ status, item }) => [status, item])).toEqual([["taken", "x"]]);
+	expect(restarted.list()).toMatchObject([{ status: "taken", item: "x" }]);
 
 	await restarted.maintain();
 
-	expect(restarted.list().map(({ status, item }) => [status, item])).toEqual([["free", undefined]]);
+	expect(restarted.list()).toMatchObject([{ status: "free" }]);
+	expect(restarted.list()[0]).not.toHaveProperty("item");
 });
 
 test.each<[string, ReadonlySet<string>, Slot["status"]]>([
@@ -84,7 +91,7 @@ test.each<[string, ReadonlySet<string>, Slot["status"]]>([
 	const w = world({ runners: 1 });
 
 	await w.ask("y");
-	w.state.runs.begin({ itemId: "y", run: "build", attempt: 0 }, "hum y build #0");
+	w.state.runs.begin({ itemId: "y", run: "build", attempt: 0 }, { name: "hum y build #0" });
 
 	const restarted = w.reopened(async () => alive);
 
@@ -123,7 +130,7 @@ test("a pass that ends with a commit the remote lacks keeps its slot taken, with
 });
 
 test("a slot refreshes between passes: its data resets every time and its dependencies reinstall only when a lockfile changed", async () => {
-	const counters = mkdtempSync(join(tmpdir(), "hum-counters-"));
+	const counters = tempDir("counters");
 	const count = (name: string): number => (existsSync(join(counters, name)) ? readFileSync(join(counters, name), "utf8").split("\n").filter(Boolean).length : 0);
 
 	const w = world({
@@ -146,7 +153,7 @@ test("a slot refreshes between passes: its data resets every time and its depend
 	expect(existsSync(join(counters, "data"))).toBe(false);
 	expect(count("installs")).toBe(1);
 
-	w.repo.put("bun.lock", "changed\n");
+	w.repo.put({ path: "bun.lock", content: "changed\n" });
 	await (await w.ask("b")).giveBack();
 	await w.slots.idle();
 
@@ -167,7 +174,7 @@ test("a slot that fails its ready check leaves the pool with one card naming it 
 	expect(cards).toHaveLength(1);
 	expect(cards[0]?.cause).toContain("slot-2");
 	expect(cards[0]?.cause).toContain(check);
-	expect(await stillWaiting(second)).toBe(true);
+	expect(await isStillWaiting(second)).toBe(true);
 
 	await only.giveBack();
 
@@ -194,26 +201,4 @@ test("a slot made by git clone is refused, and the other slots go on", async () 
 	expect(statuses(w)).toEqual(["free", "out"]);
 	expect(card?.cause).toContain("not a git worktree");
 	expect(card?.cause).toContain(clone);
-});
-
-test("a repo's own environment script is the recipe's prepare, and a repo without one gets an empty recipe", async () => {
-	const bare = world({ runners: 1 });
-
-	expect(proposeRecipe(bare.repo.owner)).toEqual({ prepare: [], refresh: [], ready: [] });
-
-	const owned = world({
-		runners: 1,
-		seed: (repo) => {
-			const owner = repo.owner;
-
-			mkdirSync(join(owner, "scripts"), { recursive: true });
-			writeFileSync(join(owner, "scripts", "env.sh"), '#!/bin/sh\ntouch "$HUM_SLOT_FOLDER/prepared-by-env-script"\n');
-			chmodSync(join(owner, "scripts", "env.sh"), 0o755);
-			repo.commit("env script");
-			sh(owner, ["push", "-q", "origin", "main"]);
-		},
-		recipe: proposeRecipe,
-	});
-
-	expect(await Bun.file(join((await owned.ask("a")).folder, "prepared-by-env-script")).exists()).toBe(true);
 });

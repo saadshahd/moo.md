@@ -24,8 +24,14 @@ const FIXED = new Set<string>(FIXED_PARTS);
 const isWait = (node: StateNodeJSON) => node.tags?.includes(WAIT_TAG) || node.tags?.includes(OWNER_WAIT_TAG);
 const isTerminal = (node: StateNodeJSON) => node.type === "final" || node.tags?.includes(STUCK_TAG);
 
-const settles = (value: Transitions) =>
+const doesSettle = (value: Transitions) =>
 	(value ?? []).some((t) => t.target !== undefined || (t.actions?.length ?? 0) > 0);
+
+/** Whether a wait ends on its own: a timeout with an action that settles it, or a delay that does. */
+const hasTimeoutAction = (node: StateNodeJSON): boolean => (doesSettle(node.onTimeout) && node.timeout !== undefined) || Object.values(node.after ?? {}).some(doesSettle);
+
+/** Events xstate sends itself, which no config declares. */
+const isXstateEvent = (event: string): boolean => event.startsWith("xstate.") || event.startsWith("@xstate.");
 
 /** Every state is reachable and reaches done or stuck; every wait has a timeout and an action. */
 const graphProblems = (kind: string, config: Kind): Problem[] => {
@@ -67,9 +73,7 @@ const graphProblems = (kind: string, config: Kind): Problem[] => {
 	return Object.entries(states).flatMap(([state, node]): Problem[] => [
 		...(reachable.has(state) ? [] : [{ problem: "unreachable-state", kind, state } as const]),
 		...(finishing.has(state) ? [] : [{ problem: "dead-end-state", kind, state } as const]),
-		...(isWait(node) && !(settles(node.onTimeout) && node.timeout !== undefined) && !Object.values(node.after ?? {}).some(settles)
-			? [{ problem: "wait-without-timeout", kind, state } as const]
-			: []),
+		...(isWait(node) && !hasTimeoutAction(node) ? [{ problem: "wait-without-timeout", kind, state } as const] : []),
 	]);
 };
 
@@ -139,13 +143,7 @@ export const pickTier = (kind: Pick<Kind, "tiers">, key: { purpose: string; leve
 /** Every event has a source and a handler, and every event a machine waits on has a source. */
 const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): Problem[] => {
 	const parts = new Set<string>([...FIXED_PARTS, ...Object.keys(hum.roles)]);
-	const handled = new Set<string>();
-
-	for (const kind of Object.values(kinds)) {
-		for (const node of Object.values(kind.machine.states)) {
-			for (const event of Object.keys(node.on ?? {})) handled.add(event);
-		}
-	}
+	const handled = new Set(Object.values(kinds).flatMap((kind) => Object.values(kind.machine.states).flatMap((node) => Object.keys(node.on ?? {}))));
 
 	return [
 		...Object.entries(hum.events).flatMap(([event, { source }]): Problem[] => [
@@ -153,9 +151,7 @@ const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): P
 			...(handled.has(event) ? [] : [{ problem: "event-without-handler", event } as const]),
 		]),
 		...[...handled].flatMap((event): Problem[] =>
-			event in hum.events || event.startsWith("xstate.") || event.startsWith("@xstate.")
-				? []
-				: [{ problem: "event-without-source", event, source: undefined }],
+			event in hum.events || isXstateEvent(event) ? [] : [{ problem: "event-without-source", event, source: undefined }],
 		),
 	];
 };
@@ -171,18 +167,18 @@ const skillProblems = (hum: HumConfig, env: CheckEnv): Problem[] =>
 	);
 
 /** A run branch could then share a name, or a folder, with a claim branch. */
-const prefixesOverlap = ({ runBranchPrefix, claimPrefix }: Naming): boolean =>
+const doPrefixesOverlap = ({ runBranchPrefix, claimPrefix }: Naming): boolean =>
 	runBranchPrefix.startsWith(claimPrefix) || claimPrefix.startsWith(runBranchPrefix);
 
 const namingProblems = (hum: HumConfig): Problem[] =>
-	prefixesOverlap(hum) ? [{ problem: "overlapping-prefixes", run: hum.runBranchPrefix, claim: hum.claimPrefix }] : [];
+	doPrefixesOverlap(hum) ? [{ problem: "overlapping-prefixes", run: hum.runBranchPrefix, claim: hum.claimPrefix }] : [];
 
 const levelNames = (hum: HumConfig): ReadonlySet<string> => new Set(hum.levels.map(({ name }) => name));
 
 const ALL_KINDS = "*";
 
 /** A path whose level releases only after proof names a proof for every kind, or for each kind there is. */
-const provesEveryKind = (rule: PathRule, kinds: readonly string[]): boolean =>
+const doesProveEveryKind = (rule: PathRule, kinds: readonly string[]): boolean =>
 	rule.proofs?.[ALL_KINDS] !== undefined || kinds.every((kind) => rule.proofs?.[kind] !== undefined);
 
 const pathProblems = (hum: HumConfig): Problem[] => {
@@ -192,7 +188,7 @@ const pathProblems = (hum: HumConfig): Problem[] => {
 	return [
 		...[...hum.paths, ...hum.launches, ...Object.values(hum.kindFloors).map((level) => ({ level }))].flatMap(({ level }): Problem[] => (levels.has(level) ? [] : [{ problem: "unknown-level", level }])),
 		...hum.paths.flatMap((rule): Problem[] =>
-			afterProof.has(rule.level) && !provesEveryKind(rule, hum.kinds) ? [{ problem: "path-without-proof", glob: rule.glob, level: rule.level }] : [],
+			afterProof.has(rule.level) && !doesProveEveryKind(rule, hum.kinds) ? [{ problem: "path-without-proof", glob: rule.glob, level: rule.level }] : [],
 		),
 	];
 };

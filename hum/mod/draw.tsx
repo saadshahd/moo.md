@@ -3,12 +3,12 @@ import type { Press, Row, Span, Tone } from "./view/row.ts";
 
 type Tags = ReturnType<EngineInterface["ui"]["resolve"]>;
 
-const TONE: Readonly<Record<Exclude<Tone, "filled">, { readonly color?: "warning"; readonly dimColor?: true; readonly bold?: true }>> = {
+const TONE = {
 	plain: {},
 	dim: { dimColor: true },
 	strong: { bold: true },
 	amber: { color: "warning" },
-};
+} as const satisfies Record<Exclude<Tone, "filled">, { readonly color?: "warning"; readonly dimColor?: true; readonly bold?: true }>;
 
 const ACCENT = "suggestion";
 

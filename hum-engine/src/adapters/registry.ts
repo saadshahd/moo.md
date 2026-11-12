@@ -2,10 +2,10 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
-import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, PermanentError } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, type Integrations, PermanentError } from "../adapter-api.ts";
 import { readSettings } from "../config/settings.ts";
 import { HumConfig } from "../config/schema.ts";
-import { commandTimeoutMs } from "../exec.ts";
+import { commandTimeoutMs, type Env } from "../exec.ts";
 import type { Faults } from "../state/faults.ts";
 import type { Card } from "../status/format.ts";
 import { githubAdapter, repoFromRemote } from "./github.ts";
@@ -61,10 +61,10 @@ const defaultBase = async (repo: string, timeoutMs: number): Promise<string> => 
 };
 
 /** The pull requests of the repo's `origin` when it is on GitHub. */
-const originPulls = async (repo: string, timeoutMs: number): Promise<PullRequests | undefined> => {
+const originPulls = async (repo: string, timeoutMs: number, env: Env): Promise<PullRequests | undefined> => {
 	const found = repoFromRemote(await gitIn(repo, { timeoutMs }).raw(["remote", "get-url", "origin"]).catch(whenGitFailed("")));
 
-	return found === undefined ? undefined : gitHubPullRequests(found, { timeoutMs });
+	return found === undefined ? undefined : gitHubPullRequests(found, { timeoutMs, env });
 };
 
 const githubRepo = async (repo: string, timeoutMs: number): Promise<string> => {
@@ -80,7 +80,7 @@ const BUILT_IN = {
 	[MARKDOWN]: async ({ path, settings, context }) => {
 		const timeoutMs = commandTimeoutMs(settings);
 
-		return markdownAdapter({ repo: path, base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce, pulls: await originPulls(path, timeoutMs), mergeMethod: settings.mergeMethod, ownerBranchPrefix: settings.ownerBranchPrefix, timeoutMs }, context);
+		return markdownAdapter({ repo: path, base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce, pulls: await originPulls(path, timeoutMs, context.env), mergeMethod: settings.mergeMethod, ownerBranchPrefix: settings.ownerBranchPrefix, timeoutMs }, context);
 	},
 	github: async ({ path, settings, context }) => {
 		const timeoutMs = commandTimeoutMs(settings);
@@ -125,7 +125,7 @@ export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Fault
 export const resolveAdapters = async (
 	repo: string,
 	{ faults, guard, context }: { faults: Faults; guard: Pick<GuardOptions, "lastReady">; context: AdapterContext },
-): Promise<Partial<Record<Slot, Adapter>>> => {
+): Promise<Partial<Record<Slot, Integrations>>> => {
 	const settings = readSettings(repo, AdapterSettings);
 
 	const slots = SLOTS.flatMap((slot) => {
@@ -136,7 +136,7 @@ export const resolveAdapters = async (
 
 	const source: Repo = { path: repo, settings, context };
 
-	const build = async (name: string): Promise<Adapter> => {
+	const build = async (name: string): Promise<Integrations> => {
 		const adapter = await (isBuiltIn(name) ? BUILT_IN[name](source) : ownerAdapter(name, source));
 
 		if (refuseOtherVersion(name, adapter, faults)) throw new PermanentError(`adapter "${name}" implements another adapter API version`);

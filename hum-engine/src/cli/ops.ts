@@ -1,10 +1,11 @@
 import { Command, CommanderError, Option } from "commander";
-import { x } from "tinyexec";
 import { z } from "zod";
-import { type ClaimResult, type Item, type ItemRef, PermanentError, Watch } from "../adapter-api.ts";
+import { type ClaimResult, Holder, type Item, ItemId, type ItemRef, PermanentError, Watch } from "../adapter-api.ts";
+import { parseArgument } from "../adapters/argument.ts";
 import { pushArgs } from "../adapters/git.ts";
 import { resolveAdapters, type Slot } from "../adapters/registry.ts";
 import { readSettings } from "../config/settings.ts";
+import { CommandTimedOut, commandTimeoutMs, type Env, exec } from "../exec.ts";
 import { HumConfig } from "../config/schema.ts";
 import { dropInto } from "../state/fs.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
@@ -19,6 +20,7 @@ type Printable = ItemRef[] | ItemRef | Item | ClaimResult | Watch | { readonly o
 
 export type Io = {
 	readonly cwd: string;
+	readonly env: Env;
 	readonly stdout: (text: string) => void;
 	readonly stderr: (text: string) => void;
 };
@@ -29,6 +31,7 @@ const EXIT_MISUSED = 2;
 const OK = { ok: true } as const;
 
 const CliSettings = z.looseObject({
+	commandTimeoutSeconds: HumConfig.shape.commandTimeoutSeconds,
 	claimExpirySeconds: HumConfig.shape.claimExpirySeconds,
 	watchCacheSeconds: HumConfig.shape.watchCacheSeconds,
 	watchLockSeconds: HumConfig.shape.watchLockSeconds,
@@ -72,19 +75,21 @@ const performed = async (action: Promise<void>): Promise<Printable> => {
 
 type Handler = (call: Call) => Promise<Printable>;
 
+const idOf = (item: string): ItemId => parseArgument(ItemId, item);
+
 const handlers = {
 	"list-ready": ({ slot }) => slot("work-source", (a) => a.workSource).listReady(),
 	claim: ({ slot, item, second: holder, flags, settings }) => {
 		const source = slot("work-source", (a) => a.workSource);
 		const ttlMs = (flags.ttl ?? settings.claimExpirySeconds) * SECOND_MS;
 
-		return (flags.renew ? source.renew : source.claim)(item, holder, ttlMs);
+		return (flags.renew ? source.renew : source.claim)(idOf(item), parseArgument(Holder, holder), ttlMs);
 	},
-	read: ({ slot, item }) => slot("work-source", (a) => a.workSource).read(item),
-	comment: ({ slot, item, text }) => performed(slot("work-source", (a) => a.workSource).comment(item, text)),
-	ask: ({ slot, item, text, options }) => performed(slot("questions", (a) => a.questions).ask(item, { text: text, options: options.length > 0 ? options : undefined })),
+	read: ({ slot, item }) => slot("work-source", (a) => a.workSource).read(idOf(item)),
+	comment: ({ slot, item, text }) => performed(slot("work-source", (a) => a.workSource).comment(idOf(item), text)),
+	ask: ({ slot, item, text, options }) => performed(slot("questions", (a) => a.questions).ask(idOf(item), { text: text, options: options.length > 0 ? options : undefined })),
 	answer: async ({ slot, item, text, options, inbox, settings }) => {
-		await slot("answers", (a) => a.answers).answer(item, { text, option: options[0] });
+		await slot("answers", (a) => a.answers).answer(idOf(item), { text, option: options[0] });
 		wakeWorker({ inbox, settings }, item);
 
 		return OK;
@@ -103,21 +108,21 @@ const handlers = {
 			changed: () => wakeWorker({ inbox, settings }, ""),
 		});
 	},
-	"file-follow-up": ({ slot, item, second, flags }) => slot("work-source", (a) => a.workSource).fileFollowUp(item, { title: second, body: flags.body ?? "" }),
-	decide: ({ slot, item, text }) => performed(slot("questions", (a) => a.questions).decide(item, text)),
-	publish: ({ slot, item, second }) => performed(slot("release", (a) => a.release).publish(item, second)),
-	release: ({ slot, item, second }) => performed(slot("release", (a) => a.release).release(item, second)),
+	"file-follow-up": ({ slot, item, second, flags }) => slot("work-source", (a) => a.workSource).fileFollowUp(idOf(item), { title: second, body: flags.body ?? "" }),
+	decide: ({ slot, item, text }) => performed(slot("questions", (a) => a.questions).decide(idOf(item), text)),
+	publish: ({ slot, item, second }) => performed(slot("release", (a) => a.release).publish(idOf(item), second)),
+	release: ({ slot, item, second }) => performed(slot("release", (a) => a.release).release(idOf(item), second)),
 } as const satisfies Record<Exclude<OpName, "push">, Handler>;
 
 const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Promise<Call> => {
 	const stateDir = await defaultStateDir(io.cwd);
-	const state = openState(stateDir);
+	const state = openState(stateDir, { now: Date.now });
 	const settings = readSettings(io.cwd, CliSettings);
 
 	const adapters = await resolveAdapters(io.cwd, {
 		faults: state.faults,
 		guard: {},
-		context: { report: (fault) => void state.faults.raise(fault), now: Date.now },
+		context: { report: (fault) => void state.faults.raise(fault), now: Date.now, env: io.env },
 	});
 
 	const [item = "", ...rest] = positionals;
@@ -142,9 +147,22 @@ const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Pro
 	};
 };
 
+/** `git push` with the arguments given, under the repo's command time limit; a push past it is stopped and fails. */
+const push = async (positionals: readonly string[], io: Io): Promise<number> => {
+	try {
+		return (await exec("git", pushArgs(positionals), { timeoutMs: commandTimeoutMs(readSettings(io.cwd, CliSettings)), nodeOptions: { cwd: io.cwd, stdio: "inherit" } })).exitCode ?? EXIT_FAILED;
+	} catch (error) {
+		if (!(error instanceof CommandTimedOut)) throw error;
+
+		io.stderr(`hum push: ${error.message}\n`);
+
+		return EXIT_FAILED;
+	}
+};
+
 /** Runs one parsed `hum <op>` and returns its exit code: 0 done, 1 failed, 2 misused. */
 const perform = async (op: OpName, positionals: readonly string[], flags: Flags, io: Io): Promise<number> => {
-	if (op === "push") return (await x("git", pushArgs(positionals), { nodeOptions: { cwd: io.cwd, stdio: "inherit" } })).exitCode ?? EXIT_FAILED;
+	if (op === "push") return push(positionals, io);
 
 	try {
 		const printed = await handlers[op](await callOf(positionals, flags, io));

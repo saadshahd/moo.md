@@ -27,15 +27,18 @@ test("wakes that arrive during a tick make one more tick, however many arrive", 
 	const stop = new AbortController();
 	const life = runLifecycle({ tick, stopRuns: async () => {}, tickIntervalMs: HOUR_MS, drainTimeoutMs: HOUR_MS }, stop.signal);
 
-	for (let wake = 0; wake < 20; wake++) life.wake();
-	busy.resolve();
-	await secondTick.promise;
-	// A third tick would start in the microtasks that end the second; one macrotask later every one of them has run.
-	await new Promise((resolve) => setImmediate(resolve));
+	try {
+		for (let wake = 0; wake < 20; wake++) life.wake();
+		busy.resolve();
+		await secondTick.promise;
+		// A third tick would start in the microtasks that end the second; one macrotask later every one of them has run.
+		await new Promise((resolve) => setImmediate(resolve));
 
-	expect(ticks).toHaveLength(2);
+		expect(ticks).toHaveLength(2);
+	} finally {
+		stop.abort();
+	}
 
-	stop.abort();
 	expect(await life.ended).toEqual({ reason: "stopped" });
 });
 

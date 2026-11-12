@@ -1,19 +1,24 @@
 import { quantile } from "simple-statistics";
+import { z } from "zod";
 import type { HumConfig, Launch, Level, PathRule } from "../config/schema.ts";
 
 /** What only the owner changes: hum's own config, the owner's adapters and the CI workflows. */
 const OWN_PATHS = [".hum/**", "adapters/**", ".github/workflows/**"] as const;
 
 /** What hum reads from a change's diff. */
-export type Change = {
-	readonly paths: readonly string[];
-	/** Lines added plus lines deleted. */
-	readonly size: number;
-	/** An added or removed line matches the project's loosened-check rule. */
-	readonly loosened: boolean;
-	/** A changed line in `package.json` or a lockfile names the engine package. */
-	readonly pinChanged: boolean;
-};
+export const Change = z
+	.object({
+		paths: z.array(z.string().min(1)).readonly(),
+		/** Lines added plus lines deleted. */
+		size: z.int().nonnegative(),
+		/** An added or removed line matches the project's loosened-check rule. */
+		loosened: z.boolean(),
+		/** A changed line in `package.json` or a lockfile names the engine package. */
+		pinChanged: z.boolean(),
+	})
+	.readonly();
+
+export type Change = z.infer<typeof Change>;
 
 export const LABELS = ["reverted", "fixed", "clean"] as const;
 
@@ -76,12 +81,12 @@ export type Placement = {
 	readonly steps: readonly Step[];
 };
 
-const matches = (glob: string, path: string): boolean =>
+const doesMatch = (glob: string, path: string): boolean =>
 	new Bun.Glob(glob).match(path);
 
 const isLaunchOn = (launch: Launch, { now, base }: Moment): boolean =>
 	"base" in launch
-		? matches(launch.base, base)
+		? doesMatch(launch.base, base)
 		: Date.parse(launch.from) <= now && now < Date.parse(launch.until);
 
 /** Fixed or reverted changes among a path's last `of` merged changes. */
@@ -119,13 +124,16 @@ export const placeChange = (
 		names[Math.min(strictest, rank(name) + 1)] ?? name;
 
 	const rulesOn = (path: string): readonly PathRule[] =>
-		policy.paths.filter((rule) => matches(rule.glob, path));
+		policy.paths.filter((rule) => doesMatch(rule.glob, path));
 
 	const isStrict = (path: string): boolean =>
-		policy.strictPaths.some((glob) => matches(glob, path));
+		policy.strictPaths.some((glob) => doesMatch(glob, path));
 
 	const isOwn = (path: string): boolean =>
-		[...OWN_PATHS, ...policy.hookPaths].some((glob) => matches(glob, path));
+		[...OWN_PATHS, ...policy.hookPaths].some((glob) => doesMatch(glob, path));
+
+	/** A path no rule places, outside the strict paths and hum's own. */
+	const isUnclear = (path: string): boolean => rulesOn(path).length === 0 && !isStrict(path) && !isOwn(path);
 
 	const touched = [
 		...new Map(
@@ -162,7 +170,7 @@ export const placeChange = (
 
 	const launchSteps = policy.launches.flatMap((launch): SetsLevel[] =>
 		isLaunchOn(launch, moment) &&
-		change.paths.some((path) => matches(launch.glob, path))
+		change.paths.some((path) => doesMatch(launch.glob, path))
 			? [{ step: "launch", glob: launch.glob, level: launch.level }]
 			: [],
 	);
@@ -176,7 +184,7 @@ export const placeChange = (
 		),
 		...(change.pinChanged ? [{ step: "engine-pin" } as const] : []),
 		...change.paths.flatMap((path): Step[] =>
-			(moment.blocked ?? []).some((glob) => matches(glob, path)) ? [{ step: "blocked-path", path }] : [],
+			(moment.blocked ?? []).some((glob) => doesMatch(glob, path)) ? [{ step: "blocked-path", path }] : [],
 		),
 	];
 
@@ -208,9 +216,7 @@ export const placeChange = (
 
 	return {
 		level,
-		unclear: change.paths.filter(
-			(path) => rulesOn(path).length === 0 && !isStrict(path) && !isOwn(path),
-		),
+		unclear: change.paths.filter(isUnclear),
 		steps: [...ruleSteps, ...launchSteps, ...kindFloorSteps, ...floors, ...bumps],
 	};
 };

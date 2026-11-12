@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import * as core from "@actions/core";
 import { z } from "zod";
-import { x } from "tinyexec";
+import { exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 import pkg from "../../package.json" with { type: "json" };
 import { type Baseline, checkBump, type Verdict } from "./compare.ts";
 import { extractSurface, Surface } from "./surface.ts";
@@ -21,7 +21,7 @@ const PackResult = z.tuple([z.object({ filename: z.string() })]);
 const SURFACE_IN_TARBALL = `package/${SURFACE_FILE}`;
 
 const npm = async (...args: string[]) => {
-	const result = await x("npm", args, { nodeOptions: { cwd: PACKAGE_ROOT } });
+	const result = await exec("npm", args, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, nodeOptions: { cwd: PACKAGE_ROOT } });
 
 	return { ok: result.exitCode === 0, stdout: result.stdout.trim(), stderr: result.stderr };
 };
@@ -91,6 +91,6 @@ const check = async (): Promise<number> => {
 
 const CommandName = z.enum(["surface", "check"], { error: "usage: release <surface | check>" });
 
-const COMMANDS: Record<z.infer<typeof CommandName>, () => Promise<number>> = { surface: writeSurface, check };
+const COMMANDS = { surface: writeSurface, check } as const satisfies Record<z.infer<typeof CommandName>, () => Promise<number>>;
 
 process.exitCode = await COMMANDS[CommandName.parse(process.argv[2])]();

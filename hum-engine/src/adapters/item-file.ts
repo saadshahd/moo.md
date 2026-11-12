@@ -20,7 +20,7 @@ const FRONT_MATTER_FENCE = "---";
 
 const FrontMatter = z.looseObject({ title: z.string().min(1), state: z.string().min(1), kind: z.string().min(1).optional() });
 
-const EntryMarker = z.strictObject({ kind: z.enum(THREAD_KINDS), at: z.int().nonnegative(), option: z.string().min(1).optional() });
+const EntryMarker = z.object({ kind: z.enum(THREAD_KINDS), at: z.int().nonnegative(), option: z.string().min(1).optional() });
 
 const Span = z.object({ start: z.object({ offset: z.int() }), end: z.object({ offset: z.int() }) });
 

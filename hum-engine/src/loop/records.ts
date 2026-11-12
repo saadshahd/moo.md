@@ -4,12 +4,12 @@ const name = z.string().min(1);
 const time = z.int().nonnegative();
 
 /** Where a review note comes from. */
-export const NOTE_SOURCES = ["review-comment", "review-body", "plan-answer", "revert", "fix"] as const;
+const NOTE_SOURCES = ["review-comment", "review-body", "plan-answer", "revert", "fix"] as const;
 
 export type NoteSource = (typeof NOTE_SOURCES)[number];
 
 /** One correction the owner made to hum's work, saved before anything acts on it and keyed by its source and source id. */
-export const ReviewNote = z.strictObject({
+export const ReviewNote = z.object({
 	source: z.enum(NOTE_SOURCES),
 	sourceId: name,
 	/** What the note is about: the commit a comment sits on, the change a revert or fix names, or the item a plan answer corrected. */
@@ -30,7 +30,7 @@ export type ReviewNote = z.infer<typeof ReviewNote>;
 export const noteKey = ({ source, sourceId }: Pick<ReviewNote, "source" | "sourceId">): string => `${source}:${sourceId}`;
 
 /** Notes that state one rule. The key is its first note's, so a later note joins instead of starting another group. */
-export const RepeatGroup = z.strictObject({
+export const RepeatGroup = z.object({
 	key: name,
 	notes: z.array(name),
 	/** The check item filed for the group. */
@@ -38,7 +38,7 @@ export const RepeatGroup = z.strictObject({
 	/** Notes already added to the item's thread. */
 	commented: z.array(name),
 	/** The check landed and CI ran it. */
-	checked: z.strictObject({ at: time, check: name }).optional(),
+	checked: z.object({ at: time, check: name }).optional(),
 	/** Notes that came after the check ran in CI. */
 	misses: z.array(name),
 });
@@ -46,30 +46,29 @@ export const RepeatGroup = z.strictObject({
 export type RepeatGroup = z.infer<typeof RepeatGroup>;
 
 /** Two notes only a model found alike, waiting for its precision to reach the owner's bar. */
-export const PossibleRepeat = z.strictObject({ a: name, b: name, models: z.array(name), at: time });
+export const PossibleRepeat = z.object({ a: name, b: name, models: z.array(name), at: time });
 
 export type PossibleRepeat = z.infer<typeof PossibleRepeat>;
 
 /** A merged change: what the measure counts. */
-export const Merge = z.strictObject({ item: name, sha: name, at: time, paths: z.array(name) });
+export const Merge = z.object({ item: name, sha: name, at: time, paths: z.array(name) });
 
 export type Merge = z.infer<typeof Merge>;
 
 /** A test of the base that failed after an item's change merged. */
-export const Break = z.strictObject({ item: name, sha: name, at: time, paths: z.array(name), level: name, failure: z.string(), onBreak: z.enum(["follow-up", "block"]), followUp: name });
+export const Break = z.object({ item: name, sha: name, at: time, paths: z.array(name), level: name, failure: z.string(), onBreak: z.enum(["follow-up", "block"]), followUp: name });
 
 export type Break = z.infer<typeof Break>;
 
-/** What proving a check cost: the commits it ran on, and the time it took. */
-export const Proof = z.strictObject({
+const proofFields = {
 	item: name,
 	at: time,
-	passed: z.boolean(),
-	/** Why it failed, when it did. */
-	reason: z.string().optional(),
 	/** Worktrees made: one per note commit and one for the check's own head. */
 	worktrees: z.int().nonnegative(),
 	ms: z.int().nonnegative(),
-});
+};
+
+/** What proving a check cost: the commits it ran on, and the time it took; a failed proof says why. */
+export const Proof = z.discriminatedUnion("passed", [z.object({ ...proofFields, passed: z.literal(true) }), z.object({ ...proofFields, passed: z.literal(false), reason: z.string() })]);
 
 export type Proof = z.infer<typeof Proof>;

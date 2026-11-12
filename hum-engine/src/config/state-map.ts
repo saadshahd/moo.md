@@ -5,8 +5,10 @@ import type { Config } from "./load.ts";
 import { kindMachine } from "./machine.ts";
 import type { Kind } from "./schema.ts";
 
-/** A work item saved in a state of a kind. */
+/** A work item saved in a state of a kind. `kind` is the kind's `machine.id`, as a saved snapshot records it, which need not be its file name. */
 export type SavedItem = { readonly kind: string; readonly state: string };
+
+const kindWithId = (config: Config, id: string): Kind | undefined => Object.values(config.kinds).find((kind) => kind.machine.id === id);
 
 /** Where a saved state goes under the new kind: itself, its mapped name, or nowhere. */
 const mappedState = (previous: Kind, next: Kind, state: string): string | undefined => {
@@ -19,8 +21,8 @@ const mappedState = (previous: Kind, next: Kind, state: string): string | undefi
 /** The saved items whose state the new config neither keeps nor maps. */
 export const unmappedItems = (current: Config, next: Config, saved: readonly SavedItem[]): SavedItem[] =>
 	saved.filter(({ kind, state }) => {
-		const previous = current.kinds[kind];
-		const target = next.kinds[kind];
+		const previous = kindWithId(current, kind);
+		const target = kindWithId(next, kind);
 
 		return previous !== undefined && (target === undefined || mappedState(previous, target, state) === undefined);
 	});

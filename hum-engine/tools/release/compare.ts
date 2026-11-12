@@ -4,7 +4,7 @@ import type { Surface } from "./surface.ts";
 
 const LEVELS = ["none", "patch", "minor", "major"] as const;
 
-export type Level = (typeof LEVELS)[number];
+type Level = (typeof LEVELS)[number];
 
 const rank = (level: Level): number => LEVELS.indexOf(level);
 
@@ -35,7 +35,7 @@ const levelOf = (difference: Difference): Level => (difference.type === "CREATE"
 /** Two owner picks meet here: a change that takes behaviour away is major, and hum stays under 1.0 until its first real project runs. Below 1.0 the next field down carries each level. */
 const UNSTABLE_MAJOR = 0;
 
-const LEVEL_BELOW_ONE: Record<Level, Level> = { major: "minor", minor: "patch", patch: "patch", none: "none" };
+const LEVEL_BELOW_ONE = { major: "minor", minor: "patch", patch: "patch", none: "none" } as const satisfies Record<Level, Level>;
 
 const levelAt = (version: string, level: Level): Level => (semver.major(version) === UNSTABLE_MAJOR ? LEVEL_BELOW_ONE[level] : level);
 
@@ -43,9 +43,9 @@ const levelAt = (version: string, level: Level): Level => (semver.major(version)
 export const PLACEHOLDER_VERSION = "0.0.0";
 
 /** One difference between two surfaces, with the smallest bump that may carry it. */
-export type Finding = { readonly part: string; readonly path: string; readonly difference: Difference["type"]; readonly requires: Level };
+type Finding = { readonly part: string; readonly path: string; readonly difference: Difference["type"]; readonly requires: Level };
 
-export const findingsBetween = (published: Surface, next: Surface, version: string): Finding[] =>
+const findingsBetween = (published: Surface, next: Surface, version: string): Finding[] =>
 	diff(published, next).map((difference) => ({
 		part: String(difference.path[0]),
 		path: difference.path.slice(1).join("."),
@@ -59,7 +59,7 @@ export type Baseline = { readonly version: string; readonly surface: Surface | u
 
 const refuse = (...reasons: string[]): Verdict => ({ ok: false, reasons });
 
-const DIFFERENCE_WORD: Record<Difference["type"], string> = { CREATE: "added", REMOVE: "removed", CHANGE: "changed" };
+const DIFFERENCE_WORD = { CREATE: "added", REMOVE: "removed", CHANGE: "changed" } as const satisfies Record<Difference["type"], string>;
 
 const describeFinding = ({ part, path, difference, requires }: Finding): string => `${part} ${path}: ${DIFFERENCE_WORD[difference]}, needs a ${requires} bump`;
 

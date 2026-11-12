@@ -1,6 +1,6 @@
 import { docsJudge } from "./fixtures/judge.ts";
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { x } from "tinyexec";
@@ -13,6 +13,8 @@ import { openState } from "../src/state/open.ts";
 import { type LandContext, land } from "../src/worker/land.ts";
 import { configWith } from "./fixtures/config.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
+import { ItemId } from "../src/adapter-api.ts";
 
 const live = process.env.HUM_LIVE === "1";
 const repo = process.env.HUM_GITHUB_SCRATCH ?? "saadshahd/factory-smoke";
@@ -22,12 +24,12 @@ const MERGE_WAIT_MS = 480_000;
 if (!live) console.log(`skip live landing: set HUM_LIVE=1 to open pull requests on ${repo}, whose main requires one and the check status`);
 
 const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
-	const clone = mkdtempSync(join(tmpdir(), "hum-live-landing-"));
+	const clone = tempDir("live-landing");
 	const git = gitIn(clone, { identity: config.hum.commitIdentity, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const id = `live-${stamp}`;
 	const branch = `${config.hum.runBranchPrefix}${id}`;
 	const file = `docs/${id}.md`;
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-live-state-")));
+	const state = openState(tempDir("live-state"), { now: Date.now });
 	const provider = new FakeProvider().adapter();
 
 	await gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
@@ -46,7 +48,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		config,
 		kind: "docs",
 		id,
-		item: { id, title: `Landing test ${stamp}`, body: "", ready: true, thread: [] },
+		item: { id: ItemId.parse(id), title: `Landing test ${stamp}`, body: "", ready: true, thread: [] },
 		branch,
 		base: "main",
 		remote: `https://github.com/${repo}.git`,
@@ -65,7 +67,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		},
 	};
 
-	return { ctx, branch, cleanup: () => [clone, state.dir].forEach((dir) => rmSync(dir, { recursive: true, force: true })) };
+	return { ctx, branch };
 };
 
 const closeAndDelete = async (branch: string) => {
@@ -76,7 +78,7 @@ const closeAndDelete = async (branch: string) => {
 // The owner's own login may bypass the ruleset, so a push would land; hum reads the rules and opens a pull request.
 test.skipIf(!live)("live: where main requires a pull request, a cleared change opens one with auto-merge that merges once the check passes; a change for the owner waits unarmed", async () => {
 	const stamp = String(Date.now());
-	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, env: process.env });
 	const alone = await landing(configWith(), pulls, `${stamp}-a`);
 	const owner = await landing(configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])), pulls, `${stamp}-b`);
 
@@ -100,8 +102,6 @@ test.skipIf(!live)("live: where main requires a pull request, a cleared change o
 	} finally {
 		await closeAndDelete(owner.branch);
 		await closeAndDelete(alone.branch);
-		alone.cleanup();
-		owner.cleanup();
 	}
 }, MERGE_WAIT_MS + 120_000);
 
@@ -109,9 +109,9 @@ test.skipIf(!live)("live: where main requires a pull request, a cleared change o
 test.skipIf(!live)("live: an owner's commit goes through a pull request that auto-merges once the check passes", async () => {
 	const stamp = String(Date.now());
 	const config = configWith();
-	const clone = mkdtempSync(join(tmpdir(), "hum-live-owner-"));
+	const clone = tempDir("live-owner");
 	const git = gitIn(clone, { identity: config.hum.commitIdentity, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
-	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const pulls = gitHubPullRequests(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, env: process.env });
 	const file = `docs/owner-${stamp}.md`;
 
 	await gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["clone", "-q", "--depth", "50", `https://github.com/${repo}.git`, clone]);
@@ -139,6 +139,5 @@ test.skipIf(!live)("live: an owner's commit goes through a pull request that aut
 		expect(pull).toMatchObject({ state: "MERGED" });
 	} finally {
 		await closeAndDelete(branch);
-		rmSync(clone, { recursive: true, force: true });
 	}
 }, MERGE_WAIT_MS + 120_000);

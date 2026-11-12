@@ -1,11 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CI_TICK_REF } from "../src/service/ci-tick.ts";
 import { readStatus } from "../src/status/file.ts";
 import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
 import { sh } from "./fixtures/work-repo.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const owners: ReturnType<typeof ownerRepo>[] = [];
 
@@ -51,7 +51,7 @@ test("hum wake on a comment event records no tick", () => {
 
 test("hum wake with a rejected token exits 1, annotates the job and writes its summary", () => {
 	const o = owner({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }] });
-	const summary = join(mkdtempSync(join(tmpdir(), "hum-summary-")), "summary.md");
+	const summary = join(tempDir("summary"), "summary.md");
 
 	writeFileSync(summary, "");
 	o.item("a");

@@ -4,9 +4,9 @@ import type { HumConfig } from "../config/schema.ts";
 import { DAY_MS } from "../time.ts";
 
 /** The reasons a run gives for needing the owner, each with the facts code checks it against. */
-export const ASK_REASONS = ["missing-secret", "past-undoing", "spends-money", "publishes", "choice", "unsure"] as const;
+const ASK_REASONS = ["missing-secret", "past-undoing", "spends-money", "publishes", "choice", "unsure"] as const;
 
-export type AskReason = (typeof ASK_REASONS)[number];
+type AskReason = (typeof ASK_REASONS)[number];
 
 const ChoiceOption = z.strictObject({ word: z.string().min(1), paths: z.array(z.string().min(1)) });
 
@@ -33,29 +33,29 @@ export type AskFacts = {
 	readonly undoableLevels: readonly string[];
 };
 
-export type AskDecision =
+type AskDecision =
 	/** `confirmed`: the facts bear the reason out, so its own question is asked; otherwise the owner gets the plain one. */
 	| { readonly action: "ask"; readonly reason: AskReason; readonly confirmed: boolean }
 	| { readonly action: "decide"; readonly choice: string; readonly over: readonly string[] };
 
-/** A choice is cheap to undo when every option touches only the change's own files, on a level where that is safe. */
-const isCheapChoice = ({ options = [], default: chosen }: RunReason, { changedPaths, level, undoableLevels }: AskFacts): boolean =>
-	options.some(({ word }) => word === chosen) && undoableLevels.includes(level) && options.every(({ paths }) => paths.every((path) => changedPaths.includes(path)));
+/** The run's own pick, when the choice is cheap to undo: every option touches only the change's own files, on a level where that is safe. */
+const cheapPick = ({ options = [], default: chosen }: RunReason, { changedPaths, level, undoableLevels }: AskFacts): string | undefined =>
+	undoableLevels.includes(level) && options.every(({ paths }) => paths.every((path) => changedPaths.includes(path))) ? options.find(({ word }) => word === chosen)?.word : undefined;
 
-const CONFIRMS: Readonly<Record<AskReason, (reason: RunReason, facts: AskFacts) => boolean>> = {
+const CONFIRMS = {
 	"missing-secret": ({ variable }, { runnerVariables }) => variable !== undefined && !runnerVariables.has(variable),
 	"past-undoing": ({ command }) => command !== undefined,
 	"spends-money": () => true,
 	publishes: () => true,
 	choice: () => false,
 	unsure: () => true,
-};
+} as const satisfies Record<AskReason, (reason: RunReason, facts: AskFacts) => boolean>;
 
 /** Whether the owner is asked: a reason the facts cannot confirm still asks, and a cheap choice is made without them. */
 export const askDecision = (reason: RunReason, facts: AskFacts): AskDecision => {
-	if (reason.kind === "choice" && isCheapChoice(reason, facts)) {
-		return { action: "decide", choice: reason.default ?? "", over: (reason.options ?? []).map(({ word }) => word) };
-	}
+	const choice = reason.kind === "choice" ? cheapPick(reason, facts) : undefined;
+
+	if (choice !== undefined) return { action: "decide", choice, over: (reason.options ?? []).map(({ word }) => word) };
 
 	return { action: "ask", reason: reason.kind, confirmed: CONFIRMS[reason.kind](reason, facts) };
 };
@@ -86,10 +86,10 @@ const ASKED = {
 	unsure: () => PLAIN_QUESTIONS.unsure,
 } as const satisfies Record<AskReason, (reason: RunReason) => string>;
 
-export type AskedQuestion = { readonly question: Question; readonly plain: PlainQuestion };
+type AskedQuestion = { readonly question: Question; readonly plain: PlainQuestion };
 
 /** The question a run's need becomes. A reason the facts bear out asks its own question with the run's words folded; any other asks in the run's words. */
-export const askedQuestion = (reason: RunReason, confirmed: boolean, runsWords: string | undefined): AskedQuestion => {
+export const askedQuestion = ({ reason, confirmed, runsWords }: { readonly reason: RunReason; readonly confirmed: boolean; readonly runsWords: string | undefined }): AskedQuestion => {
 	const kind = confirmed ? reason.kind : "unsure";
 	const options = reason.options?.map(({ word }) => word);
 
@@ -105,7 +105,7 @@ const SIDE_QUESTIONS: readonly string[] = [PLAIN_QUESTIONS.kind, PLAIN_QUESTIONS
 export const isWaitQuestion = (text: string): boolean => !SIDE_QUESTIONS.includes(text);
 
 /** Why a question text is refused. */
-export type QuestionIssue = "too-wide" | "no-question-mark" | "names-item" | "long-word";
+type QuestionIssue = "too-wide" | "no-question-mark" | "names-item" | "long-word";
 
 const QUESTION_MARK = "?";
 
@@ -113,11 +113,14 @@ const words = (text: string): string[] => text.split(/\s+/).filter(Boolean);
 
 const cellsOf = (text: string): number => Bun.stringWidth(text);
 
-const WORD_EDGES = /^\W+|\W+$/g;
+const WORD_EDGES = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
+
+/** A word without the punctuation around it. */
+export const bareWord = (word: string): string => word.replaceAll(WORD_EDGES, "");
 
 /** The question text rules: at most `cells` wide, ends in "?", names no item id, and no word over `wordCells`. */
-export const questionIssues = (text: string, item: string, { cells, wordCells }: HumConfig["questionLimits"]): QuestionIssue[] => {
-	const mentionsItem = words(text).some((word) => word.replaceAll(WORD_EDGES, "") === item);
+export const questionIssues = ({ text, item, limits: { cells, wordCells } }: { readonly text: string; readonly item: string; readonly limits: HumConfig["questionLimits"] }): QuestionIssue[] => {
+	const mentionsItem = words(text).some((word) => bareWord(word) === item);
 
 	return [
 		...(cellsOf(text) > cells ? (["too-wide"] as const) : []),
@@ -129,7 +132,7 @@ export const questionIssues = (text: string, item: string, { cells, wordCells }:
 
 /** A question to put on the thread: the run's own text when it passes the rules, else the plain one with the run's text folded. */
 export const composeQuestion = (draft: Question, plain: PlainQuestion, item: string, limits: HumConfig["questionLimits"]): Question => {
-	if (questionIssues(draft.text, item, limits).length === 0) return draft;
+	if (questionIssues({ text: draft.text, item, limits }).length === 0) return draft;
 
 	return { ...draft, text: PLAIN_QUESTIONS[plain], detail: [draft.text, draft.detail].filter(Boolean).join("\n\n") };
 };
@@ -148,12 +151,12 @@ export type Waiting = {
 export const questionOrder = (a: Waiting, b: Waiting): number => a.priority - b.priority || b.behind - a.behind || a.since - b.since;
 
 /** The priority of an item: the index of its first label in the owner's list, or past the end when it has none. */
-export const priorityOf = (labels: readonly string[], priorityLabels: readonly string[]): number => {
+export const priorityOf = ({ labels, priorityLabels }: { readonly labels: readonly string[]; readonly priorityLabels: readonly string[] }): number => {
 	const found = priorityLabels.findIndex((label) => labels.includes(label));
 
 	return found < 0 ? priorityLabels.length : found;
 };
 
 /** How many more questions the owner can be asked now: the cap less those asked within the last day. No cap leaves no limit. */
-export const roomToAsk = (askedAt: readonly number[], cap: number | undefined, now: number): number =>
+export const roomToAsk = ({ askedAt, cap, now }: { readonly askedAt: readonly number[]; readonly cap: number | undefined; readonly now: number }): number =>
 	cap === undefined ? Number.POSITIVE_INFINITY : Math.max(0, cap - askedAt.filter((at) => now - at < DAY_MS).length);

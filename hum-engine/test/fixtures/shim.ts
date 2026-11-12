@@ -1,8 +1,11 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tempDir } from "./temp.ts";
 
 const SHIM = join(import.meta.dir, "claude-shim.ts");
+
+/** The model id the shim answers as. */
+export const SHIM_MODEL = "claude-haiku-5-5";
 
 /** The JSON spec a shim process runs by, from the file HUM_SHIM names: Linux refuses one environment variable over 128 KB, and a spec can hold a longer output. */
 export const shimSpecJson = (): string => {
@@ -42,12 +45,17 @@ export type Behavior = {
 	beforeToken?: number;
 	/** Sleep this long after it, so the run overlaps another. */
 	sleep?: number;
+	/** After it, wait until this many runs have written theirs, so the runs overlap; runs that never overlap hang the test. */
+	meet?: number;
 	/** Write to stderr in the middle of the result line, between two writes of it. */
 	stderrNoise?: boolean;
 };
 
 /** What a plan or review run picks, as the run's answer. */
 export type Decided = { event: string; sure: boolean; reason: string; cites?: { file: string; line: number }[]; parts?: string[]; question?: string; plan?: { summary: string; steps: string[]; paths: string[] } };
+
+/** A plan run's pick of a clear item: write docs/note.md in one step. */
+export const READY_PLAN: Decided = { event: "plan-ready", sure: true, reason: "The item is clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };
 
 export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean; agentsWrapped?: boolean };
 
@@ -80,7 +88,7 @@ const lines = (file: string) => {
 
 /** A `claude` stand-in in a temp folder; nothing leaves it. */
 export const makeShim = (spec: ShimSpec = {}): Shim => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-shim-"));
+	const dir = tempDir("shim");
 	const binary = join(dir, "claude");
 	const log = join(dir, "calls.jsonl");
 	const bg = join(dir, "bg");

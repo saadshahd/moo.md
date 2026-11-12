@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Boundary, HumConfig } from "../config/schema.ts";
 import { isTrusted, jsonSchemaOf } from "../decide/prose.ts";
 import { SECOND_MS } from "../time.ts";
-import { type RunOutcome, type Runner, succeeded } from "./claude-p.ts";
+import { type RunOutcome, type Runner, hasSucceeded } from "./claude-p.ts";
 
 /** One question to the cheap model: the boundary it is measured at, the prompt, and the typed answer. */
 export type Question<T> = { readonly boundary: Boundary; readonly prompt: string; readonly answer: z.ZodType<T>;
@@ -20,12 +20,12 @@ export type Judgment<T> =
 
 export type ModelCall = <T>(question: Question<T>) => Promise<Judgment<T>>;
 
-const NOT_ANSWERED: Readonly<Record<Exclude<RunOutcome, { kind: "finished" }>["kind"], string>> = {
+const NOT_ANSWERED = {
 	limited: "a usage limit refused the call",
 	held: "the runner is held",
 	"over-cap": "the call passed its token cap",
 	stopped: "the call timed out",
-};
+} as const satisfies Record<Exclude<RunOutcome, { kind: "finished" }>["kind"], string>;
 
 const abstained = (why: string) => ({ kind: "abstained", why }) as const;
 
@@ -56,7 +56,7 @@ export const modelCallOver =
 
 		if (outcome.kind !== "finished") return abstained(NOT_ANSWERED[outcome.kind]);
 
-		if (!succeeded(outcome)) return abstained(`the call ended as ${outcome.subtype}`);
+		if (!hasSucceeded(outcome)) return abstained(`the call ended as ${outcome.subtype}`);
 
 		if (reportOnly !== true && !trusts(boundary, outcome.models)) return abstained(`${outcome.models.join(", ") || "no model"} has no measured rate at ${boundary} that meets the bar`);
 

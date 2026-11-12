@@ -27,7 +27,7 @@ export const proveCheckItem = async ({ state, config, git, item, base, checks, n
 	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
 	const proof = await proveCheck({ git, head, base: `origin/${base}`, notes, checks, timeoutMs: checksTimeoutMs(config.hum), now });
 
-	state.proofs.put(item, { item, at: now(), passed: proof.passed, reason: proof.reason, worktrees: proof.worktrees, ms: proof.ms });
+	state.proofs.put(item, { item, at: now(), ...proof });
 
 	return proof;
 };

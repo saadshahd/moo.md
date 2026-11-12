@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { x } from "tinyexec";
@@ -7,8 +7,11 @@ import { BACKGROUND_CHECK_CODE, backgroundRunner, FALLBACK_CODE, backgroundSetti
 import { type Runner, type RunRequest, startRunner } from "../src/adapters/claude-p.ts";
 import { readTranscript, billedTokens } from "../src/adapters/transcript.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { listFiles, listRecords } from "../src/state/fs.ts";
 import { openState } from "../src/state/open.ts";
-import { makeShim, type ShimSpec } from "./fixtures/shim.ts";
+import { makeShim, SHIM_MODEL, type ShimSpec } from "./fixtures/shim.ts";
+import { until } from "./fixtures/process.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const MODEL = SHIPPED_DEFAULTS.models.light;
 const CONFIG = { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.05 };
@@ -16,9 +19,9 @@ const STRUCTURED = { ok: true };
 
 const setup = async (spec: ShimSpec = {}) => {
 	const shim = makeShim(spec);
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-background-")));
-	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env });
-	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner });
+	const state = openState(tempDir("background"), { now: Date.now });
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, now: Date.now });
+	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner, now: Date.now });
 
 	return { shim, state, runner, background };
 };
@@ -27,7 +30,7 @@ const ask = (runner: Runner, over: Partial<RunRequest> = {}) => runner.run({ nam
 
 type Usage = { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number; iterations?: { type: string; input_tokens: number; output_tokens: number }[] };
 
-const assistant = (id: string, usage: Usage) => JSON.stringify({ type: "assistant", message: { id, model: "claude-haiku-5-5", usage } });
+const assistant = (id: string, usage: Usage) => JSON.stringify({ type: "assistant", message: { id, model: SHIM_MODEL, usage } });
 
 const attachment = (timestamp: string) => JSON.stringify({ type: "attachment", timestamp, attachment: { type: "structured_output", data: STRUCTURED } });
 
@@ -54,7 +57,7 @@ const NOW_MS = Date.parse("2026-11-08T10:00:00.000Z");
 
 const reading = (over: Partial<Reading> & { structuredAt?: number; spent?: number }): Reading => ({
 	transcript: {
-		messages: over.spent === undefined ? {} : { m: { billed: over.spent, output: 0, cacheRead: 0, model: "claude-haiku-5-5" } },
+		messages: over.spent === undefined ? {} : { m: { billed: over.spent, output: 0, cacheRead: 0, model: SHIM_MODEL } },
 		structured: over.structuredAt === undefined ? undefined : { data: STRUCTURED, at: over.structuredAt },
 		apiError: over.transcript?.apiError,
 		limit: over.transcript?.limit,
@@ -87,9 +90,28 @@ test("run settings turn hum's plugin off, deny the GitHub writes and report the 
 	const args = launchArgs({ name: "hum #68 build #0", model: MODEL, effort: "low", schema: { type: "object" }, settings });
 
 	expect(settings).toMatchObject({ enabledPlugins: { [HUM_PLUGIN]: false }, permissions: { deny: expect.arrayContaining(["Bash(git push *)"]) } });
-	expect(JSON.stringify(settings)).toContain(`cat > '/tmp/it'\\\\''s here/stops'/$$.json`);
 	expect(args.slice(0, 3)).toEqual(["--bg", "-n", "hum #68 build #0"]);
 	expect(args).not.toContain("do it");
+});
+
+test("the run's hook files its report whole: the stops folder lists no record until the hook's input has ended", async () => {
+	const stops = join(tempDir("stops"), "it's here");
+
+	mkdirSync(stops);
+
+	const hook = Bun.spawn(["sh", "-c", backgroundSettings(CONFIG, stops).hooks["Stop"]![0]!.hooks[0]!.command], { stdin: "pipe" });
+
+	hook.stdin.write('{"session_id":');
+	hook.stdin.flush();
+	await until(() => listFiles(stops).length > 0);
+
+	expect(listRecords(stops)).toEqual([]);
+
+	hook.stdin.write('"s"}');
+	hook.stdin.end();
+	await hook.exited;
+
+	expect(listRecords(stops).map((file) => JSON.parse(readFileSync(file, "utf8")))).toEqual([{ session_id: "s" }]);
 });
 
 test("a named run is a background agent: its prompt comes on stdin, its tokens are read from the transcript, and it is stopped and removed once its outcome is taken", async () => {
@@ -97,7 +119,7 @@ test("a named run is a background agent: its prompt comes on stdin, its tokens a
 	const sessions: string[] = [];
 	const outcome = await ask(background, { prompt: "build the thing", onSession: (id) => sessions.push(id) });
 
-	expect(outcome).toMatchObject({ kind: "finished", structured: { done: 1 }, tokens: 8, isError: false, models: ["claude-haiku-5-5"] });
+	expect(outcome).toMatchObject({ kind: "finished", structured: { done: 1 }, tokens: 8, isError: false, models: [SHIM_MODEL] });
 	expect(sessions).toHaveLength(1);
 
 	const [launch, ...after] = shim.background();
@@ -106,6 +128,17 @@ test("a named run is a background agent: its prompt comes on stdin, its tokens a
 	expect(launch?.argv).not.toContain("build the thing");
 	expect(after.map(({ cmd }) => cmd)).toEqual(["stop", "rm"]);
 	expect(shim.agents()).toEqual([]);
+});
+
+test("once a run's outcome is taken its hook reports leave the stops folder, and another session's stay", async () => {
+	const { state, background } = await setup({ script: [{}, { structured: { done: 1 } }] });
+	const other = join(state.stops, "other.json");
+
+	mkdirSync(state.stops, { recursive: true });
+	writeFileSync(other, JSON.stringify({ hook_event_name: "Stop", session_id: "another session" }));
+
+	expect(await ask(background)).toMatchObject({ kind: "finished", structured: { done: 1 } });
+	expect(listRecords(state.stops)).toEqual([other]);
 });
 
 test("a cheap model call and a run with no name are never background agents", async () => {
@@ -144,7 +177,7 @@ test("a run that fails is a finished error with the API's text", async () => {
 
 test("a worker killed after the launch and before the session id is saved finds its run by name on restart: one run, its id saved", async () => {
 	const shim = makeShim({ script: [{}, { structured: { done: 1 }, sleep: 400 }] });
-	const dir = mkdtempSync(join(tmpdir(), "hum-background-d1-"));
+	const dir = tempDir("background-d1");
 	const name = "hum #68 build #0";
 	const key = { itemId: "#68", run: "build", attempt: 0 };
 
@@ -152,14 +185,14 @@ test("a worker killed after the launch and before the session id is saved finds 
 
 	expect(died.exitCode).not.toBe(0);
 
-	const state = openState(dir);
-	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env });
-	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner });
+	const state = openState(dir, { now: Date.now });
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, now: Date.now });
+	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner, now: Date.now });
 
 	expect(state.runs.unended("#68", "build")?.sessionId).toBeUndefined();
 
-	const begun = state.runs.begin(key, name);
-	const outcome = await ask(background, { onSession: (id) => state.runs.saveSession(key, id) });
+	const begun = state.runs.begin(key, { name });
+	const outcome = await ask(background, { onSession: (id) => begun.saveSession(id) });
 
 	expect(begun.adopted).toBe(true);
 	expect(outcome).toMatchObject({ kind: "finished", structured: { done: 1 } });
@@ -167,18 +200,20 @@ test("a worker killed after the launch and before the session id is saved finds 
 	expect(state.runs.get(key)?.sessionId).toBe(outcome.kind === "finished" ? outcome.sessionId : undefined);
 });
 
-test("the start check starts one background run and keeps it; a run that cannot start leaves one card and every run goes on as claude -p", async () => {
+test("the start check starts one background run and keeps it", async () => {
 	const good = makeShim();
-	const goodState = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
-	const started = await startBackgroundRunner({ state: goodState, model: MODEL, binary: good.binary, env: good.env, config: CONFIG, repo: tmpdir() });
+	const goodState = openState(tempDir("background-check"), { now: Date.now });
+	const started = await startBackgroundRunner({ state: goodState, model: MODEL, binary: good.binary, env: good.env, config: CONFIG, repo: tmpdir(), now: Date.now });
 
 	expect(started.check).toMatchObject({ kind: "finished", structured: STRUCTURED });
 	expect(good.background().filter(({ cmd }) => cmd === "bg")).toHaveLength(1);
 	expect(goodState.faults.list().map(({ code }) => code)).toEqual([]);
+});
 
+test("a start check that cannot start a background run leaves one card, and every run goes on as claude -p", async () => {
 	const down = makeShim({ bgDown: true });
-	const downState = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
-	const fallen = await startBackgroundRunner({ state: downState, model: MODEL, binary: down.binary, env: down.env, config: CONFIG, repo: tmpdir() });
+	const downState = openState(tempDir("background-check"), { now: Date.now });
+	const fallen = await startBackgroundRunner({ state: downState, model: MODEL, binary: down.binary, env: down.env, config: CONFIG, repo: tmpdir(), now: Date.now });
 
 	expect(downState.faults.list().map(({ code }) => code)).toEqual([BACKGROUND_CHECK_CODE]);
 	expect(downState.faults.list()[0]?.cause).toContain("background service is not running");
@@ -187,8 +222,8 @@ test("the start check starts one background run and keeps it; a run that cannot 
 
 test("a background start check that never answers is stopped at commandTimeoutSeconds and leaves one card that says so", async () => {
 	const shim = makeShim({ script: [{}, { hang: true }] });
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
-	const started = await startBackgroundRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, config: { ...CONFIG, commandTimeoutSeconds: 2 }, repo: tmpdir() });
+	const state = openState(tempDir("background-check"), { now: Date.now });
+	const started = await startBackgroundRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, config: { ...CONFIG, commandTimeoutSeconds: 2 }, repo: tmpdir(), now: Date.now });
 
 	expect(started.check.kind).toBe("stopped");
 	expect(state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: BACKGROUND_CHECK_CODE, cause: expect.stringContaining("no result within 2 seconds") }]);

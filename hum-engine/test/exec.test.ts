@@ -1,16 +1,16 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { CommandTimedOut, exec } from "../src/exec.ts";
 import { isAlive } from "./fixtures/process.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const LIMIT_MS = 500;
 const GRACE_MS = 100;
 const FAR_SOONER_THAN_THE_COMMAND_ENDS_MS = 5000;
 
 test("a command that ignores the stop signal fails at its limit, naming itself, and takes its own child with it", async () => {
-	const folder = mkdtempSync(join(tmpdir(), "hum-exec-"));
+	const folder = tempDir("exec");
 	const pidFile = join(folder, "child.pid");
 	const script = `trap '' TERM; sleep 60 & echo $! > ${pidFile}; wait`;
 	const started = Date.now();

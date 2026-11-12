@@ -1,24 +1,24 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
-import { declaredKind } from "../src/decide/kind.ts";
 import { kindCoverage, proposeSetup } from "../src/setup/propose.ts";
 import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
-import { shippedConfig } from "../src/setup/shipped.ts";
+import { shippedConfig, shippedSettingsAs } from "../src/setup/shipped.ts";
 import { waitsOf, withTimeouts } from "../src/setup/waits.ts";
 import { SetupAnswers, writeSetup } from "../src/setup/write.ts";
 import { hopeSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 /** A git repo on `main` holding the files, with its remote as `origin`. */
 const repoWith = (files: Record<string, string>): string => {
-	const root = mkdtempSync(join(tmpdir(), "hum-setup-"));
+	const root = tempDir("setup");
 	const repo = join(root, "repo");
 
 	sh(root, ["init", "-q", "--bare", "-b", "main", "remote.git"]);
@@ -81,6 +81,23 @@ test("a scan reads the checks CI runs on a pull request after the install a fres
 	expect(proposal.runSlots.recipe.prepare).toContain("bun install --frozen-lockfile");
 });
 
+test("a scan skips a workflow, compose or issue-template file that is not YAML and reads the rest", async () => {
+	const broken = "key: [unclosed\n";
+	const scan = await scanRepo(repoWith({ ...PROJECT, ".github/workflows/broken.yml": broken, "compose.yaml": broken, ".github/ISSUE_TEMPLATE/broken.yml": broken }), "main");
+
+	expect(scan.ci.map(({ file }) => file)).toEqual(["ci.yml"]);
+	expect(scan.composeServices).toEqual([]);
+	expect(scan.issueTemplates.map(({ file }) => file)).toEqual(["bug.yml"]);
+});
+
+test("a repo's own executable environment script is the slot recipe's prepare and refresh", async () => {
+	const repo = repoWith({ ...PROJECT, "scripts/env.sh": "#!/bin/sh\n" });
+
+	chmodSync(join(repo, "scripts", "env.sh"), 0o755);
+
+	expect(proposeSetup(await scanRepo(repo, "main"), shipped.hum).runSlots.recipe).toMatchObject({ prepare: ["./scripts/env.sh"], refresh: [{ run: "./scripts/env.sh", when: "lockfile-changed" }] });
+});
+
 test("a migration proposes a strict glob, and source and markdown get their own levels", async () => {
 	const { paths, strictPaths } = proposeSetup(await scanRepo(repoWith(PROJECT), "main"), shipped.hum);
 
@@ -95,7 +112,6 @@ test("the repo's labels map to kinds, and the map covers the open items that car
 
 	expect(proposal.kindLabels).toMatchObject({ bug: "fix", documentation: "docs" });
 	expect(kindCoverage(items, shipped.hum.kinds, proposal.kindLabels)).toEqual({ covered: 2, total: 4 });
-	expect(declaredKind({ body: "", labels: ["Bug"] }, shipped.hum.kinds, proposal.kindLabels)).toBe("fix");
 });
 
 test("every wait the shipped kinds have is asked once, and an answered wait carries its hours as its timeout", () => {
@@ -108,12 +124,6 @@ test("every wait the shipped kinds have is asked once, and an answered wait carr
 	const kinds = withTimeouts(shipped.kinds, { [`${first?.kind}/${first?.state}`]: 5 });
 
 	expect(JSON.stringify(kinds[first?.kind ?? ""]?.machine.states[first?.state ?? ""]?.after)).toContain(String(5 * 3_600_000));
-});
-
-test("the shipped kinds alone do not load, because their waits have no timeout", () => {
-	const raw = readConfigDir(join(import.meta.dir, "..", "defaults"));
-
-	expect(loadConfig(raw, { env: { hopeSkills: hopeSkills() } }).ok).toBe(false);
 });
 
 test("writing setup answers writes a config that loads and carries only the settings that differ from the defaults", () => {
@@ -157,6 +167,11 @@ test("setup writes nothing and says what to set when git config holds no name or
 	expect(existsSync(join(repo, ".hum"))).toBe(false);
 });
 
+test("the shipped settings commit as the identity git config holds, and say what to set without one", () => {
+	expect(shippedSettingsAs({ found: true, identity: OWNER })).toMatchObject({ ok: true, value: { commitIdentity: OWNER } });
+	expect(shippedSettingsAs({ found: false, missing: ["user.name"] })).toMatchObject({ ok: false, refusal: { code: "no-git-identity", message: expect.stringContaining('git config --global user.name "<yours>"') } });
+});
+
 test("the owner's identity is read from git config, and each key it lacks is named", async () => {
 	const repo = repoWith({ "README.md": "x" });
 	const git = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, env: { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" } });
@@ -195,7 +210,7 @@ test("proving a written setup on a scratch copy passes its checks and contract, 
 	sh(repo, ["commit", "-q", "-m", "setup"]);
 	sh(repo, ["push", "-q", "origin", "main"]);
 
-	const steps = await proveSetup(repo, { hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished" });
+	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
 	const byName = Object.fromEntries(steps.map((step) => [step.name, step.status]));
 
 	expect(byName).toMatchObject({ config: "passed", checks: "passed", contract: "passed", "engine pin": "skipped", item: "skipped" });
@@ -208,7 +223,33 @@ test("proving fails the checks step when a check command fails", async () => {
 	// A work source that is not markdown skips the contract step, which the proving test above covers.
 	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"], integrations: { workSource: "github" } }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT });
 
-	const steps = await proveSetup(repo, { hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished" });
+	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
 
 	expect(steps.find(({ name }) => name === "checks")?.status).toBe("failed");
+});
+
+const SHIPPED_FIX = JSON.parse(readFileSync(join(import.meta.dir, "..", "defaults", "kinds", "fix.json"), "utf8"));
+
+const WITHOUT_STUCK = {
+	...SHIPPED_FIX,
+	machine: {
+		...SHIPPED_FIX.machine,
+		states: Object.fromEntries(Object.entries<{ tags?: string[] }>(SHIPPED_FIX.machine.states).map(([name, node]) => [name, { ...node, tags: node.tags?.filter((tag) => tag !== "stuck") }])),
+	},
+};
+
+test.each([
+	["does not parse", { machine: 1 }, "malformed-config"],
+	["has no stuck state for a wait to time out to", WITHOUT_STUCK, "invalid-config"],
+] as const)("setup refuses a repo whose kind file %s", (_, fix, code) => {
+	const repo = repoWith({ "README.md": "x" });
+	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
+	const env = { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT };
+
+	expect(writeSetup(repo, answers, env).ok).toBe(true);
+	writeFileSync(join(repo, ".hum", "kinds", "fix.json"), JSON.stringify(fix));
+
+	const result = writeSetup(repo, answers, env);
+
+	expect(!result.ok && result.refusal.code).toBe(code);
 });

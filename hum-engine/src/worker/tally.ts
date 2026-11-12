@@ -21,5 +21,3 @@ export const tallyOf = (state: State, item: string) => {
 		},
 	};
 };
-
-export type Tally = ReturnType<typeof tallyOf>;

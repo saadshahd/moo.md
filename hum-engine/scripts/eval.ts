@@ -6,10 +6,10 @@ import { AgentDecisionExhaustedError } from "@statelyai/agent";
 import PQueue from "p-queue";
 import { z } from "zod";
 import { type Finished, type Runner, startRunner } from "../src/adapters/claude-p.ts";
+import { gitIn, readGitIdentity } from "../src/adapters/git.ts";
 import { modelCallOver } from "../src/adapters/model-call.ts";
-import { readConfigDir } from "../src/config/load.ts";
-import { BOUNDARIES, type Boundary, HumConfig } from "../src/config/schema.ts";
-import { alignmentQuestion, raisesLevel } from "../src/decide/alignment.ts";
+import { BOUNDARIES, type Boundary } from "../src/config/schema.ts";
+import { alignmentQuestion, doesRaiseLevel } from "../src/decide/alignment.ts";
 import { replyQuestion } from "../src/decide/answer.ts";
 import { kindQuestion } from "../src/decide/kind.ts";
 import { tasteQuestion } from "../src/decide/taste.ts";
@@ -17,17 +17,21 @@ import { pairQuestion } from "../src/loop/pair.ts";
 import type { ReviewNote } from "../src/loop/records.ts";
 import { pairing, prepare } from "../src/loop/signals.ts";
 import type { JsonSchema, ProsePurpose } from "../src/decide/prose.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { shippedRaw, shippedSettingsAs } from "../src/setup/shipped.ts";
 import { openState } from "../src/state/open.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
 import { PROSE_PROMPTS } from "../src/worker/thin-path.ts";
 import { SECOND_MS } from "../src/time.ts";
+import { rateOf } from "../src/measure/rate.ts";
 
 /**
  * Measures one model-judgment boundary on its labelled cases, through the same prompts and fences the engine runs,
  * and adds a row to its RESULTS.md. `bun run eval -- --model <id>` measures every boundary on that model id; naming
  * boundaries measures only those. A case the runner held or limited counts in no rate. `--runs <n>` repeats each
  * boundary and pools the runs, since one run proves little; `--write <folder>` records each pooled rate under
- * `measuredModels` in that folder's `hum.json`, which is how setup measures an owner's own models.
+ * `measuredModels` in that folder's `hum.json`, which is how setup measures an owner's own models. A boundary where
+ * nothing was measured records no rate, and the script exits non-zero.
  */
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { model: { type: "string" }, limit: { type: "string" }, runs: { type: "string" }, write: { type: "string" } } });
@@ -36,16 +40,23 @@ const OWNER_LABELLED: readonly Boundary[] = ["taste"];
 
 const boundaries: readonly Boundary[] = positionals.length > 0 ? z.array(z.enum(BOUNDARIES)).parse(positionals) : BOUNDARIES.filter((boundary) => !OWNER_LABELLED.includes(boundary));
 const root = join(import.meta.dir, "..");
-const raw = readConfigDir(join(root, "defaults"));
-const config = { hum: HumConfig.parse(raw.hum), roles: raw.roles };
+const settings = shippedSettingsAs(await readGitIdentity(gitIn(process.cwd(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })));
+
+if (!settings.ok) {
+	console.error(settings.refusal.message);
+	process.exit(1);
+}
+
+const config = { hum: settings.value, roles: shippedRaw().roles };
 const model = values.model ?? config.hum.decisionModel;
-const runs = values.runs === undefined ? 1 : Number(values.runs);
-const limit = values.limit === undefined ? Number.POSITIVE_INFINITY : Number(values.limit);
+const Count = z.coerce.number().int().positive();
+const runs = values.runs === undefined ? 1 : Count.parse(values.runs);
+const limit = values.limit === undefined ? Number.POSITIVE_INFINITY : Count.parse(values.limit);
 
 type Verdict = "right" | "wrong" | "abstained" | "halted";
 
-const state = openState(mkdtempSync(join(tmpdir(), "hum-eval-")));
-const started = await startRunner({ state, model });
+const state = openState(mkdtempSync(join(tmpdir(), "hum-eval-")), { now: Date.now });
+const started = await startRunner({ state, model, now: Date.now, env: process.env });
 
 if (started.check.kind !== "finished") throw new Error(`the start check ended as ${started.check.kind}`);
 
@@ -109,7 +120,7 @@ const TasteCase = z.object({ case: z.string(), label: z.enum(["keeps", "breaks"]
 /** Calls at once: enough to finish a set in minutes, few enough not to trip a rate limit. */
 const AT_ONCE = 4;
 
-const eachOf = <T>(cases: readonly T[], measure: (found: T) => Promise<Verdict>): Promise<Verdict[]> => new PQueue({ concurrency: AT_ONCE }).addAll(cases.map((found) => () => measure(found)));
+const eachOf = <T, R>(cases: readonly T[], measure: (found: T) => Promise<R>): Promise<R[]> => new PQueue({ concurrency: AT_ONCE }).addAll(cases.map((found) => () => measure(found)));
 
 const read = async <T>(boundary: Boundary, schema: z.ZodType<T>, file = "cases.jsonl"): Promise<T[]> =>
 	(await Bun.file(join(root, "evals", boundary, file)).text())
@@ -118,78 +129,98 @@ const read = async <T>(boundary: Boundary, schema: z.ZodType<T>, file = "cases.j
 		.map((line) => schema.parse(JSON.parse(line)));
 
 /** The confusion counts of the review-note boundary: its rate is precision, and recall is recorded beside it. */
-const pairCounts = { tp: 0, fp: 0, fn: 0, tn: 0, pairedBySignals: 0 };
+type PairCounts = { readonly tp: number; readonly fp: number; readonly fn: number; readonly tn: number; readonly pairedBySignals: number };
+
+type Cell = Exclude<keyof PairCounts, "pairedBySignals">;
+
+const NO_PAIRS: PairCounts = { tp: 0, fp: 0, fn: 0, tn: 0, pairedBySignals: 0 };
+
+const addPairs = (a: PairCounts, b: PairCounts): PairCounts => ({ tp: a.tp + b.tp, fp: a.fp + b.fp, fn: a.fn + b.fn, tn: a.tn + b.tn, pairedBySignals: a.pairedBySignals + b.pairedBySignals });
+
+/** One run of a boundary: each case's verdict, and for the review-note boundary its confusion counts. */
+type Measured = { readonly verdicts: readonly Verdict[]; readonly pairs?: PairCounts };
 
 const noteOf = (text: string, sourceId: string): ReviewNote => ({ source: "review-comment", sourceId, change: sourceId, hunk: "", text, at: 0 });
 
-const BOUNDARY_RUNS: Record<Boundary, () => Promise<Verdict[]>> = {
+const BOUNDARY_RUNS: Record<Boundary, () => Promise<Measured>> = {
 	kind: async () => {
 		const cases = (await read("kind", KindCase)).slice(0, limit);
 
-		return eachOf(cases, async (found) => {
+		return {
+			verdicts: await eachOf(cases, async (found) => {
 				const judged = await judge(kindQuestion(found, config.hum));
 
 				return judged.kind === "abstained" ? "abstained" : scored(judged.value.kind, found.label);
-		});
+			}),
+		};
 	},
 	alignment: async () => {
 		const sample = (await read("alignment", AlignmentCase, "sample.jsonl")).slice(0, limit);
 
-		return eachOf(sample, async (found) => {
+		return {
+			verdicts: await eachOf(sample, async (found): Promise<Verdict> => {
 				const judged = await judge(alignmentQuestion({ title: found.subject, body: "" }, found.diff, config.hum));
 
 				if (judged.kind === "abstained") return "abstained";
 
-				return raisesLevel(0, config.hum.levels.length, judged.value, config.hum) === (found.label !== "clean") ? "right" : "wrong";
-		});
+				return doesRaiseLevel({ rank: 0, levels: config.hum.levels.length, answer: judged.value, config: config.hum }) === (found.label !== "clean") ? "right" : "wrong";
+			}),
+		};
 	},
 	"plan-outcome": async () => {
 		const repo = planRepo();
 		const cases = (await read("plan-outcome", PlanCase)).slice(0, limit);
 
-		return eachOf(cases, async (found) => scored(await prosePick("plan", PROSE_PROMPTS.plan(config, { id: found.case, title: found.body.split("\n")[0] ?? "", body: found.body }), "", repo), found.label));
+		return { verdicts: await eachOf(cases, async (found) => scored(await prosePick("plan", PROSE_PROMPTS.plan(config, { id: found.case, title: found.body.split("\n")[0] ?? "", body: found.body }), "", repo), found.label)) };
 	},
 	"reply-option": async () => {
 		const cases = (await read("reply-option", ReplyCase)).slice(0, limit);
 
-		return eachOf(cases, async (found) => {
-			const judged = await judge(replyQuestion(found.question, found.options, found.reply));
+		return {
+			verdicts: await eachOf(cases, async (found) => {
+				const judged = await judge(replyQuestion({ question: found.question, options: found.options, reply: found.reply }));
 
-			return judged.kind === "abstained" ? "abstained" : scored(judged.value.option, found.label);
-		});
+				return judged.kind === "abstained" ? "abstained" : scored(judged.value.option, found.label);
+			}),
+		};
 	},
 	"repeat-pair": async () => {
 		const cases = (await read("repeat-pair", PairCase)).slice(0, limit);
 		const open = cases.filter((found) => pairing(prepare(noteOf(found.a.text, "a")), prepare(noteOf(found.b.text, "b"))).signal === undefined);
 
-		pairCounts.pairedBySignals = cases.length - open.length;
+		const judged = await eachOf(open, async (found): Promise<{ verdict: Verdict; cell?: Cell }> => {
+			const pair = await judge(pairQuestion(noteOf(found.a.text, "a"), noteOf(found.b.text, "b")));
 
-		return eachOf(open, async (found) => {
-			const judged = await judge(pairQuestion(noteOf(found.a.text, "a"), noteOf(found.b.text, "b")));
+			if (pair.kind === "abstained") return { verdict: "abstained" };
 
-			if (judged.kind === "abstained") return "abstained";
-
-			const said = judged.value.same;
+			const said = pair.value.same;
 			const truth = found.label === "same";
 
-			pairCounts[said ? (truth ? "tp" : "fp") : truth ? "fn" : "tn"]++;
-
-			return said === truth ? "right" : "wrong";
+			return { verdict: said === truth ? "right" : "wrong", cell: said ? (truth ? "tp" : "fp") : truth ? "fn" : "tn" };
 		});
+
+		const countOf = (cell: Cell) => judged.filter((found) => found.cell === cell).length;
+
+		return {
+			verdicts: judged.map(({ verdict }) => verdict),
+			pairs: { tp: countOf("tp"), fp: countOf("fp"), fn: countOf("fn"), tn: countOf("tn"), pairedBySignals: cases.length - open.length },
+		};
 	},
 	taste: async () => {
 		const cases = (await read("taste", TasteCase)).slice(0, limit);
 
-		return eachOf(cases, async (found) => {
-			const judged = await judge(tasteQuestion(found.rule, found.diff, config.hum));
+		return {
+			verdicts: await eachOf(cases, async (found) => {
+				const judged = await judge(tasteQuestion(found.rule, found.diff, config.hum));
 
-			return judged.kind === "abstained" ? "abstained" : scored(judged.value.keeps ? "keeps" : "breaks", found.label);
-		});
+				return judged.kind === "abstained" ? "abstained" : scored(judged.value.keeps ? "keeps" : "breaks", found.label);
+			}),
+		};
 	},
 	"review-verdict": async () => {
 		const cases = (await read("review-verdict", ReviewCase)).slice(0, limit);
 
-		return eachOf(cases, async (found) => scored(await prosePick("review", PROSE_PROMPTS.review(config, { id: found.case, title: found.item, body: "" }, found.diff), found.diff, tmpdir()), found.label));
+		return { verdicts: await eachOf(cases, async (found) => scored(await prosePick("review", PROSE_PROMPTS.review(config, { id: found.case, title: found.item, body: "" }, found.diff), found.diff, tmpdir()), found.label)) };
 	},
 };
 
@@ -197,12 +228,13 @@ const header = "| Date | Model id | n | Right | Wrong | Abstained | Rate | Live 
 
 const pairHeader = "| Date | Model id | n | TP | FP | FN | TN | Abstained | Paired by signals | Precision | Recall | Live calls |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n";
 
-const ratio = (part: number, whole: number): string => (whole === 0 ? "0.00" : (part / whole).toFixed(2));
+/** A rate as a RESULTS.md cell; a dash where nothing was measured. */
+const rateCell = (rate: number | undefined): string => rate?.toFixed(2) ?? "-";
 
-const pairRow = (day: string, abstained: number, used: number): string =>
-	`| ${day} | ${model} | ${pairCounts.tp + pairCounts.fp + pairCounts.fn + pairCounts.tn} | ${pairCounts.tp} | ${pairCounts.fp} | ${pairCounts.fn} | ${pairCounts.tn} | ${abstained} | ${pairCounts.pairedBySignals} | ${ratio(pairCounts.tp, pairCounts.tp + pairCounts.fp)} | ${ratio(pairCounts.tp, pairCounts.tp + pairCounts.fn)} | ${used} |`;
+const precisionOf = ({ tp, fp }: PairCounts): number | undefined => rateOf(tp, tp + fp);
 
-const EMPTY_POOL = { right: 0, measured: 0 };
+const pairRow = (day: string, pairs: PairCounts, abstained: number, used: number): string =>
+	`| ${day} | ${model} | ${pairs.tp + pairs.fp + pairs.fn + pairs.tn} | ${pairs.tp} | ${pairs.fp} | ${pairs.fn} | ${pairs.tn} | ${abstained} | ${pairs.pairedBySignals} | ${rateCell(precisionOf(pairs))} | ${rateCell(rateOf(pairs.tp, pairs.tp + pairs.fn))} | ${used} |`;
 
 /** Sets one pooled rate in the owner's `hum.json`, where trust reads it. */
 const recordRate = async (folder: string, boundary: Boundary, rate: number): Promise<void> => {
@@ -212,33 +244,39 @@ const recordRate = async (folder: string, boundary: Boundary, rate: number): Pro
 	await Bun.write(file, `${JSON.stringify({ ...written, measuredModels: { ...written.measuredModels, [boundary]: { ...written.measuredModels[boundary], [model]: Number(rate.toFixed(2)) } } }, null, "\t")}\n`);
 };
 
-for (const boundary of boundaries) {
-	const pool = { ...EMPTY_POOL };
+const unmeasured: Boundary[] = [];
 
-	Object.assign(pairCounts, { tp: 0, fp: 0, fn: 0, tn: 0, pairedBySignals: 0 });
+for (const boundary of boundaries) {
+	const pool = { right: 0, measured: 0, pairs: NO_PAIRS };
 
 	for (let run = 1; run <= runs; run++) {
 		const before = calls;
-		const verdicts = await BOUNDARY_RUNS[boundary]();
+		const { verdicts, pairs = NO_PAIRS } = await BOUNDARY_RUNS[boundary]();
 		const count = (verdict: Verdict) => verdicts.filter((found) => found === verdict).length;
 		const measured = verdicts.length - count("halted");
-		const rate = measured === 0 ? 0 : count("right") / measured;
 		const day = new Date().toISOString().slice(0, 10);
-		const row = boundary === "repeat-pair" ? pairRow(day, count("abstained"), calls - before) : `| ${day} | ${model} | ${measured} | ${count("right")} | ${count("wrong")} | ${count("abstained")} | ${rate.toFixed(2)} | ${calls - before} |`;
+		const row = boundary === "repeat-pair" ? pairRow(day, pairs, count("abstained"), calls - before) : `| ${day} | ${model} | ${measured} | ${count("right")} | ${count("wrong")} | ${count("abstained")} | ${rateCell(rateOf(count("right"), measured))} | ${calls - before} |`;
 		const results = join(values.write ?? root, "evals", boundary, "RESULTS.md");
 		const earlier = (await Bun.file(results).exists()) ? await Bun.file(results).text() : boundary === "repeat-pair" ? pairHeader : header;
 
 		pool.right += count("right");
 		pool.measured += measured;
+		pool.pairs = addPairs(pool.pairs, pairs);
 		await Bun.write(results, `${earlier}${row}\n`);
 		console.log(`${boundary}: ${row}`);
 	}
 
-	const pooled = boundary === "repeat-pair" ? pairCounts.tp / (pairCounts.tp + pairCounts.fp || 1) : pool.right / (pool.measured || 1);
+	const pooled = boundary === "repeat-pair" ? precisionOf(pool.pairs) : rateOf(pool.right, pool.measured);
 
-	console.log(`${boundary}: pooled over ${runs} run(s): ${pooled.toFixed(2)}`);
+	console.log(`${boundary}: pooled over ${runs} run(s): ${rateCell(pooled)}`);
 
-	if (values.write !== undefined) await recordRate(values.write, boundary, pooled);
+	if (pooled === undefined) unmeasured.push(boundary);
+	else if (values.write !== undefined) await recordRate(values.write, boundary, pooled);
+}
+
+if (unmeasured.length > 0) {
+	console.error(`Nothing was measured on ${unmeasured.join(", ")}, so no rate was recorded for ${unmeasured.length === 1 ? "it" : "them"}.`);
+	process.exitCode = 1;
 }
 
 console.log(`${calls} live calls, the start check included. Record each rate under measuredModels in defaults/hum.json; a model decides a boundary alone only at minJudgeRate or above; repeat-pair takes its precision, against repeatPrecision.`);

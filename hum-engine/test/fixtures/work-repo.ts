@@ -2,9 +2,11 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { ItemId } from "../../src/adapter-api.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { OWNER } from "./identity.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
+import { runTempDir, tempDir } from "./temp.ts";
 
 /** The markdown adapter's settings as hum ships them. */
 export const markdownSettings = {
@@ -47,7 +49,7 @@ export const sh = (cwd: string, args: string[]): string => {
 	return result.stdout;
 };
 
-export const itemFile = (title: string, state = "ready", body = "body") => `---\ntitle: ${JSON.stringify(title)}\nstate: ${state}\n---\n\n${body}\n`;
+export const itemFile = (title: string, { state = "ready", body = "body" }: { readonly state?: string; readonly body?: string } = {}) => `---\ntitle: ${JSON.stringify(title)}\nstate: ${state}\n---\n\n${body}\n`;
 
 let built: string | undefined;
 
@@ -55,7 +57,7 @@ let built: string | undefined;
 const firstWorld = (): string => (built ??= buildFirstWorld());
 
 const buildFirstWorld = (): string => {
-	const world = mkdtempSync(join(tmpdir(), "hum-work-first-"));
+	const world = runTempDir("work-first");
 	const remote = join(world, "remote.git");
 	const owner = join(world, "owner");
 
@@ -74,7 +76,7 @@ const buildFirstWorld = (): string => {
 
 /** A temp bare remote, one seeding clone that plays the owner, and worker clones. Nothing leaves the temp folder. */
 export class WorkRepo {
-	readonly root = mkdtempSync(join(tmpdir(), "hum-work-"));
+	readonly root = tempDir("work");
 	readonly remote = join(this.root, "remote.git");
 	readonly owner = join(this.root, "owner");
 	#count = 0;
@@ -90,14 +92,14 @@ export class WorkRepo {
 	}
 
 	/** The owner commits an item file and pushes it. */
-	add(id: string, content: string): string {
-		this.put(`.hum/work/${id}.md`, content, `add ${id}`);
+	add(id: string, content: string): ItemId {
+		this.put({ path: `.hum/work/${id}.md`, content, message: `add ${id}` });
 
-		return id;
+		return ItemId.parse(id);
 	}
 
 	/** The owner commits a file and pushes it, rebasing onto the remote's main first only when a worker moved it. */
-	put(path: string, content: string, message = `put ${path}`): void {
+	put({ path, content, message = `put ${path}` }: { readonly path: string; readonly content: string; readonly message?: string }): void {
 		mkdirSync(join(this.owner, dirname(path)), { recursive: true });
 		writeFileSync(join(this.owner, path), content);
 		this.commit(message);
@@ -108,7 +110,7 @@ export class WorkRepo {
 		}
 	}
 
-	seed(title: string): string {
+	seed(title: string): ItemId {
 		return this.add(`seed-${++this.#count}`, itemFile(title));
 	}
 
@@ -121,13 +123,14 @@ export class WorkRepo {
 		return path;
 	}
 
-	/** The remote refuses every push to main, saying `said`: by default that another writer moved it. Returns how many pushes it has refused. */
-	refuseMainPushes(said = "fetch first"): () => number {
+	/** The remote refuses every push to a ref `refs` matches, a shell pattern, saying `said`: by default that another writer moved main. With `touching`, only a push that changes that path is refused. Returns how many pushes it has refused. */
+	refusePushes({ refs = "refs/heads/main", said = "fetch first", touching }: { readonly refs?: string; readonly said?: string; readonly touching?: string } = {}): () => number {
 		const refused = join(this.root, "refused-pushes");
 		const hook = join(this.remote, "hooks", "pre-receive");
+		const allowUntouched = touching === undefined ? "" : `git diff --quiet "$old" "$new" -- '${touching}' && continue; `;
 
 		mkdirSync(join(this.remote, "hooks"), { recursive: true });
-		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tif [ "$ref" = "refs/heads/main" ]; then echo x >> ${refused}; echo "${said}" >&2; exit 1; fi\ndone\n`);
+		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tcase "$ref" in ${refs}) ${allowUntouched}echo x >> ${refused}; echo "${said}" >&2; exit 1;; esac\ndone\n`);
 		chmodSync(hook, 0o755);
 
 		return () => (existsSync(refused) ? readFileSync(refused, "utf8").split("\n").filter(Boolean).length : 0);

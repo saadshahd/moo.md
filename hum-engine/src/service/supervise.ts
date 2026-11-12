@@ -41,7 +41,7 @@ type Card = ReturnType<(typeof CARD_KINDS)["workerSilent"]> | undefined;
 
 /** Shows `card` as the only worker-down card, or none; the status file is written here because no worker is there to write it. */
 const showWorkerDown = ({ faults, statusPath }: Supervision["state"], card: Card, now: number): void => {
-	faults.clear(CARD_CODES.workerDown);
+	faults.clear({ code: CARD_CODES.workerDown });
 
 	if (card) faults.raise(card);
 
@@ -62,7 +62,8 @@ const silenceOf = (quietSince: number, beat: { readonly time: number; readonly i
 	return { quietSince: lastSeen, silentMs, isSilent: silentMs >= o.workerDownTicks * (beat?.intervalMs ?? o.intervalMs) };
 };
 
-const backoffFor = (crashes: number, { backoffMs, maxBackoffMs }: Pick<Supervision, "backoffMs" | "maxBackoffMs">): number => Math.min(backoffMs * 2 ** (crashes - 1), maxBackoffMs);
+/** The pause before a restart once `crashes` crashes sit inside the window. */
+export const backoffFor = (crashes: number, { backoffMs, maxBackoffMs }: Pick<Supervision, "backoffMs" | "maxBackoffMs">): number => Math.min(backoffMs * 2 ** (crashes - 1), maxBackoffMs);
 
 /**
  * The start script as a machine. It runs the worker and starts it again when it exits, looks at the heartbeat once

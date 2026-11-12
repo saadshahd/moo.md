@@ -1,5 +1,6 @@
 import { OWNER_WAIT_TAG, STUCK_TAG, WAIT_TAG, type Kind, type StateNodeJSON } from "../config/schema.ts";
-import { HOUR_MS, WAIT_HOURS } from "./tables.ts";
+import { HOUR_MS } from "../time.ts";
+import { WAIT_HOURS } from "./tables.ts";
 
 /** A state a kind's machine waits in, with the hours its timeout proposes. */
 export type Wait = { readonly kind: string; readonly state: string; readonly waitsOn: "owner" | "other"; readonly hours: number };
@@ -8,7 +9,7 @@ export type Wait = { readonly kind: string; readonly state: string; readonly wai
 export type WaitAnswers = Readonly<Record<string, number>>;
 
 /** The key a wait's answer sits under. */
-export const waitKey = ({ kind, state }: Pick<Wait, "kind" | "state">): string => `${kind}/${state}`;
+const waitKey = ({ kind, state }: Pick<Wait, "kind" | "state">): string => `${kind}/${state}`;
 
 const isOwnerWait = (tags: readonly string[] | undefined): boolean => tags?.includes(OWNER_WAIT_TAG) ?? false;
 
@@ -27,24 +28,21 @@ export const waitsOf = (kinds: Readonly<Record<string, Kind>>): Wait[] =>
 	);
 
 /** The state a timed-out wait goes to: the kind's first stuck state. */
-const stuckStateOf = (kind: string, config: Kind): string => {
-	const stuck = Object.entries(config.machine.states).find(([, node]) => node.tags?.includes(STUCK_TAG));
-
-	if (!stuck) throw new Error(`kind "${kind}" has no state tagged "${STUCK_TAG}" for a timed-out wait to go to`);
-
-	return stuck[0];
-};
+const stuckStateOf = (config: Kind): string | undefined => Object.entries(config.machine.states).find(([, node]) => node.tags?.includes(STUCK_TAG))?.[0];
 
 const hasTimeout = (node: StateNodeJSON): boolean => node.timeout !== undefined || Object.keys(node.after ?? {}).length > 0;
 
 /**
  * The kinds with a timeout on every wait: the hours answered, else the proposed hours. A timed-out wait ends stuck.
- * A wait that already has a timeout keeps it.
+ * A wait that already has a timeout keeps it. A kind with no stuck state stays as it is, so the config check refuses its waits.
  */
 export const withTimeouts = (kinds: Readonly<Record<string, Kind>>, answers: WaitAnswers): Record<string, Kind> =>
 	Object.fromEntries(
 		Object.entries(kinds).map(([kind, config]) => {
-			const stuck = stuckStateOf(kind, config);
+			const stuck = stuckStateOf(config);
+
+			if (stuck === undefined) return [kind, config];
+
 			const hoursOf = new Map(waitsOf({ [kind]: config }).map((wait) => [wait.state, answers[waitKey(wait)] ?? wait.hours]));
 
 			const states = Object.entries(config.machine.states).map(([state, node]): [string, StateNodeJSON] => {

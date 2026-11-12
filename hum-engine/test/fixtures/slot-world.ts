@@ -1,11 +1,9 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { type PoolOptions, SlotPool } from "../../src/slots/pool.ts";
 import { type HumConfig, SHIPPED_DEFAULTS, type SlotRecipe } from "../../src/config/schema.ts";
 import { openState } from "../../src/state/open.ts";
 import type { Checkout } from "../../src/worker/thin-path.ts";
 import { WorkRepo } from "./work-repo.ts";
+import { tempDir } from "./temp.ts";
 
 export const BASE = "main";
 
@@ -31,18 +29,18 @@ export const poolConfig = (pool: string, { runners = 2, recipe = {}, services, p
 /** An owner\'s checkout with a remote, a pool folder outside it, saved state, and a pool over them. Nothing leaves temp folders. */
 export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["liveRuns"]) => {
 	const repo = new WorkRepo();
-	const pool = mkdtempSync(join(tmpdir(), "hum-pool-"));
-	const stateDir = mkdtempSync(join(tmpdir(), "hum-slot-state-"));
+	const pool = tempDir("pool");
+	const stateDir = tempDir("slot-state");
 	settings.seed?.(repo);
 
 	const { recipe } = settings;
 	const config = poolConfig(pool, { ...settings, recipe: recipe instanceof Function ? recipe(repo.owner) : recipe });
-	const state = openState(stateDir);
-	const options: PoolOptions = { repo: repo.owner, state, config, base: BASE, liveRuns };
+	const state = openState(stateDir, { now: Date.now });
+	const options: PoolOptions = { repo: repo.owner, state, config, base: BASE, liveRuns, now: Date.now };
 	const slots = new SlotPool(options);
 
 	/** A pool over the same saved state, as a restarted worker would open it. */
-	const reopened = (alive?: PoolOptions["liveRuns"]) => new SlotPool({ ...options, state: openState(stateDir), liveRuns: alive });
+	const reopened = (alive?: PoolOptions["liveRuns"]) => new SlotPool({ ...options, state: openState(stateDir, { now: Date.now }), liveRuns: alive });
 
 	const ask = (item: string, over: { signal?: AbortSignal; pool?: SlotPool } = {}) => (over.pool ?? slots).checkout({ remote: repo.remote, base: BASE, item, signal: over.signal });
 
@@ -55,9 +53,6 @@ export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["l
 		slots,
 		ask,
 		reopened,
-		dispose: () => {
-			for (const folder of [repo.root, pool, stateDir]) rmSync(folder, { recursive: true, force: true });
-		},
 	};
 };
 

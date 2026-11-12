@@ -26,7 +26,7 @@ export const INSTALL_COMMANDS = {
 } as const satisfies Record<PackageManager, string>;
 
 /** The command that runs a package script, per package manager that has scripts. */
-export const RUN_SCRIPT: Readonly<Record<PackageManager, string | undefined>> = { bun: "bun run", pnpm: "pnpm run", yarn: "yarn", npm: "npm run", uv: undefined, poetry: undefined, cargo: undefined, go: undefined };
+export const RUN_SCRIPT = { bun: "bun run", pnpm: "pnpm run", yarn: "yarn", npm: "npm run", uv: undefined, poetry: undefined, cargo: undefined, go: undefined } as const satisfies Record<PackageManager, string | undefined>;
 
 /** Package scripts that check a change, in the order a repo's own run gives them. */
 export const CHECK_SCRIPTS = ["check", "typecheck", "lint", "test"] as const;
@@ -42,6 +42,9 @@ export const NOT_A_CHECK = /^(echo|export|cd|mkdir|cp|mv|rm|curl|wget|sudo|gh|gi
 
 /** The files that hold a repo's tool versions. */
 export const TOOL_VERSION_FILES = [".tool-versions", ".nvmrc", ".node-version", ".bun-version", ".python-version", "mise.toml", ".mise.toml", "rust-toolchain.toml", ".go-version"] as const;
+
+/** Where owners keep a script that sets up a working environment, in the order a repo's own convention is preferred. */
+export const ENV_SCRIPTS = ["bin/setup", "script/setup", "scripts/setup", "scripts/setup.sh", "bin/env", "scripts/env", "scripts/env.sh"] as const;
 
 export const ENV_EXAMPLE_FILES = [".env.example", ".env.sample", ".env.template"] as const;
 
@@ -94,8 +97,6 @@ export const KIND_LABEL_WORDS = {
 
 /** Hours a wait gets before it ends stuck, by who it waits on. */
 export const WAIT_HOURS = { owner: 72, other: 24 } as const;
-
-export const HOUR_MS = 3_600_000;
 
 /** Tracked files setup reads the repo's shape from, at most. */
 export const TRACKED_FILE_LIMIT = 50_000;

@@ -1,24 +1,21 @@
 import type { EngineInterface } from "claude-code";
 import type { ViewSource } from "../types";
 import { agesShown } from "./view/ages.ts";
-import { type ViewRead, statusPathOf } from "./view/read.ts";
-import { failureOf, runHum } from "./press.ts";
+import { readOf, statusPathOf, type ViewRead } from "./view/read.ts";
+import { runHum } from "./hum.ts";
+import { failureOf } from "./says.ts";
 
 type Engine = EngineInterface;
 
-/** What one session's poller remembers between looks. A reload starts it over, which costs one extra read. */
-export type Watch = {
-	path: string;
-	/** The repo's root, where its pinned hum lives. */
-	root: string;
-	lastModified: number;
-	lastRead: ViewRead;
-	lastShown: string;
-};
+/** What one session's poller saw at its last look. A reload starts it over, which costs one extra read. */
+export type Seen = { readonly modified: number; readonly read: ViewRead; readonly shown: string };
 
 const NEVER = -1;
 
-export const newWatch = (): Watch => ({ path: "", root: "", lastModified: NEVER, lastRead: { kind: "waiting" }, lastShown: "" });
+export const NOTHING_SEEN: Seen = { modified: NEVER, read: { kind: "waiting" }, shown: "" };
+
+/** A look's answer: what it found when the file changed, and what the next look starts from. */
+export type Look = { readonly found?: ViewSource; readonly seen: Seen };
 
 /** The engine rejects a missing path with the code at the end of the message, not on a `code` field. */
 const isMissing = (error: Error): boolean => error.message.endsWith("ENOENT");
@@ -35,36 +32,33 @@ export async function locate($: Engine, cwd: string): Promise<string> {
 
 	if (found.exitCode !== 0) throw new Error(`${cwd} is not inside a git repository`);
 
-	return statusPathOf(cwd, found.stdout.trim());
+	return statusPathOf({ cwd, commonDir: found.stdout.trim() });
 }
 
 /** One look. A new file time reads the file and answers what it found; the same file answers nothing and redraws only when a shown age changed. */
-export async function poll($: Engine, watch: Watch, amberAfterSeconds: number): Promise<ViewSource | undefined> {
+export async function poll($: Engine, path: string, seen: Seen, amberAfterSeconds: number): Promise<Look> {
 	const now = await $.clock.now();
-	const stat = await $.fs.stat(watch.path).catch((error: Error) => error);
+	const stat = await $.fs.stat(path).catch((error: Error) => error);
 
 	if (stat instanceof Error) {
-		watch.lastModified = NEVER;
+		const found = sourceOf(stat, path);
 
-		return sourceOf(stat, watch.path);
+		return { found, seen: { ...seen, modified: NEVER, read: readOf(found) } };
 	}
 
-	if (stat.mtimeMs !== watch.lastModified) {
-		const text = await $.fs.read(watch.path).catch((error: Error) => error);
+	if (stat.mtimeMs !== seen.modified) {
+		const found = sourceOf(await $.fs.read(path).catch((error: Error) => error), path);
 
-		watch.lastModified = stat.mtimeMs;
-
-		return sourceOf(text, watch.path);
+		return { found, seen: { ...seen, modified: stat.mtimeMs, read: readOf(found) } };
 	}
 
-	const shown = watch.lastRead.kind === "status" ? agesShown(watch.lastRead.status, now, amberAfterSeconds) : "";
+	const shown = seen.read.kind === "status" ? agesShown(seen.read.status, { now, amberAfterSeconds }) : "";
 
-	if (shown !== watch.lastShown) {
-		watch.lastShown = shown;
-		$.ui.invalidate("ui.render");
-	}
+	if (shown === seen.shown) return { seen };
 
-	return undefined;
+	$.ui.invalidate("ui.render");
+
+	return { seen: { ...seen, shown } };
 }
 
 /** A timer's callback that starts `run` only once its last run has ended, so a slow `hum watch` is never started again on top of itself. */

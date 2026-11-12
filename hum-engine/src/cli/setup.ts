@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { Command } from "commander";
 import { x } from "tinyexec";
@@ -53,6 +54,10 @@ const gh = async (repo: string, args: readonly string[]) => {
 	}
 };
 
+type GhOutput = Awaited<ReturnType<typeof gh>>;
+
+const isRead = (output: GhOutput): output is NonNullable<GhOutput> => output?.exitCode === 0;
+
 /** The repo's open issues and its label names, from `gh`. Without `gh` or a GitHub remote there are none, and the scan prints no coverage. */
 const githubFacts = async (repo: string): Promise<GithubFacts | undefined> => {
 	const issues = await gh(repo, ["issue", "list", "--state", "open", "--limit", GH_LIST_LIMIT, "--json", "body,labels"]);
@@ -60,7 +65,7 @@ const githubFacts = async (repo: string): Promise<GithubFacts | undefined> => {
 
 	const permissions = await gh(repo, ["api", "repos/{owner}/{repo}/actions/permissions/workflow"]);
 
-	if (issues?.exitCode !== 0 || labels?.exitCode !== 0 || permissions?.exitCode !== 0) return undefined;
+	if (!isRead(issues) || !isRead(labels) || !isRead(permissions)) return undefined;
 
 	return {
 		items: GhIssues.parse(JSON.parse(issues.stdout)).map(({ body, labels: on }) => ({ body, labels: on.map(({ name }) => name) })),
@@ -118,7 +123,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.option("--base <branch>", "the branch items merge into", DEFAULT_BASE)
 		.option("--item", "run one item through the real claude on a scratch copy; spends live calls")
 		.action(async ({ base, item }: { base: string; item?: true }) => {
-			const steps = await proveSetup(io.cwd, { hopeSkills: listHopeSkills(await hopeRoot()), base, item: item === true });
+			const steps = await proveSetup(io.cwd, { now: Date.now, processEnv: io.env, newSessionId: randomUUID, hopeSkills: listHopeSkills(await hopeRoot()), base, item: item === true });
 
 			io.stdout(`${steps.map(printStep).join("\n")}\n`);
 			done(steps.some(({ status }) => status === "failed") ? EXIT_FAILED : EXIT_OK);
@@ -131,7 +136,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.option("--model <id...>", "model ids to measure; default every model the tiers and the cheap call use")
 		.action(async ({ runs, model }: { runs: string; model?: string[] }) => {
 			for (const id of model ?? modelsOf(io.cwd)) {
-				const ran = await x(process.execPath, [EVAL_SCRIPT, "--model", id, "--runs", runs, "--write", join(io.cwd, ".hum")], { throwOnError: false, nodeOptions: { stdio: "inherit" } });
+				const ran = await x(process.execPath, [EVAL_SCRIPT, "--model", id, "--runs", runs, "--write", join(io.cwd, ".hum")], { throwOnError: false, nodeOptions: { cwd: io.cwd, stdio: "inherit" } });
 
 				if (ran.exitCode !== 0) return done(EXIT_FAILED);
 			}
