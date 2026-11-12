@@ -59,7 +59,7 @@ test("of runs sharing a prefix the first goes at once and the rest wait for its 
 });
 
 test("a first run that ends without a token hands the first place to the next, and the run after waits on it", async () => {
-	const gate = new PrefixGate();
+	const gate = new PrefixGate({ now: Date.now });
 	const first = await gate.enter("fix");
 	const next = gate.enter("fix");
 
@@ -75,7 +75,7 @@ test("a first run that ends without a token hands the first place to the next, a
 });
 
 test("a run stopped while it waits for the first token does not start", async () => {
-	const gate = new PrefixGate();
+	const gate = new PrefixGate({ now: Date.now });
 
 	await gate.enter("plan");
 

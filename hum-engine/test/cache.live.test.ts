@@ -17,7 +17,7 @@ test.skipIf(!live)("live: the runs that wait for the first token read the shared
 	const { runner } = await startRunner({ state, model });
 	expect(state.faults.list()).toEqual([]);
 
-	const gate = new PrefixGate();
+	const gate = new PrefixGate({ now: Date.now });
 	const prompt = `Reply with the JSON {"ok":true}. Say nothing else.`;
 
 	const go = async (): Promise<RunOutcome> => {

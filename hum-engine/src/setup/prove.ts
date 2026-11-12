@@ -37,6 +37,7 @@ const timed = async (name: string, run: () => Promise<Outcome>): Promise<Step> =
 };
 
 export type ProveEnv = {
+	readonly now: () => number;
 	readonly hopeSkills: ReadonlySet<string>;
 	readonly base: string;
 	/** Whether to run one item end to end through the real `claude`; each run spends live calls. */
@@ -93,7 +94,7 @@ const checksStep = async (repo: string, config: Config): Promise<Outcome> => {
 const markdownOver = (repo: string, base: string, hum: Config["hum"], context: AdapterContext) =>
 	markdownAdapter({ repo, base, claimPrefix: hum.claimPrefix, itemsDir: hum.itemsDir, identity: hum.commitIdentity, writeRaceRetries: hum.writeRaceRetries, itemReadsAtOnce: hum.itemReadsAtOnce, mergeMethod: hum.mergeMethod, ownerBranchPrefix: hum.ownerBranchPrefix, timeoutMs: commandTimeoutMs(hum) }, context);
 
-const contractStep = async (config: Config, scratch: Scratch, base: string): Promise<Outcome> => {
+const contractStep = async (config: Config, scratch: Scratch, { base, now }: Pick<ProveEnv, "base" | "now">): Promise<Outcome> => {
 	const others = Object.entries(config.hum.integrations ?? {}).filter(([, adapter]) => adapter !== "markdown");
 
 	if (others.length > 0) return skipped(`${others.map(([slot, adapter]) => `${slot}: ${adapter}`).join(", ")} write to a live target; run its contract suite there`);
@@ -101,7 +102,7 @@ const contractStep = async (config: Config, scratch: Scratch, base: string): Pro
 	let skew = 0;
 	let count = 0;
 
-	const context: AdapterContext = { report: () => {}, now: () => Date.now() + skew };
+	const context: AdapterContext = { report: () => {}, now: () => now() + skew };
 	const first = markdownOver(await scratch.worker(), base, config.hum, context);
 	const second = markdownOver(await scratch.worker(), base, config.hum, context);
 
@@ -138,7 +139,7 @@ const slotStep = async (config: Config, scratch: Scratch, env: ProveEnv): Promis
 
 	const pool = mkdtempSync(join(tmpdir(), "hum-prove-slots-"));
 	const state = openState(mkdtempSync(join(tmpdir(), "hum-prove-state-")));
-	const slots = new SlotPool({ repo: scratch.owner, state, config: { ...config.hum, runners: 1, runSlots: { ...config.hum.runSlots, pool } }, base: env.base });
+	const slots = new SlotPool({ repo: scratch.owner, state, config: { ...config.hum, runners: 1, runSlots: { ...config.hum.runSlots, pool } }, base: env.base, now: env.now });
 	const started = performance.now();
 
 	await slots.maintain();
@@ -172,6 +173,7 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 	const results: string[] = [];
 
 	const worker = await openWorker(scratch.owner, {
+		now: env.now,
 		hopeSkills: env.hopeSkills,
 		holder: "setup-proof",
 		base: env.base,
@@ -205,7 +207,7 @@ export const proveSetup = async (repo: string, env: ProveEnv): Promise<Step[]> =
 		return [
 			configured,
 			await timed("checks", () => checksStep(repo, config)),
-			await timed("contract", () => contractStep(config, scratch, env.base)),
+			await timed("contract", () => contractStep(config, scratch, env)),
 			await timed("engine pin", () => pinStep(repo, env)),
 			await timed("slot", () => slotStep(config, scratch, env)),
 			await timed("item", () => itemStep(repo, config, env)),

@@ -31,7 +31,7 @@ export type PoolOptions = {
 	readonly base: string;
 	/** The names of the runs alive outside this process; a taken slot whose item has none of them is returned. */
 	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
-	readonly now?: () => number;
+	readonly now: () => number;
 };
 
 const nextChange = (changes: EventTarget, signal: AbortSignal | undefined): Promise<void> =>
@@ -72,7 +72,7 @@ export class SlotPool {
 
 	constructor(options: PoolOptions) {
 		this.#o = options;
-		this.#now = options.now ?? Date.now;
+		this.#now = options.now;
 	}
 
 	get #settings(): HumConfig["runSlots"] {

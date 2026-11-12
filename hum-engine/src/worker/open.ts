@@ -52,7 +52,7 @@ const isInBackground = ({ backgroundRuns }: Pick<HumConfig, "backgroundRuns">, w
  */
 export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => {
 	const { stateDir, hopeSkills, binary, env, ...rest } = options;
-	const now = rest.now ?? Date.now;
+	const { now } = rest;
 	const state = openState(stateDir ?? (await defaultStateDir(repo)), { now });
 	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { hopeSkills } });
 

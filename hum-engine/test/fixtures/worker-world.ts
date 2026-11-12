@@ -102,6 +102,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			checks,
 			holder: "worker-1",
 			workDir: tempDir("thin-work"),
+			now: Date.now,
 			...over,
 		}),
 	};

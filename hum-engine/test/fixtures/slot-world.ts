@@ -36,7 +36,7 @@ export const slotWorld = (settings: SlotSettings = {}, liveRuns?: PoolOptions["l
 	const { recipe } = settings;
 	const config = poolConfig(pool, { ...settings, recipe: recipe instanceof Function ? recipe(repo.owner) : recipe });
 	const state = openState(stateDir);
-	const options: PoolOptions = { repo: repo.owner, state, config, base: BASE, liveRuns };
+	const options: PoolOptions = { repo: repo.owner, state, config, base: BASE, liveRuns, now: Date.now };
 	const slots = new SlotPool(options);
 
 	/** A pool over the same saved state, as a restarted worker would open it. */

@@ -44,7 +44,7 @@ test.skipIf(!live)("live: a feature item runs its plan and review states on Haik
 	const { runner } = await startRunner({ state, model: config.hum.models.light });
 	const id = repo.add("live-1", `---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n`);
 
-	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote: repo.remote, checks: ["test -f docs/note.md"], holder: "live", workDir: tempDir("live-work") });
+	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote: repo.remote, checks: ["test -f docs/note.md"], holder: "live", workDir: tempDir("live-work"), now: Date.now });
 	const runs = state.runs.list(id).map((record) => record.run);
 
 	expect(runs).toContain("plan");

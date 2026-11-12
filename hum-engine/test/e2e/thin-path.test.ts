@@ -90,7 +90,7 @@ test("the thin path through a background run in a slot: the build starts in the 
 	const w = await world({ script: [{}, {}, NOTE] }, { background: true });
 	const id = w.repo.seed("Write the note");
 	const pool = tempDir("thin-pool");
-	const slots = new SlotPool({ repo: w.repo.owner, state: w.state, config: poolConfig(pool, { runners: 1 }), base: BASE });
+	const slots = new SlotPool({ repo: w.repo.owner, state: w.state, config: poolConfig(pool, { runners: 1 }), base: BASE, now: Date.now });
 
 	expect(await runThinPath(w.thinPath({ checkout: slots.checkout }))).toEqual({ outcome: "merged", item: id });
 	await slots.idle();

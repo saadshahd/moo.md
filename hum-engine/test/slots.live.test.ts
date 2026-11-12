@@ -70,7 +70,7 @@ test.skipIf(!live)("live: a background run in a slot starts in the slot's folder
 
 	const { state, pool, remote } = shared;
 
-	const slots = new SlotPool({ repo, state, config: poolConfig(pool, { runners: 1 }), base: "main" });
+	const slots = new SlotPool({ repo, state, config: poolConfig(pool, { runners: 1 }), base: "main", now: Date.now });
 	const { runner } = await startBackgroundRunner({ state, model: MODEL, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.5 }, repo });
 	const taken = await slots.checkout({ remote, base: "main", item: "live", signal: undefined });
 
@@ -124,12 +124,12 @@ test.skipIf(!live)("live: a feature item runs its plan, build and review in a sl
 	const { state, pool, remote, work } = shared;
 
 	const config = configWith((raw) => void (raw.hum.models = { light: MODEL, standard: MODEL, top: MODEL }));
-	const slots = new SlotPool({ repo, state, config: poolConfig(pool, { runners: 1 }), base: "main" });
+	const slots = new SlotPool({ repo, state, config: poolConfig(pool, { runners: 1 }), base: "main", now: Date.now });
 	const { runner } = await startBackgroundRunner({ state, model: MODEL, config: { ...config.hum, backgroundPollSeconds: 0.5 }, repo });
 	const adapter = markdownAdapter({ ...markdownSettings, repo: work.worker("w") }, { report: () => {}, now: Date.now });
 	const id = work.add("live-slot-1", "---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n");
 
-	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote, checks: ["test -f docs/note.md"], holder: "live", workDir: tempDir("live-slot-work"), checkout: slots.checkout });
+	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote, checks: ["test -f docs/note.md"], holder: "live", workDir: tempDir("live-slot-work"), checkout: slots.checkout, now: Date.now });
 	const runs = state.runs.list(id).map((record) => record.run);
 
 	await slots.idle();

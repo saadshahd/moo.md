@@ -76,7 +76,7 @@ export type ThinPathOptions = {
 	readonly dir?: string;
 	/** Take this item; default the first ready one. */
 	readonly itemId?: string;
-	readonly now?: () => number;
+	readonly now: () => number;
 	/** Aborted when the worker loses the claim or exits for an update; the run stops and the result is `lost`. */
 	readonly signal?: AbortSignal;
 	/** Lets the first run of a shared prompt prefix reach its first token before the rest start. */
@@ -163,8 +163,7 @@ const kindNamed = (config: Config, name: string): Kind => {
 	return kind;
 };
 
-export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult> => {
-	const o: WithNow = { ...options, now: options.now ?? Date.now };
+export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const base = o.base ?? DEFAULT_BASE;
 	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
 
@@ -299,9 +298,7 @@ const onRunBranch = async (git: Git, branch: string): Promise<void> => {
 };
 
 /** The options with the clock every later step reads. */
-type WithNow = ThinPathOptions & { readonly now: () => number };
-
-type Driven = WithNow & {
+type Driven = ThinPathOptions & {
 	readonly kindName: string;
 	readonly judge: ModelCall;
 	readonly base: string;
@@ -468,7 +465,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: d.workSource, questions: d.questions }, state.ops, { run: "decide", attempt: state.runs.list(id).length });
 
 		await calls.questions?.decide(id, text);
-		state.choices.put(`${id}@${text}`, { item: id, text, at: (d.now ?? Date.now)() });
+		state.choices.put(`${id}@${text}`, { item: id, text, at: d.now() });
 
 		return { chose: text };
 	};
@@ -792,7 +789,7 @@ const landContext = (d: Driven): LandContext => ({
 	workSource: d.workSource,
 	questions: d.questions,
 	pulls: d.pulls,
-	now: d.now ?? Date.now,
+	now: d.now,
 	judge: d.judge,
 	reviewRun: reviewAtLanding(d),
 });
@@ -807,7 +804,7 @@ const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Pr
 	if (!(await stillMine(d))) return { outcome: "lost", item: d.id };
 
 	if (d.kindName === d.config.hum.checkKind) {
-		const proof = await proveCheckItem({ state: d.state, config: d.config, git: d.git, item: d.id, base: d.base, checks: d.checks, now: d.now ?? Date.now });
+		const proof = await proveCheckItem({ state: d.state, config: d.config, git: d.git, item: d.id, base: d.base, checks: d.checks, now: d.now });
 
 		if (proof && !proof.passed) return { outcome: "stuck", item: d.id, detail: proof.reason };
 	}
@@ -873,7 +870,7 @@ export const park = (o: Pick<ThinPathOptions, "state" | "now">, result: ThinResu
 	const rule = PARKING[result.outcome];
 	const cause = result.detail ?? rule.fallback;
 
-	o.state.parked.put(result.item, { item: result.item, why: result.outcome, cause, since: (o.now ?? Date.now)() });
+	o.state.parked.put(result.item, { item: result.item, why: result.outcome, cause, since: o.now() });
 	o.state.faults.raise({
 		code: rule.code,
 		item: result.item,

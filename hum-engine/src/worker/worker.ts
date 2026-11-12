@@ -71,7 +71,7 @@ export type WorkerOptions = {
 	readonly slots?: Pick<SlotPool, "keepReady">;
 	readonly dir?: string;
 	readonly where?: "mac" | "ci";
-	readonly now?: () => number;
+	readonly now: () => number;
 	/** The engine this process runs; the update check compares the one installed in `repo` with it. */
 	readonly engineVersion?: string;
 	/** The newest published version; a failed or slow read shows no version. */
@@ -183,7 +183,7 @@ export class Worker {
 
 	constructor(options: WorkerOptions) {
 		this.#o = options;
-		this.#now = options.now ?? Date.now;
+		this.#now = options.now;
 		this.#gate = options.gate ?? new PrefixGate({ now: this.#now });
 		const timeoutMs = options.config.hum.statusReadTimeoutSeconds * SECOND_MS;
 

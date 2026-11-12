@@ -122,7 +122,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.option("--base <branch>", "the branch items merge into", DEFAULT_BASE)
 		.option("--item", "run one item through the real claude on a scratch copy; spends live calls")
 		.action(async ({ base, item }: { base: string; item?: true }) => {
-			const steps = await proveSetup(io.cwd, { hopeSkills: listHopeSkills(await hopeRoot()), base, item: item === true });
+			const steps = await proveSetup(io.cwd, { now: Date.now, hopeSkills: listHopeSkills(await hopeRoot()), base, item: item === true });
 
 			io.stdout(`${steps.map(printStep).join("\n")}\n`);
 			done(steps.some(({ status }) => status === "failed") ? EXIT_FAILED : EXIT_OK);

@@ -92,7 +92,7 @@ export class PrefixGate {
 	readonly #open = new Map<string, { readonly promise: Promise<void>; readonly resolve: () => void }>();
 	readonly #warm = new Map<string, number>();
 
-	constructor({ now = Date.now, ttlMs = CACHE_TTL_MS }: { now?: () => number; ttlMs?: number } = {}) {
+	constructor({ now, ttlMs = CACHE_TTL_MS }: { now: () => number; ttlMs?: number }) {
 		this.#now = now;
 		this.#ttl = ttlMs;
 	}

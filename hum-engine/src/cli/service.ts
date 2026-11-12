@@ -73,6 +73,7 @@ const openFor = async (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 	const timeoutMs = commandTimeoutMs(serviceSettings(repo));
 
 	return openWorker(repo, {
+		now: Date.now,
 		hopeSkills: listHopeSkills(await hopeRoot()),
 		holder: flags.holder ?? `${where}@${hostname()}`,
 		base: flags.base,
@@ -150,7 +151,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			const status = readStatus(join(await defaultStateDir(io.cwd), "status.json"));
 			const cards = status.ok ? status.status.cards : [];
 
-			await reportCards(cards);
+			await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });
 			done(cards.length > 0 ? EXIT_CARDS_SHOWN : EXIT_OK);
 		});
 };
