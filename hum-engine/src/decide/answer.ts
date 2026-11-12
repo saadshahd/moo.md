@@ -89,6 +89,11 @@ export type DisposeFacts = {
 
 const dropped = (why: string): Disposition => ({ disposition: "dropped", why });
 
+const isUnmatched = ({ source }: Resolution): boolean => source === "none-of-these" || source === "abstained";
+
+/** Whether a model call, not the owner's own word, picked the approval. */
+const isModelApproval = (resolution: Resolution): boolean => resolution.source === "model" && resolution.option === OWNER_APPROVAL;
+
 /** D4: every answer is applied, held for the next state, or dropped with its reason. A model's pick never approves a change that waits for the owner's approval. */
 export const dispose = ({
 	resolution,
@@ -97,20 +102,9 @@ export const dispose = ({
 }: DisposeFacts): Disposition => {
 	if (answeredBefore) return dropped("The question already has an answer.");
 
-	if (
-		resolution.source === "none-of-these" ||
-		resolution.source === "abstained"
-	)
-		return dropped("No option matched the reply.");
+	if (isUnmatched(resolution)) return dropped("No option matched the reply.");
 
-	if (
-		resolution.source === "model" &&
-		resolution.option === OWNER_APPROVAL &&
-		stage === "approval"
-	)
-		return dropped(
-			`a model cannot approve it; reply with the word ${OWNER_APPROVAL}`,
-		);
+	if (isModelApproval(resolution) && stage === "approval") return dropped(`a model cannot approve it; reply with the word ${OWNER_APPROVAL}`);
 
 	if (stage === "ended") return dropped("The item has ended.");
 

@@ -132,6 +132,9 @@ export const placeChange = (
 	const isOwn = (path: string): boolean =>
 		[...OWN_PATHS, ...policy.hookPaths].some((glob) => matches(glob, path));
 
+	/** A path no rule places, outside the strict paths and hum's own. */
+	const isUnclear = (path: string): boolean => rulesOn(path).length === 0 && !isStrict(path) && !isOwn(path);
+
 	const touched = [
 		...new Map(
 			change.paths.flatMap(rulesOn).map((rule) => [rule.glob, rule]),
@@ -213,9 +216,7 @@ export const placeChange = (
 
 	return {
 		level,
-		unclear: change.paths.filter(
-			(path) => rulesOn(path).length === 0 && !isStrict(path) && !isOwn(path),
-		),
+		unclear: change.paths.filter(isUnclear),
 		steps: [...ruleSteps, ...launchSteps, ...kindFloorSteps, ...floors, ...bumps],
 	};
 };

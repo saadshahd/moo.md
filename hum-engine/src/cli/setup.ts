@@ -53,6 +53,10 @@ const gh = async (repo: string, args: readonly string[]) => {
 	}
 };
 
+type GhOutput = Awaited<ReturnType<typeof gh>>;
+
+const isRead = (output: GhOutput): output is NonNullable<GhOutput> => output?.exitCode === 0;
+
 /** The repo's open issues and its label names, from `gh`. Without `gh` or a GitHub remote there are none, and the scan prints no coverage. */
 const githubFacts = async (repo: string): Promise<GithubFacts | undefined> => {
 	const issues = await gh(repo, ["issue", "list", "--state", "open", "--limit", GH_LIST_LIMIT, "--json", "body,labels"]);
@@ -60,7 +64,7 @@ const githubFacts = async (repo: string): Promise<GithubFacts | undefined> => {
 
 	const permissions = await gh(repo, ["api", "repos/{owner}/{repo}/actions/permissions/workflow"]);
 
-	if (issues?.exitCode !== 0 || labels?.exitCode !== 0 || permissions?.exitCode !== 0) return undefined;
+	if (!isRead(issues) || !isRead(labels) || !isRead(permissions)) return undefined;
 
 	return {
 		items: GhIssues.parse(JSON.parse(issues.stdout)).map(({ body, labels: on }) => ({ body, labels: on.map(({ name }) => name) })),

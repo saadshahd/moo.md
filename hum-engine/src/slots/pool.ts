@@ -298,11 +298,16 @@ export class SlotPool {
 				return held ? { slot: held, held: true } : { slot: this.#save({ ...freed(taking, "free"), status: "taken", item }), held: false };
 			}
 
-			if (slots.length === this.#o.config.runners && slots.every(({ status }) => status === "out")) throw new Error(`every run slot is out of the pool: ${this.#o.state.faults.list().filter(({ code }) => code === SLOT_OUT_CODE).map(({ cause }) => cause).join("; ")}`);
+			if (this.#isAllOut(slots)) throw new Error(`every run slot is out of the pool: ${this.#o.state.faults.list().filter(({ code }) => code === SLOT_OUT_CODE).map(({ cause }) => cause).join("; ")}`);
 
 			this.keepReady();
 			await nextChange(this.#changes, signal);
 		}
+	}
+
+	/** Whether every slot the pool runs is out, so no run can take one until the owner acts. */
+	#isAllOut(slots: readonly Slot[]): boolean {
+		return slots.length === this.#o.config.runners && slots.every(({ status }) => status === "out");
 	}
 
 	/** The seam a thin-path pass takes its working copy from: a slot, at the latest base, with its own ports and database. */

@@ -69,7 +69,9 @@ const missesOf = (state: State, group: RepeatGroup): ReviewNote[] =>
 export const closeLoop = async ({ state, workSource, memoryPath }: Pick<LoopPass, "state" | "workSource" | "memoryPath">): Promise<void> => {
 	const covered = new Set(state.repeats.list().flatMap((group) => (group.checked ? group.notes : [])));
 
-	if (memoryPath !== undefined && covered.size > 0 && existsSync(memoryPath)) {
+	const hasEntriesToDrop = memoryPath !== undefined && covered.size > 0 && existsSync(memoryPath);
+
+	if (hasEntriesToDrop) {
 		const text = readFileSync(memoryPath, "utf8");
 		const kept = withoutCovered(text, covered);
 

@@ -27,6 +27,12 @@ const isTerminal = (node: StateNodeJSON) => node.type === "final" || node.tags?.
 const settles = (value: Transitions) =>
 	(value ?? []).some((t) => t.target !== undefined || (t.actions?.length ?? 0) > 0);
 
+/** Whether a wait ends on its own: a timeout with an action that settles it, or a delay that does. */
+const hasTimeoutAction = (node: StateNodeJSON): boolean => (settles(node.onTimeout) && node.timeout !== undefined) || Object.values(node.after ?? {}).some(settles);
+
+/** Events xstate sends itself, which no config declares. */
+const isXstateEvent = (event: string): boolean => event.startsWith("xstate.") || event.startsWith("@xstate.");
+
 /** Every state is reachable and reaches done or stuck; every wait has a timeout and an action. */
 const graphProblems = (kind: string, config: Kind): Problem[] => {
 	const { states, initial } = config.machine;
@@ -67,9 +73,7 @@ const graphProblems = (kind: string, config: Kind): Problem[] => {
 	return Object.entries(states).flatMap(([state, node]): Problem[] => [
 		...(reachable.has(state) ? [] : [{ problem: "unreachable-state", kind, state } as const]),
 		...(finishing.has(state) ? [] : [{ problem: "dead-end-state", kind, state } as const]),
-		...(isWait(node) && !(settles(node.onTimeout) && node.timeout !== undefined) && !Object.values(node.after ?? {}).some(settles)
-			? [{ problem: "wait-without-timeout", kind, state } as const]
-			: []),
+		...(isWait(node) && !hasTimeoutAction(node) ? [{ problem: "wait-without-timeout", kind, state } as const] : []),
 	]);
 };
 
@@ -147,9 +151,7 @@ const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): P
 			...(handled.has(event) ? [] : [{ problem: "event-without-handler", event } as const]),
 		]),
 		...[...handled].flatMap((event): Problem[] =>
-			event in hum.events || event.startsWith("xstate.") || event.startsWith("@xstate.")
-				? []
-				: [{ problem: "event-without-source", event, source: undefined }],
+			event in hum.events || isXstateEvent(event) ? [] : [{ problem: "event-without-source", event, source: undefined }],
 		),
 	];
 };
