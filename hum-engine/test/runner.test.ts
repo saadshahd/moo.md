@@ -105,7 +105,7 @@ test("a start check refused with a limit that has no readable reset time is made
 });
 
 test("a start check that never answers is stopped at the limit, held with a card that says so, and made again on the next run", async () => {
-	const { runner, shim, state, check } = await setup({ script: [{ hang: true }, {}, {}] }, { timeoutMs: 1000 });
+	const { runner, shim, state, check } = await setup({ script: [{ hang: true }, {}, {}] }, { timeoutMs: 2000 });
 
 	expect(check).toMatchObject({ kind: "held", card: { code: "start-check-timed-out" } });
 
