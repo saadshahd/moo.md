@@ -71,4 +71,4 @@ const isGroup = (runner: Runner): runner is Extract<Runner, { readonly group: st
 const HOSTED_LABEL = /^(ubuntu|windows|macos)-/;
 
 /** Whether GitHub hosts the runner: a fresh machine per job. A group, or any other label, may be a machine that outlives the job. */
-export const isGitHubHosted = (runner: HumConfig["ciRunner"]): boolean => !isGroup(runner) && [runner].flat().every((label) => HOSTED_LABEL.test(label));
+export const isGitHubHosted = (runner: Runner): boolean => !isGroup(runner) && [runner].flat().every((label) => HOSTED_LABEL.test(label));
