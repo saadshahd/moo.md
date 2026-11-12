@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { tmpdir } from "node:os";
-import { startRunner, succeeded } from "../src/adapters/claude-p.ts";
+import { startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
@@ -23,7 +23,7 @@ test.skipIf(!live)("live: the start check passes on Haiku, and a run reports the
 
 	if (started.kind !== "finished") return;
 
-	expect(succeeded(started)).toBe(true);
+	expect(hasSucceeded(started)).toBe(true);
 	expect(started.plugins).toContain("hope");
 	expect(started.structured).toEqual({ ok: true });
 

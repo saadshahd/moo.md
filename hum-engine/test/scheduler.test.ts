@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { type Candidate, footprintOf, overlaps, pick, PrefixGate } from "../src/worker/scheduler.ts";
+import { type Candidate, footprintOf, doOverlap, pick, PrefixGate } from "../src/worker/scheduler.ts";
 
 const c = (id: string, touches?: string[], answered = false): Candidate => ({ id, footprint: touches, answered });
 
@@ -9,14 +9,14 @@ test("an item declares its files in a body line; no line means unknown", () => {
 });
 
 test("two footprints clash when a path of one lies in the other; unknown clashes with everything; globs count as their folder", () => {
-	expect(overlaps(["docs/a.md"], ["docs/b.md"])).toBe(false);
-	expect(overlaps(["docs/a.md"], ["docs/a.md"])).toBe(true);
-	expect(overlaps(["docs/"], ["docs/a.md"])).toBe(true);
-	expect(overlaps(["docs/*.md"], ["docs/a.md"])).toBe(true);
-	expect(overlaps(["docs/*.md"], ["src/a.ts"])).toBe(false);
-	expect(overlaps(["doc*"], ["docs/a.md"])).toBe(true);
-	expect(overlaps(["**/*.md"], ["src/a.ts"])).toBe(true);
-	expect(overlaps(undefined, ["docs/a.md"])).toBe(true);
+	expect(doOverlap(["docs/a.md"], ["docs/b.md"])).toBe(false);
+	expect(doOverlap(["docs/a.md"], ["docs/a.md"])).toBe(true);
+	expect(doOverlap(["docs/"], ["docs/a.md"])).toBe(true);
+	expect(doOverlap(["docs/*.md"], ["docs/a.md"])).toBe(true);
+	expect(doOverlap(["docs/*.md"], ["src/a.ts"])).toBe(false);
+	expect(doOverlap(["doc*"], ["docs/a.md"])).toBe(true);
+	expect(doOverlap(["**/*.md"], ["src/a.ts"])).toBe(true);
+	expect(doOverlap(undefined, ["docs/a.md"])).toBe(true);
 });
 
 test("pick: different files start together; one file goes in order; an item behind a waiting item on its file waits too", () => {

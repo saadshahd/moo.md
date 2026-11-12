@@ -13,7 +13,7 @@ type Entry = { readonly kind: ThreadEntry["kind"]; readonly text: string; readon
 const opName = ({ kind, text, option }: Entry): string => `${kind}:${createHash("sha256").update(`${option ?? ""}\u0000${text}`).digest("hex").slice(0, OP_HASH_LENGTH)}`;
 
 /** Whether `thread` already holds `entry`; a provider may append its own lines after the text. */
-const holdsEntry = (thread: readonly ThreadEntry[], { kind, text, option }: Entry): boolean =>
+const hasEntry = (thread: readonly ThreadEntry[], { kind, text, option }: Entry): boolean =>
 	thread.some((found) => found.kind === kind && found.option === option && (found.text === text || found.text.startsWith(`${text}\n`)));
 
 /**
@@ -26,7 +26,7 @@ export const onceCalls = (adapter: Adapter, ops: OpKeys, scope: CallScope): Adap
 	const once = async (itemId: string, entry: Entry, write: () => Promise<void>): Promise<void> => {
 		await ops.once(
 			{ itemId, ...scope, op: opName(entry) },
-			{ holds: async () => (workSource ? holdsEntry((await workSource.read(itemId)).thread, entry) : false), run: write },
+			{ holds: async () => (workSource ? hasEntry((await workSource.read(itemId)).thread, entry) : false), run: write },
 		);
 	};
 

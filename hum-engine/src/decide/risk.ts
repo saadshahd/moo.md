@@ -81,12 +81,12 @@ export type Placement = {
 	readonly steps: readonly Step[];
 };
 
-const matches = (glob: string, path: string): boolean =>
+const doesMatch = (glob: string, path: string): boolean =>
 	new Bun.Glob(glob).match(path);
 
 const isLaunchOn = (launch: Launch, { now, base }: Moment): boolean =>
 	"base" in launch
-		? matches(launch.base, base)
+		? doesMatch(launch.base, base)
 		: Date.parse(launch.from) <= now && now < Date.parse(launch.until);
 
 /** Fixed or reverted changes among a path's last `of` merged changes. */
@@ -124,13 +124,13 @@ export const placeChange = (
 		names[Math.min(strictest, rank(name) + 1)] ?? name;
 
 	const rulesOn = (path: string): readonly PathRule[] =>
-		policy.paths.filter((rule) => matches(rule.glob, path));
+		policy.paths.filter((rule) => doesMatch(rule.glob, path));
 
 	const isStrict = (path: string): boolean =>
-		policy.strictPaths.some((glob) => matches(glob, path));
+		policy.strictPaths.some((glob) => doesMatch(glob, path));
 
 	const isOwn = (path: string): boolean =>
-		[...OWN_PATHS, ...policy.hookPaths].some((glob) => matches(glob, path));
+		[...OWN_PATHS, ...policy.hookPaths].some((glob) => doesMatch(glob, path));
 
 	/** A path no rule places, outside the strict paths and hum's own. */
 	const isUnclear = (path: string): boolean => rulesOn(path).length === 0 && !isStrict(path) && !isOwn(path);
@@ -170,7 +170,7 @@ export const placeChange = (
 
 	const launchSteps = policy.launches.flatMap((launch): SetsLevel[] =>
 		isLaunchOn(launch, moment) &&
-		change.paths.some((path) => matches(launch.glob, path))
+		change.paths.some((path) => doesMatch(launch.glob, path))
 			? [{ step: "launch", glob: launch.glob, level: launch.level }]
 			: [],
 	);
@@ -184,7 +184,7 @@ export const placeChange = (
 		),
 		...(change.pinChanged ? [{ step: "engine-pin" } as const] : []),
 		...change.paths.flatMap((path): Step[] =>
-			(moment.blocked ?? []).some((glob) => matches(glob, path)) ? [{ step: "blocked-path", path }] : [],
+			(moment.blocked ?? []).some((glob) => doesMatch(glob, path)) ? [{ step: "blocked-path", path }] : [],
 		),
 	];
 

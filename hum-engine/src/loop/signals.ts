@@ -91,7 +91,7 @@ export const prepare = (note: ReviewNote): Prepared => {
 	};
 };
 
-const shares = <T>(a: Set<T> | undefined, b: Set<T> | undefined): boolean => a !== undefined && b !== undefined && [...a].some((found) => b.has(found));
+const doShare = <T>(a: Set<T> | undefined, b: Set<T> | undefined): boolean => a !== undefined && b !== undefined && [...a].some((found) => b.has(found));
 
 /** Two notes on one change are about one hunk; only notes across changes repeat. */
 const isAnotherChange = (a: Prepared, b: Prepared): boolean => a.note.change !== b.note.change;
@@ -108,9 +108,9 @@ type Signal = {
 /** The deterministic signals, checked in order. */
 const SIGNALS: readonly Signal[] = [
 	{ name: "same-text", parsed: false, pairs: (a, b) => a.text === b.text },
-	{ name: "same-code", parsed: false, pairs: (a, b) => shares(a.suggestions, b.suggestions) || shares(a.spans, b.spans) },
-	{ name: "shared-identifier", parsed: true, pairs: (a, b) => isAnotherChange(a, b) && shares(a.named, b.named) },
-	{ name: "same-glob-symbol", parsed: true, pairs: (a, b) => isAnotherChange(a, b) && a.glob !== undefined && a.glob === b.glob && shares(a.declared, b.declared) },
+	{ name: "same-code", parsed: false, pairs: (a, b) => doShare(a.suggestions, b.suggestions) || doShare(a.spans, b.spans) },
+	{ name: "shared-identifier", parsed: true, pairs: (a, b) => isAnotherChange(a, b) && doShare(a.named, b.named) },
+	{ name: "same-glob-symbol", parsed: true, pairs: (a, b) => isAnotherChange(a, b) && a.glob !== undefined && a.glob === b.glob && doShare(a.declared, b.declared) },
 	{
 		name: "same-code-pattern",
 		parsed: false,

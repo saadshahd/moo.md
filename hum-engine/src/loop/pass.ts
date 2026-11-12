@@ -4,7 +4,7 @@ import type { Config } from "../config/load.ts";
 import type { PastChange } from "../decide/labels.ts";
 import type { State } from "../state/open.ts";
 import { checkNameOf, fileChecks, filedFrom } from "./check-item.ts";
-import { type CiLogs, logNames } from "./ci.ts";
+import { type CiLogs, doesLogName } from "./ci.ts";
 import { type Proposer, groupNotes } from "./groups.ts";
 import { withoutCovered } from "./memory.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "./notes.ts";
@@ -61,7 +61,7 @@ export const confirmChecks = async ({ state, ciLogs, now }: Pick<LoopPass, "stat
 		unconfirmed.map(async ({ group, merge }) => {
 			const logs = await ciLogs(merge.at);
 
-			if (logs.some((log) => logNames(log, group.key))) state.repeats.put(group.key, { ...group, checked: { at: now(), check: checkNameOf(group.key) } });
+			if (logs.some((log) => doesLogName(log, group.key))) state.repeats.put(group.key, { ...group, checked: { at: now(), check: checkNameOf(group.key) } });
 		}),
 	);
 };

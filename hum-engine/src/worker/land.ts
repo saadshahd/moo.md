@@ -30,12 +30,12 @@ import {
 import type { ModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
 import type { Boundary } from "../config/schema.ts";
-import { alignedPlacement, alignmentQuestion, gatesAlignment } from "../decide/alignment.ts";
+import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
 	isCleared,
 	type Landing,
 	landingOf,
-	needsReviewRun,
+	doesNeedReviewRun,
 	OWNER_APPROVAL,
 	type Route,
 	routeOf,
@@ -434,10 +434,10 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	const diff = await ctx.git.raw(["diff", ...PATCH, `origin/${ctx.base}...${saved.head}`]);
 	const alignment = saved.change.paths.length > 0 ? await alignmentOf(ctx, saved, diff) : undefined;
-	const aligned = gatesAlignment(ctx.config.hum) && alignment && "graded" in alignment ? alignedPlacement(placement, alignment.graded, ctx.config.hum) : placement;
+	const aligned = doesGateAlignment(ctx.config.hum) && alignment && "graded" in alignment ? alignedPlacement(placement, alignment.graded, ctx.config.hum) : placement;
 	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, alignment, verdict));
 	const placed = routeWith();
-	const reviewed = needsReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name }) : undefined;
+	const reviewed = doesNeedReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name }) : undefined;
 
 	if (reviewed && "halted" in reviewed) return reviewed.halted;
 
@@ -475,14 +475,14 @@ const unmeasured = (models: readonly string[]): string => `${models.join(", ") |
 
 /** Every model judgment behind the change that abstained, or came from a model id its boundary was not measured on. */
 const abstentionsOf = (ctx: LandContext, alignment: SavedLanding["alignment"], verdict: Verdict | undefined): Unclear[] => {
-	const measured = (boundary: Boundary, models: readonly string[]): boolean => isTrusted(models, boundary, ctx.config.hum);
+	const isMeasured = (boundary: Boundary, models: readonly string[]): boolean => isTrusted(models, boundary, ctx.config.hum);
 	const kind = ctx.state.itemKinds.get(ctx.id);
 	const plan = ctx.state.plans.get(ctx.id);
 
 	return [
 		...(kind?.from === "fallback" ? [abstained("kind", kind.why)] : []),
-		...(gatesAlignment(ctx.config.hum) && alignment && "abstained" in alignment ? [abstained("alignment", alignment.abstained)] : []),
-		...(plan && !measured("plan-outcome", plan.models) ? [abstained("plan-outcome", unmeasured(plan.models))] : []),
-		...(verdict && !measured("review-verdict", verdict.models) ? [abstained("review-verdict", unmeasured(verdict.models))] : []),
+		...(doesGateAlignment(ctx.config.hum) && alignment && "abstained" in alignment ? [abstained("alignment", alignment.abstained)] : []),
+		...(plan && !isMeasured("plan-outcome", plan.models) ? [abstained("plan-outcome", unmeasured(plan.models))] : []),
+		...(verdict && !isMeasured("review-verdict", verdict.models) ? [abstained("review-verdict", unmeasured(verdict.models))] : []),
 	];
 };

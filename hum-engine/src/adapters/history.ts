@@ -121,14 +121,14 @@ export const readHistory = async (
 ): Promise<PastChange[]> => {
 	const changes = await readLog(git, base, historyDepth);
 
-	const rewrites = (change: PastChange): boolean =>
+	const doesRewrite = (change: PastChange): boolean =>
 		[changeLabels.fixSubject, changeLabels.revertSubject].some((subject) => new RegExp(subject).test(change.subject));
 
 	const queue = new PQueue({ concurrency: BLAMES_AT_ONCE });
 
 	return Promise.all(
 		changes.map(async (change) =>
-			rewrites(change)
+			doesRewrite(change)
 				? {
 						...change,
 						blamed: (await queue.add(() => blame(git, change.sha))) ?? [],
@@ -164,7 +164,7 @@ export const historiesOf = (
 	);
 };
 
-const matchesAny = (sources: readonly string[], line: string): boolean =>
+const doesMatchAny = (sources: readonly string[], line: string): boolean =>
 	sources.some((source) => new RegExp(source).test(line));
 
 /** What a diff tells the risk level: the paths, the size, a loosened check and a change to the engine's pin. */
@@ -184,7 +184,7 @@ export const changeOf = (
 		),
 	);
 
-	const holdsPin = (file: parseDiff.File): boolean =>
+	const doesHoldPin = (file: parseDiff.File): boolean =>
 		[MANIFEST, ...lockfiles].includes(basename(file.to ?? file.from ?? ""));
 
 	return {
@@ -201,12 +201,12 @@ export const changeOf = (
 		size: files.reduce((sum, file) => sum + file.additions + file.deletions, 0),
 		loosened: lines.some(
 			({ change, text }) =>
-				(change.type === "add" && matchesAny(loosenedCheck.added, text)) ||
-				(change.type === "del" && matchesAny(loosenedCheck.removed, text)),
+				(change.type === "add" && doesMatchAny(loosenedCheck.added, text)) ||
+				(change.type === "del" && doesMatchAny(loosenedCheck.removed, text)),
 		),
 		pinChanged: lines.some(
 			({ file, change, text }) =>
-				change.type !== "normal" && holdsPin(file) && text.includes(pkg.name),
+				change.type !== "normal" && doesHoldPin(file) && text.includes(pkg.name),
 		),
 	};
 };

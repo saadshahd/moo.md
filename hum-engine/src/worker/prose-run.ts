@@ -1,5 +1,5 @@
 import { type AgentDecisionExecutor, createDecisionRequest, getMessageText, renderDecisionAttempts, resolveDecision } from "@statelyai/agent";
-import { type Finished, succeeded } from "../adapters/claude-p.ts";
+import { type Finished, hasSucceeded } from "../adapters/claude-p.ts";
 import { type EventPick, type JsonSchema, PROSE_STATES, type ProsePurpose, pickSchema, readPick } from "../decide/prose.ts";
 
 const RESULT_EXCERPT = 300;
@@ -36,7 +36,7 @@ export const decideProse = async ({ purpose, prompt, diff, model, run, canTake =
 		const feedback = renderDecisionAttempts(request).map(getMessageText);
 		const outcome = await run([prompt, offer(offered), ...feedback].join("\n\n"), pickSchema(offered));
 
-		if (!succeeded(outcome)) return { rejected: { failure: "invalid-payload", reason: `the run ended as ${outcome.subtype}: ${outcome.text.slice(0, RESULT_EXCERPT)}` } };
+		if (!hasSucceeded(outcome)) return { rejected: { failure: "invalid-payload", reason: `the run ended as ${outcome.subtype}: ${outcome.text.slice(0, RESULT_EXCERPT)}` } };
 
 		const read = readPick(purpose, outcome, diff);
 

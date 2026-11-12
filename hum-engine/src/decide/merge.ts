@@ -73,7 +73,7 @@ export const isCleared = (route: Pick<Route, "level" | "unclear">, approvals: Ap
 	approvals.owner || (route.unclear.length === 0 && CLEARED_BY[route.level.review](approvals));
 
 /** Every level that asks for a review gets a fresh review run first; the owner's review comes after it. */
-export const needsReviewRun = (route: Route): boolean => route.level.review !== "none";
+export const doesNeedReviewRun = (route: Route): boolean => route.level.review !== "none";
 
 /** Where the target branch requires a pull request, every change lands through one, merging itself only when cleared; elsewhere a cleared change is pushed. */
 export const landingOf = (

@@ -5,4 +5,4 @@ import { checkNameOf } from "./check-item.ts";
 export type CiLogs = (since: number) => Promise<readonly string[]>;
 
 /** Whether a CI log names the check: the next run after the check landed proves it ran. */
-export const logNames = (log: string, groupKey: RepeatGroup["key"]): boolean => log.includes(checkNameOf(groupKey));
+export const doesLogName = (log: string, groupKey: RepeatGroup["key"]): boolean => log.includes(checkNameOf(groupKey));

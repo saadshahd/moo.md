@@ -35,5 +35,5 @@ export const modelProposer =
 	};
 
 /** Whether every model id behind a proposal reached the owner's precision bar on labelled pairs. */
-export const trustsRepeats = (models: readonly string[], { measuredModels, repeatPrecision }: Pick<HumConfig, "measuredModels" | "repeatPrecision">): boolean =>
+export const doesTrustRepeats = (models: readonly string[], { measuredModels, repeatPrecision }: Pick<HumConfig, "measuredModels" | "repeatPrecision">): boolean =>
 	models.length > 0 && models.every((model) => (measuredModels["repeat-pair"]?.[model] ?? 0) >= repeatPrecision);

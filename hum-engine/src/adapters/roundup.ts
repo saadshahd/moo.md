@@ -139,20 +139,20 @@ const claimEntryOf = (body: string): ClaimEntry | undefined => {
 };
 
 /** A later entry takes over when no claim stands, the standing one ended before it was made, or its holder renews. */
-const takesOver = (current: ClaimEntry | undefined, entry: ClaimEntry): boolean => !current || current.expiresAt <= entry.at || current.holder === entry.holder;
+const doesTakeOver = (current: ClaimEntry | undefined, entry: ClaimEntry): boolean => !current || current.expiresAt <= entry.at || current.holder === entry.holder;
 
 /** The claim that stands after the comments' order. The daemon orders comments, so every worker folds the same list to the same winner. */
 const standingEntry = (comments: readonly Comment[]): ClaimEntry | undefined =>
 	comments.reduce<ClaimEntry | undefined>((current, comment) => {
 		const entry = claimEntryOf(comment.body);
 
-		return entry && takesOver(current, entry) ? entry : current;
+		return entry && doesTakeOver(current, entry) ? entry : current;
 	}, undefined);
 
 /** Open, unblocked and unassigned: a Todo nobody else has taken. */
 const isOpenToTake = (todo: Todo): boolean => !todo.done && !todo.blocked && !todo.owner;
 
-const fitsOneComment = (text: string): boolean => !text.includes("\n") && text.length <= COMMENT_LIMIT;
+const doesFitOneComment = (text: string): boolean => !text.includes("\n") && text.length <= COMMENT_LIMIT;
 
 type Whole = Adapter & {
 	readonly workSource: WorkSource;
@@ -179,7 +179,7 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 	const todos = async () => Todos.parse(await call("todo_list", {}));
 
 	const post = async (id: string, text: string): Promise<void> => {
-		if (!fitsOneComment(text)) throw new PermanentError(`a roundup comment is one line of at most ${COMMENT_LIMIT} characters`);
+		if (!doesFitOneComment(text)) throw new PermanentError(`a roundup comment is one line of at most ${COMMENT_LIMIT} characters`);
 
 		await call("todo_comment", { id: parseArgument(TodoId, id), body: text });
 	};
@@ -198,7 +198,7 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 		return line.length <= COMMENT_LIMIT ? post(id, line) : postInPad(id, marker, text);
 	};
 
-	const postPlain = async (id: string, text: string): Promise<void> => (fitsOneComment(text) ? post(id, text) : postInPad(id, undefined, text));
+	const postPlain = async (id: string, text: string): Promise<void> => (doesFitOneComment(text) ? post(id, text) : postInPad(id, undefined, text));
 
 	const standingClaim = (id: string, list: readonly Comment[]) => {
 		const entry = standingEntry(list);

@@ -111,7 +111,7 @@ export {
 	type RunnerOptions,
 	runArgs,
 	startRunner,
-	succeeded,
+	hasSucceeded,
 } from "./adapters/claude-p.ts";
 
 export {
@@ -127,15 +127,15 @@ export {
 
 export { type Change, type Histories, LABELS, type Label, type Moment, type PathHistory, type Placement, type Policy, placeChange, type Step, usualSize } from "./decide/risk.ts";
 
-export { type Approvals, isCleared, type Landing, landingOf, needsReviewRun, OWNER_APPROVAL, type Route, routeOf, type Unclear, waitReason } from "./decide/merge.ts";
+export { type Approvals, isCleared, type Landing, landingOf, doesNeedReviewRun, OWNER_APPROVAL, type Route, routeOf, type Unclear, waitReason } from "./decide/merge.ts";
 
 export { reviewInput } from "./decide/review.ts";
 
-export { citesDiff, DATA_RULE, fenced, EventPick, isTrusted, PlanFile, planHash, PROSE_STATES, type ProsePurpose, readPick } from "./decide/prose.ts";
+export { doesCiteDiff, DATA_RULE, fenced, EventPick, isTrusted, PlanFile, planHash, PROSE_STATES, type ProsePurpose, readPick } from "./decide/prose.ts";
 
-export { declaredKind, kindQuestion, leavesDocs, UNSURE } from "./decide/kind.ts";
+export { declaredKind, kindQuestion, doesLeaveDocs, UNSURE } from "./decide/kind.ts";
 
-export { AlignmentAnswer, alignedPlacement, alignmentQuestion, GRADES, raisesLevel } from "./decide/alignment.ts";
+export { AlignmentAnswer, alignedPlacement, alignmentQuestion, GRADES, doesRaiseLevel } from "./decide/alignment.ts";
 
 export { configuredModelCall, type Judgment, type ModelCall, modelCallOver, type Question as ModelQuestion } from "./adapters/model-call.ts";
 
@@ -169,7 +169,7 @@ export { Heartbeat } from "./status/format.ts";
 
 export { readHeartbeat, writeHeartbeat } from "./status/file.ts";
 
-export { type Candidate, type Footprint, footprintOf, overlaps, pick, type Picked, PrefixGate } from "./worker/scheduler.ts";
+export { type Candidate, type Footprint, footprintOf, doOverlap, pick, type Picked, PrefixGate } from "./worker/scheduler.ts";
 
 export { installedVersion, type Signature, signatureOf } from "./worker/signature.ts";
 

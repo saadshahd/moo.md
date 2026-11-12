@@ -9,7 +9,7 @@ import { listRecords, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
 import { SECOND_MS } from "../time.ts";
-import { type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, succeeded } from "./claude-p.ts";
+import { type Finished, type RunOutcome, type RunRequest, type Runner, type RunnerOptions, START_ANSWER, START_PROMPT, START_SCHEMA, startRunner, hasSucceeded } from "./claude-p.ts";
 import { type LimitEnded, limitOf, savedLimitUntil, settleLimit } from "./limit.ts";
 import { parseLooseJson } from "./marked.ts";
 import { billedTokens, cacheReadTokens, modelsOf, outputTokens, type RunTranscript, readTranscript } from "./transcript.ts";
@@ -344,7 +344,7 @@ export type BackgroundStartOptions = Omit<RunnerOptions, "state"> &
 		readonly repo: string;
 	};
 
-const isOk = (outcome: RunOutcome): boolean => outcome.kind === "finished" && succeeded(outcome) && START_ANSWER.safeParse(outcome.structured).success;
+const isOk = (outcome: RunOutcome): boolean => outcome.kind === "finished" && hasSucceeded(outcome) && START_ANSWER.safeParse(outcome.structured).success;
 
 const startCheckFault = (repo: string, why: string) => ({
 	code: BACKGROUND_CHECK_CODE,

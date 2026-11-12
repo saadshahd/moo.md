@@ -32,7 +32,7 @@ const statuses = (w: SlotWorld): string[] => w.slots.list().map(({ status }) => 
 
 const WAITED_MS = 150;
 
-const stillWaiting = async (pending: Promise<unknown>): Promise<boolean> => (await Promise.race([pending.then(() => false), Bun.sleep(WAITED_MS).then(() => true)]));
+const isStillWaiting = async (pending: Promise<unknown>): Promise<boolean> => (await Promise.race([pending.then(() => false), Bun.sleep(WAITED_MS).then(() => true)]));
 
 test("with more passes than slots, the extra pass waits and starts in the first slot returned", async () => {
 	const w = world({ runners: 2 });
@@ -41,7 +41,7 @@ test("with more passes than slots, the extra pass waits and starts in the first 
 	const extra = w.ask("c");
 
 	expect(first.folder).not.toBe(second.folder);
-	expect(await stillWaiting(extra)).toBe(true);
+	expect(await isStillWaiting(extra)).toBe(true);
 
 	await first.giveBack();
 
@@ -166,7 +166,7 @@ test("a slot that fails its ready check leaves the pool with one card naming it 
 	expect(cards).toHaveLength(1);
 	expect(cards[0]?.cause).toContain("slot-2");
 	expect(cards[0]?.cause).toContain(check);
-	expect(await stillWaiting(second)).toBe(true);
+	expect(await isStillWaiting(second)).toBe(true);
 
 	await only.giveBack();
 

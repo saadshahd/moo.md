@@ -30,5 +30,5 @@ export const kindQuestion = (item: Pick<Item, "title" | "body">, { kinds, kindMe
 });
 
 /** A change of the docs-only kind that touches a path outside its globs is not docs. */
-export const leavesDocs = (paths: readonly string[], { docsOnly }: Pick<HumConfig, "docsOnly">): boolean =>
+export const doesLeaveDocs = (paths: readonly string[], { docsOnly }: Pick<HumConfig, "docsOnly">): boolean =>
 	paths.some((path) => !docsOnly.paths.some((glob) => new Bun.Glob(glob).match(path)));

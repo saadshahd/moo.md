@@ -225,7 +225,7 @@ export type RunOutcome =
 /** What one process ended as, before the runner acts on a limit it could not read. */
 type Ended = RunOutcome | LimitEnded;
 
-export const succeeded = (outcome: Finished): boolean => outcome.subtype === "success" && !outcome.isError;
+export const hasSucceeded = (outcome: Finished): boolean => outcome.subtype === "success" && !outcome.isError;
 
 const LOCK_TEXT = /refresh[^\n]*lock|lock[^\n]*refresh/i;
 
@@ -546,7 +546,7 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 
 	const hasPlugin = check.plugins.includes(REQUIRED_PLUGIN);
 
-	if (!succeeded(check) || !hasPlugin) {
+	if (!hasSucceeded(check) || !hasPlugin) {
 		return held(
 			hold(
 				"start-check-failed",

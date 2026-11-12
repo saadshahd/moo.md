@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, succeeded } from "../src/adapters/claude-p.ts";
+import { type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
@@ -60,7 +60,7 @@ test("a usage-limit message parses to limited(until), and no call is made until 
 
 	const after = await ask(runner);
 
-	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(after.kind === "finished" && hasSucceeded(after)).toBe(true);
 	expect(shim.calls()).toHaveLength(3);
 });
 
@@ -80,7 +80,7 @@ test("a runner started while a saved limit stands makes no call until the limit 
 
 	const after = await ask(restarted.runner);
 
-	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(after.kind === "finished" && hasSucceeded(after)).toBe(true);
 	expect(first.shim.calls()).toHaveLength(4);
 });
 
@@ -96,7 +96,7 @@ test("a start check the limit refused is made again once the limit has ended, so
 
 	const after = await ask(runner);
 
-	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(after.kind === "finished" && hasSucceeded(after)).toBe(true);
 	expect(shim.calls()).toHaveLength(3);
 });
 
@@ -107,7 +107,7 @@ test("a start check refused with a limit that has no readable reset time is made
 
 	const after = await ask(runner);
 
-	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(after.kind === "finished" && hasSucceeded(after)).toBe(true);
 	expect(shim.calls()).toHaveLength(3);
 	expect(state.faults.list()).toEqual([]);
 });
@@ -119,7 +119,7 @@ test("a start check that never answers is stopped at the limit, held with a card
 
 	const after = await ask(runner);
 
-	expect(after.kind === "finished" && succeeded(after)).toBe(true);
+	expect(after.kind === "finished" && hasSucceeded(after)).toBe(true);
 	expect(shim.calls()).toHaveLength(3);
 	expect(state.faults.list()).toEqual([]);
 });
@@ -150,7 +150,7 @@ test("a refresh-lock error runs again on a new session id", async () => {
 	const cleared = await setup({ script: [{}, { error: "OAuth token refresh failed: lock held by another process" }, {}] });
 	const outcome = await ask(cleared.runner);
 
-	expect(outcome.kind === "finished" && succeeded(outcome)).toBe(true);
+	expect(outcome.kind === "finished" && hasSucceeded(outcome)).toBe(true);
 
 	const ids = cleared.shim.calls().map((c) => c.argv[c.argv.indexOf("--session-id") + 1]);
 
@@ -249,7 +249,7 @@ test("stderr written while a long stream-json line streams never splits the line
 	const { runner } = await setup({ script: [{}, { stderrNoise: true, structured: { text: "y".repeat(200_000) } }] });
 	const outcome = await ask(runner);
 
-	expect(outcome.kind === "finished" && succeeded(outcome)).toBe(true);
+	expect(outcome.kind === "finished" && hasSucceeded(outcome)).toBe(true);
 	expect(outcome.kind === "finished" && outcome.structured).toEqual({ text: "y".repeat(200_000) });
 });
 

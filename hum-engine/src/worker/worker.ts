@@ -24,7 +24,7 @@ import { join } from "node:path";
 import { configuredModelCall, modelCallOver } from "../adapters/model-call.ts";
 import { type MemoryEntry, readMemory, type RefusedLine, unusedEntries, useOf } from "../loop/memory.ts";
 import { runLoopPass, type LoopPass } from "../loop/pass.ts";
-import { modelProposer, trustsRepeats } from "../loop/pair.ts";
+import { modelProposer, doesTrustRepeats } from "../loop/pair.ts";
 import { measureOf } from "../measure/measure.ts";
 import { measureInputsOf } from "../measure/inputs.ts";
 import { readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
@@ -40,7 +40,7 @@ import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, hasEndedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -232,7 +232,7 @@ export class Worker {
 	#isAsleep(saved: SavedSnapshot): boolean {
 		const kind = this.#kindNamed(saved.kind)?.kind;
 
-		return kind !== undefined && waitsOnOwner(kind, saved.state);
+		return kind !== undefined && isWaitingOnOwner(kind, saved.state);
 	}
 
 	#dueWaits(t: number): DueWait[] {
@@ -273,7 +273,7 @@ export class Worker {
 		if (value !== saved.state) {
 			state.items.save(saved.itemId, kind, persistedSnapshot(actor));
 
-			if (endedStuck(kind, value))
+			if (hasEndedStuck(kind, value))
 				park(
 					{ state, now: this.#now },
 					{
@@ -551,7 +551,7 @@ export class Worker {
 			history: () => readHistory(git, tip, config.hum),
 			hunkOf: async (sha, file) => (await git.run(["show", ...PATCH, "-U3", "--format=", sha, ...(file === undefined ? [] : ["--", file])])).stdout,
 			propose: modelProposer(call),
-			trusts: (models) => trustsRepeats(models, config.hum),
+			trusts: (models) => doesTrustRepeats(models, config.hum),
 			memoryPath: join(repo, ".hum", "memory.md"),
 		});
 	}

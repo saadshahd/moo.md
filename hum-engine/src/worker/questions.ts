@@ -6,7 +6,7 @@ import { composeQuestion, type PlainQuestion, priorityOf, questionOrder, roomToA
 import type { State } from "../state/open.ts";
 import type { QueuedQuestion } from "../state/saved.ts";
 import { DAY_MS, HOUR_MS } from "../time.ts";
-import { footprintOf, overlaps } from "./scheduler.ts";
+import { footprintOf, doOverlap } from "./scheduler.ts";
 import { openQuestion } from "./thread.ts";
 
 export type QuestionContext = {
@@ -58,7 +58,7 @@ const waitingOrder = (queue: readonly QueuedQuestion[]): QueuedQuestion[] => {
 	const ranked = queue.map((queued): Waiting & { queued: QueuedQuestion } => ({
 		item: queued.item,
 		priority: queued.priority,
-		behind: queue.filter((other) => other !== queued && overlaps(queued.footprint, other.footprint)).length,
+		behind: queue.filter((other) => other !== queued && doOverlap(queued.footprint, other.footprint)).length,
 		since: queued.queuedAt,
 		queued,
 	}));

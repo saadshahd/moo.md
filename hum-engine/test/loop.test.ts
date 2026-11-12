@@ -8,7 +8,7 @@ import { groupNotes } from "../src/loop/groups.ts";
 import { parseMemory, rulesUsed, unusedEntries, useOf } from "../src/loop/memory.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "../src/loop/notes.ts";
 import { closeLoop, confirmChecks } from "../src/loop/pass.ts";
-import { trustsRepeats } from "../src/loop/pair.ts";
+import { doesTrustRepeats } from "../src/loop/pair.ts";
 import { noteKey, type ReviewNote } from "../src/loop/records.ts";
 import { pairing, prepare } from "../src/loop/signals.ts";
 import { openState } from "../src/state/open.ts";
@@ -126,7 +126,7 @@ test("a model that abstains proposes nothing", async () => {
 test("a model id counts for repeats only at the owner's precision bar", () => {
 	const config = { ...SHIPPED_DEFAULTS, measuredModels: { ...SHIPPED_DEFAULTS.measuredModels, "repeat-pair": { good: 0.95, weak: 0.7 } } };
 
-	expect([trustsRepeats(["good"], config), trustsRepeats(["good", "weak"], config), trustsRepeats(["unmeasured"], config), trustsRepeats([], config)]).toEqual([true, false, false, false]);
+	expect([doesTrustRepeats(["good"], config), doesTrustRepeats(["good", "weak"], config), doesTrustRepeats(["unmeasured"], config), doesTrustRepeats([], config)]).toEqual([true, false, false, false]);
 });
 
 const fakeSource = () => {

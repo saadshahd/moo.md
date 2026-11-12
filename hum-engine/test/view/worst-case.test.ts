@@ -51,16 +51,16 @@ const headersAt = (width: number): Row[] => [headerRow(worstStatus, { now: NOW, 
 const NOT_DRAWABLE = /\p{Cc}/u;
 const PRINTED_JUNK = /NaN|undefined|null|Infinity|\[object/;
 
-const FAULTS: readonly { readonly name: string; readonly found: (row: Row, width: number) => boolean }[] = [
-	{ name: "past the width", found: (row, width) => rowCells(row) > width },
-	{ name: "holds a control character", found: (row) => NOT_DRAWABLE.test(drawn(row)) },
-	{ name: "prints a broken value", found: (row) => PRINTED_JUNK.test(drawn(row)) },
+const FAULTS: readonly { readonly name: string; readonly isFoundIn: (row: Row, width: number) => boolean }[] = [
+	{ name: "past the width", isFoundIn: (row, width) => rowCells(row) > width },
+	{ name: "holds a control character", isFoundIn: (row) => NOT_DRAWABLE.test(drawn(row)) },
+	{ name: "prints a broken value", isFoundIn: (row) => PRINTED_JUNK.test(drawn(row)) },
 ];
 
 test("worst-case data never makes a row pass its width, hold a control character or print a broken value, from 20 to 200 cells", () => {
 	const broken = WIDTHS.flatMap((width) =>
 		[...bandsAt(width), ...panesAt(width), ...headersAt(width)].flatMap((row) =>
-			FAULTS.flatMap(({ name, found }) => (found(row, width) ? [`${width} cells, ${name}: ${JSON.stringify(drawn(row).slice(0, 80))}`] : [])),
+			FAULTS.flatMap(({ name, isFoundIn }) => (isFoundIn(row, width) ? [`${width} cells, ${name}: ${JSON.stringify(drawn(row).slice(0, 80))}`] : [])),
 		),
 	);
 

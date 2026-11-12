@@ -22,15 +22,15 @@ const SHA_IN_TEXT = /\b[0-9a-f]{7,40}\b/g;
 const shasIn = (text: string): readonly string[] =>
 	text.match(SHA_IN_TEXT) ?? [];
 
-const names = (later: PastChange, earlier: PastChange): boolean =>
+const doesName = (later: PastChange, earlier: PastChange): boolean =>
 	shasIn(`${later.subject}\n${later.body}`).some((sha) =>
 		earlier.sha.startsWith(sha),
 	);
 
-const sharesAFile = (a: PastChange, b: PastChange): boolean =>
+const doShareAFile = (a: PastChange, b: PastChange): boolean =>
 	a.files.some((file) => b.files.includes(file));
 
-const revertsByTrailer = (
+const doesRevertByTrailer = (
 	later: PastChange,
 	earlier: PastChange,
 	{ revertTrailer }: LabelRules,
@@ -39,14 +39,14 @@ const revertsByTrailer = (
 		([, sha]) => sha !== undefined && earlier.sha.startsWith(sha),
 	);
 
-const revertsByTitle = (
+const doesRevertByTitle = (
 	later: PastChange,
 	earlier: PastChange,
 	{ revertSubject }: LabelRules,
 ): boolean =>
 	new RegExp(revertSubject).test(later.subject) &&
 	(later.subject.includes(`"${earlier.subject}"`) ||
-		names(later, earlier) ||
+		doesName(later, earlier) ||
 		later.blamed.includes(earlier.sha));
 
 const isRevertOf = (
@@ -54,8 +54,8 @@ const isRevertOf = (
 	earlier: PastChange,
 	rules: LabelRules,
 ): boolean =>
-	revertsByTrailer(later, earlier, rules) ||
-	revertsByTitle(later, earlier, rules);
+	doesRevertByTrailer(later, earlier, rules) ||
+	doesRevertByTitle(later, earlier, rules);
 
 const isFixOf = (
 	later: PastChange,
@@ -63,7 +63,7 @@ const isFixOf = (
 	{ fixSubject }: LabelRules,
 ): boolean =>
 	new RegExp(fixSubject).test(later.subject) &&
-	(names(later, earlier) || later.blamed.includes(earlier.sha));
+	(doesName(later, earlier) || later.blamed.includes(earlier.sha));
 
 /** The later change that breaks `changes[at]`, and how: a revert of it, else a fix among the next `fixWindow` changes on its files. */
 export const breakOf = (
@@ -81,7 +81,7 @@ export const breakOf = (
 	if (reverting) return { by: reverting, label: "reverted" };
 
 	const fixing = later
-		.filter((next) => sharesAFile(next, change))
+		.filter((next) => doShareAFile(next, change))
 		.slice(0, rules.fixWindow)
 		.find((next) => isFixOf(next, change, rules));
 

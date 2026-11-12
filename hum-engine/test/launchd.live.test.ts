@@ -14,7 +14,7 @@ if (!live) console.log("skip scratch launchd unit: set HUM_LIVE=1 on a Mac to lo
 
 const launchctl = (...args: string[]) => Bun.spawnSync(["launchctl", ...args]);
 
-const alive = (pattern: string): boolean => Bun.spawnSync(["pgrep", "-f", "--", pattern]).exitCode === 0;
+const isAlive = (pattern: string): boolean => Bun.spawnSync(["pgrep", "-f", "--", pattern]).exitCode === 0;
 
 test.skipIf(!live)("a scratch launchd unit starts the script, which runs the worker, and unloads clean", async () => {
 	const label = `md.moo.hum.scratch.${process.pid}.${Date.now()}`;
@@ -55,17 +55,17 @@ test.skipIf(!live)("a scratch launchd unit starts the script, which runs the wor
 		for (let waited = 0; waited < 30_000 && sh(o.repo.remote, ["ls-tree", "-r", "--name-only", "main"]).includes("docs/a.md") === false; waited += 250) await Bun.sleep(250);
 
 		expect(sh(o.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
-		expect(alive(`--holder ${label}`)).toBe(true);
+		expect(isAlive(`--holder ${label}`)).toBe(true);
 	} finally {
 		launchctl("bootout", `${domain}/${label}`);
 		rmSync(plist, { force: true });
 	}
 
 	// `bootout` returns before launchd has stopped the job. Unloaded means launchd no longer knows the label and no process it started survives.
-	const known = () => launchctl("print", `${domain}/${label}`).exitCode === 0;
+	const isKnown = () => launchctl("print", `${domain}/${label}`).exitCode === 0;
 
-	for (let waited = 0; waited < 15_000 && (known() || alive(`--holder ${label}`)); waited += 250) await Bun.sleep(250);
+	for (let waited = 0; waited < 15_000 && (isKnown() || isAlive(`--holder ${label}`)); waited += 250) await Bun.sleep(250);
 
-	expect(known()).toBe(false);
-	expect(alive(`--holder ${label}`)).toBe(false);
+	expect(isKnown()).toBe(false);
+	expect(isAlive(`--holder ${label}`)).toBe(false);
 }, 90_000);

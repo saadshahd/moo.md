@@ -9,7 +9,7 @@ import { type Finished, type Runner, startRunner } from "../src/adapters/claude-
 import { modelCallOver } from "../src/adapters/model-call.ts";
 import { readConfigDir } from "../src/config/load.ts";
 import { BOUNDARIES, type Boundary, HumConfig } from "../src/config/schema.ts";
-import { alignmentQuestion, raisesLevel } from "../src/decide/alignment.ts";
+import { alignmentQuestion, doesRaiseLevel } from "../src/decide/alignment.ts";
 import { replyQuestion } from "../src/decide/answer.ts";
 import { kindQuestion } from "../src/decide/kind.ts";
 import { tasteQuestion } from "../src/decide/taste.ts";
@@ -155,7 +155,7 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Measured>> = {
 
 				if (judged.kind === "abstained") return "abstained";
 
-				return raisesLevel(0, config.hum.levels.length, judged.value, config.hum) === (found.label !== "clean") ? "right" : "wrong";
+				return doesRaiseLevel(0, config.hum.levels.length, judged.value, config.hum) === (found.label !== "clean") ? "right" : "wrong";
 			}),
 		};
 	},

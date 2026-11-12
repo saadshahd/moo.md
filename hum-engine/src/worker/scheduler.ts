@@ -26,10 +26,10 @@ const isRoot = (folder: string): boolean => folder === "";
 const isWithin = (inner: string, outer: string): boolean => inner === outer || inner.startsWith(`${outer}/`);
 
 /** Two folders are related when either holds the other; the repo root holds every folder. */
-const related = (a: string, b: string): boolean => isRoot(a) || isRoot(b) || isWithin(a, b) || isWithin(b, a);
+const areRelated = (a: string, b: string): boolean => isRoot(a) || isRoot(b) || isWithin(a, b) || isWithin(b, a);
 
 /** Safe by default: two items clash when either footprint is unknown or any path of one lies in the other's. */
-export const overlaps = (a: Footprint, b: Footprint): boolean => a === undefined || b === undefined || a.some((x) => b.some((y) => related(folderOf(x), folderOf(y))));
+export const doOverlap = (a: Footprint, b: Footprint): boolean => a === undefined || b === undefined || a.some((x) => b.some((y) => areRelated(folderOf(x), folderOf(y))));
 
 export type Candidate = {
 	readonly id: string;
@@ -64,7 +64,7 @@ export const pick = ({ now, limitedUntil, runners, running, queue }: PickInput):
 	return ordered.reduce<Picked>(
 		(picked, candidate, index) => {
 			const ahead = [...running, ...ordered.slice(0, index)];
-			const clashes = ahead.some((other) => overlaps(other.footprint, candidate.footprint));
+			const clashes = ahead.some((other) => doOverlap(other.footprint, candidate.footprint));
 			const isFull = running.length + picked.start.length >= runners;
 
 			return clashes || isFull ? { ...picked, deferred: [...picked.deferred, candidate] } : { ...picked, start: [...picked.start, candidate] };

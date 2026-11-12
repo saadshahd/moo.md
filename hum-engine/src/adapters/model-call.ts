@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Boundary, HumConfig } from "../config/schema.ts";
 import { isTrusted, jsonSchemaOf } from "../decide/prose.ts";
 import { SECOND_MS } from "../time.ts";
-import { type RunOutcome, type Runner, succeeded } from "./claude-p.ts";
+import { type RunOutcome, type Runner, hasSucceeded } from "./claude-p.ts";
 
 /** One question to the cheap model: the boundary it is measured at, the prompt, and the typed answer. */
 export type Question<T> = { readonly boundary: Boundary; readonly prompt: string; readonly answer: z.ZodType<T>;
@@ -56,7 +56,7 @@ export const modelCallOver =
 
 		if (outcome.kind !== "finished") return abstained(NOT_ANSWERED[outcome.kind]);
 
-		if (!succeeded(outcome)) return abstained(`the call ended as ${outcome.subtype}`);
+		if (!hasSucceeded(outcome)) return abstained(`the call ended as ${outcome.subtype}`);
 
 		if (reportOnly !== true && !trusts(boundary, outcome.models)) return abstained(`${outcome.models.join(", ") || "no model"} has no measured rate at ${boundary} that meets the bar`);
 

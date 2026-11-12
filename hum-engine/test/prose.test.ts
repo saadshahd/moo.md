@@ -2,9 +2,9 @@ import { expect, test } from "bun:test";
 import { AgentDecisionExhaustedError } from "@statelyai/agent";
 import { FakeProvider } from "../src/adapters/fake.ts";
 import { configuredModelCall, modelCallOver } from "../src/adapters/model-call.ts";
-import { alignedPlacement, AlignmentAnswer, raisesLevel } from "../src/decide/alignment.ts";
+import { alignedPlacement, AlignmentAnswer, doesRaiseLevel } from "../src/decide/alignment.ts";
 import { declaredKind } from "../src/decide/kind.ts";
-import { citesDiff, fenced, pickSchema, readPick } from "../src/decide/prose.ts";
+import { doesCiteDiff, fenced, pickSchema, readPick } from "../src/decide/prose.ts";
 import { reviewInput } from "../src/decide/review.ts";
 import { openState } from "../src/state/open.ts";
 import { keepKind, pickKind } from "../src/worker/kind.ts";
@@ -101,9 +101,9 @@ test("a model id is trusted at a boundary only when its measured rate meets minJ
 test("the alignment grades raise a level at most one step, only when they move the merge-risk score across a cut, and never lower it", () => {
 	const graded = (alignment: "sound" | "partial" | "concern", verification: "sound" | "partial" | "concern") => ({ alignment, verification });
 
-	expect(raisesLevel(0, 4, SOUND, config.hum)).toBe(false);
-	expect(raisesLevel(0, 4, graded("concern", "sound"), config.hum)).toBe(false);
-	expect(raisesLevel(0, 4, graded("sound", "concern"), config.hum)).toBe(true);
+	expect(doesRaiseLevel(0, 4, SOUND, config.hum)).toBe(false);
+	expect(doesRaiseLevel(0, 4, graded("concern", "sound"), config.hum)).toBe(false);
+	expect(doesRaiseLevel(0, 4, graded("sound", "concern"), config.hum)).toBe(true);
 
 	const placement = { level: levels[0]!, unclear: [], steps: [] };
 
@@ -116,7 +116,7 @@ test("a review asks for changes only by citing a changed line, a plan is ready o
 	const cite = (file: string, line: number) => ({ file, line });
 	const review = (cites: { file: string; line: number }[], sure = true) => finished({ structured: { event: "request-changes", sure, reason: "It breaks the log.", cites } });
 
-	expect(citesDiff([cite("src/a.ts", 11)], DIFF)).toBe(true);
+	expect(doesCiteDiff([cite("src/a.ts", 11)], DIFF)).toBe(true);
 	expect(readPick("review", review([cite("src/a.ts", 11)]), DIFF)).toMatchObject({ ok: true, pick: { event: "request-changes" } });
 	expect(readPick("review", review([cite("src/a.ts", 40)]), DIFF)).toEqual({ ok: false, why: "request-changes must cite a file and a line the diff changes" });
 	expect(readPick("review", review([]), DIFF).ok).toBe(false);

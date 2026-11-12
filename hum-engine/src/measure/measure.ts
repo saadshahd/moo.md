@@ -47,7 +47,7 @@ const abandonedSince = (abandoned: readonly AbandonedItem[], inWindow: readonly 
 	return abandoned.filter(({ since }) => since >= start);
 };
 
-const touches = (glob: string, paths: readonly string[]): boolean => paths.some((path) => new Bun.Glob(glob).match(path));
+const doesTouch = (glob: string, paths: readonly string[]): boolean => paths.some((path) => new Bun.Glob(glob).match(path));
 
 /**
  * The three numbers per merged change over the last `window` merged changes, and over each path's own last
@@ -59,9 +59,9 @@ export const measureOf = ({ merged, abandoned, loopTokens, window, globs }: Meas
 	if (recent.length === 0) return undefined;
 
 	const byPath = globs.flatMap((glob) => {
-		const onPath = newestFirst(merged.filter(({ paths }) => touches(glob, paths)), window);
+		const onPath = newestFirst(merged.filter(({ paths }) => doesTouch(glob, paths)), window);
 
-		return onPath.length === 0 ? [] : [{ glob, ...perMerge(onPath, abandonedSince(abandoned, onPath).filter(({ paths }) => touches(glob, paths)), 0) }];
+		return onPath.length === 0 ? [] : [{ glob, ...perMerge(onPath, abandonedSince(abandoned, onPath).filter(({ paths }) => doesTouch(glob, paths)), 0) }];
 	});
 
 	return { window, ...perMerge(recent, abandonedSince(abandoned, recent), loopTokens), byPath };

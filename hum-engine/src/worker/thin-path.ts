@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
 import type { Item, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
-import { type Finished, type Runner, type RunOutcome, succeeded } from "../adapters/claude-p.ts";
+import { type Finished, type Runner, type RunOutcome, hasSucceeded } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
@@ -16,7 +16,7 @@ import type { Config } from "../config/load.ts";
 import { invokedSources, kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
-import { leavesDocs } from "../decide/kind.ts";
+import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
@@ -142,9 +142,9 @@ export const rememberKinds = (state: State, config: Config): void => {
 /** Whether the kind's machine tags this state with `tag`. */
 const hasTag = (kind: Kind, state: string | undefined, tag: string): boolean => (state !== undefined && kind.machine.states[state]?.tags?.includes(tag)) ?? false;
 
-export const waitsOnOwner = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, OWNER_WAIT_TAG);
+export const isWaitingOnOwner = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, OWNER_WAIT_TAG);
 
-export const endedStuck = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, STUCK_TAG);
+export const hasEndedStuck = (kind: Kind, state: string | undefined): boolean => hasTag(kind, state, STUCK_TAG);
 
 /** Placeholder sources: enough to restore a snapshot and read its state before the real sources exist. */
 const stubSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: async () => {} }));
@@ -183,7 +183,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	const at = saved.value === undefined ? undefined : String(saved.value.getSnapshot().value);
 
-	if (knownKind && endedStuck(knownKind, at)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
+	if (knownKind && hasEndedStuck(knownKind, at)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
 
 	const claim = await o.workSource.claim(id, o.holder, claimTtlMs(o.config));
 
@@ -192,7 +192,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum, (item, tokens) => tallyOf(o.state, item).spend(tokens));
 	const { now } = o;
 	const onSnapshot = saved.value !== undefined;
-	const ownerWait = knownKind && waitsOnOwner(knownKind, at) ? ownerWaitStage(knownKind, at) : undefined;
+	const ownerWait = knownKind && isWaitingOnOwner(knownKind, at) ? ownerWaitStage(knownKind, at) : undefined;
 	const stage: Stage = o.state.landings.get(id) ? "approval" : (ownerWait ?? (onSnapshot ? "running" : "waiting"));
 	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, await o.workSource.read(id), { stage });
 	const named = known && kindAnswered(known, item, o.config.hum.kinds);
@@ -214,7 +214,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const kindContext = { ...o, judge, now };
 	const kindName = settled ? settled.kind : await keepKind(kindContext, item, await pickKind(kindContext, item));
 	const kind = kindNamed(o.config, kindName);
-	const asking = waitsOnOwner(kind, at);
+	const asking = isWaitingOnOwner(kind, at);
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
 
 	if (asking && answered === undefined) return { outcome: "waiting", item: id };
@@ -481,7 +481,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				for (;;) {
 					const outcome = await runAgent(purpose, `${await prompt(purpose)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
 
-					if (!succeeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
+					if (!hasSucceeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
 
 					const wants = Wants.safeParse(outcome.structured).data;
 
@@ -576,12 +576,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 		handled = value;
 
-		if (endedStuck(kind, value)) return result.resolve({ outcome: "stuck", item: id, detail: stuckCause() });
+		if (hasEndedStuck(kind, value)) return result.resolve({ outcome: "stuck", item: id, detail: stuckCause() });
 
-		if (waitsOnOwner(kind, value)) {
+		if (isWaitingOnOwner(kind, value)) {
 			const note = pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" };
 
-			if (!(await stillMine(d))) return result.resolve({ outcome: "lost", item: id });
+			if (!(await isStillMine(d))) return result.resolve({ outcome: "lost", item: id });
 
 			await handOff(d, isApprovalWait(kind, value) ? approvalQuestion(note) : note);
 
@@ -770,7 +770,7 @@ const handOff = async (d: Driven, { question, plain, plan }: Pending) => {
 };
 
 /** Every act that changes the world checks the claim first. */
-const stillMine = async (d: Pick<Driven, "workSource" | "id" | "holder" | "config">): Promise<boolean> => (await d.workSource.renew(d.id, d.holder, claimTtlMs(d.config))).won;
+const isStillMine = async (d: Pick<Driven, "workSource" | "id" | "holder" | "config">): Promise<boolean> => (await d.workSource.renew(d.id, d.holder, claimTtlMs(d.config))).won;
 
 const landContext = (d: Driven): LandContext => ({
 	state: d.state,
@@ -801,7 +801,7 @@ const DRAINING = "the worker restarts for an update; the next worker lands the c
  * docs-only item whose change reaches past its globs moves to its real kind first.
  */
 const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Promise<ThinResult> => {
-	if (!(await stillMine(d))) return { outcome: "lost", item: d.id };
+	if (!(await isStillMine(d))) return { outcome: "lost", item: d.id };
 
 	if (d.kindName === d.config.hum.checkKind) {
 		const proof = await proveCheckItem({ state: d.state, config: d.config, git: d.git, item: d.id, base: d.base, checks: d.checks, now: d.now });
@@ -811,7 +811,7 @@ const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Pr
 
 	const isDocsOnly = d.kindName === d.config.hum.docsOnly.kind;
 
-	if (isDocsOnly && leavesDocs((await changeOn(landContext(d))).paths, d.config.hum)) {
+	if (isDocsOnly && doesLeaveDocs((await changeOn(landContext(d))).paths, d.config.hum)) {
 		const real = await keepKind(d, d.item, await pickKind(d, d.item, d.kindName), d.kindName);
 
 		return { outcome: "moved", item: d.id, kind: real };

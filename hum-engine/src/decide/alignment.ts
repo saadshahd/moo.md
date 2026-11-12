@@ -15,12 +15,12 @@ export const AlignmentAnswer = z.strictObject({ alignment: Grade, verification: 
 export type AlignmentAnswer = z.infer<typeof AlignmentAnswer>;
 
 /** Whether the alignment call may raise a level: the decision model's measured rate at this boundary meets the bar. */
-export const gatesAlignment = (config: Pick<HumConfig, "decisionModel" | "measuredModels" | "minJudgeRate">): boolean => isTrusted([config.decisionModel], "alignment", config);
+export const doesGateAlignment = (config: Pick<HumConfig, "decisionModel" | "measuredModels" | "minJudgeRate">): boolean => isTrusted([config.decisionModel], "alignment", config);
 
 /** The cheap model call that grades a change against the item it answers. Below the bar its grades go in a report and decide nothing. */
 export const alignmentQuestion = (item: Pick<Item, "title" | "body">, diff: string, config: Pick<HumConfig, "diffLimit" | "decisionModel" | "measuredModels" | "minJudgeRate">) => ({
 	boundary: "alignment" as const,
-	reportOnly: !gatesAlignment(config) || undefined,
+	reportOnly: !doesGateAlignment(config) || undefined,
 	prompt: [
 		"Grade this change against the item it answers. alignment: does the diff do what the item asked, no more and no less? verification: do the tests or proof in the diff show it works? Grade each sound, partial or concern.",
 		DATA_RULE,
@@ -61,7 +61,7 @@ const gradeOfRank = (rank: number, levels: number): number => (levels < 2 ? GRAD
  * Whether the alignment call's grades raise the level one step: they put the merge-risk score in a higher band than
  * sound grades would at the same level. The call never lowers a level.
  */
-export const raisesLevel = (rank: number, levels: number, answer: AlignmentAnswer, { mergeRisk }: Pick<HumConfig, "mergeRisk">): boolean => {
+export const doesRaiseLevel = (rank: number, levels: number, answer: AlignmentAnswer, { mergeRisk }: Pick<HumConfig, "mergeRisk">): boolean => {
 	const fromLevel = gradeOfRank(rank, levels);
 
 	const scored = (alignment: number, verification: number): number =>
@@ -75,5 +75,5 @@ export const alignedPlacement = (placement: Placement, answer: AlignmentAnswer, 
 	const rank = config.levels.findIndex(({ name }) => name === placement.level.name);
 	const above = config.levels[Math.min(rank + 1, config.levels.length - 1)];
 
-	return above && raisesLevel(rank, config.levels.length, answer, config) ? { ...placement, level: above, steps: [...placement.steps, { step: "alignment" }] } : placement;
+	return above && doesRaiseLevel(rank, config.levels.length, answer, config) ? { ...placement, level: above, steps: [...placement.steps, { step: "alignment" }] } : placement;
 };

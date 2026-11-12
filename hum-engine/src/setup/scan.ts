@@ -49,7 +49,7 @@ export type RepoScan = {
 
 const textOf = (repo: string, path: string): string => (path === "" ? "" : orMissing(() => readFileSync(join(repo, path), "utf8"), ""));
 
-const exists = (repo: string, path: string): boolean => orMissing(() => (accessSync(join(repo, path)), true), false);
+const doesExist = (repo: string, path: string): boolean => orMissing(() => (accessSync(join(repo, path)), true), false);
 
 const isRunnable = (repo: string, path: string): boolean => orMissing(() => (accessSync(join(repo, path), constants.X_OK), true), false);
 
@@ -104,7 +104,7 @@ const ciJobsOf = (repo: string): CiJob[] =>
 	});
 
 const codeownersOf = (repo: string): RepoScan["codeowners"] => {
-	const file = CODEOWNERS_FILES.find((candidate) => exists(repo, candidate));
+	const file = CODEOWNERS_FILES.find((candidate) => doesExist(repo, candidate));
 
 	return textOf(repo, file ?? "")
 		.split("\n")
@@ -113,7 +113,7 @@ const codeownersOf = (repo: string): RepoScan["codeowners"] => {
 };
 
 const composeOf = (repo: string): RepoScan["composeServices"] => {
-	const file = COMPOSE_FILES.find((candidate) => exists(repo, candidate));
+	const file = COMPOSE_FILES.find((candidate) => doesExist(repo, candidate));
 	const compose = yamlOf(Compose, textOf(repo, file ?? ""));
 
 	return compose ? Object.entries(compose.services).map(([name, { image }]) => ({ name, image })) : [];
@@ -171,7 +171,7 @@ export const scanRepo = async (repo: string, base: string): Promise<RepoScan> =>
 	const manifest = PackageJson.safeParse(orMissing(() => JSON.parse(textOf(repo, "package.json") || "null"), null));
 	const scripts = manifest.success ? manifest.data.scripts : {};
 	const pinned = manifest.success ? { ...manifest.data.dependencies, ...manifest.data.devDependencies }["@moo.md/hum"] : undefined;
-	const lockfile = Object.entries(LOCKFILES).find(([file]) => exists(repo, file));
+	const lockfile = Object.entries(LOCKFILES).find(([file]) => doesExist(repo, file));
 
 	return {
 		packageManager: lockfile?.[1],
@@ -181,9 +181,9 @@ export const scanRepo = async (repo: string, base: string): Promise<RepoScan> =>
 		composeServices: composeOf(repo),
 		envScripts: envScriptsOf(repo),
 		setupTargets: setupTargetsOf(repo, scripts),
-		toolVersions: TOOL_VERSION_FILES.filter((file) => exists(repo, file)),
-		envExamples: ENV_EXAMPLE_FILES.filter((file) => exists(repo, file)),
-		envTooling: ENV_TOOLING_FILES.filter((file) => exists(repo, file)),
+		toolVersions: TOOL_VERSION_FILES.filter((file) => doesExist(repo, file)),
+		envExamples: ENV_EXAMPLE_FILES.filter((file) => doesExist(repo, file)),
+		envTooling: ENV_TOOLING_FILES.filter((file) => doesExist(repo, file)),
 		issueTemplates: templatesOf(repo),
 		tracked: await trackedOf(repo),
 		folders: await foldersOf(repo, base),
