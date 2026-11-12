@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { CI_TICK_REF, readCiTick, recordCiTick } from "../src/service/ci-tick.ts";
-import { type Child, EXIT_UPDATED, supervise, type Supervision } from "../src/service/supervise.ts";
+import { backoffFor, type Child, EXIT_UPDATED, supervise, type Supervision } from "../src/service/supervise.ts";
 import { checkTokenAge } from "../src/service/token.ts";
 import { wakeUntilQuiet } from "../src/service/wake.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
@@ -90,28 +90,8 @@ test("crashes spread over more than the window do not stop the restarts", async 
 	expect(u.cardsInStatus().map((c) => c.cause).join()).not.toContain("Restarts have stopped");
 });
 
-test("restarts never wait longer than maxBackoffMs", async () => {
-	const spawnedAt: number[] = [];
-
-	const u = unit({
-		crashWindowMs: 60_000,
-		maxCrashes: 10,
-		backoffMs: 20,
-		maxBackoffMs: 20,
-		spawn: () => {
-			spawnedAt.push(Date.now());
-
-			if (spawnedAt.length === 6) u.stop.abort();
-
-			return exited(1);
-		},
-	});
-
-	await u.run();
-
-	const gaps = spawnedAt.slice(1).map((at, index) => at - spawnedAt[index]!);
-
-	expect(Math.max(...gaps)).toBeLessThan(150);
+test("a restart waits backoffMs, doubled for each crash in the window, and never longer than maxBackoffMs", () => {
+	expect([1, 2, 3, 4, 5, 6].map((crashes) => backoffFor(crashes, { backoffMs: 20, maxBackoffMs: 100 }))).toEqual([20, 40, 80, 100, 100, 100]);
 });
 
 test("a worker that exits to take an update is started again and never counts as a crash", async () => {

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,6 +8,11 @@ const forRun: string[] = [];
 let testRunning = false;
 
 const removed: string[] = [];
+
+/** Where each folder was made: the first test file line on the stack, so a folder that comes back names the test that left work going. */
+const origins = new Map<string, string>();
+const SHOWN_ENTRIES = 20;
+
 const unsettled: (() => Promise<void>)[] = [];
 
 const removeAll = (folders: string[]) => {
@@ -18,6 +23,7 @@ const made = (name: string, owners: string[]): string => {
 	const folder = mkdtempSync(join(tmpdir(), `hum-${name}-`));
 
 	owners.push(folder);
+	origins.set(folder, new Error().stack?.split("\n").find((line) => line.includes(".test.ts"))?.trim() ?? "outside a test file");
 
 	return folder;
 };
@@ -49,7 +55,13 @@ export const runEnded = (): void => {
 
 	const back = removed.splice(0).filter((folder) => existsSync(folder));
 
+	const written = back.map((folder) => {
+		const entries = readdirSync(folder, { recursive: true }).map(String).sort();
+
+		return `${folder}, made ${origins.get(folder)}, now holding ${entries.length} entries: ${entries.slice(0, SHOWN_ENTRIES).join(" ")}`;
+	});
+
 	for (const folder of back) rmSync(folder, { recursive: true, force: true });
 
-	if (back.length > 0) throw new Error(`work went on after its test ended and wrote into ${back.join(", ")}`);
+	if (back.length > 0) throw new Error(`work went on after its test ended and wrote into ${written.join("; ")}`);
 };

@@ -62,7 +62,8 @@ const silenceOf = (quietSince: number, beat: { readonly time: number; readonly i
 	return { quietSince: lastSeen, silentMs, isSilent: silentMs >= o.workerDownTicks * (beat?.intervalMs ?? o.intervalMs) };
 };
 
-const backoffFor = (crashes: number, { backoffMs, maxBackoffMs }: Pick<Supervision, "backoffMs" | "maxBackoffMs">): number => Math.min(backoffMs * 2 ** (crashes - 1), maxBackoffMs);
+/** The pause before a restart once `crashes` crashes sit inside the window. */
+export const backoffFor = (crashes: number, { backoffMs, maxBackoffMs }: Pick<Supervision, "backoffMs" | "maxBackoffMs">): number => Math.min(backoffMs * 2 ** (crashes - 1), maxBackoffMs);
 
 /**
  * The start script as a machine. It runs the worker and starts it again when it exits, looks at the heartbeat once
