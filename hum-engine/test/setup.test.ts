@@ -73,12 +73,174 @@ const OWNER_GIT: GitIdentityRead = { found: true, identity: OWNER };
 
 test("a scan reads the checks CI runs on a pull request after the install a fresh clone needs, the compose services and the issue-template labels", async () => {
 	const scan = await scanRepo(repoWith(PROJECT), "main");
-	const proposal = proposeSetup(scan, shipped.hum, ["bug", "docs"]);
+	const proposal = proposeSetup(scan, shipped.hum, { labels: ["bug", "docs"] });
 
 	expect(scan.packageManager).toBe("bun");
 	expect(scan.composeServices).toEqual([{ name: "db", image: "mongo:7" }]);
 	expect(proposal.checks).toEqual(["bun install --frozen-lockfile", "bun run typecheck", "bun test"]);
 	expect(proposal.runSlots.recipe.prepare).toContain("bun install --frozen-lockfile");
+});
+
+const AGENTS = `name: agents
+on: [workflow_dispatch]
+env:
+  CLAUDE_CODE_USE_BEDROCK: '1'
+  IS_SANDBOX: 1
+  ANTHROPIC_CUSTOM_HEADERS: |
+    x-team: one
+    x-use: two
+jobs:
+  agents:
+    runs-on: own-large
+    container: mcr.microsoft.com/playwright:v1.0.0-noble
+    env:
+      GH_TOKEN: \${{ github.token }}
+    steps:
+      - uses: actions/create-github-app-token@v3
+        with:
+          client-id: \${{ secrets.APP_CLIENT_ID }}
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+      - run: npm install --global @anthropic-ai/claude-code
+`;
+
+test("a scan proposes the wake job's runner, container, env and sign-in from the job that runs Claude Code, and the App from the step that mints a token", async () => {
+	const { wakeJob } = proposeSetup(await scanRepo(repoWith({ ...PROJECT, ".github/workflows/agents.yml": AGENTS }), "main"), shipped.hum);
+
+	expect(wakeJob).toEqual({
+		ciRunner: "own-large",
+		ciContainer: "mcr.microsoft.com/playwright:v1.0.0-noble",
+		ciEnv: { CLAUDE_CODE_USE_BEDROCK: "1", IS_SANDBOX: "1", ANTHROPIC_CUSTOM_HEADERS: "x-team: one\nx-use: two\n" },
+		ciClaudeAuth: "env",
+		pullRequestToken: { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" },
+	});
+});
+
+/** The wake job setup proposes for a repo whose only workflow besides its checks is `workflow`. */
+const wakeJobFrom = async (workflow: string, facts: { isPublic?: boolean } = {}) =>
+	proposeSetup(await scanRepo(repoWith({ ...PROJECT, ".github/workflows/agents.yml": workflow }), "main"), shipped.hum, facts).wakeJob;
+
+/** A workflow whose one job runs Claude Code on GitHub's runner, with `job` as the rest of the job. */
+const claudeJob = (job: string): string => `on: [workflow_dispatch]\njobs:\n  agents:\n    runs-on: ubuntu-latest\n${job}`;
+
+const CLAUDE_STEP = "    steps:\n      - run: npm install --global @anthropic-ai/claude-code\n";
+
+test("a scan reads a runner written as a label list or a group, and a container with everything the job gives it", async () => {
+	const listed = await wakeJobFrom(`on: [workflow_dispatch]
+jobs:
+  agents:
+    runs-on: [self-hosted, linux]
+    container:
+      image: ghcr.io/own/agents:1
+      credentials:
+        username: \${{ github.actor }}
+        password: \${{ secrets.REGISTRY_TOKEN }}
+      env:
+        NODE_ENV: test
+      ports: [80, "8080:80"]
+      volumes: ["/cache:/cache"]
+      options: --cpus 2
+${CLAUDE_STEP}`);
+
+	const grouped = await wakeJobFrom(`on: [workflow_dispatch]\njobs:\n  agents:\n    runs-on:\n      group: agents\n      labels: linux\n${CLAUDE_STEP}`);
+
+	expect(listed.ciRunner).toEqual(["self-hosted", "linux"]);
+	expect(listed.ciContainer).toEqual({ image: "ghcr.io/own/agents:1", credentials: { username: "${{ github.actor }}", password: "${{ secrets.REGISTRY_TOKEN }}" }, env: { NODE_ENV: "test" }, ports: [80, "8080:80"], volumes: ["/cache:/cache"], options: "--cpus 2" });
+	expect(grouped.ciRunner).toEqual({ group: "agents", labels: "linux" });
+});
+
+test("an env entry with no value is left out alone, and the rest of the map is read", async () => {
+	const { ciEnv } = await wakeJobFrom(claudeJob(`    env:\n      EMPTY:\n      CLAUDE_CODE_USE_BEDROCK: 1\n${CLAUDE_STEP}`));
+
+	expect(ciEnv).toEqual({ CLAUDE_CODE_USE_BEDROCK: "1" });
+});
+
+test("a runner, container or env value that reads the matrix, an earlier job or a step is not proposed, since the wake job has none", async () => {
+	const wakeJob = await wakeJobFrom(`on: [workflow_dispatch]
+jobs:
+  agents:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: \${{ matrix.os }}
+    container: \${{ needs.build.outputs.image }}
+    env:
+      CLAUDE_CODE_USE_VERTEX: 1
+      SHARD: \${{ matrix.shard }}
+${CLAUDE_STEP}`);
+
+	expect(wakeJob).toMatchObject({ ciRunner: shipped.hum.ciRunner, ciContainer: shipped.hum.ciContainer, ciEnv: { CLAUDE_CODE_USE_VERTEX: "1" } });
+});
+
+test("an API key the Claude Code action takes as an input becomes the env Claude Code reads it from, and sign-in is through env", async () => {
+	const wakeJob = await wakeJobFrom(claudeJob("    steps:\n      - uses: anthropics/claude-code-action@v1\n        with:\n          anthropic_api_key: ${{ secrets.ANTHROPIC_KEY }}\n"));
+
+	expect(wakeJob).toMatchObject({ ciEnv: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_KEY }}" }, ciClaudeAuth: "env" });
+});
+
+test("an OAuth token the Claude Code action takes under any secret's name proposes the OAuth token sign-in", async () => {
+	const wakeJob = await wakeJobFrom(claudeJob("    steps:\n      - uses: anthropics/claude-code-action@v1\n        with:\n          claude_code_oauth_token: ${{ secrets.MY_CLAUDE }}\n"));
+
+	expect(wakeJob).toMatchObject({ ciEnv: {}, ciClaudeAuth: "oauth-token" });
+});
+
+test("a Claude Code job whose env holds no credential gets the shipped sign-in, never sign-in through an env that signs in with nothing", async () => {
+	const wakeJob = await wakeJobFrom(claudeJob(`    env:\n      IS_SANDBOX: 1\n${CLAUDE_STEP}`));
+
+	expect(wakeJob).toMatchObject({ ciEnv: { IS_SANDBOX: "1" }, ciClaudeAuth: shipped.hum.ciClaudeAuth });
+});
+
+test("on a public repo a runner GitHub does not host is not proposed", async () => {
+	expect((await wakeJobFrom(AGENTS, { isPublic: true })).ciRunner).toBe(shipped.hum.ciRunner);
+});
+
+test("setup refuses a runner GitHub does not host on a public repo, or one whose visibility nothing read, until the owner agreed", () => {
+	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const], ciRunner: ["self-hosted", "linux"] }, waitHours: {} };
+	const write = (repo: string, more: Pick<SetupAnswers, "ownRunnerOnPublicRepo">, isPublicRepo?: boolean) => writeSetup(repo, SetupAnswers.parse({ ...answers, ...more }), { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT, isPublicRepo });
+	const open = repoWith({ "README.md": "x" });
+	const unread = write(repoWith({ "README.md": "x" }), {});
+	const refused = write(open, {}, true);
+
+	expect(!refused.ok && refused.refusal.code).toBe("own-runner-on-public-repo");
+	expect(!unread.ok && unread.refusal.code).toBe("own-runner-on-public-repo");
+	expect(existsSync(join(open, ".hum"))).toBe(false);
+	expect(write(open, { ownRunnerOnPublicRepo: true }, true).ok).toBe(true);
+});
+
+test("without a job that runs Claude Code, the wake job takes the pull request job's runner and the shipped rest, and hum's own workflows are not read", async () => {
+	const repo = repoWith(PROJECT);
+
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"], ciRunner: "own-large", ciClaudeAuth: "env" }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT, isPublicRepo: false }).ok).toBe(true);
+	expect(proposeSetup(await scanRepo(repo, "main"), shipped.hum).wakeJob).toEqual({
+		ciRunner: "ubuntu-latest",
+		ciContainer: shipped.hum.ciContainer,
+		ciEnv: shipped.hum.ciEnv,
+		ciClaudeAuth: shipped.hum.ciClaudeAuth,
+		pullRequestToken: shipped.hum.pullRequestToken,
+	});
+});
+
+test("setup rewrites a schema 1 hum.json at schema 2, its pull request token secret carried into the token source", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const file = join(repo, ".hum", "hum.json");
+	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
+
+	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), schemaVersion: 1, pullRequestTokenSecret: "PR_TOKEN" }));
+	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+
+	const written = JSON.parse(readFileSync(file, "utf8"));
+
+	expect(written).toMatchObject({ schemaVersion: 2, pullRequestToken: { from: "secret", secret: "PR_TOKEN" } });
+	expect(written).not.toHaveProperty("pullRequestTokenSecret");
+	expect(readFileSync(join(repo, ".github", "workflows", "hum-wake.yml"), "utf8")).toContain("secrets.PR_TOKEN || github.token");
+});
+
+test("setup reads schema 1 answers, their pull request token secret carried into the token source", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const], pullRequestTokenSecret: "OTHER_TOKEN" }, waitHours: {}, schemaVersion: 1 };
+
+	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")).pullRequestToken).toEqual({ from: "secret", secret: "OTHER_TOKEN" });
 });
 
 test("a scan skips a workflow, compose or issue-template file that is not YAML and reads the rest", async () => {
@@ -107,7 +269,7 @@ test("a migration proposes a strict glob, and source and markdown get their own 
 });
 
 test("the repo's labels map to kinds, and the map covers the open items that carry one", async () => {
-	const proposal = proposeSetup(await scanRepo(repoWith(PROJECT), "main"), shipped.hum, ["bug", "documentation", "question"]);
+	const proposal = proposeSetup(await scanRepo(repoWith(PROJECT), "main"), shipped.hum, { labels: ["bug", "documentation", "question"] });
 	const items = [{ body: "", labels: ["bug"] }, { body: "", labels: ["documentation"] }, { body: "", labels: [] }, { body: "", labels: ["question"] }];
 
 	expect(proposal.kindLabels).toMatchObject({ bug: "fix", documentation: "docs" });

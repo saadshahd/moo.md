@@ -4,10 +4,10 @@ import { z } from "zod";
 import shippedConfig from "../../defaults/hum.json" with { type: "json" };
 
 /** The `hum.json` schema version this engine writes. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** The schema versions this engine reads, each migrated up to `SCHEMA_VERSION` by `migrateConfig`. */
-export const READABLE_SCHEMA_VERSIONS: readonly number[] = [1];
+export const READABLE_SCHEMA_VERSIONS: readonly number[] = [1, 2];
 
 /** Parts the engine ships; the owner adds roles, never these. */
 export const FIXED_PARTS = [
@@ -56,6 +56,10 @@ export type RunPlace = (typeof RUN_PLACES)[number];
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
 export type MergeMethod = (typeof MERGE_METHODS)[number];
+
+const CLAUDE_AUTHS = ["oauth-token", "env"] as const;
+
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** Who reviews a change before it merges: no one, a fresh agent review run, or that run and then the owner. */
 export const REVIEWS = ["none", "agent", "owner"] as const;
@@ -117,6 +121,40 @@ const backoff = z
 
 const fraction = z.number().gt(0).lt(1);
 
+/** A name GitHub stores a secret under: a workflow reads it as `secrets.<name>`, and GitHub keeps the `GITHUB_` prefix for its own. */
+const secretName = z
+	.string()
+	.regex(ENV_NAME, "a secret's name is letters, digits and underscores, and starts with no digit")
+	.refine((secret) => !/^GITHUB_/i.test(secret), "a secret's name may not start with GITHUB_, which GitHub keeps for its own");
+
+const runnerLabels = z.union([name, z.array(name).min(1)]);
+
+/** What a job's `runs-on` holds: one label, every label the runner must carry, or a runner group with the labels wanted in it. */
+const Runner = z.union([runnerLabels, z.strictObject({ group: name, labels: runnerLabels.optional() })]);
+
+const envName = z.string().regex(ENV_NAME, "an env name is letters, digits and underscores, and starts with no digit");
+
+/** A job's container: its image alone, or the image with what a workflow's `container` holds beside it, each as written there. */
+const Container = z.union([
+	name,
+	z.strictObject({
+		image: name,
+		credentials: z.strictObject({ username: name, password: name }).optional(),
+		env: z.record(envName, z.string()).optional(),
+		ports: z.array(z.union([name, z.int().positive()])).optional(),
+		volumes: z.array(name).optional(),
+		options: name.optional(),
+	}),
+]);
+
+/** Where a CI run's GitHub token comes from: a secret that holds one, or a GitHub App that mints one per run from its client ID and private key. */
+const PullRequestToken = z.discriminatedUnion("from", [
+	z.strictObject({ from: z.literal("secret"), secret: secretName }),
+	z.strictObject({ from: z.literal("app"), clientIdSecret: secretName, privateKeySecret: secretName }),
+]);
+
+export type PullRequestToken = z.infer<typeof PullRequestToken>;
+
 const Launch = z.union([
 	z.strictObject({ glob: name, level: name, from: date, until: date }).refine(({ from, until }) => from < until, "a launch ends after it starts"),
 	z.strictObject({ glob: name, level: name, base: name }),
@@ -163,8 +201,24 @@ const Shipped = z.object({
 	itemReadsAtOnce: count.describe("Item files the markdown source reads at once; each read is a git process."),
 	restartBackoff: backoff.describe("The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."),
 	restartDelaySeconds: seconds.describe("Seconds the service manager waits before it starts a failed start script again."),
-	pullRequestTokenSecret: name.describe("The repository secret holding a GitHub App or fine-grained token for CI runs. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset."),
+	pullRequestToken: PullRequestToken.describe(
+		"Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset.",
+	),
 	ciWakeTimeoutMinutes: count.describe("Minutes a CI wake may run before GitHub stops it."),
+	ciRunner: Runner.describe(
+		"What the CI wake job runs on, as a workflow's runs-on holds it: one runner label, a list of labels the runner must carry all of, or { group, labels } for a runner group. On a public repo, a runner GitHub does not host keeps what a wake leaves on it, and setup asks before it writes one.",
+	),
+	ciContainer: Container.nullable().describe(
+		"The container the CI wake job runs in: its image, or { image, credentials: { username, password }, env, ports, volumes, options } as a workflow's container holds them, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts.",
+	),
+	ciEnv: z
+		.record(envName, z.string())
+		.describe(
+			"Env the CI wake job sets, such as a gateway's settings; a value may be a workflow expression. A value that reads a secret reaches only the step that runs hum; every other value reaches every step, the installs too. A name the job sets itself, such as GH_TOKEN, is refused.",
+		),
+	ciClaudeAuth: z
+		.enum(CLAUDE_AUTHS)
+		.describe("How a CI run's Claude Code signs in: 'oauth-token' requires the CLAUDE_CODE_OAUTH_TOKEN secret, from `claude setup-token`; 'env' asks for no secret, and ciEnv carries the credentials, such as a gateway's settings."),
 	strictPaths: z.array(name).describe("Globs of data and secrets: a change touching one takes the strictest level."),
 	launches: z
 		.array(Launch)
@@ -221,7 +275,11 @@ const Shipped = z.object({
 		.describe(
 			"Prewarmed run slots on the Mac: worktrees of the owner's checkout that background runs work in, as many as 'runners'. 'pool' is the folder that holds them, relative to the checkout or absolute, and never inside .git, where Claude Code writes nothing; 'services' gives each slot its own services or one shared set with a database per slot; 'ports' starts each slot's block of ports; 'recipe' is the owner's own setup commands.",
 		),
-	ownerLogins: z.array(name).describe("GitHub logins whose pull request reviews and comments are the owner's review notes."),
+	ownerLogins: z
+		.array(name)
+		.describe(
+			"GitHub logins whose pull request reviews and comments are the owner's review notes, and whose issue comments hum reads as replies. hum also reads the issue comments of the repo's owner, the owning organisation's members and invited collaborators, and reads no one else's.",
+		),
 	repeatAt: count.describe("Review notes stating one rule at which hum files a check item for it."),
 	repeatPrecision: fraction.describe("The lowest precision on labelled pairs at which a model's call that two notes state one rule files a check item; below it the pair waits as a possible repeat."),
 	tasteRules: z.array(name).describe("The owner's taste rules that have no deterministic check. Each pull request hum opens gets a comment saying whether its diff keeps each rule; the comment reports only and gates nothing."),
@@ -417,7 +475,11 @@ export const OWNER_CHANGEABLE = {
 	"restart backoff": "restartBackoff",
 	"restart delay": "restartDelaySeconds",
 	"CI wake timeout": "ciWakeTimeoutMinutes",
-	"pull request token secret": "pullRequestTokenSecret",
+	"pull request token": "pullRequestToken",
+	"CI runner": "ciRunner",
+	"CI container": "ciContainer",
+	"CI env": "ciEnv",
+	"CI Claude auth": "ciClaudeAuth",
 	"data and secrets paths": "strictPaths",
 	"path rules": "paths",
 	launches: "launches",

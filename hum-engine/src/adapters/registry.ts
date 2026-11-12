@@ -33,6 +33,7 @@ const AdapterSettings = z.looseObject({
 	itemsDir: HumConfig.shape.itemsDir,
 	commitIdentity: HumConfig.shape.commitIdentity,
 	readyLabel: HumConfig.shape.readyLabel,
+	ownerLogins: HumConfig.shape.ownerLogins,
 	mergeMethod: HumConfig.shape.mergeMethod,
 	ownerBranchPrefix: HumConfig.shape.ownerBranchPrefix,
 	writeRaceRetries: HumConfig.shape.writeRaceRetries,
@@ -85,7 +86,7 @@ const BUILT_IN = {
 	github: async ({ path, settings, context }) => {
 		const timeoutMs = commandTimeoutMs(settings);
 
-		return githubAdapter({ repo: await githubRepo(path, timeoutMs), base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod, timeoutMs }, context);
+		return githubAdapter({ repo: await githubRepo(path, timeoutMs), base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod, ownerLogins: settings.ownerLogins, timeoutMs }, context);
 	},
 	roundup: async ({ context }) => roundupAdapter({}, context),
 } satisfies Readonly<Record<string, (repo: Repo) => Promise<Adapter>>>;

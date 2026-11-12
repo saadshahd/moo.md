@@ -148,6 +148,57 @@ test("the previous schema migrates", () => {
 	expect(migrated).toEqual({ ok: true, value: { schemaVersion: 2, title: "old" } });
 });
 
+/** The shipped config as a schema 1 file held it: no token source, and the token secret under its old key when `secret` names one. */
+const atSchema1 = (secret?: string): RawConfig => {
+	const old = clone(setUp());
+
+	old.hum = { ...old.hum, schemaVersion: 1 };
+	delete old.hum.pullRequestToken;
+
+	if (secret !== undefined) old.hum.pullRequestTokenSecret = secret;
+
+	return old;
+};
+
+test("a schema 1 hum.json's pull request token secret becomes schema 2's secret source", () => {
+	expect(loaded(atSchema1("PR_TOKEN")).hum.pullRequestToken).toEqual({ from: "secret", secret: "PR_TOKEN" });
+});
+
+test("a schema 1 hum.json that names no pull request token secret gets the shipped source", () => {
+	expect(loaded(atSchema1()).hum.pullRequestToken).toEqual(SHIPPED_DEFAULTS.pullRequestToken);
+});
+
+test.each(["PR-TOKEN", "GITHUB_PR_TOKEN", "9LIVES"])("a secret name GitHub would not take, %s, is refused", (secret) => {
+	const bad = clone(setUp());
+
+	bad.hum.pullRequestToken = { from: "secret", secret };
+
+	const result = loadConfig(bad, { env });
+
+	expect(!result.ok && result.refusal.code).toBe("malformed-config");
+});
+
+test("ciEnv that sets a name the CI wake job sets itself is refused, naming it", () => {
+	const bad = clone(setUp());
+
+	bad.hum.ciEnv = { IS_SANDBOX: "1", GH_TOKEN: "${{ secrets.MINE }}" };
+
+	expect(problemsOf(bad)).toEqual([{ problem: "wake-env-taken", name: "GH_TOKEN" }]);
+});
+
+test("a CI wake that mints an App's token may run no longer than the token lasts", () => {
+	const app = clone(setUp());
+
+	app.hum.pullRequestToken = { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" };
+	app.hum.ciWakeTimeoutMinutes = 60;
+
+	expect(problemsOf(app)).toEqual([]);
+
+	app.hum.ciWakeTimeoutMinutes = 61;
+
+	expect(problemsOf(app)).toEqual([{ problem: "wake-outlasts-app-token", minutes: 61, tokenMinutes: 60 }]);
+});
+
 test("an unknown schema version is refused and names the step", () => {
 	const newer = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 99 } }, { env });
 	const older = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 0 } }, { env });

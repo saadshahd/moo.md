@@ -40,6 +40,24 @@ export const CHECK_COMMAND = /\b(test|tests|lint|typecheck|type-check|tsc|check|
 /** A CI command line that is not a check, whatever words it holds: installs, publishing, shell plumbing. */
 export const NOT_A_CHECK = /^(echo|export|cd|mkdir|cp|mv|rm|curl|wget|sudo|gh|git)\b|\b(install|publish|deploy|release|upload|setup)\b/;
 
+/** A CI command line that installs or runs Claude Code. */
+export const CLAUDE_COMMAND = /@anthropic-ai\/claude-code|(^|[\s;&|(])claude(\s|$)/;
+
+/** The action a CI step runs Claude Code with, named without its version. */
+export const CLAUDE_ACTION = "anthropics/claude-code-action";
+
+/** The action's inputs that sign Claude Code in: an API key, and the OAuth token `claude setup-token` makes. */
+export const CLAUDE_ACTION_SIGN_IN = { apiKey: "anthropic_api_key", oauthToken: "claude_code_oauth_token" } as const;
+
+/** The env name Claude Code reads an API key from. */
+export const CLAUDE_API_KEY = "ANTHROPIC_API_KEY";
+
+/** Env that signs Claude Code in with no OAuth token: a key, a gateway's token, or a cloud provider whose own credentials the job holds. */
+export const CLAUDE_CREDENTIAL_ENV: ReadonlySet<string> = new Set([CLAUDE_API_KEY, "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"]);
+
+/** An input or env value that is one secret, which the first group names. */
+export const SECRET_VALUE = /^\$\{\{\s*secrets\.(\w+)\s*\}\}$/;
+
 /** The files that hold a repo's tool versions. */
 export const TOOL_VERSION_FILES = [".tool-versions", ".nvmrc", ".node-version", ".bun-version", ".python-version", "mise.toml", ".mise.toml", "rust-toolchain.toml", ".go-version"] as const;
 
