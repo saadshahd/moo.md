@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { x } from "tinyexec";
@@ -128,6 +128,17 @@ test("a named run is a background agent: its prompt comes on stdin, its tokens a
 	expect(launch?.argv).not.toContain("build the thing");
 	expect(after.map(({ cmd }) => cmd)).toEqual(["stop", "rm"]);
 	expect(shim.agents()).toEqual([]);
+});
+
+test("once a run's outcome is taken its hook reports leave the stops folder, and another session's stay", async () => {
+	const { state, background } = await setup({ script: [{}, { structured: { done: 1 } }] });
+	const other = join(state.stops, "other.json");
+
+	mkdirSync(state.stops, { recursive: true });
+	writeFileSync(other, JSON.stringify({ hook_event_name: "Stop", session_id: "another session" }));
+
+	expect(await ask(background)).toMatchObject({ kind: "finished", structured: { done: 1 } });
+	expect(listRecords(state.stops)).toEqual([other]);
 });
 
 test("a cheap model call and a run with no name are never background agents", async () => {

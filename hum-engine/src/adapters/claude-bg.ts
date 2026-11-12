@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
@@ -204,12 +204,17 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 		return found.flatMap(({ kind, id, name, sessionId, state }) => (kind === AGENT_VIEW_KIND && id !== undefined ? [{ id, name, sessionId, state }] : []));
 	};
 
-	const reportsOf = (sessionId: string): { at: number; event: string; transcriptPath: string | undefined }[] =>
+	const reportsOf = (sessionId: string): { file: string; at: number; event: string; transcriptPath: string | undefined }[] =>
 		listRecords(state.stops).flatMap((file) => {
 			const reported = orMissing(() => Reported.safeParse(JSON.parse(readFileSync(file, "utf8"))), undefined);
 
-			return reported?.success && reported.data.session_id === sessionId ? [{ at: statSync(file).mtimeMs, event: reported.data.hook_event_name, transcriptPath: reported.data.transcript_path }] : [];
+			return reported?.success && reported.data.session_id === sessionId ? [{ file, at: statSync(file).mtimeMs, event: reported.data.hook_event_name, transcriptPath: reported.data.transcript_path }] : [];
 		});
+
+	/** Drops the session's hook reports, so the stops folder holds only runs still going. */
+	const forget = (sessionId: string): void => {
+		for (const { file } of reportsOf(sessionId)) rmSync(file, { force: true });
+	};
 
 	const jobTokens = (id: string): number => orMissing(() => JobFile.parse(JSON.parse(readFileSync(join(jobsFolder, id, JOB_STATE_FILE), "utf8"))).tokens ?? 0, 0);
 
@@ -329,6 +334,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 			return await watch(request, id, session.sessionId);
 		} finally {
 			await end(id);
+			forget(session.sessionId);
 		}
 	};
 
