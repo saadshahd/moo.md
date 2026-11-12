@@ -59,8 +59,12 @@ export async function changedBox($: Engine, origin: string, box: string): Promis
 
 const optionArgs = ({ option }: Answering): string[] => (option === undefined ? [] : ["--option", option]);
 
-/** How a post ended: hum exited 0 or not, or it never reported, so the answer may be on the thread. */
-async function postEvent($: Engine, root: string, answering: Answering, box: () => Promise<string>): Promise<AnswerEvent> {
+/** How a post ended: the repo could not be found, hum exited 0 or not, or it never reported, so the answer may be on the thread. */
+async function postEvent($: Engine, rootOf: () => Promise<string>, answering: Answering, box: () => Promise<string>): Promise<AnswerEvent> {
+	const root = await rootOf().catch((error: Error) => error);
+
+	if (root instanceof Error) return { type: "postFail", cause: root.message, box: await box() };
+
 	const ran = await runHum($, root, ["answer", ...optionArgs(answering), "--", answering.item, postedText(answering)], { timeoutMs: POST_LIMIT_MS }).catch((error: Error) => error);
 
 	if (ran instanceof Error) return { type: "postUnknown", cause: ran.message, box: await box() };
@@ -69,8 +73,8 @@ async function postEvent($: Engine, root: string, answering: Answering, box: () 
 }
 
 /** Posts the answer through the repo's hum, then tells answer mode how it went, so it always leaves posting. */
-export async function post($: Engine, root: string, answering: Answering): Promise<void> {
-	await send($, await postEvent($, root, answering, () => $.prompt.read().then(({ text }) => text, () => "")));
+export async function post($: Engine, rootOf: () => Promise<string>, answering: Answering): Promise<void> {
+	await send($, await postEvent($, rootOf, answering, () => $.prompt.read().then(({ text }) => text, () => "")));
 }
 
 /** What the owner's Enter decided, and the answer to post when it went to the item's thread. */

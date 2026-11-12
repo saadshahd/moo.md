@@ -9,7 +9,7 @@ import { bandRow } from "./view/band.ts";
 import { paneRows } from "./view/pane.ts";
 import { readOf } from "./view/read.ts";
 import type { Press } from "./view/row.ts";
-import { exclusive, locate, newWatch, poll, repoRoot, watchOnce } from "./watch.ts";
+import { exclusive, locate, NOTHING_SEEN, poll, repoRoot, watchOnce } from "./watch.ts";
 
 const MS = 1000;
 const PANE = "hum";
@@ -45,23 +45,26 @@ const showOnce = ($: EngineInterface) => (error: Error): void => $.ui.toast(`hum
 
 export const register: Register = (on, options) => {
 	const { pollSeconds, amberAfterSeconds, watchSeconds } = viewSettings(options);
-	const watch = newWatch();
 
 	on("session.start", async ($, e, next) => {
 		if (!e.isInteractive) return next(e);
 
 		await restartAnswer($);
-		watch.path = await locate($, e.cwd);
-		watch.root = await repoRoot($, e.cwd);
+
+		const path = await locate($, e.cwd);
+		const root = await repoRoot($, e.cwd);
+		let seen = NOTHING_SEEN;
 
 		const look = async (): Promise<void> => {
-			const found = await poll($, watch, amberAfterSeconds);
+			const { found, seen: after } = await poll($, path, seen, amberAfterSeconds);
+
+			seen = after;
 
 			if (found !== undefined) await update($, source, () => found);
 		};
 
 		const ask = async (): Promise<void> => {
-			const cause = await watchOnce($, watch.root);
+			const cause = await watchOnce($, root);
 			const now = await $.clock.now();
 
 			await update($, unread, (before) => (cause === undefined ? null : { cause, since: before?.since ?? now }));
@@ -83,7 +86,7 @@ export const register: Register = (on, options) => {
 			decide: async () => {
 				const { decision, toPost } = await submitted($, e.origin.kind, e.text);
 
-				if (toPost !== undefined) post($, watch.root, toPost).catch(showOnce($));
+				if (toPost !== undefined) post($, () => $.session.cwd().then((cwd) => repoRoot($, cwd)), toPost).catch(showOnce($));
 
 				return decision;
 			},
@@ -127,8 +130,6 @@ export const register: Register = (on, options) => {
 
 		const tags = $.ui.resolve(e);
 		const { Box } = tags;
-
-		watch.lastRead = view;
 
 		return (
 			<Box flexDirection="column">
