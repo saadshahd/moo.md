@@ -126,6 +126,9 @@ export const unansweredQuestion = (item: Item): ThreadEntry | undefined => {
 /** Whether the kind's machine takes the owner's approval of a change in this state. */
 const isApprovalWait = (kind: Kind, state: string | undefined): boolean => state !== undefined && kind.machine.states[state]?.on?.[OWNER_APPROVED] !== undefined;
 
+/** Where an item saved in an owner wait stands for an answer: waiting on approval where the state takes the owner's approval, else waiting. */
+export const ownerWaitStage = (kind: Kind, state: string | undefined): Stage => (isApprovalWait(kind, state) ? "approval" : "waiting");
+
 const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional() });
 
 /** The kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
@@ -190,8 +193,8 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum, (item, tokens) => tallyOf(o.state, item).spend(tokens));
 	const { now } = o;
 	const onSnapshot = saved.value !== undefined;
-	const waitingState = knownKind && waitsOnOwner(knownKind, at);
-	const stage: Stage = o.state.landings.get(id) ? "approval" : waitingState ? (knownKind && isApprovalWait(knownKind, at) ? "approval" : "waiting") : onSnapshot ? "running" : "waiting";
+	const ownerWait = knownKind && waitsOnOwner(knownKind, at) ? ownerWaitStage(knownKind, at) : undefined;
+	const stage: Stage = o.state.landings.get(id) ? "approval" : (ownerWait ?? (onSnapshot ? "running" : "waiting"));
 	const item = await settleAnswers({ state: o.state, workSource: o.workSource, judge, now }, await o.workSource.read(id), { stage });
 	const named = known && kindAnswered(known, item, o.config.hum.kinds);
 

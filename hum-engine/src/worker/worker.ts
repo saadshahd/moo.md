@@ -40,7 +40,7 @@ import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, claimTtlMs, DEFAULT_BASE, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, endedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, waitsOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -338,7 +338,7 @@ export class Worker {
 		const asleep = sleeping.get(id);
 		const kind = asleep && this.#kindNamed(asleep.kind)?.kind;
 
-		if (asleep && kind) return { stage: kind.machine.states[asleep.state ?? ""]?.on?.["owner-approved"] ? "approval" : "waiting" };
+		if (asleep && kind) return { stage: ownerWaitStage(kind, asleep.state) };
 
 		return { stage: ready ? "waiting" : "ended" };
 	}
