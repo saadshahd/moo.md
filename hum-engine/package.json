@@ -1,6 +1,6 @@
 {
   "name": "@moo.md/hum",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The hum engine: work items become Claude Code agent runs, the repo's checks decide what they can, and only what nothing settles becomes a question to the owner.",
   "license": "MIT",
   "author": {
