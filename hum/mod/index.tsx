@@ -1,7 +1,7 @@
 import type { EngineInterface, Register } from "claude-code";
 import { atom, read, update } from "claude-code";
 import { guardAnswer } from "./answer/guard.ts";
-import { answeringLabel, changedBox, editedBox, fillAnswer, isAnswering, restartAnswer, submitted } from "./answer/mode.ts";
+import { answeringLabel, changedBox, editedBox, fillAnswer, isAnswering, post, restartAnswer, submitted } from "./answer/mode.ts";
 import { drawRows } from "./draw.tsx";
 import { type PressContext, openPane } from "./press.ts";
 import { viewSettings } from "./settings.ts";
@@ -80,7 +80,13 @@ export const register: Register = (on, options) => {
 	on("prompt.submit", ($, e, next) =>
 		guardAnswer({
 			isAnswering: () => isAnswering($),
-			decide: () => submitted($, watch.root, e.origin.kind, e.text),
+			decide: async () => {
+				const { decision, toPost } = await submitted($, e.origin.kind, e.text);
+
+				if (toPost !== undefined) post($, watch.root, toPost).catch(showOnce($));
+
+				return decision;
+			},
 			pass: () => next(e),
 			drop: (reason) => ({ drop: reason }),
 			show: (message) => $.ui.toast(message),

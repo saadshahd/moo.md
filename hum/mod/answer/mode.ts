@@ -68,17 +68,19 @@ async function postEvent($: Engine, root: string, answering: Answering, box: () 
 	return ran.exitCode === 0 ? { type: "postOk", box: await box() } : { type: "postFail", cause: failureOf(ran), box: await box() };
 }
 
-/** Posts the answer through the repo's hum, then tells answer mode how it went, so it always leaves posting. Runs past the hook's return. */
-async function post($: Engine, root: string, answering: Answering): Promise<void> {
+/** Posts the answer through the repo's hum, then tells answer mode how it went, so it always leaves posting. */
+export async function post($: Engine, root: string, answering: Answering): Promise<void> {
 	await send($, await postEvent($, root, answering, () => $.prompt.read().then(({ text }) => text, () => "")));
 }
 
-/** The owner's Enter: in answer mode it posts on the item's thread and keeps the prompt from Claude. */
-export async function submitted($: Engine, root: string, origin: string, text: string): Promise<Decision> {
+/** What the owner's Enter decided, and the answer to post when it went to the item's thread. */
+export type Submitted = { readonly decision: Decision; readonly toPost?: Answering };
+
+/** The owner's Enter: in answer mode it goes to the item's thread and is kept from Claude. */
+export async function submitted($: Engine, origin: string, text: string): Promise<Submitted> {
 	const after = await send($, { type: "submit", origin, text });
 	const { enter, answering, say } = after.context;
+	const decision: Decision = enter === "thread" || enter === "nowhere" ? { kind: "drop", reason: say ?? "" } : PASS;
 
-	if (enter === "thread" && answering !== undefined) post($, root, answering).catch((error: Error) => $.ui.toast(`hum: ${error.message}`));
-
-	return enter === "thread" || enter === "nowhere" ? { kind: "drop", reason: say ?? "" } : PASS;
+	return enter === "thread" ? { decision, toPost: answering } : { decision };
 }
