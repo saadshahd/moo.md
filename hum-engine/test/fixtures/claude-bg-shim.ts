@@ -58,7 +58,7 @@ const valueOf = (argv: string[], flag: string): string => argv[argv.indexOf(flag
 
 const hookFolder = (settings: string): string => /cat > '(.*?)'\/\$\$\.json/.exec(settings)?.[1] ?? "";
 
-const dropHook = (folder: string, event: string, sessionId: string, transcriptPath: string) => {
+const dropHook = ({ folder, event, sessionId, transcriptPath }: { readonly folder: string; readonly event: string; readonly sessionId: string; readonly transcriptPath: string }) => {
 	writeFileSync(join(folder, `${process.pid}-${Date.now()}-${event}.json`), JSON.stringify({ hook_event_name: event, session_id: sessionId, transcript_path: transcriptPath }));
 };
 
@@ -98,7 +98,7 @@ const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = 
 	const prompt = readFileSync(join(dir, `${id}.prompt`), "utf8");
 
 	writeFileSync(transcript, "");
-	dropHook(folder, "UserPromptSubmit", sessionId, transcript);
+	dropHook({ folder, event: "UserPromptSubmit", sessionId, transcriptPath: transcript });
 
 	const proc = Bun.spawn([process.execPath, SHIM, "-p", "--json-schema", schema, "--session-id", sessionId], { cwd, stdin: new TextEncoder().encode(prompt), stdout: "pipe", env: process.env });
 
@@ -129,11 +129,11 @@ const finish = async ([id = "", sessionId = "", cwd = "", folder = "", schema = 
 			return;
 		}
 
-		dropHook(folder, "Stop", sessionId, transcript);
+		dropHook({ folder, event: "Stop", sessionId, transcriptPath: transcript });
 		await wait(AFTER_ROW_MS);
 		rows({ type: "attachment", timestamp: new Date().toISOString(), attachment: { type: "structured_output", data: event.structured_output } });
 		await wait(AFTER_ROW_MS);
-		dropHook(folder, "Stop", sessionId, transcript);
+		dropHook({ folder, event: "Stop", sessionId, transcriptPath: transcript });
 	}
 };
 

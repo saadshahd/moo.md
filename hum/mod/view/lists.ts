@@ -20,7 +20,7 @@ export type ListEntry = {
  * One line per entry: id, title, metadata. A title that does not fit ends in "…" and pressing the row shows it whole.
  * Where the title would get under 12 cells it goes under the id instead, and an unfolded row always does.
  */
-export const listRows = (entry: ListEntry, isUnfolded: boolean, width: number): Row[] => {
+export const listRows = (entry: ListEntry, { isUnfolded, width }: { readonly isUnfolded: boolean; readonly width: number }): Row[] => {
 	const id = ellipsize(displayId(entry.item), width);
 	const press = { kind: "fold", id: entry.foldId } as const;
 	const meta = fitting(droppingFromEnd(entry.meta), width - cells(id) - COLUMN_GAP) ?? [];

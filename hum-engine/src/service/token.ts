@@ -12,7 +12,7 @@ export const UNAUTHORIZED = /API Error: 401|Failed to authenticate/i;
 export const raiseRejectedToken = (faults: Faults, said: string) => faults.raise(CARD_KINDS.tokenRejected({ said }));
 
 /** One card from `warnDays` before the token's year ends; it clears when `setUp` moves to a later day. */
-export const checkTokenAge = (faults: Faults, setUp: string, now: number, warnDays: number): void => {
+export const checkTokenAge = (faults: Faults, { setUp, now, warnDays }: { readonly setUp: string; readonly now: number; readonly warnDays: number }): void => {
 	const expires = Date.parse(setUp) + TOKEN_LIFE_DAYS * DAY_MS;
 
 	if (now < expires - warnDays * DAY_MS) return faults.clear({ code: CARD_CODES.tokenExpiring });

@@ -48,7 +48,7 @@ export const sh = (cwd: string, args: string[]): string => {
 	return result.stdout;
 };
 
-export const itemFile = (title: string, state = "ready", body = "body") => `---\ntitle: ${JSON.stringify(title)}\nstate: ${state}\n---\n\n${body}\n`;
+export const itemFile = (title: string, { state = "ready", body = "body" }: { readonly state?: string; readonly body?: string } = {}) => `---\ntitle: ${JSON.stringify(title)}\nstate: ${state}\n---\n\n${body}\n`;
 
 let built: string | undefined;
 
@@ -92,13 +92,13 @@ export class WorkRepo {
 
 	/** The owner commits an item file and pushes it. */
 	add(id: string, content: string): string {
-		this.put(`.hum/work/${id}.md`, content, `add ${id}`);
+		this.put({ path: `.hum/work/${id}.md`, content, message: `add ${id}` });
 
 		return id;
 	}
 
 	/** The owner commits a file and pushes it, rebasing onto the remote's main first only when a worker moved it. */
-	put(path: string, content: string, message = `put ${path}`): void {
+	put({ path, content, message = `put ${path}` }: { readonly path: string; readonly content: string; readonly message?: string }): void {
 		mkdirSync(join(this.owner, dirname(path)), { recursive: true });
 		writeFileSync(join(this.owner, path), content);
 		this.commit(message);

@@ -32,7 +32,7 @@ export async function locate($: Engine, cwd: string): Promise<string> {
 
 	if (found.exitCode !== 0) throw new Error(`${cwd} is not inside a git repository`);
 
-	return statusPathOf(cwd, found.stdout.trim());
+	return statusPathOf({ cwd, commonDir: found.stdout.trim() });
 }
 
 /** One look. A new file time reads the file and answers what it found; the same file answers nothing and redraws only when a shown age changed. */

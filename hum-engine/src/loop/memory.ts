@@ -56,7 +56,7 @@ export const withoutCovered = (text: string, covered: ReadonlySet<string>): stri
 		.join("\n");
 
 /** Entries no run used within the last `limit` runs: `lastUsed` is the run number of an entry's last use, absent when none used it. */
-export const unusedEntries = (entries: readonly MemoryEntry[], lastUsed: ReadonlyMap<string, number>, runsSoFar: number, limit: number): MemoryEntry[] =>
+export const unusedEntries = ({ entries, lastUsed, runsSoFar, limit }: { readonly entries: readonly MemoryEntry[]; readonly lastUsed: ReadonlyMap<string, number>; readonly runsSoFar: number; readonly limit: number }): MemoryEntry[] =>
 	entries.filter(({ rule }) => runsSoFar - (lastUsed.get(rule) ?? 0) >= limit);
 
 /** The memory file at `path`; empty when it is absent. */

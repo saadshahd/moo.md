@@ -46,7 +46,7 @@ export const queueQuestion = (ctx: Pick<QuestionContext, "state" | "config" | "n
 		text: question.text,
 		options: question.options && [...question.options],
 		detail: question.detail,
-		priority: priorityOf(item.labels ?? [], config.hum.priorityLabels),
+		priority: priorityOf({ labels: item.labels ?? [], priorityLabels: config.hum.priorityLabels }),
 		footprint: footprintOf(item) && [...(footprintOf(item) ?? [])],
 		queuedAt: now(),
 	};
@@ -73,7 +73,7 @@ export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> 
 
 	for (const old of all) if (old.askedAt !== undefined && !isKept(old.askedAt, config, now())) state.questions.remove(keyOf(old));
 
-	const room = roomToAsk(all.flatMap(({ askedAt }) => (askedAt === undefined ? [] : [askedAt])), config.hum.dailyQuestionCap, now());
+	const room = roomToAsk({ askedAt: all.flatMap(({ askedAt }) => (askedAt === undefined ? [] : [askedAt])), cap: config.hum.dailyQuestionCap, now: now() });
 	const released: string[] = [];
 
 	for (const queued of waitingOrder(all.filter(isWaiting)).slice(0, room)) {

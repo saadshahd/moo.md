@@ -79,7 +79,7 @@ const openFor = async (repo: string, flags: WorkFlags, where: "mac" | "ci") => {
 		base: flags.base,
 		where,
 		latestVersion: where === "mac" ? npmLatest : undefined,
-		ciTick: where === "mac" ? () => readCiTick(repo, "origin", timeoutMs) : undefined,
+		ciTick: where === "mac" ? () => readCiTick({ repo, remote: "origin", timeoutMs }) : undefined,
 	});
 };
 
@@ -146,7 +146,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			await wakeUntilQuiet(worker);
 
-			if (flags.event === SCHEDULE_EVENT) await recordCiTick(io.cwd, "origin", Date.now(), worker.config.hum.commitIdentity, commandTimeoutMs(worker.config.hum));
+			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: worker.config.hum.commitIdentity, timeoutMs: commandTimeoutMs(worker.config.hum) });
 
 			const status = readStatus(join(await defaultStateDir(io.cwd), "status.json"));
 			const cards = status.ok ? status.status.cards : [];

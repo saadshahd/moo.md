@@ -83,7 +83,7 @@ test.each<[string, ReadonlySet<string>, Slot["status"]]>([
 	const w = world({ runners: 1 });
 
 	await w.ask("y");
-	w.state.runs.begin({ itemId: "y", run: "build", attempt: 0 }, "hum y build #0");
+	w.state.runs.begin({ itemId: "y", run: "build", attempt: 0 }, { name: "hum y build #0" });
 
 	const restarted = w.reopened(async () => alive);
 
@@ -145,7 +145,7 @@ test("a slot refreshes between passes: its data resets every time and its depend
 	expect(existsSync(join(counters, "data"))).toBe(false);
 	expect(count("installs")).toBe(1);
 
-	w.repo.put("bun.lock", "changed\n");
+	w.repo.put({ path: "bun.lock", content: "changed\n" });
 	await (await w.ask("b")).giveBack();
 	await w.slots.idle();
 

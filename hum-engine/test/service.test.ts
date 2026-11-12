@@ -144,15 +144,15 @@ test("the token card shows the warning lead before the year ends, once, and clea
 	const { faults } = openState(tempDir("token"));
 	const madeAgo = (days: number) => new Date(NOW - days * DAY).toISOString().slice(0, 10);
 
-	checkTokenAge(faults, madeAgo(300), NOW, WARN_DAYS);
+	checkTokenAge(faults, { setUp: madeAgo(300), now: NOW, warnDays: WARN_DAYS });
 	expect(faults.list()).toEqual([]);
 
-	checkTokenAge(faults, madeAgo(340), NOW, WARN_DAYS);
-	checkTokenAge(faults, madeAgo(340), NOW + DAY, WARN_DAYS);
+	checkTokenAge(faults, { setUp: madeAgo(340), now: NOW, warnDays: WARN_DAYS });
+	checkTokenAge(faults, { setUp: madeAgo(340), now: NOW + DAY, warnDays: WARN_DAYS });
 	expect(faults.list().map((c) => c.code)).toEqual(["token-expiring"]);
 	expect(faults.list()[0]?.fix).toContain("claude setup-token");
 
-	checkTokenAge(faults, madeAgo(0), NOW, WARN_DAYS);
+	checkTokenAge(faults, { setUp: madeAgo(0), now: NOW, warnDays: WARN_DAYS });
 	expect(faults.list()).toEqual([]);
 });
 
@@ -205,13 +205,13 @@ test("the scheduled workflow's tick is a ref on the remote; the Mac reads its ti
 
 	const mac = repo.worker("mac");
 
-	expect(await readCiTick(mac, "origin", SHIPPED_COMMAND_TIMEOUT_MS)).toBeUndefined();
+	expect(await readCiTick({ repo: mac, remote: "origin", timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })).toBeUndefined();
 
-	await recordCiTick(repo.owner, "origin", NOW, OWNER, SHIPPED_COMMAND_TIMEOUT_MS);
-	expect(await readCiTick(mac, "origin", SHIPPED_COMMAND_TIMEOUT_MS)).toBe(NOW);
+	await recordCiTick({ repo: repo.owner, remote: "origin", at: NOW, identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	expect(await readCiTick({ repo: mac, remote: "origin", timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })).toBe(NOW);
 
-	await recordCiTick(repo.owner, "origin", NOW + 900_000, OWNER, SHIPPED_COMMAND_TIMEOUT_MS);
-	expect(await readCiTick(mac, "origin", SHIPPED_COMMAND_TIMEOUT_MS)).toBe(NOW + 900_000);
+	await recordCiTick({ repo: repo.owner, remote: "origin", at: NOW + 900_000, identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	expect(await readCiTick({ repo: mac, remote: "origin", timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })).toBe(NOW + 900_000);
 	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe(CI_TICK_REF);
 	// The tick is no branch and no file: main is as it was.
 	expect(sh(repo.remote, ["rev-list", "--count", "main"]).trim()).toBe("1");

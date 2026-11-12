@@ -346,16 +346,16 @@ test("the run's name is saved before launch and adopted after a restart", () => 
 	const key = { itemId: "#68", run: "build", attempt: 1 };
 	const before = openState(dir).runs;
 
-	expect(before.begin(key, "hum #68 build 1").adopted).toBe(false);
+	expect(before.begin(key, { name: "hum #68 build 1" }).adopted).toBe(false);
 
 	// The worker died before it learned the session id. The next one finds the name.
 	const after = openState(dir).runs;
-	const found = after.begin(key, "hum #68 build 1");
+	const found = after.begin(key, { name: "hum #68 build 1" });
 
 	expect(found.adopted).toBe(true);
 	expect(found.record.sessionId).toBeUndefined();
 	expect(found.saveSession("session-1").sessionId).toBe("session-1");
-	expect(openState(dir).runs.begin(key, "hum #68 build 1").record.sessionId).toBe("session-1");
+	expect(openState(dir).runs.begin(key, { name: "hum #68 build 1" }).record.sessionId).toBe("session-1");
 	expect(after.list("#68")).toHaveLength(1);
 });
 
@@ -363,7 +363,7 @@ test("a run is adopted until its outcome is taken, then the next attempt starts 
 	const key = { itemId: "#68", run: "build", attempt: 0 };
 	const runs = openState(dir).runs;
 
-	const begun = runs.begin(key, "hum #68 build #0");
+	const begun = runs.begin(key, { name: "hum #68 build #0" });
 
 	expect(runs.unended("#68", "build")?.attempt).toBe(0);
 	expect(runs.unended("#68", "review")).toBeUndefined();

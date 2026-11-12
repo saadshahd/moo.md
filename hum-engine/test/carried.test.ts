@@ -23,7 +23,7 @@ const WRITES: readonly Write[] = [
 ];
 
 /** The adapter does the write, or not, and then the process "dies". */
-const dying = (real: Adapter, writeFirst: boolean): Adapter => {
+const dying = (real: Adapter, { writeFirst }: { readonly writeFirst: boolean }): Adapter => {
 	const die = async (write: () => Promise<void>) => {
 		if (writeFirst) await write();
 
@@ -60,7 +60,7 @@ for (const write of WRITES) {
 	test(`${write.name} retried after a crash past the write reads the thread and writes nothing`, async () => {
 		const { w, id, entries, calls } = await thread();
 
-		await expect(write.call(calls(dying(w.adapter, true), "after"), id, "two")).rejects.toThrow("died");
+		await expect(write.call(calls(dying(w.adapter, { writeFirst: true }), "after"), id, "two")).rejects.toThrow("died");
 		await write.call(calls(w.adapter, "after"), id, "two");
 		expect(await entries()).toBe(1);
 	});
@@ -68,7 +68,7 @@ for (const write of WRITES) {
 	test(`${write.name} retried after a crash before the write writes once`, async () => {
 		const { w, id, entries, calls } = await thread();
 
-		await expect(write.call(calls(dying(w.adapter, false), "before"), id, "three")).rejects.toThrow("died");
+		await expect(write.call(calls(dying(w.adapter, { writeFirst: false }), "before"), id, "three")).rejects.toThrow("died");
 		expect(await entries()).toBe(0);
 		await write.call(calls(w.adapter, "before"), id, "three");
 		expect(await entries()).toBe(1);

@@ -10,7 +10,7 @@ const OPEN_SENTENCES = new Map([["change", "change the plan so that "]]);
 const sentenceOf = (option: string): string => (WHOLE_ANSWERS.has(option) ? option : (OPEN_SENTENCES.get(option) ?? `${option} `));
 
 /** What pressing a question's button puts in the prompt, and the option the post will carry. */
-export const answerOf = (item: string, word: string): Answering => {
+export const answerOf = ({ item, word }: { readonly item: string; readonly word: string }): Answering => {
 	const label = displayId(item);
 	const opener = `${label}: `;
 	const isFree = word === FREE_ANSWER;

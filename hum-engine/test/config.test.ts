@@ -84,7 +84,7 @@ test("a rename that strands a saved item is refused; with a map the item restore
 	const persisted = Json.parse(JSON.parse(JSON.stringify(actor.getPersistedSnapshot())));
 	actor.stop();
 
-	const renamed = (map: boolean): RawConfig => {
+	const renamed = ({ map }: { readonly map: boolean }): RawConfig => {
 		const next = clone(setUp());
 		const text = JSON.stringify(next.kinds.feature).replaceAll("owner-review", "deep-review");
 		next.kinds.feature = JSON.parse(text);
@@ -97,12 +97,12 @@ test("a rename that strands a saved item is refused; with a map the item restore
 
 	const saved = [{ kind: "feature", state: "owner-review" }];
 
-	const refused = change(before, renamed(false), { saved });
+	const refused = change(before, renamed({ map: false }), { saved });
 	expect(refused.accepted).toBe(false);
 	expect(refused.config).toBe(before);
 	expect(!refused.accepted && refused.refusals[0]?.code).toBe("unmapped-state");
 
-	const accepted = change(before, renamed(true), { saved });
+	const accepted = change(before, renamed({ map: true }), { saved });
 	expect(accepted.accepted).toBe(true);
 
 	if (!accepted.accepted) return;

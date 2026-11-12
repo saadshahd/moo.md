@@ -31,7 +31,7 @@ export const questionCardRows = ({ item, text, options, since }: Question, { now
 	titleRule([displayId(item), sinceText(since, now)], width),
 	...paragraph(text, width, "plain"),
 	...buttonRows(
-		buttonWords({ options }).map((word, index) => button(word, { kind: "fill", item, word }, index === 0)),
+		buttonWords({ options }).map((word, index) => button({ label: word, press: { kind: "fill", item, word }, isPrimary: index === 0 })),
 		width,
 	),
 ];
@@ -41,7 +41,7 @@ export const noticeCardRows = ({ kind, item, code, cause, fix, action, since }: 
 	titleRule([displayId(item ?? code), kind, sinceText(since, now)], width),
 	...paragraph(cause, width, "plain"),
 	...paragraph(fix, width, "dim"),
-	...(action === undefined || item === undefined ? [] : buttonRows([button(action.label, { kind: "fill", item, word: action.answer }, true)], width)),
+	...(action === undefined || item === undefined ? [] : buttonRows([button({ label: action.label, press: { kind: "fill", item, word: action.answer }, isPrimary: true })], width)),
 ];
 
 /** The card for a work source the view cannot read: what the read said, wrapped whole where the band has no room for it. */

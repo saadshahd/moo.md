@@ -402,7 +402,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal): Promise<Finished> => {
 		const attempt = state.runs.unended(id, purpose)?.attempt ?? state.runs.list(id).length;
 		const key = { itemId: id, run: purpose, attempt };
-		const begun = state.runs.begin(key, `hum ${id} ${purpose} #${attempt}`, crypto.randomUUID());
+		const begun = state.runs.begin(key, { name: `hum ${id} ${purpose} #${attempt}`, sessionId: crypto.randomUUID() });
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[purpose]?.file ?? purpose;
 
@@ -459,7 +459,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			undoableLevels: config.hum.undoableLevels,
 		});
 
-		if (decision.action === "ask") return { asked: { ...askedQuestion(reason, decision.confirmed, wants.question), plan: wants.plan ?? "" } };
+		if (decision.action === "ask") return { asked: { ...askedQuestion({ reason, confirmed: decision.confirmed, runsWords: wants.question }), plan: wants.plan ?? "" } };
 
 		const text = `Chose "${decision.choice}" over ${decision.over.filter((word) => word !== decision.choice).join(", ")} without you.`;
 		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: d.workSource, questions: d.questions }, state.ops, { run: "decide", attempt: state.runs.list(id).length });
@@ -527,7 +527,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		],
 	]);
 
-	const saveVerdict = (pick: EventPick, models: readonly string[], head: string) => state.verdicts.put(id, verdictOf(id, head, pick, models));
+	const saveVerdict = (pick: EventPick, models: readonly string[], head: string) => state.verdicts.put(id, verdictOf({ id, head, pick, models }));
 
 	/** A plan or review state: its run picks the next event, and a split files the parts and lands the item as done. */
 	const decision = (purpose: ProsePurpose) =>
@@ -668,7 +668,7 @@ export const PROSE_PROMPTS = {
 	review: (config: RunConfig, item: ItemText, diff: string): string => [roleOf(config, "review"), reviewInput(item, diff, config.hum)].join("\n\n"),
 } as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string) => string>;
 
-const verdictOf = (id: string, head: string, pick: EventPick, models: readonly string[]) => ({ item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] });
+const verdictOf = ({ id, head, pick, models }: { readonly id: string; readonly head: string; readonly pick: EventPick; readonly models: readonly string[] }) => ({ item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] });
 
 /** A run that ended with no answer and no token to count: a usage limit, a hold, or a stop. */
 type Paused = Extract<RunOutcome, { kind: "limited" | "held" | "stopped" }>;
@@ -723,7 +723,7 @@ const reviewAtLanding =
 		};
 
 		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(d.config, d.item, diff), diff, model: d.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => {
-			const verdict = verdictOf(d.id, head, pick, models);
+			const verdict = verdictOf({ id: d.id, head, pick, models });
 
 			d.state.verdicts.put(d.id, verdict);
 

@@ -101,9 +101,9 @@ test("a model id is trusted at a boundary only when its measured rate meets minJ
 test("the alignment grades raise a level at most one step, only when they move the merge-risk score across a cut, and never lower it", () => {
 	const graded = (alignment: "sound" | "partial" | "concern", verification: "sound" | "partial" | "concern") => ({ alignment, verification });
 
-	expect(doesRaiseLevel(0, 4, SOUND, config.hum)).toBe(false);
-	expect(doesRaiseLevel(0, 4, graded("concern", "sound"), config.hum)).toBe(false);
-	expect(doesRaiseLevel(0, 4, graded("sound", "concern"), config.hum)).toBe(true);
+	expect(doesRaiseLevel({ rank: 0, levels: 4, answer: SOUND, config: config.hum })).toBe(false);
+	expect(doesRaiseLevel({ rank: 0, levels: 4, answer: graded("concern", "sound"), config: config.hum })).toBe(false);
+	expect(doesRaiseLevel({ rank: 0, levels: 4, answer: graded("sound", "concern"), config: config.hum })).toBe(true);
 
 	const placement = { level: levels[0]!, unclear: [], steps: [] };
 

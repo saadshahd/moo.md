@@ -47,9 +47,7 @@ export const matchOption = (
 
 /** The cheap model call that picks one of a question's options for a reply no marker or exact word settles. */
 export const replyQuestion = (
-	question: string,
-	options: readonly string[],
-	reply: string,
+	{ question, options, reply }: { readonly question: string; readonly options: readonly string[]; readonly reply: string },
 ) => ({
 	boundary: "reply-option" as const,
 	prompt: [

@@ -274,7 +274,7 @@ describe("the start check", () => {
 });
 
 describe("an answer writes, commits and pushes with hooks off", () => {
-	const hook = (dir: string, name: string, script: string) => {
+	const hook = ({ dir, name, script }: { readonly dir: string; readonly name: string; readonly script: string }) => {
 		const path = join(dir, "hooks", name);
 
 		mkdirSync(dirname(path), { recursive: true });
@@ -287,7 +287,7 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		const worker = repo.worker("w");
 		const ran = join(repo.root, "hook-ran");
 
-		for (const name of ["pre-push", "pre-commit", "commit-msg", "reference-transaction"]) hook(join(worker, ".git"), name, `touch ${ran}; exit 1`);
+		for (const name of ["pre-push", "pre-commit", "commit-msg", "reference-transaction"]) hook({ dir: join(worker, ".git"), name, script: `touch ${ran}; exit 1` });
 
 		const id = repo.seed("asked");
 		const adapter = markdownAdapter({ repo: worker, base: "main", ...markdownSettings }, { report: () => {}, now: Date.now });
@@ -304,7 +304,7 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		const reported: FaultInput[] = [];
 		const id = repo.seed("asked");
 
-		hook(repo.remote, "pre-receive", `echo "GH006: Protected branch update failed for refs/heads/main" >&2; exit 1`);
+		hook({ dir: repo.remote, name: "pre-receive", script: `echo "GH006: Protected branch update failed for refs/heads/main" >&2; exit 1` });
 
 		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now });
 

@@ -155,7 +155,7 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Measured>> = {
 
 				if (judged.kind === "abstained") return "abstained";
 
-				return doesRaiseLevel(0, config.hum.levels.length, judged.value, config.hum) === (found.label !== "clean") ? "right" : "wrong";
+				return doesRaiseLevel({ rank: 0, levels: config.hum.levels.length, answer: judged.value, config: config.hum }) === (found.label !== "clean") ? "right" : "wrong";
 			}),
 		};
 	},
@@ -170,7 +170,7 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Measured>> = {
 
 		return {
 			verdicts: await eachOf(cases, async (found) => {
-				const judged = await judge(replyQuestion(found.question, found.options, found.reply));
+				const judged = await judge(replyQuestion({ question: found.question, options: found.options, reply: found.reply }));
 
 				return judged.kind === "abstained" ? "abstained" : scored(judged.value.option, found.label);
 			}),

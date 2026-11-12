@@ -92,7 +92,7 @@ const proposer = (answer: { same: boolean; models: string[] } | undefined) => {
 	return { asked, propose: async (a: ReviewNote, b: ReviewNote) => (asked.push(`${a.sourceId}~${b.sourceId}`), answer) };
 };
 
-const group = async (notes: ReviewNote[], answer: Parameters<typeof proposer>[0], trusted: boolean) => {
+const group = async (notes: ReviewNote[], { answer, trusted }: { readonly answer: Parameters<typeof proposer>[0]; readonly trusted: boolean }) => {
 	const state = freshState();
 	const { asked, propose } = proposer(answer);
 
@@ -103,21 +103,21 @@ const group = async (notes: ReviewNote[], answer: Parameters<typeof proposer>[0]
 };
 
 test("the model sees only notes no signal pairs; a trusted proposal joins the group", async () => {
-	const { state, asked } = await group([reviewNote({ sourceId: "1", at: 1, text: "Use a lookup table." }), reviewNote({ sourceId: "2", at: 2, text: "use a lookup-table" }), reviewNote({ sourceId: "3", at: 3, text: "Cache the result." })], { same: true, models: ["m"] }, true);
+	const { state, asked } = await group([reviewNote({ sourceId: "1", at: 1, text: "Use a lookup table." }), reviewNote({ sourceId: "2", at: 2, text: "use a lookup-table" }), reviewNote({ sourceId: "3", at: 3, text: "Cache the result." })], { answer: { same: true, models: ["m"] }, trusted: true });
 
 	expect(asked).toEqual(["1~3"]);
 	expect(state.repeats.list().map(({ notes }) => notes.length)).toEqual([3]);
 });
 
 test("a proposal from a model below the owner's bar waits as a possible repeat and files nothing", async () => {
-	const { state } = await group([reviewNote({ sourceId: "1", at: 1, text: "Use a lookup table." }), reviewNote({ sourceId: "2", at: 2, text: "Cache the result." })], { same: true, models: ["m"] }, false);
+	const { state } = await group([reviewNote({ sourceId: "1", at: 1, text: "Use a lookup table." }), reviewNote({ sourceId: "2", at: 2, text: "Cache the result." })], { answer: { same: true, models: ["m"] }, trusted: false });
 
 	expect(state.repeats.list()).toHaveLength(2);
 	expect(state.possibleRepeats.list()).toHaveLength(1);
 });
 
 test("a model that abstains proposes nothing", async () => {
-	const { state } = await group([reviewNote({ sourceId: "1", at: 1 }), reviewNote({ sourceId: "2", at: 2, text: "Cache the result." })], undefined, true);
+	const { state } = await group([reviewNote({ sourceId: "1", at: 1 }), reviewNote({ sourceId: "2", at: 2, text: "Cache the result." })], { answer: undefined, trusted: true });
 
 	expect(state.possibleRepeats.list()).toHaveLength(0);
 	expect(state.repeats.list()).toHaveLength(2);
@@ -237,7 +237,7 @@ test("memory.md shows runs its entries while they fit its byte cap, and refuses 
 test("a memory.md entry no recent run used is listed", () => {
 	const held = [{ rule: "Use a lookup table", source: "review-comment:1" }];
 
-	expect(unusedEntries([...held, { rule: "Fresh", source: "s" }], new Map([["Fresh", 95]]), 100, 20)).toEqual(held);
+	expect(unusedEntries({ entries: [...held, { rule: "Fresh", source: "s" }], lastUsed: new Map([["Fresh", 95]]), runsSoFar: 100, limit: 20 })).toEqual(held);
 });
 
 test("a model call tells what it spent for the item it served, whether it was trusted or not", async () => {
@@ -260,17 +260,17 @@ test("runs record the memory rules they applied, and a rule no run applied in th
 	const ended = (item: string, structured: { memoryUsed?: number[] }) => {
 		const key = { itemId: item, run: "build", attempt: 0 };
 
-		state.runs.begin(key, `hum ${item} build #0`).end(rulesUsed({ structured }, held));
+		state.runs.begin(key, { name: `hum ${item} build #0` }).end(rulesUsed({ structured }, held));
 	};
 
 	ended("a", { memoryUsed: [1] });
 	ended("b", { memoryUsed: [1, 9] });
 	ended("c", {});
-	state.runs.begin({ itemId: "d", run: "plan", attempt: 0 }, "hum d plan #0").end();
+	state.runs.begin({ itemId: "d", run: "plan", attempt: 0 }, { name: "hum d plan #0" }).end();
 
 	const { runsSoFar, lastUsed } = useOf(state.runs.all());
 
 	expect(runsSoFar).toBe(3);
-	expect(unusedEntries(held, lastUsed, runsSoFar, 3)).toEqual([idle]);
-	expect(unusedEntries(held, lastUsed, runsSoFar, 4)).toEqual([]);
+	expect(unusedEntries({ entries: held, lastUsed, runsSoFar, limit: 3 })).toEqual([idle]);
+	expect(unusedEntries({ entries: held, lastUsed, runsSoFar, limit: 4 })).toEqual([]);
 });

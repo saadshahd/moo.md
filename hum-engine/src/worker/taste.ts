@@ -22,7 +22,7 @@ export const reportTaste = async (ctx: LandContext, { pulls, pull, head }: PullA
 				const results: TasteResult[] = verdicts.map(({ rule, judged }) => ({ rule, answer: judged.kind === "picked" ? judged.value : { abstained: judged.why } }));
 				const models = new Set(verdicts.flatMap(({ judged }) => (judged.kind === "picked" ? judged.models : [])));
 
-				await pulls.comment(pull, tasteComment(results, isTrusted([...models], "taste", bar)));
+				await pulls.comment(pull, tasteComment(results, { measured: isTrusted([...models], "taste", bar) }));
 			},
 		},
 	);

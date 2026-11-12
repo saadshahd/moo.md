@@ -180,7 +180,7 @@ test("a notice card gives the cause, then the fix, then its one action whole, wh
 });
 
 const BUTTONS = ["approve", "change the plan", "file follow-up", "x".repeat(14)].map((label, index) =>
-	button(label, { kind: "fill", item: "68", word: label }, index === 0),
+	button({ label, press: { kind: "fill", item: "68", word: label }, isPrimary: index === 0 }),
 );
 
 test("the first button is drawn filled and the rest dim", () => {
@@ -215,7 +215,7 @@ const ENTRY = {
 };
 
 test.each(WIDTHS)("a folded list row fits width %p and ends a cut title in an ellipsis that unfolds", (width) => {
-	const folded = listRows(ENTRY, false, width);
+	const folded = listRows(ENTRY, { isUnfolded: false, width });
 
 	for (const row of folded) expect(rowCells(row)).toBeLessThanOrEqual(width);
 
@@ -228,7 +228,7 @@ test.each(WIDTHS)("a folded list row fits width %p and ends a cut title in an el
 });
 
 test.each(WIDTHS)("an unfolded list row fits width %p and shows the whole title", (width) => {
-	const unfolded = listRows(ENTRY, true, width);
+	const unfolded = listRows(ENTRY, { isUnfolded: true, width });
 
 	for (const row of unfolded) expect(rowCells(row)).toBeLessThanOrEqual(width);
 
@@ -242,11 +242,11 @@ test.each([
 	[120, 1],
 	[30, 2],
 ])("a list row at width %p takes %p lines: one while its title has room, the title under the id when narrow", (width, lines) => {
-	expect(listRows(ENTRY, false, width)).toHaveLength(lines);
+	expect(listRows(ENTRY, { isUnfolded: false, width })).toHaveLength(lines);
 });
 
 test("an unclear item carries the word beside its level", () => {
-	expect(listRows(ENTRY, false, 120).map(textOf).join("")).toContain(
+	expect(listRows(ENTRY, { isUnfolded: false, width: 120 }).map(textOf).join("")).toContain(
 		"medium unclear",
 	);
 });
@@ -377,9 +377,9 @@ test("a status file of this format in another shape reads as unreadable, naming 
 });
 
 test("the status file sits in the repo's git common dir, from the main checkout and from a worktree", () => {
-	expect(statusPathOf("/repo", ".git")).toBe("/repo/.git/hum/status.json");
-	expect(statusPathOf("/repo", ".")).toBe("/repo/hum/status.json");
-	expect(statusPathOf("/repo/.worktrees/a", "/repo/.git")).toBe(
+	expect(statusPathOf({ cwd: "/repo", commonDir: ".git" })).toBe("/repo/.git/hum/status.json");
+	expect(statusPathOf({ cwd: "/repo", commonDir: "." })).toBe("/repo/hum/status.json");
+	expect(statusPathOf({ cwd: "/repo/.worktrees/a", commonDir: "/repo/.git" })).toBe(
 		"/repo/.git/hum/status.json",
 	);
 });

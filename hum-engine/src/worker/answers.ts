@@ -40,12 +40,12 @@ const repliesOn = (thread: readonly ThreadEntry[], afterQuestion: number): Reply
 	});
 };
 
-const resolveReply = async (ctx: AnswerContext, itemId: string, question: string, options: readonly string[], { entry }: Reply): Promise<Resolution> => {
+const resolveReply = async (ctx: AnswerContext, { itemId, question, options, reply: { entry } }: { readonly itemId: string; readonly question: string; readonly options: readonly string[]; readonly reply: Reply }): Promise<Resolution> => {
 	const matched = matchOption(entry, options);
 
 	if (matched) return matched;
 
-	const judged = await ctx.judge({ ...replyQuestion(question, options, entry.text), item: itemId });
+	const judged = await ctx.judge({ ...replyQuestion({ question, options, reply: entry.text }), item: itemId });
 
 	if (judged.kind === "abstained") return { source: "abstained", why: judged.why };
 
@@ -95,9 +95,9 @@ const SUPERSEDED: Disposition = { disposition: "dropped", why: "A newer question
 type Settling = { readonly ctx: AnswerContext; readonly item: Item; readonly question: string; readonly options: readonly string[]; readonly stage: Stage };
 
 /** One reply's record: kept once final, else decided again from where the item stands now. */
-const settleOne = async ({ ctx, item, question, options, stage }: Settling, reply: Reply, answeredBefore: boolean): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
+const settleOne = async ({ ctx, item, question, options, stage }: Settling, { reply, answeredBefore }: { readonly reply: Reply; readonly answeredBefore: boolean }): Promise<{ record: SettledAnswer; resolution: Resolution }> => {
 	const saved = ctx.state.answers.get(keyOf(item.id, reply.ordinal));
-	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, item.id, question, options, reply);
+	const resolution = saved ? resolutionOf(saved) : await resolveReply(ctx, { itemId: item.id, question, options, reply });
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 
@@ -135,7 +135,7 @@ export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, opt
 
 	for (const reply of replies) {
 		const answeredBefore = [...settled.values()].some(({ disposition }) => disposition === "applied");
-		const { record, resolution } = await settleOne(settling, reply, answeredBefore);
+		const { record, resolution } = await settleOne(settling, { reply, answeredBefore });
 		const outcome = { disposition: record.disposition, why: record.why };
 
 		settled.set(reply.index, record);

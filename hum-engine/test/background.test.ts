@@ -158,7 +158,7 @@ test("a worker killed after the launch and before the session id is saved finds 
 
 	expect(state.runs.unended("#68", "build")?.sessionId).toBeUndefined();
 
-	const begun = state.runs.begin(key, name);
+	const begun = state.runs.begin(key, { name });
 	const outcome = await ask(background, { onSession: (id) => begun.saveSession(id) });
 
 	expect(begun.adopted).toBe(true);

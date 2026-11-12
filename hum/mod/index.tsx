@@ -112,7 +112,7 @@ export const register: Register = (on, options) => {
 	});
 
 	on("prompt.change", async ($, e, next) => {
-		await changedBox($, e.origin.kind, e.text).catch(showOnce($));
+		await changedBox($, { origin: e.origin.kind, box: e.text }).catch(showOnce($));
 
 		return next(e);
 	});

@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { type Candidate, footprintOf, doOverlap, pick, PrefixGate } from "../src/worker/scheduler.ts";
 
-const c = (id: string, touches?: string[], answered = false): Candidate => ({ id, footprint: touches, answered });
+const c = (id: string, { touches, answered = false }: { readonly touches?: string[]; readonly answered?: boolean } = {}): Candidate => ({ id, footprint: touches, answered });
 
 test("an item declares its files in a body line; no line means unknown", () => {
 	expect(footprintOf({ body: "Do it.\n\nTouches: docs/a.md, src/\n" })).toEqual(["docs/a.md", "src/"]);
@@ -22,20 +22,20 @@ test("two footprints clash when a path of one lies in the other; unknown clashes
 test("pick: different files start together; one file goes in order; an item behind a waiting item on its file waits too", () => {
 	const base = { now: 0, limitedUntil: 0, runners: 5, running: [] };
 
-	expect(pick({ ...base, queue: [c("a", ["x"]), c("b", ["y"])] }).start.map((i) => i.id)).toEqual(["a", "b"]);
-	expect(pick({ ...base, queue: [c("a", ["x"]), c("b", ["x"]), c("c", ["y"])] }).start.map((i) => i.id)).toEqual(["a", "c"]);
-	expect(pick({ ...base, running: [{ id: "r", footprint: ["x"] }], queue: [c("a", ["x"]), c("b", ["y"])] }).start.map((i) => i.id)).toEqual(["b"]);
+	expect(pick({ ...base, queue: [c("a", { touches: ["x"] }), c("b", { touches: ["y"] })] }).start.map((i) => i.id)).toEqual(["a", "b"]);
+	expect(pick({ ...base, queue: [c("a", { touches: ["x"] }), c("b", { touches: ["x"] }), c("c", { touches: ["y"] })] }).start.map((i) => i.id)).toEqual(["a", "c"]);
+	expect(pick({ ...base, running: [{ id: "r", footprint: ["x"] }], queue: [c("a", { touches: ["x"] }), c("b", { touches: ["y"] })] }).start.map((i) => i.id)).toEqual(["b"]);
 	// d clashes with the waiting b only through b's wider footprint, and b waits on running r.
-	expect(pick({ ...base, running: [{ id: "r", footprint: ["x"] }], queue: [c("b", ["x", "y"]), c("d", ["y"])] }).start).toEqual([]);
+	expect(pick({ ...base, running: [{ id: "r", footprint: ["x"] }], queue: [c("b", { touches: ["x", "y"] }), c("d", { touches: ["y"] })] }).start).toEqual([]);
 });
 
 test("pick: the queue stays under the runner count, answered items go first, and nothing starts while limited", () => {
 	const base = { now: 100, limitedUntil: 0, runners: 2, running: [{ id: "r", footprint: ["z"] }] };
 
-	expect(pick({ ...base, queue: [c("a", ["x"]), c("b", ["y"], true)] }).start.map((i) => i.id)).toEqual(["b"]);
-	expect(pick({ ...base, queue: [c("a", ["x"]), c("b", ["y"], true)] }).deferred.map((i) => i.id)).toEqual(["a"]);
-	expect(pick({ ...base, limitedUntil: 101, queue: [c("a", ["x"])] }).start).toEqual([]);
-	expect(pick({ ...base, limitedUntil: 100, queue: [c("a", ["x"])] }).start.map((i) => i.id)).toEqual(["a"]);
+	expect(pick({ ...base, queue: [c("a", { touches: ["x"] }), c("b", { touches: ["y"], answered: true })] }).start.map((i) => i.id)).toEqual(["b"]);
+	expect(pick({ ...base, queue: [c("a", { touches: ["x"] }), c("b", { touches: ["y"], answered: true })] }).deferred.map((i) => i.id)).toEqual(["a"]);
+	expect(pick({ ...base, limitedUntil: 101, queue: [c("a", { touches: ["x"] })] }).start).toEqual([]);
+	expect(pick({ ...base, limitedUntil: 100, queue: [c("a", { touches: ["x"] })] }).start.map((i) => i.id)).toEqual(["a"]);
 });
 
 test("of runs sharing a prefix the first goes at once and the rest wait for its first token; a warm prefix lets all go", async () => {

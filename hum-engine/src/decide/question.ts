@@ -89,7 +89,7 @@ const ASKED = {
 type AskedQuestion = { readonly question: Question; readonly plain: PlainQuestion };
 
 /** The question a run's need becomes. A reason the facts bear out asks its own question with the run's words folded; any other asks in the run's words. */
-export const askedQuestion = (reason: RunReason, confirmed: boolean, runsWords: string | undefined): AskedQuestion => {
+export const askedQuestion = ({ reason, confirmed, runsWords }: { readonly reason: RunReason; readonly confirmed: boolean; readonly runsWords: string | undefined }): AskedQuestion => {
 	const kind = confirmed ? reason.kind : "unsure";
 	const options = reason.options?.map(({ word }) => word);
 
@@ -119,7 +119,7 @@ const WORD_EDGES = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 export const bareWord = (word: string): string => word.replaceAll(WORD_EDGES, "");
 
 /** The question text rules: at most `cells` wide, ends in "?", names no item id, and no word over `wordCells`. */
-export const questionIssues = (text: string, item: string, { cells, wordCells }: HumConfig["questionLimits"]): QuestionIssue[] => {
+export const questionIssues = ({ text, item, limits: { cells, wordCells } }: { readonly text: string; readonly item: string; readonly limits: HumConfig["questionLimits"] }): QuestionIssue[] => {
 	const mentionsItem = words(text).some((word) => bareWord(word) === item);
 
 	return [
@@ -132,7 +132,7 @@ export const questionIssues = (text: string, item: string, { cells, wordCells }:
 
 /** A question to put on the thread: the run's own text when it passes the rules, else the plain one with the run's text folded. */
 export const composeQuestion = (draft: Question, plain: PlainQuestion, item: string, limits: HumConfig["questionLimits"]): Question => {
-	if (questionIssues(draft.text, item, limits).length === 0) return draft;
+	if (questionIssues({ text: draft.text, item, limits }).length === 0) return draft;
 
 	return { ...draft, text: PLAIN_QUESTIONS[plain], detail: [draft.text, draft.detail].filter(Boolean).join("\n\n") };
 };
@@ -151,12 +151,12 @@ export type Waiting = {
 export const questionOrder = (a: Waiting, b: Waiting): number => a.priority - b.priority || b.behind - a.behind || a.since - b.since;
 
 /** The priority of an item: the index of its first label in the owner's list, or past the end when it has none. */
-export const priorityOf = (labels: readonly string[], priorityLabels: readonly string[]): number => {
+export const priorityOf = ({ labels, priorityLabels }: { readonly labels: readonly string[]; readonly priorityLabels: readonly string[] }): number => {
 	const found = priorityLabels.findIndex((label) => labels.includes(label));
 
 	return found < 0 ? priorityLabels.length : found;
 };
 
 /** How many more questions the owner can be asked now: the cap less those asked within the last day. No cap leaves no limit. */
-export const roomToAsk = (askedAt: readonly number[], cap: number | undefined, now: number): number =>
+export const roomToAsk = ({ askedAt, cap, now }: { readonly askedAt: readonly number[]; readonly cap: number | undefined; readonly now: number }): number =>
 	cap === undefined ? Number.POSITIVE_INFINITY : Math.max(0, cap - askedAt.filter((at) => now - at < DAY_MS).length);

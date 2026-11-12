@@ -28,7 +28,7 @@ export const parseStatus = (text: string): ViewRead => {
 };
 
 /** The status file's place: the repo's git common dir, as the engine's default state folder. */
-export const statusPathOf = (cwd: string, commonDir: string): string => {
+export const statusPathOf = ({ cwd, commonDir }: { readonly cwd: string; readonly commonDir: string }): string => {
 	const absolute = commonDir.startsWith("/") ? commonDir : `${cwd}/${commonDir}`;
 
 	return `${absolute.replace(/\/\.?$/, "")}/hum/status.json`;

@@ -77,8 +77,7 @@ export const doesNeedReviewRun = (route: Route): boolean => route.level.review !
 
 /** Where the target branch requires a pull request, every change lands through one, merging itself only when cleared; elsewhere a cleared change is pushed. */
 export const landingOf = (
-	requiresPullRequest: boolean,
-	cleared: boolean,
+	{ requiresPullRequest, cleared }: { readonly requiresPullRequest: boolean; readonly cleared: boolean },
 ): Landing => {
 	if (requiresPullRequest) return { via: "pull-request", autoMerge: cleared };
 

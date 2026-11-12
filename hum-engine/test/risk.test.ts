@@ -45,7 +45,7 @@ test("prototyping, a low-risk UI tweak: merged on green, no question", () => {
 	const route = routeOf(placed, policy().paths, "feature", ["ui/button.tsx"]);
 
 	expect(route).toMatchObject({ level: { name: "low" }, unclear: [], mergesAlone: true, proof: undefined });
-	expect(landingOf(false, isCleared(route, { review: false, owner: false }))).toEqual({ via: "push" });
+	expect(landingOf({ requiresPullRequest: false, cleared: isCleared(route, { review: false, owner: false }) })).toEqual({ via: "push" });
 });
 
 test("follow-ups up to a path's limit leave its level", () => {
@@ -74,7 +74,7 @@ test.each<[boolean, Landing]>([
 	[true, { via: "pull-request", autoMerge: false }],
 	[false, { via: "wait" }],
 ])("an uncleared change where the base needs a pull request (%p) lands by %j", (needsPull, landing) => {
-	expect(landingOf(needsPull, false)).toEqual(landing);
+	expect(landingOf({ requiresPullRequest: needsPull, cleared: false })).toEqual(landing);
 });
 
 test("a change touching docs and billing takes billing's level", () => {

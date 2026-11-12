@@ -35,7 +35,7 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	const stdinCopy = stdinFile();
 	const w = await world({ script: [{}, { ...NOTE, saveStdin: stdinCopy }] });
 	const body = `${"y".repeat(99)}\n`.repeat(2100);
-	const id = w.repo.add("big", itemFile("Write the note", "ready", body));
+	const id = w.repo.add("big", itemFile("Write the note", { state: "ready", body }));
 	const result = await runThinPath(w.thinPath());
 
 	expect(result).toEqual({ outcome: "merged", item: id });
@@ -202,7 +202,7 @@ const questionsOn = async (w: Awaited<ReturnType<typeof world>>, id: string) => 
 test("a change to a path no rule places runs, waits unmerged and asks one question; the answer becomes a path rule, and the next change there is not unclear", async () => {
 	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }, { commit: { "src/y.ts": "y\n" } }] });
 
-	w.repo.put(".hum/hum.json", OWNER_CONFIG);
+	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
 
 	const id = w.repo.seed("Write the note");
 
@@ -232,7 +232,7 @@ test("where the base needs a pull request, the answer's path rule travels in one
 	const github = new FakePulls();
 	const pulls = github.client();
 
-	w.repo.put(".hum/hum.json", OWNER_CONFIG);
+	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
 
 	const id = w.repo.seed("Write the note");
 
@@ -353,7 +353,7 @@ test("a change that waits for the owner runs on its level's tier and opens the s
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])) });
 	const github = new FakePulls();
 	const pulls = github.client();
-	const id = w.repo.add("note", itemFile("Write the note", "ready", "touches: docs/note.md"));
+	const id = w.repo.add("note", itemFile("Write the note", { state: "ready", body: "touches: docs/note.md" }));
 
 	github.requiresPullRequest = true;
 	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
@@ -412,7 +412,7 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 	const github = new FakePulls();
 	const id = w.repo.seed("Write the note");
 
-	w.repo.put(".hum/hum.json", OWNER_CONFIG);
+	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
 
 	// Every clone hum makes from here on carries a pre-push hook that would fail and leave a mark.
 	process.env.GIT_TEMPLATE_DIR = templates;

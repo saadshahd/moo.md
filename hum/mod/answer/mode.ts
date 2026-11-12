@@ -47,14 +47,14 @@ export async function restartAnswer($: Engine): Promise<void> {
 
 /** A question's button: fills the prompt, only when it is empty. */
 export async function fillAnswer($: Engine, item: string, word: string): Promise<void> {
-	await send($, { type: "filled", answer: answerOf(item, word), box: (await $.prompt.read()).text });
+	await send($, { type: "filled", answer: answerOf({ item, word }), box: (await $.prompt.read()).text });
 }
 
 export async function editedBox($: Engine, box: string): Promise<void> {
 	await send($, { type: "edited", box });
 }
 
-export async function changedBox($: Engine, origin: string, box: string): Promise<void> {
+export async function changedBox($: Engine, { origin, box }: { readonly origin: string; readonly box: string }): Promise<void> {
 	await send($, { type: "changed", origin, box });
 }
 

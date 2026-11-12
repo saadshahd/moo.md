@@ -292,5 +292,5 @@ test.each([
 	["a whole answer", "68", "approve", { filled: "#68: approve", isOpen: false, option: "approve" }],
 	["a free answer", "seed-2", FREE_ANSWER, { filled: "seed-2: ", isOpen: true, option: undefined }],
 ])("a question's button fills %s", (_, item, word, answer) => {
-	expect(answerOf(item, word)).toMatchObject(answer);
+	expect(answerOf({ item, word })).toMatchObject(answer);
 });

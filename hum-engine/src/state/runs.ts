@@ -56,7 +56,7 @@ export class RunRecords {
 	}
 
 	/** Saves the run before it launches. When one is already saved for this key, returns it unchanged, so the caller adopts it. */
-	begin(key: RunKey, name: string, sessionId?: string): BegunRun {
+	begin(key: RunKey, { name, sessionId }: { readonly name: string; readonly sessionId?: string }): BegunRun {
 		const record = RunRecord.parse({ ...key, name, sessionId, savedAt: this.#now() });
 		const created = createOnce(this.#path(record), `${JSON.stringify(record)}\n`);
 		const saved = created ? record : this.get(key);

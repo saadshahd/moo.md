@@ -12,6 +12,6 @@ const state = openState(dir);
 const { runner } = await startRunner({ state, model: SHIPPED_DEFAULTS.models.light, binary });
 const background = backgroundRunner({ binary, state, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.05 }, fallback: runner });
 
-state.runs.begin({ itemId: "#68", run: "build", attempt: 0 }, name);
+state.runs.begin({ itemId: "#68", run: "build", attempt: 0 }, { name });
 
 await background.run({ name, prompt: "do it", cwd: process.cwd(), model: SHIPPED_DEFAULTS.models.light, effort: "low", schema: { type: "object" }, onSession: () => process.kill(process.pid, "SIGKILL") });

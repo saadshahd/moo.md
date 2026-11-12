@@ -24,7 +24,7 @@ export const tasteQuestion = (rule: string, diff: string, { diffLimit }: Pick<Hu
 export type TasteResult = { readonly rule: string; readonly answer: TasteAnswer | { readonly abstained: string } };
 
 /** The pull request comment. It only reports; `measured` says whether the model's rate at this boundary meets the bar. */
-export const tasteComment = (results: readonly TasteResult[], measured: boolean): string => {
+export const tasteComment = (results: readonly TasteResult[], { measured }: { readonly measured: boolean }): string => {
 	const lines = results.map(({ rule, answer }) => {
 		if ("abstained" in answer) return `- ? ${rule} (not checked: ${answer.abstained})`;
 

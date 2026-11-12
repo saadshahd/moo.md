@@ -12,7 +12,7 @@ test("a taste check with no measured rate still reports its pick, says so, and b
 	expect(judged.kind).toBe("picked");
 
 	const measured = isTrusted(["m"], "taste", SHIPPED_DEFAULTS);
-	const comment = judged.kind === "picked" ? tasteComment([{ rule: "No mutation of a local.", answer: judged.value }], measured) : "";
+	const comment = judged.kind === "picked" ? tasteComment([{ rule: "No mutation of a local.", answer: judged.value }], { measured }) : "";
 
 	expect(measured).toBe(false);
 	expect(comment).toContain("- broken: No mutation of a local.\n  > + let total = 0");

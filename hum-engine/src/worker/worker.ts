@@ -189,7 +189,7 @@ export class Worker {
 
 		this.#latest = readEvery(options.latestVersion, { everyMs: options.config.hum.latestVersionCacheSeconds * SECOND_MS, timeoutMs });
 		this.#ciTick = readEvery(options.ciTick, { everyMs: options.config.hum.ciTickCacheSeconds * SECOND_MS, timeoutMs });
-		this.#start = signatureOf(options.repo, options.engineVersion ?? ENGINE_VERSION, options.config.hum.itemsDir);
+		this.#start = signatureOf({ repo: options.repo, fallbackVersion: options.engineVersion ?? ENGINE_VERSION, itemsDir: options.config.hum.itemsDir });
 		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
 		rememberKinds(options.state, options.config);
 		this.#recheckLandings();
@@ -499,7 +499,7 @@ export class Worker {
 		const { state, config } = this.#o;
 		const { runsSoFar, lastUsed } = useOf(state.runs.all());
 
-		return unusedEntries(entries, lastUsed, runsSoFar, config.hum.memoryUnusedRuns).map(({ rule }) => rule);
+		return unusedEntries({ entries, lastUsed, runsSoFar, limit: config.hum.memoryUnusedRuns }).map(({ rule }) => rule);
 	}
 
 	/** One card for each reason memory.md lines are refused, naming the lines as they stand; a reason no line has any more clears its card. */
@@ -707,9 +707,9 @@ export class Worker {
 
 		await Promise.all(this.#dueWaits(t).map((due) => this.#fireDue(due, t)));
 
-		if (config.hum.ciToken) checkTokenAge(state.faults, config.hum.ciToken.setUp, t, config.hum.tokenWarnDays);
+		if (config.hum.ciToken) checkTokenAge(state.faults, { setUp: config.hum.ciToken.setUp, now: t, warnDays: config.hum.tokenWarnDays });
 
-		const signature = signatureOf(this.#o.repo, this.#o.engineVersion ?? ENGINE_VERSION, this.#o.config.hum.itemsDir);
+		const signature = signatureOf({ repo: this.#o.repo, fallbackVersion: this.#o.engineVersion ?? ENGINE_VERSION, itemsDir: this.#o.config.hum.itemsDir });
 		const update = this.#updateSeen(signature);
 
 		this.#updating = update;

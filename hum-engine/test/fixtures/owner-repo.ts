@@ -25,7 +25,7 @@ export const ownerRepo = (spec: ShimSpec, env: Record<string, string> = {}, edit
 		repo,
 		shim,
 		home,
-		item: (id: string) => repo.add(id, itemFile(id, "ready", "Do the work.")),
+		item: (id: string) => repo.add(id, itemFile(id, { state: "ready", body: "Do the work." })),
 		/** The environment a unit or workflow gives the binary. */
 		env: {
 			...shim.env,

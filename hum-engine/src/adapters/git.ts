@@ -142,7 +142,7 @@ export const pushOrRefuse = async (git: Git, rest: readonly string[]): Promise<"
 };
 
 /** Whether `ancestor` is reachable from `descendant`. git answers by exit code alone. */
-export const isAncestor = async (git: Git, ancestor: string, descendant: string): Promise<boolean> => {
+export const isAncestor = async (git: Git, { ancestor, descendant }: { readonly ancestor: string; readonly descendant: string }): Promise<boolean> => {
 	const args = ["merge-base", "--is-ancestor", ancestor, descendant];
 	const result = await git.run(args);
 

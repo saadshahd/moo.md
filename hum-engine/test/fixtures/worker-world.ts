@@ -84,7 +84,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 		workerWith,
 		worker: workerWith(),
 		/** An item that declares what it touches. */
-		item: (id: string, touches?: string) => repo.add(id, itemFile(id, "ready", touches ? `touches: ${touches}\n\nDo the work.` : "Do the work.")),
+		item: (id: string, touches?: string) => repo.add(id, itemFile(id, { state: "ready", body: touches ? `touches: ${touches}\n\nDo the work.` : "Do the work." })),
 		/** A file in the owner's checkout, which the update check watches. */
 		ownerFile: (path: string, content: string) => {
 			mkdirSync(dirname(join(repo.owner, path)), { recursive: true });

@@ -6,14 +6,14 @@ import { DAY_MS } from "../src/time.ts";
 const LIMITS = { cells: 80, wordCells: 40 };
 
 test("a question is at most 80 cells, ends in a question mark, names no item and holds no word over 40 cells", () => {
-	expect(questionIssues("Which title should the note carry?", "seed-1", LIMITS)).toEqual([]);
-	expect(questionIssues(`${"a ".repeat(41)}?`, "seed-1", LIMITS)).toEqual(["too-wide"]);
-	expect(questionIssues("Which title", "seed-1", LIMITS)).toEqual(["no-question-mark"]);
-	expect(questionIssues("Should seed-1 go on?", "seed-1", LIMITS)).toEqual(["names-item"]);
-	expect(questionIssues("Should _seed-1_ go on?", "seed-1", LIMITS)).toEqual(["names-item"]);
-	expect(questionIssues(`Is ${"x".repeat(41)} right?`, "seed-1", LIMITS)).toEqual(["long-word"]);
+	expect(questionIssues({ text: "Which title should the note carry?", item: "seed-1", limits: LIMITS })).toEqual([]);
+	expect(questionIssues({ text: `${"a ".repeat(41)}?`, item: "seed-1", limits: LIMITS })).toEqual(["too-wide"]);
+	expect(questionIssues({ text: "Which title", item: "seed-1", limits: LIMITS })).toEqual(["no-question-mark"]);
+	expect(questionIssues({ text: "Should seed-1 go on?", item: "seed-1", limits: LIMITS })).toEqual(["names-item"]);
+	expect(questionIssues({ text: "Should _seed-1_ go on?", item: "seed-1", limits: LIMITS })).toEqual(["names-item"]);
+	expect(questionIssues({ text: `Is ${"x".repeat(41)} right?`, item: "seed-1", limits: LIMITS })).toEqual(["long-word"]);
 	// Full-width characters take two cells each.
-	expect(questionIssues(`${"日".repeat(41)}?`, "seed-1", LIMITS)).toContain("too-wide");
+	expect(questionIssues({ text: `${"日".repeat(41)}?`, item: "seed-1", limits: LIMITS })).toContain("too-wide");
 });
 
 test("a question that breaks the rules is asked in its plain form with its own words folded", () => {
@@ -23,7 +23,7 @@ test("a question that breaks the rules is asked in its plain form with its own w
 	expect(composed.text).toBe(PLAIN_QUESTIONS.unsure);
 	expect(composed.options).toEqual(["yes", "no"]);
 	expect(composed.detail).toContain(draft.text);
-	expect(questionIssues(composed.text, "seed-1", LIMITS)).toEqual([]);
+	expect(questionIssues({ text: composed.text, item: "seed-1", limits: LIMITS })).toEqual([]);
 	expect(composeQuestion({ text: "Which title?" }, "unsure", "seed-1", LIMITS)).toEqual({ text: "Which title?" });
 });
 
@@ -51,16 +51,16 @@ test("under a cap, the questions that ask first are the priority label's, then t
 	const order = [at("old", 1, 0, 1), at("blocking", 1, 3, 9), at("labelled", 0, 0, 9), at("new", 1, 0, 5)].sort(questionOrder).map(({ item }) => item);
 
 	expect(order).toEqual(["labelled", "blocking", "old", "new"]);
-	expect(priorityOf(["bug", "priority:high"], ["priority:high"])).toBe(0);
-	expect(priorityOf(["bug"], ["priority:high"])).toBe(1);
+	expect(priorityOf({ labels: ["bug", "priority:high"], priorityLabels: ["priority:high"] })).toBe(0);
+	expect(priorityOf({ labels: ["bug"], priorityLabels: ["priority:high"] })).toBe(1);
 });
 
 test("the cap counts the questions asked in the last day; no cap leaves no limit", () => {
 	const now = 10 * DAY_MS;
 
-	expect(roomToAsk([now - 1, now - DAY_MS + 1, now - DAY_MS - 1], 3, now)).toBe(1);
-	expect(roomToAsk([], undefined, now)).toBe(Number.POSITIVE_INFINITY);
-	expect(roomToAsk([now, now, now, now], 3, now)).toBe(0);
+	expect(roomToAsk({ askedAt: [now - 1, now - DAY_MS + 1, now - DAY_MS - 1], cap: 3, now })).toBe(1);
+	expect(roomToAsk({ askedAt: [], cap: undefined, now })).toBe(Number.POSITIVE_INFINITY);
+	expect(roomToAsk({ askedAt: [now, now, now, now], cap: 3, now })).toBe(0);
 });
 
 const OPTIONS = ["approve", "change"];

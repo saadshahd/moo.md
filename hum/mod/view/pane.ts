@@ -25,7 +25,7 @@ const listSection = (title: string, entries: readonly ListEntry[], input: PaneIn
 	section(
 		title,
 		entries.length,
-		entries.flatMap((entry) => listRows(entry, input.unfolded.has(entry.foldId), input.width)),
+		entries.flatMap((entry) => listRows(entry, { isUnfolded: input.unfolded.has(entry.foldId), width: input.width })),
 		input.width,
 	);
 

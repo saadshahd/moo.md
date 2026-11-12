@@ -38,7 +38,7 @@ export type EnvelopeMigrations = Steps<EnvelopeJson>;
 export const ENVELOPE_MIGRATIONS: EnvelopeMigrations = {};
 
 /** True when a file was written by an engine newer than the running one, or by one whose version is unreadable. */
-export const isFromNewerEngine = (written: string, running: string): boolean => semver.valid(written) === null || semver.gt(written, running);
+export const isFromNewerEngine = ({ written, running }: { readonly written: string; readonly running: string }): boolean => semver.valid(written) === null || semver.gt(written, running);
 
 /** The part of an envelope that names the item and its machine, enough to list what is saved without restoring it. */
 export const SavedHeader = z.looseObject({

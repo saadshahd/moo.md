@@ -61,7 +61,7 @@ const gradeOfRank = (rank: number, levels: number): number => (levels < 2 ? GRAD
  * Whether the alignment call's grades raise the level one step: they put the merge-risk score in a higher band than
  * sound grades would at the same level. The call never lowers a level.
  */
-export const doesRaiseLevel = (rank: number, levels: number, answer: AlignmentAnswer, { mergeRisk }: Pick<HumConfig, "mergeRisk">): boolean => {
+export const doesRaiseLevel = ({ rank, levels, answer, config: { mergeRisk } }: { readonly rank: number; readonly levels: number; readonly answer: AlignmentAnswer; readonly config: Pick<HumConfig, "mergeRisk"> }): boolean => {
 	const fromLevel = gradeOfRank(rank, levels);
 
 	const scored = (alignment: number, verification: number): number =>
@@ -75,5 +75,5 @@ export const alignedPlacement = (placement: Placement, answer: AlignmentAnswer, 
 	const rank = config.levels.findIndex(({ name }) => name === placement.level.name);
 	const above = config.levels[Math.min(rank + 1, config.levels.length - 1)];
 
-	return above && doesRaiseLevel(rank, config.levels.length, answer, config) ? { ...placement, level: above, steps: [...placement.steps, { step: "alignment" }] } : placement;
+	return above && doesRaiseLevel({ rank, levels: config.levels.length, answer, config }) ? { ...placement, level: above, steps: [...placement.steps, { step: "alignment" }] } : placement;
 };

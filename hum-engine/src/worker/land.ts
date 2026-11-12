@@ -265,14 +265,14 @@ export const prepareLanding = async (ctx: LandContext, ownerApproved = false): P
 const isOnBase = async ({ git, base }: LandContext): Promise<boolean> => {
 	await git.raw(["fetch", "-q", "origin", base]);
 
-	return isAncestor(git, "HEAD", `origin/${base}`);
+	return isAncestor(git, { ancestor: "HEAD", descendant: `origin/${base}` });
 };
 
 /** The change on the newest base: when the base moved it is rebased and the checks run again; else why it cannot merge there. */
 const ontoNewestBase = async ({ git, base, clone, env, checks, config }: LandContext): Promise<Stale | undefined> => {
 	await git.raw(["fetch", "-q", "origin", base]);
 
-	if (await isAncestor(git, `origin/${base}`, "HEAD")) return undefined;
+	if (await isAncestor(git, { ancestor: `origin/${base}`, descendant: "HEAD" })) return undefined;
 
 	const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
 
@@ -294,7 +294,7 @@ const pushBranchAndBase = async ({ git, base, branch }: LandContext): Promise<vo
 };
 
 const finish = async ({ state, git, id, now }: LandContext): Promise<ThinResult> => {
-	recordMerged(state, id, (await git.raw(["rev-parse", "HEAD"])).trim(), now());
+	recordMerged(state, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
 
 	return { outcome: "merged", item: id };
 };
@@ -447,7 +447,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 
-	return landBy(ctx, landingOf(rules.requiresPullRequest, isCleared(route, approvals)), route, rules, why);
+	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest, cleared: isCleared(route, approvals) }), route, rules, why);
 };
 
 /** The alignment call's grades for a saved change, made once and kept with the landing. */
