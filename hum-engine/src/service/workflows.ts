@@ -1,4 +1,4 @@
-import { stringify } from "yaml";
+import { Document, visit } from "yaml";
 import { CLAUDE_FLOOR } from "../adapters/claude-p.ts";
 import type { HumConfig, PullRequestToken } from "../config/schema.ts";
 import { APP_TOKEN_ACTION, CLAUDE_TOKEN, readsSecrets, secretsNamed, TRUSTED_ASSOCIATIONS, WAKE_ENV as ENV, WORKFLOW_FILES } from "../config/wake-job.ts";
@@ -19,7 +19,16 @@ const HOPE_MARKETPLACE = "saadshahd/moo.md";
 /** The Bun that builds the workflows is the one the owner's repo runs, so CI installs with the same lockfile reader. */
 const BUN_VERSION = Bun.version;
 
-const ACTIONS = { checkout: "actions/checkout@v4", appToken: `${APP_TOKEN_ACTION}@v3` } as const;
+/**
+ * Each action the workflows run, at the one commit its release is. A tag can move to code that then holds the App's
+ * private key and every secret of the job; a commit cannot. The release rides beside the commit as a comment.
+ */
+const ACTIONS = {
+	checkout: { uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", release: "v7.0.1" },
+	appToken: { uses: `${APP_TOKEN_ACTION}@64ab729a6294000f5aa4a4bc0b73d1f32bc45510`, release: "v3.3.0" },
+} as const;
+
+const RELEASE_OF: ReadonlyMap<string, string> = new Map(Object.values(ACTIONS).map(({ uses, release }) => [uses, release]));
 
 const PERMISSIONS = { contents: "write", issues: "write", "pull-requests": "write" } as const;
 
@@ -102,7 +111,7 @@ const githubToken = (source: PullRequestToken) =>
 					{
 						id: APP_TOKEN_STEP,
 						if: `env.${ENV.hasApp} == 'true'`,
-						uses: ACTIONS.appToken,
+						uses: ACTIONS.appToken.uses,
 						with: {
 							"client-id": secret(source.clientIdSecret),
 							"private-key": secret(source.privateKeySecret),
@@ -156,7 +165,7 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner
 				"timeout-minutes": ciWakeTimeoutMinutes,
 				env: { ...env.everyStep, ...github.env, [ENV.event]: "${{ github.event_name }}" },
 				steps: [
-					{ uses: ACTIONS.checkout, with: { "fetch-depth": 0 } },
+					{ uses: ACTIONS.checkout.uses, with: { "fetch-depth": 0 } },
 					JOB_PATHS_STEP,
 					{ run: `npm install --global --prefix "${JOB_TOOLS}" bun@${BUN_VERSION} @anthropic-ai/claude-code@${CLAUDE_FLOOR}` },
 					{ run: "bun install --frozen-lockfile" },
@@ -173,6 +182,23 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner
 /** A comment wakes hum only when a person the repo trusts wrote it: on a public repo anyone may comment, and a wake holds every secret. */
 const TRUSTED_COMMENT = `github.event.comment.user.type != 'Bot' && contains(fromJSON('${JSON.stringify(TRUSTED_ASSOCIATIONS)}'), github.event.comment.author_association)`;
 
+type Workflow = ReturnType<typeof wake> | ReturnType<typeof trigger>;
+
+/** A workflow as YAML, each pinned action followed by its release as a comment, and a value two keys share written out under both. */
+const render = (workflow: Workflow): string => {
+	const document = new Document(workflow, { aliasDuplicateObjects: false });
+
+	visit(document, {
+		Scalar: (_key, node) => {
+			const release = RELEASE_OF.get(String(node.value));
+
+			if (release !== undefined) node.comment = ` ${release}`;
+		},
+	});
+
+	return document.toString({ lineWidth: 0 });
+};
+
 const WORKFLOWS = {
 	[WORKFLOW_FILES.wake]: wake,
 	[WORKFLOW_FILES.comment]: () => trigger("hum on comment", { issue_comment: { types: ["created"] } }, { if: TRUSTED_COMMENT }),
@@ -185,4 +211,4 @@ export type WorkflowFile = { readonly file: string; readonly text: string };
 
 /** The workflow files for an owner's repo, each named for `.github/workflows/`. */
 export const ciWorkflows = (settings: WorkflowSettings): WorkflowFile[] =>
-	Object.entries(WORKFLOWS).map(([file, build]) => ({ file, text: stringify(build(settings), { lineWidth: 0 }) }));
+	Object.entries(WORKFLOWS).map(([file, build]) => ({ file, text: render(build(settings)) }));

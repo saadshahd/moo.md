@@ -154,6 +154,20 @@ test("a comment wakes hum only when the repo's owner, a member or a collaborator
 	expect(Trigger.parse(parseYaml(text)).jobs.wake.if).toBe(`github.event.comment.user.type != 'Bot' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)`);
 });
 
+test("a value two keys share is written out under both, with no YAML anchor", () => {
+	expect(wakeOf(gateway).on.workflow_call.secrets.APP_CLIENT_ID).toEqual({ required: false });
+	expect(wakeText(gateway)).not.toMatch(/[&*]a\d/);
+});
+
+test("each action runs at one commit, with its release beside it as a comment", () => {
+	const uses = ciWorkflows(gateway).flatMap(({ text }) => text.split("\n").filter((line) => /uses: [^.]/.test(line)).map((line) => line.trim().replace(/^- /, "")));
+
+	expect(uses).toEqual([
+		"uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
+		"uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0",
+	]);
+});
+
 test("the wake job runs on the runner and in the container the settings name, as written", () => {
 	const shipped = wakeOf(settings).jobs.wake;
 	const own = wakeOf(gateway).jobs.wake;
