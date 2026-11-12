@@ -192,20 +192,11 @@ export const roundupAdapter = (options: RoundupOptions, { now }: AdapterContext)
 		await post(id, cutLine(marker, text, ` … full text in Pad "${name}"`, COMMENT_LIMIT));
 	};
 
-	const fitsMarked = (marker: Marker, text: string): boolean => {
-		try {
-			markedLine(marker, text, COMMENT_LIMIT);
+	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> => {
+		const line = markedLine(marker, text);
 
-			return true;
-		} catch (cause) {
-			if (cause instanceof PermanentError) return false;
-
-			throw cause;
-		}
+		return line.length <= COMMENT_LIMIT ? post(id, line) : postInPad(id, marker, text);
 	};
-
-	const postMarked = async (id: string, marker: Marker, text: string): Promise<void> =>
-		fitsMarked(marker, text) ? post(id, markedLine(marker, text, COMMENT_LIMIT)) : postInPad(id, marker, text);
 
 	const postPlain = async (id: string, text: string): Promise<void> => (fitsOneComment(text) ? post(id, text) : postInPad(id, undefined, text));
 

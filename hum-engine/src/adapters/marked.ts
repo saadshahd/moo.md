@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { PermanentError, type Question, THREAD_KINDS, type ThreadEntry } from "../adapter-api.ts";
+import { type Question, THREAD_KINDS, type ThreadEntry } from "../adapter-api.ts";
 
 const OPEN = "<!-- hum ";
 const CLOSE = " -->";
@@ -100,14 +100,8 @@ export const filedFollowUp = (bodies: readonly string[], title: string): string 
 /** A comment hum writes on a provider's thread. */
 export const marked = (marker: Marker, text: string): string => `${markerLine(Marker, marker)}\n\n${text.trim()}`;
 
-/** The same comment on one line, for a provider whose comments hold one line of at most `limit` characters; text that does not fit is refused, never cut. */
-export const markedLine = (marker: Marker, text: string, limit: number): string => {
-	const line = `${markerLine(Marker, marker)} ${text.replaceAll(/\s+/g, " ").trim()}`;
-
-	if (line.length > limit) throw new PermanentError(`this provider's comments hold ${limit} characters; this one needs ${line.length}`);
-
-	return line;
-};
+/** The same comment on one line, for a provider whose comments hold one line. */
+export const markedLine = (marker: Marker, text: string): string => `${markerLine(Marker, marker)} ${text.replaceAll(/\s+/g, " ").trim()}`;
 
 /** The first lines of `text` on one line, cut so the line with its optional marker and the closing `note` fits `limit`. */
 export const cutLine = (marker: Marker | undefined, text: string, note: string, limit: number): string => {
