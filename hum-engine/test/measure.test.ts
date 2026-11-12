@@ -8,6 +8,7 @@ import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
 import { pastChange } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { rateOf } from "../src/measure/rate.ts";
 
 
 const freshState = () => openState(tempDir("measure"));
@@ -92,4 +93,9 @@ test("a revert titled revert!: that names a change's commit marks that change re
 
 	expect(labels(pastChange({ sha: "54e7809", subject: "revert!: roll back to router skills pattern (pre-3028506)" })).get("3028506abcdef")).toBe("reverted");
 	expect(labels(pastChange({ sha: "54e7809", subject: "revert!: roll back to router skills pattern" })).get("3028506abcdef")).toBe("clean");
+});
+
+test("a boundary where nothing was measured has no rate, so it never stands in for a measured one", () => {
+	expect(rateOf(0, 0)).toBeUndefined();
+	expect(rateOf(3, 4)).toBe(0.75);
 });
