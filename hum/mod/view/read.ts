@@ -1,8 +1,7 @@
-import type { Status } from "../../../hum-engine/src/status/format.ts";
 import type { ViewSource } from "../../types";
-import { STATUS_FORMAT } from "../vendor/libs.js";
+import { STATUS_FORMAT, Status } from "../vendor/libs.js";
 
-/** What the view knows about the status file. The engine validates every write, so the view checks only the format number. */
+/** What the view knows about the status file: a format it does not read is unsupported, and its own format in another shape is unreadable. */
 export type ViewRead =
 	| { readonly kind: "waiting" }
 	| { readonly kind: "status"; readonly status: Status }
@@ -12,13 +11,17 @@ export type ViewRead =
 
 type Formatted = { readonly format?: number | string };
 
-const isStatus = (value: Formatted | null): value is Status => value?.format === STATUS_FORMAT;
+const readFormatted = (parsed: Formatted | null): ViewRead => {
+	if (parsed?.format !== STATUS_FORMAT) return { kind: "unsupported", format: parsed?.format ?? "none" };
+
+	const checked = Status.safeParse(parsed);
+
+	return checked.success ? { kind: "status", status: checked.data } : { kind: "unreadable", message: checked.error.issues.map(({ path, message }) => `${path.join(".")}: ${message}`).join("; ") };
+};
 
 export const parseStatus = (text: string): ViewRead => {
 	try {
-		const parsed: Formatted | null = JSON.parse(text);
-
-		return isStatus(parsed) ? { kind: "status", status: parsed } : { kind: "unsupported", format: parsed?.format ?? "none" };
+		return readFormatted(JSON.parse(text));
 	} catch (error) {
 		return { kind: "unreadable", message: error instanceof Error ? error.message : "the status file cannot be parsed" };
 	}

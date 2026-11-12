@@ -370,6 +370,14 @@ test("the status file's format number decides what the view reads", () => {
 	expect(parseStatus("{").kind).toBe("unreadable");
 });
 
+test("a status file of this format in another shape reads as unreadable, naming the field", () => {
+	const { questions: _, ...withoutQuestions } = fullStatus;
+	const read = parseStatus(JSON.stringify(withoutQuestions));
+
+	expect(read.kind).toBe("unreadable");
+	expect(read.kind === "unreadable" && read.message).toContain("questions");
+});
+
 test("the status file sits in the repo's git common dir, from the main checkout and from a worktree", () => {
 	expect(statusPathOf("/repo", ".git")).toBe("/repo/.git/hum/status.json");
 	expect(statusPathOf("/repo", ".")).toBe("/repo/hum/status.json");
