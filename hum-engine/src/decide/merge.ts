@@ -30,11 +30,11 @@ const STRICTEST_PROOF = "the owner's word that the change is proven";
 export type Approvals = { readonly review: boolean; readonly owner: boolean };
 
 /** What clears a clear change without the owner, by its level's review. The owner's approval clears any change. */
-const CLEARED_BY: Readonly<Record<(typeof REVIEWS)[number], (approvals: Approvals) => boolean>> = {
+const CLEARED_BY = {
 	none: () => true,
 	agent: (approvals) => approvals.review,
 	owner: () => false,
-};
+} as const satisfies Record<(typeof REVIEWS)[number], (approvals: Approvals) => boolean>;
 
 const NO_APPROVALS: Approvals = { review: false, owner: false };
 

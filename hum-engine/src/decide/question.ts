@@ -42,14 +42,14 @@ type AskDecision =
 const cheapPick = ({ options = [], default: chosen }: RunReason, { changedPaths, level, undoableLevels }: AskFacts): string | undefined =>
 	undoableLevels.includes(level) && options.every(({ paths }) => paths.every((path) => changedPaths.includes(path))) ? options.find(({ word }) => word === chosen)?.word : undefined;
 
-const CONFIRMS: Readonly<Record<AskReason, (reason: RunReason, facts: AskFacts) => boolean>> = {
+const CONFIRMS = {
 	"missing-secret": ({ variable }, { runnerVariables }) => variable !== undefined && !runnerVariables.has(variable),
 	"past-undoing": ({ command }) => command !== undefined,
 	"spends-money": () => true,
 	publishes: () => true,
 	choice: () => false,
 	unsure: () => true,
-};
+} as const satisfies Record<AskReason, (reason: RunReason, facts: AskFacts) => boolean>;
 
 /** Whether the owner is asked: a reason the facts cannot confirm still asks, and a cheap choice is made without them. */
 export const askDecision = (reason: RunReason, facts: AskFacts): AskDecision => {

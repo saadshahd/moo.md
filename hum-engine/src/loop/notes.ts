@@ -19,7 +19,7 @@ export type RawComment = {
 	readonly at: number;
 };
 
-const SOURCE_OF_KIND: Readonly<Record<RawComment["kind"], NoteSource>> = { comment: "review-comment", review: "review-body" };
+const SOURCE_OF_KIND = { comment: "review-comment", review: "review-body" } as const satisfies Record<RawComment["kind"], NoteSource>;
 
 /** The owner's comments and review bodies; a bot's, another person's and an empty body are not review notes. */
 export const ownerNotes = (raw: readonly RawComment[], owners: readonly string[]): ReviewNote[] =>

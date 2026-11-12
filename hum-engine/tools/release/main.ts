@@ -91,6 +91,6 @@ const check = async (): Promise<number> => {
 
 const CommandName = z.enum(["surface", "check"], { error: "usage: release <surface | check>" });
 
-const COMMANDS: Record<z.infer<typeof CommandName>, () => Promise<number>> = { surface: writeSurface, check };
+const COMMANDS = { surface: writeSurface, check } as const satisfies Record<z.infer<typeof CommandName>, () => Promise<number>>;
 
 process.exitCode = await COMMANDS[CommandName.parse(process.argv[2])]();

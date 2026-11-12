@@ -26,7 +26,7 @@ export const INSTALL_COMMANDS = {
 } as const satisfies Record<PackageManager, string>;
 
 /** The command that runs a package script, per package manager that has scripts. */
-export const RUN_SCRIPT: Readonly<Record<PackageManager, string | undefined>> = { bun: "bun run", pnpm: "pnpm run", yarn: "yarn", npm: "npm run", uv: undefined, poetry: undefined, cargo: undefined, go: undefined };
+export const RUN_SCRIPT = { bun: "bun run", pnpm: "pnpm run", yarn: "yarn", npm: "npm run", uv: undefined, poetry: undefined, cargo: undefined, go: undefined } as const satisfies Record<PackageManager, string | undefined>;
 
 /** Package scripts that check a change, in the order a repo's own run gives them. */
 export const CHECK_SCRIPTS = ["check", "typecheck", "lint", "test"] as const;

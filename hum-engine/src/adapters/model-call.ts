@@ -20,12 +20,12 @@ export type Judgment<T> =
 
 export type ModelCall = <T>(question: Question<T>) => Promise<Judgment<T>>;
 
-const NOT_ANSWERED: Readonly<Record<Exclude<RunOutcome, { kind: "finished" }>["kind"], string>> = {
+const NOT_ANSWERED = {
 	limited: "a usage limit refused the call",
 	held: "the runner is held",
 	"over-cap": "the call passed its token cap",
 	stopped: "the call timed out",
-};
+} as const satisfies Record<Exclude<RunOutcome, { kind: "finished" }>["kind"], string>;
 
 const abstained = (why: string) => ({ kind: "abstained", why }) as const;
 

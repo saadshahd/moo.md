@@ -36,11 +36,9 @@ export const questionCardRows = ({ item, text, options, since }: Question, { now
 	),
 ];
 
-const KIND_WORD: Readonly<Record<Card["kind"], string>> = { waiting: "waiting", limited: "limited", fault: "fault" };
-
 /** A waiting, limited or fault card: the cause, then the fix in one sentence, then at most one action. */
 export const noticeCardRows = ({ kind, item, code, cause, fix, action, since }: Card, { now, width }: CardInput): Row[] => [
-	titleRule([displayId(item ?? code), KIND_WORD[kind], sinceText(since, now)], width),
+	titleRule([displayId(item ?? code), kind, sinceText(since, now)], width),
 	...paragraph(cause, width, "plain"),
 	...paragraph(fix, width, "dim"),
 	...(action === undefined || item === undefined ? [] : buttonRows([button(action.label, { kind: "fill", item, word: action.answer }, true)], width)),
