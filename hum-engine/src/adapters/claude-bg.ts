@@ -31,8 +31,15 @@ const SINGLE_QUOTE = /'/g;
 
 const shellQuote = (text: string): string => `'${text.replace(SINGLE_QUOTE, `'\\''`)}'`;
 
-/** A hook command that saves the hook's input, which names the session and its transcript, as a file of its own. */
-const dropInto = (folder: string): string => `cat > ${shellQuote(folder)}/$$.json`;
+/**
+ * A hook command that saves the hook's input, which names the session and its transcript, as a file of its own. It
+ * writes a temp file the folder's reader skips and renames it in, so a reader never meets half a report.
+ */
+const dropInto = (folder: string): string => {
+	const at = shellQuote(folder);
+
+	return `cat > ${at}/$$.part && mv ${at}/$$.part ${at}/$$.json`;
+};
 
 /** The settings every background run starts with: hum's plugin off, the deny rules and auto mode's rules, and a hook that reports the run. */
 export const backgroundSettings = ({ deniedRunCommands, runAutoMode }: Pick<HumConfig, "deniedRunCommands" | "runAutoMode">, stopsFolder: string, env: Readonly<Record<string, string>> = {}) => ({

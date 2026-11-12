@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { mkdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { x } from "tinyexec";
@@ -6,8 +7,10 @@ import { BACKGROUND_CHECK_CODE, backgroundRunner, FALLBACK_CODE, backgroundSetti
 import { type Runner, type RunRequest, startRunner } from "../src/adapters/claude-p.ts";
 import { readTranscript, billedTokens } from "../src/adapters/transcript.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { listFiles, listRecords } from "../src/state/fs.ts";
 import { openState } from "../src/state/open.ts";
 import { makeShim, SHIM_MODEL, type ShimSpec } from "./fixtures/shim.ts";
+import { until } from "./fixtures/process.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
 const MODEL = SHIPPED_DEFAULTS.models.light;
@@ -87,9 +90,28 @@ test("run settings turn hum's plugin off, deny the GitHub writes and report the 
 	const args = launchArgs({ name: "hum #68 build #0", model: MODEL, effort: "low", schema: { type: "object" }, settings });
 
 	expect(settings).toMatchObject({ enabledPlugins: { [HUM_PLUGIN]: false }, permissions: { deny: expect.arrayContaining(["Bash(git push *)"]) } });
-	expect(JSON.stringify(settings)).toContain(`cat > '/tmp/it'\\\\''s here/stops'/$$.json`);
 	expect(args.slice(0, 3)).toEqual(["--bg", "-n", "hum #68 build #0"]);
 	expect(args).not.toContain("do it");
+});
+
+test("the run's hook files its report whole: the stops folder lists no record until the hook's input has ended", async () => {
+	const stops = join(tempDir("stops"), "it's here");
+
+	mkdirSync(stops);
+
+	const hook = Bun.spawn(["sh", "-c", backgroundSettings(CONFIG, stops).hooks["Stop"]![0]!.hooks[0]!.command], { stdin: "pipe" });
+
+	hook.stdin.write('{"session_id":');
+	hook.stdin.flush();
+	await until(() => listFiles(stops).length > 0);
+
+	expect(listRecords(stops)).toEqual([]);
+
+	hook.stdin.write('"s"}');
+	hook.stdin.end();
+	await hook.exited;
+
+	expect(listRecords(stops).map((file) => JSON.parse(readFileSync(file, "utf8")))).toEqual([{ session_id: "s" }]);
 });
 
 test("a named run is a background agent: its prompt comes on stdin, its tokens are read from the transcript, and it is stopped and removed once its outcome is taken", async () => {
