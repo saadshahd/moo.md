@@ -135,7 +135,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.option("--model <id...>", "model ids to measure; default every model the tiers and the cheap call use")
 		.action(async ({ runs, model }: { runs: string; model?: string[] }) => {
 			for (const id of model ?? modelsOf(io.cwd)) {
-				const ran = await x(process.execPath, [EVAL_SCRIPT, "--model", id, "--runs", runs, "--write", join(io.cwd, ".hum")], { throwOnError: false, nodeOptions: { stdio: "inherit" } });
+				const ran = await x(process.execPath, [EVAL_SCRIPT, "--model", id, "--runs", runs, "--write", join(io.cwd, ".hum")], { throwOnError: false, nodeOptions: { cwd: io.cwd, stdio: "inherit" } });
 
 				if (ran.exitCode !== 0) return done(EXIT_FAILED);
 			}

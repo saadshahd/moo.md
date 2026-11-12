@@ -6,9 +6,9 @@ import { AgentDecisionExhaustedError } from "@statelyai/agent";
 import PQueue from "p-queue";
 import { z } from "zod";
 import { type Finished, type Runner, startRunner } from "../src/adapters/claude-p.ts";
+import { gitIn, readGitIdentity } from "../src/adapters/git.ts";
 import { modelCallOver } from "../src/adapters/model-call.ts";
-import { readConfigDir } from "../src/config/load.ts";
-import { BOUNDARIES, type Boundary, HumConfig } from "../src/config/schema.ts";
+import { BOUNDARIES, type Boundary } from "../src/config/schema.ts";
 import { alignmentQuestion, doesRaiseLevel } from "../src/decide/alignment.ts";
 import { replyQuestion } from "../src/decide/answer.ts";
 import { kindQuestion } from "../src/decide/kind.ts";
@@ -17,6 +17,8 @@ import { pairQuestion } from "../src/loop/pair.ts";
 import type { ReviewNote } from "../src/loop/records.ts";
 import { pairing, prepare } from "../src/loop/signals.ts";
 import type { JsonSchema, ProsePurpose } from "../src/decide/prose.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { shippedRaw, shippedSettingsAs } from "../src/setup/shipped.ts";
 import { openState } from "../src/state/open.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
 import { PROSE_PROMPTS } from "../src/worker/thin-path.ts";
@@ -38,8 +40,14 @@ const OWNER_LABELLED: readonly Boundary[] = ["taste"];
 
 const boundaries: readonly Boundary[] = positionals.length > 0 ? z.array(z.enum(BOUNDARIES)).parse(positionals) : BOUNDARIES.filter((boundary) => !OWNER_LABELLED.includes(boundary));
 const root = join(import.meta.dir, "..");
-const raw = readConfigDir(join(root, "defaults"));
-const config = { hum: HumConfig.parse(raw.hum), roles: raw.roles };
+const settings = shippedSettingsAs(await readGitIdentity(gitIn(process.cwd(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })));
+
+if (!settings.ok) {
+	console.error(settings.refusal.message);
+	process.exit(1);
+}
+
+const config = { hum: settings.value, roles: shippedRaw().roles };
 const model = values.model ?? config.hum.decisionModel;
 const Count = z.coerce.number().int().positive();
 const runs = values.runs === undefined ? 1 : Count.parse(values.runs);

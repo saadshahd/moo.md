@@ -6,7 +6,7 @@ import { loadConfig, readConfigDir } from "../src/config/load.ts";
 import { kindCoverage, proposeSetup } from "../src/setup/propose.ts";
 import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
-import { shippedConfig } from "../src/setup/shipped.ts";
+import { shippedConfig, shippedSettingsAs } from "../src/setup/shipped.ts";
 import { waitsOf, withTimeouts } from "../src/setup/waits.ts";
 import { SetupAnswers, writeSetup } from "../src/setup/write.ts";
 import { hopeSkills } from "./fixtures/config.ts";
@@ -164,6 +164,11 @@ test("setup writes nothing and says what to set when git config holds no name or
 	expect(!result.ok && result.refusal.code).toBe("no-git-identity");
 	expect(!result.ok && result.refusal.message).toContain('git config --global user.email "<yours>"');
 	expect(existsSync(join(repo, ".hum"))).toBe(false);
+});
+
+test("the shipped settings commit as the identity git config holds, and say what to set without one", () => {
+	expect(shippedSettingsAs({ found: true, identity: OWNER })).toMatchObject({ ok: true, value: { commitIdentity: OWNER } });
+	expect(shippedSettingsAs({ found: false, missing: ["user.name"] })).toMatchObject({ ok: false, refusal: { code: "no-git-identity", message: expect.stringContaining('git config --global user.name "<yours>"') } });
 });
 
 test("the owner's identity is read from git config, and each key it lacks is named", async () => {

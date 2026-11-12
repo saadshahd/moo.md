@@ -7,7 +7,7 @@ import { type Config, loadConfig, type RawConfig, readConfigDir } from "../confi
 import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
 import { migrateConfig } from "../config/migrate.ts";
-import type { Refusal, Result } from "../config/refusal.ts";
+import { noGitIdentity, type Refusal, type Result } from "../config/refusal.ts";
 import { Kind, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "../config/schema.ts";
 import { ciWorkflows } from "../service/workflows.ts";
 import { renderUnit, type UnitKind } from "../service/unit.ts";
@@ -63,17 +63,15 @@ const schemaRefusal = (existing: Json | undefined, target: number): Refusal | un
 	return migrated && !migrated.ok ? { ...migrated.refusal, message: `${migrated.refusal.message} Nothing was written.` } : undefined;
 };
 
-const noGitIdentity = (missing: readonly string[]): Refusal => ({
-	code: "no-git-identity",
-	missing,
-	message: `hum commits as you, and git config holds no ${missing.join(" or ")}. Set ${missing.length === 1 ? "it" : "each"}, then run setup again: ${missing.map((key) => `git config --global ${key} "<yours>"`).join("; ")}. Nothing was written.`,
-});
-
 /** The identity hum.json already holds, else the one git config holds, else the refusal that says what to set. */
 const identityOf = (hum: Readonly<Record<string, Json>>, git: GitIdentityRead): Result<Json> => {
 	if (hum.commitIdentity !== undefined) return { ok: true, value: hum.commitIdentity };
 
-	return git.found ? { ok: true, value: asJson(git.identity) } : { ok: false, refusal: noGitIdentity(git.missing) };
+	if (git.found) return { ok: true, value: asJson(git.identity) };
+
+	const refusal = noGitIdentity(git.missing);
+
+	return { ok: false, refusal: { ...refusal, message: `${refusal.message} Nothing was written.` } };
 };
 
 const readExisting = (repo: string): RawConfig | undefined => (existsSync(join(repo, ".hum", "hum.json")) ? readConfigDir(join(repo, ".hum")) : undefined);
