@@ -125,13 +125,11 @@ export interface Release {
 	release(id: ItemId, ref: string): Promise<void>;
 }
 
-export const FAILED_KINDS = ["retry", "now"] as const;
-
 /**
  * A call an adapter could not complete, answered in place of its value. `retry`: a later attempt may work, and the
  * engine tries again within the provider timeout. `now`: no attempt will, and the engine raises one card and stops.
  */
-export const Failed = z.strictObject({ failed: z.enum(FAILED_KINDS), why: text });
+export const Failed = z.strictObject({ failed: z.enum(["retry", "now"]), why: text });
 
 export type Failed = z.infer<typeof Failed>;
 
