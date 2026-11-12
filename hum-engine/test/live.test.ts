@@ -9,6 +9,7 @@ import { runThinPath } from "../src/worker/thin-path.ts";
 import { configWith } from "./fixtures/config.ts";
 import { markdownSettings, WorkRepo } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { Holder } from "../src/adapter-api.ts";
 
 const live = process.env.HUM_LIVE === "1";
 
@@ -45,7 +46,7 @@ test.skipIf(!live)("live: a feature item runs its plan and review states on Haik
 	const { runner } = await startRunner({ state, model: config.hum.models.light, now: Date.now, env: process.env });
 	const id = repo.add("live-1", `---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n`);
 
-	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote: repo.remote, checks: ["test -f docs/note.md"], holder: "live", workDir: tempDir("live-work"), now: Date.now, newSessionId: randomUUID, runnerVariables: new Set(Object.keys(process.env)) });
+	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote: repo.remote, checks: ["test -f docs/note.md"], holder: Holder.parse("live"), workDir: tempDir("live-work"), now: Date.now, newSessionId: randomUUID, runnerVariables: new Set(Object.keys(process.env)) });
 	const runs = state.runs.list(id).map((record) => record.run);
 
 	expect(runs).toContain("plan");

@@ -16,6 +16,7 @@ import { pastChange, reviewNote } from "./fixtures/records.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { ItemId } from "../src/adapter-api.ts";
 
 
 const scratch = (): string => {
@@ -89,7 +90,7 @@ const followUps = () => {
 	const filed: { from: string; followUp: FollowUp }[] = [];
 
 	const workSource = {
-		fileFollowUp: async (from: string, followUp: FollowUp): Promise<ItemRef> => (filed.push({ from, followUp }), { id: `${from}-fix`, title: followUp.title }),
+		fileFollowUp: async (from: string, followUp: FollowUp): Promise<ItemRef> => (filed.push({ from, followUp }), { id: ItemId.parse(`${from}-fix`), title: followUp.title }),
 	} satisfies Pick<WorkSource, "fileFollowUp">;
 
 	return { filed, workSource };

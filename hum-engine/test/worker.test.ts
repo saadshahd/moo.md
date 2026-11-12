@@ -9,6 +9,7 @@ import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { HOUR_MS } from "../src/time.ts";
+import { Holder, ItemId } from "../src/adapter-api.ts";
 
 const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort();
 
@@ -268,11 +269,11 @@ test("the claim of a run in flight is renewed each tick, and a run whose claim i
 	w.clock.at += 3000;
 	await worker.tick();
 	w.clock.at += 3000;
-	expect((await w.adapter.workSource!.claim(id, "worker-2", 5000)).won).toBe(false);
+	expect((await w.adapter.workSource!.claim(id, Holder.parse("worker-2"), 5000)).won).toBe(false);
 
 	// 10 s on, with no renewal: worker-2 takes it, the next tick finds the claim gone and stops the run.
 	w.clock.at += 4000;
-	expect((await w.adapter.workSource!.claim(id, "worker-2", 5000)).won).toBe(true);
+	expect((await w.adapter.workSource!.claim(id, Holder.parse("worker-2"), 5000)).won).toBe(true);
 
 	const pid = w.shim.calls().find((c) => c.itemId === id)!.pid;
 
@@ -295,7 +296,7 @@ test("an item id in the inbox folder wakes a waiting item at once and its questi
 	await worker.idle();
 	expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
 
-	await w.adapter.answers!.answer("a", { text: "Use Plain" });
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
 	w.clock.at += TTL + 1;
 
 	// Nothing says the answer arrived: the watch reports no change.
@@ -367,7 +368,7 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 
 	writeFileSync(flag, "");
 	w.clock.at += 1000;
-	await w.adapter.answers!.answer("a", { text: "retry" });
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "retry" });
 	await w.worker.tick();
 	await w.worker.idle();
 

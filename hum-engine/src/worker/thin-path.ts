@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
-import type { Item, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
+import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
 import { type Finished, type Runner, type RunOutcome, hasSucceeded } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
@@ -26,7 +26,7 @@ import { changeOn, type LandContext, land, placementOf, prepareLanding, type Rev
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
-import { reviewInput } from "../decide/review.ts";
+import { type ItemText, reviewInput } from "../decide/review.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
@@ -68,14 +68,14 @@ export type ThinPathOptions = {
 	readonly base?: string;
 	/** The repo's checks as shell commands, run in the clone. All must exit 0. */
 	readonly checks: readonly string[];
-	readonly holder: string;
+	readonly holder: Holder;
 	/** Where runs clone to; a temp folder by default. */
 	readonly workDir?: string;
 	/** Gives the run its working copy on the remote's base branch, and takes it back when the item's pass ends. By default a `git clone` in a temp folder. */
 	readonly checkout?: Checkout;
 	readonly dir?: string;
 	/** Take this item; default the first ready one. */
-	readonly itemId?: string;
+	readonly itemId?: ItemId;
 	readonly now: () => number;
 	/** Aborted when the worker loses the claim or exits for an update; the run stops and the result is `lost`. */
 	readonly signal?: AbortSignal;
@@ -312,7 +312,7 @@ type Driven = ThinPathOptions & {
 	readonly base: string;
 	readonly dir: string;
 	readonly kind: Kind;
-	readonly id: string;
+	readonly id: ItemId;
 	readonly item: Item;
 	readonly branch: string;
 	readonly clone: string;
@@ -665,7 +665,6 @@ const roleOf = (config: RunConfig, purpose: Purpose): string => {
 	return ((role && config.roles[role.file]) ?? "").trim();
 };
 
-type ItemText = Pick<Item, "id" | "title" | "body">;
 
 /** What a plan or review run reads. A plan run reads the repo too; a review run reads only the item and the diff, so no author's reasoning reaches it. */
 export const PROSE_PROMPTS = {

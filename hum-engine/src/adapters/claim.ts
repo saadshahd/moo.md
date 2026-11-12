@@ -1,9 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { type Claim, type ClaimResult, PermanentError } from "../adapter-api.ts";
+import { type Claim, type ClaimResult, Holder, type ItemId, PermanentError } from "../adapter-api.ts";
 import { parseArgument } from "./argument.ts";
-
-const Holder = z.string().regex(/^[A-Za-z0-9][\w.@:-]{0,99}$/, "a holder is a plain name: letters, digits and . _ @ : -");
 
 const Ttl = z.int().positive("a claim lasts a positive whole number of milliseconds");
 
@@ -13,9 +11,9 @@ export type ClaimMode = "claim" | "renew";
 
 /** A provider's claims. `S` is the standing claim with whatever the provider needs to write over it. */
 export type ClaimStore<S extends { readonly claim: Claim }> = {
-	readonly standing: (id: string) => Promise<S | undefined>;
+	readonly standing: (id: ItemId) => Promise<S | undefined>;
 	/** Asked only before a first claim: a standing one already proves the item was taken while ready. */
-	readonly isReady: (id: string) => Promise<boolean>;
+	readonly isReady: (id: ItemId) => Promise<boolean>;
 	/** Writes `claim` over `over`; false when another writer moved first. */
 	readonly write: (claim: Claim, over: S | undefined) => Promise<boolean>;
 };
@@ -45,7 +43,7 @@ const decideClaim = (mode: ClaimMode, holder: string, standing: Claim | undefine
 /** `claim` and `renew` over one provider's store: an atomic take whose race the provider's write settles. */
 export const claimer =
 	<S extends { readonly claim: Claim }>(store: ClaimStore<S>, now: () => number) =>
-	async (mode: ClaimMode, item: string, holder: string, ttlMs: number): Promise<ClaimResult> => {
+	async (mode: ClaimMode, item: ItemId, holder: Holder, ttlMs: number): Promise<ClaimResult> => {
 		const who = parseArgument(Holder, holder);
 		const ttl = parseArgument(Ttl, ttlMs);
 		const standing = await store.standing(item);
@@ -85,9 +83,10 @@ export const claimCommitMessage = (claim: Claim): string => {
 };
 
 /** The claim a commit message holds, or undefined for any other commit. */
-export const claimOfCommit = (item: string, message: string): Claim | undefined => {
+export const claimOfCommit = (item: ItemId, message: string): Claim | undefined => {
 	const [subject = ""] = message.split("\n");
 	const match = CLAIM_SUBJECT.exec(subject);
+	const holder = Holder.safeParse(match?.[1]);
 
-	return match?.[1] && match[2] ? { item, holder: match[1], expiresAt: Number(match[2]) } : undefined;
+	return holder.success && match?.[2] ? { item, holder: holder.data, expiresAt: Number(match[2]) } : undefined;
 };

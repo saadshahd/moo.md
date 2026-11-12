@@ -1,4 +1,4 @@
-import { ADAPTER_API_VERSION, type Item, type Question, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Item, ItemId, type Question, type Questions, type ThreadEntry, type WorkSource } from "../adapter-api.ts";
 import { visibleText } from "../adapters/marked.ts";
 import { onceCalls } from "../adapters/once.ts";
 import type { Config } from "../config/load.ts";
@@ -79,7 +79,7 @@ export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> 
 	for (const queued of waitingOrder(all.filter(isWaiting)).slice(0, room)) {
 		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource, questions }, state.ops, { run: "ask", attempt: queued.queuedAt });
 
-		await calls.questions?.ask(queued.item, { text: queued.text, options: queued.options, detail: queued.detail });
+		await calls.questions?.ask(ItemId.parse(queued.item), { text: queued.text, options: queued.options, detail: queued.detail });
 		state.questions.put(keyOf(queued), { ...queued, askedAt: now() });
 		released.push(queued.item);
 	}

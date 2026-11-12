@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Adapter, ThreadEntry } from "../adapter-api.ts";
+import type { Integrations, ItemId, ThreadEntry } from "../adapter-api.ts";
 import type { OpKeys } from "../state/ops.ts";
 
 /** The run and attempt a write belongs to; with the item and the write itself they form its op key. */
@@ -20,10 +20,10 @@ const hasEntry = (thread: readonly ThreadEntry[], { kind, text, option }: Entry)
  * `comment`, `ask`, `decide` and `answer` are never retried by the guard, so each runs under an op key. A key a
  * crash left started is settled by reading the item's thread: when the entry is there, the write is skipped.
  */
-export const onceCalls = (adapter: Adapter, ops: OpKeys, scope: CallScope): Adapter => {
+export const onceCalls = (adapter: Integrations, ops: OpKeys, scope: CallScope): Integrations => {
 	const { workSource, questions, answers } = adapter;
 
-	const once = async (itemId: string, entry: Entry, write: () => Promise<void>): Promise<void> => {
+	const once = async (itemId: ItemId, entry: Entry, write: () => Promise<void>): Promise<void> => {
 		await ops.once(
 			{ itemId, ...scope, op: opName(entry) },
 			{ holds: async () => (workSource ? hasEntry((await workSource.read(itemId)).thread, entry) : false), run: write },

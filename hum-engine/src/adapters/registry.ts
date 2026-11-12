@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
-import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, PermanentError } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, type Integrations, PermanentError } from "../adapter-api.ts";
 import { readSettings } from "../config/settings.ts";
 import { HumConfig } from "../config/schema.ts";
 import { commandTimeoutMs, type Env } from "../exec.ts";
@@ -125,7 +125,7 @@ export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Fault
 export const resolveAdapters = async (
 	repo: string,
 	{ faults, guard, context }: { faults: Faults; guard: Pick<GuardOptions, "lastReady">; context: AdapterContext },
-): Promise<Partial<Record<Slot, Adapter>>> => {
+): Promise<Partial<Record<Slot, Integrations>>> => {
 	const settings = readSettings(repo, AdapterSettings);
 
 	const slots = SLOTS.flatMap((slot) => {
@@ -136,7 +136,7 @@ export const resolveAdapters = async (
 
 	const source: Repo = { path: repo, settings, context };
 
-	const build = async (name: string): Promise<Adapter> => {
+	const build = async (name: string): Promise<Integrations> => {
 		const adapter = await (isBuiltIn(name) ? BUILT_IN[name](source) : ownerAdapter(name, source));
 
 		if (refuseOtherVersion(name, adapter, faults)) throw new PermanentError(`adapter "${name}" implements another adapter API version`);

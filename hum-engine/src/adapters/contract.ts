@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { type Adapter, type Answers, ClaimResult, Item, ItemRef, type Questions, type Release, Watch, type WorkSource } from "../adapter-api.ts";
+import { type Adapter, type Answers, ClaimResult, Failed, type Fallible, Holder, Item, ItemId, ItemRef, type Questions, type Release, Watch, type WorkSource } from "../adapter-api.ts";
 import type { ClaimMode } from "./claim.ts";
+import { eachCall } from "./each-call.ts";
 
 /**
  * What the contract suite needs from one provider. Reads hit the provider; writes go to a scratch
@@ -12,7 +13,7 @@ export type ContractTarget = {
 	/** A second worker on the same scratch target, for races. Defaults to `adapter`. */
 	readonly other?: () => Promise<Adapter>;
 	/** Puts a ready item on the scratch target and returns its id. */
-	readonly seed: (title: string) => Promise<string>;
+	readonly seed: (title: string) => Promise<ItemId>;
 	/** Moves the provider's clock forward, so a claim expires. */
 	readonly advance: (ms: number) => Promise<void>;
 	/** Requests so far that spent rate limit. */
@@ -31,14 +32,25 @@ const need = <T>(value: T | undefined, what: string): T => {
 	return value;
 };
 
+/** `integration` with a `Failed` reply turned into a failed check, in the adapter's own words. */
+const answering = <I extends object>(integration: Fallible<I>): I =>
+	eachCall<Fallible<I>, I>(integration, (call, name) => async (...args) => {
+		const reply = await call(...args);
+		const failed = Failed.safeParse(reply);
+
+		assert.ok(!failed.success, `${name} answered failed ${failed.data?.failed}: ${failed.data?.why}`);
+
+		return reply;
+	});
+
 const workSourceChecks = (target: ContractTarget, source: WorkSource): Check[] => {
 	const second = async () => (target.other ? target.other() : target.adapter);
-	const readItem = async (id: string) => Item.parse(await source.read(id));
+	const readItem = async (id: ItemId) => Item.parse(await source.read(id));
 	const ready = async () => ItemRef.array().parse(await source.listReady());
-	const isListed = async (id: string) => (await ready()).some((ref) => ref.id === id);
+	const isListed = async (id: ItemId) => (await ready()).some((ref) => ref.id === id);
 
-	const claimOf = async (who: Adapter, id: string, holder: string, mode: ClaimMode = "claim") =>
-		ClaimResult.parse(await need(who.workSource, "no work source")[mode](id, holder, TTL));
+	const claimOf = async (who: Adapter, id: ItemId, holder: string, mode: ClaimMode = "claim") =>
+		ClaimResult.parse(await answering<WorkSource>(need(who.workSource, "no work source"))[mode](id, Holder.parse(holder), TTL));
 
 	return [
 		{
@@ -199,13 +211,13 @@ const releaseChecks = (target: ContractTarget, release: Release): Check[] => [
 /** The checks every adapter runs for the integrations it provides. */
 export const contractChecks = (target: ContractTarget): Check[] => {
 	const { questions, answers, release } = target.adapter;
-	const source = need(target.adapter.workSource, `${target.name} provides no work source`);
+	const source = answering<WorkSource>(need(target.adapter.workSource, `${target.name} provides no work source`));
 
 	return [
 		...workSourceChecks(target, source),
-		...(questions ? questionChecks(target, source, questions) : []),
-		...(answers ? answerChecks(target, source, answers) : []),
-		...(release ? releaseChecks(target, release) : []),
+		...(questions ? questionChecks(target, source, answering<Questions>(questions)) : []),
+		...(answers ? answerChecks(target, source, answering<Answers>(answers)) : []),
+		...(release ? releaseChecks(target, answering<Release>(release)) : []),
 	];
 };
 

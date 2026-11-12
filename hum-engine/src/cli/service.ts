@@ -16,6 +16,8 @@ import { SECOND_MS } from "../time.ts";
 import { readStatus } from "../status/file.ts";
 import { npmLatest, openWorker } from "../worker/open.ts";
 import type { Io } from "./ops.ts";
+import { Holder } from "../adapter-api.ts";
+import { parseArgument } from "../adapters/argument.ts";
 
 const EXIT_OK = 0;
 
@@ -78,7 +80,7 @@ const openFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac" | 
 		env,
 		newSessionId: randomUUID,
 		hopeSkills: listHopeSkills(await hopeRoot()),
-		holder: flags.holder ?? `${where}@${hostname()}`,
+		holder: parseArgument(Holder, flags.holder ?? `${where}@${hostname()}`),
 		base: flags.base,
 		where,
 		latestVersion: where === "mac" ? npmLatest : undefined,

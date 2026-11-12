@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { z } from "zod";
-import { type Adapter, type AdapterContext, type Answers, type Item, ItemId, PermanentError, type Questions, type Watch, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Answers, Holder, type Integrations, type Item, ItemId, PermanentError, type Questions, type Watch, type WorkSource } from "../adapter-api.ts";
 import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
 import type { Env } from "../exec.ts";
@@ -33,7 +33,7 @@ const COMMENT_LIMIT = 280;
 /** The digest in a Pad's name, so the same text posts to the same Pad name. */
 const PAD_DIGEST_LENGTH = 8;
 
-const TodoId = ItemId.pipe(z.string().regex(/^(0|[1-9]\d*)$/, "a roundup Todo id is a whole number")).transform(Number);
+const TodoId = ItemId.refine((id) => /^(0|[1-9]\d*)$/.test(id), "a roundup Todo id is a whole number").transform(Number);
 
 const Actor = z.looseObject({ kind: z.string(), id: z.string() });
 
@@ -62,7 +62,7 @@ const Reply = z.looseObject({
 });
 
 /** One take or renewal of an item's claim, written as a comment. */
-const ClaimEntry = z.object({ holder: z.string().min(1), at: z.int().nonnegative(), expiresAt: z.int().nonnegative() });
+const ClaimEntry = z.object({ holder: Holder, at: z.int().nonnegative(), expiresAt: z.int().nonnegative() });
 
 type ClaimEntry = z.infer<typeof ClaimEntry>;
 
@@ -155,7 +155,7 @@ const isOpenToTake = (todo: Todo): boolean => !todo.done && !todo.blocked && !to
 
 const doesFitOneComment = (text: string): boolean => !text.includes("\n") && text.length <= COMMENT_LIMIT;
 
-type Whole = Adapter & {
+type Whole = Integrations & {
 	readonly workSource: WorkSource;
 	readonly questions: Questions;
 	readonly answers: Answers;
@@ -201,13 +201,13 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 	const postPlain = async (id: string, text: string): Promise<void> => (doesFitOneComment(text) ? post(id, text) : postInPad(id, undefined, text));
 
-	const standingClaim = (id: string, list: readonly Comment[]) => {
+	const standingClaim = (id: ItemId, list: readonly Comment[]) => {
 		const entry = standingEntry(list);
 
 		return entry && { claim: { item: id, holder: entry.holder, expiresAt: entry.expiresAt } };
 	};
 
-	const isFree = (id: string, list: readonly Comment[]): boolean => !isLive(standingClaim(id, list)?.claim, now());
+	const isFree = (id: ItemId, list: readonly Comment[]): boolean => !isLive(standingClaim(id, list)?.claim, now());
 
 	const take = claimer(
 		{
@@ -236,15 +236,15 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 	});
 
 	return {
-		apiVersion: 1,
+		apiVersion: ADAPTER_API_VERSION,
 		spent: () => 0,
 		close: client.close,
 		workSource: {
 			listReady: async () => {
-				const open = (await todos()).filter(isOpenToTake);
-				const free = await Promise.all(open.map(async (found) => isFree(String(found.id), await comments(String(found.id)))));
+				const open = (await todos()).filter(isOpenToTake).map((found) => ({ id: ItemId.parse(String(found.id)), title: found.title }));
+				const free = await Promise.all(open.map(async ({ id }) => isFree(id, await comments(id))));
 
-				return open.flatMap((found, index) => (free[index] ? [{ id: String(found.id), title: found.title }] : []));
+				return open.filter((_, index) => free[index]);
 			},
 			read: async (id): Promise<Item> => {
 				const [found, list] = await Promise.all([todo(id), comments(id)]);
@@ -260,7 +260,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 				if (filed !== undefined) return { id: filed, title };
 
 				const created = async () => Todo.parse(await call("todo_create", { title, body: followUpBody(body, `#${from}`) })).id;
-				const id = String((await todos()).find(isFollowUpOf(`#${from}`, title))?.id ?? (await created()));
+				const id = ItemId.parse(String((await todos()).find(isFollowUpOf(`#${from}`, title))?.id ?? (await created())));
 				const note = followUpNote(title, id);
 
 				await postMarked(from, note.marker, note.text);

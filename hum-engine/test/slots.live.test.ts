@@ -14,6 +14,7 @@ import { configWith } from "./fixtures/config.ts";
 import { markdownSettings, WorkRepo } from "./fixtures/work-repo.ts";
 import { poolConfig } from "./fixtures/slot-world.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { Holder } from "../src/adapter-api.ts";
 
 const repo = process.env.HUM_SLOT_REPO;
 const live = process.env.HUM_LIVE === "1" && repo !== undefined;
@@ -130,7 +131,7 @@ test.skipIf(!live)("live: a feature item runs its plan, build and review in a sl
 	const adapter = markdownAdapter({ ...markdownSettings, repo: work.worker("w") }, { report: () => {}, now: Date.now, env: process.env });
 	const id = work.add("live-slot-1", "---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n");
 
-	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote, checks: ["test -f docs/note.md"], holder: "live", workDir: tempDir("live-slot-work"), checkout: slots.checkout, now: Date.now, newSessionId: randomUUID, runnerVariables: new Set(Object.keys(process.env)) });
+	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote, checks: ["test -f docs/note.md"], holder: Holder.parse("live"), workDir: tempDir("live-slot-work"), checkout: slots.checkout, now: Date.now, newSessionId: randomUUID, runnerVariables: new Set(Object.keys(process.env)) });
 	const runs = state.runs.list(id).map((record) => record.run);
 
 	await slots.idle();

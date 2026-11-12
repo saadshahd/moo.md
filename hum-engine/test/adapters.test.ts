@@ -22,6 +22,7 @@ import { markDone, newItemFile, parseItemFile } from "../src/adapters/item-file.
 import { filedFollowUp, followUpKey } from "../src/adapters/marked.ts";
 import { WorkRepo, itemFile, markdownSettings } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { type Failed, type Fallible, Holder, ItemId, type WorkSource } from "../src/adapter-api.ts";
 
 const stateIn = (now: () => number): State => openState(tempDir("adapter"), { now });
 
@@ -105,7 +106,7 @@ describe("a malformed item file", () => {
 
 		const ready = await adapter.workSource?.listReady();
 
-		expect(ready?.map((ref) => ref.id)).toEqual(["good"]);
+		expect(ready?.map((ref) => ref.id)).toEqual([ItemId.parse("good")]);
 		expect(reported.map((fault) => fault.item).sort()).toEqual(["bad-marker", "broken"]);
 		expect(reported[0]?.cause).toContain(".hum/work/");
 	});
@@ -152,6 +153,37 @@ describe("provider failures and empty lists", () => {
 		expect(attempts).toBeGreaterThan(10);
 	});
 
+	/** The fake's adapter, whose `read` answers each of `replies` in turn before it reads for real. */
+	const answering = (provider: FakeProvider, replies: readonly Failed[]) => {
+		const inner = provider.adapter();
+		let calls = 0;
+		const read: Fallible<WorkSource>["read"] = async (id) => replies[calls++] ?? (await inner.workSource!.read(id));
+
+		return { adapter: { ...inner, workSource: { ...inner.workSource!, read } }, calls: () => calls };
+	};
+
+	test("a read the adapter answers failed now fails at once with one card, and is not tried again", async () => {
+		const provider = new FakeProvider();
+		const state = stateIn(provider.now);
+		const id = provider.seed("one");
+		const { adapter, calls } = answering(provider, [{ failed: "now", why: "the item was deleted" }]);
+
+		await expect(guarded(adapter, { provider: "fake", faults: state.faults, timeoutMs: 10_000, backoffMs: { first: 5, max: 5 } }).workSource?.read(id)).rejects.toThrow("the item was deleted");
+		expect(calls()).toBe(1);
+		expect(state.faults.list().map(({ code, cause }) => ({ code, cause }))).toEqual([{ code: "provider-failed", cause: expect.stringContaining("the item was deleted") }]);
+	});
+
+	test("a read the adapter answers failed retry is tried again, and the answer after it stands", async () => {
+		const provider = new FakeProvider();
+		const state = stateIn(provider.now);
+		const id = provider.seed("one");
+		const { adapter, calls } = answering(provider, [{ failed: "retry", why: "busy" }, { failed: "retry", why: "busy" }]);
+
+		expect((await guarded(adapter, { provider: "fake", faults: state.faults, timeoutMs: 10_000, backoffMs: { first: 5, max: 5 } }).workSource?.read(id))?.title).toBe("one");
+		expect(calls()).toBe(3);
+		expect(state.faults.list()).toEqual([]);
+	});
+
 	test("502 past the timeout shows one card, however often it is read", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);
@@ -193,7 +225,7 @@ describe("provider failures and empty lists", () => {
 		const id = provider.seed("a");
 
 		await adapter.workSource?.listReady();
-		await adapter.workSource?.claim(id, "w", 60_000);
+		await adapter.workSource?.claim(id, Holder.parse("w"), 60_000);
 
 		expect(await adapter.workSource?.listReady()).toEqual([]);
 		expect(state.faults.list()).toEqual([]);
@@ -318,5 +350,5 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 test("a follow-up note whose marker carries a field a newer engine added still names the filed item", () => {
 	const marker = { kind: "comment", followUp: { key: followUpKey("Split the parser"), item: "12", addedLater: true } };
 
-	expect(filedFollowUp([`<!-- hum ${JSON.stringify(marker)} -->\nFiled follow-up #12: Split the parser`], "Split the parser")).toBe("12");
+	expect(filedFollowUp([`<!-- hum ${JSON.stringify(marker)} -->\nFiled follow-up #12: Split the parser`], "Split the parser")).toBe(ItemId.parse("12"));
 });

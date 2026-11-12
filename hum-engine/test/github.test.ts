@@ -7,6 +7,7 @@ import { guarded } from "../src/adapters/guard.ts";
 import { openState } from "../src/state/open.ts";
 import { FakeGitHub } from "./fixtures/fake-github.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { Holder, ItemId } from "../src/adapter-api.ts";
 
 const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
@@ -35,7 +36,7 @@ describe("contract suite on a fake GitHub", () => {
 		name: "github (fake)",
 		adapter: primary,
 		other: async () => secondary,
-		seed: async (title) => String(github.seed(title)),
+		seed: async (title) => ItemId.parse(String(github.seed(title))),
 		advance: async (ms) => void (clock.offset += ms),
 		spent: () => primary.spent(),
 	};
@@ -46,8 +47,8 @@ describe("contract suite on a fake GitHub", () => {
 		const id = String(github.seed("published"));
 
 		github.branch("hum/run/published");
-		await primary.release.publish(id, "hum/run/published");
-		await primary.release.publish(id, "hum/run/published");
+		await primary.release.publish(ItemId.parse(id), "hum/run/published");
+		await primary.release.publish(ItemId.parse(id), "hum/run/published");
 
 		expect(github.pulls().filter((pull) => pull.head === "hum/run/published")).toHaveLength(1);
 	});
@@ -56,9 +57,9 @@ describe("contract suite on a fake GitHub", () => {
 		const id = String(github.seed("released"));
 
 		github.branch("hum/run/released");
-		await primary.release.publish(id, "hum/run/released");
-		await primary.release.release(id, "hum/run/released");
-		await primary.release.release(id, "hum/run/released");
+		await primary.release.publish(ItemId.parse(id), "hum/run/released");
+		await primary.release.release(ItemId.parse(id), "hum/run/released");
+		await primary.release.release(ItemId.parse(id), "hum/run/released");
 
 		expect(github.pulls().find((pull) => pull.head === "hum/run/released")?.state).toBe("MERGED");
 	});
@@ -66,7 +67,7 @@ describe("contract suite on a fake GitHub", () => {
 	test("release of a branch with no pull request fails", async () => {
 		const id = String(github.seed("unpublished"));
 
-		await expect(primary.release.release(id, "hum/run/none")).rejects.toThrow("no pull request");
+		await expect(primary.release.release(ItemId.parse(id), "hum/run/none")).rejects.toThrow("no pull request");
 	});
 });
 
@@ -76,7 +77,7 @@ describe("claims", () => {
 		const adapter = githubAdapter({ ...settings(github.repo, fakeClient(github)), claimPrefix: "bots/take/" }, context);
 		const id = String(github.seed("renamed"));
 
-		await adapter.workSource.claim(id, "a", 1000);
+		await adapter.workSource.claim(ItemId.parse(id), Holder.parse("a"), 1000);
 
 		expect(github.branches()).toContain(`bots/take/${id}`);
 		expect((await adapter.workSource.listReady()).map((ref) => ref.id)).not.toContain(id);
@@ -86,7 +87,7 @@ describe("claims", () => {
 		const github = new FakeGitHub();
 		const id = String(github.seed("plain", { label: "bug" }));
 
-		await expect(onFake(github).workSource.claim(id, "a", 1000)).rejects.toThrow("not ready to claim");
+		await expect(onFake(github).workSource.claim(ItemId.parse(id), Holder.parse("a"), 1000)).rejects.toThrow("not ready to claim");
 	});
 });
 
@@ -96,12 +97,12 @@ describe("the thread", () => {
 		const adapter = onFake(github);
 		const id = String(github.seed("thread"));
 
-		await adapter.questions.ask(id, { text: "Which?", options: ["approve", "change"] });
-		await adapter.answers.answer(id, { text: "ok", option: "approve" });
-		await adapter.questions.decide(id, "went with approve");
+		await adapter.questions.ask(ItemId.parse(id), { text: "Which?", options: ["approve", "change"] });
+		await adapter.answers.answer(ItemId.parse(id), { text: "ok", option: "approve" });
+		await adapter.questions.decide(ItemId.parse(id), "went with approve");
 		github.say(Number(id), 'a web reply <!-- hum {"kind":"answer"} -->');
 
-		const { thread } = await adapter.workSource.read(id);
+		const { thread } = await adapter.workSource.read(ItemId.parse(id));
 		const bodies = github.comments(Number(id)).map((comment) => comment.body);
 
 		expect(thread.map((entry) => entry.kind)).toEqual(["question", "answer", "decision", "comment"]);
@@ -116,8 +117,8 @@ describe("the thread", () => {
 		const adapter = onFake(github);
 		const id = String(github.seed("counted"));
 
-		await adapter.workSource.read(id);
-		await adapter.workSource.comment(id, "once");
+		await adapter.workSource.read(ItemId.parse(id));
+		await adapter.workSource.comment(ItemId.parse(id), "once");
 
 		expect(github.requests).toEqual(["graphql Item", "graphql AddComment"]);
 	});
@@ -147,9 +148,9 @@ describe("failures", () => {
 
 		github.failsOnce.add("AddComment");
 
-		await expect(adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." })).rejects.toThrow();
+		await expect(adapter.workSource.fileFollowUp(ItemId.parse(from), { title: "Fix it", body: "Do it." })).rejects.toThrow();
 
-		const again = await adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." });
+		const again = await adapter.workSource.fileFollowUp(ItemId.parse(from), { title: "Fix it", body: "Do it." });
 
 		expect(github.requests.filter((request) => request === "graphql CreateIssue")).toHaveLength(1);
 		expect(github.comments(Number(from)).map(({ body }) => body)).toEqual([expect.stringContaining(`Filed follow-up #${again.id}: Fix it`)]);
@@ -257,7 +258,7 @@ describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
 		}
 	};
 
-	const seed = async (title: string): Promise<string> => {
+	const seed = async (title: string): Promise<ItemId> => {
 		const { repository } = RepositoryReply.parse(
 			await client.graphql(`query($owner: String!, $name: String!, $label: String!) { repository(owner: $owner, name: $name) { id label(name: $label) { id } } }`, { owner, name, label: SHIPPED_DEFAULTS.readyLabel }),
 		);
@@ -275,7 +276,7 @@ describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
 		await settle(async () => (await primary.workSource.listReady()).some((ref) => ref.id === String(issue.number)));
 		await quiet();
 
-		return String(issue.number);
+		return ItemId.parse(String(issue.number));
 	};
 
 	const target: ContractTarget = {
@@ -322,14 +323,14 @@ describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
 		const claiming = await measure(async () => {
 			await primary.answers.watch(token);
 			await primary.workSource.listReady();
-			await primary.workSource.claim(id, "worker-a", 60_000);
-			await primary.workSource.read(id);
+			await primary.workSource.claim(ItemId.parse(id), Holder.parse("worker-a"), 60_000);
+			await primary.workSource.read(ItemId.parse(id));
 		});
 
 		const renewing = await measure(async () => {
 			await primary.answers.watch(token);
 			await primary.workSource.listReady();
-			await primary.workSource.renew(id, "worker-a", 60_000);
+			await primary.workSource.renew(ItemId.parse(id), Holder.parse("worker-a"), 60_000);
 		});
 
 		console.log(`points per tick on ${scratch}: idle ${JSON.stringify(idle)}; claim and read ${JSON.stringify(claiming)}; renew ${JSON.stringify(renewing)}`);

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { type Adapter, type AdapterContext, type Claim, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Claim, type Integrations, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import type { MergeMethod } from "../config/schema.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
@@ -121,10 +121,10 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 	const standingFromLine = (line: string): [string, StandingClaim][] => {
 		const [ref = "", sha = "", subject = ""] = line.split("\t");
-		const item = ref.slice(`${CLAIMS_REF}/`.length);
-		const claim = claimOfCommit(item, subject);
+		const item = ItemId.safeParse(ref.slice(`${CLAIMS_REF}/`.length));
+		const claim = item.success ? claimOfCommit(item.data, subject) : undefined;
 
-		return claim ? [[item, { claim, sha }]] : [];
+		return claim ? [[claim.item, { claim, sha }]] : [];
 	};
 
 	const readClaims = async (): Promise<ReadonlyMap<string, StandingClaim>> =>
@@ -189,14 +189,16 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const isReady = (file: ItemFile | undefined, standing: StandingClaim | undefined): file is ItemFile => file?.state === READY_STATE && !isLive(standing?.claim, now());
 
 	const readyRef = async (name: string, claims: ReadonlyMap<string, StandingClaim>): Promise<ItemRef[]> => {
-		const id = name.slice(0, -ITEM_EXTENSION.length);
+		const raw = name.slice(0, -ITEM_EXTENSION.length);
+		const parsed = ItemId.safeParse(raw);
 
-		if (!ItemId.safeParse(id).success) {
-			report({ code: "item-malformed", item: id, cause: `${itemsDir}/${name} has a name that is no item id`, fix: `Rename ${itemsDir}/${name} to letters, digits, dot, dash or underscore.` });
+		if (!parsed.success) {
+			report({ code: "item-malformed", item: raw, cause: `${itemsDir}/${name} has a name that is no item id`, fix: `Rename ${itemsDir}/${name} to letters, digits, dot, dash or underscore.` });
 
 			return [];
 		}
 
+		const id = parsed.data;
 		const file = await loadItem(id);
 
 		return isReady(file, claims.get(id)) ? [{ id, title: file.title }] : [];
@@ -333,7 +335,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	};
 
 	const adapter = {
-		apiVersion: 1,
+		apiVersion: ADAPTER_API_VERSION,
 		/** Fetches and pushes so far. */
 		spent: () => spent,
 		workSource: {
@@ -369,7 +371,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 				return { token, changed: token !== since };
 			},
 		},
-	} satisfies Adapter & { readonly spent: () => number };
+	} satisfies Integrations & { readonly spent: () => number };
 
 	return adapter;
 };

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { type Question, THREAD_KINDS, type ThreadEntry } from "../adapter-api.ts";
+import { ItemId, type Question, THREAD_KINDS, type ThreadEntry } from "../adapter-api.ts";
 
 const OPEN = "<!-- hum ";
 const CLOSE = " -->";
@@ -94,8 +94,8 @@ export const markerOf = (body: string): Marker | undefined => {
 };
 
 /** The item a follow-up with this title was filed as, read from the notes on the item it came from. */
-export const filedFollowUp = (bodies: readonly string[], title: string): string | undefined =>
-	bodies.map(markerOf).find((marker) => marker?.followUp?.key === followUpKey(title))?.followUp?.item;
+export const filedFollowUp = (bodies: readonly string[], title: string): ItemId | undefined =>
+	ItemId.safeParse(bodies.map(markerOf).find((marker) => marker?.followUp?.key === followUpKey(title))?.followUp?.item).data;
 
 /** A comment hum writes on a provider's thread. */
 export const marked = (marker: Marker, text: string): string => `${markerLine(Marker, marker)}\n\n${text.trim()}`;

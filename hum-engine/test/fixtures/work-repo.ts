@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { ItemId } from "../../src/adapter-api.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { OWNER } from "./identity.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
@@ -91,10 +92,10 @@ export class WorkRepo {
 	}
 
 	/** The owner commits an item file and pushes it. */
-	add(id: string, content: string): string {
+	add(id: string, content: string): ItemId {
 		this.put({ path: `.hum/work/${id}.md`, content, message: `add ${id}` });
 
-		return id;
+		return ItemId.parse(id);
 	}
 
 	/** The owner commits a file and pushes it, rebasing onto the remote's main first only when a worker moved it. */
@@ -109,7 +110,7 @@ export class WorkRepo {
 		}
 	}
 
-	seed(title: string): string {
+	seed(title: string): ItemId {
 		return this.add(`seed-${++this.#count}`, itemFile(title));
 	}
 

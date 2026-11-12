@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { extname, relative } from "node:path";
-import type { Adapter } from "../adapter-api.ts";
+import type { Adapter, Integrations } from "../adapter-api.ts";
 import type { Faults } from "../state/faults.ts";
 import type { Card } from "../status/format.ts";
 import { type GuardOptions, guarded } from "./guard.ts";
@@ -47,7 +47,7 @@ export const engineImporters = (files: readonly string[]): { file: string; modul
 export const sourceFiles = (dir: string): string[] =>
 	existsSync(dir) ? [...SOURCE_GLOB.scanSync({ cwd: dir, absolute: true })].filter(isOutsideDependencies).sort() : [];
 
-export type Admission = { readonly ok: true; readonly adapter: Adapter } | { readonly ok: false; readonly cards: Card[] };
+export type Admission = { readonly ok: true; readonly adapter: Integrations } | { readonly ok: false; readonly cards: Card[] };
 
 export type AdmitInput = {
 	readonly name: string;

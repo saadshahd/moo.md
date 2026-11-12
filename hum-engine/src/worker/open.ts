@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
-import type { Adapter } from "../adapter-api.ts";
+import type { Integrations } from "../adapter-api.ts";
 import { resolveAdapters } from "../adapters/registry.ts";
 import { startBackgroundRunner } from "../adapters/claude-bg.ts";
 import { startRunner } from "../adapters/claude-p.ts";
@@ -75,9 +75,9 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	});
 
 	// One adapter serves several slots; its calls go one at a time whichever slot they come through.
-	const ordered = new Map<Adapter, Adapter>();
+	const ordered = new Map<Integrations, Integrations>();
 
-	const inOrder = (adapter: Adapter | undefined): Adapter | undefined => {
+	const inOrder = (adapter: Integrations | undefined): Integrations | undefined => {
 		if (adapter && !ordered.has(adapter)) ordered.set(adapter, serialized(adapter));
 
 		return adapter && ordered.get(adapter);

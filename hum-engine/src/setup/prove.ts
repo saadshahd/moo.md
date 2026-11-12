@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import type { AdapterContext } from "../adapter-api.ts";
+import { type AdapterContext, Holder, ItemId } from "../adapter-api.ts";
 import { runContract } from "../adapters/contract.ts";
 import { markdownAdapter } from "../adapters/markdown.ts";
 import { type Config, loadConfig, readConfigDir } from "../config/load.ts";
@@ -112,7 +112,7 @@ const contractStep = async (config: Config, scratch: Scratch, { base, now, proce
 		name: "markdown",
 		adapter: first,
 		other: async () => second,
-		seed: (title) => scratch.seed(`contract-${++count}`, title, "body"),
+		seed: async (title) => ItemId.parse(await scratch.seed(`contract-${++count}`, title, "body")),
 		advance: async (ms) => void (skew += ms),
 		spent: () => first.spent(),
 	});
@@ -179,7 +179,7 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 		env: env.processEnv,
 		newSessionId: env.newSessionId,
 		hopeSkills: env.hopeSkills,
-		holder: "setup-proof",
+		holder: Holder.parse("setup-proof"),
 		base: env.base,
 		where: "ci",
 		stateDir: mkdtempSync(join(tmpdir(), "hum-prove-state-")),

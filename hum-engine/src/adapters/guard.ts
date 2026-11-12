@@ -1,6 +1,6 @@
 import pRetry, { AbortError, type RetryContext } from "p-retry";
 import { z } from "zod";
-import { type Adapter, ClaimResult, Item, ItemRef, PermanentError, Watch, type WorkSource } from "../adapter-api.ts";
+import { type Adapter, ClaimResult, Failed, type Fallible, type Integrations, Item, ItemId, ItemRef, PermanentError, Watch, type WorkSource } from "../adapter-api.ts";
 import { type HumConfig, SHIPPED_DEFAULTS } from "../config/schema.ts";
 import type { Faults } from "../state/faults.ts";
 import { SECOND_MS } from "../time.ts";
@@ -42,8 +42,9 @@ const abortIfPermanent = (cause: unknown): never => {
  * - A transient failure is retried inside the timeout; one that outlasts it raises one card and throws.
  * - An empty ready list that contradicts the last read is a fault, not "no work".
  * - A call that would double on a retry (`comment`, `ask`, `decide`, `answer`) runs once; its caller retries it under an op key.
+ * - An answer of `failed: "now"` raises one card and throws at once; `failed: "retry"` is a transient failure like any other.
  */
-export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = SHIPPED_BACKOFF_MS, lastReady: remembered }: GuardOptions): Adapter => {
+export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoffMs = SHIPPED_BACKOFF_MS, lastReady: remembered }: GuardOptions): Integrations => {
 	const unavailable = { code: "provider-unavailable", item: provider };
 	const contradicted = { code: "empty-list", item: provider };
 
@@ -71,14 +72,24 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 		});
 	};
 
-	const once = async <T>(call: () => Promise<T>, schema: z.ZodType<T>): Promise<T> => {
+	const failNow = ({ why }: Failed): never => {
+		faults.raise({ code: "provider-failed", item: provider, cause: `${provider} could not complete a call: ${why}`, fix: `Fix what ${provider} names, or update its adapter; hum calls it again on its next tick.` });
+
+		throw new PermanentError(`${provider}: ${why}`);
+	};
+
+	const once = async <T>(call: () => Promise<T | Failed>, schema: z.ZodType<T>): Promise<T> => {
 		const reply = await call();
+		const failed = Failed.safeParse(reply);
+
+		if (failed.success) return failed.data.failed === "now" ? failNow(failed.data) : Promise.reject(new Error(`${provider}: ${failed.data.why}`));
+
 		const parsed = schema.safeParse(reply);
 
 		return parsed.success ? parsed.data : refuseChangedReply(parsed.error);
 	};
 
-	const retried = async <T>(call: () => Promise<T>, schema: z.ZodType<T>): Promise<T> => {
+	const retried = async <T>(call: () => Promise<T | Failed>, schema: z.ZodType<T>): Promise<T> => {
 		const value = await pRetry(() => once(call, schema).catch(abortIfPermanent), {
 			retries: Number.POSITIVE_INFINITY,
 			maxRetryTime: timeoutMs,
@@ -93,15 +104,15 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 	};
 
 	const { workSource, questions, answers, release } = adapter;
-	let lastReadyIds: string[] = remembered?.load() ?? [];
+	let lastReadyIds: ItemId[] = (remembered?.load() ?? []).flatMap((id) => ItemId.safeParse(id).data ?? []);
 
-	const firstStillReady = async (source: WorkSource, ids: readonly string[]): Promise<string | undefined> => {
+	const firstStillReady = async (source: Fallible<WorkSource>, ids: readonly ItemId[]): Promise<ItemId | undefined> => {
 		for (const id of ids) if ((await retried(() => source.read(id), Item)).ready) return id;
 
 		return undefined;
 	};
 
-	const refuseContradictingEmptyList = async (source: WorkSource): Promise<void> => {
+	const refuseContradictingEmptyList = async (source: Fallible<WorkSource>): Promise<void> => {
 		const stillReady = await firstStillReady(source, lastReadyIds);
 
 		if (stillReady === undefined) return;

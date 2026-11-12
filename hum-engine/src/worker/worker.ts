@@ -5,7 +5,7 @@ import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
-import { ADAPTER_API_VERSION, type Answers, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Answers, type Holder, ItemId, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
 import { invokedSources } from "../config/machine.ts";
@@ -63,7 +63,7 @@ export type WorkerOptions = {
 	readonly remote: string;
 	readonly base?: string;
 	readonly checks: readonly string[];
-	readonly holder: string;
+	readonly holder: Holder;
 	readonly workDir?: string;
 	/** Gives each pass its working copy; by default a `git clone`. */
 	readonly checkout?: Checkout;
@@ -384,7 +384,7 @@ export class Worker {
 		await Promise.all(
 			[...new Set([...waiting, ...parked.map((p) => p.item), ...inbox, ...asked, ...this.#unread])].map((id) =>
 				this.#readThread(id, async () => {
-					const raw = await adapters.workSource.read(id);
+					const raw = await adapters.workSource.read(ItemId.parse(id));
 					const item = await settleAnswers({ state, workSource: adapters.workSource, judge: this.#judge, now: this.#now }, raw, this.#stageOf(id, raw.ready, asleep));
 					const held = parked.find((p) => p.item === id);
 					const lastAnswer = item.thread.findLast((e) => e.kind === "answer");
@@ -433,7 +433,7 @@ export class Worker {
 
 		await Promise.all(
 			[...this.#inFlight].map(async ([id, run]) => {
-				const claim = await adapters.workSource.renew(id, holder, claimTtlMs(config)).catch(() => undefined);
+				const claim = await adapters.workSource.renew(ItemId.parse(id), holder, claimTtlMs(config)).catch(() => undefined);
 
 				if (claim?.won === false) run.abort.abort();
 			}),
@@ -460,7 +460,7 @@ export class Worker {
 				workDir: this.#o.workDir,
 				checkout: this.#o.checkout,
 				dir: this.#o.dir,
-				itemId: id,
+				itemId: ItemId.parse(id),
 				signal: abort.signal,
 				gate: this.#gate,
 				now: this.#now,
@@ -652,7 +652,7 @@ export class Worker {
 
 	/** What the scheduler needs of an item, read fresh each tick so an owner's edit to its `touches:` counts. */
 	async #learn(id: string): Promise<Known> {
-		const item = await this.#o.adapters.workSource.read(id);
+		const item = await this.#o.adapters.workSource.read(ItemId.parse(id));
 
 		return { footprint: footprintOf(item), title: item.title };
 	}

@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import { type AdapterContext, contractChecks, type ContractTarget, roundupAdapter, stdioCall, type ToolCall } from "../src/index.ts";
 import { FakeRoundup } from "./fixtures/fake-roundup.ts";
+import { Holder, ItemId } from "../src/adapter-api.ts";
 
 const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
@@ -16,7 +17,7 @@ describe("contract suite on a fake roundup", () => {
 		name: "roundup (fake)",
 		adapter: primary,
 		other: async () => secondary,
-		seed: async (title) => String(roundup.seed(title)),
+		seed: async (title) => ItemId.parse(String(roundup.seed(title))),
 		advance: async (ms) => void (clock.offset += ms),
 		spent: primary.spent,
 	};
@@ -33,9 +34,9 @@ describe("what a Todo needs to be ready", () => {
 		const blocked = roundup.seed("blocked", { blocked: true });
 		const owned = roundup.seed("owned", { owner: { kind: "agent", id: "7" } });
 
-		expect((await adapter.workSource.listReady()).map((ref) => ref.id)).toEqual([String(open)]);
+		expect((await adapter.workSource.listReady()).map((ref) => ref.id)).toEqual([ItemId.parse(String(open))]);
 
-		for (const id of [done, blocked, owned]) await expect(adapter.workSource.claim(String(id), "a", 1000)).rejects.toThrow("not ready to claim");
+		for (const id of [done, blocked, owned]) await expect(adapter.workSource.claim(ItemId.parse(String(id)), Holder.parse("a"), 1000)).rejects.toThrow("not ready to claim");
 	});
 
 	test("claim comments stay off the thread, and a person's reply reads as a comment", async () => {
@@ -43,11 +44,11 @@ describe("what a Todo needs to be ready", () => {
 		const adapter = roundupAdapter({ call: roundup.call }, context);
 		const id = roundup.seed("threaded");
 
-		await adapter.workSource.claim(String(id), "a", 1000);
-		await adapter.questions.ask(String(id), { text: "Which?", options: ["approve", "change"] });
+		await adapter.workSource.claim(ItemId.parse(String(id)), Holder.parse("a"), 1000);
+		await adapter.questions.ask(ItemId.parse(String(id)), { text: "Which?", options: ["approve", "change"] });
 		roundup.say(id, "approve please");
 
-		const { thread } = await adapter.workSource.read(String(id));
+		const { thread } = await adapter.workSource.read(ItemId.parse(String(id)));
 
 		expect(thread.map((entry) => entry.kind)).toEqual(["question", "comment"]);
 	});
@@ -59,7 +60,7 @@ describe("what a Todo needs to be ready", () => {
 
 		roundup.say(id, `<!-- hum-claim ${JSON.stringify({ holder: "newer", at: now(), expiresAt: now() + 60_000, addedLater: true })} -->`);
 
-		expect((await adapter.workSource.claim(String(id), "older", 1000)).won).toBe(false);
+		expect((await adapter.workSource.claim(ItemId.parse(String(id)), Holder.parse("older"), 1000)).won).toBe(false);
 	});
 });
 
@@ -71,12 +72,12 @@ describe("follow-ups", () => {
 
 		roundup.failsOnce.add("todo_comment");
 
-		await expect(adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." })).rejects.toThrow();
+		await expect(adapter.workSource.fileFollowUp(ItemId.parse(from), { title: "Fix it", body: "Do it." })).rejects.toThrow();
 
-		const again = await adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." });
+		const again = await adapter.workSource.fileFollowUp(ItemId.parse(from), { title: "Fix it", body: "Do it." });
 
 		expect(roundup.calls.filter((tool) => tool === "todo_create")).toHaveLength(1);
-		expect(await adapter.workSource.fileFollowUp(from, { title: "Fix it", body: "Do it." })).toEqual(again);
+		expect(await adapter.workSource.fileFollowUp(ItemId.parse(from), { title: "Fix it", body: "Do it." })).toEqual(again);
 	});
 });
 
@@ -86,10 +87,10 @@ describe("a roundup comment is one line", () => {
 		const adapter = roundupAdapter({ call: roundup.call }, context);
 		const id = String(roundup.seed("short"));
 
-		await adapter.questions.ask(id, { text: "Which title?", options: ["a", "b"] });
-		await adapter.workSource.comment(id, "Answer 1 applied: a.");
+		await adapter.questions.ask(ItemId.parse(id), { text: "Which title?", options: ["a", "b"] });
+		await adapter.workSource.comment(ItemId.parse(id), "Answer 1 applied: a.");
 
-		expect((await adapter.workSource.read(id)).thread.map((entry) => entry.text)).toEqual(["Which title? Options: a, b", "Answer 1 applied: a."]);
+		expect((await adapter.workSource.read(ItemId.parse(id))).thread.map((entry) => entry.text)).toEqual(["Which title? Options: a, b", "Answer 1 applied: a."]);
 		expect(roundup.pads.size).toBe(0);
 	});
 
@@ -99,10 +100,10 @@ describe("a roundup comment is one line", () => {
 		const id = String(roundup.seed("short"));
 		const detail = "why ".repeat(120);
 
-		await adapter.questions.ask(id, { text: "Which title?", options: ["a", "b"], detail });
-		await adapter.workSource.comment(id, "two\nlines");
+		await adapter.questions.ask(ItemId.parse(id), { text: "Which title?", options: ["a", "b"], detail });
+		await adapter.workSource.comment(ItemId.parse(id), "two\nlines");
 
-		const [question, reply] = (await adapter.workSource.read(id)).thread;
+		const [question, reply] = (await adapter.workSource.read(ItemId.parse(id))).thread;
 		const names = [...roundup.pads.keys()];
 
 		expect(names).toHaveLength(2);
@@ -175,7 +176,7 @@ describe.skipIf(!env.success)("contract suite on the scratch roundup Project (li
 		name: "roundup (scratch Project)",
 		adapter,
 		other: async () => second,
-		seed: async (title) => String(Created.parse(await call("todo_create", { title, body: `${title} body` })).id),
+		seed: async (title) => ItemId.parse(String(Created.parse(await call("todo_create", { title, body: `${title} body` })).id)),
 		advance: async (ms) => void (clock.offset += ms),
 		spent: adapter.spent,
 	};

@@ -15,6 +15,7 @@ import { configWith } from "./config.ts";
 import { makeShim, type ShimSpec } from "./shim.ts";
 import { WorkRepo, itemFile, markdownSettings } from "./work-repo.ts";
 import { settleAtTestEnd, tempDir } from "./temp.ts";
+import { Holder } from "../../src/adapter-api.ts";
 
 export const NOW = 1_800_000_000_000;
 export const TTL = SHIPPED_DEFAULTS.claimExpirySeconds * 1000;
@@ -60,7 +61,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			judge: docsJudge,
 			remote: repo.remote,
 			checks,
-			holder: "worker-1",
+			holder: Holder.parse("worker-1"),
 			workDir: tempDir("worker-work"),
 			now,
 			runnerVariables: new Set(Object.keys(process.env)),
@@ -108,7 +109,7 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			judge: docsJudge,
 			remote: repo.remote,
 			checks,
-			holder: "worker-1",
+			holder: Holder.parse("worker-1"),
 			workDir: tempDir("thin-work"),
 			now: Date.now,
 			runnerVariables: new Set(Object.keys(process.env)),

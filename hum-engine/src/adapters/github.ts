@@ -2,7 +2,7 @@ import ExpiryMap from "expiry-map";
 import hostedGitInfo from "hosted-git-info";
 import pMemoize from "p-memoize";
 import { z } from "zod";
-import { type Adapter, type AdapterContext, type Answers, type Claim, type Item, ItemId, PermanentError, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, type Item, ItemId, PermanentError, type Integrations, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
 import type { Json } from "../config/json.ts";
 import type { MERGE_METHODS } from "../config/schema.ts";
 import { HOUR_MS } from "../time.ts";
@@ -20,7 +20,9 @@ const ISSUE_ID_KEPT_MS = HOUR_MS;
 
 type Variables = Readonly<Record<string, Json>>;
 
-const IssueNumber = ItemId.pipe(z.string().regex(/^[1-9]\d*$/, "a GitHub issue number is a whole number above 0")).transform(Number);
+const IssueId = ItemId.refine((id) => /^[1-9]\d*$/.test(id), "a GitHub issue number is a whole number above 0");
+
+const IssueNumber = IssueId.transform(Number);
 
 const Repo = z.string().regex(/^[\w.-]+\/[\w.-]+$/, "a GitHub repo is owner/name");
 
@@ -153,7 +155,7 @@ export type GitHubOptions = {
 	readonly timeoutMs: number;
 };
 
-type Whole = Adapter & {
+type Whole = Integrations & {
 	readonly workSource: WorkSource;
 	readonly questions: Questions;
 	readonly answers: Answers;
@@ -242,7 +244,7 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 		return { repository: repository.id, label: repository.label?.id ?? (await made()) };
 	});
 
-	const claimFrom = (item: string, target: { oid?: string; message?: string } | undefined): Claim | undefined => claimOfCommit(item, target?.message ?? "");
+	const claimFrom = (item: ItemId, target: { oid?: string; message?: string } | undefined): Claim | undefined => claimOfCommit(item, target?.message ?? "");
 
 	const firstClaim = async (claim: Claim): Promise<boolean> => {
 		const { repository } = await query(BaseReply, BASE, { baseRef: `refs/heads/${base}` });
@@ -275,7 +277,7 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 	const pulls = gitHubPullRequests(repo, { timeoutMs, client });
 
 	return {
-		apiVersion: 1,
+		apiVersion: ADAPTER_API_VERSION,
 		spent: () => spent,
 		workSource: {
 			listReady: async () => {
@@ -283,9 +285,13 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 
 				if (refs.totalCount > refs.nodes.length) throw new PermanentError(`${repo} holds ${refs.totalCount} claim branches; hum reads ${refs.nodes.length}`);
 
-				const claims = new Map(refs.nodes.map((ref) => [ref.name, claimFrom(ref.name, ref.target)]));
+				const claims = new Map(refs.nodes.flatMap((ref) => {
+					const item = ItemId.safeParse(ref.name);
 
-				return issues.nodes.flatMap(({ number, title }) => (isLive(claims.get(String(number)), now()) ? [] : [{ id: String(number), title }]));
+					return item.success ? [[ref.name, claimFrom(item.data, ref.target)] as const] : [];
+				}));
+
+				return issues.nodes.flatMap(({ number, title }) => (isLive(claims.get(String(number)), now()) ? [] : [{ id: ItemId.parse(String(number)), title }]));
 			},
 			read: async (id): Promise<Item> => {
 				const { issue, ref } = await fetchItem(parseArgument(IssueNumber, id));
@@ -299,8 +305,8 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 					labels: issue.labels.nodes.map((label) => label.name),
 				};
 			},
-			claim: (id, holder, ttlMs) => take("claim", String(parseArgument(IssueNumber, id)), holder, ttlMs),
-			renew: (id, holder, ttlMs) => take("renew", String(parseArgument(IssueNumber, id)), holder, ttlMs),
+			claim: (id, holder, ttlMs) => take("claim", parseArgument(IssueId, id), holder, ttlMs),
+			renew: (id, holder, ttlMs) => take("renew", parseArgument(IssueId, id), holder, ttlMs),
 			comment: (id, text) => comment(id, commentText(text)),
 			fileFollowUp: async (from, { title, body }) => {
 				const { issue } = await fetchItem(parseArgument(IssueNumber, from));
@@ -315,7 +321,7 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 				};
 
 				const recent = (await query(RecentIssuesReply, RECENT_ISSUES, {})).repository.issues.nodes;
-				const id = String(recent.find(isFollowUpOf(`#${from}`, title))?.number ?? (await created()));
+				const id = ItemId.parse(String(recent.find(isFollowUpOf(`#${from}`, title))?.number ?? (await created())));
 				const note = followUpNote(title, id);
 
 				await commentMarked(from, note.marker, note.text);

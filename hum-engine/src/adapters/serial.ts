@@ -1,15 +1,14 @@
 import PQueue from "p-queue";
-import type { Adapter } from "../adapter-api.ts";
+import type { Integrations } from "../adapter-api.ts";
+import { eachCall } from "./each-call.ts";
 
-// SAFETY: every member of an integration role is an async method; each is replaced by one with the same signature.
-const inOrder = <R extends object>(role: R | undefined, queue: PQueue): R | undefined =>
-	role && (Object.fromEntries(Object.entries(role).map(([name, member]) => [name, member instanceof Function ? (...args: unknown[]) => queue.add(async () => member.apply(role, args)) : member])) as R);
+const inOrder = <R extends object>(role: R | undefined, queue: PQueue): R | undefined => role && eachCall<R, R>(role, (call) => async (...args) => queue.add(async () => call(...args)));
 
 /**
  * Runs an adapter's calls one at a time. Runs that go side by side share one adapter, and an adapter
  * that keeps a clone, as the markdown source does, must not take two writes into it at once.
  */
-export const serialized = (adapter: Adapter): Adapter => {
+export const serialized = (adapter: Integrations): Integrations => {
 	const queue = new PQueue({ concurrency: 1 });
 
 	return {

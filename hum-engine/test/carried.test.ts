@@ -3,7 +3,7 @@ import { docsJudge } from "./fixtures/judge.ts";
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Adapter, type Item, PermanentError } from "../src/adapter-api.ts";
+import { ADAPTER_API_VERSION, type Adapter, Holder, type Integrations, type Item, ItemId, PermanentError } from "../src/adapter-api.ts";
 import { guarded } from "../src/adapters/guard.ts";
 import { onceCalls } from "../src/adapters/once.ts";
 import { openState } from "../src/state/open.ts";
@@ -14,17 +14,17 @@ import { NOW, TTL, workerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
-type Write = { readonly name: string; readonly kind: string; readonly call: (a: Adapter, id: string, text: string) => Promise<void> };
+type Write = { readonly name: string; readonly kind: string; readonly call: (a: Integrations, id: string, text: string) => Promise<void> };
 
 const WRITES: readonly Write[] = [
-	{ name: "comment", kind: "comment", call: (a, id, text) => a.workSource!.comment(id, text) },
-	{ name: "ask", kind: "question", call: (a, id, text) => a.questions!.ask(id, { text }) },
-	{ name: "decide", kind: "decision", call: (a, id, text) => a.questions!.decide(id, text) },
-	{ name: "answer", kind: "answer", call: (a, id, text) => a.answers!.answer(id, { text }) },
+	{ name: "comment", kind: "comment", call: (a, id, text) => a.workSource!.comment(ItemId.parse(id), text) },
+	{ name: "ask", kind: "question", call: (a, id, text) => a.questions!.ask(ItemId.parse(id), { text }) },
+	{ name: "decide", kind: "decision", call: (a, id, text) => a.questions!.decide(ItemId.parse(id), text) },
+	{ name: "answer", kind: "answer", call: (a, id, text) => a.answers!.answer(ItemId.parse(id), { text }) },
 ];
 
 /** The adapter does the write, or not, and then the process "dies". */
-const dying = (real: Adapter, { writeFirst }: { readonly writeFirst: boolean }): Adapter => {
+const dying = (real: Integrations, { writeFirst }: { readonly writeFirst: boolean }): Integrations => {
 	const die = async (write: () => Promise<void>) => {
 		if (writeFirst) await write();
 
@@ -44,7 +44,7 @@ for (const write of WRITES) {
 		const w = await workerWorld({});
 		const id = w.repo.seed("An item");
 		const entries = async () => (await w.adapter.workSource!.read(id)).thread.filter((e) => e.kind === write.kind).length;
-		const calls = (adapter: Adapter, run: string) => onceCalls(adapter, w.state.ops, { run, attempt: 0 });
+		const calls = (adapter: Integrations, run: string) => onceCalls(adapter, w.state.ops, { run, attempt: 0 });
 
 		return { w, id, entries, calls };
 	};
@@ -76,7 +76,7 @@ for (const write of WRITES) {
 	});
 }
 
-const item = (id: string): Item => ({ id, title: id, body: "", ready: true, thread: [] });
+const item = (id: string): Item => ({ id: ItemId.parse(id), title: id, body: "", ready: true, thread: [] });
 
 test("the last-read list survives a restart: a fresh guard still sees an empty list that contradicts it", async () => {
 	const state = openState(tempDir("r3"), { now: Date.now });
@@ -84,9 +84,9 @@ test("the last-read list survives a restart: a fresh guard still sees an empty l
 	const store = { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids: string[]) => state.ready.put("work-source", { ids }) };
 
 	const listing = (ids: string[]): Adapter => ({
-		apiVersion: 1,
+		apiVersion: ADAPTER_API_VERSION,
 		workSource: {
-			listReady: async () => ids.map((id) => ({ id, title: id })),
+			listReady: async () => ids.map((id) => ({ id: ItemId.parse(id), title: id })),
 			read: async (id) => item(id),
 			claim: async () => {
 				throw new Error("unused");
@@ -127,7 +127,7 @@ test("an item saved under an earlier machine version restores through the kinds 
 		raw.kinds.docs.machine.version = "2";
 	});
 
-	await w.adapter.answers!.answer("a", { text: "Use Plain" });
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
 	w.clock.at += TTL + 1;
 
 	const restarted = w.workerWith({ config: next });
@@ -153,7 +153,7 @@ test("an item's token total is saved over all its runs and restarts; the cap cou
 	expect(w.state.spent.get("a")).toEqual({ item: "a", total: 700, base: 0 });
 
 	// A restart and an answer: the second run spends 700 more, which a per-call count would allow too, but the total is kept.
-	await w.adapter.answers!.answer("a", { text: "Use Plain" });
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
 	w.clock.at += TTL + 1;
 
 	const restarted = w.workerWith();
@@ -180,7 +180,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
 	expect(w.state.spent.get("a")?.total).toBe(1200);
 
-	const thread = (await w.adapter.workSource!.read("a")).thread;
+	const thread = (await w.adapter.workSource!.read(ItemId.parse("a"))).thread;
 
 	expect(thread.map((e) => e.kind)).toEqual(["question"]);
 	expect(thread[0]?.text).toContain("token cap");
@@ -217,7 +217,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 	const worker = await openWorker(w.repo.owner, {
 		hopeSkills: hopeSkills(),
 		judge: docsJudge,
-		holder: "worker-1",
+		holder: Holder.parse("worker-1"),
 		binary: w.shim.binary,
 		env: w.shim.env,
 		now: () => NOW,
@@ -250,7 +250,7 @@ test("openWorker refuses a repo whose hum.json names no commit identity, saying 
 	mkdirSync(join(w.repo.owner, ".hum"), { recursive: true });
 	writeFileSync(join(w.repo.owner, ".hum", "hum.json"), JSON.stringify(hum));
 
-	await expect(openWorker(w.repo.owner, { hopeSkills: hopeSkills(), judge: docsJudge, holder: "worker-1", binary: w.shim.binary, env: w.shim.env, now: () => NOW, newSessionId: randomUUID })).rejects.toThrow("commitIdentity");
+	await expect(openWorker(w.repo.owner, { hopeSkills: hopeSkills(), judge: docsJudge, holder: Holder.parse("worker-1"), binary: w.shim.binary, env: w.shim.env, now: () => NOW, newSessionId: randomUUID })).rejects.toThrow("commitIdentity");
 });
 
 test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
@@ -272,7 +272,7 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 	const worker = await openWorker(w.repo.owner, {
 		hopeSkills: hopeSkills(),
 		judge: docsJudge,
-		holder: "worker-1",
+		holder: Holder.parse("worker-1"),
 		binary: w.shim.binary,
 		env: w.shim.env,
 		now: () => NOW,

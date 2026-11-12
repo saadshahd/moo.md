@@ -7,8 +7,9 @@ import { configWith } from "./fixtures/config.ts";
 import { workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { ItemId } from "../src/adapter-api.ts";
 
-const threadOf = async (w: WorkerWorld, id: string) => (await w.adapter.workSource!.read(id)).thread;
+const threadOf = async (w: WorkerWorld, id: string) => (await w.adapter.workSource!.read(ItemId.parse(id))).thread;
 
 const questionsOn = async (w: WorkerWorld, id: string) => (await threadOf(w, id)).filter((entry) => entry.kind === "question");
 
@@ -25,7 +26,7 @@ test("with 50 items ready and a cap of 3, three are asked and the rest wait for 
 
 	const ctx = { state: w.state, config: w.config, workSource: w.adapter.workSource!, questions: w.adapter.questions!, now: () => w.clock.at };
 
-	for (const id of ids) queueQuestion(ctx, await w.adapter.workSource!.read(id), { text: "Which title?" }, "unsure");
+	for (const id of ids) queueQuestion(ctx, await w.adapter.workSource!.read(ItemId.parse(id)), { text: "Which title?" }, "unsure");
 
 	const asked = async () => (await Promise.all(ids.map(async (id) => ((await questionsOn(w, id)).length > 0 ? [id] : [])))).flat();
 
@@ -46,7 +47,7 @@ test("a question still open is not queued again after the owner's reply that was
 		{ kind: "comment" as const, text: "not sure yet", at: 2, author: "person" as const },
 	];
 
-	queueQuestion(ctx, { id: "a", title: "a", body: "", ready: true, thread }, { text: "Which title?" }, "unsure");
+	queueQuestion(ctx, { id: ItemId.parse("a"), title: "a", body: "", ready: true, thread }, { text: "Which title?" }, "unsure");
 
 	expect(ctx.state.questions.list()).toEqual([]);
 });
@@ -59,8 +60,8 @@ test("every answer is saved first and gets a reply: applied, then a second answe
 	await w.worker.idle();
 	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
 
-	await w.adapter.answers!.answer("a", { text: "Use Plain" });
-	await w.adapter.answers!.answer("a", { text: "No, Use Short" });
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
+	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "No, Use Short" });
 	w.clock.at += 2 * HOUR_MS;
 	await w.worker.tick();
 	await w.worker.idle();
@@ -90,7 +91,7 @@ test("an answer pushed from another clone after a quiet tick starts the run on t
 
 	const elsewhere = markdownAdapter({ ...markdownSettings, repo: w.repo.worker("elsewhere") }, { report: () => {}, now: () => w.clock.at, env: process.env });
 
-	await elsewhere.answers.answer("a", { text: "Use Plain" });
+	await elsewhere.answers.answer(ItemId.parse("a"), { text: "Use Plain" });
 	w.clock.at += 2 * HOUR_MS;
 	await w.worker.tick();
 	await w.worker.idle();

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { WorkSource } from "../adapter-api.ts";
+import { ItemId, type WorkSource } from "../adapter-api.ts";
 import type { State } from "../state/open.ts";
 import { noteKey, type RepeatGroup, type ReviewNote } from "./records.ts";
 
@@ -12,7 +12,7 @@ const hashOf = (groupKey: string): string => createHash("sha1").update(groupKey)
 export const checkNameOf = (groupKey: string): string => `hum-check-${hashOf(groupKey)}`;
 
 /** The id a group files its items from; filing the same title from it twice returns the first item. */
-export const filedFrom = (groupKey: string): string => `rn-${hashOf(groupKey)}`;
+export const filedFrom = (groupKey: string): ItemId => ItemId.parse(`rn-${hashOf(groupKey)}`);
 
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();
 
@@ -69,7 +69,7 @@ export const fileChecks = async ({ state, workSource, repeatAt, checkKind }: Fil
 
 		const unposted = notes.filter((found) => !group.commented.includes(noteKey(found)));
 
-		for (const note of unposted) await workSource.comment(group.item, noteBlock(note));
+		for (const note of unposted) await workSource.comment(ItemId.parse(group.item), noteBlock(note));
 
 		if (unposted.length > 0) state.repeats.put(group.key, { ...group, commented: group.notes });
 	}

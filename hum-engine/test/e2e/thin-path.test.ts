@@ -16,6 +16,7 @@ import { BASE, poolConfig } from "../fixtures/slot-world.ts";
 import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
 import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
+import { Holder, ItemId } from "../../src/adapter-api.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
 const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
@@ -206,7 +207,7 @@ test("a commit with an error subtype is not done", async () => {
 
 const OWNER_CONFIG = `${JSON.stringify({ schemaVersion: 1, paths: [{ glob: "docs/**", level: "low" }] }, null, "\t")}\n`;
 
-const questionsOn = async (w: Awaited<ReturnType<typeof world>>, id: string) => (await w.adapter.workSource!.read(id)).thread.filter((entry) => entry.kind === "question");
+const questionsOn = async (w: Awaited<ReturnType<typeof world>>, id: string) => (await w.adapter.workSource!.read(ItemId.parse(id))).thread.filter((entry) => entry.kind === "question");
 
 test("a change to a path no rule places runs, waits unmerged and asks one question; the answer becomes a path rule, and the next change there is not unclear", async () => {
 	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }, { commit: { "src/y.ts": "y\n" } }] });
@@ -328,7 +329,7 @@ test("a claim another worker holds is lost, and no run starts", async () => {
 	const w = await world({ script: [{}, NOTE] });
 	const id = w.repo.seed("Write the note");
 
-	expect((await w.adapter.workSource!.claim(id, "worker-2", TTL)).won).toBe(true);
+	expect((await w.adapter.workSource!.claim(id, Holder.parse("worker-2"), TTL)).won).toBe(true);
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toEqual({ outcome: "lost", item: id });
 	expect(w.shim.calls()).toHaveLength(1);
 });

@@ -14,6 +14,7 @@ import { type LandContext, land } from "../src/worker/land.ts";
 import { configWith } from "./fixtures/config.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { ItemId } from "../src/adapter-api.ts";
 
 const live = process.env.HUM_LIVE === "1";
 const repo = process.env.HUM_GITHUB_SCRATCH ?? "saadshahd/factory-smoke";
@@ -47,7 +48,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		config,
 		kind: "docs",
 		id,
-		item: { id, title: `Landing test ${stamp}`, body: "", ready: true, thread: [] },
+		item: { id: ItemId.parse(id), title: `Landing test ${stamp}`, body: "", ready: true, thread: [] },
 		branch,
 		base: "main",
 		remote: `https://github.com/${repo}.git`,

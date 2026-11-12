@@ -15,6 +15,7 @@ import { openState } from "../src/state/open.ts";
 import { z } from "zod";
 import { finished, pastChange, reviewNote, runnerOf } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
+import { ItemId } from "../src/adapter-api.ts";
 
 const freshState = () => openState(tempDir("loop"), { now: Date.now });
 
@@ -137,7 +138,7 @@ const fakeSource = () => {
 		fileFollowUp: async (from: string, followUp: FollowUp): Promise<ItemRef> => {
 			filed.push({ from, followUp });
 
-			return { id: `${from}-item`, title: followUp.title };
+			return { id: ItemId.parse(`${from}-item`), title: followUp.title };
 		},
 		comment: async (id: string, text: string) => void commented.push({ id, text }),
 	} satisfies Pick<WorkSource, "fileFollowUp" | "comment">;

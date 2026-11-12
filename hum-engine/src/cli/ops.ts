@@ -1,6 +1,7 @@
 import { Command, CommanderError, Option } from "commander";
 import { z } from "zod";
-import { type ClaimResult, type Item, type ItemRef, PermanentError, Watch } from "../adapter-api.ts";
+import { type ClaimResult, Holder, type Item, ItemId, type ItemRef, PermanentError, Watch } from "../adapter-api.ts";
+import { parseArgument } from "../adapters/argument.ts";
 import { pushArgs } from "../adapters/git.ts";
 import { resolveAdapters, type Slot } from "../adapters/registry.ts";
 import { readSettings } from "../config/settings.ts";
@@ -74,19 +75,21 @@ const performed = async (action: Promise<void>): Promise<Printable> => {
 
 type Handler = (call: Call) => Promise<Printable>;
 
+const idOf = (item: string): ItemId => parseArgument(ItemId, item);
+
 const handlers = {
 	"list-ready": ({ slot }) => slot("work-source", (a) => a.workSource).listReady(),
 	claim: ({ slot, item, second: holder, flags, settings }) => {
 		const source = slot("work-source", (a) => a.workSource);
 		const ttlMs = (flags.ttl ?? settings.claimExpirySeconds) * SECOND_MS;
 
-		return (flags.renew ? source.renew : source.claim)(item, holder, ttlMs);
+		return (flags.renew ? source.renew : source.claim)(idOf(item), parseArgument(Holder, holder), ttlMs);
 	},
-	read: ({ slot, item }) => slot("work-source", (a) => a.workSource).read(item),
-	comment: ({ slot, item, text }) => performed(slot("work-source", (a) => a.workSource).comment(item, text)),
-	ask: ({ slot, item, text, options }) => performed(slot("questions", (a) => a.questions).ask(item, { text: text, options: options.length > 0 ? options : undefined })),
+	read: ({ slot, item }) => slot("work-source", (a) => a.workSource).read(idOf(item)),
+	comment: ({ slot, item, text }) => performed(slot("work-source", (a) => a.workSource).comment(idOf(item), text)),
+	ask: ({ slot, item, text, options }) => performed(slot("questions", (a) => a.questions).ask(idOf(item), { text: text, options: options.length > 0 ? options : undefined })),
 	answer: async ({ slot, item, text, options, inbox, settings }) => {
-		await slot("answers", (a) => a.answers).answer(item, { text, option: options[0] });
+		await slot("answers", (a) => a.answers).answer(idOf(item), { text, option: options[0] });
 		wakeWorker({ inbox, settings }, item);
 
 		return OK;
@@ -105,10 +108,10 @@ const handlers = {
 			changed: () => wakeWorker({ inbox, settings }, ""),
 		});
 	},
-	"file-follow-up": ({ slot, item, second, flags }) => slot("work-source", (a) => a.workSource).fileFollowUp(item, { title: second, body: flags.body ?? "" }),
-	decide: ({ slot, item, text }) => performed(slot("questions", (a) => a.questions).decide(item, text)),
-	publish: ({ slot, item, second }) => performed(slot("release", (a) => a.release).publish(item, second)),
-	release: ({ slot, item, second }) => performed(slot("release", (a) => a.release).release(item, second)),
+	"file-follow-up": ({ slot, item, second, flags }) => slot("work-source", (a) => a.workSource).fileFollowUp(idOf(item), { title: second, body: flags.body ?? "" }),
+	decide: ({ slot, item, text }) => performed(slot("questions", (a) => a.questions).decide(idOf(item), text)),
+	publish: ({ slot, item, second }) => performed(slot("release", (a) => a.release).publish(idOf(item), second)),
+	release: ({ slot, item, second }) => performed(slot("release", (a) => a.release).release(idOf(item), second)),
 } as const satisfies Record<Exclude<OpName, "push">, Handler>;
 
 const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Promise<Call> => {
