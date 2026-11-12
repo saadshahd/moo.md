@@ -16,6 +16,16 @@ export type Resolution =
 	| { readonly source: "none-of-these" }
 	| { readonly source: "abstained"; readonly why: string };
 
+/** Each way an answer comes to pick its option, by the name its settled answer is saved under. */
+export const RESOLUTION_SOURCES = {
+	marker: "marker",
+	free: "free",
+	"first-word": "first-word",
+	model: "model",
+	"none-of-these": "none-of-these",
+	abstained: "abstained",
+} as const satisfies { readonly [S in Resolution["source"]]: S };
+
 const firstWordOf = (text: string): string => bareWord(text.trim().split(/\s+/)[0] ?? "").toLowerCase();
 
 /** The option an answer picks by its hidden marker, else by its first word matching an option exactly. */
@@ -63,8 +73,10 @@ export type Stage =
 	/** It has merged, or otherwise ended. */
 	| "ended";
 
+export const DISPOSITIONS = ["applied", "held", "dropped"] as const;
+
 export type Disposition = {
-	readonly disposition: "applied" | "held" | "dropped";
+	readonly disposition: (typeof DISPOSITIONS)[number];
 	readonly why: string;
 };
 

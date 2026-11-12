@@ -61,7 +61,7 @@ const Reply = z.looseObject({
 });
 
 /** One take or renewal of an item's claim, written as a comment. */
-const ClaimEntry = z.strictObject({ holder: z.string().min(1), at: z.int().nonnegative(), expiresAt: z.int().nonnegative() });
+const ClaimEntry = z.object({ holder: z.string().min(1), at: z.int().nonnegative(), expiresAt: z.int().nonnegative() });
 
 type ClaimEntry = z.infer<typeof ClaimEntry>;
 

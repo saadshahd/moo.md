@@ -2,21 +2,27 @@ import { join } from "node:path";
 import { z } from "zod";
 import { atomicWrite, createOnce, listFiles, listRecords, orMissing, readJson, slug } from "./fs.ts";
 
-export const RunKey = z.strictObject({ itemId: z.string().min(1), run: z.string().min(1), attempt: z.int().nonnegative() });
+export const RunKey = z.object({ itemId: z.string().min(1), run: z.string().min(1), attempt: z.int().nonnegative() });
 
 export type RunKey = z.infer<typeof RunKey>;
 
-export const RunRecord = RunKey.extend({
+const BegunRecord = RunKey.extend({
 	/** On the Mac the run's name is saved before launch and found by it after a crash. */
 	name: z.string().min(1),
 	/** The Claude session id: set ahead in CI, learned after launch on the Mac. */
 	sessionId: z.string().min(1).optional(),
 	savedAt: z.int().nonnegative(),
-	/** Set when the run's outcome has been taken; a record without it is a run a restart adopts. */
-	endedAt: z.int().nonnegative().optional(),
-	/** The rules of memory.md the run says it applied; absent when the run was shown none. */
-	memoryUsed: z.array(z.string()).optional(),
 });
+
+/** A run whose outcome is not yet taken is one a restart adopts; an ended run carries when it ended and the memory it used. */
+export const RunRecord = z.union([
+	BegunRecord.extend({ endedAt: z.undefined().optional() }),
+	BegunRecord.extend({
+		endedAt: z.int().nonnegative(),
+		/** The rules of memory.md the run says it applied; absent when the run was shown none. */
+		memoryUsed: z.array(z.string()).optional(),
+	}),
+]);
 
 export type RunRecord = z.infer<typeof RunRecord>;
 

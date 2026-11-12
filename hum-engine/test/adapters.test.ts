@@ -96,6 +96,12 @@ describe("item files", () => {
 		expect(finished).toContain("owner: me");
 		expect(parseItemFile(finished)).toMatchObject({ title: "A title", state: "done", kind: "fix", body: "The body." });
 	});
+
+	test("a thread entry a newer engine marked with a field this one does not know still reads", () => {
+		const source = `${newItemFile("A title", "The body.")}\n<!-- hum {"kind":"answer","at":5,"option":"yes","addedLater":true} -->\nyes\n`;
+
+		expect(parseItemFile(source).thread).toEqual([{ kind: "answer", at: 5, option: "yes", text: "yes" }]);
+	});
 });
 
 describe("a malformed item file", () => {

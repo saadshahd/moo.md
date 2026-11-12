@@ -270,7 +270,7 @@ export const prepareLanding = async (ctx: LandContext, ownerApproved = false): P
 	await git.raw(["add", `${dir}/${id}.md`]);
 	await git.raw(["commit", "-q", "-m", `hum: finish ${id}`]);
 	await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
-	state.landings.put(id, { item: id, branch, since: now(), change: { ...change, paths: [...change.paths] }, head, ownerApproved });
+	state.landings.put(id, { item: id, branch, since: now(), change, head, ownerApproved });
 };
 
 /** A merge is rechecked on the newest base: when the base moved, the change is rebased and the checks run again. */

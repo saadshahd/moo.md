@@ -51,6 +51,16 @@ describe("what a Todo needs to be ready", () => {
 
 		expect(thread.map((entry) => entry.kind)).toEqual(["question", "comment"]);
 	});
+
+	test("a claim a newer worker wrote with a field this engine does not know still holds the Todo", async () => {
+		const roundup = new FakeRoundup();
+		const adapter = roundupAdapter({ call: roundup.call }, context);
+		const id = roundup.seed("claimed");
+
+		roundup.say(id, `<!-- hum-claim ${JSON.stringify({ holder: "newer", at: now(), expiresAt: now() + 60_000, addedLater: true })} -->`);
+
+		expect((await adapter.workSource.claim(String(id), "older", 1000)).won).toBe(false);
+	});
 });
 
 describe("follow-ups", () => {

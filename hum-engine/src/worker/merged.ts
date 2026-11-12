@@ -8,7 +8,7 @@ import type { State } from "../state/open.ts";
 export const recordMerged = (state: State, item: string, sha: string, at: number): void => {
 	const landing = state.landings.get(item);
 
-	state.merges.put(item, { item, sha, at, paths: landing?.change.paths ?? [] });
+	state.merges.put(item, { item, sha, at, paths: [...(landing?.change.paths ?? [])] });
 	state.landings.remove(item);
 	state.plans.remove(item);
 	state.verdicts.remove(item);

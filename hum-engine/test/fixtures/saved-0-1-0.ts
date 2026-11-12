@@ -1,0 +1,26 @@
+/** One file of each record the state folder holds, by its folder, as hum 0.1.0 wrote it. A later engine must still read every one. */
+export const SAVED_0_1_0 = {
+	parked: { item: "7", why: "review", cause: "the change waits for review", since: 1_700_000_000_000 },
+	spent: { item: "7", total: 1200, base: 300 },
+	limit: { until: 1_700_000_000_000 },
+	ready: { ids: ["7", "8"] },
+	landings: {
+		item: "7",
+		branch: "hum/7",
+		since: 1_700_000_000_000,
+		change: { paths: ["src/a.ts"], size: 12, loosened: false, pinChanged: false },
+		head: "0123456789abcdef0123456789abcdef01234567",
+		ownerApproved: false,
+		alignment: { graded: { alignment: "sound", verification: "partial" } },
+	},
+	learned: { glob: "docs/**", level: "auto", item: "7", commit: "0123456789abcdef", pull: "12", at: 1_700_000_000_000 },
+	"item-kinds": { item: "7", kind: "build", from: "fallback", why: "the kind call abstained" },
+	plans: { item: "7", plan: { summary: "Add a flag.", steps: ["Add it."], paths: ["src/a.ts"] }, hash: "abc", models: ["claude-haiku-5-5"] },
+	verdicts: { item: "7", head: "0123456789abcdef", event: "approve", reason: "It does what the item asks.", cites: [{ file: "src/a.ts", line: 3 }], models: ["claude-haiku-5-5"] },
+	questions: { item: "7", text: "Which name?", options: ["alpha", "beta"], detail: "Both fit.", priority: 0, footprint: ["src/a.ts"], queuedAt: 1_700_000_000_000, askedAt: 1_700_000_000_500 },
+	answers: { item: "7", ordinal: 1, text: "alpha", option: "alpha", source: "first-word", disposition: "applied", why: "The run goes on with your answer.", at: 1_700_000_000_000 },
+	slots: { name: "slot-1", index: 0, folder: "/tmp/slots/slot-1", status: "taken", item: "7", lockfiles: "abc", since: 1_700_000_000_000 },
+	runs: { itemId: "7", run: "build", attempt: 0, name: "hum #7 build 0", sessionId: "session-1", savedAt: 1_700_000_000_000, endedAt: 1_700_000_000_900, memoryUsed: ["Run the tests first."] },
+	events: { source: "thread", sourceId: "c1", itemId: "7", type: "answer", receivedAt: 1_700_000_000_000, payload: { text: "alpha" } },
+	ops: { itemId: "7", run: "build", attempt: 0, op: "comment", state: "done", at: 1_700_000_000_000 },
+} as const;

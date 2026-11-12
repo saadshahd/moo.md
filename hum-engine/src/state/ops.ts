@@ -3,7 +3,7 @@ import { z } from "zod";
 import { atomicWrite, createOnce, listRecords, orMissing, readJson, slug } from "./fs.ts";
 
 /** One external op of one attempt of one run of one item. */
-export const OpKey = z.strictObject({
+export const OpKey = z.object({
 	itemId: z.string().min(1),
 	run: z.string().min(1),
 	attempt: z.int().nonnegative(),

@@ -70,11 +70,12 @@ test("a slot taken by a worker that died before its run started is returned", as
 	expect(died.exitCode).not.toBe(0);
 	const restarted = w.reopened();
 
-	expect(restarted.list().map(({ status, item }) => [status, item])).toEqual([["taken", "x"]]);
+	expect(restarted.list()).toMatchObject([{ status: "taken", item: "x" }]);
 
 	await restarted.maintain();
 
-	expect(restarted.list().map(({ status, item }) => [status, item])).toEqual([["free", undefined]]);
+	expect(restarted.list()).toMatchObject([{ status: "free" }]);
+	expect(restarted.list()[0]).not.toHaveProperty("item");
 });
 
 test.each<[string, ReadonlySet<string>, Slot["status"]]>([

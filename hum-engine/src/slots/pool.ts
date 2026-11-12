@@ -6,7 +6,7 @@ import { hashJson } from "../config/hash.ts";
 import type { HumConfig } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import type { State } from "../state/open.ts";
-import type { Slot } from "../state/saved.ts";
+import type { FreeSlot, HeldSlot, Slot } from "../state/saved.ts";
 import { SECOND_MS } from "../time.ts";
 import { runChecks } from "../worker/checks.ts";
 import type { Checkedout, Checkout } from "../worker/thin-path.ts";
@@ -50,7 +50,10 @@ const nextChange = (changes: EventTarget, signal: AbortSignal | undefined): Prom
 		signal?.addEventListener("abort", aborted, { once: true });
 	});
 
-const isHeld = ({ status }: Slot): boolean => status === "taken" || status === "kept";
+const isHeld = (slot: Slot): slot is HeldSlot => slot.status === "taken" || slot.status === "kept";
+
+/** The slot with no item, at a free status. */
+const freed = ({ name, index, folder, lockfiles, since }: Slot, status: FreeSlot["status"]): FreeSlot => ({ name, index, folder, lockfiles, status, since });
 
 /**
  * The run slots: git worktrees of the owner's checkout, kept prepared so a run starts in one at once. A slot serves
@@ -83,10 +86,10 @@ export class SlotPool {
 			.sort((a, b) => a.index - b.index);
 	}
 
-	#save(slot: Slot, patch: Partial<Slot>): Slot {
-		const saved = { ...slot, ...patch, since: this.#now() };
+	#save<S extends Slot>(next: S): S {
+		const saved = { ...next, since: this.#now() };
 
-		this.#o.state.slots.put(slot.name, saved);
+		this.#o.state.slots.put(saved.name, saved);
 		this.#changes.dispatchEvent(new Event(CHANGE));
 
 		return saved;
@@ -111,13 +114,13 @@ export class SlotPool {
 	}
 
 	#out(slot: Slot, cause: string, fix: string): void {
-		this.#save(slot, { status: "out", item: undefined });
+		this.#save(freed(slot, "out"));
 		this.#o.state.faults.raise({ code: SLOT_OUT_CODE, item: slot.name, cause: `${slot.name} (${slot.folder}) left the pool: ${cause}`.slice(0, CARD_OUTPUT), fix });
 	}
 
 	#ready(slot: Slot, lockfiles: string): void {
 		this.#o.state.faults.clear(`${SLOT_OUT_CODE}:${slot.name}`);
-		this.#save(slot, { status: "free", item: undefined, lockfiles });
+		this.#save({ ...freed(slot, "free"), lockfiles });
 	}
 
 	/** Makes the slot's worktree if it is not there, runs the recipe's prepare and ready; a failure takes the slot out. */
@@ -167,8 +170,8 @@ export class SlotPool {
 		await this.#check(slot, this.#settings.recipe.ready, lockfiles);
 	}
 
-	#keep(slot: Slot, cause: string, fix: string): void {
-		this.#save(slot, { status: "kept" });
+	#keep(slot: HeldSlot, cause: string, fix: string): void {
+		this.#save({ ...slot, status: "kept" });
 		this.#o.state.faults.raise({ code: SLOT_KEPT_CODE, item: slot.name, cause: `${slot.name} (${slot.folder}) stays taken: ${cause}`.slice(0, CARD_OUTPUT), fix });
 	}
 
@@ -176,7 +179,7 @@ export class SlotPool {
 	 * Returns the slot to the pool once its branch holds no commit the remote lacks: resets it, detaches it at the base
 	 * and deletes the run's branch. A slot that cannot be returned stays taken with one card, and its commits are left alone.
 	 */
-	async #give(slot: Slot): Promise<void> {
+	async #give(slot: HeldSlot): Promise<void> {
 		if (this.#returning.has(slot.name)) return;
 
 		this.#returning.add(slot.name);
@@ -199,7 +202,7 @@ export class SlotPool {
 			if (branch) await git.raw(["branch", "-q", "-D", branch]);
 
 			this.#o.state.faults.clear(`${SLOT_KEPT_CODE}:${slot.name}`);
-			this.#save(slot, { status: "stale", item: undefined });
+			this.#save(freed(slot, "stale"));
 		} catch (error) {
 			this.#keep(slot, `it could not be returned: ${error instanceof Error ? error.message : String(error)}`, "Fix what git reports in the slot; hum returns the slot at its next tick.");
 		} finally {
@@ -211,14 +214,14 @@ export class SlotPool {
 
 	/** A taken slot with no pass in this process and no run alive for its item is returned. A run alive for it is adopted. */
 	async #reclaim(): Promise<void> {
-		const orphans = this.#slots().filter((slot) => isHeld(slot) && !this.#active.has(slot.name) && !this.#returning.has(slot.name));
+		const orphans = this.#slots().filter(isHeld).filter((slot) => !this.#active.has(slot.name) && !this.#returning.has(slot.name));
 
 		if (orphans.length === 0) return;
 
 		const alive = (await this.#o.liveRuns?.()) ?? new Set<string>();
 
 		for (const slot of orphans) {
-			const adopted = slot.item !== undefined && this.#o.state.runs.list(slot.item).some(({ name, endedAt }) => endedAt === undefined && alive.has(name));
+			const adopted = this.#o.state.runs.list(slot.item).some(({ name, endedAt }) => endedAt === undefined && alive.has(name));
 
 			if (!adopted) await this.#give(slot);
 		}
@@ -241,11 +244,11 @@ export class SlotPool {
 		for (let index = 0; index < config.runners; index++) {
 			const name = slotName(index);
 
-			if (!state.slots.get(name)) this.#save({ name, index, folder: slotFolder(this.#o.repo, this.#settings.pool, name), status: "new", since: 0 }, {});
+			if (!state.slots.get(name)) this.#save({ name, index, folder: slotFolder(this.#o.repo, this.#settings.pool, name), status: "new", since: 0 });
 		}
 
 		for (const listed of this.#slots()) {
-			const slot = recheck && listed.status === "out" ? this.#save(listed, { status: "new" }) : listed;
+			const slot = recheck && listed.status === "out" ? this.#save(freed(listed, "new")) : listed;
 
 			await this.#settle(slot).then(
 				() => state.faults.clear(`${SLOT_MAINTENANCE_CODE}:${slot.name}`),
@@ -279,20 +282,20 @@ export class SlotPool {
 	}
 
 	/** The slot for the item's pass: the one that already holds the item, else the first free one, waiting for a return when none is. */
-	async #take(request: Parameters<Checkout>[0]): Promise<{ readonly slot: Slot; readonly held: boolean }> {
+	async #take(request: Parameters<Checkout>[0]): Promise<{ readonly slot: HeldSlot; readonly held: boolean }> {
 		const { signal, item } = request;
 
 		for (;;) {
 			signal?.throwIfAborted();
 
 			const slots = this.#slots();
-			const held = slots.find((slot) => isHeld(slot) && slot.item === item && !this.#returning.has(slot.name));
+			const held = slots.filter(isHeld).find((slot) => slot.item === item && !this.#returning.has(slot.name));
 			const taking = held ?? slots.find(({ status }) => status === "free");
 
 			if (taking) {
 				this.#active.set(taking.name, item);
 
-				return held ? { slot: held, held: true } : { slot: this.#save(taking, { status: "taken", item }), held: false };
+				return held ? { slot: held, held: true } : { slot: this.#save({ ...freed(taking, "free"), status: "taken", item }), held: false };
 			}
 
 			if (slots.length === this.#o.config.runners && slots.every(({ status }) => status === "out")) throw new Error(`every run slot is out of the pool: ${this.#o.state.faults.list().filter(({ code }) => code === SLOT_OUT_CODE).map(({ cause }) => cause).join("; ")}`);

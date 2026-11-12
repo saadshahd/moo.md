@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import type { Finished } from "../adapters/claude-p.ts";
+import type { RunRecord } from "../state/runs.ts";
 
 export type MemoryEntry = { readonly rule: string; readonly source: string };
 
@@ -63,8 +64,8 @@ export const rulesUsed = ({ structured }: Pick<Finished, "structured">, entries:
 export type MemoryUse = { readonly runsSoFar: number; readonly lastUsed: ReadonlyMap<string, number> };
 
 /** From the runs that were shown memory.md, oldest first: how many there were, and the run each rule was last used in. */
-export const useOf = (runs: readonly { readonly memoryUsed?: readonly string[] }[]): MemoryUse => {
-	const shown = runs.flatMap(({ memoryUsed }) => (memoryUsed === undefined ? [] : [memoryUsed]));
+export const useOf = (runs: readonly RunRecord[]): MemoryUse => {
+	const shown = runs.flatMap((run) => (run.endedAt === undefined || run.memoryUsed === undefined ? [] : [run.memoryUsed]));
 
 	return { runsSoFar: shown.length, lastUsed: new Map(shown.flatMap((rules, at) => rules.map((rule): [string, number] => [rule, at + 1]))) };
 };

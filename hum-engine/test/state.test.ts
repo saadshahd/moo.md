@@ -18,6 +18,8 @@ import {
 	writeStatus,
 } from "../src/index.ts";
 import { kindMachine } from "../src/index.ts";
+import { slug } from "../src/state/fs.ts";
+import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
 
 const DAY = 86_400_000;
 
@@ -247,6 +249,36 @@ test("a half-written temp file a crash left beside the records is not read as on
 	writeFileSync(join(dir, "parked", "partial.json.1234567890"), "{");
 
 	expect(state.parked.list().map((parked) => parked.item)).toEqual(["a"]);
+});
+
+const readsOf = (state: State) =>
+	({
+		parked: () => state.parked.list(),
+		spent: () => state.spent.list(),
+		limit: () => state.limit.list(),
+		ready: () => state.ready.list(),
+		landings: () => state.landings.list(),
+		learned: () => state.learned.list(),
+		"item-kinds": () => state.itemKinds.list(),
+		plans: () => state.plans.list(),
+		verdicts: () => state.verdicts.list(),
+		questions: () => state.questions.list(),
+		answers: () => state.answers.list(),
+		slots: () => state.slots.list(),
+		runs: () => state.runs.all(),
+		events: () => state.events.list(SAVED_0_1_0.events.itemId),
+		ops: () => state.ops.list(),
+	}) satisfies Record<keyof typeof SAVED_0_1_0, () => unknown[]>;
+
+/** Runs and events live one folder deeper, under the item's slug. */
+const folderOf = (store: keyof typeof SAVED_0_1_0): string => (store === "runs" || store === "events" ? join(dir, store, slug(SAVED_0_1_0[store].itemId)) : join(dir, store));
+
+// SAFETY: Object.keys of a literal object lists exactly the keys its type names.
+test.each(Object.keys(SAVED_0_1_0) as (keyof typeof SAVED_0_1_0)[])("a %s record hum 0.1.0 wrote reads, with a field a newer engine added", (store) => {
+	mkdirSync(folderOf(store), { recursive: true });
+	writeFileSync(join(folderOf(store), "record.json"), JSON.stringify({ ...SAVED_0_1_0[store], addedLater: true }));
+
+	expect(readsOf(openState(dir))[store]()).toEqual([expect.objectContaining(SAVED_0_1_0[store])]);
 });
 
 test("a failed save of a new item leaves nothing behind, and a later save clears the card", () => {

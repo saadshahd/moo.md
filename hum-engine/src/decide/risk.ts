@@ -1,19 +1,24 @@
 import { quantile } from "simple-statistics";
+import { z } from "zod";
 import type { HumConfig, Launch, Level, PathRule } from "../config/schema.ts";
 
 /** What only the owner changes: hum's own config, the owner's adapters and the CI workflows. */
 const OWN_PATHS = [".hum/**", "adapters/**", ".github/workflows/**"] as const;
 
 /** What hum reads from a change's diff. */
-export type Change = {
-	readonly paths: readonly string[];
-	/** Lines added plus lines deleted. */
-	readonly size: number;
-	/** An added or removed line matches the project's loosened-check rule. */
-	readonly loosened: boolean;
-	/** A changed line in `package.json` or a lockfile names the engine package. */
-	readonly pinChanged: boolean;
-};
+export const Change = z
+	.object({
+		paths: z.array(z.string().min(1)).readonly(),
+		/** Lines added plus lines deleted. */
+		size: z.int().nonnegative(),
+		/** An added or removed line matches the project's loosened-check rule. */
+		loosened: z.boolean(),
+		/** A changed line in `package.json` or a lockfile names the engine package. */
+		pinChanged: z.boolean(),
+	})
+	.readonly();
+
+export type Change = z.infer<typeof Change>;
 
 export const LABELS = ["reverted", "fixed", "clean"] as const;
 
