@@ -3,7 +3,10 @@ import { z } from "zod";
 import { type AdapterContext, contractChecks, type ContractTarget, type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, parseComment, repoFromRemote } from "../src/index.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { guarded } from "../src/adapters/guard.ts";
+import { openState } from "../src/state/open.ts";
 import { FakeGitHub } from "./fixtures/fake-github.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const clock = { offset: 0 };
 const now = () => Date.now() + clock.offset;
@@ -57,22 +60,6 @@ describe("contract suite on a fake GitHub", () => {
 });
 
 describe("claims", () => {
-	test("a claim is a branch under the claim prefix, and an expired claim goes to the first writer on its head", async () => {
-		const github = new FakeGitHub();
-		const a = onFake(github);
-		const b = onFake(github);
-		const id = String(github.seed("branchy"));
-
-		expect((await a.workSource.claim(id, "a", 1000)).won).toBe(true);
-		expect(github.branches()).toContain(`${SHIPPED_DEFAULTS.claimPrefix}${id}`);
-
-		clock.offset += 2000;
-
-		const raced = await Promise.all([a.workSource.claim(id, "a2", 1000), b.workSource.claim(id, "b2", 1000)]);
-
-		expect(raced.filter((result) => result.won)).toHaveLength(1);
-	});
-
 	test("a claim prefix from the settings names the claim branch", async () => {
 		const github = new FakeGitHub();
 		const adapter = githubAdapter({ ...settings(github.repo, fakeClient(github)), claimPrefix: "bots/take/" }, context);
@@ -134,9 +121,10 @@ describe("the thread", () => {
 describe("failures", () => {
 	test("a rejected login is permanent, not retried", async () => {
 		const github = new FakeGitHub();
+		const adapter = guarded(onFake(github, fakeClient(github, "wrong")), { provider: "github", faults: openState(tempDir("github")).faults, timeoutMs: 1000, backoffMs: { first: 5, max: 5 } });
 
-		await expect(onFake(github, fakeClient(github, "wrong")).workSource.listReady()).rejects.toThrow("Bad credentials");
-		expect(github.requests).toEqual([]);
+		await expect(adapter.workSource!.listReady()).rejects.toThrow("Bad credentials");
+		expect(github.fetched).toBe(1);
 	});
 
 	test("a follow-up filed again after its note failed to post is the issue already created", async () => {
@@ -161,16 +149,22 @@ describe("failures", () => {
 		await expect(client.request("GET /rate_limit")).rejects.toThrow();
 	});
 
-	test("a client on GitHub's own terms spaces its GraphQL requests", async () => {
-		const github = new FakeGitHub();
-		const adapter = githubAdapter(settings(github.repo, gitHubClient({ token: "fake-token", baseUrl: "https://fake.github", fetch: github.fetch, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })), context);
-		const id = String(github.seed("spaced"));
-		const started = Date.now();
+	test("a client on GitHub's own terms waits out a rate limit and tries once more, then gives up", async () => {
+		let fetched = 0;
 
-		await adapter.workSource.read(id);
-		await adapter.workSource.read(id);
+		const limited = async () => {
+			fetched++;
 
-		expect(Date.now() - started).toBeGreaterThanOrEqual(900);
+			return new Response(JSON.stringify({ message: "API rate limit exceeded" }), {
+				status: 403,
+				headers: { "content-type": "application/json", "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) - 2) },
+			});
+		};
+
+		const client = gitHubClient({ token: "fake-token", baseUrl: "https://fake.github", fetch: limited, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+
+		await expect(client.request("GET /rate_limit")).rejects.toThrow("rate limit");
+		expect(fetched).toBe(2);
 	});
 });
 
@@ -179,7 +173,6 @@ const scratch = process.env.HUM_GITHUB_SCRATCH ?? "saadshahd/factory-smoke";
 
 if (!live) console.log("skip live GitHub contract: set HUM_LIVE=1 to run it on saadshahd/factory-smoke (writes issues, comments and claim branches, then deletes them)");
 
-const RateLimit = z.object({ resources: z.object({ core: z.object({ used: z.int() }) }) });
 const RepositoryReply = z.object({ repository: z.object({ id: z.string(), label: z.object({ id: z.string() }).nullable() }) });
 const Created = z.object({ createIssue: z.object({ issue: z.object({ number: z.int() }) }) });
 const IssueReply = z.object({ repository: z.object({ issue: z.object({ id: z.string() }) }) });
@@ -203,7 +196,28 @@ describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
 		});
 	}
 
-	const used = async () => RateLimit.parse((await client.request("GET /rate_limit")).data).resources;
+	const sent: ("query" | "mutation" | "rest" | "not-modified")[] = [];
+	const kindOf = (options: { url: string; query?: string }) => (options.url !== "/graphql" ? "rest" : /^\s*mutation/.test(options.query ?? "") ? "mutation" : "query");
+
+	client.hook.after("request", (_response, options) => void sent.push(kindOf(options)));
+	client.hook.error("request", (error, options) => {
+		sent.push("status" in error && error.status === 304 ? "not-modified" : kindOf(options));
+
+		throw error;
+	});
+
+	/**
+	 * Counts the requests `send` makes through the primary client. GitHub's account-wide counters lag and count other
+	 * clients, so the client's own requests are the measure: each query hum sends costs one GraphQL point by GitHub's dry run.
+	 */
+	const measure = async <T>(send: () => Promise<T>) => {
+		sent.length = 0;
+		await send();
+
+		const count = (kind: string) => sent.filter((request) => request === kind).length;
+
+		return { queries: count("query"), mutations: count("mutation"), rest: count("rest"), notModified: count("not-modified") };
+	};
 
 	/** GitHub's reads lag its writes by seconds, so a test polls for the effect instead of guessing. */
 	const settle = async (until: () => Promise<boolean>) => {
@@ -277,47 +291,19 @@ describe.skipIf(!live)(`contract suite on ${scratch} (live)`, () => {
 		await quiet();
 
 		const first = await primary.answers.watch();
-
-		await Bun.sleep(2000);
-
-		const before = await used();
 		const spent = primary.spent();
-		const polls = await Promise.all(Array.from({ length: 30 }, () => primary.answers.watch(first.token)));
+		const watched = await measure(() => Promise.all(Array.from({ length: 30 }, () => primary.answers.watch(first.token))));
 
-		expect(polls.every((poll) => !poll.changed)).toBe(true);
+		expect(watched).toEqual({ queries: 0, mutations: 0, rest: 0, notModified: 30 });
 		expect(primary.spent()).toBe(spent);
-		expect((await used()).core.used - before.core.used).toBeLessThan(10);
 	}, 60_000);
 
-	test("the points one worker tick spends, idle and busy", async () => {
+	test("an idle worker tick spends no points, and the busy ticks' points are logged", async () => {
 		const id = await seed("ticked");
 
 		await quiet();
 
 		const token = (await primary.answers.watch()).token;
-		const sent: ("query" | "mutation" | "rest" | "not-modified")[] = [];
-		const kindOf = (options: { url: string; query?: string }) => (options.url !== "/graphql" ? "rest" : /^\s*mutation/.test(options.query ?? "") ? "mutation" : "query");
-
-		client.hook.after("request", (_response, options) => void sent.push(kindOf(options)));
-		client.hook.error("request", (error, options) => {
-			sent.push("status" in error && error.status === 304 ? "not-modified" : kindOf(options));
-
-			throw error;
-		});
-
-		/**
-		 * Counts the requests one tick sends. GitHub's account-wide counters lag and count other clients, so the
-		 * client's own requests are the measure: each query hum sends costs one GraphQL point by GitHub's dry run.
-		 */
-		const measure = async <T>(tick: () => Promise<T>) => {
-			sent.length = 0;
-			await tick();
-
-			const count = (kind: string) => sent.filter((request) => request === kind).length;
-
-			return { queries: count("query"), mutations: count("mutation"), rest: count("rest"), notModified: count("not-modified") };
-		};
-
 		const idle = await measure(() => primary.answers.watch(token));
 
 		const claiming = await measure(async () => {

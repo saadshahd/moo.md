@@ -46,16 +46,12 @@ const pullNode = ({ id, state }: Pull): Json => ({ id, number: Number(id.slice("
 const json = (status: number, value: Json, headers: Record<string, string> = {}) =>
 	new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", ...headers } });
 
-/** A GraphQL error GitHub would report in the reply's `errors`. */
-class GraphqlFailure extends Error {
-	constructor(readonly graphql: GraphqlError) {
-		super(graphql.message);
-	}
+/** A GraphQL error GitHub would report in the reply's `errors`, which an operation answers in place of its data. */
+class Refused {
+	constructor(readonly graphql: GraphqlError) {}
 }
 
-const failed = (type: string, message: string): never => {
-	throw new GraphqlFailure({ type, message });
-};
+const refused = (type: string, message: string): Refused => new Refused({ type, message });
 
 /**
  * An in-memory GitHub for one repo, behind a `fetch`: the GraphQL operations the adapter sends, by name, and the two
@@ -75,6 +71,8 @@ export class FakeGitHub {
 	#tick = 0;
 	/** Each request: `GET /path?query` for REST, `graphql <operation>` for GraphQL. */
 	readonly requests: string[] = [];
+	/** Every call to `fetch`, a refused or failed one too. */
+	fetched = 0;
 	/** The next `count` requests answer 502. */
 	failures = 0;
 	/** GraphQL operations whose next request answers 502. */
@@ -85,6 +83,8 @@ export class FakeGitHub {
 		const url = new URL(String(input));
 		const method = init?.method ?? "GET";
 		const headers = new Headers(init?.headers);
+
+		this.fetched++;
 
 		if (this.failures > 0) {
 			this.failures--;
@@ -114,7 +114,9 @@ export class FakeGitHub {
 
 	/** A person's comment on an issue. */
 	say(number: number, text: string): void {
-		this.#commentOn(number, text);
+		const refusal = this.#commentOn(number, text);
+
+		if (refusal) throw new Error(refusal.graphql.message);
 	}
 
 	/** A branch, as `git push` would make it. */
@@ -134,14 +136,19 @@ export class FakeGitHub {
 		return this.#comments.get(number) ?? [];
 	}
 
-	#issue(number: number | undefined): Issue {
-		return this.#issues.find((found) => found.number === number) ?? failed("NOT_FOUND", `Could not resolve to an Issue with the number of ${number}.`);
+	#issue(number: number | undefined): Issue | Refused {
+		return this.#issues.find((found) => found.number === number) ?? refused("NOT_FOUND", `Could not resolve to an Issue with the number of ${number}.`);
 	}
 
-	#commentOn(number: number, text: string): void {
-		this.#issue(number);
+	#commentOn(number: number, text: string): Refused | undefined {
+		const issue = this.#issue(number);
+
+		if (issue instanceof Refused) return issue;
+
 		this.#comments.set(number, [...this.comments(number), { body: text, createdAt: new Date(1_700_000_000_000 + ++this.#tick * 1000).toISOString() }]);
 		this.#version++;
+
+		return undefined;
 	}
 
 	#commitTarget(ref: string | undefined) {
@@ -177,24 +184,30 @@ export class FakeGitHub {
 				refs: this.#claims(v.claimRefs ?? ""),
 			},
 		}),
-		Item: (v) => ({
-			repository: {
-				issue: { ...this.#issueNode(this.#issue(v.number)), comments: { nodes: [...this.comments(v.number ?? 0)], pageInfo: { hasNextPage: false, endCursor: null } } },
-				ref: this.#commitTarget(v.claimRef),
-			},
-		}),
+		Item: (v) => {
+			const issue = this.#issue(v.number);
+
+			return issue instanceof Refused
+				? issue
+				: {
+						repository: {
+							issue: { ...this.#issueNode(issue), comments: { nodes: [...this.comments(issue.number)], pageInfo: { hasNextPage: false, endCursor: null } } },
+							ref: this.#commitTarget(v.claimRef),
+						},
+					};
+		},
 		Claim: (v) => ({ repository: { ref: this.#commitTarget(v.claimRef) } }),
-		IssueState: (v) => ({ repository: { issue: this.#issueNode(this.#issue(v.number)) } }),
+		IssueState: (v) => {
+			const issue = this.#issue(v.number);
+
+			return issue instanceof Refused ? issue : { repository: { issue: this.#issueNode(issue) } };
+		},
 		Base: (v) => ({ repository: { id: REPOSITORY_ID, ref: this.#commitTarget(v.baseRef) } }),
 		Label: (v) => ({ repository: { id: REPOSITORY_ID, label: this.#labels.has(v.label ?? "") ? { id: `L_${v.label}` } : null } }),
 		PullsFrom: (v) => ({ repository: { id: REPOSITORY_ID, pullRequests: { nodes: this.#pulls.filter((pull) => pull.head === v.head).toReversed().slice(0, 1).map(pullNode) } } }),
-		AddComment: (v) => {
-			this.#commentOn(Number(v.subject?.slice("I_".length)), v.body ?? "");
-
-			return { addComment: { clientMutationId: null } };
-		},
+		AddComment: (v) => this.#commentOn(Number(v.subject?.slice("I_".length)), v.body ?? "") ?? { addComment: { clientMutationId: null } },
 		CreateRef: (v) => {
-			if (this.#refs.has(v.name ?? "")) failed("UNPROCESSABLE", `A ref named "${v.name}" already exists in the repository.`);
+			if (this.#refs.has(v.name ?? "")) return refused("UNPROCESSABLE", `A ref named "${v.name}" already exists in the repository.`);
 
 			this.#refs.set(v.name ?? "", v.oid ?? "");
 
@@ -204,7 +217,7 @@ export class FakeGitHub {
 			const ref = `refs/heads/${v.branch?.branchName}`;
 			const head = this.#refs.get(ref);
 
-			if (head !== v.expected) failed("STALE_DATA", `Expected branch to point to "${v.expected}" but it did not.  Pull and try again.`);
+			if (head !== v.expected) return refused("STALE_DATA", `Expected branch to point to "${v.expected}" but it did not.  Pull and try again.`);
 
 			const message = [v.message?.headline, v.message?.body].filter(Boolean).join("\n\n");
 
@@ -220,8 +233,11 @@ export class FakeGitHub {
 		RecentIssues: () => ({ repository: { issues: { nodes: this.#issues.toReversed().slice(0, 20).map(({ number, title, body }) => ({ number, title, body })) } } }),
 		CreateIssue: (v) => {
 			const number = this.seed(v.title ?? "", { label: (v.labels?.[0] ?? "").slice("L_".length) });
+			const issue = this.#issue(number);
 
-			Object.assign(this.#issue(number), { body: v.body ?? "" });
+			if (issue instanceof Refused) return issue;
+
+			issue.body = v.body ?? "";
 
 			return { createIssue: { issue: { number } } };
 		},
@@ -233,30 +249,30 @@ export class FakeGitHub {
 			return { createPullRequest: { pullRequest: pullNode(pull) } };
 		},
 		MergeNow: (v) => {
-			const pull = this.#pulls.find((found) => found.id === v.pull) ?? failed("NOT_FOUND", `no pull ${v.pull}`);
+			const pull = this.#pulls.find((found) => found.id === v.pull);
+
+			if (!pull) return refused("NOT_FOUND", `no pull ${v.pull}`);
 
 			pull.state = "MERGED";
 
 			return { mergePullRequest: { clientMutationId: null } };
 		},
-	} satisfies Readonly<Record<string, (v: Vars) => Json>>;
+	} satisfies Readonly<Record<string, (v: Vars) => Json | Refused>>;
 
 	#graphql(raw: string): Response {
 		const { query, variables } = Request.parse(JSON.parse(raw));
 		const operation = /^\s*(?:query|mutation)\s+(\w+)/.exec(query)?.[1] ?? "";
-		const run = Object.entries(this.#operations).find(([name]) => name === operation)?.[1] ?? failed("UNKNOWN", `the fake knows no operation "${operation}"`);
+		const run = Object.entries(this.#operations).find(([name]) => name === operation)?.[1];
+
+		if (!run) throw new Error(`the fake knows no operation "${operation}"`);
 
 		this.requests.push(`graphql ${operation}`);
 
 		if (this.failsOnce.delete(operation)) return new Response("bad gateway", { status: 502 });
 
-		try {
-			return json(200, { data: run(Vars.parse(variables)) });
-		} catch (error) {
-			if (!(error instanceof GraphqlFailure)) throw error;
+		const answer = run(Vars.parse(variables));
 
-			return json(200, { data: null, errors: [error.graphql] });
-		}
+		return answer instanceof Refused ? json(200, { data: null, errors: [answer.graphql] }) : json(200, { data: answer });
 	}
 
 	#rest(method: string, url: URL, body: RequestInit["body"], headers: Headers): Response {
