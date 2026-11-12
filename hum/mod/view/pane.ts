@@ -65,7 +65,7 @@ const cardBlocks = (status: Status, input: ViewInput): Row[][] => [
 const headerRows = (status: Status, input: ViewInput): Row[] => [headerRow(status, input), measureRow(status.measure, input.width)];
 
 /** The pane's blocks in order, split where an inline pane opens: the header and the first card lead, and a status file it cannot show leads with all it has. */
-const blocksOf = (input: PaneInput): { readonly lead: Row[][]; readonly rest: Row[][] } => {
+const blocksOf = (input: PaneInput) => {
 	const { read, now, width } = input;
 
 	if (read.kind !== "status") return { lead: [...unreadBlocks(input), wrap(problemWords(read) ?? "Reading the status file.", width).map((line): Row => [span(line, "amber")])], rest: [] };
