@@ -122,13 +122,13 @@ export class WorkRepo {
 		return path;
 	}
 
-	/** The remote refuses every push to main, saying `said`: by default that another writer moved it. Returns how many pushes it has refused. */
-	refuseMainPushes(said = "fetch first"): () => number {
+	/** The remote refuses every push to a ref `refs` matches, a shell pattern, saying `said`: by default that another writer moved main. Returns how many pushes it has refused. */
+	refusePushes({ refs = "refs/heads/main", said = "fetch first" }: { readonly refs?: string; readonly said?: string } = {}): () => number {
 		const refused = join(this.root, "refused-pushes");
 		const hook = join(this.remote, "hooks", "pre-receive");
 
 		mkdirSync(join(this.remote, "hooks"), { recursive: true });
-		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tif [ "$ref" = "refs/heads/main" ]; then echo x >> ${refused}; echo "${said}" >&2; exit 1; fi\ndone\n`);
+		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tcase "$ref" in ${refs}) echo x >> ${refused}; echo "${said}" >&2; exit 1;; esac\ndone\n`);
 		chmodSync(hook, 0o755);
 
 		return () => (existsSync(refused) ? readFileSync(refused, "utf8").split("\n").filter(Boolean).length : 0);

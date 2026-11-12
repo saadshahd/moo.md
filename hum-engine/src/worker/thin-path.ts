@@ -9,7 +9,7 @@ import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, identityEnv, PATCH, pushOrRefuse } from "../adapters/git.ts";
+import { type Git, gitIn, identityEnv, PATCH, push, type PushOutcome } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -585,12 +585,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			if (!(await isStillMine(d))) return result.resolve({ outcome: "lost", item: id });
 
-			await handOff(d, isApprovalWait(kind, value) ? approvalQuestion(note) : note);
+			const stopped = await handOff(d, isApprovalWait(kind, value) ? approvalQuestion(note) : note);
 
-			return result.resolve({ outcome: "asked", item: id, detail: note.question.text });
+			return result.resolve(stopped ?? { outcome: "asked", item: id, detail: note.question.text });
 		}
 
-		if (value === "merging") return result.resolve(await merge(d, () => actor.send({ type: "merged" }), approvedByOwner));
+		if (value === "merging") return result.resolve(await merge(d, { onMerged: () => actor.send({ type: "merged" }), ownerApproved: approvedByOwner }));
 	};
 
 	actor.subscribe((snapshot) => {
@@ -741,7 +741,7 @@ const split = async (d: Driven, parts: readonly string[], onMerged: () => void):
 
 	for (const title of parts) await calls.workSource?.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}` });
 
-	return merge(d, onMerged);
+	return merge(d, { onMerged });
 };
 
 /** The owner-review wait asks for the change's approval, whatever the review run wrote. */
@@ -751,24 +751,31 @@ const approvalQuestion = ({ question, plan }: Pending): Pending => ({
 	plan,
 });
 
-/** Push the work branch, put the plan on the item, queue the question for room under the daily cap, and end. Each write runs once per key. */
-const handOff = async (d: Driven, { question, plain, plan }: Pending) => {
+/** A run branch push that did not land: the remote's refusal ends the item stuck in its words; a push another writer beat waits for the next pass. */
+const unpushed = (id: string, branch: string, outcome: Exclude<PushOutcome, { kind: "pushed" }>): ThinResult =>
+	outcome.kind === "refused" ? { outcome: "stuck", item: id, detail: outcome.said } : { outcome: "held", item: id, why: `another push moved ${branch} first` };
+
+/** Push the work branch, put the plan on the item, queue the question for room under the daily cap, and end. Each write runs once per key. A push that did not land ends the pass with its result instead. */
+const handOff = async (d: Driven, { question, plain, plan }: Pending): Promise<ThinResult | undefined> => {
 	const { state, id, g, branch, workSource, questions, git } = d;
 	const attempt = state.runs.list(id).length;
 	const key = (op: string) => ({ itemId: id, run: "ask", attempt, op });
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource, questions }, state.ops, { run: "ask", attempt });
 
-	await state.ops.once(key("push-branch"), {
+	const pushed = await state.ops.once(key("push-branch"), {
 		holds: async () => (await g(["ls-remote", "--heads", "origin", branch])).startsWith((await g(["rev-parse", "HEAD"])).trim()),
-		run: async () => {
-			if ((await pushOrRefuse(git, ["--force", "origin", `HEAD:refs/heads/${branch}`])) !== "pushed") throw new Error(`could not push ${branch}`);
-		},
+		run: () => push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]),
+		isDone: ({ kind }) => kind === "pushed",
 	});
+
+	if (pushed.kind === "ran" && pushed.value.kind !== "pushed") return unpushed(id, branch, pushed.value);
 
 	if (plan.trim()) await calls.workSource?.comment(id, `${PLAN_MARK}\n${plan.trim()}`);
 
 	queueQuestion(d, d.item, question, plain);
 	await releaseQuestions(d);
+
+	return undefined;
 };
 
 /** Every act that changes the world checks the claim first. */
@@ -802,7 +809,7 @@ const DRAINING = "the worker restarts for an update; the next worker lands the c
  * At `merging`: the change is saved and its branch pushed, then landed by its level unless the worker drains. A
  * docs-only item whose change reaches past its globs moves to its real kind first.
  */
-const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Promise<ThinResult> => {
+const merge = async (d: Driven, { onMerged, ownerApproved = false }: { readonly onMerged: () => void; readonly ownerApproved?: boolean }): Promise<ThinResult> => {
 	if (!(await isStillMine(d))) return { outcome: "lost", item: d.id };
 
 	if (d.kindName === d.config.hum.checkKind) {
@@ -819,7 +826,9 @@ const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Pr
 		return { outcome: "moved", item: d.id, kind: real };
 	}
 
-	await prepareLanding(landContext(d), ownerApproved);
+	const pushed = await prepareLanding(landContext(d), { ownerApproved });
+
+	if (pushed.kind !== "pushed") return unpushed(d.id, d.branch, pushed);
 
 	if (d.mayLand?.() === false) return { outcome: "held", item: d.id, why: DRAINING };
 

@@ -319,10 +319,22 @@ test("a done op is skipped without asking the provider, and keys differ by attem
 	let ran = 0;
 	const provider = { holds: async () => (asked++, false), run: async () => void ran++ };
 
-	expect(await ops.once(key, provider)).toBe("ran");
-	expect(await ops.once(key, provider)).toBe("skipped");
-	expect(await ops.once({ ...key, attempt: 2 }, provider)).toBe("ran");
+	expect(await ops.once(key, provider)).toEqual({ kind: "ran", value: undefined });
+	expect(await ops.once(key, provider)).toEqual({ kind: "skipped" });
+	expect(await ops.once({ ...key, attempt: 2 }, provider)).toEqual({ kind: "ran", value: undefined });
 	expect([asked, ran]).toEqual([0, 2]);
+	expect(ops.state(key)).toBe("done");
+});
+
+test("an op whose run returns a value that did not finish it stays started, and the next call runs it again", async () => {
+	const { ops } = openState(dir, { now: Date.now });
+	const key = { itemId: "#68", run: "merge", attempt: 0, op: "push-base" };
+	const outcomes = ["conflict", "pushed"];
+	const provider = { holds: async () => false, run: async () => outcomes.shift(), isDone: (outcome: string | undefined) => outcome === "pushed" };
+
+	expect(await ops.once(key, provider)).toEqual({ kind: "ran", value: "conflict" });
+	expect(ops.state(key)).toBe("started");
+	expect(await ops.once(key, provider)).toEqual({ kind: "ran", value: "pushed" });
 	expect(ops.state(key)).toBe("done");
 });
 

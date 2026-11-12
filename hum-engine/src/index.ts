@@ -57,7 +57,7 @@ export {
 	type EnvelopeMigrations,
 } from "./state/format.ts";
 
-export { OpKey, OpKeys, type OpProvider } from "./state/ops.ts";
+export { OpKey, OpKeys, type OpProvider, type OpRun } from "./state/ops.ts";
 
 export { defaultStateDir, openState, type State, type StateOptions } from "./state/open.ts";
 

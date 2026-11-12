@@ -145,10 +145,19 @@ test("a merge that keeps losing the race to the base stops after mergeTries push
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => (raw.hum.mergeTries = 2)) });
 
 	w.repo.seed("Write the note");
-	const refused = w.repo.refuseMainPushes();
+	const refused = w.repo.refusePushes();
 
 	await expect(runThinPath(w.thinPath())).rejects.toThrow("another push moved main first");
 	expect(refused()).toBe(2);
+});
+
+test("a run branch the remote refuses ends the item stuck, in the remote's own words", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+
+	w.repo.refusePushes({ refs: `refs/heads/${runBranch(SHIPPED_DEFAULTS, id)}`, said: "the branch is protected" });
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("the branch is protected") });
 });
 
 test("failed checks go to a fix run, and the fix run gets the failure", async () => {
@@ -375,7 +384,7 @@ test("a push the remote refuses goes through a pull request, after the branch's 
 	expect(await pulls.rules("main")).toEqual({ requiresPullRequest: false, mergeMethods: undefined });
 	github.requiresPullRequest = true;
 
-	const refused = w.repo.refuseMainPushes(GH013);
+	const refused = w.repo.refusePushes({ said: GH013 });
 
 	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
 	expect(refused()).toBe(1);

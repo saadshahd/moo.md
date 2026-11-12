@@ -132,15 +132,6 @@ export const push = async (git: Git, rest: readonly string[]): Promise<PushOutco
 	throw new GitFailed(args, result);
 };
 
-/** Pushes where a refusal leaves no other way: it throws `PushRefused` with the remote's own words. */
-export const pushOrRefuse = async (git: Git, rest: readonly string[]): Promise<"pushed" | "conflict"> => {
-	const outcome = await push(git, rest);
-
-	if (outcome.kind === "refused") throw new PushRefused(outcome.said);
-
-	return outcome.kind;
-};
-
 /** Whether `ancestor` is reachable from `descendant`. git answers by exit code alone. */
 export const isAncestor = async (git: Git, { ancestor, descendant }: { readonly ancestor: string; readonly descendant: string }): Promise<boolean> => {
 	const args = ["merge-base", "--is-ancestor", ancestor, descendant];

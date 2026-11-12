@@ -52,7 +52,7 @@ describe("markdown settings", () => {
 	test("a write that keeps losing the race gives up after writeRaceRetries retries", async () => {
 		const repo = new WorkRepo();
 		const id = repo.seed("raced");
-		const pushes = repo.refuseMainPushes();
+		const pushes = repo.refusePushes();
 		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, writeRaceRetries: 2 }, context);
 
 		await expect(adapter.workSource?.comment(id, "hello")).rejects.toThrow("gave up after 3 lost races");
