@@ -10,6 +10,7 @@ test("a question is at most 80 cells, ends in a question mark, names no item and
 	expect(questionIssues(`${"a ".repeat(41)}?`, "seed-1", LIMITS)).toEqual(["too-wide"]);
 	expect(questionIssues("Which title", "seed-1", LIMITS)).toEqual(["no-question-mark"]);
 	expect(questionIssues("Should seed-1 go on?", "seed-1", LIMITS)).toEqual(["names-item"]);
+	expect(questionIssues("Should _seed-1_ go on?", "seed-1", LIMITS)).toEqual(["names-item"]);
 	expect(questionIssues(`Is ${"x".repeat(41)} right?`, "seed-1", LIMITS)).toEqual(["long-word"]);
 	// Full-width characters take two cells each.
 	expect(questionIssues(`${"日".repeat(41)}?`, "seed-1", LIMITS)).toContain("too-wide");

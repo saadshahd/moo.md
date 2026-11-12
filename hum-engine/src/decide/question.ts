@@ -113,11 +113,14 @@ const words = (text: string): string[] => text.split(/\s+/).filter(Boolean);
 
 const cellsOf = (text: string): number => Bun.stringWidth(text);
 
-const WORD_EDGES = /^\W+|\W+$/g;
+const WORD_EDGES = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
+
+/** A word without the punctuation around it. */
+export const bareWord = (word: string): string => word.replaceAll(WORD_EDGES, "");
 
 /** The question text rules: at most `cells` wide, ends in "?", names no item id, and no word over `wordCells`. */
 export const questionIssues = (text: string, item: string, { cells, wordCells }: HumConfig["questionLimits"]): QuestionIssue[] => {
-	const mentionsItem = words(text).some((word) => word.replaceAll(WORD_EDGES, "") === item);
+	const mentionsItem = words(text).some((word) => bareWord(word) === item);
 
 	return [
 		...(cellsOf(text) > cells ? (["too-wide"] as const) : []),
