@@ -8,7 +8,7 @@ import type { Finished, Runner } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { checkNameOf, fileChecks, filedFrom } from "../src/loop/check-item.ts";
 import { groupNotes } from "../src/loop/groups.ts";
-import { addEntry, MemoryFormatError, MemoryFull, parseMemory, renderMemory, rulesUsed, unusedEntries, useOf, withoutCovered } from "../src/loop/memory.ts";
+import { parseMemory, rulesUsed, unusedEntries, useOf } from "../src/loop/memory.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "../src/loop/notes.ts";
 import { closeLoop, confirmChecks } from "../src/loop/pass.ts";
 import { trustsRepeats } from "../src/loop/pair.ts";
@@ -219,14 +219,14 @@ test("a landed check item whose name the next CI log shows is confirmed; a log w
 	expect(state.repeats.get(held.key)?.checked).toEqual({ at: 20, check: checkNameOf(held.key) });
 });
 
-test("a note that comes after the check ran reopens it as a miss, once, and memory.md drops the covered entries", async () => {
+test("a note that comes after the check ran reopens it as a miss, once, and memory.md drops the covered entries and keeps every other line", async () => {
 	const { state, workSource, filed, group: held } = await filedGroup();
 	const dir = mkdtempSync(join(tmpdir(), "hum-memory-"));
 
 	folders.push(dir);
 	const memoryPath = join(dir, "memory.md");
 
-	await Bun.write(memoryPath, renderMemory([{ rule: "Use a lookup table", source: noteKey(note({ sourceId: "1" })) }, { rule: "Name things", source: "elsewhere" }]));
+	await Bun.write(memoryPath, `- Use a lookup table (source: ${noteKey(note({ sourceId: "1" }))})\n- a rule with no source\n- Name things (source: elsewhere)\n`);
 	state.repeats.put(held.key, { ...held, checked: { at: 5, check: checkNameOf(held.key) } });
 	saveNotes(state, [note({ sourceId: "9", at: 9, text: "use a lookup table again" })]);
 	const current = state.repeats.get(held.key);
@@ -239,16 +239,20 @@ test("a note that comes after the check ran reopens it as a miss, once, and memo
 	await closeLoop({ state, workSource, memoryPath });
 
 	expect(filed.filter(({ followUp }) => followUp.title.startsWith("Check missed"))).toHaveLength(1);
-	expect(parseMemory(await Bun.file(memoryPath).text())).toEqual([{ rule: "Name things", source: "elsewhere" }]);
+	expect(await Bun.file(memoryPath).text()).toBe("- a rule with no source\n- Name things (source: elsewhere)\n");
 });
 
-test("memory.md keeps one entry per rule, refuses a line with no source and an entry past its cap, and lists entries no run used", () => {
+test("memory.md shows runs its entries while they fit its byte cap, refuses a line with no source or past the cap, and lists entries no run used", () => {
 	const held = [{ rule: "Use a lookup table", source: "review-comment:1" }];
+	const text = "# Rules\n- Use a lookup table (source: review-comment:1)\n- a rule with no source\n- Name things (source: s)\n- Fresh (source: s)\n";
 
-	expect(addEntry(held, { rule: "use a  Lookup table", source: "review-comment:7" }, 1000)).toEqual([{ rule: "use a  Lookup table", source: "review-comment:7" }]);
-	expect(() => addEntry(held, { rule: "x".repeat(50), source: "s" }, 60)).toThrow(MemoryFull);
-	expect(() => parseMemory("- a rule with no source\n")).toThrow(MemoryFormatError);
-	expect(withoutCovered(held, new Set(["review-comment:1"]))).toEqual([]);
+	expect(parseMemory(text, 80)).toEqual({
+		entries: [...held, { rule: "Name things", source: "s" }],
+		refused: [
+			{ line: 3, why: "no-source" },
+			{ line: 5, why: "past-cap" },
+		],
+	});
 	expect(unusedEntries([...held, { rule: "Fresh", source: "s" }], new Map([["Fresh", 95]]), 100, 20)).toEqual(held);
 });
 

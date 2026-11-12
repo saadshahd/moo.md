@@ -402,7 +402,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const attempt = state.runs.unended(id, purpose)?.attempt ?? state.runs.list(id).length;
 		const key = { itemId: id, run: purpose, attempt };
 		const begun = state.runs.begin(key, `hum ${id} ${purpose} #${attempt}`, crypto.randomUUID());
-		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md")) : [];
+		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[purpose]?.file ?? purpose;
 
 		const lease = await d.gate?.enter(prefix, signal);

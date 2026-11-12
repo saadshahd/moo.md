@@ -481,3 +481,19 @@ test("the status file lists the open questions and the newest choices from what 
 	expect(status.ok && status.status.questions).toEqual([{ item: "a", text: "Which title?", options: [], since: NOW - 1 }]);
 	expect(status.ok && status.status.choices).toEqual([{ item: "b", text: "new", at: 4 }]);
 });
+
+test("memory.md lines with no source or past the byte cap each raise a card naming them, and the cards go once the file is fixed", async () => {
+	const w = await world({ items: {} }, { settings: { memoryMaxBytes: 40 } });
+	const memoryCards = () => w.state.faults.list().flatMap(({ code, cause }) => (code.startsWith("memory-") ? [{ code, cause }] : []));
+
+	w.ownerFile(".hum/memory.md", "- no source\n- Use plain words (source: owner)\n- Name things for what they do (source: owner)\n");
+	await w.workerWith().tick();
+	expect(memoryCards()).toEqual([
+		{ code: "memory-format", cause: 'Runs skip memory.md line 1: no "(source: …)".' },
+		{ code: "memory-full", cause: "Runs skip memory.md line 3: past memoryMaxBytes (40)." },
+	]);
+
+	w.ownerFile(".hum/memory.md", "- Use plain words (source: owner)\n");
+	await w.workerWith().tick();
+	expect(memoryCards()).toEqual([]);
+});

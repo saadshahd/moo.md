@@ -6,7 +6,7 @@ import type { State } from "../state/open.ts";
 import { checkNameOf, fileChecks, filedFrom } from "./check-item.ts";
 import { type CiLogs, logNames } from "./ci.ts";
 import { type Proposer, groupNotes } from "./groups.ts";
-import { parseMemory, renderMemory, withoutCovered } from "./memory.ts";
+import { withoutCovered } from "./memory.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "./notes.ts";
 import { type RepeatGroup, type ReviewNote, noteKey } from "./records.ts";
 
@@ -70,10 +70,10 @@ export const closeLoop = async ({ state, workSource, memoryPath }: Pick<LoopPass
 	const covered = new Set(state.repeats.list().flatMap((group) => (group.checked ? group.notes : [])));
 
 	if (memoryPath !== undefined && covered.size > 0 && existsSync(memoryPath)) {
-		const held = parseMemory(readFileSync(memoryPath, "utf8"));
-		const kept = withoutCovered(held, covered);
+		const text = readFileSync(memoryPath, "utf8");
+		const kept = withoutCovered(text, covered);
 
-		if (kept.length < held.length) writeFileSync(memoryPath, renderMemory(kept));
+		if (kept !== text) writeFileSync(memoryPath, kept);
 	}
 
 	for (const group of state.repeats.list()) {

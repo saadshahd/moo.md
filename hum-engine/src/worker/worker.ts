@@ -22,7 +22,7 @@ import { readHistory } from "../adapters/history.ts";
 import { gitIn, PATCH } from "../adapters/git.ts";
 import { join } from "node:path";
 import { configuredModelCall, modelCallOver } from "../adapters/model-call.ts";
-import { MemoryFormatError, readMemory, unusedEntries, useOf } from "../loop/memory.ts";
+import { type MemoryEntry, readMemory, type RefusedLine, unusedEntries, useOf } from "../loop/memory.ts";
 import { runLoopPass, type LoopPass } from "../loop/pass.ts";
 import { modelProposer, trustsRepeats } from "../loop/pair.ts";
 import { measureOf } from "../measure/measure.ts";
@@ -104,7 +104,24 @@ type InFlight = {
 };
 
 const ERROR_EXCERPT = 300;
+
 const UNREAD_CODE = "item-unread";
+
+const linesText = (lines: readonly number[]): string => `${lines.length === 1 ? "line" : "lines"} ${lines.join(", ")}`;
+
+/** The card for each reason memory.md lines are refused. */
+const MEMORY_CARDS = {
+	"no-source": {
+		code: "memory-format",
+		cause: (lines: readonly number[]) => `Runs skip memory.md ${linesText(lines)}: no "(source: …)".`,
+		fix: "Give the line a source, as in - <rule> (source: <where you said it>).",
+	},
+	"past-cap": {
+		code: "memory-full",
+		cause: (lines: readonly number[], maxBytes: number) => `Runs skip memory.md ${linesText(lines)}: past memoryMaxBytes (${maxBytes}).`,
+		fix: "Remove entries you no longer need, or raise memoryMaxBytes in .hum/hum.json.",
+	},
+} as const satisfies Record<RefusedLine["why"], { code: string; cause: (lines: readonly number[], maxBytes: number) => string; fix: string }>;
 
 /** Reads `read` at most once per `everyMs`; a failed read, or one slower than `timeoutMs`, shows no value, and that too is kept for the period. */
 const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyMs, timeoutMs }: { everyMs: number; timeoutMs: number }): (() => Promise<T | undefined>) =>
@@ -488,19 +505,24 @@ export class Worker {
 	}
 
 	/** The memory.md rules the runs shown the file did not apply in the last `memoryUnusedRuns` of them. */
-	#unusedMemory(): string[] {
-		const { state, config, repo } = this.#o;
+	#unusedMemory(entries: readonly MemoryEntry[]): string[] {
+		const { state, config } = this.#o;
+		const { runsSoFar, lastUsed } = useOf(state.runs.all());
 
-		try {
-			const { runsSoFar, lastUsed } = useOf(state.runs.all());
+		return unusedEntries(entries, lastUsed, runsSoFar, config.hum.memoryUnusedRuns).map(({ rule }) => rule);
+	}
 
-			return unusedEntries(readMemory(join(repo, ".hum", "memory.md")), lastUsed, runsSoFar, config.hum.memoryUnusedRuns).map(({ rule }) => rule);
-		} catch (error) {
-			if (!(error instanceof MemoryFormatError)) throw error;
+	/** One card for each reason memory.md lines are refused, naming the lines as they stand; a reason no line has any more clears its card. */
+	#showRefusedMemory(refused: readonly RefusedLine[]): void {
+		const { faults } = this.#o.state;
 
-			state.faults.raise({ code: "memory-format", cause: error.message.slice(0, ERROR_EXCERPT), fix: "Give the line a source, as in - <rule> (source: <where you said it>)." });
+		for (const [why, { code, cause, fix }] of Object.entries(MEMORY_CARDS)) {
+			const lines = refused.flatMap((line) => (line.why === why ? [line.line] : []));
+			const now = lines.length === 0 ? undefined : cause(lines, this.#o.config.hum.memoryMaxBytes);
 
-			return [];
+			if (faults.list().some((card) => card.code === code && card.cause !== now)) faults.clear({ code });
+
+			if (now !== undefined) faults.raise({ code, cause: now, fix });
 		}
 	}
 
@@ -576,6 +598,9 @@ export class Worker {
 
 		const read = readStatus(state.statusPath);
 		const before = read.ok ? read.status : emptyStatus(signature.engineVersion, t);
+		const memory = readMemory(join(this.#o.repo, ".hum", "memory.md"), config.hum.memoryMaxBytes);
+
+		this.#showRefusedMemory(memory.refused);
 		const [latest, ci] = await Promise.all([this.#latest(), this.#ciTick()]);
 		const saved = new Map(state.items.saved().map((s) => [s.itemId, s.state]));
 
@@ -601,7 +626,7 @@ export class Worker {
 			})),
 			merged: [...this.#merged.splice(0), ...before.merged].slice(0, this.#o.config.hum.mergedShown),
 			possibleRepeats: state.possibleRepeats.list().map(({ a, b }) => ({ a, b })),
-			unusedMemory: this.#unusedMemory(),
+			unusedMemory: this.#unusedMemory(memory.entries),
 			measure: measureOf({ ...measureInputsOf(state), window: config.hum.measureWindow, globs: config.hum.paths.map(({ glob }) => glob) }) ?? null,
 			rules: state.learned.list().map(({ glob, level, item, at, commit }) => ({ glob, level, item, at, undo: { label: "Undo", command: `git revert ${commit}` } })),
 		});
