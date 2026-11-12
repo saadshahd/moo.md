@@ -1,11 +1,9 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { type RunOutcome, startRunner } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
 import { PrefixGate } from "../src/worker/scheduler.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const live = process.env.HUM_LIVE === "1";
 
@@ -14,7 +12,7 @@ if (!live) console.log("skip live prompt-cache check: set HUM_LIVE=1 to make fou
 const SCHEMA = { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] };
 
 test.skipIf(!live)("live: the runs that wait for the first token read the shared prefix from the cache", async () => {
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-cache-")));
+	const state = openState(tempDir("cache"));
 	const model = SHIPPED_DEFAULTS.models.light;
 	const { runner } = await startRunner({ state, model });
 	expect(state.faults.list()).toEqual([]);
@@ -26,7 +24,7 @@ test.skipIf(!live)("live: the runs that wait for the first token read the shared
 		const lease = await gate.enter("role");
 
 		try {
-			return await runner.run({ prompt, cwd: mkdtempSync(join(tmpdir(), "hum-cache-run-")), model, effort: "low", schema: SCHEMA, onFirstToken: lease.opened });
+			return await runner.run({ prompt, cwd: tempDir("cache-run"), model, effort: "low", schema: SCHEMA, onFirstToken: lease.opened });
 		} finally {
 			lease.release();
 		}

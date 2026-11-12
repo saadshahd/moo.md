@@ -1,6 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { expect, test } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { FollowUp, ItemRef, WorkSource } from "../src/adapter-api.ts";
 import { gitIn } from "../src/adapters/git.ts";
@@ -16,17 +15,12 @@ import { configWith } from "./fixtures/config.ts";
 import { pastChange, reviewNote } from "./fixtures/records.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
-const folders: string[] = [];
-
-afterEach(() => {
-	for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
 
 const scratch = (): string => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-loop-git-"));
+	const dir = tempDir("loop-git");
 
-	folders.push(dir);
 	sh(dir, ["init", "-q", "-b", "main"]);
 
 	return dir;
@@ -95,9 +89,8 @@ const followUps = () => {
 /** A merge of `src/a.ts` under the path rule `rule`, and a check of the base after it that `checks` decide. */
 const mergedUnder = (rule: Omit<PathRule, "glob">) => {
 	const dir = scratch();
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-state-")));
+	const state = openState(tempDir("state"));
 
-	folders.push(state.dir);
 	commit(dir, { "src/a.ts": "export const x = 1;\n" }, "init");
 	const merged = violating(dir);
 

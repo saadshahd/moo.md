@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { x } from "tinyexec";
@@ -9,6 +8,7 @@ import { readTranscript, billedTokens } from "../src/adapters/transcript.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
 import { makeShim, SHIM_MODEL, type ShimSpec } from "./fixtures/shim.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const MODEL = SHIPPED_DEFAULTS.models.light;
 const CONFIG = { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.05 };
@@ -16,7 +16,7 @@ const STRUCTURED = { ok: true };
 
 const setup = async (spec: ShimSpec = {}) => {
 	const shim = makeShim(spec);
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-background-")));
+	const state = openState(tempDir("background"));
 	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env });
 	const background = backgroundRunner({ binary: shim.binary, env: shim.env, state, config: CONFIG, fallback: runner });
 
@@ -144,7 +144,7 @@ test("a run that fails is a finished error with the API's text", async () => {
 
 test("a worker killed after the launch and before the session id is saved finds its run by name on restart: one run, its id saved", async () => {
 	const shim = makeShim({ script: [{}, { structured: { done: 1 }, sleep: 400 }] });
-	const dir = mkdtempSync(join(tmpdir(), "hum-background-d1-"));
+	const dir = tempDir("background-d1");
 	const name = "hum #68 build #0";
 	const key = { itemId: "#68", run: "build", attempt: 0 };
 
@@ -169,7 +169,7 @@ test("a worker killed after the launch and before the session id is saved finds 
 
 test("the start check starts one background run and keeps it; a run that cannot start leaves one card and every run goes on as claude -p", async () => {
 	const good = makeShim();
-	const goodState = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
+	const goodState = openState(tempDir("background-check"));
 	const started = await startBackgroundRunner({ state: goodState, model: MODEL, binary: good.binary, env: good.env, config: CONFIG, repo: tmpdir() });
 
 	expect(started.check).toMatchObject({ kind: "finished", structured: STRUCTURED });
@@ -177,7 +177,7 @@ test("the start check starts one background run and keeps it; a run that cannot 
 	expect(goodState.faults.list().map(({ code }) => code)).toEqual([]);
 
 	const down = makeShim({ bgDown: true });
-	const downState = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
+	const downState = openState(tempDir("background-check"));
 	const fallen = await startBackgroundRunner({ state: downState, model: MODEL, binary: down.binary, env: down.env, config: CONFIG, repo: tmpdir() });
 
 	expect(downState.faults.list().map(({ code }) => code)).toEqual([BACKGROUND_CHECK_CODE]);
@@ -187,7 +187,7 @@ test("the start check starts one background run and keeps it; a run that cannot 
 
 test("a background start check that never answers is stopped at commandTimeoutSeconds and leaves one card that says so", async () => {
 	const shim = makeShim({ script: [{}, { hang: true }] });
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-background-check-")));
+	const state = openState(tempDir("background-check"));
 	const started = await startBackgroundRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, config: { ...CONFIG, commandTimeoutSeconds: 2 }, repo: tmpdir() });
 
 	expect(started.check.kind).toBe("stopped");

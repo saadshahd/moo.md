@@ -1,6 +1,6 @@
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tempDir } from "./temp.ts";
 
 const SHIM = join(import.meta.dir, "claude-shim.ts");
 
@@ -86,7 +86,7 @@ const lines = (file: string) => {
 
 /** A `claude` stand-in in a temp folder; nothing leaves it. */
 export const makeShim = (spec: ShimSpec = {}): Shim => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-shim-"));
+	const dir = tempDir("shim");
 	const binary = join(dir, "claude");
 	const log = join(dir, "calls.jsonl");
 	const bg = join(dir, "bg");

@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
 	type AdapterContext,
@@ -21,22 +20,9 @@ import {
 import { guardTimings } from "../src/adapters/guard.ts";
 import { markDone, newItemFile, parseItemFile } from "../src/adapters/item-file.ts";
 import { WorkRepo, itemFile, markdownSettings } from "./fixtures/work-repo.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
-const cleanups: (() => void)[] = [];
-
-const tmp = (): string => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-adapter-"));
-
-	cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-
-	return dir;
-};
-
-afterEach(() => {
-	for (const clean of cleanups.splice(0)) clean();
-});
-
-const stateIn = (now: () => number): State => openState(tmp(), { now });
+const stateIn = (now: () => number): State => openState(tempDir("adapter"), { now });
 
 describe("contract suite on markdown (a temp repo with a local bare remote)", () => {
 	const repo = new WorkRepo();
@@ -248,7 +234,7 @@ describe("the start check", () => {
 	test("an adapter that imports xstate is refused, and the card names the file", async () => {
 		const provider = new FakeProvider();
 		const state = stateIn(provider.now);
-		const dir = tmp();
+		const dir = tempDir("adapter");
 		const bad = join(dir, "adapters", "linear.ts");
 		const good = join(dir, "adapters", "clean.ts");
 

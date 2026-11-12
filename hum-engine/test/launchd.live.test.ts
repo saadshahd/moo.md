@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { renderUnit } from "../src/service/unit.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
 import { sh } from "./fixtures/work-repo.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const live = process.env.HUM_LIVE === "1" && process.platform === "darwin";
 
@@ -20,7 +20,7 @@ test.skipIf(!live)("a scratch launchd unit starts the script, which runs the wor
 	const label = `md.moo.hum.scratch.${process.pid}.${Date.now()}`;
 	const domain = `gui/${process.getuid?.() ?? 501}`;
 	const o = ownerRepo({ items: { a: { commitForItem: true } } });
-	const dir = mkdtempSync(join(tmpdir(), "hum-launchd-"));
+	const dir = tempDir("launchd");
 	const plist = join(dir, `${label}.plist`);
 	const log = join(dir, "unit.log");
 	const state = join(o.repo.owner, ".git", "hum");
@@ -68,6 +68,4 @@ test.skipIf(!live)("a scratch launchd unit starts the script, which runs the wor
 
 	expect(known()).toBe(false);
 	expect(alive(`--holder ${label}`)).toBe(false);
-	rmSync(dir, { recursive: true, force: true });
-	rmSync(o.repo.root, { recursive: true, force: true });
 }, 90_000);

@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { OWNER } from "./identity.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
+import { runTempDir, tempDir } from "./temp.ts";
 
 /** The markdown adapter's settings as hum ships them. */
 export const markdownSettings = {
@@ -55,7 +56,7 @@ let built: string | undefined;
 const firstWorld = (): string => (built ??= buildFirstWorld());
 
 const buildFirstWorld = (): string => {
-	const world = mkdtempSync(join(tmpdir(), "hum-work-first-"));
+	const world = runTempDir("work-first");
 	const remote = join(world, "remote.git");
 	const owner = join(world, "owner");
 
@@ -74,7 +75,7 @@ const buildFirstWorld = (): string => {
 
 /** A temp bare remote, one seeding clone that plays the owner, and worker clones. Nothing leaves the temp folder. */
 export class WorkRepo {
-	readonly root = mkdtempSync(join(tmpdir(), "hum-work-"));
+	readonly root = tempDir("work");
 	readonly remote = join(this.root, "remote.git");
 	readonly owner = join(this.root, "owner");
 	#count = 0;

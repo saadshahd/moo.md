@@ -1,6 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { expect, test } from "bun:test";
 import { join } from "node:path";
 import type { FollowUp, ItemRef, WorkSource } from "../src/adapter-api.ts";
 import { modelCallOver } from "../src/adapters/model-call.ts";
@@ -16,21 +14,9 @@ import { pairing, prepare } from "../src/loop/signals.ts";
 import { openState } from "../src/state/open.ts";
 import { z } from "zod";
 import { finished, pastChange, reviewNote, runnerOf } from "./fixtures/records.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
-const folders: string[] = [];
-
-const freshState = () => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-loop-"));
-
-	folders.push(dir);
-
-	return openState(dir);
-};
-
-afterEach(() => {
-	for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
-
+const freshState = () => openState(tempDir("loop"));
 
 const hunk = (...lines: string[]): string => ["@@ -1,2 +1,2 @@", ...lines].join("\n");
 
@@ -217,10 +203,7 @@ test("a landed check item whose name the next CI log shows is confirmed; a log w
 
 test("a note that comes after the check ran reopens it as a miss, once, and memory.md drops the covered entries and keeps every other line", async () => {
 	const { state, workSource, filed, group: held } = await filedGroup();
-	const dir = mkdtempSync(join(tmpdir(), "hum-memory-"));
-
-	folders.push(dir);
-	const memoryPath = join(dir, "memory.md");
+	const memoryPath = join(tempDir("memory"), "memory.md");
 
 	await Bun.write(memoryPath, `- Use a lookup table (source: ${noteKey(reviewNote({ sourceId: "1" }))})\n- a rule with no source\n- Name things (source: elsewhere)\n`);
 	state.repeats.put(held.key, { ...held, checked: { at: 5, check: checkNameOf(held.key) } });

@@ -1,34 +1,17 @@
 import { docsJudge } from "./fixtures/judge.ts";
-import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { expect, test } from "bun:test";
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { type Adapter, type Item, PermanentError } from "../src/adapter-api.ts";
 import { guarded } from "../src/adapters/guard.ts";
 import { onceCalls } from "../src/adapters/once.ts";
 import { openState } from "../src/state/open.ts";
 import { openWorker } from "../src/worker/open.ts";
-import { configWith, hopeSkills, rawConfig } from "./fixtures/config.ts";
+import { configWith, hopeSkills, rawConfig, writeConfigDir } from "./fixtures/config.ts";
 import { sh } from "./fixtures/work-repo.ts";
-import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
+import { NOW, TTL, workerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
-
-const worlds: WorkerWorld[] = [];
-const temp: string[] = [];
-
-const world = async (...args: Parameters<typeof workerWorld>) => {
-	const w = await workerWorld(...args);
-
-	worlds.push(w);
-
-	return w;
-};
-
-afterEach(() => {
-	for (const w of worlds.splice(0)) w.clean();
-
-	for (const dir of temp.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
+import { tempDir } from "./fixtures/temp.ts";
 
 type Write = { readonly name: string; readonly kind: string; readonly call: (a: Adapter, id: string, text: string) => Promise<void> };
 
@@ -57,7 +40,7 @@ const dying = (real: Adapter, writeFirst: boolean): Adapter => {
 
 for (const write of WRITES) {
 	test(`${write.name} runs once per scope, and a retry after a crash reads the thread before it writes again`, async () => {
-		const w = await world({});
+		const w = await workerWorld({});
 		const id = w.repo.seed("An item");
 		const scope = { run: "t", attempt: 0 };
 		const entries = async () => (await w.adapter.workSource!.read(id)).thread.filter((e) => e.kind === write.kind).length;
@@ -87,9 +70,7 @@ for (const write of WRITES) {
 const item = (id: string): Item => ({ id, title: id, body: "", ready: true, thread: [] });
 
 test("the last-read list survives a restart: a fresh guard still sees an empty list that contradicts it", async () => {
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-r3-")));
-
-	temp.push(state.dir);
+	const state = openState(tempDir("r3"));
 
 	const store = { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids: string[]) => state.ready.put("work-source", { ids }) };
 
@@ -124,7 +105,7 @@ test("the last-read list survives a restart: a fresh guard still sees an empty l
 });
 
 test("an item saved under an earlier machine version restores through the kinds the worker kept", async () => {
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -155,7 +136,7 @@ test("an item's token total is saved over all its runs and restarts; the cap cou
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await world({ items: { a: { commitForItem: true, modelTokens: 699, askUnlessAnswered: "Which?" } } }, { config });
+	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 699, askUnlessAnswered: "Which?" } } }, { config });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -180,7 +161,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await world({ items: { a: { commitForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
+	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -198,7 +179,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 
 test("three items on one role start one after the other's first token, not together", async () => {
 	const behavior = { commitForItem: true, spend: 5, beforeToken: 300 };
-	const w = await world({ items: { a: behavior, b: behavior, c: behavior } });
+	const w = await workerWorld({ items: { a: behavior, b: behavior, c: behavior } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -216,19 +197,9 @@ test("three items on one role start one after the other's first token, not toget
 });
 
 test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markdown source, a started runner", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } });
-	const raw = rawConfig();
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } });
 
-	const put = (path: string, text: string) => {
-		mkdirSync(dirname(join(w.repo.owner, path)), { recursive: true });
-		writeFileSync(join(w.repo.owner, path), text);
-	};
-
-	put(".hum/hum.json", JSON.stringify({ ...raw.hum, backgroundPollSeconds: 0.05 }));
-
-	for (const [name, kind] of Object.entries(raw.kinds)) put(`.hum/kinds/${name}.json`, JSON.stringify(kind));
-
-	for (const [file, text] of Object.entries<string>(raw.roles)) put(`.hum/${file}`, text);
+	writeConfigDir(join(w.repo.owner, ".hum"), rawConfig((raw) => void (raw.hum.backgroundPollSeconds = 0.05)));
 
 	w.item("a", "docs/a.md");
 
@@ -241,7 +212,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 		binary: w.shim.binary,
 		env: w.shim.env,
 		now: () => NOW,
-		workDir: mkdtempSync(join(tmpdir(), "hum-open-work-")),
+		workDir: tempDir("open-work"),
 		onResult: (r) => results.push(r.outcome),
 	});
 
@@ -263,7 +234,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 });
 
 test("openWorker refuses a repo whose hum.json names no commit identity, saying which setting", async () => {
-	const w = await world({});
+	const w = await workerWorld({});
 	const { hum } = rawConfig((raw) => void delete raw.hum.commitIdentity);
 
 	mkdirSync(join(w.repo.owner, ".hum"), { recursive: true });
@@ -273,21 +244,16 @@ test("openWorker refuses a repo whose hum.json names no commit identity, saying 
 });
 
 test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } });
-	const raw = rawConfig();
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } });
+	const pool = tempDir("open-pool");
 
-	const put = (path: string, text: string) => {
-		mkdirSync(dirname(join(w.repo.owner, path)), { recursive: true });
-		writeFileSync(join(w.repo.owner, path), text);
-	};
-
-	const pool = mkdtempSync(join(tmpdir(), "hum-open-pool-"));
-
-	put(".hum/hum.json", JSON.stringify({ ...raw.hum, backgroundPollSeconds: 0.05, runSlots: { ...raw.hum.runSlots, enabled: true, pool } }));
-
-	for (const [name, kind] of Object.entries(raw.kinds)) put(`.hum/kinds/${name}.json`, JSON.stringify(kind));
-
-	for (const [file, text] of Object.entries<string>(raw.roles)) put(`.hum/${file}`, text);
+	writeConfigDir(
+		join(w.repo.owner, ".hum"),
+		rawConfig((raw) => {
+			raw.hum.backgroundPollSeconds = 0.05;
+			raw.hum.runSlots = { ...raw.hum.runSlots, enabled: true, pool };
+		}),
+	);
 
 	w.item("a", "docs/a.md");
 
@@ -300,7 +266,7 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 		binary: w.shim.binary,
 		env: w.shim.env,
 		now: () => NOW,
-		workDir: mkdtempSync(join(tmpdir(), "hum-open-work-")),
+		workDir: tempDir("open-work"),
 		onResult: (r) => results.push(r.outcome),
 	});
 
@@ -312,5 +278,4 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 	const folders = w.shim.background().filter(({ cmd }) => cmd === "bg").map(({ cwd }) => cwd ?? "");
 
 	expect(folders.filter((folder) => folder.startsWith(realpathSync(pool)))).not.toEqual([]);
-	rmSync(pool, { recursive: true, force: true });
 });

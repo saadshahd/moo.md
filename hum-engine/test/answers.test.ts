@@ -1,7 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
 import { HOUR_MS } from "../src/time.ts";
@@ -9,20 +6,7 @@ import { queueQuestion, releaseQuestions } from "../src/worker/questions.ts";
 import { configWith } from "./fixtures/config.ts";
 import { workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { itemFile, markdownSettings, sh } from "./fixtures/work-repo.ts";
-
-const worlds: WorkerWorld[] = [];
-
-const world = async (...args: Parameters<typeof workerWorld>) => {
-	const made = await workerWorld(...args);
-
-	worlds.push(made);
-
-	return made;
-};
-
-afterEach(() => {
-	for (const made of worlds.splice(0)) made.clean();
-});
+import { tempDir } from "./fixtures/temp.ts";
 
 const threadOf = async (w: WorkerWorld, id: string) => (await w.adapter.workSource!.read(id)).thread;
 
@@ -32,7 +16,7 @@ const repliesOn = async (w: WorkerWorld, id: string) => (await threadOf(w, id)).
 
 test("with 50 items ready and a cap of 3, three are asked and the rest wait for room; a day later the next three are", async () => {
 	const ids = Array.from({ length: 50 }, (_, n) => `q-${String(n).padStart(2, "0")}`);
-	const w = await world({}, { settings: { dailyQuestionCap: 3 } });
+	const w = await workerWorld({}, { settings: { dailyQuestionCap: 3 } });
 
 	for (const id of ids) w.ownerFile(`.hum/work/${id}.md`, itemFile(id));
 
@@ -55,25 +39,20 @@ test("with 50 items ready and a cap of 3, three are asked and the rest wait for 
 });
 
 test("a question still open is not queued again after the owner's reply that was not taken as an answer", () => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-open-question-"));
-	const ctx = { state: openState(dir, { now: () => 0 }), config: configWith(), now: () => 0 };
+	const ctx = { state: openState(tempDir("open-question"), { now: () => 0 }), config: configWith(), now: () => 0 };
 
 	const thread = [
 		{ kind: "question" as const, text: "Which title?", at: 1, author: "hum" as const },
 		{ kind: "comment" as const, text: "not sure yet", at: 2, author: "person" as const },
 	];
 
-	try {
-		queueQuestion(ctx, { id: "a", title: "a", body: "", ready: true, thread }, { text: "Which title?" }, "unsure");
+	queueQuestion(ctx, { id: "a", title: "a", body: "", ready: true, thread }, { text: "Which title?" }, "unsure");
 
-		expect(ctx.state.questions.list()).toEqual([]);
-	} finally {
-		rmSync(dir, { recursive: true, force: true });
-	}
+	expect(ctx.state.questions.list()).toEqual([]);
 });
 
 test("every answer is saved first and gets a reply: applied, then a second answer to the same question dropped with its reason", async () => {
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -100,7 +79,7 @@ test("every answer is saved first and gets a reply: applied, then a second answe
 });
 
 test("an answer pushed from another clone after a quiet tick starts the run on the next tick", async () => {
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -120,14 +99,14 @@ test("an answer pushed from another clone after a quiet tick starts the run on t
 });
 
 test("a CI run with an empty state reads the question's age from the thread: it waits inside the deadline and parks stuck past it, asking nothing twice", async () => {
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
 	await w.worker.idle();
 	expect(w.results.at(-1)).toMatchObject({ outcome: "asked" });
 
-	const fresh = () => w.workerWith({ state: openState(mkdtempSync(join(tmpdir(), "hum-ci-")), { now: () => w.clock.at }) });
+	const fresh = () => w.workerWith({ state: openState(tempDir("ci"), { now: () => w.clock.at }) });
 
 	w.clock.at += 2 * HOUR_MS;
 

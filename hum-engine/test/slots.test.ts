@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { x } from "tinyexec";
 import { gitIn } from "../src/adapters/git.ts";
@@ -12,6 +11,7 @@ import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { type SlotSettings, slotWorld, type SlotWorld } from "./fixtures/slot-world.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const worlds: SlotWorld[] = [];
 
@@ -26,7 +26,6 @@ const world = (settings?: SlotSettings, liveRuns?: Parameters<typeof slotWorld>[
 afterEach(async () => {
 	for (const made of worlds.splice(0)) {
 		await made.slots.idle();
-		made.dispose();
 	}
 });
 
@@ -124,7 +123,7 @@ test("a pass that ends with a commit the remote lacks keeps its slot taken, with
 });
 
 test("a slot refreshes between passes: its data resets every time and its dependencies reinstall only when a lockfile changed", async () => {
-	const counters = mkdtempSync(join(tmpdir(), "hum-counters-"));
+	const counters = tempDir("counters");
 	const count = (name: string): number => (existsSync(join(counters, name)) ? readFileSync(join(counters, name), "utf8").split("\n").filter(Boolean).length : 0);
 
 	const w = world({

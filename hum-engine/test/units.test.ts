@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "plist";
@@ -8,11 +8,12 @@ import { z } from "zod";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { renderUnit, type UnitVars } from "../src/service/unit.ts";
 import { ciWorkflows, type WorkflowSettings } from "../src/service/workflows.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const dirs: string[] = [];
 
 const temp = () => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-unit-lint-"));
+	const dir = tempDir("unit-lint");
 
 	dirs.push(dir);
 

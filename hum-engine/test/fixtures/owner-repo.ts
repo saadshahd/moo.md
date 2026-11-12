@@ -1,9 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { rawConfig, root } from "./config.ts";
+import { rawConfig, root, writeConfigDir } from "./config.ts";
 import { makeShim, type ShimSpec } from "./shim.ts";
 import { itemFile, sh, WorkRepo } from "./work-repo.ts";
+import { tempDir } from "./temp.ts";
 
 export const MAIN = join(root, "src", "cli", "main.ts");
 
@@ -14,24 +13,13 @@ export const MAIN = join(root, "src", "cli", "main.ts");
 export const ownerRepo = (spec: ShimSpec, env: Record<string, string> = {}, edit: Parameters<typeof rawConfig>[0] = () => {}) => {
 	const repo = new WorkRepo();
 	const shim = makeShim(spec);
-	const raw = rawConfig(edit);
 
-	writeFileSync(join(repo.owner, ".hum", "hum.json"), JSON.stringify(raw.hum));
-
-	for (const [name, kind] of Object.entries<object>(raw.kinds)) {
-		mkdirSync(join(repo.owner, ".hum", "kinds"), { recursive: true });
-		writeFileSync(join(repo.owner, ".hum", "kinds", `${name}.json`), JSON.stringify(kind));
-	}
-
-	for (const [path, text] of Object.entries<string>(raw.roles)) {
-		mkdirSync(dirname(join(repo.owner, ".hum", path)), { recursive: true });
-		writeFileSync(join(repo.owner, ".hum", path), text);
-	}
+	writeConfigDir(join(repo.owner, ".hum"), rawConfig(edit));
 
 	repo.commit("config");
 	sh(repo.owner, ["push", "-q", "origin", "main"]);
 
-	const home = mkdtempSync(join(tmpdir(), "hum-home-"));
+	const home = tempDir("home");
 
 	return {
 		repo,

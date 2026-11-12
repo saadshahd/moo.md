@@ -1,7 +1,4 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { AgentDecisionExhaustedError } from "@statelyai/agent";
 import { FakeProvider } from "../src/adapters/fake.ts";
 import { configuredModelCall, modelCallOver } from "../src/adapters/model-call.ts";
@@ -16,6 +13,7 @@ import { configWith } from "./fixtures/config.ts";
 import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { finished, runnerOf } from "./fixtures/records.ts";
 import { SHIM_MODEL } from "./fixtures/shim.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const config = configWith();
 const levels = config.hum.levels;
@@ -46,7 +44,7 @@ test("with no kind named, the model call picks it; an abstention runs the fallba
 	const adapter = provider.adapter();
 	const id = provider.seed("Tidy the log");
 	const item = { id, title: "Tidy the log", body: "It is noisy.", ready: true, thread: [] };
-	const context = (judge = scriptedJudge({ kind: { kind: "fix" } })) => ({ state: openState(mkdtempSync(join(tmpdir(), "hum-kind-"))), config, judge, workSource: adapter.workSource!, questions: adapter.questions!, now: provider.now });
+	const context = (judge = scriptedJudge({ kind: { kind: "fix" } })) => ({ state: openState(tempDir("kind")), config, judge, workSource: adapter.workSource!, questions: adapter.questions!, now: provider.now });
 
 	expect(await pickKind(context(), item)).toEqual({ item: id, kind: "fix", from: "model" });
 

@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, utimesSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import type { Watch } from "../src/adapter-api.ts";
 import { type SharedWatchOptions, sharedWatch } from "../src/cli/shared-watch.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const CACHE_MS = 10_000;
 const LOCK_MS = 30_000;
@@ -16,7 +16,7 @@ const harness = (answer: (since: string | undefined) => Promise<Watch>): Harness
 		wakes: 0,
 		now: 1_000_000,
 		options: {
-			stateDir: join(mkdtempSync(join(tmpdir(), "hum-watch-")), "hum"),
+			stateDir: join(tempDir("watch"), "hum"),
 			now: () => h.now,
 			cacheMs: CACHE_MS,
 			lockMs: LOCK_MS,

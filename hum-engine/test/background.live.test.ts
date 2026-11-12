@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { stripVTControlCharacters } from "node:util";
 import { join } from "node:path";
@@ -12,6 +12,7 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { PROSE_STATES } from "../src/decide/prose.ts";
 import { openState } from "../src/state/open.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const repo = process.env.HUM_BG_REPO;
 const other = process.env.HUM_BG_OTHER;
@@ -27,7 +28,7 @@ const SLOW_TURN = 'Run `echo one`, then `echo two`, then `echo three`, each as i
 const ADVISOR_TURN = 'Call the advisor tool exactly once (it takes no parameters), then reply {"ok":true}.';
 const RUNS_NAMED = "hum live";
 
-const state = openState(mkdtempSync(join(tmpdir(), "hum-live-bg-")));
+const state = openState(tempDir("live-bg"));
 let runner: Runner;
 let check: Awaited<ReturnType<typeof startBackgroundRunner>>["check"];
 

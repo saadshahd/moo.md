@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, succeeded } from "../src/adapters/claude-p.ts";
@@ -8,13 +8,14 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
 import { isAlive, until } from "./fixtures/process.ts";
 import { makeShim, type ShimSpec } from "./fixtures/shim.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const NOW = 1_800_000_000_000;
 const MODEL = SHIPPED_DEFAULTS.models.light;
 
 const setup = async (spec: ShimSpec = {}, extra: Partial<RunnerOptions> & { clock?: { at: number } } = {}) => {
 	const shim = makeShim(spec);
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-runner-")));
+	const state = openState(tempDir("runner"));
 	const { clock = { at: NOW }, ...rest } = extra;
 	const { check, runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: shim.env, now: () => clock.at, lockBackoffMs: 1, ...rest });
 

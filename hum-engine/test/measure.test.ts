@@ -1,7 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { expect, test } from "bun:test";
 import type { Pull } from "../src/adapters/pull-requests.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { labelChanges, type PastChange } from "../src/decide/labels.ts";
@@ -10,20 +7,10 @@ import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure
 import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
 import { pastChange } from "./fixtures/records.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
-const folders: string[] = [];
 
-afterEach(() => {
-	for (const dir of folders.splice(0)) rmSync(dir, { recursive: true, force: true });
-});
-
-const freshState = () => {
-	const dir = mkdtempSync(join(tmpdir(), "hum-measure-"));
-
-	folders.push(dir);
-
-	return openState(dir);
-};
+const freshState = () => openState(tempDir("measure"));
 
 const merge = (n: number): MergedChange => ({ item: `m${n}`, at: n, paths: [n < 10 ? "ui/x.ts" : "api/y.ts"], notes: n % 5 === 0 ? 2 : 0, questions: n % 4 === 0 ? 1 : 0, tokens: 1000 });
 

@@ -1,34 +1,20 @@
-import { afterEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isAlive, until } from "./fixtures/process.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { FakePulls } from "./fixtures/fake-pulls.ts";
 import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
+import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { HOUR_MS } from "../src/time.ts";
-
-const worlds: WorkerWorld[] = [];
-
-const world = async (...args: Parameters<typeof workerWorld>) => {
-	const w = await workerWorld(...args);
-
-	worlds.push(w);
-
-	return w;
-};
-
-afterEach(() => {
-	for (const w of worlds.splice(0)) w.clean();
-});
 
 const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort();
 
 test("the thin path runs two items on different files side by side, and both merge", async () => {
-	const checkLog = join(tmpdir(), `hum-checks-${process.pid}-${Date.now()}`);
-	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 300 }, b: { commitForItem: true, spend: 5, sleep: 300 } } }, { checks: [`echo run >> ${checkLog}`] });
+	const checkLog = join(tempDir("checks"), "log");
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, sleep: 300 }, b: { commitForItem: true, spend: 5, sleep: 300 } } }, { checks: [`echo run >> ${checkLog}`] });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -54,7 +40,7 @@ test("the thin path runs two items on different files side by side, and both mer
 });
 
 test("a tick that claims, runs and merges an item fetches from the remote once", async () => {
-	const w = await world({ items: { a: { commitForItem: true } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true } } });
 	const reads = join(w.repo.root, "upload-pack.log");
 	const uploadPack = join(w.repo.root, "upload-pack");
 
@@ -72,7 +58,7 @@ test("a tick that claims, runs and merges an item fetches from the remote once",
 });
 
 test("an item whose thread cannot be read raises a card naming it, and the other items still start", async () => {
-	const w = await world({ items: { a: { commitForItem: true } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true } } });
 
 	w.item("a", "docs/a.md");
 	w.state.parked.put("gone", { item: "gone", why: "stuck", cause: "c", since: NOW });
@@ -84,7 +70,7 @@ test("an item whose thread cannot be read raises a card naming it, and the other
 });
 
 test("items that touch one file go one after the other, and an item that says nothing goes alone", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 }, c: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 }, c: { commitForItem: true, spend: 5 } } });
 
 	w.item("a", "docs/shared.md");
 	w.item("b", "docs/shared.md");
@@ -112,7 +98,7 @@ test("items that touch one file go one after the other, and an item that says no
 
 test("a merge is rechecked on the newest main: checks that passed on the old main and fail on the new one stop the merge", async () => {
 	// b's check passes in b's clone, taken before a merged; once a's file is on main it fails.
-	const w = await world({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5, sleep: 800 } } }, { checks: ["! (test -f docs/a.md && test -f docs/b.md)"] });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5, sleep: 800 } } }, { checks: ["! (test -f docs/a.md && test -f docs/b.md)"] });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -130,7 +116,7 @@ test("a merge is rechecked on the newest main: checks that passed on the old mai
 });
 
 test("a run's end while a tick is busy brings the next tick once that tick ends", async () => {
-	const w = await world({}, { settings: { tickIntervalSeconds: 3600 } });
+	const w = await workerWorld({}, { settings: { tickIntervalSeconds: 3600 } });
 	const reading = Promise.withResolvers<void>();
 	const nextTick = Promise.withResolvers<void>();
 	const gate = Promise.withResolvers<void>();
@@ -166,7 +152,7 @@ test("a run's end while a tick is busy brings the next tick once that tick ends"
 });
 
 test("a new engine in node_modules, or an edit under .hum/ or adapters/, makes the worker exit within one tick; item files do not", async () => {
-	const w = await world({});
+	const w = await workerWorld({});
 
 	w.ownerFile("node_modules/@moo.md/hum/package.json", JSON.stringify({ version: "0.1.0" }));
 	const worker = w.workerWith({ latestVersion: async () => "0.2.0" });
@@ -197,7 +183,7 @@ test("a new engine in node_modules, or an edit under .hum/ or adapters/, makes t
 });
 
 test("a worker that sees an update starts nothing new, lands nothing and exits when its runs end; the next worker lands the change without a run", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 400 } } }, { settings: { runners: 1 } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, sleep: 400 } } }, { settings: { runners: 1 } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -225,7 +211,7 @@ test("a worker that sees an update starts nothing new, lands nothing and exits w
 });
 
 test("the status file lists only the newest mergedShown merged changes", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 } } }, { settings: { mergedShown: 1 } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 } } }, { settings: { mergedShown: 1 } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -240,7 +226,7 @@ test("the status file lists only the newest mergedShown merged changes", async (
 });
 
 test("a status read that outlasts statusReadTimeoutSeconds shows no value and never holds the tick", async () => {
-	const w = await world({}, { settings: { statusReadTimeoutSeconds: 1 } });
+	const w = await workerWorld({}, { settings: { statusReadTimeoutSeconds: 1 } });
 	const worker = w.workerWith({ latestVersion: () => new Promise<never>(() => {}) });
 	const began = Date.now();
 
@@ -253,7 +239,7 @@ test("a status read that outlasts statusReadTimeoutSeconds shows no value and ne
 });
 
 test("each tick writes a heartbeat and the status file for the view", async () => {
-	const w = await world({});
+	const w = await workerWorld({});
 	const worker = w.workerWith({ latestVersion: async () => "9.9.9" });
 
 	await worker.tick();
@@ -276,7 +262,7 @@ test("each tick writes a heartbeat and the status file for the view", async () =
 });
 
 test("the claim of a run in flight is renewed each tick, and a run whose claim is gone stops", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5, hang: true } } }, { settings: { claimExpirySeconds: 5 } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, hang: true } } }, { settings: { claimExpirySeconds: 5 } });
 	const id = w.item("a", "docs/a.md");
 	const worker = w.workerWith();
 
@@ -305,7 +291,7 @@ test("the claim of a run in flight is renewed each tick, and a run whose claim i
 
 test("an item id in the inbox folder wakes a waiting item at once and its question leaves the status file", async () => {
 	const answersAdapter = (real: NonNullable<WorkerWorld["adapter"]["answers"]>) => ({ ...real, watch: async () => ({ token: "same", changed: false }) });
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 
@@ -340,7 +326,7 @@ test("an item id in the inbox folder wakes a waiting item at once and its questi
 });
 
 test("a saved deadline fires on the next event, not only on a tick: a question the owner never answers ends stuck", async () => {
-	const w = await world({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } }, { worker: { ciTick: async () => NOW } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } }, { worker: { ciTick: async () => NOW } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -364,8 +350,8 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 });
 
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {
-	const flag = join(tmpdir(), `hum-flag-${process.pid}-${Date.now()}`);
-	const w = await world({ items: { a: { commitForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });
+	const flag = join(tempDir("flag"), "flag");
+	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -400,7 +386,7 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 
 test("a limit the runner hit is saved, and a restarted worker makes no call before it ends, then resumes", async () => {
 	const until = Math.floor(NOW / 1000) + 3600;
-	const w = await world({ items: { a: { error: `Claude usage limit reached|${until}` } } });
+	const w = await workerWorld({ items: { a: { error: `Claude usage limit reached|${until}` } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -425,7 +411,7 @@ test("a limit the runner hit is saved, and a restarted worker makes no call befo
 });
 
 test("a level change re-checks a waiting change once a worker starts on the new config: it lands without another run", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -443,7 +429,7 @@ test("a level change re-checks a waiting change once a worker starts on the new 
 });
 
 test("the status file lists each path rule the owner's answers added, with the command that takes it back", async () => {
-	const w = await world({});
+	const w = await workerWorld({});
 
 	w.state.learned.put("src/**", { glob: "src/**", level: "low", item: "a", commit: "abc1234", at: NOW });
 	await w.worker.tick();
@@ -456,7 +442,7 @@ test("the status file lists each path rule the owner's answers added, with the c
 test("a path raised while its change's pull request is armed: the next worker disarms it at its first tick, without waiting for the claim and without a run", async () => {
 	const github = new FakePulls();
 	const pulls = github.client();
-	const w = await world({ items: { a: { commitForItem: true, spend: 5 } } }, { worker: { pulls } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } }, { worker: { pulls } });
 
 	github.requiresPullRequest = true;
 	w.item("a", "docs/a.md");
@@ -473,7 +459,7 @@ test("a path raised while its change's pull request is armed: the next worker di
 });
 
 test("the status file lists the open questions and the newest choices from what the engine saved", async () => {
-	const w = await world({}, { settings: { choicesShown: 1 } });
+	const w = await workerWorld({}, { settings: { choicesShown: 1 } });
 
 	w.state.questions.put("a@1", { item: "a", text: "Which title?", priority: 0, queuedAt: NOW - 2, askedAt: NOW - 1 });
 	w.state.choices.put("b@old", { item: "b", text: "old", at: 3 });
@@ -487,7 +473,7 @@ test("the status file lists the open questions and the newest choices from what 
 });
 
 test("memory.md lines with no source or past the byte cap each raise a card naming them, and the cards go once the file is fixed", async () => {
-	const w = await world({ items: {} }, { settings: { memoryMaxBytes: 40 } });
+	const w = await workerWorld({ items: {} }, { settings: { memoryMaxBytes: 40 } });
 	const memoryCards = () => w.state.faults.list().flatMap(({ code, cause }) => (code.startsWith("memory-") ? [{ code, cause }] : []));
 
 	w.ownerFile(".hum/memory.md", "- no source\n- Use plain words (source: owner)\n- Name things for what they do (source: owner)\n");
@@ -503,7 +489,7 @@ test("memory.md lines with no source or past the byte cap each raise a card nami
 });
 
 test("an item waiting behind a run on the same file starts once the owner moves its touches: elsewhere", async () => {
-	const w = await world({ items: { a: { commitForItem: true, spend: 5, sleep: 400 }, b: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, sleep: 400 }, b: { commitForItem: true, spend: 5 } } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/a.md");

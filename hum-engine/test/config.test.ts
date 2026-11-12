@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createActor, SimulatedClock, waitFor } from "xstate";
 import { restoreActor } from "xstate/persist";
@@ -26,6 +25,7 @@ import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { DAY_MS, HOUR_MS } from "../src/time.ts";
 import { hopeSkills, root, shippedRaw, type Tree, withProposedTimeouts } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const env = { hopeSkills: hopeSkills() };
 
@@ -158,7 +158,7 @@ test("an unknown schema version is refused and names the step", () => {
 });
 
 test("a setting read outside the full config refuses a hum.json of a schema version this engine does not read", () => {
-	const repo = mkdtempSync(join(tmpdir(), "hum-settings-"));
+	const repo = tempDir("settings");
 
 	try {
 		mkdirSync(join(repo, ".hum"));

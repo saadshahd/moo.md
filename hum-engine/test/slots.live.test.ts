@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { x } from "tinyexec";
 import { z } from "zod";
@@ -13,6 +12,7 @@ import { runThinPath } from "../src/worker/thin-path.ts";
 import { configWith } from "./fixtures/config.ts";
 import { markdownSettings, WorkRepo } from "./fixtures/work-repo.ts";
 import { poolConfig } from "./fixtures/slot-world.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const repo = process.env.HUM_SLOT_REPO;
 const live = process.env.HUM_LIVE === "1" && repo !== undefined;
@@ -34,16 +34,20 @@ const Listed = z.array(z.looseObject({ kind: z.string(), name: z.string().nullis
 
 const sh = async (cwd: string, cmd: string, args: string[]) => (await x(cmd, args, { nodeOptions: { cwd } })).stdout.trim();
 
-const work = new WorkRepo();
-const remote = work.remote;
-const pool = mkdtempSync(join(tmpdir(), "hum-live-slot-pool-"));
-const stateDir = mkdtempSync(join(tmpdir(), "hum-live-slot-state-"));
-const state = openState(stateDir);
+/** The work repo, slot pool folder and saved state the live tests share. */
+const sharedWorld = () => {
+	const work = new WorkRepo();
+
+	return { work, remote: work.remote, pool: tempDir("live-slot-pool"), state: openState(tempDir("live-slot-state")) };
+};
+
+let shared: ReturnType<typeof sharedWorld>;
 
 beforeAll(async () => {
 	if (!live || !repo) return;
 
-	await sh(repo, "git", ["remote", "add", "origin", remote]);
+	shared = sharedWorld();
+	await sh(repo, "git", ["remote", "add", "origin", shared.remote]);
 	await sh(repo, "git", ["fetch", "-q", "origin"]);
 });
 
@@ -54,15 +58,17 @@ afterAll(async () => {
 
 	await sh(repo, "git", ["remote", "remove", "origin"]).catch(() => undefined);
 
-	for (const folder of [work.root, pool, stateDir]) rmSync(folder, { recursive: true, force: true });
+	rmSync(shared.pool, { recursive: true, force: true });
 	await sh(repo, "git", ["worktree", "prune"]);
 
 	expect(leftOver).toEqual([]);
-	expect(await sh(repo, "git", ["worktree", "list", "--porcelain"])).not.toContain(pool);
+	expect(await sh(repo, "git", ["worktree", "list", "--porcelain"])).not.toContain(shared.pool);
 }, 120_000);
 
 test.skipIf(!live)("live: a background run in a slot starts in the slot's folder with the slot's environment, and the slot comes back free", async () => {
 	if (!repo) return;
+
+	const { state, pool, remote } = shared;
 
 	const slots = new SlotPool({ repo, state, config: poolConfig(pool, { runners: 1 }), base: "main" });
 	const { runner } = await startBackgroundRunner({ state, model: MODEL, config: { ...SHIPPED_DEFAULTS, backgroundPollSeconds: 0.5 }, repo });
@@ -115,13 +121,15 @@ test.skipIf(!live)("live: a background run in a slot starts in the slot's folder
 test.skipIf(!live)("live: a feature item runs its plan, build and review in a slot on Haiku, and the slot comes back free", async () => {
 	if (!repo) return;
 
+	const { state, pool, remote, work } = shared;
+
 	const config = configWith((raw) => void (raw.hum.models = { light: MODEL, standard: MODEL, top: MODEL }));
 	const slots = new SlotPool({ repo, state, config: poolConfig(pool, { runners: 1 }), base: "main" });
 	const { runner } = await startBackgroundRunner({ state, model: MODEL, config: { ...config.hum, backgroundPollSeconds: 0.5 }, repo });
 	const adapter = markdownAdapter({ ...markdownSettings, repo: work.worker("w") }, { report: () => {}, now: Date.now });
 	const id = work.add("live-slot-1", "---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n");
 
-	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote, checks: ["test -f docs/note.md"], holder: "live", workDir: mkdtempSync(join(tmpdir(), "hum-live-slot-work-")), checkout: slots.checkout });
+	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote, checks: ["test -f docs/note.md"], holder: "live", workDir: tempDir("live-slot-work"), checkout: slots.checkout });
 	const runs = state.runs.list(id).map((record) => record.run);
 
 	await slots.idle();

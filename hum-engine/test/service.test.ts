@@ -1,6 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { expect, test } from "bun:test";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { CI_TICK_REF, readCiTick, recordCiTick } from "../src/service/ci-tick.ts";
 import { type Child, EXIT_UPDATED, supervise, type Supervision } from "../src/service/supervise.ts";
@@ -13,37 +12,19 @@ import { configWith } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { until } from "./fixtures/process.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
-import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world.ts";
+import { NOW, TTL, workerWorld } from "./fixtures/worker-world.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const DAY = 86_400_000;
 const WARN_DAYS = SHIPPED_DEFAULTS.tokenWarnDays;
-
-const cleanups: (() => void)[] = [];
-
-afterEach(() => {
-	for (const clean of cleanups.splice(0)) clean();
-});
-
-const worlds: WorkerWorld[] = [];
-
-const world = async (...args: Parameters<typeof workerWorld>) => {
-	const w = await workerWorld(...args);
-
-	worlds.push(w);
-	cleanups.push(w.clean);
-
-	return w;
-};
 
 const TICK_MS = 20;
 
 /** The service unit's start script over a state folder in a temp dir, on short real intervals. */
 const unit = (over: Partial<Supervision> & { spawn: () => Child }) => {
-	const state = openState(mkdtempSync(join(tmpdir(), "hum-unit-")));
+	const state = openState(tempDir("unit"));
 	const stop = new AbortController();
-
-	cleanups.push(() => rmSync(state.dir, { recursive: true, force: true }));
 
 	const supervision: Supervision = {
 		state,
@@ -160,7 +141,7 @@ test("one card shows when the heartbeat is old and clears when the worker writes
 });
 
 test("the token card shows the warning lead before the year ends, once, and clears when the date moves", () => {
-	const { faults } = openState(mkdtempSync(join(tmpdir(), "hum-token-")));
+	const { faults } = openState(tempDir("token"));
 	const madeAgo = (days: number) => new Date(NOW - days * DAY).toISOString().slice(0, 10);
 
 	checkTokenAge(faults, madeAgo(300), NOW, WARN_DAYS);
@@ -177,7 +158,7 @@ test("the token card shows the warning lead before the year ends, once, and clea
 
 test("a worker's tick shows the card from the config's token date", async () => {
 	const old = new Date(NOW - 340 * DAY).toISOString().slice(0, 10);
-	const w = await world({}, { config: configWith((raw) => void (raw.hum.ciToken = { setUp: old })) });
+	const w = await workerWorld({}, { config: configWith((raw) => void (raw.hum.ciToken = { setUp: old })) });
 
 	await w.worker.tick();
 
@@ -187,7 +168,7 @@ test("a worker's tick shows the card from the config's token date", async () => 
 });
 
 test("a 401 holds the item where it is with one card naming claude setup-token; the next run that gets through clears it", async () => {
-	const w = await world({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { commitForItem: true }] });
+	const w = await workerWorld({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { commitForItem: true }] });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -222,8 +203,6 @@ test("a 401 holds the item where it is with one card naming claude setup-token; 
 test("the scheduled workflow's tick is a ref on the remote; the Mac reads its time", async () => {
 	const repo = new WorkRepo();
 
-	cleanups.push(() => rmSync(repo.root, { recursive: true, force: true }));
-
 	const mac = repo.worker("mac");
 
 	expect(await readCiTick(mac, "origin", SHIPPED_COMMAND_TIMEOUT_MS)).toBeUndefined();
@@ -239,7 +218,7 @@ test("the scheduled workflow's tick is a ref on the remote; the Mac reads its ti
 });
 
 test("CI wake: ticks until a tick starts nothing, so a run that frees another item is followed by that item's run", async () => {
-	const w = await world({ items: { a: { commitForItem: true }, b: { commitForItem: true } } }, { settings: { runners: 1 } });
+	const w = await workerWorld({ items: { a: { commitForItem: true }, b: { commitForItem: true } } }, { settings: { runners: 1 } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");

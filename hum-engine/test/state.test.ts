@@ -1,7 +1,6 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createActor, SimulatedClock } from "xstate";
 import {
@@ -20,6 +19,7 @@ import {
 import { kindMachine } from "../src/index.ts";
 import { slug } from "../src/state/fs.ts";
 import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const DAY = 86_400_000;
 
@@ -46,11 +46,7 @@ const tiny = kindAt("1");
 let dir: string;
 
 beforeEach(() => {
-	dir = mkdtempSync(join(tmpdir(), "hum-state-"));
-});
-
-afterEach(() => {
-	rmSync(dir, { recursive: true, force: true });
+	dir = tempDir("state");
 });
 
 const waitingItem = (state: State, itemId: string) => {

@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
@@ -14,10 +13,11 @@ import { hopeSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 /** A git repo on `main` holding the files, with its remote as `origin`. */
 const repoWith = (files: Record<string, string>): string => {
-	const root = mkdtempSync(join(tmpdir(), "hum-setup-"));
+	const root = tempDir("setup");
 	const repo = join(root, "repo");
 
 	sh(root, ["init", "-q", "--bare", "-b", "main", "remote.git"]);

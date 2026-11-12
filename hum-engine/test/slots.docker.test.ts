@@ -33,7 +33,6 @@ const world = (settings: SlotSettings): SlotWorld => {
 afterEach(async () => {
 	for (const made of worlds.splice(0)) {
 		await made.slots.idle();
-		made.dispose();
 	}
 });
 

@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { bandRow } from "../../../hum/mod/view/band.ts";
@@ -6,13 +6,8 @@ import { rowCells } from "../../../hum/mod/view/cells.ts";
 import { paneRows } from "../../../hum/mod/view/pane.ts";
 import { parseStatus } from "../../../hum/mod/view/read.ts";
 import type { Row } from "../../../hum/mod/view/row.ts";
-import { workerWorld, type WorkerWorld } from "../fixtures/worker-world.ts";
+import { workerWorld } from "../fixtures/worker-world.ts";
 
-const worlds: WorkerWorld[] = [];
-
-afterEach(() => {
-	for (const w of worlds.splice(0)) w.clean();
-});
 
 const WIDTHS = [20, 33, 45, 53, 80, 120, 200];
 const AMBER_AFTER = 15;
@@ -25,7 +20,6 @@ const textOf = (row: Row): string => row.map(({ text }) => text).join("");
 const realStatus = async () => {
 	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, askUnlessAnswered: "Which title should it carry?" }, c: { commitForItem: true, spend: 5, sleep: 300 } } });
 
-	worlds.push(w);
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
 	w.state.faults.raise({ code: "run-error", item: "z", cause: "The run for z failed: the checks still fail.", fix: "hum tries the item again when its claim lapses." });

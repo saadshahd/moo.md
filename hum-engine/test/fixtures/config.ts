@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { BOUNDARIES } from "../../src/config/schema.ts";
 import { type Config, listHopeSkills, loadConfig, readConfigDir } from "../../src/config/load.ts";
 import { withTimeouts } from "../../src/setup/waits.ts";
@@ -37,6 +38,20 @@ export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 	edit(raw);
 
 	return raw;
+};
+
+/** Writes `raw` as the folder readConfigDir reads: hum.json, a file per kind and the role prompts. */
+export const writeConfigDir = (folder: string, raw: Tree): void => {
+	const put = (path: string, text: string) => {
+		mkdirSync(dirname(join(folder, path)), { recursive: true });
+		writeFileSync(join(folder, path), text);
+	};
+
+	put("hum.json", JSON.stringify(raw.hum));
+
+	for (const [name, kind] of Object.entries<object>(raw.kinds)) put(`kinds/${name}.json`, JSON.stringify(kind));
+
+	for (const [path, text] of Object.entries<string>(raw.roles)) put(path, text);
 };
 
 export const hopeSkills = (): ReadonlySet<string> => listHopeSkills(join(root, "../hope"));

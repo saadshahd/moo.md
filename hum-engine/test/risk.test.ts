@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gitIn } from "../src/adapters/git.ts";
 import { changeOf, historiesOf, readHistory } from "../src/adapters/history.ts";
@@ -17,6 +16,7 @@ import { configWith } from "./fixtures/config.ts";
 import { pastChange } from "./fixtures/records.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const config = configWith();
 const NOW = Date.parse("2026-11-08");
@@ -189,40 +189,37 @@ test("the sample is every broken change plus, for each, the clean change on the 
 });
 
 /** A repo whose second commit is a fix that rewrites a line the first wrote. */
-const withFixHistory = async (use: (repo: string) => Promise<void>): Promise<void> => {
-	const repo = mkdtempSync(join(tmpdir(), "hum-history-"));
+const fixHistory = (): string => {
+	const repo = tempDir("history");
 
-	try {
-		sh(repo, ["init", "-q", "-b", "main"]);
-		writeFileSync(join(repo, "a.ts"), "one\ntwo\nthree\n");
-		sh(repo, ["add", "-A"]);
-		sh(repo, ["commit", "-q", "-m", "feat: a"]);
-		writeFileSync(join(repo, "a.ts"), "one\nTWO\nthree\n");
-		sh(repo, ["commit", "-q", "-am", "fix: two"]);
-		await use(repo);
-	} finally {
-		rmSync(repo, { recursive: true, force: true });
-	}
+	sh(repo, ["init", "-q", "-b", "main"]);
+	writeFileSync(join(repo, "a.ts"), "one\ntwo\nthree\n");
+	sh(repo, ["add", "-A"]);
+	sh(repo, ["commit", "-q", "-m", "feat: a"]);
+	writeFileSync(join(repo, "a.ts"), "one\nTWO\nthree\n");
+	sh(repo, ["commit", "-q", "-am", "fix: two"]);
+
+	return repo;
 };
 
-test("git history: a fix commit carries the commits whose lines it rewrote, and the path's history labels them", () =>
-	withFixHistory(async (repo) => {
-		const changes = await readHistory(gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), "main", config.hum);
-		const [first, fix] = changes;
-		const histories = historiesOf(changes, { paths: [{ glob: "*.ts", level: "low" }], changeLabels: config.hum.changeLabels });
+test("git history: a fix commit carries the commits whose lines it rewrote, and the path's history labels them", async () => {
+	const repo = fixHistory();
+	const changes = await readHistory(gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), "main", config.hum);
+	const [first, fix] = changes;
+	const histories = historiesOf(changes, { paths: [{ glob: "*.ts", level: "low" }], changeLabels: config.hum.changeLabels });
 
-		expect(fix?.blamed).toEqual([first?.sha ?? ""]);
-		expect(histories.get("*.ts")).toEqual({ sizes: [2, 3], labels: ["clean", "fixed"] });
-	}));
+	expect(fix?.blamed).toEqual([first?.sha ?? ""]);
+	expect(histories.get("*.ts")).toEqual({ sizes: [2, 3], labels: ["clean", "fixed"] });
+});
 
-test("git history: a blame git fails throws, so a fix never reads as rewriting nothing", () =>
-	withFixHistory(async (repo) => {
-		const real = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
-		const blameMissing = (args: readonly string[]) => (args[0] === "blame" ? [...args.slice(0, -1), "missing.ts"] : args);
-		const git = { run: (args: readonly string[], input?: string) => real.run(blameMissing(args), input), raw: (args: readonly string[], input?: string) => real.raw(blameMissing(args), input) };
+test("git history: a blame git fails throws, so a fix never reads as rewriting nothing", async () => {
+	const repo = fixHistory();
+	const real = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const blameMissing = (args: readonly string[]) => (args[0] === "blame" ? [...args.slice(0, -1), "missing.ts"] : args);
+	const git = { run: (args: readonly string[], input?: string) => real.run(blameMissing(args), input), raw: (args: readonly string[], input?: string) => real.raw(blameMissing(args), input) };
 
-		await expect(readHistory(git, "main", config.hum)).rejects.toThrow("missing.ts");
-	}));
+	await expect(readHistory(git, "main", config.hum)).rejects.toThrow("missing.ts");
+});
 
 test("a fresh review run reads the item and the diff, and none of the author's plan or answers", () => {
 	const item = { id: "7", title: "Add a button", body: "A blue one.", ready: true, thread: [{ kind: "comment" as const, text: "hum plan:\nuse the red theme", at: NOW }] };
