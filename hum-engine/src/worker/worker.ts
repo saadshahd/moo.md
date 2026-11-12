@@ -67,8 +67,8 @@ export type WorkerOptions = {
 	readonly workDir?: string;
 	/** Gives each pass its working copy; by default a `git clone`. */
 	readonly checkout?: Checkout;
-	/** The run slots behind `checkout`, if any: each tick asks them to keep slots ready. */
-	readonly slots?: Pick<SlotPool, "keepReady">;
+	/** The run slots behind `checkout`, if any: each tick asks them to keep slots ready, and the worker is idle once their upkeep ends. */
+	readonly slots?: Pick<SlotPool, "keepReady" | "idle">;
 	readonly dir?: string;
 	readonly where?: "mac" | "ci";
 	readonly now: () => number;
@@ -217,8 +217,10 @@ export class Worker {
 		return [...this.#inFlight.keys()];
 	}
 
-	idle(): Promise<void> {
-		return this.#pool.onIdle();
+	/** Resolves when no pass runs and no slot upkeep a pass asked for is left: a returned slot is ready again. */
+	async idle(): Promise<void> {
+		await this.#pool.onIdle();
+		await this.#o.slots?.idle();
 	}
 
 	/** Asks a serving worker for a tick now: a run ended, or an answer arrived. */

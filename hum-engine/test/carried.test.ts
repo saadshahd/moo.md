@@ -261,7 +261,7 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 		join(w.repo.owner, ".hum"),
 		rawConfig((raw) => {
 			raw.hum.backgroundPollSeconds = 0.05;
-			raw.hum.runSlots = { ...raw.hum.runSlots, enabled: true, pool };
+			raw.hum.runSlots = { ...raw.hum.runSlots, enabled: true, pool, recipe: { ...raw.hum.runSlots.recipe, refresh: [{ when: "always", run: "sleep 0.5" }] } };
 		}),
 	);
 
@@ -289,4 +289,5 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 	const folders = w.shim.background().filter(({ cmd }) => cmd === "bg").map(({ cwd }) => cwd ?? "");
 
 	expect(folders.filter((folder) => folder.startsWith(realpathSync(pool)))).not.toEqual([]);
+	expect(openState(join(w.repo.owner, ".git", "hum"), { now: () => NOW }).slots.list().filter(({ status }) => status !== "free")).toEqual([]);
 });
