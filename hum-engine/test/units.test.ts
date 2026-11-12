@@ -56,7 +56,7 @@ const SECRET_ENV = { ANTHROPIC_AUTH_TOKEN: "${{ secrets.GATEWAY_TOKEN }}" };
 const gateway: WorkflowSettings = {
 	...settings,
 	ciRunner: "own-large",
-	ciContainer: { image: CONTAINER, credentials: { username: "${{ vars.REGISTRY_USER }}", password: "${{ secrets.REGISTRY_TOKEN }}" }, options: "--cpus 2" },
+	ciContainer: { image: CONTAINER, credentials: { username: "${{ vars.REGISTRY_USER }}", password: "${{ secrets.REGISTRY_TOKEN }}" }, env: { NODE_ENV: "test" }, ports: [80, "8080:80"], volumes: ["/cache:/cache"], options: "--cpus 2" },
 	ciEnv: { ...OPEN_ENV, ...SECRET_ENV },
 	ciClaudeAuth: "env",
 	pullRequestToken: { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" },

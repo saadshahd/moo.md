@@ -675,6 +675,39 @@
 									],
 									"additionalProperties": false
 								},
+								"env": {
+									"type": "object",
+									"propertyNames": {
+										"type": "string",
+										"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+									},
+									"additionalProperties": {
+										"type": "string"
+									}
+								},
+								"ports": {
+									"type": "array",
+									"items": {
+										"anyOf": [
+											{
+												"type": "string",
+												"minLength": 1
+											},
+											{
+												"type": "integer",
+												"exclusiveMinimum": 0,
+												"maximum": 9007199254740991
+											}
+										]
+									}
+								},
+								"volumes": {
+									"type": "array",
+									"items": {
+										"type": "string",
+										"minLength": 1
+									}
+								},
 								"options": {
 									"type": "string",
 									"minLength": 1
@@ -691,7 +724,7 @@
 					"type": "null"
 				}
 			],
-			"description": "The container the CI wake job runs in: its image, or { image, credentials: { username, password }, options } for a private registry or docker options, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts."
+			"description": "The container the CI wake job runs in: its image, or { image, credentials: { username, password }, env, ports, volumes, options } as a workflow's container holds them, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts."
 		},
 		"ciEnv": {
 			"default": {},

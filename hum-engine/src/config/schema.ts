@@ -132,8 +132,20 @@ const runnerLabels = z.union([name, z.array(name).min(1)]);
 /** What a job's `runs-on` holds: one label, every label the runner must carry, or a runner group with the labels wanted in it. */
 const Runner = z.union([runnerLabels, z.strictObject({ group: name, labels: runnerLabels.optional() })]);
 
-/** A job's container: its image alone, or the image with the registry sign-in and the `docker create` options it needs. */
-const Container = z.union([name, z.strictObject({ image: name, credentials: z.strictObject({ username: name, password: name }).optional(), options: name.optional() })]);
+const envName = z.string().regex(ENV_NAME, "an env name is letters, digits and underscores, and starts with no digit");
+
+/** A job's container: its image alone, or the image with what a workflow's `container` holds beside it, each as written there. */
+const Container = z.union([
+	name,
+	z.strictObject({
+		image: name,
+		credentials: z.strictObject({ username: name, password: name }).optional(),
+		env: z.record(envName, z.string()).optional(),
+		ports: z.array(z.union([name, z.int().positive()])).optional(),
+		volumes: z.array(name).optional(),
+		options: name.optional(),
+	}),
+]);
 
 /** Where a CI run's GitHub token comes from: a secret that holds one, or a GitHub App that mints one per run from its client ID and private key. */
 const PullRequestToken = z.discriminatedUnion("from", [
@@ -197,10 +209,10 @@ const Shipped = z.object({
 		"What the CI wake job runs on, as a workflow's runs-on holds it: one runner label, a list of labels the runner must carry all of, or { group, labels } for a runner group. On a public repo, a runner GitHub does not host keeps what a wake leaves on it, and setup asks before it writes one.",
 	),
 	ciContainer: Container.nullable().describe(
-		"The container the CI wake job runs in: its image, or { image, credentials: { username, password }, options } for a private registry or docker options, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts.",
+		"The container the CI wake job runs in: its image, or { image, credentials: { username, password }, env, ports, volumes, options } as a workflow's container holds them, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts.",
 	),
 	ciEnv: z
-		.record(z.string().regex(ENV_NAME, "an env name is letters, digits and underscores, and starts with no digit"), z.string())
+		.record(envName, z.string())
 		.describe(
 			"Env the CI wake job sets, such as a gateway's settings; a value may be a workflow expression. A value that reads a secret reaches only the step that runs hum; every other value reaches every step, the installs too. A name the job sets itself, such as GH_TOKEN, is refused.",
 		),

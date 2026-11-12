@@ -30,7 +30,7 @@ export type CiJob = {
 	readonly commands: readonly string[];
 	/** What the job's `runs-on` holds: a label, a label list or a runner group. */
 	readonly runner: HumConfig["ciRunner"] | undefined;
-	/** The job's container: its image, with the registry sign-in and options where the job names them. */
+	/** The job's container: its image, with the registry sign-in, env, ports, volumes and options where the job names them. */
 	readonly container: NonNullable<HumConfig["ciContainer"]> | undefined;
 	/** The env every step gets: the workflow's, with the job's own over it. */
 	readonly env: Readonly<Record<string, string>>;
@@ -96,8 +96,8 @@ const Container = z
 	.union([
 		z.string(),
 		z
-			.looseObject({ image: z.string(), credentials: z.object({ username: Text, password: Text }).optional(), options: z.string().optional() })
-			.transform(({ image, credentials, options }) => (credentials === undefined && options === undefined ? image : withoutUnset({ image, credentials, options }))),
+			.object({ image: z.string(), credentials: z.object({ username: Text, password: Text }).optional(), env: TextMap.optional(), ports: z.array(z.union([z.string(), z.number()])).optional(), volumes: z.array(z.string()).optional(), options: z.string().optional() })
+			.transform(({ image, ...beside }) => (Object.values(beside).every((value) => value === undefined) ? image : withoutUnset({ image, ...beside }))),
 	])
 	.optional()
 	.catch(undefined);

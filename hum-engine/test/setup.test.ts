@@ -124,7 +124,7 @@ const claudeJob = (job: string): string => `on: [workflow_dispatch]\njobs:\n  ag
 
 const CLAUDE_STEP = "    steps:\n      - run: npm install --global @anthropic-ai/claude-code\n";
 
-test("a scan reads a runner written as a label list or a group, and a container with its registry sign-in and options", async () => {
+test("a scan reads a runner written as a label list or a group, and a container with everything the job gives it", async () => {
 	const listed = await wakeJobFrom(`on: [workflow_dispatch]
 jobs:
   agents:
@@ -134,13 +134,17 @@ jobs:
       credentials:
         username: \${{ github.actor }}
         password: \${{ secrets.REGISTRY_TOKEN }}
+      env:
+        NODE_ENV: test
+      ports: [80, "8080:80"]
+      volumes: ["/cache:/cache"]
       options: --cpus 2
 ${CLAUDE_STEP}`);
 
 	const grouped = await wakeJobFrom(`on: [workflow_dispatch]\njobs:\n  agents:\n    runs-on:\n      group: agents\n      labels: linux\n${CLAUDE_STEP}`);
 
 	expect(listed.ciRunner).toEqual(["self-hosted", "linux"]);
-	expect(listed.ciContainer).toEqual({ image: "ghcr.io/own/agents:1", credentials: { username: "${{ github.actor }}", password: "${{ secrets.REGISTRY_TOKEN }}" }, options: "--cpus 2" });
+	expect(listed.ciContainer).toEqual({ image: "ghcr.io/own/agents:1", credentials: { username: "${{ github.actor }}", password: "${{ secrets.REGISTRY_TOKEN }}" }, env: { NODE_ENV: "test" }, ports: [80, "8080:80"], volumes: ["/cache:/cache"], options: "--cpus 2" });
 	expect(grouped.ciRunner).toEqual({ group: "agents", labels: "linux" });
 });
 
