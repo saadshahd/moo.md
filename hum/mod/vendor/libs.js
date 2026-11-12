@@ -946,53 +946,6 @@ function stringWidth(input, options = {}) {
 }
 // ../hum-engine/src/status/version.ts
 var STATUS_FORMAT = 2;
-// node_modules/xstate/dist/xstate-fsm.development.esm.js
-function createFSM(config) {
-  const createSnapshot = (value, context) => ({
-    status: "active",
-    value,
-    context,
-    output: undefined,
-    error: undefined
-  });
-  const initialState = createSnapshot(config.initial, config.context ?? {});
-  return {
-    id: config.id,
-    config,
-    initialState,
-    initialTransition: () => [initialState, []],
-    getInitialSnapshot: () => initialState,
-    getPersistedSnapshot: (snapshot) => snapshot,
-    transition(snapshot, event) {
-      let {
-        value,
-        context
-      } = snapshot;
-      const transitions = config.states[value]?.on;
-      const transition = Object.hasOwn(transitions || {}, event.type) && transitions[event.type];
-      const {
-        target = value,
-        context: patch
-      } = (typeof transition === "string" ? {
-        target: transition
-      } : typeof transition === "function" ? transition({
-        context,
-        event
-      }) : transition) || {};
-      for (const key in {
-        ...patch
-      }) {
-        if (patch[key] !== context[key]) {
-          context = {
-            ...context,
-            ...patch
-          };
-        }
-      }
-      return [target === value && context === snapshot.context ? snapshot : createSnapshot(target, context), []];
-    }
-  };
-}
 // ../hum-engine/node_modules/zod/v4/classic/external.js
 var exports_external = {};
 __export(exports_external, {
@@ -21035,13 +20988,79 @@ var Heartbeat = exports_external.strictObject({
   intervalMs: exports_external.int().positive(),
   restarting: name2.optional()
 });
+// node_modules/xstate/dist/schema.types-1cd4652e.development.esm.js
+function types() {
+  return {
+    "~standard": {
+      version: 1,
+      vendor: "xstate.types",
+      validate: (value) => ({
+        value
+      })
+    }
+  };
+}
+
+// node_modules/xstate/dist/xstate-fsm.development.esm.js
+function setup(_config = {}) {
+  return {
+    createFSM: (config2) => createFSM(config2)
+  };
+}
+function createFSM(config2) {
+  const createSnapshot = (value, context) => ({
+    status: "active",
+    value,
+    context,
+    output: undefined,
+    error: undefined
+  });
+  const initialState = createSnapshot(config2.initial, config2.context ?? {});
+  return {
+    id: config2.id,
+    config: config2,
+    initialState,
+    initialTransition: () => [initialState, []],
+    getInitialSnapshot: () => initialState,
+    getPersistedSnapshot: (snapshot) => snapshot,
+    transition(snapshot, event) {
+      let {
+        value,
+        context
+      } = snapshot;
+      const transitions = config2.states[value]?.on;
+      const transition = Object.hasOwn(transitions || {}, event.type) && transitions[event.type];
+      const {
+        target = value,
+        context: patch
+      } = (typeof transition === "string" ? {
+        target: transition
+      } : typeof transition === "function" ? transition({
+        context,
+        event
+      }) : transition) || {};
+      for (const key in {
+        ...patch
+      }) {
+        if (patch[key] !== context[key]) {
+          context = {
+            ...context,
+            ...patch
+          };
+        }
+      }
+      return [target === value && context === snapshot.context ? snapshot : createSnapshot(target, context), []];
+    }
+  };
+}
 var export_isNewer = import_gt.default;
 
 export {
+  types,
   stripAnsi,
   stringWidth,
+  setup,
   export_isNewer as isNewer,
-  createFSM,
   Status,
   STATUS_FORMAT
 };

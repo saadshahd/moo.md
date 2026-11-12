@@ -1,7 +1,7 @@
 import type { EngineInterface, Register } from "claude-code";
 import { atom, read, update } from "claude-code";
 import { guardAnswer } from "./answer/guard.ts";
-import { answeringLabel, changedBox, editedBox, fillAnswer, isAnswering, post, restartAnswer, submitted } from "./answer/mode.ts";
+import { answeringLabel, changedBox, editedBox, fillAnswer, isAnswering, post, restartAnswer, routeEnter } from "./answer/mode.ts";
 import { drawRows } from "./draw.tsx";
 import { type PressContext, openPane } from "./press.ts";
 import { viewSettings } from "./settings.ts";
@@ -84,7 +84,7 @@ export const register: Register = (on, options) => {
 		guardAnswer({
 			isAnswering: () => isAnswering($),
 			decide: async () => {
-				const { decision, toPost } = await submitted($, e.origin.kind, e.text);
+				const { decision, toPost } = await routeEnter($, e.origin.kind, e.text);
 
 				if (toPost !== undefined) post($, () => $.session.cwd().then((cwd) => repoRoot($, cwd)), toPost).catch(showOnce($));
 
