@@ -112,7 +112,7 @@ test("a snapshot xstate cannot restore gives an error status, one card, and the 
 	expect(existsSync(file)).toBe(true);
 });
 
-test("a snapshot from an older engine restores in place, and a rollback to an older engine gives one card", async () => {
+test("a snapshot from an older engine restores in place and saves under the newer engine", async () => {
 	waitingItem(openState(dir, { engineVersion: "0.1.0", now: Date.now }), "#68");
 
 	const next = openState(dir, { engineVersion: "0.2.0", now: Date.now });
@@ -122,8 +122,11 @@ test("a snapshot from an older engine restores in place, and a rollback to an ol
 
 	if (restored.ok && restored.value) next.items.save("#68", tiny, persistedSnapshot(restored.value));
 	expect(JSON.parse(readFileSync(next.items.path("#68"), "utf8")).engineVersion).toBe("0.2.0");
+});
 
-	// Rollback: the 0.1.0 engine meets a 0.2.0 file. One card, however often it looks; the file stays and the item does not start over.
+test("an older engine that meets a newer engine's snapshot gives one card however often it looks, keeps the file, and does not start the item over", async () => {
+	waitingItem(openState(dir, { engineVersion: "0.2.0", now: Date.now }), "#68");
+
 	const rolledBack = openState(dir, { engineVersion: "0.1.0", now: Date.now });
 	const before = readFileSync(rolledBack.items.path("#68"));
 
