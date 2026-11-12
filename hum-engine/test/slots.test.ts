@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { x } from "tinyexec";
 import { gitIn } from "../src/adapters/git.ts";
-import { slotFolder } from "../src/slots/env.ts";
+import { SLOT_ENV, slotEnv, slotFolder, slotName } from "../src/slots/env.ts";
 import { SLOT_KEPT_CODE, SLOT_OUT_CODE } from "../src/slots/pool.ts";
 import type { Slot } from "../src/state/saved.ts";
 import { OWNER } from "./fixtures/identity.ts";
@@ -33,6 +33,14 @@ const statuses = (w: SlotWorld): string[] => w.slots.list().map(({ status }) => 
 const WAITED_MS = 150;
 
 const isStillWaiting = async (pending: Promise<unknown>): Promise<boolean> => (await Promise.race([pending.then(() => false), Bun.sleep(WAITED_MS).then(() => true)]));
+
+test("each slot's ports start at its own block, and on one shared set of services every slot's start at the first", () => {
+	const portBases = (services: "per-slot" | "shared") =>
+		[0, 1].map((index) => slotEnv({ services, ports: { base: 4000, stride: 10 }, projectPrefix: "hum" }, { name: slotName(index), index, folder: "slot" })[SLOT_ENV.portBase]);
+
+	expect(portBases("per-slot")).toEqual(["4000", "4010"]);
+	expect(portBases("shared")).toEqual(["4000", "4000"]);
+});
 
 test("with more passes than slots, the extra pass waits and starts in the first slot returned", async () => {
 	const w = world({ runners: 2 });
