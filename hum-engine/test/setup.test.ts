@@ -80,6 +80,15 @@ test("a scan reads the checks CI runs on a pull request after the install a fres
 	expect(proposal.runSlots.recipe.prepare).toContain("bun install --frozen-lockfile");
 });
 
+test("a scan skips a workflow, compose or issue-template file that is not YAML and reads the rest", async () => {
+	const broken = "key: [unclosed\n";
+	const scan = await scanRepo(repoWith({ ...PROJECT, ".github/workflows/broken.yml": broken, "compose.yaml": broken, ".github/ISSUE_TEMPLATE/broken.yml": broken }), "main");
+
+	expect(scan.ci.map(({ file }) => file)).toEqual(["ci.yml"]);
+	expect(scan.composeServices).toEqual([]);
+	expect(scan.issueTemplates.map(({ file }) => file)).toEqual(["bug.yml"]);
+});
+
 test("a migration proposes a strict glob, and source and markdown get their own levels", async () => {
 	const { paths, strictPaths } = proposeSetup(await scanRepo(repoWith(PROJECT), "main"), shipped.hum);
 
@@ -203,4 +212,30 @@ test("proving fails the checks step when a check command fails", async () => {
 	const steps = await proveSetup(repo, { hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished" });
 
 	expect(steps.find(({ name }) => name === "checks")?.status).toBe("failed");
+});
+
+const SHIPPED_FIX = JSON.parse(readFileSync(join(import.meta.dir, "..", "defaults", "kinds", "fix.json"), "utf8"));
+
+const WITHOUT_STUCK = {
+	...SHIPPED_FIX,
+	machine: {
+		...SHIPPED_FIX.machine,
+		states: Object.fromEntries(Object.entries<{ tags?: string[] }>(SHIPPED_FIX.machine.states).map(([name, node]) => [name, { ...node, tags: node.tags?.filter((tag) => tag !== "stuck") }])),
+	},
+};
+
+test.each([
+	["does not parse", { machine: 1 }, "malformed-config"],
+	["has no stuck state for a wait to time out to", WITHOUT_STUCK, "invalid-config"],
+] as const)("setup refuses a repo whose kind file %s", (_, fix, code) => {
+	const repo = repoWith({ "README.md": "x" });
+	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
+	const env = { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT };
+
+	expect(writeSetup(repo, answers, env).ok).toBe(true);
+	writeFileSync(join(repo, ".hum", "kinds", "fix.json"), JSON.stringify(fix));
+
+	const result = writeSetup(repo, answers, env);
+
+	expect(!result.ok && result.refusal.code).toBe(code);
 });

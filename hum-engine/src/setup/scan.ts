@@ -1,6 +1,6 @@
 import { accessSync, constants, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import { parse as parseYaml } from "yaml";
+import { parseDocument } from "yaml";
 import { z } from "zod";
 import { gitIn } from "../adapters/git.ts";
 import { readHistory } from "../adapters/history.ts";
@@ -72,6 +72,14 @@ const Template = z.looseObject({ labels: z.union([z.string(), z.array(z.string()
 
 const TEMPLATE_FRONT_MATTER = /^---\n([\s\S]*?)\n---/;
 
+/** A YAML file read through `schema`, or undefined when the file does not parse or does not fit it. */
+const yamlOf = <Schema extends z.ZodType>(schema: Schema, text: string): z.output<Schema> | undefined => {
+	const document = parseDocument(text);
+	const parsed = document.errors.length === 0 ? schema.safeParse(document.toJS()) : undefined;
+
+	return parsed?.success ? parsed.data : undefined;
+};
+
 const commandsOf = (run: string): string[] =>
 	run
 		.split("\n")
@@ -81,13 +89,13 @@ const commandsOf = (run: string): string[] =>
 /** The CI workflows' jobs. A workflow that does not parse is skipped, because the owner's CI is not setup's to judge. */
 const ciJobsOf = (repo: string): CiJob[] =>
 	filesIn(repo, `${WORKFLOW_FOLDER}/*.{yml,yaml}`).flatMap((file) => {
-		const parsed = Workflow.safeParse(parseYaml(textOf(repo, file)));
+		const workflow = yamlOf(Workflow, textOf(repo, file));
 
-		if (!parsed.success) return [];
+		if (workflow === undefined) return [];
 
-		const triggers = parsed.data.on;
+		const triggers = workflow.on;
 
-		return Object.entries(parsed.data.jobs).map(([job, { steps }]) => ({
+		return Object.entries(workflow.jobs).map(([job, { steps }]) => ({
 			file: basename(file),
 			job,
 			triggers,
@@ -106,9 +114,9 @@ const codeownersOf = (repo: string): RepoScan["codeowners"] => {
 
 const composeOf = (repo: string): RepoScan["composeServices"] => {
 	const file = COMPOSE_FILES.find((candidate) => exists(repo, candidate));
-	const parsed = Compose.safeParse(parseYaml(textOf(repo, file ?? "")));
+	const compose = yamlOf(Compose, textOf(repo, file ?? ""));
 
-	return parsed.success ? Object.entries(parsed.data.services).map(([name, { image }]) => ({ name, image })) : [];
+	return compose ? Object.entries(compose.services).map(([name, { image }]) => ({ name, image })) : [];
 };
 
 /** The environment scripts a repo is built to run: executable files in the usual places. */
@@ -127,9 +135,9 @@ const templatesOf = (repo: string): RepoScan["issueTemplates"] =>
 	filesIn(repo, `${ISSUE_TEMPLATE_FOLDER}/*`).flatMap((file) => {
 		const text = textOf(repo, file);
 		const front = file.endsWith(".md") ? TEMPLATE_FRONT_MATTER.exec(text)?.[1] ?? "" : text;
-		const parsed = Template.safeParse(parseYaml(front));
+		const template = yamlOf(Template, front);
 
-		return parsed.success ? [{ file: basename(file), labels: [parsed.data.labels].flat().flatMap((label) => label.split(",").map((one) => one.trim()).filter(Boolean)) }] : [];
+		return template ? [{ file: basename(file), labels: [template.labels].flat().flatMap((label) => label.split(",").map((one) => one.trim()).filter(Boolean)) }] : [];
 	});
 
 const trackedOf = async (repo: string): Promise<string[]> => (await gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).raw(["ls-files"])).split("\n").filter(Boolean).slice(0, TRACKED_FILE_LIMIT);

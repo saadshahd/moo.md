@@ -114,7 +114,8 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 	if (!identity.ok) return identity;
 
 	const hum = { ...given, commitIdentity: identity.value };
-	const kinds = Object.fromEntries(Object.entries(withTimeouts(parseKinds(base), answers.waitHours)).map(([name, kind]) => [name, asJson(kind)]));
+	const timed = withTimeouts(parsedKinds(base), answers.waitHours);
+	const kinds = Object.fromEntries(Object.entries(base.kinds).map(([name, file]) => [name, timed[name] ? asJson(timed[name]) : file]));
 	const roles = { ...shipped.roles, ...existing?.roles };
 	const loaded = loadConfig({ hum: asJson(hum), kinds, roles }, { env: { hopeSkills: env.hopeSkills } });
 
@@ -135,7 +136,15 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 	return { ok: true, written: files.map(({ path }) => path), config: loaded.value };
 };
 
-const parseKinds = (raw: RawConfig): Record<string, Kind> => Object.fromEntries(Object.entries(raw.kinds).map(([name, file]) => [name, Kind.parse(file)]));
+/** The kind files that parse. One that does not stays as it is, so the config check refuses it by name. */
+const parsedKinds = (raw: RawConfig): Record<string, Kind> =>
+	Object.fromEntries(
+		Object.entries(raw.kinds).flatMap(([name, file]) => {
+			const kind = Kind.safeParse(file);
+
+			return kind.success ? [[name, kind.data]] : [];
+		}),
+	);
 
 const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite => {
 	const kind: UnitKind = (env.platform ?? process.platform) === "darwin" ? "launchd" : "systemd";
