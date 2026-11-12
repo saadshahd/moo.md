@@ -75,7 +75,7 @@ export { type Check, contractChecks, type ContractResult, type ContractTarget, r
 
 export { FakeProvider, ProviderError } from "./adapters/fake.ts";
 
-export { pushArgs, PushRefused } from "./adapters/git.ts";
+export { pushArgs } from "./adapters/git.ts";
 
 export { type GuardOptions, guarded } from "./adapters/guard.ts";
 

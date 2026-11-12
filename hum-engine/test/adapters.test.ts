@@ -13,7 +13,6 @@ import {
 	guarded,
 	markdownAdapter,
 	openState,
-	PushRefused,
 	sourceFiles,
 	type State,
 } from "../src/index.ts";
@@ -331,7 +330,7 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 		expect(existsSync(ran)).toBe(false);
 	});
 
-	test("a protected branch refuses the push, loudly", async () => {
+	test("a protected branch refuses the answer's push, and the answer is a failure in the remote's words that no retry fixes", async () => {
 		const repo = new WorkRepo();
 		const reported: FaultInput[] = [];
 		const id = repo.seed("asked");
@@ -340,10 +339,20 @@ describe("an answer writes, commits and pushes with hooks off", () => {
 
 		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: (fault) => void reported.push(fault), now: Date.now, env: process.env });
 
-		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toBeInstanceOf(PushRefused);
-		await expect(adapter.answers?.answer(id, { text: "no" })).rejects.toThrow("Protected branch");
-		expect(reported[0]?.code).toBe("push-refused");
+		expect(await adapter.answers?.answer(id, { text: "no" })).toEqual({ failed: "now", why: expect.stringContaining("Protected branch") });
+		expect(reported).toEqual([]);
 		expect(repo.show(id)).not.toContain('"kind":"answer"');
+	});
+
+	test("a claim the remote refuses is a failure in the remote's words that no retry fixes", async () => {
+		const repo = new WorkRepo();
+		const id = repo.seed("claimed");
+
+		repo.refusePushes({ refs: `refs/heads/${markdownSettings.claimPrefix}*`, said: "GH013: claim branches are protected" });
+
+		const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings }, { report: () => {}, now: Date.now, env: process.env });
+
+		expect(await adapter.workSource?.claim(id, Holder.parse("w"), 60_000)).toEqual({ failed: "now", why: expect.stringContaining("GH013") });
 	});
 });
 

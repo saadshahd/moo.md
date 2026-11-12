@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { guarded, guardTimings } from "../src/adapters/guard.ts";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
 import { runThinPath } from "../src/worker/thin-path.ts";
@@ -42,7 +43,7 @@ test.skipIf(!live)("live: a feature item runs its plan and review states on Haik
 	const config = configWith((raw) => void (raw.hum.models = { light: SHIPPED_DEFAULTS.models.light, standard: SHIPPED_DEFAULTS.models.light, top: SHIPPED_DEFAULTS.models.light }));
 	const repo = new WorkRepo();
 	const state = openState(tempDir("live-thin"), { now: Date.now });
-	const adapter = markdownAdapter({ ...markdownSettings, repo: repo.worker("w") }, { report: () => {}, now: Date.now, env: process.env });
+	const adapter = guarded(markdownAdapter({ ...markdownSettings, repo: repo.worker("w") }, { report: () => {}, now: Date.now, env: process.env }), { provider: "markdown", faults: state.faults, ...guardTimings(config.hum) });
 	const { runner } = await startRunner({ state, model: config.hum.models.light, now: Date.now, env: process.env });
 	const id = repo.add("live-1", `---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n`);
 

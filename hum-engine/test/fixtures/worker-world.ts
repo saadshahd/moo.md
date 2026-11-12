@@ -6,6 +6,7 @@ import { startBackgroundRunner } from "../../src/adapters/claude-bg.ts";
 import { startRunner } from "../../src/adapters/claude-p.ts";
 import { type HumConfig, SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { markdownAdapter } from "../../src/adapters/markdown.ts";
+import { guarded, guardTimings } from "../../src/adapters/guard.ts";
 import { serialized } from "../../src/adapters/serial.ts";
 import type { Config } from "../../src/config/load.ts";
 import { openState } from "../../src/state/open.ts";
@@ -39,10 +40,10 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const state = openState(tempDir("worker"), { now });
 	const reports: string[] = [];
 	const clone = repo.worker("w");
-	const markdown = markdownAdapter({ ...markdownSettings, repo: clone }, { report: (f) => reports.push(f.code), now, env: process.env });
-	const adapter = serialized(markdown);
 	const base = options.config ?? configWith();
 	const config: Config = { ...base, hum: { ...base.hum, ...options.settings } };
+	const markdown = guarded(markdownAdapter({ ...markdownSettings, repo: clone }, { report: (f) => reports.push(f.code), now, env: process.env }), { provider: "markdown", faults: state.faults, ...guardTimings(config.hum) });
+	const adapter = serialized(markdown);
 	const results: { outcome: string; item?: string; detail?: string }[] = [];
 
 	const runnerOptions = { state, model: config.hum.models.light, binary: shim.binary, env: shim.env, now, lockBackoffMs: 1 };

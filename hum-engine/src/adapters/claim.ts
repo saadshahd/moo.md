@@ -9,13 +9,13 @@ const CLAIM_SUBJECT = /^hum-claim (\S+) (\d+)$/;
 
 export type ClaimMode = "claim" | "renew";
 
-/** A provider's claims. `S` is the standing claim with whatever the provider needs to write over it. */
-export type ClaimStore<S extends { readonly claim: Claim }> = {
+/** A provider's claims. `S` is the standing claim with whatever the provider needs to write over it; `F` is what its write answers when it fails. */
+export type ClaimStore<S extends { readonly claim: Claim }, F = never> = {
 	readonly standing: (id: ItemId) => Promise<S | undefined>;
 	/** Asked only before a first claim: a standing one already proves the item was taken while ready. */
 	readonly isReady: (id: ItemId) => Promise<boolean>;
-	/** Writes `claim` over `over`; false when another writer moved first. */
-	readonly write: (claim: Claim, over: S | undefined) => Promise<boolean>;
+	/** Writes `claim` over `over`; false when another writer moved first, `F` when the write failed. */
+	readonly write: (claim: Claim, over: S | undefined) => Promise<boolean | NoInfer<F>>;
 };
 
 export type ClaimDecision =
@@ -42,8 +42,8 @@ const decideClaim = (mode: ClaimMode, holder: string, standing: Claim | undefine
 
 /** `claim` and `renew` over one provider's store: an atomic take whose race the provider's write settles. */
 export const claimer =
-	<S extends { readonly claim: Claim }>(store: ClaimStore<S>, now: () => number) =>
-	async (mode: ClaimMode, item: ItemId, holder: Holder, ttlMs: number): Promise<ClaimResult> => {
+	<S extends { readonly claim: Claim }, F = never>(store: ClaimStore<S, F>, now: () => number) =>
+	async (mode: ClaimMode, item: ItemId, holder: Holder, ttlMs: number): Promise<ClaimResult | F> => {
 		const who = parseArgument(Holder, holder);
 		const ttl = parseArgument(Ttl, ttlMs);
 		const standing = await store.standing(item);
@@ -59,7 +59,11 @@ export const claimer =
 
 				const claim: Claim = { item, holder: who, expiresAt: now() + ttl };
 
-				if (await store.write(claim, standing)) return { won: true, claim };
+				const written = await store.write(claim, standing);
+
+				if (written === true) return { won: true, claim };
+
+				if (written !== false) return written;
 
 				const winner = await store.standing(item);
 

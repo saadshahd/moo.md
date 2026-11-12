@@ -1,4 +1,3 @@
-import { PermanentError } from "../adapter-api.ts";
 import { exec } from "../exec.ts";
 
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
@@ -43,11 +42,6 @@ export const whenGitFailed =
 
 		throw error;
 	};
-
-/** The remote refused the push: a protected branch, a hook, a permission. Retrying cannot help. */
-export class PushRefused extends PermanentError {
-	override name = "PushRefused";
-}
 
 /** `conflict`: another writer moved the ref first, and a retry can win. `refused`: the remote said no, in `said`, and no retry helps. */
 export type PushOutcome = { readonly kind: "pushed" } | { readonly kind: "conflict" } | { readonly kind: "refused"; readonly said: string };

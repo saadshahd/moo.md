@@ -7,6 +7,7 @@ import { z } from "zod";
 import { startBackgroundRunner } from "../src/adapters/claude-bg.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SlotPool } from "../src/slots/pool.ts";
+import { guarded, guardTimings } from "../src/adapters/guard.ts";
 import { markdownAdapter } from "../src/adapters/markdown.ts";
 import { openState } from "../src/state/open.ts";
 import { runThinPath } from "../src/worker/thin-path.ts";
@@ -128,7 +129,7 @@ test.skipIf(!live)("live: a feature item runs its plan, build and review in a sl
 	const config = configWith((raw) => void (raw.hum.models = { light: MODEL, standard: MODEL, top: MODEL }));
 	const slots = new SlotPool({ repo, state, config: poolConfig(pool, { runners: 1 }), base: "main", now: Date.now });
 	const { runner } = await startBackgroundRunner({ state, model: MODEL, config: { ...config.hum, backgroundPollSeconds: 0.5 }, repo, now: Date.now, env: process.env });
-	const adapter = markdownAdapter({ ...markdownSettings, repo: work.worker("w") }, { report: () => {}, now: Date.now, env: process.env });
+	const adapter = guarded(markdownAdapter({ ...markdownSettings, repo: work.worker("w") }, { report: () => {}, now: Date.now, env: process.env }), { provider: "markdown", faults: state.faults, ...guardTimings(config.hum) });
 	const id = work.add("live-slot-1", "---\ntitle: Write the note\nstate: ready\nkind: feature\n---\n\nCreate docs/note.md holding one line: hello.\n");
 
 	const result = await runThinPath({ workSource: adapter.workSource!, questions: adapter.questions!, state, runner, config, remote, checks: ["test -f docs/note.md"], holder: Holder.parse("live"), workDir: tempDir("live-slot-work"), checkout: slots.checkout, now: Date.now, newSessionId: randomUUID, runnerVariables: new Set(Object.keys(process.env)) });

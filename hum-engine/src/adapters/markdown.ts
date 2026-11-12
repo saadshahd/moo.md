@@ -4,11 +4,11 @@ import { join } from "node:path";
 import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { ADAPTER_API_VERSION, type AdapterContext, type Claim, type Integrations, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
+import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
 import type { MergeMethod } from "../config/schema.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
-import { type GitIdentity, gitIn, push, PushRefused, readOrAbsent } from "./git.ts";
+import { type GitIdentity, gitIn, push, readOrAbsent } from "./git.ts";
 import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
 import { answerMarker, followUpBody, followUpKey, questionText } from "./marked.ts";
 import { type CommitLanded, landOwnerCommit } from "./owner-commit.ts";
@@ -64,7 +64,7 @@ type View = {
 };
 
 /** How a write reached the base: a push of its own commit, or a pull request that merges it as a commit of GitHub's. */
-type Landed = Exclude<CommitLanded["via"], "conflict">;
+type Landed = Extract<CommitLanded["via"], "push" | "pull-request">;
 
 /** Another writer moved the base branch between this write's read and its push. */
 class LostRace extends Error {
@@ -223,21 +223,13 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		}
 	};
 
-	const reportRefusal = (said: string): never => {
-		report({
-			code: "push-refused",
-			item: base,
-			cause: `The remote refused the push to ${base}: ${said.slice(0, 300)}`,
-			fix: `Let this account push to ${base}, or point hum at a branch it may write.`,
-		});
+	/** No retry gets past a remote that said no, so the call fails now, in the remote's words. */
+	const refused = (ref: string, said: string): Failed => ({ failed: "now", why: `${said}; let this account push to ${ref}` });
 
-		throw new PushRefused(said);
-	};
-
-	const pushToBase = async (sha: string): Promise<Landed> => {
+	const pushToBase = async (sha: string): Promise<Landed | Failed> => {
 		const outcome = await pushCounted([`${sha}:${baseBranch}`]);
 
-		if (outcome.kind === "refused") return reportRefusal(outcome.said);
+		if (outcome.kind === "refused") return refused(base, outcome.said);
 
 		if (outcome.kind === "conflict") throw new LostRace(`another writer moved ${base} first`);
 
@@ -245,7 +237,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	};
 
 	/** An owner's commit lands the way the base asks: a pull request that merges itself where one is required, a push elsewhere. */
-	const landOwned = async (sha: string, message: string, label: string): Promise<Landed> => {
+	const landOwned = async (sha: string, message: string, label: string): Promise<Landed | Failed> => {
 		const landed = await landOwnerCommit({
 			sha,
 			base,
@@ -258,35 +250,38 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			push: pushCounted,
 		});
 
-		if (landed.via === "refused") return reportRefusal(landed.said);
+		if (landed.via === "refused") return refused(base, landed.said);
 
 		if (landed.via === "conflict") throw new LostRace(`another writer moved ${base} first`);
 
 		return landed.via;
 	};
 
-	/** Changes one file on the remote base branch, reading it afresh after every lost race. */
-	const write = async (message: string, change: () => Promise<FileChange | undefined>, ownedBy?: string): Promise<void> => {
-		const attempt = async () => {
+	/** Changes one file on the remote base branch, reading it afresh after every lost race; a write the remote refused answers why. */
+	const write = async (message: string, change: () => Promise<FileChange | undefined>, ownedBy?: string): Promise<Failed | undefined> => {
+		const attempt = async (): Promise<Failed | undefined> => {
 			await current();
 
 			const next = await change();
 
-			if (!next) return;
+			if (!next) return undefined;
 
 			const sha = await commitOn((await git.raw(["rev-parse", BASE_REF])).trim(), message, next);
 			const landed = ownedBy === undefined ? await pushToBase(sha) : await landOwned(sha, message, ownedBy);
 
 			if (landed === "push") await mirrorBase(sha, next);
-			else view = undefined;
+			else if (landed === "pull-request") view = undefined;
+			else return landed;
+
+			return undefined;
 		};
 
-		await pRetry(attempt, { retries: writeRaceRetries, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
+		return pRetry(attempt, { retries: writeRaceRetries, minTimeout: WRITE_RACE_BACKOFF_MS, randomize: true, shouldRetry: ({ error }) => error instanceof LostRace }).catch((cause: unknown) => {
 			throw cause instanceof LostRace ? new PermanentError(`gave up after ${writeRaceRetries + 1} lost races pushing to ${base}`) : cause;
 		});
 	};
 
-	const appendTo = (id: string, entry: Omit<ThreadEntry, "text" | "at">, text: string): Promise<void> =>
+	const appendTo = (id: string, entry: Omit<ThreadEntry, "text" | "at">, text: string): Promise<Failed | undefined> =>
 		write(
 			`hum: ${entry.kind} on ${id}`,
 			async () => {
@@ -299,7 +294,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			entry.kind === "answer" ? id : undefined,
 		);
 
-	const take = claimer<StandingClaim>(
+	const take = claimer<StandingClaim, Failed>(
 		{
 			standing: async (id) => (await claimsNow()).get(id),
 			isReady: async (id) => (await loadItem(id))?.state === READY_STATE,
@@ -309,7 +304,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 				const pushed = await pushCounted([`${sha}:refs/heads/${claimPrefix}${claim.item}`]);
 
-				if (pushed.kind === "refused") throw new PushRefused(pushed.said);
+				if (pushed.kind === "refused") return refused(`${claimPrefix}${claim.item}`, pushed.said);
 
 				if (pushed.kind === "conflict") return false;
 
@@ -353,9 +348,9 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			fileFollowUp: async (from, { title, body }) => {
 				const id = parseArgument(ItemId, followUpId(parseArgument(ItemId, from), title));
 
-				await write(`hum: file ${id}`, async () => ((await itemSource(id)) === undefined ? { path: pathOf(id), content: newItemFile(title, followUpBody(body, from)) } : undefined));
+				const failed = await write(`hum: file ${id}`, async () => ((await itemSource(id)) === undefined ? { path: pathOf(id), content: newItemFile(title, followUpBody(body, from)) } : undefined));
 
-				return { id, title };
+				return failed ?? { id, title };
 			},
 		},
 		questions: {
@@ -371,7 +366,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 				return { token, changed: token !== since };
 			},
 		},
-	} satisfies Integrations & { readonly spent: () => number };
+	} satisfies Adapter & { readonly spent: () => number };
 
 	return adapter;
 };
