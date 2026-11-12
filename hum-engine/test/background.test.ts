@@ -167,7 +167,7 @@ test("a worker killed after the launch and before the session id is saved finds 
 	expect(state.runs.get(key)?.sessionId).toBe(outcome.kind === "finished" ? outcome.sessionId : undefined);
 });
 
-test("the start check starts one background run and keeps it; a run that cannot start leaves one card and every run goes on as claude -p", async () => {
+test("the start check starts one background run and keeps it", async () => {
 	const good = makeShim();
 	const goodState = openState(tempDir("background-check"));
 	const started = await startBackgroundRunner({ state: goodState, model: MODEL, binary: good.binary, env: good.env, config: CONFIG, repo: tmpdir() });
@@ -175,7 +175,9 @@ test("the start check starts one background run and keeps it; a run that cannot 
 	expect(started.check).toMatchObject({ kind: "finished", structured: STRUCTURED });
 	expect(good.background().filter(({ cmd }) => cmd === "bg")).toHaveLength(1);
 	expect(goodState.faults.list().map(({ code }) => code)).toEqual([]);
+});
 
+test("a start check that cannot start a background run leaves one card, and every run goes on as claude -p", async () => {
 	const down = makeShim({ bgDown: true });
 	const downState = openState(tempDir("background-check"));
 	const fallen = await startBackgroundRunner({ state: downState, model: MODEL, binary: down.binary, env: down.env, config: CONFIG, repo: tmpdir() });

@@ -100,14 +100,21 @@ test("hum claim without --ttl lasts claimExpirySeconds from the repo's hum.json"
 	expect(claimed.claim.expiresAt - Date.now()).toBeLessThanOrEqual(120_000);
 });
 
-test("an unknown op, an unknown flag and a bad ttl exit 2; a failure outside a repo exits 1 with no stack trace", () => {
+test("an unknown op exits 2 and lists the ops", () => {
 	const unknownOp = hum(process.cwd(), "nope");
 
 	expect(unknownOp.code).toBe(2);
 	expect(unknownOp.err).toContain("list-ready");
-	expect(hum(process.cwd(), "claim", "an-item", "me", "--ttl", "abc").code).toBe(2);
-	expect(hum(process.cwd(), "list-ready", "--nope").code).toBe(2);
+});
 
+test.each([
+	["a bad ttl", ["claim", "an-item", "me", "--ttl", "abc"]],
+	["an unknown flag", ["list-ready", "--nope"]],
+])("%s exits 2", (_, args) => {
+	expect(hum(process.cwd(), ...args).code).toBe(2);
+});
+
+test("a failure outside a repo exits 1 with no stack trace", () => {
 	const outside = hum(tmpdir(), "list-ready");
 
 	expect(outside.code).toBe(1);

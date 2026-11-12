@@ -221,7 +221,7 @@ test("a note that comes after the check ran reopens it as a miss, once, and memo
 	expect(await Bun.file(memoryPath).text()).toBe("- a rule with no source\n- Name things (source: elsewhere)\n");
 });
 
-test("memory.md shows runs its entries while they fit its byte cap, refuses a line with no source or past the cap, and lists entries no run used", () => {
+test("memory.md shows runs its entries while they fit its byte cap, and refuses a line with no source or past the cap", () => {
 	const held = [{ rule: "Use a lookup table", source: "review-comment:1" }];
 	const text = "# Rules\n- Use a lookup table (source: review-comment:1)\n- a rule with no source\n- Name things (source: s)\n- Fresh (source: s)\n";
 
@@ -232,6 +232,11 @@ test("memory.md shows runs its entries while they fit its byte cap, refuses a li
 			{ line: 5, why: "past-cap" },
 		],
 	});
+});
+
+test("a memory.md entry no recent run used is listed", () => {
+	const held = [{ rule: "Use a lookup table", source: "review-comment:1" }];
+
 	expect(unusedEntries([...held, { rule: "Fresh", source: "s" }], new Map([["Fresh", 95]]), 100, 20)).toEqual(held);
 });
 

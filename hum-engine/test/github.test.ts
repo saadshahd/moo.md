@@ -42,19 +42,30 @@ describe("contract suite on a fake GitHub", () => {
 
 	for (const check of contractChecks(target)) test(check.name, check.run);
 
-	test("publish opens one pull request, and release merges it", async () => {
-		const id = String(github.seed("shipped"));
+	test("publish opens one pull request, however often it runs", async () => {
+		const id = String(github.seed("published"));
 
-		github.branch("hum/run/shipped");
-		await primary.release.publish(id, "hum/run/shipped");
-		await primary.release.publish(id, "hum/run/shipped");
+		github.branch("hum/run/published");
+		await primary.release.publish(id, "hum/run/published");
+		await primary.release.publish(id, "hum/run/published");
 
-		expect(github.pulls().filter((pull) => pull.head === "hum/run/shipped")).toHaveLength(1);
+		expect(github.pulls().filter((pull) => pull.head === "hum/run/published")).toHaveLength(1);
+	});
 
-		await primary.release.release(id, "hum/run/shipped");
-		await primary.release.release(id, "hum/run/shipped");
+	test("release merges the published pull request, however often it runs", async () => {
+		const id = String(github.seed("released"));
 
-		expect(github.pulls().find((pull) => pull.head === "hum/run/shipped")?.state).toBe("MERGED");
+		github.branch("hum/run/released");
+		await primary.release.publish(id, "hum/run/released");
+		await primary.release.release(id, "hum/run/released");
+		await primary.release.release(id, "hum/run/released");
+
+		expect(github.pulls().find((pull) => pull.head === "hum/run/released")?.state).toBe("MERGED");
+	});
+
+	test("release of a branch with no pull request fails", async () => {
+		const id = String(github.seed("unpublished"));
+
 		await expect(primary.release.release(id, "hum/run/none")).rejects.toThrow("no pull request");
 	});
 });
@@ -111,10 +122,12 @@ describe("the thread", () => {
 		expect(github.requests).toEqual(["graphql Item", "graphql AddComment"]);
 	});
 
-	test("repoFromRemote reads https and ssh remotes, and refuses other hosts", () => {
-		expect(repoFromRemote("https://github.com/saadshahd/factory-smoke.git")).toBe("saadshahd/factory-smoke");
-		expect(repoFromRemote("git@github.com:saadshahd/factory-smoke.git")).toBe("saadshahd/factory-smoke");
-		expect(repoFromRemote("https://gitlab.com/a/b.git")).toBeUndefined();
+	test.each([
+		["https://github.com/saadshahd/factory-smoke.git", "saadshahd/factory-smoke"],
+		["git@github.com:saadshahd/factory-smoke.git", "saadshahd/factory-smoke"],
+		["https://gitlab.com/a/b.git", undefined],
+	])("repoFromRemote reads %s as %p", (remote, repo) => {
+		expect(repoFromRemote(remote)).toBe(repo);
 	});
 });
 

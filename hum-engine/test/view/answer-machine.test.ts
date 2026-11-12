@@ -147,13 +147,15 @@ describe("every event from every reachable state", () => {
 		}
 	});
 
-	test("a post's end always leaves posting, and a restart always ends answer mode", () => {
+	test("a post's end always leaves posting", () => {
 		for (const { event, after } of steps.filter(
 			({ before }) => before.value === "posting",
 		))
 			if (event.type === "posted" || event.type === "postFailed" || event.type === "postUnconfirmed")
 				expect(after.value).not.toBe("posting");
+	});
 
+	test("a restart always ends answer mode", () => {
 		for (const { after } of steps.filter(
 			({ event }) => event.type === "restarted",
 		))
@@ -281,9 +283,14 @@ test("Enter on the bare open sentence posts nothing and says so", () => {
 	});
 });
 
-test("a question's buttons fill an open sentence, a whole answer, or a free answer", () => {
+test("a question with no options has one button, for a free answer", () => {
 	expect(buttonWords({ options: [] })).toEqual([FREE_ANSWER]);
-	expect(answerOf("68", "change")).toMatchObject({ filled: "#68: change the plan so that ", isOpen: true, option: "change" });
-	expect(answerOf("68", "approve")).toMatchObject({ filled: "#68: approve", isOpen: false, option: "approve" });
-	expect(answerOf("seed-2", FREE_ANSWER)).toMatchObject({ filled: "seed-2: ", isOpen: true, option: undefined });
+});
+
+test.each([
+	["an open sentence", "68", "change", { filled: "#68: change the plan so that ", isOpen: true, option: "change" }],
+	["a whole answer", "68", "approve", { filled: "#68: approve", isOpen: false, option: "approve" }],
+	["a free answer", "seed-2", FREE_ANSWER, { filled: "seed-2: ", isOpen: true, option: undefined }],
+])("a question's button fills %s", (_, item, word, answer) => {
+	expect(answerOf(item, word)).toMatchObject(answer);
 });

@@ -276,7 +276,7 @@ test("every owner-changeable part maps to a key the hum.json schema holds", () =
 	for (const setting of Object.keys(SHIPPED_DEFAULTS)) expect(mapped, setting).toContain(setting);
 });
 
-test("settings an owner changes load as given, and a value that breaks its rule is refused", () => {
+test("settings an owner changes load as given", () => {
 	const changed = {
 		providerTimeoutSeconds: 12,
 		providerBackoff: { firstSeconds: 1.5, maxSeconds: 20 },
@@ -295,13 +295,13 @@ test("settings an owner changes load as given, and a value that breaks its rule 
 
 	Object.assign(raw.hum, changed);
 	expect(loaded(raw).hum).toMatchObject(changed);
+});
 
-	for (const refused of [{ providerBackoff: { firstSeconds: 40, maxSeconds: 20 } }, { mergedShown: 0 }, { mergeTries: 0 }, { ciSchedule: "61 * * * *" }, { restartDelaySeconds: 0.5 }]) {
-		const bad = clone(setUp());
+test.each([{ providerBackoff: { firstSeconds: 40, maxSeconds: 20 } }, { mergedShown: 0 }, { mergeTries: 0 }, { ciSchedule: "61 * * * *" }, { restartDelaySeconds: 0.5 }])("a setting that breaks its rule is refused: %j", (refused) => {
+	const bad = clone(setUp());
 
-		Object.assign(bad.hum, refused);
-		expect(loadConfig(bad, { env }).ok, JSON.stringify(refused)).toBe(false);
-	}
+	Object.assign(bad.hum, refused);
+	expect(loadConfig(bad, { env }).ok).toBe(false);
 });
 
 test("the committed schema file matches the schema in code", () => {
@@ -341,16 +341,23 @@ test("a hum.json without the branch and label keys gets the shipped names", () =
 	expect(loaded(bare).hum).toMatchObject({ runBranchPrefix: "hum/run/", claimPrefix: "hum/claim/", readyLabel: "hum:ready" });
 });
 
-test("a branch prefix that makes no valid git branch, or two prefixes that overlap, are refused", () => {
+test("a branch prefix that makes no valid git branch is refused", () => {
 	const spaced = clone(setUp());
+
 	spaced.hum.claimPrefix = "hum claim/";
-	const nested = clone(setUp());
-	nested.hum.claimPrefix = "hum/run/claim/";
 
 	const malformed = change(undefined, spaced);
-	const overlapping = change(undefined, nested);
 
 	expect(!malformed.accepted && malformed.refusals[0]?.code).toBe("malformed-config");
+});
+
+test("two branch prefixes that overlap are refused", () => {
+	const nested = clone(setUp());
+
+	nested.hum.claimPrefix = "hum/run/claim/";
+
+	const overlapping = change(undefined, nested);
+
 	expect(!overlapping.accepted && overlapping.refusals[0]?.message).toContain("overlap");
 });
 
@@ -364,12 +371,17 @@ test("the hash ignores key order and changes with content", () => {
 	expect(loaded(edited).hash).not.toBe(loaded(raw).hash);
 });
 
-test("a tier table with a gap is refused, and the most specific row wins", () => {
+test("a tier table with a gap is refused", () => {
 	const bad = clone(setUp());
+
 	bad.kinds.docs.tiers = bad.kinds.docs.tiers.filter((row: Tree) => !(row.purpose === "build" && row.level === undefined));
-	const tiers = loaded(setUp()).kinds.feature!;
 
 	expect(problemsOf(bad)).toContainEqual({ kind: "docs", problem: "tier-table-gap", purpose: "build", level: "low", size: "small" });
+});
+
+test("the most specific tier row wins", () => {
+	const tiers = loaded(setUp()).kinds.feature!;
+
 	expect(pickTier(tiers, { purpose: "build", level: "critical", size: "small" })).toMatchObject({ tier: "top", effort: "high" });
 	expect(pickTier(tiers, { purpose: "build", level: "low", size: "small" })).toMatchObject({ tier: "standard", effort: "medium" });
 });

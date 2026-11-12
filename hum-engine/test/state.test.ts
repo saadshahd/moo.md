@@ -394,37 +394,66 @@ test("a reader never sees a partial status file", async () => {
 	expect(readdirSync(dir).filter((name) => !name.endsWith(".json"))).toEqual([]);
 });
 
-test("the status file holds its sections, the engine versions and the measure slot, and refuses a stranger", () => {
+const statusFile = () => {
 	const path = join(dir, "nested", "status.json");
 	const status = emptyStatus(ENGINE_VERSION, 1000);
 
 	status.workers = { mac: 990 };
 	status.inFlight = [{ item: "#68", title: "Fix it", level: "low", state: "building", since: 900, unclear: true }];
 	writeStatus(path, status);
+
+	return { path, status };
+};
+
+test("the status file reads back as written, with every section, the engine version and an empty measure slot", () => {
+	const { path, status } = statusFile();
 	const read = readStatus(path);
 
 	expect(read.ok && read.status).toEqual(status);
 	expect(Object.keys(status)).toEqual(["format", "writtenAt", "workers", "engine", "questions", "cards", "inFlight", "merged", "choices", "rules", "possibleRepeats", "unusedMemory", "measure"]);
 	expect(status.measure).toBeNull();
 	expect(status.engine.version).toBe(ENGINE_VERSION);
+});
+
+test("a status that breaks its schema is not written, and the file keeps the last good one", () => {
+	const { path, status } = statusFile();
+
 	expect(() => writeStatus(path, { ...status, writtenAt: -1 })).toThrow();
 	expect(readStatus(path).ok).toBe(true);
+});
+
+test("a status file that does not parse reads as unreadable, and one that is not there as missing", () => {
+	const { path } = statusFile();
+
 	writeFileSync(path, "{");
 	expect(readStatus(path)).toMatchObject({ ok: false, reason: "unreadable" });
 	expect(readStatus(join(dir, "none.json"))).toMatchObject({ ok: false, reason: "missing" });
+});
+
+test("a status with a field the schema does not know is refused", () => {
+	const { status } = statusFile();
+
 	expect(Status.safeParse({ ...status, extra: 1 }).success).toBe(false);
 });
 
-test("a fault card gives the cause, a one-line fix and at most one action; one card per cause", () => {
-	const { faults } = openState(dir, { now: () => 5 });
-	const input = { code: "x", item: "#1", cause: "It broke.", fix: "Fix it." };
+const FAULT = { code: "x", item: "#1", cause: "It broke.", fix: "Fix it." };
 
-	expect(faults.raise(input)).toBe(faults.raise(input));
-	expect(() => faults.raise({ ...input, code: "y", fix: "one\ntwo" })).toThrow();
-	expect(() => faults.raise({ ...input, code: "z", action: { label: "a label far over fourteen cells", answer: "retry" } })).toThrow();
+test("a fault raised twice is one saved card, and clearing it removes it", () => {
+	const { faults } = openState(dir, { now: () => 5 });
+
+	expect(faults.raise(FAULT)).toBe(faults.raise(FAULT));
 	expect(openState(dir).faults.list()).toHaveLength(1);
 	faults.clear({ code: "x", item: "#1" });
 	expect(openState(dir).faults.list()).toEqual([]);
+});
+
+test.each([
+	["a fix of two lines", { code: "y", fix: "one\ntwo" }],
+	["an action label too wide for its button", { code: "z", action: { label: "a label far over fourteen cells", answer: "retry" } }],
+])("a fault card with %s is refused", (_, over) => {
+	const { faults } = openState(dir, { now: () => 5 });
+
+	expect(() => faults.raise({ ...FAULT, ...over })).toThrow();
 });
 
 test("the state folder is the git common dir's hum/, shared by worktrees", async () => {

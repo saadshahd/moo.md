@@ -82,40 +82,50 @@ test("a view narrower than any it is built for still draws and does not throw", 
 	}
 });
 
-test("a tool's newline, tab and colour codes in a question or a card show as the words they hold", () => {
+test.each(WIDTHS)("a tool's newline and tab in a question show as the words they hold at width %p", (width) => {
 	const question = { item: "71", text: "Which one?\nThe short title or\tthe long one?", options: [], since: NOW };
 
+	const asked = questionCardRows(question, { now: NOW, width })
+		.slice(1)
+		.filter((row) => !row.some(({ press }) => press !== undefined))
+		.map(drawn);
+
+	expect(asked.join(" ")).toBe("Which one? The short title or the long one?");
+});
+
+test("a tool's colour codes in a card show as the words they hold", () => {
 	const [cause] = noticeCardRows(
 		{ kind: "fault", key: "k", item: "72", code: "check-failed", cause: "\u001b[31mFAIL\u001b[0m test/a.test.ts > renders the pane\u001b[2K\r expected 1 to be 2", fix: "Fix it.", since: NOW },
 		{ now: NOW, width: 200 },
 	).slice(1);
-
-	for (const width of WIDTHS) {
-		const asked = questionCardRows(question, { now: NOW, width })
-			.slice(1)
-			.filter((row) => !row.some(({ press }) => press !== undefined))
-			.map(drawn);
-
-		expect(asked.join(" ")).toBe("Which one? The short title or the long one?");
-	}
 
 	expect(cause === undefined ? "" : drawn(cause)).toBe("FAIL test/a.test.ts > renders the pane expected 1 to be 2");
 });
 
 const STATUS_READ: ViewRead = { kind: "status", status: worstStatus };
 
-test("a read of the work source that keeps failing says so in a few words in the band and gives its cause whole in the pane", () => {
-	const input = { read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 200 };
-	const pane = paneRows({ ...input, unfolded: new Set(), unread: UNREAD }).map(drawn);
-	const brief = { ...UNREAD, since: NOW - 5000 };
+const UNREAD_INPUT = { read: STATUS_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 200 };
 
-	expect(drawn(bandRow({ ...input, unread: UNREAD }))).toContain("work source unread 1 m");
-	expect(drawn(bandRow({ ...input, unread: UNREAD }))).not.toContain("ls-remote");
+test("a read of the work source that keeps failing says so in a few words in the band", () => {
+	const band = drawn(bandRow({ ...UNREAD_INPUT, unread: UNREAD }));
+
+	expect(band).toContain("work source unread 1 m");
+	expect(band).not.toContain("ls-remote");
+});
+
+test("a read of the work source that keeps failing gives its cause whole in the pane", () => {
+	const pane = paneRows({ ...UNREAD_INPUT, unfolded: new Set(), unread: UNREAD }).map(drawn);
+
 	expect(pane.find((line) => line.includes("work source")) ?? "").toContain("unread · 1 m");
 	expect(pane.find((line) => line.includes("ls-remote")) ?? "").toContain("git ls-remote exited 128: fatal: unable to access the remote Could not resolve host example.com");
-	expect(drawn(bandRow({ ...input, unread: brief }))).not.toContain("work source unread");
+});
+
+test("a read of the work source that failed only briefly shows in neither the band nor the pane", () => {
+	const brief = { ...UNREAD, since: NOW - 5000 };
+
+	expect(drawn(bandRow({ ...UNREAD_INPUT, unread: brief }))).not.toContain("work source unread");
 	expect(
-		paneRows({ ...input, unfolded: new Set(), unread: brief })
+		paneRows({ ...UNREAD_INPUT, unfolded: new Set(), unread: brief })
 			.map(drawn)
 			.join("\n"),
 	).not.toContain("ls-remote");
@@ -158,11 +168,15 @@ test("the worst-case lists are as long as the shipped settings allow", () => {
 	expect([worstStatus.merged.length, worstStatus.choices.length]).toEqual([SHIPPED_DEFAULTS.mergedShown, SHIPPED_DEFAULTS.choicesShown]);
 });
 
-test("a status file with no items draws only its header, and one with hundreds lists every item once", () => {
+test("a status file with no items draws only its header", () => {
 	const empty = { ...worstStatus, questions: [], cards: [], inFlight: [], merged: [], choices: [] };
-	const listed = new Set(paneRows({ read: { kind: "status", status: hugeStatus }, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unfolded: new Set() }).map(([, first]) => first?.text));
 
 	expect(paneRows({ read: { kind: "status", status: empty }, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unfolded: new Set() })).toHaveLength(2);
+});
+
+test("a status file with hundreds of items lists every item once", () => {
+	const listed = new Set(paneRows({ read: { kind: "status", status: hugeStatus }, now: NOW, amberAfterSeconds: AMBER_AFTER, width: 80, unfolded: new Set() }).map(([, first]) => first?.text));
+
 	expect(hugeStatus.merged.filter(({ item }) => !listed.has(`#${item}`))).toEqual([]);
 	expect(hugeStatus.inFlight.filter(({ item }) => item !== LONGEST_ID && !listed.has(`#${item}`))).toEqual([]);
 });

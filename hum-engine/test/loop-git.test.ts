@@ -53,27 +53,36 @@ const prove = (dir: string, head: string, notes: ReviewNote[]) => {
 	return proveCheck({ git: gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), head, base: "main", notes, checks: ["sh check.sh"], timeoutMs: 20_000, now: () => timeMs + Date.now() });
 };
 
-test("a check is real when it fails on the commit a note points at and passes on the base; one that misses the violation is refused, and no worktree stays", async () => {
+/** A repo whose base fixed a violating commit, and a check that forbids `forbidden` on top of the fix. */
+const checkOver = (forbidden: string) => {
 	const dir = scratch();
 
 	commit(dir, { "src/a.ts": "export const x = 1;\n" }, "init");
 	const bad = violating(dir);
 
 	commit(dir, { "src/a.ts": "export const x = 2;\n" }, "fix: a");
-	const real = checkItemHead(dir, "legacy");
 
-	const proof = await prove(dir, real, [reviewNote({ change: bad })]);
+	return { dir, bad, head: checkItemHead(dir, forbidden) };
+};
 
-	expect(proof).toMatchObject({ passed: true, worktrees: 2, ms: expect.any(Number) });
+test("a check is real when it fails on the commit a note points at and passes on the base, and no worktree stays", async () => {
+	const { dir, bad, head } = checkOver("legacy");
 
-	sh(dir, ["checkout", "-q", "main"]);
-	sh(dir, ["branch", "-q", "-D", "check"]);
-
-	const misses = checkItemHead(dir, "nothing-like-it");
-
-	expect(await prove(dir, misses, [reviewNote({ change: bad })])).toMatchObject({ passed: false, reason: `the check passes on ${bad}, the commit a note points at` });
-	expect(await prove(dir, misses, [reviewNote({ change: "not-a-commit" })])).toMatchObject({ passed: false, worktrees: 0 });
+	expect(await prove(dir, head, [reviewNote({ change: bad })])).toMatchObject({ passed: true, worktrees: 2, ms: expect.any(Number) });
 	expect(sh(dir, ["worktree", "list"]).trim().split("\n")).toHaveLength(1);
+});
+
+test("a check that misses the violation is refused, and no worktree stays", async () => {
+	const { dir, bad, head } = checkOver("nothing-like-it");
+
+	expect(await prove(dir, head, [reviewNote({ change: bad })])).toMatchObject({ passed: false, reason: `the check passes on ${bad}, the commit a note points at` });
+	expect(sh(dir, ["worktree", "list"]).trim().split("\n")).toHaveLength(1);
+});
+
+test("a check whose note points at no commit is refused before any worktree", async () => {
+	const { dir, head } = checkOver("legacy");
+
+	expect(await prove(dir, head, [reviewNote({ change: "not-a-commit" })])).toMatchObject({ passed: false, worktrees: 0 });
 });
 
 const followUps = () => {

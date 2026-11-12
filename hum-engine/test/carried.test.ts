@@ -39,31 +39,39 @@ const dying = (real: Adapter, writeFirst: boolean): Adapter => {
 };
 
 for (const write of WRITES) {
-	test(`${write.name} runs once per scope, and a retry after a crash reads the thread before it writes again`, async () => {
+	const thread = async () => {
 		const w = await workerWorld({});
 		const id = w.repo.seed("An item");
-		const scope = { run: "t", attempt: 0 };
 		const entries = async () => (await w.adapter.workSource!.read(id)).thread.filter((e) => e.kind === write.kind).length;
+		const calls = (adapter: Adapter, run: string) => onceCalls(adapter, w.state.ops, { run, attempt: 0 });
 
-		// Twice in one scope: one write.
-		const calls = onceCalls(w.adapter, w.state.ops, scope);
+		return { w, id, entries, calls };
+	};
 
-		await write.call(calls, id, "one");
-		await write.call(calls, id, "one");
+	test(`${write.name} runs once per scope`, async () => {
+		const { w, id, entries, calls } = await thread();
+		const scoped = calls(w.adapter, "t");
+
+		await write.call(scoped, id, "one");
+		await write.call(scoped, id, "one");
 		expect(await entries()).toBe(1);
+	});
 
-		// Died after the write: the retry finds the entry and writes nothing.
-		const after = onceCalls(w.adapter, w.state.ops, { run: "after", attempt: 0 });
+	test(`${write.name} retried after a crash past the write reads the thread and writes nothing`, async () => {
+		const { w, id, entries, calls } = await thread();
 
-		await expect(write.call(onceCalls(dying(w.adapter, true), w.state.ops, { run: "after", attempt: 0 }), id, "two")).rejects.toThrow("died");
-		await write.call(after, id, "two");
-		expect(await entries()).toBe(2);
+		await expect(write.call(calls(dying(w.adapter, true), "after"), id, "two")).rejects.toThrow("died");
+		await write.call(calls(w.adapter, "after"), id, "two");
+		expect(await entries()).toBe(1);
+	});
 
-		// Died before the write: the retry finds no entry and writes one.
-		await expect(write.call(onceCalls(dying(w.adapter, false), w.state.ops, { run: "before", attempt: 0 }), id, "three")).rejects.toThrow("died");
-		expect(await entries()).toBe(2);
-		await write.call(onceCalls(w.adapter, w.state.ops, { run: "before", attempt: 0 }), id, "three");
-		expect(await entries()).toBe(3);
+	test(`${write.name} retried after a crash before the write writes once`, async () => {
+		const { w, id, entries, calls } = await thread();
+
+		await expect(write.call(calls(dying(w.adapter, false), "before"), id, "three")).rejects.toThrow("died");
+		expect(await entries()).toBe(0);
+		await write.call(calls(w.adapter, "before"), id, "three");
+		expect(await entries()).toBe(1);
 	});
 }
 

@@ -151,7 +151,7 @@ test("a run's end while a tick is busy brings the next tick once that tick ends"
 	expect(await served).toEqual({ reason: "stopped" });
 });
 
-test("a new engine in node_modules, or an edit under .hum/ or adapters/, makes the worker exit within one tick; item files do not", async () => {
+test("a new engine in node_modules makes the worker exit within one tick, saying so in its heartbeat and status; an item file does not", async () => {
 	const w = await workerWorld({});
 
 	w.ownerFile("node_modules/@moo.md/hum/package.json", JSON.stringify({ version: "0.1.0" }));
@@ -169,17 +169,18 @@ test("a new engine in node_modules, or an edit under .hum/ or adapters/, makes t
 
 	expect(beat).toMatchObject({ engineVersion: "0.1.1", configHash: w.config.hash, restarting: "the engine changed from 0.1.0 to 0.1.1", inFlight: [] });
 	expect(status.ok && status.status.engine).toMatchObject({ version: "0.1.1", latest: "0.2.0" });
+});
 
-	for (const [file, text] of [
-		[".hum/memory.md", "never touch vendor/\n"],
-		["adapters/mine.ts", "export default () => ({})\n"],
-		["bun.lock", "{}\n"],
-	] as const) {
-		const fresh = w.workerWith();
+test.each([
+	[".hum/memory.md", "never touch vendor/\n"],
+	["adapters/mine.ts", "export default () => ({})\n"],
+	["bun.lock", "{}\n"],
+])("an edit to %s makes the worker exit within one tick", async (file, text) => {
+	const w = await workerWorld({});
+	const worker = w.workerWith();
 
-		w.ownerFile(file, text);
-		expect(await fresh.tick(), file).toMatchObject({ kind: "exit" });
-	}
+	w.ownerFile(file, text);
+	expect(await worker.tick()).toMatchObject({ kind: "exit" });
 });
 
 test("a worker that sees an update starts nothing new, lands nothing and exits when its runs end; the next worker lands the change without a run", async () => {

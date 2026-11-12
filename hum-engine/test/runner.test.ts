@@ -24,15 +24,22 @@ const setup = async (spec: ShimSpec = {}, extra: Partial<RunnerOptions> & { cloc
 
 const ask = (runner: Runner, over: Partial<RunRequest> = {}) => runner.run({ prompt: "do it", cwd: tmpdir(), model: MODEL, effort: "low", schema: { type: "object" }, ...over });
 
-test("the flag set holds the five flags and never --bare, --resume or --continue; a model call adds hope's judge flags and loads no settings source or tool", () => {
-	const args = runArgs({ model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111" });
+const RUN = { model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111" } as const;
 
-	for (const flag of ["--model", "--effort", "--json-schema", "--settings", "--session-id"]) expect(args).toContain(flag);
+test("a run's flags start with stream-json output and hold the five flags", () => {
+	const args = runArgs(RUN);
 
-	for (const banned of ["--bare", "--resume", "--continue", "-r", "-c"]) expect(args).not.toContain(banned);
 	expect(args.slice(0, 4)).toEqual(["-p", "--output-format", "stream-json", "--verbose"]);
 
-	const judging = runArgs({ model: "m", effort: "low", schema: { type: "object" }, sessionId: "11111111-1111-4111-8111-111111111111", call: "judgment" });
+	for (const flag of ["--model", "--effort", "--json-schema", "--settings", "--session-id"]) expect(args).toContain(flag);
+});
+
+test.each(["--bare", "--resume", "--continue", "-r", "-c"])("a run's flags never hold %s", (banned) => {
+	expect(runArgs(RUN)).not.toContain(banned);
+});
+
+test("a model call keeps no session, loads no settings source, tool or hook, and draws in the default style", () => {
+	const judging = runArgs({ ...RUN, call: "judgment" });
 
 	expect(judging).toContain("--no-session-persistence");
 	expect(judging.slice(judging.indexOf("--setting-sources"), judging.indexOf("--setting-sources") + 2)).toEqual(["--setting-sources", ""]);
@@ -130,11 +137,16 @@ test("a limit message that does not parse holds the run with one card", async ()
 	expect((await ask(runner)).kind).toBe("held");
 	expect(state.faults.list().map((c) => c.code)).toEqual(["limit-unparsed"]);
 	expect(shim.calls()).toHaveLength(2);
-	expect(parseLimit("try later")).toBeUndefined();
-	expect(parseLimit("usage limit, resets at 2026-11-08T00:00:00Z")).toBe(Date.parse("2026-11-08T00:00:00Z"));
 });
 
-test("a refresh-lock error runs again on a new session id, and stops after three tries", async () => {
+test.each([
+	["try later", undefined],
+	["usage limit, resets at 2026-11-08T00:00:00Z", Date.parse("2026-11-08T00:00:00Z")],
+])("a limit message %p resets at %p", (message, until) => {
+	expect(parseLimit(message)).toBe(until);
+});
+
+test("a refresh-lock error runs again on a new session id", async () => {
 	const cleared = await setup({ script: [{}, { error: "OAuth token refresh failed: lock held by another process" }, {}] });
 	const outcome = await ask(cleared.runner);
 
@@ -143,7 +155,9 @@ test("a refresh-lock error runs again on a new session id, and stops after three
 	const ids = cleared.shim.calls().map((c) => c.argv[c.argv.indexOf("--session-id") + 1]);
 
 	expect(new Set(ids.slice(1)).size).toBe(2);
+});
 
+test("a refresh-lock error that keeps coming stops after three tries", async () => {
 	const stuck = await setup({ script: [{}, { error: "refresh lock timeout" }] });
 	const last = await ask(stuck.runner);
 
@@ -196,11 +210,14 @@ test("an API key in the environment is passed on and allowed; a changed credenti
 	expect(JSON.parse(readFileSync(join(login.state.dir, "credentials.json"), "utf8")).credential).toBe("login");
 });
 
-test("a run past the token cap, or aborted, is killed mid-run and leaves no claude process", async () => {
+test("a run past the token cap is killed mid-run and leaves no claude process", async () => {
 	const capped = await setup({ script: [{}, { spend: 5000, hang: true }] });
 
 	expect(await ask(capped.runner, { tokenCap: 1000 })).toEqual({ kind: "over-cap", tokens: 5001 });
+	await until(() => !isAlive(capped.shim.calls()[1]?.pid ?? 0));
+});
 
+test("an aborted run is killed mid-run and leaves no claude process", async () => {
 	const aborted = await setup({ script: [{}, { hang: true }] });
 	const controller = new AbortController();
 	const pending = ask(aborted.runner, { signal: controller.signal });
@@ -211,8 +228,7 @@ test("a run past the token cap, or aborted, is killed mid-run and leaves no clau
 	const outcome = await pending;
 
 	expect(outcome.kind === "finished" && outcome.subtype).toBe("no-result");
-
-	for (const shim of [capped.shim, aborted.shim]) await until(() => !isAlive(shim.calls()[1]?.pid ?? 0));
+	await until(() => !isAlive(aborted.shim.calls()[1]?.pid ?? 0));
 });
 
 test("a 200 KB body goes on stdin whole, and argv stays small", async () => {

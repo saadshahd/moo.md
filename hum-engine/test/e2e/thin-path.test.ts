@@ -533,26 +533,30 @@ test("an alignment call below the bar gates nothing: the change still lands by i
 	expect(github.comments).toEqual([expect.stringContaining("alignment concern, verification concern")]);
 });
 
-test("a review that leaves the change to the owner asks; the owner's approval lands it past its level's own review run, and a rejection sends it to a fix with the owner's words", async () => {
-	const toOwner = { event: "needs-owner", sure: true, reason: "A matter of tone.", question: "Is the tone right?" };
+const TO_OWNER = { event: "needs-owner", sure: true, reason: "A matter of tone.", question: "Is the tone right?" };
+const mediumDocs = () => configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }]));
+
+test("a review that leaves the change to the owner asks, and the owner's approval lands it past its level's own review run", async () => {
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN, TO_OWNER] }, { config: mediumDocs() });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "asked", item: id, detail: "Is the tone right?" });
+
+	await w.adapter.answers!.answer(id, { text: "yes", option: "approve" });
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toEqual({ outcome: "merged", item: id });
+});
+
+test("the owner's rejection of a change a review left to them sends it to a fix with the owner's words", async () => {
 	const fixStdin = stdinFile();
-	const config = configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }]));
-	const w = await world({ script: [{}, NOTE, { commit: { "docs/other.md": "other\n" } }, { commit: { "docs/other.md": "other, softer\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, toOwner, READY_PLAN, toOwner] }, { config });
-	const approved = w.repo.seed("Write the note");
+	const w = await world({ script: [{}, NOTE, { commit: { "docs/note.md": "hello, softer\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, TO_OWNER] }, { config: mediumDocs() });
+	const id = w.repo.seed("Write the note");
 
-	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "asked", item: approved, detail: "Is the tone right?" });
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "asked", item: id });
 
-	await w.adapter.answers!.answer(approved, { text: "yes", option: "approve" });
+	await w.adapter.answers!.answer(id, { text: "Make it softer." });
 
-	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: approved }))).toEqual({ outcome: "merged", item: approved });
-
-	const rejected = w.repo.seed("Write another note");
-
-	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: rejected }))).toMatchObject({ outcome: "asked", item: rejected });
-
-	await w.adapter.answers!.answer(rejected, { text: "Make it softer." });
-
-	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: rejected }))).toEqual({ outcome: "merged", item: rejected });
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toEqual({ outcome: "merged", item: id });
 	expect(readFileSync(fixStdin, "utf8")).toContain("Make it softer.");
 });
 

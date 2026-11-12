@@ -87,11 +87,13 @@ test("every answer is applied, held or dropped, and a model's pick never approve
 	expect(dispose({ ...base, stage: "approval", resolution: { source: "marker", option: "approve" } }).disposition).toBe("applied");
 });
 
-test("a dropped reply gives its reason and the options to answer with; an applied one names the pick", () => {
+test("a dropped reply gives its reason and the options to answer with", () => {
 	const dropped = dispose({ resolution: { source: "none-of-these" }, answeredBefore: false, stage: "waiting" });
 
 	expect(replyText(2, dropped, { source: "none-of-these" }, OPTIONS, "hm")).toBe(`Answer 2 dropped: ${dropped.why} Options: approve, change.`);
+});
 
+test("an applied reply names the pick", () => {
 	const applied = dispose({ resolution: { source: "first-word", option: "change" }, answeredBefore: false, stage: "waiting" });
 
 	expect(replyText(1, applied, { source: "first-word", option: "change" }, OPTIONS, "change it")).toStartWith("Answer 1 applied: change.");

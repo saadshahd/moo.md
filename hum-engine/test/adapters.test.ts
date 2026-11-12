@@ -68,13 +68,15 @@ describe("markdown settings", () => {
 });
 
 describe("item files", () => {
-	test("a new item file keeps a long title on one line, and finishing an item changes only its state", () => {
+	test("a new item file keeps a long title on one line", () => {
 		const title = `${"word ".repeat(40)}end`;
 		const created = newItemFile(title, "The body.");
 
 		expect(created.split("\n")[1]).toBe(`title: ${title}`);
 		expect(parseItemFile(created)).toMatchObject({ title, state: "ready", body: "The body." });
+	});
 
+	test("finishing an item changes only its state", () => {
 		const owned = "---\n# the owner's note\ntitle: A title\nstate: ready\nkind: fix\nowner: me\n---\n\nThe body.\n";
 		const finished = markDone(owned);
 
@@ -236,22 +238,31 @@ describe("the start check", () => {
 		const state = stateIn(provider.now);
 		const dir = tempDir("adapter");
 		const bad = join(dir, "adapters", "linear.ts");
-		const good = join(dir, "adapters", "clean.ts");
 
 		mkdirSync(dirname(bad), { recursive: true });
 		writeFileSync(bad, `import { createMachine } from "xstate";\nexport default () => createMachine;\n`);
-		writeFileSync(good, `import { ItemId } from "@moo.md/hum/adapter-api";\nexport default () => ItemId;\n`);
+		writeFileSync(join(dir, "adapters", "clean.ts"), `import { ItemId } from "@moo.md/hum/adapter-api";\nexport default () => ItemId;\n`);
 
 		const refused = await admit({ name: "linear", adapter: provider.adapter(), files: sourceFiles(join(dir, "adapters")), root: dir, faults: state.faults, guard: guard() });
 
 		expect(refused.ok).toBe(false);
 		expect(state.faults.list().map((card) => card.item)).toEqual(["adapters/linear.ts"]);
-		expect(engineImporters([good])).toEqual([]);
+	});
 
-		for (const line of [`import("xstate/graph")`, `require("@statelyai/agent")`, `import "xstate"`, `export * from "xstate"`]) {
-			writeFileSync(bad, `${line};\n`);
-			expect(engineImporters([bad]).length).toBe(1);
-		}
+	test("an adapter that imports only the adapter API imports no engine module", () => {
+		const good = join(tempDir("adapter"), "clean.ts");
+
+		writeFileSync(good, `import { ItemId } from "@moo.md/hum/adapter-api";\nexport default () => ItemId;\n`);
+
+		expect(engineImporters([good])).toEqual([]);
+	});
+
+	test.each([`import("xstate/graph")`, `require("@statelyai/agent")`, `import "xstate"`, `export * from "xstate"`])("%s is an engine import", (line) => {
+		const bad = join(tempDir("adapter"), "linear.ts");
+
+		writeFileSync(bad, `${line};\n`);
+
+		expect(engineImporters([bad])).toHaveLength(1);
 	});
 
 	test("the engine's own adapters import no engine module", () => {

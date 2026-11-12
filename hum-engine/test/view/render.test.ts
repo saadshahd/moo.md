@@ -179,33 +179,26 @@ test("a notice card gives the cause, then the fix, then its one action whole, wh
 	}
 });
 
-test("buttons are whole, two cells apart and right-aligned; one that does not fit starts a new row", () => {
-	const labels = [
-		"approve",
-		"change the plan",
-		"file follow-up",
-		"x".repeat(14),
-	];
+const BUTTONS = ["approve", "change the plan", "file follow-up", "x".repeat(14)].map((label, index) =>
+	button(label, { kind: "fill", item: "68", word: label }, index === 0),
+);
 
-	const buttons = labels.map((label, index) =>
-		button(label, { kind: "fill", item: "68", word: label }, index === 0),
+test("the first button is drawn filled and the rest dim", () => {
+	expect(BUTTONS.map(({ tone }) => tone)).toEqual(["filled", "dim", "dim", "dim"]);
+	expect(BUTTONS[0]?.text).toBe("▐ approve ▌");
+	expect(BUTTONS[1]?.text).toBe(" change the plan ");
+});
+
+test.each(WIDTHS)("buttons are whole and fill each row to width %p, and one that does not fit starts a new row", (width) => {
+	const rows = buttonRows(BUTTONS, width);
+
+	const shown = rows.flatMap((row) =>
+		row.filter(({ press }) => press !== undefined).map(({ text }) => text),
 	);
 
-	expect(buttons.map(({ tone }) => tone)).toEqual(["filled", "dim", "dim", "dim"]);
-	expect(buttons[0]?.text).toBe("▐ approve ▌");
-	expect(buttons[1]?.text).toBe(" change the plan ");
+	for (const row of rows) expect(rowCells(row)).toBe(width);
 
-	for (const width of WIDTHS) {
-		const rows = buttonRows(buttons, width);
-
-		const shown = rows.flatMap((row) =>
-			row.filter(({ press }) => press !== undefined).map(({ text }) => text),
-		);
-
-		for (const row of rows) expect(rowCells(row), String(width)).toBe(width);
-
-		expect(shown).toEqual(buttons.map(({ text }) => text));
-	}
+	expect(shown).toEqual(BUTTONS.map(({ text }) => text));
 });
 
 const LONG_TITLE = `Rename the release script and update every workflow that calls it ${"and then some ".repeat(6)}`;
@@ -221,33 +214,35 @@ const ENTRY = {
 	],
 };
 
-test("a list row is one line while its title has room, ends a cut title in an ellipsis that unfolds, and goes under the id when narrow", () => {
-	for (const width of WIDTHS) {
-		const folded = listRows(ENTRY, false, width);
+test.each(WIDTHS)("a folded list row fits width %p and ends a cut title in an ellipsis that unfolds", (width) => {
+	const folded = listRows(ENTRY, false, width);
 
-		for (const row of folded)
-			expect(rowCells(row), String(width)).toBeLessThanOrEqual(width);
+	for (const row of folded) expect(rowCells(row)).toBeLessThanOrEqual(width);
 
-		const cut = folded.flatMap((row) =>
-			row.filter(({ text }) => text.endsWith("…")),
-		);
+	const cut = folded.flatMap((row) =>
+		row.filter(({ text }) => text.endsWith("…")),
+	);
 
-		for (const part of cut)
-			expect(part.press).toEqual({ kind: "fold", id: ENTRY.foldId });
+	for (const part of cut)
+		expect(part.press).toEqual({ kind: "fold", id: ENTRY.foldId });
+});
 
-		const unfolded = listRows(ENTRY, true, width);
+test.each(WIDTHS)("an unfolded list row fits width %p and shows the whole title", (width) => {
+	const unfolded = listRows(ENTRY, true, width);
 
-		for (const row of unfolded)
-			expect(rowCells(row)).toBeLessThanOrEqual(width);
+	for (const row of unfolded) expect(rowCells(row)).toBeLessThanOrEqual(width);
 
-		expect(unfolded.map(textOf).join("")).not.toContain("…");
-		expect(withoutSpaces(unfolded.slice(1).map(textOf).join(""))).toBe(
-			withoutSpaces(LONG_TITLE),
-		);
-	}
+	expect(unfolded.map(textOf).join("")).not.toContain("…");
+	expect(withoutSpaces(unfolded.slice(1).map(textOf).join(""))).toBe(
+		withoutSpaces(LONG_TITLE),
+	);
+});
 
-	expect(listRows(ENTRY, false, 120)).toHaveLength(1);
-	expect(listRows(ENTRY, false, 30)).toHaveLength(2);
+test.each([
+	[120, 1],
+	[30, 2],
+])("a list row at width %p takes %p lines: one while its title has room, the title under the id when narrow", (width, lines) => {
+	expect(listRows(ENTRY, false, width)).toHaveLength(lines);
 });
 
 test("an unclear item carries the word beside its level", () => {
@@ -307,7 +302,7 @@ test("an inline pane opens as tall as its header and first card", () => {
 	expect(openingRows(inputOf(statusRead, 45))).toBe(firstCardEnd);
 });
 
-test("an age is never negative, grows with the clock, and is amber exactly past the limit", () => {
+test("an age is never negative, grows with the clock, and is amber only past the limit", () => {
 	for (const at of [0, 1_000, NOW - 14_000, NOW]) {
 		let previous = -1;
 
@@ -330,9 +325,13 @@ test("an age is never negative, grows with the clock, and is amber exactly past 
 			expect(isAmber(age, AMBER_AFTER)).toBe(age > AMBER_AFTER);
 		}
 	}
+});
 
-	expect(isAmber(15, AMBER_AFTER)).toBe(false);
-	expect(isAmber(16, AMBER_AFTER)).toBe(true);
+test.each([
+	[15, false],
+	[16, true],
+])("an age of %p seconds is amber: %p", (age, amber) => {
+	expect(isAmber(age, AMBER_AFTER)).toBe(amber);
 });
 
 test("an age reads in its two biggest units", () => {

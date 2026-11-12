@@ -8,7 +8,7 @@ import { createActor, waitFor } from "xstate";
 import { kindMachine } from "../src/config/machine.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { labelChanges, matchedSample } from "../src/decide/labels.ts";
-import { isCleared, landingOf, routeOf } from "../src/decide/merge.ts";
+import { isCleared, type Landing, landingOf, routeOf } from "../src/decide/merge.ts";
 import { reviewInput } from "../src/decide/review.ts";
 import { type Change, type Histories, type Label, placeChange, type Policy, usualSize } from "../src/decide/risk.ts";
 import { ruleGlobFor } from "../src/worker/land.ts";
@@ -60,13 +60,21 @@ test("follow-ups past a path's limit raise it one step, and it comes back once t
 	expect(levelOf(change(["ui/a.tsx"]), undefined, labelled("ui/**", ["clean", "clean", "clean", "clean", "fixed", "reverted"]))).toBe("low");
 });
 
-test("a refactor on the critical billing path gets checks, an agent review and the owner's review, and release waits for billing's proof", () => {
+test("a refactor on the critical billing path gets checks, an agent review and the owner's review, and release waits for its kind's proof", () => {
 	const route = routeOf(place(change(["billing/invoice.ts"])), policy().paths, "refactor", ["billing/invoice.ts"]);
 
 	expect(route).toMatchObject({ level: { name: "critical", review: "owner" }, mergesAlone: false, proof: "existing tests pass" });
+});
+
+test("a kind with no proof of its own on a path waits for the path's catch-all proof", () => {
 	expect(routeOf(place(change(["billing/invoice.ts"])), policy().paths, "feature", ["billing/invoice.ts"]).proof).toBe("a day on the canary");
-	expect(landingOf(true, false)).toEqual({ via: "pull-request", autoMerge: false });
-	expect(landingOf(false, false)).toEqual({ via: "wait" });
+});
+
+test.each<[boolean, Landing]>([
+	[true, { via: "pull-request", autoMerge: false }],
+	[false, { via: "wait" }],
+])("an uncleared change where the base needs a pull request (%p) lands by %j", (needsPull, landing) => {
+	expect(landingOf(needsPull, false)).toEqual(landing);
 });
 
 test("a change touching docs and billing takes billing's level", () => {
@@ -91,7 +99,7 @@ test("a launch raises a path between its dates or while the base matches, and on
 });
 
 
-test("a change touching a folder no rule places is unclear at the level of the rest, never merges alone, and its rule names the folder", () => {
+test("a change touching a folder no rule places is unclear at the level of the rest, and only the owner clears it", () => {
 	const placed = place(change(["docs/a.md", "tools/gen/x.ts"]));
 	const route = routeOf(placed, policy().paths, "feature", ["docs/a.md", "tools/gen/x.ts"]);
 
@@ -99,7 +107,16 @@ test("a change touching a folder no rule places is unclear at the level of the r
 	expect(route).toMatchObject({ level: { name: "low" }, unclear: [{ cause: "paths", paths: ["tools/gen/x.ts"] }], mergesAlone: false });
 	expect(isCleared(route, { review: true, owner: false })).toBe(false);
 	expect(isCleared(route, { review: false, owner: true })).toBe(true);
-	expect([ruleGlobFor("tools/gen/x.ts"), ruleGlobFor("README.md")]).toEqual(["tools/gen/**", "README.md"]);
+});
+
+test.each([
+	["tools/gen/x.ts", "tools/gen/**"],
+	["README.md", "README.md"],
+])("the rule for an unplaced %s names %s", (path, glob) => {
+	expect(ruleGlobFor(path)).toBe(glob);
+});
+
+test("a change made only of unplaced paths takes the lowest level", () => {
 	expect(levelOf(change(["only/new.ts"]))).toBe("low");
 });
 
@@ -116,38 +133,55 @@ test("an urgent security fix on a critical path runs the hotfix kind's own state
 	expect(routeOf(place(change(["billing/tax.ts"])), policy().paths, "hotfix", ["billing/tax.ts"]).mergesAlone).toBe(false);
 });
 
-test("hum's own config, the owner's adapters, workflows, hooks and the engine pin take the strictest level", () => {
-	for (const path of [".hum/hum.json", "adapters/linear.ts", ".github/workflows/ci.yml", ".husky/pre-push"]) {
-		expect(place(change(["docs/a.md", path])).steps, path).toContainEqual({ step: "own-config", path });
-	}
+test.each([".hum/hum.json", "adapters/linear.ts", ".github/workflows/ci.yml", ".husky/pre-push"])("hum's own config, the owner's adapters, workflows and hooks take the strictest level: %s", (path) => {
+	expect(place(change(["docs/a.md", path])).steps).toContainEqual({ step: "own-config", path });
+});
 
+test("a change to the engine pin takes the strictest level, and one to package.json alone does not", () => {
 	expect(place(change(["docs/a.md", "package.json"], { pinChanged: true })).steps).toContainEqual({ step: "engine-pin" });
 	expect(levelOf(change(["docs/a.md", "package.json"]))).toBe("low");
 });
 
-test("a change above its path's usual size goes one step up; a path with too few changes has no range", () => {
-	const sizes = Array.from({ length: 20 }, (_, i) => i + 1);
-	const usual = usualSize(sizes, config.hum.sizeRange);
+const TWENTY_SIZES = Array.from({ length: 20 }, (_, i) => i + 1);
 
-	expect(usual).toBeCloseTo(18.1, 1);
-	expect(usualSize(sizes.slice(1), config.hum.sizeRange)).toBeUndefined();
-	expect(levelOf(change(["docs/a.md"], { size: 19 }), undefined, new Map([["docs/**", { sizes, labels: [] }]]))).toBe("medium");
-	expect(levelOf(change(["docs/a.md"], { size: 18 }), undefined, new Map([["docs/**", { sizes, labels: [] }]]))).toBe("low");
+test("a path's usual size is the top of its range, and a path with too few changes has no range", () => {
+	expect(usualSize(TWENTY_SIZES, config.hum.sizeRange)).toBeCloseTo(18.1, 1);
+	expect(usualSize(TWENTY_SIZES.slice(1), config.hum.sizeRange)).toBeUndefined();
+});
+
+test.each([
+	[19, "medium"],
+	[18, "low"],
+])("a change of size %p on a path whose usual size is 18.1 is %s", (size, level) => {
+	expect(levelOf(change(["docs/a.md"], { size }), undefined, new Map([["docs/**", { sizes: TWENTY_SIZES, labels: [] }]]))).toBe(level);
+});
+
+test("a change that loosens a check goes one step up", () => {
 	expect(levelOf(change(["docs/a.md"], { loosened: true }))).toBe("medium");
 });
 
 const diff = (file: string, lines: string[]) => [`diff --git a/${file} b/${file}`, `--- a/${file}`, `+++ b/${file}`, `@@ -1,${lines.length} +1,${lines.length} @@`, ...lines, ""].join("\n");
 
-test("a diff loosens a check by an added skip or lint disable, or a removed test, and changes the pin only on a line naming the engine", () => {
-	const facts = (text: string) => changeOf(text, config.hum);
+const facts = (text: string) => changeOf(text, config.hum);
 
-	expect(facts(diff("src/a.test.ts", ["+test.skip(\"x\", () => {});"])).loosened).toBe(true);
-	expect(facts(diff("src/a.ts", ["+// oxlint-disable-next-line no-console"])).loosened).toBe(true);
-	expect(facts(diff("src/a.test.ts", ["-test(\"x\", () => {});"])).loosened).toBe(true);
-	expect(facts(diff("src/a.ts", ["+const skipped = 1;"])).loosened).toBe(false);
-	expect(facts(diff("package.json", ["-\t\t\"@moo.md/hum\": \"0.1.0\",", "+\t\t\"@moo.md/hum\": \"0.2.0\","])).pinChanged).toBe(true);
-	expect(facts(diff("package.json", ["-\t\t\"zod\": \"4.0.0\",", "+\t\t\"zod\": \"4.1.0\","])).pinChanged).toBe(false);
-	expect(facts(diff("bun.lock", ["+\t\t\"@moo.md/hum\": [\"@moo.md/hum@0.2.0\"],"])).pinChanged).toBe(true);
+test.each([
+	["an added skip", diff("src/a.test.ts", ["+test.skip(\"x\", () => {});"]), true],
+	["an added lint disable", diff("src/a.ts", ["+// oxlint-disable-next-line no-console"]), true],
+	["a removed test", diff("src/a.test.ts", ["-test(\"x\", () => {});"]), true],
+	["a name that holds skip", diff("src/a.ts", ["+const skipped = 1;"]), false],
+])("a diff with %s loosens a check: %p", (_, text, loosened) => {
+	expect(facts(text).loosened).toBe(loosened);
+});
+
+test.each([
+	["the engine's version in package.json", diff("package.json", ["-\t\t\"@moo.md/hum\": \"0.1.0\",", "+\t\t\"@moo.md/hum\": \"0.2.0\","]), true],
+	["another package's version", diff("package.json", ["-\t\t\"zod\": \"4.0.0\",", "+\t\t\"zod\": \"4.1.0\","]), false],
+	["the engine's line in bun.lock", diff("bun.lock", ["+\t\t\"@moo.md/hum\": [\"@moo.md/hum@0.2.0\"],"]), true],
+])("a diff of %s changes the pin: %p", (_, text, pinChanged) => {
+	expect(facts(text).pinChanged).toBe(pinChanged);
+});
+
+test("a diff's paths and size are its files and changed lines", () => {
 	expect(facts(diff("docs/a.md", ["+one", "-two"]))).toMatchObject({ paths: ["docs/a.md"], size: 2 });
 });
 
