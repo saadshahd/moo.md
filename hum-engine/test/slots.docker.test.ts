@@ -111,15 +111,17 @@ test.skipIf(!dockerUp)("on one shared set of services each slot gets its own dat
 	);
 
 	const rowsOf = async (taken: typeof first) => (await psql(taken.env.HUM_SLOT_DATABASE ?? "", "select v from marker")).stdout.trim();
+	const slotOf = (taken: typeof first): string => taken.env.HUM_SLOT ?? "";
 
 	expect(first.env.HUM_SLOT_DATABASE).not.toBe(second.env.HUM_SLOT_DATABASE);
-	expect(await rowsOf(first)).toBe("slot-1");
-	expect(await rowsOf(second)).toBe("slot-2");
-	expect(Object.values(first.env).join(" ")).not.toContain("slot-2");
+	expect([slotOf(first), slotOf(second)].sort()).toEqual(["slot-1", "slot-2"]);
+	expect(await rowsOf(first)).toBe(slotOf(first));
+	expect(await rowsOf(second)).toBe(slotOf(second));
+	expect(Object.values(first.env).join(" ")).not.toContain(slotOf(second));
 
 	await first.giveBack();
 	await w.slots.idle();
 
 	expect((await psql(first.env.HUM_SLOT_DATABASE ?? "", "select v from marker")).exitCode).not.toBe(0);
-	expect(await rowsOf(second)).toBe("slot-2");
+	expect(await rowsOf(second)).toBe(slotOf(second));
 }, 120_000);
