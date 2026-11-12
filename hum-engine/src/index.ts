@@ -199,4 +199,3 @@ export { SLOT_ENV, slotEnv } from "./slots/env.ts";
 
 export { type PoolOptions, SLOT_KEPT_CODE, SLOT_MAINTENANCE_CODE, SLOT_OUT_CODE, SlotPool } from "./slots/pool.ts";
 
-export { proposeRecipe } from "./slots/scan.ts";

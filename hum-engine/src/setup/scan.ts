@@ -7,11 +7,11 @@ import { readHistory } from "../adapters/history.ts";
 import { SHIPPED_DEFAULTS } from "../config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { orMissing } from "../state/fs.ts";
-import { ENV_SCRIPTS } from "../slots/scan.ts";
 import {
 	CODEOWNERS_FILES,
 	COMPOSE_FILES,
 	ENV_EXAMPLE_FILES,
+	ENV_SCRIPTS,
 	ENV_TOOLING_FILES,
 	ISSUE_TEMPLATE_FOLDER,
 	LOCKFILES,

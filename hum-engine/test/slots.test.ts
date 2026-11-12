@@ -1,11 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { x } from "tinyexec";
 import { gitIn } from "../src/adapters/git.ts";
 import { slotFolder } from "../src/slots/env.ts";
 import { SLOT_KEPT_CODE, SLOT_OUT_CODE } from "../src/slots/pool.ts";
-import { proposeRecipe } from "../src/slots/scan.ts";
 import type { Slot } from "../src/state/saved.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
@@ -194,26 +193,4 @@ test("a slot made by git clone is refused, and the other slots go on", async () 
 	expect(statuses(w)).toEqual(["free", "out"]);
 	expect(card?.cause).toContain("not a git worktree");
 	expect(card?.cause).toContain(clone);
-});
-
-test("a repo's own environment script is the recipe's prepare, and a repo without one gets an empty recipe", async () => {
-	const bare = world({ runners: 1 });
-
-	expect(proposeRecipe(bare.repo.owner)).toEqual({ prepare: [], refresh: [], ready: [] });
-
-	const owned = world({
-		runners: 1,
-		seed: (repo) => {
-			const owner = repo.owner;
-
-			mkdirSync(join(owner, "scripts"), { recursive: true });
-			writeFileSync(join(owner, "scripts", "env.sh"), '#!/bin/sh\ntouch "$HUM_SLOT_FOLDER/prepared-by-env-script"\n');
-			chmodSync(join(owner, "scripts", "env.sh"), 0o755);
-			repo.commit("env script");
-			sh(owner, ["push", "-q", "origin", "main"]);
-		},
-		recipe: proposeRecipe,
-	});
-
-	expect(await Bun.file(join((await owned.ask("a")).folder, "prepared-by-env-script")).exists()).toBe(true);
 });

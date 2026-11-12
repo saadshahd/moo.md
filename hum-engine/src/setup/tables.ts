@@ -43,6 +43,9 @@ export const NOT_A_CHECK = /^(echo|export|cd|mkdir|cp|mv|rm|curl|wget|sudo|gh|gi
 /** The files that hold a repo's tool versions. */
 export const TOOL_VERSION_FILES = [".tool-versions", ".nvmrc", ".node-version", ".bun-version", ".python-version", "mise.toml", ".mise.toml", "rust-toolchain.toml", ".go-version"] as const;
 
+/** Where owners keep a script that sets up a working environment, in the order a repo's own convention is preferred. */
+export const ENV_SCRIPTS = ["bin/setup", "script/setup", "scripts/setup", "scripts/setup.sh", "bin/env", "scripts/env", "scripts/env.sh"] as const;
+
 export const ENV_EXAMPLE_FILES = [".env.example", ".env.sample", ".env.template"] as const;
 
 /** The owner's own environment tooling: a recipe calls it and rebuilds nothing. */

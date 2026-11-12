@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
@@ -87,6 +87,14 @@ test("a scan skips a workflow, compose or issue-template file that is not YAML a
 	expect(scan.ci.map(({ file }) => file)).toEqual(["ci.yml"]);
 	expect(scan.composeServices).toEqual([]);
 	expect(scan.issueTemplates.map(({ file }) => file)).toEqual(["bug.yml"]);
+});
+
+test("a repo's own executable environment script is the slot recipe's prepare and refresh", async () => {
+	const repo = repoWith({ ...PROJECT, "scripts/env.sh": "#!/bin/sh\n" });
+
+	chmodSync(join(repo, "scripts", "env.sh"), 0o755);
+
+	expect(proposeSetup(await scanRepo(repo, "main"), shipped.hum).runSlots.recipe).toMatchObject({ prepare: ["./scripts/env.sh"], refresh: [{ run: "./scripts/env.sh", when: "lockfile-changed" }] });
 });
 
 test("a migration proposes a strict glob, and source and markdown get their own levels", async () => {
