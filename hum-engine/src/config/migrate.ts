@@ -22,10 +22,10 @@ export const climb = <T extends object>(value: T, from: number, to: number, step
 export type Migrations = Steps<ConfigJson>;
 
 /** One entry per earlier schema version. Setup climbs the owner's answers, a part of a config, through the same steps, so a step rewrites only the keys it finds. */
-export const MIGRATIONS: Migrations = {
+export const MIGRATIONS = {
 	/** 2 holds the pull request token as one of its sources: the secret 1 named becomes `{ from: "secret", secret }`. */
 	1: ({ pullRequestTokenSecret, ...config }) => (pullRequestTokenSecret === undefined ? config : { ...config, pullRequestToken: { from: "secret", secret: pullRequestTokenSecret } }),
-};
+} satisfies Migrations;
 
 const Raw = z.record(z.string(), Json);
 const Version = z.int();
