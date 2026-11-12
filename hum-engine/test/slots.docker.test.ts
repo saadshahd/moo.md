@@ -12,9 +12,13 @@ const dockerUp = await x("docker", ["info"]).then(
 
 if (!dockerUp) console.log("skip run-slot service tests: docker is not running");
 
-const PREFIX = "humslot";
-const SHARED_SERVER = "humslot-shared-pg";
-const PORTS = { base: 38600, stride: 10 };
+/** Suites that run at once on one docker share its names and host ports, so each run takes its own from its pid. */
+const RUN = process.pid;
+const PREFIX = `humslot${RUN}`;
+const SHARED_SERVER = `${PREFIX}-shared-pg`;
+const PORT_BLOCKS = 1000;
+const PORTS_PER_RUN = 20;
+const PORTS = { base: 20000 + (RUN % PORT_BLOCKS) * PORTS_PER_RUN, stride: 10 };
 const SERVER_WAIT_MS = 500;
 const SERVER_TRIES = 60;
 
@@ -39,7 +43,7 @@ afterEach(async () => {
 const composeProjects = async (): Promise<string[]> => {
 	const { stdout } = await docker(["ps", "--filter", `label=com.docker.compose.project`, "--format", '{{.Label "com.docker.compose.project"}}']);
 
-	return [...new Set(stdout.split("\n").filter((name) => name.startsWith(PREFIX)))].sort();
+	return [...new Set(stdout.split("\n").filter((name) => name.startsWith(`${PREFIX}-`)))].sort();
 };
 
 const COMPOSE = "services:\n  cache:\n    image: redis:7-alpine\n    ports:\n      - '127.0.0.1:${HUM_SLOT_PORT_BASE}:6379'\n";
