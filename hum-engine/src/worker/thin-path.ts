@@ -267,8 +267,9 @@ export type Checkedout = {
 };
 
 /**
- * Gives an item's pass its working copy, with the base branch's files. A background run starts only in a repo the
- * owner trusts, which a fresh clone is not; a slot is a worktree of the owner's checkout.
+ * Gives an item's pass its working copy, with the base branch's files and `origin/<base>`, where a restarted run
+ * branch starts. A background run starts only in a repo the owner trusts, which a fresh clone is not; a slot is a
+ * worktree of the owner's checkout.
  */
 export type Checkout = (request: CheckoutRequest) => Promise<Checkedout>;
 
