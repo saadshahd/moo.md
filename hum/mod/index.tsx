@@ -34,6 +34,9 @@ const pressed = ($: EngineInterface, context: PressContext) => async (press: Pre
 			break;
 		case "open":
 			await openPane($, PANE, context);
+			break;
+		default:
+			return press satisfies never;
 	}
 };
 

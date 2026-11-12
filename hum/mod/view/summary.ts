@@ -44,7 +44,10 @@ export const problemWords = (read: ViewRead): string | undefined => {
 			return `The status file cannot be read: ${read.message}`;
 		case "unsupported":
 			return `The status file is format ${read.format}; this view reads another. Update the plugin or the engine so they match.`;
-		default:
+		case "waiting":
+		case "status":
 			return undefined;
+		default:
+			return read satisfies never;
 	}
 };
