@@ -240,7 +240,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	try {
 		await onRunBranch(git, { branch, restartAt: isFresh ? `origin/${base}` : undefined });
 
-		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, env, g, git, answered, resume: asking };
+		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, env, g, git, answered, resume: asking, restarted: isFresh };
 
 		// A change already finished lands again from its pushed branch; no run is spent on it.
 		const result = park(o, landing ? await landAgain(driven) : await drive(driven));
@@ -322,6 +322,8 @@ type Driven = ThinPathOptions & {
 	readonly answered: Answered | undefined;
 	/** Restore the saved owner-wait snapshot instead of starting the machine. */
 	readonly resume: boolean;
+	/** The run branch starts again at the base: earlier work on the item, and the plan written for it, are gone. */
+	readonly restarted: boolean;
 };
 
 const drive = async (d: Driven): Promise<ThinResult> => {
@@ -379,11 +381,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
 
 		if (d.answered) {
-			const diff = await branchDiff();
+			const soFar = d.restarted
+				? `## The branch so far\nIt starts again at origin/${base}: the earlier work on this item was discarded, and no file it made is here.`
+				: `## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${(await branchDiff()).slice(0, config.hum.diffLimit)}`;
 
-			parts.push(
-				`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n## The plan so far\n${d.answered.plan || "(none saved)"}\n\n## The branch so far\n${diff.slice(0, config.hum.diffLimit)}`,
-			);
+			parts.push(`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n${soFar}`);
 		}
 
 		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause and commit.`);

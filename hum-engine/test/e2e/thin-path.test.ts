@@ -517,7 +517,8 @@ test("a docs item whose change touches code moves to its real kind and runs agai
 test("an item whose run asked and pushed its branch, then moved to the kind the owner named, runs again from the base", async () => {
 	const judge = scriptedJudge({ alignment: SOUND });
 	const asking = { commit: { "docs/part-one.md": "one\n" }, structured: { status: "needs-owner", question: "Which title?", plan: "Write two parts." } };
-	const w = await world({ script: [{}, asking, NOTE], decisions: [READY_PLAN] });
+	const restartStdin = stdinFile();
+	const w = await world({ script: [{}, asking, { ...NOTE, saveStdin: restartStdin }], decisions: [READY_PLAN] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge }))).toEqual({ outcome: "asked", item: id, detail: "Which title?" });
@@ -529,6 +530,12 @@ test("an item whose run asked and pushed its branch, then moved to the kind the 
 	expect(await runThinPath(w.thinPath({ judge, itemId: id }))).toEqual({ outcome: "moved", item: id, kind: "docs" });
 	expect(await runThinPath(w.thinPath({ judge, itemId: id }))).toEqual({ outcome: "merged", item: id });
 	expect(sh(w.repo.remote, ["ls-tree", "--name-only", "main", "docs/"])).toBe("docs/note.md\n");
+
+	const stdin = readFileSync(restartStdin, "utf8");
+
+	expect(stdin).toContain("Question: Which title?\nAnswer: docs: docs");
+	expect(stdin).toContain("## The branch so far\nIt starts again at origin/main: the earlier work on this item was discarded, and no file it made is here.");
+	expect(stdin).not.toContain("Write two parts.");
 });
 
 test("the alignment grade times out: the change is unclear and waits for the owner's review at its level, with no question", async () => {
