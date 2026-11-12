@@ -46,16 +46,46 @@ const EXPORTED_TYPE_FILES = ["src/index.ts"];
 
 const SURFACE_FILES = [...ADAPTER_API_FILES, ...SAVED_STATE_FILES, ...EXPORTED_TYPE_FILES];
 
-const TYPE_FLAGS = ts.TypeFormatFlags.NoTruncation;
+const NODE_FLAGS = ts.NodeBuilderFlags.NoTruncation | ts.NodeBuilderFlags.IgnoreErrors;
 
 const TYPE_ONLY_SYMBOLS = ts.SymbolFlags.Interface | ts.SymbolFlags.TypeAlias;
 
 const printer = ts.createPrinter({ removeComments: true });
 
+const PRINTED_IN = ts.createSourceFile("surface.ts", "", ts.ScriptTarget.Latest);
+
+const printed = (node: ts.Node): string => printer.printNode(ts.EmitHint.Unspecified, node, PRINTED_IN);
+
+/** By code unit, never by locale, so every machine sorts alike. */
+const byPrintedText = (a: ts.TypeNode, b: ts.TypeNode): number => {
+	const [first, second] = [printed(a), printed(b)];
+
+	return first < second ? -1 : first > second ? 1 : 0;
+};
+
+/** The compiler orders a union's members by when it first met each one, which an unrelated edit can change; sorted at every depth, the text changes only with the members. */
+const sortUnions = (context: ts.TransformationContext) => {
+	const visit = (node: ts.Node): ts.Node => {
+		const visited = ts.visitEachChild(node, visit, context);
+
+		return ts.isUnionTypeNode(visited) ? context.factory.updateUnionTypeNode(visited, context.factory.createNodeArray(visited.types.toSorted(byPrintedText))) : visited;
+	};
+
+	return visit;
+};
+
+const stableText = (node: ts.Node | undefined): string => {
+	if (!node) throw new Error("the compiler could not write a surface type out");
+
+	return printed(ts.transform(node, [sortUnions]).transformed[0] ?? node);
+};
+
+const stableTypeText = (checker: ts.TypeChecker, type: ts.Type, flags = ts.NodeBuilderFlags.None): string => stableText(checker.typeToTypeNode(type, undefined, NODE_FLAGS | flags));
+
 /** Machines differ in where the package sits, and type text names files by absolute path. */
 const withoutRoot = (text: string): string => text.replaceAll(`${PACKAGE_ROOT}/`, "");
 
-const programOf = (files: readonly string[]): ts.Program => {
+export const programOf = (files: readonly string[]): ts.Program => {
 	const configPath = resolve(PACKAGE_ROOT, "tsconfig.json");
 	const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
 	const options = ts.parseJsonConfigFileContent(config, ts.sys, PACKAGE_ROOT).options;
@@ -65,9 +95,9 @@ const programOf = (files: readonly string[]): ts.Program => {
 
 const typeText = (checker: ts.TypeChecker, symbol: ts.Symbol): string => {
 	const type = checker.getTypeOfSymbol(symbol);
-	const construct = checker.getSignaturesOfType(type, ts.SignatureKind.Construct).map((signature) => `new ${checker.signatureToString(signature)}`);
+	const construct = checker.getSignaturesOfType(type, ts.SignatureKind.Construct).map((signature) => stableText(checker.signatureToSignatureDeclaration(signature, ts.SyntaxKind.ConstructorType, undefined, NODE_FLAGS)));
 
-	return [checker.typeToString(type, undefined, TYPE_FLAGS), ...construct].join("; ");
+	return [stableTypeText(checker, type), ...construct].join("; ");
 };
 
 const isTypeDeclaration = (declaration: ts.Declaration): boolean => ts.isInterfaceDeclaration(declaration) || ts.isTypeAliasDeclaration(declaration);
@@ -75,12 +105,9 @@ const isTypeDeclaration = (declaration: ts.Declaration): boolean => ts.isInterfa
 const declarationText = (symbol: ts.Symbol): string =>
 	(symbol.declarations ?? []).filter(isTypeDeclaration).map((declaration) => printer.printNode(ts.EmitHint.Unspecified, declaration, declaration.getSourceFile())).join("\n");
 
-/** The compiler orders a union's members by when it first met each one, which an unrelated edit can change; sorted, the text changes only with the members. */
-const expandedText = (checker: ts.TypeChecker, type: ts.Type): string =>
-	type.isUnion() ? type.types.map((member) => checker.typeToString(member, undefined, TYPE_FLAGS)).toSorted().join(" | ") : checker.typeToString(type, undefined, TYPE_FLAGS | ts.TypeFormatFlags.InTypeAlias);
-
 /** What a type alias points at, written out, so a change to its target shows even where the alias's own text stays. */
-const aliasTarget = (checker: ts.TypeChecker, symbol: ts.Symbol): string => (symbol.flags & ts.SymbolFlags.TypeAlias ? `= ${expandedText(checker, checker.getDeclaredTypeOfSymbol(symbol))}` : "");
+const aliasTarget = (checker: ts.TypeChecker, symbol: ts.Symbol): string =>
+	symbol.flags & ts.SymbolFlags.TypeAlias ? `= ${stableTypeText(checker, checker.getDeclaredTypeOfSymbol(symbol), ts.NodeBuilderFlags.InTypeAlias)}` : "";
 
 const HIDDEN_MODIFIERS = ts.ModifierFlags.Private | ts.ModifierFlags.Protected;
 
@@ -94,13 +121,13 @@ const membersText = (checker: ts.TypeChecker, type: ts.Type, prefix: string): st
 	checker
 		.getPropertiesOfType(type)
 		.filter((member) => member.name !== PROTOTYPE && isPublicMember(member))
-		.map((member) => `${prefix}${member.name}: ${checker.typeToString(checker.getTypeOfSymbol(member), undefined, TYPE_FLAGS)}`);
+		.map((member) => `${prefix}${member.name}: ${stableTypeText(checker, checker.getTypeOfSymbol(member))}`);
 
 /** A class's public members, static and instance, so a change to a method's signature shows as a change to the class. */
 const classMembers = (checker: ts.TypeChecker, symbol: ts.Symbol): string =>
 	symbol.flags & ts.SymbolFlags.Class ? [...membersText(checker, checker.getTypeOfSymbol(symbol), "static "), ...membersText(checker, checker.getDeclaredTypeOfSymbol(symbol), "")].join("; ") : "";
 
-const compilerType = (checker: ts.TypeChecker, exported: ts.Symbol): string => {
+export const compilerType = (checker: ts.TypeChecker, exported: ts.Symbol): string => {
 	const symbol = exported.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(exported) : exported;
 	const typePart = symbol.flags & TYPE_ONLY_SYMBOLS ? declarationText(symbol) : "";
 	const valuePart = symbol.flags & ts.SymbolFlags.Value ? typeText(checker, symbol) : "";

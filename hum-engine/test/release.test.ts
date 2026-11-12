@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
 import { type Baseline, checkBump, PLACEHOLDER_VERSION } from "../tools/release/compare.ts";
-import { extractSurface, type Surface } from "../tools/release/surface.ts";
+import { compilerType, extractSurface, programOf, type Surface } from "../tools/release/surface.ts";
+import { tempDir } from "./fixtures/temp.ts";
 
 const REPO_ROOT = join(import.meta.dir, "../..");
 
@@ -109,6 +111,19 @@ test("the surface shows a class's public method signatures and what a type alias
 	expect(symbols?.Faults?.type).toContain("clear: (");
 	expect(symbols?.Faults?.type).not.toContain("#");
 	expect(symbols?.Slot?.type).toContain('"work-source"');
+});
+
+test("the surface prints a union's members sorted at every depth, where the compiler orders them by when it first met each", () => {
+	const file = join(tempDir("surface"), "unions.ts");
+
+	writeFileSync(file, 'export const pick = (k: "b" | "a"): { readonly k: "b" | "a" } => ({ k });\n');
+
+	const program = programOf([file]);
+	const checker = program.getTypeChecker();
+	const source = program.getSourceFile(file);
+	const pick = checker.getExportsOfModule(checker.getSymbolAtLocation(source!)!).find(({ name }) => name === "pick");
+
+	expect(compilerType(checker, pick!)).toBe('(k: "a" | "b") => { readonly k: "a" | "b"; }');
 });
 
 test("the engine's lockfile resolves one xstate, so an owner's install holds one", async () => {
