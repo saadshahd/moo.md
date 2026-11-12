@@ -1,6 +1,25 @@
 import { readFileSync } from "node:fs";
+import { ADAPTER_API_VERSION } from "../adapter-api.ts";
+import { SCHEMA_VERSION } from "../config/schema.ts";
 import { atomicWrite, isMissing, orMissing } from "../state/fs.ts";
-import { emptyStatus, Heartbeat, Status } from "./format.ts";
+import { Heartbeat, Status, STATUS_FORMAT } from "./format.ts";
+
+/** A status with nothing in it, stamped with the engine that wrote it. */
+export const emptyStatus = (engineVersion: string, writtenAt: number): Status => ({
+	format: STATUS_FORMAT,
+	writtenAt,
+	workers: {},
+	engine: { version: engineVersion, adapterApi: ADAPTER_API_VERSION, configSchema: SCHEMA_VERSION },
+	questions: [],
+	cards: [],
+	inFlight: [],
+	merged: [],
+	choices: [],
+	rules: [],
+	possibleRepeats: [],
+	unusedMemory: [],
+	measure: null,
+});
 
 export type StatusRead =
 	| { readonly ok: true; readonly status: Status }
