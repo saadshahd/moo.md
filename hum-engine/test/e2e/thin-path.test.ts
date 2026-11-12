@@ -142,14 +142,27 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(w.repo.show(id)).toContain("state: done");
 });
 
-test("a merge that keeps losing the race to the base stops after mergeTries pushes", async () => {
+test("a merge that keeps losing the race to the base stops after mergeTries pushes, with one card while it stays held, gone once it lands", async () => {
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => (raw.hum.mergeTries = 2)) });
-
-	w.repo.seed("Write the note");
+	const id = w.repo.seed("Write the note");
 	const refused = w.repo.refusePushes();
 
 	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "held", why: "another push moved main first" });
 	expect(refused()).toBe(2);
+
+	const cards = w.state.faults.list();
+
+	expect(cards).toEqual([expect.objectContaining({ item: id, cause: expect.stringContaining("main") })]);
+
+	w.clock.at += 1;
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held" });
+	expect(w.state.faults.list()).toEqual(cards);
+
+	w.repo.allowPushes();
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "merged", item: id });
+	expect(w.state.faults.list()).toEqual([]);
 });
 
 test("a base the remote refuses off GitHub ends the item stuck, in the remote's own words", async () => {
