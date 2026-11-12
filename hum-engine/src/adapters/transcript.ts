@@ -72,13 +72,18 @@ const parseRow = (line: string): Row | undefined => {
 };
 
 const readRow = (t: RunTranscript, row: Row | undefined): RunTranscript => {
-	if (row?.kind === "limit") return { ...t, limit: { resetsAt: row.resetsAt, text: row.text } };
-
-	if (row?.kind === "api-error") return { ...t, apiError: row.error };
-
-	if (row?.kind === "message") return { ...t, messages: { ...t.messages, [row.id]: row.spent } };
-
-	return row?.kind === "structured" ? { ...t, structured: { data: row.data, at: row.at } } : t;
+	switch (row?.kind) {
+		case undefined:
+			return t;
+		case "limit":
+			return { ...t, limit: { resetsAt: row.resetsAt, text: row.text } };
+		case "api-error":
+			return { ...t, apiError: row.error };
+		case "message":
+			return { ...t, messages: { ...t.messages, [row.id]: row.spent } };
+		case "structured":
+			return { ...t, structured: { data: row.data, at: row.at } };
+	}
 };
 
 const EMPTY: RunTranscript = { messages: {}, structured: undefined, apiError: undefined, limit: undefined };

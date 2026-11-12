@@ -80,7 +80,7 @@ const rewrittenRanges = (
 		}),
 	);
 
-/** The changes that wrote the lines `sha` deleted or rewrote: git blame at its parent. */
+/** The changes that wrote the lines `sha` deleted or rewrote: git blame at its parent. A root commit deletes nothing, so it blames nothing; a blame git fails throws. */
 const blame = async (git: Git, sha: string): Promise<readonly string[]> => {
 	const diff = await git.raw([
 		"show",
@@ -93,7 +93,7 @@ const blame = async (git: Git, sha: string): Promise<readonly string[]> => {
 
 	const found = await Promise.all(
 		rewrittenRanges(diff).map(async ({ file, from, to }) => {
-			const result = await git.run([
+			const blamed = await git.raw([
 				"blame",
 				"--porcelain",
 				"-L",
@@ -103,11 +103,7 @@ const blame = async (git: Git, sha: string): Promise<readonly string[]> => {
 				file,
 			]);
 
-			return result.code === 0
-				? result.stdout
-						.split("\n")
-						.flatMap((line) => BLAME_HEADER.exec(line)?.[1] ?? [])
-				: [];
+			return blamed.split("\n").flatMap((line) => BLAME_HEADER.exec(line)?.[1] ?? []);
 		}),
 	);
 

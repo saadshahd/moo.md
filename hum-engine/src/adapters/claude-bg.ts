@@ -259,6 +259,22 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 		return undefined;
 	};
 
+	/** The outcome a reading ends the run with, or `waiting` while it goes on. */
+	const endOf = (progress: Progress, sessionId: string, reading: Reading): RunOutcome | "waiting" => {
+		switch (progress.kind) {
+			case "waiting":
+				return "waiting";
+			case "over-cap":
+				return progress;
+			case "limit":
+				return settleLimit(state, progress.ended);
+			case "done":
+				return finishedOf(sessionId, reading, succeededWith(progress.structured));
+			case "failed":
+				return finishedOf(sessionId, reading, failedWith(progress.why));
+		}
+	};
+
 	const watch = async (request: RunRequest, id: string, sessionId: string): Promise<RunOutcome> => {
 		let announced = false;
 
@@ -272,15 +288,9 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 				request.onFirstToken?.();
 			}
 
-			const progress = progressOf(reading, request.tokenCap);
+			const ended = endOf(progressOf(reading, request.tokenCap), sessionId, reading);
 
-			if (progress.kind === "over-cap") return progress;
-
-			if (progress.kind === "limit") return settleLimit(state, progress.ended);
-
-			if (progress.kind === "done") return finishedOf(sessionId, reading, succeededWith(progress.structured));
-
-			if (progress.kind === "failed") return finishedOf(sessionId, reading, failedWith(progress.why));
+			if (ended !== "waiting") return ended;
 
 			await Bun.sleep(pollMs);
 		}

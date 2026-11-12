@@ -188,7 +188,8 @@ test("the sample is every broken change plus, for each, the clean change on the 
 	expect(matchedSample([broken, near, far, elsewhere], labels).map(({ sha }) => sha[0])).toEqual(["a", "b"]);
 });
 
-test("git history: a fix commit carries the commits whose lines it rewrote, and the path's history labels them", async () => {
+/** A repo whose second commit is a fix that rewrites a line the first wrote. */
+const withFixHistory = async (use: (repo: string) => Promise<void>): Promise<void> => {
 	const repo = mkdtempSync(join(tmpdir(), "hum-history-"));
 
 	try {
@@ -198,17 +199,30 @@ test("git history: a fix commit carries the commits whose lines it rewrote, and 
 		sh(repo, ["commit", "-q", "-m", "feat: a"]);
 		writeFileSync(join(repo, "a.ts"), "one\nTWO\nthree\n");
 		sh(repo, ["commit", "-q", "-am", "fix: two"]);
+		await use(repo);
+	} finally {
+		rmSync(repo, { recursive: true, force: true });
+	}
+};
 
+test("git history: a fix commit carries the commits whose lines it rewrote, and the path's history labels them", () =>
+	withFixHistory(async (repo) => {
 		const changes = await readHistory(gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), "main", config.hum);
 		const [first, fix] = changes;
 		const histories = historiesOf(changes, { paths: [{ glob: "*.ts", level: "low" }], changeLabels: config.hum.changeLabels });
 
 		expect(fix?.blamed).toEqual([first?.sha ?? ""]);
 		expect(histories.get("*.ts")).toEqual({ sizes: [2, 3], labels: ["clean", "fixed"] });
-	} finally {
-		rmSync(repo, { recursive: true, force: true });
-	}
-});
+	}));
+
+test("git history: a blame git fails throws, so a fix never reads as rewriting nothing", () =>
+	withFixHistory(async (repo) => {
+		const real = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+		const blameMissing = (args: readonly string[]) => (args[0] === "blame" ? [...args.slice(0, -1), "missing.ts"] : args);
+		const git = { run: (args: readonly string[], input?: string) => real.run(blameMissing(args), input), raw: (args: readonly string[], input?: string) => real.raw(blameMissing(args), input) };
+
+		await expect(readHistory(git, "main", config.hum)).rejects.toThrow("missing.ts");
+	}));
 
 test("a fresh review run reads the item and the diff, and none of the author's plan or answers", () => {
 	const item = { id: "7", title: "Add a button", body: "A blue one.", ready: true, thread: [{ kind: "comment" as const, text: "hum plan:\nuse the red theme", at: NOW }] };

@@ -18,6 +18,9 @@ const ITEM_EXTENSION = ".md";
 const BASE_REF = "refs/hum/base";
 const CLAIMS_REF = "refs/hum/claims";
 const NO_BASE_TOKEN = "none";
+
+/** The remote the adapter fetches from and pushes to. */
+const REMOTE = "origin";
 const WRITE_RACE_BACKOFF_MS = 50;
 const FOLLOW_UP_SLUG_LENGTH = 40;
 
@@ -30,7 +33,6 @@ export type MarkdownOptions = {
 	readonly itemsDir: string;
 	/** The author and committer of the commits the adapter makes. */
 	readonly identity: GitIdentity;
-	readonly remote?: string;
 	/** Retries of a write that another writer's push beat. */
 	readonly writeRaceRetries: number;
 	/** Item files read at once; each read is a git process. */
@@ -79,7 +81,7 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, timeoutMs, remote = "origin", base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, timeoutMs, base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
 	const git = gitIn(repo, { identity, timeoutMs });
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
@@ -90,7 +92,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const refetch = (): Promise<View> => {
 		spent++;
 
-		const fetched = git.raw(["fetch", "--prune", "--no-tags", "--quiet", remote, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]).then((): View => ({ sources: new Map() }));
+		const fetched = git.raw(["fetch", "--prune", "--no-tags", "--quiet", REMOTE, `+${baseBranch}:${BASE_REF}`, `+refs/heads/${claimPrefix}*:${CLAIMS_REF}/*`]).then((): View => ({ sources: new Map() }));
 
 		view = fetched;
 		fetched.catch(() => {
@@ -106,7 +108,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 	const pushCounted = async (args: readonly string[]) => {
 		spent++;
 
-		const outcome = await push(git, [remote, ...args]).catch((cause: unknown) => {
+		const outcome = await push(git, [REMOTE, ...args]).catch((cause: unknown) => {
 			view = undefined;
 
 			throw cause;
@@ -354,7 +356,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			answer: (id, { text, option }) => appendTo(id, answerMarker(option), text),
 			/** The token is the remote base branch's tip; reading one ref spends no rate limit. */
 			watch: async (since?: string): Promise<Watch> => {
-				const [token = NO_BASE_TOKEN] = (await git.raw(["ls-remote", remote, baseBranch])).split(/\s/).filter(Boolean);
+				const [token = NO_BASE_TOKEN] = (await git.raw(["ls-remote", REMOTE, baseBranch])).split(/\s/).filter(Boolean);
 
 				return { token, changed: token !== since };
 			},
