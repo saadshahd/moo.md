@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createActor, SimulatedClock, waitFor } from "xstate";
 import { restoreActor } from "xstate/persist";
@@ -22,6 +23,7 @@ import {
 	readConfigDir,
 } from "../src/index.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { readSettings } from "../src/config/settings.ts";
 import { OWNER } from "./fixtures/identity.ts";
 
 const root = join(import.meta.dir, "..");
@@ -140,6 +142,25 @@ test("a rename that strands a saved item is refused; with a map the item restore
 	expect(restored.getSnapshot().value).toBe("stuck");
 });
 
+test("a saved item names its kind by machine id, so a kind whose id differs from its file name still strands it", () => {
+	const named = (raw: RawConfig): Tree => {
+		const next = clone(withTimeouts(raw));
+
+		next.kinds.feature.machine.id = "feature-machine";
+
+		return next;
+	};
+
+	const renamed = named(shipped());
+
+	renamed.kinds.feature = JSON.parse(JSON.stringify(renamed.kinds.feature).replaceAll("owner-review", "deep-review"));
+	renamed.kinds.feature.machine.version = "2";
+
+	const refused = change(loaded(named(shipped())), renamed, { saved: [{ kind: "feature-machine", state: "owner-review" }] });
+
+	expect(!refused.accepted && refused.refusals[0]?.code).toBe("unmapped-state");
+});
+
 test("the previous schema migrates", () => {
 	const previous = { schemaVersion: 1, name: "old" };
 
@@ -159,6 +180,19 @@ test("an unknown schema version is refused and names the step", () => {
 	expect(!newer.ok && newer.refusal.code).toBe("unknown-schema-version");
 	expect(!newer.ok && newer.refusal.message).toContain("Update the engine");
 	expect(!older.ok && older.refusal.message).toContain("/hum");
+});
+
+test("a setting read outside the full config refuses a hum.json of a schema version this engine does not read", () => {
+	const repo = mkdtempSync(join(tmpdir(), "hum-settings-"));
+
+	try {
+		mkdirSync(join(repo, ".hum"));
+		writeFileSync(join(repo, ".hum", "hum.json"), JSON.stringify({ schemaVersion: 99, claimPrefix: "hum/claim/" }));
+
+		expect(() => readSettings(repo, z.looseObject({ claimPrefix: z.string() }))).toThrow("Update the engine");
+	} finally {
+		rmSync(repo, { recursive: true, force: true });
+	}
 });
 
 test("a config with no commit identity, or an empty name or email, is refused, naming the setting", () => {
