@@ -1,11 +1,14 @@
 import type { Item } from "../adapter-api.ts";
 import { declaredKind } from "../decide/kind.ts";
 import { usualSize } from "../decide/risk.ts";
-import type { DefaultsConfig, HumConfig, PathRule, RunPlace, SlotRecipe } from "../config/schema.ts";
+import type { DefaultsConfig, HumConfig, PathRule, PullRequestToken, RunPlace, SlotRecipe } from "../config/schema.ts";
+import { APP_TOKEN_ACTION, CI_WORKFLOW_FILES, CLAUDE_TOKEN, WAKE_OWN_ENV } from "../service/workflows.ts";
 import type { CiJob, RepoScan } from "./scan.ts";
 import {
 	CHECK_COMMAND,
 	CHECK_SCRIPTS,
+	CLAUDE_ACTION,
+	CLAUDE_COMMAND,
 	DATA_AND_SECRET_GLOBS,
 	DEFAULT_FOLDER_RANK,
 	FOLDER_RANKS,
@@ -15,6 +18,7 @@ import {
 	ROOT_MARKDOWN_RANK,
 	RUN_SCRIPT,
 	SECRET_TEMPLATE,
+	SECRET_VALUE,
 } from "./tables.ts";
 
 /** The settings setup proposes from a scan; the owner changes any of them before they are written. */
@@ -28,6 +32,7 @@ export type Proposal = {
 	readonly kindLabels: Readonly<Record<string, string>>;
 	readonly runSlots: Pick<HumConfig["runSlots"], "services" | "recipe">;
 	readonly runPlaces: readonly RunPlace[];
+	readonly wakeJob: Pick<HumConfig, "ciRunner" | "ciContainer" | "ciEnv" | "ciClaudeAuth" | "pullRequestToken">;
 };
 
 const isPullRequestJob = ({ triggers }: CiJob): boolean => triggers.includes("pull_request");
@@ -103,6 +108,48 @@ const recipeOf = (scan: RepoScan, checks: readonly string[]): SlotRecipe => {
 	};
 };
 
+const isAction = (uses: string, action: string): boolean => uses.startsWith(`${action}@`);
+
+const runsClaude = ({ commands, actions }: CiJob): boolean => commands.some((command) => CLAUDE_COMMAND.test(command)) || actions.some(({ uses }) => isAction(uses, CLAUDE_ACTION));
+
+const secretIn = (value: string | undefined): string | undefined => (value === undefined ? undefined : SECRET_VALUE.exec(value)?.[1]);
+
+/** The first GitHub App a job mints a token from with both its client ID and its private key in secrets. */
+const appOf = (jobs: readonly CiJob[]): PullRequestToken | undefined =>
+	jobs
+		.flatMap(({ actions }) => actions)
+		.flatMap(({ uses, with: inputs }): PullRequestToken[] => {
+			const clientIdSecret = secretIn(inputs["client-id"] ?? inputs["app-id"]);
+			const privateKeySecret = secretIn(inputs["private-key"]);
+
+			return isAction(uses, APP_TOKEN_ACTION) && clientIdSecret !== undefined && privateKeySecret !== undefined ? [{ from: "app", clientIdSecret, privateKeySecret }] : [];
+		})[0];
+
+/** Whether a job hands Claude Code the OAuth token: its env, commands or action inputs name it. */
+const readsClaudeToken = ({ env, commands, actions }: CiJob): boolean =>
+	[...Object.entries(env).flat(), ...commands, ...actions.flatMap((action) => Object.values(action.with))].some((text) => text.includes(CLAUDE_TOKEN));
+
+const claudeAuthOf = (job: CiJob): HumConfig["ciClaudeAuth"] => (readsClaudeToken(job) ? "oauth-token" : "env");
+
+/**
+ * The wake job's settings from the job most like it: the one that runs Claude Code gives its runner, container, env
+ * and sign-in; without one, the first pull request job that names a runner gives its runner and container. hum's own
+ * workflows are left out, so a second setup reads the owner's. The App comes from any job that mints a token.
+ */
+const wakeJobOf = (ci: readonly CiJob[], shipped: DefaultsConfig): Proposal["wakeJob"] => {
+	const jobs = ci.filter(({ file }) => !CI_WORKFLOW_FILES.has(file));
+	const claude = jobs.find(runsClaude);
+	const like = claude ?? jobs.find((job) => isPullRequestJob(job) && job.runner !== undefined);
+
+	return {
+		ciRunner: like?.runner ?? shipped.ciRunner,
+		ciContainer: like?.container ?? shipped.ciContainer,
+		ciEnv: claude ? Object.fromEntries(Object.entries(claude.env).filter(([name]) => !WAKE_OWN_ENV.has(name))) : shipped.ciEnv,
+		ciClaudeAuth: claude ? claudeAuthOf(claude) : shipped.ciClaudeAuth,
+		pullRequestToken: appOf(jobs) ?? shipped.pullRequestToken,
+	};
+};
+
 /** Everything setup proposes from a scan, before it asks. */
 export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, repoLabels: readonly string[] = []): Proposal => {
 	const checks = checksOf(scan);
@@ -116,5 +163,6 @@ export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, repoLabels
 		kindLabels: kindLabelsOf(scan, repoLabels, shipped.kinds),
 		runSlots: { services: shipped.runSlots.services, recipe: recipeOf(scan, checks) },
 		runPlaces: shipped.runPlaces,
+		wakeJob: wakeJobOf(scan.ci, shipped),
 	};
 };

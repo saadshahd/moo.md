@@ -1,4 +1,5 @@
 import { toDirectedGraph } from "xstate/graph";
+import { WAKE_OWN_ENV } from "../service/workflows.ts";
 import { kindMachine } from "./machine.ts";
 import type { Problem } from "./refusal.ts";
 import {
@@ -193,6 +194,19 @@ const pathProblems = (hum: HumConfig): Problem[] => {
 	];
 };
 
+/** GitHub's fixed life of an App's installation token. */
+const APP_TOKEN_MINUTES = 60;
+
+/** `ciEnv` sets none of the env the wake job sets itself. */
+const wakeEnvProblems = ({ ciEnv }: HumConfig): Problem[] =>
+	Object.keys(ciEnv).flatMap((name): Problem[] => (WAKE_OWN_ENV.has(name) ? [{ problem: "wake-env-taken", name }] : []));
+
+/** A wake that mints an App's token ends before the token does. */
+const appTokenProblems = ({ pullRequestToken, ciWakeTimeoutMinutes }: HumConfig): Problem[] =>
+	pullRequestToken.from === "app" && ciWakeTimeoutMinutes > APP_TOKEN_MINUTES
+		? [{ problem: "wake-outlasts-app-token", minutes: ciWakeTimeoutMinutes, tokenMinutes: APP_TOKEN_MINUTES }]
+		: [];
+
 /** The proof a path names for a kind: its own, else the one for every kind. */
 export const proofFor = (rule: PathRule, kind: string): string | undefined => rule.proofs?.[kind] ?? rule.proofs?.[ALL_KINDS];
 
@@ -210,4 +224,6 @@ export const checkConfig = (
 	...eventProblems(hum, kinds),
 	...skillProblems(hum, env),
 	...namingProblems(hum),
+	...wakeEnvProblems(hum),
+	...appTokenProblems(hum),
 ];

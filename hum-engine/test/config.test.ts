@@ -148,6 +148,40 @@ test("the previous schema migrates", () => {
 	expect(migrated).toEqual({ ok: true, value: { schemaVersion: 2, title: "old" } });
 });
 
+test("a schema 1 hum.json's pull request token secret becomes schema 2's secret source, and one that names none gets the shipped source", () => {
+	const named = clone(setUp());
+	const unnamed = clone(setUp());
+
+	named.hum = { ...named.hum, schemaVersion: 1, pullRequestTokenSecret: "PR_TOKEN" };
+	delete named.hum.pullRequestToken;
+	unnamed.hum = { ...unnamed.hum, schemaVersion: 1 };
+	delete unnamed.hum.pullRequestToken;
+
+	expect(loaded(named).hum.pullRequestToken).toEqual({ from: "secret", secret: "PR_TOKEN" });
+	expect(loaded(unnamed).hum.pullRequestToken).toEqual(SHIPPED_DEFAULTS.pullRequestToken);
+});
+
+test("ciEnv that sets a name the CI wake job sets itself is refused, naming it", () => {
+	const bad = clone(setUp());
+
+	bad.hum.ciEnv = { IS_SANDBOX: "1", GH_TOKEN: "${{ secrets.MINE }}" };
+
+	expect(problemsOf(bad)).toEqual([{ problem: "wake-env-taken", name: "GH_TOKEN" }]);
+});
+
+test("a CI wake that mints an App's token may run no longer than the token lasts", () => {
+	const app = clone(setUp());
+
+	app.hum.pullRequestToken = { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" };
+	app.hum.ciWakeTimeoutMinutes = 60;
+
+	expect(problemsOf(app)).toEqual([]);
+
+	app.hum.ciWakeTimeoutMinutes = 61;
+
+	expect(problemsOf(app)).toEqual([{ problem: "wake-outlasts-app-token", minutes: 61, tokenMinutes: 60 }]);
+});
+
 test("an unknown schema version is refused and names the step", () => {
 	const newer = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 99 } }, { env });
 	const older = loadConfig({ ...shippedRaw(), hum: { schemaVersion: 0 } }, { env });

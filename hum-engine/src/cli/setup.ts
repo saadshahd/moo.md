@@ -108,7 +108,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 	setup
 		.command("write")
 		.description("Write .hum/ and the service files from the answers file, or write nothing and say why.")
-		.requiredOption("--answers <file>", 'JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 1 }')
+		.requiredOption("--answers <file>", 'JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 2 }')
 		.option("--home <folder>", "where the service unit goes; default the user's home")
 		.action(async ({ answers, home }: { answers: string; home?: string }) => {
 			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)) });

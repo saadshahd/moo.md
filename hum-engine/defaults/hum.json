@@ -1,5 +1,5 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"levels": [
 		{
 			"name": "low",
@@ -139,7 +139,14 @@
 	},
 	"restartDelaySeconds": 10,
 	"ciWakeTimeoutMinutes": 60,
-	"pullRequestTokenSecret": "HUM_GITHUB_TOKEN",
+	"pullRequestToken": {
+		"from": "secret",
+		"secret": "HUM_GITHUB_TOKEN"
+	},
+	"ciRunner": "ubuntu-latest",
+	"ciContainer": null,
+	"ciEnv": {},
+	"ciClaudeAuth": "oauth-token",
 	"strictPaths": [],
 	"launches": [],
 	"sizeRange": {

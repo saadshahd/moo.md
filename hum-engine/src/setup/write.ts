@@ -47,20 +47,22 @@ export type SetupResult = { readonly ok: true; readonly written: readonly string
 
 const UPDATE_ENGINE = "Update the engine: bun add --exact @moo.md/hum@latest.";
 
-/** Refuses a schema the installed engine does not read, whether the existing file has it or the writer would produce it. */
-const schemaRefusal = (existing: Json | undefined, target: number): Refusal | undefined => {
-	if (!READABLE_SCHEMA_VERSIONS.includes(target)) {
-		return {
-			code: "unknown-schema-version",
-			found: target,
-			readable: READABLE_SCHEMA_VERSIONS,
-			message: `Setup would write hum.json schemaVersion ${target}, and this engine reads ${READABLE_SCHEMA_VERSIONS.join(", ")}. ${UPDATE_ENGINE} Nothing was written.`,
-		};
-	}
+/** Refuses answers written for a schema the installed engine does not read. */
+const targetRefusal = (target: number): Refusal | undefined =>
+	READABLE_SCHEMA_VERSIONS.includes(target)
+		? undefined
+		: {
+				code: "unknown-schema-version",
+				found: target,
+				readable: READABLE_SCHEMA_VERSIONS,
+				message: `Setup would write hum.json schemaVersion ${target}, and this engine reads ${READABLE_SCHEMA_VERSIONS.join(", ")}. ${UPDATE_ENGINE} Nothing was written.`,
+			};
 
-	const migrated = existing === undefined ? undefined : migrateConfig(existing);
+/** Settings migrated to the schema this engine writes, so the repo's file and the answers merge at one version; refused at a schema it does not read. */
+const atCurrentSchema = (hum: Json): Result<Readonly<Record<string, Json>>> => {
+	const migrated = migrateConfig(hum);
 
-	return migrated && !migrated.ok ? { ...migrated.refusal, message: `${migrated.refusal.message} Nothing was written.` } : undefined;
+	return migrated.ok ? migrated : { ok: false, refusal: { ...migrated.refusal, message: `${migrated.refusal.message} Nothing was written.` } };
 };
 
 /** The identity hum.json already holds, else the one git config holds, else the refusal that says what to set. */
@@ -99,14 +101,23 @@ const asJson = (value: Kind | Readonly<Record<string, Json>>): Json => Json.pars
  */
 export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): SetupResult => {
 	const existing = readExisting(repo);
-	const refused = schemaRefusal(existing?.hum, answers.schemaVersion ?? SCHEMA_VERSION);
+	const target = answers.schemaVersion ?? SCHEMA_VERSION;
+	const refused = targetRefusal(target);
 
 	if (refused) return { ok: false, refusal: refused };
 
 	const shipped = shippedRaw();
 	const base = existing ?? shipped;
+	const fromRepo = atCurrentSchema(base.hum);
+
+	if (!fromRepo.ok) return fromRepo;
+
+	const answered = atCurrentSchema({ ...answers.hum, schemaVersion: target });
+
+	if (!answered.ok) return answered;
+
 	const shippedHum = HumObject.parse(shipped.hum);
-	const given = { ...HumObject.parse(base.hum), ...answers.hum };
+	const given = { ...fromRepo.value, ...answered.value };
 	const identity = identityOf(given, env.gitIdentity);
 
 	if (!identity.ok) return identity;
@@ -164,5 +175,5 @@ const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite =
 	};
 };
 
-/** The answers file the skill writes: `{ "hum": {...}, "waitHours": {...}, "schemaVersion": 1 }`. */
+/** The answers file the skill writes: `{ "hum": {...}, "waitHours": {...}, "schemaVersion": 2 }`. */
 export const readAnswers = (file: string): SetupAnswers => SetupAnswers.parse(JSON.parse(readFileSync(file, "utf8")));

@@ -81,6 +81,72 @@ test("a scan reads the checks CI runs on a pull request after the install a fres
 	expect(proposal.runSlots.recipe.prepare).toContain("bun install --frozen-lockfile");
 });
 
+const AGENTS = `name: agents
+on: [workflow_dispatch]
+env:
+  CLAUDE_CODE_USE_BEDROCK: '1'
+  IS_SANDBOX: 1
+  ANTHROPIC_CUSTOM_HEADERS: |
+    x-team: one
+    x-use: two
+jobs:
+  agents:
+    runs-on: own-large
+    container: mcr.microsoft.com/playwright:v1.0.0-noble
+    env:
+      GH_TOKEN: \${{ github.token }}
+    steps:
+      - uses: actions/create-github-app-token@v3
+        with:
+          client-id: \${{ secrets.APP_CLIENT_ID }}
+          private-key: \${{ secrets.APP_PRIVATE_KEY }}
+      - run: npm install --global @anthropic-ai/claude-code
+`;
+
+test("a scan proposes the wake job's runner, container, env and sign-in from the job that runs Claude Code, and the App from the step that mints a token", async () => {
+	const { wakeJob } = proposeSetup(await scanRepo(repoWith({ ...PROJECT, ".github/workflows/agents.yml": AGENTS }), "main"), shipped.hum);
+
+	expect(wakeJob).toEqual({
+		ciRunner: "own-large",
+		ciContainer: "mcr.microsoft.com/playwright:v1.0.0-noble",
+		ciEnv: { CLAUDE_CODE_USE_BEDROCK: "1", IS_SANDBOX: "1", ANTHROPIC_CUSTOM_HEADERS: "x-team: one\nx-use: two\n" },
+		ciClaudeAuth: "env",
+		pullRequestToken: { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" },
+	});
+});
+
+test("without a job that runs Claude Code, the wake job takes the pull request job's runner and the shipped rest, and hum's own workflows are not read", async () => {
+	const repo = repoWith(PROJECT);
+
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"], ciRunner: "own-large", ciClaudeAuth: "env" }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(proposeSetup(await scanRepo(repo, "main"), shipped.hum).wakeJob).toEqual({
+		ciRunner: "ubuntu-latest",
+		ciContainer: shipped.hum.ciContainer,
+		ciEnv: shipped.hum.ciEnv,
+		ciClaudeAuth: shipped.hum.ciClaudeAuth,
+		pullRequestToken: shipped.hum.pullRequestToken,
+	});
+});
+
+test("setup rewrites a schema 1 hum.json, and reads schema 1 answers, at schema 2, a pull request token secret carried into the token source", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const file = join(repo, ".hum", "hum.json");
+	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
+
+	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), schemaVersion: 1, pullRequestTokenSecret: "PR_TOKEN" }));
+	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+
+	const written = JSON.parse(readFileSync(file, "utf8"));
+
+	expect(written).toMatchObject({ schemaVersion: 2, pullRequestToken: { from: "secret", secret: "PR_TOKEN" } });
+	expect(written).not.toHaveProperty("pullRequestTokenSecret");
+	expect(readFileSync(join(repo, ".github", "workflows", "hum-wake.yml"), "utf8")).toContain("secrets.PR_TOKEN || github.token");
+
+	expect(writeSetup(repo, { ...answers, hum: { ...answers.hum, pullRequestTokenSecret: "OTHER_TOKEN" }, schemaVersion: 1 }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(JSON.parse(readFileSync(file, "utf8")).pullRequestToken).toEqual({ from: "secret", secret: "OTHER_TOKEN" });
+});
+
 test("a scan skips a workflow, compose or issue-template file that is not YAML and reads the rest", async () => {
 	const broken = "key: [unclosed\n";
 	const scan = await scanRepo(repoWith({ ...PROJECT, ".github/workflows/broken.yml": broken, "compose.yaml": broken, ".github/ISSUE_TEMPLATE/broken.yml": broken }), "main");

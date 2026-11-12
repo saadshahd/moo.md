@@ -40,6 +40,15 @@ export const CHECK_COMMAND = /\b(test|tests|lint|typecheck|type-check|tsc|check|
 /** A CI command line that is not a check, whatever words it holds: installs, publishing, shell plumbing. */
 export const NOT_A_CHECK = /^(echo|export|cd|mkdir|cp|mv|rm|curl|wget|sudo|gh|git)\b|\b(install|publish|deploy|release|upload|setup)\b/;
 
+/** A CI command line that installs or runs Claude Code. */
+export const CLAUDE_COMMAND = /@anthropic-ai\/claude-code|(^|[\s;&|(])claude(\s|$)/;
+
+/** The action a CI step runs Claude Code with, named without its version. */
+export const CLAUDE_ACTION = "anthropics/claude-code-action";
+
+/** An input or env value that is one secret, which the first group names. */
+export const SECRET_VALUE = /^\$\{\{\s*secrets\.(\w+)\s*\}\}$/;
+
 /** The files that hold a repo's tool versions. */
 export const TOOL_VERSION_FILES = [".tool-versions", ".nvmrc", ".node-version", ".bun-version", ".python-version", "mise.toml", ".mise.toml", "rust-toolchain.toml", ".go-version"] as const;
 

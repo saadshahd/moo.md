@@ -4,10 +4,10 @@ import { z } from "zod";
 import shippedConfig from "../../defaults/hum.json" with { type: "json" };
 
 /** The `hum.json` schema version this engine writes. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /** The schema versions this engine reads, each migrated up to `SCHEMA_VERSION` by `migrateConfig`. */
-export const READABLE_SCHEMA_VERSIONS: readonly number[] = [1];
+export const READABLE_SCHEMA_VERSIONS: readonly number[] = [1, 2];
 
 /** Parts the engine ships; the owner adds roles, never these. */
 export const FIXED_PARTS = [
@@ -56,6 +56,10 @@ export type RunPlace = (typeof RUN_PLACES)[number];
 export const MERGE_METHODS = ["merge", "squash", "rebase"] as const;
 
 export type MergeMethod = (typeof MERGE_METHODS)[number];
+
+const CLAUDE_AUTHS = ["oauth-token", "env"] as const;
+
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /** Who reviews a change before it merges: no one, a fresh agent review run, or that run and then the owner. */
 export const REVIEWS = ["none", "agent", "owner"] as const;
@@ -117,6 +121,14 @@ const backoff = z
 
 const fraction = z.number().gt(0).lt(1);
 
+/** Where a CI run's GitHub token comes from: a secret that holds one, or a GitHub App that mints one per run from its client ID and private key. */
+const PullRequestToken = z.discriminatedUnion("from", [
+	z.strictObject({ from: z.literal("secret"), secret: name }),
+	z.strictObject({ from: z.literal("app"), clientIdSecret: name, privateKeySecret: name }),
+]);
+
+export type PullRequestToken = z.infer<typeof PullRequestToken>;
+
 const Launch = z.union([
 	z.strictObject({ glob: name, level: name, from: date, until: date }).refine(({ from, until }) => from < until, "a launch ends after it starts"),
 	z.strictObject({ glob: name, level: name, base: name }),
@@ -163,8 +175,18 @@ const Shipped = z.object({
 	itemReadsAtOnce: count.describe("Item files the markdown source reads at once; each read is a git process."),
 	restartBackoff: backoff.describe("The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."),
 	restartDelaySeconds: seconds.describe("Seconds the service manager waits before it starts a failed start script again."),
-	pullRequestTokenSecret: name.describe("The repository secret holding a GitHub App or fine-grained token for CI runs. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset."),
+	pullRequestToken: PullRequestToken.describe(
+		"Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset.",
+	),
 	ciWakeTimeoutMinutes: count.describe("Minutes a CI wake may run before GitHub stops it."),
+	ciRunner: name.describe("The runner label the CI wake job runs on."),
+	ciContainer: name.nullable().describe("The image of the container the CI wake job runs in, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts."),
+	ciEnv: z
+		.record(z.string().regex(ENV_NAME, "an env name is letters, digits and underscores, and starts with no digit"), z.string())
+		.describe("Env the CI wake job sets for every step, such as a gateway's settings; a value may be a workflow expression. A name the job sets itself, such as GH_TOKEN, is refused."),
+	ciClaudeAuth: z
+		.enum(CLAUDE_AUTHS)
+		.describe("How a CI run's Claude Code signs in: 'oauth-token' requires the CLAUDE_CODE_OAUTH_TOKEN secret, from `claude setup-token`; 'env' asks for no secret, and ciEnv carries the credentials, such as a gateway's settings."),
 	strictPaths: z.array(name).describe("Globs of data and secrets: a change touching one takes the strictest level."),
 	launches: z
 		.array(Launch)
@@ -417,7 +439,11 @@ export const OWNER_CHANGEABLE = {
 	"restart backoff": "restartBackoff",
 	"restart delay": "restartDelaySeconds",
 	"CI wake timeout": "ciWakeTimeoutMinutes",
-	"pull request token secret": "pullRequestTokenSecret",
+	"pull request token": "pullRequestToken",
+	"CI runner": "ciRunner",
+	"CI container": "ciContainer",
+	"CI env": "ciEnv",
+	"CI Claude auth": "ciClaudeAuth",
 	"data and secrets paths": "strictPaths",
 	"path rules": "paths",
 	launches: "launches",

@@ -22,8 +22,20 @@ import {
 	WORKFLOW_FOLDER,
 } from "./tables.ts";
 
-/** One job of a CI workflow: when it runs and the shell commands its steps run. */
-export type CiJob = { readonly file: string; readonly job: string; readonly triggers: readonly string[]; readonly commands: readonly string[] };
+/** One job of a CI workflow: when it runs, where, with what env, and the shell commands and actions its steps run. */
+export type CiJob = {
+	readonly file: string;
+	readonly job: string;
+	readonly triggers: readonly string[];
+	readonly commands: readonly string[];
+	/** The runner, when the job names one label. */
+	readonly runner: string | undefined;
+	/** The image of the job's container. */
+	readonly container: string | undefined;
+	/** The env every step gets: the workflow's, with the job's own over it. */
+	readonly env: Readonly<Record<string, string>>;
+	readonly actions: readonly { readonly uses: string; readonly with: Readonly<Record<string, string>> }[];
+};
 
 type FolderHistory = { readonly folder: string; readonly changes: number; readonly sizes: readonly number[] };
 
@@ -61,9 +73,28 @@ const PackageJson = z.looseObject({
 	devDependencies: z.record(z.string(), z.string()).default({}),
 });
 
+/** YAML reads `1` and `true` as a number and a boolean; a workflow passes each on as text. */
+const Text = z.union([z.string(), z.number(), z.boolean()]).transform(String);
+
+/** A map of text, or none where the workflow writes an expression in its place. */
+const TextMap = z.record(z.string(), Text).catch({});
+
+const Container = z.union([z.string(), z.looseObject({ image: z.string() }).transform(({ image }) => image)]).optional().catch(undefined);
+
 const Workflow = z.looseObject({
 	on: z.union([z.string().transform((trigger) => [trigger]), z.array(z.string()), z.record(z.string(), z.unknown()).transform((triggers) => Object.keys(triggers))]).default([]),
-	jobs: z.record(z.string(), z.looseObject({ steps: z.array(z.looseObject({ run: z.string().optional() })).default([]) })).default({}),
+	env: TextMap,
+	jobs: z
+		.record(
+			z.string(),
+			z.looseObject({
+				"runs-on": z.string().optional().catch(undefined),
+				container: Container,
+				env: TextMap,
+				steps: z.array(z.looseObject({ run: z.string().optional(), uses: z.string().optional(), with: TextMap })).default([]),
+			}),
+		)
+		.default({}),
 });
 
 const Compose = z.looseObject({ services: z.record(z.string(), z.looseObject({ image: z.string().optional() })).default({}) });
@@ -95,11 +126,15 @@ const ciJobsOf = (repo: string): CiJob[] =>
 
 		const triggers = workflow.on;
 
-		return Object.entries(workflow.jobs).map(([job, { steps }]) => ({
+		return Object.entries(workflow.jobs).map(([job, { steps, ...where }]) => ({
 			file: basename(file),
 			job,
 			triggers,
 			commands: steps.flatMap((step) => commandsOf(step.run ?? "")),
+			runner: where["runs-on"],
+			container: where.container,
+			env: { ...workflow.env, ...where.env },
+			actions: steps.flatMap((step) => (step.uses === undefined ? [] : [{ uses: step.uses, with: step.with }])),
 		}));
 	});
 
