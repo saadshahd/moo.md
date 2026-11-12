@@ -5,7 +5,8 @@ import { resolveAdapters } from "../adapters/registry.ts";
 import { startBackgroundRunner } from "../adapters/claude-bg.ts";
 import { startRunner } from "../adapters/claude-p.ts";
 import { gitIn } from "../adapters/git.ts";
-import { gitHubClient, ownerToken, repoFromRemote } from "../adapters/github.ts";
+import { repoFromRemote } from "../adapters/github.ts";
+import { ownerGitHub } from "../adapters/github-client.ts";
 import { githubLoopReads } from "../loop/github.ts";
 import { gitHubPullRequests } from "../adapters/pull-requests.ts";
 import { serialized } from "../adapters/serial.ts";
@@ -94,7 +95,7 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	const slots = config.hum.runSlots.enabled && isInBackground(config.hum, rest.where) ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
 	const github = repoFromRemote(remote);
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs });
-	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, async () => gitHubClient({ token: await ownerToken(timeoutMs), timeoutMs }));
+	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, () => ownerGitHub(timeoutMs));
 
 	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop });
 };

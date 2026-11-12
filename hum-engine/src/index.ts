@@ -79,7 +79,9 @@ export { pushArgs, PushRefused } from "./adapters/git.ts";
 
 export { type GuardOptions, guarded } from "./adapters/guard.ts";
 
-export { type GitHubClient, gitHubClient, githubAdapter, type GitHubOptions, repoFromRemote } from "./adapters/github.ts";
+export { githubAdapter, type GitHubOptions, repoFromRemote } from "./adapters/github.ts";
+
+export { type GitHubClient, gitHubClient } from "./adapters/github-client.ts";
 
 export { Marker, marked, markerOf, parseComment } from "./adapters/marked.ts";
 

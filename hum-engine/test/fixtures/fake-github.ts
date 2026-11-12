@@ -40,6 +40,9 @@ const Posted = z.object({ message: z.string(), tree: z.string(), parents: z.arra
 const REPOSITORY_ID = "R_fake";
 const TOKENS = new Set(["token fake-token", "bearer fake-token"]);
 
+/** A pull request as GitHub's GraphQL answers it; its number is the one its id ends in. */
+const pullNode = ({ id, state }: Pull): Json => ({ id, number: Number(id.slice("PR_".length)), url: `https://github.com/me/scratch/pull/${id.slice("PR_".length)}`, state, mergeStateStatus: "CLEAN", autoMergeRequest: null });
+
 const json = (status: number, value: Json, headers: Record<string, string> = {}) =>
 	new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", ...headers } });
 
@@ -184,13 +187,7 @@ export class FakeGitHub {
 		IssueState: (v) => ({ repository: { issue: this.#issueNode(this.#issue(v.number)) } }),
 		Base: (v) => ({ repository: { id: REPOSITORY_ID, ref: this.#commitTarget(v.baseRef) } }),
 		Label: (v) => ({ repository: { id: REPOSITORY_ID, label: this.#labels.has(v.label ?? "") ? { id: `L_${v.label}` } : null } }),
-		Pulls: (v) => ({
-			repository: {
-				id: REPOSITORY_ID,
-				issue: { title: this.#issue(v.number).title },
-				pullRequests: { nodes: this.#pulls.filter((pull) => pull.head === v.head).map(({ id, state }) => ({ id, state })) },
-			},
-		}),
+		PullsFrom: (v) => ({ repository: { id: REPOSITORY_ID, pullRequests: { nodes: this.#pulls.filter((pull) => pull.head === v.head).toReversed().slice(0, 1).map(pullNode) } } }),
 		AddComment: (v) => {
 			this.#commentOn(Number(v.subject?.slice("I_".length)), v.body ?? "");
 
@@ -228,12 +225,14 @@ export class FakeGitHub {
 
 			return { createIssue: { issue: { number } } };
 		},
-		CreatePull: (v) => {
-			this.#pulls.push({ id: `PR_${this.#pulls.length + 1}`, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", state: "OPEN" });
+		OpenPull: (v) => {
+			const pull: Pull = { id: `PR_${this.#pulls.length + 1}`, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", state: "OPEN" };
 
-			return { createPullRequest: { clientMutationId: null } };
+			this.#pulls.push(pull);
+
+			return { createPullRequest: { pullRequest: pullNode(pull) } };
 		},
-		MergePull: (v) => {
+		MergeNow: (v) => {
 			const pull = this.#pulls.find((found) => found.id === v.pull) ?? failed("NOT_FOUND", `no pull ${v.pull}`);
 
 			pull.state = "MERGED";

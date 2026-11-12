@@ -1,32 +1,24 @@
-import { Octokit } from "@octokit/core";
-import { GraphqlResponseError } from "@octokit/graphql";
-import { paginateGraphQL } from "@octokit/plugin-paginate-graphql";
-import { type ThrottlingOptions, throttling } from "@octokit/plugin-throttling";
-import { RequestError } from "@octokit/request-error";
+import ExpiryMap from "expiry-map";
 import hostedGitInfo from "hosted-git-info";
 import pMemoize from "p-memoize";
 import { z } from "zod";
 import { type Adapter, type AdapterContext, type Answers, type Claim, type Item, ItemId, PermanentError, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
 import type { Json } from "../config/json.ts";
 import type { MERGE_METHODS } from "../config/schema.ts";
-import { exec } from "../exec.ts";
+import { HOUR_MS } from "../time.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommit, claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
+import { failureOf, type GitHubClient, ownerGitHub, raise } from "./github-client.ts";
 import { answerMarker, commentText, filedFollowUp, followUpBody, followUpNote, isFollowUpOf, type Marker, marked, parseComment, questionMarker, questionText } from "./marked.ts";
+import { gitHubPullRequests } from "./pull-requests.ts";
 
-const RATE_LIMIT_RETRIES = 1;
-const NOT_MODIFIED = 304;
 const READY_LABEL_COLOR = "0e8a16";
 const READY_LABEL_DESCRIPTION = "hum may take this item";
 
-const HumOctokit = Octokit.plugin(throttling, paginateGraphQL);
-
-export type GitHubClient = InstanceType<typeof HumOctokit>;
+/** How long an issue's node id is kept after it was read. An id never changes; the limit only bounds what the worker holds. */
+const ISSUE_ID_KEPT_MS = HOUR_MS;
 
 type Variables = Readonly<Record<string, Json>>;
-
-/** The GraphQL name of each merge method. */
-export const MERGE_METHOD = { merge: "MERGE", squash: "SQUASH", rebase: "REBASE" } as const satisfies Record<(typeof MERGE_METHODS)[number], string>;
 
 const IssueNumber = ItemId.pipe(z.string().regex(/^[1-9]\d*$/, "a GitHub issue number is a whole number above 0")).transform(Number);
 
@@ -71,14 +63,6 @@ const CreatedIssue = z.object({ createIssue: z.object({ issue: z.object({ number
 
 const RecentIssuesReply = z.object({ repository: z.object({ issues: z.object({ nodes: z.array(z.object({ number: z.int().positive(), title: z.string(), body: z.string() })) }) }) });
 
-const PullsReply = z.object({
-	repository: z.object({
-		id: z.string(),
-		issue: z.object({ title: z.string() }),
-		pullRequests: z.object({ nodes: z.array(z.object({ id: z.string(), state: z.enum(["OPEN", "MERGED", "CLOSED"]) })) }),
-	}),
-});
-
 const CreatedCommit = z.object({ sha: z.string() });
 
 /** The reply of a write whose result hum does not read. */
@@ -121,14 +105,6 @@ const LABEL = `query Label($owner: String!, $name: String!, $label: String!) {
 	repository(owner: $owner, name: $name) { id label(name: $label) { id } }
 }`;
 
-const PULLS = `query Pulls($owner: String!, $name: String!, $number: Int!, $head: String!) {
-	repository(owner: $owner, name: $name) {
-		id
-		issue(number: $number) { title }
-		pullRequests(headRefName: $head, states: [OPEN, MERGED], first: 1) { nodes { id state } }
-	}
-}`;
-
 const ADD_COMMENT = `mutation AddComment($subject: ID!, $body: String!) {
 	addComment(input: { subjectId: $subject, body: $body }) { clientMutationId }
 }`;
@@ -154,100 +130,12 @@ const CREATE_ISSUE = `mutation CreateIssue($repository: ID!, $title: String!, $b
 	createIssue(input: { repositoryId: $repository, title: $title, body: $body, labelIds: $labels }) { issue { number } }
 }`;
 
-const CREATE_PULL = `mutation CreatePull($repository: ID!, $base: String!, $head: String!, $title: String!, $body: String!) {
-	createPullRequest(input: { repositoryId: $repository, baseRefName: $base, headRefName: $head, title: $title, body: $body }) { clientMutationId }
-}`;
-
-const MERGE_PULL = `mutation MergePull($pull: ID!, $mergeMethod: PullRequestMergeMethod!) {
-	mergePullRequest(input: { pullRequestId: $pull, mergeMethod: $mergeMethod }) { clientMutationId }
-}`;
-
-/** What a failed request means to hum. */
-type Failure =
-	/** GitHub answered 304 to a conditional request: nothing changed, and no rate limit was spent. */
-	| { readonly kind: "not-modified" }
-	/** Another writer took the ref first: it already exists, or it moved since it was read. */
-	| { readonly kind: "lost-race" }
-	/** No retry fixes it: a 4xx other than a rate limit, or a GraphQL error about the request itself. */
-	| { readonly kind: "permanent"; readonly message: string }
-	| { readonly kind: "transient" };
-
-/** GraphQL errors about the request itself; any other, such as a timeout GitHub reports, may pass on a retry. */
-const PERMANENT_GRAPHQL_ERRORS: ReadonlySet<string> = new Set(["NOT_FOUND", "FORBIDDEN", "UNPROCESSABLE"]);
-
-const isRateLimited = (error: RequestError): boolean => error.status === 429 || (error.status === 403 && error.response?.headers["x-ratelimit-remaining"] === "0");
-
-const failureOf = (cause: unknown): Failure => {
-	if (cause instanceof RequestError) {
-		if (cause.status === NOT_MODIFIED) return { kind: "not-modified" };
-
-		return cause.status >= 400 && cause.status < 500 && !isRateLimited(cause) ? { kind: "permanent", message: cause.message } : { kind: "transient" };
-	}
-
-	const found = cause instanceof GraphqlResponseError ? cause.errors?.[0] : undefined;
-
-	if (found?.type === "STALE_DATA" || (found?.type === "UNPROCESSABLE" && /already exists/i.test(found.message))) return { kind: "lost-race" };
-
-	return found && PERMANENT_GRAPHQL_ERRORS.has(found.type ?? "") ? { kind: "permanent", message: found.message } : { kind: "transient" };
-};
-
-/** Throws `cause`, marked permanent when no retry can fix it. */
-export const raise = (cause: unknown): never => {
-	const failure = failureOf(cause);
-
-	throw failure.kind === "permanent" ? new PermanentError(failure.message, { cause }) : cause;
-};
-
 /** The `owner/name` of a GitHub remote URL, or undefined for any other host. */
 export const repoFromRemote = (url: string): string | undefined => {
 	const remote = hostedGitInfo.fromUrl(url.trim());
 
 	return remote?.type === "github" ? `${remote.user}/${remote.project}` : undefined;
 };
-
-/** The owner's own login: `GH_TOKEN` or `GITHUB_TOKEN`, else the token `gh` holds. */
-export const ownerToken = async (timeoutMs: number): Promise<string> => {
-	const fromEnv = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-
-	if (fromEnv) return fromEnv;
-
-	const gh = await exec("gh", ["auth", "token"], { stdin: "", timeoutMs });
-	const token = gh.stdout.trim();
-
-	if (gh.exitCode !== 0 || token === "") throw new PermanentError("no GitHub login: run `gh auth login`, or set GH_TOKEN");
-
-	return token;
-};
-
-const retryOnce: NonNullable<ThrottlingOptions["onRateLimit"]> = (_retryAfter, _options, _octokit, retryCount) => retryCount < RATE_LIMIT_RETRIES;
-
-type Send = (url: string, init?: RequestInit) => Promise<Response>;
-
-export type GitHubClientOptions = {
-	readonly token: string;
-	readonly baseUrl?: string;
-	/** Replaces `fetch`, for a GitHub that is not github.com. */
-	readonly fetch?: Send;
-	/** Whether writes are spaced as GitHub asks; only a GitHub with no secondary rate limit may go without. */
-	readonly spaced?: boolean;
-	/** The owner's `commandTimeoutSeconds` in milliseconds: how long one request may wait for GitHub's answer. */
-	readonly timeoutMs: number;
-};
-
-const bounded =
-	(send: Send, timeoutMs: number): Send =>
-	(url, init) =>
-		send(url, { ...init, signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(init?.signal ? [init.signal] : [])]) });
-
-/** A GitHub client that waits out rate limits, spaces its writes as GitHub asks, and gives up on a request GitHub has not answered within `timeoutMs`. */
-export const gitHubClient = ({ token, baseUrl, fetch = globalThis.fetch, spaced = true, timeoutMs }: GitHubClientOptions): GitHubClient =>
-	new HumOctokit({
-		auth: token,
-		userAgent: "hum",
-		baseUrl,
-		request: { fetch: bounded(fetch, timeoutMs) },
-		throttle: { enabled: spaced, onRateLimit: retryOnce, onSecondaryRateLimit: retryOnce },
-	});
 
 export type GitHubOptions = {
 	/** `owner/name`. */
@@ -270,7 +158,7 @@ type Whole = Adapter & {
 	readonly questions: Questions;
 	readonly answers: Answers;
 	readonly release: Release;
-	/** Requests so far that spent rate limit; a 304 spends none. */
+	/** Requests so far on its client that spent rate limit; a 304 spends none. The owner's client is shared, so other readers count too. */
 	readonly spent: () => number;
 };
 
@@ -288,11 +176,11 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 	const [owner = "", name = ""] = repo.split("/");
 	const where = { owner, name };
 	const claimRefs = `refs/heads/${claimPrefix}`;
-	const issueIds = new Map<number, string>();
+	const issueIds = new ExpiryMap<number, string>(ISSUE_ID_KEPT_MS);
 	let spent = 0;
 
 	const client = pMemoize(async () => {
-		const made = options.client ?? gitHubClient({ token: await ownerToken(timeoutMs), timeoutMs });
+		const made = options.client ?? (await ownerGitHub(timeoutMs));
 
 		made.hook.after("request", () => void spent++);
 		made.hook.error("request", (error) => {
@@ -384,11 +272,7 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 		now,
 	);
 
-	const pullFor = async (id: string, head: string) => {
-		const { repository } = await query(PullsReply, PULLS, { number: parseArgument(IssueNumber, id), head });
-
-		return { ...repository, pull: repository.pullRequests.nodes[0] };
-	};
+	const pulls = gitHubPullRequests(repo, { timeoutMs, client });
 
 	return {
 		apiVersion: 1,
@@ -461,18 +345,20 @@ export const githubAdapter = (options: GitHubOptions, { now }: AdapterContext): 
 		},
 		release: {
 			publish: async (id, ref) => {
-				const { pull, issue, id: repository } = await pullFor(id, ref);
+				const found = await pulls.find(ref);
 
-				if (pull) return;
+				if (found !== undefined && found.state !== "CLOSED") return;
 
-				await mutate(Acknowledged, CREATE_PULL, { repository, base, head: ref, title: issue.title, body: `Closes #${id}` });
+				const { issue } = await fetchItem(parseArgument(IssueNumber, id));
+
+				await pulls.open({ head: ref, base, title: issue.title, body: `Closes #${id}` });
 			},
 			release: async (id, ref) => {
-				const { pull } = await pullFor(id, ref);
+				const pull = await pulls.find(ref);
 
-				if (!pull) throw new PermanentError(`no pull request from ${ref} to release for item ${id}`);
+				if (!pull || pull.state === "CLOSED") throw new PermanentError(`no pull request from ${ref} to release for item ${id}`);
 
-				if (pull.state === "OPEN") await mutate(Acknowledged, MERGE_PULL, { pull: pull.id, mergeMethod: MERGE_METHOD[mergeMethod] });
+				if (pull.state === "OPEN") await pulls.merge(pull, mergeMethod);
 			},
 		},
 	};

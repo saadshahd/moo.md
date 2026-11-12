@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { gitHubClient } from "../../src/adapters/github.ts";
+import { gitHubClient } from "../../src/adapters/github-client.ts";
 import { gitHubPullRequests, type PullRequests } from "../../src/adapters/pull-requests.ts";
 import type { Json } from "../../src/config/json.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
@@ -105,6 +105,8 @@ export class FakePulls {
 	}
 
 	client(): PullRequests {
-		return gitHubPullRequests("me/scratch", { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }) });
+		const client = gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+
+		return gitHubPullRequests("me/scratch", { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: async () => client });
 	}
 }

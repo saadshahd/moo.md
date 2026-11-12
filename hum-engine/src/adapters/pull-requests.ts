@@ -3,13 +3,7 @@ import pMemoize from "p-memoize";
 import { z } from "zod";
 import type { Json } from "../config/json.ts";
 import { MERGE_METHODS, type MergeMethod } from "../config/schema.ts";
-import {
-	type GitHubClient,
-	gitHubClient,
-	MERGE_METHOD,
-	ownerToken,
-	raise,
-} from "./github.ts";
+import { type GitHubClient, MERGE_METHOD, ownerGitHub, raise } from "./github-client.ts";
 
 /** What the target branch's rules ask of a change that lands on it. */
 export type BranchRules = {
@@ -46,6 +40,8 @@ export type PullRequests = {
 		on: boolean,
 		method: MergeMethod,
 	) => Promise<"armed" | "merged" | "off">;
+	/** Merges the pull request now. */
+	readonly merge: (pull: Pull, method: MergeMethod) => Promise<void>;
 	readonly update: (pull: Pull) => Promise<void>;
 	/** One comment on the pull request. */
 	readonly comment: (pull: Pull, body: string) => Promise<void>;
@@ -142,13 +138,10 @@ export const methodFor = (
 /** Pull requests and branch rules of a GitHub repo, on the owner's own login unless a client is given. `timeoutMs` bounds the `gh auth token` that reads that login. */
 export const gitHubPullRequests = (
 	repo: string,
-	{ timeoutMs, client }: { readonly timeoutMs: number; readonly client?: GitHubClient },
+	{ timeoutMs, client }: { readonly timeoutMs: number; readonly client?: () => Promise<GitHubClient> },
 ): PullRequests => {
 	const [owner = "", name = ""] = repo.split("/");
-
-	const connect = pMemoize(
-		async () => client ?? gitHubClient({ token: await ownerToken(timeoutMs), timeoutMs }),
-	);
+	const connect = client ?? (() => ownerGitHub(timeoutMs));
 
 	const rulesCache = new Map<string, BranchRules>();
 
@@ -187,6 +180,9 @@ export const gitHubPullRequests = (
 		},
 		{ cache: rulesCache },
 	);
+
+	const merge = async (pull: Pull, method: MergeMethod): Promise<void> =>
+		void (await graphql(Acknowledged, MERGE_NOW, { pull: pull.id, mergeMethod: MERGE_METHOD[method] }));
 
 	const find = async (head: string): Promise<Pull | undefined> => {
 		const node = (await graphql(PullsReply, PULLS, { head })).repository
@@ -241,10 +237,11 @@ export const gitHubPullRequests = (
 
 			if (armed) return "armed";
 
-			await graphql(Acknowledged, MERGE_NOW, { pull: pull.id, mergeMethod });
+			await merge(pull, method);
 
 			return "merged";
 		},
+		merge,
 		update: async (pull) =>
 			void (await graphql(Acknowledged, UPDATE_BRANCH, { pull: pull.id })),
 		comment: async (pull, body) =>
