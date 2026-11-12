@@ -1,6 +1,12 @@
-/* The mod bundles this file for its reader: zod's mini build keeps that bundle small, where the full one brings every locale. */
+/*
+ * The mod bundles this file for its reader: zod's mini build keeps that bundle small, where the full one brings
+ * every locale. Mini loads none, so the English messages are loaded here, for a reader that loads nothing else.
+ */
 import * as z from "zod/mini";
+import en from "zod/v4/locales/en.js";
 import { STATUS_FORMAT } from "./version.ts";
+
+z.config(en());
 
 export { STATUS_FORMAT };
 
