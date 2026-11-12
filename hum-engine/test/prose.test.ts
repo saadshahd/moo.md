@@ -10,7 +10,7 @@ import { declaredKind } from "../src/decide/kind.ts";
 import { citesDiff, fenced, pickSchema, readPick } from "../src/decide/prose.ts";
 import { reviewInput } from "../src/decide/review.ts";
 import { openState } from "../src/state/open.ts";
-import { decideKind } from "../src/worker/kind.ts";
+import { keepKind, pickKind } from "../src/worker/kind.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
 import { configWith } from "./fixtures/config.ts";
 import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
@@ -41,19 +41,21 @@ test("an item names its kind by a label, else by its template field; nothing els
 	expect(declaredKind({ body: "", labels: ["Bug"] }, KINDS, { bug: "fix" })).toBe("fix");
 });
 
-test("with no kind named, the model call picks it; an abstention runs the fallback kind, unclear, and asks once for the kind", async () => {
+test("with no kind named, the model call picks it; an abstention runs the fallback kind, unclear, and keeping it asks once for the kind", async () => {
 	const provider = new FakeProvider();
 	const adapter = provider.adapter();
 	const id = provider.seed("Tidy the log");
 	const item = { id, title: "Tidy the log", body: "It is noisy.", ready: true, thread: [] };
 	const context = (judge = scriptedJudge({ kind: { kind: "fix" } })) => ({ state: openState(mkdtempSync(join(tmpdir(), "hum-kind-"))), config, judge, workSource: adapter.workSource!, questions: adapter.questions!, now: provider.now });
 
-	expect(await decideKind(context(), item)).toEqual({ item: id, kind: "fix", from: "model" });
+	expect(await pickKind(context(), item)).toEqual({ item: id, kind: "fix", from: "model" });
 
 	const abstaining = context(scriptedJudge({}));
+	const fallback = await pickKind(abstaining, item);
 
-	expect(await decideKind(abstaining, item)).toEqual({ item: id, kind: "feature", from: "fallback", why: "no scripted answer fits" });
-	await decideKind(abstaining, item);
+	expect(fallback).toEqual({ item: id, kind: "feature", from: "fallback", why: "no scripted answer fits" });
+	await keepKind(abstaining, item, fallback);
+	await keepKind(abstaining, item, fallback);
 	expect(abstaining.state.itemKinds.get(id)?.from).toBe("fallback");
 	expect((await adapter.workSource!.read(id)).thread.filter((entry) => entry.kind === "question")).toEqual([expect.objectContaining({ text: expect.stringContaining("Which kind of work is this?") })]);
 });

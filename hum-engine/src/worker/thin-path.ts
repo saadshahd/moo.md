@@ -27,7 +27,7 @@ import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
 import { reviewInput } from "../decide/review.ts";
-import { decideKind, forgetProgress, kindAnswered } from "./kind.ts";
+import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
 import { answerToLatest, latestQuestionAt, openQuestion } from "./thread.ts";
@@ -211,7 +211,9 @@ export const runThinPath = async (options: ThinPathOptions): Promise<ThinResult>
 
 	if (unanswered) return unanswered.at + o.config.hum.questionTimeoutHours * HOUR_MS < now() ? park(o, { outcome: "stuck", item: id, detail: `no answer came within ${o.config.hum.questionTimeoutHours} hours` }) : { outcome: "waiting", item: id };
 
-	const kindName = (named ?? known ?? (await decideKind({ ...o, judge, now }, item))).kind;
+	const settled = named ?? known;
+	const kindContext = { ...o, judge, now };
+	const kindName = settled ? settled.kind : await keepKind(kindContext, item, await pickKind(kindContext, item));
 	const kind = kindNamed(o.config, kindName);
 	const asking = waitsOnOwner(kind, at);
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
@@ -812,9 +814,9 @@ const merge = async (d: Driven, onMerged: () => void, ownerApproved = false): Pr
 	const isDocsOnly = d.kindName === d.config.hum.docsOnly.kind;
 
 	if (isDocsOnly && leavesDocs((await changeOn(landContext(d))).paths, d.config.hum)) {
-		const real = await decideKind(d, d.item, d.kindName);
+		const real = await keepKind(d, d.item, await pickKind(d, d.item, d.kindName), d.kindName);
 
-		return { outcome: "moved", item: d.id, kind: real.kind };
+		return { outcome: "moved", item: d.id, kind: real };
 	}
 
 	await prepareLanding(landContext(d), ownerApproved);

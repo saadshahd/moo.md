@@ -141,7 +141,7 @@ export { configuredModelCall, type Judgment, type ModelCall, modelCallOver, type
 
 export { decideProse, type ProseDecision } from "./worker/prose-run.ts";
 
-export { decideKind } from "./worker/kind.ts";
+export { keepKind, pickKind } from "./worker/kind.ts";
 
 export { labelChanges, type LabelRules, matchedSample, type PastChange } from "./decide/labels.ts";
 
