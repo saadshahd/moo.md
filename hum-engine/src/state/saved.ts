@@ -82,21 +82,27 @@ export const QueuedQuestion = z.object({
 
 export type QueuedQuestion = z.infer<typeof QueuedQuestion>;
 
-/** What became of one answer on an item's thread, saved before its reply is posted. */
-export const SettledAnswer = z.object({
+const settledFields = {
 	item: name,
 	/** The answer's number among the thread's answers and replies from people. */
 	ordinal: z.int().positive(),
 	text: name,
-	/** The option the answer picked, when it picked one. */
-	option: name.optional(),
-	source: z.enum(RESOLUTION_SOURCES),
 	disposition: z.enum(DISPOSITIONS),
 	why: name,
 	at: time,
-});
+};
+
+/** What became of one answer on an item's thread, saved before its reply is posted: a marker may name an option, a first word or a model call always does, and the rest name none. */
+export const SettledAnswer = z.discriminatedUnion("source", [
+	z.object({ ...settledFields, source: z.literal(RESOLUTION_SOURCES.marker), option: name.optional() }),
+	z.object({ ...settledFields, source: z.enum([RESOLUTION_SOURCES["first-word"], RESOLUTION_SOURCES.model]), option: name }),
+	z.object({ ...settledFields, source: z.enum([RESOLUTION_SOURCES.free, RESOLUTION_SOURCES["none-of-these"], RESOLUTION_SOURCES.abstained]) }),
+]);
 
 export type SettledAnswer = z.infer<typeof SettledAnswer>;
+
+/** The option a settled answer picked, when its source names one. */
+export const optionOf = (answer: SettledAnswer): string | undefined => ("option" in answer ? answer.option : undefined);
 
 const slotFields = {
 	name,

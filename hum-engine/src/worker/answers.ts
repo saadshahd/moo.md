@@ -5,7 +5,7 @@ import { onceCalls } from "../adapters/once.ts";
 import { dispose, type Disposition, matchOption, NONE_OF_THESE, replyQuestion, replyStem, replyText, type Resolution, type Stage } from "../decide/answer.ts";
 import { visibleText } from "../adapters/marked.ts";
 import type { State } from "../state/open.ts";
-import type { SettledAnswer } from "../state/saved.ts";
+import { optionOf, type SettledAnswer } from "../state/saved.ts";
 import { isFromHum, latestQuestionAt } from "./thread.ts";
 
 export type AnswerContext = {
@@ -54,27 +54,32 @@ const resolveReply = async (ctx: AnswerContext, itemId: string, question: string
 
 const keyOf = (item: string, ordinal: number): string => `${item}#${ordinal}`;
 
-const optionOf = (resolution: Resolution): { option?: string } => ("option" in resolution && resolution.option !== undefined ? { option: resolution.option } : {});
+/** A resolution as its settled answer saves it; an abstention's own why gives way to the disposition's. */
+const savedResolution = (resolution: Resolution) => (resolution.source === "abstained" ? { source: resolution.source } : resolution);
 
 const recordOf = (item: string, { entry, ordinal }: Reply, resolution: Resolution, outcome: Disposition, at: number): SettledAnswer => ({
 	item,
 	ordinal,
 	text: entry.text,
-	...optionOf(resolution),
-	source: resolution.source,
 	disposition: outcome.disposition,
 	why: outcome.why,
 	at,
+	...savedResolution(resolution),
 });
 
-const resolutionOf = ({ source, option, why }: SettledAnswer): Resolution => {
-	if (source === "abstained") return { source, why };
-
-	if (source === "marker") return { source, option };
-
-	if (source === "free" || source === "none-of-these") return { source };
-
-	return { source, option: option ?? "" };
+const resolutionOf = (record: SettledAnswer): Resolution => {
+	switch (record.source) {
+		case "abstained":
+			return { source: record.source, why: record.why };
+		case "marker":
+			return { source: record.source, option: record.option };
+		case "first-word":
+		case "model":
+			return { source: record.source, option: record.option };
+		case "free":
+		case "none-of-these":
+			return { source: record.source };
+	}
 };
 
 const isFinal = ({ disposition }: SettledAnswer): boolean => disposition !== "held";
@@ -82,8 +87,8 @@ const isFinal = ({ disposition }: SettledAnswer): boolean => disposition !== "he
 const hasReplyOn = (thread: readonly ThreadEntry[], stem: string): boolean => thread.some((entry) => isFromHum(entry) && entry.kind === "comment" && entry.text.startsWith(stem));
 
 /** The answer as the engine reads it from here on: the option it picked, or no longer an answer at all. */
-const normalized = (entry: ThreadEntry, { disposition, option }: SettledAnswer): ThreadEntry =>
-	disposition === "applied" ? { ...entry, kind: "answer", option } : { ...entry, kind: "comment", option: undefined };
+const normalized = (entry: ThreadEntry, record: SettledAnswer): ThreadEntry =>
+	record.disposition === "applied" ? { ...entry, kind: "answer", option: optionOf(record) } : { ...entry, kind: "comment", option: undefined };
 
 const SUPERSEDED: Disposition = { disposition: "dropped", why: "A newer question replaced the one this answered." };
 

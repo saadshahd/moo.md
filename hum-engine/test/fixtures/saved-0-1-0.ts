@@ -23,4 +23,5 @@ export const SAVED_0_1_0 = {
 	runs: { itemId: "7", run: "build", attempt: 0, name: "hum #7 build 0", sessionId: "session-1", savedAt: 1_700_000_000_000, endedAt: 1_700_000_000_900, memoryUsed: ["Run the tests first."] },
 	events: { source: "thread", sourceId: "c1", itemId: "7", type: "answer", receivedAt: 1_700_000_000_000, payload: { text: "alpha" } },
 	ops: { itemId: "7", run: "build", attempt: 0, op: "comment", state: "done", at: 1_700_000_000_000 },
+	proofs: { item: "7", at: 1_700_000_000_000, passed: false, reason: "the check passes on 0123456, the commit a note points at", worktrees: 2, ms: 900 },
 } as const;

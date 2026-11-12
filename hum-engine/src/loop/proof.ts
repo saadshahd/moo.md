@@ -19,13 +19,14 @@ export type ProofOptions = {
 	readonly now: () => number;
 };
 
-export type ProofResult = {
-	readonly passed: boolean;
-	readonly reason?: string;
+/** What a proof cost. */
+type ProofCost = {
 	/** Worktrees made: one per note commit and one for the head. */
 	readonly worktrees: number;
 	readonly ms: number;
 };
+
+export type ProofResult = ProofCost & ({ readonly passed: true } | { readonly passed: false; readonly reason: string });
 
 const isCommit = async (git: Git, sha: string): Promise<boolean> => (await git.run(["cat-file", "-e", `${sha}^{commit}`])).code === 0;
 
@@ -56,13 +57,14 @@ export const proveCheck = async ({ git, head, base, notes, checks, timeoutMs, no
 	const started = now();
 	let worktrees = 0;
 
-	const done = (reason?: string): ProofResult => ({ passed: reason === undefined, reason, worktrees, ms: now() - started });
+	const cost = (): ProofCost => ({ worktrees, ms: now() - started });
+	const failed = (reason: string): ProofResult => ({ passed: false, reason, ...cost() });
 
 	const files = await checkFiles(git, base, head);
 	const commits = [...new Set(notes.map(({ change }) => change))];
 	const provable = (await Promise.all(commits.map(async (sha) => ((await isCommit(git, sha)) ? [sha] : [])))).flat();
 
-	if (provable.length === 0) return done("no note points at a commit the check can run on");
+	if (provable.length === 0) return failed("no note points at a commit the check can run on");
 
 	for (const sha of provable) {
 		const failure = await inWorktreeAt(git, sha, async (folder) => {
@@ -72,7 +74,7 @@ export const proveCheck = async ({ git, head, base, notes, checks, timeoutMs, no
 			return runChecks(checks, folder, { timeoutMs });
 		});
 
-		if (failure === undefined) return done(`the check passes on ${sha}, the commit a note points at`);
+		if (failure === undefined) return failed(`the check passes on ${sha}, the commit a note points at`);
 	}
 
 	const failure = await inWorktreeAt(git, head, async (folder) => {
@@ -81,5 +83,5 @@ export const proveCheck = async ({ git, head, base, notes, checks, timeoutMs, no
 		return runChecks(checks, folder, { timeoutMs });
 	});
 
-	return failure === undefined ? done() : done(`the checks fail on the check item's own commit: ${failure.slice(0, 300)}`);
+	return failure === undefined ? { passed: true, ...cost() } : failed(`the checks fail on the check item's own commit: ${failure.slice(0, 300)}`);
 };

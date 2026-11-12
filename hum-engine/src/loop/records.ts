@@ -60,16 +60,15 @@ export const Break = z.strictObject({ item: name, sha: name, at: time, paths: z.
 
 export type Break = z.infer<typeof Break>;
 
-/** What proving a check cost: the commits it ran on, and the time it took. */
-export const Proof = z.strictObject({
+const proofFields = {
 	item: name,
 	at: time,
-	passed: z.boolean(),
-	/** Why it failed, when it did. */
-	reason: z.string().optional(),
 	/** Worktrees made: one per note commit and one for the check's own head. */
 	worktrees: z.int().nonnegative(),
 	ms: z.int().nonnegative(),
-});
+};
+
+/** What proving a check cost: the commits it ran on, and the time it took; a failed proof says why. */
+export const Proof = z.discriminatedUnion("passed", [z.object({ ...proofFields, passed: z.literal(true) }), z.object({ ...proofFields, passed: z.literal(false), reason: z.string() })]);
 
 export type Proof = z.infer<typeof Proof>;

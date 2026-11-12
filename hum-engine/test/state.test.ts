@@ -264,6 +264,7 @@ const readsOf = (state: State) =>
 		runs: () => state.runs.all(),
 		events: () => state.events.list(SAVED_0_1_0.events.itemId),
 		ops: () => state.ops.list(),
+		proofs: () => state.proofs.list(),
 	}) satisfies Record<keyof typeof SAVED_0_1_0, () => unknown[]>;
 
 /** Runs and events live one folder deeper, under the item's slug. */
