@@ -1,14 +1,13 @@
 import { PATCH } from "../adapters/git.ts";
-import type { Pull, PullRequests } from "../adapters/pull-requests.ts";
 import { isTrusted } from "../decide/prose.ts";
 import { type TasteResult, tasteComment, tasteQuestion } from "../decide/taste.ts";
-import type { LandContext } from "./land.ts";
+import type { LandContext, PullAtHead } from "./land.ts";
 
 /**
  * Comments on the pull request whether its diff keeps each of the owner's taste rules, once per head. The comment
  * reports only: no result reaches the placement, the route or the merge.
  */
-export const reportTaste = async (ctx: LandContext, pulls: PullRequests, pull: Pull, head: string): Promise<void> => {
+export const reportTaste = async (ctx: LandContext, { pulls, pull, head }: PullAtHead): Promise<void> => {
 	const { rules, ...bar } = { rules: ctx.config.hum.tasteRules, measuredModels: ctx.config.hum.measuredModels, minJudgeRate: ctx.config.hum.minJudgeRate };
 
 	if (rules.length === 0) return;

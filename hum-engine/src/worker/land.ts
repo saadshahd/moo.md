@@ -24,6 +24,7 @@ import { markDone } from "../adapters/item-file.ts";
 import {
 	type BranchRules,
 	methodFor,
+	type Pull,
 	type PullRequests,
 } from "../adapters/pull-requests.ts";
 import type { ModelCall } from "../adapters/model-call.ts";
@@ -68,6 +69,9 @@ const NO_RULES: BranchRules = {
 	requiresPullRequest: false,
 	mergeMethods: undefined,
 };
+
+/** A change's pull request as it stands at one head of the run branch, which a report on it is made once for. */
+export type PullAtHead = { readonly pulls: PullRequests; readonly pull: Pull; readonly head: string };
 
 /** Everything landing a finished change reads and writes. The clone has the run branch checked out and the base fetched. */
 export type LandContext = {
@@ -343,10 +347,10 @@ const throughPullRequest = async (
 			detail: `its pull request was closed unmerged: ${pull.url}`,
 		};
 
-	const head = ctx.state.landings.get(id)?.head ?? branch;
+	const atHead: PullAtHead = { pulls, pull, head: ctx.state.landings.get(id)?.head ?? branch };
 
-	await reportTaste(ctx, pulls, pull, head);
-	await reportAlignment(ctx, pulls, pull, head);
+	await reportTaste(ctx, atHead);
+	await reportAlignment(ctx, atHead);
 
 	const armed = await pulls.autoMerge(
 		pull,
