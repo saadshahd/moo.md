@@ -20,10 +20,12 @@ export const recordMerged = (state: State, item: string, sha: string, at: number
  * listed again. Each saved landing whose pull request has merged is recorded as merged, so the measure counts it.
  */
 export const settleMergedPulls = async (state: State, pulls: Pick<PullRequests, "find">, at: number): Promise<void> => {
-	for (const { item, branch, head } of state.landings.list()) {
-		if ((await pulls.find(branch))?.state !== "MERGED") continue;
+	await Promise.all(
+		state.landings.list().map(async ({ item, branch, head }) => {
+			if ((await pulls.find(branch))?.state !== "MERGED") return;
 
-		recordMerged(state, item, head, at);
-		state.items.remove(item);
-	}
+			recordMerged(state, item, head, at);
+			state.items.remove(item);
+		}),
+	);
 };

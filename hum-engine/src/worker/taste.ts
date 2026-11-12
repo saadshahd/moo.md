@@ -19,17 +19,9 @@ export const reportTaste = async (ctx: LandContext, pulls: PullRequests, pull: P
 			holds: async () => false,
 			run: async () => {
 				const diff = await ctx.git.raw(["diff", ...PATCH, `origin/${ctx.base}...${head}`]);
-				const models = new Set<string>();
-
-				const results: TasteResult[] = [];
-
-				for (const rule of rules) {
-					const judged = await ctx.judge({ ...tasteQuestion(rule, diff, ctx.config.hum), item: ctx.id });
-
-					if (judged.kind === "picked") judged.models.forEach((model) => models.add(model));
-
-					results.push({ rule, answer: judged.kind === "picked" ? judged.value : { abstained: judged.why } });
-				}
+				const verdicts = await Promise.all(rules.map(async (rule) => ({ rule, judged: await ctx.judge({ ...tasteQuestion(rule, diff, ctx.config.hum), item: ctx.id }) })));
+				const results: TasteResult[] = verdicts.map(({ rule, judged }) => ({ rule, answer: judged.kind === "picked" ? judged.value : { abstained: judged.why } }));
+				const models = new Set(verdicts.flatMap(({ judged }) => (judged.kind === "picked" ? judged.models : [])));
 
 				await pulls.comment(pull, tasteComment(results, isTrusted([...models], "taste", bar)));
 			},

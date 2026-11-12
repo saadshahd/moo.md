@@ -51,15 +51,19 @@ export const collectNotes = async ({ state, config, comments, history, hunkOf }:
 
 /** Step 6: a landed check item whose name the next CI run's log shows. */
 export const confirmChecks = async ({ state, ciLogs, now }: Pick<LoopPass, "state" | "ciLogs" | "now">): Promise<void> => {
-	for (const group of state.repeats.list()) {
+	const unconfirmed = state.repeats.list().flatMap((group) => {
 		const merge = group.item === undefined ? undefined : state.merges.get(group.item);
 
-		if (group.checked || !merge) continue;
+		return group.checked || !merge ? [] : [{ group, merge }];
+	});
 
-		const logs = await ciLogs(merge.at);
+	await Promise.all(
+		unconfirmed.map(async ({ group, merge }) => {
+			const logs = await ciLogs(merge.at);
 
-		if (logs.some((log) => logNames(log, group.key))) state.repeats.put(group.key, { ...group, checked: { at: now(), check: checkNameOf(group.key) } });
-	}
+			if (logs.some((log) => logNames(log, group.key))) state.repeats.put(group.key, { ...group, checked: { at: now(), check: checkNameOf(group.key) } });
+		}),
+	);
 };
 
 const missesOf = (state: State, group: RepeatGroup): ReviewNote[] =>
