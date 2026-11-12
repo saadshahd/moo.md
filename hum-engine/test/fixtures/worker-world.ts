@@ -13,7 +13,7 @@ import { Worker, type WorkerOptions } from "../../src/worker/worker.ts";
 import { configWith } from "./config.ts";
 import { makeShim, type ShimSpec } from "./shim.ts";
 import { WorkRepo, itemFile, markdownSettings } from "./work-repo.ts";
-import { tempDir } from "./temp.ts";
+import { settleAtTestEnd, tempDir } from "./temp.ts";
 
 export const NOW = 1_800_000_000_000;
 export const TTL = SHIPPED_DEFAULTS.claimExpirySeconds * 1000;
@@ -49,8 +49,8 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 	const { check: startCheck, runner } = await started();
 	const checks = options.checks ?? ["true"];
 
-	const workerWith = (over: Partial<WorkerOptions> = {}): Worker =>
-		new Worker({
+	const workerWith = (over: Partial<WorkerOptions> = {}): Worker => {
+		const worker = new Worker({
 			repo: repo.owner,
 			state,
 			config,
@@ -66,6 +66,11 @@ export const workerWorld = async (spec: ShimSpec, options: WorldOptions = {}) =>
 			...options.worker,
 			...over,
 		});
+
+		settleAtTestEnd(() => worker.idle());
+
+		return worker;
+	};
 
 	return {
 		repo,
