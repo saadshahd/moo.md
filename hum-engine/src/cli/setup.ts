@@ -38,6 +38,15 @@ type GithubFacts = {
 	readonly workflowsMayOpenPullRequests: boolean;
 };
 
+const Visibility = z.object({ visibility: z.string() });
+
+/** Whether anyone may read and comment on the repo; undefined without `gh` or a GitHub remote. */
+const isPublicRepo = async (repo: string): Promise<boolean | undefined> => {
+	const viewed = await gh(repo, ["repo", "view", "--json", "visibility"]);
+
+	return isRead(viewed) ? Visibility.parse(JSON.parse(viewed.stdout)).visibility === "PUBLIC" : undefined;
+};
+
 const WorkflowPermissions = z.object({ can_approve_pull_request_reviews: z.boolean() });
 
 /** Setup reads before any `hum.json` is written, so its commands run on the shipped time limit. */
@@ -97,12 +106,13 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 			const shipped = shippedConfig();
 			const scan = await scanRepo(io.cwd, base);
 			const facts = await githubFacts(io.cwd);
-			const proposal = proposeSetup(scan, shipped.hum, facts?.labels);
+			const isPublic = await isPublicRepo(io.cwd);
+			const proposal = proposeSetup(scan, shipped.hum, { labels: facts?.labels, isPublic: isPublic ?? true });
 			const { tracked, folders, ...shown } = scan;
 			const coverage = facts && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
 			const gitIdentity = await readGitIdentity(setupGit(io.cwd));
 
-			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts?.workflowsMayOpenPullRequests ?? null, gitIdentity }, null, "\t")}\n`);
+			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts?.workflowsMayOpenPullRequests ?? null, isPublicRepo: isPublic ?? null, gitIdentity }, null, "\t")}\n`);
 		});
 
 	setup
@@ -111,7 +121,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.requiredOption("--answers <file>", 'JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 2 }')
 		.option("--home <folder>", "where the service unit goes; default the user's home")
 		.action(async ({ answers, home }: { answers: string; home?: string }) => {
-			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)) });
+			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)), isPublicRepo: await isPublicRepo(io.cwd) });
 
 			io.stdout(`${JSON.stringify(result.ok ? { written: result.written } : { refused: result.refusal.message }, null, "\t")}\n`);
 			done(result.ok ? EXIT_OK : EXIT_FAILED);

@@ -548,7 +548,7 @@
 						},
 						"secret": {
 							"type": "string",
-							"minLength": 1
+							"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
 						}
 					},
 					"required": [
@@ -566,11 +566,11 @@
 						},
 						"clientIdSecret": {
 							"type": "string",
-							"minLength": 1
+							"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
 						},
 						"privateKeySecret": {
 							"type": "string",
-							"minLength": 1
+							"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
 						}
 					},
 					"required": [
@@ -581,7 +581,7 @@
 					"additionalProperties": false
 				}
 			],
-			"description": "Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset."
+			"description": "Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset."
 		},
 		"ciWakeTimeoutMinutes": {
 			"default": 60,
@@ -592,22 +592,106 @@
 		},
 		"ciRunner": {
 			"default": "ubuntu-latest",
-			"type": "string",
-			"minLength": 1,
-			"description": "The runner label the CI wake job runs on."
+			"anyOf": [
+				{
+					"anyOf": [
+						{
+							"type": "string",
+							"minLength": 1
+						},
+						{
+							"minItems": 1,
+							"type": "array",
+							"items": {
+								"type": "string",
+								"minLength": 1
+							}
+						}
+					]
+				},
+				{
+					"type": "object",
+					"properties": {
+						"group": {
+							"type": "string",
+							"minLength": 1
+						},
+						"labels": {
+							"anyOf": [
+								{
+									"type": "string",
+									"minLength": 1
+								},
+								{
+									"minItems": 1,
+									"type": "array",
+									"items": {
+										"type": "string",
+										"minLength": 1
+									}
+								}
+							]
+						}
+					},
+					"required": [
+						"group"
+					],
+					"additionalProperties": false
+				}
+			],
+			"description": "What the CI wake job runs on, as a workflow's runs-on holds it: one runner label, a list of labels the runner must carry all of, or { group, labels } for a runner group. On a public repo, a runner GitHub does not host keeps what a wake leaves on it, and setup asks before it writes one."
 		},
 		"ciContainer": {
 			"default": null,
 			"anyOf": [
 				{
-					"type": "string",
-					"minLength": 1
+					"anyOf": [
+						{
+							"type": "string",
+							"minLength": 1
+						},
+						{
+							"type": "object",
+							"properties": {
+								"image": {
+									"type": "string",
+									"minLength": 1
+								},
+								"credentials": {
+									"type": "object",
+									"properties": {
+										"username": {
+											"type": "string",
+											"minLength": 1
+										},
+										"password": {
+											"type": "string",
+											"minLength": 1
+										}
+									},
+									"required": [
+										"username",
+										"password"
+									],
+									"additionalProperties": false
+								},
+								"options": {
+									"type": "string",
+									"minLength": 1
+								}
+							},
+							"required": [
+								"image"
+							],
+							"additionalProperties": false
+						}
+					]
 				},
 				{
 					"type": "null"
 				}
 			],
-			"description": "The image of the container the CI wake job runs in, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts."
+			"description": "The container the CI wake job runs in: its image, or { image, credentials: { username, password }, options } for a private registry or docker options, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts."
 		},
 		"ciEnv": {
 			"default": {},
@@ -619,7 +703,7 @@
 			"additionalProperties": {
 				"type": "string"
 			},
-			"description": "Env the CI wake job sets for every step, such as a gateway's settings; a value may be a workflow expression. A name the job sets itself, such as GH_TOKEN, is refused."
+			"description": "Env the CI wake job sets, such as a gateway's settings; a value may be a workflow expression. A value that reads a secret reaches only the step that runs hum; every other value reaches every step, the installs too. A name the job sets itself, such as GH_TOKEN, is refused."
 		},
 		"ciClaudeAuth": {
 			"default": "oauth-token",
@@ -1277,7 +1361,7 @@
 				"type": "string",
 				"minLength": 1
 			},
-			"description": "GitHub logins whose pull request reviews and comments are the owner's review notes."
+			"description": "GitHub logins whose pull request reviews and comments are the owner's review notes, and whose issue comments hum reads as replies. hum also reads the issue comments of the repo's owner, the owning organisation's members and invited collaborators, and reads no one else's."
 		},
 		"repeatAt": {
 			"default": 2,

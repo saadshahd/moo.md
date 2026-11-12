@@ -6,7 +6,19 @@ import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 
 type Issue = { number: number; title: string; body: string; state: "OPEN" | "CLOSED"; labels: string[] };
 
-type Comment = { body: string; createdAt: string };
+/** Who wrote a comment, as GitHub's GraphQL names them. */
+export type Author = { readonly authorAssociation: string; readonly author: { readonly __typename: "User" | "Bot"; readonly login: string } | null };
+
+/** The repo's owner, whose login the fake's tokens post on. */
+export const OWNER: Author = { authorAssociation: "OWNER", author: { __typename: "User", login: "owner" } };
+
+/** Someone with no tie to the repo, who may still comment on a public one. */
+export const STRANGER: Author = { authorAssociation: "NONE", author: { __typename: "User", login: "stranger" } };
+
+/** The bot a workflow's own token posts as. */
+export const WORKFLOW_BOT: Author = { authorAssociation: "NONE", author: { __typename: "Bot", login: "github-actions" } };
+
+type Comment = Author & { body: string; createdAt: string };
 
 type Pull = { id: string; number: number; head: string; base: string; title: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND" };
 
@@ -127,9 +139,9 @@ export class FakeGitHub {
 		return number;
 	}
 
-	/** A person's comment on an issue. */
-	say(number: number, text: string): void {
-		const refusal = this.#commentOn(number, text);
+	/** A comment on an issue, the owner's unless `by` names another author. */
+	say(number: number, text: string, by: Author = OWNER): void {
+		const refusal = this.#commentOn(number, text, by);
 
 		if (refusal) throw new Error(refusal.graphql.message);
 	}
@@ -189,12 +201,12 @@ export class FakeGitHub {
 		return this.#issues.find((found) => found.number === number) ?? refused("NOT_FOUND", `Could not resolve to an Issue with the number of ${number}.`);
 	}
 
-	#commentOn(number: number, text: string): Refused | undefined {
+	#commentOn(number: number, text: string, by: Author = OWNER): Refused | undefined {
 		const issue = this.#issue(number);
 
 		if (issue instanceof Refused) return issue;
 
-		this.#comments.set(number, [...this.comments(number), { body: text, createdAt: new Date(1_700_000_000_000 + ++this.#tick * 1000).toISOString() }]);
+		this.#comments.set(number, [...this.comments(number), { ...by, body: text, createdAt: new Date(1_700_000_000_000 + ++this.#tick * 1000).toISOString() }]);
 		this.#version++;
 
 		return undefined;

@@ -148,17 +148,34 @@ test("the previous schema migrates", () => {
 	expect(migrated).toEqual({ ok: true, value: { schemaVersion: 2, title: "old" } });
 });
 
-test("a schema 1 hum.json's pull request token secret becomes schema 2's secret source, and one that names none gets the shipped source", () => {
-	const named = clone(setUp());
-	const unnamed = clone(setUp());
+/** The shipped config as a schema 1 file held it: no token source, and the token secret under its old key when `secret` names one. */
+const atSchema1 = (secret?: string): RawConfig => {
+	const old = clone(setUp());
 
-	named.hum = { ...named.hum, schemaVersion: 1, pullRequestTokenSecret: "PR_TOKEN" };
-	delete named.hum.pullRequestToken;
-	unnamed.hum = { ...unnamed.hum, schemaVersion: 1 };
-	delete unnamed.hum.pullRequestToken;
+	old.hum = { ...old.hum, schemaVersion: 1 };
+	delete old.hum.pullRequestToken;
 
-	expect(loaded(named).hum.pullRequestToken).toEqual({ from: "secret", secret: "PR_TOKEN" });
-	expect(loaded(unnamed).hum.pullRequestToken).toEqual(SHIPPED_DEFAULTS.pullRequestToken);
+	if (secret !== undefined) old.hum.pullRequestTokenSecret = secret;
+
+	return old;
+};
+
+test("a schema 1 hum.json's pull request token secret becomes schema 2's secret source", () => {
+	expect(loaded(atSchema1("PR_TOKEN")).hum.pullRequestToken).toEqual({ from: "secret", secret: "PR_TOKEN" });
+});
+
+test("a schema 1 hum.json that names no pull request token secret gets the shipped source", () => {
+	expect(loaded(atSchema1()).hum.pullRequestToken).toEqual(SHIPPED_DEFAULTS.pullRequestToken);
+});
+
+test.each(["PR-TOKEN", "GITHUB_PR_TOKEN", "9LIVES"])("a secret name GitHub would not take, %s, is refused", (secret) => {
+	const bad = clone(setUp());
+
+	bad.hum.pullRequestToken = { from: "secret", secret };
+
+	const result = loadConfig(bad, { env });
+
+	expect(!result.ok && result.refusal.code).toBe("malformed-config");
 });
 
 test("ciEnv that sets a name the CI wake job sets itself is refused, naming it", () => {

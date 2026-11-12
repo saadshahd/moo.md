@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "plist";
@@ -46,17 +46,23 @@ const settings: WorkflowSettings = {
 
 const CONTAINER = "mcr.microsoft.com/playwright:v1.0.0-noble";
 
-/** A repo whose CI runs in a job container on its own runner, signs Claude Code in through a gateway and mints its token from a GitHub App. */
+/** Env that reads no secret: a gateway's address, a model from a variable, headers on two lines. */
+const OPEN_ENV = { IS_SANDBOX: "1", ANTHROPIC_BEDROCK_BASE_URL: "https://gateway.example.com", ANTHROPIC_DEFAULT_HAIKU_MODEL: "${{ vars.HAIKU_MODEL }}", ANTHROPIC_CUSTOM_HEADERS: "x-team: one\nx-use: two\n" };
+
+/** Env that reads a secret: the gateway's token. */
+const SECRET_ENV = { ANTHROPIC_AUTH_TOKEN: "${{ secrets.GATEWAY_TOKEN }}" };
+
+/** A repo whose CI runs on its own runner, in a job container from a private registry, signs Claude Code in through a gateway and mints its token from a GitHub App. */
 const gateway: WorkflowSettings = {
 	...settings,
 	ciRunner: "own-large",
-	ciContainer: CONTAINER,
-	ciEnv: { IS_SANDBOX: "1", ANTHROPIC_BEDROCK_BASE_URL: "https://gateway.example.com", ANTHROPIC_DEFAULT_HAIKU_MODEL: "${{ vars.HAIKU_MODEL }}", ANTHROPIC_CUSTOM_HEADERS: "x-team: one\nx-use: two\n" },
+	ciContainer: { image: CONTAINER, credentials: { username: "${{ vars.REGISTRY_USER }}", password: "${{ secrets.REGISTRY_TOKEN }}" }, options: "--cpus 2" },
+	ciEnv: { ...OPEN_ENV, ...SECRET_ENV },
 	ciClaudeAuth: "env",
 	pullRequestToken: { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" },
 };
 
-const Trigger = z.object({ on: z.record(z.string(), z.json()) });
+const Trigger = z.object({ on: z.record(z.string(), z.json()), jobs: z.object({ wake: z.object({ if: z.string().optional() }) }) });
 
 const Step = z.object({
 	id: z.string().optional(),
@@ -70,7 +76,7 @@ const Step = z.object({
 const Wake = z.object({
 	on: z.object({ workflow_call: z.object({ secrets: z.record(z.string(), z.object({ required: z.boolean() })) }) }),
 	permissions: z.record(z.string(), z.string()),
-	jobs: z.object({ wake: z.object({ "runs-on": z.string(), container: z.string().optional(), env: z.record(z.string(), z.string()), steps: z.array(Step) }) }),
+	jobs: z.object({ wake: z.object({ "runs-on": z.json(), container: z.json().optional(), env: z.record(z.string(), z.string()), steps: z.array(Step) }) }),
 });
 
 const wakeText = (from: WorkflowSettings): string => ciWorkflows(from).find(({ file }) => file === "hum-wake.yml")?.text ?? "";
@@ -108,7 +114,7 @@ test("the launchd plist restarts only after a failure, keeps the paths absolute 
 	});
 });
 
-// actionlint 1.7.12 knows create-github-app-token v3 only by app-id, which v3 deprecates for client-id.
+/** actionlint 1.7.12 knows create-github-app-token v3 only by app-id, which v3 deprecates for client-id. */
 const STALE_ACTION_INPUTS = ["-ignore", 'missing input "app-id"', "-ignore", 'input "client-id" is not defined'];
 
 test.skipIf(!has("actionlint"))("actionlint passes on every CI workflow, with the wake workflow they call beside them", () => {
@@ -142,24 +148,55 @@ test("the CI workflows wake on the four events from the settings, never resume a
 	expect([...wakeSteps, ...wakeOf(gateway).jobs.wake.steps].every((step) => !step.run?.includes("${{"))).toBe(true);
 });
 
-test("the wake job runs on the runner and in the container the settings name, and gives every step their env as written", () => {
+test("a comment wakes hum only when the repo's owner, a member or a collaborator wrote it, and never a bot", () => {
+	const text = ciWorkflows(settings).find(({ file }) => file === "hum-comment.yml")?.text ?? "";
+
+	expect(Trigger.parse(parseYaml(text)).jobs.wake.if).toBe(`github.event.comment.user.type != 'Bot' && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)`);
+});
+
+test("the wake job runs on the runner and in the container the settings name, as written", () => {
 	const shipped = wakeOf(settings).jobs.wake;
 	const own = wakeOf(gateway).jobs.wake;
 
 	expect(shipped["runs-on"]).toBe("ubuntu-latest");
 	expect(wakeText(settings)).not.toContain("container:");
 	expect(own["runs-on"]).toBe("own-large");
-	expect(own.container).toBe(CONTAINER);
-	expect(own.env).toMatchObject(gateway.ciEnv);
-	expect(own.env.HUM_EVENT).toBe("${{ github.event_name }}");
+	expect(own.container).toEqual(gateway.ciContainer);
+	expect(wakeOf({ ...gateway, ciRunner: { group: "agents", labels: ["self-hosted", "linux"] } }).jobs.wake["runs-on"]).toEqual({ group: "agents", labels: ["self-hosted", "linux"] });
 });
 
-test("signed in with the OAuth token, the wake requires its secret and hands it to Claude Code; signed in through env, it names no such secret", () => {
+test("env that reads no secret reaches every step, and env that reads one reaches only the step that runs hum", () => {
+	const { env, steps } = wakeOf(gateway).jobs.wake;
+
+	expect(env).toEqual({ ...OPEN_ENV, HUM_HAS_APP: "${{ secrets.APP_CLIENT_ID != '' }}", HUM_EVENT: "${{ github.event_name }}" });
+	expect(steps.at(-1)?.env).toMatchObject(SECRET_ENV);
+	expect(steps.slice(0, -1).filter((step) => JSON.stringify(step.env ?? {}).includes("GATEWAY_TOKEN"))).toEqual([]);
+});
+
+test("every secret the runner, container and env name is declared for the called workflow, and none is required", () => {
+	expect(wakeOf(gateway).on.workflow_call.secrets).toMatchObject({ GATEWAY_TOKEN: { required: false }, REGISTRY_TOKEN: { required: false } });
+});
+
+test("signed in with the OAuth token, the wake requires its secret and hands it to the step that runs hum alone; signed in through env, it names no such secret", () => {
 	const token = wakeOf(settings);
 
 	expect(token.on.workflow_call.secrets.CLAUDE_CODE_OAUTH_TOKEN).toEqual({ required: true });
-	expect(token.jobs.wake.env.CLAUDE_CODE_OAUTH_TOKEN).toBe("${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}");
+	expect(token.jobs.wake.steps.at(-1)?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe("${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}");
+	expect(wakeText(settings).match(/CLAUDE_CODE_OAUTH_TOKEN: \$/g)).toHaveLength(1);
 	expect(wakeText(gateway)).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
+});
+
+test("git's global config and the installed tools sit in the runner's temp folder, so a wake leaves nothing on a machine that outlives it", () => {
+	const { steps } = wakeOf(settings).jobs.wake;
+	const paths = steps.find(({ run }) => run?.includes("GITHUB_ENV"));
+	const folder = temp();
+	const files = { GITHUB_ENV: join(folder, "env"), GITHUB_PATH: join(folder, "path") };
+
+	expect(Bun.spawnSync(["bash", "-ec", paths?.run ?? "false"], { env: { PATH: process.env.PATH, RUNNER_TEMP: "/runner/temp", ...files } }).exitCode).toBe(0);
+	expect(readFileSync(files.GITHUB_ENV, "utf8")).toBe("GIT_CONFIG_GLOBAL=/runner/temp/hum-gitconfig\n");
+	expect(readFileSync(files.GITHUB_PATH, "utf8")).toBe("/runner/temp/hum-tools/bin\n");
+	expect(steps.findIndex((step) => step === paths)).toBeLessThan(steps.findIndex(({ run }) => run?.includes("git config --global")));
+	expect(steps.find(({ run }) => run?.startsWith("npm install"))?.run).toStartWith('npm install --global --prefix "$RUNNER_TEMP/hum-tools" ');
 });
 
 test("a secret's token is the run's GH_TOKEN, and falls back to the workflow token while the secret is unset", () => {
@@ -174,13 +211,16 @@ test("an App's token is minted last, with the workflow's own permissions, from t
 	const { on, permissions, jobs } = wakeOf(gateway);
 	const [mint, wake] = jobs.wake.steps.slice(-2);
 
-	expect(on.workflow_call.secrets).toEqual({ APP_CLIENT_ID: { required: false }, APP_PRIVATE_KEY: { required: false } });
+	expect(on.workflow_call.secrets).toMatchObject({ APP_CLIENT_ID: { required: false }, APP_PRIVATE_KEY: { required: false } });
 	expect(mint?.uses).toStartWith("actions/create-github-app-token@");
 	expect(mint?.with).toEqual({
 		"client-id": "${{ secrets.APP_CLIENT_ID }}",
 		"private-key": "${{ secrets.APP_PRIVATE_KEY }}",
-		...Object.fromEntries(Object.entries(permissions).map(([scope, level]) => [`permission-${scope}`, level])),
+		"permission-contents": "write",
+		"permission-issues": "write",
+		"permission-pull-requests": "write",
 	});
+	expect(permissions).toEqual({ contents: "write", issues: "write", "pull-requests": "write" });
 	expect(mint?.if).toBe("env.HUM_HAS_APP == 'true'");
 	expect(jobs.wake.env.HUM_HAS_APP).toBe("${{ secrets.APP_CLIENT_ID != '' }}");
 	expect(wake?.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token || github.token }}`);

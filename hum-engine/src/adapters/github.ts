@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ADAPTER_API_VERSION, type AdapterContext, type Answers, type Claim, type Item, ItemId, PermanentError, type Integrations, type Questions, type Release, type Watch, type WorkSource } from "../adapter-api.ts";
 import type { Json } from "../config/json.ts";
 import type { MERGE_METHODS } from "../config/schema.ts";
+import { TRUSTED_ASSOCIATIONS } from "../config/wake-job.ts";
 import { HOUR_MS } from "../time.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommit, claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
@@ -30,6 +31,11 @@ const Commit = z.object({ oid: z.string(), message: z.string() });
 
 const Labels = z.object({ nodes: z.array(z.object({ name: z.string() })) });
 
+/** A comment with who wrote it; GitHub names no author once the account is deleted. */
+const IssueComment = z.object({ body: z.string(), createdAt: z.string(), authorAssociation: z.string(), author: z.object({ __typename: z.string(), login: z.string() }).nullable() });
+
+type IssueComment = z.infer<typeof IssueComment>;
+
 const ReadyItems = z.object({
 	repository: z.object({
 		issues: z.object({ nodes: z.array(z.object({ number: z.int().positive(), title: z.string() })) }),
@@ -45,7 +51,7 @@ const ItemReply = z.object({
 			body: z.string(),
 			state: z.enum(["OPEN", "CLOSED"]),
 			labels: Labels,
-			comments: z.object({ nodes: z.array(z.object({ body: z.string(), createdAt: z.string() })) }),
+			comments: z.object({ nodes: z.array(IssueComment) }),
 		}),
 		ref: z.object({ target: Commit.partial() }).nullable(),
 	}),
@@ -85,7 +91,7 @@ const ITEM = `query Item($owner: String!, $name: String!, $number: Int!, $claimR
 		issue(number: $number) {
 			id title body state
 			labels(first: 100) { nodes { name } }
-			comments(first: 100, after: $cursor) { nodes { body createdAt } pageInfo { hasNextPage endCursor } }
+			comments(first: 100, after: $cursor) { nodes { body createdAt authorAssociation author { __typename login } } pageInfo { hasNextPage endCursor } }
 		}
 		ref(qualifiedName: $claimRef) { target { ... on Commit { message } } }
 	}
@@ -149,6 +155,8 @@ export type GitHubOptions = {
 	/** Open issues with this label are the ready items. */
 	readonly readyLabel: string;
 	readonly mergeMethod: (typeof MERGE_METHODS)[number];
+	/** Logins whose comments are read whatever GitHub says of them, beside the people the repo trusts. */
+	readonly ownerLogins: readonly string[];
 	/** The client to use; by default one on the owner's own login. */
 	readonly client?: GitHubClient;
 	/** The owner's `commandTimeoutSeconds` in milliseconds: the limit of the `gh auth token` that reads the owner's login. */
@@ -166,14 +174,29 @@ type Whole = Integrations & {
 
 type StandingClaim = { readonly claim: Claim; readonly sha: string };
 
+const TRUSTED: ReadonlySet<string> = new Set(TRUSTED_ASSOCIATIONS);
+
 /**
- * GitHub on the owner's own login: issues are items, comments are the thread. Each read is one GraphQL query,
+ * Whether hum reads a comment. Anyone may comment on a public repo, a reply after a question is an answer, and hum's
+ * marker is only text, so who wrote a comment decides, never what it says. A person's is read when the repo trusts
+ * them or the owner names them. A bot's is read only when it is one of hum's own: in CI hum posts as the workflow's
+ * bot or the owner's App, and only a workflow or an App the owner installed posts as a bot at all.
+ */
+const isHeard = (owners: ReadonlySet<string>) => ({ body, author, authorAssociation }: IssueComment): boolean => {
+	if (author === null) return false;
+
+	return author.__typename === "Bot" ? parseComment(body, 0).author === "hum" : owners.has(author.login.toLowerCase()) || TRUSTED.has(authorAssociation);
+};
+
+/**
+ * GitHub on the owner's own login: issues are items, and the comments hum reads are the thread. Each read is one GraphQL query,
  * each write one mutation. A claim is a branch: its first commit is made through REST, since no mutation makes a
  * bare commit, and created with `createRef`; a renewal or an expired take is `createCommitOnBranch` on the head it
  * read. `watch` is one REST request with `If-None-Match`, because GitHub answers 304 free of rate limit.
  */
 export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterContext): Whole => {
 	const { base, claimPrefix, readyLabel, mergeMethod, timeoutMs } = options;
+	const isHeardHere = isHeard(new Set(options.ownerLogins.map((login) => login.toLowerCase())));
 	const repo = parseArgument(Repo, options.repo);
 	const [owner = "", name = ""] = repo.split("/");
 	const where = { owner, name };
@@ -226,7 +249,7 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 
 		issueIds.set(number, repository.issue.id);
 
-		return repository;
+		return { ...repository, issue: { ...repository.issue, comments: { nodes: repository.issue.comments.nodes.filter(isHeardHere) } } };
 	};
 
 	const comment = async (id: string, body: string): Promise<void> => {

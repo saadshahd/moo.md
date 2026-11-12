@@ -4,7 +4,7 @@ import { parseDocument } from "yaml";
 import { z } from "zod";
 import { gitIn } from "../adapters/git.ts";
 import { readHistory } from "../adapters/history.ts";
-import { SHIPPED_DEFAULTS } from "../config/schema.ts";
+import { type HumConfig, SHIPPED_DEFAULTS } from "../config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { orMissing } from "../state/fs.ts";
 import {
@@ -28,10 +28,10 @@ export type CiJob = {
 	readonly job: string;
 	readonly triggers: readonly string[];
 	readonly commands: readonly string[];
-	/** The runner, when the job names one label. */
-	readonly runner: string | undefined;
-	/** The image of the job's container. */
-	readonly container: string | undefined;
+	/** What the job's `runs-on` holds: a label, a label list or a runner group. */
+	readonly runner: HumConfig["ciRunner"] | undefined;
+	/** The job's container: its image, with the registry sign-in and options where the job names them. */
+	readonly container: NonNullable<HumConfig["ciContainer"]> | undefined;
 	/** The env every step gets: the workflow's, with the job's own over it. */
 	readonly env: Readonly<Record<string, string>>;
 	readonly actions: readonly { readonly uses: string; readonly with: Readonly<Record<string, string>> }[];
@@ -76,10 +76,31 @@ const PackageJson = z.looseObject({
 /** YAML reads `1` and `true` as a number and a boolean; a workflow passes each on as text. */
 const Text = z.union([z.string(), z.number(), z.boolean()]).transform(String);
 
-/** A map of text, or none where the workflow writes an expression in its place. */
-const TextMap = z.record(z.string(), Text).catch({});
+/** A map's entries that are text: one that is not, such as a key YAML reads with no value, is left out alone. No entries where the workflow writes an expression in the map's place. */
+const TextMap = z
+	.record(z.string(), z.unknown())
+	.catch({})
+	.transform((map) => Object.fromEntries(Object.entries(map).flatMap(([key, value]) => (Text.safeParse(value).success ? [[key, String(value)]] : []))));
 
-const Container = z.union([z.string(), z.looseObject({ image: z.string() }).transform(({ image }) => image)]).optional().catch(undefined);
+const RunnerLabels = z.union([z.string(), z.array(z.string()).min(1)]);
+
+/** A key the workflow leaves out stays out, so what a scan reads has the shape `hum.json` holds. */
+const withoutUnset = <T extends object>(value: T): T => JSON.parse(JSON.stringify(value));
+
+const RunsOn = z
+	.union([RunnerLabels, z.looseObject({ group: z.string(), labels: RunnerLabels.optional() }).transform(({ group, labels }) => withoutUnset({ group, labels })), z.looseObject({ labels: RunnerLabels }).transform(({ labels }) => labels)])
+	.optional()
+	.catch(undefined);
+
+const Container = z
+	.union([
+		z.string(),
+		z
+			.looseObject({ image: z.string(), credentials: z.object({ username: Text, password: Text }).optional(), options: z.string().optional() })
+			.transform(({ image, credentials, options }) => (credentials === undefined && options === undefined ? image : withoutUnset({ image, credentials, options }))),
+	])
+	.optional()
+	.catch(undefined);
 
 const Workflow = z.looseObject({
 	on: z.union([z.string().transform((trigger) => [trigger]), z.array(z.string()), z.record(z.string(), z.unknown()).transform((triggers) => Object.keys(triggers))]).default([]),
@@ -88,7 +109,7 @@ const Workflow = z.looseObject({
 		.record(
 			z.string(),
 			z.looseObject({
-				"runs-on": z.string().optional().catch(undefined),
+				"runs-on": RunsOn,
 				container: Container,
 				env: TextMap,
 				steps: z.array(z.looseObject({ run: z.string().optional(), uses: z.string().optional(), with: TextMap })).default([]),

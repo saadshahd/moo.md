@@ -25,7 +25,8 @@ export type Refusal =
 	| { readonly code: "invalid-config"; readonly problems: readonly Problem[]; readonly message: string }
 	| { readonly code: "unmapped-state"; readonly items: readonly { readonly kind: string; readonly state: string }[]; readonly message: string }
 	| { readonly code: "change-from-run"; readonly branch: string; readonly message: string }
-	| { readonly code: "no-git-identity"; readonly missing: readonly string[]; readonly message: string };
+	| { readonly code: "no-git-identity"; readonly missing: readonly string[]; readonly message: string }
+	| { readonly code: "own-runner-on-public-repo"; readonly message: string };
 
 export type Result<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly refusal: Refusal };
 

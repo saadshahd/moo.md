@@ -1,5 +1,5 @@
 import { toDirectedGraph } from "xstate/graph";
-import { WAKE_OWN_ENV } from "../service/workflows.ts";
+import { APP_TOKEN_MINUTES, WAKE_OWN_ENV } from "./wake-job.ts";
 import { kindMachine } from "./machine.ts";
 import type { Problem } from "./refusal.ts";
 import {
@@ -193,9 +193,6 @@ const pathProblems = (hum: HumConfig): Problem[] => {
 		),
 	];
 };
-
-/** GitHub's fixed life of an App's installation token. */
-const APP_TOKEN_MINUTES = 60;
 
 /** `ciEnv` sets none of the env the wake job sets itself. */
 const wakeEnvProblems = ({ ciEnv }: HumConfig): Problem[] =>

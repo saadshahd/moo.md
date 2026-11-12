@@ -46,6 +46,15 @@ export const CLAUDE_COMMAND = /@anthropic-ai\/claude-code|(^|[\s;&|(])claude(\s|
 /** The action a CI step runs Claude Code with, named without its version. */
 export const CLAUDE_ACTION = "anthropics/claude-code-action";
 
+/** The action's inputs that sign Claude Code in: an API key, and the OAuth token `claude setup-token` makes. */
+export const CLAUDE_ACTION_SIGN_IN = { apiKey: "anthropic_api_key", oauthToken: "claude_code_oauth_token" } as const;
+
+/** The env name Claude Code reads an API key from. */
+export const CLAUDE_API_KEY = "ANTHROPIC_API_KEY";
+
+/** Env that signs Claude Code in with no OAuth token: a key, a gateway's token, or a cloud provider whose own credentials the job holds. */
+export const CLAUDE_CREDENTIAL_ENV: ReadonlySet<string> = new Set([CLAUDE_API_KEY, "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"]);
+
 /** An input or env value that is one secret, which the first group names. */
 export const SECRET_VALUE = /^\$\{\{\s*secrets\.(\w+)\s*\}\}$/;
 
