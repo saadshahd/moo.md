@@ -94,7 +94,7 @@ export type ThinPathOptions = {
 export type ThinResult =
 	| { readonly outcome: "idle" }
 	| { readonly outcome: "lost" | "waiting"; readonly item: string }
-	/** The item's change showed it is another kind: it runs again from the start as that kind, on the same branch. */
+	/** The item's change showed it is another kind: it runs again from the start as that kind, on the same branch restarted at the base. */
 	| { readonly outcome: "moved"; readonly item: string; readonly kind: string }
 	| { readonly outcome: "merged" | "asked" | "stuck" | "review" | "landing"; readonly item: string; readonly detail?: string }
 	| { readonly outcome: "limited"; readonly item: string; readonly until: number }
@@ -222,6 +222,8 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	if (asking && answered === undefined) return { outcome: "waiting", item: id };
 
 	const landing = o.state.landings.get(id);
+	/** Nothing saved is left to go on from: a new item, one that moved to another kind, or one the owner ran again. */
+	const isFresh = !onSnapshot && landing === undefined;
 	const branch = runBranch(o.config.hum, id);
 	const timeoutMs = commandTimeoutMs(o.config.hum);
 	const taken = await (o.checkout ?? clonesIn(o.workDir, timeoutMs))({ remote: o.remote, base, item: id, signal: o.signal }).catch((error: Error) => (o.signal?.aborted ? undefined : Promise.reject(error)));
@@ -236,7 +238,7 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 	try {
-		await onRunBranch(git, branch);
+		await onRunBranch(git, { branch, restartAt: isFresh ? `origin/${base}` : undefined });
 
 		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, env, g, git, answered, resume: asking };
 
@@ -282,11 +284,14 @@ const clonesIn =
 	};
 
 /**
- * Checks out the run branch: from the remote when it has it, from the folder when only the folder does (a pass that
- * ended before it pushed), and new from the current commit when neither does. A folder and the remote that disagree
- * throw: neither is dropped.
+ * Checks out the run branch. Given `restartAt`, it starts there, whatever an earlier run left on the remote or in the
+ * folder; its next push replaces the remote's. Otherwise it comes from the remote when the remote has it, from the
+ * folder when only the folder does (a pass that ended before it pushed), and new from the current commit when neither
+ * does. A folder and the remote that disagree throw: neither is dropped.
  */
-const onRunBranch = async (git: Git, branch: string): Promise<void> => {
+const onRunBranch = async (git: Git, { branch, restartAt }: { readonly branch: string; readonly restartAt: string | undefined }): Promise<void> => {
+	if (restartAt !== undefined) return void (await git.raw(["checkout", "-q", "-B", branch, restartAt]));
+
 	const onRemote = (await git.raw(["ls-remote", "--heads", "origin", branch])).trim() !== "";
 	const onFolder = (await git.run(["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
 

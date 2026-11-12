@@ -63,7 +63,7 @@ export const kindAnswered = (known: ItemKind, item: Item, kinds: readonly string
 	return answer?.option === undefined ? undefined : { item: item.id, kind: answer.option, from: "source" };
 };
 
-/** Drops what an item's run on its earlier kind left: its snapshot, its landing, its plan and its verdict. Its branch stays. */
+/** Drops what an item's run on its earlier kind left: its snapshot, its landing, its plan and its verdict. Its next run restarts its branch at the base. */
 export const forgetProgress = (state: State, id: string): void => {
 	state.items.remove(id);
 	state.landings.remove(id);

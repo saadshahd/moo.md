@@ -514,6 +514,23 @@ test("a docs item whose change touches code moves to its real kind and runs agai
 	expect([readFileSync(firstBuild, "utf8"), readFileSync(secondBuild, "utf8")].map((stdin) => stdin.includes(onBranch))).toEqual([true, true]);
 });
 
+test("an item whose run asked and pushed its branch, then moved to the kind the owner named, runs again from the base", async () => {
+	const judge = scriptedJudge({ alignment: SOUND });
+	const asking = { commit: { "docs/part-one.md": "one\n" }, structured: { status: "needs-owner", question: "Which title?", plan: "Write two parts." } };
+	const w = await world({ script: [{}, asking, NOTE], decisions: [READY_PLAN] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge }))).toEqual({ outcome: "asked", item: id, detail: "Which title?" });
+	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/part-one.md`])).toBe("one\n");
+
+	await w.adapter.answers!.answer(id, { text: "docs", option: "docs" });
+	w.clock.at += TTL + 1;
+
+	expect(await runThinPath(w.thinPath({ judge, itemId: id }))).toEqual({ outcome: "moved", item: id, kind: "docs" });
+	expect(await runThinPath(w.thinPath({ judge, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(sh(w.repo.remote, ["ls-tree", "--name-only", "main", "docs/"])).toBe("docs/note.md\n");
+});
+
 test("the alignment grade times out: the change is unclear and waits for the owner's review at its level, with no question", async () => {
 	const hanging: Runner = { run: (request) => new Promise((resolve) => request.signal?.addEventListener("abort", () => resolve({ kind: "stopped" }))), limitedUntil: () => 0 };
 	const alignment = modelCallOver(hanging, { model: "m", timeoutMs: 5, trusts: () => true });
