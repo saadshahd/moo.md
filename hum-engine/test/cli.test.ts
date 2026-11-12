@@ -64,6 +64,17 @@ test("hum push runs no hook, though a pre-push hook that would fail is installed
 	expect(sh(repo.remote, ["log", "-1", "--format=%s", "main"]).trim()).toBe("g");
 });
 
+test("a hum push that outruns the repo's command time limit is stopped and fails", () => {
+	const worker = new WorkRepo().worker("w");
+
+	writeSettings(worker, { commandTimeoutSeconds: 1 });
+
+	const pushed = hum(worker, "push", "--receive-pack=sleep 30; git-receive-pack", "origin", "main");
+
+	expect(pushed.code).toBe(1);
+	expect(pushed.err).toContain("ran longer than 1 seconds");
+});
+
 test("hum list-ready, claim, watch, answer and read work end to end on a temp repo", () => {
 	const repo = new WorkRepo();
 	const worker = repo.worker("w");

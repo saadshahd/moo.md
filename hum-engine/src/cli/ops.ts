@@ -1,10 +1,10 @@
 import { Command, CommanderError, Option } from "commander";
-import { x } from "tinyexec";
 import { z } from "zod";
 import { type ClaimResult, type Item, type ItemRef, PermanentError, Watch } from "../adapter-api.ts";
 import { pushArgs } from "../adapters/git.ts";
 import { resolveAdapters, type Slot } from "../adapters/registry.ts";
 import { readSettings } from "../config/settings.ts";
+import { CommandTimedOut, commandTimeoutMs, exec } from "../exec.ts";
 import { HumConfig } from "../config/schema.ts";
 import { dropInto } from "../state/fs.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
@@ -29,6 +29,7 @@ const EXIT_MISUSED = 2;
 const OK = { ok: true } as const;
 
 const CliSettings = z.looseObject({
+	commandTimeoutSeconds: HumConfig.shape.commandTimeoutSeconds,
 	claimExpirySeconds: HumConfig.shape.claimExpirySeconds,
 	watchCacheSeconds: HumConfig.shape.watchCacheSeconds,
 	watchLockSeconds: HumConfig.shape.watchLockSeconds,
@@ -142,9 +143,22 @@ const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Pro
 	};
 };
 
+/** `git push` with the arguments given, under the repo's command time limit; a push past it is stopped and fails. */
+const push = async (positionals: readonly string[], io: Io): Promise<number> => {
+	try {
+		return (await exec("git", pushArgs(positionals), { timeoutMs: commandTimeoutMs(readSettings(io.cwd, CliSettings)), nodeOptions: { cwd: io.cwd, stdio: "inherit" } })).exitCode ?? EXIT_FAILED;
+	} catch (error) {
+		if (!(error instanceof CommandTimedOut)) throw error;
+
+		io.stderr(`hum push: ${error.message}\n`);
+
+		return EXIT_FAILED;
+	}
+};
+
 /** Runs one parsed `hum <op>` and returns its exit code: 0 done, 1 failed, 2 misused. */
 const perform = async (op: OpName, positionals: readonly string[], flags: Flags, io: Io): Promise<number> => {
-	if (op === "push") return (await x("git", pushArgs(positionals), { nodeOptions: { cwd: io.cwd, stdio: "inherit" } })).exitCode ?? EXIT_FAILED;
+	if (op === "push") return push(positionals, io);
 
 	try {
 		const printed = await handlers[op](await callOf(positionals, flags, io));
