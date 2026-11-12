@@ -1,3 +1,5 @@
+import { humSays } from "../says.ts";
+
 /** What answering a prompt decided: pass it on, or keep it from Claude with a reason. */
 export type Decision = { readonly kind: "pass" } | { readonly kind: "drop"; readonly reason: string };
 
@@ -10,7 +12,7 @@ export type GuardSteps<R> = {
 	readonly show: (message: string) => void;
 };
 
-const messageOf = (error: Error): string => `hum: ${error.message}`;
+const messageOf = (error: Error): string => humSays(error.message);
 
 /**
  * Hooks fail open, with one exception: a failure while answer mode is on drops that prompt, because an answer that

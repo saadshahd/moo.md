@@ -1,6 +1,7 @@
 import type { EngineInterface } from "claude-code";
 import { atom, read, update } from "claude-code";
-import { failureOf, runHum } from "../hum.ts";
+import { runHum } from "../hum.ts";
+import { failureOf } from "../says.ts";
 import { answerOf } from "./fill.ts";
 import type { Decision } from "./guard.ts";
 import { type AnswerEvent, type AnswerSnapshot, answerMachine, type Answering, type Posting, postedText } from "./machine.ts";

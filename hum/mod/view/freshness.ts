@@ -31,3 +31,6 @@ export const ageText = (age: number): string => {
 
 	return small === 0 ? `${big} ${unit.big}` : `${big} ${unit.big} ${small} ${unit.small}`;
 };
+
+/** How long ago `at` was, as the view writes an age. */
+export const sinceText = (at: number, now: number): string => ageText(ageSeconds(at, now));

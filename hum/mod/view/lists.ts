@@ -1,7 +1,6 @@
 import { cells, ellipsize, rowCells, spaces, wrap } from "./cells.ts";
-import { ageSeconds, ageText } from "./freshness.ts";
 import { displayId } from "../item.ts";
-import { joinParts } from "./fit.ts";
+import { droppingFromEnd, fitting } from "./fit.ts";
 import { type Row, type Span, span } from "./row.ts";
 
 /** Under this many cells a title has no room beside its id and metadata, so it goes under them. */
@@ -17,12 +16,6 @@ export type ListEntry = {
 	readonly meta: readonly Span[];
 };
 
-const metaThatFits = (meta: readonly Span[], room: number): Row => {
-	const kept = meta.map((_, index) => joinParts(meta.slice(0, meta.length - index))).find((candidate) => rowCells(candidate) <= room);
-
-	return kept ?? [];
-};
-
 /**
  * One line per entry: id, title, metadata. A title that does not fit ends in "…" and pressing the row shows it whole.
  * Where the title would get under 12 cells it goes under the id instead, and an unfolded row always does.
@@ -30,7 +23,7 @@ const metaThatFits = (meta: readonly Span[], room: number): Row => {
 export const listRows = (entry: ListEntry, isUnfolded: boolean, width: number): Row[] => {
 	const id = ellipsize(displayId(entry.item), width);
 	const press = { kind: "fold", id: entry.foldId } as const;
-	const meta = metaThatFits(entry.meta, width - cells(id) - COLUMN_GAP);
+	const meta = fitting(droppingFromEnd(entry.meta), width - cells(id) - COLUMN_GAP) ?? [];
 	const room = width - cells(id) - rowCells(meta) - 2 * COLUMN_GAP;
 	const isStacked = isUnfolded || room < MIN_TITLE_CELLS;
 
@@ -48,5 +41,3 @@ export const listRows = (entry: ListEntry, isUnfolded: boolean, width: number): 
 
 	return [head, [span(title, "plain", title === entry.title ? undefined : press)]];
 };
-
-export const sinceText = (at: number, now: number): string => ageText(ageSeconds(at, now));

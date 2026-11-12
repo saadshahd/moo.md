@@ -3,6 +3,7 @@ import { atom, read, update } from "claude-code";
 import { guardAnswer } from "./answer/guard.ts";
 import { answeringLabel, changedBox, editedBox, fillAnswer, isAnswering, post, restartAnswer, routeEnter } from "./answer/mode.ts";
 import { drawRows } from "./draw.tsx";
+import { humSays } from "./says.ts";
 import { type PressContext, openPane } from "./press.ts";
 import { viewSettings } from "./settings.ts";
 import { bandRow } from "./view/band.ts";
@@ -41,7 +42,7 @@ const pressed = ($: EngineInterface, context: PressContext) => async (press: Pre
 };
 
 /** A failure outside answer mode shows once and the event passes on. */
-const showOnce = ($: EngineInterface) => (error: Error): void => $.ui.toast(`hum: ${error.message}`);
+const showOnce = ($: EngineInterface) => (error: Error): void => $.ui.toast(humSays(error.message));
 
 export const register: Register = (on, options) => {
 	const { pollSeconds, amberAfterSeconds, watchSeconds } = viewSettings(options);
