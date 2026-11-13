@@ -62,7 +62,12 @@ const newCommits = async (git: Git, tips: readonly string[], trust: BundleTrust)
 			return { sha, parents: parents.split(" ").filter(Boolean), author: `${authorName} <${authorEmail}>`, committer: `${committerName} <${committerEmail}>` };
 		});
 
-/** Why the commits break the owner's rules: each is by commitIdentity, and each parent is another new commit, gather's base or an inbox head. Only an evidence ref's tip has no parent. */
+/**
+ * Why the commits break the owner's rules: each is by commitIdentity, and each parent is another new commit, gather's
+ * base or an inbox head. Only an evidence ref's tip has no parent. The identity check stops a commit made under the
+ * wrong name by mistake; a hostile work job writes any name it likes, so the walls against it are the ref check and
+ * publish placing the change from its own diff and config.
+ */
 const commitFault = (commits: readonly NewCommit[], evidenceTips: ReadonlySet<string>, trust: BundleTrust): string | undefined => {
 	const owner = `${trust.identity.name} <${trust.identity.email}>`;
 	const known = new Set([trust.base, ...trust.heads, ...commits.map(({ sha }) => sha)]);

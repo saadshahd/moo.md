@@ -36,7 +36,7 @@ Say what the labels cover: "`kindLabels` covers N of M open issues; the rest get
 
 Where runs include CI and `isPublicRepo` is not `false`, tell the owner that anyone can read `refs/hum/state`, where each wake keeps hum's state: plans, answers and the output of failed checks.
 
-Where runs include CI, tell the owner what a wake's three jobs hold. `gather` and `publish` hold GitHub's token and run hum from npm, with none of the repo's code. `work` runs the runs and the repo's checks with no GitHub token, but it holds the Actions token its artifact upload needs, so a run there could write the Actions cache on the default branch for any workflow that restores it.
+Where runs include CI, tell the owner what a wake's three jobs hold. `gather` and `publish` hold GitHub's token and run hum from npm, with none of the repo's code. `work` runs the runs and the repo's checks with no GitHub token, but it holds the Actions token its artifact upload needs, so a run there could write the Actions cache on the default branch for any workflow that restores it. Publish checks that each new commit is by the commit identity, but the work job writes those names itself: what holds against a hostile work job is that publish writes only hum's own branches and places every change from its own diff and config.
 
 ## Write
 
