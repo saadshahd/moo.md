@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import pMemoize from "p-memoize";
 import { ADAPTER_API_VERSION, type Item, ItemId, type Questions, type WorkSource } from "../adapter-api.ts";
 import { type Git, gitIn, push } from "../adapters/git.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
@@ -64,15 +65,23 @@ export type Publisher = {
 
 const timeoutOf = (p: Pick<Publisher, "config">): number => commandTimeoutMs(p.config.hum);
 
+/** Makes publish's repo at `repo` with `remote` as `origin`, once: passes that open it at the same time share the one making. */
+const makePublishRepo = pMemoize(
+	async (repo: string, remote: string, git: Git): Promise<void> => {
+		if (existsSync(join(repo, ".git"))) return;
+
+		mkdirSync(repo, { recursive: true });
+		await git.raw(["init", "-q"]);
+		await git.raw(["remote", "add", "origin", remote]);
+	},
+	{ cacheKey: ([repo]) => repo },
+);
+
 /** Publish's repo, made on first use, with the remote as `origin`. */
 export const openPublishRepo = async (p: Pick<Publisher, "repo" | "remote" | "config">): Promise<Git> => {
 	const git = gitIn(p.repo, { identity: p.config.hum.commitIdentity, timeoutMs: timeoutOf(p) });
 
-	if (existsSync(join(p.repo, ".git"))) return git;
-
-	mkdirSync(p.repo, { recursive: true });
-	await git.raw(["init", "-q"]);
-	await git.raw(["remote", "add", "origin", p.remote]);
+	await makePublishRepo(p.repo, p.remote, git);
 
 	return git;
 };
