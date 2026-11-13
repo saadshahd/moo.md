@@ -131,6 +131,35 @@ export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions
 	return { run, raw, bytes };
 };
 
+/** Every config entry git reads in the folder, with the file each came from: reading config runs nothing. */
+const CONFIG_READ = ["config", "--list", "--show-origin"] as const;
+
+/** The key of one `--show-origin` line, `<origin>\t<key>=<value>`, without its value. */
+const keyOf = (line: string): string => line.slice(line.indexOf("\t") + 1).split("=")[0] ?? line;
+
+/**
+ * `git` that runs nothing once the config git reads has changed since this was made. A run in the same folder can
+ * write config that git runs as code, such as core.fsmonitor, a filter or a credential helper, and hum's git would
+ * run it with hum's environment. A change throws, naming each key; no value is shown, as one may hold a secret.
+ */
+export const withConfigPinned = async (git: Git): Promise<Git> => {
+	const read = async (): Promise<ReadonlySet<string>> => new Set((await git.raw(CONFIG_READ)).split("\n").filter(Boolean));
+	const pinned = await read();
+
+	const unchanged = async (): Promise<void> => {
+		const now = await read();
+		const changed = [...new Set([...now].filter((line) => !pinned.has(line)).concat([...pinned].filter((line) => !now.has(line))).map(keyOf))];
+
+		if (changed.length > 0) throw new Error(`the git config hum reads changed since hum checked the folder out: ${changed.join(", ")}. A run may have written config that git runs as code, so hum runs no more git in this folder.`);
+	};
+
+	return {
+		run: async (args, input) => (await unchanged(), git.run(args, input)),
+		raw: async (args, input) => (await unchanged(), git.raw(args, input)),
+		bytes: async (args, input) => (await unchanged(), git.bytes(args, input)),
+	};
+};
+
 /** The arguments for `git push` with hooks off, for a command line handed straight to git. */
 export const pushArgs = (rest: readonly string[]): string[] => ["-c", HOOKS_OFF, "push", "--no-verify", ...rest];
 

@@ -9,7 +9,7 @@ import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, PATCH } from "../adapters/git.ts";
+import { type Git, gitIn, PATCH, withConfigPinned } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -264,7 +264,8 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 		await onRunBranch(checkedOut, { branch, restartAt: isFresh ? `origin/${base}` : undefined });
 
-		const git = checkedOut;
+		/** From here a run may have written in the folder, so hum's git runs only while the config it read stands. */
+		const git = await withConfigPinned(checkedOut);
 		const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 		/** Where a run saves its one picture or video of the change, outside the clone so nothing commits it. */
