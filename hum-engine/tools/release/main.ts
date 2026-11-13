@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import * as core from "@actions/core";
 import { z } from "zod";
 import { exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
-import { RELEASE_FILE } from "../../src/service/plugins.ts";
+import { Release, RELEASE_FILE } from "../../src/service/plugins.ts";
 import pkg from "../../package.json" with { type: "json" };
 import { type Baseline, checkBump, type Verdict } from "./compare.ts";
 import { extractSurface, Surface } from "./surface.ts";
@@ -63,11 +63,11 @@ const writeSurface = async (): Promise<number> => {
 	return 0;
 };
 
-/** Writes the moo.md commit being published into the package folder, so the engine installs hope from that commit. */
+/** Writes the moo.md commit being published into the package folder, so the engine installs hope from that commit. A HEAD git cannot name throws, and nothing is published. */
 const writeCommit = async (): Promise<number> => {
-	const commit = (await exec("git", ["rev-parse", "HEAD"], { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, nodeOptions: { cwd: PACKAGE_ROOT } })).stdout.trim();
+	const head = await exec("git", ["rev-parse", "HEAD"], { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, throwOnError: true, nodeOptions: { cwd: PACKAGE_ROOT } });
 
-	await Bun.write(join(PACKAGE_ROOT, RELEASE_FILE), `${JSON.stringify({ commit }, null, "\t")}\n`);
+	await Bun.write(join(PACKAGE_ROOT, RELEASE_FILE), `${JSON.stringify(Release.parse({ commit: head.stdout.trim() }), null, "\t")}\n`);
 
 	return 0;
 };

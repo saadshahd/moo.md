@@ -18,7 +18,8 @@ const ENGINE_ROOT = resolve(import.meta.dir, "..", "..");
 /** The file the publish job writes beside the package: the moo.md commit it was published from. */
 export const RELEASE_FILE = "release.json";
 
-const Release = z.object({ commit: z.string().regex(/^[0-9a-f]{40}$/) });
+/** What `release.json` holds: the full sha of the moo.md commit the package was published from. */
+export const Release = z.object({ commit: z.string().regex(/^[0-9a-f]{40}$/) });
 
 /** A marketplace as a settings file declares it, in the forms `claude plugin marketplace add` takes. */
 const Source = z.discriminatedUnion("source", [
