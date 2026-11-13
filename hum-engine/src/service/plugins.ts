@@ -68,20 +68,22 @@ const marketplaceArgument = (source: z.infer<typeof Source>, repo: string): stri
 	}
 };
 
-/** A marketplace fetched from a repo with no `ref` installs whatever its default branch holds at the wake. */
-const isUnpinned = (source: z.infer<typeof Source>): boolean => (source.source === "github" || source.source === "git") && source.ref === undefined;
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+
+/** A marketplace fetched from a repo by anything but a commit SHA installs whatever its branch or tag holds at the wake. */
+const isUnpinned = (source: z.infer<typeof Source>): boolean => (source.source === "github" || source.source === "git") && !COMMIT_SHA.test(source.ref ?? "");
 
 /**
  * The `claude` command lines that install hope and the repo's plugins: moo.md from `mooFolder`, its checkout at the
  * shipped commit, which stands in for any moo.md the settings declare; each other marketplace they declare; then hope
- * and every plugin they enable. A marketplace from a repo with no `ref` throws: its hooks would run in every run as
- * whatever its branch holds that day.
+ * and every plugin they enable. A marketplace from a repo whose `ref` is no full commit SHA throws: its hooks would run
+ * in every run as whatever its branch or tag holds that day.
  */
 export const pluginCommands = (settings: RepoPlugins, { repo, mooFolder }: { readonly repo: string; readonly mooFolder: string }): string[][] => {
 	const declared = Object.entries(settings.extraKnownMarketplaces).filter(([name]) => name !== MOO_MARKETPLACE);
 	const unpinned = declared.flatMap(([name, { source }]) => (isUnpinned(source) ? [name] : []));
 
-	if (unpinned.length > 0) throw new Error(`the marketplaces ${unpinned.join(", ")} in .claude/settings.json name no "ref", so a wake would install whatever their default branch holds, and their hooks run in every run. Give each a "ref": a commit SHA, which no push can move.`);
+	if (unpinned.length > 0) throw new Error(`the marketplaces ${unpinned.join(", ")} in .claude/settings.json name no commit SHA as "ref", so a wake would install whatever their branch or tag holds, and their hooks run in every run. Give each a "ref" of a full 40-character commit SHA, which no push can move.`);
 
 	const marketplaces = declared.map(([, { source }]) => marketplaceArgument(source, repo));
 	const enabled = Object.entries(settings.enabledPlugins).flatMap(([id, on]) => (on === true ? [id] : []));

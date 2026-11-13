@@ -5,13 +5,17 @@ import { installPlugins, pluginCommands, RepoPlugins, shippedCommit } from "../s
 import { sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
+const SKILLS_SHA = "3f1c2a9".padEnd(40, "0");
+
+const PINNED_SHA = "b2".padEnd(40, "1");
+
 /** A repo's settings: its own moo.md, three other marketplaces, plugins on and one off. */
 const SETTINGS = {
 	outputStyle: "hold:Plain",
 	extraKnownMarketplaces: {
 		"moo.md": { source: { source: "github", repo: "saadshahd/moo.md" } },
-		skills: { source: { source: "github", repo: "humanlayer/skills", ref: "3f1c2a9" } },
-		pinned: { source: { source: "git", url: "https://example.com/plugins.git", ref: "v2" } },
+		skills: { source: { source: "github", repo: "humanlayer/skills", ref: SKILLS_SHA } },
+		pinned: { source: { source: "git", url: "https://example.com/plugins.git", ref: PINNED_SHA } },
 		local: { source: { source: "directory", path: "tools/plugins" } },
 	},
 	enabledPlugins: { "hope@moo.md": true, "sound@moo.md": true, "show-me@skills": true, "old@skills": false },
@@ -20,8 +24,8 @@ const SETTINGS = {
 test("hope comes from moo.md at the shipped commit, in place of the moo.md the repo declares; each other marketplace is added, and each enabled plugin installed", () => {
 	expect(pluginCommands(RepoPlugins.parse(SETTINGS), { repo: "/repo", mooFolder: "/tmp/moo" })).toEqual([
 		["plugin", "marketplace", "add", "/tmp/moo"],
-		["plugin", "marketplace", "add", "humanlayer/skills#3f1c2a9"],
-		["plugin", "marketplace", "add", "https://example.com/plugins.git#v2"],
+		["plugin", "marketplace", "add", `humanlayer/skills#${SKILLS_SHA}`],
+		["plugin", "marketplace", "add", `https://example.com/plugins.git#${PINNED_SHA}`],
 		["plugin", "marketplace", "add", "/repo/tools/plugins"],
 		["plugin", "install", "hope@moo.md"],
 		["plugin", "install", "sound@moo.md"],
@@ -50,10 +54,10 @@ test("the first command claude refuses stops the install, naming the command and
 	expect(ran.at(-1)).toBe("plugin install hope@moo.md");
 });
 
-test("a marketplace from a repo with no ref is refused, naming it, before any command runs", () => {
-	const settings = RepoPlugins.parse({ extraKnownMarketplaces: { ...SETTINGS.extraKnownMarketplaces, floating: { source: { source: "git", url: "https://example.com/floating.git" } } } });
+test.each([undefined, "main", "v2", "3f1c2a9"])("a marketplace from a repo whose ref is %p, no full commit SHA, is refused, naming it, before any command runs", (ref) => {
+	const settings = RepoPlugins.parse({ extraKnownMarketplaces: { ...SETTINGS.extraKnownMarketplaces, floating: { source: { source: "git", url: "https://example.com/floating.git", ref } } } });
 
-	expect(() => pluginCommands(settings, { repo: "/repo", mooFolder: "/tmp/moo" })).toThrow('the marketplaces floating in .claude/settings.json name no "ref"');
+	expect(() => pluginCommands(settings, { repo: "/repo", mooFolder: "/tmp/moo" })).toThrow('the marketplaces floating in .claude/settings.json name no commit SHA as "ref"');
 });
 
 test("a marketplace kept in a folder of a repo is refused, which claude plugin marketplace add cannot take", () => {
