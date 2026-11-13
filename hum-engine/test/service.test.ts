@@ -197,12 +197,14 @@ test("the scheduled workflow's tick is a ref on the remote; the Mac reads its ti
 	expect(sh(repo.remote, ["rev-list", "--count", "main"]).trim()).toBe("1");
 });
 
-test("CI wake: ticks until a tick starts nothing, so a run that frees another item is followed by that item's run", async () => {
+test("CI wake: ticks until a tick starts nothing, so a run that frees another item is followed by that item's run, and saves after each tick once its runs end", async () => {
 	const w = await workerWorld({ items: { a: { commitForItem: true }, b: { commitForItem: true } } }, { settings: { runners: 1 } });
+	const mergedAtEachSave: number[] = [];
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
-	await wakeUntilQuiet(w.worker);
+	await wakeUntilQuiet(w.worker, async () => void mergedAtEachSave.push(w.results.filter((r) => r.outcome === "merged").length));
 
 	expect(w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort()).toEqual(["a", "b"]);
+	expect(mergedAtEachSave).toEqual([1, 2, 2]);
 });

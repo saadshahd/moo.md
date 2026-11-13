@@ -4,12 +4,14 @@ import { join } from "node:path";
 import type { Command } from "commander";
 import { x } from "tinyexec";
 import { z } from "zod";
-import { listHopeSkills } from "../config/load.ts";
+import { listPluginSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
 import { readSettings } from "../config/settings.ts";
 import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { restoreCiState, saveCiState } from "../service/ci-state.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
+import { installPlugins } from "../service/plugins.ts";
 import { reportCards, wakeUntilQuiet } from "../service/wake.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
@@ -26,6 +28,8 @@ const EXIT_STAY_DOWN = EXIT_OK;
 
 const EXIT_CARDS_SHOWN = 1;
 
+const EXIT_FAILED = 1;
+
 const SCHEDULE_EVENT = "schedule";
 
 type WorkFlags = { holder?: string; base?: string };
@@ -36,18 +40,23 @@ const withWorkOptions = (cmd: Command): Command =>
 		.option("--holder <name>", "the name this worker claims items by; default <where>@<host>")
 		.option("--base <branch>", "the branch items merge into; default main");
 
-const PluginList = z.array(z.looseObject({ id: z.string(), installPath: z.string() }));
+const PluginList = z.array(z.looseObject({ id: z.string(), installPath: z.string(), enabled: z.boolean().default(true) }));
 
-/** The folder of the installed hope plugin: `HUM_HOPE_ROOT`, else the path `claude plugin list` gives. */
-export const hopeRoot = async (): Promise<string> => {
-	if (process.env.HUM_HOPE_ROOT) return process.env.HUM_HOPE_ROOT;
+const HOPE = "hope";
+
+/**
+ * The skills of every enabled plugin, as a role names them (`sound:prime`), read from the folders `claude plugin list`
+ * gives. `HUM_HOPE_ROOT` names hope's folder instead, and then hope's skills are all there is. hope must be there.
+ */
+export const installedSkills = async (): Promise<ReadonlySet<string>> => {
+	if (process.env.HUM_HOPE_ROOT) return new Set(listPluginSkills(HOPE, process.env.HUM_HOPE_ROOT));
 
 	const listed = await exec("claude", ["plugin", "list", "--json"], { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
-	const hope = listed.exitCode === 0 ? PluginList.parse(JSON.parse(listed.stdout)).find((plugin) => plugin.id.startsWith("hope@")) : undefined;
+	const plugins = listed.exitCode === 0 ? PluginList.parse(JSON.parse(listed.stdout)).filter(({ enabled }) => enabled).map(({ id, installPath }) => ({ name: id.split("@")[0] ?? id, installPath })) : [];
 
-	if (!hope) throw new Error("the hope plugin is not installed: run `claude plugin install hope@moo.md`, or set HUM_HOPE_ROOT to its folder");
+	if (!plugins.some(({ name }) => name === HOPE)) throw new Error("the hope plugin is not installed: run `claude plugin install hope@moo.md`, or set HUM_HOPE_ROOT to its folder");
 
-	return hope.installPath;
+	return new Set(plugins.flatMap(({ name, installPath }) => listPluginSkills(name, installPath)));
 };
 
 const ServiceSettings = z.looseObject({
@@ -79,7 +88,7 @@ const openFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac" | 
 		now: Date.now,
 		env,
 		newSessionId: randomUUID,
-		hopeSkills: listHopeSkills(await hopeRoot()),
+		installedSkills: await installedSkills(),
 		holder: parseArgument(Holder, flags.holder ?? `${where}@${hostname()}`),
 		base: flags.base,
 		where,
@@ -144,16 +153,43 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			done(EXIT_STAY_DOWN);
 		});
 
-	withWorkOptions(root.command("wake").description("One CI wake: tick until nothing more starts, record the tick when --event is schedule, and show the cards."))
+	root
+		.command("plugins")
+		.description("Install hope and the repo's own Claude Code plugins for a CI wake: moo.md at the commit this engine shipped with, then each marketplace and enabled plugin .claude/settings.json names.")
+		.action(async () => {
+			try {
+				for (const args of await installPlugins({ repo: io.cwd, env: io.env })) io.stdout(`claude ${args.join(" ")}\n`);
+
+				done(EXIT_OK);
+			} catch (error) {
+				io.stderr(`hum plugins: ${error instanceof Error ? error.message : String(error)}\n`);
+				done(EXIT_FAILED);
+			}
+		});
+
+	withWorkOptions(root.command("wake").description("One CI wake: bring back the state the last wake saved, tick until nothing more starts, saving the state after each tick, record the tick when --event is schedule, and show the cards."))
 		.option("--event <name>", "the GitHub event that started this job")
 		.action(async (flags: WorkFlags & { event?: string }) => {
+			const dir = await defaultStateDir(io.cwd);
+			const where = { repo: io.cwd, remote: "origin", dir };
+			// A CI job's git dir dies with it, so the state the last wake saved comes back first and goes back after each tick.
+			let saved = await restoreCiState({ ...where, timeoutMs: commandTimeoutMs(serviceSettings(io.cwd)) });
 			const worker = await openFor(io, flags, "ci");
+			const timeoutMs = commandTimeoutMs(worker.config.hum);
 
-			await wakeUntilQuiet(worker);
+			const save = async () => {
+				saved = await saveCiState({ ...where, ...saved, identity: worker.config.hum.commitIdentity, at: Date.now(), timeoutMs });
+			};
 
-			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: worker.config.hum.commitIdentity, timeoutMs: commandTimeoutMs(worker.config.hum) });
+			try {
+				await wakeUntilQuiet(worker, save);
+			} finally {
+				await save();
+			}
 
-			const status = readStatus(join(await defaultStateDir(io.cwd), "status.json"));
+			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: worker.config.hum.commitIdentity, timeoutMs });
+
+			const status = readStatus(join(dir, "status.json"));
 			const cards = status.ok ? status.status.cards : [];
 
 			await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });

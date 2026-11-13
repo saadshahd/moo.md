@@ -6,7 +6,7 @@ export type Problem =
 	| { readonly problem: "event-without-source"; readonly event: string; readonly source: string | undefined }
 	| { readonly problem: "event-without-handler"; readonly event: string }
 	| { readonly problem: "run-and-owner-wait"; readonly kind: string; readonly state: string }
-	| { readonly problem: "missing-hope-skill"; readonly skill: string; readonly role: string }
+	| { readonly problem: "missing-skill"; readonly skill: string; readonly role: string }
 	| { readonly problem: "unknown-state"; readonly kind: string; readonly state: string; readonly why: string }
 	| { readonly problem: "unknown-run-source"; readonly kind: string; readonly state: string; readonly src: string }
 	| { readonly problem: "tier-table-gap"; readonly kind: string; readonly purpose: string; readonly level: string; readonly size: string }
@@ -40,7 +40,7 @@ const DESCRIPTIONS = {
 		p.source === undefined ? `event "${p.event}" is waited on but declared nowhere` : `event "${p.event}" has no source: "${p.source}" is not a part or role`,
 	"event-without-handler": (p) => `event "${p.event}" has no handler in any kind`,
 	"run-and-owner-wait": (p) => `${p.kind}: state "${p.state}" starts a run and waits on the owner`,
-	"missing-hope-skill": (p) => `role "${p.role}" names hope skill "${p.skill}", which hope's installed copy lacks`,
+	"missing-skill": (p) => `role "${p.role}" names skill "${p.skill}", which no installed plugin has`,
 	"unknown-state": (p) => `${p.kind}: ${p.why} names state "${p.state}", which does not exist`,
 	"unknown-run-source": (p) => `${p.kind}: state "${p.state}" invokes "${p.src}", which is neither a role nor a part`,
 	"tier-table-gap": (p) => `${p.kind}: no tier for purpose "${p.purpose}", level "${p.level}", size "${p.size}"`,

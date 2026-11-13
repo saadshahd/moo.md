@@ -15,8 +15,8 @@ import {
 	WAIT_TAG,
 } from "./schema.ts";
 
-/** What the checks read besides the config: hope's installed skills, by bare name (`intent`, not `hope:intent`). */
-export type CheckEnv = { readonly hopeSkills: ReadonlySet<string> };
+/** What the checks read besides the config: the installed plugins' skills, as a role names them (`hope:intent`). */
+export type CheckEnv = { readonly installedSkills: ReadonlySet<string> };
 
 type Transitions = StateNodeJSON["onTimeout"];
 
@@ -157,14 +157,13 @@ const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): P
 	];
 };
 
-/** Each `hope:<skill>` a role names exists in hope's installed copy. */
+/** A plugin's skill is named `<plugin>:<skill>`; a bare name is the repo's or the user's own, which no plugin list holds. */
+const isPluginSkill = (skill: string): boolean => skill.includes(":");
+
+/** Each plugin skill a role names is in an installed plugin. */
 const skillProblems = (hum: HumConfig, env: CheckEnv): Problem[] =>
 	Object.entries(hum.roles).flatMap(([role, { skills }]) =>
-		skills.flatMap((skill): Problem[] =>
-			skill.startsWith("hope:") && !env.hopeSkills.has(skill.slice("hope:".length))
-				? [{ problem: "missing-hope-skill", skill, role }]
-				: [],
-		),
+		skills.flatMap((skill): Problem[] => (isPluginSkill(skill) && !env.installedSkills.has(skill) ? [{ problem: "missing-skill", skill, role }] : [])),
 	);
 
 /** A run branch could then share a name, or a folder, with a claim branch. */

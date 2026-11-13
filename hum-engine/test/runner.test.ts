@@ -38,13 +38,30 @@ test.each(["--bare", "--resume", "--continue", "-r", "-c"])("a run's flags never
 	expect(runArgs(RUN)).not.toContain(banned);
 });
 
-test("a model call keeps no session, loads no settings source, tool or hook, and draws in the default style", () => {
+test("a model call keeps no session, loads only the user's settings, where their sign-in lives, and no skill, MCP server, tool or hook, and draws in the default style", () => {
 	const judging = runArgs({ ...RUN, call: "judgment" });
 
 	expect(judging).toContain("--no-session-persistence");
-	expect(judging.slice(judging.indexOf("--setting-sources"), judging.indexOf("--setting-sources") + 2)).toEqual(["--setting-sources", ""]);
+	expect(judging.slice(judging.indexOf("--setting-sources"), judging.indexOf("--setting-sources") + 2)).toEqual(["--setting-sources", "user"]);
+	expect(judging).toContain("--disable-slash-commands");
+	expect(judging).toContain("--strict-mcp-config");
 	expect(judging.slice(judging.indexOf("--tools"), judging.indexOf("--tools") + 2)).toEqual(["--tools", ""]);
 	expect(JSON.parse(judging[judging.indexOf("--settings") + 1] ?? "{}")).toMatchObject({ disableAllHooks: true, outputStyle: "default" });
+});
+
+test("a run never holds the GitHub tokens hum pushes with; the rest of the environment reaches it", async () => {
+	const saved = join(tempDir("run-env"), "env.json");
+	const shim = makeShim({ script: [{}, { saveEnv: saved }] });
+	const state = openState(tempDir("runner"), { now: Date.now });
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: { ...shim.env, GH_TOKEN: "ghs_app", GITHUB_TOKEN: "ghs_workflow", HUM_KEPT: "yes" }, now: () => NOW });
+
+	await ask(runner, { env: { GH_TOKEN: "from-a-slot" } });
+
+	const names = Object.keys(JSON.parse(readFileSync(saved, "utf8")));
+
+	expect(names).toContain("HUM_KEPT");
+	expect(names).not.toContain("GH_TOKEN");
+	expect(names).not.toContain("GITHUB_TOKEN");
 });
 
 test("a usage-limit message parses to limited(until), and no call is made until then", async () => {

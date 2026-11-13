@@ -36,6 +36,10 @@ export type Behavior = {
 	modelTokens?: number;
 	/** A file the shim writes its stdin to. */
 	saveStdin?: string;
+	/** A file the shim writes its environment to, as JSON. */
+	saveEnv?: string;
+	/** A picture of this name the shim saves in the folder for evidence its prompt names. */
+	saveEvidence?: string;
 	subtype?: string;
 	/** Write `docs/<item>.md` and commit it, the item being the id in the prompt's `# Item <id>:` heading. */
 	commitForItem?: boolean;

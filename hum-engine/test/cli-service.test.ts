@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { CI_STATE_REF } from "../src/service/ci-state.ts";
 import { CI_TICK_REF } from "../src/service/ci-tick.ts";
 import { readStatus } from "../src/status/file.ts";
 import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
@@ -29,7 +30,7 @@ const hum = (o: ReturnType<typeof ownerRepo>, args: string[], env: Record<string
 
 const stateDir = (o: ReturnType<typeof ownerRepo>) => join(o.repo.owner, ".git", "hum");
 
-test("hum wake on a schedule event: the item merges, the tick is recorded on the remote, and the job exits 0", () => {
+test("hum wake on a schedule event: the item merges, the tick and hum's state are recorded on the remote, and the job exits 0", () => {
 	const o = owner({ items: { a: { commitForItem: true } } });
 
 	o.item("a");
@@ -39,14 +40,21 @@ test("hum wake on a schedule event: the item merges, the tick is recorded on the
 	expect(run.err).toBe("");
 	expect(run.code).toBe(0);
 	expect(sh(o.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
-	expect(sh(o.repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe(CI_TICK_REF);
+	expect(sh(o.repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim().split("\n")).toEqual([CI_STATE_REF, CI_TICK_REF]);
+	expect(sh(o.repo.remote, ["ls-tree", "-r", "--name-only", CI_STATE_REF])).toContain("merges/");
 });
 
-test("hum wake on a comment event records no tick", () => {
+test("hum wake on a comment event records no tick, and the next wake starts from the state it saved", () => {
 	const o = owner({});
 
 	expect(hum(o, ["wake", "--event", "issue_comment"]).code).toBe(0);
-	expect(sh(o.repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe("");
+	expect(sh(o.repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe(CI_STATE_REF);
+
+	const saved = sh(o.repo.remote, ["rev-parse", CI_STATE_REF]).trim();
+
+	rmSync(stateDir(o), { recursive: true, force: true });
+	expect(hum(o, ["wake", "--event", "issue_comment"]).code).toBe(0);
+	expect(sh(o.repo.owner, ["rev-parse", CI_STATE_REF]).trim()).toBe(saved);
 });
 
 test("hum wake with a rejected token exits 1, annotates the job and writes its summary", () => {

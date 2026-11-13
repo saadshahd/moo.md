@@ -9,6 +9,8 @@ import { type GitHubClient, MERGE_METHOD, ownerGitHub, raise } from "./github-cl
 /** What the target branch's rules ask of a change that lands on it. */
 export type BranchRules = {
 	readonly requiresPullRequest: boolean;
+	/** Every commit that reaches the branch must carry a signature GitHub verifies. */
+	readonly requiresSignatures: boolean;
 	/** The merge methods a pull request may use; undefined when no rule narrows them. */
 	readonly mergeMethods: readonly MergeMethod[] | undefined;
 };
@@ -58,6 +60,8 @@ const Rule = z.looseObject({
 });
 
 const PULL_REQUEST_RULE = "pull_request";
+
+const SIGNATURES_RULE = "required_signatures";
 
 const PullNode = z.object({
 	id: z.string(),
@@ -176,6 +180,7 @@ export const gitHubPullRequests = (
 
 			return {
 				requiresPullRequest: pullRule !== undefined,
+				requiresSignatures: rules.some((rule) => rule.type === SIGNATURES_RULE),
 				mergeMethods: pullRule?.parameters?.allowed_merge_methods,
 			};
 		},

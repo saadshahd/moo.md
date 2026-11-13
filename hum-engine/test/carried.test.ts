@@ -8,7 +8,7 @@ import { guarded } from "../src/adapters/guard.ts";
 import { onceCalls } from "../src/adapters/once.ts";
 import { openState } from "../src/state/open.ts";
 import { openWorker } from "../src/worker/open.ts";
-import { configWith, hopeSkills, rawConfig, writeConfigDir } from "./fixtures/config.ts";
+import { configWith, installedSkills, rawConfig, writeConfigDir } from "./fixtures/config.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { NOW, TTL, workerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
@@ -98,6 +98,7 @@ test("the last-read list survives a restart: a fresh guard still sees an empty l
 			fileFollowUp: async () => {
 				throw new Error("unused");
 			},
+			finish: async () => {},
 		},
 	});
 
@@ -215,7 +216,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 	const results: string[] = [];
 
 	const worker = await openWorker(w.repo.owner, {
-		hopeSkills: hopeSkills(),
+		installedSkills: installedSkills(),
 		judge: docsJudge,
 		holder: Holder.parse("worker-1"),
 		binary: w.shim.binary,
@@ -250,7 +251,7 @@ test("openWorker refuses a repo whose hum.json names no commit identity, saying 
 	mkdirSync(join(w.repo.owner, ".hum"), { recursive: true });
 	writeFileSync(join(w.repo.owner, ".hum", "hum.json"), JSON.stringify(hum));
 
-	await expect(openWorker(w.repo.owner, { hopeSkills: hopeSkills(), judge: docsJudge, holder: Holder.parse("worker-1"), binary: w.shim.binary, env: w.shim.env, now: () => NOW, newSessionId: randomUUID })).rejects.toThrow("commitIdentity");
+	await expect(openWorker(w.repo.owner, { installedSkills: installedSkills(), judge: docsJudge, holder: Holder.parse("worker-1"), binary: w.shim.binary, env: w.shim.env, now: () => NOW, newSessionId: randomUUID })).rejects.toThrow("commitIdentity");
 });
 
 test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
@@ -270,7 +271,7 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 	const results: string[] = [];
 
 	const worker = await openWorker(w.repo.owner, {
-		hopeSkills: hopeSkills(),
+		installedSkills: installedSkills(),
 		judge: docsJudge,
 		holder: Holder.parse("worker-1"),
 		binary: w.shim.binary,

@@ -60,6 +60,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		workSource: provider.workSource!,
 		questions: provider.questions!,
 		pulls,
+		commits: undefined,
 		now: Date.now,
 		judge: docsJudge,
 		reviewRun: () => {

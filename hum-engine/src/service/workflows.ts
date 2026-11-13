@@ -14,8 +14,6 @@ const DISPATCH_EVENT = "hum-wake";
 
 const WAKE_PATH = `./.github/workflows/${WORKFLOW_FILES.wake}`;
 
-const HOPE_MARKETPLACE = "saadshahd/moo.md";
-
 /** The Bun that builds the workflows is the one the owner's repo runs, so CI installs with the same lockfile reader. */
 const BUN_VERSION = Bun.version;
 
@@ -99,18 +97,27 @@ const CLAUDE_SIGN_IN = {
 
 /**
  * The secrets a wake's GitHub token comes from, the env and steps that turn them into it, and the expression that
- * holds it. An App's token is minted with the workflow token's permissions, so both hold the same rights.
+ * holds it. An App's token is minted with the workflow token's permissions, so both hold the same rights. A wake
+ * whose App secrets are unset stops at its first step and says which: with the workflow token in their place, the
+ * pull requests it opened would start no checks. A secret's token falls back to the workflow token while it is unset.
  */
 const githubToken = (source: PullRequestToken) =>
 	source.from === "secret"
-		? { secrets: { [source.secret]: OPTIONAL_SECRET }, env: {}, steps: [], token: `\${{ secrets.${source.secret} || github.token }}` }
+		? { secrets: { [source.secret]: OPTIONAL_SECRET }, env: {}, check: [], steps: [], token: `\${{ secrets.${source.secret} || github.token }}` }
 		: {
 				secrets: { [source.clientIdSecret]: OPTIONAL_SECRET, [source.privateKeySecret]: OPTIONAL_SECRET },
-				env: { [ENV.hasApp]: `\${{ secrets.${source.clientIdSecret} != '' }}` },
+				env: { [ENV.hasApp]: `\${{ secrets.${source.clientIdSecret} != '' && secrets.${source.privateKeySecret} != '' }}` },
+				check: [
+					{
+						if: `env.${ENV.hasApp} != 'true'`,
+						run: `echo "::error title=hum::The GitHub App secrets ${source.clientIdSecret} and ${source.privateKeySecret} are not both set. A pull request opened with the workflow token starts no checks, so this wake stops. Set both secrets, or change pullRequestToken in .hum/hum.json."
+exit 1
+`,
+					},
+				],
 				steps: [
 					{
 						id: APP_TOKEN_STEP,
-						if: `env.${ENV.hasApp} == 'true'`,
 						uses: ACTIONS.appToken.uses,
 						with: {
 							"client-id": secret(source.clientIdSecret),
@@ -119,7 +126,7 @@ const githubToken = (source: PullRequestToken) =>
 						},
 					},
 				],
-				token: `\${{ steps.${APP_TOKEN_STEP}.outputs.token || github.token }}`,
+				token: `\${{ steps.${APP_TOKEN_STEP}.outputs.token }}`,
 			};
 
 /**
@@ -144,10 +151,13 @@ git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
 /**
  * The job every wake runs. A run that needs the owner has pushed its run branch, asked on the item and ended; the
- * owner's answer starts a fresh run on that branch, so no session, artifact or approval is kept between runs. Bun and
- * Claude Code install through npm into the job's temp folder, so the job needs only git, node and npm from its runner
- * or container, and leaves nothing on a machine that outlives it. The Claude sign-in, the GitHub token and every
- * `ciEnv` value that reads a secret reach the last step alone. An App's token lasts an hour, so it is minted last.
+ * owner's answer starts a fresh run on that branch, so no session, artifact or approval is kept between runs; hum
+ * keeps its own state between wakes in a ref. Bun and Claude Code install through npm into the job's temp folder, so
+ * the job needs only git, node and npm from its runner or container, and leaves nothing on a machine that outlives it.
+ * `hum plugins` installs hope and the repo's own Claude Code plugins, which a fresh checkout would not load. The
+ * checkout keeps no token in the workspace, where a run could read it. The Claude sign-in, the GitHub token and every
+ * `ciEnv` value that reads a secret reach the last step alone, and hum keeps the token from the runs it starts. An
+ * App's token lasts an hour, so it is minted last.
  */
 const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner, ciContainer, ciEnv, ciClaudeAuth }: WorkflowSettings) => {
 	const claude = CLAUDE_SIGN_IN[ciClaudeAuth];
@@ -165,11 +175,12 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner
 				"timeout-minutes": ciWakeTimeoutMinutes,
 				env: { ...env.everyStep, ...github.env, [ENV.event]: "${{ github.event_name }}" },
 				steps: [
-					{ uses: ACTIONS.checkout.uses, with: { "fetch-depth": 0 } },
+					...github.check,
+					{ uses: ACTIONS.checkout.uses, with: { "fetch-depth": 0, "persist-credentials": false } },
 					JOB_PATHS_STEP,
 					{ run: `npm install --global --prefix "${JOB_TOOLS}" bun@${BUN_VERSION} @anthropic-ai/claude-code@${CLAUDE_FLOOR}` },
 					{ run: "bun install --frozen-lockfile" },
-					{ run: `claude plugin marketplace add ${HOPE_MARKETPLACE}\nclaude plugin install hope@moo.md\n` },
+					{ run: "./node_modules/.bin/hum plugins" },
 					gitSetup(commitIdentity),
 					...github.steps,
 					{ run: `./node_modules/.bin/hum wake --event "$${ENV.event}"`, env: { ...env.humStep, ...claude.env, [ENV.githubToken]: github.token } },
@@ -178,6 +189,9 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner
 		},
 	};
 };
+
+/** An item push wakes hum only on the default branch: a wake runs the checked-out branch's code with every secret, and anyone who may push a branch could change that code. */
+const ON_DEFAULT_BRANCH = "github.ref_name == github.event.repository.default_branch";
 
 /** A comment wakes hum only when a person the repo trusts wrote it: on a public repo anyone may comment, and a wake holds every secret. */
 const TRUSTED_COMMENT = `github.event.comment.user.type != 'Bot' && contains(fromJSON('${JSON.stringify(TRUSTED_ASSOCIATIONS)}'), github.event.comment.author_association)`;
@@ -202,7 +216,7 @@ const render = (workflow: Workflow): string => {
 const WORKFLOWS = {
 	[WORKFLOW_FILES.wake]: wake,
 	[WORKFLOW_FILES.comment]: () => trigger("hum on comment", { issue_comment: { types: ["created"] } }, { if: TRUSTED_COMMENT }),
-	[WORKFLOW_FILES.push]: ({ itemsDir, runBranchPrefix }) => trigger("hum on item push", { push: { branches: ["**", `!${runBranchPrefix}**`], paths: [`${itemsDir}/**`] } }),
+	[WORKFLOW_FILES.push]: ({ itemsDir, runBranchPrefix }) => trigger("hum on item push", { push: { branches: ["**", `!${runBranchPrefix}**`], paths: [`${itemsDir}/**`] } }, { if: ON_DEFAULT_BRANCH }),
 	[WORKFLOW_FILES.dispatch]: () => trigger("hum on dispatch", { repository_dispatch: { types: [DISPATCH_EVENT] } }),
 	[WORKFLOW_FILES.schedule]: ({ ciSchedule }) => trigger("hum on schedule", { schedule: [{ cron: ciSchedule }], workflow_dispatch: null }),
 } as const satisfies Record<(typeof WORKFLOW_FILES)[keyof typeof WORKFLOW_FILES], (settings: WorkflowSettings) => object>;

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { BOUNDARIES } from "../../src/config/schema.ts";
-import { type Config, listHopeSkills, loadConfig, readConfigDir } from "../../src/config/load.ts";
+import { type Config, listPluginSkills, loadConfig, readConfigDir } from "../../src/config/load.ts";
 import { withTimeouts } from "../../src/setup/waits.ts";
 import { OWNER } from "./identity.ts";
 import { SHIM_MODEL } from "./shim.ts";
@@ -54,10 +54,11 @@ export const writeConfigDir = (folder: string, raw: Tree): void => {
 	for (const [path, text] of Object.entries<string>(raw.roles)) put(path, text);
 };
 
-export const hopeSkills = (): ReadonlySet<string> => listHopeSkills(join(root, "../hope"));
+export const installedSkills = (): ReadonlySet<string> => new Set(listPluginSkills("hope", join(root, "../hope")));
 
-export const configWith = (edit: (raw: Tree) => void = () => {}): Config => {
-	const loaded = loadConfig(rawConfig(edit), { env: { hopeSkills: hopeSkills() } });
+/** The shipped config with `edit` applied, loaded as if hope and the plugin skills in `installed` were installed. */
+export const configWith = (edit: (raw: Tree) => void = () => {}, installed: readonly string[] = []): Config => {
+	const loaded = loadConfig(rawConfig(edit), { env: { installedSkills: new Set([...installedSkills(), ...installed]) } });
 
 	if (!loaded.ok) throw new Error(JSON.stringify(loaded.refusal));
 

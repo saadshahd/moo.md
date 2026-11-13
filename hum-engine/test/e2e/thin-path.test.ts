@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SlotPool } from "../../src/slots/pool.ts";
-import { type Checkout, PLAN_MARK, runBranch, runThinPath } from "../../src/worker/thin-path.ts";
+import { type Checkout, PLAN_MARK, PROSE_PROMPTS, runBranch, runThinPath } from "../../src/worker/thin-path.ts";
 import { configWith } from "../fixtures/config.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { itemFile, sh } from "../fixtures/work-repo.ts";
@@ -71,6 +71,21 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	expect(w.state.events.get({ source: "work-source", sourceId: `merged:${tip}`, itemId: id }).type).toBe("merged");
 	// The finished item leaves no snapshot behind.
 	expect(existsSync(w.state.items.path(id))).toBe(false);
+});
+
+test("a build run is told to reach for its role's skills and to write the pull request under the repo's own rules", async () => {
+	const stdinCopy = stdinFile();
+	const config = configWith((raw) => void (raw.hum.roles.build.skills = ["sound:prime", "my-skill"]), ["sound:prime"]);
+	const w = await world({ script: [{}, { ...NOTE, saveStdin: stdinCopy }] }, { config });
+
+	w.repo.seed("Write the note");
+	await runThinPath(w.thinPath());
+
+	const prompt = readFileSync(stdinCopy, "utf8");
+
+	expect(prompt).toContain("Use these skills with the Skill tool where they apply: sound:prime, my-skill.");
+	expect(prompt).toContain('give "pullRequest": the title and body of the pull request');
+	expect(PROSE_PROMPTS.review(configWith(), { id: "1", title: "t", body: "" }, "")).toContain("Use these skills with the Skill tool where they apply: hope:judge.");
 });
 
 test("the thin path through a background run: the build is a named agent and its commit lands", async () => {
@@ -422,7 +437,7 @@ test("a push the remote refuses goes through a pull request, after the branch's 
 	const pulls = github.client();
 	const id = w.repo.seed("Write the note");
 
-	expect(await pulls.rules("main")).toEqual({ requiresPullRequest: false, mergeMethods: undefined });
+	expect(await pulls.rules("main")).toEqual({ requiresPullRequest: false, requiresSignatures: false, mergeMethods: undefined });
 	github.requiresPullRequest = true;
 
 	const refused = w.repo.refusePushes({ said: GH013 });

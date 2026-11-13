@@ -267,6 +267,9 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 				return { id, title };
 			},
+			finish: async (id) => {
+				if (!(await todo(id)).done) await call("todo_complete", { id: parseArgument(TodoId, id) });
+			},
 		},
 		questions: {
 			ask: (id, question) => postMarked(id, questionMarker(question.options), questionText(question)),

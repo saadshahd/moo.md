@@ -23,6 +23,12 @@ export const FIXED_PARTS = [
 ] as const;
 
 export const PURPOSES = ["plan", "build", "fix", "review"] as const;
+
+/** The integration slots `hum.json` `integrations` names, each to an adapter. */
+export const SLOTS = ["work-source", "questions", "answers", "release"] as const;
+
+export type Slot = (typeof SLOTS)[number];
+
 export const SIZES = ["small", "medium", "large"] as const;
 const TIERS = ["light", "standard", "top"] as const;
 export const EFFORTS = ["low", "medium", "high"] as const;
@@ -202,7 +208,7 @@ const Shipped = z.object({
 	restartBackoff: backoff.describe("The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."),
 	restartDelaySeconds: seconds.describe("Seconds the service manager waits before it starts a failed start script again."),
 	pullRequestToken: PullRequestToken.describe(
-		"Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset.",
+		"Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset; a wake whose App secrets are unset stops with an error.",
 	),
 	ciWakeTimeoutMinutes: count.describe("Minutes a CI wake may run before GitHub stops it."),
 	ciRunner: Runner.describe(
@@ -352,7 +358,7 @@ export const HumConfig = z.strictObject({
 	safety: z.record(z.string(), z.unknown()).optional(),
 	dailyQuestionCap: z.number().int().positive().optional(),
 	/** Adapter slot → adapter name. */
-	integrations: z.record(name, name).optional(),
+	integrations: z.partialRecord(z.enum(SLOTS), name).optional(),
 	/** The day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
 	ciToken: z.strictObject({ setUp: z.iso.date() }).optional(),
 	/** No default: a commit is credited to whichever account lists its email, so only the owner's own is safe. */

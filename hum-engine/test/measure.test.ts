@@ -8,7 +8,9 @@ import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
 import { pastChange } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
-import { rateOf } from "../src/measure/rate.ts";
+import { rateOf, withRate } from "../src/measure/rate.ts";
+import { isTrusted } from "../src/decide/prose.ts";
+import { doesGateAlignment } from "../src/decide/alignment.ts";
 
 
 const freshState = () => openState(tempDir("measure"), { now: Date.now });
@@ -71,18 +73,22 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 	});
 });
 
-const pull = (state: Pull["state"]) => ({ find: async () => ({ id: "p", number: 1, url: "u", state, autoMerge: true, behind: false }) });
+/** A pull request in `state`, and a work source that writes each item it finishes into `finished`. */
+const pull = (state: Pull["state"], finished: string[]) => ({ pulls: { find: async () => ({ id: "p", number: 1, url: "u", state, autoMerge: true, behind: false }) }, workSource: { finish: async (id: string) => void finished.push(id) } });
 
-test("a change merged through a pull request after the worker moved on is recorded as merged, once, and its saved landing goes", async () => {
+test("a change merged through a pull request after the worker moved on ends its item and is recorded as merged, once, and its saved landing goes", async () => {
 	const state = freshState();
+	const finished: string[] = [];
 
 	state.landings.put("a", { item: "a", branch: "hum/a", since: 1, change: { paths: ["ui/a.ts"], size: 3, loosened: false, pinChanged: false }, head: "sha-a", ownerApproved: false });
-	await settleMergedPulls(state, pull("OPEN"), 9);
+	await settleMergedPulls(state, pull("OPEN", finished), 9);
 	expect(state.merges.list()).toEqual([]);
+	expect(finished).toEqual([]);
 
-	await settleMergedPulls(state, pull("MERGED"), 9);
-	await settleMergedPulls(state, pull("MERGED"), 10);
+	await settleMergedPulls(state, pull("MERGED", finished), 9);
+	await settleMergedPulls(state, pull("MERGED", finished), 10);
 
+	expect(finished).toEqual(["a"]);
 	expect(state.merges.list()).toEqual([{ item: "a", sha: "sha-a", at: 9, paths: ["ui/a.ts"] }]);
 	expect(state.landings.list()).toEqual([]);
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
@@ -98,4 +104,14 @@ test("a revert titled revert!: that names a change's commit marks that change re
 test("a boundary where nothing was measured has no rate, so it never stands in for a measured one", () => {
 	expect(rateOf(0, 0)).toBeUndefined();
 	expect(rateOf(3, 4)).toBe(0.75);
+});
+
+test("a measured rate is kept under the model as the owner names it and under each id that answered, so an alias such as haiku is trusted by the id its answers name", () => {
+	const shipped = SHIPPED_DEFAULTS.measuredModels;
+	const measured = withRate(shipped, { boundary: "alignment", model: "haiku", answered: ["global.anthropic.claude-haiku-5-5"], rate: 0.8123 });
+	const bar = { measuredModels: measured, minJudgeRate: 0.8 };
+
+	expect(measured).toEqual({ ...shipped, alignment: { ...shipped.alignment, haiku: 0.81, "global.anthropic.claude-haiku-5-5": 0.81 } });
+	expect(isTrusted(["global.anthropic.claude-haiku-5-5"], "alignment", bar)).toBe(true);
+	expect(doesGateAlignment({ ...bar, decisionModel: "haiku" })).toBe(true);
 });

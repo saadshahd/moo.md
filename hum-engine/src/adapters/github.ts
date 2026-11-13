@@ -125,6 +125,10 @@ const COMMIT_ON_BRANCH = `mutation CommitOnBranch($branch: CommittableBranch!, $
 	createCommitOnBranch(input: { branch: $branch, expectedHeadOid: $expected, message: $message, fileChanges: {} }) { clientMutationId }
 }`;
 
+const CLOSE_ISSUE = `mutation CloseIssue($issue: ID!) {
+	closeIssue(input: { issueId: $issue, stateReason: COMPLETED }) { clientMutationId }
+}`;
+
 const CREATE_LABEL = `mutation CreateLabel($repository: ID!, $name: String!, $color: String!, $description: String!) {
 	createLabel(input: { repositoryId: $repository, name: $name, color: $color, description: $description }) { label { id } }
 }`;
@@ -350,6 +354,11 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 				await commentMarked(from, note.marker, note.text);
 
 				return { id, title };
+			},
+			finish: async (id) => {
+				const issue = await issueState(parseArgument(IssueNumber, id));
+
+				if (issue.state === "OPEN") await mutate(Acknowledged, CLOSE_ISSUE, { issue: issue.id });
 			},
 		},
 		questions: {

@@ -61,6 +61,16 @@ export const SavedPlan = z.object({ item: name, plan: PlanFile, hash: name, mode
 
 export type SavedPlan = z.infer<typeof SavedPlan>;
 
+/** One picture or video of the change at work, kept at `url`, or why the one the run named was left out. */
+export const Evidence = z.union([z.object({ kind: z.enum(["image", "video"]), url: z.url() }), z.object({ left: name })]);
+
+export type Evidence = z.infer<typeof Evidence>;
+
+/** The pull request a build or fix run wrote for its item's whole change, under the repo's own rules for one; the latest run's stands. */
+export const PullRequestText = z.object({ item: name, title: name, body: name, evidence: Evidence.optional() });
+
+export type PullRequestText = z.infer<typeof PullRequestText>;
+
 /** A fresh review run's verdict on the change that ends at `head`. */
 export const Verdict = z.object({ item: name, head: name, event: name, reason: z.string(), cites: z.array(Cite), models });
 

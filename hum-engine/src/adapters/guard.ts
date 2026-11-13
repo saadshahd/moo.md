@@ -146,6 +146,7 @@ export const guarded = (adapter: Adapter, { provider, faults, timeoutMs, backoff
 			renew: (id, holder, ttlMs) => retried(() => workSource.renew(id, holder, ttlMs), ClaimResult),
 			comment: (id, text) => once(() => workSource.comment(id, text), none),
 			fileFollowUp: (from, followUp) => retried(() => workSource.fileFollowUp(from, followUp), ItemRef),
+			finish: (id) => retried(() => workSource.finish(id), none),
 		},
 		questions: questions && {
 			ask: (id, question) => once(() => questions.ask(id, question), none),

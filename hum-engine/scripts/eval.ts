@@ -23,7 +23,7 @@ import { openState } from "../src/state/open.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
 import { PROSE_PROMPTS } from "../src/worker/thin-path.ts";
 import { SECOND_MS } from "../src/time.ts";
-import { rateOf } from "../src/measure/rate.ts";
+import { rateOf, withRate } from "../src/measure/rate.ts";
 
 /**
  * Measures one model-judgment boundary on its labelled cases, through the same prompts and fences the engine runs,
@@ -61,7 +61,21 @@ const started = await startRunner({ state, model, now: Date.now, env: process.en
 if (started.check.kind !== "finished") throw new Error(`the start check ended as ${started.check.kind}`);
 
 let calls = 1;
-const runner: Runner = { ...started.runner, run: (request) => (calls++, started.runner.run(request)) };
+/** The model ids that answered since the boundary in hand started. */
+const answered = new Set<string>();
+
+const runner: Runner = {
+	...started.runner,
+	run: async (request) => {
+		calls++;
+
+		const outcome = await started.runner.run(request);
+
+		if (outcome.kind === "finished") for (const id of outcome.models) answered.add(id);
+
+		return outcome;
+	},
+};
 const judge = modelCallOver(runner, { model, timeoutMs: config.hum.modelCallTimeoutSeconds * SECOND_MS, trusts: () => true });
 
 /** A run that ended without an answer: a limit or a hold. It says nothing about the boundary. */
@@ -236,18 +250,20 @@ const precisionOf = ({ tp, fp }: PairCounts): number | undefined => rateOf(tp, t
 const pairRow = (day: string, pairs: PairCounts, abstained: number, used: number): string =>
 	`| ${day} | ${model} | ${pairs.tp + pairs.fp + pairs.fn + pairs.tn} | ${pairs.tp} | ${pairs.fp} | ${pairs.fn} | ${pairs.tn} | ${abstained} | ${pairs.pairedBySignals} | ${rateCell(precisionOf(pairs))} | ${rateCell(rateOf(pairs.tp, pairs.tp + pairs.fn))} | ${used} |`;
 
-/** Sets one pooled rate in the owner's `hum.json`, where trust reads it. */
+/** Sets one pooled rate in the owner's `hum.json`, where trust reads it, under the model as named and each id that answered for it. */
 const recordRate = async (folder: string, boundary: Boundary, rate: number): Promise<void> => {
 	const file = join(folder, "hum.json");
-	const written = z.looseObject({ measuredModels: z.record(z.string(), z.record(z.string(), z.number())).default({}) }).parse(JSON.parse(await Bun.file(file).text()));
+	const written = z.looseObject({ measuredModels: z.partialRecord(z.enum(BOUNDARIES), z.record(z.string(), z.number())).default({}) }).parse(JSON.parse(await Bun.file(file).text()));
 
-	await Bun.write(file, `${JSON.stringify({ ...written, measuredModels: { ...written.measuredModels, [boundary]: { ...written.measuredModels[boundary], [model]: Number(rate.toFixed(2)) } } }, null, "\t")}\n`);
+	await Bun.write(file, `${JSON.stringify({ ...written, measuredModels: withRate(written.measuredModels, { boundary, model, answered: [...answered], rate }) }, null, "\t")}\n`);
 };
 
 const unmeasured: Boundary[] = [];
 
 for (const boundary of boundaries) {
 	const pool = { right: 0, measured: 0, pairs: NO_PAIRS };
+
+	answered.clear();
 
 	for (let run = 1; run <= runs; run++) {
 		const before = calls;

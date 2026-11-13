@@ -9,7 +9,7 @@ import type { MergeMethod } from "../config/schema.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
 import { type GitIdentity, gitIn, push, readOrAbsent } from "./git.ts";
-import { appendEntry, type ItemFile, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
+import { appendEntry, DONE_STATE, type ItemFile, markDone, newItemFile, parseItemFile, READY_STATE } from "./item-file.ts";
 import { answerMarker, followUpBody, followUpKey, questionText } from "./marked.ts";
 import { type CommitLanded, landOwnerCommit } from "./owner-commit.ts";
 import type { PullRequests } from "./pull-requests.ts";
@@ -352,6 +352,15 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 
 				return failed ?? { id, title };
 			},
+			/** A landed change already carries the item file's done state, so this writes only where it does not. */
+			finish: async (id) =>
+				write(`hum: finish ${id}`, async () => {
+					const source = await itemSource(id);
+
+					if (source === undefined) throw new PermanentError(`no item "${id}" under ${itemsDir}/`);
+
+					return parseItemFile(source).state === DONE_STATE ? undefined : { path: pathOf(id), content: markDone(source) };
+				}),
 		},
 		questions: {
 			ask: (id, question) => appendTo(id, { kind: "question" }, questionText(question)),

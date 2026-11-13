@@ -10,7 +10,7 @@ import { Choice } from "../status/format.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { ItemKind, Landing, Learned, Limit, Parked, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
+import { ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
 /** On the Mac and in a clone, state lives in the repo's git common dir, so every worktree shares it. */
 export const defaultStateDir = async (cwd: string): Promise<string> => {
@@ -57,6 +57,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		itemKinds: new Records(join(dir, "item-kinds"), ItemKind),
 		plans: new Records(join(dir, "plans"), SavedPlan),
 		verdicts: new Records(join(dir, "verdicts"), Verdict),
+		/** The pull request text the latest build or fix run wrote, by item. */
+		pullRequests: new Records(join(dir, "pull-requests"), PullRequestText),
 		/** Questions by item, waiting for room under the daily cap or asked within the day. */
 		questions: new Records(join(dir, "questions"), QueuedQuestion),
 		/** Choices made without the owner, by item and time. */

@@ -125,6 +125,8 @@ const outSplit = async (event: Emitted) => {
 
 if (step.saveStdin) writeFileSync(step.saveStdin, stdin);
 
+if (step.saveEnv) writeFileSync(step.saveEnv, JSON.stringify(process.env));
+
 out({
 	type: "system",
 	subtype: "init",
@@ -191,6 +193,10 @@ if (step.commit) {
 		"shim: the change",
 	]);
 }
+
+const evidenceFolder = /save that one file in (\S+), never in the repo/.exec(prompt)?.[1];
+
+if (step.saveEvidence && evidenceFolder) writeFileSync(join(evidenceFolder, step.saveEvidence), "\u0089PNG\r\n");
 
 const tokens = step.modelTokens ?? 10;
 

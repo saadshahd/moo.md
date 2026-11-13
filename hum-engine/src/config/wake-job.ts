@@ -8,7 +8,7 @@ export const WAKE_ENV = {
 	claudeToken: CLAUDE_TOKEN,
 	githubToken: "GH_TOKEN",
 	event: "HUM_EVENT",
-	/** Whether the App's client ID secret is set, because a step's `if` cannot read a secret. */
+	/** Whether both of the App's secrets are set, because a step's `if` cannot read a secret. */
 	hasApp: "HUM_HAS_APP",
 	gitName: "HUM_GIT_NAME",
 	gitEmail: "HUM_GIT_EMAIL",

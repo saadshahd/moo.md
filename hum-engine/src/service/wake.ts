@@ -5,12 +5,14 @@ import type { Worker } from "../worker/worker.ts";
 /**
  * CI wake: ticks, lets the runs it started end, and ticks again until a tick starts nothing. A CI job holds no
  * session across a wait for the owner: a run that needs them has pushed its branch, asked on the item and ended.
+ * `afterTick` runs once each tick's runs have ended, so a job stopped at its time limit loses only the tick in flight.
  */
-export const wakeUntilQuiet = async (worker: Worker): Promise<void> => {
+export const wakeUntilQuiet = async (worker: Pick<Worker, "tick" | "idle">, afterTick: () => Promise<void> = async () => {}): Promise<void> => {
 	for (;;) {
 		const result = await worker.tick();
 
 		await worker.idle();
+		await afterTick();
 
 		if (result.kind !== "ran" || result.started.length === 0) return;
 	}

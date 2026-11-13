@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
@@ -12,13 +12,13 @@ import {
 	gitIn,
 	isAncestor,
 	PATCH,
-	push,
 	type PushOutcome,
 } from "../adapters/git.ts";
+import type { GitHubCommits } from "../adapters/github-commits.ts";
 import { landOwnerCommit } from "../adapters/owner-commit.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { changeOf, historiesOf, readHistory } from "../adapters/history.ts";
-import { markDone } from "../adapters/item-file.ts";
+import { DONE_STATE, markDone, parseItemFile } from "../adapters/item-file.ts";
 import {
 	type BranchRules,
 	methodFor,
@@ -58,6 +58,8 @@ import { pickedAnswer } from "./thread.ts";
 import { reportAlignment } from "./alignment-report.ts";
 import { reportTaste } from "./taste.ts";
 import type { ThinResult } from "./thin-path.ts";
+import { evidenceMarkdown } from "./evidence.ts";
+import { pushBase, pushCommits, pushRunBranch } from "./signed-push.ts";
 
 const SHORT_EXCERPT = 200;
 
@@ -65,6 +67,7 @@ const HUM_CONFIG = ".hum/hum.json";
 
 const NO_RULES: BranchRules = {
 	requiresPullRequest: false,
+	requiresSignatures: false,
 	mergeMethods: undefined,
 };
 
@@ -91,6 +94,8 @@ export type LandContext = {
 	readonly questions: Questions;
 	/** The remote's pull requests and branch rules; undefined for a remote that is not on GitHub. */
 	readonly pulls: PullRequests | undefined;
+	/** The remote's branches through GitHub's API, which signs the commits it makes; undefined for a remote that is not on GitHub. */
+	readonly commits: GitHubCommits | undefined;
 	readonly now: () => number;
 	readonly judge: ModelCall;
 	/** A fresh review run on the change that ends at `head`, at its level's tier; it saves its verdict. */
@@ -233,7 +238,7 @@ const learnRules = async (
 			branchPrefix: config.hum.ownerBranchPrefix,
 			mergeMethod: config.hum.mergeMethod,
 			pulls: ctx.pulls,
-			push: (refspecs) => push(git, ["origin", ...refspecs]),
+			push: (refspecs) => pushCommits({ git, clone: scratch, base, pulls: ctx.pulls, commits: ctx.commits }, refspecs),
 		});
 
 		if (landed.via === "refused") return { kind: "refused", said: landed.said };
@@ -249,19 +254,47 @@ const learnRules = async (
 	}
 };
 
-/** Marks the item done on the run branch, pushes the branch and saves what its diff showed, so a retry lands it without a run. `ownerApproved` records that the owner approved this change in its review state. */
-export const prepareLanding = async (ctx: LandContext, { ownerApproved = false }: { readonly ownerApproved?: boolean } = {}): Promise<PushOutcome> => {
-	const { git, clone, dir, id, branch, state, now } = ctx;
-	const change = await changeOn(ctx);
-	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
+/**
+ * Where the run branch holds the item's file, as a markdown item's branch does, the file is marked done in a commit of
+ * its own, so the merged change itself takes the item off the ready list. A work source that keeps its items
+ * elsewhere ends the item once the change merged.
+ */
+const markItemDone = async ({ git, clone, dir, id }: LandContext): Promise<void> => {
 	const file = join(clone, dir, `${id}.md`);
 
-	writeFileSync(file, markDone(readFileSync(file, "utf8")));
+	if (!existsSync(file)) return;
+
+	const source = readFileSync(file, "utf8");
+
+	if (parseItemFile(source).state === DONE_STATE) return;
+
+	writeFileSync(file, markDone(source));
 	await git.raw(["add", `${dir}/${id}.md`]);
 	await git.raw(["commit", "-q", "-m", `hum: finish ${id}`]);
-	const pushed = await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+};
 
-	if (pushed.kind === "pushed") state.landings.put(id, { item: id, branch, since: now(), change, head, ownerApproved });
+/**
+ * Marks the item done on the run branch where it holds the item's file, pushes the branch and saves what its diff
+ * showed, so a retry lands it without a run. The saved head is the change before hum's done mark; a push GitHub signed
+ * rebuilt the change as its own commit, which is then the head, and a verdict on the old commit holds for its tree.
+ * `ownerApproved` records that the owner approved this change in its review state.
+ */
+export const prepareLanding = async (ctx: LandContext, { ownerApproved = false }: { readonly ownerApproved?: boolean } = {}): Promise<PushOutcome> => {
+	const { git, id, branch, state, now } = ctx;
+	const change = await changeOn(ctx);
+	const built = (await git.raw(["rev-parse", "HEAD"])).trim();
+
+	await markItemDone(ctx);
+	const pushed = await pushRunBranch(ctx, branch);
+
+	if (pushed.kind !== "pushed") return pushed;
+
+	const head = (await isAncestor(git, { ancestor: built, descendant: "HEAD" })) ? built : (await git.raw(["rev-parse", "HEAD"])).trim();
+	const verdict = state.verdicts.get(id);
+
+	if (head !== built && verdict?.head === built) state.verdicts.put(id, { ...verdict, head });
+
+	state.landings.put(id, { item: id, branch, since: now(), change, head, ownerApproved });
 
 	return pushed;
 };
@@ -292,13 +325,15 @@ const ontoNewestBase = async ({ git, base, clone, env, checks, config }: LandCon
 	return failure ? { kind: "stale", why: `the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}` } : undefined;
 };
 
-const pushBranchAndBase = async ({ git, base, branch }: LandContext): Promise<PushOutcome> => {
-	const toBranch = await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+const pushBranchAndBase = async (ctx: LandContext): Promise<PushOutcome> => {
+	const toBranch = await pushRunBranch(ctx, ctx.branch);
 
-	return toBranch.kind === "pushed" ? push(git, ["origin", `HEAD:refs/heads/${base}`]) : toBranch;
+	return toBranch.kind === "pushed" ? pushBase(ctx) : toBranch;
 };
 
-const finish = async ({ state, git, id, now }: LandContext): Promise<ThinResult> => {
+/** The change is on the base: its item ends at the work source, then the merge is recorded. A failed end leaves the landing saved, so the next pass ends it again. */
+const finish = async ({ state, git, id, item, workSource, now }: LandContext): Promise<ThinResult> => {
+	await workSource.finish(item.id);
 	recordMerged(state, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
 
 	return { outcome: "merged", item: id };
@@ -323,22 +358,23 @@ const pushToBase = async (ctx: LandContext): Promise<BaseLanding> => {
 	return { kind: "conflict" };
 };
 
+/** What the change's pull request says: the text the run wrote under the repo's own rules, else the item's title, then its evidence, then hum's word on the merge and the item. */
+const pullRequestOf = ({ state, id, item }: LandContext, merging: string) => {
+	const written = state.pullRequests.get(id);
+
+	return {
+		title: written?.title ?? `hum: ${item.title}`,
+		body: [written?.body, written?.evidence && evidenceMarkdown(written.evidence), merging, `Item ${id}.`].filter(Boolean).join("\n\n"),
+	};
+};
+
 /** One pull request from the run branch: it merges itself once GitHub's required checks pass when the change is cleared, and waits for the owner otherwise. */
 const throughPullRequest = async (
 	ctx: LandContext,
 	{ pulls, autoMerge, route, rules, why }: { readonly pulls: PullRequests; readonly autoMerge: boolean; readonly route: Route; readonly rules: BranchRules; readonly why: string },
 ): Promise<ThinResult> => {
-	const { id, branch, base, item, config } = ctx;
-	const body = `${autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`}\n\nItem ${id}.`;
-
-	const pull =
-		(await pulls.find(branch)) ??
-		(await pulls.open({
-			head: branch,
-			base,
-			title: `hum: ${item.title}`,
-			body,
-		}));
+	const { id, branch, base, config } = ctx;
+	const pull = (await pulls.find(branch)) ?? (await pulls.open({ head: branch, base, ...pullRequestOf(ctx, autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`) }));
 
 	if (pull.state === "MERGED") return finish(ctx);
 
@@ -426,6 +462,9 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const saved = ctx.state.landings.get(ctx.id);
 
 	if (!saved) throw new Error(`no landing is saved for ${ctx.id}`);
+
+	// A change of no files, such as a split item's, whose branch the base already holds has nothing left to land.
+	if (saved.change.paths.length === 0 && (await isOnBase(ctx))) return finish(ctx);
 
 	const first = await placementOf(ctx, saved.change);
 	const answered = answeredLevel(ctx.item, saved.since, levelNames(ctx.config));

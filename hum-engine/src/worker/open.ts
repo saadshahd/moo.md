@@ -9,20 +9,21 @@ import { repoFromRemote } from "../adapters/github.ts";
 import { ownerGitHub } from "../adapters/github-client.ts";
 import { githubLoopReads } from "../loop/github.ts";
 import { gitHubPullRequests } from "../adapters/pull-requests.ts";
+import { gitHubCommits } from "../adapters/github-commits.ts";
 import { serialized } from "../adapters/serial.ts";
 import { SlotPool } from "../slots/pool.ts";
 import { loadConfig, readConfigDir } from "../config/load.ts";
 import type { HumConfig } from "../config/schema.ts";
-import { commandTimeoutMs, type Env } from "../exec.ts";
+import { commandTimeoutMs, type Env, withoutGitHubTokens } from "../exec.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
 import { DEFAULT_BASE } from "./thin-path.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
-export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "loop" | "checks" | "runnerVariables"> & {
+export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" | "adapters" | "runner" | "remote" | "pulls" | "commits" | "loop" | "checks" | "runnerVariables"> & {
 	/** Where saved state lives; default `<git common dir>/hum`. */
 	readonly stateDir?: string;
-	/** The skill names of hope's installed copy; a role that names another is refused. */
-	readonly hopeSkills: ReadonlySet<string>;
+	/** The installed plugins' skills, as a role names them; a role that names another plugin skill is refused. */
+	readonly installedSkills: ReadonlySet<string>;
 	readonly remote?: string;
 	readonly binary?: string;
 	/** The process environment: runs start with it, and the GitHub login and adapters read it. */
@@ -52,10 +53,10 @@ const isInBackground = ({ backgroundRuns }: Pick<HumConfig, "backgroundRuns">, w
  * Throws when the config is refused or the repo has no `origin`; the service unit shows that as a card.
  */
 export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => {
-	const { stateDir, hopeSkills, binary, env, ...rest } = options;
+	const { stateDir, installedSkills, binary, env, ...rest } = options;
 	const { now } = rest;
 	const state = openState(stateDir ?? (await defaultStateDir(repo)), { now });
-	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { hopeSkills } });
+	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills } });
 
 	if (!loaded.ok) throw new Error(loaded.refusal.message);
 
@@ -96,7 +97,8 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 	const slots = config.hum.runSlots.enabled && isInBackground(config.hum, rest.where) ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
 	const github = repoFromRemote(remote);
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs, env });
+	const commits = github === undefined ? undefined : gitHubCommits(github, { timeoutMs, env });
 	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, () => ownerGitHub(timeoutMs, env));
 
-	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, loop, runnerVariables: new Set(Object.keys(env)) });
+	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.keys(withoutGitHubTokens(env))) });
 };

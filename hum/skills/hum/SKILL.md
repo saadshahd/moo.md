@@ -17,6 +17,7 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | Ask | Proposal comes from | The answer sets |
 | --- | --- | --- |
 | Where runs happen: your Mac, CI, or both | the scan: CI workflows, a service unit | `runPlaces` |
+| Where items, questions and answers live: GitHub issues, or markdown files in `itemsDir` | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel` | `integrations` |
 | Which commands a change must pass | CI jobs on pull requests, else package scripts, after the lockfile install a fresh clone needs | `checks` |
 | For CI runs: the repo's setting "Allow GitHub Actions to create and approve pull requests" | `workflowsMayOpenPullRequests` in the scan; if off, ask the owner to turn it on and never change it yourself | nothing written |
 | For CI runs: the runner, job container and env the wake job runs with | `wakeJob` in the proposal: the job that runs Claude Code, else the pull request job; drop env only that job uses. The image needs git, node and npm; one that runs as root needs `IS_SANDBOX` set to `1` in `ciEnv`. An env value that reads a secret reaches only the step that runs hum | `ciRunner`, `ciContainer`, `ciEnv` |

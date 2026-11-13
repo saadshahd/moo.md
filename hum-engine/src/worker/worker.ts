@@ -18,6 +18,7 @@ import type { State } from "../state/open.ts";
 import { tallyOf } from "./tally.ts";
 import { checkBaseAfterMerge } from "./base-check.ts";
 import { settleMergedPulls } from "./merged.ts";
+import type { GitHubCommits } from "../adapters/github-commits.ts";
 import { readHistory } from "../adapters/history.ts";
 import { gitIn, PATCH } from "../adapters/git.ts";
 import { join } from "node:path";
@@ -86,6 +87,8 @@ export type WorkerOptions = {
 	readonly onResult?: (result: ThinResult) => void;
 	/** The remote's pull requests and branch rules, for a remote on GitHub. */
 	readonly pulls?: PullRequests;
+	/** The remote's branches through GitHub's API, which signs the commits it makes, for a remote on GitHub. */
+	readonly commits?: GitHubCommits;
 	/** What the review-note loop reads from the review surface and CI; without it the loop reads only git and the owner's answers. */
 	readonly loop?: Partial<Pick<LoopPass, "comments" | "ciLogs">>;
 };
@@ -469,6 +472,7 @@ export class Worker {
 				runnerVariables: this.#o.runnerVariables,
 				newSessionId: this.#o.newSessionId,
 				pulls: this.#o.pulls,
+				commits: this.#o.commits,
 				mayLand: () => this.#updating === undefined,
 			}).then(
 				(result) => this.#ended(id, known, result),
@@ -547,7 +551,7 @@ export class Worker {
 
 		const tip = (await git.raw(["rev-parse", LOOP_REF])).trim();
 
-		if (pulls) await settleMergedPulls(state, pulls, this.#now());
+		if (pulls) await settleMergedPulls(state, { pulls, workSource: adapters.workSource }, this.#now());
 
 		await runLoopPass({
 			state,

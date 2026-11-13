@@ -1,5 +1,10 @@
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 import { gitHubClient } from "../../src/adapters/github-client.ts";
+import { type GitHubCommits, gitHubCommits } from "../../src/adapters/github-commits.ts";
 import { gitHubPullRequests, type PullRequests } from "../../src/adapters/pull-requests.ts";
 import type { Json } from "../../src/config/json.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
@@ -20,7 +25,7 @@ export const WORKFLOW_BOT: Author = { authorAssociation: "NONE", author: { __typ
 
 type Comment = Author & { body: string; createdAt: string };
 
-type Pull = { id: string; number: number; head: string; base: string; title: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND" };
+type Pull = { id: string; number: number; head: string; base: string; title: string; body: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND" };
 
 type Commit = { message: string; tree: string; parents: string[] };
 
@@ -46,11 +51,24 @@ const Vars = z.looseObject({
 	labels: z.array(z.string()).optional(),
 	base: z.string().optional(),
 	pull: z.string().optional(),
+	issue: z.string().optional(),
+	files: z.object({ additions: z.array(z.object({ path: z.string(), contents: z.string() })).default([]), deletions: z.array(z.object({ path: z.string() })).default([]) }).optional(),
 });
 
 type Vars = z.infer<typeof Vars>;
 
 const Posted = z.object({ message: z.string(), tree: z.string(), parents: z.array(z.string()) });
+
+const RefPosted = z.object({ ref: z.string(), sha: z.string() });
+
+const RefMoved = z.object({ sha: z.string(), force: z.boolean().default(false) });
+
+/** git in the bare repo that backs the fake's real branches; a failure is the answer, never a throw. */
+const gitAt = (repo: string, args: readonly string[], input?: Buffer | string) => {
+	const ran = spawnSync("git", args, { cwd: repo, input, encoding: "utf8" });
+
+	return { ok: ran.status === 0, out: ran.stdout.trim(), err: ran.stderr.trim() };
+};
 
 const REPOSITORY_ID = "R_fake";
 const TOKENS = new Set(["token fake-token", "bearer fake-token"]);
@@ -93,6 +111,12 @@ export class FakeGitHub {
 	#pullComments: string[] = [];
 	/** The base branch's rules ask for a pull request with passing checks. */
 	requiresPullRequest = false;
+	/** The base branch's rules ask for commits GitHub verified, which only the commits the fake makes are. */
+	requiresSignatures = false;
+	/** The bare repo whose branches the fake's ref and commit calls write, as GitHub's own do. */
+	gitRemote: string | undefined;
+	/** The commits the fake made through `createCommitOnBranch`: the ones GitHub signs. */
+	readonly signed = new Set<string>();
 	allowAutoMerge = true;
 	#version = 1;
 	#tick = 0;
@@ -159,6 +183,11 @@ export class FakeGitHub {
 		return this.#pulls;
 	}
 
+	/** Whether the issue is open or closed. */
+	issueState(number: number): Issue["state"] | undefined {
+		return this.#issues.find((found) => found.number === number)?.state;
+	}
+
 	comments(number: number): readonly Comment[] {
 		return this.#comments.get(number) ?? [];
 	}
@@ -179,6 +208,76 @@ export class FakeGitHub {
 		const client = gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 		return gitHubPullRequests(this.repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: async () => client });
+	}
+
+	/** The branches of `gitRemote` through the fake's API. */
+	commits(): GitHubCommits {
+		const client = gitHubClient({ token: "fake-token", fetch: this.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+
+		return gitHubCommits(this.repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, client: async () => client });
+	}
+
+	#bare(): string {
+		if (this.gitRemote === undefined) throw new Error("the fake has no git remote for its branches");
+
+		return this.gitRemote;
+	}
+
+	/** createCommitOnBranch on the backing repo: the files applied to the branch's tip through a scratch index, the commit made as GitHub's. */
+	#commitSigned(v: Vars): Json | Refused {
+		const bare = this.#bare();
+		const ref = `refs/heads/${v.branch?.branchName}`;
+		const head = gitAt(bare, ["rev-parse", "--verify", "--quiet", ref]).out;
+
+		if (head !== v.expected) return refused("STALE_DATA", `Expected branch to point to "${v.expected}" but it did not.  Pull and try again.`);
+
+		const scratch = mkdtempSync(join(tmpdir(), "fake-index-"));
+		const env = { ...process.env, GIT_INDEX_FILE: join(scratch, "index"), GIT_AUTHOR_NAME: "app[bot]", GIT_AUTHOR_EMAIL: "app@users.noreply.github.com", GIT_COMMITTER_NAME: "GitHub", GIT_COMMITTER_EMAIL: "noreply@github.com" };
+		const indexed = (args: readonly string[], input?: Buffer) => spawnSync("git", args, { cwd: bare, env, input, encoding: "utf8" }).stdout.trim();
+
+		try {
+			indexed(["read-tree", head]);
+
+			for (const { path, contents } of v.files?.additions ?? []) indexed(["update-index", "--add", "--cacheinfo", `100644,${indexed(["hash-object", "-w", "--stdin"], Buffer.from(contents, "base64"))},${path}`]);
+
+			for (const { path } of v.files?.deletions ?? []) indexed(["update-index", "--force-remove", path]);
+
+			const tree = indexed(["write-tree"]);
+			const oid = indexed(["commit-tree", tree, "-p", head, "-m", [v.message?.headline, v.message?.body].filter(Boolean).join("\n\n")]);
+
+			gitAt(bare, ["update-ref", ref, oid, head]);
+			this.signed.add(oid);
+
+			return { createCommitOnBranch: { commit: { oid, tree: { oid: tree } } } };
+		} finally {
+			rmSync(scratch, { recursive: true, force: true });
+		}
+	}
+
+	/** The REST ref calls on the backing repo, as GitHub answers them: a second create and a move that is no fast-forward are refused, and so is a move of the base its rules keep for pull requests. */
+	#refCall(method: string, ref: string, body: RequestInit["body"]): Response {
+		const bare = this.#bare();
+		const current = gitAt(bare, ["rev-parse", "--verify", "--quiet", ref]).out;
+
+		if (method === "GET") return current ? json(200, { ref, object: { sha: current } }) : json(404, { message: "Not Found" });
+
+		if (method === "DELETE") return gitAt(bare, ["update-ref", "-d", ref]).ok ? new Response(null, { status: 204 }) : json(422, { message: "Reference does not exist" });
+
+		if (method === "POST") {
+			const { ref: made, sha } = RefPosted.parse(JSON.parse(String(body)));
+
+			return gitAt(bare, ["rev-parse", "--verify", "--quiet", made]).ok ? json(422, { message: "Reference already exists" }) : (gitAt(bare, ["update-ref", made, sha, ""]), json(201, { ref: made, object: { sha } }));
+		}
+
+		const { sha, force } = RefMoved.parse(JSON.parse(String(body)));
+
+		if (ref === "refs/heads/main" && this.requiresPullRequest) return json(422, { message: "Repository rule violations found\n\nChanges must be made through a pull request." });
+
+		if (!force && current && !gitAt(bare, ["merge-base", "--is-ancestor", current, sha]).ok) return json(422, { message: "Update is not a fast forward" });
+
+		gitAt(bare, ["update-ref", ref, sha]);
+
+		return json(200, { ref, object: { sha } });
 	}
 
 	#pull(id: string | undefined, change: Partial<Pull>, mutation: string): Json | Refused {
@@ -286,6 +385,17 @@ export class FakeGitHub {
 
 			return { createCommitOnBranch: { clientMutationId: null } };
 		},
+		CloseIssue: (v) => {
+			const issue = this.#issue(Number(v.issue?.slice("I_".length)));
+
+			if (issue instanceof Refused) return issue;
+
+			issue.state = "CLOSED";
+			this.#version++;
+
+			return { closeIssue: { clientMutationId: null } };
+		},
+		CommitSigned: (v) => this.#commitSigned(v),
 		CreateLabel: (v) => {
 			this.#labels.add(v.name ?? "");
 
@@ -304,7 +414,7 @@ export class FakeGitHub {
 		},
 		OpenPull: (v) => {
 			const number = this.#pulls.length + 1;
-			const pull: Pull = { id: `PR_${number}`, number, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", state: "OPEN", autoMerge: false, status: "BLOCKED" };
+			const pull: Pull = { id: `PR_${number}`, number, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", body: v.body ?? "", state: "OPEN", autoMerge: false, status: "BLOCKED" };
 
 			this.#pulls.push(pull);
 
@@ -341,7 +451,14 @@ export class FakeGitHub {
 		if (url.pathname === "/rate_limit") return json(200, { resources: { core: { remaining: this.remaining } } });
 
 		if (method === "GET" && path.startsWith("/rules/branches/"))
-			return json(200, this.requiresPullRequest ? [{ type: "pull_request", parameters: { allowed_merge_methods: ["squash"] } }, { type: "required_status_checks" }] : [{ type: "deletion" }]);
+			return json(200, [
+				...(this.requiresPullRequest ? [{ type: "pull_request", parameters: { allowed_merge_methods: ["squash"] } }, { type: "required_status_checks" }] : [{ type: "deletion" }]),
+				...(this.requiresSignatures ? [{ type: "required_signatures" }] : []),
+			]);
+
+		const refPath = /^\/git\/refs?(?:\/(.+))?$/.exec(decodeURIComponent(path));
+
+		if (refPath && this.gitRemote !== undefined) return this.#refCall(method, `refs/${refPath[1] ?? ""}`, body);
 
 		if (method === "GET" && path === "/issues") {
 			const etag = `W/"v${this.#version}"`;

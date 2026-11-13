@@ -23,11 +23,11 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { readSettings } from "../src/config/settings.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { DAY_MS, HOUR_MS } from "../src/time.ts";
-import { hopeSkills, root, shippedRaw, type Tree, withProposedTimeouts } from "./fixtures/config.ts";
+import { installedSkills, root, shippedRaw, type Tree, withProposedTimeouts } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
-const env = { hopeSkills: hopeSkills() };
+const env = { installedSkills: installedSkills() };
 
 const clone = (raw: RawConfig): Tree => structuredClone(raw);
 
@@ -247,15 +247,24 @@ test("hum ships no email address: its defaults and its schema hold none", () => 
 	expect(schemaFile.properties.commitIdentity).not.toHaveProperty("default");
 });
 
-test("a missing hope skill is refused, naming the skill and the role", () => {
-	const fake = { hopeSkills: new Set(["intent", "shape"]) };
+test("a plugin skill no installed plugin has is refused, naming the skill and the role", () => {
+	const fake = { installedSkills: new Set(["hope:intent", "hope:shape"]) };
 	const result = loadConfig(setUp(), { env: fake });
 
 	expect(result.ok).toBe(false);
 	expect(!result.ok && result.refusal.code === "invalid-config" && result.refusal.problems).toEqual([
-		{ problem: "missing-hope-skill", skill: "hope:judge", role: "review" },
+		{ problem: "missing-skill", skill: "hope:judge", role: "review" },
 	]);
-	expect(env.hopeSkills.has("judge")).toBe(true);
+	expect(env.installedSkills.has("hope:judge")).toBe(true);
+});
+
+test("a role may name another plugin's skill once that plugin is installed, and a bare skill name is the repo's own", () => {
+	const named = clone(setUp());
+
+	named.hum.roles.build.skills = ["sound:prime", "sound:review", "my-own-skill"];
+
+	expect(loadConfig(named, { env: { installedSkills: new Set([...env.installedSkills, "sound:prime", "sound:review"]) } }).ok).toBe(true);
+	expect(!loadConfig(named, { env }).ok).toBe(true);
 });
 
 test("an unreachable state and a wait with no timeout give one refusal naming both; the old config stays", () => {

@@ -11,7 +11,7 @@ import { isMarkerLine, markerLine, splitMarker } from "./marked.ts";
 export const READY_STATE = "ready";
 
 /** The front matter `state` of a merged item. */
-const DONE_STATE = "done";
+export const DONE_STATE = "done";
 
 /** Titles are never folded over several lines, so the owner reads the line they wrote. */
 const YAML_OPTIONS = { lineWidth: 0 };

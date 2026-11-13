@@ -76,6 +76,10 @@ export class FakeRoundup {
 				this.pads.set(String(args.name), args.text ?? "");
 
 				return { name: String(args.name) };
+			case "todo_complete":
+				this.#todo(args.id).done = true;
+
+				return structuredClone(this.#todo(args.id));
 			case "todo_create": {
 				const id = this.seed(String(args.title), { body: String(args.body ?? "") });
 

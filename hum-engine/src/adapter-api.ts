@@ -5,7 +5,7 @@ import type { FaultInput } from "./state/faults.ts";
 export type { FaultInput };
 
 /** Bumped on every change to the API an adapter implements; a breaking change bumps the engine's major version. */
-export const ADAPTER_API_VERSION = 2;
+export const ADAPTER_API_VERSION = 3;
 
 /** Failure that retrying cannot fix: a reply of the wrong shape, a refused push. The engine surfaces it at once, as it does a `failed: "now"` answer. */
 export class PermanentError extends Error {
@@ -102,6 +102,8 @@ export interface WorkSource {
 	comment(id: ItemId, text: string): Promise<void>;
 	/** Files a ready item. Filing the same `title` from the same `from` twice returns the first item. */
 	fileFollowUp(from: ItemId, followUp: FollowUp): Promise<ItemRef>;
+	/** Ends an item whose change merged, so `listReady` never lists it again. Ending an ended item changes nothing. */
+	finish(id: ItemId): Promise<void>;
 }
 
 /** Where a run's questions and the choices made without the owner land. */

@@ -15,7 +15,7 @@ export { Json } from "./config/json.ts";
 
 export {
 	type Config,
-	listHopeSkills,
+	listPluginSkills,
 	loadConfig,
 	type LoadOptions,
 	type RawConfig,

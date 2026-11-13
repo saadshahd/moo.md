@@ -182,7 +182,12 @@
 			"type": "object",
 			"propertyNames": {
 				"type": "string",
-				"minLength": 1
+				"enum": [
+					"work-source",
+					"questions",
+					"answers",
+					"release"
+				]
 			},
 			"additionalProperties": {
 				"type": "string",
@@ -581,7 +586,7 @@
 					"additionalProperties": false
 				}
 			],
-			"description": "Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset."
+			"description": "Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset; a wake whose App secrets are unset stops with an error."
 		},
 		"ciWakeTimeoutMinutes": {
 			"default": 60,

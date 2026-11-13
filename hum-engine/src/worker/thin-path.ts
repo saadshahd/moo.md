@@ -9,7 +9,7 @@ import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, identityEnv, PATCH, push } from "../adapters/git.ts";
+import { type Git, gitIn, identityEnv, PATCH } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -36,6 +36,10 @@ import { proveCheckItem } from "../loop/prove-item.ts";
 import { tallyOf } from "./tally.ts";
 import { decideProse } from "./prose-run.ts";
 import { footprintOf, type PrefixGate } from "./scheduler.ts";
+import { keepEvidence } from "./evidence.ts";
+import { pushRunBranch } from "./signed-push.ts";
+import type { GitHubCommits } from "../adapters/github-commits.ts";
+import { repoFromRemote } from "../adapters/github.ts";
 
 /** How long a claim lasts unless its holder renews it. */
 export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeconds * SECOND_MS;
@@ -49,8 +53,13 @@ export const DEFAULT_BASE = "main";
 
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
+/** The pull request a build or fix run writes for the branch's whole change, and the one file of evidence it saved, by name. */
+const PullRequestWritten = z.object({ title: z.string().min(1), body: z.string().min(1), evidence: z.string().min(1).optional() });
+
+type PullRequestWritten = z.infer<typeof PullRequestWritten>;
+
 /** What the agent run hands back besides its commit. */
-export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional() }));
+export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional(), pullRequest: PullRequestWritten.optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
 export const PLAN_MARK = "hum plan:";
@@ -83,6 +92,8 @@ export type ThinPathOptions = {
 	readonly gate?: PrefixGate;
 	/** The remote's pull requests and branch rules, for a remote on GitHub. */
 	readonly pulls?: PullRequests;
+	/** The remote's branches through GitHub's API, which signs the commits it makes, for a remote on GitHub. */
+	readonly commits?: GitHubCommits;
 	/** The names, never the values, of the variables the runs have; a missing secret is checked against them. */
 	readonly runnerVariables: ReadonlySet<string>;
 	/** A fresh id for each run's session. */
@@ -131,7 +142,7 @@ const isApprovalWait = (kind: Kind, state: string | undefined): boolean => state
 /** Where an item saved in an owner wait stands for an answer: waiting on approval where the state takes the owner's approval, else waiting. */
 export const ownerWaitStage = (kind: Kind, state: string | undefined): Stage => (isApprovalWait(kind, state) ? "approval" : "waiting");
 
-const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional() });
+const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), pullRequest: PullRequestWritten.optional() });
 
 /** The kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
 const earlierKinds = (state: State, kind: Kind) => (machineVersion: string) => state.kinds.get(`${kind.machine.id}@${machineVersion}`);
@@ -256,14 +267,21 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 	try {
 		await onRunBranch(git, { branch, restartAt: isFresh ? `origin/${base}` : undefined });
 
-		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, env, g, git, answered, resume: asking, restarted: isFresh };
+		/** Where a run saves its one picture or video of the change, outside the clone so nothing commits it. */
+		const evidence = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-evidence-"));
 
-		// A change already finished lands again from its pushed branch; no run is spent on it.
-		const result = park(o, landing ? await landAgain(driven) : await drive(driven));
+		try {
+			const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh };
 
-		if (result.outcome === "moved") forgetProgress(o.state, id);
+			// A change already finished lands again from its pushed branch; no run is spent on it.
+			const result = park(o, landing ? await landAgain(driven) : await drive(driven));
 
-		return result;
+			if (result.outcome === "moved") forgetProgress(o.state, id);
+
+			return result;
+		} finally {
+			rmSync(evidence, { recursive: true, force: true });
+		}
 	} finally {
 		await taken.giveBack();
 	}
@@ -332,6 +350,8 @@ type Driven = ThinPathOptions & {
 	readonly item: Item;
 	readonly branch: string;
 	readonly clone: string;
+	/** The folder a run saves its evidence in. */
+	readonly evidence: string;
 	readonly env: Readonly<Record<string, string>>;
 	readonly g: (args: readonly string[]) => Promise<string>;
 	readonly git: Git;
@@ -392,6 +412,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			roleOf(config, purpose),
 			`# Item ${id}: ${item.title}\n\n${item.body}`,
 			`Work on the branch ${branch}. Commit the change when it is whole. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+			`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be. Where one screenshot or short video shows the change at work, save that one file in ${d.evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
 		];
 
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
@@ -511,7 +532,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 					const wants = Wants.safeParse(outcome.structured).data;
 
-					if (wants?.status !== "needs-owner") break;
+					if (wants?.status !== "needs-owner") {
+						if (wants?.pullRequest) await keepPullRequest(d, wants.pullRequest);
+
+						break;
+					}
 
 					const settled = await settleNeed(wants);
 
@@ -646,6 +671,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	return result.promise.finally(() => actor.stop());
 };
 
+/** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */
+const keepPullRequest = async (d: Driven, { title, body, evidence }: PullRequestWritten): Promise<void> => {
+	const kept = evidence === undefined ? d.state.pullRequests.get(d.id)?.evidence : await keepEvidence({ git: d.git, folder: d.evidence, file: evidence, item: d.id, repo: repoFromRemote(d.remote) });
+
+	d.state.pullRequests.put(d.id, { item: d.id, title, body, evidence: kept });
+};
+
 /** What a run left for the owner: the question, the plain one it falls back to, and the plan so far. */
 type Pending = { readonly question: Question; readonly plain: PlainQuestion; readonly plan: string };
 
@@ -675,10 +707,13 @@ const SPLIT = "needs-split";
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
 
+/** The role file of a run's purpose, then the skills its role names, so the run reaches for them. */
 const roleOf = (config: RunConfig, purpose: Purpose): string => {
 	const role = config.hum.roles[purpose];
+	const text = ((role && config.roles[role.file]) ?? "").trim();
+	const skills = role?.skills ?? [];
 
-	return ((role && config.roles[role.file]) ?? "").trim();
+	return skills.length === 0 ? text : [text, `Use these skills with the Skill tool where they apply: ${skills.join(", ")}.`].filter(Boolean).join("\n\n");
 };
 
 
@@ -776,14 +811,14 @@ const approvalQuestion = ({ question, plan }: Pending): Pending => ({
 
 /** Push the work branch, put the plan on the item, queue the question for room under the daily cap, and end. Each write runs once per key. A push that did not land ends the pass with its result instead. */
 const handOff = async (d: Driven, { question, plain, plan }: Pending): Promise<ThinResult | undefined> => {
-	const { state, id, g, branch, workSource, questions, git } = d;
+	const { state, id, g, branch, workSource, questions } = d;
 	const attempt = state.runs.list(id).length;
 	const key = (op: string) => ({ itemId: id, run: "ask", attempt, op });
 	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource, questions }, state.ops, { run: "ask", attempt });
 
 	const pushed = await state.ops.once(key("push-branch"), {
 		holds: async () => (await g(["ls-remote", "--heads", "origin", branch])).startsWith((await g(["rev-parse", "HEAD"])).trim()),
-		run: () => push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]),
+		run: () => pushRunBranch(landContext(d), branch),
 		isDone: ({ kind }) => kind === "pushed",
 	});
 
@@ -817,6 +852,7 @@ const landContext = (d: Driven): LandContext => ({
 	workSource: d.workSource,
 	questions: d.questions,
 	pulls: d.pulls,
+	commits: d.commits,
 	now: d.now,
 	judge: d.judge,
 	reviewRun: reviewAtLanding(d),

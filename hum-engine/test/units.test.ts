@@ -139,6 +139,7 @@ test("the CI workflows wake on the four events from the settings, never resume a
 
 	expect(Object.keys(on("hum-comment.yml"))).toEqual(["issue_comment"]);
 	expect(on("hum-push.yml")).toEqual({ push: { branches: ["**", "!bots/run/**"], paths: ["work/items/**"] } });
+	expect(Trigger.parse(parseYaml(files["hum-push.yml"] ?? "")).jobs.wake.if).toBe("github.ref_name == github.event.repository.default_branch");
 	expect(Object.keys(on("hum-dispatch.yml"))).toEqual(["repository_dispatch"]);
 	expect(on("hum-schedule.yml")).toMatchObject({ schedule: [{ cron: "7 * * * *" }] });
 	expect(files["hum-wake.yml"]).toContain("HUM_GIT_EMAIL: bot@example.com");
@@ -182,7 +183,7 @@ test("the wake job runs on the runner and in the container the settings name, as
 test("env that reads no secret reaches every step, and env that reads one reaches only the step that runs hum", () => {
 	const { env, steps } = wakeOf(gateway).jobs.wake;
 
-	expect(env).toEqual({ ...OPEN_ENV, HUM_HAS_APP: "${{ secrets.APP_CLIENT_ID != '' }}", HUM_EVENT: "${{ github.event_name }}" });
+	expect(env).toEqual({ ...OPEN_ENV, HUM_HAS_APP: "${{ secrets.APP_CLIENT_ID != '' && secrets.APP_PRIVATE_KEY != '' }}", HUM_EVENT: "${{ github.event_name }}" });
 	expect(steps.at(-1)?.env).toMatchObject(SECRET_ENV);
 	expect(steps.slice(0, -1).filter((step) => JSON.stringify(step.env ?? {}).includes("GATEWAY_TOKEN"))).toEqual([]);
 });
@@ -221,7 +222,7 @@ test("a secret's token is the run's GH_TOKEN, and falls back to the workflow tok
 	expect(wakeText(settings)).not.toContain("create-github-app-token");
 });
 
-test("an App's token is minted last, with the workflow's own permissions, from the two secrets the settings name, and falls back to the workflow token while the client ID is unset", () => {
+test("an App's token is minted last, with the workflow's own permissions, from the two secrets the settings name, and a wake whose App secrets are unset stops first, naming them", () => {
 	const { on, permissions, jobs } = wakeOf(gateway);
 	const [mint, wake] = jobs.wake.steps.slice(-2);
 
@@ -235,9 +236,27 @@ test("an App's token is minted last, with the workflow's own permissions, from t
 		"permission-pull-requests": "write",
 	});
 	expect(permissions).toEqual({ contents: "write", issues: "write", "pull-requests": "write" });
-	expect(mint?.if).toBe("env.HUM_HAS_APP == 'true'");
-	expect(jobs.wake.env.HUM_HAS_APP).toBe("${{ secrets.APP_CLIENT_ID != '' }}");
-	expect(wake?.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token || github.token }}`);
+	expect(mint?.if).toBeUndefined();
+	expect(wake?.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token }}`);
+
+	const [check] = jobs.wake.steps;
+	const ran = Bun.spawnSync(["bash", "-ec", check?.run ?? "true"], { env: { PATH: process.env.PATH } });
+
+	expect(check?.if).toBe("env.HUM_HAS_APP != 'true'");
+	expect(ran.exitCode).toBe(1);
+	expect(ran.stdout.toString()).toContain("::error title=hum::The GitHub App secrets APP_CLIENT_ID and APP_PRIVATE_KEY are not both set.");
+});
+
+test("the checkout keeps no token in the workspace, and the plugins install after the engine, before git learns the token", () => {
+	const { steps } = wakeOf(settings).jobs.wake;
+	const at = (found: (typeof steps)[number] | undefined) => steps.findIndex((step) => step === found);
+	const checkout = steps.find(({ uses }) => uses?.startsWith("actions/checkout@"));
+	const plugins = steps.find(({ run }) => run === "./node_modules/.bin/hum plugins");
+
+	expect(checkout?.with).toEqual({ "fetch-depth": 0, "persist-credentials": false });
+	expect(at(plugins)).toBeGreaterThan(at(steps.find(({ run }) => run === "bun install --frozen-lockfile")));
+	expect(at(plugins)).toBeLessThan(at(steps.find(({ run }) => run?.includes("credential"))));
+	expect(wakeText(settings)).not.toContain("claude plugin");
 });
 
 test("the git setup step hands git the run's GH_TOKEN when git asks, with no gh, and trusts the checkout", () => {

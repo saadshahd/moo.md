@@ -8,7 +8,7 @@ import semver from "semver";
 import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
-import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS, withoutGitHubTokens } from "../exec.ts";
 import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
@@ -29,15 +29,16 @@ export const RUN_SETTINGS = JSON.stringify({
 
 /**
  * The two kinds of `claude -p` call. An agent run keeps its session. A model call runs as hope's judge does: no
- * session kept, no hooks, and the default output style, so the owner's style cannot reshape its answer. It also loads
- * no settings source (plugins, MCP servers, memory files) and no built-in tool: a question needs neither, and each
- * one bills on every call.
+ * session kept, no hooks, and the default output style, so the owner's style cannot reshape its answer. It loads the
+ * user's settings alone, which hold their sign-in (`apiKeyHelper`, a gateway's `env`); it runs in a temp folder, which
+ * holds no project settings. It loads no skill or command, no MCP server and no built-in tool: a question needs
+ * none, and each bills on every call. The user's CLAUDE.md does load with their settings, so a measured rate counts it.
  */
 const CALLS = {
 	run: { settings: RUN_SETTINGS, flags: [] },
 	judgment: {
 		settings: JSON.stringify({ permissions: { defaultMode: "bypassPermissions" }, disableAllHooks: true, outputStyle: "default" }),
-		flags: ["--no-session-persistence", "--setting-sources", "", "--tools", ""],
+		flags: ["--no-session-persistence", "--setting-sources", "user", "--disable-slash-commands", "--strict-mcp-config", "--tools", ""],
 	},
 } as const satisfies Record<string, { settings: string; flags: readonly string[] }>;
 
@@ -318,7 +319,7 @@ export type RunnerOptions = {
 	readonly binary?: string;
 	/** The limit of `claude --version`, which the version floor reads, and of the start check; the owner's `commandTimeoutSeconds` in milliseconds. */
 	readonly timeoutMs?: number;
-	/** The environment `claude` runs with, the process's own from the root. An API key in it is passed on untouched. */
+	/** The environment `claude` runs with, the process's own from the root, without its GitHub tokens. An API key in it is passed on untouched. */
 	readonly env: Env;
 	readonly now: () => number;
 	/** The first wait before a run that hit the refresh-lock error runs again; later waits grow from it. */
@@ -426,7 +427,7 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 				// stderr goes to a file, so the line reader sees stdout alone: one stream cannot split another's line.
 				nodeOptions: {
 					cwd,
-					env: { ...env, ...runEnv },
+					env: withoutGitHubTokens({ ...env, ...runEnv }),
 					killSignal: "SIGKILL",
 					stdio: ["pipe", "pipe", stderrFd],
 				},
