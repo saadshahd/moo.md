@@ -24,12 +24,14 @@ test("the thin path runs two items on different files side by side, and both mer
 	expect(w.worker.running().sort()).toEqual(["a", "b"]);
 
 	await w.worker.idle();
+	await w.worker.tick();
+	await w.worker.idle();
 
 	expect(merged(w)).toEqual(["a", "b"]);
 	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
 	expect(sh(w.repo.remote, ["show", "main:docs/b.md"])).toBe("from b\n");
 
-	// Each merge is rechecked on the newest main: the later one reran the checks after the earlier one moved it.
+	// The later merge lost the race to main and was rechecked on the newest main at the next tick.
 	expect(readFileSync(checkLog, "utf8").split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(3);
 });
 
@@ -98,10 +100,12 @@ test("a merge is rechecked on the newest main: checks that passed on the old mai
 	w.item("b", "docs/b.md");
 	await w.worker.tick();
 	await w.worker.idle();
+	await w.worker.tick();
+	await w.worker.idle();
 
 	expect(merged(w)).toEqual(["a"]);
 
-	const stopped = w.results.find((r) => r.item === "b");
+	const stopped = w.results.findLast((r) => r.item === "b");
 
 	expect(stopped).toMatchObject({ outcome: "review" });
 	expect(stopped?.detail).toContain("the checks fail on the newest main");
@@ -210,6 +214,8 @@ test("the status file lists only the newest mergedShown merged changes", async (
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
+	await w.worker.tick();
+	await w.worker.idle();
 	await w.worker.tick();
 	await w.worker.idle();
 	await w.worker.tick();

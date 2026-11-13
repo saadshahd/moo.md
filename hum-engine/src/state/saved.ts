@@ -33,6 +33,10 @@ export const Landing = z.object({
 	head: name,
 	/** The owner approved this change in its review state, before it was saved. */
 	ownerApproved: z.boolean(),
+	/** The passes in a row whose push to the base another push beat. */
+	lostRaces: z.int().nonnegative().default(0),
+	/** The change's patch id against the base: the same change rebased keeps its landing. */
+	patch: z.string().optional(),
 	/** The alignment call's grades, or why it abstained; made once per change. */
 	alignment: z.union([z.object({ graded: AlignmentAnswer }), z.object({ abstained: name })]).optional(),
 });

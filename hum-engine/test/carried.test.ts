@@ -197,6 +197,11 @@ test("three items on one role start one after the other's first token, not toget
 	await w.worker.tick();
 	await w.worker.idle();
 
+	for (const _ of ["the second landing, which lost the race to main", "the third"]) {
+		await w.worker.tick();
+		await w.worker.idle();
+	}
+
 	const [first, second, third] = w.shim.calls().filter((call) => call.itemId).sort((a, b) => a.at - b.at);
 	const tokens = new Map(w.shim.tokens().map(({ pid, at }) => [pid, at]));
 

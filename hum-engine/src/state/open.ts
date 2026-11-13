@@ -19,6 +19,9 @@ export const INBOX_DIR = "inbox";
 export const STOPS_DIR = "stops";
 export const SLOTS_DIR = "slots";
 
+/** Publish's own git repo, beside the state, never saved with it. */
+export const PUBLISH_DIR = "publish";
+
 /** On the Mac and in a clone, state lives in the repo's git common dir, so every worktree shares it. */
 export const defaultStateDir = async (cwd: string): Promise<string> => {
 	const found = await gitIn(cwd, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).run(["rev-parse", "--git-common-dir"]);

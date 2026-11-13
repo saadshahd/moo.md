@@ -27,6 +27,8 @@ const realStatus = async () => {
 	await w.worker.tick();
 	await w.worker.idle();
 	await w.worker.tick();
+	await w.worker.idle();
+	await w.worker.tick();
 
 	return { path: w.state.statusPath, now: w.clock.at };
 };

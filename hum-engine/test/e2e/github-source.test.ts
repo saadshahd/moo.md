@@ -79,7 +79,7 @@ test("an issue whose base takes a push lands on main and closes, with no item fi
 	expect(github.issueState(Number(id))).toBe("CLOSED");
 });
 
-test("a run's picture of its change is kept alone on the item's evidence ref, never a branch, and linked by its commit", async () => {
+test("a run's picture of its change is kept alone on the item's evidence ref in the clone, never a branch, and linked by its commit; nothing reaches the remote before publish", async () => {
 	const repo = new WorkRepo();
 	const clone = repo.worker("run");
 	const folder = tempDir("evidence");
@@ -87,11 +87,12 @@ test("a run's picture of its change is kept alone on the item's evidence ref, ne
 	writeFileSync(join(folder, "shot.png"), "\u0089PNG\r\n");
 
 	const kept = await keepEvidence({ git: gitIn(clone, { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), folder, file: "shot.png", item: "7", repo: "me/scratch" });
-	const commit = sh(repo.remote, ["rev-parse", evidenceRef("7")]).trim();
+	const commit = sh(clone, ["rev-parse", evidenceRef("7")]).trim();
 
 	expect(kept).toEqual({ kind: "image", url: `https://github.com/me/scratch/blob/${commit}/shot.png?raw=true` });
-	expect(sh(repo.remote, ["ls-tree", "--name-only", commit]).trim()).toBe("shot.png");
-	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/heads"]).trim()).toBe("refs/heads/main");
+	expect(sh(clone, ["ls-tree", "--name-only", commit]).trim()).toBe("shot.png");
+	expect(sh(clone, ["for-each-ref", "--format=%(refname)", "refs/heads"]).trim()).toBe("refs/heads/main");
+	expect(sh(repo.remote, ["for-each-ref", "refs/hum"]).trim()).toBe("");
 	expect(evidenceMarkdown(kept)).toBe(`![The change at work](${"url" in kept ? kept.url : ""})`);
 	expect(await keepEvidence({ git: gitIn(clone, { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), folder, file: "notes.txt", item: "7", repo: "me/scratch" })).toEqual({ left: "notes.txt is no picture or video" });
 });
@@ -103,8 +104,10 @@ test("a run's evidence that is a link is left out, so no file the link names is 
 	writeFileSync(join(folder, "secret.txt"), "token\n");
 	symlinkSync(join(folder, "secret.txt"), join(folder, "shot.png"));
 
-	expect(await keepEvidence({ git: gitIn(repo.worker("run"), { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), folder, file: "shot.png", item: "7", repo: "me/scratch" })).toEqual({ left: "shot.png is no plain file" });
-	expect(sh(repo.remote, ["for-each-ref", "refs/hum"]).trim()).toBe("");
+	const clone = repo.worker("run");
+
+	expect(await keepEvidence({ git: gitIn(clone, { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), folder, file: "shot.png", item: "7", repo: "me/scratch" })).toEqual({ left: "shot.png is no plain file" });
+	expect(sh(clone, ["for-each-ref", "refs/hum"]).trim()).toBe("");
 });
 
 test("a merged item's evidence ref is taken off the remote, and taking it off again does nothing", async () => {

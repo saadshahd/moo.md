@@ -47,25 +47,7 @@ const log = spec.log ?? "/dev/null";
 
 mkdirSync(dirname(log), { recursive: true });
 
-const JUDGMENTS = { kind: { kind: "docs" }, alignment: { alignment: "sound", verification: "sound" }, ...spec.judgments };
-
-if (process.argv.includes("--no-session-persistence")) {
-	const schema = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
-	const asked = schema.includes('"alignment"') ? "alignment" : "kind";
-
-	appendFileSync(`${log}.judgments`, `${JSON.stringify({ asked })}\n`);
-	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [] }));
-	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: JUDGMENTS[asked], modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 1 } } }));
-	process.exit(0);
-}
-
-const calls = (() => {
-	try {
-		return readFileSync(log, "utf8").split("\n").filter(Boolean).length;
-	} catch {
-		return 0;
-	}
-})();
+const schemaArg = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
 
 const prompt = new TextDecoder().decode(stdin);
 const itemId = /^# Item (\S+):/m.exec(prompt)?.[1];
@@ -74,8 +56,6 @@ const DECIDED: Record<"plan" | "review", Decided> = {
 	plan: READY_PLAN,
 	review: { event: "approve", sure: true, reason: "The change does what the item asks." },
 };
-
-const schemaArg = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
 
 if (schemaArg.includes('"sure"')) {
 	const decisionLog = `${log}.decisions`;
@@ -96,6 +76,25 @@ if (schemaArg.includes('"sure"')) {
 	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: answer, modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 10 } } }));
 	process.exit(0);
 }
+
+const JUDGMENTS = { kind: { kind: "docs" }, alignment: { alignment: "sound", verification: "sound" }, ...spec.judgments };
+
+if (process.argv.includes("--no-session-persistence")) {
+	const asked = schemaArg.includes('"alignment"') ? "alignment" : "kind";
+
+	appendFileSync(`${log}.judgments`, `${JSON.stringify({ asked })}\n`);
+	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [] }));
+	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: JUDGMENTS[asked], modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 1 } } }));
+	process.exit(0);
+}
+
+const calls = (() => {
+	try {
+		return readFileSync(log, "utf8").split("\n").filter(Boolean).length;
+	} catch {
+		return 0;
+	}
+})();
 
 appendFileSync(
 	log,

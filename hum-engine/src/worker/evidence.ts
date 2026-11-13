@@ -23,10 +23,10 @@ const BYTES_PER_MEGABYTE = 1024 * 1024;
 export const evidenceRef = (item: string): string => `refs/hum/evidence/${item}`;
 
 /**
- * Keeps the one picture or video a run saved in `folder` to show its change at work: a commit of that file alone,
- * force-pushed to the item's evidence ref, and linked on GitHub by that commit. Says why it was left out where it
- * cannot be kept; a name with a folder in it is read from `folder` all the same. Only a plain file is kept: a run could
- * name a link to any file it can read.
+ * Keeps the one picture or video a run saved in `folder` to show its change at work: a commit of that file alone, on
+ * the item's evidence ref in this clone for publish to push, and linked on GitHub by that commit. Says why it was left
+ * out where it cannot be kept; a name with a folder in it is read from `folder` all the same. Only a plain file is
+ * kept: a run could name a link to any file it can read.
  */
 export const keepEvidence = async ({ git, folder, file, item, repo }: { readonly git: Git; readonly folder: string; readonly file: string; readonly item: string; readonly repo: string | undefined }): Promise<Evidence> => {
 	const name = basename(file);
@@ -48,9 +48,8 @@ export const keepEvidence = async ({ git, folder, file, item, repo }: { readonly
 	const blob = (await git.raw(["hash-object", "-w", path])).trim();
 	const tree = (await git.raw(["mktree"], `100644 blob ${blob}\t${name}\n`)).trim();
 	const commit = (await git.raw(["commit-tree", tree, "-m", `hum: evidence for ${item}`])).trim();
-	const pushed = await push(git, ["--force", "origin", `${commit}:${evidenceRef(item)}`]);
 
-	if (pushed.kind !== "pushed") return { left: `the push of ${name} did not land${pushed.kind === "refused" ? `: ${pushed.said}` : ""}` };
+	await git.raw(["update-ref", evidenceRef(item), commit]);
 
 	return { kind, url: `https://github.com/${repo}/blob/${commit}/${encodeURIComponent(name)}?raw=true` };
 };

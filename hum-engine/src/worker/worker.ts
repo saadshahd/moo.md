@@ -493,6 +493,8 @@ export class Worker {
 
 		if (result.outcome === "merged") void this.#pool.add(() => this.#checkBase(id));
 
+		if (result.outcome === "held" && this.#o.state.landings.get(id) !== undefined) this.#relanding.add(id);
+
 		this.#o.onResult?.(result);
 		this.wake();
 	}

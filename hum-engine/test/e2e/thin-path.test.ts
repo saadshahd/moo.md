@@ -157,12 +157,17 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(w.repo.show(id)).toContain("state: done");
 });
 
-test("a merge that keeps losing the race to the base stops after mergeTries pushes, with one card while it stays held, gone once the item leaves the base by a pull request", async () => {
+test("a merge that keeps losing the race to the base raises one card after mergeTries passes, kept while it stays held and gone once the item leaves the base by a pull request", async () => {
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => (raw.hum.mergeTries = 2)) });
 	const id = w.repo.seed("Write the note");
 	const refused = w.repo.refusePushes();
 
 	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "held", why: "another push moved main first" });
+	expect(w.state.faults.list()).toEqual([]);
+
+	w.clock.at += 1;
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held" });
 	expect(refused()).toBe(2);
 
 	const cards = w.state.faults.list();
@@ -264,6 +269,7 @@ test("a change to a path no rule places runs, waits unmerged and asks one questi
 
 	const runs = w.shim.calls().length;
 
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held", why: expect.stringContaining("main moved") });
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toEqual({ outcome: "merged", item: id });
 	expect(w.shim.calls()).toHaveLength(runs);
 	expect(JSON.parse(sh(w.repo.remote, ["show", "main:.hum/hum.json"])).paths).toEqual([{ glob: "docs/**", level: "low" }, { glob: "src/**", level: "low" }]);
