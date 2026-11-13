@@ -263,8 +263,13 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			const judge = options.judge ?? configuredModelCall(options.runner, hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
 			const publisher = publisherOf({ ...options, workSource: options.adapters.workSource, questions: options.adapters.questions }, judge, started + (APP_TOKEN_MINUTES - hum.ciMergeMarginMinutes) * MINUTE_MS);
 
-			await publishWake({ publisher, gathered, outbox, work: openState(outbox.stateDir, { now: Date.now }) });
-			await saveCiState({ ...where, ...read, identity: hum.commitIdentity, at: Date.now() });
+			let saved = read;
+
+			const save = async () => {
+				saved = await saveCiState({ ...where, ...saved, identity: hum.commitIdentity, at: Date.now() });
+			};
+
+			await publishWake({ publisher, gathered, outbox, work: openState(outbox.stateDir, { now: Date.now }), save });
 
 			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: hum.commitIdentity, timeoutMs });
 

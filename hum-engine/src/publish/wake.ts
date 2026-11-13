@@ -8,8 +8,8 @@ import { kindMoveFault, takeWorkRecords } from "./handoff.ts";
 import type { Gathered, OutboxPass, ReadOutbox } from "./handover.ts";
 import { type Publisher, publishPass, refusedPass } from "./publisher.ts";
 
-/** What publish works from in a CI wake: its own root, what gather settled, the work job's outbox and its state. */
-export type PublishWake = { readonly publisher: Publisher; readonly gathered: Gathered; readonly outbox: ReadOutbox; readonly work: State };
+/** What publish works from in a CI wake: its own root, what gather settled, the work job's outbox and its state, and how it saves its own state. */
+export type PublishWake = { readonly publisher: Publisher; readonly gathered: Gathered; readonly outbox: ReadOutbox; readonly work: State; readonly save: () => Promise<void> };
 
 /**
  * Publishes one pass of a work job: the work job's own records for the item, a kind it moved the item to only where
@@ -42,20 +42,29 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 	return published ?? pass.result;
 };
 
-/** Publishes every pass of a work job's outbox in order, then asks the questions the daily cap has room for. */
+/**
+ * Publishes every pass of a work job's outbox in order, then asks the questions the daily cap has room for. A pass
+ * that throws ends refused, and the state is saved after each pass and once more at the end however it ends, so what
+ * one pass wrote is never written again.
+ */
 export const publishWake = async (wake: PublishWake): Promise<ThinResult[]> => {
 	const { publisher: p } = wake;
 	const results: ThinResult[] = [];
 
-	for (const pass of wake.outbox.passes) {
-		const result = park(p, await publishWorked(wake, pass));
+	try {
+		for (const pass of wake.outbox.passes) {
+			const result = park(p, await publishWorked(wake, pass).catch((error: Error) => refusedPass(pass.item, error.message)));
 
-		if (result.outcome === "merged") p.state.items.remove(pass.item);
+			if (result.outcome === "merged") p.state.items.remove(pass.item);
 
-		results.push(result);
+			results.push(result);
+			await wake.save();
+		}
+
+		await releaseQuestions({ state: p.state, config: p.config, workSource: p.workSource, questions: p.questions, now: p.now });
+
+		return results;
+	} finally {
+		await wake.save();
 	}
-
-	await releaseQuestions({ state: p.state, config: p.config, workSource: p.workSource, questions: p.questions, now: p.now });
-
-	return results;
 };
