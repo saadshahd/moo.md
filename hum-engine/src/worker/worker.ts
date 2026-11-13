@@ -551,7 +551,7 @@ export class Worker {
 
 		const tip = (await git.raw(["rev-parse", LOOP_REF])).trim();
 
-		if (pulls) await settleMergedPulls(state, { pulls, workSource: adapters.workSource }, this.#now());
+		if (pulls) await settleMergedPulls(state, { pulls, workSource: adapters.workSource, git, remote }, this.#now());
 
 		await runLoopPass({
 			state,

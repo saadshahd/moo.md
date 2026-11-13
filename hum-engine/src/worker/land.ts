@@ -347,7 +347,7 @@ const finish = async (ctx: LandContext): Promise<ThinResult> => {
 	const { state, git, id, item, workSource, now } = ctx;
 
 	if (!(await endedByChange(ctx))) await workSource.finish(item.id);
-	recordMerged(state, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
+	await recordMerged(state, { git, remote: "origin" }, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
 
 	return { outcome: "merged", item: id };
 };

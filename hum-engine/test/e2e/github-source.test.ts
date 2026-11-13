@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AdapterContext, gitHubClient, githubAdapter } from "../../src/index.ts";
 import { guarded, guardTimings } from "../../src/adapters/guard.ts";
@@ -9,7 +9,7 @@ import { runThinPath } from "../../src/worker/thin-path.ts";
 import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { sh, WorkRepo } from "../fixtures/work-repo.ts";
 import { gitIn } from "../../src/adapters/git.ts";
-import { evidenceMarkdown, evidenceRef, keepEvidence } from "../../src/worker/evidence.ts";
+import { dropEvidence, evidenceMarkdown, evidenceRef, keepEvidence } from "../../src/worker/evidence.ts";
 import { pushRunBranch } from "../../src/worker/signed-push.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { tempDir } from "../fixtures/temp.ts";
@@ -94,6 +94,30 @@ test("a run's picture of its change is kept alone on the item's evidence ref, ne
 	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/heads"]).trim()).toBe("refs/heads/main");
 	expect(evidenceMarkdown(kept)).toBe(`![The change at work](${"url" in kept ? kept.url : ""})`);
 	expect(await keepEvidence({ git: gitIn(clone, { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), folder, file: "notes.txt", item: "7", repo: "me/scratch" })).toEqual({ left: "notes.txt is no picture or video" });
+});
+
+test("a run's evidence that is a link is left out, so no file the link names is pushed", async () => {
+	const repo = new WorkRepo();
+	const folder = tempDir("evidence");
+
+	writeFileSync(join(folder, "secret.txt"), "token\n");
+	symlinkSync(join(folder, "secret.txt"), join(folder, "shot.png"));
+
+	expect(await keepEvidence({ git: gitIn(repo.worker("run"), { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), folder, file: "shot.png", item: "7", repo: "me/scratch" })).toEqual({ left: "shot.png is no plain file" });
+	expect(sh(repo.remote, ["for-each-ref", "refs/hum"]).trim()).toBe("");
+});
+
+test("a merged item's evidence ref is taken off the remote, and taking it off again does nothing", async () => {
+	const repo = new WorkRepo();
+	const git = gitIn(repo.worker("run"), { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const folder = tempDir("evidence");
+
+	writeFileSync(join(folder, "shot.png"), "\u0089PNG\r\n");
+	await keepEvidence({ git, folder, file: "shot.png", item: "7", repo: "me/scratch" });
+	await dropEvidence(git, { remote: "origin", item: "7" });
+	await dropEvidence(git, { remote: "origin", item: "7" });
+
+	expect(sh(repo.remote, ["for-each-ref", "refs/hum"]).trim()).toBe("");
 });
 
 test("where main requires signed commits, the change reaches its branch as one commit GitHub made, with the run's tree, and the pull request lands that", async () => {

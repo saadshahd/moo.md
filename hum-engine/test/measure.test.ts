@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
+import { tmpdir } from "node:os";
+import { gitIn } from "../src/adapters/git.ts";
 import type { Pull } from "../src/adapters/pull-requests.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { labelChanges, type PastChange } from "../src/decide/labels.ts";
 import { measureInputsOf } from "../src/measure/inputs.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
@@ -74,7 +77,12 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 });
 
 /** A pull request in `state`, and a work source that writes each item it finishes into `finished`. */
-const pull = (state: Pull["state"], finished: string[]) => ({ pulls: { find: async () => ({ id: "p", number: 1, url: "u", state, autoMerge: true, behind: false }) }, workSource: { finish: async (id: string) => void finished.push(id) } });
+const pull = (state: Pull["state"], finished: string[]) => ({
+	pulls: { find: async () => ({ id: "p", number: 1, url: "u", state, autoMerge: true, behind: false }) },
+	workSource: { finish: async (id: string) => void finished.push(id) },
+	git: gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }),
+	remote: "origin",
+});
 
 test("a change merged through a pull request after the worker moved on ends its item and is recorded as merged, once, and its saved landing goes", async () => {
 	const state = freshState();
