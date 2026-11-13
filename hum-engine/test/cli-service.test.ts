@@ -87,8 +87,8 @@ test("a wake on a comment event records no tick, and the next wake starts from t
 });
 
 test("a wake with a rejected token exits 1, annotates the job and writes its summary", () => {
-	// gather and work each make a start check; the run after them meets the rejected token.
-	const o = owner({ script: [{}, {}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }] });
+	// Only the work job makes a start check; the run after it meets the rejected token.
+	const o = owner({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }] });
 	const summary = join(tempDir("summary"), "summary.md");
 
 	writeFileSync(summary, "");
