@@ -14,8 +14,8 @@ export type PublishWake = { readonly publisher: Publisher; readonly gathered: Ga
 
 /**
  * Publishes one pass of a work job: the work job's own records for the item, a kind it moved the item to only where
- * that kind is another whose risk floor is no lower, kept a fallback where publish's was one, then the pass's outbox, checked as on a Mac. The pass's result is the landing's,
- * else the work job's own, which never merges.
+ * that kind is another whose risk floor is no lower, kept a fallback where publish's was one, then the pass's outbox,
+ * checked as on a Mac. The pass's result is the landing's, else the work job's own, which never merges.
  */
 const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWake, pass: OutboxPass): Promise<ThinResult> => {
 	const known = p.state.itemKinds.get(pass.item);
@@ -45,9 +45,8 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 
 /**
  * Settles the base check the work job ran, so its breaks place every pass after it, publishes every pass of its
- * outbox in order, then asks the questions the daily cap has room for. A pass
- * that throws ends refused, and the state is saved after each pass and once more at the end however it ends, so what
- * one pass wrote is never written again.
+ * outbox in order, then asks the questions the daily cap has room for. A pass that throws ends refused, and the state
+ * is saved after each pass and once more however the wake ends, so what one pass wrote is never written again.
  */
 export const publishWake = async (wake: PublishWake): Promise<ThinResult[]> => {
 	const { publisher: p } = wake;

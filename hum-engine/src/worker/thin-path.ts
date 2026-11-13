@@ -261,7 +261,7 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (asking && answered === undefined) return { outcome: "waiting", item: id };
 
-	// The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands.
+	/* The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands. */
 	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
 
 	return { item, kindName, kind, judge, onSnapshot, asking, answered };
@@ -308,7 +308,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 			const outbox = new Outbox(id);
 			const driven: Driven = { ...o, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh, outbox };
 
-			// A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait.
+			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
 			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
 			const published = await (o.publish ?? publishInProcess(o, judge, gathered))({ item: id, intents: outbox.drain(), bundle: await bundleOf(git, { branch, item: id, gathered, folder: evidence }) }, worked);
 			const result = park(o, published ?? worked);
