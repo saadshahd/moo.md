@@ -2,10 +2,9 @@ import { type Git, isAncestor, push, type PushOutcome } from "../adapters/git.ts
 import type { FileChanges, GitHubCommits } from "../adapters/github-commits.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 
-/** What a push reads: the clone and its git, the base the change lands on, and the remote's rules and branches on GitHub. */
+/** What a push reads: the clone's git, the base the change lands on, and the remote's rules and branches on GitHub. */
 export type PushContext = {
 	readonly git: Git;
-	readonly clone: string;
 	readonly base: string;
 	readonly pulls: PullRequests | undefined;
 	readonly commits: GitHubCommits | undefined;
@@ -14,23 +13,46 @@ export type PushContext = {
 /** A push that landed, at the commit the branch now holds. */
 type Signed = { readonly kind: "pushed"; readonly sha: string } | Exclude<PushOutcome, { kind: "pushed" }>;
 
-/** The bytes of one blob, in base64; git hands them back as written, binary or not. */
-const blobBase64 = async (clone: string, spec: string): Promise<string> => {
-	const proc = Bun.spawn(["git", "cat-file", "blob", spec], { cwd: clone, stdout: "pipe", stderr: "pipe" });
-	const [bytes, said, code] = await Promise.all([new Response(proc.stdout).arrayBuffer(), new Response(proc.stderr).text(), proc.exited]);
+/** One object `git cat-file --batch` printed: `<oid> <type> <size>`, a newline, the bytes and a newline. */
+const BATCH_HEADER = /^([0-9a-f]+) blob (\d+)$/;
 
-	if (code !== 0) throw new Error(`git cat-file blob ${spec} exited ${code}: ${said.trim()}`);
+const NEWLINE = 0x0a;
 
-	return Buffer.from(bytes).toString("base64");
+/** Each blob's bytes in base64 by its oid, from what `git cat-file --batch` printed; anything but a blob throws. */
+const blobsOf = (batch: Buffer): ReadonlyMap<string, string> => {
+	const blobs = new Map<string, string>();
+
+	for (let at = 0; at < batch.length; ) {
+		const end = batch.indexOf(NEWLINE, at);
+		const header = batch.toString("utf8", at, end);
+		const [, oid, size] = BATCH_HEADER.exec(header) ?? [];
+
+		if (oid === undefined) throw new Error(`git cat-file --batch printed ${header}, not a blob`);
+
+		const stop = end + 1 + Number(size);
+
+		blobs.set(oid, batch.subarray(end + 1, stop).toString("base64"));
+		at = stop + 1;
+	}
+
+	return blobs;
 };
 
-/** The files `to` adds, changes and deletes against `from`, as GitHub's commit takes them. */
-const changesBetween = async ({ git, clone }: Pick<PushContext, "git" | "clone">, from: string, to: string): Promise<FileChanges> => {
-	const fields = (await git.raw(["diff", "--no-renames", "--name-status", "-z", from, to])).split("\0").filter(Boolean);
-	const changed = fields.flatMap((status, at) => (at % 2 === 0 ? [{ status, path: fields[at + 1] ?? "" }] : []));
+/** The files `to` adds, changes and deletes against `from`, as GitHub's commit takes them, every blob read by one git process. */
+const changesBetween = async (git: Git, from: string, to: string): Promise<FileChanges> => {
+	const fields = (await git.raw(["diff", "--raw", "--no-abbrev", "--no-renames", "-z", from, to])).split("\0").filter(Boolean);
+
+	const changed = fields.flatMap((meta, at) => {
+		const [, , , blob = "", status = ""] = meta.split(" ");
+
+		return at % 2 === 0 ? [{ blob, status, path: fields[at + 1] ?? "" }] : [];
+	});
+
+	const kept = changed.filter(({ status }) => status !== "D");
+	const blobs = kept.length === 0 ? new Map<string, string>() : blobsOf(await git.bytes(["cat-file", "--batch"], `${kept.map(({ blob }) => blob).join("\n")}\n`));
 
 	return {
-		additions: await Promise.all(changed.filter(({ status }) => status !== "D").map(async ({ path }) => ({ path, contents: await blobBase64(clone, `${to}:${path}`) }))),
+		additions: kept.map(({ path, blob }) => ({ path, contents: blobs.get(blob) ?? "" })),
 		deletions: changed.filter(({ status }) => status === "D").map(({ path }) => ({ path })),
 	};
 };
@@ -76,7 +98,7 @@ export const commitSigned = async (ctx: PushContext, { from, parent, branch, rep
 	if (placed.kind !== "done") return placed;
 
 	try {
-		const made = await commits.commitOnBranch({ branch: scratch, expected: parent, ...(await messageOf(ctx.git, parent, from)), files: await changesBetween(ctx, parent, from) });
+		const made = await commits.commitOnBranch({ branch: scratch, expected: parent, ...(await messageOf(ctx.git, parent, from)), files: await changesBetween(ctx.git, parent, from) });
 
 		if (made.kind !== "done") return made;
 

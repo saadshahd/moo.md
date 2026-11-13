@@ -250,7 +250,7 @@ test("git history: a blame git fails throws, so a fix never reads as rewriting n
 	const repo = fixHistory();
 	const real = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const blameMissing = (args: readonly string[]) => (args[0] === "blame" ? [...args.slice(0, -1), "missing.ts"] : args);
-	const git = { run: (args: readonly string[], input?: string) => real.run(blameMissing(args), input), raw: (args: readonly string[], input?: string) => real.raw(blameMissing(args), input) };
+	const git = { run: (args: readonly string[], input?: string) => real.run(blameMissing(args), input), raw: (args: readonly string[], input?: string) => real.raw(blameMissing(args), input), bytes: real.bytes };
 
 	await expect(readHistory(git, "main", config.hum)).rejects.toThrow("missing.ts");
 });

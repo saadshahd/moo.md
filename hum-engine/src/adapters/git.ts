@@ -1,3 +1,6 @@
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { exec } from "../exec.ts";
 
 /** No hook runs: the hooks path points nowhere, whatever the clone's own config says. */
@@ -21,6 +24,8 @@ export type Git = {
 	readonly run: (args: readonly string[], input?: string) => Promise<GitResult>;
 	/** Runs git and returns what it printed; a non-zero exit throws `GitFailed` with git's own words. */
 	readonly raw: (args: readonly string[], input?: string) => Promise<string>;
+	/** As `raw`, with what git printed as bytes, which reading it as text would change. */
+	readonly bytes: (args: readonly string[], input?: string) => Promise<Buffer>;
 };
 
 class GitFailed extends Error {
@@ -87,25 +92,43 @@ export const readGitIdentity = async (git: Git): Promise<GitIdentityRead> => {
 
 /** git in `cwd` with hooks off. */
 export const gitIn = (cwd: string, { identity, env = {}, timeoutMs }: GitOptions): Git => {
-	const run = async (args: readonly string[], input = ""): Promise<GitResult> => {
-		const { exitCode, stdout, stderr } = await exec("git", ["-c", HOOKS_OFF, ...args], {
+	/** Runs git, its stdout piped back as text, or written to `stdout` where that names an open file. */
+	const spawn = async (args: readonly string[], input: string, stdout: "pipe" | number = "pipe"): Promise<GitResult> => {
+		const result = await exec("git", ["-c", HOOKS_OFF, ...args], {
 			timeoutMs,
-			nodeOptions: { cwd, env: { ...(identity && identityEnv(identity)), ...env } },
+			nodeOptions: { cwd, env: { ...(identity && identityEnv(identity)), ...env }, stdio: ["pipe", stdout, "pipe"] },
 			stdin: input,
 		});
 
-		return { code: exitCode ?? -1, stdout, stderr };
+		return { code: result.exitCode ?? -1, stdout: result.stdout, stderr: result.stderr };
 	};
 
-	const raw = async (args: readonly string[], input?: string): Promise<string> => {
-		const result = await run(args, input);
-
+	const succeeded = (args: readonly string[], result: GitResult): GitResult => {
 		if (result.code !== 0) throw new GitFailed(args, result);
 
-		return result.stdout;
+		return result;
 	};
 
-	return { run, raw };
+	const run = (args: readonly string[], input = ""): Promise<GitResult> => spawn(args, input);
+
+	const raw = async (args: readonly string[], input = ""): Promise<string> => succeeded(args, await spawn(args, input)).stdout;
+
+	const bytes = async (args: readonly string[], input = ""): Promise<Buffer> => {
+		const folder = mkdtempSync(join(tmpdir(), "hum-git-"));
+		const file = join(folder, "stdout");
+		const fd = openSync(file, "w");
+
+		try {
+			succeeded(args, await spawn(args, input, fd));
+
+			return readFileSync(file);
+		} finally {
+			closeSync(fd);
+			rmSync(folder, { recursive: true, force: true });
+		}
+	};
+
+	return { run, raw, bytes };
 };
 
 /** The arguments for `git push` with hooks off, for a command line handed straight to git. */

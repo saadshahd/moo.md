@@ -239,7 +239,7 @@ const learnRules = async (
 			branchPrefix: config.hum.ownerBranchPrefix,
 			mergeMethod: config.hum.mergeMethod,
 			pulls: ctx.pulls,
-			push: (refspecs) => pushCommits({ git, clone: scratch, base, pulls: ctx.pulls, commits: ctx.commits }, refspecs),
+			push: (refspecs) => pushCommits({ git, base, pulls: ctx.pulls, commits: ctx.commits }, refspecs),
 		});
 
 		if (landed.via === "refused") return { kind: "refused", said: landed.said };

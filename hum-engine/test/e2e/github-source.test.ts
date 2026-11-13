@@ -148,6 +148,25 @@ test("where main requires signed commits and takes a push, main moves to GitHub'
 	expect(github.issueState(Number(id))).toBe("CLOSED");
 });
 
+test("where main requires signed commits, a binary file reaches GitHub's commit byte for byte", async () => {
+	const repo = new WorkRepo();
+	const github = new FakeGitHub();
+	const clone = repo.worker("run");
+	const git = gitIn(clone, { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const bytes = Buffer.from(Array.from({ length: 256 }, (_, at) => at));
+
+	github.requiresSignatures = true;
+	github.gitRemote = repo.remote;
+	writeFileSync(join(clone, "logo.bin"), bytes);
+	writeFileSync(join(clone, "note.md"), "hello\n");
+	await git.raw(["checkout", "-q", "-b", "hum/run/9"]);
+	await git.raw(["add", "logo.bin", "note.md"]);
+	await git.raw(["commit", "-q", "-m", "add a logo"]);
+
+	expect(await pushRunBranch({ git, base: "main", pulls: github.client(), commits: github.commits() }, "hum/run/9")).toEqual({ kind: "pushed" });
+	expect(Bun.spawnSync(["git", "show", "hum/run/9:logo.bin"], { cwd: repo.remote }).stdout).toEqual(bytes);
+});
+
 test("a change GitHub's API cannot carry, such as an executable bit, fails loud and leaves the remote's branches as they were", async () => {
 	const repo = new WorkRepo();
 	const github = new FakeGitHub();
@@ -161,6 +180,6 @@ test("a change GitHub's API cannot carry, such as an executable bit, fails loud 
 	await git.raw(["add", "run.sh"]);
 	await git.raw(["commit", "-q", "-m", "add a script"]);
 
-	await expect(pushRunBranch({ git, clone, base: "main", pulls: github.client(), commits: github.commits() }, "hum/run/9")).rejects.toThrow("an executable bit, a link or a submodule");
+	await expect(pushRunBranch({ git, base: "main", pulls: github.client(), commits: github.commits() }, "hum/run/9")).rejects.toThrow("an executable bit, a link or a submodule");
 	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/heads"]).trim()).toBe("refs/heads/main");
 });
