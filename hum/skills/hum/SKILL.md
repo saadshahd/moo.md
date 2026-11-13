@@ -34,6 +34,8 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 
 Say what the labels cover: "`kindLabels` covers N of M open issues; the rest get the fallback kind and one question."
 
+Where runs include CI and `isPublicRepo` is not `false`, tell the owner that anyone can read `refs/hum/state`, where each wake keeps hum's state: plans, answers and the output of failed checks.
+
 ## Write
 
 1. Write the answers as JSON: `{ "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 2 }`.
