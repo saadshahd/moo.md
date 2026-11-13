@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
+import { judgmentRunner, type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
@@ -206,6 +206,15 @@ test("a start check without the hope plugin, as bare mode answers, starts zero r
 		expect(shim.calls()).toHaveLength(1);
 		expect(state.faults.list().map((c) => c.code)).toEqual(["start-check-failed"]);
 	}
+});
+
+test("a judgment runner makes no start check and starts no session: it answers a judgment call and refuses any other run", async () => {
+	const shim = makeShim();
+	const runner = judgmentRunner({ state: openState(tempDir("runner"), { now: Date.now }), model: MODEL, binary: shim.binary, env: shim.env, now: () => NOW });
+
+	await expect(ask(runner)).rejects.toThrow("judgment calls alone");
+	expect((await ask(runner, { call: "judgment" })).kind).toBe("finished");
+	expect(shim.calls()).toEqual([]);
 });
 
 test("the start check and a run use the same flags", async () => {

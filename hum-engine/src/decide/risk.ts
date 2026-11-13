@@ -2,8 +2,8 @@ import { quantile } from "simple-statistics";
 import { z } from "zod";
 import type { HumConfig, Launch, Level, PathRule } from "../config/schema.ts";
 
-/** What only the owner changes: hum's own config, the owner's adapters and the CI workflows. */
-const OWN_PATHS = [".hum/**", "adapters/**", ".github/workflows/**"] as const;
+/** What only the owner changes: hum's own config, the owner's adapters, the CI workflows, and Claude Code's project settings, whose plugins and hooks load in every run. */
+const OWN_PATHS = [".hum/**", "adapters/**", ".github/workflows/**", ".claude/**"] as const;
 
 /** What hum reads from a change's diff. */
 export const Change = z

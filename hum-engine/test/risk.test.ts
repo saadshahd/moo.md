@@ -133,7 +133,7 @@ test("an urgent security fix on a critical path runs the hotfix kind's own state
 	expect(routeOf(place(change(["billing/tax.ts"])), policy().paths, "hotfix", ["billing/tax.ts"]).mergesAlone).toBe(false);
 });
 
-test.each([".hum/hum.json", "adapters/linear.ts", ".github/workflows/ci.yml", ".husky/pre-push"])("hum's own config, the owner's adapters, workflows and hooks take the strictest level: %s", (path) => {
+test.each([".hum/hum.json", "adapters/linear.ts", ".github/workflows/ci.yml", ".husky/pre-push", ".claude/settings.json"])("hum's own config, the owner's adapters, workflows, hooks and Claude Code settings take the strictest level: %s", (path) => {
 	expect(place(change(["docs/a.md", path])).steps).toContainEqual({ step: "own-config", path });
 });
 

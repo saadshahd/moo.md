@@ -294,7 +294,7 @@ test("the work job holds no GitHub token: it reads the repo alone, at the base g
 	for (const job of [work, publish]) expect(job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with?.ref).toBe("${{ fromJSON(needs.gather.outputs.gathered).baseSha }}");
 });
 
-test("the checkout keeps no token in the workspace; the jobs that hold GitHub's token install hum from npm and none of the repo's packages, and the work job installs its plugins after its packages", () => {
+test("the checkout keeps no token in the workspace; the jobs that hold GitHub's token install hum from npm, none of the repo's packages and no plugin, and the work job installs its plugins after its packages", () => {
 	const { work } = wakeOf(settings).jobs;
 	const at = (steps: typeof work.steps, found: (typeof work.steps)[number] | undefined) => steps.findIndex((step) => step === found);
 
@@ -303,7 +303,7 @@ test("the checkout keeps no token in the workspace; the jobs that hold GitHub's 
 	for (const { steps } of tokenJobs(settings)) {
 		expect(steps.find(({ run }) => run?.startsWith("npm install"))?.run).toEndWith(` @moo.md/hum@${ENGINE_VERSION}`);
 		expect(steps.filter(({ run }) => run?.includes("bun install") || run?.includes("node_modules"))).toEqual([]);
-		expect(at(steps, steps.find(({ run }) => run === "hum plugins"))).toBeLessThan(at(steps, steps.find(({ run }) => run?.includes("credential"))));
+		expect(steps.filter(({ run }) => run?.includes("plugins"))).toEqual([]);
 	}
 
 	expect(at(work.steps, work.steps.find(({ run }) => run === "./node_modules/.bin/hum plugins"))).toBeGreaterThan(at(work.steps, work.steps.find(({ run }) => run === "bun install --frozen-lockfile")));

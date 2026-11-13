@@ -101,7 +101,7 @@ const optionsFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac"
 		now: Date.now,
 		env,
 		newSessionId: randomUUID,
-		installedSkills: await installedSkills(),
+		installedSkills: extra.judgmentsOnly ? undefined : await installedSkills(),
 		holder: parseArgument(Holder, flags.holder ?? `${where}@${hostname()}`),
 		base: flags.base,
 		where,
@@ -192,7 +192,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			const where = { repo: io.cwd, remote: "origin", dir, timeoutMs };
 			const read = await restoreCiState(where);
 			const claimed = new Map<string, Item>();
-			const options = await optionsFor(io, flags, "ci", { ciJob: { kind: "gather", gathered: claimed } });
+			const options = await optionsFor(io, flags, "ci", { ciJob: { kind: "gather", gathered: claimed }, judgmentsOnly: true });
 			const worker = new Worker(options);
 
 			for (let before = -1; claimed.size > before; ) {
@@ -257,7 +257,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			if (read.read !== gathered.stateRead) throw new CiStateRaced(`hum's state at ${CI_STATE_REF} is not the one gather saved, so another wake ran since; this wake publishes nothing`);
 
-			const options = await optionsFor(io, { holder: gathered.holder, base: gathered.base }, "ci");
+			const options = await optionsFor(io, { holder: gathered.holder, base: gathered.base }, "ci", { judgmentsOnly: true });
 			const { hum } = options.config;
 			const outbox = readOutbox(flags.outbox, { maxBytes: hum.ciOutboxMaxMegabytes * MEGABYTE, claimed: new Set(gathered.claimed) });
 			const judge = options.judge ?? configuredModelCall(options.runner, hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));

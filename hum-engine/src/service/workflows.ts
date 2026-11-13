@@ -198,13 +198,13 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner
 	const humEnv = { ...env.humStep, ...claude.env, [ENV.githubToken]: github.token };
 	const checkout = (ref?: string) => ({ uses: ACTIONS.checkout.uses, with: { ...(ref && { ref }), "fetch-depth": 0, "persist-credentials": false } });
 
-	/** A job that holds GitHub's token: hum from npm, git that pushes as hum, and the token minted last. */
+	/** A job that holds GitHub's token: hum from npm, git that pushes as hum, and the token minted last. It installs no plugin: it makes judgment calls alone, which load none. */
 	const holdsToken = ({ before, ref, run }: { readonly before: readonly object[]; readonly ref?: string; readonly run: object }) => ({
 		...where,
 		permissions: PERMISSIONS,
 		"timeout-minutes": APP_TOKEN_MINUTES,
 		env: { ...env.everyStep, ...github.env, [ENV.event]: "${{ github.event_name }}" },
-		steps: [...github.check, checkout(ref), JOB_PATHS_STEP, installTools(` ${PUBLISHED_HUM}`), { run: "hum plugins" }, gitSetup(commitIdentity), ...before, ...github.steps, run],
+		steps: [...github.check, checkout(ref), JOB_PATHS_STEP, installTools(` ${PUBLISHED_HUM}`), gitSetup(commitIdentity), ...before, ...github.steps, run],
 	});
 
 	return {

@@ -14,8 +14,8 @@ import {
 	WAIT_TAG,
 } from "./schema.ts";
 
-/** What the checks read besides the config: the installed plugins' skills, as a role names them (`hope:intent`). */
-export type CheckEnv = { readonly installedSkills: ReadonlySet<string> };
+/** What the checks read besides the config: the installed plugins' skills, as a role names them (`hope:intent`); absent where no role runs, so no role's skills are checked. */
+export type CheckEnv = { readonly installedSkills?: ReadonlySet<string> };
 
 type Transitions = StateNodeJSON["onTimeout"];
 
@@ -134,11 +134,11 @@ const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): P
 /** A plugin's skill is named `<plugin>:<skill>`; a bare name is the repo's or the user's own, which no plugin list holds. */
 const isPluginSkill = (skill: string): boolean => skill.includes(":");
 
-/** Each plugin skill a role names is in an installed plugin. */
-const skillProblems = (hum: HumConfig, env: CheckEnv): Problem[] =>
-	Object.entries(hum.roles).flatMap(([role, { skills }]) =>
-		skills.flatMap((skill): Problem[] => (isPluginSkill(skill) && !env.installedSkills.has(skill) ? [{ problem: "missing-skill", skill, role }] : [])),
-	);
+/** Each plugin skill a role names is in an installed plugin, where roles run. */
+const skillProblems = (hum: HumConfig, { installedSkills }: CheckEnv): Problem[] =>
+	installedSkills === undefined
+		? []
+		: Object.entries(hum.roles).flatMap(([role, { skills }]) => skills.flatMap((skill): Problem[] => (isPluginSkill(skill) && !installedSkills.has(skill) ? [{ problem: "missing-skill", skill, role }] : [])));
 
 /** A run branch could then share a name, or a folder, with a claim branch. */
 const doPrefixesOverlap = ({ runBranchPrefix, claimPrefix }: Naming): boolean =>
