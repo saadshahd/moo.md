@@ -1,7 +1,8 @@
 import { Document, visit } from "yaml";
 import { CLAUDE_FLOOR } from "../adapters/claude-p.ts";
 import type { HumConfig, PullRequestToken } from "../config/schema.ts";
-import { APP_TOKEN_ACTION, CLAUDE_TOKEN, readsSecrets, secretsNamed, TRUSTED_ASSOCIATIONS, WAKE_ENV as ENV, WORKFLOW_FILES } from "../config/wake-job.ts";
+import { APP_TOKEN_ACTION, APP_TOKEN_MINUTES, CLAUDE_TOKEN, readsSecrets, secretsNamed, TRUSTED_ASSOCIATIONS, WAKE_ENV as ENV, WORKFLOW_FILES } from "../config/wake-job.ts";
+import { ENGINE_VERSION } from "../state/format.ts";
 
 /** The settings the workflows are built from. */
 export type WorkflowSettings = Pick<
@@ -24,6 +25,8 @@ const BUN_VERSION = Bun.version;
 const ACTIONS = {
 	checkout: { uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", release: "v7.0.1" },
 	appToken: { uses: `${APP_TOKEN_ACTION}@64ab729a6294000f5aa4a4bc0b73d1f32bc45510`, release: "v3.3.0" },
+	upload: { uses: "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9", release: "v7.0.2" },
+	download: { uses: "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333", release: "v8.0.2" },
 } as const;
 
 const RELEASE_OF: ReadonlyMap<string, string> = new Map(Object.values(ACTIONS).map(({ uses, release }) => [uses, release]));
@@ -149,42 +152,91 @@ git config --global --add safe.directory "$GITHUB_WORKSPACE"
 	},
 });
 
+/** The inbox gather hands the work job, and the outbox the work job hands publish: one artifact each, kept a day. */
+const HANDOVER = { inbox: "hum-inbox", outbox: "hum-outbox" } as const;
+
+const RETENTION_DAYS = 1;
+
+/** Where a handover sits on the runner: as an action's input reads it, and as a shell reads it. */
+const handoverPath = (name: string): string => `\${{ runner.temp }}/${name}`;
+
+const handoverFolder = (name: string): string => `"$RUNNER_TEMP/${name}"`;
+
+const upload = (name: string) => ({ uses: ACTIONS.upload.uses, with: { name, path: handoverPath(name), "retention-days": RETENTION_DAYS, "if-no-files-found": "error" } });
+
+const download = (name: string) => ({ uses: ACTIONS.download.uses, with: { name, path: handoverPath(name) } });
+
+/** What gather settled, as its job output: publish trusts it, and the work job checks out the base it names. */
+const GATHERED = "${{ needs.gather.outputs.gathered }}";
+
+const GATHERED_BASE = "${{ fromJSON(needs.gather.outputs.gathered).baseSha }}";
+
+/** hum at this engine's own version from npm, which checks the package against the registry's integrity; the jobs that hold GitHub's token run this hum and none of the repo's code. */
+const PUBLISHED_HUM = `@moo.md/hum@${ENGINE_VERSION}`;
+
+const TOOLS = `bun@${BUN_VERSION} @anthropic-ai/claude-code@${CLAUDE_FLOOR}`;
+
+const installTools = (extra = "") => ({ run: `npm install --global --prefix "${JOB_TOOLS}" ${TOOLS}${extra}` });
+
+/** Git in a job container trusts the checkout the runner's user owns; the global config is the job's own file. */
+const SAFE_CHECKOUT = { run: 'git config --global --add safe.directory "$GITHUB_WORKSPACE"\n' } as const;
+
 /**
- * The job every wake runs. A run that needs the owner has pushed its run branch, asked on the item and ended; the
- * owner's answer starts a fresh run on that branch, so no session, artifact or approval is kept between runs; hum
- * keeps its own state between wakes in a ref. Bun and Claude Code install through npm into the job's temp folder, so
- * the job needs only git, node and npm from its runner or container, and leaves nothing on a machine that outlives it.
- * `hum plugins` installs hope and the repo's own Claude Code plugins, which a fresh checkout would not load. The
- * checkout keeps no token in the workspace, where a run could read it. The Claude sign-in, the GitHub token and every
- * `ciEnv` value that reads a secret reach the last step alone, and hum keeps the token from the runs it starts. An
- * App's token lasts an hour, so it is minted last.
+ * The wake, as three jobs. `gather` and `publish` hold GitHub's token and run hum as published, with none of the
+ * repo's code: no install of its packages, no hook and no check; each mints an App's token at its end, inside the
+ * token's hour. `work` holds no GitHub token: its workflow token reads the repo alone and stays out of the checkout,
+ * and everything it needs from GitHub reaches it in gather's inbox. Its runs and the repo's checks run there, and what
+ * they made goes to publish as the outbox, which publish checks before any write. The Claude sign-in and every `ciEnv`
+ * value that reads a secret reach the steps that run hum alone. A runner GitHub does not host keeps what a job leaves,
+ * so a process a run left could outlive the work job there: ephemeral runners close that.
  */
 const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner, ciContainer, ciEnv, ciClaudeAuth }: WorkflowSettings) => {
 	const claude = CLAUDE_SIGN_IN[ciClaudeAuth];
 	const github = githubToken(pullRequestToken);
 	const env = envByReach(ciEnv);
+	const where = { "runs-on": ciRunner, container: ciContainer ?? NO_KEY };
+	const humEnv = { ...env.humStep, ...claude.env, [ENV.githubToken]: github.token };
+	const checkout = (ref?: string) => ({ uses: ACTIONS.checkout.uses, with: { ...(ref && { ref }), "fetch-depth": 0, "persist-credentials": false } });
+
+	/** A job that holds GitHub's token: hum from npm, git that pushes as hum, and the token minted last. */
+	const holdsToken = ({ before, ref, run }: { readonly before: readonly object[]; readonly ref?: string; readonly run: object }) => ({
+		...where,
+		permissions: PERMISSIONS,
+		"timeout-minutes": APP_TOKEN_MINUTES,
+		env: { ...env.everyStep, ...github.env, [ENV.event]: "${{ github.event_name }}" },
+		steps: [...github.check, checkout(ref), JOB_PATHS_STEP, installTools(` ${PUBLISHED_HUM}`), { run: "hum plugins" }, gitSetup(commitIdentity), ...before, ...github.steps, run],
+	});
 
 	return {
 		name: "hum wake",
 		on: { workflow_call: { secrets: { ...ownerSecrets({ ciRunner, ciContainer, ciEnv }), ...claude.secrets, ...github.secrets } } },
-		permissions: PERMISSIONS,
+		permissions: {},
 		jobs: {
-			wake: {
-				"runs-on": ciRunner,
-				container: ciContainer ?? NO_KEY,
+			gather: {
+				...holdsToken({ before: [], run: { id: "gather", run: `hum wake gather --inbox ${handoverFolder(HANDOVER.inbox)}`, env: humEnv } }),
+				outputs: { gathered: "${{ steps.gather.outputs.gathered }}" },
+			},
+			work: {
+				needs: "gather",
+				...where,
+				permissions: { contents: "read" },
 				"timeout-minutes": ciWakeTimeoutMinutes,
-				env: { ...env.everyStep, ...github.env, [ENV.event]: "${{ github.event_name }}" },
+				env: Object.keys(env.everyStep).length > 0 ? env.everyStep : NO_KEY,
 				steps: [
-					...github.check,
-					{ uses: ACTIONS.checkout.uses, with: { "fetch-depth": 0, "persist-credentials": false } },
+					checkout(GATHERED_BASE),
 					JOB_PATHS_STEP,
-					{ run: `npm install --global --prefix "${JOB_TOOLS}" bun@${BUN_VERSION} @anthropic-ai/claude-code@${CLAUDE_FLOOR}` },
+					installTools(),
 					{ run: "bun install --frozen-lockfile" },
 					{ run: "./node_modules/.bin/hum plugins" },
-					gitSetup(commitIdentity),
-					...github.steps,
-					{ run: `./node_modules/.bin/hum wake --event "$${ENV.event}"`, env: { ...env.humStep, ...claude.env, [ENV.githubToken]: github.token } },
+					SAFE_CHECKOUT,
+					download(HANDOVER.inbox),
+					{ run: `./node_modules/.bin/hum wake work --inbox ${handoverFolder(HANDOVER.inbox)} --outbox ${handoverFolder(HANDOVER.outbox)}`, env: { ...env.humStep, ...claude.env } },
+					upload(HANDOVER.outbox),
 				],
+			},
+			publish: {
+				needs: ["gather", "work"],
+				...holdsToken({ ref: GATHERED_BASE, before: [download(HANDOVER.outbox)], run: { run: `hum wake publish --outbox ${handoverFolder(HANDOVER.outbox)} --event "$${ENV.event}"`, env: { ...humEnv, [ENV.gathered]: GATHERED } } }),
 			},
 		},
 	};

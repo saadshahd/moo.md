@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { z } from "zod";
-import type { Integrations } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Integrations } from "../adapter-api.ts";
+import type { WorkIntegrations } from "../publish/handover.ts";
 import { resolveAdapters } from "../adapters/registry.ts";
 import { startBackgroundRunner } from "../adapters/claude-bg.ts";
 import { startRunner } from "../adapters/claude-p.ts";
@@ -28,6 +29,8 @@ export type OpenWorkerOptions = Omit<WorkerOptions, "repo" | "state" | "config" 
 	readonly binary?: string;
 	/** The process environment: runs start with it, and the GitHub login and adapters read it. */
 	readonly env: Env;
+	/** The work source and questions in place of the ones `hum.json` names, with no GitHub reads: a CI work job's inbox. */
+	readonly integrations?: WorkIntegrations;
 };
 
 const Latest = z.looseObject({ version: z.string().min(1) });
@@ -52,7 +55,11 @@ const isInBackground = ({ backgroundRuns }: Pick<HumConfig, "backgroundRuns">, w
  * remote on GitHub its pull requests and branch rules, so landing follows what the target branch requires.
  * Throws when the config is refused or the repo has no `origin`; the service unit shows that as a card.
  */
-export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => {
+/** A worker on `repo`, as `workerOptions` opens it. */
+export const openWorker = async (repo: string, options: OpenWorkerOptions): Promise<Worker> => new Worker(await workerOptions(repo, options));
+
+/** Everything a worker on `repo` works with: its state, its config, its integrations, its runner and its remote. */
+export const workerOptions = async (repo: string, options: OpenWorkerOptions): Promise<WorkerOptions> => {
 	const { stateDir, installedSkills, binary, env, ...rest } = options;
 	const { now } = rest;
 	const state = openState(stateDir ?? (await defaultStateDir(repo)), { now });
@@ -69,11 +76,13 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	if (config.hum.checks.length === 0) throw new Error("hum.json names no checks: set \"checks\" to the commands a change must pass, or run /hum");
 
-	const adapters = await resolveAdapters(repo, {
-		faults: state.faults,
-		guard: { lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
-		context: { report: (fault) => void state.faults.raise(fault), now, env },
-	});
+	const adapters = options.integrations
+		? { "work-source": { apiVersion: ADAPTER_API_VERSION, ...options.integrations }, questions: { apiVersion: ADAPTER_API_VERSION, ...options.integrations }, answers: undefined }
+		: await resolveAdapters(repo, {
+				faults: state.faults,
+				guard: { lastReady: { load: () => state.ready.get("work-source")?.ids ?? [], save: (ids) => state.ready.put("work-source", { ids }) } },
+				context: { report: (fault) => void state.faults.raise(fault), now, env },
+			});
 
 	// One adapter serves several slots; its calls go one at a time whichever slot they come through.
 	const ordered = new Map<Integrations, Integrations>();
@@ -95,10 +104,10 @@ export const openWorker = async (repo: string, options: OpenWorkerOptions): Prom
 
 	// A slot is a worktree a background run starts in, so the pool stands only where runs are background agents.
 	const slots = config.hum.runSlots.enabled && isInBackground(config.hum, rest.where) ? new SlotPool({ repo, state, config: config.hum, base: rest.base ?? DEFAULT_BASE, liveRuns: runner.liveRuns, now }) : undefined;
-	const github = repoFromRemote(remote);
+	const github = options.integrations ? undefined : repoFromRemote(remote);
 	const pulls = github === undefined ? undefined : gitHubPullRequests(github, { timeoutMs, env });
 	const commits = github === undefined ? undefined : gitHubCommits(github, { timeoutMs, env });
 	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, () => ownerGitHub(timeoutMs, env));
 
-	return new Worker({ ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) });
+	return { ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
 };

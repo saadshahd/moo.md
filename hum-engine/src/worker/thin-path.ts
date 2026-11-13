@@ -98,8 +98,8 @@ export type ThinPathOptions = {
 	readonly runnerVariables: ReadonlySet<string>;
 	/** A fresh id for each run's session. */
 	readonly newSessionId: () => string;
-	/** Applies a pass's outbox; by default publish runs in this process once the pass's runs ended. */
-	readonly publish?: (pass: PassOutbox) => Promise<ThinResult | undefined>;
+	/** Applies a pass's outbox, given what the pass's own work came to; by default publish runs in this process once the pass's runs ended. */
+	readonly publish?: (pass: PassOutbox, worked: ThinResult) => Promise<ThinResult | undefined>;
 	/** False while the worker drains for an update: a finished change is saved and pushed, and the next worker lands it under the config it starts with. */
 	readonly mayLand?: () => boolean;
 };
@@ -194,12 +194,23 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	return result;
 };
 
-const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
-	const base = o.base ?? DEFAULT_BASE;
-	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
+/**
+ * What a pass settles before any clone or run, all from the work source and saved state: the claim, the owner's
+ * answers and the item's kind. Gather runs it apart from the work in CI; a pass that runs it again on what gather
+ * settled writes nothing.
+ */
+export type Gathered = {
+	readonly item: Item;
+	readonly kindName: string;
+	readonly kind: Kind;
+	readonly judge: ModelCall;
+	/** The item has a saved machine state to go on from. */
+	readonly onSnapshot: boolean;
+	readonly asking: boolean;
+	readonly answered: ReturnType<typeof answerTo>;
+};
 
-	if (id === undefined) return { outcome: "idle" };
-
+export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gathered | ThinResult> => {
 	// A parked item stays parked until the owner acts: its file still says ready, and a rerun would spend the same tokens again.
 	const parked = o.state.parked.get(id);
 
@@ -243,13 +254,29 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	const settled = named ?? known;
 	const kindContext = { ...o, judge, now };
-	const kindName = settled ? settled.kind : await keepKind(kindContext, item, await pickKind(kindContext, item));
+	const kindName = settled ? settled.kind : keepKind(kindContext, item, await pickKind(kindContext, item));
 	const kind = kindNamed(o.config, kindName);
 	const asking = isWaitingOnOwner(kind, at);
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
 
 	if (asking && answered === undefined) return { outcome: "waiting", item: id };
 
+	return { item, kindName, kind, judge, onSnapshot, asking, answered };
+};
+
+export const isGathered = (gathered: Gathered | ThinResult): gathered is Gathered => "kindName" in gathered;
+
+const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
+	const base = o.base ?? DEFAULT_BASE;
+	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
+
+	if (id === undefined) return { outcome: "idle" };
+
+	const gathered = await gatherItem(o, id);
+
+	if (!isGathered(gathered)) return gathered;
+
+	const { item, kindName, kind, judge, onSnapshot, asking, answered } = gathered;
 	const landing = o.state.landings.get(id);
 	/** Nothing saved is left to go on from: a new item, one that moved to another kind, or one the owner ran again. */
 	const isFresh = !onSnapshot && landing === undefined;
@@ -280,7 +307,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 			// A change already finished lands again from its pushed branch; no run is spent on it.
 			const worked = landing ? await landAgain(driven) : await drive(driven);
-			const published = await (o.publish ?? publishInProcess(o, judge, gathered))({ item: id, intents: outbox.drain(), bundle: await bundleOf(git, { branch, item: id, gathered, folder: evidence }) });
+			const published = await (o.publish ?? publishInProcess(o, judge, gathered))({ item: id, intents: outbox.drain(), bundle: await bundleOf(git, { branch, item: id, gathered, folder: evidence }) }, worked);
 			const result = park(o, published ?? worked);
 
 			if (result.outcome === "moved") forgetProgress(o.state, id);
@@ -828,7 +855,11 @@ export const reviewRunOf =
 	};
 
 /** Publish's root for the passes of `o`: the worker's own adapters, its claim, and a repo of publish's own beside the state. */
-const publisherOf = (o: ThinPathOptions, judge: ModelCall): Publisher => ({
+export const publisherOf = (
+	o: Pick<ThinPathOptions, "state" | "config" | "workSource" | "questions" | "pulls" | "commits" | "runner" | "holder" | "now" | "remote" | "base" | "dir">,
+	judge: ModelCall,
+	mergesBefore?: number,
+): Publisher => ({
 	state: o.state,
 	config: o.config,
 	workSource: o.workSource,
@@ -844,6 +875,7 @@ const publisherOf = (o: ThinPathOptions, judge: ModelCall): Publisher => ({
 	base: o.base ?? DEFAULT_BASE,
 	dir: o.dir ?? o.config.hum.itemsDir,
 	repo: join(o.state.dir, PUBLISH_REPO),
+	mergesBefore,
 });
 
 /** Publishes a pass in the worker's own process, against what the pass's checkout saw before any run. */
@@ -926,7 +958,7 @@ const merge = async (d: Driven, { ownerApproved = false }: { readonly ownerAppro
 	const isDocsOnly = d.kindName === d.config.hum.docsOnly.kind;
 
 	if (isDocsOnly && doesLeaveDocs((await changeOn(placing(d))).paths, d.config.hum)) {
-		const real = await keepKind(d, d.item, await pickKind(d, d.item, d.kindName), d.kindName);
+		const real = keepKind(d, d.item, await pickKind(d, d.item, d.kindName), d.kindName);
 
 		return { outcome: "moved", item: d.id, kind: real };
 	}

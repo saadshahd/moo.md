@@ -63,7 +63,7 @@ export type Decided = { event: string; sure: boolean; reason: string; cites?: { 
 /** A plan run's pick of a clear item: write docs/note.md in one step. */
 export const READY_PLAN: Decided = { event: "plan-ready", sure: true, reason: "The item is clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };
 
-export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean; agentsWrapped?: boolean };
+export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean; agentsWrapped?: boolean; judgmentEnv?: string };
 
 export type Shim = {
 	/** The executable the runner calls instead of `claude`. */

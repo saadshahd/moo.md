@@ -5,7 +5,7 @@ import { declaredKind, kindQuestion, UNSURE } from "../decide/kind.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import type { State } from "../state/open.ts";
 import type { ItemKind } from "../state/saved.ts";
-import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { queueQuestion } from "./questions.ts";
 import { pickedAnswer } from "./thread.ts";
 
 export type KindContext = {
@@ -44,14 +44,11 @@ export const pickKind = async (o: Pick<KindContext, "config" | "judge">, item: I
 	return "kind" in picked ? { item: item.id, kind: picked.kind, from: "model" } : { item: item.id, kind: o.config.hum.fallbackKind, from: "fallback", why: picked.why };
 };
 
-/** Saves the item's kind and, for a fallback, asks the owner once for it; returns the kind's name. */
-export const keepKind = async (o: KindContext, item: Item, kind: ItemKind, except?: string): Promise<string> => {
+/** Saves the item's kind and, for a fallback, queues one question to the owner for it; returns the kind's name. */
+export const keepKind = (o: Pick<KindContext, "state" | "config" | "now">, item: Item, kind: ItemKind, except?: string): string => {
 	o.state.itemKinds.put(item.id, kind);
 
-	if (kind.from === "fallback") {
-		queueQuestion(o, item, { text: PLAIN_QUESTIONS.kind, options: kindsBut(o, except), detail: `It runs as ${kind.kind} for now.` }, "kind");
-		await releaseQuestions(o);
-	}
+	if (kind.from === "fallback") queueQuestion(o, item, { text: PLAIN_QUESTIONS.kind, options: kindsBut(o, except), detail: `It runs as ${kind.kind} for now.` }, "kind");
 
 	return kind.kind;
 };

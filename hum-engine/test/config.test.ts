@@ -186,17 +186,16 @@ test("ciEnv that sets a name the CI wake job sets itself is refused, naming it",
 	expect(problemsOf(bad)).toEqual([{ problem: "wake-env-taken", name: "GH_TOKEN" }]);
 });
 
-test("a CI wake that mints an App's token may run no longer than the token lasts", () => {
-	const app = clone(setUp());
+test("publish keeps less than the App token's hour in hand, so it has time left to merge", () => {
+	const margin = clone(setUp());
 
-	app.hum.pullRequestToken = { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" };
-	app.hum.ciWakeTimeoutMinutes = 60;
+	margin.hum.ciMergeMarginMinutes = 59;
 
-	expect(problemsOf(app)).toEqual([]);
+	expect(problemsOf(margin)).toEqual([]);
 
-	app.hum.ciWakeTimeoutMinutes = 61;
+	margin.hum.ciMergeMarginMinutes = 60;
 
-	expect(problemsOf(app)).toEqual([{ problem: "wake-outlasts-app-token", minutes: 61, tokenMinutes: 60 }]);
+	expect(problemsOf(margin)).toEqual([{ problem: "merge-margin-fills-token-hour", minutes: 60, tokenMinutes: 60 }]);
 });
 
 test("an unknown schema version is refused and names the step", () => {

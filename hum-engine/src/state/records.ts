@@ -25,6 +25,13 @@ export class Records<S extends z.core.$ZodType> {
 		atomicWrite(this.#path(key), `${JSON.stringify(z.parse(this.#schema, value))}\n`);
 	}
 
+	/** Copies the record at `key` into another store of its kind, as its schema reads it, where this one has it. */
+	copyTo(into: Records<S>, key: string): void {
+		const record = this.get(key);
+
+		if (record !== undefined) atomicWrite(into.#path(key), `${JSON.stringify(record)}\n`);
+	}
+
 	remove(key: string): void {
 		rmSync(this.#path(key), { force: true });
 	}

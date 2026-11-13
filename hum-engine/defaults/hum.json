@@ -139,6 +139,8 @@
 	},
 	"restartDelaySeconds": 10,
 	"ciWakeTimeoutMinutes": 60,
+	"ciOutboxMaxMegabytes": 200,
+	"ciMergeMarginMinutes": 10,
 	"pullRequestToken": {
 		"from": "secret",
 		"secret": "HUM_GITHUB_TOKEN"

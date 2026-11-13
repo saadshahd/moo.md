@@ -30,12 +30,41 @@ const hum = (o: ReturnType<typeof ownerRepo>, args: string[], env: Record<string
 
 const stateDir = (o: ReturnType<typeof ownerRepo>) => join(o.repo.owner, ".git", "hum");
 
-test("hum wake on a schedule event: the item merges, the tick and hum's state are recorded on the remote, and the job exits 0", () => {
+/**
+ * The three jobs of a CI wake in the owner's checkout, each on a fresh runner's state folder, as the workflow runs them:
+ * gather, then work after the checkout fetched what gather left on the remote, then publish with gather's output.
+ * Returns the first job that failed, else publish.
+ */
+const wake = (o: ReturnType<typeof ownerRepo>, args: string[] = [], env: Record<string, string> = {}) => {
+	const folder = tempDir("wake");
+	const [inbox, outbox, output] = [join(folder, "inbox"), join(folder, "outbox"), join(folder, "output")];
+
+	writeFileSync(output, "");
+
+	const gather = hum(o, ["wake", "gather", "--inbox", inbox], { ...env, GITHUB_OUTPUT: output });
+
+	if (gather.code !== 0) return gather;
+
+	rmSync(stateDir(o), { recursive: true, force: true });
+	sh(o.repo.owner, ["fetch", "-q", "origin"]);
+
+	const work = hum(o, ["wake", "work", "--inbox", inbox, "--outbox", outbox], env);
+
+	if (work.code !== 0) return work;
+
+	rmSync(stateDir(o), { recursive: true, force: true });
+
+	const gathered = readFileSync(output, "utf8").split("\n")[1] ?? "";
+
+	return hum(o, ["wake", "publish", "--outbox", outbox, ...args], { ...env, HUM_GATHERED: gathered });
+};
+
+test("a wake on a schedule event: the item merges, the tick and hum's state are recorded on the remote, and each job exits 0", () => {
 	const o = owner({ items: { a: { writeForItem: true } } });
 
 	o.item("a");
 
-	const run = hum(o, ["wake", "--event", "schedule"]);
+	const run = wake(o, ["--event", "schedule"]);
 
 	expect(run.err).toBe("");
 	expect(run.code).toBe(0);
@@ -44,27 +73,28 @@ test("hum wake on a schedule event: the item merges, the tick and hum's state ar
 	expect(sh(o.repo.remote, ["ls-tree", "-r", "--name-only", CI_STATE_REF])).toContain("merges/");
 });
 
-test("hum wake on a comment event records no tick, and the next wake starts from the state it saved", () => {
+test("a wake on a comment event records no tick, and the next wake starts from the state it saved, which it could not replace otherwise", () => {
 	const o = owner({});
 
-	expect(hum(o, ["wake", "--event", "issue_comment"]).code).toBe(0);
+	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
 	expect(sh(o.repo.remote, ["for-each-ref", "--format=%(refname)", "refs/hum"]).trim()).toBe(CI_STATE_REF);
 
 	const saved = sh(o.repo.remote, ["rev-parse", CI_STATE_REF]).trim();
 
 	rmSync(stateDir(o), { recursive: true, force: true });
-	expect(hum(o, ["wake", "--event", "issue_comment"]).code).toBe(0);
-	expect(sh(o.repo.owner, ["rev-parse", CI_STATE_REF]).trim()).toBe(saved);
+	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
+	expect(sh(o.repo.remote, ["rev-parse", CI_STATE_REF]).trim()).not.toBe(saved);
 });
 
-test("hum wake with a rejected token exits 1, annotates the job and writes its summary", () => {
-	const o = owner({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }] });
+test("a wake with a rejected token exits 1, annotates the job and writes its summary", () => {
+	// gather and work each make a start check; the run after them meets the rejected token.
+	const o = owner({ script: [{}, {}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }] });
 	const summary = join(tempDir("summary"), "summary.md");
 
 	writeFileSync(summary, "");
 	o.item("a");
 
-	const run = hum(o, ["wake", "--event", "workflow_dispatch"], { GITHUB_STEP_SUMMARY: summary });
+	const run = wake(o, ["--event", "workflow_dispatch"], { GITHUB_STEP_SUMMARY: summary });
 
 	expect(run.code).toBe(1);
 	expect(run.out).toContain("::error title=hum token-rejected::");
@@ -74,9 +104,9 @@ test("hum wake with a rejected token exits 1, annotates the job and writes its s
 	expect(sh(o.repo.remote, ["show", "main:.hum/work/a.md"])).toContain("state: ready");
 });
 
-test("hum wake with a config that names no checks says what is missing and exits 1", () => {
+test("a wake with a config that names no checks says what is missing and exits 1", () => {
 	const o = owner({}, {}, (raw) => void Object.assign(raw.hum, { checks: [] }));
-	const run = hum(o, ["wake"]);
+	const run = wake(o);
 
 	expect(run.code).toBe(1);
 	expect(run.err).toContain("names no checks");

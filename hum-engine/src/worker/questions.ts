@@ -23,7 +23,7 @@ const isOpenQuestion = (thread: readonly ThreadEntry[], text: string): boolean =
 	return open !== undefined && visibleText(open.text) === text;
 };
 
-const keyOf = ({ item, queuedAt }: Pick<QueuedQuestion, "item" | "queuedAt">): string => `${item}@${queuedAt}`;
+export const queuedKey = ({ item, queuedAt }: Pick<QueuedQuestion, "item" | "queuedAt">): string => `${item}@${queuedAt}`;
 
 /** How long an asked question is kept: long enough to count the day, and to read late answers to it. */
 const keptFor = ({ hum }: Config): number => Math.max(DAY_MS, hum.questionTimeoutHours * HOUR_MS);
@@ -51,7 +51,7 @@ export const queueQuestion = (ctx: Pick<QuestionContext, "state" | "config" | "n
 		queuedAt: now(),
 	};
 
-	state.questions.put(keyOf(queued), queued);
+	state.questions.put(queuedKey(queued), queued);
 };
 
 const waitingOrder = (queue: readonly QueuedQuestion[]): QueuedQuestion[] => {
@@ -71,7 +71,7 @@ export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> 
 	const { state, config, workSource, questions, now } = ctx;
 	const all = state.questions.list();
 
-	for (const old of all) if (old.askedAt !== undefined && !isKept(old.askedAt, config, now())) state.questions.remove(keyOf(old));
+	for (const old of all) if (old.askedAt !== undefined && !isKept(old.askedAt, config, now())) state.questions.remove(queuedKey(old));
 
 	const room = roomToAsk({ askedAt: all.flatMap(({ askedAt }) => (askedAt === undefined ? [] : [askedAt])), cap: config.hum.dailyQuestionCap, now: now() });
 	const released: string[] = [];
@@ -80,7 +80,7 @@ export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> 
 		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource, questions }, state.ops, { run: "ask", attempt: queued.queuedAt });
 
 		await calls.questions?.ask(ItemId.parse(queued.item), { text: queued.text, options: queued.options, detail: queued.detail });
-		state.questions.put(keyOf(queued), { ...queued, askedAt: now() });
+		state.questions.put(queuedKey(queued), { ...queued, askedAt: now() });
 		released.push(queued.item);
 	}
 

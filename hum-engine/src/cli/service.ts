@@ -1,5 +1,7 @@
+import * as core from "@actions/core";
 import { randomUUID } from "node:crypto";
-import { hostname } from "node:os";
+import { mkdtempSync } from "node:fs";
+import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Command } from "commander";
 import { x } from "tinyexec";
@@ -8,7 +10,7 @@ import { listPluginSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
 import { readSettings } from "../config/settings.ts";
 import { commandTimeoutMs, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
-import { restoreCiState, saveCiState } from "../service/ci-state.ts";
+import { CI_STATE_REF, CiStateRaced, restoreCiState, saveCiState } from "../service/ci-state.ts";
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
 import { installPlugins } from "../service/plugins.ts";
@@ -16,9 +18,18 @@ import { reportCards, wakeUntilQuiet } from "../service/wake.ts";
 import { defaultStateDir, openState, STATUS_FILE } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { readStatus } from "../status/file.ts";
-import { npmLatest, openWorker } from "../worker/open.ts";
+import { npmLatest, type OpenWorkerOptions, workerOptions } from "../worker/open.ts";
+import { Worker, type WorkerOptions } from "../worker/worker.ts";
+import { DEFAULT_BASE, publisherOf } from "../worker/thin-path.ts";
+import { tallyOf } from "../worker/tally.ts";
+import { Gathered, inboxIntegrations, readInbox, readOutbox, workRemote, writeInbox, writeOutboxState, writePass } from "../publish/handover.ts";
+import { publishWake } from "../publish/wake.ts";
+import { configuredModelCall } from "../adapters/model-call.ts";
+import { type Git, gitIn } from "../adapters/git.ts";
+import { APP_TOKEN_MINUTES, WAKE_ENV } from "../config/wake-job.ts";
+import { MINUTE_MS } from "../time.ts";
 import type { Io } from "./ops.ts";
-import { Holder } from "../adapter-api.ts";
+import { Holder, type Item, ItemId } from "../adapter-api.ts";
 import { parseArgument } from "../adapters/argument.ts";
 
 const EXIT_OK = 0;
@@ -31,6 +42,8 @@ const EXIT_CARDS_SHOWN = 1;
 const EXIT_FAILED = 1;
 
 const SCHEDULE_EVENT = "schedule";
+
+const MEGABYTE = 1024 * 1024;
 
 type WorkFlags = { holder?: string; base?: string };
 
@@ -81,10 +94,10 @@ const serviceSettings = (repo: string): z.infer<typeof ServiceSettings> => {
 };
 
 /** The Mac reads the npm version and when the scheduled workflow last ran; a CI job is that workflow. */
-const openFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac" | "ci") => {
+const optionsFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac" | "ci", extra: Partial<OpenWorkerOptions> = {}): Promise<WorkerOptions> => {
 	const timeoutMs = commandTimeoutMs(serviceSettings(repo));
 
-	return openWorker(repo, {
+	return workerOptions(repo, {
 		now: Date.now,
 		env,
 		newSessionId: randomUUID,
@@ -94,6 +107,7 @@ const openFor = async ({ cwd: repo, env }: Io, flags: WorkFlags, where: "mac" | 
 		where,
 		latestVersion: where === "mac" ? npmLatest : undefined,
 		ciTick: where === "mac" ? () => readCiTick({ repo, remote: "origin", timeoutMs }) : undefined,
+		...extra,
 	});
 };
 
@@ -109,9 +123,9 @@ const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
 };
 
 /**
- * `hum work`, `hum serve` and `hum wake`: the processes a service unit and a CI workflow start. They are not ops:
+ * `hum work`, `hum serve` and `hum wake`'s jobs: the processes a service unit and a CI workflow start. They are not ops:
  * roles and machines never name them, so they stay out of the table `hum help --json` prints. A CI job's git dir dies
- * with it, so `hum wake` brings back the state the last wake saved first, and saves it again after each tick.
+ * with it, so gather brings back the state the last wake saved first and saves it for publish, which saves it again.
  */
 export const addServiceCommands = (root: Command, io: Io, done: (code: number) => void): void => {
 	withWorkOptions(root.command("work").description("Run the worker on this machine until it is stopped or an update arrives; exits 75 for an update."))
@@ -120,7 +134,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			onStop(() => abort.abort());
 
-			const worker = await openFor(io, flags, "mac");
+			const worker = new Worker(await optionsFor(io, flags, "mac"));
 			const ended = await worker.serve(abort.signal);
 
 			io.stderr(`hum work: stopped, ${ended.reason}\n`);
@@ -168,31 +182,119 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 			}
 		});
 
-	withWorkOptions(root.command("wake").description("One CI wake: bring back the state the last wake saved, tick until nothing more starts, saving the state after each tick, record the tick when --event is schedule, and show the cards."))
-		.option("--event <name>", "the GitHub event that started this job")
-		.action(async (flags: WorkFlags & { event?: string }) => {
+	const wake = root.command("wake").description("One CI wake, as three jobs: gather claims and settles with GitHub's token, work runs with none, and publish checks and applies what work made.");
+
+	withWorkOptions(wake.command("gather").description("Bring back the state the last wake saved, claim each item and settle its answers and kind, save the state, and write the inbox the work job reads; sets the job output `gathered` for publish."))
+		.requiredOption("--inbox <folder>", "where to write the inbox")
+		.action((flags: WorkFlags & { inbox: string }) => wakeJob(io, done, async () => {
 			const dir = await defaultStateDir(io.cwd);
-			const where = { repo: io.cwd, remote: "origin", dir };
-			let saved = await restoreCiState({ ...where, timeoutMs: commandTimeoutMs(serviceSettings(io.cwd)) });
-			const worker = await openFor(io, flags, "ci");
-			const timeoutMs = commandTimeoutMs(worker.config.hum);
+			const timeoutMs = commandTimeoutMs(serviceSettings(io.cwd));
+			const where = { repo: io.cwd, remote: "origin", dir, timeoutMs };
+			const read = await restoreCiState(where);
+			const claimed = new Map<string, Item>();
+			const options = await optionsFor(io, flags, "ci", { ciJob: { kind: "gather", gathered: claimed } });
+			const worker = new Worker(options);
 
-			const save = async () => {
-				saved = await saveCiState({ ...where, ...saved, identity: worker.config.hum.commitIdentity, at: Date.now(), timeoutMs });
-			};
-
-			try {
-				await wakeUntilQuiet(worker, save);
-			} finally {
-				await save();
+			for (let before = -1; claimed.size > before; ) {
+				before = claimed.size;
+				await worker.tick();
+				await worker.idle();
 			}
 
-			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: worker.config.hum.commitIdentity, timeoutMs });
+			const base = options.base ?? DEFAULT_BASE;
+			const saved = await saveCiState({ ...where, ...read, identity: options.config.hum.commitIdentity, at: Date.now() });
+			const heads = await remoteHeads(gitIn(io.cwd, { timeoutMs }), options.config.hum.runBranchPrefix);
+			const baseSha = (await remoteHeads(gitIn(io.cwd, { timeoutMs }), base)).get(base);
 
-			const status = readStatus(join(dir, STATUS_FILE));
-			const cards = status.ok ? status.status.cards : [];
+			if (baseSha === undefined) throw new Error(`origin has no branch ${base}`);
 
-			await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });
-			done(cards.length > 0 ? EXIT_CARDS_SHOWN : EXIT_OK);
-		});
+			heads.delete(base);
+
+			const gathered: Gathered = { holder: options.holder, base, baseSha, heads: Object.fromEntries(heads), claimed: [...claimed.keys()].map((id) => ItemId.parse(id)), stateRead: saved.read };
+
+			writeInbox(flags.inbox, { gathered, items: [...claimed.values()] }, dir);
+			core.setOutput("gathered", JSON.stringify(gathered));
+
+			return dir;
+		}));
+
+	wake
+		.command("work")
+		.description("Run each item the inbox holds with no GitHub token: runs clone the base and hum branches gather saw, and each pass leaves what it asks publish to do in the outbox, with hum's state.")
+		.requiredOption("--inbox <folder>", "the inbox gather wrote")
+		.requiredOption("--outbox <folder>", "where to write the outbox")
+		.action((flags: { inbox: string; outbox: string }) => wakeJob(io, done, async () => {
+			const dir = await defaultStateDir(io.cwd);
+			const timeoutMs = commandTimeoutMs(serviceSettings(io.cwd));
+			const inbox = readInbox(flags.inbox, dir);
+			const { gathered } = inbox;
+			const remote = await workRemote({ checkout: io.cwd, gathered, folder: mkdtempSync(join(io.env.RUNNER_TEMP ?? tmpdir(), "hum-remote-")), timeoutMs });
+
+			const options = await optionsFor(io, { holder: gathered.holder, base: gathered.base }, "ci", {
+				remote,
+				integrations: inboxIntegrations(inbox, Date.now),
+				ciJob: { kind: "work", publish: async (pass, worked) => void writePass(flags.outbox, { ...pass, result: worked }) },
+			});
+
+			await wakeUntilQuiet(new Worker(options));
+			writeOutboxState(flags.outbox, dir);
+
+			return dir;
+		}));
+
+	wake
+		.command("publish")
+		.description(`Check and apply the work job's outbox with GitHub's token, from what gather settled in ${WAKE_ENV.gathered}, save the state, and record the tick when --event is schedule.`)
+		.requiredOption("--outbox <folder>", "the outbox the work job wrote")
+		.option("--event <name>", "the GitHub event that started this wake")
+		.action((flags: { outbox: string; event?: string }) => wakeJob(io, done, async () => {
+			const started = Date.now();
+			const gathered = Gathered.parse(JSON.parse(io.env[WAKE_ENV.gathered] ?? "null"));
+			const dir = await defaultStateDir(io.cwd);
+			const timeoutMs = commandTimeoutMs(serviceSettings(io.cwd));
+			const where = { repo: io.cwd, remote: "origin", dir, timeoutMs };
+			const read = await restoreCiState(where);
+
+			if (read.read !== gathered.stateRead) throw new CiStateRaced(`hum's state at ${CI_STATE_REF} is not the one gather saved, so another wake ran since; this wake publishes nothing`);
+
+			const options = await optionsFor(io, { holder: gathered.holder, base: gathered.base }, "ci");
+			const { hum } = options.config;
+			const outbox = readOutbox(flags.outbox, { maxBytes: hum.ciOutboxMaxMegabytes * MEGABYTE, claimed: new Set(gathered.claimed) });
+			const judge = options.judge ?? configuredModelCall(options.runner, hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
+			const publisher = publisherOf({ ...options, workSource: options.adapters.workSource, questions: options.adapters.questions }, judge, started + (APP_TOKEN_MINUTES - hum.ciMergeMarginMinutes) * MINUTE_MS);
+
+			await publishWake({ publisher, gathered, outbox, work: openState(outbox.stateDir, { now: Date.now }) });
+			await saveCiState({ ...where, ...read, identity: hum.commitIdentity, at: Date.now() });
+
+			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: hum.commitIdentity, timeoutMs });
+
+			return dir;
+		}));
 };
+
+/** Runs one job of a wake, then shows the cards its state holds; the job exits 1 when it shows any or fails. */
+const wakeJob = async (io: Io, done: (code: number) => void, job: () => Promise<string>): Promise<void> => {
+	try {
+		const status = readStatus(join(await job(), STATUS_FILE));
+		const cards = status.ok ? status.status.cards : [];
+
+		await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });
+		done(cards.length > 0 ? EXIT_CARDS_SHOWN : EXIT_OK);
+	} catch (error) {
+		io.stderr(`hum wake: ${error instanceof Error ? error.message : String(error)}\n`);
+		done(EXIT_FAILED);
+	}
+};
+
+/** Each branch on origin under `prefix`, or named `prefix`, at its head. */
+const remoteHeads = async (git: Git, prefix: string): Promise<Map<string, string>> =>
+	new Map(
+		(await git.raw(["ls-remote", "--heads", "origin", `refs/heads/${prefix}*`]))
+			.split("\n")
+			.filter(Boolean)
+			.map((line) => {
+				const [sha = "", ref = ""] = line.split("\t");
+
+				return [ref.slice("refs/heads/".length), sha] as const;
+			}),
+	);

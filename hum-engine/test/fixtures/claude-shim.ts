@@ -24,6 +24,8 @@ const spec = JSON.parse(shimSpecJson()) as {
 	items?: Record<string, Behavior>;
 	/** What a cheap model call answers, by the property its schema asks for; logged apart, so the script's order holds. */
 	judgments?: { kind?: { kind: string }; alignment?: { alignment: string; verification: string } };
+	/** A file each model call writes its environment to, as JSON. */
+	judgmentEnv?: string;
 	/** What plan and review runs pick, in order, logged apart; past the last, a plan is ready and a review approves. */
 	decisions?: Decided[];
 	/** Where background runs are kept; makeShim sets it. */
@@ -48,6 +50,8 @@ const log = spec.log ?? "/dev/null";
 mkdirSync(dirname(log), { recursive: true });
 
 const schemaArg = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
+
+if (spec.judgmentEnv && process.argv.includes("--no-session-persistence")) writeFileSync(spec.judgmentEnv, JSON.stringify(process.env));
 
 const prompt = new TextDecoder().decode(stdin);
 const itemId = /^# Item (\S+):/m.exec(prompt)?.[1];

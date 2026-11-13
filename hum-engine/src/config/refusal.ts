@@ -16,7 +16,7 @@ export type Problem =
 	| { readonly problem: "path-without-proof"; readonly glob: string; readonly level: string }
 	| { readonly problem: "overlapping-prefixes"; readonly run: string; readonly claim: string }
 	| { readonly problem: "wake-env-taken"; readonly name: string }
-	| { readonly problem: "wake-outlasts-app-token"; readonly minutes: number; readonly tokenMinutes: number };
+	| { readonly problem: "merge-margin-fills-token-hour"; readonly minutes: number; readonly tokenMinutes: number };
 
 /** A config change the engine will not take. The caller keeps the last good config. */
 export type Refusal =
@@ -49,9 +49,8 @@ const DESCRIPTIONS = {
 	"unknown-level": (p) => `risk level "${p.level}" is not in levels`,
 	"path-without-proof": (p) => `path "${p.glob}" is at level "${p.level}", whose release waits for proof, and names no proof for every kind`,
 	"overlapping-prefixes": (p) => `the run branch prefix "${p.run}" and the claim prefix "${p.claim}" overlap: one starts with the other`,
-	"wake-env-taken": (p) => `ciEnv sets ${p.name}, which the CI wake job sets itself`,
-	"wake-outlasts-app-token": (p) =>
-		`ciWakeTimeoutMinutes is ${p.minutes}, and the token a GitHub App mints lasts ${p.tokenMinutes} minutes: a longer wake loses GitHub before it ends`,
+	"wake-env-taken": (p) => `ciEnv sets ${p.name}, which the CI wake's jobs set themselves`,
+	"merge-margin-fills-token-hour": (p) => `ciMergeMarginMinutes is ${p.minutes}, and the token a GitHub App mints lasts ${p.tokenMinutes} minutes: publish would never have time left to merge`,
 } as const satisfies Describe;
 
 // SAFETY: each description is keyed by the problem name it reads, so the lookup by `problem.problem` takes its own variant.

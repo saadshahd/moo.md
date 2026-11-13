@@ -9,6 +9,7 @@ import { reviewInput } from "../src/decide/review.ts";
 import { openState } from "../src/state/open.ts";
 import { keepKind, pickKind } from "../src/worker/kind.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
+import { releaseQuestions } from "../src/worker/questions.ts";
 import { configWith } from "./fixtures/config.ts";
 import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { finished, runnerOf } from "./fixtures/records.ts";
@@ -39,7 +40,7 @@ test("an item names its kind by a label, else by its template field; nothing els
 	expect(declaredKind({ body: "", labels: ["Bug"] }, KINDS, { bug: "fix" })).toBe("fix");
 });
 
-test("with no kind named, the model call picks it; an abstention runs the fallback kind, unclear, and keeping it asks once for the kind", async () => {
+test("with no kind named, the model call picks it; an abstention runs the fallback kind, unclear, and keeping it queues one question for the kind", async () => {
 	const provider = new FakeProvider();
 	const adapter = provider.adapter();
 	const id = provider.seed("Tidy the log");
@@ -52,8 +53,9 @@ test("with no kind named, the model call picks it; an abstention runs the fallba
 	const fallback = await pickKind(abstaining, item);
 
 	expect(fallback).toEqual({ item: id, kind: "feature", from: "fallback", why: "no scripted answer fits" });
-	await keepKind(abstaining, item, fallback);
-	await keepKind(abstaining, item, fallback);
+	keepKind(abstaining, item, fallback);
+	keepKind(abstaining, item, fallback);
+	await releaseQuestions(abstaining);
 	expect(abstaining.state.itemKinds.get(id)?.from).toBe("fallback");
 	expect((await adapter.workSource!.read(id)).thread.filter((entry) => entry.kind === "question")).toEqual([expect.objectContaining({ text: expect.stringContaining("Which kind of work is this?") })]);
 });

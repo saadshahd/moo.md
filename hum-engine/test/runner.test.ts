@@ -49,19 +49,25 @@ test("a model call keeps no session, loads only the user's settings, where their
 	expect(JSON.parse(judging[judging.indexOf("--settings") + 1] ?? "{}")).toMatchObject({ disableAllHooks: true, outputStyle: "default" });
 });
 
-test("a run never holds the GitHub tokens hum pushes with; the rest of the environment reaches it", async () => {
-	const saved = join(tempDir("run-env"), "env.json");
-	const shim = makeShim({ script: [{}, { saveEnv: saved }] });
+test("neither a run nor a model call holds the GitHub tokens hum pushes with; the rest of the environment reaches both", async () => {
+	const folder = tempDir("run-env");
+	const [saved, judged] = [join(folder, "run.json"), join(folder, "judgment.json")];
+	const shim = makeShim({ script: [{}, { saveEnv: saved }], judgmentEnv: judged });
 	const state = openState(tempDir("runner"), { now: Date.now });
 	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: { ...shim.env, GH_TOKEN: "ghs_app", HUM_KEPT: "yes" }, now: () => NOW });
 
-	await holdingGitHubTokens(() => ask(runner, { env: { GH_TOKEN: "from-a-slot" } }));
+	await holdingGitHubTokens(async () => {
+		await ask(runner, { env: { GH_TOKEN: "from-a-slot" } });
+		await ask(runner, { call: "judgment" });
+	});
 
-	const names = Object.keys(JSON.parse(readFileSync(saved, "utf8")));
+	for (const file of [saved, judged]) {
+		const names = Object.keys(JSON.parse(readFileSync(file, "utf8")));
 
-	expect(names).toContain("HUM_KEPT");
-	expect(names).not.toContain("GH_TOKEN");
-	expect(names).not.toContain("GITHUB_TOKEN");
+		expect(names).toContain("HUM_KEPT");
+		expect(names).not.toContain("GH_TOKEN");
+		expect(names).not.toContain("GITHUB_TOKEN");
+	}
 });
 
 test("a usage-limit message parses to limited(until), and no call is made until then", async () => {

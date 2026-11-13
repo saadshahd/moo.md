@@ -5,7 +5,7 @@ import pMemoize from "p-memoize";
 import PQueue from "p-queue";
 import pTimeout from "p-timeout";
 import { createAsyncLogic } from "xstate";
-import { ADAPTER_API_VERSION, type Answers, type Holder, ItemId, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
+import { ADAPTER_API_VERSION, type Answers, type Holder, type Item, ItemId, type ItemRef, type Questions, type WorkSource } from "../adapter-api.ts";
 import type { Runner } from "../adapters/claude-p.ts";
 import type { Config } from "../config/load.ts";
 import { invokedSources } from "../config/machine.ts";
@@ -41,7 +41,7 @@ import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, hasEndedStuck, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
 
@@ -91,7 +91,18 @@ export type WorkerOptions = {
 	readonly commits?: GitHubCommits;
 	/** What the review-note loop reads from the review surface and CI; without it the loop reads only git and the owner's answers. */
 	readonly loop?: Partial<Pick<LoopPass, "comments" | "ciLogs">>;
+	/** The CI job this worker is, where a wake splits into jobs; unset, a tick does all a wake does. */
+	readonly ciJob?: CiJob;
 };
+
+/**
+ * A wake's job that holds a token, `gather`, claims each item and settles its answers and kind, keeps it in `gathered`
+ * and runs nothing. The job that holds none, `work`, runs each pass and hands its outbox to `publish`; it asks,
+ * files and posts nothing itself. Either takes each item once.
+ */
+export type CiJob =
+	| { readonly kind: "gather"; readonly gathered: Map<string, Item> }
+	| { readonly kind: "work"; readonly publish: NonNullable<ThinPathOptions["publish"]> };
 
 /** What the tick read of its sources: whether the watch saw a change, and the ready list. */
 type Sources = {
@@ -173,6 +184,8 @@ export class Worker {
 	readonly #answered = new Set<string>();
 	/** Saved changes that land again under this worker's config before anything else starts. */
 	readonly #relanding = new Set<string>();
+	/** The items a CI job's passes ended on: each job takes an item once, and the next wake takes it again. */
+	readonly #handled = new Set<string>();
 	/** Items whose thread a tick failed to read; the next tick reads them again whatever the watch says. */
 	readonly #unread = new Set<string>();
 	readonly #merged: Status["merged"] = [];
@@ -445,13 +458,28 @@ export class Worker {
 		);
 	}
 
+	/** A pass, or in a gather job its claim and settling alone, kept for the work job. */
+	async #pass(o: ThinPathOptions & { readonly itemId: ItemId }): Promise<ThinResult> {
+		const job = this.#o.ciJob;
+
+		if (job?.kind !== "gather") return runThinPath(o);
+
+		const gathered = await gatherItem(o, o.itemId);
+
+		if (!isGathered(gathered)) return gathered;
+
+		job.gathered.set(o.itemId, gathered.item);
+
+		return { outcome: "waiting", item: o.itemId };
+	}
+
 	#begin(id: string, known: Known, t: number): void {
 		const { state, config, adapters } = this.#o;
 		const abort = new AbortController();
 
 		this.#inFlight.set(id, { abort, since: t, known });
 		void this.#pool.add(() =>
-			runThinPath({
+			this.#pass({
 				workSource: adapters.workSource,
 				questions: adapters.questions,
 				state,
@@ -474,6 +502,7 @@ export class Worker {
 				pulls: this.#o.pulls,
 				commits: this.#o.commits,
 				mayLand: () => this.#updating === undefined,
+				publish: this.#o.ciJob?.kind === "work" ? this.#o.ciJob.publish : undefined,
 			}).then(
 				(result) => this.#ended(id, known, result),
 				(error: Error) => this.#failed(id, error),
@@ -483,6 +512,8 @@ export class Worker {
 
 	#ended(id: string, known: Known, result: ThinResult): void {
 		this.#inFlight.delete(id);
+
+		if (this.#o.ciJob) this.#handled.add(id);
 
 		if (result.outcome === "merged")
 			this.#merged.unshift({
@@ -572,6 +603,8 @@ export class Worker {
 
 	#failed(id: string, error: Error): void {
 		this.#inFlight.delete(id);
+
+		if (this.#o.ciJob) this.#handled.add(id);
 		this.#o.state.faults.raise({
 			code: "run-error",
 			item: id,
@@ -670,7 +703,7 @@ export class Worker {
 		const { state, runner, config } = this.#o;
 		const parked = new Set(state.parked.list().map((p) => p.item));
 		const asleep = new Set(sleeping.map((s) => s.itemId));
-		const isFresh = (id: string) => !this.#inFlight.has(id) && !parked.has(id) && !asleep.has(id);
+		const isFresh = (id: string) => !this.#inFlight.has(id) && !parked.has(id) && !asleep.has(id) && !this.#handled.has(id);
 		const isAnsweredAndIdle = (id: string) => this.#answered.has(id) && !this.#inFlight.has(id);
 		const learned = (id: string) => this.#learn(id).catch(() => undefined);
 
@@ -741,11 +774,13 @@ export class Worker {
 
 		const sources = await this.#readSources();
 
-		await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).catch((error: Error) => {
-			state.faults.raise({ code: "question-release", cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
-		});
+		if (this.#o.ciJob?.kind !== "work") {
+			await releaseQuestions({ state, config, workSource: this.#o.adapters.workSource, questions: this.#o.adapters.questions, now: this.#now }).catch((error: Error) => {
+				state.faults.raise({ code: "question-release", cause: `Queued questions could not be asked: ${error.message}`.slice(0, ERROR_EXCERPT), fix: "hum asks them again on the next tick." });
+			});
 
-		this.#loopIfDue(t);
+			this.#loopIfDue(t);
+		}
 
 		const ready = await this.#readReady(sources, sleeping);
 		const started = ready ? await this.#startPicked(t, ready, sleeping) : [];

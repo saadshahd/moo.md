@@ -24,14 +24,17 @@ test("the thin path runs two items on different files side by side, and both mer
 	expect(w.worker.running().sort()).toEqual(["a", "b"]);
 
 	await w.worker.idle();
-	await w.worker.tick();
-	await w.worker.idle();
+
+	// Each push that loses the race to main waits for the next tick, mergeTries of them at most.
+	for (let tick = 0; tick < w.config.hum.mergeTries && merged(w).length < 2; tick++) {
+		await w.worker.tick();
+		await w.worker.idle();
+	}
 
 	expect(merged(w)).toEqual(["a", "b"]);
 	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
 	expect(sh(w.repo.remote, ["show", "main:docs/b.md"])).toBe("from b\n");
 
-	// The later merge lost the race to main and was rechecked on the newest main at the next tick.
 	expect(readFileSync(checkLog, "utf8").split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(3);
 });
 

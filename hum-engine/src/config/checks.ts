@@ -1,6 +1,5 @@
-import { toDirectedGraph } from "xstate/graph";
 import { APP_TOKEN_MINUTES, WAKE_OWN_ENV } from "./wake-job.ts";
-import { kindMachine } from "./machine.ts";
+import { kindMachine, nextStates, reachedFrom } from "./machine.ts";
 import type { Problem } from "./refusal.ts";
 import {
 	FIXED_PARTS,
@@ -37,39 +36,14 @@ const isXstateEvent = (event: string): boolean => event.startsWith("xstate.") ||
 /** Every state is reachable and reaches done or stuck; every wait has a timeout and an action. */
 const graphProblems = (kind: string, config: Kind): Problem[] => {
 	const { states, initial } = config.machine;
-	const graph = toDirectedGraph(kindMachine(config));
-	const forward = new Map<string, string[]>();
+	const forward = nextStates(config);
 	const backward = new Map<string, string[]>();
 
-	for (const node of graph.children) {
-		for (const edge of node.edges) {
-			forward.set(edge.source.key, [...(forward.get(edge.source.key) ?? []), edge.target.key]);
-			backward.set(edge.target.key, [...(backward.get(edge.target.key) ?? []), edge.source.key]);
-		}
-	}
+	for (const [source, targets] of forward) for (const target of targets) backward.set(target, [...(backward.get(target) ?? []), source]);
 
-	const walk = (from: Iterable<string>, edges: Map<string, string[]>) => {
-		const seen = new Set<string>(from);
-		const todo = [...seen];
-
-		for (let key = todo.pop(); key !== undefined; key = todo.pop()) {
-			for (const next of edges.get(key) ?? []) {
-				if (seen.has(next)) continue;
-
-				seen.add(next);
-				todo.push(next);
-			}
-		}
-
-		return seen;
-	};
-
-	const reachable = walk([initial], forward);
-
-	const finishing = walk(
-		Object.entries(states).flatMap(([name, node]) => (isTerminal(node) ? [name] : [])),
-		backward,
-	);
+	const reachable = reachedFrom(initial, forward);
+	const terminal = Object.entries(states).flatMap(([name, node]) => (isTerminal(node) ? [name] : []));
+	const finishing = new Set(terminal.flatMap((state) => [...reachedFrom(state, backward)]));
 
 	return Object.entries(states).flatMap(([state, node]): Problem[] => [
 		...(reachable.has(state) ? [] : [{ problem: "unreachable-state", kind, state } as const]),
@@ -193,15 +167,13 @@ const pathProblems = (hum: HumConfig): Problem[] => {
 	];
 };
 
-/** `ciEnv` sets none of the env the wake job sets itself. */
+/** `ciEnv` sets none of the env the wake's jobs set themselves. */
 const wakeEnvProblems = ({ ciEnv }: HumConfig): Problem[] =>
 	Object.keys(ciEnv).flatMap((name): Problem[] => (WAKE_OWN_ENV.has(name) ? [{ problem: "wake-env-taken", name }] : []));
 
-/** A wake that mints an App's token ends before the token does. */
-const appTokenProblems = ({ pullRequestToken, ciWakeTimeoutMinutes }: HumConfig): Problem[] =>
-	pullRequestToken.from === "app" && ciWakeTimeoutMinutes > APP_TOKEN_MINUTES
-		? [{ problem: "wake-outlasts-app-token", minutes: ciWakeTimeoutMinutes, tokenMinutes: APP_TOKEN_MINUTES }]
-		: [];
+/** Publish keeps less than the App token's hour in hand, so it has time left to merge. */
+const mergeMarginProblems = ({ ciMergeMarginMinutes }: HumConfig): Problem[] =>
+	ciMergeMarginMinutes < APP_TOKEN_MINUTES ? [] : [{ problem: "merge-margin-fills-token-hour", minutes: ciMergeMarginMinutes, tokenMinutes: APP_TOKEN_MINUTES }];
 
 /** The proof a path names for a kind: its own, else the one for every kind. */
 export const proofFor = (rule: PathRule, kind: string): string | undefined => rule.proofs?.[kind] ?? rule.proofs?.[ALL_KINDS];
@@ -221,5 +193,5 @@ export const checkConfig = (
 	...skillProblems(hum, env),
 	...namingProblems(hum),
 	...wakeEnvProblems(hum),
-	...appTokenProblems(hum),
+	...mergeMarginProblems(hum),
 ];

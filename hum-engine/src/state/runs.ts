@@ -71,6 +71,11 @@ export class RunRecords {
 		};
 	}
 
+	/** Saves a record another process kept, as it is. */
+	keep(record: RunRecord): void {
+		atomicWrite(this.#path(record), `${JSON.stringify(RunRecord.parse(record))}\n`);
+	}
+
 	/** Rewrites a begun run's record. Nothing removes a record, so one gone since `begin` saved it throws. */
 	#rewrite(key: RunKey, change: { readonly sessionId?: string; readonly endedAt?: number; readonly memoryUsed?: string[] }): RunRecord {
 		const record = this.get(key);

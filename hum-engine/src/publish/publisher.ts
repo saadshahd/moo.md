@@ -57,6 +57,8 @@ export type Publisher = {
 	readonly dir: string;
 	/** Publish's own repo: the remote's objects and each pass's bundle; no work tree of it runs anything. */
 	readonly repo: string;
+	/** The time past which publish starts no merge: its GitHub token's hour less `ciMergeMarginMinutes`; unset on a Mac. */
+	readonly mergesBefore?: number;
 };
 
 const timeoutOf = (p: Pick<Publisher, "config">): number => commandTimeoutMs(p.config.hum);
@@ -110,11 +112,13 @@ const landContext = (p: Publisher, item: Item, { git, folder }: { readonly git: 
 	now: p.now,
 	judge: p.judge,
 	reviewRun: p.reviewRun(item, p.kindOf(item)),
+	mergesBefore: p.mergesBefore,
 });
 
 const NOTHING_BUNDLED: BundleCheck = { ok: true, refs: new Map() };
 
-const stuck = (item: string, why: string): ThinResult => ({ outcome: "stuck", item, detail: `publish refused the pass: ${why}` });
+/** A pass publish refused before any write, and why. */
+export const refusedPass = (item: string, why: string): ThinResult => ({ outcome: "stuck", item, detail: `publish refused the pass: ${why}` });
 
 /**
  * Applies one pass's outbox: the claim must still be the worker's, the bundle must pass every check, then each intent
@@ -138,7 +142,7 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 		signs: await signsCommits({ pulls: p.pulls, base: p.base }),
 	});
 
-	if (!checked.ok) return stuck(pass.item, checked.why);
+	if (!checked.ok) return refusedPass(pass.item, checked.why);
 
 	const calls = (scope: Scope) => onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: p.workSource, questions: p.questions }, p.state.ops, scope);
 	const item = await p.workSource.read(id);
@@ -170,7 +174,7 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 		"keep-evidence": async () => {
 			const ref = evidenceRef(pass.item);
 
-			if (!checked.refs.has(ref)) return stuck(pass.item, `it asks to keep evidence its bundle does not hold on ${ref}`);
+			if (!checked.refs.has(ref)) return refusedPass(pass.item, `it asks to keep evidence its bundle does not hold on ${ref}`);
 
 			const pushed = await push(git, ["--force", "origin", `${outboxRef(ref)}:${ref}`]);
 
