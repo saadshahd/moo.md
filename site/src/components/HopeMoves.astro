@@ -1,0 +1,10 @@
+---
+/* Every hope move under its group's heading (menus.ts), each a link to its
+   page: its name, then what it does. */
+import MenuItems from "./MenuItems.astro";
+import { hopeMoves } from "../menus";
+
+const groups = await hopeMoves();
+---
+
+<MenuItems items={groups.flatMap((g) => g.items)} groups={groups} here={Astro.url.pathname} kind="commands" stack at="hope" />

@@ -1,0 +1,41 @@
+---
+title: hold
+move: comprehension at your pace
+description: "You can say how it works with the agent out of the room."
+tableOfContents: false
+---
+import Copy from "../../../components/Copy.astro";
+import { OUTPUT_STYLE_COMMAND, RELOAD_PLUGINS, pluginInstall, skillFiles } from "../../../install";
+import { href } from "../../../link";
+
+hold takes something that already exists and hands you a thing to work through at your own speed. A change, a behavior and one thing to keep each get a different skill.
+
+## Skills
+
+| Command | What it does |
+| --- | --- |
+| `/hold:learn` | finds what you still lack and runs the skill that fits |
+| `/hold:grasp` | builds a walkthrough you work through until you pass a quiz on it |
+| `/hold:toy` | builds a world you drive until a behavior feels obvious |
+| `/hold:land` | builds a stepped deck that leaves an audience holding one thing |
+
+## What else it ships
+
+- The `hold:Plain` output style keeps replies short and puts the next action first.
+- A Mermaid diagram in a reply draws as a picture.
+- A picture Claude touches gets a `[view]` button that opens it in place.
+
+## Install
+
+<a href={href("install")}>Install</a> sets up hope, hold and hunch together. To add hold alone, in a terminal:
+
+<Copy command={pluginInstall("hold")} />
+
+Then, in Claude Code:
+
+<Copy command={RELOAD_PLUGINS} />
+<Copy command={OUTPUT_STYLE_COMMAND} />
+
+For other agents, copy the skill files. Take every hold skill: `learn` calls the others by name.
+
+<Copy command={skillFiles("hold")} />

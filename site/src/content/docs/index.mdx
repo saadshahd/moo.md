@@ -13,10 +13,110 @@ moves:
   - widen
   - anchor
 ---
+import Copy from "../../components/Copy.astro";
 import Demo from "../../components/Demo.astro";
+import HopeMoves from "../../components/HopeMoves.astro";
+import PartCard from "../../components/PartCard.astro";
+import WhatThisRuns from "../../components/WhatThisRuns.mdx";
 import { chainScene } from "../../demo/scenes";
+import { FIRST_COMMAND, INSTALL_LINE } from "../../install";
+import { href } from "../../link";
+import "../../styles/front.css";
+
+<section class="front slip not-content">
+  <h2>Your agent ships faster than you can own.</h2>
+  <p class="lead">Every session ends with code you signed for and could not explain.</p>
+  <p>moo.md runs agents at the pace you think. Every choice the agent would make for you comes back as a question, with a preview.</p>
+  <p class="quiet">Plugins for Claude Code. Skill files for any other agent.</p>
+  <p class="actions"><a class="moo-action" href="#install">Install</a><a class="moo-action second" href="#session">See a session</a></p>
+</section>
+
+<section class="front traps not-content">
+  <h2>Not an autopilot.</h2>
+  <p class="lead">You are the world model. The agent is your hands.</p>
+  <ul>
+    <li>AI fills in your decisions.</li>
+    <li>Compaction mutates and drifts your context.</li>
+    <li>External state gets remembered, not read.</li>
+  </ul>
+</section>
+
+<table class="front guards not-content">
+  <thead>
+    <tr><th scope="col">The trap</th><th scope="col">The guard</th><th scope="col">Where</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">AI fills in your decisions</th>
+      <td>Interactive questions, each choice previewed</td>
+      <td><a href={href("start/intent")}><code>/hope:intent</code></a>, <a href={href("start/shape")}><code>/hope:shape</code></a></td>
+    </tr>
+    <tr>
+      <th scope="row">Compaction drifts your context</th>
+      <td>Doing stays out, deciding stays in</td>
+      <td><a href={href("moves/router")}><code>/hope:router</code></a></td>
+    </tr>
+    <tr>
+      <th scope="row">Stale or remembered state</th>
+      <td>Snapshot facts, never infer</td>
+      <td><a href={href("moves/freeze")}><code>/hope:freeze</code></a></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="front parts not-content">
+  <article class="part hope">
+    <h2>hope: the decision loop.</h2>
+    <p>You don't have to remember the moves. Type <a href={href("start/compose")}><code>/hope:compose</code></a> and your words; each move takes over as its turn comes.</p>
+    <HopeMoves />
+  </article>
+  <PartCard part="hold">
+    <p>Grasp a change, drive a behavior, land one thing in an audience, until you can say how it works with the agent out of the room. Its <code>hold:Plain</code> output style keeps replies short.</p>
+    <p class="skills">learn · grasp · toy · land</p>
+  </PartCard>
+  <PartCard part="sound">
+    <p>It reads your repo's stack and picks only the rules your code shows a surface for, each with its evidence. The rules land as files you own.</p>
+    <p class="skills">setup · prime · review</p>
+  </PartCard>
+  <PartCard part="hum">
+    <p>Work items become Claude Code runs, on your Mac or in CI. The repo's own checks decide what they can. A path's risk level decides who reviews. Only what nothing settles becomes a question to you.</p>
+  </PartCard>
+  <PartCard part="hunch">
+    <p>Skills and features tried here before they earn a place in hope or sound.</p>
+  </PartCard>
+</div>
+
+<ul class="front keep not-content">
+  <li><strong>Less decision regret.</strong> Tradeoffs surface before you commit.</li>
+  <li><strong>More clarity.</strong> Fog becomes a spec you can say in one sentence.</li>
+  <li><strong>Fewer, stronger artifacts.</strong> Every output earns its place.</li>
+  <li><strong>You still own it.</strong> Velocity that outpaces understanding creates debt, not progress.</li>
+</ul>
+
+<section id="session" class="front session not-content">
+  <h2>A fix that you can trust.</h2>
+  <p class="lead">It asks the one fact it can't check before it builds on it.</p>
+</section>
 
 <Demo
   scene={chainScene}
   summary="Claude Code. With moo off, you ask: some customers were charged twice this week; find the cause and make sure it can't come back. Claude finds the cause and the charges to refund, and adds a fix it couldn't check against the provider. With moo on, you type /hope:compose and the same words. Each move takes over as it comes up: /freeze, /deepen, a dialog asking the one fact it can't check, whether the payment provider honors an idempotency key, then /widen and /anchor. The reply gives the cause, the charges to refund, and tests that fail on the old code."
 />
+
+<section id="install" class="front install not-content">
+  <Copy command={INSTALL_LINE} />
+  <ul>
+    <li>Claude Code: installs the hope, hold and hunch plugins and sets the <code>hold:Plain</code> output style.</li>
+    <li>Other agents: copies the skill files for them.</li>
+    <li>Run it again to update.</li>
+  </ul>
+</section>
+
+<div class="front runs">
+  <WhatThisRuns />
+</div>
+
+<div class="front then not-content">
+  <p>Then:</p>
+  <Copy command={FIRST_COMMAND} />
+</div>

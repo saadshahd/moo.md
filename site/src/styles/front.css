@@ -1,0 +1,90 @@
+/* The front page (index.mdx): seven sections down one column, in the site's
+   type and tones (identity.css). Each section is a block with the class
+   front; the space between two is one section gap. */
+:root:has(.front) {
+  --front-gap: clamp(4rem, 2.5rem + 6vw, 7.5rem);
+  --front-card-pad: clamp(1.25rem, 0.9rem + 1.5vw, 2rem);
+  /* The session's heading and line stand above its demo; the demo gives up
+     their height, so the three fit one screen (chrome.css). */
+  --front-session-head: 7rem;
+}
+.front { margin-top: var(--front-gap); color: var(--moo-ink); }
+.front :is(h2, p, ul, li, table) { margin: 0; padding: 0; }
+ul.front { padding: 0; }
+:is(ul.front, .front ul) { list-style: none; }
+.front h2 { font: 600 clamp(1.75rem, 1.3rem + 2.2vw, 3rem) / 1.05 var(--moo-heading); letter-spacing: -0.03em; text-wrap: balance; }
+.front .lead { margin-top: 0.75rem; max-width: 40ch; font-size: var(--sl-text-xl); line-height: 1.45; }
+.front code { font-family: var(--__sl-font-mono); font-size: 0.875em; background: none; padding: 0; }
+.front a:has(> code) { color: var(--sl-color-text-accent); text-underline-offset: 0.2em; }
+
+/* The slip: the band the bar sits on runs down through it, edge to edge. */
+:root:has(.front.slip) .main-frame main .content-panel + .content-panel { padding-top: 0; }
+.front.slip {
+  margin-top: 0; padding-block: clamp(2.5rem, 1.5rem + 5vw, 5.5rem);
+  background: var(--moo-band); box-shadow: 0 0 0 100vmax var(--moo-band); clip-path: inset(0 -100vmax);
+}
+.front.slip h2 { max-width: 16ch; font-size: clamp(2.5rem, 1.2rem + 5vw, 5.5rem); line-height: 0.95; letter-spacing: -0.04em; }
+.front.slip .lead { margin-top: 1.5rem; }
+.front.slip p:not(.lead, .actions) { margin-top: 1rem; max-width: 52ch; line-height: 1.5; }
+.front .quiet { color: var(--sl-color-gray-3); }
+.front .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+.moo-action.second, .moo-action.second:hover { background: var(--moo-surface); color: var(--moo-ink); }
+.moo-action.second:hover { background: var(--moo-paper); }
+.front .moo-action:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+
+/* Three traps side by side, each under a block in the demo's moo-off amber. */
+.front.traps ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1.5rem 2rem; margin-top: 2.5rem; }
+.front.traps li { font: 600 1.375rem / 1.2 var(--moo-heading); letter-spacing: -0.02em; text-wrap: balance; }
+.front.traps li::before { content: ""; display: block; width: 0.6rem; height: 1.15rem; margin-bottom: 0.9rem; background: var(--moo-off); }
+
+/* One guard each: a table on a surface, its rows parted by the page's tone. */
+.front.guards {
+  display: table; width: 100%; margin-top: 2.5rem; border-collapse: separate; border-spacing: 0;
+  background: var(--moo-surface); border-radius: var(--moo-menu-radius); overflow: hidden;
+}
+.front.guards :is(th, td) { padding: 1rem var(--front-card-pad); border: 0; text-align: start; vertical-align: baseline; line-height: 1.4; background: none; }
+.front.guards thead th { padding-block: 1.25rem 0.5rem; font: 500 0.75rem / 1.2 var(--__sl-font); letter-spacing: 0.04em; text-transform: uppercase; color: var(--sl-color-gray-3); }
+.front.guards tbody th { font-weight: 600; }
+.front.guards tbody tr + tr :is(th, td) { box-shadow: inset 0 2px 0 var(--moo-paper); }
+.front.guards tbody tr:last-child :is(th, td) { padding-bottom: 1.25rem; }
+@media (max-width: 40rem) {
+  .front.guards, .front.guards :is(tbody, tr, th, td) { display: block; }
+  .front.guards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .front.guards tbody tr { padding-block: 1rem; }
+  .front.guards tbody :is(th, td) { padding-block: 0.15rem; box-shadow: none; }
+  .front.guards tbody tr + tr { box-shadow: inset 0 2px 0 var(--moo-paper); }
+  .front.guards tbody tr + tr :is(th, td) { box-shadow: none; }
+  .front.guards tbody tr:last-child :is(th, td) { padding-bottom: 0.15rem; }
+}
+
+/* The parts: hope across the column, the other four two by two under it. */
+.front.parts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+@media (max-width: 50rem) { .front.parts { grid-template-columns: minmax(0, 1fr); } }
+.front .part { padding: var(--front-card-pad); background: var(--moo-surface); border-radius: var(--moo-menu-radius); }
+.front .part h2 { font-size: 1.375rem; line-height: 1.2; letter-spacing: -0.02em; }
+.front .part p { margin-top: 0.75rem; max-width: 60ch; line-height: 1.5; }
+.front .part .skills { font: 400 0.875rem / 1.4 var(--__sl-font-mono); color: var(--sl-color-gray-3); }
+.front .part.hope { grid-column: 1 / -1; }
+.front .part.hope h2 { font-size: clamp(1.5rem, 1.2rem + 1.4vw, 2.25rem); line-height: 1.1; letter-spacing: -0.03em; }
+.front .part.hope p { font-size: var(--sl-text-lg); }
+/* Each move's row is padded for its hover tone; the rows' text lines up with
+   the card's. */
+.front .part.hope .groups { margin: 1.5rem calc(-1 * var(--moo-row-pad)) calc(-0.5 * var(--moo-row-pad)); }
+
+/* What you keep: four outcomes in a row, two by two, or one under another. */
+.front.keep { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 2rem; }
+.front.keep li { line-height: 1.5; color: var(--sl-color-gray-2); }
+.front.keep strong { display: block; margin-bottom: 0.4rem; font: 600 1.375rem / 1.2 var(--moo-heading); letter-spacing: -0.02em; color: var(--moo-ink); }
+.front.keep li::before { content: ""; display: block; width: 0.6rem; height: 1.15rem; margin-bottom: 0.9rem; background: var(--moo-accent); }
+
+/* See a session: the heading, its line, then the page's one demo. A jump to
+   the heading stops 1.5rem under the bar (Starlight's scroll padding). */
+:root:has(.front.session) { --moo-demo-h: calc(100dvh - var(--sl-nav-height) - 3 * var(--moo-step) - 2rem - var(--front-session-head) - 1.5rem); }
+.front.session { min-height: calc(var(--front-session-head) - 1rem); margin-bottom: 1rem; }
+
+/* Install: the one line, what it does, what it runs, and what to type next. */
+.front:is(.install, .runs, .then) { max-width: 46rem; }
+.front.install ul { display: grid; gap: 0.4rem; margin-top: 1.25rem; line-height: 1.5; }
+.front:is(.runs, .then) { margin-top: 1.5rem; }
+.front.then { padding-bottom: var(--front-gap); }
+.front.then p { color: var(--sl-color-gray-3); }

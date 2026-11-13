@@ -1,26 +1,25 @@
 ---
 title: Install
-description: Install hope and hold, set the hold:Plain output style, and add hunch if you want it. In Claude Code, or as skill files for other agents.
+description: Install hope, hold and hunch, and set the hold:Plain output style. In Claude Code, or as skill files for other agents.
 tableOfContents: false
 ---
 import Copy from "../../components/Copy.astro";
+import WhatThisRuns from "../../components/WhatThisRuns.mdx";
+import { FIRST_COMMAND, INSTALL_LINE } from "../../install";
 
 <div class="ways not-content">
   <section>
-    <h2>Claude Code</h2>
-    <p>A plugin from the moo.md marketplace. Each moo.md release updates it.</p>
-    <Copy command="/plugin marketplace add saadshahd/moo.md" />
-    <Copy command="/plugin install hope@moo.md" />
-    <Copy command="/plugin install hold@moo.md" />
-    <p>Load the new plugins, then switch the output style to hold:Plain.</p>
-    <Copy command="/reload-plugins" />
-    <Copy command="/output-style hold:Plain" />
-    <p class="optional">Optional: the demos were recorded with hunch's tend on.</p>
-    <Copy command="/plugin install hunch@moo.md" />
+    <h2>One line</h2>
+    <p>Paste it in a terminal. Run it again to update.</p>
+    <Copy command={INSTALL_LINE} />
+    <p class="optional">Then, in Claude Code. A session already open needs /reload-plugins first.</p>
+    <Copy command={FIRST_COMMAND} />
   </section>
   <section>
-    <h2>Other agents</h2>
-    <p>Skill files copied into your project, yours to edit. Take every hope skill: they call each other by name. /hope:compose arrives as /compose.</p>
-    <Copy command="npx skills@latest add saadshahd/moo.md" />
+    <h2>What you get</h2>
+    <p><strong>Claude Code:</strong> the hope, hold and hunch plugins, and the hold:Plain output style.</p>
+    <p><strong>Other agents:</strong> the same skills as files in ~/.agents/skills, yours to edit. /hope:compose arrives as /compose.</p>
   </section>
 </div>
+
+<WhatThisRuns />

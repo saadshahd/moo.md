@@ -1,0 +1,36 @@
+import { Code } from "@astrojs/starlight/components";
+import {
+  INSTALL_SCRIPT_URL,
+  MARKETPLACE_UPDATE,
+  OUTPUT_STYLE_SETTING,
+  PLUGINS,
+  SKILL_PICKER,
+  pluginInstall,
+  pluginUpdate,
+  skillFiles,
+} from "../install";
+
+<details>
+<summary>What this runs</summary>
+
+<a href={INSTALL_SCRIPT_URL}>install.sh</a> runs these and nothing else. Run them yourself if you won't pipe a script.
+
+When the `claude` command is on your machine:
+
+<Code lang="sh" code={[...PLUGINS.map(pluginInstall), MARKETPLACE_UPDATE, ...PLUGINS.map(pluginUpdate)].join("\n")} />
+
+Then it sets one key in `~/.claude/settings.json` and keeps the rest:
+
+<Code lang="json" code={OUTPUT_STYLE_SETTING} />
+
+When your home folder holds `.codex`, `.cursor`, `.copilot`, `.gemini` or `.config/opencode`:
+
+<Code lang="sh" code={PLUGINS.map(skillFiles).join("\n")} />
+
+The files land in `~/.agents/skills`, which Claude Code does not read. Running the line again replaces them, your edits included.
+
+For an agent that reads its own folder, such as Windsurf or Goose, pick the skills and the agent yourself:
+
+<Code lang="sh" code={SKILL_PICKER} />
+
+</details>

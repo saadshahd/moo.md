@@ -1,0 +1,36 @@
+---
+title: sound
+move: code taste as installable rules
+description: "Your repo gets only the code rules its own code calls for, as files you own."
+tableOfContents: false
+---
+import Copy from "../../../components/Copy.astro";
+import { RELOAD_PLUGINS, pluginInstall, skillFiles } from "../../../install";
+
+sound reads your repo's stack and proposes only the rules your code shows a surface for. Each proposal names the file that earns it. The rules you confirm land as plain files in `.claude/sound/`, yours to edit.
+
+## Skills
+
+| Command | What it does |
+| --- | --- |
+| `/sound:setup` | reads your stack, proposes rules with their evidence, installs the ones you confirm |
+| `/sound:prime` | has Claude read the rules for the code it is about to change |
+| `/sound:review` | checks a staged diff or a commit range against your rules |
+
+Run `/sound:setup` again after your stack changes. It reconciles with the rules you already have.
+
+## Install
+
+In a terminal:
+
+<Copy command={pluginInstall("sound")} />
+
+Then, in Claude Code:
+
+<Copy command={RELOAD_PLUGINS} />
+
+Then run `/sound:setup` in your repo.
+
+For other agents, copy the skill files. `/sound:review` arrives as `/review`.
+
+<Copy command={skillFiles("sound")} />

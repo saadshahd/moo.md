@@ -79,10 +79,13 @@ const id = `${at}-group`;
   .groups a { padding-block: 0.55rem; }
   /* Stacked: as many columns as fit one command, /interrogate, the longest. */
   .groups.stack { grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 1rem 0.5rem; }
+  /* Stacked groups whose moves show their lines: as many columns as fit the
+     longest row, a move and its line. */
+  .groups.stack:has(.note) { grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); }
   /* On a phone, each line goes under its command, so none wraps. */
   @media (max-width: 27rem) {
-    .commands.stack:has(.note) { grid-template-columns: max-content; }
-    .commands.stack:has(.note) a { row-gap: 0.2rem; }
-    .commands.stack:has(.note) .note { grid-column: 1; }
+    :is(.commands.stack, .groups.stack .commands):has(.note) { grid-template-columns: max-content; }
+    :is(.commands.stack, .groups.stack .commands):has(.note) a { row-gap: 0.2rem; }
+    :is(.commands.stack, .groups.stack .commands):has(.note) .note { grid-column: 1; }
   }
 </style>

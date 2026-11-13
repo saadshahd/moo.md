@@ -1,0 +1,36 @@
+---
+title: hum
+move: unwatched work you still decide
+description: "Agents work through your repo's work items while you are away, and only what nothing else settles comes back to you."
+tableOfContents: false
+---
+import Copy from "../../../components/Copy.astro";
+import { RELOAD_PLUGINS, pluginInstall } from "../../../install";
+
+hum turns work items into Claude Code runs, on your Mac or in CI.
+
+- The repo's own checks decide what they can.
+- A path's risk level decides who reviews.
+- Only what nothing settles becomes a question to you, in a pane beside Claude Code.
+- hum lists each choice it made alone, and you can undo it.
+- Every commit hum makes uses your own git name and email.
+
+## Skills
+
+| Command | What it does |
+| --- | --- |
+| `/hum:hum` | sets hum up in a repo, or changes how it is set up |
+
+`/hum:hum` reads the repo and proposes every setting. It asks only what you alone hold: where runs happen, which checks a change must pass, what each folder's risk is. It writes `.hum/hum.json` and proves the setup on a scratch copy.
+
+## Install
+
+In a terminal:
+
+<Copy command={pluginInstall("hum")} />
+
+Then, in Claude Code:
+
+<Copy command={RELOAD_PLUGINS} />
+
+Then run `/hum:hum` in your repo. It runs hum's engine, the npm package `@moo.md/hum`, with bun.

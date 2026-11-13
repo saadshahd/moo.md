@@ -8,35 +8,57 @@ One idea runs through every layer: **agents at the pace you think.**
 
 ## Installation (30-second setup)
 
-Two ways in, two philosophies. The **[Claude Code plugin](https://code.claude.com/docs/en/plugins)** installs each layer as a managed bundle that updates when I ship — you subscribe rather than fork. **[skills.sh](https://skills.sh/saadshahd/moo.md)** copies editable skill files into your project, on any agent, so you can make them your own. Pick one — installing both leaves you with every skill twice.
-
 ### 1. Get the skills
 
-<details>
-<summary><strong>Claude Code</strong></summary>
-
 ```bash
-/plugin marketplace add saadshahd/moo.md
-/plugin install hope@moo.md
-/plugin install hold@moo.md
-/reload-plugins
-/output-style hold:Plain
+curl -fsSL https://saadshahd.github.io/moo.md/install.sh | sh
 ```
 
-`hope` is the decision loop, and the reason to be here. `hold` is comprehension at your own pace, and its `hold:Plain` output style keeps replies short. More layers ship from the same marketplace: `sound@moo.md`, code taste as installable rules, and `hunch@moo.md`, experiments that graduate or die.
+One line works out what your machine has. Run it again to update.
+
+- **Claude Code** gets the `hope`, `hold` and `hunch` [plugins](https://code.claude.com/docs/en/plugins), managed bundles that update when I ship, and the `hold:Plain` output style. A session already open needs `/reload-plugins`.
+- **Codex, Cursor, Copilot, Gemini CLI and opencode** get the same skills as files in `~/.agents/skills`, copied by [skills.sh](https://skills.sh/saadshahd/moo.md) and yours to edit.
+- **Both on one machine** get both. Claude Code does not read `~/.agents`, so no skill lands twice.
+
+<details>
+<summary><strong>Claude Code: what this runs</strong></summary>
+
+```bash
+claude plugin install hope --marketplace saadshahd/moo.md --scope user
+claude plugin install hold --marketplace saadshahd/moo.md --scope user
+claude plugin install hunch --marketplace saadshahd/moo.md --scope user
+claude plugin marketplace update moo.md
+claude plugin update hope@moo.md
+claude plugin update hold@moo.md
+claude plugin update hunch@moo.md
+```
+
+Then it sets `"outputStyle": "hold:Plain"` in `~/.claude/settings.json` and keeps every other key.
+
+`hope` is the decision loop, and the reason to be here. `hold` is comprehension at your own pace, and its `hold:Plain` output style keeps replies short. `hunch` is experiments that graduate or die. One more layer ships from the same marketplace: `sound@moo.md`, code taste as installable rules.
 
 </details>
 
 <details>
-<summary><strong>Codex, Cursor, Copilot, and other agents</strong></summary>
+<summary><strong>Codex, Cursor, Copilot, and other agents: what this runs</strong></summary>
+
+When your home folder holds `.codex`, `.cursor`, `.copilot`, `.gemini` or `.config/opencode`:
+
+```bash
+npx --yes skills@latest add saadshahd/moo.md/hope --global --agent universal --skill '*' --yes
+npx --yes skills@latest add saadshahd/moo.md/hold --global --agent universal --skill '*' --yes
+npx --yes skills@latest add saadshahd/moo.md/hunch --global --agent universal --skill '*' --yes
+```
+
+`hope` and `hold` arrive whole: their skills call each other by name, and a missing one stops the skill that called it.
+
+They land as ordinary files you own — flat, and without the plugin prefix, so `hope:intent` arrives as `intent` and `hold:grasp` as `grasp`. Watch for collisions with skills you already have. Running the line again replaces them, your edits included.
+
+For an agent that reads its own folder, such as Windsurf or Goose, or to add `sound`, pick the skills and the agents yourself:
 
 ```bash
 npx skills@latest add saadshahd/moo.md
 ```
-
-Pick the skills you want and the agents to install them on — but take `hope` and `hold` whole if you take them at all: their skills call each other by name, and a missing one stops the skill that called it. `sound` and `hunch` have no such requirement.
-
-They land as ordinary files you own — flat, and without the plugin prefix, so `hope:intent` arrives as `intent` and `sound:review` as `review`. Watch for collisions with skills you already have.
 
 </details>
 

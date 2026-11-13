@@ -1,0 +1,45 @@
+---
+title: hunch
+move: experiments that graduate or die
+description: "You try moo's experiments early. Each one graduates or dies."
+tableOfContents: false
+---
+import Copy from "../../../components/Copy.astro";
+import { RELOAD_PLUGINS, pluginInstall, skillFiles } from "../../../install";
+import { href } from "../../../link";
+
+hunch holds skills and features tried here before they earn a place in hope or sound. An experiment enters with a rough skill and a note that says what better looks like, when it graduates and what kills it. At every release each one graduates, stays with a stated reason, or dies. Expect this list to change.
+
+## Skills
+
+| Command | What it does |
+| --- | --- |
+| `/hunch:complain` | says what the agent would change and kept to itself |
+| `/hunch:cross-check` | has the agents behind rival answers check each other, then picks on the evidence |
+| `/hunch:dream` | checks the project's memory notes against the repo and fixes the ones that went false |
+| `/hunch:fly` | carries one thought across several agents until you have accounted for every detail |
+| `/hunch:harvest` | reports where a session fell short of moo's standard, as issues a builder can act on |
+| `/hunch:smooth` | counts what slowed the agents down and leaves one fix on a branch you keep or drop |
+
+## Features
+
+These run without a command once hunch is installed.
+
+| Feature | What it does |
+| --- | --- |
+| tend | keeps the session's open questions and Claude's suggestions one click away, above the prompt |
+| short replies | redraws a long reply short once its turn ends; `/long` shows it at full length |
+
+## Install
+
+<a href={href("install")}>Install</a> sets up hope, hold and hunch together. To add hunch alone, in a terminal:
+
+<Copy command={pluginInstall("hunch")} />
+
+Then, in Claude Code:
+
+<Copy command={RELOAD_PLUGINS} />
+
+For other agents, copy the skill files. The features need Claude Code.
+
+<Copy command={skillFiles("hunch")} />

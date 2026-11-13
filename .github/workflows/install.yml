@@ -1,0 +1,38 @@
+# Runs the install page's one line in a clean room, against the deployed
+# install.sh, on every release. Every push to main is a release: the line
+# installs the plugins from main. A push that changes site/ redeploys
+# install.sh, so the check also runs after each site deploy.
+name: install
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["site/**"]
+  workflow_run:
+    workflows: [site]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm install --global @anthropic-ai/claude-code
+      - run: sh site/tools/check-install.sh
