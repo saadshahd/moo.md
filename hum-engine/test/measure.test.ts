@@ -88,7 +88,7 @@ test("a change merged through a pull request after the worker moved on ends its 
 	const state = freshState();
 	const finished: string[] = [];
 
-	state.landings.put("a", { item: "a", branch: "hum/a", since: 1, change: { paths: ["ui/a.ts"], size: 3, loosened: false, pinChanged: false }, head: "sha-a", ownerApproved: false });
+	state.landings.put("a", { item: "a", branch: "hum/a", since: 1, change: { paths: ["ui/a.ts"], size: 3, loosened: false, pinChanged: false }, head: "sha-a" });
 	await settleMergedPulls(state, pull("OPEN", finished), 9);
 	expect(state.merges.list()).toEqual([]);
 	expect(finished).toEqual([]);

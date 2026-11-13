@@ -279,10 +279,10 @@ const patchOf = async (ctx: Pick<LandContext, "git" | "base" | "dir" | "id">): P
  * Marks the item done on the run branch where it holds the item's file, pushes the branch and saves what its diff
  * showed, so a retry lands it without a run. The saved head is the change before hum's done mark; a push GitHub signed
  * rebuilt the change as its own commit, which is then the head, and a verdict on the old commit holds for its tree.
- * `ownerApproved` records that the owner approved this change in its review state. The same change saved again, as
- * after a rebase, keeps when it was first saved, so the owner's answers since then still count.
+ * The same change saved again, as after a rebase, keeps when it was first saved, so the owner's answers since then
+ * still count; a new change starts the count afresh.
  */
-export const prepareLanding = async (ctx: LandContext, { ownerApproved = false }: { readonly ownerApproved?: boolean } = {}): Promise<PushOutcome> => {
+export const prepareLanding = async (ctx: LandContext): Promise<PushOutcome> => {
 	const { git, id, branch, state, now } = ctx;
 	const change = await changeOn(ctx);
 	const built = (await git.raw(["rev-parse", "HEAD"])).trim();
@@ -300,7 +300,7 @@ export const prepareLanding = async (ctx: LandContext, { ownerApproved = false }
 
 	if (head !== built && verdict?.head === built) state.verdicts.put(id, { ...verdict, head });
 
-	state.landings.put(id, { item: id, branch, since: kept?.since ?? now(), change, head, ownerApproved: ownerApproved || kept?.ownerApproved === true, lostRaces: kept?.lostRaces ?? 0, alignment: kept?.alignment, patch });
+	state.landings.put(id, { item: id, branch, since: kept?.since ?? now(), change, head, lostRaces: kept?.lostRaces ?? 0, alignment: kept?.alignment, patch });
 
 	return pushed;
 };
@@ -477,6 +477,7 @@ const landBy = async (
 /**
  * Lands a change saved by `prepareLanding`, by its level under the policy as it stands now: an answered level
  * becomes a path rule first, an unclear change asks once, and the target branch's rules pick a push or a pull request.
+ * The owner's approval counts only when they gave it after this change was saved, so no earlier answer approves it.
  */
 export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const saved = ctx.state.landings.get(ctx.id);
@@ -511,7 +512,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	const verdict = reviewed?.verdict;
 	const route = routeWith(verdict);
-	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: saved.ownerApproved || pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
+	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 

@@ -261,6 +261,9 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (asking && answered === undefined) return { outcome: "waiting", item: id };
 
+	// The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands.
+	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
+
 	return { item, kindName, kind, judge, onSnapshot, asking, answered };
 };
 
@@ -305,8 +308,8 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 			const outbox = new Outbox(id);
 			const driven: Driven = { ...o, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh, outbox };
 
-			// A change already finished lands again from its pushed branch; no run is spent on it.
-			const worked = landing ? await landAgain(driven) : await drive(driven);
+			// A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait.
+			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
 			const published = await (o.publish ?? publishInProcess(o, judge, gathered))({ item: id, intents: outbox.drain(), bundle: await bundleOf(git, { branch, item: id, gathered, folder: evidence }) }, worked);
 			const result = park(o, published ?? worked);
 
@@ -419,7 +422,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	let cause = "";
 	let handled = "";
 	let pending: Pending | undefined;
-	let approvedByOwner = false;
 	let actor: AnyActor;
 
 	const stuckCause = (): string | undefined => cause || lastFailure.slice(0, CARD_EXCERPT) || undefined;
@@ -673,12 +675,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (isWaitingOnOwner(kind, value)) {
 			const note = pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" };
 
-			const stopped = await handOff(d, isApprovalWait(kind, value) ? approvalQuestion(note) : note);
+			const approval = isApprovalWait(kind, value);
+			const stopped = await handOff(d, approval ? approvalQuestion(note) : note, { approval });
 
 			return result.resolve(stopped ?? { outcome: "asked", item: id, detail: note.question.text });
 		}
 
-		if (value === "merging") return result.resolve(await merge(d, { ownerApproved: approvedByOwner }));
+		if (value === "merging") return result.resolve(await merge(d));
 	};
 
 	actor.subscribe((snapshot) => {
@@ -699,8 +702,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	if (d.answered && d.resume) {
 		const resume = resumeEvent(actor.getSnapshot(), d.answered);
-
-		approvedByOwner = resume === OWNER_APPROVED;
 
 		if (resume === OWNER_REJECTED) lastFailure = d.answered.answer;
 
@@ -911,7 +912,7 @@ const split = async (d: Driven, parts: readonly string[]): Promise<ThinResult> =
 
 	for (const title of parts) await writes.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}` });
 
-	return merge(d, {});
+	return merge(d);
 };
 
 /** The owner-review wait asks for the change's approval, whatever the review run wrote. */
@@ -921,12 +922,17 @@ const approvalQuestion = ({ question, plan }: Pending): Pending => ({
 	plan,
 });
 
-/** Hands the work branch and the plan to publish, queues the question for room under the daily cap, and ends. */
-const handOff = async (d: Driven, { question, plain, plan }: Pending): Promise<undefined> => {
+/**
+ * Hands the work branch and the plan to publish, queues the question for room under the daily cap, and ends. At the
+ * owner's approval wait publish saves the change as the item's landing before it asks, so the approval the owner
+ * gives counts for this change alone.
+ */
+const handOff = async (d: Driven, { question, plain, plan }: Pending, { approval }: { readonly approval: boolean }): Promise<undefined> => {
 	const { state, id } = d;
 	const attempt = state.runs.list(id).length;
+	const head = (await d.g(["rev-parse", "HEAD"])).trim();
 
-	d.outbox.add({ kind: "push-branch", head: (await d.g(["rev-parse", "HEAD"])).trim() });
+	d.outbox.add(approval ? { kind: "save-landing", head } : { kind: "push-branch", head });
 
 	if (plan.trim()) await d.outbox.calls({ run: "ask", attempt }).comment(id, `${PLAN_MARK}\n${plan.trim()}`);
 
@@ -948,7 +954,7 @@ const LANDING_HANDED: string = "publish lands the change";
  * there, unless the worker drains. A check item proves its check first. A docs-only item whose change reaches past
  * its globs moves to its real kind first.
  */
-const merge = async (d: Driven, { ownerApproved = false }: { readonly ownerApproved?: boolean }): Promise<ThinResult> => {
+const merge = async (d: Driven): Promise<ThinResult> => {
 	if (d.kindName === d.config.hum.checkKind) {
 		const proof = await proveCheckItem({ state: d.state, config: d.config, git: d.git, item: d.id, base: d.base, checks: d.checks, now: d.now });
 
@@ -963,17 +969,15 @@ const merge = async (d: Driven, { ownerApproved = false }: { readonly ownerAppro
 		return { outcome: "moved", item: d.id, kind: real };
 	}
 
-	return handToPublish(d, ownerApproved);
+	return handToPublish(d);
 };
 
 /** A finished change whose landing did not end: its branch is checked on the base again, and publish lands it. */
-const landAgain = async (d: Driven): Promise<ThinResult> => handToPublish(d, d.state.landings.get(d.id)?.ownerApproved ?? false);
-
-const handToPublish = async (d: Driven, ownerApproved: boolean): Promise<ThinResult> => {
+const handToPublish = async (d: Driven): Promise<ThinResult> => {
 	const head = async () => (await d.g(["rev-parse", "HEAD"])).trim();
 
 	if (d.mayLand?.() === false) {
-		d.outbox.add({ kind: "save-landing", head: await head(), ownerApproved });
+		d.outbox.add({ kind: "save-landing", head: await head() });
 
 		return { outcome: "held", item: d.id, why: DRAINING };
 	}
@@ -982,7 +986,7 @@ const handToPublish = async (d: Driven, ownerApproved: boolean): Promise<ThinRes
 
 	if (stale) return { outcome: "review", item: d.id, detail: stale };
 
-	d.outbox.add({ kind: "land", head: await head(), ownerApproved });
+	d.outbox.add({ kind: "land", head: await head() });
 
 	return { outcome: "held", item: d.id, why: LANDING_HANDED };
 };

@@ -17,7 +17,7 @@ export const Intent = z.discriminatedUnion("kind", [
 	z.strictObject({ kind: z.literal("file-follow-up"), title: text, body: text }),
 	z.strictObject({ kind: z.literal("push-branch"), head: text }),
 	z.strictObject({ kind: z.literal("keep-evidence") }),
-	...(["land", "save-landing"] as const).map((kind) => z.strictObject({ kind: z.literal(kind), head: text, ownerApproved: z.boolean() })),
+	...(["land", "save-landing"] as const).map((kind) => z.strictObject({ kind: z.literal(kind), head: text })),
 ]);
 
 export type Intent = z.infer<typeof Intent>;

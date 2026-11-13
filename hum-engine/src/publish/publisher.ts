@@ -14,8 +14,7 @@ import { evidenceRef } from "../worker/evidence.ts";
 import { land, type LandContext, prepareLanding, unpushed } from "../worker/land.ts";
 import { releaseQuestions } from "../worker/questions.ts";
 import { pushRunBranch, signsCommits } from "../worker/signed-push.ts";
-import { answerTo, claimTtlMs, runBranch, type ThinResult } from "../worker/thin-path.ts";
-import { OWNER_APPROVAL } from "../decide/merge.ts";
+import { claimTtlMs, runBranch, type ThinResult } from "../worker/thin-path.ts";
 import { type BundleCheck, checkBundle, OUTBOX_REFS } from "./bundle.ts";
 import type { Intent } from "./intents.ts";
 
@@ -158,11 +157,11 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 		return { ref: head, branch };
 	};
 
-	/** Saves the change on the run branch as the item's landing, then goes on with it. The owner approved it only where the thread's latest answer says so. */
-	const landing = (head: string, ownerApproved: boolean, then: (ctx: LandContext) => Promise<ThinResult | undefined>) =>
+	/** Saves the change on the run branch as the item's landing, then goes on with it. */
+	const landing = (head: string, then: (ctx: LandContext) => Promise<ThinResult | undefined>) =>
 		onBranch(git, p, branchAt(head), async (worktree) => {
 			const ctx = landContext(p, item, worktree, branch);
-			const pushed = await prepareLanding(ctx, { ownerApproved: ownerApproved && answerTo(item)?.option === OWNER_APPROVAL });
+			const pushed = await prepareLanding(ctx);
 
 			return pushed.kind === "pushed" ? then(ctx) : unpushed(pass.item, branch, pushed);
 		});
@@ -185,8 +184,8 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 
 			return pushed.kind === "pushed" ? undefined : unpushed(pass.item, branch, pushed);
 		},
-		"save-landing": async ({ head, ownerApproved }) => landing(head, ownerApproved, async () => undefined),
-		land: async ({ head, ownerApproved }) => landing(head, ownerApproved, land),
+		"save-landing": async ({ head }) => landing(head, async () => undefined),
+		land: async ({ head }) => landing(head, land),
 	} satisfies Appliers;
 
 	let result: ThinResult | undefined;

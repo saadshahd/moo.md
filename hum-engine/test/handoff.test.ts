@@ -18,7 +18,7 @@ test("publish takes a work job's runs and a machine state a pass can reach, and 
 
 	work.items.save("a", feature, { status: "active", value: "checking", context: {} });
 	work.runs.begin({ itemId: "a", run: "build", attempt: 0 }, { name: "a build" });
-	work.landings.put("a", { item: "a", branch: "hum/run/a", since: 0, change: { paths: [], size: 0, loosened: false, pinChanged: false }, head: "abc", ownerApproved: true });
+	work.landings.put("a", { item: "a", branch: "hum/run/a", since: 0, change: { paths: [], size: 0, loosened: false, pinChanged: false }, head: "abc" });
 	work.verdicts.put("a", { item: "a", head: "abc", event: "approve", reason: "forged", cites: [], models: ["m"] });
 
 	expect(takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false })).toBeUndefined();

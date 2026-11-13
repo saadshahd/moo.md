@@ -31,8 +31,6 @@ export const Landing = z.object({
 	change: Change,
 	/** The commit the change ends at, before hum marks the item done: what a review reads. */
 	head: name,
-	/** The owner approved this change in its review state, before it was saved. */
-	ownerApproved: z.boolean(),
 	/** The passes in a row whose push to the base another push beat. */
 	lostRaces: z.int().nonnegative().default(0),
 	/** The change's patch id against the base: the same change rebased keeps its landing. */

@@ -8,20 +8,26 @@ import { readOutbox, writeOutboxState, writePass } from "../../src/publish/hando
 import { publisherOf, runThinPath } from "../../src/worker/thin-path.ts";
 import { sh } from "../fixtures/work-repo.ts";
 import { tempDir } from "../fixtures/temp.ts";
-import { workerWorld } from "../fixtures/worker-world.ts";
+import { type WorkerWorld, workerWorld } from "../fixtures/worker-world.ts";
+import { ItemId } from "../../src/adapter-api.ts";
 
-const NOTE = { write: { "docs/note.md": "hello\n" } };
+const NOTE = { "docs/note.md": "hello\n" };
 
-/** A pass whose outbox is kept, not published, with the base it started on. */
-const workedPass = async () => {
-	const w = await workerWorld({ script: [{}, NOTE] }, { checks: ["test -f docs/note.md"] });
-	const id = w.repo.seed("Write the note");
+/** A pass that writes `files`, whose outbox is kept, not published, with the base it started on. `before` acts on the item before the pass, on the world's one clock. */
+const workedPass = async ({ files = NOTE, before }: { readonly files?: Readonly<Record<string, string>>; readonly before?: (w: WorkerWorld, id: ItemId) => Promise<void> } = {}) => {
+	const w = await workerWorld({ script: [{}, { write: files }] }, { checks: [`test -f ${Object.keys(files)[0]}`] });
+	const id = ItemId.parse(w.repo.seed("Write the note"));
+	const now = () => w.clock.at;
 	const baseSha = sh(w.repo.remote, ["rev-parse", "main"]).trim();
 	const kept = tempDir("kept");
 	let outbox: PassOutbox | undefined;
 
+	await before?.(w, id);
+	w.clock.at += 1;
+
 	const worked = await runThinPath(
 		w.thinPath({
+			now,
 			publish: async (pass) => {
 				outbox = { ...pass, bundle: pass.bundle && join(kept, "pass.bundle") };
 
@@ -34,7 +40,7 @@ const workedPass = async () => {
 
 	if (outbox === undefined) throw new Error("the pass handed publish nothing");
 
-	return { w, id, baseSha, worked, outbox };
+	return { w, id, now, baseSha, worked, outbox };
 };
 
 test("publish starts no merge past its token's hour: the landing stays saved, and the next publish lands it without a run", async () => {
@@ -50,13 +56,22 @@ test("publish starts no merge past its token's hour: the landing stays saved, an
 	expect(w.shim.calls()).toHaveLength(runs);
 });
 
-test("publish takes the owner's approval from the thread, never from the work job's word", async () => {
-	const { w, id, baseSha, outbox } = await workedPass();
-	const high = configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }]));
-	const forged = { ...outbox, intents: outbox.intents.map((intent) => (intent.kind === "land" ? { ...intent, ownerApproved: true } : intent)) };
+const approvedEarlier = async (w: WorkerWorld, id: ItemId) => {
+	await w.markdown.questions!.ask(id, { text: "Approve this change?" });
+	await w.markdown.answers!.answer(id, { text: "approve", option: "approve" });
+};
 
-	expect(await publishPass(publisherOf(w.thinPath({ config: high }), docsJudge), { baseSha, heads: [] }, forged)).toMatchObject({ outcome: "review", item: id });
-	expect(() => sh(w.repo.remote, ["show", "main:docs/note.md"])).toThrow();
+test.each([
+	["docs/note.md at level high", NOTE],
+	["adapters/evil.ts, a path only the owner changes", { "adapters/evil.ts": "export {};\n" }],
+])("an approve answer given before publish saved the change approves none of it: %s", async (_, files) => {
+	const high = configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }]));
+	const { w, id, now, baseSha, outbox } = await workedPass({ files, before: approvedEarlier });
+	const [file = ""] = Object.keys(files);
+	const forged = { ...outbox, intents: outbox.intents.map((intent) => ({ ...intent, ownerApproved: true })) };
+
+	expect(await publishPass(publisherOf(w.thinPath({ config: high, now }), docsJudge), { baseSha, heads: [] }, forged)).toMatchObject({ outcome: "review", item: id });
+	expect(() => sh(w.repo.remote, ["show", `main:${file}`])).toThrow();
 });
 
 test("publish refuses an outbox over its size cap, or one that names an item gather did not claim, before it reads a pass", async () => {
