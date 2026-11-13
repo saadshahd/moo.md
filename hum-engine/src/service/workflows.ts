@@ -171,12 +171,22 @@ const GATHERED = "${{ needs.gather.outputs.gathered }}";
 
 const GATHERED_BASE = "${{ fromJSON(needs.gather.outputs.gathered).baseSha }}";
 
-/** hum at this engine's own version from npm, which checks the package against the registry's integrity; the jobs that hold GitHub's token run this hum and none of the repo's code. */
+/** hum at this engine's own version from npm, which checks the package against the registry's integrity and installs each dependency at the version and hash its shrinkwrap pins; the jobs that hold GitHub's token run this hum and none of the repo's code. */
 const PUBLISHED_HUM = `@moo.md/hum@${ENGINE_VERSION}`;
 
-const TOOLS = `bun@${BUN_VERSION} @anthropic-ai/claude-code@${CLAUDE_FLOOR}`;
+/** The tools every job installs at exact versions, each with the one install script that fetches its native binary. */
+const TOOLS = [
+	{ spec: `bun@${BUN_VERSION}`, folder: "bun", script: "install.js" },
+	{ spec: `@anthropic-ai/claude-code@${CLAUDE_FLOOR}`, folder: "@anthropic-ai/claude-code", script: "install.cjs" },
+] as const;
 
-const installTools = (extra = "") => ({ run: `npm install --global --prefix "${JOB_TOOLS}" ${TOOLS}${extra}` });
+/**
+ * Installs the tools, and `extra` packages, with no package's install script, so no dependency of theirs runs code at
+ * install; then the tools' own scripts alone fetch their native binaries.
+ */
+const installTools = (extra = "") => ({
+	run: [`npm install --global --prefix "${JOB_TOOLS}" --ignore-scripts ${TOOLS.map(({ spec }) => spec).join(" ")}${extra}`, ...TOOLS.map(({ folder, script }) => `(cd "${JOB_TOOLS}/lib/node_modules/${folder}" && node ${script})`)].join("\n"),
+});
 
 /** Git in a job container trusts the checkout the runner's user owns; the global config is the job's own file. */
 const SAFE_CHECKOUT = { run: 'git config --global --add safe.directory "$GITHUB_WORKSPACE"\n' } as const;

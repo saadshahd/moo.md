@@ -301,8 +301,11 @@ test("the checkout keeps no token in the workspace; the jobs that hold GitHub's 
 	for (const { steps } of Object.values(wakeOf(settings).jobs)) expect(steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with).toMatchObject({ "fetch-depth": 0, "persist-credentials": false });
 
 	for (const { steps } of tokenJobs(settings)) {
-		expect(steps.find(({ run }) => run?.startsWith("npm install"))?.run).toEndWith(` @moo.md/hum@${ENGINE_VERSION}`);
-		expect(steps.filter(({ run }) => run?.includes("bun install") || run?.includes("node_modules"))).toEqual([]);
+		const [install = ""] = steps.find(({ run }) => run?.startsWith("npm install"))?.run?.split("\n") ?? [];
+
+		expect(install).toContain(" --ignore-scripts ");
+		expect(install).toEndWith(` @moo.md/hum@${ENGINE_VERSION}`);
+		expect(steps.filter(({ run }) => run?.includes("bun install") || run?.includes("./node_modules"))).toEqual([]);
 		expect(steps.filter(({ run }) => run?.includes("plugins"))).toEqual([]);
 	}
 

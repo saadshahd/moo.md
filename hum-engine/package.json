@@ -30,7 +30,8 @@
     "evals",
     "scripts/eval.ts",
     "surface.json",
-    "release.json"
+    "release.json",
+    "npm-shrinkwrap.json"
   ],
   "scripts": {
     "typecheck": "test -d ../hum/node_modules || { echo \"hum-engine: the view tests import hum/mod, whose types come from hum's packages; run bun install in hum first\" >&2; exit 1; }; tsc --noEmit",
@@ -40,6 +41,7 @@
     "release:surface": "bun tools/release/main.ts surface",
     "release:commit": "bun tools/release/main.ts commit",
     "lint": "oxlint src test tools/release",
+    "shrinkwrap": "d=$(mktemp -d) && cp package.json \"$d\" && (cd \"$d\" && npm install --package-lock-only --ignore-scripts --silent && npm shrinkwrap --silent) && cp \"$d/npm-shrinkwrap.json\" . && rm -rf \"$d\"",
     "test": "n=$(getconf _NPROCESSORS_ONLN); seq 1 $n | xargs -P $n -I{} bun test --shard={}/$n --timeout 30000 test"
   },
   "dependencies": {
