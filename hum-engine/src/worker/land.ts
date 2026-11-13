@@ -13,6 +13,7 @@ import {
 	isAncestor,
 	PATCH,
 	type PushOutcome,
+	readOrAbsent,
 } from "../adapters/git.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
 import { landOwnerCommit } from "../adapters/owner-commit.ts";
@@ -331,9 +332,21 @@ const pushBranchAndBase = async (ctx: LandContext): Promise<PushOutcome> => {
 	return toBranch.kind === "pushed" ? pushBase(ctx) : toBranch;
 };
 
-/** The change is on the base: its item ends at the work source, then the merge is recorded. A failed end leaves the landing saved, so the next pass ends it again. */
-const finish = async ({ state, git, id, item, workSource, now }: LandContext): Promise<ThinResult> => {
-	await workSource.finish(item.id);
+/** Whether the change holds the item's file marked done, so the merge itself took the item off the ready list. */
+const endedByChange = async ({ git, dir, id }: LandContext): Promise<boolean> => {
+	const source = await readOrAbsent(git, ["show", `HEAD:${dir}/${id}.md`]);
+
+	return source !== undefined && parseItemFile(source).state === DONE_STATE;
+};
+
+/**
+ * The change is on the base: its item ends at the work source unless the change ended it, then the merge is recorded.
+ * A failed end leaves the landing saved, so the next pass ends it again.
+ */
+const finish = async (ctx: LandContext): Promise<ThinResult> => {
+	const { state, git, id, item, workSource, now } = ctx;
+
+	if (!(await endedByChange(ctx))) await workSource.finish(item.id);
 	recordMerged(state, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
 
 	return { outcome: "merged", item: id };

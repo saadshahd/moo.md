@@ -31,11 +31,16 @@ type Failure =
 /** GraphQL errors about the request itself; any other, such as a timeout GitHub reports, may pass on a retry. */
 const PERMANENT_GRAPHQL_ERRORS: ReadonlySet<string> = new Set(["NOT_FOUND", "FORBIDDEN", "UNPROCESSABLE"]);
 
+/** REST's words when another writer moved or made the ref first. */
+const RACED = /not a fast.forward|already exists/i;
+
 const isRateLimited = (error: RequestError): boolean => error.status === 429 || (error.status === 403 && error.response?.headers["x-ratelimit-remaining"] === "0");
 
 export const failureOf = (cause: unknown): Failure => {
 	if (cause instanceof RequestError) {
 		if (cause.status === NOT_MODIFIED) return { kind: "not-modified" };
+
+		if (RACED.test(cause.message)) return { kind: "lost-race" };
 
 		return cause.status >= 400 && cause.status < 500 && !isRateLimited(cause) ? { kind: "permanent", message: cause.message } : { kind: "transient" };
 	}
@@ -99,4 +104,14 @@ export const gitHubClient = ({ token, baseUrl, fetch = globalThis.fetch, spaced 
 	});
 
 /** The client on the owner's own login, made once per process and `timeoutMs`, so every reader and writer shares its rate-limit spacing. */
+/** How a repo's client is reached: one given, or the owner's own login, read within `timeoutMs`. */
+export type RepoClientOptions = { readonly timeoutMs: number } & ({ readonly client: () => Promise<GitHubClient> } | { readonly env: Env });
+
+/** The owner and name of `repo` (`owner/name`), and how to reach its client. */
+export const repoClient = (repo: string, options: RepoClientOptions) => {
+	const [owner = "", name = ""] = repo.split("/");
+
+	return { owner, name, connect: "client" in options ? options.client : () => ownerGitHub(options.timeoutMs, options.env) };
+};
+
 export const ownerGitHub = pMemoize(async (timeoutMs: number, env: Env): Promise<GitHubClient> => gitHubClient({ token: await ownerToken(timeoutMs, env), timeoutMs }), { cacheKey: ([timeoutMs]) => timeoutMs });

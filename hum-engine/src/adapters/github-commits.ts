@@ -1,8 +1,7 @@
 import { RequestError } from "@octokit/request-error";
 import { z } from "zod";
-import type { Env } from "../exec.ts";
 import type { PushOutcome } from "./git.ts";
-import { failureOf, type GitHubClient, ownerGitHub } from "./github-client.ts";
+import { failureOf, type RepoClientOptions, repoClient } from "./github-client.ts";
 
 /** A file a commit adds or changes, its bytes in base64, as `createCommitOnBranch` takes it. */
 export type FileAddition = { readonly path: string; readonly contents: string };
@@ -37,12 +36,8 @@ const Ref = z.object({ object: z.object({ sha: z.string() }) });
 
 const NOT_FOUND = 404;
 
-/** REST's words when another writer moved or made the ref first. */
-const RACED = /not a fast.forward|already exists/i;
-
 /** A write's failure as an outcome: another writer first, or the repo's refusal; anything a retry may fix is thrown. */
 const writeFailure = (cause: unknown): Exclude<PushOutcome, { kind: "pushed" }> => {
-	if (cause instanceof RequestError && RACED.test(cause.message)) return { kind: "conflict" };
 
 	const failure = failureOf(cause);
 
@@ -56,9 +51,8 @@ const writeFailure = (cause: unknown): Exclude<PushOutcome, { kind: "pushed" }> 
 const written = <T>(write: Promise<T>): Promise<BranchWrite<T>> => write.then((value) => ({ kind: "done" as const, value }), writeFailure);
 
 /** The branches of `repo` (`owner/name`), on the owner's own login unless a client is given. */
-export const gitHubCommits = (repo: string, options: { readonly timeoutMs: number } & ({ readonly client: () => Promise<GitHubClient> } | { readonly env: Env })): GitHubCommits => {
-	const [owner = "", name = ""] = repo.split("/");
-	const connect = "client" in options ? options.client : () => ownerGitHub(options.timeoutMs, options.env);
+export const gitHubCommits = (repo: string, options: RepoClientOptions): GitHubCommits => {
+	const { owner, name, connect } = repoClient(repo, options);
 	const where = { owner, repo: name };
 
 	return {

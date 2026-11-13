@@ -2,12 +2,13 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type GitIdentity, gitIn, push } from "../adapters/git.ts";
+import { HEARTBEAT_FILE, INBOX_DIR, SLOTS_DIR, STATUS_FILE, STOPS_DIR } from "../state/open.ts";
 
 /** Where a CI wake keeps hum's state for the next one. A ref holds no file, so no branch or checkout changes. */
 export const CI_STATE_REF = "refs/hum/state";
 
 /** The state files a job keeps to itself: what the view and the service unit poll, and what a Mac's hooks and slots leave. */
-const JOB_ONLY = ["status.json", "heartbeat.json", "inbox/", "stops/", "slots/"];
+const JOB_ONLY = [STATUS_FILE, HEARTBEAT_FILE, `${INBOX_DIR}/`, `${STOPS_DIR}/`, `${SLOTS_DIR}/`];
 
 const isJobOnly = (path: string): boolean => JOB_ONLY.some((name) => (name.endsWith("/") ? path.startsWith(name) : path === name));
 

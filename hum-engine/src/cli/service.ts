@@ -13,7 +13,7 @@ import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
 import { installPlugins } from "../service/plugins.ts";
 import { reportCards, wakeUntilQuiet } from "../service/wake.ts";
-import { defaultStateDir, openState } from "../state/open.ts";
+import { defaultStateDir, openState, STATUS_FILE } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { readStatus } from "../status/file.ts";
 import { npmLatest, openWorker } from "../worker/open.ts";
@@ -189,7 +189,7 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 
 			if (flags.event === SCHEDULE_EVENT) await recordCiTick({ repo: io.cwd, remote: "origin", at: Date.now(), identity: worker.config.hum.commitIdentity, timeoutMs });
 
-			const status = readStatus(join(dir, "status.json"));
+			const status = readStatus(join(dir, STATUS_FILE));
 			const cards = status.ok ? status.status.cards : [];
 
 			await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });

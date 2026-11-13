@@ -12,6 +12,13 @@ import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
 import { ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
+/** Names under the state folder that other modules address by name. */
+export const STATUS_FILE = "status.json";
+export const HEARTBEAT_FILE = "heartbeat.json";
+export const INBOX_DIR = "inbox";
+export const STOPS_DIR = "stops";
+export const SLOTS_DIR = "slots";
+
 /** On the Mac and in a clone, state lives in the repo's git common dir, so every worktree shares it. */
 export const defaultStateDir = async (cwd: string): Promise<string> => {
 	const found = await gitIn(cwd, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }).run(["rev-parse", "--git-common-dir"]);
@@ -30,13 +37,13 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 	return {
 		dir,
 		/** The one status file for the repo. */
-		statusPath: join(dir, "status.json"),
+		statusPath: join(dir, STATUS_FILE),
 		/** The worker's heartbeat, one file the service unit reads. */
-		heartbeatPath: join(dir, "heartbeat.json"),
+		heartbeatPath: join(dir, HEARTBEAT_FILE),
 		/** The answer hook drops one file here per posted answer; its content is the item id. */
-		inbox: join(dir, "inbox"),
+		inbox: join(dir, INBOX_DIR),
 		/** A background run's Stop hook drops one file here per stop: the run's session id and transcript path. */
-		stops: join(dir, "stops"),
+		stops: join(dir, STOPS_DIR),
 		faults,
 		items: new Items(join(dir, "items"), faults, now, codec),
 		events: new EventLog(join(dir, "events"), now),
@@ -49,7 +56,7 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		limit: new Records(join(dir, "limit"), Limit),
 		ready: new Records(join(dir, "ready"), ReadyList),
 		/** The run slots, by name. */
-		slots: new Records(join(dir, "slots"), Slot),
+		slots: new Records(join(dir, SLOTS_DIR), Slot),
 		landings: new Records(join(dir, "landings"), Landing),
 		/** Path rules by glob. */
 		learned: new Records(join(dir, "learned"), Learned),

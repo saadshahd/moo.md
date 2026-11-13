@@ -17,9 +17,9 @@ type Signed = { readonly kind: "pushed"; readonly sha: string } | Exclude<PushOu
 /** The bytes of one blob, in base64; git hands them back as written, binary or not. */
 const blobBase64 = async (clone: string, spec: string): Promise<string> => {
 	const proc = Bun.spawn(["git", "cat-file", "blob", spec], { cwd: clone, stdout: "pipe", stderr: "pipe" });
-	const [bytes, code] = await Promise.all([new Response(proc.stdout).arrayBuffer(), proc.exited]);
+	const [bytes, said, code] = await Promise.all([new Response(proc.stdout).arrayBuffer(), new Response(proc.stderr).text(), proc.exited]);
 
-	if (code !== 0) throw new Error(`git cat-file blob ${spec} exited ${code}`);
+	if (code !== 0) throw new Error(`git cat-file blob ${spec} exited ${code}: ${said.trim()}`);
 
 	return Buffer.from(bytes).toString("base64");
 };
