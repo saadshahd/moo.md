@@ -7,10 +7,14 @@ import { SECOND_MS } from "./time.ts";
 export type Env = Readonly<Record<string, string | undefined>>;
 
 /** The GitHub tokens hum pushes and calls GitHub with. A comment can steer a run, and a run writes the code the checks run, so neither holds one. */
-const GITHUB_TOKENS: ReadonlySet<string> = new Set(["GH_TOKEN", "GITHUB_TOKEN"]);
+const GITHUB_TOKENS = ["GH_TOKEN", "GITHUB_TOKEN"] as const;
 
-/** The environment as a run and the repo's checks get it: everything but the GitHub tokens, which only hum itself uses. */
-export const withoutGitHubTokens = (env: Env): Record<string, string | undefined> => Object.fromEntries(Object.entries(env).filter(([name]) => !GITHUB_TOKENS.has(name)));
+/**
+ * The environment as a run and the repo's checks get it: everything but the GitHub tokens, which only hum itself uses.
+ * tinyexec starts every child from `process.env` and lays this over it, so a token is kept out by naming it with no
+ * value, which the runtime drops; leaving the name out would let `process.env` put it back.
+ */
+export const withoutGitHubTokens = (env: Env) => ({ ...env, ...Object.fromEntries(GITHUB_TOKENS.map((name) => [name, undefined])) });
 
 /** A command ran past its limit and was told to stop. */
 export class CommandTimedOut extends Error {

@@ -6,7 +6,7 @@ import { type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner,
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
-import { isAlive, until } from "./fixtures/process.ts";
+import { holdingGitHubTokens, isAlive, until } from "./fixtures/process.ts";
 import { makeShim, type ShimSpec } from "./fixtures/shim.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -53,9 +53,9 @@ test("a run never holds the GitHub tokens hum pushes with; the rest of the envir
 	const saved = join(tempDir("run-env"), "env.json");
 	const shim = makeShim({ script: [{}, { saveEnv: saved }] });
 	const state = openState(tempDir("runner"), { now: Date.now });
-	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: { ...shim.env, GH_TOKEN: "ghs_app", GITHUB_TOKEN: "ghs_workflow", HUM_KEPT: "yes" }, now: () => NOW });
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: { ...shim.env, GH_TOKEN: "ghs_app", HUM_KEPT: "yes" }, now: () => NOW });
 
-	await ask(runner, { env: { GH_TOKEN: "from-a-slot" } });
+	await holdingGitHubTokens(() => ask(runner, { env: { GH_TOKEN: "from-a-slot" } }));
 
 	const names = Object.keys(JSON.parse(readFileSync(saved, "utf8")));
 
