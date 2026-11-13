@@ -48,7 +48,7 @@ test("a tick that claims, runs and merges an item fetches from the remote once",
 	await w.worker.idle();
 
 	expect(merged(w)).toEqual(["a"]);
-	expect(readFileSync(reads, "utf8").split("\n").filter((command) => /^git .* fetch /.test(command))).toHaveLength(1);
+	expect(readFileSync(reads, "utf8").split("\n").filter((command) => /(^|\/)git .* fetch /.test(command))).toHaveLength(1);
 });
 
 test("an item whose thread cannot be read raises a card naming it, and the other items still start", async () => {
