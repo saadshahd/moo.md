@@ -13,6 +13,14 @@ import { Holder, ItemId } from "../src/adapter-api.ts";
 
 const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort();
 
+/** Ticks until `count` items merged: each push that loses the race to main waits for the next tick, mergeTries of them at most. */
+const landsRaced = async (w: WorkerWorld, count: number): Promise<void> => {
+	for (let tick = 0; tick < w.config.hum.mergeTries && merged(w).length < count; tick++) {
+		await w.worker.tick();
+		await w.worker.idle();
+	}
+};
+
 test("the thin path runs two items on different files side by side, and both merge", async () => {
 	const checkLog = join(tempDir("checks"), "log");
 	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, meet: 2 }, b: { writeForItem: true, spend: 5, meet: 2 } } }, { checks: [`echo run >> ${checkLog}`] });
@@ -24,12 +32,7 @@ test("the thin path runs two items on different files side by side, and both mer
 	expect(w.worker.running().sort()).toEqual(["a", "b"]);
 
 	await w.worker.idle();
-
-	// Each push that loses the race to main waits for the next tick, mergeTries of them at most.
-	for (let tick = 0; tick < w.config.hum.mergeTries && merged(w).length < 2; tick++) {
-		await w.worker.tick();
-		await w.worker.idle();
-	}
+	await landsRaced(w, 2);
 
 	expect(merged(w)).toEqual(["a", "b"]);
 	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
@@ -219,8 +222,7 @@ test("the status file lists only the newest mergedShown merged changes", async (
 	w.item("b", "docs/b.md");
 	await w.worker.tick();
 	await w.worker.idle();
-	await w.worker.tick();
-	await w.worker.idle();
+	await landsRaced(w, 2);
 	await w.worker.tick();
 
 	const status = readStatus(w.state.statusPath);

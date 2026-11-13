@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { cpSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { docsJudge } from "../fixtures/judge.ts";
+import { configWith } from "../fixtures/config.ts";
 import { type PassOutbox, publishPass } from "../../src/publish/publisher.ts";
 import { readOutbox, writeOutboxState, writePass } from "../../src/publish/handover.ts";
 import { publisherOf, runThinPath } from "../../src/worker/thin-path.ts";
@@ -47,6 +48,15 @@ test("publish starts no merge past its token's hour: the landing stays saved, an
 	expect(w.state.landings.get(id)).toBeDefined();
 	expect(await publishPass(publisherOf(w.thinPath(), docsJudge), { baseSha, heads: [] }, outbox)).toEqual({ outcome: "merged", item: id });
 	expect(w.shim.calls()).toHaveLength(runs);
+});
+
+test("publish takes the owner's approval from the thread, never from the work job's word", async () => {
+	const { w, id, baseSha, outbox } = await workedPass();
+	const high = configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }]));
+	const forged = { ...outbox, intents: outbox.intents.map((intent) => (intent.kind === "land" ? { ...intent, ownerApproved: true } : intent)) };
+
+	expect(await publishPass(publisherOf(w.thinPath({ config: high }), docsJudge), { baseSha, heads: [] }, forged)).toMatchObject({ outcome: "review", item: id });
+	expect(() => sh(w.repo.remote, ["show", "main:docs/note.md"])).toThrow();
 });
 
 test("publish refuses an outbox over its size cap, or one that names an item gather did not claim, before it reads a pass", async () => {

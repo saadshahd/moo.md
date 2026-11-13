@@ -14,7 +14,8 @@ import { evidenceRef } from "../worker/evidence.ts";
 import { land, type LandContext, prepareLanding, unpushed } from "../worker/land.ts";
 import { releaseQuestions } from "../worker/questions.ts";
 import { pushRunBranch, signsCommits } from "../worker/signed-push.ts";
-import { claimTtlMs, runBranch, type ThinResult } from "../worker/thin-path.ts";
+import { answerTo, claimTtlMs, runBranch, type ThinResult } from "../worker/thin-path.ts";
+import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { type BundleCheck, checkBundle, OUTBOX_REFS } from "./bundle.ts";
 import type { Intent } from "./intents.ts";
 
@@ -27,7 +28,7 @@ type Appliers = { readonly [K in Intent["kind"]]: (intent: Extract<Intent, { kin
  * The order publish applies a pass's intents in: the change first, so a work source that keeps its threads on the
  * base, as markdown does, moves the base only after the change landed on the base the pass checked it on.
  */
-const APPLY_ORDER: readonly Intent["kind"][] = ["keep-evidence", "push-branch", "save-landing", "land", "file-follow-up", "comment", "decide", "ask"];
+const APPLY_ORDER: readonly Intent["kind"][] = ["keep-evidence", "push-branch", "save-landing", "land", "file-follow-up", "comment", "decide"];
 
 /** What gather saw for a pass, which publish checks the pass's bundle against: the base commit and each hum branch's head. */
 export type GatherTrust = { readonly baseSha: string; readonly heads: readonly string[] };
@@ -157,20 +158,19 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 		return { ref: head, branch };
 	};
 
-	/** Saves the change on the run branch as the item's landing, then goes on with it. */
+	/** Saves the change on the run branch as the item's landing, then goes on with it. The owner approved it only where the thread's latest answer says so. */
 	const landing = (head: string, ownerApproved: boolean, then: (ctx: LandContext) => Promise<ThinResult | undefined>) =>
 		onBranch(git, p, branchAt(head), async (worktree) => {
 			const ctx = landContext(p, item, worktree, branch);
-			const pushed = await prepareLanding(ctx, { ownerApproved });
+			const pushed = await prepareLanding(ctx, { ownerApproved: ownerApproved && answerTo(item)?.option === OWNER_APPROVAL });
 
 			return pushed.kind === "pushed" ? then(ctx) : unpushed(pass.item, branch, pushed);
 		});
 
 	const apply = {
 		comment: async ({ text, scope }) => void (await calls(scope).workSource?.comment(id, text)),
-		ask: async ({ question, scope }) => void (await calls(scope).questions?.ask(id, question)),
 		decide: async ({ text, scope }) => void (await calls(scope).questions?.decide(id, text)),
-		"file-follow-up": async (intent) => keepFiled(p.state, intent, (await p.workSource.fileFollowUp(id, { title: intent.title, body: intent.body })).id),
+		"file-follow-up": async ({ title, body }) => void (await p.workSource.fileFollowUp(id, { title, body })),
 		"keep-evidence": async () => {
 			const ref = evidenceRef(pass.item);
 
@@ -201,24 +201,5 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 	await releaseQuestions({ state: p.state, config: p.config, workSource: p.workSource, questions: p.questions, now: p.now });
 
 	return result;
-};
-
-/** Saves the id of an item publish filed where the record that asked for it reads it. */
-const keepFiled = (state: State, intent: Extract<Intent, { kind: "file-follow-up" }>, filed: string): undefined => {
-	const target = intent.filedFor;
-
-	if (target?.record === "break") {
-		const saved = state.breaks.get(target.item);
-
-		if (saved) state.breaks.put(target.item, { ...saved, followUp: filed });
-	}
-
-	if (target?.record === "repeat") {
-		const saved = state.repeats.get(target.key);
-
-		if (saved) state.repeats.put(target.key, { ...saved, item: filed, commented: saved.notes });
-	}
-
-	return undefined;
 };
 
