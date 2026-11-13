@@ -66,14 +66,22 @@ const waitingOrder = (queue: readonly QueuedQuestion[]): QueuedQuestion[] => {
 	return ranked.sort(questionOrder).map(({ queued }) => queued);
 };
 
+/** What the daily question cap has room for now: the questions asked and the follow-ups filed within the day take theirs, and older ones are dropped. */
+export const roomToday = ({ state, config, now }: Pick<QuestionContext, "state" | "config" | "now">): number => {
+	for (const old of state.questions.list()) if (old.askedAt !== undefined && !isKept(old.askedAt, config, now())) state.questions.remove(queuedKey(old));
+
+	for (const old of state.followUps.list()) if (!isKept(old.at, config, now())) state.followUps.remove(old.item);
+
+	const asked = state.questions.list().flatMap(({ askedAt }) => (askedAt === undefined ? [] : [askedAt]));
+
+	return roomToAsk({ askedAt: [...asked, ...state.followUps.list().map(({ at }) => at)], cap: config.hum.dailyQuestionCap, now: now() });
+};
+
 /** Asks the queued questions the daily cap has room for, first by the owner's priority label, then by how many items wait on it, then by age. */
 export const releaseQuestions = async (ctx: QuestionContext): Promise<string[]> => {
-	const { state, config, workSource, questions, now } = ctx;
+	const { state, workSource, questions, now } = ctx;
+	const room = roomToday(ctx);
 	const all = state.questions.list();
-
-	for (const old of all) if (old.askedAt !== undefined && !isKept(old.askedAt, config, now())) state.questions.remove(queuedKey(old));
-
-	const room = roomToAsk({ askedAt: all.flatMap(({ askedAt }) => (askedAt === undefined ? [] : [askedAt])), cap: config.hum.dailyQuestionCap, now: now() });
 	const released: string[] = [];
 
 	for (const queued of waitingOrder(all.filter(isWaiting)).slice(0, room)) {

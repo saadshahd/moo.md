@@ -10,7 +10,7 @@ import { Choice } from "../status/format.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
+import { FiledFollowUp, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
 /** Names under the state folder that other modules address by name. */
 export const STATUS_FILE = "status.json";
@@ -71,6 +71,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		pullRequests: new Records(join(dir, "pull-requests"), PullRequestText),
 		/** Questions by item, waiting for room under the daily cap or asked within the day. */
 		questions: new Records(join(dir, "questions"), QueuedQuestion),
+		/** Follow-up items a pass filed within the day, by the item filed. */
+		followUps: new Records(join(dir, "follow-ups"), FiledFollowUp),
 		/** Choices made without the owner, by item and time. */
 		choices: new Records(join(dir, "choices"), Choice),
 		/** Each answer's disposition, by item and ordinal. */

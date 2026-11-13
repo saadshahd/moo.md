@@ -12,10 +12,10 @@ import { commandTimeoutMs } from "../exec.ts";
 import type { State } from "../state/open.ts";
 import { evidenceRef } from "../worker/evidence.ts";
 import { land, type LandContext, prepareLanding, unpushed } from "../worker/land.ts";
-import { releaseQuestions } from "../worker/questions.ts";
+import { releaseQuestions, roomToday } from "../worker/questions.ts";
 import { pushRunBranch, signsCommits } from "../worker/signed-push.ts";
 import { claimTtlMs, runBranch, type ThinResult } from "../worker/thin-path.ts";
-import { type BundleCheck, checkBundle, OUTBOX_REFS } from "./bundle.ts";
+import { type BundleCheck, type BundleRefs, checkBundle, OUTBOX_REFS } from "./bundle.ts";
 import type { Intent } from "./intents.ts";
 
 type Scope = { readonly run: string; readonly attempt: number };
@@ -29,8 +29,8 @@ type Appliers = { readonly [K in Intent["kind"]]: (intent: Extract<Intent, { kin
  */
 const APPLY_ORDER: readonly Intent["kind"][] = ["keep-evidence", "push-branch", "save-landing", "land", "file-follow-up", "comment", "decide"];
 
-/** What gather saw for a pass, which publish checks the pass's bundle against: the base commit and each hum branch's head. */
-export type GatherTrust = { readonly baseSha: string; readonly heads: readonly string[] };
+/** What gather saw for a pass, which publish checks the pass's bundle against: the base commit and each hum branch at its head. */
+export type GatherTrust = { readonly baseSha: string; readonly heads: Readonly<Record<string, string>> };
 
 /** One pass's outbox: its item, its intents in order, and the bundle of the refs it made, absent when it made none. */
 export type PassOutbox = { readonly item: string; readonly intents: readonly Intent[]; readonly bundle: string | undefined };
@@ -120,23 +120,63 @@ const NOTHING_BUNDLED: BundleCheck = { ok: true, refs: new Map() };
 /** A pass publish refused before any write, and why. */
 export const refusedPass = (item: string, why: string): ThinResult => ({ outcome: "stuck", item, detail: `publish refused the pass: ${why}` });
 
+const MEGABYTE = 1024 * 1024;
+
+/** The bytes of every file the tree at `commit` holds, which a worktree of it writes to disk. */
+const treeBytes = async (git: Git, commit: string): Promise<number> =>
+	(await git.raw(["ls-tree", "-r", "-l", commit])).split("\n").reduce((total, line) => total + (Number(line.split(/\s+/)[3]) || 0), 0);
+
+type PassCheck = { readonly p: Publisher; readonly git: Git; readonly trust: GatherTrust; readonly pass: PassOutbox; readonly refs: BundleRefs; readonly branch: string };
+
 /**
- * Applies one pass's outbox: the claim must still be the worker's, the bundle must pass every check, then each intent
- * runs in order under its op key, and the questions the daily cap has room for go out. A landing's result is the
- * pass's result; nothing else decides the item.
+ * Why publish refuses a pass whose bundle passed, before any write: an intent names a head that is neither its
+ * bundle's tip of the item's run branch, gather's base, nor that branch's head as gather saw it; it keeps evidence
+ * its bundle does not hold; it files more follow-ups than `followUpsPerPass` and the daily question cap leave room
+ * for; or a head's tree is larger than `publishTreeMaxMegabytes`.
+ */
+const passFault = async ({ p, git, trust, pass, refs, branch }: PassCheck): Promise<string | undefined> => {
+	const heads = [...new Set(pass.intents.flatMap((intent) => ("head" in intent ? [intent.head] : [])))];
+	const known = new Set([refs.get(`refs/heads/${branch}`), trust.baseSha, trust.heads[branch]]);
+	const stranger = heads.find((head) => !known.has(head));
+
+	if (stranger !== undefined) return `it names ${stranger} as the head of ${branch}, which is neither its bundle's tip, the base gather saw, nor the head gather saw for ${branch}`;
+
+	const evidence = evidenceRef(pass.item);
+
+	if (pass.intents.some(({ kind }) => kind === "keep-evidence") && !refs.has(evidence)) return `it asks to keep evidence its bundle does not hold on ${evidence}`;
+
+	const followUps = pass.intents.filter(({ kind }) => kind === "file-follow-up").length;
+	const room = Math.min(p.config.hum.followUpsPerPass, roomToday(p));
+
+	if (followUps > room) return `it files ${followUps} follow-ups, and followUpsPerPass and the daily question cap leave room for ${room}`;
+
+	const cap = p.config.hum.publishTreeMaxMegabytes * MEGABYTE;
+
+	for (const head of heads) {
+		const bytes = await treeBytes(git, head);
+
+		if (bytes > cap) return `the tree at ${head} holds ${bytes} bytes, over publishTreeMaxMegabytes (${p.config.hum.publishTreeMaxMegabytes})`;
+	}
+
+	return undefined;
+};
+
+/**
+ * Applies one pass's outbox: the bundle must pass every check and the pass every check of its intents, before any
+ * write; then the claim must still be the worker's, each intent runs in order under its op key, and the questions the
+ * daily cap has room for go out. A landing's result is the pass's result; nothing else decides the item.
  */
 export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOutbox): Promise<ThinResult | undefined> => {
 	const id = ItemId.parse(pass.item);
-
-	if (!(await p.workSource.renew(id, p.holder, claimTtlMs(p.config))).won) return { outcome: "lost", item: pass.item };
-
 	const git = await openPublishRepo(p);
+	const branch = runBranch(p.config.hum, pass.item);
+	const heads = Object.values(trust.heads);
 
-	await git.raw(["fetch", "-q", "origin", `+refs/heads/${p.base}:refs/remotes/origin/${p.base}`, ...trust.heads]);
+	await git.raw(["fetch", "-q", "origin", `+refs/heads/${p.base}:refs/remotes/origin/${p.base}`, ...heads]);
 
 	const checked = pass.bundle === undefined ? NOTHING_BUNDLED : await checkBundle(git, pass.bundle, {
 		base: trust.baseSha,
-		heads: trust.heads,
+		heads,
 		identity: p.config.hum.commitIdentity,
 		branchPrefixes: [p.config.hum.runBranchPrefix, p.config.hum.ownerBranchPrefix],
 		signs: await signsCommits({ pulls: p.pulls, base: p.base }),
@@ -144,22 +184,19 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 
 	if (!checked.ok) return refusedPass(pass.item, checked.why);
 
+	const fault = await passFault({ p, git, trust, pass, refs: checked.refs, branch });
+
+	if (fault !== undefined) return refusedPass(pass.item, fault);
+
+	if (!(await p.workSource.renew(id, p.holder, claimTtlMs(p.config))).won) return { outcome: "lost", item: pass.item };
+
 	const calls = (scope: Scope) => onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: p.workSource, questions: p.questions }, p.state.ops, scope);
 	const item = await p.workSource.read(id);
-	const branch = runBranch(p.config.hum, pass.item);
-
-	/** The item's run branch at the commit an intent names, which publish checked: the bundle's tip of it, or a commit gather saw. */
-	const branchAt = (head: string) => {
-		const known = checked.refs.get(`refs/heads/${branch}`) === head || head === trust.baseSha || trust.heads.includes(head);
-
-		if (!known) throw new Error(`the pass names ${head} as the head of ${branch}, which is neither in its bundle nor a commit gather saw`);
-
-		return { ref: head, branch };
-	};
+	const onRunBranch = (head: string) => ({ ref: head, branch });
 
 	/** Saves the change on the run branch as the item's landing, then goes on with it. */
 	const landing = (head: string, then: (ctx: LandContext) => Promise<ThinResult | undefined>) =>
-		onBranch(git, p, branchAt(head), async (worktree) => {
+		onBranch(git, p, onRunBranch(head), async (worktree) => {
 			const ctx = landContext(p, item, worktree, branch);
 			const pushed = await prepareLanding(ctx);
 
@@ -169,18 +206,21 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 	const apply = {
 		comment: async ({ text, scope }) => void (await calls(scope).workSource?.comment(id, text)),
 		decide: async ({ text, scope }) => void (await calls(scope).questions?.decide(id, text)),
-		"file-follow-up": async ({ title, body }) => void (await p.workSource.fileFollowUp(id, { title, body })),
+		"file-follow-up": async ({ title, body }) => {
+			const filed = await p.workSource.fileFollowUp(id, { title, body });
+
+			p.state.followUps.put(filed.id, { item: filed.id, from: pass.item, at: p.now() });
+
+			return undefined;
+		},
 		"keep-evidence": async () => {
 			const ref = evidenceRef(pass.item);
-
-			if (!checked.refs.has(ref)) return refusedPass(pass.item, `it asks to keep evidence its bundle does not hold on ${ref}`);
-
 			const pushed = await push(git, ["--force", "origin", `${outboxRef(ref)}:${ref}`]);
 
 			return pushed.kind === "refused" ? unpushed(pass.item, ref, pushed) : undefined;
 		},
 		"push-branch": async ({ head }) => {
-			const pushed = await onBranch(git, p, branchAt(head), (worktree) => pushRunBranch({ git: worktree.git, base: p.base, pulls: p.pulls, commits: p.commits }, branch));
+			const pushed = await onBranch(git, p, onRunBranch(head), (worktree) => pushRunBranch({ git: worktree.git, base: p.base, pulls: p.pulls, commits: p.commits }, branch));
 
 			return pushed.kind === "pushed" ? undefined : unpushed(pass.item, branch, pushed);
 		},

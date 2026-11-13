@@ -94,6 +94,9 @@ export const QueuedQuestion = z.object({
 
 export type QueuedQuestion = z.infer<typeof QueuedQuestion>;
 
+/** A follow-up item a pass filed, which counts against the daily question cap like a question asked. */
+export const FiledFollowUp = z.object({ item: name, from: name, at: time });
+
 const settledFields = {
 	item: name,
 	/** The answer's number among the thread's answers and replies from people. */

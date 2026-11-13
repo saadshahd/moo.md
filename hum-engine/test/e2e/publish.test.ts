@@ -49,10 +49,10 @@ test("publish starts no merge past its token's hour: the landing stays saved, an
 	const runs = w.shim.calls().length;
 
 	expect(worked).toMatchObject({ outcome: "held", why: "publish lands the change" });
-	expect(await publishPass(publisherOf(w.thinPath(), docsJudge, 0), { baseSha, heads: [] }, outbox)).toMatchObject({ outcome: "held", why: expect.stringContaining("token's hour") });
+	expect(await publishPass(publisherOf(w.thinPath(), docsJudge, 0), { baseSha, heads: {} }, outbox)).toMatchObject({ outcome: "held", why: expect.stringContaining("token's hour") });
 	expect(sh(w.repo.remote, ["rev-parse", "main"]).trim()).toBe(before);
 	expect(w.state.landings.get(id)).toBeDefined();
-	expect(await publishPass(publisherOf(w.thinPath(), docsJudge), { baseSha, heads: [] }, outbox)).toEqual({ outcome: "merged", item: id });
+	expect(await publishPass(publisherOf(w.thinPath(), docsJudge), { baseSha, heads: {} }, outbox)).toEqual({ outcome: "merged", item: id });
 	expect(w.shim.calls()).toHaveLength(runs);
 });
 
@@ -70,7 +70,7 @@ test.each([
 	const [file = ""] = Object.keys(files);
 	const forged = { ...outbox, intents: outbox.intents.map((intent) => ({ ...intent, ownerApproved: true })) };
 
-	expect(await publishPass(publisherOf(w.thinPath({ config: high, now }), docsJudge), { baseSha, heads: [] }, forged)).toMatchObject({ outcome: "review", item: id });
+	expect(await publishPass(publisherOf(w.thinPath({ config: high, now }), docsJudge), { baseSha, heads: {} }, forged)).toMatchObject({ outcome: "review", item: id });
 	expect(() => sh(w.repo.remote, ["show", `main:${file}`])).toThrow();
 });
 

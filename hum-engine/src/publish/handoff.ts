@@ -7,6 +7,8 @@ import { type Kind, OWNER_WAIT_TAG } from "../config/schema.ts";
 import type { State } from "../state/open.ts";
 import type { Spent } from "../state/saved.ts";
 import { queuedKey } from "../worker/questions.ts";
+import { OWNER_APPROVAL } from "../decide/merge.ts";
+import { SNAPSHOT_CARDS } from "../state/items.ts";
 
 /** Where publish found an item's saved machine state before the work job ran, and whether the owner had answered. */
 export type InboxItem = {
@@ -55,14 +57,18 @@ const raisedSpend = (held: Spent | undefined, worked: Spent, answered: boolean):
 	return { item: worked.item, total, base: answered ? Math.min(Math.max(base, worked.base), total) : base };
 };
 
+/** The cards a work job raises on an item that publish shows: those of its saved state, never one with an action. */
+const WORK_CARD_CODES: ReadonlySet<string> = new Set(Object.values(SNAPSHOT_CARDS));
+
 /**
  * Takes into publish's state what a work job wrote for one item it ran, and nothing else: the item's machine state
  * when it is one a pass can reach from the inbox's, its runs, its spend where it raises publish's, its plan, whose
  * models land reads beside the ones the config gives the plan run, its pull request text, its proof,
- * the questions it queued, its choices, its events, its cards and the usage limit. Landings, verdicts, merges, learned rules, kinds, answers
- * and op keys stay as publish has them. Returns why the machine state was refused, or nothing once all is taken.
+ * the questions it queued, never offering the owner's approval, its choices, its events, its saved state's cards with
+ * no action, and the usage limit cut to `usageLimitMaxMs` from now. Landings, verdicts, merges, learned rules, kinds,
+ * answers and op keys stay as publish has them. Returns why the machine state was refused, or nothing once all is taken.
  */
-export const takeWorkRecords = (work: State, into: State, inbox: InboxItem): string | undefined => {
+export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limits: { readonly now: number; readonly usageLimitMaxMs: number }): string | undefined => {
 	const { item, kind } = inbox;
 	const saved = work.items.saved().find(({ itemId }) => itemId === item);
 
@@ -85,17 +91,17 @@ export const takeWorkRecords = (work: State, into: State, inbox: InboxItem): str
 	work.pullRequests.copyTo(into.pullRequests, item);
 	work.proofs.copyTo(into.proofs, item);
 
-	for (const queued of work.questions.list().filter((queued) => queued.item === item && queued.askedAt === undefined)) into.questions.put(queuedKey(queued), queued);
+	for (const queued of work.questions.list().filter((queued) => queued.item === item && queued.askedAt === undefined)) into.questions.put(queuedKey(queued), { ...queued, options: queued.options?.filter((option) => option !== OWNER_APPROVAL) });
 
 	for (const choice of work.choices.list().filter((choice) => choice.item === item)) into.choices.put(`${item}@${choice.text}`, choice);
 
 	for (const event of work.events.list(item)) into.events.add(event);
 
-	for (const { code, cause, fix, action } of work.faults.list().filter((card) => card.item === item)) into.faults.raise({ code, item, cause, fix, action });
+	for (const { code, cause, fix } of work.faults.list().filter((card) => card.item === item && WORK_CARD_CODES.has(card.code))) into.faults.raise({ code, item, cause, fix });
 
 	const until = savedLimitUntil(work);
 
-	if (until > 0) settleLimit(into, { kind: "limited", until });
+	if (until > 0) settleLimit(into, { kind: "limited", until: Math.min(until, limits.now + limits.usageLimitMaxMs) });
 
 	return undefined;
 };

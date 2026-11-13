@@ -602,6 +602,27 @@
 			"maximum": 9007199254740991,
 			"description": "Megabytes of a CI work job's outbox, its bundles and its state, past which publish refuses the whole wake before any write."
 		},
+		"ciUsageLimitMaxHours": {
+			"default": 168,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Hours from now past which publish cuts the reset time of a usage limit a CI work job reports, so no work job can hold hum's runs longer than Claude's own limit window."
+		},
+		"followUpsPerPass": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Follow-up items one pass may file; publish refuses a pass that files more, and each one it files counts against the daily question cap."
+		},
+		"publishTreeMaxMegabytes": {
+			"default": 1024,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Megabytes of the tree a pass's branch holds, past which publish refuses the pass before it checks the branch out."
+		},
 		"ciMergeMarginMinutes": {
 			"default": 10,
 			"type": "integer",

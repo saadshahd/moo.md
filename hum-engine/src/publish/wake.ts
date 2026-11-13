@@ -1,5 +1,6 @@
 import { ItemId } from "../adapter-api.ts";
 import type { State } from "../state/open.ts";
+import { HOUR_MS } from "../time.ts";
 import { forgetProgress } from "../worker/kind.ts";
 import { releaseQuestions } from "../worker/questions.ts";
 import { answerTo, park, type ThinResult } from "../worker/thin-path.ts";
@@ -23,7 +24,7 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 
 	const item = await p.workSource.read(ItemId.parse(pass.item));
 	const at = p.state.items.saved().find(({ itemId }) => itemId === pass.item)?.state;
-	const refused = takeWorkRecords(work, p.state, { item: pass.item, kind, at, answered: answerTo(item) !== undefined });
+	const refused = takeWorkRecords(work, p.state, { item: pass.item, kind, at, answered: answerTo(item) !== undefined }, { now: p.now(), usageLimitMaxMs: p.config.hum.ciUsageLimitMaxHours * HOUR_MS });
 
 	if (refused !== undefined) return refusedPass(pass.item, refused);
 
@@ -36,7 +37,7 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 		p.state.itemKinds.put(pass.item, known.from === "fallback" ? { ...known, kind: pass.result.kind } : { item: pass.item, kind: pass.result.kind, from: "model" });
 	}
 
-	const published = await publishPass(p, { baseSha: gathered.baseSha, heads: Object.values(gathered.heads) }, { item: pass.item, intents: pass.intents, bundle: outbox.bundleOf(pass) });
+	const published = await publishPass(p, { baseSha: gathered.baseSha, heads: gathered.heads }, { item: pass.item, intents: pass.intents, bundle: outbox.bundleOf(pass) });
 
 	return published ?? pass.result;
 };

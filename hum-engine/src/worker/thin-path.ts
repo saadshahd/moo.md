@@ -878,12 +878,12 @@ const publishInProcess =
 /** What the checkout saw before any run: the base commit and the run branch's head on the remote. */
 const gatheredIn = async (git: Git, { base, branch }: { readonly base: string; readonly branch: string }): Promise<GatherTrust> => ({
 	baseSha: (await git.raw(["rev-parse", `origin/${base}`])).trim(),
-	heads: (await git.raw(["ls-remote", "--heads", "origin", branch])).split("\n").flatMap((line) => line.split("\t")[0] || []),
+	heads: Object.fromEntries((await git.raw(["ls-remote", "--heads", "origin", branch])).split("\n").flatMap((line) => line.split("\t", 1).filter(Boolean).map((sha) => [branch, sha] as const))),
 });
 
 /** The bundle of the refs a pass made, the run branch and its evidence, with only what gather did not see; undefined when the pass made nothing new. */
 const bundleOf = async (git: Git, { branch, item, gathered, folder }: { readonly branch: string; readonly item: string; readonly gathered: GatherTrust; readonly folder: string }): Promise<string | undefined> => {
-	const known = [gathered.baseSha, ...gathered.heads];
+	const known = [gathered.baseSha, ...Object.values(gathered.heads)];
 	const refs = (await Promise.all([`refs/heads/${branch}`, evidenceRef(item)].map(async (ref) => ((await git.run(["rev-parse", "--verify", "--quiet", ref])).code === 0 ? [ref] : [])))).flat();
 	const fresh = refs.length === 0 ? 0 : Number((await git.raw(["rev-list", "--count", ...refs, "--not", ...known])).trim());
 
