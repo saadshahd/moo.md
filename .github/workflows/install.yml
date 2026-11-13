@@ -1,16 +1,12 @@
 # Runs the install page's one line in a clean room, against the deployed
 # install.sh, on every release. Every push to main is a release: the line
-# installs the plugins from main. A push that changes site/ redeploys
-# install.sh, so the check also runs after each site deploy.
+# installs the plugins from main. The check waits until the site serves this
+# push's install.sh, so a push that changes site/ is checked after its own
+# deploy.
 name: install
 
 on:
   push:
-    branches: [main]
-    paths-ignore: ["site/**"]
-  workflow_run:
-    workflows: [site]
-    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -19,11 +15,10 @@ permissions:
 
 concurrency:
   group: install-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   check:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     strategy:
       fail-fast: false
       matrix:

@@ -2,11 +2,12 @@
 # Clean-room check of the install page's one line.
 #
 # Reads the line from src/install.ts, where every page that shows it takes it
-# from, runs it twice in an empty home that holds
-# Claude Code and one other agent, and passes only when the plugins are
-# enabled, the output style is set, every plugin skill has its file copy for
-# other agents, and Claude's own skills folder stays absent. The second run is
-# the "run it again to update" the page promises.
+# from, waits until the origin serves this checkout's public/install.sh, so a
+# push is checked after its own deploy, runs the line twice in an empty home
+# that holds Claude Code and one other agent, and passes only when the plugins
+# are enabled, the output style is set, every plugin skill has its file copy
+# for other agents, and Claude's own skills folder stays absent. The second run
+# is the "run it again to update" the page promises.
 #
 # Usage: check-install.sh [origin]
 # An origin, such as http://localhost:4321, replaces the page's origin so the
@@ -14,6 +15,9 @@
 set -eu
 
 SOURCE="$(dirname "$0")/../src/install.ts"
+CHECKOUT_SCRIPT="$(dirname "$0")/../public/install.sh"
+DEPLOY_POLL_SECONDS=15
+DEPLOY_TIMEOUT_SECONDS=600
 MARKETPLACE_NAME="moo.md"
 PLUGINS="hope hold hunch"
 OUTPUT_STYLE="hold:Plain"
@@ -36,11 +40,34 @@ installed_plugins() {
   in_room claude plugin list --json
 }
 
+script_url() {
+  printf '%s\n' "$1" | sed -n 's|.* \(https\{0,1\}://[^ ]*install\.sh\) .*|\1|p'
+}
+
+origin_serves_checkout_script() {
+  curl -fsL "$1" | cmp -s - "$CHECKOUT_SCRIPT"
+}
+
+wait_for_deploy() {
+  waited=0
+  until origin_serves_checkout_script "$1"; do
+    [ "$waited" -lt "$DEPLOY_TIMEOUT_SECONDS" ] ||
+      fail "$1 still does not match $CHECKOUT_SCRIPT after ${DEPLOY_TIMEOUT_SECONDS}s: the deployed script does not match this commit"
+    printf 'install check: waiting for %s to serve this commit (%ss)\n' "$1" "$waited"
+    sleep "$DEPLOY_POLL_SECONDS"
+    waited=$((waited + DEPLOY_POLL_SECONDS))
+  done
+}
+
 line=$(page_line)
 [ "$(printf '%s\n' "$line" | grep -c .)" -eq 1 ] || fail "expected one install line in $SOURCE, found: $line"
 if [ $# -gt 0 ]; then
   line=$(printf '%s\n' "$line" | sed "s|https://[^/]*|$1|")
 fi
+
+url=$(script_url "$line")
+[ -n "$url" ] || fail "no install.sh url in the install line: $line"
+wait_for_deploy "$url"
 
 room=$(mktemp -d)
 trap 'rm -rf "$room"' EXIT
