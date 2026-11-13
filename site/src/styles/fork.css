@@ -90,15 +90,22 @@
 .fork-panel[data-pick] .fork-opt[data-chosen] .tag.taken,
 .fork-panel[data-pick] .fork-opt:not([data-chosen]) .tag.not { opacity: 1; }
 .fork-panel[data-pick] .fork-opt:not([data-chosen]) { opacity: 0.55; }
-.fork-taken { display: grid; gap: 0.6rem; padding: 0; list-style: none; }
-.fork-taken li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; font-size: 0.9375rem; line-height: 1.4; }
+/* The path taken is one table: a column each for the label, the picked answer
+   and the one not taken, with each row a subgrid of the list so a column keeps
+   one left edge. The pine block hangs in the gap before the picked answer, so
+   the text starts on the column's edge. Where the three columns don't fit,
+   band/fork.ts sets data-stacked, which it finds by the table overrunning the
+   list, so the list keeps its panel's width (min-width: 0), and the not-taken
+   answer drops under the picked one. */
+.fork-taken { --mark: 0.4rem; --taken: 1 / 3; display: grid; grid-template-columns: repeat(3, max-content); justify-content: start; gap: 0.6rem 0.75rem; min-width: 0; padding: 0; list-style: none; }
+.fork-taken[data-stacked] { --taken: 2 / 2; grid-template-columns: max-content minmax(0, 1fr); }
+.fork-taken li { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; align-items: baseline; row-gap: 0.25rem; font-size: 0.9375rem; line-height: 1.4; }
+.fork-taken .fork-head { grid-area: 1 / 1; justify-self: start; margin-inline-end: calc(var(--mark) * 2); }
 .fork-took { display: none; }
-.fork-taken li[data-pick] .fork-took { display: inline; color: var(--sl-color-gray-3); font-size: 0.8125rem; }
+.fork-taken li[data-pick] .fork-took { display: block; grid-area: var(--taken); color: var(--sl-color-gray-3); font-size: 0.8125rem; }
 .fork-taken li[data-pick] .fork-took::before { content: "not taken: "; }
-.fork-taken .fork-head { order: -2; }
-.fork-taken li[data-pick="1"] [data-took="1"] { order: -1; }
-.fork-taken li[data-pick="0"] [data-took="0"], .fork-taken li[data-pick="1"] [data-took="1"] { color: var(--moo-ink); font-weight: 600; font-size: 0.9375rem; }
-.fork-taken li[data-pick="0"] [data-took="0"]::before, .fork-taken li[data-pick="1"] [data-took="1"]::before { content: ""; display: inline-block; width: 0.4rem; height: 0.8rem; margin-inline-end: 0.4rem; background: var(--moo-accent); }
+.fork-taken li[data-pick="0"] [data-took="0"], .fork-taken li[data-pick="1"] [data-took="1"] { grid-area: 1 / 2; color: var(--moo-ink); font-weight: 600; font-size: 0.9375rem; }
+.fork-taken li[data-pick="0"] [data-took="0"]::before, .fork-taken li[data-pick="1"] [data-took="1"]::before { content: ""; display: inline-block; width: var(--mark); height: calc(var(--mark) * 2); margin-inline: calc(var(--mark) * -2) var(--mark); vertical-align: middle; background: var(--moo-accent); }
 .fork-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Under the copy, on a narrow screen: the same piece, packed. */

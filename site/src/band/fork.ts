@@ -227,6 +227,17 @@ export function mount(fork: HTMLElement) {
       ).focus({ preventScroll: true });
   };
 
+  /* The path taken keeps its three columns while they fit; when they don't,
+     the not-taken answer stacks under the picked one. */
+  const taken = panel("end").querySelector<HTMLElement>("ul")!;
+  const fitTaken = () => {
+    taken.toggleAttribute("data-stacked", false);
+    taken.toggleAttribute(
+      "data-stacked",
+      taken.scrollWidth > taken.clientWidth,
+    );
+  };
+
   /* The fork waiting for a pick, and how to hurry what leads up to it. */
   let asking: { k: number; resolve(i: number): void; hurry(): void } | null =
     null;
@@ -367,6 +378,7 @@ export function mount(fork: HTMLElement) {
       await lane.done;
       if (!(await beat(mine, BEATS.result))) return false;
     }
+    fitTaken();
     show("end");
     await Promise.all([draw(geo.tail).done, walk([cursorAt(), geo.end]).done]);
     return !engaged && !still;
