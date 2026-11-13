@@ -4,6 +4,7 @@ import { z } from "zod";
 import { type ClaimResult, Holder, Item, ItemId, type Questions, type WorkSource } from "../adapter-api.ts";
 import { gitIn } from "../adapters/git.ts";
 import type { ThinResult } from "../worker/thin-path.ts";
+import type { BaseCheck } from "../worker/base-check.ts";
 import { Intent } from "./intents.ts";
 
 const text = z.string().min(1);
@@ -56,7 +57,23 @@ const BUNDLE_NAME = /^[\w.-]+\.bundle$/;
 /** One pass the work job ran: its item, its result, what it asks publish to do and the bundle file it made. */
 const OutboxPass = z.strictObject({ item: ItemId, result: WorkResult, intents: z.array(Intent), bundle: z.string().regex(BUNDLE_NAME).optional() });
 
-export const OutboxFile = z.strictObject({ passes: z.array(OutboxPass) });
+/** The repo's checks the work job ran on gather's base for the merges no check had covered: their failure, absent when they passed. */
+const BaseCheckReport = z.strictObject({ items: z.array(ItemId).min(1), failure: z.string().optional() });
+
+export const OutboxFile = z.strictObject({ passes: z.array(OutboxPass), baseCheck: BaseCheckReport.optional() });
+
+type OutboxFile = z.infer<typeof OutboxFile>;
+
+const readOutboxFile = (folder: string): OutboxFile => {
+	const file = join(folder, OUTBOX_FILE);
+
+	return existsSync(file) ? OutboxFile.parse(JSON.parse(readFileSync(file, "utf8"))) : { passes: [] };
+};
+
+const writeOutboxFile = (folder: string, outbox: z.input<typeof OutboxFile>): void => {
+	mkdirSync(folder, { recursive: true });
+	writeFileSync(join(folder, OUTBOX_FILE), `${JSON.stringify(OutboxFile.parse(outbox))}\n`);
+};
 
 export type OutboxPass = z.infer<typeof OutboxPass>;
 
@@ -106,24 +123,24 @@ export const inboxIntegrations = (inbox: Inbox, now: () => number): WorkIntegrat
 
 /** Adds a pass to the outbox in `folder`, its bundle moved beside it. */
 export const writePass = (folder: string, { item, result, intents, bundle }: { readonly item: string; readonly result: ThinResult; readonly intents: readonly z.input<typeof Intent>[]; readonly bundle: string | undefined }): void => {
-	mkdirSync(folder, { recursive: true });
-
-	const file = join(folder, OUTBOX_FILE);
-	const outbox = existsSync(file) ? OutboxFile.parse(JSON.parse(readFileSync(file, "utf8"))) : { passes: [] };
+	const outbox = readOutboxFile(folder);
 	const kept = bundle === undefined ? undefined : `${item}-${outbox.passes.length}.bundle`;
+
+	mkdirSync(folder, { recursive: true });
 
 	if (bundle !== undefined && kept !== undefined) cpSync(bundle, join(folder, kept));
 
-	writeFileSync(file, `${JSON.stringify(OutboxFile.parse({ passes: [...outbox.passes, { item, result: WorkResult.parse(result), intents, bundle: kept }] }))}\n`);
+	writeOutboxFile(folder, { ...outbox, passes: [...outbox.passes, { item, result: WorkResult.parse(result), intents: [...intents], bundle: kept }] });
 };
 
-export type ReadOutbox = { readonly passes: readonly OutboxPass[]; readonly stateDir: string; readonly bundleOf: (pass: OutboxPass) => string | undefined };
+/** Puts the base check the work job ran into the outbox in `folder`. */
+export const writeBaseCheck = (folder: string, { items, failure }: BaseCheck): void => writeOutboxFile(folder, { ...readOutboxFile(folder), baseCheck: { items: [...items], failure } });
 
-/** Ends the work job's outbox: an empty one where no pass ran, and a copy of its state folder for publish to take its own records from. */
+export type ReadOutbox = { readonly passes: readonly OutboxPass[]; readonly baseCheck: BaseCheck | undefined; readonly stateDir: string; readonly bundleOf: (pass: OutboxPass) => string | undefined };
+
+/** Ends the work job's outbox: an empty one where nothing was written, and a copy of its state folder for publish to take its own records from. */
 export const writeOutboxState = (folder: string, stateDir: string): void => {
-	mkdirSync(folder, { recursive: true });
-
-	if (!existsSync(join(folder, OUTBOX_FILE))) writeFileSync(join(folder, OUTBOX_FILE), `${JSON.stringify(OutboxFile.parse({ passes: [] }))}\n`);
+	writeOutboxFile(folder, readOutboxFile(folder));
 
 	if (existsSync(stateDir)) cpSync(stateDir, join(folder, STATE_FOLDER), { recursive: true });
 };
@@ -138,12 +155,12 @@ export const readOutbox = (folder: string, { maxBytes, claimed }: { readonly max
 
 	if (size > maxBytes) refused(`outbox holds ${size} bytes, over the ${maxBytes} bytes publish reads`);
 
-	const { passes } = OutboxFile.parse(JSON.parse(readFileSync(join(folder, OUTBOX_FILE), "utf8")));
+	const { passes, baseCheck } = OutboxFile.parse(JSON.parse(readFileSync(join(folder, OUTBOX_FILE), "utf8")));
 	const stranger = passes.find(({ item }) => !claimed.has(item));
 
 	if (stranger !== undefined) refused(`outbox names ${stranger.item}, which gather did not claim`);
 
-	return { passes, stateDir: join(folder, STATE_FOLDER), bundleOf: (pass) => pass.bundle && join(folder, basename(pass.bundle)) };
+	return { passes, baseCheck, stateDir: join(folder, STATE_FOLDER), bundleOf: (pass) => pass.bundle && join(folder, basename(pass.bundle)) };
 };
 
 /** The bytes of every file under `folder`, links not followed. */

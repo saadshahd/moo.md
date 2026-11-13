@@ -22,7 +22,8 @@ import { npmLatest, type OpenWorkerOptions, workerOptions } from "../worker/open
 import { Worker, type WorkerOptions } from "../worker/worker.ts";
 import { DEFAULT_BASE, publisherOf } from "../worker/thin-path.ts";
 import { tallyOf } from "../worker/tally.ts";
-import { Gathered, inboxIntegrations, readInbox, readOutbox, workRemote, writeInbox, writeOutboxState, writePass } from "../publish/handover.ts";
+import { Gathered, inboxIntegrations, readInbox, readOutbox, workRemote, writeBaseCheck, writeInbox, writeOutboxState, writePass } from "../publish/handover.ts";
+import { checkMergesAt } from "../worker/base-check.ts";
 import { publishWake } from "../publish/wake.ts";
 import { configuredModelCall } from "../adapters/model-call.ts";
 import { type Git, gitIn } from "../adapters/git.ts";
@@ -235,6 +236,10 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 				integrations: inboxIntegrations(inbox, Date.now),
 				ciJob: { kind: "work", publish: async (pass, worked) => void writePass(flags.outbox, { ...pass, result: worked }) },
 			});
+
+			const baseCheck = await checkMergesAt({ ...options, git: gitIn(io.cwd, { timeoutMs }) }, gathered.baseSha);
+
+			if (baseCheck !== undefined) writeBaseCheck(flags.outbox, baseCheck);
 
 			await wakeUntilQuiet(new Worker(options));
 			writeOutboxState(flags.outbox, dir);

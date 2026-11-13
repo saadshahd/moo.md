@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { docsJudge } from "../fixtures/judge.ts";
 import { configWith } from "../fixtures/config.ts";
 import { type PassOutbox, publishPass } from "../../src/publish/publisher.ts";
-import { readOutbox, writeOutboxState, writePass } from "../../src/publish/handover.ts";
+import { readOutbox, writeBaseCheck, writeOutboxState, writePass } from "../../src/publish/handover.ts";
 import { publisherOf, runThinPath } from "../../src/worker/thin-path.ts";
 
 import { sh } from "../fixtures/work-repo.ts";
@@ -82,16 +82,17 @@ test.each([
 	expect(() => sh(w.repo.remote, ["show", `main:${file}`])).toThrow();
 });
 
-test("publish refuses an outbox over its size cap, or one that names an item gather did not claim, before it reads a pass", async () => {
+test("publish refuses an outbox over its size cap, or one that names an item gather did not claim, before it reads a pass, and reads the base check the work job ran", async () => {
 	const folder = tempDir("outbox");
 
 	writePass(folder, { item: "a", result: { outcome: "held", item: "a", why: "publish lands the change" }, intents: [], bundle: undefined });
+	writeBaseCheck(folder, { items: ["merged"], failure: "the checks fail" });
 	writeOutboxState(folder, tempDir("work-state"));
 	writeFileSync(join(folder, "padding"), "x".repeat(2048));
 
 	expect(() => readOutbox(folder, { maxBytes: 1024, claimed: new Set(["a"]) })).toThrow(/over the 1024 bytes/);
 	expect(() => readOutbox(folder, { maxBytes: 1024 * 1024, claimed: new Set(["b"]) })).toThrow(/names a, which gather did not claim/);
-	expect(readOutbox(folder, { maxBytes: 1024 * 1024, claimed: new Set(["a"]) }).passes).toHaveLength(1);
+	expect(readOutbox(folder, { maxBytes: 1024 * 1024, claimed: new Set(["a"]) })).toMatchObject({ passes: [{ item: "a" }], baseCheck: { items: ["merged"], failure: "the checks fail" } });
 });
 
 /** The remote's refs and every record of publish's state, which a refused pass leaves as they were. */
@@ -161,7 +162,7 @@ test("publish refuses a work job's move to the kind the item has, keeps the kind
 	const results = await publishWake({
 		publisher: { ...publisher, workSource: { ...publisher.workSource, read: async (item) => (item === other ? Promise.reject(new Error("the work source broke")) : publisher.workSource.read(item)) } },
 		gathered: { holder: w.thinPath().holder, base: "main", baseSha, heads: {}, claimed: [id, other] },
-		outbox: { passes: [{ item: id, result: { outcome: "moved", item: id, kind: "docs" }, intents: [...outbox.intents], bundle: undefined }, { item: other, result: { outcome: "held", item: other, why: "publish lands the change" }, intents: [], bundle: undefined }], stateDir: tempDir("work-state"), bundleOf: () => outbox.bundle },
+		outbox: { passes: [{ item: id, result: { outcome: "moved", item: id, kind: "docs" }, intents: [...outbox.intents], bundle: undefined }, { item: other, result: { outcome: "held", item: other, why: "publish lands the change" }, intents: [], bundle: undefined }], baseCheck: undefined, stateDir: tempDir("work-state"), bundleOf: () => outbox.bundle },
 		work: openState(tempDir("work-state"), { now }),
 		save: async () => void saves++,
 	});

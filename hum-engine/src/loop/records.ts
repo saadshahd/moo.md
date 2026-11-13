@@ -51,7 +51,14 @@ export const PossibleRepeat = z.object({ a: name, b: name, models: z.array(name)
 export type PossibleRepeat = z.infer<typeof PossibleRepeat>;
 
 /** A merged change: what the measure counts. */
-export const Merge = z.object({ item: name, sha: name, at: time, paths: z.array(name) });
+export const Merge = z.object({
+	item: name,
+	sha: name,
+	at: time,
+	paths: z.array(name),
+	/** The repo's checks have run on the base since it merged; a merge saved before hum checked the base counts as checked. */
+	baseChecked: z.boolean().default(true),
+});
 
 export type Merge = z.infer<typeof Merge>;
 

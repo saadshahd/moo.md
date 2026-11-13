@@ -76,6 +76,15 @@ export const openPublishRepo = async (p: Pick<Publisher, "repo" | "remote" | "co
 	return git;
 };
 
+/** Publish's repo with the remote's base, as `origin/<base>`, and the commits `heads` fetched into it. */
+export const fetchedPublishRepo = async (p: Pick<Publisher, "repo" | "remote" | "config" | "base">, heads: readonly string[] = []): Promise<Git> => {
+	const git = await openPublishRepo(p);
+
+	await git.raw(["fetch", "-q", "origin", `+refs/heads/${p.base}:refs/remotes/origin/${p.base}`, ...heads]);
+
+	return git;
+};
+
 /** A worktree of publish's repo at `ref`, on `branch`, removed after `use`. Checking files out runs no hook and no filter of the repo. */
 const onBranch = async <T>(git: Git, p: Publisher, { ref, branch }: { readonly ref: string; readonly branch: string }, use: (worktree: { readonly git: Git; readonly folder: string }) => Promise<T>): Promise<T> => {
 	const folder = mkdtempSync(join(tmpdir(), "hum-publish-"));
@@ -168,11 +177,9 @@ const passFault = async ({ p, git, trust, pass, refs, branch }: PassCheck): Prom
  */
 export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOutbox): Promise<ThinResult | undefined> => {
 	const id = ItemId.parse(pass.item);
-	const git = await openPublishRepo(p);
-	const branch = runBranch(p.config.hum, pass.item);
 	const heads = Object.values(trust.heads);
-
-	await git.raw(["fetch", "-q", "origin", `+refs/heads/${p.base}:refs/remotes/origin/${p.base}`, ...heads]);
+	const git = await fetchedPublishRepo(p, heads);
+	const branch = runBranch(p.config.hum, pass.item);
 
 	const checked = pass.bundle === undefined ? NOTHING_BUNDLED : await checkBundle(git, pass.bundle, {
 		base: trust.baseSha,

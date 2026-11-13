@@ -17,7 +17,7 @@ export const recordMerged = async (state: State, { git, remote }: EvidenceRemote
 
 	if (evidence !== undefined && "url" in evidence) await dropEvidence(git, { remote, item });
 
-	state.merges.put(item, { item, sha, at, paths: [...(landing?.change.paths ?? [])] });
+	state.merges.put(item, { item, sha, at, paths: [...(landing?.change.paths ?? [])], baseChecked: false });
 	state.landings.remove(item);
 	state.plans.remove(item);
 	state.verdicts.remove(item);

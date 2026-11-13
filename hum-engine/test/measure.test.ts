@@ -97,7 +97,7 @@ test("a change merged through a pull request after the worker moved on ends its 
 	await settleMergedPulls(state, pull("MERGED", finished), 10);
 
 	expect(finished).toEqual(["a"]);
-	expect(state.merges.list()).toEqual([{ item: "a", sha: "sha-a", at: 9, paths: ["ui/a.ts"] }]);
+	expect(state.merges.list()).toEqual([{ item: "a", sha: "sha-a", at: 9, paths: ["ui/a.ts"], baseChecked: false }]);
 	expect(state.landings.list()).toEqual([]);
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
 });

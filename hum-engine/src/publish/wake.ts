@@ -6,7 +6,8 @@ import { releaseQuestions } from "../worker/questions.ts";
 import { answerTo, park, type ThinResult } from "../worker/thin-path.ts";
 import { kindMoveFault, takeWorkRecords } from "./handoff.ts";
 import type { Gathered, OutboxPass, ReadOutbox } from "./handover.ts";
-import { type Publisher, publishPass, refusedPass } from "./publisher.ts";
+import { fetchedPublishRepo, type Publisher, publishPass, refusedPass } from "./publisher.ts";
+import { settleBaseCheck } from "../worker/base-check.ts";
 
 /** What publish works from in a CI wake: its own root, what gather settled, the work job's outbox and its state, and how it saves its own state. */
 export type PublishWake = { readonly publisher: Publisher; readonly gathered: Gathered; readonly outbox: ReadOutbox; readonly work: State; readonly save: () => Promise<void> };
@@ -43,7 +44,8 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 };
 
 /**
- * Publishes every pass of a work job's outbox in order, then asks the questions the daily cap has room for. A pass
+ * Settles the base check the work job ran, so its breaks place every pass after it, publishes every pass of its
+ * outbox in order, then asks the questions the daily cap has room for. A pass
  * that throws ends refused, and the state is saved after each pass and once more at the end however it ends, so what
  * one pass wrote is never written again.
  */
@@ -52,6 +54,13 @@ export const publishWake = async (wake: PublishWake): Promise<ThinResult[]> => {
 	const results: ThinResult[] = [];
 
 	try {
+		const { baseCheck } = wake.outbox;
+
+		if (baseCheck !== undefined) {
+			await settleBaseCheck({ state: p.state, config: p.config, workSource: p.workSource, git: await fetchedPublishRepo(p), base: p.base, now: p.now }, baseCheck);
+			await wake.save();
+		}
+
 		for (const pass of wake.outbox.passes) {
 			const result = park(p, await publishWorked(wake, pass).catch((error: Error) => refusedPass(pass.item, error.message)));
 
