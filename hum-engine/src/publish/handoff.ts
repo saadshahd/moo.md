@@ -5,6 +5,7 @@ import { nextStates, reachedFrom } from "../config/machine.ts";
 import { type Config } from "../config/load.ts";
 import { type Kind, OWNER_WAIT_TAG } from "../config/schema.ts";
 import type { State } from "../state/open.ts";
+import type { Spent } from "../state/saved.ts";
 import { queuedKey } from "../worker/questions.ts";
 
 /** Where publish found an item's saved machine state before the work job ran, and whether the owner had answered. */
@@ -36,12 +37,28 @@ const floorRank = (config: Config, kind: string): number => {
 	return floor === undefined ? -1 : config.hum.levels.findIndex(({ name }) => name === floor);
 };
 
-/** A work job may move an item to another kind only where that kind's risk floor is no lower. */
-export const mayMoveKind = (config: Config, { from, to }: { readonly from: string; readonly to: string }): boolean => floorRank(config, to) >= floorRank(config, from);
+/** Why a work job may not move an item from one kind to another: it names the kind the item has, or one whose risk floor is lower. */
+export const kindMoveFault = (config: Config, { from, to }: { readonly from: string; readonly to: string }): string | undefined => {
+	if (to === from) return `it moves the item to ${to}, the kind it already has`;
+
+	return floorRank(config, to) < floorRank(config, from) ? `it moves the item from ${from} to ${to}, whose risk floor is lower` : undefined;
+};
+
+/**
+ * An item's spend as publish takes it from a work job: the total only rises, and the count toward the kind's cap
+ * starts afresh only where the owner answered.
+ */
+const raisedSpend = (held: Spent | undefined, worked: Spent, answered: boolean): Spent => {
+	const total = Math.max(held?.total ?? 0, worked.total);
+	const base = held?.base ?? 0;
+
+	return { item: worked.item, total, base: answered ? Math.min(Math.max(base, worked.base), total) : base };
+};
 
 /**
  * Takes into publish's state what a work job wrote for one item it ran, and nothing else: the item's machine state
- * when it is one a pass can reach from the inbox's, its runs, its spend, its plan, its pull request text, its proof,
+ * when it is one a pass can reach from the inbox's, its runs, its spend where it raises publish's, its plan, whose
+ * models land reads beside the ones the config gives the plan run, its pull request text, its proof,
  * the questions it queued, its choices, its events, its cards and the usage limit. Landings, verdicts, merges, learned rules, kinds, answers
  * and op keys stay as publish has them. Returns why the machine state was refused, or nothing once all is taken.
  */
@@ -60,7 +77,10 @@ export const takeWorkRecords = (work: State, into: State, inbox: InboxItem): str
 
 	for (const record of work.runs.list(item)) into.runs.keep(record);
 
-	work.spent.copyTo(into.spent, item);
+	const worked = work.spent.get(item);
+
+	if (worked !== undefined) into.spent.put(item, raisedSpend(into.spent.get(item), worked, inbox.answered));
+
 	work.plans.copyTo(into.plans, item);
 	work.pullRequests.copyTo(into.pullRequests, item);
 	work.proofs.copyTo(into.proofs, item);

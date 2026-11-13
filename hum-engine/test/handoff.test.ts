@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mayMoveKind, passReach, takeWorkRecords } from "../src/publish/handoff.ts";
+import { kindMoveFault, passReach, takeWorkRecords } from "../src/publish/handoff.ts";
 import { openState } from "../src/state/open.ts";
 import { configWith } from "./fixtures/config.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -38,9 +38,26 @@ test("publish refuses a machine state the owner's wait stands before, and keeps 
 	expect(into.items.saved().map(({ state }) => state)).toEqual(["owner-review"]);
 });
 
-test("a work job may move an item only to a kind whose risk floor is no lower", () => {
+test("a work job may move an item only to another kind whose risk floor is no lower", () => {
 	const floored = configWith((raw) => void (raw.hum.kindFloors = { check: "high" }));
 
-	expect(mayMoveKind(floored, { from: "docs", to: "check" })).toBe(true);
-	expect(mayMoveKind(floored, { from: "check", to: "docs" })).toBe(false);
+	expect(kindMoveFault(floored, { from: "docs", to: "check" })).toBeUndefined();
+	expect(kindMoveFault(floored, { from: "check", to: "docs" })).toContain("whose risk floor is lower");
+	expect(kindMoveFault(floored, { from: "check", to: "check" })).toContain("the kind it already has");
+});
+
+test("a work job's spend only raises publish's, and starts the cap's count afresh only where the owner answered", () => {
+	const [work, into] = [stateIn("work"), stateIn("publish")];
+
+	into.spent.put("a", { item: "a", total: 900, base: 100 });
+	work.spent.put("a", { item: "a", total: 0, base: 0 });
+	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false });
+	expect(into.spent.get("a")).toEqual({ item: "a", total: 900, base: 100 });
+
+	work.spent.put("a", { item: "a", total: 1000, base: 1000 });
+	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false });
+	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 100 });
+
+	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: true });
+	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 1000 });
 });

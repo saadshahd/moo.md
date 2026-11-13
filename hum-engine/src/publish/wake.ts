@@ -3,7 +3,7 @@ import type { State } from "../state/open.ts";
 import { forgetProgress } from "../worker/kind.ts";
 import { releaseQuestions } from "../worker/questions.ts";
 import { answerTo, park, type ThinResult } from "../worker/thin-path.ts";
-import { mayMoveKind, takeWorkRecords } from "./handoff.ts";
+import { kindMoveFault, takeWorkRecords } from "./handoff.ts";
 import type { Gathered, OutboxPass, ReadOutbox } from "./handover.ts";
 import { type Publisher, publishPass, refusedPass } from "./publisher.ts";
 
@@ -12,7 +12,7 @@ export type PublishWake = { readonly publisher: Publisher; readonly gathered: Ga
 
 /**
  * Publishes one pass of a work job: the work job's own records for the item, a kind it moved the item to only where
- * that kind's risk floor is no lower, then the pass's outbox, checked as on a Mac. The pass's result is the landing's,
+ * that kind is another whose risk floor is no lower, kept a fallback where publish's was one, then the pass's outbox, checked as on a Mac. The pass's result is the landing's,
  * else the work job's own, which never merges.
  */
 const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWake, pass: OutboxPass): Promise<ThinResult> => {
@@ -28,10 +28,12 @@ const publishWorked = async ({ publisher: p, gathered, outbox, work }: PublishWa
 	if (refused !== undefined) return refusedPass(pass.item, refused);
 
 	if (pass.result.outcome === "moved") {
-		if (!mayMoveKind(p.config, { from: known.kind, to: pass.result.kind })) return refusedPass(pass.item, `it moves ${pass.item} from ${known.kind} to ${pass.result.kind}, whose risk floor is lower`);
+		const fault = kindMoveFault(p.config, { from: known.kind, to: pass.result.kind });
+
+		if (fault !== undefined) return refusedPass(pass.item, fault);
 
 		forgetProgress(p.state, pass.item);
-		p.state.itemKinds.put(pass.item, { item: pass.item, kind: pass.result.kind, from: "model" });
+		p.state.itemKinds.put(pass.item, known.from === "fallback" ? { ...known, kind: pass.result.kind } : { item: pass.item, kind: pass.result.kind, from: "model" });
 	}
 
 	const published = await publishPass(p, { baseSha: gathered.baseSha, heads: Object.values(gathered.heads) }, { item: pass.item, intents: pass.intents, bundle: outbox.bundleOf(pass) });

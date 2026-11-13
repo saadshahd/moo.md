@@ -20,7 +20,7 @@ import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
-import { BASE_CONTENDED, changeOn, placementOf, rebaseOnto, type ReviewOutcome } from "./land.ts";
+import { BASE_CONTENDED, changeOn, declaredChange, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
@@ -33,7 +33,7 @@ import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
 import { proveCheckItem } from "../loop/prove-item.ts";
 import { tallyOf } from "./tally.ts";
 import { decideProse } from "./prose-run.ts";
-import { footprintOf, type PrefixGate } from "./scheduler.ts";
+import { type PrefixGate } from "./scheduler.ts";
 import { evidenceRef, keepEvidence } from "./evidence.ts";
 import { Outbox } from "../publish/intents.ts";
 import { type GatherTrust, type PassOutbox, type Publisher, publishPass } from "../publish/publisher.ts";
@@ -433,17 +433,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** A plan or build is placed by the files its item declares; a fix or review by the branch's diff so far. */
-	const tierFor = async (purpose: Purpose) => {
-		const declared = { paths: footprintOf(item) ?? [], size: 0, loosened: false, pinChanged: false };
-		const change = PLACED_BY_DIFF[purpose] ? await changeOn(placing(d)) : declared;
-		const { placement } = await placementOf(placing(d), change);
-		const row = pickTier(kind, { purpose, level: placement.level.name, size: "small" });
-
-		if (!row) throw new Error(`the ${d.kindName} table has no ${purpose} row`);
-
-		return { model: config.hum.models[row.tier], effort: row.effort };
-	};
-
+	const tierFor = async (purpose: Purpose) => tierOf(placing(d), kind, purpose, PLACED_BY_DIFF[purpose] ? await changeOn(placing(d)) : declaredChange(item));
 
 	const branchDiff = (): Promise<string> => g(["diff", ...PATCH, `origin/${base}...HEAD`]);
 

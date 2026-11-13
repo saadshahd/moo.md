@@ -11,7 +11,7 @@ import { type Checkout, PLAN_MARK, PROSE_PROMPTS, runBranch, runThinPath } from 
 import { configWith } from "../fixtures/config.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { itemFile, sh } from "../fixtures/work-repo.ts";
-import { READY_PLAN, type ShimSpec } from "../fixtures/shim.ts";
+import { READY_PLAN, SHIM_MODEL, type ShimSpec } from "../fixtures/shim.ts";
 import { BASE, poolConfig } from "../fixtures/slot-world.ts";
 import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
@@ -547,6 +547,15 @@ test("a review run at landing counts toward the item's total, and one that passe
 
 	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "review", item: id, detail: expect.stringContaining("the review run passed the item's token cap (305)") });
 	expect(w.state.spent.get(id)?.total).toBeGreaterThan(305);
+});
+
+test("the plan bar reads the model the config gives the plan run, so a run that reports only a measured model cannot lift it", async () => {
+	const config = configWith((raw) => void (raw.hum.measuredModels["plan-outcome"] = { [SHIM_MODEL]: 1 }));
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] }, { config });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "review", item: id, detail: `the plan-outcome call abstained: ${config.hum.models.standard}, ${SHIM_MODEL} has no measured rate that meets the bar` });
+	expect(w.state.plans.get(id)?.models).toEqual([SHIM_MODEL]);
 });
 
 test("a plan run that splits its item files each part as a ready item and lands the item as done with no change of its own", async () => {

@@ -25,7 +25,7 @@ export const withProposedTimeouts = (raw: Tree): Tree => ({ ...structuredClone(r
 
 /**
  * The shipped config as setup writes it, with one path rule (docs are low risk). Tests run items as docs, the kind with
- * the fewest states, on changes of any path, and trust the shim's model at every boundary.
+ * the fewest states, on changes of any path, and trust the shim's model and each model the tiers name at every boundary.
  */
 export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 	const raw: Tree = withProposedTimeouts(shippedRaw());
@@ -33,7 +33,7 @@ export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 	raw.hum.paths = [{ glob: "docs/**", level: "low" }];
 	raw.hum.docsOnly.paths = ["**"];
 	raw.hum.checks = ["true"];
-	raw.hum.measuredModels = Object.fromEntries(BOUNDARIES.map((boundary) => [boundary, { [SHIM_MODEL]: 1 }]));
+	raw.hum.measuredModels = Object.fromEntries(BOUNDARIES.map((boundary) => [boundary, Object.fromEntries([SHIM_MODEL, ...Object.values(raw.hum.models)].map((model) => [model, 1]))]));
 
 	edit(raw);
 

@@ -28,7 +28,9 @@ import {
 } from "../adapters/pull-requests.ts";
 import type { ModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
-import type { Boundary } from "../config/schema.ts";
+import type { Boundary, Kind, PURPOSES } from "../config/schema.ts";
+import { pickTier } from "../config/checks.ts";
+import { footprintOf } from "./scheduler.ts";
 import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
 	isCleared,
@@ -164,6 +166,19 @@ export const placementOf = async (
 		}),
 		policy,
 	};
+};
+
+/** The change an item declares before any run: the paths it says it touches. */
+export const declaredChange = (item: Item): Change => ({ paths: footprintOf(item) ?? [], size: 0, loosened: false, pinChanged: false });
+
+/** The model and effort the kind's tier table gives a run of `purpose` on `change`, at the level the change places at. */
+export const tierOf = async (ctx: Pick<LandContext, "config" | "state" | "git" | "base" | "now"> & { readonly kind: string }, kind: Kind, purpose: (typeof PURPOSES)[number], change: Change): Promise<{ readonly model: string; readonly effort: Kind["tiers"][number]["effort"] }> => {
+	const { placement } = await placementOf(ctx, change);
+	const row = pickTier(kind, { purpose, level: placement.level.name, size: "small" });
+
+	if (!row) throw new Error(`the ${ctx.kind} table has no ${purpose} row`);
+
+	return { model: ctx.config.hum.models[row.tier], effort: row.effort };
 };
 
 /** The run branch's diff from where it left the base to `tip`, the item's own file left out: hum's done mark is no part of the change. */
@@ -504,7 +519,8 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const diff = await changeDiff(ctx, saved.head);
 	const alignment = saved.change.paths.length > 0 ? await alignmentOf(ctx, saved, diff) : undefined;
 	const aligned = doesGateAlignment(ctx.config.hum) && alignment && "graded" in alignment ? alignedPlacement(placement, alignment.graded, ctx.config.hum) : placement;
-	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, alignment, verdict));
+	const planModels = await planModelsOf(ctx);
+	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, { alignment, planModels, verdict }));
 	const placed = routeWith();
 	const reviewed = doesNeedReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name }) : undefined;
 
@@ -542,16 +558,32 @@ const abstained = (boundary: Boundary, why: string): Unclear => ({ cause: "absta
 
 const unmeasured = (models: readonly string[]): string => `${models.join(", ") || "no model"} has no measured rate that meets the bar`;
 
+/** Whether an item of `kind` runs a plan: a state of its machine runs a role whose purpose is plan. */
+const doesPlan = (config: Config, kind: Kind): boolean => Object.values(kind.machine.states).some((node) => node.invoke !== undefined && config.hum.roles[node.invoke.src]?.purpose === "plan");
+
+/**
+ * The models behind the item's plan: the one its kind's tier table gives the plan run, with any the run reported,
+ * which can only add to it; none where the kind never plans.
+ */
+const planModelsOf = async (ctx: LandContext): Promise<readonly string[] | undefined> => {
+	const kind = ctx.config.kinds[ctx.kind];
+
+	if (kind === undefined || !doesPlan(ctx.config, kind)) return undefined;
+
+	const { model } = await tierOf(ctx, kind, "plan", declaredChange(ctx.item));
+
+	return [...new Set([model, ...(ctx.state.plans.get(ctx.id)?.models ?? [])])];
+};
+
 /** Every model judgment behind the change that abstained, or came from a model id its boundary was not measured on. */
-const abstentionsOf = (ctx: LandContext, alignment: SavedLanding["alignment"], verdict: Verdict | undefined): Unclear[] => {
+const abstentionsOf = (ctx: LandContext, { alignment, planModels, verdict }: { readonly alignment: SavedLanding["alignment"]; readonly planModels: readonly string[] | undefined; readonly verdict: Verdict | undefined }): Unclear[] => {
 	const isMeasured = (boundary: Boundary, models: readonly string[]): boolean => isTrusted(models, boundary, ctx.config.hum);
 	const kind = ctx.state.itemKinds.get(ctx.id);
-	const plan = ctx.state.plans.get(ctx.id);
 
 	return [
 		...(kind?.from === "fallback" ? [abstained("kind", kind.why)] : []),
 		...(doesGateAlignment(ctx.config.hum) && alignment && "abstained" in alignment ? [abstained("alignment", alignment.abstained)] : []),
-		...(plan && !isMeasured("plan-outcome", plan.models) ? [abstained("plan-outcome", unmeasured(plan.models))] : []),
+		...(planModels && !isMeasured("plan-outcome", planModels) ? [abstained("plan-outcome", unmeasured(planModels))] : []),
 		...(verdict && !isMeasured("review-verdict", verdict.models) ? [abstained("review-verdict", unmeasured(verdict.models))] : []),
 	];
 };
