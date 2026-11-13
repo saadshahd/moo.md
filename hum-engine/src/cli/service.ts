@@ -110,7 +110,8 @@ const spawnWorker = (cwd: string, workArgs: readonly string[]) => {
 
 /**
  * `hum work`, `hum serve` and `hum wake`: the processes a service unit and a CI workflow start. They are not ops:
- * roles and machines never name them, so they stay out of the table `hum help --json` prints.
+ * roles and machines never name them, so they stay out of the table `hum help --json` prints. A CI job's git dir dies
+ * with it, so `hum wake` brings back the state the last wake saved first, and saves it again after each tick.
  */
 export const addServiceCommands = (root: Command, io: Io, done: (code: number) => void): void => {
 	withWorkOptions(root.command("work").description("Run the worker on this machine until it is stopped or an update arrives; exits 75 for an update."))
@@ -172,7 +173,6 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 		.action(async (flags: WorkFlags & { event?: string }) => {
 			const dir = await defaultStateDir(io.cwd);
 			const where = { repo: io.cwd, remote: "origin", dir };
-			// A CI job's git dir dies with it, so the state the last wake saved comes back first and goes back after each tick.
 			let saved = await restoreCiState({ ...where, timeoutMs: commandTimeoutMs(serviceSettings(io.cwd)) });
 			const worker = await openFor(io, flags, "ci");
 			const timeoutMs = commandTimeoutMs(worker.config.hum);
