@@ -13,7 +13,7 @@
    pause, and with no pick at all the loop goes round again. Under reduced
    motion every stretch is drawn at once and the piece waits at the first
    fork. */
-import { Clock, whileSeen } from "./clock";
+import { Clock, EASE, whileSeen } from "./clock";
 
 type P = [number, number];
 type Seg = { el: HTMLElement; base: string; length: number };
@@ -23,7 +23,6 @@ const LINE_WIDTH = 6;
 const CURSOR: P = [12, 24];
 const DRAW_PX_PER_MS = 0.7;
 const WALK_MS = 900;
-const WALK_EASE = "cubic-bezier(0.77, 0, 0.175, 1)";
 const BEATS = {
   idle: 400,
   alone: 1800,
@@ -91,7 +90,9 @@ export function mount(fork: HTMLElement) {
 
   /* The line: a lead-in, then per fork two lanes that part and meet again,
      a link to the next fork, and a tail. The upper lane is the first answer.
-     Every stretch is built hidden here; the loop only draws and fades. */
+     It starts and ends half a cursor in, so the cursor stays on the piece's
+     edges. Every stretch is built hidden here; the loop only draws and
+     fades. */
   let geo: {
     start: P;
     end: P;
@@ -113,7 +114,8 @@ export function mount(fork: HTMLElement) {
     const gap = w * 0.05;
     const span = (w - lead - gap * (n - 1) - w * 0.08) / n;
     const dx = Math.min(rise, span * 0.22);
-    const start: P = [0, cy];
+    const inset = CURSOR[0] / 2;
+    const start: P = [inset, cy];
     const forkAt: P[] = asks.map((_, k) => [lead + k * (span + gap), cy]);
     const meet = (k: number): P => [forkAt[k][0] + span, cy];
     const lanes = forkAt.map((a, k) =>
@@ -136,13 +138,13 @@ export function mount(fork: HTMLElement) {
           return g;
         }),
       );
-    const cursor = layer(path, "fork-cursor");
+    const cursor = layer(path, "band-cursor");
     cursor.style.width = `${CURSOR[0]}px`;
     cursor.style.height = `${CURSOR[1]}px`;
     cursor.style.transform = at(start);
     geo = {
       start,
-      end: [w, cy],
+      end: [w - inset, cy],
       forkAt,
       lanes,
       links: forkAt.map((a, k) =>
@@ -151,7 +153,7 @@ export function mount(fork: HTMLElement) {
       pine: lanes.map((pair) => pair.map((pts) => stretch(pine, pts, "pine"))),
       ghosts: overLanes("fork-ghost", "ghost"),
       tints: overLanes("fork-tint", "pine"),
-      tail: stretch(pine, [meet(n - 1), [w, cy]], "pine"),
+      tail: stretch(pine, [meet(n - 1), [w - inset, cy]], "pine"),
       amber,
       cursor,
     };
@@ -196,7 +198,7 @@ export function mount(fork: HTMLElement) {
     }));
     const a = clock.play(geo.cursor, frames, {
       duration: still ? 0 : WALK_MS,
-      easing: WALK_EASE,
+      easing: EASE.inOut,
     });
     return {
       done: a.finished.catch(() => {}),
@@ -400,7 +402,7 @@ export function mount(fork: HTMLElement) {
   layout();
   whileSeen(fork, { pause: () => clock.pause(), resume: () => clock.resume() });
   new ResizeObserver(() => {
-    if (Math.abs(path.clientWidth - geo.end[0]) < 1) return;
+    if (Math.abs(path.clientWidth - geo.end[0] - CURSOR[0] / 2) < 1) return;
     layout();
     start();
   }).observe(path);

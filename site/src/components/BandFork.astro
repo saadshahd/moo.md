@@ -4,43 +4,14 @@
    preview. moo off shows the reply the moo-off session gave without asking.
    The panels are drawn here, so their buttons work from the first paint;
    band/fork.ts draws the line and plays the loop. */
-import { turns as offTurns } from "../demo/sessions/skills-off";
-import { turns as onTurns } from "../demo/sessions/skills-on";
+import { alone, forks, job } from "../band/job";
 import "../styles/fork.css";
-
-const fail = (why: string): never => {
-  throw new Error(`BandFork: ${why}`);
-};
-const job = onTurns[0].user.replace(/^\/\S+\s+/, "").replace(/\s+\/\S+/g, "");
-const sentences = (s: string) => s.match(/.*?[.!?](?=\s+[A-Z]|$)/g) ?? [s];
-/* The last two lines of a preview's last block, less their shared indent. */
-const glimpse = (preview: string) => {
-  const lines = preview.split("\n\n").at(-1)!.split("\n").slice(-2);
-  const indent = Math.min(...lines.map((l) => l.match(/^ */)![0].length));
-  return lines.map((l) => l.slice(indent)).join("\n");
-};
-const forks = onTurns
-  .flatMap((t) => t.dialogs ?? [])
-  .flatMap((d) => d.questions)
-  .filter((q) => q.options.length === 2 && q.options.every((o) => o.preview))
-  .map((q) => ({
-    header: q.header,
-    question: q.question,
-    proposed: q.options.findIndex((o) => o.label.includes("(Recommended)")),
-    options: q.options.map((o) => ({ label: o.label, preview: glimpse(o.preview!), result: sentences(o.description)[0].trim() })),
-  }));
-if (!forks.length) fail("the moo-on session asks no question with two answers, each with a preview");
-const unproposed = forks.find((f) => f.proposed < 0);
-if (unproposed) fail(`its question "${unproposed.header}" recommends neither answer`);
-const alone = sentences(String(offTurns.at(-1)!.reply![0]))
-  .slice(0, 2)
-  .join("");
 ---
 
 <div class="fork" data-fork data-phase="idle">
-  <div class="fork-top" aria-hidden="true">
-    <span class="fork-labels"><span class="fork-label off">moo off</span><span class="fork-label on">moo on</span></span>
-    <span class="fork-job">{job}</span>
+  <div class="band-top" aria-hidden="true">
+    <span class="band-labels"><span class="band-label off">moo off</span><span class="band-label on">moo on</span></span>
+    <span class="band-job">{job}</span>
   </div>
   <div class="fork-path" data-path aria-hidden="true"></div>
   <div class="fork-panels">
@@ -50,7 +21,7 @@ const alone = sentences(String(offTurns.at(-1)!.reply![0]))
         <div class="fork-panel" data-panel={k} data-proposed={f.proposed} role="group" aria-labelledby={`fork-q${k}`} inert>
           <div class="fork-say">
             <p class="fork-q" id={`fork-q${k}`}>
-              <span class="fork-head">{f.header}</span> {f.question}
+              <span class="band-head">{f.header}</span> {f.question}
             </p>
             {f.options.map((o, i) => (
               <p class="fork-result" data-result={i} aria-hidden="true">
@@ -78,7 +49,7 @@ const alone = sentences(String(offTurns.at(-1)!.reply![0]))
         {
           forks.map((f, k) => (
             <li data-row={k}>
-              <span class="fork-head">{f.header}</span>
+              <span class="band-head">{f.header}</span>
               {f.options.map((o, i) => (
                 <span class="fork-took" data-took={i}>
                   {o.label}

@@ -1,0 +1,41 @@
+---
+/* hum's band piece: the job of the skills demo sessions, run while you are
+   away. moo off shows the reply the moo-off session gave without asking;
+   moo on shows the first question the moo-on run left for you, with its two
+   answers, and the one the session's user picked. band/pace.ts draws the
+   lines and plays the loop. */
+import { alone, job, leftForYou } from "../band/job";
+import "../styles/pace.css";
+---
+
+<div class="pace" data-pace aria-hidden="true">
+  <div class="band-top">
+    <span class="band-labels"><span class="band-label off" data-label="off">moo off</span><span class="band-label on" data-label="on">moo on</span></span>
+    <span class="band-job">{job}</span>
+  </div>
+  <div class="pace-sheet" data-sheet></div>
+  <div class="pace-panels">
+    <p class="pace-alone" data-panel="off">{alone}</p>
+    <div class="pace-ask" data-panel="on">
+      <p><span class="band-head">{leftForYou.title}</span> {leftForYou.question}</p>
+      <ul class="pace-answers" data-picked={leftForYou.picked}>
+        {
+          leftForYou.answers.map((a, i) => (
+            <li data-answer={i}>
+              <span class="pace-mark">
+                <span data-pine />
+              </span>
+              {a}
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { mount } from "../band/pace";
+  const pace = document.querySelector<HTMLElement>("[data-pace]");
+  if (pace) mount(pace);
+</script>

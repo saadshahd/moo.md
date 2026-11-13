@@ -12,6 +12,9 @@ export const collections = {
         move: z.string().refine((s) => s.split(/\s+/).length <= 8, "eight words or fewer").optional(),
         // A chain page: its moves in order, as its demo runs them.
         moves: z.array(z.string()).optional(),
+        // A part page with a top band: the motion piece beside its title
+        // (PageTitle.astro).
+        band: z.enum(["pace", "pile"]).optional(),
       }),
     }),
   }),

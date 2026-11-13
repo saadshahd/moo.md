@@ -1,0 +1,19 @@
+/* hold's band piece (BandPile.astro), a piece in the band's piece column
+   (band.css). The labels and the yard share two columns, so each label's
+   block stands on its column's edge: moo off's pile on the left, moo on's
+   stack on the right. band/pile.ts places the blocks and plays every
+   opacity and transform. */
+.pile-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--moo-space-6); }
+.pile-yard { height: 14rem; }
+.pile-yard > * { position: relative; }
+.pile-yard > * > * { position: absolute; left: 0; top: 0; }
+.pile-face { position: absolute; inset: 0; border-radius: var(--moo-row-radius); }
+.pile-face.amber { background: var(--moo-surface); }
+.pile-face.ghost { box-shadow: inset 0 0 0 1.5px var(--sl-color-gray-4); }
+.pile-face.pine {
+  padding-inline: var(--moo-space-2); background: var(--moo-accent); color: var(--moo-on-accent);
+  font: 400 0.75rem / 1.5rem var(--__sl-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pile-bar { position: absolute; left: var(--moo-space-2); height: var(--moo-space-1); border-radius: 1px; }
+.pile-face.amber .pile-bar { background: var(--moo-off); }
+.pile-face.ghost .pile-bar { background: var(--sl-color-gray-4); opacity: 0.6; }

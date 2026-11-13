@@ -23,6 +23,17 @@
   --moo-radius: 0.5rem;
   --moo-pill: 999px;
   --moo-heading: "Switzer", "Instrument Sans", sans-serif;
+  /* One spacing scale: every gap in a page's band and in its piece is one
+     of these steps (band.css). */
+  --moo-space-1: 0.25rem;
+  --moo-space-2: 0.5rem;
+  --moo-space-3: 0.75rem;
+  --moo-space-4: 1rem;
+  --moo-space-5: 1.5rem;
+  --moo-space-6: 2rem;
+  --moo-space-7: 3rem;
+  --moo-space-8: 4rem;
+  --moo-space-9: 6rem;
 
   --sl-color-white: var(--moo-ink);
   --sl-color-gray-6: var(--moo-band);

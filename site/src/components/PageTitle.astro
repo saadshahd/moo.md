@@ -1,15 +1,39 @@
 ---
-// Every page shows its title and, under it, its description in plain words.
-// A page that draws a demo (Demo.astro), the front page among them, keeps
-// the title for the tab and screen readers alone, so the terminal comes first.
-const { title, description } = Astro.locals.starlightRoute.entry.data;
+/* Every page shows its title and, under it, its description in plain words.
+   A page with a band piece (its frontmatter's `band`) shows them in its top
+   band, the title over its move line and description, beside the piece.
+   A page that draws a demo (Demo.astro), the front page among them, keeps
+   the title for the tab and screen readers alone, so the terminal comes
+   first. */
+import Band from "./Band.astro";
+import BandPace from "./BandPace.astro";
+import BandPile from "./BandPile.astro";
+
+const { id, data } = Astro.locals.starlightRoute.entry;
+const { title, description, move, band } = data;
+const pieces = { pace: BandPace, pile: BandPile };
+const Piece = band && pieces[band];
+if (Piece && !(move && description)) throw new Error(`PageTitle: ${id} has a band but no move line or description`);
 ---
 
-<h1 id="_top">{title}</h1>
-{description && <p class="lede">{description}</p>}
+{
+  Piece ? (
+    <Band>
+      <h1 id="_top">{title}</h1>
+      <p class="lead">{move}</p>
+      <p>{description}</p>
+      <Piece slot="piece" />
+    </Band>
+  ) : (
+    <>
+      <h1 id="_top" class="page-title">{title}</h1>
+      {description && <p class="lede">{description}</p>}
+    </>
+  )
+}
 
 <style>
-  h1 {
+  .page-title {
     margin-top: 1rem;
     font-size: var(--sl-text-h1);
     line-height: var(--sl-line-height-headings);

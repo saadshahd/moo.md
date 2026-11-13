@@ -1,0 +1,10 @@
+---
+/* A page's top band: its copy, and beside it the page's motion piece, on the
+   one grid every band shares (band.css). */
+import "../styles/band.css";
+---
+
+<section class="band not-content">
+  <div class="band-copy"><slot /></div>
+  <div class="band-piece"><slot name="piece" /></div>
+</section>

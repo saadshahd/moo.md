@@ -1,6 +1,6 @@
-/* The front page (index.mdx): seven sections down one column, in the site's
-   type and tones (identity.css). Each section is a block with the class
-   front; the space between two is one section gap. */
+/* The front page (index.mdx): its band (band.css), then six sections down
+   one column, in the site's type and tones (identity.css). Each section is a
+   block with the class front; the space between two is one section gap. */
 :root:has(.front) {
   --front-gap: clamp(4rem, 2.5rem + 6vw, 7.5rem);
   --front-card-pad: clamp(1.25rem, 0.9rem + 1.5vw, 2rem);
@@ -17,20 +17,9 @@ ul.front { padding: 0; }
 .front code { font-family: var(--__sl-font-mono); font-size: 0.875em; background: none; padding: 0; }
 .front a:has(> code) { color: var(--sl-color-text-accent); text-underline-offset: 0.2em; }
 
-/* The slip: the band the bar sits on runs down through it, edge to edge. */
-:root:has(.front.slip) .main-frame main .content-panel + .content-panel { padding-top: 0; }
-.front.slip {
-  margin-top: 0; padding-block: clamp(2.5rem, 1.5rem + 5vw, 5.5rem);
-  background: var(--moo-band); box-shadow: 0 0 0 100vmax var(--moo-band); clip-path: inset(0 -100vmax);
-}
-.front.slip h2 { max-width: 16ch; font-size: clamp(2.5rem, 1.2rem + 5vw, 5.5rem); line-height: 0.95; letter-spacing: -0.04em; }
-.front.slip .lead { margin-top: 1.5rem; }
-.front.slip p:not(.lead, .actions) { margin-top: 1rem; max-width: 52ch; line-height: 1.5; }
-.front .quiet { color: var(--sl-color-gray-3); }
-.front .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+/* The band's second action, a pill on the surface beside the filled one. */
 .moo-action.second, .moo-action.second:hover { background: var(--moo-surface); color: var(--moo-ink); }
 .moo-action.second:hover { background: var(--moo-paper); }
-.front .moo-action:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
 
 /* Three traps side by side, each under a block in the demo's moo-off amber. */
 .front.traps ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: 1.5rem 2rem; margin-top: 2.5rem; }

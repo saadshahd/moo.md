@@ -1,3 +1,10 @@
+/* The band pieces' two curves: out for what arrives, in-out for what moves
+   from one place to another. */
+export const EASE = {
+  out: "cubic-bezier(0.23, 1, 0.32, 1)",
+  inOut: "cubic-bezier(0.77, 0, 0.175, 1)",
+};
+
 /* Every animation and wait a stepped piece starts goes through one Clock, so
    pausing it stops them all, waits included. Every move is a transform or an
    opacity run by the Web Animations API: the compositor plays it, and the

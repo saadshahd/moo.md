@@ -1,0 +1,25 @@
+---
+/* hold's band piece: a pile of work you signed for beside a stack you own.
+   Each block on the stack carries the name of one question the moo-on
+   session asked, so you can name every part you hold. band/pile.ts draws the
+   blocks and plays the loop. */
+import { forks } from "../band/job";
+import "../styles/pile.css";
+---
+
+<div class="pile" data-pile data-names={JSON.stringify(forks.map((f) => f.header))} data-picks={JSON.stringify(forks.map((f) => f.proposed))} aria-hidden="true">
+  <div class="pile-cols">
+    <span class="band-label off" data-label="off">moo off</span>
+    <span class="band-label on" data-label="on">moo on</span>
+  </div>
+  <div class="pile-cols pile-yard">
+    <div data-col="off"></div>
+    <div data-col="on"></div>
+  </div>
+</div>
+
+<script>
+  import { mount } from "../band/pile";
+  const pile = document.querySelector<HTMLElement>("[data-pile]");
+  if (pile) mount(pile);
+</script>
