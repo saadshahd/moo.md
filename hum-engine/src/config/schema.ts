@@ -362,7 +362,7 @@ export const HumConfig = z.strictObject({
 	/** The day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
 	ciToken: z.strictObject({ setUp: z.iso.date() }).optional(),
 	/** No default: a commit is credited to whichever account lists its email, so only the owner's own is safe. */
-	commitIdentity: commitIdentity.describe("The owner's own name and email: the author and committer of every commit hum makes. Setup writes them from git config; hum ships none."),
+	commitIdentity: commitIdentity.describe("The owner's own name and email: the author and committer of every commit hum makes with git. Where the base requires signed commits, GitHub makes the commits and credits them to the account of the token hum writes with: the owner's own on a Mac; in CI, the GitHub App's bot or the account whose token pullRequestToken names. Setup writes them from git config; hum ships none."),
 	...withShippedDefaults(Shipped.shape),
 });
 

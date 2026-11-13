@@ -8,7 +8,7 @@ Read first, then ask. Every question leads with what the repo showed and a propo
 
 ## Read
 
-Run `bunx hum setup scan` (the pinned engine: `bun add --exact @moo.md/hum@<version>` first if `package.json` has none). It prints the scan, a proposal for each setting, the waiting states, how many open issues the label map covers, and `gitIdentity`: the name and email hum will commit as, read from your git config. If `gitIdentity.found` is false, stop: tell the owner to set the `missing` keys with `git config --global <key> "<value>"` and ask nothing more. Answer nothing from the scan that the repo already says.
+Run `bunx hum setup scan` (the pinned engine: `bun add --exact @moo.md/hum@<version>` first if `package.json` has none). It prints the scan, a proposal for each setting, the waiting states, how many open issues the label map covers, and `gitIdentity`: the name and email hum will commit as, read from your git config. Where the base requires signed commits, GitHub makes hum's commits and credits them to the token's account instead: yours on a Mac, the App's bot in CI. If `gitIdentity.found` is false, stop: tell the owner to set the `missing` keys with `git config --global <key> "<value>"` and ask nothing more. Answer nothing from the scan that the repo already says.
 
 ## Ask
 
