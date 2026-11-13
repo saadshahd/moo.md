@@ -48,52 +48,48 @@ const messageOf = async (git: Git, from: string, to: string): Promise<{ readonly
 /** Whether commits that reach the base must carry a signature GitHub verifies, as its rules say. */
 export const signsCommits = async ({ pulls, base }: Pick<PushContext, "pulls" | "base">): Promise<boolean> => pulls !== undefined && (await pulls.rules(base)).requiresSignatures;
 
-const githubCommits = ({ commits, base }: Pick<PushContext, "commits" | "base">): GitHubCommits => {
+const requireCommits = ({ commits, base }: Pick<PushContext, "commits" | "base">): GitHubCommits => {
 	if (!commits) throw new Error(`${base} requires signed commits, and hum has no GitHub client to make them through`);
 
 	return commits;
 };
 
-/** The branch hum builds a replacement commit on, so the branch itself moves once, from its old commit to the new. */
+/** The branch GitHub makes each commit on, so the branch itself moves only to a commit whose tree is checked. */
 const scratchBranch = (branch: string): string => `${branch}-signing`;
 
 /**
  * Puts the tree of `from` on `branch` as one commit that GitHub makes on `parent`, and so signs. The branch must stand
  * at `parent`, or not exist; with `replace`, a branch elsewhere is moved to the new commit. A commit through the API
- * carries no file mode or link, so a tree that comes back different throws.
+ * carries no file mode or link, so GitHub makes it on a scratch branch first, and a tree that comes back different
+ * throws before the branch moves.
  */
 export const commitSigned = async (ctx: PushContext, { from, parent, branch, replace }: { readonly from: string; readonly parent: string; readonly branch: string; readonly replace: boolean }): Promise<Signed> => {
-	const commits = githubCommits(ctx);
+	const commits = requireCommits(ctx);
 	const remote = await commits.head(branch);
 
 	if (remote !== undefined && remote !== parent && !replace) return { kind: "conflict" };
 
-	const target = remote === undefined || remote === parent ? branch : scratchBranch(branch);
+	const scratch = scratchBranch(branch);
+	const created = await commits.createBranch(scratch, parent);
+	const placed = created.kind === "conflict" ? await commits.moveBranch(scratch, parent, true) : created;
 
-	if (target !== branch || remote === undefined) {
-		const created = await commits.createBranch(target, parent);
-		const placed = created.kind === "conflict" && target !== branch ? await commits.moveBranch(target, parent, true) : created;
+	if (placed.kind !== "done") return placed;
 
-		if (placed.kind !== "done") return placed;
+	try {
+		const made = await commits.commitOnBranch({ branch: scratch, expected: parent, ...(await messageOf(ctx.git, parent, from)), files: await changesBetween(ctx, parent, from) });
+
+		if (made.kind !== "done") return made;
+
+		const tree = (await ctx.git.raw(["rev-parse", `${from}^{tree}`])).trim();
+
+		if (made.value.tree !== tree) throw new Error(`GitHub's commit ${made.value.oid} holds another tree than ${from}, so ${branch} was left where it was: the change holds an executable bit, a link or a submodule, which a commit through GitHub's API cannot carry`);
+
+		const moved = remote === undefined ? await commits.createBranch(branch, made.value.oid) : await commits.moveBranch(branch, made.value.oid, remote !== parent);
+
+		return moved.kind === "done" ? { kind: "pushed", sha: made.value.oid } : moved;
+	} finally {
+		await commits.deleteBranch(scratch);
 	}
-
-	const made = await commits.commitOnBranch({ branch: target, expected: parent, ...(await messageOf(ctx.git, parent, from)), files: await changesBetween(ctx, parent, from) });
-
-	if (made.kind !== "done") return made;
-
-	if (target !== branch) {
-		const moved = await commits.moveBranch(branch, made.value.oid, true);
-
-		await commits.deleteBranch(target);
-
-		if (moved.kind !== "done") return moved;
-	}
-
-	const tree = (await ctx.git.raw(["rev-parse", `${from}^{tree}`])).trim();
-
-	if (made.value.tree !== tree) throw new Error(`GitHub's commit ${made.value.oid} on ${branch} holds another tree than ${from}: the change holds an executable bit, a link or a submodule, which a commit through GitHub's API cannot carry`);
-
-	return { kind: "pushed", sha: made.value.oid };
 };
 
 /**
@@ -107,7 +103,7 @@ export const pushRunBranch = async (ctx: PushContext, branch: string): Promise<P
 	if (!(await signsCommits(ctx))) return push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
 
 	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
-	const remote = await githubCommits(ctx).head(branch);
+	const remote = await requireCommits(ctx).head(branch);
 
 	if (remote === head) return { kind: "pushed" };
 
@@ -129,7 +125,7 @@ export const pushRunBranch = async (ctx: PushContext, branch: string): Promise<P
 export const pushBase = async (ctx: PushContext): Promise<PushOutcome> => {
 	if (!(await signsCommits(ctx))) return push(ctx.git, ["origin", `HEAD:refs/heads/${ctx.base}`]);
 
-	const moved = await githubCommits(ctx).moveBranch(ctx.base, (await ctx.git.raw(["rev-parse", "HEAD"])).trim(), false);
+	const moved = await requireCommits(ctx).moveBranch(ctx.base, (await ctx.git.raw(["rev-parse", "HEAD"])).trim(), false);
 
 	return moved.kind === "done" ? { kind: "pushed" } : moved;
 };

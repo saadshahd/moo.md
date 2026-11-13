@@ -124,7 +124,7 @@ test("where main requires signed commits and takes a push, main moves to GitHub'
 	expect(github.issueState(Number(id))).toBe("CLOSED");
 });
 
-test("a change GitHub's API cannot carry, such as an executable bit, fails loud instead of landing another tree", async () => {
+test("a change GitHub's API cannot carry, such as an executable bit, fails loud and leaves the remote's branches as they were", async () => {
 	const repo = new WorkRepo();
 	const github = new FakeGitHub();
 	const clone = repo.worker("run");
@@ -138,4 +138,5 @@ test("a change GitHub's API cannot carry, such as an executable bit, fails loud 
 	await git.raw(["commit", "-q", "-m", "add a script"]);
 
 	await expect(pushRunBranch({ git, clone, base: "main", pulls: github.client(), commits: github.commits() }, "hum/run/9")).rejects.toThrow("an executable bit, a link or a submodule");
+	expect(sh(repo.remote, ["for-each-ref", "--format=%(refname)", "refs/heads"]).trim()).toBe("refs/heads/main");
 });
