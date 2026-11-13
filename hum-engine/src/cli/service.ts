@@ -32,6 +32,7 @@ import { MINUTE_MS } from "../time.ts";
 import type { Io } from "./ops.ts";
 import { Holder, type Item, ItemId } from "../adapter-api.ts";
 import { parseArgument } from "../adapters/argument.ts";
+import { MEGABYTE } from "../bytes.ts";
 
 const EXIT_OK = 0;
 
@@ -43,8 +44,6 @@ const EXIT_CARDS_SHOWN = 1;
 const EXIT_FAILED = 1;
 
 const SCHEDULE_EVENT = "schedule";
-
-const MEGABYTE = 1024 * 1024;
 
 type WorkFlags = { holder?: string; base?: string };
 

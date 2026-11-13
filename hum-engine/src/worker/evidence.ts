@@ -2,6 +2,7 @@ import { lstatSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import { type Git, push } from "../adapters/git.ts";
 import type { Evidence } from "../state/saved.ts";
+import { MEGABYTE } from "../bytes.ts";
 
 /** The files a pull request body shows, by extension: a picture inline, a video as a link. */
 const KINDS: ReadonlyMap<string, "image" | "video"> = new Map([
@@ -16,8 +17,6 @@ const KINDS: ReadonlyMap<string, "image" | "video"> = new Map([
 ]);
 
 const MOST_MEGABYTES = 10;
-
-const BYTES_PER_MEGABYTE = 1024 * 1024;
 
 /** Where an item's evidence is kept: a ref, never a branch, so no branch rule and no merge reaches it. */
 export const evidenceRef = (item: string): string => `refs/hum/evidence/${item}`;
@@ -41,7 +40,7 @@ export const keepEvidence = async ({ git, folder, file, item, repo }: { readonly
 
 	if (!entry.isFile()) return { left: `${name} is no plain file` };
 
-	if (entry.size > MOST_MEGABYTES * BYTES_PER_MEGABYTE) return { left: `${name} is over ${MOST_MEGABYTES} MB` };
+	if (entry.size > MOST_MEGABYTES * MEGABYTE) return { left: `${name} is over ${MOST_MEGABYTES} MB` };
 
 	if (repo === undefined) return { left: "the repo is not on GitHub, where a pull request would show it" };
 

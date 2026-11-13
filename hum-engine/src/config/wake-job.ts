@@ -18,6 +18,8 @@ export const WAKE_ENV = {
 	gitConfig: "GIT_CONFIG_GLOBAL",
 	/** What gather settled, from its job outputs, for the publish job. */
 	gathered: "HUM_GATHERED",
+	/** The workflow's own token, with which the publish job reads the outbox artifact's size before it downloads it. */
+	actionsToken: "HUM_ACTIONS_TOKEN",
 } as const;
 
 /** The env names the wake job sets itself, which `ciEnv` may not set. */

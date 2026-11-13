@@ -267,7 +267,7 @@ test("an App's token is minted last in each job that holds it, with the workflow
 			"permission-issues": "write",
 			"permission-pull-requests": "write",
 		});
-		expect(job.permissions).toEqual({ contents: "write", issues: "write", "pull-requests": "write" });
+		expect(job.permissions).toMatchObject({ contents: "write", issues: "write", "pull-requests": "write" });
 		expect(mint?.if).toBeUndefined();
 		expect(wake?.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token }}`);
 
@@ -311,6 +311,37 @@ test("the checkout keeps no token in the workspace; the jobs that hold GitHub's 
 
 	expect(at(work.steps, work.steps.find(({ run }) => run === "./node_modules/.bin/hum plugins"))).toBeGreaterThan(at(work.steps, work.steps.find(({ run }) => run === "bun install --frozen-lockfile")));
 	expect(wakeText(settings)).not.toContain("claude plugin");
+});
+
+test("the publish job reads the outbox artifact's size from GitHub's artifacts API, and stops before it downloads one over the outbox cap", async () => {
+	const { steps, permissions } = wakeOf(settings).jobs.publish;
+	const check = steps.find(({ run }) => run?.includes("/artifacts?name="));
+	const asked: string[] = [];
+	let size = 1;
+
+	const server = Bun.serve({
+		port: 0,
+		fetch: (request) => {
+			asked.push(`${new URL(request.url).pathname}${new URL(request.url).search} ${request.headers.get("authorization")}`);
+
+			return Response.json({ artifacts: [{ name: "hum-outbox", size_in_bytes: size }] });
+		},
+	});
+
+	const exitOf = () => Bun.spawn(["bash", "-ec", check?.run ?? "false"], { env: { PATH: process.env.PATH, GITHUB_API_URL: server.url.origin, GITHUB_REPOSITORY: "owner/repo", GITHUB_RUN_ID: "7", HUM_ACTIONS_TOKEN: "t0ken" }, stderr: "ignore" }).exited;
+
+	try {
+		expect(await exitOf()).toBe(0);
+		size = settings.ciOutboxMaxMegabytes * 1024 * 1024 + 1;
+		expect(await exitOf()).not.toBe(0);
+	} finally {
+		await server.stop();
+	}
+
+	expect(asked[0]).toBe("/repos/owner/repo/actions/runs/7/artifacts?name=hum-outbox Bearer t0ken");
+	expect(check?.env).toEqual({ HUM_ACTIONS_TOKEN: "${{ github.token }}" });
+	expect(permissions).toMatchObject({ actions: "read" });
+	expect(steps.indexOf(check ?? {})).toBeLessThan(steps.findIndex(({ uses }) => uses?.startsWith("actions/download-artifact@")));
 });
 
 test("the git setup step hands git the run's GH_TOKEN when git asks, with no gh, and trusts the checkout", () => {

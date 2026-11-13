@@ -17,6 +17,7 @@ import { pushRunBranch, signsCommits } from "../worker/signed-push.ts";
 import { claimTtlMs, runBranch, type ThinResult } from "../worker/thin-path.ts";
 import { type BundleCheck, type BundleRefs, checkBundle, OUTBOX_REFS } from "./bundle.ts";
 import type { Intent } from "./intents.ts";
+import { MEGABYTE } from "../bytes.ts";
 
 type Scope = { readonly run: string; readonly attempt: number };
 
@@ -128,8 +129,6 @@ const NOTHING_BUNDLED: BundleCheck = { ok: true, refs: new Map() };
 
 /** A pass publish refused before any write, and why. */
 export const refusedPass = (item: string, why: string): ThinResult => ({ outcome: "stuck", item, detail: `publish refused the pass: ${why}` });
-
-const MEGABYTE = 1024 * 1024;
 
 /** The bytes of every file the tree at `commit` holds, which a worktree of it writes to disk. */
 const treeBytes = async (git: Git, commit: string): Promise<number> =>

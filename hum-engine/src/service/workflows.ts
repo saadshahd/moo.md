@@ -3,11 +3,12 @@ import { CLAUDE_FLOOR } from "../adapters/claude-p.ts";
 import type { HumConfig, PullRequestToken } from "../config/schema.ts";
 import { APP_TOKEN_ACTION, APP_TOKEN_MINUTES, CLAUDE_TOKEN, readsSecrets, secretsNamed, TRUSTED_ASSOCIATIONS, WAKE_ENV as ENV, WORKFLOW_FILES } from "../config/wake-job.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
+import { MEGABYTE } from "../bytes.ts";
 
 /** The settings the workflows are built from. */
 export type WorkflowSettings = Pick<
 	HumConfig,
-	"runBranchPrefix" | "itemsDir" | "ciSchedule" | "commitIdentity" | "ciWakeTimeoutMinutes" | "pullRequestToken" | "ciRunner" | "ciContainer" | "ciEnv" | "ciClaudeAuth"
+	"runBranchPrefix" | "itemsDir" | "ciSchedule" | "commitIdentity" | "ciWakeTimeoutMinutes" | "ciOutboxMaxMegabytes" | "pullRequestToken" | "ciRunner" | "ciContainer" | "ciEnv" | "ciClaudeAuth"
 >;
 
 /** The type of the `repository_dispatch` event a tracker's webhook sends. */
@@ -33,6 +34,9 @@ const RELEASE_OF: ReadonlyMap<string, string> = new Map(Object.values(ACTIONS).m
 
 const PERMISSIONS = { contents: "write", issues: "write", "pull-requests": "write" } as const;
 
+/** The workflow token's permissions: the App's, and reading the run's artifacts, which the publish job sizes before it downloads one. */
+const WORKFLOW_PERMISSIONS = { ...PERMISSIONS, actions: "read" } as const;
+
 /** One wake at a time: a second event waits for the first run instead of racing it. */
 const CONCURRENCY = { group: "hum-wake", "cancel-in-progress": false } as const;
 
@@ -53,7 +57,7 @@ type TriggerJob = { readonly if?: string };
 const trigger = (name: string, on: TriggerEvents, job: TriggerJob = {}) => ({
 	name,
 	on,
-	permissions: PERMISSIONS,
+	permissions: WORKFLOW_PERMISSIONS,
 	concurrency: CONCURRENCY,
 	jobs: { wake: { ...job, uses: WAKE_PATH, secrets: "inherit" } },
 });
@@ -166,6 +170,20 @@ const upload = (name: string) => ({ uses: ACTIONS.upload.uses, with: { name, pat
 
 const download = (name: string) => ({ uses: ACTIONS.download.uses, with: { name, path: handoverPath(name) } });
 
+/** Stops the job before it downloads the artifact `name` when GitHub's artifacts API says it is larger than `maxBytes`, or the run holds no single one. */
+const sizeCheck = (name: string, maxBytes: number) => ({
+	env: { [ENV.actionsToken]: "${{ github.token }}" },
+	run: `node --input-type=module -e '
+const env = process.env;
+const reply = await fetch(env.GITHUB_API_URL + "/repos/" + env.GITHUB_REPOSITORY + "/actions/runs/" + env.GITHUB_RUN_ID + "/artifacts?name=${name}", { headers: { authorization: "Bearer " + env.${ENV.actionsToken}, accept: "application/vnd.github+json" } });
+if (!reply.ok) throw new Error("GitHub artifacts API answered " + reply.status);
+const { artifacts } = await reply.json();
+if (artifacts.length !== 1) throw new Error("the run holds " + artifacts.length + " artifacts named ${name}");
+if (artifacts[0].size_in_bytes > ${maxBytes}) throw new Error("${name} holds " + artifacts[0].size_in_bytes + " bytes, over the ${maxBytes} bytes publish reads; this wake publishes nothing");
+'
+`,
+});
+
 /** What gather settled, as its job output: publish trusts it, and the work job checks out the base it names. */
 const GATHERED = "${{ needs.gather.outputs.gathered }}";
 
@@ -200,7 +218,7 @@ const SAFE_CHECKOUT = { run: 'git config --global --add safe.directory "$GITHUB_
  * value that reads a secret reach the steps that run hum alone. A runner GitHub does not host keeps what a job leaves,
  * so a process a run left could outlive the work job there: ephemeral runners close that.
  */
-const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner, ciContainer, ciEnv, ciClaudeAuth }: WorkflowSettings) => {
+const wake = ({ commitIdentity, ciWakeTimeoutMinutes, ciOutboxMaxMegabytes, pullRequestToken, ciRunner, ciContainer, ciEnv, ciClaudeAuth }: WorkflowSettings) => {
 	const claude = CLAUDE_SIGN_IN[ciClaudeAuth];
 	const github = githubToken(pullRequestToken);
 	const env = envByReach(ciEnv);
@@ -209,9 +227,9 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner
 	const checkout = (ref?: string) => ({ uses: ACTIONS.checkout.uses, with: { ...(ref && { ref }), "fetch-depth": 0, "persist-credentials": false } });
 
 	/** A job that holds GitHub's token: hum from npm, git that pushes as hum, and the token minted last. It installs no plugin: it makes judgment calls alone, which load none. */
-	const holdsToken = ({ before, ref, run }: { readonly before: readonly object[]; readonly ref?: string; readonly run: object }) => ({
+	const holdsToken = ({ before, ref, run, permissions = PERMISSIONS }: { readonly before: readonly object[]; readonly ref?: string; readonly run: object; readonly permissions?: typeof PERMISSIONS }) => ({
 		...where,
-		permissions: PERMISSIONS,
+		permissions,
 		"timeout-minutes": APP_TOKEN_MINUTES,
 		env: { ...env.everyStep, ...github.env, [ENV.event]: "${{ github.event_name }}" },
 		steps: [...github.check, checkout(ref), JOB_PATHS_STEP, installTools(` ${PUBLISHED_HUM}`), gitSetup(commitIdentity), ...before, ...github.steps, run],
@@ -246,7 +264,7 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, pullRequestToken, ciRunner
 			},
 			publish: {
 				needs: ["gather", "work"],
-				...holdsToken({ ref: GATHERED_BASE, before: [download(HANDOVER.outbox)], run: { run: `hum wake publish --outbox ${handoverFolder(HANDOVER.outbox)} --event "$${ENV.event}"`, env: { ...humEnv, [ENV.gathered]: GATHERED } } }),
+				...holdsToken({ ref: GATHERED_BASE, permissions: WORKFLOW_PERMISSIONS, before: [sizeCheck(HANDOVER.outbox, ciOutboxMaxMegabytes * MEGABYTE), download(HANDOVER.outbox)], run: { run: `hum wake publish --outbox ${handoverFolder(HANDOVER.outbox)} --event "$${ENV.event}"`, env: { ...humEnv, [ENV.gathered]: GATHERED } } }),
 			},
 		},
 	};
