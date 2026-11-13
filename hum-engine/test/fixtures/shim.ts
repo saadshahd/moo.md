@@ -18,8 +18,10 @@ export const shimSpecJson = (): string => {
 
 /** What one `-p` call does. */
 export type Behavior = {
-	/** Files to write and commit in the working directory. */
-	commit?: Record<string, string>;
+	/** Files to write in the working directory, which hum then commits. Without `structured`, the run ends done with a pull request title. */
+	write?: Record<string, string>;
+	/** Commit what the run wrote as the shim's own commit, as a run told to leave its change uncommitted might. */
+	commitsItself?: boolean;
 	/** A structured result. */
 	structured?: unknown;
 	plugins?: string[];
@@ -41,8 +43,8 @@ export type Behavior = {
 	/** A picture of this name the shim saves in the folder for evidence its prompt names. */
 	saveEvidence?: string;
 	subtype?: string;
-	/** Write `docs/<item>.md` and commit it, the item being the id in the prompt's `# Item <id>:` heading. */
-	commitForItem?: boolean;
+	/** Write `docs/<item>.md`, the item being the id in the prompt's `# Item <id>:` heading. Without `structured`, the run ends done with a pull request title. */
+	writeForItem?: boolean;
 	/** Ask this question until the prompt carries the owner's answer, then finish. */
 	askUnlessAnswered?: string;
 	/** Sleep this long before the first assistant message. */

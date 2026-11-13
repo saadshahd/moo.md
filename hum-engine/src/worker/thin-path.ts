@@ -9,7 +9,7 @@ import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { ADAPTER_API_VERSION } from "../adapter-api.ts";
 import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, identityEnv, PATCH } from "../adapters/git.ts";
+import { type Git, gitIn, PATCH } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -58,7 +58,7 @@ const PullRequestWritten = z.object({ title: z.string().min(1), body: z.string()
 
 type PullRequestWritten = z.infer<typeof PullRequestWritten>;
 
-/** What the agent run hands back besides its commit. */
+/** What the agent run hands back besides the change it leaves in the working tree. */
 export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional(), pullRequest: PullRequestWritten.optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
@@ -257,15 +257,15 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (taken === undefined) return { outcome: "lost", item: id };
 
-	const { folder: clone } = taken;
-	const { commitIdentity } = o.config.hum;
-	/** The agent's own commits take the owner's identity too: a fresh clone holds none of the repo's local git config. */
-	const env = { ...identityEnv(commitIdentity), ...taken.env };
-	const git = gitIn(clone, { identity: commitIdentity, timeoutMs });
-	const g = (args: readonly string[]): Promise<string> => git.raw(args);
+	const { folder: clone, env } = taken;
 
 	try {
-		await onRunBranch(git, { branch, restartAt: isFresh ? `origin/${base}` : undefined });
+		const checkedOut = gitIn(clone, { identity: o.config.hum.commitIdentity, timeoutMs });
+
+		await onRunBranch(checkedOut, { branch, restartAt: isFresh ? `origin/${base}` : undefined });
+
+		const git = checkedOut;
+		const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
 		/** Where a run saves its one picture or video of the change, outside the clone so nothing commits it. */
 		const evidence = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-evidence-"));
@@ -411,8 +411,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const parts = [
 			roleOf(config, purpose),
 			`# Item ${id}: ${item.title}\n\n${item.body}`,
-			`Work on the branch ${branch}. Commit the change when it is whole. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
-			`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be. Where one screenshot or short video shows the change at work, save that one file in ${d.evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
+			`Work on the branch ${branch}. Leave the change in the working tree and make no commit: hum commits every file there once you are done. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+			`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${d.evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
 		];
 
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
@@ -425,7 +425,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			parts.push(`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n${soFar}`);
 		}
 
-		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause and commit.`);
+		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
 
 		return parts.join("\n\n");
 	};
@@ -533,10 +533,16 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					const wants = Wants.safeParse(outcome.structured).data;
 
 					if (wants?.status !== "needs-owner") {
-						if (wants?.pullRequest) await keepPullRequest(d, wants.pullRequest);
+						if (!wants?.pullRequest) throw failed(`the ${purpose} run ended without the pull request title hum commits its change under`);
 
-						break;
+						await keepPullRequest(d, wants.pullRequest);
+
+						if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${purpose} run succeeded and changed nothing`);
+
+						return;
 					}
+
+					await commitRun(d.git, { since: before, subject: `hum: ${id} so far` });
 
 					const settled = await settleNeed(wants);
 
@@ -544,9 +550,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 					chosen.push(settled.chose);
 				}
-
-				// Done is a new commit on the branch, not the run's word.
-				if ((await g(["rev-parse", "HEAD"])).trim() === before) throw failed(`the ${purpose} run succeeded and committed nothing`);
 			},
 		});
 
@@ -672,6 +675,22 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 };
 
 /** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */
+/**
+ * Commits what a build or fix run left in the working tree as one commit on `since`, under `subject`, by the owner's
+ * commitIdentity, and says whether there was a change to commit. A commit the run made anyway, and the work so far
+ * hum committed when the run asked, are folded into it, so the run's whole change is one commit of hum's.
+ */
+const commitRun = async (git: Git, { since, subject }: { readonly since: string; readonly subject: string }): Promise<boolean> => {
+	await git.raw(["reset", "-q", "--soft", since]);
+	await git.raw(["add", "-A"]);
+
+	if ((await git.run(["diff", "--cached", "--quiet"])).code === 0) return false;
+
+	await git.raw(["commit", "-q", "--no-verify", "-m", subject]);
+
+	return true;
+};
+
 const keepPullRequest = async (d: Driven, { title, body, evidence }: PullRequestWritten): Promise<void> => {
 	const kept = evidence === undefined ? d.state.pullRequests.get(d.id)?.evidence : await keepEvidence({ git: d.git, folder: d.evidence, file: evidence, item: d.id, repo: repoFromRemote(d.remote) });
 

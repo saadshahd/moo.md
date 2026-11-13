@@ -168,31 +168,24 @@ if (step.sleep) await new Promise((resolve) => setTimeout(resolve, step.sleep));
 
 if (step.hang) await new Promise((resolve) => setTimeout(resolve, 60_000));
 
-if (step.commitForItem && itemId) {
+if (step.writeForItem && itemId) {
 	mkdirSync(join(process.cwd(), "docs"), { recursive: true });
 	appendFileSync(join(process.cwd(), "docs", `${itemId}.md`), `from ${itemId}\n`);
-	spawnSync("git", ["add", "-A"]);
-	spawnSync("git", ["-c", "user.name=shim", "-c", "user.email=shim@t", "commit", "-q", "-m", `shim: ${itemId}`]);
 }
 
-if (step.commit) {
-	for (const [path, content] of Object.entries(step.commit)) {
-		mkdirSync(dirname(join(process.cwd(), path)), { recursive: true });
-		writeFileSync(join(process.cwd(), path), content);
-	}
-
-	spawnSync("git", ["add", "-A"]);
-	spawnSync("git", [
-		"-c",
-		"user.name=shim",
-		"-c",
-		"user.email=shim@t",
-		"commit",
-		"-q",
-		"-m",
-		"shim: the change",
-	]);
+for (const [path, content] of Object.entries(step.write ?? {})) {
+	mkdirSync(dirname(join(process.cwd(), path)), { recursive: true });
+	writeFileSync(join(process.cwd(), path), content);
 }
+
+if (step.commitsItself) {
+	spawnSync("git", ["add", "-A"]);
+	spawnSync("git", ["-c", "user.name=shim", "-c", "user.email=shim@t", "commit", "-q", "-m", "shim: its own commit"]);
+}
+
+/** A run that wrote its change ends done, with the pull request title hum commits the change under. */
+const wrote = step.write !== undefined || (step.writeForItem === true && itemId !== undefined);
+const done = { status: "done", pullRequest: { title: step.writeForItem ? `shim: ${itemId}` : "shim: the change", body: "The shim's change." } };
 
 const evidenceFolder = /save that one file in (\S+), never in the repo/.exec(prompt)?.[1];
 
@@ -207,7 +200,7 @@ await (step.stderrNoise ? outSplit : out)({
 	subtype: step.subtype ?? (step.error ? "error_during_execution" : "success"),
 	is_error: step.error !== undefined,
 	result: step.error ?? '{"ok":true}',
-	structured_output: step.askUnlessAnswered && !prompt.includes("## The owner answered") ? { status: "needs-owner", question: step.askUnlessAnswered, plan: "Plan A" } : (step.structured ?? { ok: true }),
+	structured_output: step.askUnlessAnswered && !prompt.includes("## The owner answered") ? { status: "needs-owner", question: step.askUnlessAnswered, plan: "Plan A" } : (step.structured ?? (wrote ? done : { ok: true })),
 	modelUsage: {
 		[SHIM_MODEL]: {
 			inputTokens: 1,

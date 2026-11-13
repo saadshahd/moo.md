@@ -115,7 +115,7 @@ test("the last-read list survives a restart: a fresh guard still sees an empty l
 });
 
 test("an item saved under an earlier machine version restores through the kinds the worker kept", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -146,7 +146,7 @@ test("an item's token total is saved over all its runs and restarts; the cap cou
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 699, askUnlessAnswered: "Which?" } } }, { config });
+	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 699, askUnlessAnswered: "Which?" } } }, { config });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -171,7 +171,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
+	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -188,7 +188,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 });
 
 test("three items on one role start one after the other's first token, not together", async () => {
-	const behavior = { commitForItem: true, spend: 5, beforeToken: 300 };
+	const behavior = { writeForItem: true, spend: 5, beforeToken: 300 };
 	const w = await workerWorld({ items: { a: behavior, b: behavior, c: behavior } });
 
 	w.item("a", "docs/a.md");
@@ -207,7 +207,7 @@ test("three items on one role start one after the other's first token, not toget
 });
 
 test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markdown source, a started runner", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 } } });
 
 	writeConfigDir(join(w.repo.owner, ".hum"), rawConfig((raw) => void (raw.hum.backgroundPollSeconds = 0.05)));
 
@@ -255,7 +255,7 @@ test("openWorker refuses a repo whose hum.json names no commit identity, saying 
 });
 
 test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 } } });
 	const pool = tempDir("open-pool");
 
 	writeConfigDir(

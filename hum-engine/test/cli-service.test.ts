@@ -31,7 +31,7 @@ const hum = (o: ReturnType<typeof ownerRepo>, args: string[], env: Record<string
 const stateDir = (o: ReturnType<typeof ownerRepo>) => join(o.repo.owner, ".git", "hum");
 
 test("hum wake on a schedule event: the item merges, the tick and hum's state are recorded on the remote, and the job exits 0", () => {
-	const o = owner({ items: { a: { commitForItem: true } } });
+	const o = owner({ items: { a: { writeForItem: true } } });
 
 	o.item("a");
 

@@ -16,7 +16,7 @@ import { tempDir } from "../fixtures/temp.ts";
 import { workerWorld } from "../fixtures/worker-world.ts";
 import { ItemId } from "../../src/adapter-api.ts";
 
-const NOTE = { commit: { "docs/note.md": "hello\n" } };
+const NOTE = { write: { "docs/note.md": "hello\n" } };
 
 /** The pull request a build run writes under the repo's rules, naming a picture it saved. */
 const WRITTEN = { title: "Write the note", body: "## Context\nThe item asks for a note in docs, so readers find it there.\n\n## Testing\ntest -f docs/note.md passes.", evidence: "note.png" };
@@ -68,13 +68,13 @@ test("an issue lands through a pull request: no item file is marked, the pull re
 	expect(w.state.merges.get(id)).toBeDefined();
 });
 
-test("an issue whose base takes a push lands on main and closes, with no item file in the repo", async () => {
+test("an issue whose base takes a push lands on main and closes, with no item file in the repo, as hum's commit under the run's pull request title", async () => {
 	const { w, github, id, pass } = await issuesWorld({ requiresPullRequest: false });
 
 	expect(await pass()).toEqual({ outcome: "merged", item: id });
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("hello\n");
 	expect(existsSync(join(w.repo.owner, SHIPPED_DEFAULTS.itemsDir, `${id}.md`))).toBe(false);
-	expect(sh(w.repo.remote, ["log", "--format=%s", "-1", "main"]).trim()).toBe("shim: the change");
+	expect(sh(w.repo.remote, ["log", "--format=%s %an", "-1", "main"]).trim()).toBe(`${WRITTEN.title} ${w.config.hum.commitIdentity.name}`);
 	expect(github.pulls()).toEqual([]);
 	expect(github.issueState(Number(id))).toBe("CLOSED");
 });

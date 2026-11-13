@@ -148,7 +148,7 @@ test("a worker's tick shows the card from the config's token date", async () => 
 });
 
 test("a 401 holds the item where it is with one card naming claude setup-token; the next run that gets through clears it", async () => {
-	const w = await workerWorld({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { commitForItem: true }] });
+	const w = await workerWorld({ script: [{}, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { error: "Failed to authenticate. API Error: 401 Invalid bearer token" }, { writeForItem: true }] });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -198,7 +198,7 @@ test("the scheduled workflow's tick is a ref on the remote; the Mac reads its ti
 });
 
 test("CI wake: ticks until a tick starts nothing, so a run that frees another item is followed by that item's run, and saves after each tick once its runs end", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true }, b: { commitForItem: true } } }, { settings: { runners: 1 } });
+	const w = await workerWorld({ items: { a: { writeForItem: true }, b: { writeForItem: true } } }, { settings: { runners: 1 } });
 	const mergedAtEachSave: number[] = [];
 
 	w.item("a", "docs/a.md");

@@ -18,7 +18,7 @@ const textOf = (row: Row): string => row.map(({ text }) => text).join("");
 
 /** A status file the engine wrote while it merged one item, asked about another, held a third in flight and raised a fault. */
 const realStatus = async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, askUnlessAnswered: "Which title should it carry?" }, c: { commitForItem: true, spend: 5, sleep: 300 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 }, b: { writeForItem: true, askUnlessAnswered: "Which title should it carry?" }, c: { writeForItem: true, spend: 5, sleep: 300 } } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
