@@ -10,7 +10,6 @@ export const SAVED_0_1_0 = {
 		since: 1_700_000_000_000,
 		change: { paths: ["src/a.ts"], size: 12, loosened: false, pinChanged: false },
 		head: "0123456789abcdef0123456789abcdef01234567",
-		ownerApproved: false,
 		alignment: { graded: { alignment: "sound", verification: "partial" } },
 	},
 	learned: { glob: "docs/**", level: "auto", item: "7", commit: "0123456789abcdef", pull: "12", at: 1_700_000_000_000 },

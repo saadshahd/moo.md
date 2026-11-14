@@ -182,7 +182,12 @@
 			"type": "object",
 			"propertyNames": {
 				"type": "string",
-				"minLength": 1
+				"enum": [
+					"work-source",
+					"questions",
+					"answers",
+					"release"
+				]
 			},
 			"additionalProperties": {
 				"type": "string",
@@ -220,7 +225,7 @@
 				"email"
 			],
 			"additionalProperties": false,
-			"description": "The owner's own name and email: the author and committer of every commit hum makes. Setup writes them from git config; hum ships none."
+			"description": "The owner's own name and email: the author and committer of every commit hum makes with git. Where the base requires signed commits, GitHub makes the commits and credits them to the account of the token hum writes with: the owner's own on a Mac; in CI, the GitHub App's bot or the account whose token pullRequestToken names. Setup writes them from git config; hum ships none."
 		},
 		"checks": {
 			"default": [],
@@ -581,14 +586,49 @@
 					"additionalProperties": false
 				}
 			],
-			"description": "Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset."
+			"description": "Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset; a wake whose App secrets are unset stops with an error."
 		},
 		"ciWakeTimeoutMinutes": {
 			"default": 60,
 			"type": "integer",
 			"exclusiveMinimum": 0,
 			"maximum": 9007199254740991,
-			"description": "Minutes a CI wake may run before GitHub stops it."
+			"description": "Minutes the CI wake's work job, which runs the runs, may run before GitHub stops it; the two jobs that hold GitHub's token stop within its hour."
+		},
+		"ciOutboxMaxMegabytes": {
+			"default": 200,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Megabytes of a CI work job's outbox, its bundles and its state, past which publish refuses the whole wake before any write."
+		},
+		"ciUsageLimitMaxHours": {
+			"default": 168,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Hours from now past which publish cuts the reset time of a usage limit a CI work job reports, so no work job can hold hum's runs longer than Claude's own limit window."
+		},
+		"followUpsPerPass": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Follow-up items one pass may file; publish refuses a pass that files more, and each one it files counts against the daily question cap."
+		},
+		"publishTreeMaxMegabytes": {
+			"default": 1024,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Megabytes of the tree a pass's branch holds, past which publish refuses the pass before it checks the branch out."
+		},
+		"ciMergeMarginMinutes": {
+			"default": 10,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Minutes of the GitHub App token's hour publish keeps in hand: past the rest, it saves a landing and leaves its merge to the next wake."
 		},
 		"ciRunner": {
 			"default": "ubuntu-latest",
@@ -639,7 +679,7 @@
 					"additionalProperties": false
 				}
 			],
-			"description": "What the CI wake job runs on, as a workflow's runs-on holds it: one runner label, a list of labels the runner must carry all of, or { group, labels } for a runner group. On a public repo, a runner GitHub does not host keeps what a wake leaves on it, and setup asks before it writes one."
+			"description": "What each job of the CI wake runs on, as a workflow's runs-on holds it: one runner label, a list of labels the runner must carry all of, or { group, labels } for a runner group. On a public repo, a runner GitHub does not host keeps what a job leaves on it, and setup asks before it writes one."
 		},
 		"ciContainer": {
 			"default": null,
@@ -724,7 +764,7 @@
 					"type": "null"
 				}
 			],
-			"description": "The container the CI wake job runs in: its image, or { image, credentials: { username, password }, env, ports, volumes, options } as a workflow's container holds them, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts."
+			"description": "The container each job of the CI wake runs in: its image, or { image, credentials: { username, password }, env, ports, volumes, options } as a workflow's container holds them, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts."
 		},
 		"ciEnv": {
 			"default": {},
@@ -736,7 +776,7 @@
 			"additionalProperties": {
 				"type": "string"
 			},
-			"description": "Env the CI wake job sets, such as a gateway's settings; a value may be a workflow expression. A value that reads a secret reaches only the step that runs hum; every other value reaches every step, the installs too. A name the job sets itself, such as GH_TOKEN, is refused."
+			"description": "Env the CI wake's jobs set, such as a gateway's settings; a value may be a workflow expression. A value that reads a secret reaches only the steps that run hum; every other value reaches every step, the installs too. A name the jobs set themselves, such as GH_TOKEN, is refused."
 		},
 		"ciClaudeAuth": {
 			"default": "oauth-token",

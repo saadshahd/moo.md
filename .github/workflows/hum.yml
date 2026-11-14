@@ -76,6 +76,9 @@ jobs:
         run: npm install --global npm@^11.5.1
       - if: steps.release.outputs.publish == 'true'
         run: bun run release:surface
+      # The package names the commit it was published from; a CI wake installs hope from that commit.
+      - if: steps.release.outputs.publish == 'true'
+        run: bun run release:commit
       - if: steps.release.outputs.publish == 'true'
         run: npm publish --provenance --access public
       - if: steps.release.outputs.publish == 'true'

@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import * as core from "@actions/core";
 import { z } from "zod";
 import { exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
+import { Release, RELEASE_FILE } from "../../src/service/plugins.ts";
 import pkg from "../../package.json" with { type: "json" };
 import { type Baseline, checkBump, type Verdict } from "./compare.ts";
 import { extractSurface, Surface } from "./surface.ts";
@@ -62,6 +63,15 @@ const writeSurface = async (): Promise<number> => {
 	return 0;
 };
 
+/** Writes the moo.md commit being published into the package folder, so the engine installs hope from that commit. A HEAD git cannot name throws, and nothing is published. */
+const writeCommit = async (): Promise<number> => {
+	const head = await exec("git", ["rev-parse", "HEAD"], { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS, throwOnError: true, nodeOptions: { cwd: PACKAGE_ROOT } });
+
+	await Bun.write(join(PACKAGE_ROOT, RELEASE_FILE), `${JSON.stringify(Release.parse({ commit: head.stdout.trim() }), null, "\t")}\n`);
+
+	return 0;
+};
+
 const report = (verdict: Verdict): void => {
 	if (verdict.ok) return core.info(verdict.summary);
 
@@ -89,8 +99,8 @@ const check = async (): Promise<number> => {
 	return verdict.ok ? 0 : 1;
 };
 
-const CommandName = z.enum(["surface", "check"], { error: "usage: release <surface | check>" });
+const CommandName = z.enum(["surface", "commit", "check"], { error: "usage: release <surface | commit | check>" });
 
-const COMMANDS = { surface: writeSurface, check } as const satisfies Record<z.infer<typeof CommandName>, () => Promise<number>>;
+const COMMANDS = { surface: writeSurface, commit: writeCommit, check } as const satisfies Record<z.infer<typeof CommandName>, () => Promise<number>>;
 
 process.exitCode = await COMMANDS[CommandName.parse(process.argv[2])]();

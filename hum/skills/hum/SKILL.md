@@ -8,7 +8,7 @@ Read first, then ask. Every question leads with what the repo showed and a propo
 
 ## Read
 
-Run `bunx hum setup scan` (the pinned engine: `bun add --exact @moo.md/hum@<version>` first if `package.json` has none). It prints the scan, a proposal for each setting, the waiting states, how many open issues the label map covers, and `gitIdentity`: the name and email hum will commit as, read from your git config. If `gitIdentity.found` is false, stop: tell the owner to set the `missing` keys with `git config --global <key> "<value>"` and ask nothing more. Answer nothing from the scan that the repo already says.
+Run `bunx hum setup scan` (the pinned engine: `bun add --exact @moo.md/hum@<version>` first if `package.json` has none). It prints the scan, a proposal for each setting, the waiting states, how many open issues the label map covers, and `gitIdentity`: the name and email hum will commit as, read from your git config. Where the base requires signed commits, GitHub makes hum's commits and credits them to the token's account instead: yours on a Mac, the App's bot in CI. If `gitIdentity.found` is false, stop: tell the owner to set the `missing` keys with `git config --global <key> "<value>"` and ask nothing more. Answer nothing from the scan that the repo already says.
 
 ## Ask
 
@@ -17,10 +17,11 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | Ask | Proposal comes from | The answer sets |
 | --- | --- | --- |
 | Where runs happen: your Mac, CI, or both | the scan: CI workflows, a service unit | `runPlaces` |
+| Where items, questions and answers live: GitHub issues, or markdown files in `itemsDir` | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel` | `integrations` |
 | Which commands a change must pass | CI jobs on pull requests, else package scripts, after the lockfile install a fresh clone needs | `checks` |
 | For CI runs: the repo's setting "Allow GitHub Actions to create and approve pull requests" | `workflowsMayOpenPullRequests` in the scan; if off, ask the owner to turn it on and never change it yourself | nothing written |
-| For CI runs: the runner, job container and env the wake job runs with | `wakeJob` in the proposal: the job that runs Claude Code, else the pull request job; drop env only that job uses. The image needs git, node and npm; one that runs as root needs `IS_SANDBOX` set to `1` in `ciEnv`. An env value that reads a secret reaches only the step that runs hum | `ciRunner`, `ciContainer`, `ciEnv` |
-| For CI runs, when the owner names a runner GitHub does not host and `isPublicRepo` in the scan is not `false`: whether wakes may run there | the proposal never names one; such a machine keeps what a wake leaves, and a wake holds the owner's secrets | `"ownRunnerOnPublicRepo": true` beside `hum` in the answers, only on the owner's yes |
+| For CI runs: the runner, job container and env the wake's jobs run with | `wakeJob` in the proposal: the job that runs Claude Code, else the pull request job; drop env only that job uses. The image needs git, node and npm; one that runs as root needs `IS_SANDBOX` set to `1` in `ciEnv`. An env value that reads a secret reaches only the step that runs hum | `ciRunner`, `ciContainer`, `ciEnv` |
+| For CI runs, when the owner names a runner GitHub does not host and `isPublicRepo` in the scan is not `false`: whether wakes may run there | the proposal never names one; such a machine keeps what a job leaves, so a process a run started could outlive the work job and reach the next job there, which holds GitHub's token; recommend ephemeral runners | `"ownRunnerOnPublicRepo": true` beside `hum` in the answers, only on the owner's yes |
 | For CI runs: how Claude Code signs in | `wakeJob.ciClaudeAuth`: the `CLAUDE_CODE_OAUTH_TOKEN` secret, or `env` where `ciEnv` carries the credentials, such as a gateway's settings | `ciClaudeAuth` |
 | For CI runs: how a pull request's required checks start | a pull request opened with the workflow token starts no workflows, and dispatching the check workflow does not satisfy the required check; ask for a GitHub App with contents, issues and pull requests write, whose two secrets `wakeJob.pullRequestToken` names where a workflow already mints a token, or a fine-grained token's secret | `pullRequestToken` |
 | One question per waiting state: after how many hours it ends stuck | `waits` in the scan | `waitHours` |
@@ -32,6 +33,10 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | When `ciClaudeAuth` is `oauth-token`: the date the CI token expires, after `claude setup-token` | only the owner holds it | a reminder the owner keeps |
 
 Say what the labels cover: "`kindLabels` covers N of M open issues; the rest get the fallback kind and one question."
+
+Where runs include CI and `isPublicRepo` is not `false`, tell the owner that anyone can read `refs/hum/state`, where each wake keeps hum's state: plans, answers and the output of failed checks.
+
+Where runs include CI, tell the owner what a wake's three jobs hold. `gather` and `publish` hold GitHub's token and run hum from npm, with none of the repo's code. `work` runs the runs and the repo's checks with no GitHub token, but it holds the Actions token its artifact upload needs, so a run there could write the Actions cache on the default branch for any workflow that restores it. Publish checks that each new commit is by the commit identity, but the work job writes those names itself: what holds against a hostile work job is that publish writes only hum's own branches and places every change from its own diff and config.
 
 ## Write
 

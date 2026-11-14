@@ -139,6 +139,11 @@ export class FakeProvider {
 
 						return { id, title };
 					}),
+				finish: async (id) =>
+					spend(() => {
+						this.#get(id).ready = false;
+						this.#version++;
+					}),
 			},
 			questions: {
 				ask: async (id, question) => spend(() => this.#push(id, { kind: "question", text: questionText(question) })),

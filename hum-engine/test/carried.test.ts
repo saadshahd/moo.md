@@ -8,7 +8,7 @@ import { guarded } from "../src/adapters/guard.ts";
 import { onceCalls } from "../src/adapters/once.ts";
 import { openState } from "../src/state/open.ts";
 import { openWorker } from "../src/worker/open.ts";
-import { configWith, hopeSkills, rawConfig, writeConfigDir } from "./fixtures/config.ts";
+import { configWith, installedSkills, rawConfig, writeConfigDir } from "./fixtures/config.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { NOW, TTL, workerWorld } from "./fixtures/worker-world.ts";
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
@@ -98,6 +98,7 @@ test("the last-read list survives a restart: a fresh guard still sees an empty l
 			fileFollowUp: async () => {
 				throw new Error("unused");
 			},
+			finish: async () => {},
 		},
 	});
 
@@ -114,7 +115,7 @@ test("the last-read list survives a restart: a fresh guard still sees an empty l
 });
 
 test("an item saved under an earlier machine version restores through the kinds the worker kept", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -145,7 +146,7 @@ test("an item's token total is saved over all its runs and restarts; the cap cou
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 699, askUnlessAnswered: "Which?" } } }, { config });
+	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 699, askUnlessAnswered: "Which?" } } }, { config });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -170,7 +171,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
+	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -187,7 +188,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 });
 
 test("three items on one role start one after the other's first token, not together", async () => {
-	const behavior = { commitForItem: true, spend: 5, beforeToken: 300 };
+	const behavior = { writeForItem: true, spend: 5, beforeToken: 300 };
 	const w = await workerWorld({ items: { a: behavior, b: behavior, c: behavior } });
 
 	w.item("a", "docs/a.md");
@@ -195,6 +196,11 @@ test("three items on one role start one after the other's first token, not toget
 	w.item("c", "docs/c.md");
 	await w.worker.tick();
 	await w.worker.idle();
+
+	for (const _ of ["the second landing, which lost the race to main", "the third"]) {
+		await w.worker.tick();
+		await w.worker.idle();
+	}
 
 	const [first, second, third] = w.shim.calls().filter((call) => call.itemId).sort((a, b) => a.at - b.at);
 	const tokens = new Map(w.shim.tokens().map(({ pid, at }) => [pid, at]));
@@ -206,7 +212,7 @@ test("three items on one role start one after the other's first token, not toget
 });
 
 test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markdown source, a started runner", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 } } });
 
 	writeConfigDir(join(w.repo.owner, ".hum"), rawConfig((raw) => void (raw.hum.backgroundPollSeconds = 0.05)));
 
@@ -215,7 +221,7 @@ test("openWorker wires a repo: state in .git/hum, the config in .hum/, the markd
 	const results: string[] = [];
 
 	const worker = await openWorker(w.repo.owner, {
-		hopeSkills: hopeSkills(),
+		installedSkills: installedSkills(),
 		judge: docsJudge,
 		holder: Holder.parse("worker-1"),
 		binary: w.shim.binary,
@@ -250,11 +256,11 @@ test("openWorker refuses a repo whose hum.json names no commit identity, saying 
 	mkdirSync(join(w.repo.owner, ".hum"), { recursive: true });
 	writeFileSync(join(w.repo.owner, ".hum", "hum.json"), JSON.stringify(hum));
 
-	await expect(openWorker(w.repo.owner, { hopeSkills: hopeSkills(), judge: docsJudge, holder: Holder.parse("worker-1"), binary: w.shim.binary, env: w.shim.env, now: () => NOW, newSessionId: randomUUID })).rejects.toThrow("commitIdentity");
+	await expect(openWorker(w.repo.owner, { installedSkills: installedSkills(), judge: docsJudge, holder: Holder.parse("worker-1"), binary: w.shim.binary, env: w.shim.env, now: () => NOW, newSessionId: randomUUID })).rejects.toThrow("commitIdentity");
 });
 
 test("openWorker with run slots enabled builds the pool: the run starts in a slot and the worker keeps slots ready", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 } } });
 	const pool = tempDir("open-pool");
 
 	writeConfigDir(
@@ -270,7 +276,7 @@ test("openWorker with run slots enabled builds the pool: the run starts in a slo
 	const results: string[] = [];
 
 	const worker = await openWorker(w.repo.owner, {
-		hopeSkills: hopeSkills(),
+		installedSkills: installedSkills(),
 		judge: docsJudge,
 		holder: Holder.parse("worker-1"),
 		binary: w.shim.binary,

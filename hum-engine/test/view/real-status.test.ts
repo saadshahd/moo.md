@@ -18,12 +18,14 @@ const textOf = (row: Row): string => row.map(({ text }) => text).join("");
 
 /** A status file the engine wrote while it merged one item, asked about another, held a third in flight and raised a fault. */
 const realStatus = async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, askUnlessAnswered: "Which title should it carry?" }, c: { commitForItem: true, spend: 5, sleep: 300 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 }, b: { writeForItem: true, askUnlessAnswered: "Which title should it carry?" }, c: { writeForItem: true, spend: 5, sleep: 300 } } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
 	w.state.faults.raise({ code: "run-error", item: "z", cause: "The run for z failed: the checks still fail.", fix: "hum tries the item again when its claim lapses." });
 	w.state.choices.put("c@choice", { item: "c", text: 'Chose "short" over long without you.', at: w.clock.at });
+	await w.worker.tick();
+	await w.worker.idle();
 	await w.worker.tick();
 	await w.worker.idle();
 	await w.worker.tick();

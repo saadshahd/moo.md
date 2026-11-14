@@ -3,12 +3,12 @@ import type { HumConfig } from "./schema.ts";
 /** The secret Claude Code's OAuth token is stored in, under the env name Claude Code reads it from. */
 export const CLAUDE_TOKEN = "CLAUDE_CODE_OAUTH_TOKEN";
 
-/** The env the wake job sets itself. */
+/** The env the wake's jobs set themselves. */
 export const WAKE_ENV = {
 	claudeToken: CLAUDE_TOKEN,
 	githubToken: "GH_TOKEN",
 	event: "HUM_EVENT",
-	/** Whether the App's client ID secret is set, because a step's `if` cannot read a secret. */
+	/** Whether both of the App's secrets are set, because a step's `if` cannot read a secret. */
 	hasApp: "HUM_HAS_APP",
 	gitName: "HUM_GIT_NAME",
 	gitEmail: "HUM_GIT_EMAIL",
@@ -16,6 +16,10 @@ export const WAKE_ENV = {
 	gitCredentialHelper: "HUM_GIT_CREDENTIAL_HELPER",
 	/** Git's own name for the file `git config --global` writes: the job points it into the runner's temp folder. */
 	gitConfig: "GIT_CONFIG_GLOBAL",
+	/** What gather settled, from its job outputs, for the publish job. */
+	gathered: "HUM_GATHERED",
+	/** The workflow's own token, with which the publish job reads the outbox artifact's size before it downloads it. */
+	actionsToken: "HUM_ACTIONS_TOKEN",
 } as const;
 
 /** The env names the wake job sets itself, which `ciEnv` may not set. */

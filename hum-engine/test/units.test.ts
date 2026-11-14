@@ -8,6 +8,7 @@ import { z } from "zod";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { renderUnit, type UnitVars } from "../src/service/unit.ts";
 import { ciWorkflows, type WorkflowSettings } from "../src/service/workflows.ts";
+import { ENGINE_VERSION } from "../src/state/format.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
 const dirs: string[] = [];
@@ -73,15 +74,38 @@ const Step = z.object({
 	env: z.record(z.string(), z.string()).optional(),
 });
 
+const Job = z.object({
+	needs: z.json().optional(),
+	permissions: z.record(z.string(), z.string()),
+	"runs-on": z.json(),
+	container: z.json().optional(),
+	"timeout-minutes": z.number(),
+	env: z.record(z.string(), z.string()).optional(),
+	outputs: z.record(z.string(), z.string()).optional(),
+	steps: z.array(Step),
+});
+
 const Wake = z.object({
 	on: z.object({ workflow_call: z.object({ secrets: z.record(z.string(), z.object({ required: z.boolean() })) }) }),
 	permissions: z.record(z.string(), z.string()),
-	jobs: z.object({ wake: z.object({ "runs-on": z.json(), container: z.json().optional(), env: z.record(z.string(), z.string()), steps: z.array(Step) }) }),
+	jobs: z.object({ gather: Job, work: Job, publish: Job }),
 });
 
 const wakeText = (from: WorkflowSettings): string => ciWorkflows(from).find(({ file }) => file === "hum-wake.yml")?.text ?? "";
 
 const wakeOf = (from: WorkflowSettings) => Wake.parse(parseYaml(wakeText(from)));
+
+/** The jobs of the wake that hold GitHub's token. */
+const tokenJobs = (from: WorkflowSettings) => {
+	const { gather, publish } = wakeOf(from).jobs;
+
+	return [gather, publish];
+};
+
+const allSteps = (from: WorkflowSettings) => Object.values(wakeOf(from).jobs).flatMap(({ steps }) => steps);
+
+/** The step of a job that runs hum's part of the wake. */
+const humStep = (job: z.infer<typeof Job>) => job.steps.find(({ run }) => run?.includes("hum wake "));
 
 const has = (tool: string): boolean => Bun.which(tool) !== null;
 
@@ -135,17 +159,18 @@ test.skipIf(!has("actionlint"))("actionlint passes on every CI workflow, with th
 test("the CI workflows wake on the four events from the settings, never resume a session and gate nothing", () => {
 	const files = Object.fromEntries(ciWorkflows(settings).map(({ file, text }) => [file, text]));
 	const on = (file: string) => Trigger.parse(parseYaml(files[file] ?? "")).on;
-	const wakeSteps = Wake.parse(parseYaml(files["hum-wake.yml"] ?? "")).jobs.wake.steps;
+	const { gather, work, publish } = wakeOf(settings).jobs;
 
 	expect(Object.keys(on("hum-comment.yml"))).toEqual(["issue_comment"]);
 	expect(on("hum-push.yml")).toEqual({ push: { branches: ["**", "!bots/run/**"], paths: ["work/items/**"] } });
+	expect(Trigger.parse(parseYaml(files["hum-push.yml"] ?? "")).jobs.wake.if).toBe("github.ref_name == github.event.repository.default_branch");
 	expect(Object.keys(on("hum-dispatch.yml"))).toEqual(["repository_dispatch"]);
 	expect(on("hum-schedule.yml")).toMatchObject({ schedule: [{ cron: "7 * * * *" }] });
 	expect(files["hum-wake.yml"]).toContain("HUM_GIT_EMAIL: bot@example.com");
-	expect(files["hum-wake.yml"]).toContain("timeout-minutes: 15");
-	expect(Object.values(files).join("\n")).not.toMatch(/upload-artifact|download-artifact|--resume|environment:/);
+	expect([gather, work, publish].map((job) => job["timeout-minutes"])).toEqual([60, 15, 60]);
+	expect(Object.values(files).join("\n")).not.toMatch(/--resume|environment:|actions\/cache/);
 	// A comment's text never reaches a shell line: event data comes through env only.
-	expect([...wakeSteps, ...wakeOf(gateway).jobs.wake.steps].every((step) => !step.run?.includes("${{"))).toBe(true);
+	expect([...allSteps(settings), ...allSteps(gateway)].every((step) => !step.run?.includes("${{"))).toBe(true);
 });
 
 test("a comment wakes hum only when the repo's owner, a member or a collaborator wrote it, and never a bot", () => {
@@ -161,87 +186,166 @@ test("a value two keys share is written out under both, with no YAML anchor", ()
 
 test("each action runs at one commit, with its release beside it as a comment", () => {
 	const uses = ciWorkflows(gateway).flatMap(({ text }) => text.split("\n").filter((line) => /uses: [^.]/.test(line)).map((line) => line.trim().replace(/^- /, "")));
+	const checkout = "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1";
+	const mint = "uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0";
+	const download = "uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2";
 
-	expect(uses).toEqual([
-		"uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
-		"uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0",
-	]);
+	expect(uses).toEqual([checkout, mint, checkout, download, "uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2", checkout, download, mint]);
 });
 
-test("the wake job runs on the runner and in the container the settings name, as written", () => {
-	const shipped = wakeOf(settings).jobs.wake;
-	const own = wakeOf(gateway).jobs.wake;
+test("each job of the wake runs on the runner and in the container the settings name, as written", () => {
+	const own = Object.values(wakeOf(gateway).jobs);
 
-	expect(shipped["runs-on"]).toBe("ubuntu-latest");
+	expect(Object.values(wakeOf(settings).jobs).map((job) => job["runs-on"])).toEqual(["ubuntu-latest", "ubuntu-latest", "ubuntu-latest"]);
 	expect(wakeText(settings)).not.toContain("container:");
-	expect(own["runs-on"]).toBe("own-large");
-	expect(own.container).toEqual(gateway.ciContainer);
-	expect(wakeOf({ ...gateway, ciRunner: { group: "agents", labels: ["self-hosted", "linux"] } }).jobs.wake["runs-on"]).toEqual({ group: "agents", labels: ["self-hosted", "linux"] });
+	expect(own.map((job) => [job["runs-on"], job.container])).toEqual(own.map(() => ["own-large", gateway.ciContainer]));
+	expect(wakeOf({ ...gateway, ciRunner: { group: "agents", labels: ["self-hosted", "linux"] } }).jobs.work["runs-on"]).toEqual({ group: "agents", labels: ["self-hosted", "linux"] });
 });
 
-test("env that reads no secret reaches every step, and env that reads one reaches only the step that runs hum", () => {
-	const { env, steps } = wakeOf(gateway).jobs.wake;
+test("env that reads no secret reaches every step, and env that reads one reaches only the steps that run hum", () => {
+	const { jobs } = wakeOf(gateway);
 
-	expect(env).toEqual({ ...OPEN_ENV, HUM_HAS_APP: "${{ secrets.APP_CLIENT_ID != '' }}", HUM_EVENT: "${{ github.event_name }}" });
-	expect(steps.at(-1)?.env).toMatchObject(SECRET_ENV);
-	expect(steps.slice(0, -1).filter((step) => JSON.stringify(step.env ?? {}).includes("GATEWAY_TOKEN"))).toEqual([]);
+	expect(jobs.gather.env).toEqual({ ...OPEN_ENV, HUM_HAS_APP: "${{ secrets.APP_CLIENT_ID != '' && secrets.APP_PRIVATE_KEY != '' }}", HUM_EVENT: "${{ github.event_name }}" });
+	expect(jobs.work.env).toEqual(OPEN_ENV);
+
+	for (const job of Object.values(jobs)) expect(humStep(job)?.env).toMatchObject(SECRET_ENV);
+
+	expect(allSteps(gateway).filter((step) => JSON.stringify(step.env ?? {}).includes("GATEWAY_TOKEN") && !step.run?.includes("hum wake "))).toEqual([]);
 });
 
 test("every secret the runner, container and env name is declared for the called workflow, and none is required", () => {
 	expect(wakeOf(gateway).on.workflow_call.secrets).toMatchObject({ GATEWAY_TOKEN: { required: false }, REGISTRY_TOKEN: { required: false } });
 });
 
-test("signed in with the OAuth token, the wake requires its secret and hands it to the step that runs hum alone; signed in through env, it names no such secret", () => {
+test("signed in with the OAuth token, the wake requires its secret and hands it to the steps that run hum alone; signed in through env, it names no such secret", () => {
 	const token = wakeOf(settings);
 
 	expect(token.on.workflow_call.secrets.CLAUDE_CODE_OAUTH_TOKEN).toEqual({ required: true });
-	expect(token.jobs.wake.steps.at(-1)?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe("${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}");
-	expect(wakeText(settings).match(/CLAUDE_CODE_OAUTH_TOKEN: \$/g)).toHaveLength(1);
+
+	for (const job of Object.values(token.jobs)) expect(humStep(job)?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe("${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}");
+
+	expect(wakeText(settings).match(/CLAUDE_CODE_OAUTH_TOKEN: \$/g)).toHaveLength(3);
 	expect(wakeText(gateway)).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
 });
 
 test("git's global config and the installed tools sit in the runner's temp folder, so a wake leaves nothing on a machine that outlives it", () => {
-	const { steps } = wakeOf(settings).jobs.wake;
-	const paths = steps.find(({ run }) => run?.includes("GITHUB_ENV"));
-	const folder = temp();
-	const files = { GITHUB_ENV: join(folder, "env"), GITHUB_PATH: join(folder, "path") };
+	for (const { steps } of Object.values(wakeOf(settings).jobs)) {
+		const paths = steps.find(({ run }) => run?.includes("GITHUB_ENV"));
+		const folder = temp();
+		const files = { GITHUB_ENV: join(folder, "env"), GITHUB_PATH: join(folder, "path") };
 
-	expect(Bun.spawnSync(["bash", "-ec", paths?.run ?? "false"], { env: { PATH: process.env.PATH, RUNNER_TEMP: "/runner/temp", ...files } }).exitCode).toBe(0);
-	expect(readFileSync(files.GITHUB_ENV, "utf8")).toBe("GIT_CONFIG_GLOBAL=/runner/temp/hum-gitconfig\n");
-	expect(readFileSync(files.GITHUB_PATH, "utf8")).toBe("/runner/temp/hum-tools/bin\n");
-	expect(steps.findIndex((step) => step === paths)).toBeLessThan(steps.findIndex(({ run }) => run?.includes("git config --global")));
-	expect(steps.find(({ run }) => run?.startsWith("npm install"))?.run).toStartWith('npm install --global --prefix "$RUNNER_TEMP/hum-tools" ');
+		expect(Bun.spawnSync(["bash", "-ec", paths?.run ?? "false"], { env: { PATH: process.env.PATH, RUNNER_TEMP: "/runner/temp", ...files } }).exitCode).toBe(0);
+		expect(readFileSync(files.GITHUB_ENV, "utf8")).toBe("GIT_CONFIG_GLOBAL=/runner/temp/hum-gitconfig\n");
+		expect(readFileSync(files.GITHUB_PATH, "utf8")).toBe("/runner/temp/hum-tools/bin\n");
+		expect(steps.findIndex((step) => step === paths)).toBeLessThan(steps.findIndex(({ run }) => run?.includes("git config --global")));
+		expect(steps.find(({ run }) => run?.startsWith("npm install"))?.run).toStartWith('npm install --global --prefix "$RUNNER_TEMP/hum-tools" ');
+	}
 });
 
-test("a secret's token is the run's GH_TOKEN, and falls back to the workflow token while the secret is unset", () => {
-	const { on, jobs } = wakeOf(settings);
+test("a secret's token is GH_TOKEN in the jobs that hold GitHub's token, and falls back to the workflow token while the secret is unset", () => {
+	const { on } = wakeOf(settings);
 
 	expect(on.workflow_call.secrets.PR_TOKEN).toEqual({ required: false });
-	expect(jobs.wake.steps.at(-1)?.env?.GH_TOKEN).toBe("${{ secrets.PR_TOKEN || github.token }}");
+	expect(tokenJobs(settings).map((job) => humStep(job)?.env?.GH_TOKEN)).toEqual(["${{ secrets.PR_TOKEN || github.token }}", "${{ secrets.PR_TOKEN || github.token }}"]);
 	expect(wakeText(settings)).not.toContain("create-github-app-token");
 });
 
-test("an App's token is minted last, with the workflow's own permissions, from the two secrets the settings name, and falls back to the workflow token while the client ID is unset", () => {
-	const { on, permissions, jobs } = wakeOf(gateway);
-	const [mint, wake] = jobs.wake.steps.slice(-2);
+test("an App's token is minted last in each job that holds it, with the workflow's own permissions, from the two secrets the settings name, and a job whose App secrets are unset stops first, naming them", () => {
+	const { on, permissions } = wakeOf(gateway);
 
 	expect(on.workflow_call.secrets).toMatchObject({ APP_CLIENT_ID: { required: false }, APP_PRIVATE_KEY: { required: false } });
-	expect(mint?.uses).toStartWith("actions/create-github-app-token@");
-	expect(mint?.with).toEqual({
-		"client-id": "${{ secrets.APP_CLIENT_ID }}",
-		"private-key": "${{ secrets.APP_PRIVATE_KEY }}",
-		"permission-contents": "write",
-		"permission-issues": "write",
-		"permission-pull-requests": "write",
+	expect(permissions).toEqual({});
+
+	for (const job of tokenJobs(gateway)) {
+		const [mint, wake] = job.steps.slice(-2);
+
+		expect(mint?.uses).toStartWith("actions/create-github-app-token@");
+		expect(mint?.with).toEqual({
+			"client-id": "${{ secrets.APP_CLIENT_ID }}",
+			"private-key": "${{ secrets.APP_PRIVATE_KEY }}",
+			"permission-contents": "write",
+			"permission-issues": "write",
+			"permission-pull-requests": "write",
+		});
+		expect(job.permissions).toMatchObject({ contents: "write", issues: "write", "pull-requests": "write" });
+		expect(mint?.if).toBeUndefined();
+		expect(wake?.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token }}`);
+
+		const [check] = job.steps;
+		const ran = Bun.spawnSync(["bash", "-ec", check?.run ?? "true"], { env: { PATH: process.env.PATH } });
+
+		expect(check?.if).toBe("env.HUM_HAS_APP != 'true'");
+		expect(ran.exitCode).toBe(1);
+		expect(ran.stdout.toString()).toContain("::error title=hum::The GitHub App secrets APP_CLIENT_ID and APP_PRIVATE_KEY are not both set.");
+	}
+});
+
+test("the work job holds no GitHub token: it reads the repo alone, at the base gather saw, and learns what gather settled from gather's output", () => {
+	const { gather, work, publish } = wakeOf(gateway).jobs;
+	const text = JSON.stringify(work);
+
+	expect(work.permissions).toEqual({ contents: "read" });
+	expect(text).not.toMatch(/GH_TOKEN|APP_CLIENT_ID|APP_PRIVATE_KEY|credential\.https/);
+	expect(work.needs).toBe("gather");
+	expect(publish.needs).toEqual(["gather", "work"]);
+	expect(gather.outputs?.gathered).toBe(`\${{ steps.${humStep(gather)?.id}.outputs.gathered }}`);
+	expect(humStep(publish)?.env?.HUM_GATHERED).toBe("${{ needs.gather.outputs.gathered }}");
+
+	for (const job of [work, publish]) expect(job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with?.ref).toBe("${{ fromJSON(needs.gather.outputs.gathered).baseSha }}");
+});
+
+test("the checkout keeps no token in the workspace; the jobs that hold GitHub's token install hum from npm, none of the repo's packages and no plugin, and the work job installs its plugins after its packages", () => {
+	const { work } = wakeOf(settings).jobs;
+	const at = (steps: typeof work.steps, found: (typeof work.steps)[number] | undefined) => steps.findIndex((step) => step === found);
+
+	for (const { steps } of Object.values(wakeOf(settings).jobs)) expect(steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with).toMatchObject({ "fetch-depth": 0, "persist-credentials": false });
+
+	for (const { steps } of tokenJobs(settings)) {
+		const [install = ""] = steps.find(({ run }) => run?.startsWith("npm install"))?.run?.split("\n") ?? [];
+
+		expect(install).toContain(" --ignore-scripts ");
+		expect(install).toEndWith(` @moo.md/hum@${ENGINE_VERSION}`);
+		expect(steps.filter(({ run }) => run?.includes("bun install") || run?.includes("./node_modules"))).toEqual([]);
+		expect(steps.filter(({ run }) => run?.includes("plugins"))).toEqual([]);
+	}
+
+	expect(at(work.steps, work.steps.find(({ run }) => run === "./node_modules/.bin/hum plugins"))).toBeGreaterThan(at(work.steps, work.steps.find(({ run }) => run === "bun install --frozen-lockfile")));
+	expect(wakeText(settings)).not.toContain("claude plugin");
+});
+
+test("the publish job reads the outbox artifact's size from GitHub's artifacts API, and stops before it downloads one over the outbox cap", async () => {
+	const { steps, permissions } = wakeOf(settings).jobs.publish;
+	const check = steps.find(({ run }) => run?.includes("/artifacts?name="));
+	const asked: string[] = [];
+	let size = 1;
+
+	const server = Bun.serve({
+		port: 0,
+		fetch: (request) => {
+			asked.push(`${new URL(request.url).pathname}${new URL(request.url).search} ${request.headers.get("authorization")}`);
+
+			return Response.json({ artifacts: [{ name: "hum-outbox", size_in_bytes: size }] });
+		},
 	});
-	expect(permissions).toEqual({ contents: "write", issues: "write", "pull-requests": "write" });
-	expect(mint?.if).toBe("env.HUM_HAS_APP == 'true'");
-	expect(jobs.wake.env.HUM_HAS_APP).toBe("${{ secrets.APP_CLIENT_ID != '' }}");
-	expect(wake?.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token || github.token }}`);
+
+	const exitOf = () => Bun.spawn(["bash", "-ec", check?.run ?? "false"], { env: { PATH: process.env.PATH, GITHUB_API_URL: server.url.origin, GITHUB_REPOSITORY: "owner/repo", GITHUB_RUN_ID: "7", HUM_ACTIONS_TOKEN: "t0ken" }, stderr: "ignore" }).exited;
+
+	try {
+		expect(await exitOf()).toBe(0);
+		size = settings.ciOutboxMaxMegabytes * 1024 * 1024 + 1;
+		expect(await exitOf()).not.toBe(0);
+	} finally {
+		await server.stop();
+	}
+
+	expect(asked[0]).toBe("/repos/owner/repo/actions/runs/7/artifacts?name=hum-outbox Bearer t0ken");
+	expect(check?.env).toEqual({ HUM_ACTIONS_TOKEN: "${{ github.token }}" });
+	expect(permissions).toMatchObject({ actions: "read" });
+	expect(steps.indexOf(check ?? {})).toBeLessThan(steps.findIndex(({ uses }) => uses?.startsWith("actions/download-artifact@")));
 });
 
 test("the git setup step hands git the run's GH_TOKEN when git asks, with no gh, and trusts the checkout", () => {
-	const step = wakeOf(settings).jobs.wake.steps.find(({ run }) => run?.includes("credential"));
+	const step = wakeOf(settings).jobs.gather.steps.find(({ run }) => run?.includes("credential"));
 	const home = temp();
 	const env = { PATH: process.env.PATH, HOME: home, GIT_CONFIG_GLOBAL: join(home, "gitconfig"), GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0", GITHUB_WORKSPACE: home, ...step?.env };
 

@@ -6,7 +6,7 @@ export type Problem =
 	| { readonly problem: "event-without-source"; readonly event: string; readonly source: string | undefined }
 	| { readonly problem: "event-without-handler"; readonly event: string }
 	| { readonly problem: "run-and-owner-wait"; readonly kind: string; readonly state: string }
-	| { readonly problem: "missing-hope-skill"; readonly skill: string; readonly role: string }
+	| { readonly problem: "missing-skill"; readonly skill: string; readonly role: string }
 	| { readonly problem: "unknown-state"; readonly kind: string; readonly state: string; readonly why: string }
 	| { readonly problem: "unknown-run-source"; readonly kind: string; readonly state: string; readonly src: string }
 	| { readonly problem: "tier-table-gap"; readonly kind: string; readonly purpose: string; readonly level: string; readonly size: string }
@@ -16,7 +16,7 @@ export type Problem =
 	| { readonly problem: "path-without-proof"; readonly glob: string; readonly level: string }
 	| { readonly problem: "overlapping-prefixes"; readonly run: string; readonly claim: string }
 	| { readonly problem: "wake-env-taken"; readonly name: string }
-	| { readonly problem: "wake-outlasts-app-token"; readonly minutes: number; readonly tokenMinutes: number };
+	| { readonly problem: "merge-margin-fills-token-hour"; readonly minutes: number; readonly tokenMinutes: number };
 
 /** A config change the engine will not take. The caller keeps the last good config. */
 export type Refusal =
@@ -40,7 +40,7 @@ const DESCRIPTIONS = {
 		p.source === undefined ? `event "${p.event}" is waited on but declared nowhere` : `event "${p.event}" has no source: "${p.source}" is not a part or role`,
 	"event-without-handler": (p) => `event "${p.event}" has no handler in any kind`,
 	"run-and-owner-wait": (p) => `${p.kind}: state "${p.state}" starts a run and waits on the owner`,
-	"missing-hope-skill": (p) => `role "${p.role}" names hope skill "${p.skill}", which hope's installed copy lacks`,
+	"missing-skill": (p) => `role "${p.role}" names skill "${p.skill}", which no installed plugin has`,
 	"unknown-state": (p) => `${p.kind}: ${p.why} names state "${p.state}", which does not exist`,
 	"unknown-run-source": (p) => `${p.kind}: state "${p.state}" invokes "${p.src}", which is neither a role nor a part`,
 	"tier-table-gap": (p) => `${p.kind}: no tier for purpose "${p.purpose}", level "${p.level}", size "${p.size}"`,
@@ -49,9 +49,8 @@ const DESCRIPTIONS = {
 	"unknown-level": (p) => `risk level "${p.level}" is not in levels`,
 	"path-without-proof": (p) => `path "${p.glob}" is at level "${p.level}", whose release waits for proof, and names no proof for every kind`,
 	"overlapping-prefixes": (p) => `the run branch prefix "${p.run}" and the claim prefix "${p.claim}" overlap: one starts with the other`,
-	"wake-env-taken": (p) => `ciEnv sets ${p.name}, which the CI wake job sets itself`,
-	"wake-outlasts-app-token": (p) =>
-		`ciWakeTimeoutMinutes is ${p.minutes}, and the token a GitHub App mints lasts ${p.tokenMinutes} minutes: a longer wake loses GitHub before it ends`,
+	"wake-env-taken": (p) => `ciEnv sets ${p.name}, which the CI wake's jobs set themselves`,
+	"merge-margin-fills-token-hour": (p) => `ciMergeMarginMinutes is ${p.minutes}, and the token a GitHub App mints lasts ${p.tokenMinutes} minutes: publish would never have time left to merge`,
 } as const satisfies Describe;
 
 // SAFETY: each description is keyed by the problem name it reads, so the lookup by `problem.problem` takes its own variant.

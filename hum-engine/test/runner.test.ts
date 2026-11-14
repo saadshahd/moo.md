@@ -2,11 +2,11 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
+import { judgmentRunner, type Runner, type RunnerOptions, type RunRequest, runArgs, startRunner, hasSucceeded } from "../src/adapters/claude-p.ts";
 import { parseLimit } from "../src/adapters/limit.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
-import { isAlive, until } from "./fixtures/process.ts";
+import { holdingGitHubTokens, isAlive, until } from "./fixtures/process.ts";
 import { makeShim, type ShimSpec } from "./fixtures/shim.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -38,13 +38,36 @@ test.each(["--bare", "--resume", "--continue", "-r", "-c"])("a run's flags never
 	expect(runArgs(RUN)).not.toContain(banned);
 });
 
-test("a model call keeps no session, loads no settings source, tool or hook, and draws in the default style", () => {
+test("a model call keeps no session, loads only the user's settings, where their sign-in lives, and no skill, MCP server, tool or hook, and draws in the default style", () => {
 	const judging = runArgs({ ...RUN, call: "judgment" });
 
 	expect(judging).toContain("--no-session-persistence");
-	expect(judging.slice(judging.indexOf("--setting-sources"), judging.indexOf("--setting-sources") + 2)).toEqual(["--setting-sources", ""]);
+	expect(judging.slice(judging.indexOf("--setting-sources"), judging.indexOf("--setting-sources") + 2)).toEqual(["--setting-sources", "user"]);
+	expect(judging).toContain("--disable-slash-commands");
+	expect(judging).toContain("--strict-mcp-config");
 	expect(judging.slice(judging.indexOf("--tools"), judging.indexOf("--tools") + 2)).toEqual(["--tools", ""]);
 	expect(JSON.parse(judging[judging.indexOf("--settings") + 1] ?? "{}")).toMatchObject({ disableAllHooks: true, outputStyle: "default" });
+});
+
+test("neither a run nor a model call holds the GitHub tokens hum pushes with; the rest of the environment reaches both", async () => {
+	const folder = tempDir("run-env");
+	const [saved, judged] = [join(folder, "run.json"), join(folder, "judgment.json")];
+	const shim = makeShim({ script: [{}, { saveEnv: saved }], judgmentEnv: judged });
+	const state = openState(tempDir("runner"), { now: Date.now });
+	const { runner } = await startRunner({ state, model: MODEL, binary: shim.binary, env: { ...shim.env, GH_TOKEN: "ghs_app", HUM_KEPT: "yes" }, now: () => NOW });
+
+	await holdingGitHubTokens(async () => {
+		await ask(runner, { env: { GH_TOKEN: "from-a-slot" } });
+		await ask(runner, { call: "judgment" });
+	});
+
+	for (const file of [saved, judged]) {
+		const names = Object.keys(JSON.parse(readFileSync(file, "utf8")));
+
+		expect(names).toContain("HUM_KEPT");
+		expect(names).not.toContain("GH_TOKEN");
+		expect(names).not.toContain("GITHUB_TOKEN");
+	}
 });
 
 test("a usage-limit message parses to limited(until), and no call is made until then", async () => {
@@ -183,6 +206,15 @@ test("a start check without the hope plugin, as bare mode answers, starts zero r
 		expect(shim.calls()).toHaveLength(1);
 		expect(state.faults.list().map((c) => c.code)).toEqual(["start-check-failed"]);
 	}
+});
+
+test("a judgment runner makes no start check and starts no session: it answers a judgment call and refuses any other run", async () => {
+	const shim = makeShim();
+	const runner = judgmentRunner({ state: openState(tempDir("runner"), { now: Date.now }), model: MODEL, binary: shim.binary, env: shim.env, now: () => NOW });
+
+	await expect(ask(runner)).rejects.toThrow("judgment calls alone");
+	expect((await ask(runner, { call: "judgment" })).kind).toBe("finished");
+	expect(shim.calls()).toEqual([]);
 });
 
 test("the start check and a run use the same flags", async () => {

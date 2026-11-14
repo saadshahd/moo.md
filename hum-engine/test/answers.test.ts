@@ -53,7 +53,7 @@ test("a question still open is not queued again after the owner's reply that was
 });
 
 test("every answer is saved first and gets a reply: applied, then a second answer to the same question dropped with its reason", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -80,7 +80,7 @@ test("every answer is saved first and gets a reply: applied, then a second answe
 });
 
 test("an answer pushed from another clone after a quiet tick starts the run on the next tick", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -100,7 +100,7 @@ test("an answer pushed from another clone after a quiet tick starts the run on t
 });
 
 test("a CI run with an empty state reads the question's age from the thread: it waits inside the deadline and parks stuck past it, asking nothing twice", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();

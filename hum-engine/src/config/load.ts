@@ -83,6 +83,5 @@ export const readConfigDir = (dir: string): RawConfig => ({
 	roles: Object.fromEntries(filesIn(join(dir, "roles"), ".md").map((file) => [`roles/${file}`, readFileSync(join(dir, "roles", file), "utf8")])),
 });
 
-/** The skill names (`intent`, not `hope:intent`) in a hope plugin folder's `skills/*\/SKILL.md`. */
-export const listHopeSkills = (hopeRoot: string): ReadonlySet<string> =>
-	new Set(scan("*/SKILL.md", join(hopeRoot, "skills")).map((file) => dirname(file)));
+/** The skills in a plugin folder's `skills/*\/SKILL.md`, as a role names them: `hope:intent` for the plugin `hope`. */
+export const listPluginSkills = (plugin: string, root: string): string[] => scan("*/SKILL.md", join(root, "skills")).map((file) => `${plugin}:${dirname(file)}`);

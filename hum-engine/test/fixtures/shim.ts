@@ -18,8 +18,10 @@ export const shimSpecJson = (): string => {
 
 /** What one `-p` call does. */
 export type Behavior = {
-	/** Files to write and commit in the working directory. */
-	commit?: Record<string, string>;
+	/** Files to write in the working directory, which hum then commits. Without `structured`, the run ends done with a pull request title. */
+	write?: Record<string, string>;
+	/** Commit what the run wrote as the shim's own commit, as a run told to leave its change uncommitted might. */
+	commitsItself?: boolean;
 	/** A structured result. */
 	structured?: unknown;
 	plugins?: string[];
@@ -36,9 +38,13 @@ export type Behavior = {
 	modelTokens?: number;
 	/** A file the shim writes its stdin to. */
 	saveStdin?: string;
+	/** A file the shim writes its environment to, as JSON. */
+	saveEnv?: string;
+	/** A picture of this name the shim saves in the folder for evidence its prompt names. */
+	saveEvidence?: string;
 	subtype?: string;
-	/** Write `docs/<item>.md` and commit it, the item being the id in the prompt's `# Item <id>:` heading. */
-	commitForItem?: boolean;
+	/** Write `docs/<item>.md`, the item being the id in the prompt's `# Item <id>:` heading. Without `structured`, the run ends done with a pull request title. */
+	writeForItem?: boolean;
 	/** Ask this question until the prompt carries the owner's answer, then finish. */
 	askUnlessAnswered?: string;
 	/** Sleep this long before the first assistant message. */
@@ -57,7 +63,7 @@ export type Decided = { event: string; sure: boolean; reason: string; cites?: { 
 /** A plan run's pick of a clear item: write docs/note.md in one step. */
 export const READY_PLAN: Decided = { event: "plan-ready", sure: true, reason: "The item is clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };
 
-export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean; agentsWrapped?: boolean };
+export type ShimSpec = { version?: string; script?: Behavior[]; items?: Record<string, Behavior>; decisions?: Decided[]; bgDown?: boolean; agentsWrapped?: boolean; judgmentEnv?: string };
 
 export type Shim = {
 	/** The executable the runner calls instead of `claude`. */

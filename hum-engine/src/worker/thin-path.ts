@@ -6,10 +6,8 @@ import { type AnyActor, createActor, createAsyncLogic } from "xstate";
 import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
 import { type Finished, type Runner, type RunOutcome, hasSucceeded } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
-import { ADAPTER_API_VERSION } from "../adapter-api.ts";
-import { onceCalls } from "../adapters/once.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, identityEnv, PATCH, push } from "../adapters/git.ts";
+import { type Git, gitIn, PATCH, withConfigPinned } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -22,20 +20,26 @@ import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
-import { BASE_CONTENDED, changeOn, type LandContext, land, placementOf, prepareLanding, type ReviewOutcome, unpushed } from "./land.ts";
+import { BASE_CONTENDED, changeOn, declaredChange, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
 import { type ItemText, reviewInput } from "../decide/review.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
-import { queueQuestion, releaseQuestions } from "./questions.ts";
+import { queueQuestion } from "./questions.ts";
 import { answerToLatest, latestQuestionAt, openQuestion } from "./thread.ts";
 import { memorySection, readMemory, rulesUsed } from "../loop/memory.ts";
 import { proveCheckItem } from "../loop/prove-item.ts";
 import { tallyOf } from "./tally.ts";
 import { decideProse } from "./prose-run.ts";
-import { footprintOf, type PrefixGate } from "./scheduler.ts";
+import { type PrefixGate } from "./scheduler.ts";
+import { evidenceRef, keepEvidence } from "./evidence.ts";
+import { Outbox } from "../publish/intents.ts";
+import { type GatherTrust, type PassOutbox, type Publisher, publishPass } from "../publish/publisher.ts";
+import { PUBLISH_DIR as PUBLISH_REPO } from "../state/open.ts";
+import type { GitHubCommits } from "../adapters/github-commits.ts";
+import { repoFromRemote } from "../adapters/github.ts";
 
 /** How long a claim lasts unless its holder renews it. */
 export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeconds * SECOND_MS;
@@ -49,8 +53,13 @@ export const DEFAULT_BASE = "main";
 
 export const runBranch = ({ runBranchPrefix }: Naming, id: string): string => `${runBranchPrefix}${id}`;
 
-/** What the agent run hands back besides its commit. */
-export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional() }));
+/** The pull request a build or fix run writes for the branch's whole change, and the one file of evidence it saved, by name. */
+const PullRequestWritten = z.object({ title: z.string().min(1), body: z.string().min(1), evidence: z.string().min(1).optional() });
+
+type PullRequestWritten = z.infer<typeof PullRequestWritten>;
+
+/** What the agent run hands back besides the change it leaves in the working tree. */
+export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional(), pullRequest: PullRequestWritten.optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
 export const PLAN_MARK = "hum plan:";
@@ -83,10 +92,14 @@ export type ThinPathOptions = {
 	readonly gate?: PrefixGate;
 	/** The remote's pull requests and branch rules, for a remote on GitHub. */
 	readonly pulls?: PullRequests;
+	/** The remote's branches through GitHub's API, which signs the commits it makes, for a remote on GitHub. */
+	readonly commits?: GitHubCommits;
 	/** The names, never the values, of the variables the runs have; a missing secret is checked against them. */
 	readonly runnerVariables: ReadonlySet<string>;
 	/** A fresh id for each run's session. */
 	readonly newSessionId: () => string;
+	/** Applies a pass's outbox, given what the pass's own work came to; by default publish runs in this process once the pass's runs ended. */
+	readonly publish?: (pass: PassOutbox, worked: ThinResult) => Promise<ThinResult | undefined>;
 	/** False while the worker drains for an update: a finished change is saved and pushed, and the next worker lands it under the config it starts with. */
 	readonly mayLand?: () => boolean;
 };
@@ -131,7 +144,7 @@ const isApprovalWait = (kind: Kind, state: string | undefined): boolean => state
 /** Where an item saved in an owner wait stands for an answer: waiting on approval where the state takes the owner's approval, else waiting. */
 export const ownerWaitStage = (kind: Kind, state: string | undefined): Stage => (isApprovalWait(kind, state) ? "approval" : "waiting");
 
-const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional() });
+const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), pullRequest: PullRequestWritten.optional() });
 
 /** The kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
 const earlierKinds = (state: State, kind: Kind) => (machineVersion: string) => state.kinds.get(`${kind.machine.id}@${machineVersion}`);
@@ -181,12 +194,23 @@ export const runThinPath = async (o: ThinPathOptions): Promise<ThinResult> => {
 	return result;
 };
 
-const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
-	const base = o.base ?? DEFAULT_BASE;
-	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
+/**
+ * What a pass settles before any clone or run, all from the work source and saved state: the claim, the owner's
+ * answers and the item's kind. Gather runs it apart from the work in CI; a pass that runs it again on what gather
+ * settled writes nothing.
+ */
+export type Gathered = {
+	readonly item: Item;
+	readonly kindName: string;
+	readonly kind: Kind;
+	readonly judge: ModelCall;
+	/** The item has a saved machine state to go on from. */
+	readonly onSnapshot: boolean;
+	readonly asking: boolean;
+	readonly answered: ReturnType<typeof answerTo>;
+};
 
-	if (id === undefined) return { outcome: "idle" };
-
+export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gathered | ThinResult> => {
 	// A parked item stays parked until the owner acts: its file still says ready, and a rerun would spend the same tokens again.
 	const parked = o.state.parked.get(id);
 
@@ -230,13 +254,32 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	const settled = named ?? known;
 	const kindContext = { ...o, judge, now };
-	const kindName = settled ? settled.kind : await keepKind(kindContext, item, await pickKind(kindContext, item));
+	const kindName = settled ? settled.kind : keepKind(kindContext, item, await pickKind(kindContext, item));
 	const kind = kindNamed(o.config, kindName);
 	const asking = isWaitingOnOwner(kind, at);
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
 
 	if (asking && answered === undefined) return { outcome: "waiting", item: id };
 
+	/* The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands. */
+	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
+
+	return { item, kindName, kind, judge, onSnapshot, asking, answered };
+};
+
+export const isGathered = (gathered: Gathered | ThinResult): gathered is Gathered => "kindName" in gathered;
+
+const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
+	const base = o.base ?? DEFAULT_BASE;
+	const id = o.itemId ?? (await o.workSource.listReady())[0]?.id;
+
+	if (id === undefined) return { outcome: "idle" };
+
+	const gathered = await gatherItem(o, id);
+
+	if (!isGathered(gathered)) return gathered;
+
+	const { item, kindName, kind, judge, onSnapshot, asking, answered } = gathered;
 	const landing = o.state.landings.get(id);
 	/** Nothing saved is left to go on from: a new item, one that moved to another kind, or one the owner ran again. */
 	const isFresh = !onSnapshot && landing === undefined;
@@ -246,24 +289,38 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (taken === undefined) return { outcome: "lost", item: id };
 
-	const { folder: clone } = taken;
-	const { commitIdentity } = o.config.hum;
-	/** The agent's own commits take the owner's identity too: a fresh clone holds none of the repo's local git config. */
-	const env = { ...identityEnv(commitIdentity), ...taken.env };
-	const git = gitIn(clone, { identity: commitIdentity, timeoutMs });
-	const g = (args: readonly string[]): Promise<string> => git.raw(args);
+	const { folder: clone, env } = taken;
 
 	try {
-		await onRunBranch(git, { branch, restartAt: isFresh ? `origin/${base}` : undefined });
+		const checkedOut = gitIn(clone, { identity: o.config.hum.commitIdentity, timeoutMs });
+		const gathered = await gatheredIn(checkedOut, { base, branch });
 
-		const driven: Driven = { ...o, base, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, env, g, git, answered, resume: asking, restarted: isFresh };
+		await onRunBranch(checkedOut, { branch, restartAt: isFresh ? gathered.baseSha : undefined });
 
-		// A change already finished lands again from its pushed branch; no run is spent on it.
-		const result = park(o, landing ? await landAgain(driven) : await drive(driven));
+		/** From here a run may have written in the folder, so hum's git runs only while the config it read stands. */
+		const git = await withConfigPinned(checkedOut);
+		const g = (args: readonly string[]): Promise<string> => git.raw(args);
 
-		if (result.outcome === "moved") forgetProgress(o.state, id);
+		/** Where a run saves its one picture or video of the change, outside the clone so nothing commits it. */
+		const evidence = mkdtempSync(join(o.workDir ?? tmpdir(), "hum-evidence-"));
 
-		return result;
+		try {
+			const outbox = new Outbox(id);
+			const driven: Driven = { ...o, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh, outbox };
+
+			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
+			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
+			const published = await (o.publish ?? publishInProcess(o, judge, gathered))({ item: id, intents: outbox.drain(), bundle: await bundleOf(git, { branch, item: id, gathered, folder: evidence }) }, worked);
+			const result = park(o, published ?? worked);
+
+			if (result.outcome === "moved") forgetProgress(o.state, id);
+
+			if (result.outcome === "merged") o.state.items.remove(id);
+
+			return result;
+		} finally {
+			rmSync(evidence, { recursive: true, force: true });
+		}
 	} finally {
 		await taken.giveBack();
 	}
@@ -332,10 +389,16 @@ type Driven = ThinPathOptions & {
 	readonly item: Item;
 	readonly branch: string;
 	readonly clone: string;
+	/** The folder a run saves its evidence in. */
+	readonly evidence: string;
 	readonly env: Readonly<Record<string, string>>;
 	readonly g: (args: readonly string[]) => Promise<string>;
 	readonly git: Git;
 	readonly answered: Answered | undefined;
+	/** The base commit the pass started from, which a landing is checked on. */
+	readonly baseSha: string;
+	/** What the pass asks publish to do. */
+	readonly outbox: Outbox;
 	/** Restore the saved owner-wait snapshot instead of starting the machine. */
 	readonly resume: boolean;
 	/** The run branch starts again at the base: earlier work on the item, and the plan written for it, are gone. */
@@ -359,7 +422,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	let cause = "";
 	let handled = "";
 	let pending: Pending | undefined;
-	let approvedByOwner = false;
 	let actor: AnyActor;
 
 	const stuckCause = (): string | undefined => cause || lastFailure.slice(0, CARD_EXCERPT) || undefined;
@@ -371,17 +433,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** A plan or build is placed by the files its item declares; a fix or review by the branch's diff so far. */
-	const tierFor = async (purpose: Purpose) => {
-		const declared = { paths: footprintOf(item) ?? [], size: 0, loosened: false, pinChanged: false };
-		const change = PLACED_BY_DIFF[purpose] ? await changeOn(landContext(d)) : declared;
-		const { placement } = await placementOf(landContext(d), change);
-		const row = pickTier(kind, { purpose, level: placement.level.name, size: "small" });
-
-		if (!row) throw new Error(`the ${d.kindName} table has no ${purpose} row`);
-
-		return { model: config.hum.models[row.tier], effort: row.effort };
-	};
-
+	const tierFor = async (purpose: Purpose) => tierOf(placing(d), kind, purpose, PLACED_BY_DIFF[purpose] ? await changeOn(placing(d)) : declaredChange(item));
 
 	const branchDiff = (): Promise<string> => g(["diff", ...PATCH, `origin/${base}...HEAD`]);
 
@@ -391,7 +443,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const parts = [
 			roleOf(config, purpose),
 			`# Item ${id}: ${item.title}\n\n${item.body}`,
-			`Work on the branch ${branch}. Commit the change when it is whole. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+			`Work on the branch ${branch}. Leave the change in the working tree and make no commit: hum commits every file there once you are done. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+			`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${d.evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
 		];
 
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
@@ -404,7 +457,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			parts.push(`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n${soFar}`);
 		}
 
-		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause and commit.`);
+		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
 
 		return parts.join("\n\n");
 	};
@@ -475,8 +528,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	/** The owner is asked, or the run's choice stands and is listed under the choices made without them. */
 	const settleNeed = async (wants: z.infer<typeof Wants>): Promise<{ asked: Pending } | { chose: string }> => {
 		const reason = wants.reason ?? { kind: "unsure" as const };
-		const change = await changeOn(landContext(d));
-		const { placement } = await placementOf(landContext(d), change);
+		const change = await changeOn(placing(d));
+		const { placement } = await placementOf(placing(d), change);
 
 		const decision = askDecision(reason, {
 			runnerVariables: d.runnerVariables,
@@ -488,9 +541,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (decision.action === "ask") return { asked: { ...askedQuestion({ reason, confirmed: decision.confirmed, runsWords: wants.question }), plan: wants.plan ?? "" } };
 
 		const text = `Chose "${decision.choice}" over ${decision.over.filter((word) => word !== decision.choice).join(", ")} without you.`;
-		const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: d.workSource, questions: d.questions }, state.ops, { run: "decide", attempt: state.runs.list(id).length });
-
-		await calls.questions?.decide(id, text);
+		await d.outbox.calls({ run: "decide", attempt: state.runs.list(id).length }).decide(id, text);
 		state.choices.put(`${id}@${text}`, { item: id, text, at: d.now() });
 
 		return { chose: text };
@@ -511,7 +562,17 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 					const wants = Wants.safeParse(outcome.structured).data;
 
-					if (wants?.status !== "needs-owner") break;
+					if (wants?.status !== "needs-owner") {
+						if (!wants?.pullRequest) throw failed(`the ${purpose} run ended without the pull request title hum commits its change under`);
+
+						await keepPullRequest(d, wants.pullRequest);
+
+						if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${purpose} run succeeded and changed nothing`);
+
+						return;
+					}
+
+					await commitRun(d.git, { since: before, subject: `hum: ${id} so far` });
 
 					const settled = await settleNeed(wants);
 
@@ -519,9 +580,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 					chosen.push(settled.chose);
 				}
-
-				// Done is a new commit on the branch, not the run's word.
-				if ((await g(["rev-parse", "HEAD"])).trim() === before) throw failed(`the ${purpose} run succeeded and committed nothing`);
 			},
 		});
 
@@ -575,7 +633,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 				PICKED.get(pick.event)?.(pick, models);
 
-				if (pick.event === SPLIT) return result.resolve(await split(d, pick.parts, () => actor.send({ type: SPLIT })));
+				if (pick.event === SPLIT) return result.resolve(await split(d, pick.parts));
 
 				actor.send({ type: pick.event });
 			},
@@ -607,14 +665,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (isWaitingOnOwner(kind, value)) {
 			const note = pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" };
 
-			if (!(await isStillMine(d))) return result.resolve({ outcome: "lost", item: id });
-
-			const stopped = await handOff(d, isApprovalWait(kind, value) ? approvalQuestion(note) : note);
+			const approval = isApprovalWait(kind, value);
+			const stopped = await handOff(d, approval ? approvalQuestion(note) : note, { approval });
 
 			return result.resolve(stopped ?? { outcome: "asked", item: id, detail: note.question.text });
 		}
 
-		if (value === "merging") return result.resolve(await merge(d, { onMerged: () => actor.send({ type: "merged" }), ownerApproved: approvedByOwner }));
+		if (value === "merging") return result.resolve(await merge(d));
 	};
 
 	actor.subscribe((snapshot) => {
@@ -636,14 +693,37 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	if (d.answered && d.resume) {
 		const resume = resumeEvent(actor.getSnapshot(), d.answered);
 
-		approvedByOwner = resume === OWNER_APPROVED;
-
 		if (resume === OWNER_REJECTED) lastFailure = d.answered.answer;
 
 		actor.send({ type: resume });
 	}
 
 	return result.promise.finally(() => actor.stop());
+};
+
+/** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */
+/**
+ * Commits what a build or fix run left in the working tree as one commit on `since`, under `subject`, by the owner's
+ * commitIdentity, and says whether there was a change to commit. A commit the run made anyway, and the work so far
+ * hum committed when the run asked, are folded into it, so the run's whole change is one commit of hum's.
+ */
+const commitRun = async (git: Git, { since, subject }: { readonly since: string; readonly subject: string }): Promise<boolean> => {
+	await git.raw(["reset", "-q", "--soft", since]);
+	await git.raw(["add", "-A"]);
+
+	if ((await git.run(["diff", "--cached", "--quiet"])).code === 0) return false;
+
+	await git.raw(["commit", "-q", "--no-verify", "-m", subject]);
+
+	return true;
+};
+
+const keepPullRequest = async (d: Driven, { title, body, evidence }: PullRequestWritten): Promise<void> => {
+	const kept = evidence === undefined ? d.state.pullRequests.get(d.id)?.evidence : await keepEvidence({ git: d.git, folder: d.evidence, file: evidence, item: d.id, repo: repoFromRemote(d.remote) });
+
+	if (evidence !== undefined && kept !== undefined && "url" in kept) d.outbox.add({ kind: "keep-evidence" });
+
+	d.state.pullRequests.put(d.id, { item: d.id, title, body, evidence: kept });
 };
 
 /** What a run left for the owner: the question, the plain one it falls back to, and the plan so far. */
@@ -675,10 +755,13 @@ const SPLIT = "needs-split";
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
 
+/** The role file of a run's purpose, then the skills its role names, so the run reaches for them. */
 const roleOf = (config: RunConfig, purpose: Purpose): string => {
 	const role = config.hum.roles[purpose];
+	const text = ((role && config.roles[role.file]) ?? "").trim();
+	const skills = role?.skills ?? [];
 
-	return ((role && config.roles[role.file]) ?? "").trim();
+	return skills.length === 0 ? text : [text, `Use these skills with the Skill tool where they apply: ${skills.join(", ")}.`].filter(Boolean).join("\n\n");
 };
 
 
@@ -714,15 +797,19 @@ const pauseOf = (id: string, outcome: Paused): ThinResult => {
 	}
 };
 
-/** A fresh review run at landing, for a level that asks for one: it reads only the item and the diff, and its verdict is saved. */
-const reviewAtLanding =
-	(d: Driven) =>
+/**
+ * A fresh review at landing, for a level that asks for one: a model call with no tool, which reads only the item and
+ * the diff, and whose verdict is saved. Publish makes it, so no verdict comes from the side that wrote the change.
+ */
+export const reviewRunOf =
+	(o: Pick<ThinPathOptions, "runner" | "state" | "config">, item: Item, kindName: string) =>
 	async ({ head, diff, level }: { head: string; diff: string; level: string }): Promise<ReviewOutcome> => {
-		const row = pickTier(d.kind, { purpose: "review", level, size: "small" });
+		const kind = kindNamed(o.config, kindName);
+		const row = pickTier(kind, { purpose: "review", level, size: "small" });
 
-		if (!row) throw new Error(`the ${d.kindName} table has no review row`);
+		if (!row) throw new Error(`the ${kindName} table has no review row`);
 
-		const tally = tallyOf(d.state, d.id);
+		const tally = tallyOf(o.state, item.id);
 
 		let halt: (result: ThinResult) => void = () => {};
 
@@ -732,7 +819,7 @@ const reviewAtLanding =
 
 		/** A run with no answer never settles, as AnswerRun requires; the review comes to `halted` instead. */
 		const run = async (prompt: string, schema: JsonSchema): Promise<Finished> => {
-			const outcome = await d.runner.run({ prompt, cwd: tmpdir(), model: d.config.hum.models[row.tier], effort: row.effort, schema, signal: d.signal, tokenCap: d.kind.tokenCap.tokens - tally.sinceAnswer() });
+			const outcome = await o.runner.run({ prompt, cwd: tmpdir(), call: "judgment", model: o.config.hum.models[row.tier], effort: row.effort, schema, tokenCap: kind.tokenCap.tokens - tally.sinceAnswer() });
 
 			if (outcome.kind === "finished") {
 				tally.spend(outcome.tokens);
@@ -742,15 +829,15 @@ const reviewAtLanding =
 
 			if (outcome.kind === "over-cap") tally.spend(outcome.tokens);
 
-			halt(isPaused(outcome) ? pauseOf(d.id, outcome) : { outcome: "review", item: d.id, detail: `the review run passed the item's token cap (${d.kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens` });
+			halt(isPaused(outcome) ? pauseOf(item.id, outcome) : { outcome: "review", item: item.id, detail: `the review run passed the item's token cap (${kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens` });
 
 			return new Promise<never>(() => {});
 		};
 
-		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(d.config, d.item, diff), diff, model: d.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => {
-			const verdict = verdictOf({ id: d.id, head, pick, models });
+		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => {
+			const verdict = verdictOf({ id: item.id, head, pick, models });
 
-			d.state.verdicts.put(d.id, verdict);
+			o.state.verdicts.put(item.id, verdict);
 
 			return { verdict };
 		});
@@ -758,13 +845,64 @@ const reviewAtLanding =
 		return Promise.race([decided, halted]);
 	};
 
+/** Publish's root for the passes of `o`: the worker's own adapters, its claim, and a repo of publish's own beside the state. */
+export const publisherOf = (
+	o: Pick<ThinPathOptions, "state" | "config" | "workSource" | "questions" | "pulls" | "commits" | "runner" | "holder" | "now" | "remote" | "base" | "dir">,
+	judge: ModelCall,
+	mergesBefore?: number,
+): Publisher => ({
+	state: o.state,
+	config: o.config,
+	workSource: o.workSource,
+	questions: o.questions,
+	pulls: o.pulls,
+	commits: o.commits,
+	judge,
+	reviewRun: (item, kindName) => reviewRunOf(o, item, kindName),
+	kindOf: (item) => o.state.itemKinds.get(item.id)?.kind ?? o.config.hum.fallbackKind,
+	holder: o.holder,
+	now: o.now,
+	remote: o.remote,
+	base: o.base ?? DEFAULT_BASE,
+	dir: o.dir ?? o.config.hum.itemsDir,
+	repo: join(o.state.dir, PUBLISH_REPO),
+	mergesBefore,
+});
+
+/** Publishes a pass in the worker's own process, against what the pass's checkout saw before any run. */
+const publishInProcess =
+	(o: ThinPathOptions, judge: ModelCall, gathered: GatherTrust) =>
+	(pass: PassOutbox): Promise<ThinResult | undefined> =>
+		publishPass(publisherOf(o, judge), gathered, pass);
+
+/** What the checkout saw before any run: the base commit and the run branch's head on the remote. */
+const gatheredIn = async (git: Git, { base, branch }: { readonly base: string; readonly branch: string }): Promise<GatherTrust> => ({
+	baseSha: (await git.raw(["rev-parse", `origin/${base}`])).trim(),
+	heads: Object.fromEntries((await git.raw(["ls-remote", "--heads", "origin", branch])).split("\n").flatMap((line) => line.split("\t", 1).filter(Boolean).map((sha) => [branch, sha] as const))),
+});
+
+/** The bundle of the refs a pass made, the run branch and its evidence, with only what gather did not see; undefined when the pass made nothing new. */
+const bundleOf = async (git: Git, { branch, item, gathered, folder }: { readonly branch: string; readonly item: string; readonly gathered: GatherTrust; readonly folder: string }): Promise<string | undefined> => {
+	const known = [gathered.baseSha, ...Object.values(gathered.heads)];
+	const refs = (await Promise.all([`refs/heads/${branch}`, evidenceRef(item)].map(async (ref) => ((await git.run(["rev-parse", "--verify", "--quiet", ref])).code === 0 ? [ref] : [])))).flat();
+	const fresh = refs.length === 0 ? 0 : Number((await git.raw(["rev-list", "--count", ...refs, "--not", ...known])).trim());
+
+	if (fresh === 0) return undefined;
+
+	const file = join(folder, "pass.bundle");
+
+	await git.raw(["bundle", "create", "-q", file, ...refs, "--not", ...known]);
+
+	return file;
+};
+
 /** Files each part of a split item as its own item, then lands the item as done with no change of its own. */
-const split = async (d: Driven, parts: readonly string[], onMerged: () => void): Promise<ThinResult> => {
-	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource: d.workSource, questions: d.questions }, d.state.ops, { run: SPLIT, attempt: 0 });
+const split = async (d: Driven, parts: readonly string[]): Promise<ThinResult> => {
+	const writes = d.outbox.calls({ run: SPLIT, attempt: 0 });
 
-	for (const title of parts) await calls.workSource?.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}` });
+	for (const title of parts) await writes.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}` });
 
-	return merge(d, { onMerged });
+	return merge(d);
 };
 
 /** The owner-review wait asks for the change's approval, whatever the review run wrote. */
@@ -774,63 +912,39 @@ const approvalQuestion = ({ question, plan }: Pending): Pending => ({
 	plan,
 });
 
-/** Push the work branch, put the plan on the item, queue the question for room under the daily cap, and end. Each write runs once per key. A push that did not land ends the pass with its result instead. */
-const handOff = async (d: Driven, { question, plain, plan }: Pending): Promise<ThinResult | undefined> => {
-	const { state, id, g, branch, workSource, questions, git } = d;
+/**
+ * Hands the work branch and the plan to publish, queues the question for room under the daily cap, and ends. At the
+ * owner's approval wait publish saves the change as the item's landing before it asks, so the approval the owner
+ * gives counts for this change alone.
+ */
+const handOff = async (d: Driven, { question, plain, plan }: Pending, { approval }: { readonly approval: boolean }): Promise<undefined> => {
+	const { state, id } = d;
 	const attempt = state.runs.list(id).length;
-	const key = (op: string) => ({ itemId: id, run: "ask", attempt, op });
-	const calls = onceCalls({ apiVersion: ADAPTER_API_VERSION, workSource, questions }, state.ops, { run: "ask", attempt });
+	const head = (await d.g(["rev-parse", "HEAD"])).trim();
 
-	const pushed = await state.ops.once(key("push-branch"), {
-		holds: async () => (await g(["ls-remote", "--heads", "origin", branch])).startsWith((await g(["rev-parse", "HEAD"])).trim()),
-		run: () => push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]),
-		isDone: ({ kind }) => kind === "pushed",
-	});
+	d.outbox.add(approval ? { kind: "save-landing", head } : { kind: "push-branch", head });
 
-	if (pushed.kind === "ran" && pushed.value.kind !== "pushed") return unpushed(id, branch, pushed.value);
-
-	if (plan.trim()) await calls.workSource?.comment(id, `${PLAN_MARK}\n${plan.trim()}`);
+	if (plan.trim()) await d.outbox.calls({ run: "ask", attempt }).comment(id, `${PLAN_MARK}\n${plan.trim()}`);
 
 	queueQuestion(d, d.item, question, plain);
-	await releaseQuestions(d);
 
 	return undefined;
 };
 
-/** Every act that changes the world checks the claim first. */
-const isStillMine = async (d: Pick<Driven, "workSource" | "id" | "holder" | "config">): Promise<boolean> => (await d.workSource.renew(d.id, d.holder, claimTtlMs(d.config))).won;
-
-const landContext = (d: Driven): LandContext => ({
-	state: d.state,
-	config: d.config,
-	kind: d.kindName,
-	id: d.id,
-	item: d.item,
-	branch: d.branch,
-	base: d.base,
-	remote: d.remote,
-	clone: d.clone,
-	env: d.env,
-	dir: d.dir,
-	git: d.git,
-	checks: d.checks,
-	workSource: d.workSource,
-	questions: d.questions,
-	pulls: d.pulls,
-	now: d.now,
-	judge: d.judge,
-	reviewRun: reviewAtLanding(d),
-});
+/** What the work side reads to place a change: the policy, the base's history and the change's own diff. */
+const placing = (d: Driven) => ({ state: d.state, config: d.config, git: d.git, base: d.base, now: d.now, kind: d.kindName, dir: d.dir, id: d.id });
 
 const DRAINING = "the worker restarts for an update; the next worker lands the change under its config";
 
-/**
- * At `merging`: the change is saved and its branch pushed, then landed by its level unless the worker drains. A
- * docs-only item whose change reaches past its globs moves to its real kind first.
- */
-const merge = async (d: Driven, { onMerged, ownerApproved = false }: { readonly onMerged: () => void; readonly ownerApproved?: boolean }): Promise<ThinResult> => {
-	if (!(await isStillMine(d))) return { outcome: "lost", item: d.id };
+/** Publish decides the landing; the pass's own word on it is that publish has it. */
+const LANDING_HANDED: string = "publish lands the change";
 
+/**
+ * Hands the change at `merging` to publish, once it grows from the base the pass started on and the checks pass
+ * there, unless the worker drains. A check item proves its check first. A docs-only item whose change reaches past
+ * its globs moves to its real kind first.
+ */
+const merge = async (d: Driven): Promise<ThinResult> => {
 	if (d.kindName === d.config.hum.checkKind) {
 		const proof = await proveCheckItem({ state: d.state, config: d.config, git: d.git, item: d.id, base: d.base, checks: d.checks, now: d.now });
 
@@ -839,34 +953,32 @@ const merge = async (d: Driven, { onMerged, ownerApproved = false }: { readonly 
 
 	const isDocsOnly = d.kindName === d.config.hum.docsOnly.kind;
 
-	if (isDocsOnly && doesLeaveDocs((await changeOn(landContext(d))).paths, d.config.hum)) {
-		const real = await keepKind(d, d.item, await pickKind(d, d.item, d.kindName), d.kindName);
+	if (isDocsOnly && doesLeaveDocs((await changeOn(placing(d))).paths, d.config.hum)) {
+		const real = keepKind(d, d.item, await pickKind(d, d.item, d.kindName), d.kindName);
 
 		return { outcome: "moved", item: d.id, kind: real };
 	}
 
-	const pushed = await prepareLanding(landContext(d), { ownerApproved });
-
-	if (pushed.kind !== "pushed") return unpushed(d.id, d.branch, pushed);
-
-	if (d.mayLand?.() === false) return { outcome: "held", item: d.id, why: DRAINING };
-
-	const result = await land(landContext(d));
-
-	if (result.outcome === "merged") onMerged();
-
-	return result;
+	return handToPublish(d);
 };
 
-/** A finished change whose landing did not end: its pushed branch lands again, and once merged its saved state goes. */
-const landAgain = async (d: Driven): Promise<ThinResult> => {
-	if (d.mayLand?.() === false) return { outcome: "held", item: d.id, why: DRAINING };
+/** A finished change whose landing did not end: its branch is checked on the base again, and publish lands it. */
+const handToPublish = async (d: Driven): Promise<ThinResult> => {
+	const head = async () => (await d.g(["rev-parse", "HEAD"])).trim();
 
-	const result = await land(landContext(d));
+	if (d.mayLand?.() === false) {
+		d.outbox.add({ kind: "save-landing", head: await head() });
 
-	if (result.outcome === "merged") d.state.items.remove(d.id);
+		return { outcome: "held", item: d.id, why: DRAINING };
+	}
 
-	return result;
+	const stale = await rebaseOnto(d, d.baseSha);
+
+	if (stale) return { outcome: "review", item: d.id, detail: stale };
+
+	d.outbox.add({ kind: "land", head: await head() });
+
+	return { outcome: "held", item: d.id, why: LANDING_HANDED };
 };
 
 /** The answer option that runs a parked item again from the start. */

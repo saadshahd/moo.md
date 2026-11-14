@@ -24,6 +24,8 @@ const spec = JSON.parse(shimSpecJson()) as {
 	items?: Record<string, Behavior>;
 	/** What a cheap model call answers, by the property its schema asks for; logged apart, so the script's order holds. */
 	judgments?: { kind?: { kind: string }; alignment?: { alignment: string; verification: string } };
+	/** A file each model call writes its environment to, as JSON. */
+	judgmentEnv?: string;
 	/** What plan and review runs pick, in order, logged apart; past the last, a plan is ready and a review approves. */
 	decisions?: Decided[];
 	/** Where background runs are kept; makeShim sets it. */
@@ -47,25 +49,9 @@ const log = spec.log ?? "/dev/null";
 
 mkdirSync(dirname(log), { recursive: true });
 
-const JUDGMENTS = { kind: { kind: "docs" }, alignment: { alignment: "sound", verification: "sound" }, ...spec.judgments };
+const schemaArg = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
 
-if (process.argv.includes("--no-session-persistence")) {
-	const schema = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
-	const asked = schema.includes('"alignment"') ? "alignment" : "kind";
-
-	appendFileSync(`${log}.judgments`, `${JSON.stringify({ asked })}\n`);
-	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [] }));
-	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: JUDGMENTS[asked], modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 1 } } }));
-	process.exit(0);
-}
-
-const calls = (() => {
-	try {
-		return readFileSync(log, "utf8").split("\n").filter(Boolean).length;
-	} catch {
-		return 0;
-	}
-})();
+if (spec.judgmentEnv && process.argv.includes("--no-session-persistence")) writeFileSync(spec.judgmentEnv, JSON.stringify(process.env));
 
 const prompt = new TextDecoder().decode(stdin);
 const itemId = /^# Item (\S+):/m.exec(prompt)?.[1];
@@ -74,8 +60,6 @@ const DECIDED: Record<"plan" | "review", Decided> = {
 	plan: READY_PLAN,
 	review: { event: "approve", sure: true, reason: "The change does what the item asks." },
 };
-
-const schemaArg = process.argv[process.argv.indexOf("--json-schema") + 1] ?? "";
 
 if (schemaArg.includes('"sure"')) {
 	const decisionLog = `${log}.decisions`;
@@ -96,6 +80,25 @@ if (schemaArg.includes('"sure"')) {
 	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: answer, modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 10 } } }));
 	process.exit(0);
 }
+
+const JUDGMENTS = { kind: { kind: "docs" }, alignment: { alignment: "sound", verification: "sound" }, ...spec.judgments };
+
+if (process.argv.includes("--no-session-persistence")) {
+	const asked = schemaArg.includes('"alignment"') ? "alignment" : "kind";
+
+	appendFileSync(`${log}.judgments`, `${JSON.stringify({ asked })}\n`);
+	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [] }));
+	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: JUDGMENTS[asked], modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 1 } } }));
+	process.exit(0);
+}
+
+const calls = (() => {
+	try {
+		return readFileSync(log, "utf8").split("\n").filter(Boolean).length;
+	} catch {
+		return 0;
+	}
+})();
 
 appendFileSync(
 	log,
@@ -124,6 +127,8 @@ const outSplit = async (event: Emitted) => {
 };
 
 if (step.saveStdin) writeFileSync(step.saveStdin, stdin);
+
+if (step.saveEnv) writeFileSync(step.saveEnv, JSON.stringify(process.env));
 
 out({
 	type: "system",
@@ -166,31 +171,28 @@ if (step.sleep) await new Promise((resolve) => setTimeout(resolve, step.sleep));
 
 if (step.hang) await new Promise((resolve) => setTimeout(resolve, 60_000));
 
-if (step.commitForItem && itemId) {
+if (step.writeForItem && itemId) {
 	mkdirSync(join(process.cwd(), "docs"), { recursive: true });
 	appendFileSync(join(process.cwd(), "docs", `${itemId}.md`), `from ${itemId}\n`);
-	spawnSync("git", ["add", "-A"]);
-	spawnSync("git", ["-c", "user.name=shim", "-c", "user.email=shim@t", "commit", "-q", "-m", `shim: ${itemId}`]);
 }
 
-if (step.commit) {
-	for (const [path, content] of Object.entries(step.commit)) {
-		mkdirSync(dirname(join(process.cwd(), path)), { recursive: true });
-		writeFileSync(join(process.cwd(), path), content);
-	}
-
-	spawnSync("git", ["add", "-A"]);
-	spawnSync("git", [
-		"-c",
-		"user.name=shim",
-		"-c",
-		"user.email=shim@t",
-		"commit",
-		"-q",
-		"-m",
-		"shim: the change",
-	]);
+for (const [path, content] of Object.entries(step.write ?? {})) {
+	mkdirSync(dirname(join(process.cwd(), path)), { recursive: true });
+	writeFileSync(join(process.cwd(), path), content);
 }
+
+if (step.commitsItself) {
+	spawnSync("git", ["add", "-A"]);
+	spawnSync("git", ["-c", "user.name=shim", "-c", "user.email=shim@t", "commit", "-q", "-m", "shim: its own commit"]);
+}
+
+/** A run that wrote its change ends done, with the pull request title hum commits the change under. */
+const wrote = step.write !== undefined || (step.writeForItem === true && itemId !== undefined);
+const done = { status: "done", pullRequest: { title: step.writeForItem ? `shim: ${itemId}` : "shim: the change", body: "The shim's change." } };
+
+const evidenceFolder = /save that one file in (\S+), never in the repo/.exec(prompt)?.[1];
+
+if (step.saveEvidence && evidenceFolder) writeFileSync(join(evidenceFolder, step.saveEvidence), "\u0089PNG\r\n");
 
 const tokens = step.modelTokens ?? 10;
 
@@ -201,7 +203,7 @@ await (step.stderrNoise ? outSplit : out)({
 	subtype: step.subtype ?? (step.error ? "error_during_execution" : "success"),
 	is_error: step.error !== undefined,
 	result: step.error ?? '{"ok":true}',
-	structured_output: step.askUnlessAnswered && !prompt.includes("## The owner answered") ? { status: "needs-owner", question: step.askUnlessAnswered, plan: "Plan A" } : (step.structured ?? { ok: true }),
+	structured_output: step.askUnlessAnswered && !prompt.includes("## The owner answered") ? { status: "needs-owner", question: step.askUnlessAnswered, plan: "Plan A" } : (step.structured ?? (wrote ? done : { ok: true })),
 	modelUsage: {
 		[SHIM_MODEL]: {
 			inputTokens: 1,

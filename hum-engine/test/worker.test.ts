@@ -13,9 +13,17 @@ import { Holder, ItemId } from "../src/adapter-api.ts";
 
 const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort();
 
+/** Ticks until `count` items merged: each push that loses the race to main waits for the next tick, mergeTries of them at most. */
+const landsRaced = async (w: WorkerWorld, count: number): Promise<void> => {
+	for (let tick = 0; tick < w.config.hum.mergeTries && merged(w).length < count; tick++) {
+		await w.worker.tick();
+		await w.worker.idle();
+	}
+};
+
 test("the thin path runs two items on different files side by side, and both merge", async () => {
 	const checkLog = join(tempDir("checks"), "log");
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, meet: 2 }, b: { commitForItem: true, spend: 5, meet: 2 } } }, { checks: [`echo run >> ${checkLog}`] });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, meet: 2 }, b: { writeForItem: true, spend: 5, meet: 2 } } }, { checks: [`echo run >> ${checkLog}`] });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -24,17 +32,17 @@ test("the thin path runs two items on different files side by side, and both mer
 	expect(w.worker.running().sort()).toEqual(["a", "b"]);
 
 	await w.worker.idle();
+	await landsRaced(w, 2);
 
 	expect(merged(w)).toEqual(["a", "b"]);
 	expect(sh(w.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
 	expect(sh(w.repo.remote, ["show", "main:docs/b.md"])).toBe("from b\n");
 
-	// Each merge is rechecked on the newest main: the later one reran the checks after the earlier one moved it.
 	expect(readFileSync(checkLog, "utf8").split("\n").filter(Boolean).length).toBeGreaterThanOrEqual(3);
 });
 
 test("a tick that claims, runs and merges an item fetches from the remote once", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
 	const reads = join(w.repo.root, "upload-pack.log");
 	const uploadPack = join(w.repo.root, "upload-pack");
 
@@ -48,11 +56,11 @@ test("a tick that claims, runs and merges an item fetches from the remote once",
 	await w.worker.idle();
 
 	expect(merged(w)).toEqual(["a"]);
-	expect(readFileSync(reads, "utf8").split("\n").filter((command) => /^git .* fetch /.test(command))).toHaveLength(1);
+	expect(readFileSync(reads, "utf8").split("\n").filter((command) => /(^|\/)git .* fetch /.test(command))).toHaveLength(1);
 });
 
 test("an item whose thread cannot be read raises a card naming it, and the other items still start", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
 
 	w.item("a", "docs/a.md");
 	w.state.parked.put("gone", { item: "gone", why: "stuck", cause: "c", since: NOW });
@@ -64,7 +72,7 @@ test("an item whose thread cannot be read raises a card naming it, and the other
 });
 
 test("items that touch one file go one after the other, and an item that says nothing goes alone", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 }, c: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 }, b: { writeForItem: true, spend: 5 }, c: { writeForItem: true, spend: 5 } } });
 
 	w.item("a", "docs/shared.md");
 	w.item("b", "docs/shared.md");
@@ -92,16 +100,18 @@ test("items that touch one file go one after the other, and an item that says no
 
 test("a merge is rechecked on the newest main: checks that passed on the old main and fail on the new one stop the merge", async () => {
 	// b's check passes in b's clone, taken before a merged; once a's file is on main it fails.
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5, sleep: 800 } } }, { checks: ["! (test -f docs/a.md && test -f docs/b.md)"] });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 }, b: { writeForItem: true, spend: 5, sleep: 800 } } }, { checks: ["! (test -f docs/a.md && test -f docs/b.md)"] });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
 	await w.worker.tick();
 	await w.worker.idle();
+	await w.worker.tick();
+	await w.worker.idle();
 
 	expect(merged(w)).toEqual(["a"]);
 
-	const stopped = w.results.find((r) => r.item === "b");
+	const stopped = w.results.findLast((r) => r.item === "b");
 
 	expect(stopped).toMatchObject({ outcome: "review" });
 	expect(stopped?.detail).toContain("the checks fail on the newest main");
@@ -178,7 +188,7 @@ test.each([
 });
 
 test("a worker that sees an update starts nothing new, lands nothing and exits when its runs end; the next worker lands the change without a run", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, sleep: 400 } } }, { settings: { runners: 1 } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, sleep: 400 } } }, { settings: { runners: 1 } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
@@ -206,12 +216,13 @@ test("a worker that sees an update starts nothing new, lands nothing and exits w
 });
 
 test("the status file lists only the newest mergedShown merged changes", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 }, b: { commitForItem: true, spend: 5 } } }, { settings: { mergedShown: 1 } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 }, b: { writeForItem: true, spend: 5 } } }, { settings: { mergedShown: 1 } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/b.md");
 	await w.worker.tick();
 	await w.worker.idle();
+	await landsRaced(w, 2);
 	await w.worker.tick();
 
 	const status = readStatus(w.state.statusPath);
@@ -257,7 +268,7 @@ test("each tick writes a heartbeat and the status file for the view", async () =
 });
 
 test("the claim of a run in flight is renewed each tick, and a run whose claim is gone stops", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, hang: true } } }, { settings: { claimExpirySeconds: 5 } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, hang: true } } }, { settings: { claimExpirySeconds: 5 } });
 	const id = w.item("a", "docs/a.md");
 	const worker = w.workerWith();
 
@@ -286,7 +297,7 @@ test("the claim of a run in flight is renewed each tick, and a run whose claim i
 
 test("an item id in the inbox folder wakes a waiting item at once and its question leaves the status file", async () => {
 	const answersAdapter = (real: NonNullable<WorkerWorld["adapter"]["answers"]>) => ({ ...real, watch: async () => ({ token: "same", changed: false }) });
-	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } });
 
 	w.item("a", "docs/a.md");
 
@@ -320,7 +331,7 @@ test("an item id in the inbox folder wakes a waiting item at once and its questi
 });
 
 test("a saved deadline fires on the next event, not only on a tick: a question the owner never answers ends stuck", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, askUnlessAnswered: "Which?" } } }, { worker: { ciTick: async () => NOW } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, askUnlessAnswered: "Which?" } } }, { worker: { ciTick: async () => NOW } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -345,7 +356,7 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {
 	const flag = join(tempDir("flag"), "flag");
-	const w = await workerWorld({ items: { a: { commitForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -404,7 +415,7 @@ test("a limit the runner hit is saved, and a restarted worker makes no call befo
 });
 
 test("a level change re-checks a waiting change once a worker starts on the new config: it lands without another run", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 } } }, { settings: { paths: [{ glob: "docs/**", level: "high" }] } });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
@@ -435,7 +446,7 @@ test("the status file lists each path rule the owner's answers added, with the c
 test("a path raised while its change's pull request is armed: the next worker disarms it at its first tick, without waiting for the claim and without a run", async () => {
 	const github = new FakeGitHub();
 	const pulls = github.client();
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5 } } }, { worker: { pulls } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 } } }, { worker: { pulls } });
 
 	github.requiresPullRequest = true;
 	w.item("a", "docs/a.md");
@@ -482,7 +493,7 @@ test("memory.md lines with no source or past the byte cap each raise a card nami
 });
 
 test("an item waiting behind a run on the same file starts once the owner moves its touches: elsewhere", async () => {
-	const w = await workerWorld({ items: { a: { commitForItem: true, spend: 5, sleep: 400 }, b: { commitForItem: true, spend: 5 } } });
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, sleep: 400 }, b: { writeForItem: true, spend: 5 } } });
 
 	w.item("a", "docs/a.md");
 	w.item("b", "docs/a.md");

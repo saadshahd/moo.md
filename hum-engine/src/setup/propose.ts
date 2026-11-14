@@ -1,7 +1,7 @@
 import type { Item } from "../adapter-api.ts";
 import { declaredKind } from "../decide/kind.ts";
 import { usualSize } from "../decide/risk.ts";
-import type { DefaultsConfig, HumConfig, PathRule, PullRequestToken, RunPlace, SlotRecipe } from "../config/schema.ts";
+import type { DefaultsConfig, HumConfig, PathRule, PullRequestToken, RunPlace, Slot, SlotRecipe } from "../config/schema.ts";
 import { APP_TOKEN_ACTION, CI_WORKFLOW_FILES, CLAUDE_TOKEN, isGitHubHosted, readsForeignContext, WAKE_OWN_ENV } from "../config/wake-job.ts";
 import type { CiJob, RepoScan } from "./scan.ts";
 import {
@@ -36,6 +36,8 @@ export type Proposal = {
 	readonly runSlots: Pick<HumConfig["runSlots"], "services" | "recipe">;
 	readonly runPlaces: readonly RunPlace[];
 	readonly wakeJob: Pick<HumConfig, "ciRunner" | "ciContainer" | "ciEnv" | "ciClaudeAuth" | "pullRequestToken">;
+	/** The adapter of each slot that does not use the markdown source; empty where the repo keeps no work in issues. */
+	readonly integrations: NonNullable<HumConfig["integrations"]>;
 };
 
 const isPullRequestJob = ({ triggers }: CiJob): boolean => triggers.includes("pull_request");
@@ -145,8 +147,18 @@ const claudeEnvOf = (job: CiJob): Record<string, string> => {
 	return Object.fromEntries([...Object.entries(job.env), ...fromInput].filter(([name, value]) => !WAKE_OWN_ENV.has(name) && !readsForeignContext(value)));
 };
 
-/** What a scan cannot read from the files: the repo's labels, and whether anyone may read and comment on it. */
-export type RepoFacts = { readonly labels?: readonly string[]; readonly isPublic?: boolean };
+/** What a scan cannot read from the files: the repo's labels, whether anyone may read and comment on it, and how many issues are open on GitHub. */
+export type RepoFacts = { readonly labels?: readonly string[]; readonly isPublic?: boolean; readonly openIssues?: number };
+
+/** The slots GitHub issues serve: the items, the questions on them and the answers to those. */
+const ISSUE_SLOTS = ["work-source", "questions", "answers"] as const satisfies readonly Slot[];
+
+/**
+ * A repo on GitHub that tracks work in issues, open ones or an issue template, takes its items, questions and answers
+ * from them; any other keeps markdown items under `.hum/work`. Without a GitHub read there is no issue to count.
+ */
+const integrationsOf = (scan: RepoScan, openIssues: number | undefined): Proposal["integrations"] =>
+	openIssues !== undefined && (openIssues > 0 || scan.issueTemplates.length > 0) ? Object.fromEntries(ISSUE_SLOTS.map((slot) => [slot, "github"])) : {};
 
 /**
  * The wake job's settings from the job most like it: the one that runs Claude Code gives its runner, container, env
@@ -174,7 +186,7 @@ const wakeJobOf = (ci: readonly CiJob[], shipped: DefaultsConfig, isPublic: bool
 };
 
 /** Everything setup proposes from a scan, before it asks. */
-export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, { labels = [], isPublic = false }: RepoFacts = {}): Proposal => {
+export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, { labels = [], isPublic = false, openIssues }: RepoFacts = {}): Proposal => {
 	const checks = checksOf(scan);
 
 	return {
@@ -187,5 +199,6 @@ export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, { labels =
 		runSlots: { services: shipped.runSlots.services, recipe: recipeOf(scan, checks) },
 		runPlaces: shipped.runPlaces,
 		wakeJob: wakeJobOf(scan.ci, shipped, isPublic),
+		integrations: integrationsOf(scan, openIssues),
 	};
 };

@@ -19,7 +19,7 @@ const isAlive = (pattern: string): boolean => Bun.spawnSync(["pgrep", "-f", "--"
 test.skipIf(!live)("a scratch launchd unit starts the script, which runs the worker, and unloads clean", async () => {
 	const label = `md.moo.hum.scratch.${process.pid}.${Date.now()}`;
 	const domain = `gui/${process.getuid?.() ?? 501}`;
-	const o = ownerRepo({ items: { a: { commitForItem: true } } });
+	const o = ownerRepo({ items: { a: { writeForItem: true } } });
 	const dir = tempDir("launchd");
 	const plist = join(dir, `${label}.plist`);
 	const log = join(dir, "unit.log");

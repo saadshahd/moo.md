@@ -3,12 +3,13 @@ import pMemoize from "p-memoize";
 import { z } from "zod";
 import type { Json } from "../config/json.ts";
 import { MERGE_METHODS, type MergeMethod } from "../config/schema.ts";
-import type { Env } from "../exec.ts";
-import { type GitHubClient, MERGE_METHOD, ownerGitHub, raise } from "./github-client.ts";
+import { MERGE_METHOD, raise, type RepoClientOptions, repoClient } from "./github-client.ts";
 
 /** What the target branch's rules ask of a change that lands on it. */
 export type BranchRules = {
 	readonly requiresPullRequest: boolean;
+	/** Every commit that reaches the branch must carry a signature GitHub verifies. */
+	readonly requiresSignatures: boolean;
 	/** The merge methods a pull request may use; undefined when no rule narrows them. */
 	readonly mergeMethods: readonly MergeMethod[] | undefined;
 };
@@ -58,6 +59,8 @@ const Rule = z.looseObject({
 });
 
 const PULL_REQUEST_RULE = "pull_request";
+
+const SIGNATURES_RULE = "required_signatures";
 
 const PullNode = z.object({
 	id: z.string(),
@@ -137,12 +140,8 @@ export const methodFor = (
 		: (allowed[0] ?? preferred);
 
 /** Pull requests and branch rules of a GitHub repo, on the owner's own login unless a client is given. `timeoutMs` bounds the `gh auth token` that reads that login. */
-export const gitHubPullRequests = (
-	repo: string,
-	options: { readonly timeoutMs: number } & ({ readonly client: () => Promise<GitHubClient> } | { readonly env: Env }),
-): PullRequests => {
-	const [owner = "", name = ""] = repo.split("/");
-	const connect = "client" in options ? options.client : () => ownerGitHub(options.timeoutMs, options.env);
+export const gitHubPullRequests = (repo: string, options: RepoClientOptions): PullRequests => {
+	const { owner, name, connect } = repoClient(repo, options);
 
 	const rulesCache = new Map<string, BranchRules>();
 
@@ -176,6 +175,7 @@ export const gitHubPullRequests = (
 
 			return {
 				requiresPullRequest: pullRule !== undefined,
+				requiresSignatures: rules.some((rule) => rule.type === SIGNATURES_RULE),
 				mergeMethods: pullRule?.parameters?.allowed_merge_methods,
 			};
 		},

@@ -82,6 +82,18 @@ const workSourceChecks = (target: ContractTarget, source: WorkSource): Check[] =
 			},
 		},
 		{
+			name: "work source: a finished item is never listed again, and finishing it twice changes nothing",
+			run: async () => {
+				const id = await target.seed("finished");
+
+				await source.finish(id);
+				await source.finish(id);
+
+				assert.ok(!(await isListed(id)), "a finished item is no longer listed");
+				assert.equal((await readItem(id)).ready, false);
+			},
+		},
+		{
 			name: "work source: two claims race and one wins",
 			run: async () => {
 				const id = await target.seed("raced");

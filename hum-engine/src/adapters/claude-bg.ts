@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { z } from "zod";
 import type { HumConfig } from "../config/schema.ts";
-import { commandTimeoutMs, exec } from "../exec.ts";
+import { commandTimeoutMs, exec, withoutGitHubTokens } from "../exec.ts";
 import { listRecords, orMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
 import { CARD_EXCERPT, type Card } from "../status/format.ts";
@@ -184,7 +184,7 @@ export const backgroundRunner = ({ binary = "claude", env, state, config, fallba
 	const jobsFolder = join(env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), JOBS_FOLDER);
 
 	const claude = (args: readonly string[], options: { stdin?: string; cwd?: string } = {}) =>
-		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env } });
+		exec(binary, args, { stdin: options.stdin, nodePath: false, timeoutMs: commandTimeoutMs(config), nodeOptions: { cwd: options.cwd, env: withoutGitHubTokens(env) } });
 
 	/** The background runs Claude Code lists. A list hum cannot read throws, with one card: read as empty, it would start a run that is already going. */
 	const agents = async (): Promise<Agent[]> => {

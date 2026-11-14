@@ -36,7 +36,7 @@ export const SetupAnswers = z.strictObject({
 export type SetupAnswers = z.infer<typeof SetupAnswers>;
 
 export type SetupEnv = {
-	readonly hopeSkills: ReadonlySet<string>;
+	readonly installedSkills: ReadonlySet<string>;
 	/** Where a Mac or Linux service unit is written; default the user's home. */
 	readonly home?: string;
 	readonly platform?: NodeJS.Platform;
@@ -144,7 +144,7 @@ export const writeSetup = (repo: string, answers: SetupAnswers, env: SetupEnv): 
 	const timed = withTimeouts(parsedKinds(base), answers.waitHours);
 	const kinds = Object.fromEntries(Object.entries(base.kinds).map(([name, file]) => [name, timed[name] ? asJson(timed[name]) : file]));
 	const roles = { ...shipped.roles, ...existing?.roles };
-	const loaded = loadConfig({ hum: asJson(hum), kinds, roles }, { env: { hopeSkills: env.hopeSkills } });
+	const loaded = loadConfig({ hum: asJson(hum), kinds, roles }, { env: { installedSkills: env.installedSkills } });
 
 	if (!loaded.ok) return { ok: false, refusal: loaded.refusal };
 

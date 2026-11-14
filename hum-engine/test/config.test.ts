@@ -23,11 +23,11 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { readSettings } from "../src/config/settings.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { DAY_MS, HOUR_MS } from "../src/time.ts";
-import { hopeSkills, root, shippedRaw, type Tree, withProposedTimeouts } from "./fixtures/config.ts";
+import { installedSkills, root, shippedRaw, type Tree, withProposedTimeouts } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
-const env = { hopeSkills: hopeSkills() };
+const env = { installedSkills: installedSkills() };
 
 const clone = (raw: RawConfig): Tree => structuredClone(raw);
 
@@ -186,17 +186,16 @@ test("ciEnv that sets a name the CI wake job sets itself is refused, naming it",
 	expect(problemsOf(bad)).toEqual([{ problem: "wake-env-taken", name: "GH_TOKEN" }]);
 });
 
-test("a CI wake that mints an App's token may run no longer than the token lasts", () => {
-	const app = clone(setUp());
+test("publish keeps less than the App token's hour in hand, so it has time left to merge", () => {
+	const margin = clone(setUp());
 
-	app.hum.pullRequestToken = { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" };
-	app.hum.ciWakeTimeoutMinutes = 60;
+	margin.hum.ciMergeMarginMinutes = 59;
 
-	expect(problemsOf(app)).toEqual([]);
+	expect(problemsOf(margin)).toEqual([]);
 
-	app.hum.ciWakeTimeoutMinutes = 61;
+	margin.hum.ciMergeMarginMinutes = 60;
 
-	expect(problemsOf(app)).toEqual([{ problem: "wake-outlasts-app-token", minutes: 61, tokenMinutes: 60 }]);
+	expect(problemsOf(margin)).toEqual([{ problem: "merge-margin-fills-token-hour", minutes: 60, tokenMinutes: 60 }]);
 });
 
 test("an unknown schema version is refused and names the step", () => {
@@ -247,15 +246,24 @@ test("hum ships no email address: its defaults and its schema hold none", () => 
 	expect(schemaFile.properties.commitIdentity).not.toHaveProperty("default");
 });
 
-test("a missing hope skill is refused, naming the skill and the role", () => {
-	const fake = { hopeSkills: new Set(["intent", "shape"]) };
+test("a plugin skill no installed plugin has is refused, naming the skill and the role", () => {
+	const fake = { installedSkills: new Set(["hope:intent", "hope:shape"]) };
 	const result = loadConfig(setUp(), { env: fake });
 
 	expect(result.ok).toBe(false);
 	expect(!result.ok && result.refusal.code === "invalid-config" && result.refusal.problems).toEqual([
-		{ problem: "missing-hope-skill", skill: "hope:judge", role: "review" },
+		{ problem: "missing-skill", skill: "hope:judge", role: "review" },
 	]);
-	expect(env.hopeSkills.has("judge")).toBe(true);
+	expect(env.installedSkills.has("hope:judge")).toBe(true);
+});
+
+test("a role may name another plugin's skill once that plugin is installed, and a bare skill name is the repo's own", () => {
+	const named = clone(setUp());
+
+	named.hum.roles.build.skills = ["sound:prime", "sound:review", "my-own-skill"];
+
+	expect(loadConfig(named, { env: { installedSkills: new Set([...env.installedSkills, "sound:prime", "sound:review"]) } }).ok).toBe(true);
+	expect(!loadConfig(named, { env }).ok).toBe(true);
 });
 
 test("an unreachable state and a wait with no timeout give one refusal naming both; the old config stays", () => {

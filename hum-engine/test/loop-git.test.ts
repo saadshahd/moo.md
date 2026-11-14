@@ -10,7 +10,7 @@ import { blockedPaths, brokenCommits } from "../src/loop/breaks.ts";
 import { proveCheck } from "../src/loop/proof.ts";
 import type { ReviewNote } from "../src/loop/records.ts";
 import { openState } from "../src/state/open.ts";
-import { checkBaseAfterMerge } from "../src/worker/base-check.ts";
+import { type BaseCheck, checkBaseAfterMerge, checkMergesAt, settleBaseCheck } from "../src/worker/base-check.ts";
 import { configWith } from "./fixtures/config.ts";
 import { pastChange, reviewNote } from "./fixtures/records.ts";
 import { sh } from "./fixtures/work-repo.ts";
@@ -105,14 +105,32 @@ const mergedUnder = (rule: Omit<PathRule, "glob">) => {
 	const merged = violating(dir);
 
 	sh(dir, ["remote", "add", "origin", dir]);
-	state.merges.put("item-a", { item: "item-a", sha: merged, at: 1, paths: ["src/a.ts"] });
+	state.merges.put("item-a", { item: "item-a", sha: merged, at: 1, paths: ["src/a.ts"], baseChecked: false });
 
 	const { filed, workSource } = followUps();
 	const config = configWith((raw) => (raw.hum.paths = [{ glob: "src/**", ...rule }]));
-	const checkBase = (checks: string[], at: number) => checkBaseAfterMerge({ state, config, workSource, git: gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), remote: "origin", base: "main", checks, now: () => at, item: "item-a" });
+	const git = gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const checkBase = (checks: string[], at: number) => checkBaseAfterMerge({ state, config, workSource, git, remote: "origin", base: "main", checks, now: () => at, item: "item-a" });
+	const settle = (report: BaseCheck, at: number) => settleBaseCheck({ state, config, workSource, git, base: "main", now: () => at }, report);
 
-	return { state, merged, filed, checkBase };
+	return { state, config, git, merged, filed, checkBase, settle };
 };
+
+test("a CI work job checks the base for every merge no check has covered, and publish takes its report only to add breaks", async () => {
+	const { state, config, git, merged, filed, settle } = mergedUnder({ level: "low" });
+	const report = await checkMergesAt({ state, config, git, checks: ["false"] }, merged);
+
+	expect(report).toMatchObject({ items: ["item-a"], failure: expect.any(String) });
+
+	await git.raw(["fetch", "-q", "origin", "main"]);
+	await settle({ items: ["item-a", "item-unknown"], failure: "forged" }, 7);
+	await settle({ items: ["item-a"], failure: "forged again" }, 8);
+
+	expect(state.breaks.list().map(({ item, failure }) => [item, failure])).toEqual([["item-a", "forged"]]);
+	expect(filed).toHaveLength(1);
+	expect(state.merges.get("item-a")?.baseChecked).toBe(true);
+	expect(await checkMergesAt({ state, config, git, checks: ["false"] }, merged)).toBeUndefined();
+});
 
 test("a check that fails on the base after a merge is a break: saved, its follow-up filed, and counted by the fix limit", async () => {
 	const { state, merged, filed, checkBase } = mergedUnder({ level: "critical", proofs: { "*": "canary" }, limit: { fixes: 0, of: 5 } });

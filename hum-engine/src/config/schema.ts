@@ -23,6 +23,12 @@ export const FIXED_PARTS = [
 ] as const;
 
 export const PURPOSES = ["plan", "build", "fix", "review"] as const;
+
+/** The integration slots `hum.json` `integrations` names, each to an adapter. */
+export const SLOTS = ["work-source", "questions", "answers", "release"] as const;
+
+export type Slot = (typeof SLOTS)[number];
+
 export const SIZES = ["small", "medium", "large"] as const;
 const TIERS = ["light", "standard", "top"] as const;
 export const EFFORTS = ["low", "medium", "high"] as const;
@@ -202,19 +208,24 @@ const Shipped = z.object({
 	restartBackoff: backoff.describe("The pause before the service's first restart of a crashed worker, doubled each crash up to the longest pause."),
 	restartDelaySeconds: seconds.describe("Seconds the service manager waits before it starts a failed start script again."),
 	pullRequestToken: PullRequestToken.describe(
-		"Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret, or the client ID secret, is unset.",
+		"Where a CI run's GitHub token comes from: { from: 'secret', secret } names a repository secret that holds a fine-grained token; { from: 'app', clientIdSecret, privateKeySecret } names the two secrets a GitHub App mints a token from each run, with the workflow's own permissions. clientIdSecret holds the App's client ID or its older App ID: the action that mints the token reads either as the same input. A pull request opened with the workflow token starts no workflows, so its required checks never run; one opened with this token does. A CI run falls back to the workflow token while the secret is unset; a wake whose App secrets are unset stops with an error.",
 	),
-	ciWakeTimeoutMinutes: count.describe("Minutes a CI wake may run before GitHub stops it."),
+	ciWakeTimeoutMinutes: count.describe("Minutes the CI wake's work job, which runs the runs, may run before GitHub stops it; the two jobs that hold GitHub's token stop within its hour."),
+	ciOutboxMaxMegabytes: count.describe("Megabytes of a CI work job's outbox, its bundles and its state, past which publish refuses the whole wake before any write."),
+	ciUsageLimitMaxHours: count.describe("Hours from now past which publish cuts the reset time of a usage limit a CI work job reports, so no work job can hold hum's runs longer than Claude's own limit window."),
+	followUpsPerPass: count.describe("Follow-up items one pass may file; publish refuses a pass that files more, and each one it files counts against the daily question cap."),
+	publishTreeMaxMegabytes: count.describe("Megabytes of the tree a pass's branch holds, past which publish refuses the pass before it checks the branch out."),
+	ciMergeMarginMinutes: count.describe("Minutes of the GitHub App token's hour publish keeps in hand: past the rest, it saves a landing and leaves its merge to the next wake."),
 	ciRunner: Runner.describe(
-		"What the CI wake job runs on, as a workflow's runs-on holds it: one runner label, a list of labels the runner must carry all of, or { group, labels } for a runner group. On a public repo, a runner GitHub does not host keeps what a wake leaves on it, and setup asks before it writes one.",
+		"What each job of the CI wake runs on, as a workflow's runs-on holds it: one runner label, a list of labels the runner must carry all of, or { group, labels } for a runner group. On a public repo, a runner GitHub does not host keeps what a job leaves on it, and setup asks before it writes one.",
 	),
 	ciContainer: Container.nullable().describe(
-		"The container the CI wake job runs in: its image, or { image, credentials: { username, password }, env, ports, volumes, options } as a workflow's container holds them, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts.",
+		"The container each job of the CI wake runs in: its image, or { image, credentials: { username, password }, env, ports, volumes, options } as a workflow's container holds them, or null to run on the runner itself. The image needs git, node and npm; a container that runs as root needs IS_SANDBOX=1 in ciEnv, or Claude Code refuses to skip its permission prompts.",
 	),
 	ciEnv: z
 		.record(envName, z.string())
 		.describe(
-			"Env the CI wake job sets, such as a gateway's settings; a value may be a workflow expression. A value that reads a secret reaches only the step that runs hum; every other value reaches every step, the installs too. A name the job sets itself, such as GH_TOKEN, is refused.",
+			"Env the CI wake's jobs set, such as a gateway's settings; a value may be a workflow expression. A value that reads a secret reaches only the steps that run hum; every other value reaches every step, the installs too. A name the jobs set themselves, such as GH_TOKEN, is refused.",
 		),
 	ciClaudeAuth: z
 		.enum(CLAUDE_AUTHS)
@@ -352,11 +363,11 @@ export const HumConfig = z.strictObject({
 	safety: z.record(z.string(), z.unknown()).optional(),
 	dailyQuestionCap: z.number().int().positive().optional(),
 	/** Adapter slot → adapter name. */
-	integrations: z.record(name, name).optional(),
+	integrations: z.partialRecord(z.enum(SLOTS), name).optional(),
 	/** The day `claude setup-token` made the CI token. Setup records it; the engine warns 30 days before the year ends. */
 	ciToken: z.strictObject({ setUp: z.iso.date() }).optional(),
 	/** No default: a commit is credited to whichever account lists its email, so only the owner's own is safe. */
-	commitIdentity: commitIdentity.describe("The owner's own name and email: the author and committer of every commit hum makes. Setup writes them from git config; hum ships none."),
+	commitIdentity: commitIdentity.describe("The owner's own name and email: the author and committer of every commit hum makes with git. Where the base requires signed commits, GitHub makes the commits and credits them to the account of the token hum writes with: the owner's own on a Mac; in CI, the GitHub App's bot or the account whose token pullRequestToken names. Setup writes them from git config; hum ships none."),
 	...withShippedDefaults(Shipped.shape),
 });
 
@@ -475,6 +486,11 @@ export const OWNER_CHANGEABLE = {
 	"restart backoff": "restartBackoff",
 	"restart delay": "restartDelaySeconds",
 	"CI wake timeout": "ciWakeTimeoutMinutes",
+	"CI outbox cap": "ciOutboxMaxMegabytes",
+	"CI usage limit cap": "ciUsageLimitMaxHours",
+	"follow-ups per pass": "followUpsPerPass",
+	"publish tree cap": "publishTreeMaxMegabytes",
+	"CI merge margin": "ciMergeMarginMinutes",
 	"pull request token": "pullRequestToken",
 	"CI runner": "ciRunner",
 	"CI container": "ciContainer",

@@ -133,7 +133,7 @@ test("an urgent security fix on a critical path runs the hotfix kind's own state
 	expect(routeOf(place(change(["billing/tax.ts"])), policy().paths, "hotfix", ["billing/tax.ts"]).mergesAlone).toBe(false);
 });
 
-test.each([".hum/hum.json", "adapters/linear.ts", ".github/workflows/ci.yml", ".husky/pre-push"])("hum's own config, the owner's adapters, workflows and hooks take the strictest level: %s", (path) => {
+test.each([".hum/hum.json", "adapters/linear.ts", ".github/workflows/ci.yml", ".husky/pre-push", ".claude/settings.json"])("hum's own config, the owner's adapters, workflows, hooks and Claude Code settings take the strictest level: %s", (path) => {
 	expect(place(change(["docs/a.md", path])).steps).toContainEqual({ step: "own-config", path });
 });
 
@@ -250,7 +250,7 @@ test("git history: a blame git fails throws, so a fix never reads as rewriting n
 	const repo = fixHistory();
 	const real = gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 	const blameMissing = (args: readonly string[]) => (args[0] === "blame" ? [...args.slice(0, -1), "missing.ts"] : args);
-	const git = { run: (args: readonly string[], input?: string) => real.run(blameMissing(args), input), raw: (args: readonly string[], input?: string) => real.raw(blameMissing(args), input) };
+	const git = { run: (args: readonly string[], input?: string) => real.run(blameMissing(args), input), raw: (args: readonly string[], input?: string) => real.raw(blameMissing(args), input), bytes: real.bytes };
 
 	await expect(readHistory(git, "main", config.hum)).rejects.toThrow("missing.ts");
 });

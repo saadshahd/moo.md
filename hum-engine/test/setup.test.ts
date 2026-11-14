@@ -10,7 +10,7 @@ import { scanRepo } from "../src/setup/scan.ts";
 import { shippedConfig, shippedSettingsAs } from "../src/setup/shipped.ts";
 import { waitsOf, withTimeouts } from "../src/setup/waits.ts";
 import { SetupAnswers, writeSetup } from "../src/setup/write.ts";
-import { hopeSkills } from "./fixtures/config.ts";
+import { installedSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
@@ -195,7 +195,7 @@ test("on a public repo a runner GitHub does not host is not proposed", async () 
 
 test("setup refuses a runner GitHub does not host on a public repo, or one whose visibility nothing read, until the owner agreed", () => {
 	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const], ciRunner: ["self-hosted", "linux"] }, waitHours: {} };
-	const write = (repo: string, more: Pick<SetupAnswers, "ownRunnerOnPublicRepo">, isPublicRepo?: boolean) => writeSetup(repo, SetupAnswers.parse({ ...answers, ...more }), { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT, isPublicRepo });
+	const write = (repo: string, more: Pick<SetupAnswers, "ownRunnerOnPublicRepo">, isPublicRepo?: boolean) => writeSetup(repo, SetupAnswers.parse({ ...answers, ...more }), { installedSkills: installedSkills(), gitIdentity: OWNER_GIT, isPublicRepo });
 	const open = repoWith({ "README.md": "x" });
 	const unread = write(repoWith({ "README.md": "x" }), {});
 	const refused = write(open, {}, true);
@@ -209,7 +209,7 @@ test("setup refuses a runner GitHub does not host on a public repo, or one whose
 test("without a job that runs Claude Code, the wake job takes the pull request job's runner and the shipped rest, and hum's own workflows are not read", async () => {
 	const repo = repoWith(PROJECT);
 
-	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"], ciRunner: "own-large", ciClaudeAuth: "env" }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT, isPublicRepo: false }).ok).toBe(true);
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"], ciRunner: "own-large", ciClaudeAuth: "env" }, waitHours: {} }, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT, isPublicRepo: false }).ok).toBe(true);
 	expect(proposeSetup(await scanRepo(repo, "main"), shipped.hum).wakeJob).toEqual({
 		ciRunner: "ubuntu-latest",
 		ciContainer: shipped.hum.ciContainer,
@@ -224,9 +224,9 @@ test("setup rewrites a schema 1 hum.json at schema 2, its pull request token sec
 	const file = join(repo, ".hum", "hum.json");
 	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
 
-	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(writeSetup(repo, answers, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
 	writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), schemaVersion: 1, pullRequestTokenSecret: "PR_TOKEN" }));
-	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(writeSetup(repo, answers, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
 
 	const written = JSON.parse(readFileSync(file, "utf8"));
 
@@ -239,7 +239,7 @@ test("setup reads schema 1 answers, their pull request token secret carried into
 	const repo = repoWith({ "README.md": "x" });
 	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const], pullRequestTokenSecret: "OTHER_TOKEN" }, waitHours: {}, schemaVersion: 1 };
 
-	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(writeSetup(repo, answers, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
 	expect(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")).pullRequestToken).toEqual({ from: "secret", secret: "OTHER_TOKEN" });
 });
 
@@ -276,6 +276,17 @@ test("the repo's labels map to kinds, and the map covers the open items that car
 	expect(kindCoverage(items, shipped.hum.kinds, proposal.kindLabels)).toEqual({ covered: 2, total: 4 });
 });
 
+const GITHUB_ISSUES = { "work-source": "github", questions: "github", answers: "github" };
+
+test.each([
+	["has open issues on GitHub", {}, { openIssues: 3 }, GITHUB_ISSUES],
+	["has an issue template and no open issue", PROJECT, { openIssues: 0 }, GITHUB_ISSUES],
+	["has neither an open issue nor an issue template", {}, { openIssues: 0 }, {}],
+	["has issue templates but no GitHub read", PROJECT, {}, {}],
+] as const)("a repo that %s gets the proposed integrations", async (_, files, facts, integrations) => {
+	expect(proposeSetup(await scanRepo(repoWith({ "README.md": "x", ...files }), "main"), shipped.hum, facts).integrations).toEqual(integrations);
+});
+
 test("every wait the shipped kinds have is asked once, and an answered wait carries its hours as its timeout", () => {
 	const waits = waitsOf(shipped.kinds);
 
@@ -290,7 +301,7 @@ test("every wait the shipped kinds have is asked once, and an answered wait carr
 
 test("writing setup answers writes a config that loads and carries only the settings that differ from the defaults", () => {
 	const repo = repoWith({ "README.md": "x" });
-	const result = writeSetup(repo, { hum: { checks: ["true"], kindLabels: { bug: "fix" }, runPlaces: ["ci"] }, waitHours: {} }, { hopeSkills: hopeSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
+	const result = writeSetup(repo, { hum: { checks: ["true"], kindLabels: { bug: "fix" }, runPlaces: ["ci"] }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
 
 	expect(result.ok).toBe(true);
 
@@ -300,7 +311,7 @@ test("writing setup answers writes a config that loads and carries only the sett
 	expect(written.claimExpirySeconds).toBeUndefined();
 	expect(existsSync(join(repo, ".github", "workflows"))).toBe(true);
 	expect(existsSync(join(repo, "home"))).toBe(false);
-	expect(loadConfig(readConfigDir(join(repo, ".hum")), { env: { hopeSkills: hopeSkills() } }).ok).toBe(true);
+	expect(loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills: installedSkills() } }).ok).toBe(true);
 });
 
 test("setup keeps the commit identity hum.json already names over the one git config holds", () => {
@@ -308,8 +319,8 @@ test("setup keeps the commit identity hum.json already names over the one git co
 	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
 	const later: GitIdentityRead = { found: true, identity: { name: "Later", email: "later@example.com" } };
 
-	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
-	expect(writeSetup(repo, answers, { hopeSkills: hopeSkills(), gitIdentity: later }).ok).toBe(true);
+	expect(writeSetup(repo, answers, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(writeSetup(repo, answers, { installedSkills: installedSkills(), gitIdentity: later }).ok).toBe(true);
 	expect(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")).commitIdentity).toEqual(OWNER);
 });
 
@@ -322,7 +333,7 @@ test("setup answers cannot name a commit identity, because they come from a mode
 
 test("setup writes nothing and says what to set when git config holds no name or email", () => {
 	const repo = repoWith({ "README.md": "x" });
-	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: { found: false, missing: ["user.email"] } });
+	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {} }, { installedSkills: installedSkills(), gitIdentity: { found: false, missing: ["user.email"] } });
 
 	expect(!result.ok && result.refusal.code).toBe("no-git-identity");
 	expect(!result.ok && result.refusal.message).toContain('git config --global user.email "<yours>"');
@@ -348,7 +359,7 @@ test("the owner's identity is read from git config, and each key it lacks is nam
 test("setup writes nothing when the repo's hum.json is a schema this engine does not read", () => {
 	const repo = repoWith({ ".hum/hum.json": JSON.stringify({ schemaVersion: 99 }) });
 	const before = readFileSync(join(repo, ".hum", "hum.json"), "utf8");
-	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {} }, { hopeSkills: hopeSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
+	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT });
 
 	expect(result.ok).toBe(false);
 	expect(!result.ok && result.refusal.message).toContain("bun add --exact @moo.md/hum@latest");
@@ -358,7 +369,7 @@ test("setup writes nothing when the repo's hum.json is a schema this engine does
 
 test("setup writes nothing when the schema it would write is one this engine does not read", () => {
 	const repo = repoWith({ "README.md": "x" });
-	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {}, schemaVersion: 99 }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT });
+	const result = writeSetup(repo, { hum: { checks: ["true"] }, waitHours: {}, schemaVersion: 99 }, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT });
 
 	expect(result.ok).toBe(false);
 	expect(existsSync(join(repo, ".hum"))).toBe(false);
@@ -367,12 +378,12 @@ test("setup writes nothing when the schema it would write is one this engine doe
 test("proving a written setup on a scratch copy passes its checks and contract, and skips the item without --item", async () => {
 	const repo = repoWith({ "package.json": PINNED });
 
-	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"] }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["ci"] }, waitHours: {} }, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
 	sh(repo, ["add", "-A"]);
 	sh(repo, ["commit", "-q", "-m", "setup"]);
 	sh(repo, ["push", "-q", "origin", "main"]);
 
-	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
+	const steps = await proveSetup(repo, { now: Date.now, installedSkills: installedSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
 	const byName = Object.fromEntries(steps.map((step) => [step.name, step.status]));
 
 	expect(byName).toMatchObject({ config: "passed", checks: "passed", contract: "passed", "engine pin": "skipped", item: "skipped" });
@@ -383,9 +394,9 @@ test("proving fails the checks step when a check command fails", async () => {
 	const repo = repoWith({ "package.json": PINNED });
 
 	// A work source that is not markdown skips the contract step, which the proving test above covers.
-	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"], integrations: { workSource: "github" } }, waitHours: {} }, { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT });
+	writeSetup(repo, { hum: { checks: ["false"], runPlaces: ["ci"], integrations: { "work-source": "github" } }, waitHours: {} }, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT });
 
-	const steps = await proveSetup(repo, { now: Date.now, hopeSkills: hopeSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
+	const steps = await proveSetup(repo, { now: Date.now, installedSkills: installedSkills(), base: "main", item: false, published: async () => "unpublished", newSessionId: randomUUID, processEnv: process.env });
 
 	expect(steps.find(({ name }) => name === "checks")?.status).toBe("failed");
 });
@@ -406,7 +417,7 @@ test.each([
 ] as const)("setup refuses a repo whose kind file %s", (_, fix, code) => {
 	const repo = repoWith({ "README.md": "x" });
 	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
-	const env = { hopeSkills: hopeSkills(), gitIdentity: OWNER_GIT };
+	const env = { installedSkills: installedSkills(), gitIdentity: OWNER_GIT };
 
 	expect(writeSetup(repo, answers, env).ok).toBe(true);
 	writeFileSync(join(repo, ".hum", "kinds", "fix.json"), JSON.stringify(fix));

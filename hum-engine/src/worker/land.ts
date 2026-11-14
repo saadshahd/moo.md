@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
@@ -12,13 +12,14 @@ import {
 	gitIn,
 	isAncestor,
 	PATCH,
-	push,
 	type PushOutcome,
+	readOrAbsent,
 } from "../adapters/git.ts";
+import type { GitHubCommits } from "../adapters/github-commits.ts";
 import { landOwnerCommit } from "../adapters/owner-commit.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { changeOf, historiesOf, readHistory } from "../adapters/history.ts";
-import { markDone } from "../adapters/item-file.ts";
+import { DONE_STATE, markDone, parseItemFile } from "../adapters/item-file.ts";
 import {
 	type BranchRules,
 	methodFor,
@@ -27,7 +28,9 @@ import {
 } from "../adapters/pull-requests.ts";
 import type { ModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
-import type { Boundary } from "../config/schema.ts";
+import type { Boundary, Kind, PURPOSES } from "../config/schema.ts";
+import { pickTier } from "../config/checks.ts";
+import { footprintOf } from "./scheduler.ts";
 import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
 	isCleared,
@@ -58,6 +61,8 @@ import { pickedAnswer } from "./thread.ts";
 import { reportAlignment } from "./alignment-report.ts";
 import { reportTaste } from "./taste.ts";
 import type { ThinResult } from "./thin-path.ts";
+import { evidenceMarkdown } from "./evidence.ts";
+import { pushBase, pushCommits, pushRunBranch } from "./signed-push.ts";
 
 const SHORT_EXCERPT = 200;
 
@@ -65,13 +70,14 @@ const HUM_CONFIG = ".hum/hum.json";
 
 const NO_RULES: BranchRules = {
 	requiresPullRequest: false,
+	requiresSignatures: false,
 	mergeMethods: undefined,
 };
 
 /** A change's pull request as it stands at one head of the run branch, which a report on it is made once for. */
 export type PullAtHead = { readonly pulls: PullRequests; readonly pull: Pull; readonly head: string };
 
-/** Everything landing a finished change reads and writes. The clone has the run branch checked out and the base fetched. */
+/** Everything landing a finished change reads and writes: publish's own worktree with the run branch checked out. No check of the repo runs here. */
 export type LandContext = {
 	readonly state: State;
 	readonly config: Config;
@@ -82,19 +88,20 @@ export type LandContext = {
 	readonly base: string;
 	readonly remote: string;
 	readonly clone: string;
-	/** What the run's folder adds to the environment of the repo's checks. */
-	readonly env: Readonly<Record<string, string>>;
 	readonly dir: string;
 	readonly git: Git;
-	readonly checks: readonly string[];
 	readonly workSource: WorkSource;
 	readonly questions: Questions;
 	/** The remote's pull requests and branch rules; undefined for a remote that is not on GitHub. */
 	readonly pulls: PullRequests | undefined;
+	/** The remote's branches through GitHub's API, which signs the commits it makes; undefined for a remote that is not on GitHub. */
+	readonly commits: GitHubCommits | undefined;
 	readonly now: () => number;
 	readonly judge: ModelCall;
 	/** A fresh review run on the change that ends at `head`, at its level's tier; it saves its verdict. */
 	readonly reviewRun: (change: { readonly head: string; readonly diff: string; readonly level: string }) => Promise<ReviewOutcome>;
+	/** The time past which no merge starts, as when the GitHub token's hour runs short; the landing stays saved for the next wake. */
+	readonly mergesBefore?: number;
 };
 
 /** What a review run at landing came to: its verdict, or the result that stopped it, such as a usage limit. */
@@ -103,8 +110,8 @@ export type ReviewOutcome = { readonly verdict: Verdict } | { readonly halted: T
 /** The review verdict that lets a change merge. */
 const REVIEW_APPROVAL = "approve";
 
-/** Why the change cannot merge on the newest base: it conflicts there, or its checks fail there. */
-type Stale = { readonly kind: "stale"; readonly why: string };
+/** The base moved after the work side checked the change on it: pushing now could land code no check ran on. */
+type Moved = { readonly kind: "moved" };
 
 /** A push that did not land: the remote refused it in `said`, or another writer moved the ref first. */
 type Unpushed = Exclude<PushOutcome, { kind: "pushed" }>;
@@ -113,8 +120,8 @@ type Unpushed = Exclude<PushOutcome, { kind: "pushed" }>;
 export const unpushed = (id: string, ref: string, outcome: Unpushed): ThinResult =>
 	outcome.kind === "refused" ? { outcome: "stuck", item: id, detail: outcome.said } : { outcome: "held", item: id, why: `another push moved ${ref} first` };
 
-/** How a push to the base ended: the base holds the change, it cannot merge on the newest base, or the push did not land. */
-type BaseLanding = { readonly kind: "landed" } | Stale | Unpushed;
+/** How a push to the base ended: the base holds the change, the base moved since the change was checked, or the push did not land. */
+type BaseLanding = { readonly kind: "landed" } | Moved | Unpushed;
 
 const LANDED: BaseLanding = { kind: "landed" };
 
@@ -161,13 +168,25 @@ export const placementOf = async (
 	};
 };
 
+/** The change an item declares before any run: the paths it says it touches. */
+export const declaredChange = (item: Item): Change => ({ paths: footprintOf(item) ?? [], size: 0, loosened: false, pinChanged: false });
+
+/** The model and effort the kind's tier table gives a run of `purpose` on `change`, at the level the change places at. */
+export const tierOf = async (ctx: Pick<LandContext, "config" | "state" | "git" | "base" | "now"> & { readonly kind: string }, kind: Kind, purpose: (typeof PURPOSES)[number], change: Change): Promise<{ readonly model: string; readonly effort: Kind["tiers"][number]["effort"] }> => {
+	const { placement } = await placementOf(ctx, change);
+	const row = pickTier(kind, { purpose, level: placement.level.name, size: "small" });
+
+	if (!row) throw new Error(`the ${ctx.kind} table has no ${purpose} row`);
+
+	return { model: ctx.config.hum.models[row.tier], effort: row.effort };
+};
+
+/** The run branch's diff from where it left the base to `tip`, the item's own file left out: hum's done mark is no part of the change. */
+const changeDiff = ({ git, base, dir, id }: Pick<LandContext, "git" | "base" | "dir" | "id">, tip = "HEAD"): Promise<string> =>
+	git.raw(["diff", ...PATCH, `origin/${base}...${tip}`, "--", ".", `:(exclude)${dir}/${id}.md`]);
+
 /** The diff of the run branch against the base, read as the risk level reads it. */
-export const changeOn = async ({
-	git,
-	base,
-	config,
-}: Pick<LandContext, "git" | "base" | "config">): Promise<Change> =>
-	changeOf(await git.raw(["diff", ...PATCH, `origin/${base}...HEAD`]), config.hum);
+export const changeOn = async (ctx: Pick<LandContext, "git" | "base" | "config" | "dir" | "id">): Promise<Change> => changeOf(await changeDiff(ctx), ctx.config.hum);
 
 /** The level the owner picked for unclear paths, answered since the change was saved. */
 const answeredLevel = (item: Item, since: number, levels: readonly string[]): string | undefined => pickedAnswer(item.thread, levels, since)?.option;
@@ -233,7 +252,7 @@ const learnRules = async (
 			branchPrefix: config.hum.ownerBranchPrefix,
 			mergeMethod: config.hum.mergeMethod,
 			pulls: ctx.pulls,
-			push: (refspecs) => push(git, ["origin", ...refspecs]),
+			push: (refspecs) => pushCommits({ git, base, pulls: ctx.pulls, commits: ctx.commits }, refspecs),
 		});
 
 		if (landed.via === "refused") return { kind: "refused", said: landed.said };
@@ -249,19 +268,54 @@ const learnRules = async (
 	}
 };
 
-/** Marks the item done on the run branch, pushes the branch and saves what its diff showed, so a retry lands it without a run. `ownerApproved` records that the owner approved this change in its review state. */
-export const prepareLanding = async (ctx: LandContext, { ownerApproved = false }: { readonly ownerApproved?: boolean } = {}): Promise<PushOutcome> => {
-	const { git, clone, dir, id, branch, state, now } = ctx;
-	const change = await changeOn(ctx);
-	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
+/**
+ * Where the run branch holds the item's file, as a markdown item's branch does, the file is marked done in a commit of
+ * its own, so the merged change itself takes the item off the ready list. A work source that keeps its items
+ * elsewhere ends the item once the change merged.
+ */
+const markItemDone = async ({ git, clone, dir, id }: LandContext): Promise<void> => {
 	const file = join(clone, dir, `${id}.md`);
 
-	writeFileSync(file, markDone(readFileSync(file, "utf8")));
+	if (!existsSync(file)) return;
+
+	const source = readFileSync(file, "utf8");
+
+	if (parseItemFile(source).state === DONE_STATE) return;
+
+	writeFileSync(file, markDone(source));
 	await git.raw(["add", `${dir}/${id}.md`]);
 	await git.raw(["commit", "-q", "-m", `hum: finish ${id}`]);
-	const pushed = await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+};
 
-	if (pushed.kind === "pushed") state.landings.put(id, { item: id, branch, since: now(), change, head, ownerApproved });
+/** The patch id of the change against the base: a rebase keeps it. */
+const patchOf = async (ctx: Pick<LandContext, "git" | "base" | "dir" | "id">): Promise<string> => (await ctx.git.raw(["patch-id", "--stable"], await changeDiff(ctx))).split(" ")[0] ?? "";
+
+/**
+ * Marks the item done on the run branch where it holds the item's file, pushes the branch and saves what its diff
+ * showed, so a retry lands it without a run. The saved head is the change before hum's done mark; a push GitHub signed
+ * rebuilt the change as its own commit, which is then the head, and a verdict on the old commit holds for its tree.
+ * The same change saved again, as after a rebase, keeps when it was first saved, so the owner's answers since then
+ * still count; a new change starts the count afresh.
+ */
+export const prepareLanding = async (ctx: LandContext): Promise<PushOutcome> => {
+	const { git, id, branch, state, now } = ctx;
+	const change = await changeOn(ctx);
+	const built = (await git.raw(["rev-parse", "HEAD"])).trim();
+	const patch = await patchOf(ctx);
+	const saved = state.landings.get(id);
+	const kept = saved?.patch === patch ? saved : undefined;
+
+	await markItemDone(ctx);
+	const pushed = await pushRunBranch(ctx, branch);
+
+	if (pushed.kind !== "pushed") return pushed;
+
+	const head = (await isAncestor(git, { ancestor: built, descendant: "HEAD" })) ? built : (await git.raw(["rev-parse", "HEAD"])).trim();
+	const verdict = state.verdicts.get(id);
+
+	if (head !== built && verdict?.head === built) state.verdicts.put(id, { ...verdict, head });
+
+	state.landings.put(id, { item: id, branch, since: kept?.since ?? now(), change, head, lostRaces: kept?.lostRaces ?? 0, alignment: kept?.alignment, patch });
 
 	return pushed;
 };
@@ -273,54 +327,71 @@ const isOnBase = async ({ git, base }: LandContext): Promise<boolean> => {
 	return isAncestor(git, { ancestor: "HEAD", descendant: `origin/${base}` });
 };
 
-/** The change on the newest base: when the base moved it is rebased and the checks run again; else why it cannot merge there. */
-const ontoNewestBase = async ({ git, base, clone, env, checks, config }: LandContext): Promise<Stale | undefined> => {
-	await git.raw(["fetch", "-q", "origin", base]);
+/**
+ * The change on the base the work side checked it on, as a work pass leaves it: rebased there when it does not grow
+ * from it, and checked again; else why it cannot merge there.
+ */
+export const rebaseOnto = async ({ git, clone, env, checks, config, base }: { readonly git: Git; readonly clone: string; readonly env: Readonly<Record<string, string>>; readonly checks: readonly string[]; readonly config: Config; readonly base: string }, onto: string): Promise<string | undefined> => {
+	if (await isAncestor(git, { ancestor: onto, descendant: "HEAD" })) return undefined;
 
-	if (await isAncestor(git, { ancestor: `origin/${base}`, descendant: "HEAD" })) return undefined;
-
-	const rebased = await git.run(["rebase", "-q", `origin/${base}`]);
+	const rebased = await git.run(["rebase", "-q", onto]);
 
 	if (rebased.code !== 0) {
 		await git.run(["rebase", "--abort"]);
 
-		return { kind: "stale", why: `the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}` };
+		return `the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}`;
 	}
 
 	const failure = await runChecks(checks, clone, { env, timeoutMs: checksTimeoutMs(config.hum) });
 
-	return failure ? { kind: "stale", why: `the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}` } : undefined;
+	return failure && `the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}`;
 };
 
-const pushBranchAndBase = async ({ git, base, branch }: LandContext): Promise<PushOutcome> => {
-	const toBranch = await push(git, ["--force", "origin", `HEAD:refs/heads/${branch}`]);
+const pushBranchAndBase = async (ctx: LandContext): Promise<PushOutcome> => {
+	const toBranch = await pushRunBranch(ctx, ctx.branch);
 
-	return toBranch.kind === "pushed" ? push(git, ["origin", `HEAD:refs/heads/${base}`]) : toBranch;
+	return toBranch.kind === "pushed" ? pushBase(ctx) : toBranch;
 };
 
-const finish = async ({ state, git, id, now }: LandContext): Promise<ThinResult> => {
-	recordMerged(state, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
+/** Whether the change holds the item's file marked done, so the merge itself took the item off the ready list. */
+const endedByChange = async ({ git, dir, id }: LandContext): Promise<boolean> => {
+	const source = await readOrAbsent(git, ["show", `HEAD:${dir}/${id}.md`]);
+
+	return source !== undefined && parseItemFile(source).state === DONE_STATE;
+};
+
+/**
+ * The change is on the base: its item ends at the work source unless the change ended it, then the merge is recorded.
+ * A failed end leaves the landing saved, so the next pass ends it again.
+ */
+const finish = async (ctx: LandContext): Promise<ThinResult> => {
+	const { state, git, id, item, workSource, now } = ctx;
+
+	if (!(await endedByChange(ctx))) await workSource.finish(item.id);
+	await recordMerged(state, { git, remote: "origin" }, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
 
 	return { outcome: "merged", item: id };
 };
 
-/** Pushes the change to the base once, rechecked on the newest base before each try; a base another push moved first is tried again, up to `mergeTries` pushes. */
+/** Pushes the change to the base once, only as it grows from the base as it stands: a base that moved after the change was checked waits for the next pass to check it again. */
 const pushToBase = async (ctx: LandContext): Promise<BaseLanding> => {
 	if (await isOnBase(ctx)) return LANDED;
 
-	for (let tries = 0; tries < ctx.config.hum.mergeTries; tries++) {
-		const stale = await ontoNewestBase(ctx);
+	if (!(await isAncestor(ctx.git, { ancestor: `origin/${ctx.base}`, descendant: "HEAD" }))) return { kind: "moved" };
 
-		if (stale) return stale;
+	const pushed = await ctx.state.ops.once({ itemId: ctx.id, run: "merge", attempt: 0, op: "push-base" }, { holds: () => isOnBase(ctx), run: () => pushBranchAndBase(ctx), isDone: ({ kind }) => kind === "pushed" });
 
-		const pushed = await ctx.state.ops.once({ itemId: ctx.id, run: "merge", attempt: 0, op: "push-base" }, { holds: () => isOnBase(ctx), run: () => pushBranchAndBase(ctx), isDone: ({ kind }) => kind === "pushed" });
+	return pushed.kind === "skipped" || pushed.value.kind === "pushed" ? LANDED : pushed.value;
+};
 
-		if (pushed.kind === "skipped" || pushed.value.kind === "pushed") return LANDED;
+/** What the change's pull request says: the text the run wrote under the repo's own rules, else the item's title, then its evidence, then hum's word on the merge and the item. */
+const pullRequestOf = ({ state, id, item }: LandContext, merging: string) => {
+	const written = state.pullRequests.get(id);
 
-		if (pushed.value.kind === "refused") return pushed.value;
-	}
-
-	return { kind: "conflict" };
+	return {
+		title: written?.title ?? `hum: ${item.title}`,
+		body: [written?.body, written?.evidence && evidenceMarkdown(written.evidence), merging, `Item ${id}.`].filter(Boolean).join("\n\n"),
+	};
 };
 
 /** One pull request from the run branch: it merges itself once GitHub's required checks pass when the change is cleared, and waits for the owner otherwise. */
@@ -328,17 +399,8 @@ const throughPullRequest = async (
 	ctx: LandContext,
 	{ pulls, autoMerge, route, rules, why }: { readonly pulls: PullRequests; readonly autoMerge: boolean; readonly route: Route; readonly rules: BranchRules; readonly why: string },
 ): Promise<ThinResult> => {
-	const { id, branch, base, item, config } = ctx;
-	const body = `${autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`}\n\nItem ${id}.`;
-
-	const pull =
-		(await pulls.find(branch)) ??
-		(await pulls.open({
-			head: branch,
-			base,
-			title: `hum: ${item.title}`,
-			body,
-		}));
+	const { id, branch, base, config } = ctx;
+	const pull = (await pulls.find(branch)) ?? (await pulls.open({ head: branch, base, ...pullRequestOf(ctx, autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`) }));
 
 	if (pull.state === "MERGED") return finish(ctx);
 
@@ -380,17 +442,26 @@ const afterRefusal = async (
 	);
 };
 
-/** The card of a base that other pushes kept moving through every one of `mergeTries` pushes. It stands while the item stays held; the pass that decides the item another way clears it. */
+/** The card of a base that other pushes moved first on `mergeTries` passes in a row. It stands while the item stays held; the pass that decides the item another way clears it. */
 export const BASE_CONTENDED = "base-contended";
 
-/** One card while the item's pushes to the base keep losing the race, however many passes that lasts. */
-const raiseContention = ({ state, id, base, config }: LandContext): void =>
-	void state.faults.raise({
-		code: BASE_CONTENDED,
-		item: id,
-		cause: `${id} lost the race to ${base} on all ${config.hum.mergeTries} pushes of a pass: another push moved ${base} first each time`,
-		fix: `hum tries again each pass. If this card stays, find what keeps pushing to ${base}, or raise mergeTries in .hum/hum.json.`,
-	});
+/** Counts a pass that lost the race to the base, and raises one card once `mergeTries` passes in a row did. */
+const loseRace = ({ state, id, base, config }: LandContext, why: string): ThinResult => {
+	const saved = state.landings.get(id);
+	const lost = (saved?.lostRaces ?? 0) + 1;
+
+	if (saved) state.landings.put(id, { ...saved, lostRaces: lost });
+
+	if (lost >= config.hum.mergeTries)
+		state.faults.raise({
+			code: BASE_CONTENDED,
+			item: id,
+			cause: `${id} lost the race to ${base} on ${lost} passes in a row: another push moved ${base} first each time`,
+			fix: `hum tries again each pass. If this card stays, find what keeps pushing to ${base}, or raise mergeTries in .hum/hum.json.`,
+		});
+
+	return { outcome: "held", item: id, why };
+};
 
 const landBy = async (
 	ctx: LandContext,
@@ -402,6 +473,8 @@ const landBy = async (
 	if (landing.via === "wait")
 		return { outcome: "review", item: ctx.id, detail: why };
 
+	if (ctx.mergesBefore !== undefined && ctx.now() >= ctx.mergesBefore) return { outcome: "held", item: ctx.id, why: "too little of the GitHub token's hour is left to merge; the next wake lands it" };
+
 	if (landing.via === "pull-request" && ctx.pulls)
 		return throughPullRequest(ctx, { pulls: ctx.pulls, autoMerge: landing.autoMerge, route, rules, why });
 
@@ -409,23 +482,25 @@ const landBy = async (
 
 	if (landed.kind === "refused") return afterRefusal(ctx, { cleared: true, route, why, said: landed.said });
 
-	if (landed.kind === "conflict") {
-		raiseContention(ctx);
+	if (landed.kind === "conflict") return loseRace(ctx, `another push moved ${ctx.base} first`);
 
-		return unpushed(ctx.id, ctx.base, landed);
-	}
+	if (landed.kind === "moved") return loseRace(ctx, `${ctx.base} moved after the change was checked on it; the next pass checks it there`);
 
-	return landed.kind === "stale" ? { outcome: "review", item: ctx.id, detail: landed.why } : finish(ctx);
+	return finish(ctx);
 };
 
 /**
  * Lands a change saved by `prepareLanding`, by its level under the policy as it stands now: an answered level
  * becomes a path rule first, an unclear change asks once, and the target branch's rules pick a push or a pull request.
+ * The owner's approval counts only when they gave it after this change was saved, so no earlier answer approves it.
  */
 export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const saved = ctx.state.landings.get(ctx.id);
 
 	if (!saved) throw new Error(`no landing is saved for ${ctx.id}`);
+
+	// A change of no files, such as a split item's, whose branch the base already holds has nothing left to land.
+	if (saved.change.paths.length === 0 && (await isOnBase(ctx))) return finish(ctx);
 
 	const first = await placementOf(ctx, saved.change);
 	const answered = answeredLevel(ctx.item, saved.since, levelNames(ctx.config));
@@ -441,10 +516,11 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	if (placement.unclear.length > 0) await askUnclear(ctx, placement.unclear);
 
-	const diff = await ctx.git.raw(["diff", ...PATCH, `origin/${ctx.base}...${saved.head}`]);
+	const diff = await changeDiff(ctx, saved.head);
 	const alignment = saved.change.paths.length > 0 ? await alignmentOf(ctx, saved, diff) : undefined;
 	const aligned = doesGateAlignment(ctx.config.hum) && alignment && "graded" in alignment ? alignedPlacement(placement, alignment.graded, ctx.config.hum) : placement;
-	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, alignment, verdict));
+	const planModels = await planModelsOf(ctx);
+	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, { alignment, planModels, verdict }));
 	const placed = routeWith();
 	const reviewed = doesNeedReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name }) : undefined;
 
@@ -452,7 +528,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	const verdict = reviewed?.verdict;
 	const route = routeWith(verdict);
-	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: saved.ownerApproved || pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
+	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 
@@ -482,16 +558,32 @@ const abstained = (boundary: Boundary, why: string): Unclear => ({ cause: "absta
 
 const unmeasured = (models: readonly string[]): string => `${models.join(", ") || "no model"} has no measured rate that meets the bar`;
 
+/** Whether an item of `kind` runs a plan: a state of its machine runs a role whose purpose is plan. */
+const doesPlan = (config: Config, kind: Kind): boolean => Object.values(kind.machine.states).some((node) => node.invoke !== undefined && config.hum.roles[node.invoke.src]?.purpose === "plan");
+
+/**
+ * The models behind the item's plan: the one its kind's tier table gives the plan run, with any the run reported,
+ * which can only add to it; none where the kind never plans.
+ */
+const planModelsOf = async (ctx: LandContext): Promise<readonly string[] | undefined> => {
+	const kind = ctx.config.kinds[ctx.kind];
+
+	if (kind === undefined || !doesPlan(ctx.config, kind)) return undefined;
+
+	const { model } = await tierOf(ctx, kind, "plan", declaredChange(ctx.item));
+
+	return [...new Set([model, ...(ctx.state.plans.get(ctx.id)?.models ?? [])])];
+};
+
 /** Every model judgment behind the change that abstained, or came from a model id its boundary was not measured on. */
-const abstentionsOf = (ctx: LandContext, alignment: SavedLanding["alignment"], verdict: Verdict | undefined): Unclear[] => {
+const abstentionsOf = (ctx: LandContext, { alignment, planModels, verdict }: { readonly alignment: SavedLanding["alignment"]; readonly planModels: readonly string[] | undefined; readonly verdict: Verdict | undefined }): Unclear[] => {
 	const isMeasured = (boundary: Boundary, models: readonly string[]): boolean => isTrusted(models, boundary, ctx.config.hum);
 	const kind = ctx.state.itemKinds.get(ctx.id);
-	const plan = ctx.state.plans.get(ctx.id);
 
 	return [
 		...(kind?.from === "fallback" ? [abstained("kind", kind.why)] : []),
 		...(doesGateAlignment(ctx.config.hum) && alignment && "abstained" in alignment ? [abstained("alignment", alignment.abstained)] : []),
-		...(plan && !isMeasured("plan-outcome", plan.models) ? [abstained("plan-outcome", unmeasured(plan.models))] : []),
+		...(planModels && !isMeasured("plan-outcome", planModels) ? [abstained("plan-outcome", unmeasured(planModels))] : []),
 		...(verdict && !isMeasured("review-verdict", verdict.models) ? [abstained("review-verdict", unmeasured(verdict.models))] : []),
 	];
 };

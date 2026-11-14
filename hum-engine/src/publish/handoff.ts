@@ -1,0 +1,107 @@
+import { copyFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import { savedLimitUntil, settleLimit } from "../adapters/limit.ts";
+import { nextStates, reachedFrom } from "../config/machine.ts";
+import { type Config } from "../config/load.ts";
+import { type Kind, OWNER_WAIT_TAG } from "../config/schema.ts";
+import type { State } from "../state/open.ts";
+import type { Spent } from "../state/saved.ts";
+import { queuedKey } from "../worker/questions.ts";
+import { OWNER_APPROVAL } from "../decide/merge.ts";
+import { SNAPSHOT_CARDS } from "../state/items.ts";
+
+/** Where publish found an item's saved machine state before the work job ran, and whether the owner had answered. */
+export type InboxItem = {
+	readonly item: string;
+	readonly kind: Kind;
+	/** The machine's state in the inbox, or undefined when the item had none. */
+	readonly at: string | undefined;
+	/** The inbox thread holds the owner's answer to the wait the item is in. */
+	readonly answered: boolean;
+};
+
+const isOwnerWait = (kind: Kind, state: string): boolean => kind.machine.states[state]?.tags?.includes(OWNER_WAIT_TAG) ?? false;
+
+/**
+ * The states one pass may carry an item to from where the inbox saved it: through every transition of its kind's
+ * machine, past the owner's wait it starts in only with the owner's answer, and never past another owner's wait.
+ */
+export const passReach = ({ kind, at, answered }: Omit<InboxItem, "item">): ReadonlySet<string> => {
+	const start = at ?? kind.machine.initial;
+
+	return reachedFrom(start, nextStates(kind), (state) => !isOwnerWait(kind, state) || (state === start && answered));
+};
+
+/** The rank of a kind's floor among the levels; a kind with no floor ranks lowest. */
+const floorRank = (config: Config, kind: string): number => {
+	const floor = config.hum.kindFloors[kind];
+
+	return floor === undefined ? -1 : config.hum.levels.findIndex(({ name }) => name === floor);
+};
+
+/** Why a work job may not move an item from one kind to another: it names the kind the item has, or one whose risk floor is lower. */
+export const kindMoveFault = (config: Config, { from, to }: { readonly from: string; readonly to: string }): string | undefined => {
+	if (to === from) return `it moves the item to ${to}, the kind it already has`;
+
+	return floorRank(config, to) < floorRank(config, from) ? `it moves the item from ${from} to ${to}, whose risk floor is lower` : undefined;
+};
+
+/**
+ * An item's spend as publish takes it from a work job: the total only rises, and the count toward the kind's cap
+ * starts afresh only where the owner answered.
+ */
+const raisedSpend = (held: Spent | undefined, worked: Spent, answered: boolean): Spent => {
+	const total = Math.max(held?.total ?? 0, worked.total);
+	const base = held?.base ?? 0;
+
+	return { item: worked.item, total, base: answered ? Math.min(Math.max(base, worked.base), total) : base };
+};
+
+/** The cards a work job raises on an item that publish shows: those of its saved state, never one with an action. */
+const WORK_CARD_CODES: ReadonlySet<string> = new Set(Object.values(SNAPSHOT_CARDS));
+
+/**
+ * Takes into publish's state what a work job wrote for one item it ran, and nothing else: the item's machine state
+ * when it is one a pass can reach from the inbox's, its runs, its spend where it raises publish's, its plan, whose
+ * models land reads beside the ones the config gives the plan run, its pull request text, its proof,
+ * the questions it queued, never offering the owner's approval, its choices, its events, its saved state's cards with
+ * no action, and the usage limit cut to `usageLimitMaxMs` from now. Landings, verdicts, merges, learned rules, kinds,
+ * answers and op keys stay as publish has them. Returns why the machine state was refused, or nothing once all is taken.
+ */
+export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limits: { readonly now: number; readonly usageLimitMaxMs: number }): string | undefined => {
+	const { item, kind } = inbox;
+	const saved = work.items.saved().find(({ itemId }) => itemId === item);
+
+	if (saved !== undefined) {
+		if (saved.kind !== kind.machine.id || saved.machineVersion !== kind.machine.version) return `the work job saved ${item} under ${saved.kind}@${saved.machineVersion}, not ${kind.machine.id}@${kind.machine.version}`;
+
+		if (saved.state === undefined || !passReach(inbox).has(saved.state)) return `no pass takes ${item} from ${inbox.at ?? kind.machine.initial} to ${saved.state ?? "a nested state"}`;
+
+		mkdirSync(dirname(into.items.path(item)), { recursive: true });
+		copyFileSync(work.items.path(item), into.items.path(item));
+	} else into.items.remove(item);
+
+	for (const record of work.runs.list(item)) into.runs.keep(record);
+
+	const worked = work.spent.get(item);
+
+	if (worked !== undefined) into.spent.put(item, raisedSpend(into.spent.get(item), worked, inbox.answered));
+
+	work.plans.copyTo(into.plans, item);
+	work.pullRequests.copyTo(into.pullRequests, item);
+	work.proofs.copyTo(into.proofs, item);
+
+	for (const queued of work.questions.list().filter((queued) => queued.item === item && queued.askedAt === undefined)) into.questions.put(queuedKey(queued), { ...queued, options: queued.options?.filter((option) => option !== OWNER_APPROVAL) });
+
+	for (const choice of work.choices.list().filter((choice) => choice.item === item)) into.choices.put(`${item}@${choice.text}`, choice);
+
+	for (const event of work.events.list(item)) into.events.add(event);
+
+	for (const { code, cause, fix } of work.faults.list().filter((card) => card.item === item && WORK_CARD_CODES.has(card.code))) into.faults.raise({ code, item, cause, fix });
+
+	const until = savedLimitUntil(work);
+
+	if (until > 0) settleLimit(into, { kind: "limited", until: Math.min(until, limits.now + limits.usageLimitMaxMs) });
+
+	return undefined;
+};

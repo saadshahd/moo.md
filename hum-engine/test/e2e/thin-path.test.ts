@@ -7,11 +7,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SlotPool } from "../../src/slots/pool.ts";
-import { type Checkout, PLAN_MARK, runBranch, runThinPath } from "../../src/worker/thin-path.ts";
+import { type Checkout, PLAN_MARK, PROSE_PROMPTS, runBranch, runThinPath } from "../../src/worker/thin-path.ts";
 import { configWith } from "../fixtures/config.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { itemFile, sh } from "../fixtures/work-repo.ts";
-import { READY_PLAN, type ShimSpec } from "../fixtures/shim.ts";
+import { READY_PLAN, SHIM_MODEL, type ShimSpec } from "../fixtures/shim.ts";
 import { BASE, poolConfig } from "../fixtures/slot-world.ts";
 import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
@@ -27,12 +27,12 @@ const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
 	return w;
 };
 
-const NOTE = { commit: { "docs/note.md": "hello\n" } };
+const NOTE = { write: { "docs/note.md": "hello\n" } };
 
 /** A file a shim run writes its stdin to, in a temp folder of its own. */
 const stdinFile = (): string => join(tempDir("stdin"), "stdin");
 
-test("the thin path: item → claude -p shim commit → checks → low-risk merge, state done in the same change", async () => {
+test("the thin path: item → claude -p shim change → hum commits it → checks → low-risk merge, state done in the same change", async () => {
 	const stdinCopy = stdinFile();
 	const w = await world({ script: [{}, { ...NOTE, saveStdin: stdinCopy }] });
 	const body = `${"y".repeat(99)}\n`.repeat(2100);
@@ -45,12 +45,12 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	expect(body.length).toBeGreaterThan(200_000);
 	expect(readFileSync(stdinCopy, "utf8")).toContain(body.trim());
 
-	// One change on main: the run's commit and the item's state.
+	// One change on main: hum's commit of the run's change, and the item's state.
 	expect(sh(w.repo.remote, ["show", "main:docs/note.md"])).toBe("hello\n");
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(sh(w.repo.remote, ["log", "--format=%s", "-3", "main"]).split("\n")).toEqual(["hum: finish " + id, "shim: the change", `add ${id}`, ""]);
 
-	// Hum's commit and the agent's, whatever git config the clone holds, are credited to the owner and no one else.
+	// Both of hum's commits, whatever git config the clone holds, are credited to the owner and no one else.
 	const credited = `${OWNER.name} <${OWNER.email}> | ${OWNER.name} <${OWNER.email}>`;
 
 	expect(sh(w.repo.remote, ["log", "--format=%an <%ae> | %cn <%ce>", "-2", "main"]).split("\n")).toEqual([credited, credited, ""]);
@@ -73,7 +73,22 @@ test("the thin path: item → claude -p shim commit → checks → low-risk merg
 	expect(existsSync(w.state.items.path(id))).toBe(false);
 });
 
-test("the thin path through a background run: the build is a named agent and its commit lands", async () => {
+test("a build run is told to reach for its role's skills and to write the pull request under the repo's own rules", async () => {
+	const stdinCopy = stdinFile();
+	const config = configWith((raw) => void (raw.hum.roles.build.skills = ["sound:prime", "my-skill"]), ["sound:prime"]);
+	const w = await world({ script: [{}, { ...NOTE, saveStdin: stdinCopy }] }, { config });
+
+	w.repo.seed("Write the note");
+	await runThinPath(w.thinPath());
+
+	const prompt = readFileSync(stdinCopy, "utf8");
+
+	expect(prompt).toContain("Use these skills with the Skill tool where they apply: sound:prime, my-skill.");
+	expect(prompt).toContain('give "pullRequest": the title and body of the pull request');
+	expect(PROSE_PROMPTS.review(configWith(), { id: "1", title: "t", body: "" }, "")).toContain("Use these skills with the Skill tool where they apply: hope:judge.");
+});
+
+test("the thin path through a background run: the build is a named agent and its change lands", async () => {
 	const w = await world({ script: [{}, {}, NOTE] }, { background: true });
 	const id = w.repo.seed("Write the note");
 
@@ -142,12 +157,17 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(w.repo.show(id)).toContain("state: done");
 });
 
-test("a merge that keeps losing the race to the base stops after mergeTries pushes, with one card while it stays held, gone once the item leaves the base by a pull request", async () => {
+test("a merge that keeps losing the race to the base raises one card after mergeTries passes, kept while it stays held and gone once the item leaves the base by a pull request", async () => {
 	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => (raw.hum.mergeTries = 2)) });
 	const id = w.repo.seed("Write the note");
 	const refused = w.repo.refusePushes();
 
 	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "held", why: "another push moved main first" });
+	expect(w.state.faults.list()).toEqual([]);
+
+	w.clock.at += 1;
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held" });
 	expect(refused()).toBe(2);
 
 	const cards = w.state.faults.list();
@@ -186,7 +206,7 @@ test("a run branch the remote refuses ends the item stuck, in the remote's own w
 
 test("failed checks go to a fix run, and the fix run gets the failure", async () => {
 	const fixStdin = stdinFile();
-	const w = await world({ script: [{}, { commit: { "docs/note.md": "BAD\n" } }, { commit: { "docs/note.md": "good\n" }, saveStdin: fixStdin }] }, { checks: ["! grep -q BAD docs/note.md"] });
+	const w = await world({ script: [{}, { write: { "docs/note.md": "BAD\n" } }, { write: { "docs/note.md": "good\n" }, saveStdin: fixStdin }] }, { checks: ["! grep -q BAD docs/note.md"] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "merged", item: id });
@@ -200,7 +220,7 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 		raw.hum.maxFixRuns = 2;
 	});
 
-	const w = await world({ script: [{}, { commit: { "docs/note.md": "one\n" } }, { commit: { "docs/note.md": "two\n" } }, { commit: { "docs/note.md": "three\n" } }] }, { config, checks: ["false"] });
+	const w = await world({ script: [{}, { write: { "docs/note.md": "one\n" } }, { write: { "docs/note.md": "two\n" } }, { write: { "docs/note.md": "three\n" } }] }, { config, checks: ["false"] });
 	const id = w.repo.seed("Write the note");
 	const before = sh(w.repo.remote, ["rev-parse", "main"]);
 
@@ -233,7 +253,7 @@ const OWNER_CONFIG = `${JSON.stringify({ schemaVersion: 1, paths: [{ glob: "docs
 const questionsOn = async (w: Awaited<ReturnType<typeof world>>, id: string) => (await w.adapter.workSource!.read(ItemId.parse(id))).thread.filter((entry) => entry.kind === "question");
 
 test("a change to a path no rule places runs, waits unmerged and asks one question; the answer becomes a path rule, and the next change there is not unclear", async () => {
-	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }, { commit: { "src/y.ts": "y\n" } }] });
+	const w = await world({ script: [{}, { write: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }, { write: { "src/y.ts": "y\n" } }] });
 
 	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
 
@@ -249,6 +269,7 @@ test("a change to a path no rule places runs, waits unmerged and asks one questi
 
 	const runs = w.shim.calls().length;
 
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held", why: expect.stringContaining("main moved") });
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toEqual({ outcome: "merged", item: id });
 	expect(w.shim.calls()).toHaveLength(runs);
 	expect(JSON.parse(sh(w.repo.remote, ["show", "main:.hum/hum.json"])).paths).toEqual([{ glob: "docs/**", level: "low" }, { glob: "src/**", level: "low" }]);
@@ -261,7 +282,7 @@ test("a change to a path no rule places runs, waits unmerged and asks one questi
 });
 
 test("an answer whose path rule the remote refuses off GitHub ends the item stuck, in the remote's own words", async () => {
-	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
+	const w = await world({ script: [{}, { write: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
 
 	w.repo.put({ path: ".hum/hum.json", content: OWNER_CONFIG });
 
@@ -278,7 +299,7 @@ test("an answer whose path rule the remote refuses off GitHub ends the item stuc
 });
 
 test("where the base needs a pull request, the answer's path rule travels in one, and a rerun waits on it without a second", async () => {
-	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
+	const w = await world({ script: [{}, { write: { "src/x.ts": "x\n", "docs/note.md": "hello\n" } }] });
 	const github = new FakeGitHub();
 	const pulls = github.client();
 
@@ -312,8 +333,8 @@ test("a run that needs the owner pushes its branch, asks, and ends; the answer s
 		{
 			script: [
 				{},
-				{ commit: { "docs/part-one.md": "one\n" }, structured: { status: "needs-owner", question: "Which title?", plan: "Write two parts." } },
-				{ commit: { "docs/note.md": "two\n" }, saveStdin: resumeStdin },
+				{ write: { "docs/part-one.md": "one\n" }, structured: { status: "needs-owner", question: "Which title?", plan: "Write two parts." } },
+				{ write: { "docs/note.md": "two\n" }, saveStdin: resumeStdin },
 			],
 		},
 		{ checks: ["test -f docs/part-one.md"] },
@@ -354,7 +375,7 @@ test("a run that needs the owner pushes its branch, asks, and ends; the answer s
 });
 
 test("a run that says a secret is missing asks about it only when the runner lacks the variable; otherwise the owner gets the plain question", async () => {
-	const needs = (variable: string) => ({ commit: { "docs/part.md": "one\n" }, structured: { status: "needs-owner", question: "Is it set?", plan: "Publish.", reason: { kind: "missing-secret", variable } } });
+	const needs = (variable: string) => ({ write: { "docs/part.md": "one\n" }, structured: { status: "needs-owner", question: "Is it set?", plan: "Publish.", reason: { kind: "missing-secret", variable } } });
 	const w = await world({ script: [{}, needs("NPM_TOKEN"), needs("PATH")] });
 	const lacking = w.repo.seed("Publish the note");
 
@@ -416,13 +437,37 @@ test("a change that waits for the owner runs on its level's tier and opens the s
 	expect(github.pulls()).toMatchObject([{ autoMerge: true }]);
 });
 
+test("the owner's approval holds for the same change rebased onto a moved base, so it merges without a second ask", async () => {
+	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "high" }])) });
+	const github = new FakeGitHub();
+	const pulls = github.client();
+	const id = w.repo.add("note", itemFile("Write the note", { state: "ready", body: "touches: docs/note.md" }));
+	const branch = runBranch(SHIPPED_DEFAULTS, id);
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+
+	const asked = (await questionsOn(w, id)).length;
+	const since = w.state.landings.get(id)?.since;
+
+	await w.adapter.answers!.answer(id, { text: "approve", option: "approve" });
+	w.repo.put({ path: "src/other.ts", content: "moved\n" });
+	w.clock.at += TTL;
+
+	expect(await runThinPath(w.thinPath({ pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
+	expect(sh(w.repo.remote, ["merge-base", "--is-ancestor", "main", branch])).toBe("");
+	expect(w.state.landings.get(id)?.since).toBe(since);
+	expect(github.pulls()).toMatchObject([{ autoMerge: true }]);
+	expect(await questionsOn(w, id)).toHaveLength(asked);
+});
+
 test("a push the remote refuses goes through a pull request, after the branch's rules are read again", async () => {
 	const w = await world({ script: [{}, NOTE] });
 	const github = new FakeGitHub();
 	const pulls = github.client();
 	const id = w.repo.seed("Write the note");
 
-	expect(await pulls.rules("main")).toEqual({ requiresPullRequest: false, mergeMethods: undefined });
+	expect(await pulls.rules("main")).toEqual({ requiresPullRequest: false, requiresSignatures: false, mergeMethods: undefined });
 	github.requiresPullRequest = true;
 
 	const refused = w.repo.refusePushes({ said: GH013 });
@@ -448,7 +493,7 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 		script: [
 			{},
 			{
-				commit: {
+				write: {
 					".hum/hum.json": lowered,
 					"package.json": '{ "dependencies": { "@moo.md/hum": "9.9.9" } }\n',
 					".github/workflows/ci.yml": "on: push\n",
@@ -485,7 +530,7 @@ const featureJudge = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND
 test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, and an approval merges it", async () => {
 	const [buildStdin, fixStdin] = [stdinFile(), stdinFile()];
 	const cite = { event: "request-changes", sure: true, reason: "The note says nothing.", cites: [{ file: "docs/note.md", line: 1 }] };
-	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { commit: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, cite] });
+	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { write: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, cite] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
@@ -528,6 +573,15 @@ test("a review run at landing counts toward the item's total, and one that passe
 	expect(w.state.spent.get(id)?.total).toBeGreaterThan(305);
 });
 
+test("the plan bar reads the model the config gives the plan run, so a run that reports only a measured model cannot lift it", async () => {
+	const config = configWith((raw) => void (raw.hum.measuredModels["plan-outcome"] = { [SHIM_MODEL]: 1 }));
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] }, { config });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "review", item: id, detail: `the plan-outcome call abstained: ${config.hum.models.standard}, ${SHIM_MODEL} has no measured rate that meets the bar` });
+	expect(w.state.plans.get(id)?.models).toEqual([SHIM_MODEL]);
+});
+
 test("a plan run that splits its item files each part as a ready item and lands the item as done with no change of its own", async () => {
 	const w = await world({ script: [{}], decisions: [{ event: "needs-split", sure: true, reason: "Two jobs.", parts: ["Write part one", "Write part two"] }] }, { checks: ["true"] });
 	const id = w.repo.seed("Write two parts");
@@ -543,7 +597,7 @@ test("a docs item whose change touches code moves to its real kind and runs agai
 	const asked: string[] = [];
 	const judge = scriptedJudge({ kind: { kind: "docs" }, alignment: SOUND }, asked);
 	const [firstBuild, secondBuild] = [stdinFile(), stdinFile()];
-	const w = await world({ script: [{}, { commit: { "src/x.ts": "x\n", "docs/note.md": "hello\n" }, saveStdin: firstBuild }, { ...NOTE, saveStdin: secondBuild }] }, { config });
+	const w = await world({ script: [{}, { write: { "src/x.ts": "x\n", "docs/note.md": "hello\n" }, saveStdin: firstBuild }, { ...NOTE, saveStdin: secondBuild }] }, { config });
 	const id = w.repo.seed("Write the note");
 	const onBranch = `Work on the branch ${runBranch(config.hum, id)}.`;
 
@@ -557,7 +611,7 @@ test("a docs item whose change touches code moves to its real kind and runs agai
 
 test("an item whose run asked and pushed its branch, then moved to the kind the owner named, runs again from the base", async () => {
 	const judge = scriptedJudge({ alignment: SOUND });
-	const asking = { commit: { "docs/part-one.md": "one\n" }, structured: { status: "needs-owner", question: "Which title?", plan: "Write two parts." } };
+	const asking = { write: { "docs/part-one.md": "one\n" }, structured: { status: "needs-owner", question: "Which title?", plan: "Write two parts." } };
 	const restartStdin = stdinFile();
 	const w = await world({ script: [{}, asking, { ...NOTE, saveStdin: restartStdin }], decisions: [READY_PLAN] });
 	const id = w.repo.seed("Write the note");
@@ -623,7 +677,7 @@ test("a review that leaves the change to the owner asks, and the owner's approva
 
 test("the owner's rejection of a change a review left to them sends it to a fix with the owner's words", async () => {
 	const fixStdin = stdinFile();
-	const w = await world({ script: [{}, NOTE, { commit: { "docs/note.md": "hello, softer\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, TO_OWNER] }, { config: mediumDocs() });
+	const w = await world({ script: [{}, NOTE, { write: { "docs/note.md": "hello, softer\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, TO_OWNER] }, { config: mediumDocs() });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "asked", item: id });
@@ -634,10 +688,25 @@ test("the owner's rejection of a change a review left to them sends it to a fix 
 	expect(readFileSync(fixStdin, "utf8")).toContain("Make it softer.");
 });
 
+test("a run that ends done and changed nothing ends stuck, saying so", async () => {
+	const w = await world({ script: [{}, { structured: { status: "done", pullRequest: { title: "Nothing", body: "No change." } } }] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("the build run succeeded and changed nothing") });
+});
+
+test("a run that commits its change itself still lands it as one commit of hum's, under the run's pull request title", async () => {
+	const w = await world({ script: [{}, { ...NOTE, commitsItself: true }] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "merged", item: id });
+	expect(sh(w.repo.remote, ["log", "--format=%s | %an", "-3", "main"]).split("\n")).toEqual([`hum: finish ${id} | ${OWNER.name}`, `shim: the change | ${OWNER.name}`, `add ${id} | ${sh(w.repo.remote, ["log", "--format=%an", "-1", "main~2"]).trim()}`, ""]);
+});
+
 test("a cheap choice a run reports is made without the owner, listed with its time, and the run goes on", async () => {
 	const options = [{ word: "short", paths: ["docs/note.md"] }, { word: "long", paths: ["docs/note.md"] }];
 	const choice = { status: "needs-owner", question: "Short or long?", plan: "Write it.", reason: { kind: "choice", options, default: "short" } };
-	const w = await world({ script: [{}, { commit: { "docs/note.md": "one\n" }, structured: choice }, NOTE] });
+	const w = await world({ script: [{}, { write: { "docs/note.md": "one\n" }, structured: choice }, NOTE] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "merged", item: id });

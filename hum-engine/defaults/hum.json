@@ -139,6 +139,11 @@
 	},
 	"restartDelaySeconds": 10,
 	"ciWakeTimeoutMinutes": 60,
+	"ciOutboxMaxMegabytes": 200,
+	"ciUsageLimitMaxHours": 168,
+	"followUpsPerPass": 10,
+	"publishTreeMaxMegabytes": 1024,
+	"ciMergeMarginMinutes": 10,
 	"pullRequestToken": {
 		"from": "secret",
 		"secret": "HUM_GITHUB_TOKEN"

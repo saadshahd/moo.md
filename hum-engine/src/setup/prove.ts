@@ -40,7 +40,7 @@ export type ProveEnv = {
 	readonly now: () => number;
 	readonly processEnv: Env;
 	readonly newSessionId: () => string;
-	readonly hopeSkills: ReadonlySet<string>;
+	readonly installedSkills: ReadonlySet<string>;
 	readonly base: string;
 	/** Whether to run one item end to end through the real `claude`; each run spends live calls. */
 	readonly item: boolean;
@@ -76,7 +76,7 @@ const pinOf = (repo: string): string | undefined => {
 };
 
 const configStep = (repo: string, env: ProveEnv): Outcome & { readonly config?: Config } => {
-	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { hopeSkills: env.hopeSkills } });
+	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills: env.installedSkills } });
 
 	return loaded.ok ? { ...passed("every state is reachable, reaches done or stuck, and every wait has a timeout"), config: loaded.value } : failed(loaded.refusal.message);
 };
@@ -178,7 +178,7 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 		now: env.now,
 		env: env.processEnv,
 		newSessionId: env.newSessionId,
-		hopeSkills: env.hopeSkills,
+		installedSkills: env.installedSkills,
 		holder: Holder.parse("setup-proof"),
 		base: env.base,
 		where: "ci",

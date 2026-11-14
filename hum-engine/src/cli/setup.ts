@@ -5,7 +5,6 @@ import { x } from "tinyexec";
 import { z } from "zod";
 import type { Item } from "../adapter-api.ts";
 import { gitIn, readGitIdentity } from "../adapters/git.ts";
-import { listHopeSkills } from "../config/load.ts";
 import { HumConfig } from "../config/schema.ts";
 import { CommandTimedOut, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { readSettings } from "../config/settings.ts";
@@ -16,7 +15,7 @@ import { shippedConfig } from "../setup/shipped.ts";
 import { waitsOf } from "../setup/waits.ts";
 import { readAnswers, writeSetup } from "../setup/write.ts";
 import type { Io } from "./ops.ts";
-import { hopeRoot } from "./service.ts";
+import { installedSkills } from "./service.ts";
 
 const EXIT_OK = 0;
 const EXIT_FAILED = 1;
@@ -107,7 +106,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 			const scan = await scanRepo(io.cwd, base);
 			const facts = await githubFacts(io.cwd);
 			const isPublic = await isPublicRepo(io.cwd);
-			const proposal = proposeSetup(scan, shipped.hum, { labels: facts?.labels, isPublic: isPublic ?? true });
+			const proposal = proposeSetup(scan, shipped.hum, { labels: facts?.labels, isPublic: isPublic ?? true, openIssues: facts?.items.length });
 			const { tracked, folders, ...shown } = scan;
 			const coverage = facts && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
 			const gitIdentity = await readGitIdentity(setupGit(io.cwd));
@@ -121,7 +120,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.requiredOption("--answers <file>", 'JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 2 }')
 		.option("--home <folder>", "where the service unit goes; default the user's home")
 		.action(async ({ answers, home }: { answers: string; home?: string }) => {
-			const result = writeSetup(io.cwd, readAnswers(answers), { hopeSkills: listHopeSkills(await hopeRoot()), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)), isPublicRepo: await isPublicRepo(io.cwd) });
+			const result = writeSetup(io.cwd, readAnswers(answers), { installedSkills: await installedSkills(), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)), isPublicRepo: await isPublicRepo(io.cwd) });
 
 			io.stdout(`${JSON.stringify(result.ok ? { written: result.written } : { refused: result.refusal.message }, null, "\t")}\n`);
 			done(result.ok ? EXIT_OK : EXIT_FAILED);
@@ -133,7 +132,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 		.option("--base <branch>", "the branch items merge into", DEFAULT_BASE)
 		.option("--item", "run one item through the real claude on a scratch copy; spends live calls")
 		.action(async ({ base, item }: { base: string; item?: true }) => {
-			const steps = await proveSetup(io.cwd, { now: Date.now, processEnv: io.env, newSessionId: randomUUID, hopeSkills: listHopeSkills(await hopeRoot()), base, item: item === true });
+			const steps = await proveSetup(io.cwd, { now: Date.now, processEnv: io.env, newSessionId: randomUUID, installedSkills: await installedSkills(), base, item: item === true });
 
 			io.stdout(`${steps.map(printStep).join("\n")}\n`);
 			done(steps.some(({ status }) => status === "failed") ? EXIT_FAILED : EXIT_OK);

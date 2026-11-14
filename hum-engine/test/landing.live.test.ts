@@ -41,7 +41,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 	await push(git, ["origin", `HEAD:refs/heads/${branch}`]);
 	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
 
-	state.landings.put(id, { item: id, branch, since: Date.now(), change: { paths: [file], size: 1, loosened: false, pinChanged: false }, head, ownerApproved: false });
+	state.landings.put(id, { item: id, branch, since: Date.now(), change: { paths: [file], size: 1, loosened: false, pinChanged: false }, head });
 
 	const ctx: LandContext = {
 		state,
@@ -53,13 +53,12 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		base: "main",
 		remote: `https://github.com/${repo}.git`,
 		clone,
-		env: {},
 		dir: config.hum.itemsDir,
 		git,
-		checks: [],
 		workSource: provider.workSource!,
 		questions: provider.questions!,
 		pulls,
+		commits: undefined,
 		now: Date.now,
 		judge: docsJudge,
 		reviewRun: () => {

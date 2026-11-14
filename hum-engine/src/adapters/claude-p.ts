@@ -8,7 +8,7 @@ import semver from "semver";
 import { x } from "tinyexec";
 import { z } from "zod";
 import type { EFFORTS } from "../config/schema.ts";
-import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
+import { CommandTimedOut, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS, withoutGitHubTokens } from "../exec.ts";
 import { raiseRejectedToken, UNAUTHORIZED } from "../service/token.ts";
 import { atomicWrite, isMissing } from "../state/fs.ts";
 import type { State } from "../state/open.ts";
@@ -29,15 +29,16 @@ export const RUN_SETTINGS = JSON.stringify({
 
 /**
  * The two kinds of `claude -p` call. An agent run keeps its session. A model call runs as hope's judge does: no
- * session kept, no hooks, and the default output style, so the owner's style cannot reshape its answer. It also loads
- * no settings source (plugins, MCP servers, memory files) and no built-in tool: a question needs neither, and each
- * one bills on every call.
+ * session kept, no hooks, and the default output style, so the owner's style cannot reshape its answer. It loads the
+ * user's settings alone, which hold their sign-in (`apiKeyHelper`, a gateway's `env`); it runs in a temp folder, which
+ * holds no project settings. It loads no skill or command, no MCP server and no built-in tool: a question needs
+ * none, and each bills on every call. The user's CLAUDE.md does load with their settings, so a measured rate counts it.
  */
 const CALLS = {
 	run: { settings: RUN_SETTINGS, flags: [] },
 	judgment: {
 		settings: JSON.stringify({ permissions: { defaultMode: "bypassPermissions" }, disableAllHooks: true, outputStyle: "default" }),
-		flags: ["--no-session-persistence", "--setting-sources", "", "--tools", ""],
+		flags: ["--no-session-persistence", "--setting-sources", "user", "--disable-slash-commands", "--strict-mcp-config", "--tools", ""],
 	},
 } as const satisfies Record<string, { settings: string; flags: readonly string[] }>;
 
@@ -318,7 +319,7 @@ export type RunnerOptions = {
 	readonly binary?: string;
 	/** The limit of `claude --version`, which the version floor reads, and of the start check; the owner's `commandTimeoutSeconds` in milliseconds. */
 	readonly timeoutMs?: number;
-	/** The environment `claude` runs with, the process's own from the root. An API key in it is passed on untouched. */
+	/** The environment `claude` runs with, the process's own from the root, without its GitHub tokens. An API key in it is passed on untouched. */
 	readonly env: Env;
 	readonly now: () => number;
 	/** The first wait before a run that hit the refresh-lock error runs again; later waits grow from it. */
@@ -393,22 +394,14 @@ const isBelowFloor = (version: string | undefined): boolean => version === undef
 
 type Started = { readonly check: RunOutcome; readonly runner: Runner };
 
-/**
- * Runs `claude -p` as the owner's own unmodified `claude` binary, on their login, their plan token or an API key.
- * No run starts until the version floor and the start check pass; until then every run is held with one card.
- */
-const startChecked = async (options: RunnerOptions): Promise<Started> => {
-	const { state, binary = "claude", env, now, lockBackoffMs = LOCK_BACKOFF_MS, timeoutMs = SHIPPED_COMMAND_TIMEOUT_MS } = options;
+/** The calls of `claude -p` as the owner's own unmodified `claude` binary, on their login, their plan token or an API key, with no check made first. */
+const callsOf = (options: RunnerOptions) => {
+	const { state, binary = "claude", env, now, lockBackoffMs = LOCK_BACKOFF_MS } = options;
 	const limitedUntil = () => savedLimitUntil(state);
 
 	const hold = (code: string, cause: string, fix: string): Extract<RunOutcome, { kind: "held" }> => ({
 		kind: "held",
 		card: state.faults.raise({ code, cause, fix }),
-	});
-
-	const held = (outcome: Extract<RunOutcome, { kind: "held" }>) => ({
-		check: outcome,
-		runner: { run: async () => outcome, limitedUntil },
 	});
 
 	/** One process, read line by line. The cap is checked on every streamed message, and the process is killed the moment it is passed. */
@@ -426,7 +419,7 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 				// stderr goes to a file, so the line reader sees stdout alone: one stream cannot split another's line.
 				nodeOptions: {
 					cwd,
-					env: { ...env, ...runEnv },
+					env: withoutGitHubTokens({ ...env, ...runEnv }),
 					killSignal: "SIGKILL",
 					stdio: ["pipe", "pipe", stderrFd],
 				},
@@ -509,6 +502,22 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 		return outcome;
 	};
 
+	return { hold, attempt, run, limitedUntil };
+};
+
+/**
+ * Runs `claude -p` as the owner's own unmodified `claude` binary. No run starts until the version floor and the start
+ * check pass; until then every run is held with one card.
+ */
+const startChecked = async (options: RunnerOptions): Promise<Started> => {
+	const { state, binary = "claude", env, timeoutMs = SHIPPED_COMMAND_TIMEOUT_MS } = options;
+	const { hold, attempt, run, limitedUntil } = callsOf(options);
+
+	const held = (outcome: Extract<RunOutcome, { kind: "held" }>) => ({
+		check: outcome,
+		runner: { run: async () => outcome, limitedUntil },
+	});
+
 	const version = await exec(binary, ["--version"], {
 		nodePath: false,
 		timeoutMs,
@@ -565,6 +574,23 @@ const startChecked = async (options: RunnerOptions): Promise<Started> => {
 
 /** A start check that a usage limit refused or that got no answer says nothing about the install: it is made again on the next run. */
 const isUnsettled = ({ check }: Started): boolean => check.kind === "limited" || (check.kind === "held" && (check.card.code === LIMIT_UNPARSED || check.card.code === START_TIMED_OUT));
+
+/**
+ * A runner for judgment calls alone, as a job that holds GitHub's token needs: it makes no start check, which runs a
+ * full session with the repo's plugins and hooks, and it refuses any other run.
+ */
+export const judgmentRunner = (options: RunnerOptions): Runner => {
+	const { run, limitedUntil } = callsOf(options);
+
+	return {
+		run: async (request) => {
+			if (request.call !== "judgment") throw new Error("this runner makes judgment calls alone: a job that holds GitHub's token starts no run");
+
+			return run(request);
+		},
+		limitedUntil,
+	};
+};
 
 /**
  * A runner. Its start check is made again on the next run for as long as a usage limit refuses it, and a saved

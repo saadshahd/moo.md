@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { ADAPTER_API_VERSION, type Adapter, type AdapterContext, type AdapterFactory, type Integrations, PermanentError } from "../adapter-api.ts";
 import { readSettings } from "../config/settings.ts";
-import { HumConfig } from "../config/schema.ts";
+import { HumConfig, SLOTS, type Slot } from "../config/schema.ts";
 import { commandTimeoutMs, type Env } from "../exec.ts";
 import type { Faults } from "../state/faults.ts";
 import type { Card } from "../status/format.ts";
@@ -15,10 +15,7 @@ import { markdownAdapter } from "./markdown.ts";
 import { gitHubPullRequests, type PullRequests } from "./pull-requests.ts";
 import { roundupAdapter } from "./roundup.ts";
 
-/** The integration slots `hum.json` `integrations` names, each to an adapter. */
-export const SLOTS = ["work-source", "questions", "answers", "release"] as const;
-
-export type Slot = (typeof SLOTS)[number];
+export { SLOTS, type Slot } from "../config/schema.ts";
 
 const MARKDOWN = "markdown";
 const FALLBACK_BASE = "main";
@@ -28,7 +25,7 @@ const MARKDOWN_SLOTS: readonly Slot[] = ["work-source", "questions", "answers"];
 
 /** What the adapters read from `hum.json`; every other key belongs to the worker. */
 const AdapterSettings = z.looseObject({
-	integrations: z.partialRecord(z.enum(SLOTS), z.string().min(1)).optional(),
+	integrations: HumConfig.shape.integrations,
 	claimPrefix: HumConfig.shape.claimPrefix,
 	itemsDir: HumConfig.shape.itemsDir,
 	commitIdentity: HumConfig.shape.commitIdentity,

@@ -31,8 +31,10 @@ export const Landing = z.object({
 	change: Change,
 	/** The commit the change ends at, before hum marks the item done: what a review reads. */
 	head: name,
-	/** The owner approved this change in its review state, before it was saved. */
-	ownerApproved: z.boolean(),
+	/** The passes in a row whose push to the base another push beat. */
+	lostRaces: z.int().nonnegative().default(0),
+	/** The change's patch id against the base: the same change rebased keeps its landing. */
+	patch: z.string().optional(),
 	/** The alignment call's grades, or why it abstained; made once per change. */
 	alignment: z.union([z.object({ graded: AlignmentAnswer }), z.object({ abstained: name })]).optional(),
 });
@@ -61,6 +63,16 @@ export const SavedPlan = z.object({ item: name, plan: PlanFile, hash: name, mode
 
 export type SavedPlan = z.infer<typeof SavedPlan>;
 
+/** One picture or video of the change at work, kept at `url`, or why the one the run named was left out. */
+export const Evidence = z.union([z.object({ kind: z.enum(["image", "video"]), url: z.url() }), z.object({ left: name })]);
+
+export type Evidence = z.infer<typeof Evidence>;
+
+/** The pull request a build or fix run wrote for its item's whole change, under the repo's own rules for one; the latest run's stands. */
+export const PullRequestText = z.object({ item: name, title: name, body: name, evidence: Evidence.optional() });
+
+export type PullRequestText = z.infer<typeof PullRequestText>;
+
 /** A fresh review run's verdict on the change that ends at `head`. */
 export const Verdict = z.object({ item: name, head: name, event: name, reason: z.string(), cites: z.array(Cite), models });
 
@@ -81,6 +93,9 @@ export const QueuedQuestion = z.object({
 });
 
 export type QueuedQuestion = z.infer<typeof QueuedQuestion>;
+
+/** A follow-up item a pass filed, which counts against the daily question cap like a question asked. */
+export const FiledFollowUp = z.object({ item: name, from: name, at: time });
 
 const settledFields = {
 	item: name,
