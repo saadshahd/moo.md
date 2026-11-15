@@ -21,6 +21,7 @@ const EMPTY: Slop = {
   applied: [],
   seen: [],
   offset: 0,
+  unjudged: [],
 };
 
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
@@ -61,13 +62,33 @@ export function touchedFiles(messages: Message[], offset: number): string[] {
 
 const HEADER = /^(.+?):(\d+) \| (.+?) \| (.+)$/;
 
-/** judge.sh's output as findings: none when it printed nothing or CLEAN first. A header
+export type Verdict =
+  { kind: "ran"; found: Finding[] } | { kind: "not run"; why: string };
+
+/** What judge.sh's run says. A judge that exited nonzero or printed nothing did not run: its
+ * silence never reads as CLEAN. */
+export function verdict(r: {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}): Verdict {
+  if (r.exitCode !== 0)
+    return {
+      kind: "not run",
+      why: `judge.sh exited ${r.exitCode}: ${r.stderr.trim().split("\n")[0].slice(0, 200)}`,
+    };
+  if (r.stdout.trim() === "")
+    return { kind: "not run", why: "judge.sh printed nothing" };
+  return { kind: "ran", found: parseFindings(r.stdout) };
+}
+
+/** judge.sh's output as findings: none when CLEAN is its first line. A header
  * "<file>:<line> | <rule> | <claim>" starts a finding and the "- " / "+ " lines after it are its
  * change, a bare "-" or "+" being a blank line of it. Every other line after a header, a code fence
  * say, belongs to that finding and is dropped; before any header, a line is a finding of its text alone. */
 export function parseFindings(stdout: string): Finding[] {
   const lines = stdout.split("\n").filter((l) => l.trim() !== "");
-  if (lines.length === 0 || lines[0].trim() === "CLEAN") return [];
+  if (lines[0]?.trim() === "CLEAN") return [];
   const found: Finding[] = [];
   for (const l of lines) {
     const last = found.at(-1);
@@ -297,29 +318,43 @@ async function repoBound($: any, files: string[]): Promise<string[]> {
 }
 
 async function judge($: any, files: string[]): Promise<void> {
-  const r = await $.process.run([`${$.plugin.root}/hooks/judge.sh`], {
-    cwd: await $.session.root(),
-    stdin: files.join("\n") + "\n",
-    timeoutMs: 600_000,
-  });
-  if (r.exitCode !== 0) {
-    const why = `judge.sh exited ${r.exitCode}: ${r.stderr.trim().split("\n")[0].slice(0, 200)}`;
-    // The same failure shows once a session, not on every edit turn.
+  const v: Verdict = await $.process
+    .run([`${$.plugin.root}/hooks/judge.sh`], {
+      cwd: await $.session.root(),
+      stdin: files.join("\n") + "\n",
+      timeoutMs: 600_000,
+    })
+    .then(verdict, (err: any) => ({
+      kind: "not run",
+      why: `judge.sh did not finish: ${err?.message ?? err}`,
+    }));
+  if (v.kind === "not run") {
     const { seen } = await readSlop($);
-    if (seen.includes(`error|${why}`)) return;
-    await change($, (s) => ({ ...s, seen: [...s.seen, `error|${why}`] }));
-    throw new Error(why);
+    const known = seen.includes(`error|${v.why}`);
+    await change($, (s) => ({
+      ...s,
+      unjudged: [...new Set([...s.unjudged, ...files])],
+      seen: known ? s.seen : [...s.seen, `error|${v.why}`],
+    }));
+    // The same failure shows once a session, not on every edit turn.
+    if (!known) throw new Error(`not run: ${v.why}`);
+    return;
   }
-  const found = parseFindings(r.stdout);
-  if (found.length === 0) return;
-  await change($, (s) => addFindings(s, found));
+  await change($, (s) =>
+    addFindings(
+      { ...s, unjudged: s.unjudged.filter((f) => !files.includes(f)) },
+      v.found,
+    ),
+  );
 }
 
 export async function afterTurn($: any): Promise<void> {
   const messages = await $.session.messages();
-  const { offset } = await readSlop($);
+  const { offset, unjudged } = await readSlop($);
   await change($, (s) => ({ ...s, offset: messages.length }));
-  const files = await repoBound($, touchedFiles(messages, offset));
+  const files = await repoBound($, [
+    ...new Set([...touchedFiles(messages, offset), ...unjudged]),
+  ]);
   if (files.length) await judge($, files);
 }
 

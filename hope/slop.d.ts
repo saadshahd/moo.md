@@ -46,6 +46,8 @@ export type Slop = {
   seen: string[];
   /** How many session messages were already scanned for touched files. */
   offset: number;
+  /** Files whose judge did not run; the next run judges them with its own. */
+  unjudged: string[];
 };
 
 declare module "claude-code" {

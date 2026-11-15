@@ -21,6 +21,7 @@ import {
   parseFindings,
   register,
   touchedFiles,
+  verdict,
 } from "./slop.tsx";
 import type { Finding, Slop } from "../slop.d.ts";
 
@@ -85,11 +86,30 @@ const F = (over: Partial<Finding> = {}): Finding => ({
   ...over,
 });
 
-describe("parseFindings", () => {
-  test("CLEAN or nothing is no finding", () => {
-    expect(parseFindings("CLEAN\n")).toEqual([]);
-    expect(parseFindings("  \n")).toEqual([]);
+describe("verdict", () => {
+  const run = (exitCode: number, stdout: string, stderr = "") => ({
+    exitCode,
+    stdout,
+    stderr,
   });
+  test("CLEAN first is a run with no finding", () => {
+    expect(verdict(run(0, "CLEAN\n"))).toEqual({ kind: "ran", found: [] });
+  });
+  test("printing nothing is not run, never CLEAN", () => {
+    expect(verdict(run(0, "  \n"))).toEqual({
+      kind: "not run",
+      why: "judge.sh printed nothing",
+    });
+  });
+  test("a nonzero exit is not run, whatever it printed", () => {
+    expect(verdict(run(1, "CLEAN\n", "killed\nmore\n"))).toEqual({
+      kind: "not run",
+      why: "judge.sh exited 1: killed",
+    });
+  });
+});
+
+describe("parseFindings", () => {
   test("a bare - or + is a blank line of the change, not a finding", () => {
     const found = parseFindings("a.ts:3 | r | gone.\n- x\n-\n- y\n+ x\n+\n");
     expect(found.map((f) => [f.before, f.after])).toEqual([
@@ -453,19 +473,52 @@ describe("after a turn", () => {
   });
 });
 
-describe("a failing judge", () => {
-  test("shows the same failure once a session", async () => {
+describe("a judge that did not run", () => {
+  test("shows not run once a session and adds no finding", async () => {
     const h = harness("");
-    h.$.process.run = async (argv: string[]) =>
-      argv[0] === "git"
-        ? { exitCode: 0, stdout: "", stderr: "" }
-        : { exitCode: 127, stdout: "", stderr: "claude not on PATH\n" };
     h.editTurn("/r/a.ts");
     await expect(afterTurn(h.$)).rejects.toThrow(
-      "judge.sh exited 127: claude not on PATH",
+      "not run: judge.sh printed nothing",
     );
     h.editTurn("/r/b.ts");
     await afterTurn(h.$);
+    expect((await h.slop())?.findings).toEqual([]);
+  });
+  test("its files join the next run's, once, and leave when a run happens", async () => {
+    const h = harness("");
+    const judged: string[] = [];
+    h.$.process.run = async (argv: string[], init?: { stdin?: string }) => {
+      if (argv[0] === "git") return { exitCode: 0, stdout: "", stderr: "" };
+      judged.push(init?.stdin ?? "");
+      return {
+        exitCode: 0,
+        stdout: judged.length === 1 ? "" : "CLEAN",
+        stderr: "",
+      };
+    };
+    h.editTurn("/r/a.ts", "/r/b.ts");
+    await expect(afterTurn(h.$)).rejects.toThrow("not run");
+    h.editTurn("/r/a.ts");
+    await afterTurn(h.$);
+    h.editTurn("/r/c.ts");
+    await afterTurn(h.$);
+    expect(judged).toEqual([
+      "/r/a.ts\n/r/b.ts\n",
+      "/r/a.ts\n/r/b.ts\n",
+      "/r/c.ts\n",
+    ]);
+    expect((await h.slop())?.unjudged).toEqual([]);
+  });
+  test("a judge that never finished is not run", async () => {
+    const h = harness("");
+    h.$.process.run = async (argv: string[]) => {
+      if (argv[0] === "git") return { exitCode: 0, stdout: "", stderr: "" };
+      throw new Error("timed out");
+    };
+    h.editTurn("/r/a.ts");
+    await expect(afterTurn(h.$)).rejects.toThrow(
+      "not run: judge.sh did not finish: timed out",
+    );
   });
 });
 
