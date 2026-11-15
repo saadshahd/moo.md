@@ -164,7 +164,7 @@ test("fact source prefix stripped", async () => {
   expect(bareFact("Toggle only")).toBe("Toggle only");
 });
 
-const model = (card: object, open: string | null = null) => bandModel(card as any, open && `card:${open}`);
+const model = (card: object, open: string | null = null) => bandModel(card as any, open ? { item: `card:${open}`, where: "pane" } : null);
 
 describe("band", () => {
   test("no card: nothing", async () => {
@@ -174,7 +174,7 @@ describe("band", () => {
     const b = model({ facts: ["a"], ideas: [{ by: "x", idea: "y" }], suggestions: [], questions: [{ q: "a?", options: ["y"] }] });
     expect(b.chips.map((c) => c.id)).toEqual(["chip:questions"]);
   });
-  test("a card in the pane marks its chip; the band never opens it above the chips", async () => {
+  test("a card in the pane marks its chip and leaves the band its chips alone", async () => {
     const b = model({ suggestions: ["a", "b"] }, "suggestions");
     expect(b.chips[0].open).toBe(true);
     expect(b.body).toEqual([]);
@@ -197,36 +197,36 @@ test("a question's rows: the question, which takes no click, then each answer", 
 });
 
 describe("arrows", () => {
-  // The facts pane over a row of chips: the arrows and clicks read any band the same way.
+  // A row of chips over the facts card: the arrows and clicks read any band the same way.
   const b = {
     ...model({ questions: [{ q: "q?", options: [] }], suggestions: ["s"] }, "suggestions"),
     body: cardRows({ facts: ["a", "b"] }, "facts"),
   };
   const rows = navRows(b);
-  test("rows as drawn: each card line, then the chips; a blank line is no stop", async () => {
+  test("rows as drawn: the chips, then each card line; a blank line is no stop", async () => {
     expect(rows.map((r) => r.map((i) => i.id))).toEqual([
+      ["chip:questions", "chip:suggestions"],
       ["probe:fact 1"],
       ["probe:fact 2"],
-      ["chip:questions", "chip:suggestions"],
     ]);
   });
   test("left/right stay in the row; up/down change rows", async () => {
-    expect(move({ row: 2, col: 0 }, rows, "right")).toEqual({ row: 2, col: 1 });
-    expect(move({ row: 2, col: 1 }, rows, "right")).toEqual({ row: 2, col: 1 });
-    expect(move({ row: 2, col: 1 }, rows, "up")).toEqual({ row: 1, col: 0 });
-    expect(move({ row: 0, col: 0 }, rows, "up")).toEqual({ row: 0, col: 0 });
-    expect(move({ row: 1, col: 0 }, rows, "down")).toEqual({ row: 2, col: 1 }); // back on the open chip
+    expect(move({ row: 0, col: 0 }, rows, "right")).toEqual({ row: 0, col: 1 });
+    expect(move({ row: 0, col: 1 }, rows, "right")).toEqual({ row: 0, col: 1 });
+    expect(move({ row: 0, col: 1 }, rows, "down")).toEqual({ row: 1, col: 0 });
+    expect(move({ row: 2, col: 0 }, rows, "down")).toEqual({ row: 2, col: 0 });
+    expect(move({ row: 1, col: 0 }, rows, "up")).toEqual({ row: 0, col: 1 }); // back on the open chip
   });
   test("a click lands on the item drawn there", async () => {
     const cells = layout(b, 80);
     expect(cells.map((l) => l.y)).toEqual([0, 1, 2, 3]);
-    // facts at y=0 and 2 around the blank line; chips "[ questions 1 ] [ ▴ suggestions 1 ]" at y=3
-    expect(hit(cells, 0, 0)?.id).toBe("probe:fact 1");
-    expect(hit(cells, 0, 1)).toBeUndefined();
-    expect(hit(cells, 0, 2)?.id).toBe("probe:fact 2");
-    expect(hit(cells, 1, 3)?.id).toBe("chip:questions");
-    expect(hit(cells, 18, 3)?.id).toBe("chip:suggestions");
-    expect(hit(cells, 40, 0)).toBeUndefined();
+    // chips "[ questions 1 ] [ ▴ suggestions 1 ]" at y=0; facts at y=1 and 3 around the blank line
+    expect(hit(cells, 1, 0)?.id).toBe("chip:questions");
+    expect(hit(cells, 18, 0)?.id).toBe("chip:suggestions");
+    expect(hit(cells, 0, 1)?.id).toBe("probe:fact 1");
+    expect(hit(cells, 0, 2)).toBeUndefined();
+    expect(hit(cells, 0, 3)?.id).toBe("probe:fact 2");
+    expect(hit(cells, 40, 1)).toBeUndefined();
   });
   test("a word wider than the line is the one thing clipped", async () => {
     const wide = { chips: [], body: cardRows({ facts: ["x".repeat(100)] }, "facts") };
@@ -484,6 +484,66 @@ test("clicking answers to two questions: each fills its own line once, a changed
     await click("answer:1:1");
     expect(box).toBe("q1: no \nq2: branch ");
   }
+});
+
+// Claude Code counts a click in a Client as nobody's press, and places a pane opened so only
+// from 144 columns: roundup's Terminal had 142, and the click drew nothing but a toast.
+describe("a pane Claude Code won't place", () => {
+  const qs = [{ q: "Ship?", options: ["yes", "no"] }];
+  const CARD = ["question:0", "answer:0:0", "answer:0:1"];
+  const narrow = (on: any, placed: () => boolean) => {
+    mock.store(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
+    on("session.messages", () => ({ value: [said(block(JSON.stringify({ questions: qs })))] }));
+    on("turn.complete", (_: any, e: any) => ({ text: e.answer }));
+    on("command.register", () => ({ value: undefined }));
+    let box = "";
+    on("prompt.read", () => ({ value: { text: box, cursor: box.length } }));
+    on("prompt.fill", (_: any, e: any) => ((box += e.text), { isFilled: true }));
+    const open = new Set<string>();
+    on("ui.open", (_: any, e: any) => {
+      open.add(e.id);
+      return { value: placed() ? { isPlaced: true } : { isPlaced: false, reason: "an unasked pane needs 144 columns; the terminal has 142" } };
+    });
+    on("ui.close", (_: any, e: any) => (open.delete(e.id), { value: undefined }));
+    const toasts: unknown[] = [];
+    on("ui.toast", (_: any, e: any) => (toasts.push(e), { value: undefined }));
+    return { open, toasts };
+  };
+  const drawn = async (band: any) => {
+    const props = (await band.find({ type: "Client" }))?.props.props as any;
+    return { chips: props.chips.map((c: any) => [c.id, !!c.open]), card: props.body.flat().map((i: any) => i.id) };
+  };
+  const turn = ($: any) => $.turn.complete({ answer: "ok", durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+
+  test("a chip click unfolds its card under the chips, with no toast and no pane left open; a second click folds it", async ($, on) => {
+    const { open, toasts } = narrow(on, () => false);
+    await turn($);
+    const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 142 } as any });
+    await band.post({ act: "chip:questions" });
+    expect(await drawn(band)).toEqual({ chips: [["chip:questions", true]], card: CARD });
+    expect(toasts).toEqual([]);
+    expect([...open]).toEqual([]);
+    await band.post({ act: "chip:questions" });
+    expect(await drawn(band)).toEqual({ chips: [["chip:questions", false]], card: [] });
+  });
+
+  test("an answer picked in a placed pane whose reopen is refused keeps its card, in the band", async ($, on) => {
+    let wide = true;
+    const { open, toasts } = narrow(on, () => wide);
+    await turn($);
+    const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 142 } as any });
+    await band.post({ act: "chip:questions" });
+    expect([...open]).toEqual(["tend"]);
+    expect((await drawn(band)).card).toEqual([]);
+    wide = false;
+    const pane = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "Pane", requestId: "tend", props: { bodyColumns: 72, placement: "inline" } as any });
+    await pane.post({ act: "answer:0:0" });
+    expect(await drawn(band)).toEqual({ chips: [["chip:questions", true]], card: CARD });
+    expect([...open]).toEqual([]);
+    expect(toasts).toEqual([]);
+  });
 });
 
 describe("ideas", () => {

@@ -390,17 +390,24 @@ export function cardRows(c: Card, name: string): Item[][] {
   return [];
 }
 
-/** The band is its chips alone, each with content: every card reads in the pane. */
-export function bandModel(card: Card, paneItem: string | null): Band {
+/** The card on show and where: the pane, or the band when Claude Code won't place the pane. */
+export type Shown = { item: string; where: "pane" | "band" };
+
+const nameOf = (item: string) => item.replace(/^card:/, "");
+
+/** The band: its chips, each with content, and under them a card the pane couldn't show. */
+export function bandModel(card: Card, shown: Shown | null): Band {
   return {
     chips: CHIPS.filter((n) => card[n]?.length).map((n) => ({
       id: `chip:${n}`,
       label: chipLabel(n, card),
       kind: "chip",
       // Client props refuse undefined, so an unmarked chip has no key at all.
-      ...(paneItem === `card:${n}` ? { open: true as const } : {}),
+      ...(shown?.item === `card:${n}` ? { open: true as const } : {}),
     })),
-    body: [],
+    // A blank line parts the card from the chips above it.
+    body:
+      shown?.where === "band" ? [[], ...cardRows(card, nameOf(shown.item))] : [],
   };
 }
 
@@ -410,7 +417,7 @@ let card: Card = {};
 // The questions still open: a card block holds only those its writer chose, and the user's
 // next prompt closes them all, however it answered them.
 let open: Question[] | undefined;
-let paneItem: string | null = null;
+let shown: Shown | null = null;
 let lastPaneItem: string | null = null;
 let started = false;
 let sessionId = "";
@@ -594,12 +601,24 @@ async function setOpen($: any, questions: Question[]) {
 }
 
 async function showPane($: any, item: string) {
-  paneItem = item;
+  shown = { item, where: "pane" };
   lastPaneItem = item;
   // Never takes the keys: they stay with the prompt; a click inside hands them over.
   $.ui.invalidate("ui.render");
   const r = await $.ui.open({ id: PANE, title: "tend", closeOnEscape: true });
-  if (!r.isPlaced) $.ui.toast(r.reason);
+  if (r.isPlaced) return;
+  // Claude Code places a pane nobody asked for (a click in a Client is nobody's press) only on a
+  // wide terminal. The card unfolds under the chips instead; the pane, left open and undrawn,
+  // would show it a second time once the terminal widens.
+  await $.ui.close({ id: PANE });
+  shown = { item, where: "band" };
+  $.ui.invalidate("ui.render");
+}
+
+/** Folds the card away, wherever it shows. */
+async function hide($: any) {
+  if (shown?.where === "band") shown = null;
+  else await $.ui.close({ id: PANE });
 }
 
 /** The card a skill is asked for, run where the run is certain (its Skill tool call, a prompt that
@@ -656,7 +675,7 @@ async function setAnswer($: any, n: number, options: string[], pick: string) {
 function reset() {
   card = {};
   open = undefined;
-  paneItem = null;
+  shown = null;
   lastPaneItem = null;
   typedFrom.clear();
   short.clear();
@@ -668,7 +687,7 @@ async function act($: any, id: string) {
   const [kind, ...rest] = id.split(":");
   const arg = rest.join(":");
   if (kind === "chip") {
-    if (paneItem === `card:${arg}`) await $.ui.close({ id: PANE });
+    if (shown?.item === `card:${arg}`) await hide($);
     else await showPane($, `card:${arg}`);
   } else if (kind === "probe") await fill($, `${arg}: `);
   else if (kind === "answer") {
@@ -676,7 +695,7 @@ async function act($: any, id: string) {
     const q = card.questions?.[i];
     // Answered once sent, not on the click: an abandoned answer leaves the question up.
     if (q) await setAnswer($, i + 1, q.options, q.options[j]);
-  } else if (kind === "close") await $.ui.close({ id: PANE });
+  } else if (kind === "close") await hide($);
   $.ui.invalidate("ui.render");
 }
 
@@ -795,7 +814,7 @@ export const register: Register = (on) => {
   on("ui.close", async ($, e, next) => {
     const r = await next(e);
     if (e.id === PANE) {
-      paneItem = null;
+      shown = null;
       $.ui.invalidate("ui.render");
     }
     return r;
@@ -854,8 +873,8 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const band = bandModel(card, paneItem);
-    if (!band.chips.length) return <Box />;
+    const band = bandModel(card, shown);
+    if (!band.chips.length && !band.body.length) return <Box />;
     // A blank line parts the band from the reply above it, so the chips read as controls, not its last line.
     return (
       <Box marginTop={1}>
@@ -884,8 +903,8 @@ export const register: Register = (on) => {
     }
     if (data?.release === true) fills++;
     // A pane keeps the keys past its Client's redraw; reopening it hands them to the prompt.
-    if (fills !== before && e.component === "Pane" && paneItem) {
-      const item = paneItem;
+    if (fills !== before && e.component === "Pane" && shown?.where === "pane") {
+      const item = shown.item;
       await $.ui.close({ id: PANE });
       await showPane($, item);
     }
@@ -898,7 +917,7 @@ export const register: Register = (on) => {
     const els = $.ui.resolve(e);
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const name = (paneItem ?? "").replace(/^card:/, "");
+    const name = nameOf(shown?.item ?? "");
     const width = Math.min(e.props.bodyColumns, MEASURE);
     // The whole pane is one Client: clicks and keys reach it, typing goes on to the prompt.
     const pane: Band = {

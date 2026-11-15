@@ -16,6 +16,7 @@ export type Item = {
   /** What the reader acts on, set bold among quieter text. */
   strong?: true;
 };
+/** The chips, then the card under them. */
 export type Band = { chips: Item[]; body: Item[][] };
 
 /** The pane's width, padding included: its text runs about 72 characters, past which a line is hard to read back. */
@@ -27,7 +28,7 @@ export type Cell = { item: Item; text: string; x: number; y: number };
 const focusable = (i: Item) => i.kind !== "note" && i.kind !== "title";
 
 export function navRows(b: Band): Item[][] {
-  return [...b.body, b.chips]
+  return [b.chips, ...b.body]
     .map((r) => r.filter(focusable))
     .filter((r) => r.length);
 }
@@ -128,8 +129,8 @@ export function layout(b: Band, columns: number): Line[] {
       widths[k] = Math.max(widths[k] ?? 0, textOf(i).length);
   }
   const table = widths.reduce((s, w) => s + w, 0) + 2 * Math.max(0, widths.length - 1) <= measure / 2;
-  for (const r of b.body) place("body", r, 2, measure, table ? widths : []);
   if (b.chips.length) place("chips", b.chips, 1);
+  for (const r of b.body) place("body", r, 2, measure, table ? widths : []);
   return lines;
 }
 
@@ -247,10 +248,10 @@ export default function BandView(band: Band, surface: any) {
     });
   const body = lines.filter((l) => l.part === "body").map(row);
   const out = [
+    ...lines.filter((l) => l.part === "chips").map(row),
     ...(body.length
       ? [Box({ key: "body", flexDirection: "column", children: body })]
       : []),
-    ...lines.filter((l) => l.part === "chips").map(row),
   ];
   return Box({ flexDirection: "column", children: out });
 }
