@@ -238,6 +238,25 @@ export function commandFor(names: string[], name: string): string | undefined {
   );
 }
 
+/** The command whose skill a row loads, from the folder its first line names:
+ * `…/hope/13.11.0/skills/intent` gives `hope:intent` when that command exists. */
+export function loadedCommand(
+  names: string[],
+  row: string,
+): string | undefined {
+  const dir =
+    row
+      .match(/^Base directory for this skill: (.+)$/m)?.[1]
+      ?.trim()
+      .split("/") ?? [];
+  const skill = dir.at(-1);
+  if (dir.at(-2) !== "skills") return undefined;
+  return (
+    names.find((n) => dir.some((plugin) => n === `${plugin}:${skill}`)) ??
+    names.find((n) => n === skill)
+  );
+}
+
 export function bareFact(f: string): string {
   return f.replace(
     /^\s*(?:[\w-]+(?:\s+[\w-]+)?\s+confirmed|found|measured)\s*:\s*/i,
@@ -621,14 +640,13 @@ async function hide($: any) {
   else await $.ui.close({ id: PANE });
 }
 
-/** The card a skill is asked for, run where the run is certain (its Skill tool call, a prompt that
- * starts with its command), since `skill.prompt` never reaches a user plugin where managed settings
- * seat sec-default. */
-async function cardAsk($: any, name: string): Promise<string[]> {
-  const names = ((await $.command.list()) as { name: string }[]).map(
-    (c) => c.name,
-  );
-  const format = CARD_SKILLS.get(commandFor(names, name) ?? "");
+async function commandNames($: any): Promise<string[]> {
+  return ((await $.command.list()) as { name: string }[]).map((c) => c.name);
+}
+
+/** The card a command's skill is asked for. */
+function cardAsk(command: string | undefined): string[] {
+  const format = CARD_SKILLS.get(command ?? "");
   return format ? [format] : [];
 }
 
@@ -734,24 +752,32 @@ export const register: Register = (on) => {
       return {};
     });
 
-  // A skill the session itself runs is asked for its card; an agent's skill is the agent's.
-  on("tool.call", async ($, e, next) => {
-    const skill = (e as any).skill;
-    if (e.agentId || e.tool !== "Skill" || typeof skill !== "string")
-      return next(e);
-    const r = await next(e);
-    if (r.deny !== undefined) return r;
-    const asked = await cardAsk($, skill);
-    return asked.length
-      ? { ...r, context: [...(r.context ?? []), ...asked] }
-      : r;
+  /* A skill the session itself loads is asked for its card in the row that loads it; an agent's
+   * skill is the agent's. Not `skill.prompt`: on Team, Enterprise and managed machines Claude
+   * Code's built-in guard skips every installed plugin there. Not `tool.call`: a mod hooking it
+   * keeps Code Mode off, and in Code Mode the row names no Skill call, only the skill's folder. */
+  on("session.append", { door: "tool-message" }, async ($, e, next) => {
+    const { content } = e.message;
+    const at = content.findIndex((b) => b.type === "text");
+    if (e.agentId || e.origin.kind !== "tool" || at < 0) return next(e);
+    const block = content[at] as { type: "text"; text: string };
+    const [format] = cardAsk(loadedCommand(await commandNames($), block.text));
+    if (!format) return next(e);
+    const text = `${block.text}\n\n${format}`;
+    return next({
+      ...e,
+      message: {
+        ...e.message,
+        content: content.map((b, i) => (i === at ? { ...block, text } : b)),
+      },
+    });
   });
 
   // The user's own prompt keeps a card already shown current: the model is asked for the keys this turn changes.
   on("prompt.submit", async ($, e, next) => {
     // A prompt that starts with a skill's command runs it, however the prompt arrived.
     const name = slashName(e.text);
-    const asked = name ? await cardAsk($, name) : [];
+    const asked = name ? cardAsk(commandFor(await commandNames($), name)) : [];
     const withContext = (more: string[]) =>
       more.length
         ? next({ ...e, context: [...(e.context ?? []), ...more] })

@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, withOpen } from "./tend.tsx";
+import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, loadedCommand, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -156,6 +156,15 @@ test("a prompt runs a command only when it starts with one", async () => {
   expect(slashName("/hope:intent.md is here")).toBeUndefined();
   expect(slashName("/Users/me/notes.md")).toBeUndefined();
   expect(slashName("run /hope:intent")).toBeUndefined();
+});
+
+test("a loaded skill's folder names its command, the plugin's own over a namesake", async () => {
+  const names = ["intent", "other:intent", "hope:intent", "hope:shape"];
+  expect(loadedCommand(names, row("/Users/me/.claude/plugins/cache/moo-md/hope/13.11.0/skills/intent"))).toBe("hope:intent");
+  expect(loadedCommand(names, row("/Users/me/repos/moo.md/hope/skills/shape"))).toBe("hope:shape");
+  expect(loadedCommand(names, row("/Users/me/.claude/skills/intent"))).toBe("intent");
+  expect(loadedCommand(names, row("/Users/me/repos/moo.md/hope/agents/intent"))).toBeUndefined();
+  expect(loadedCommand(names, "A note a tool handed over.")).toBeUndefined();
 });
 
 test("fact source prefix stripped", async () => {
@@ -383,6 +392,19 @@ test("a store over its cap with no session list shrinks to the current session",
   expect(store.get("tend:recent")).toEqual(["s1"]);
 });
 
+// A skill's row as Claude Code adds it, with or without Code Mode: only the folder names the skill.
+const row = (dir: string) => `Base directory for this skill: ${dir}\n\nThe skill's body.`;
+const loaded = async ($: any, dir: string, agentId?: string) =>
+  (
+    await $.session.append({
+      message: { type: "user", role: "user", isMeta: true, content: [{ type: "text", text: row(dir) }] },
+      door: "tool-message",
+      origin: { kind: "tool", tool: "unknown" },
+      uuid: "u1",
+      ...(agentId ? { agentId } : {}),
+    })
+  ).message.content[0].text;
+
 // The work machine's store, full: the band lost its card, since every write tend awaited threw first.
 test("a full store leaves the band its card and a card skill its ask; the refusal shows once", async ($, on) => {
   cappedStore(on, 0);
@@ -394,12 +416,12 @@ test("a full store leaves the band its card and a card skill its ask; the refusa
   on("command.register", () => ({ value: undefined }));
   const toasts: unknown[] = [];
   on("ui.toast", (_, e) => (toasts.push(e), { value: undefined }));
-  on("tool.call", () => ({ result: "ok" }) as any);
+  on("session.append", (_, e, next) => next(e));
   on("prompt.submit", (_, e) => ({ text: e.text, context: e.context }));
   const band = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AbovePrompt", props: { bodyColumns: 80 } as any });
   const chips = (((await band.find({ type: "Client" }))?.props.props as any)?.chips ?? []).map((c: any) => c.id);
   expect(chips).toEqual(["chip:questions", "chip:suggestions"]);
-  expect(((await $.tool.call({ tool: "Skill", skill: "hope:intent" } as any)) as any).context).toContain(CARD_FORMAT);
+  expect(await loaded($, "/plugins/cache/moo-md/hope/13.11.0/skills/intent")).toContain(CARD_FORMAT);
   const prompt = await $.prompt.submit({ text: "/hope:intent tidy it", origin: { kind: "composer" } } as any);
   expect((prompt as any).context).toContain(CARD_FORMAT);
   expect(toasts).toHaveLength(1);
@@ -572,10 +594,10 @@ describe("ideas", () => {
     on("session.id", () => ({ value: "s1" }));
     on("session.surfaces", () => ({ value: ["terminal"] }));
     on("command.list", () => ({ value: [{ name: "hope:consult" }, { name: "hope:intent" }] as any }));
-    on("tool.call", () => ({ result: "ok" }) as any);
-    const asked = async (skill: string) => ((await $.tool.call({ tool: "Skill", skill } as any)) as any).context;
-    expect(await asked("hope:consult")).toEqual([IDEAS_FORMAT]);
-    expect(await asked("hope:intent")).not.toContain(IDEAS_FORMAT);
+    on("session.append", (_, e, next) => next(e));
+    expect(await loaded($, "/repos/moo.md/hope/skills/consult")).toEndWith(IDEAS_FORMAT);
+    expect(await loaded($, "/repos/moo.md/hope/skills/intent")).toEndWith(CARD_FORMAT);
+    expect(await loaded($, "/repos/moo.md/hope/skills/intent", "agent-1")).toBe(row("/repos/moo.md/hope/skills/intent"));
   });
   test("ideas and facts are no chip; /ideas and /facts open them in the pane, or say there are none", async ($, on) => {
     mock.store(on);
