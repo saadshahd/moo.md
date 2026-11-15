@@ -9,8 +9,12 @@ import {
   afterTurn,
   appliedNote,
   applyChange,
+  FIX_SLOPS,
+  NONE,
   decide,
+  fenced,
   findingKey,
+  fixReport,
   handoff,
   hunk,
   isRepoBound,
@@ -308,6 +312,38 @@ describe("appliedNote", () => {
   test("each written finding located, then the ask to commit them", () => {
     expect(appliedNote([F({ line: 3, before: ["x"], after: ["y"] })])).toBe(
       "After your last turn the person wrote these slop fixes into the files; they are not committed:\na.ts:3 — c (rule)\n- x\n+ y\nCommit them the way you commit your own work here.",
+    );
+  });
+});
+
+describe("fenced", () => {
+  test("the fence outgrows every backtick run in the text", () => {
+    expect(fenced("diff", "+x")).toBe("```diff\n+x\n```");
+    expect(fenced("diff", "+````md")).toBe("`````diff\n+````md\n`````");
+  });
+});
+
+describe("fixReport", () => {
+  test("a written finding shows its rule and claim over its diff", () => {
+    expect(
+      fixReport([
+        { finding: F({ line: 3, before: ["x"], after: ["y"] }), wrote: true },
+      ]),
+    ).toBe("`a.ts:3` — rule — c\n\n```diff\n@@ -3,1 +3,1 @@\n-x\n+y\n```");
+  });
+  test("an unwritten finding says why and that it waits for Claude", () => {
+    expect(
+      fixReport([
+        { finding: F({ before: ["x"] }), wrote: false },
+        { finding: F(), wrote: false },
+      ]),
+    ).toBe(
+      [
+        "`a.ts:1` — rule — c",
+        "Not written: the file changed since the judge read it. It waits in the prompt box for Claude.",
+        "`a.ts:1` — rule — c",
+        "Not written: the judge gave no change. It waits in the prompt box for Claude.",
+      ].join("\n\n"),
     );
   });
 });
@@ -654,4 +690,43 @@ test("the review: accept on a file that is gone sends the finding to Claude", as
   await settle();
   expect(files).toEqual({});
   expect(now().chosen).toEqual([{ finding: gone }]);
+});
+
+/** /fix-slops as the person types it at the terminal. */
+const fixSlops = {
+  command: FIX_SLOPS,
+  args: "",
+  origin: { kind: "composer" },
+  presentation: { isFullscreen: false, columns: 80 },
+} as const;
+
+test("/fix-slops writes every waiting finding it can, hands the rest to Claude and clears the row", async ($, on) => {
+  const first = F({ line: 1, before: ["a"], after: ["A"] });
+  const second = F({ line: 3, before: ["c"], after: ["C"] });
+  const moved = F({ file: "b.ts", before: ["z"], after: ["Z"] });
+  const now = slopState(on, {
+    ...waiting([F({ file: "r.ts" }), first, second, moved]),
+    cursor: 1,
+    marks: [{ kind: "reject" }],
+  });
+  const files = fileSystem(on, { "/r/a.ts": "a\nb\nc", "/r/b.ts": "q" });
+  const box = promptBox(on);
+  const { text } = await $.command.run(fixSlops);
+  expect(text).toBe(
+    fixReport([
+      { finding: first, wrote: true },
+      { finding: second, wrote: true },
+      { finding: moved, wrote: false },
+    ]),
+  );
+  expect(files).toEqual({ "/r/a.ts": "A\nb\nC", "/r/b.ts": "q" });
+  expect(now().findings).toEqual([]);
+  expect(now().applied).toEqual([first, second]);
+  expect(now().chosen).toEqual([{ finding: moved }]);
+  expect(box()).toBe(addressed(FIX_STEM));
+});
+
+test("/fix-slops with nothing waiting says so", async ($, on) => {
+  slopState(on, waiting([]));
+  expect((await $.command.run(fixSlops)).text).toBe(NONE);
 });

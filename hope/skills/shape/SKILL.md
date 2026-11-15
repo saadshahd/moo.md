@@ -16,6 +16,7 @@ Route each open choice by what keeps it open, invoking the named skill with the 
 - The user holds taste they can't yet state → use **elicit** skill.
 - Their stated preference reads two ways that would build different things → use **clarify** skill.
 - They're missing something already settled about the technology → use **explain** skill.
+- Every way loses something: each gives up one wanted thing to get another → use **dissolve** skill.
 
 When the work iterates — an agent loop, a refinement cycle — which loop is itself one of the choices: read `loop-selection.md`.
 

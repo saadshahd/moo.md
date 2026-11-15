@@ -2,10 +2,11 @@ import type { Register } from "claude-code";
 import { update } from "claude-code";
 import type { Chosen, Finding, Mark, Slop } from "../slop.d.ts";
 
-// After a main-thread turn that edited repo-bound files, judge.sh judges them off the turn.
-// A `slop N` button waits above the prompt. It opens a pane showing one finding at a time as the
-// diff that fixes it, and the row turns into the accept, edit or reject choice for that finding: the
-// row already holds the keys, which a pane opened from it would not get. Nothing here starts a turn.
+/** After a main-thread turn that edited repo-bound files, judge.sh judges them off the turn.
+ * A `slop N` button waits above the prompt. It opens a pane showing one finding at a time as the
+ * diff that fixes it, and the row turns into the accept, edit or reject choice for that finding: the
+ * row already holds the keys, which a pane opened from it would not get. /fix-slops accepts every
+ * waiting finding at once and prints each change it wrote as a diff. Nothing here starts a turn. */
 
 const SLOP = { plugin: "hope", key: "slop" } as const;
 const PANE = "slop";
@@ -26,8 +27,10 @@ const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 
 export const FIX_STEM = "Fix the slop findings ";
 export const ADDRESSED = "Addressed slop findings";
-export const MOVED =
-  "the file changed since the judge read it; accept sends this to Claude";
+const CHANGED_SINCE = "the file changed since the judge read it";
+export const MOVED = `${CHANGED_SINCE}; accept sends this to Claude`;
+export const FIX_SLOPS = "fix-slops";
+export const NONE = "No slop findings wait.";
 
 // ---- pure ----
 
@@ -231,6 +234,34 @@ export function appliedNote(applied: Finding[]): string {
   ].join("\n");
 }
 
+/** `text` in a markdown code fence of `language`, the fence longer than any backtick run in it. */
+export function fenced(language: string, text: string): string {
+  const longest = Math.max(
+    0,
+    ...(text.match(/`+/g) ?? []).map((r) => r.length),
+  );
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return `${fence}${language}\n${text}\n${fence}`;
+}
+
+/** What /fix-slops shows for each finding it took, as markdown: where it is, the judge's rule and
+ * claim, then the change it wrote as a diff, or why it wrote none and that the finding waits for Claude. */
+export function fixReport(
+  taken: { finding: Finding; wrote: boolean }[],
+): string {
+  return taken
+    .map(({ finding: f, wrote }) => {
+      const head = f.file
+        ? `\`${f.file}:${f.line}\` — ${f.rule} — ${f.claim}`
+        : f.claim;
+      const why = hasChange(f) ? CHANGED_SINCE : "the judge gave no change";
+      return wrote
+        ? `${head}\n\n${fenced("diff", hunk(f))}`
+        : `${head}\n\nNot written: ${why}. It waits in the prompt box for Claude.`;
+    })
+    .join("\n\n");
+}
+
 // ---- effects ----
 
 async function readSlop($: any): Promise<Slop> {
@@ -301,11 +332,15 @@ async function openReview($: any): Promise<void> {
   }
 }
 
-// The last decision ends the review: the pane closes, and when any finding waits for Claude the
-// stem goes in the prompt box for the person to finish. While a change accept wrote waits to reach
-// Claude, the box's last line says the findings were addressed, under the stem or the person's draft.
 async function choose($: any, mark: Mark): Promise<void> {
   await change($, (s) => decide(s, mark));
+  await endReview($);
+}
+
+/** The last decision ends the review: the pane closes, and when any finding waits for Claude the
+ * stem goes in the prompt box for the person to finish. While a change accept wrote waits to reach
+ * Claude, the box's last line says the findings were addressed, under the stem or the person's draft. */
+async function endReview($: any): Promise<void> {
   const s = await readSlop($);
   if (s.reviewing) return;
   await $.ui.close({ id: PANE });
@@ -330,13 +365,33 @@ async function changed(
   return text === undefined ? undefined : { path, text };
 }
 
+/** Writes the finding's change into its file when the file still holds it; whether it wrote. */
+async function write($: any, f: Finding): Promise<boolean> {
+  const done = await changed($, f);
+  if (done) await $.fs.write(done.path, done.text);
+  return !!done;
+}
+
 // A change the file no longer holds goes to Claude, who reads the file as it is now.
 async function accept($: any): Promise<void> {
   const { findings, cursor } = await readSlop($);
   const f = findings[cursor];
-  const done = f && (await changed($, f));
-  if (done) await $.fs.write(done.path, done.text);
-  await choose($, { kind: "accept", wrote: !!done });
+  await choose($, { kind: "accept", wrote: !!f && (await write($, f)) });
+}
+
+/** Accepts every waiting finding, as the review's accept does each, and says what it wrote. */
+async function fixAll($: any): Promise<string> {
+  const { findings, cursor } = await readSlop($);
+  const taken: { finding: Finding; wrote: boolean }[] = [];
+  /* One at a time: two findings may change one file. */
+  for (const finding of findings.slice(cursor))
+    taken.push({ finding, wrote: await write($, finding) });
+  if (taken.length === 0) return NONE;
+  await change($, (s) =>
+    taken.reduce((t, { wrote }) => decide(t, { kind: "accept", wrote }), s),
+  );
+  await endReview($);
+  return fixReport(taken);
 }
 
 // A failure shows as a toast; the session goes on (hooks fail open).
@@ -347,6 +402,22 @@ function loud($: any, work: Promise<unknown>): void {
 // ---- hooks ----
 
 export const register: Register = (on) => {
+  on("session.start", async ($, e, next) => {
+    loud(
+      $,
+      $.command.register({
+        name: FIX_SLOPS,
+        description:
+          "Write every waiting slop finding and show each change as a diff",
+      }),
+    );
+    return next(e);
+  });
+
+  on("command.run", { command: FIX_SLOPS }, async ($) => ({
+    text: await fixAll($).catch((err) => `hope slop: ${err?.message ?? err}`),
+  }));
+
   on("turn.complete", async ($, e, next) => {
     const r = await next(e);
     // The judge runs past this dispatch, so the turn's end is never held.
