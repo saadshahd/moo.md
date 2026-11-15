@@ -15,6 +15,6 @@ Four sections, in this order.
 
 **Quiz** — multiple choice on the substance, as many questions as it carries. Real understanding, no gotchas: "what happens to a retry that arrives during shutdown" asks it; "which file changed" does not. Every option carries feedback on why it is right or wrong, hidden until the reader commits; a miss names the section to re-read, never a score, streak, or grade.
 
-Default medium: one page outside the repo, `YYYY-MM-DD-<slug>.html`, one long scroll with the quiz live, opened for them (`open <path>`). Invite the reader to pass before acting on it. Passing is theirs to report, not yours to claim.
+Default medium: one page outside the repo, `YYYY-MM-DD-<slug>.html`, one long scroll with the quiz live, opened for them (`open <path>`). Invite the reader to pass before acting on it. Passing is theirs to report, not yours to claim. A miss or a wrong explanation they bring back → find the sentence that misled them, rewrite it in the page, and they retake that question.
 
 The reader lacks how it behaves, not what it is → use **toy** skill. The reader is an audience → use **land** skill. One view or one plain line would make the point → not grasp; say so and stop.

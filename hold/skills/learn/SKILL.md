@@ -16,6 +16,6 @@ Route again while a move's gate shows something else lacked. Run no move nothing
 End on one line, with what stays open:
 
 - Held — the reader said it back in their own words, or passed the move's gate. Never from silence, a half-done gate, or an opened artifact.
-- Not yet — the gate showed what they still lack; name it and re-run the move on it. The user stopping before held is not yet, said so.
+- Not yet — the gate or their say-back showed what they still lack. The miss counts against the move's output, never the reader: name what in it misled them, re-run the move on that, and they try again. The user stopping before held is not yet, said so.
 
 Nothing built yet → deciding comes first, not hold's. One view or one plain line would make the point, or the artifact is the product → not hold's. Say which and stop.
