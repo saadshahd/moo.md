@@ -26,11 +26,11 @@ export type Picked = z.infer<typeof Picked>;
 
 /** The facts an item's log keeps, by event type. */
 const Entry = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("machine"), payload: z.object({ event: z.looseObject({ type: name }) }) }),
+	z.object({ type: z.literal("machine-stepped"), payload: z.object({ event: z.looseObject({ type: name }) }) }),
 	z.object({ type: z.literal("machine-started"), payload: z.object({ afresh: z.boolean() }) }),
-	z.object({ type: z.literal("model-answer"), payload: z.object({ run: name, attempt: z.int().nonnegative(), question: name.optional(), outcome: z.looseObject({ kind: name }) }) }),
+	z.object({ type: z.literal("model-answered"), payload: z.object({ run: name, attempt: z.int().nonnegative(), question: name.optional(), outcome: z.looseObject({ kind: name }) }) }),
 	z.object({ type: z.literal("picked"), payload: Picked }),
-	z.object({ type: z.literal("landing"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY) }) }),
+	z.object({ type: z.literal("landing-found"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY) }) }),
 	z.object({ type: z.literal("answered") }),
 	z.object({ type: z.literal("merged") }),
 ]);
@@ -42,20 +42,23 @@ const entriesOf = (events: readonly SavedEvent[]): Entry[] => events.map((event)
 /** The actor's own start and stop belong to the process that runs it, never to the item. */
 const LIFECYCLE: ReadonlySet<string> = new Set(["xstate.init", "xstate.stop"]);
 
-/** An inspector that appends each event the item's root machine, at `machineVersion` of its kind, takes to the item's log. */
+/** The item a machine record is about, and the version of its kind machine the record is made under. */
+type MachineOf = { readonly itemId: string; readonly machineVersion: string };
+
+/** An inspector that appends each event the item's root machine takes to the item's log. */
 export const recordMachine =
-	(events: EventLog, itemId: string, machineVersion: string) =>
+	(events: EventLog, { itemId, machineVersion }: MachineOf) =>
 	(inspected: InspectionEvent): void => {
 		if (inspected.type !== "@xstate.transition" || inspected.actorRef.sessionId !== inspected.rootId || LIFECYCLE.has(inspected.event.type)) return;
 
-		events.add({ source: "machine", sourceId: randomUUID(), itemId, machineVersion, type: "machine", payload: { event: asJson(inspected.event) } });
+		events.add({ source: "machine", sourceId: randomUUID(), itemId, machineVersion, type: "machine-stepped", payload: { event: asJson(inspected.event) } });
 	};
 
 /**
  * A pass starts the item's machine over from its initial state; a pass that restores a saved wait starts none. A pass
  * starts it afresh when nothing saved is left to go on from, and no answer kept before then stands for a run after it.
  */
-export const machineStarted = (itemId: string, afresh: boolean, machineVersion: string): NewEvent => ({ source: "machine", sourceId: randomUUID(), itemId, machineVersion, type: "machine-started", payload: { afresh } });
+export const machineStarted = ({ itemId, machineVersion, afresh }: MachineOf & { readonly afresh: boolean }): NewEvent => ({ source: "machine", sourceId: randomUUID(), itemId, machineVersion, type: "machine-started", payload: { afresh } });
 
 /** The owner's answer on the item's thread, keyed by when it came, so every read of it adds one entry. */
 export const ownerAnswered = (itemId: string, at: number): NewEvent => ({ source: "thread", sourceId: `answer:${at}`, itemId, type: "answered", payload: {} });
@@ -91,7 +94,7 @@ export const answerOnce = async (
 
 	const outcome = await run(begun);
 
-	if (!isPaused(outcome)) events.add({ itemId: key.itemId, source: "model", sourceId: randomUUID(), machineVersion, type: "model-answer", payload: asJson({ run: key.run, attempt: key.attempt, question: asked, outcome }) });
+	if (!isPaused(outcome)) events.add({ itemId: key.itemId, source: "model", sourceId: randomUUID(), machineVersion, type: "model-answered", payload: asJson({ run: key.run, attempt: key.attempt, question: asked, outcome }) });
 
 	return { begun, outcome };
 };
@@ -115,7 +118,7 @@ export type ItemFold = {
 const FIX = "fix" satisfies (typeof PURPOSES)[number];
 
 /** The fold after a kept answer: a finished fix run counts toward the cap, and an answer to a question stands for the next run asked it. */
-const withAnswer = (fold: ItemFold, { run, question, outcome }: Extract<Entry, { type: "model-answer" }>["payload"]): ItemFold => {
+const withAnswer = (fold: ItemFold, { run, question, outcome }: Extract<Entry, { type: "model-answered" }>["payload"]): ItemFold => {
 	// SAFETY: answerOnce alone writes model answers, each from a RunOutcome; the schema checks its kind on the way back.
 	const answered = outcome as RunOutcome;
 
@@ -124,15 +127,15 @@ const withAnswer = (fold: ItemFold, { run, question, outcome }: Extract<Entry, {
 
 const stepItem = (fold: ItemFold, entry: Entry): ItemFold => {
 	switch (entry.type) {
-		case "machine":
+		case "machine-stepped":
 			return fold;
 		case "machine-started":
 			return entry.payload.afresh ? { ...fold, answers: {} } : fold;
-		case "model-answer":
+		case "model-answered":
 			return withAnswer(fold, entry.payload);
 		case "picked":
 			return { ...fold, picks: { ...fold.picks, [entry.payload.judge]: entry.payload } };
-		case "landing":
+		case "landing-found":
 			return { ...fold, landing: entry.payload };
 		case "answered":
 			return { ...fold, fixRuns: 0, answers: {} };
@@ -145,12 +148,12 @@ const stepItem = (fold: ItemFold, entry: Entry): ItemFold => {
 export const foldItem = (events: readonly SavedEvent[]): ItemFold => entriesOf(events).reduce(stepItem, { fixRuns: 0, answers: {}, picks: {}, merged: false });
 
 /** Appends how the change that ends at `head` reaches done if it merges as landing found it, when the log last held otherwise. */
-export const keepLanding = (events: EventLog, itemId: string, head: string, doneBy: DoneBy): void => {
+export const keepLanding = (events: EventLog, { itemId, head, doneBy }: { readonly itemId: string; readonly head: string; readonly doneBy: DoneBy }): void => {
 	const last = foldItem(events.list(itemId)).landing;
 
 	if (last?.head === head && last.doneBy === doneBy) return;
 
-	events.add({ source: "landing", sourceId: randomUUID(), itemId, type: "landing", payload: { head, doneBy } });
+	events.add({ source: "landing", sourceId: randomUUID(), itemId, type: "landing-found", payload: { head, doneBy } });
 };
 
 /** How the item reached done, once its change merged: split by its plan run's last pick, else as landing last found its change; unknown where landing never judged it. */

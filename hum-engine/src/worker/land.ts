@@ -551,7 +551,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 
-	keepLanding(ctx.state.events, ctx.id, saved.head, reachesDoneBy(approvals, cleared));
+	keepLanding(ctx.state.events, { itemId: ctx.id, head: saved.head, doneBy: reachesDoneBy(approvals, cleared) });
 
 	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest, cleared }), route, rules, why);
 };

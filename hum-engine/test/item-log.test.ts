@@ -64,10 +64,10 @@ const pass = async (state: State, script: Script, answer?: string): Promise<void
 		});
 
 	const sources = { plan: picks("plan"), build: acts("build"), checks: acts("checks"), fix: acts("fix"), review: picks("review") };
-	const inspect = recordMachine(state.events, ITEM, VERSION);
+	const inspect = recordMachine(state.events, { itemId: ITEM, machineVersion: VERSION });
 
 	if (answer === undefined) {
-		state.events.add(machineStarted(ITEM, false, VERSION));
+		state.events.add(machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: false }));
 		actor = createActor(kindMachine(feature, sources), { inspect }).start();
 	} else {
 		const restored = await state.items.restore(ITEM, feature, { sources, inspect });
@@ -94,7 +94,7 @@ test("the log keeps each event the item's machine takes, under its kind's machin
 
 	await pass(state, { plan: ["plan-ready"], build: ["token-cap"] });
 
-	expect(state.events.list(ITEM).filter(({ type }) => type === "machine")).toEqual(
+	expect(state.events.list(ITEM).filter(({ type }) => type === "machine-stepped")).toEqual(
 		["plan-ready", "token-cap"].map((type) => expect.objectContaining({ machineVersion: VERSION, payload: { event: expect.objectContaining({ type }) } })),
 	);
 });
@@ -133,7 +133,7 @@ test.each([
 
 	planPicked(state, planPick);
 
-	for (const finding of found) keepLanding(state.events, ITEM, "abc", finding);
+	for (const finding of found) keepLanding(state.events, { itemId: ITEM, head: "abc", doneBy: finding });
 	expect(doneByOf(folded(state))).toBeUndefined();
 
 	merged(state);
@@ -143,14 +143,14 @@ test.each([
 test("how landing found the change stands through later passes until landing finds otherwise, and finding it again adds nothing", () => {
 	const state = openState(dir, { now: Date.now });
 
-	keepLanding(state.events, ITEM, "abc", "checks");
-	state.events.add(machineStarted(ITEM, true, VERSION));
+	keepLanding(state.events, { itemId: ITEM, head: "abc", doneBy: "checks" });
+	state.events.add(machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: true }));
 	state.events.add(ownerAnswered(ITEM, 1));
 	planPicked(state, "plan-ready");
-	keepLanding(state.events, ITEM, "abc", "checks");
+	keepLanding(state.events, { itemId: ITEM, head: "abc", doneBy: "checks" });
 	merged(state);
 
-	expect(state.events.list(ITEM).filter(({ type }) => type === "landing")).toHaveLength(1);
+	expect(state.events.list(ITEM).filter(({ type }) => type === "landing-found")).toHaveLength(1);
 	expect(doneByOf(folded(state))).toBe("checks");
 });
 
@@ -186,8 +186,8 @@ const planAsker = (state: State, answer: () => RunOutcome) => {
 };
 
 test.each([
-	["a pass that starts the machine over reads it back", machineStarted(ITEM, false, VERSION), 1],
-	["a pass that starts the item afresh asks again", machineStarted(ITEM, true, VERSION), 2],
+	["a pass that starts the machine over reads it back", machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: false }), 1],
+	["a pass that starts the item afresh asks again", machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: true }), 2],
 	["the owner's answer makes the next run ask again", ownerAnswered(ITEM, 1), 2],
 ] as const)("an answer the log keeps to the same question: %s", async (_, between, times) => {
 	const state = openState(dir, { now: Date.now });
@@ -209,7 +209,7 @@ test("a run that ends with no answer keeps nothing, so the same question is aske
 	await plan.ask();
 
 	expect(plan.asked()).toBe(2);
-	expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["model-answer"]);
+	expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["model-answered"]);
 });
 
 test("a build or fix run, which asks no question the log can answer, runs every time", async () => {
@@ -232,7 +232,7 @@ for (const mode of ["before-run", "after-run", "after-log", "after-end"] as cons
 		const state = openState(dir, { now: Date.now });
 
 		expect(readFileSync(join(dir, "transcript.txt"), "utf8").split("\n").filter(Boolean)).toHaveLength(1);
-		expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["model-answer"]);
+		expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["model-answered"]);
 		expect(state.runs.list(ITEM).every(({ endedAt }) => endedAt !== undefined)).toBe(true);
 	});
 }

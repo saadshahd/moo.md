@@ -400,7 +400,7 @@ test("one event read twice is saved once, and the first copy stays", () => {
 test("an item's events list in the order the log took them, on a clock that stands still, and a copy into another log keeps it", () => {
 	const { events } = openState(dir, { now: () => 5 });
 	const copy = openState(join(dir, "copy"), { now: () => 9 }).events;
-	const event = (sourceId: string) => ({ source: "machine", sourceId, itemId: "#68", type: "machine", payload: {} });
+	const event = (sourceId: string) => ({ source: "machine", sourceId, itemId: "#68", type: "machine-stepped", payload: {} });
 
 	for (const sourceId of ["c", "a", "b"]) events.add(event(sourceId));
 

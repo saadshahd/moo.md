@@ -96,7 +96,7 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 	/** A merge whose item's log holds how landing found its change. */
 	const mergeLogged = (merge: Merge, found: DoneBy) => {
 		state.merges.put(merge.item, merge);
-		keepLanding(state.events, merge.item, merge.sha, found);
+		keepLanding(state.events, { itemId: merge.item, head: merge.sha, doneBy: found });
 		state.events.add({ source: "work-source", sourceId: `merged:${merge.sha}`, itemId: merge.item, type: "merged", payload: {} });
 	};
 

@@ -658,7 +658,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review") };
 
 	if (d.resume) {
-		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), inspect: recordMachine(state.events, id, version) });
+		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), inspect: recordMachine(state.events, { itemId: id, machineVersion: version }) });
 
 		if (!restored.ok) return { outcome: "held", item: id, why: restored.fault.cause };
 
@@ -668,8 +668,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		// The wait it was saved in is already handled; only what follows the answer needs a reaction.
 		handled = String(actor.getSnapshot().value);
 	} else {
-		state.events.add(machineStarted(id, d.restarted, version));
-		actor = createActor(kindMachine(kind, sources), { inspect: recordMachine(state.events, id, version) });
+		state.events.add(machineStarted({ itemId: id, machineVersion: version, afresh: d.restarted }));
+		actor = createActor(kindMachine(kind, sources), { inspect: recordMachine(state.events, { itemId: id, machineVersion: version }) });
 	}
 
 	const react = async (value: string) => {
