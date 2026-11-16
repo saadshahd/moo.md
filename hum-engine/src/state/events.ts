@@ -200,7 +200,11 @@ export class EventLog {
 
 		if (refusal !== undefined) throw new Error(refusal);
 
-		return SavedEvent.parse(climb(found.record, found.placed.format, LOG_FORMAT, LOG_MIGRATIONS, "format"));
+		const current = this.#current(found);
+
+		if (!current.success) throw current.error;
+
+		return current.data;
 	}
 
 	/** An item's events in the order its log took them, or one card when a newer engine wrote any of them or this engine cannot read one. */
