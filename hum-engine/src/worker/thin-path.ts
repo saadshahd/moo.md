@@ -225,6 +225,10 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (!saved.ok) return { outcome: "held", item: id, why: saved.fault.cause };
 
+	const log = o.state.events.read(id);
+
+	if (!log.ok) return { outcome: "held", item: id, why: log.fault.cause };
+
 	const at = saved.value === undefined ? undefined : String(saved.value.getSnapshot().value);
 
 	if (knownKind && hasEndedStuck(knownKind, at)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
@@ -409,10 +413,6 @@ type Driven = ThinPathOptions & {
 
 const drive = async (d: Driven): Promise<ThinResult> => {
 	const { state, runner, config, kind, id, item, branch, clone, g, base } = d;
-	const log = state.events.read(id);
-
-	if (!log.ok) return { outcome: "held", item: id, why: log.fault.cause };
-
 	const { version } = kind.machine;
 	const maxFixes = config.hum.maxFixRuns;
 	const result = Promise.withResolvers<ThinResult>();

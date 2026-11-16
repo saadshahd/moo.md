@@ -171,11 +171,13 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(w.repo.show(id)).toContain("state: done");
 });
 
-test("an item whose log holds a record a newer engine wrote is held with that engine's card, and no run starts", async () => {
+test("an item whose log holds a record a newer engine wrote is held with that engine's card before anything runs, though it has a change saved to land", async () => {
 	const w = await world({ script: [] });
 	const id = w.repo.seed("Write the note");
 
 	const asked = w.shim.calls().length;
+
+	w.state.landings.put(id, { item: id, branch: runBranch(SHIPPED_DEFAULTS, id), since: NOW, change: { paths: ["docs/note.md"], size: 1, loosened: false, pinChanged: false }, head: "abc" });
 
 	openState(w.state.dir, { engineVersion: "99.0.0", now: Date.now }).events.add({ source: "thread", sourceId: "a1", itemId: id, type: "answered", payload: {} });
 
