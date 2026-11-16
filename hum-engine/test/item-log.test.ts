@@ -2,11 +2,10 @@ import { beforeEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createActor, createAsyncLogic } from "xstate";
-import { kindMachine, openState, type State } from "../src/index.ts";
+import { openState, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
-import { answerOnce, doneByOf, foldItem, keepLanding, keepPick, machineStarted, ownerAnswered, recordMachine } from "../src/state/item-log.ts";
+import { answerOnce, doneByOf, foldItem, keepLanding, keepPick, machineStarted, ownerAnswered } from "../src/state/item-log.ts";
 import { finished } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -18,22 +17,6 @@ let dir: string;
 
 beforeEach(() => {
 	dir = tempDir("item-log");
-});
-
-/** A source that never settles, so the machine moves only on the events the test sends. */
-const waits = createAsyncLogic({ run: () => new Promise<never>(() => {}) });
-
-test("the log keeps each event the item's machine takes, under its kind's machine version, and none of the actor's own start or stop", () => {
-	const state = openState(dir, { now: Date.now });
-	const actor = createActor(kindMachine(feature, { plan: waits, build: waits, checks: waits, fix: waits, review: waits }), { inspect: recordMachine(state.events, { itemId: ITEM, machineVersion: VERSION }) }).start();
-
-	for (const type of ["plan-ready", "token-cap"]) actor.send({ type });
-
-	actor.stop();
-
-	expect(state.events.list(ITEM).filter(({ type }) => type === "machine-stepped")).toEqual(
-		["plan-ready", "token-cap"].map((type) => expect.objectContaining({ machineVersion: VERSION, payload: { event: expect.objectContaining({ type }) } })),
-	);
 });
 
 const folded = (state: State) => foldItem(state.events.list(ITEM));

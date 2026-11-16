@@ -595,7 +595,7 @@ test("a plan answer the log keeps is read back on a pass after a limit, adding n
 	expect(w.shim.decisions().map(({ purpose }) => purpose)).toEqual(["plan", "plan"]);
 });
 
-test("the owner's answer at the token cap's wait starts the fix count over, and the pass that resumes the wait logs each event its machine takes", async () => {
+test("the owner's answer at the token cap's wait starts the fix count over", async () => {
 	const config = configWith((raw) => {
 		raw.hum.maxFixRuns = 2;
 		raw.kinds.feature.tokenCap.tokens = 500;
@@ -615,10 +615,6 @@ test("the owner's answer at the token cap's wait starts the fix count over, and 
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toMatchObject({ outcome: "stuck", item: id, detail: "the checks still fail after 2 fixes" });
 	expect(w.shim.calls().length - asked).toBe(3);
-
-	const log = w.state.events.list(id);
-
-	expect(log.slice(log.findIndex(({ type }) => type === "answered")).flatMap((record) => (record.type === "machine-stepped" ? [record.payload.event.type] : []))).toContain("answered");
 });
 
 test("a medium change waits for a fresh review run at landing: a request for changes holds it for the owner, an approval merges it", async () => {

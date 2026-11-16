@@ -17,7 +17,7 @@ import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
-import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered, recordMachine } from "../state/item-log.ts";
+import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
@@ -658,7 +658,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review") };
 
 	if (d.resume) {
-		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), inspect: recordMachine(state.events, { itemId: id, machineVersion: version }) });
+		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind) });
 
 		if (!restored.ok) return { outcome: "held", item: id, why: restored.fault.cause };
 
@@ -669,7 +669,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		handled = String(actor.getSnapshot().value);
 	} else {
 		state.events.add(machineStarted({ itemId: id, machineVersion: version, afresh: d.restarted }));
-		actor = createActor(kindMachine(kind, sources), { inspect: recordMachine(state.events, { itemId: id, machineVersion: version }) });
+		actor = createActor(kindMachine(kind, sources));
 	}
 
 	const react = async (value: string) => {

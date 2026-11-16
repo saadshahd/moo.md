@@ -1,11 +1,10 @@
-import type { InspectionEvent } from "xstate";
 import { isPaused, type RunOutcome } from "../adapters/claude-p.ts";
 import { hashJson } from "../config/hash.ts";
 import { asJson, type Json } from "../config/json.ts";
 import type { PURPOSES } from "../config/schema.ts";
 import type { DoneBy } from "../decide/merge.ts";
 import { SPLIT } from "../decide/prose.ts";
-import { type EventLog, KeptOutcome, MachineEvent, type NewEvent, type SavedEvent } from "./events.ts";
+import { type EventLog, KeptOutcome, type NewEvent, type SavedEvent } from "./events.ts";
 import type { BegunRun, RunKey, RunRecords } from "./runs.ts";
 
 /** A record of one type, as the log keeps it. */
@@ -14,20 +13,8 @@ type Entry<Type extends SavedEvent["type"]> = Extract<SavedEvent, { readonly typ
 /** What a judge picked for the item, as the log keeps it. */
 export type Picked = Entry<"picked">["payload"];
 
-/** The actor's own start and stop belong to the process that runs it, never to the item. */
-const LIFECYCLE: ReadonlySet<string> = new Set(["xstate.init", "xstate.stop"]);
-
-/** The item a machine record is about, and the version of its kind machine the record is made under. */
+/** The item whose machine a pass starts, and the version of its kind machine. */
 type MachineOf = { readonly itemId: string; readonly machineVersion: string };
-
-/** An inspector that appends each event the item's root machine takes to the item's log. */
-export const recordMachine =
-	(events: EventLog, { itemId, machineVersion }: MachineOf) =>
-	(inspected: InspectionEvent): void => {
-		if (inspected.type !== "@xstate.transition" || inspected.actorRef.sessionId !== inspected.rootId || LIFECYCLE.has(inspected.event.type)) return;
-
-		events.add({ source: "machine", itemId, machineVersion, type: "machine-stepped", payload: { event: MachineEvent.parse(asJson(inspected.event)) } });
-	};
 
 /**
  * A pass starts the item's machine over from its initial state; a pass that restores a saved wait starts none. A pass
@@ -105,8 +92,6 @@ const withAnswer = (fold: ItemFold, { run, question, outcome }: Entry<"model-ans
 
 const stepItem = (fold: ItemFold, entry: SavedEvent): ItemFold => {
 	switch (entry.type) {
-		case "machine-stepped":
-			return fold;
 		case "machine-started":
 			return entry.payload.afresh ? { ...fold, answers: {} } : fold;
 		case "model-answered":

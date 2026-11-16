@@ -36,8 +36,6 @@ export type RestoreOptions = {
 	readonly kindAt?: (machineVersion: string) => Kind | undefined;
 	readonly sources?: Readonly<Record<string, AnyActorLogic>>;
 	readonly clock?: ActorClock;
-	/** Sees every event the restored actor takes, as `createActor`'s option does. */
-	readonly inspect?: NonNullable<Parameters<typeof restoreActor>[2]>["inspect"];
 };
 
 /** An item with a saved snapshot, from the envelope header. */
@@ -141,7 +139,7 @@ export class Items {
 	 * Reads the item's snapshot and restores its actor, not started. Returns `undefined` when nothing is saved.
 	 * A snapshot that cannot be restored stays on disk, and the caller starts nothing for that item.
 	 */
-	async restore(itemId: string, kind: Kind, { kindAt, sources = {}, clock, inspect }: RestoreOptions = {}): Promise<Outcome<AnyActor | undefined>> {
+	async restore(itemId: string, kind: Kind, { kindAt, sources = {}, clock }: RestoreOptions = {}): Promise<Outcome<AnyActor | undefined>> {
 		const file = this.path(itemId);
 		const unreadable = (why: string) => this.#fault({ itemId, code: SNAPSHOT_CARDS.unreadable, cause: `The saved state of ${itemId} at ${file} is damaged: ${why}.`, fix: DAMAGED_FIX });
 		const unrestorable = (why: string) => this.#fault({ itemId, code: SNAPSHOT_CARDS.restoreError, cause: `The saved state of ${itemId} does not restore: ${why}.`, fix: DAMAGED_FIX });
@@ -195,7 +193,7 @@ export class Items {
 		try {
 			// SAFETY: the snapshot is JSON the machine's own schema validates; xstate reports a bad one as an 'error' status, checked below.
 			const restored = current as never;
-			const actor = restoreActor(kindMachine(kind, sources), restored, { ...(clock && { clock }), inspect });
+			const actor = restoreActor(kindMachine(kind, sources), restored, clock ? { clock } : undefined);
 			const status = actor.getSnapshot();
 
 			return status.status === "error" ? unrestorable(reason(status.error)) : { ok: true, value: actor };

@@ -43,9 +43,6 @@ const Placed = z.looseObject({
 
 type Placed = z.infer<typeof Placed>;
 
-/** An event the item's machine took, as the log keeps it: its type and whatever JSON it carries. */
-export const MachineEvent = z.object({ type: name }).catchall(Json);
-
 /**
  * A model run's answer as the log keeps it: a finished run's report, or the tokens a run spent before the item's cap
  * stopped it. The log owns this shape, so a change to the runner's own type leaves format 1 as it is.
@@ -107,7 +104,6 @@ const machineVersion = name;
 
 /** A log record at this engine's format: where it came from, its place, and, by type, the fact it keeps. Each type names something that happened. The log owns every shape here. */
 export const SavedEvent = z.discriminatedUnion("type", [
-	z.object({ ...envelope, machineVersion, type: z.literal("machine-stepped"), payload: z.object({ event: MachineEvent }) }),
 	z.object({ ...envelope, machineVersion, type: z.literal("machine-started"), payload: z.object({ afresh: z.boolean() }) }),
 	z.object({ ...envelope, machineVersion, type: z.literal("model-answered"), payload: z.object({ run: name, attempt: count, question: name.optional(), outcome: KeptOutcome }) }),
 	z.object({ ...envelope, type: z.literal("picked"), payload: Picked }),
