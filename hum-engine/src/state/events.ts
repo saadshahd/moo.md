@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { Json } from "../config/json.ts";
 import { climb, type Steps } from "../config/migrate.ts";
+import { DONE_BY } from "../decide/merge.ts";
 import type { Faults, Outcome } from "./faults.ts";
 import { ENGINE_VERSION, isNewerThan, UPDATE_ENGINE } from "./format.ts";
 import { createOnce, listRecords, readJson, slug } from "./fs.ts";
@@ -11,6 +12,8 @@ import { SNAPSHOT_CARDS } from "./items.ts";
 export const LOG_FORMAT = 1;
 
 const name = z.string().min(1);
+const count = z.int().nonnegative();
+const models = z.array(name);
 
 /** A log record as its file holds it, at any format. */
 const LogRecord = z.record(z.string(), Json);
@@ -33,39 +36,103 @@ const Placed = z.looseObject({
 	source: name,
 	sourceId: name,
 	itemId: name,
-	receivedAt: z.int().nonnegative(),
-	seq: z.int().nonnegative().optional(),
+	receivedAt: count,
+	seq: count.optional(),
 });
 
 type Placed = z.infer<typeof Placed>;
 
-export const SavedEvent = z.object({
+/** An event the item's machine took, as the log keeps it: its type and whatever JSON it carries. */
+export const MachineEvent = z.object({ type: name }).catchall(Json);
+
+/**
+ * A model run's answer as the log keeps it: a finished run's report, or the tokens a run spent before the item's cap
+ * stopped it. The log owns this shape, so a change to the runner's own type leaves format 1 as it is.
+ */
+export const KeptOutcome = z.discriminatedUnion("kind", [
+	z.object({
+		kind: z.literal("finished"),
+		subtype: name,
+		isError: z.boolean(),
+		sessionId: name.optional(),
+		text: z.string(),
+		structured: Json.optional(),
+		tokens: count,
+		cacheReadTokens: count,
+		plugins: z.array(name),
+		keySource: name.optional(),
+		models,
+	}),
+	z.object({ kind: z.literal("over-cap"), tokens: count }),
+]);
+
+export type KeptOutcome = z.infer<typeof KeptOutcome>;
+
+/** A plan or review run's pick as the log keeps it: the event, how sure the run was, why, and what it cited, planned, asked or split into. */
+const KeptPick = z.object({
+	event: name,
+	sure: z.boolean(),
+	reason: z.string(),
+	cites: z.array(z.object({ file: name, line: z.int().positive() })),
+	plan: z.object({ summary: name, steps: z.array(name), paths: z.array(name) }).optional(),
+	question: z.string().optional(),
+	parts: z.array(name),
+});
+
+const grade = z.enum(["sound", "partial", "concern"]);
+
+/** What a judge picked for the item: a plan or review run's pick and the models that answered it, or the alignment call's grades or why it abstained. A review and the alignment call judge the change that ends at `head`. */
+const Picked = z.discriminatedUnion("judge", [
+	z.object({ judge: z.literal("plan"), pick: KeptPick, models }),
+	z.object({ judge: z.literal("review"), head: name, pick: KeptPick, models }),
+	z.object({ judge: z.literal("alignment"), head: name, alignment: z.union([z.object({ graded: z.object({ alignment: grade, verification: grade }) }), z.object({ abstained: name })]) }),
+]);
+
+const envelope = {
 	format: z.literal(LOG_FORMAT),
 	/** The engine that wrote the record; one from before hum 0.5.0 names none. */
 	engineVersion: name.optional(),
-	/** The version of the item's kind machine that a machine entry, a machine start or a model answer was made under. */
-	machineVersion: name.optional(),
 	/** Where the event came from, such as a thread comment id: a second read of it adds nothing. */
 	source: name,
 	sourceId: name,
 	itemId: name,
-	type: name,
-	receivedAt: z.int().nonnegative(),
+	receivedAt: count,
 	/** The event's place in its item's log. An event saved before hum kept places has none, and comes first, by when it arrived. */
-	seq: z.int().nonnegative().optional(),
-	payload: Json,
-});
+	seq: count.optional(),
+};
+
+/** The version of the item's kind machine the record was made under. */
+const machineVersion = name;
+
+/** A log record at this engine's format: where it came from, its place, and, by type, the fact it keeps. Each type names something that happened. The log owns every shape here. */
+export const SavedEvent = z.discriminatedUnion("type", [
+	z.object({ ...envelope, machineVersion, type: z.literal("machine-stepped"), payload: z.object({ event: MachineEvent }) }),
+	z.object({ ...envelope, machineVersion, type: z.literal("machine-started"), payload: z.object({ afresh: z.boolean() }) }),
+	z.object({ ...envelope, machineVersion, type: z.literal("model-answered"), payload: z.object({ run: name, attempt: count, question: name.optional(), outcome: KeptOutcome }) }),
+	z.object({ ...envelope, type: z.literal("picked"), payload: Picked }),
+	z.object({ ...envelope, type: z.literal("landing-found"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY) }) }),
+	z.object({ ...envelope, type: z.literal("answered"), payload: z.object({}) }),
+	z.object({ ...envelope, type: z.literal("merged"), payload: z.object({}) }),
+]);
 
 export type SavedEvent = z.infer<typeof SavedEvent>;
 
-export type NewEvent = Omit<SavedEvent, "format" | "engineVersion" | "receivedAt" | "seq">;
+/** What the log stamps on each record it saves. */
+type Stamped = "format" | "engineVersion" | "receivedAt" | "seq";
+
+/** An event as its writer gives it; the log stamps its format, engine, time and place. */
+export type NewEvent = { [Type in SavedEvent["type"]]: Omit<Extract<SavedEvent, { type: Type }>, Stamped> }[SavedEvent["type"]];
 
 /** A record found in an item's log, with what places it. */
 type Found = { readonly record: LogRecord; readonly placed: Placed };
 
+/** What the owner does about a log record this engine cannot read. */
+const DAMAGED_RECORD_FIX = "Restore the record from a backup, or delete it; the other items go on.";
+
 /**
  * Every event is saved before anything acts on it, keyed by source, so reading one twice adds nothing; each new one
- * takes the next place in its item's log. A record a newer engine wrote is never read: it raises one card.
+ * takes the next place in its item's log. A record a newer engine wrote, or one this engine cannot read, is never
+ * read: it raises one card for its item.
  */
 export class EventLog {
 	readonly #folder: string;
@@ -100,8 +167,8 @@ export class EventLog {
 	}
 
 	/** The record in this engine's format, climbed from the one it was written in. */
-	#current({ record, placed }: Found): SavedEvent {
-		return SavedEvent.parse(climb(record, placed.format, LOG_FORMAT, LOG_MIGRATIONS, "format"));
+	#current({ record, placed }: Found) {
+		return SavedEvent.safeParse(climb(record, placed.format, LOG_FORMAT, LOG_MIGRATIONS, "format"));
 	}
 
 	/** An item's records as their files hold them, in the order its log took them. */
@@ -124,27 +191,37 @@ export class EventLog {
 		for (const { record, placed } of this.#records(itemId)) createOnce(into.#path(placed), `${JSON.stringify({ ...record, seq: into.#nextPlace(itemId) })}\n`);
 	}
 
-	/** One record; one a newer engine wrote throws. */
+	/** One record; one a newer engine wrote, or one this engine cannot read, throws. */
 	get(key: Pick<SavedEvent, "itemId" | "source" | "sourceId">): SavedEvent {
 		const found = this.#found(LogRecord.parse(readJson(this.#path(key))));
 		const refusal = this.#refusal(found);
 
 		if (refusal !== undefined) throw new Error(refusal);
 
-		return this.#current(found);
+		return SavedEvent.parse(climb(found.record, found.placed.format, LOG_FORMAT, LOG_MIGRATIONS, "format"));
 	}
 
-	/** An item's events in the order its log took them, or one card when a newer engine wrote any of them. */
+	/** An item's events in the order its log took them, or one card when a newer engine wrote any of them or this engine cannot read one. */
 	read(itemId: string): Outcome<SavedEvent[]> {
 		const found = this.#records(itemId);
 		const refusal = found.map((each) => this.#refusal(each)).find((cause) => cause !== undefined);
 
 		if (refusal !== undefined) return { ok: false, fault: this.#faults.raise({ code: SNAPSHOT_CARDS.newerEngine, item: itemId, cause: refusal, fix: UPDATE_ENGINE }) };
 
-		return { ok: true, value: found.map((each) => this.#current(each)) };
+		const events: SavedEvent[] = [];
+
+		for (const each of found) {
+			const current = this.#current(each);
+
+			if (!current.success) return { ok: false, fault: this.#faults.raise({ code: SNAPSHOT_CARDS.unreadable, item: itemId, cause: `The log of ${itemId} holds a record from ${each.placed.source} that hum cannot read: ${z.prettifyError(current.error)}`, fix: DAMAGED_RECORD_FIX }) };
+
+			events.push(current.data);
+		}
+
+		return { ok: true, value: events };
 	}
 
-	/** As `read`, for a caller past a `read` that let the item go on: a record from a newer engine throws. */
+	/** As `read`, for a caller past a `read` that let the item go on: a record from a newer engine, or one this engine cannot read, throws. */
 	list(itemId: string): SavedEvent[] {
 		const log = this.read(itemId);
 

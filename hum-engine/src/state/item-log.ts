@@ -1,43 +1,19 @@
 import { randomUUID } from "node:crypto";
 import type { InspectionEvent } from "xstate";
-import { z } from "zod";
 import { isPaused, type RunOutcome } from "../adapters/claude-p.ts";
 import { hashJson } from "../config/hash.ts";
 import { asJson, type Json } from "../config/json.ts";
 import type { PURPOSES } from "../config/schema.ts";
-import { DONE_BY, type DoneBy } from "../decide/merge.ts";
-import { EventPick, SPLIT } from "../decide/prose.ts";
-import type { EventLog, NewEvent, SavedEvent } from "./events.ts";
+import type { DoneBy } from "../decide/merge.ts";
+import { SPLIT } from "../decide/prose.ts";
+import { type EventLog, KeptOutcome, MachineEvent, type NewEvent, type SavedEvent } from "./events.ts";
 import type { BegunRun, RunKey, RunRecords } from "./runs.ts";
-import { Alignment } from "./saved.ts";
 
-const name = z.string().min(1);
+/** A record of one type, as the log keeps it. */
+type Entry<Type extends SavedEvent["type"]> = Extract<SavedEvent, { readonly type: Type }>;
 
-const models = z.array(name);
-
-/** What a judge picked for the item: a plan or review run's pick and the models that answered it, or the alignment call's grades or why it abstained. A review and the alignment call judge the change that ends at `head`. */
-const Picked = z.discriminatedUnion("judge", [
-	z.object({ judge: z.literal("plan"), pick: EventPick, models }),
-	z.object({ judge: z.literal("review"), head: name, pick: EventPick, models }),
-	z.object({ judge: z.literal("alignment"), head: name, alignment: Alignment }),
-]);
-
-export type Picked = z.infer<typeof Picked>;
-
-/** The facts an item's log keeps, by event type. */
-const Entry = z.discriminatedUnion("type", [
-	z.object({ type: z.literal("machine-stepped"), payload: z.object({ event: z.looseObject({ type: name }) }) }),
-	z.object({ type: z.literal("machine-started"), payload: z.object({ afresh: z.boolean() }) }),
-	z.object({ type: z.literal("model-answered"), payload: z.object({ run: name, attempt: z.int().nonnegative(), question: name.optional(), outcome: z.looseObject({ kind: name }) }) }),
-	z.object({ type: z.literal("picked"), payload: Picked }),
-	z.object({ type: z.literal("landing-found"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY) }) }),
-	z.object({ type: z.literal("answered") }),
-	z.object({ type: z.literal("merged") }),
-]);
-
-type Entry = z.infer<typeof Entry>;
-
-const entriesOf = (events: readonly SavedEvent[]): Entry[] => events.map((event) => Entry.parse(event));
+/** What a judge picked for the item, as the log keeps it. */
+export type Picked = Entry<"picked">["payload"];
 
 /** The actor's own start and stop belong to the process that runs it, never to the item. */
 const LIFECYCLE: ReadonlySet<string> = new Set(["xstate.init", "xstate.stop"]);
@@ -51,7 +27,7 @@ export const recordMachine =
 	(inspected: InspectionEvent): void => {
 		if (inspected.type !== "@xstate.transition" || inspected.actorRef.sessionId !== inspected.rootId || LIFECYCLE.has(inspected.event.type)) return;
 
-		events.add({ source: "machine", sourceId: randomUUID(), itemId, machineVersion, type: "machine-stepped", payload: { event: asJson(inspected.event) } });
+		events.add({ source: "machine", sourceId: randomUUID(), itemId, machineVersion, type: "machine-stepped", payload: { event: MachineEvent.parse(asJson(inspected.event)) } });
 	};
 
 /**
@@ -64,7 +40,7 @@ export const machineStarted = ({ itemId, machineVersion, afresh }: MachineOf & {
 export const ownerAnswered = (itemId: string, at: number): NewEvent => ({ source: "thread", sourceId: `answer:${at}`, itemId, type: "answered", payload: {} });
 
 /** A judge's pick for the item. */
-export const picked = (itemId: string, pick: Picked): NewEvent => ({ source: "judge", sourceId: randomUUID(), itemId, type: "picked", payload: asJson(pick) });
+export const picked = (itemId: string, pick: Picked): NewEvent => ({ source: "judge", sourceId: randomUUID(), itemId, type: "picked", payload: pick });
 
 /** What one model run is asked, and whether an answer the log keeps to the same question stands in for running it. */
 export type Ask = {
@@ -76,10 +52,14 @@ export type Ask = {
 	readonly question?: Json;
 };
 
+/** A kept answer as the run's outcome; JSON keeps no key whose value is undefined. */
+const outcomeOf = (kept: KeptOutcome): RunOutcome => (kept.kind === "finished" ? { ...kept, sessionId: kept.sessionId, structured: kept.structured, keySource: kept.keySource } : kept);
+
 /**
  * A model run's outcome. The run is saved as begun before it starts, and an outcome that answers, as a finished run or
  * one past its cap does, is kept in the item's log before this returns, so the caller ends the run's record after it.
- * A run that ends with no answer (a limit, a hold or a stop) keeps nothing, and its next call runs again.
+ * A kept answer to the same question stands in for the run: `run` is not called. A run that ends with no answer (a
+ * limit, a hold or a stop) keeps nothing, and its next call runs again.
  */
 export const answerOnce = async (
 	{ events, runs }: { readonly events: EventLog; readonly runs: RunRecords },
@@ -90,11 +70,13 @@ export const answerOnce = async (
 	const asked = question === undefined ? undefined : hashJson({ run: key.run, question });
 	const kept = asked === undefined ? undefined : foldItem(events.list(key.itemId)).answers[asked];
 
-	if (kept) return { begun, outcome: kept };
+	if (kept) return { begun, outcome: outcomeOf(kept) };
 
 	const outcome = await run(begun);
 
-	if (!isPaused(outcome)) events.add({ itemId: key.itemId, source: "model", sourceId: randomUUID(), machineVersion, type: "model-answered", payload: asJson({ run: key.run, attempt: key.attempt, question: asked, outcome }) });
+	if (!isPaused(outcome)) {
+		events.add({ itemId: key.itemId, source: "model", sourceId: randomUUID(), machineVersion, type: "model-answered", payload: { run: key.run, attempt: key.attempt, question: asked, outcome: KeptOutcome.parse(asJson(outcome)) } });
+	}
 
 	return { begun, outcome };
 };
@@ -107,10 +89,10 @@ export type ItemFold = {
 	/** The fix runs that finished since the owner last answered. */
 	readonly fixRuns: number;
 	/** The answers kept since the item last started afresh and the owner last answered, by the question each answered. */
-	readonly answers: Readonly<Record<string, RunOutcome>>;
+	readonly answers: Readonly<Record<string, KeptOutcome>>;
 	readonly picks: Picks;
 	/** How the change that ends at `head` reaches done if it merges as landing last found it; absent where landing never judged it. */
-	readonly landing?: { readonly head: string; readonly doneBy: DoneBy };
+	readonly landing?: Entry<"landing-found">["payload"];
 	readonly merged: boolean;
 };
 
@@ -118,14 +100,13 @@ export type ItemFold = {
 const FIX = "fix" satisfies (typeof PURPOSES)[number];
 
 /** The fold after a kept answer: a finished fix run counts toward the cap, and an answer to a question stands for the next run asked it. */
-const withAnswer = (fold: ItemFold, { run, question, outcome }: Extract<Entry, { type: "model-answered" }>["payload"]): ItemFold => {
-	// SAFETY: answerOnce alone writes model answers, each from a RunOutcome; the schema checks its kind on the way back.
-	const answered = outcome as RunOutcome;
+const withAnswer = (fold: ItemFold, { run, question, outcome }: Entry<"model-answered">["payload"]): ItemFold => ({
+	...fold,
+	fixRuns: fold.fixRuns + Number(run === FIX && outcome.kind === "finished"),
+	answers: question === undefined ? fold.answers : { ...fold.answers, [question]: outcome },
+});
 
-	return { ...fold, fixRuns: fold.fixRuns + Number(run === FIX && answered.kind === "finished"), answers: question === undefined ? fold.answers : { ...fold.answers, [question]: answered } };
-};
-
-const stepItem = (fold: ItemFold, entry: Entry): ItemFold => {
+const stepItem = (fold: ItemFold, entry: SavedEvent): ItemFold => {
 	switch (entry.type) {
 		case "machine-stepped":
 			return fold;
@@ -145,7 +126,7 @@ const stepItem = (fold: ItemFold, entry: Entry): ItemFold => {
 };
 
 /** An item's facts from its log alone: no model is asked and no effect runs. */
-export const foldItem = (events: readonly SavedEvent[]): ItemFold => entriesOf(events).reduce(stepItem, { fixRuns: 0, answers: {}, picks: {}, merged: false });
+export const foldItem = (events: readonly SavedEvent[]): ItemFold => events.reduce(stepItem, { fixRuns: 0, answers: {}, picks: {}, merged: false });
 
 /** Appends how the change that ends at `head` reaches done if it merges as landing found it, when the log last held otherwise. */
 export const keepLanding = (events: EventLog, { itemId, head, doneBy }: { readonly itemId: string; readonly head: string; readonly doneBy: DoneBy }): void => {
@@ -162,4 +143,3 @@ export const doneByOf = ({ merged, picks, landing }: ItemFold): DoneBy | undefin
 
 	return picks.plan?.pick.event === SPLIT ? "split" : landing?.doneBy;
 };
-

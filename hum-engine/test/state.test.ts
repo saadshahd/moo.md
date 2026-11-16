@@ -17,7 +17,7 @@ import {
 	writeStatus,
 } from "../src/index.ts";
 import { kindMachine } from "../src/index.ts";
-import { LOG_FORMAT } from "../src/state/events.ts";
+import { LOG_FORMAT, type NewEvent } from "../src/state/events.ts";
 import { slug } from "../src/state/fs.ts";
 import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -125,7 +125,7 @@ test("a snapshot from an older engine restores in place and saves under the newe
 	expect(JSON.parse(readFileSync(next.items.path("#68"), "utf8")).engineVersion).toBe("0.2.0");
 });
 
-const answered = (sourceId: string) => ({ source: "thread", sourceId, itemId: "#68", type: "answered", payload: {} });
+const answered = (sourceId: string): NewEvent => ({ source: "thread", sourceId, itemId: "#68", type: "answered", payload: {} });
 
 test("an older engine that meets a newer engine's snapshot and log gives one card however often it looks, keeps the files, and does not start the item over", async () => {
 	const newer = openState(dir, { engineVersion: "0.2.0", now: Date.now });
@@ -156,6 +156,20 @@ test("a log record in a format newer than the engine reads gives one card howeve
 
 	expect(() => state.events.list("#68")).toThrow(`format ${LOG_FORMAT + 1}`);
 	expect(state.faults.list().map((card) => card.code)).toEqual(["snapshot-from-newer-engine"]);
+});
+
+test("a log record this engine cannot read holds its item with one card however often the log is read, and another item's log reads", () => {
+	const state = openState(dir, { now: Date.now });
+	const unread = { format: LOG_FORMAT, source: "model", sourceId: "m1", itemId: "#68", machineVersion: "1", type: "model-answered", receivedAt: 1, seq: 1, payload: { run: "plan", attempt: 0, outcome: { kind: "finished" } } };
+
+	state.events.add(answered("a1"));
+	state.events.add({ ...answered("b1"), itemId: "#69" });
+	writeFileSync(join(dir, "events", slug("#68"), "unread.json"), JSON.stringify(unread));
+
+	for (let times = 0; times < 3; times++) expect(state.events.read("#68").ok).toBe(false);
+
+	expect(state.faults.list().map((card) => card.code)).toEqual(["snapshot-unreadable"]);
+	expect(state.events.list("#69").map(({ sourceId }) => sourceId)).toEqual(["b1"]);
 });
 
 test("a copied log keeps each record as its engine wrote it, at the next places in the log it joins, once", () => {
@@ -382,17 +396,15 @@ test("an op whose run returns a value that did not finish it stays started, and 
 });
 
 test("one event read twice is saved once, and the first copy stays", () => {
-
 	let tick = 0;
 	const { events } = openState(dir, { now: () => ++tick });
-	const answer = { source: "github-comment", sourceId: "4411", itemId: "#68", type: "answer", payload: { text: "yes" } };
 
-	const first = events.add(answer);
-	const second = events.add({ ...answer, payload: { text: "changed" } });
+	const first = events.add(answered("4411"));
+	const second = events.add(answered("4411"));
 
 	expect([first.added, second.added]).toEqual([true, false]);
-	expect(second.event.payload).toEqual({ text: "yes" });
-	events.add({ ...answer, sourceId: "4412", payload: { text: "later" } });
+	expect(second.event.receivedAt).toBe(first.event.receivedAt);
+	events.add(answered("4412"));
 	expect(events.list("#68").map((event) => event.sourceId)).toEqual(["4411", "4412"]);
 	expect(events.list("#none")).toEqual([]);
 });
@@ -400,9 +412,8 @@ test("one event read twice is saved once, and the first copy stays", () => {
 test("an item's events list in the order the log took them, on a clock that stands still, and a copy into another log keeps it", () => {
 	const { events } = openState(dir, { now: () => 5 });
 	const copy = openState(join(dir, "copy"), { now: () => 9 }).events;
-	const event = (sourceId: string) => ({ source: "machine", sourceId, itemId: "#68", type: "machine-stepped", payload: {} });
 
-	for (const sourceId of ["c", "a", "b"]) events.add(event(sourceId));
+	for (const sourceId of ["c", "a", "b"]) events.add(answered(sourceId));
 
 	for (const saved of events.list("#68")) copy.add(saved);
 
