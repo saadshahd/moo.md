@@ -318,14 +318,14 @@ test("the work job holds no GitHub token: it reads the repo alone, at the base g
 	expect(gather.outputs?.gathered).toBe(`\${{ steps.${humStep(gather)?.id}.outputs.gathered }}`);
 	expect(humStep(publish)?.env?.HUM_GATHERED).toBe("${{ needs.gather.outputs.gathered }}");
 
-	for (const job of [work, publish]) expect(job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with?.ref).toBe("${{ fromJSON(needs.gather.outputs.gathered).baseSha }}");
+	for (const job of [work, publish]) expect(actionStep(job, "checkout")?.with?.ref).toBe("${{ fromJSON(needs.gather.outputs.gathered).baseSha }}");
 });
 
 test("the checkout keeps no token in the workspace; the jobs that hold GitHub's token install hum from npm, none of the repo's packages and no plugin, and the work job installs its plugins after its packages", () => {
 	const { work } = wakeOf(settings).jobs;
 	const at = (steps: typeof work.steps, found: (typeof work.steps)[number] | undefined) => steps.findIndex((step) => step === found);
 
-	for (const { steps } of Object.values(wakeOf(settings).jobs)) expect(steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with).toMatchObject({ "fetch-depth": 0, "persist-credentials": false });
+	for (const job of Object.values(wakeOf(settings).jobs)) expect(actionStep(job, "checkout")?.with).toMatchObject({ "fetch-depth": 0, "persist-credentials": false });
 
 	for (const { steps } of tokenJobs(settings)) {
 		const [install = ""] = steps.find(({ run }) => run?.startsWith("npm install"))?.run?.split("\n") ?? [];

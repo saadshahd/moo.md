@@ -150,8 +150,7 @@ const gitSetup = ({ name, email }: HumConfig["commitIdentity"]) => ({
 	run: `git config --global user.name "$${ENV.gitName}"
 git config --global user.email "$${ENV.gitEmail}"
 git config --global credential.https://github.com.helper "$${ENV.gitCredentialHelper}"
-git config --global --add safe.directory "$GITHUB_WORKSPACE"
-`,
+${SAFE_CHECKOUT.run}`,
 	env: {
 		[ENV.gitName]: name,
 		[ENV.gitEmail]: email,
