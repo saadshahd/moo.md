@@ -6,7 +6,7 @@ import { type AnyActor, createActor, createAsyncLogic, waitFor } from "xstate";
 import { kindMachine, openState, persistedSnapshot, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
-import { answerOnce, doneByOf, foldItem, foldMachine, keepLanding, machineStarted, ownerAnswered, picked, recordMachine } from "../src/state/item-log.ts";
+import { answerOnce, doneByOf, foldItem, keepLanding, machineStarted, ownerAnswered, picked, recordMachine } from "../src/state/item-log.ts";
 import { finished } from "./fixtures/answers.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -86,19 +86,17 @@ const pass = async (state: State, script: Script, answer?: string): Promise<void
 
 const folded = (state: State) => foldItem(state.events.list(ITEM));
 
-/** Where the fold leaves the machine, and the fix runs it counts: plain values, so a failure prints them and not the machine. */
-const progress = (state: State) => ({ at: foldMachine(feature, state.events.list(ITEM)).value, fixRuns: folded(state).fixRuns });
+/** Where the item's saved snapshot stands, and the fix runs its log counts. */
+const progress = (state: State) => ({ at: state.items.saved().find(({ itemId }) => itemId === ITEM)?.state, fixRuns: folded(state).fixRuns });
 
-test("the item's log folds to the state its saved snapshot holds after each pass, one restored from a wait among them", async () => {
+test("the log keeps each event the item's machine takes, under its kind's machine version, and none of the actor's own start or stop", async () => {
 	const state = openState(dir, { now: Date.now });
 
 	await pass(state, { plan: ["plan-ready"], build: ["token-cap"] });
-	expect(progress(state).at).toBe("asking");
-	expect(state.items.saved().map(({ state: at }) => at)).toEqual(["asking"]);
 
-	await pass(state, { build: ["done"], checks: ["fail", "pass"], fix: ["done"], review: ["needs-owner"] }, "answered");
-	expect(progress(state).at).toBe("owner-review");
-	expect(state.items.saved().map(({ state: at }) => at)).toEqual(["owner-review"]);
+	expect(state.events.list(ITEM).filter(({ type }) => type === "machine")).toEqual(
+		["plan-ready", "token-cap"].map((type) => expect.objectContaining({ machineVersion: VERSION, payload: { event: expect.objectContaining({ type }) } })),
+	);
 });
 
 test("fix runs count from the owner's last answer, over passes that start the machine over and a pass that resumes a wait", async () => {

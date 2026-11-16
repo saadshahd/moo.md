@@ -17,7 +17,7 @@ import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
 import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
 import { Holder, ItemId } from "../../src/adapter-api.ts";
-import { doneByOf, foldItem, foldMachine } from "../../src/state/item-log.ts";
+import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import { openState } from "../../src/state/open.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
@@ -31,16 +31,12 @@ const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
 
 const NOTE = { write: { "docs/note.md": "hello\n" } };
 
-/** The item's log as saved, its machine folded under the kind hum gave the item: no model is asked and no actor starts. */
+/** What the item's log as saved folds to: no model is asked and no actor starts. */
 const folded = (w: Awaited<ReturnType<typeof world>>, id: string) => {
-	const events = w.state.events.list(id);
-	const fold = foldItem(events);
+	const fold = foldItem(w.state.events.list(id));
 
-	return { at: foldMachine(w.config.kinds[w.state.itemKinds.get(id)?.kind ?? ""]!, events).value, fixRuns: fold.fixRuns, doneBy: doneByOf(fold), picks: fold.picks };
+	return { fixRuns: fold.fixRuns, doneBy: doneByOf(fold), picks: fold.picks };
 };
-
-/** Where the item's saved snapshot stands. */
-const savedAt = (w: Awaited<ReturnType<typeof world>>, id: string) => w.state.items.saved().find(({ itemId }) => itemId === id)?.state;
 
 /** A file a shim run writes its stdin to, in a temp folder of its own. */
 const stdinFile = (): string => join(tempDir("stdin"), "stdin");
@@ -257,7 +253,7 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 
 	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
-	expect(folded(w, id)).toMatchObject({ at: "stuck", fixRuns: 2 });
+	expect(folded(w, id).fixRuns).toBe(2);
 
 	// Stuck stays stuck, though the item file still says ready: no run, no claim.
 	w.clock.at += TTL + 1;
@@ -376,7 +372,6 @@ test("a run that needs the owner pushes its branch, asks, and ends; the answer s
 	const asked = await runThinPath(w.thinPath());
 
 	expect(asked).toEqual({ outcome: "asked", item: id, detail: "Which title?" });
-	expect(folded(w, id).at).toBe(savedAt(w, id));
 	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/part-one.md`])).toBe("one\n");
 
 	const thread = (await w.adapter.workSource!.read(id)).thread;
@@ -705,7 +700,6 @@ test("a review that leaves the change to the owner asks, and the owner's approva
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "asked", item: id, detail: "Is the tone right?" });
-	expect(folded(w, id).at).toBe(savedAt(w, id));
 
 	await w.adapter.answers!.answer(id, { text: "yes", option: "approve" });
 

@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { type AnyEventObject, type AnyMachineSnapshot, type AnyStateMachine, type InspectionEvent, initialTransition, transition } from "xstate";
+import type { InspectionEvent } from "xstate";
 import { z } from "zod";
 import { isPaused, type RunOutcome } from "../adapters/claude-p.ts";
 import { hashJson } from "../config/hash.ts";
 import { asJson, type Json } from "../config/json.ts";
-import { kindMachine } from "../config/machine.ts";
-import type { Kind, PURPOSES } from "../config/schema.ts";
+import type { PURPOSES } from "../config/schema.ts";
 import { DONE_BY, type DoneBy } from "../decide/merge.ts";
 import { EventPick, SPLIT } from "../decide/prose.ts";
 import type { EventLog, NewEvent, SavedEvent } from "./events.ts";
@@ -144,42 +143,6 @@ const stepItem = (fold: ItemFold, entry: Entry): ItemFold => {
 
 /** An item's facts from its log alone: no model is asked and no effect runs. */
 export const foldItem = (events: readonly SavedEvent[]): ItemFold => entriesOf(events).reduce(stepItem, { fixRuns: 0, answers: {}, picks: {}, merged: false });
-
-/** An invoked actor's done or error event: it names the child it came from. */
-const ChildEvent = z.looseObject({ actorId: z.string() });
-
-/**
- * The event as the fold's machine takes it. An invoked actor's done or error event names its child by id and by the
- * live run's session, which every process mints afresh; the fold's own child under that id stands in for it.
- */
-const asFolded = (snapshot: AnyMachineSnapshot, event: AnyEventObject): AnyEventObject => {
-	const from = ChildEvent.safeParse(event).data?.actorId;
-	const child: { readonly sessionId?: string } | undefined = from === undefined ? undefined : snapshot.children[from];
-
-	return child ? { ...event, sessionId: child.sessionId } : event;
-};
-
-const initialOf = (logic: AnyStateMachine): AnyMachineSnapshot => initialTransition(logic)[0];
-
-const stepMachine =
-	(logic: AnyStateMachine) =>
-	(snapshot: AnyMachineSnapshot, entry: Entry): AnyMachineSnapshot => {
-		switch (entry.type) {
-			case "machine":
-				return transition(logic, snapshot, asFolded(snapshot, entry.payload.event))[0];
-			case "machine-started":
-				return initialOf(logic);
-			default:
-				return snapshot;
-		}
-	};
-
-/** The item's machine as the events its log took leave it, from the kind's initial state: no source runs. */
-export const foldMachine = (kind: Kind, events: readonly SavedEvent[]): AnyMachineSnapshot => {
-	const logic = kindMachine(kind);
-
-	return entriesOf(events).reduce(stepMachine(logic), initialOf(logic));
-};
 
 /** Appends how the change that ends at `head` reaches done if it merges as landing found it, when the log last held otherwise. */
 export const keepLanding = (events: EventLog, itemId: string, head: string, doneBy: DoneBy): void => {
