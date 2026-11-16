@@ -692,6 +692,7 @@ describe("a reply that ends on ideas", () => {
     on("ui.invalidate", () => ({ value: undefined }));
     on("ui.toast", () => ({ value: undefined }));
     on("model.complete", () => ({ value: { isAnswered: true, text: shortForm, usage: {} } }) as any);
+    on("model.classify", () => ({ value: "kept" }));
     const host: string[] = [];
     on("ui.render", (_: any, e: any) => {
       host.push(e.props.text);
@@ -822,25 +823,20 @@ describe("the redraw's passes", () => {
   });
 
   const REPLY = "a".repeat(300);
-  const pass = (chars: number, found: Partial<Pass> = {}): Pass => ({ text: "a".repeat(chars), capped: false, lost: [], missing: [], ...found });
+  const pass = (chars: number, found: Partial<Pass> = {}): Pass => ({ text: "a".repeat(chars), capped: false, lost: [], dropsPoint: false, ...found });
   test("a pass that keeps all and saves some is cut again, until the last pass shows", () => {
     const passes = Array.from({ length: MAX_PASSES - 1 }, (_, i) => pass(200 - 50 * i));
     const last = pass(200 - 50 * MAX_PASSES);
-    expect(nextStep(REPLY, [], pass(200), false)).toEqual({ kind: "cut" });
-    expect(nextStep(REPLY, passes, last, false)).toEqual({ kind: "show", pass: last });
+    expect(nextStep(REPLY, [], pass(200))).toEqual({ kind: "cut" });
+    expect(nextStep(REPLY, passes, last)).toEqual({ kind: "show", pass: last });
   });
-  test("a pass that loses a token, is cut off at its cap, or saves nothing backs off to the pass before", () => {
+  test("a pass that loses a token or a point, is cut off at its cap, or saves nothing backs off to the pass before", () => {
     const first = pass(200);
-    for (const failed of [pass(100, { lost: ["80"] }), pass(100, { capped: true }), pass(200)])
-      expect(nextStep(REPLY, [first], failed, false)).toEqual({ kind: "show", pass: first });
+    for (const failed of [pass(100, { lost: ["80"] }), pass(100, { dropsPoint: true }), pass(100, { capped: true }), pass(200)])
+      expect(nextStep(REPLY, [first], failed)).toEqual({ kind: "show", pass: first });
   });
   test("a first pass that fails keeps the reply long, naming its fault", () => {
-    expect(nextStep(REPLY, [], pass(100, { lost: ["Fowler", "80"] }), false)).toEqual({ kind: "long", why: "lost a token" });
-  });
-  test("an item the label calls missing backs a pass off only while the label gates", () => {
-    const left = pass(200, { missing: ["the ask"] });
-    expect(nextStep(REPLY, [], left, false)).toEqual({ kind: "cut" });
-    expect(nextStep(REPLY, [], left, true)).toEqual({ kind: "long", why: "left an item out" });
+    expect(nextStep(REPLY, [], pass(100, { lost: ["Fowler", "80"] }))).toEqual({ kind: "long", why: "lost a token" });
   });
 });
 
@@ -850,19 +846,18 @@ describe("a redraw whose second pass drops a number", () => {
   const KEEPS_NUMBER = "80 tests pass and the build is clean. Ship now, or wait for review?";
   const DROPS_NUMBER = "Tests pass. Ship now, or wait?";
   const setup = ($: any, on: any) => {
-    const store = cappedStore(on, MiB);
+    cappedStore(on, MiB);
     const clock = mock.clock(on);
     on("session.id", () => ({ value: "s1" }));
     on("session.surfaces", () => ({ value: ["terminal"] }));
     on("session.messages", () => ({ value: [{ role: "user", text: "status?", toolUses: [] }, said(LONG)] }));
     on("ui.invalidate", () => ({ value: undefined }));
-    const toasts: string[] = [];
-    on("ui.toast", (_: any, e: any) => (toasts.push(e.text), { value: undefined }));
+    on("ui.toast", () => ({ value: undefined }));
     on("model.complete", (_: any, e: any) => {
       const text = e.prompt.startsWith("List") ? COVER : e.prompt.includes(LONG) ? KEEPS_NUMBER : DROPS_NUMBER;
       return { value: { isAnswered: true, text, usage: {} } } as any;
     });
-    on("model.classify", () => ({ value: "missing" }));
+    on("model.classify", () => ({ value: "kept" }));
     let shown = "";
     on("ui.render", (_: any, e: any) => {
       shown = e.props.text;
@@ -873,17 +868,12 @@ describe("a redraw whose second pass drops a number", () => {
       await $.turn.complete({ answer: LONG, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
       await clock.settle();
       await (await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: LONG } as any })).drawn();
-      return { shown, toasts, store };
+      return { shown };
     };
     return { redrawn };
   };
   test("shows the first pass, the last that kept every number", async ($, on) => {
     expect((await setup($, on).redrawn()).shown).toBe(KEEPS_NUMBER);
-  });
-  test("a label below its bar keeps what it calls missing beside the short form, and shows nothing", async ($, on) => {
-    const { toasts, store } = await setup($, on).redrawn();
-    expect(store.get("tend:s1:flagged")).toEqual({ [textKey(LONG)]: ["80 tests pass", "ship now or wait for review"] });
-    expect(toasts).toEqual([]);
   });
 });
 
@@ -903,6 +893,7 @@ test("a long reply is redrawn short once its turn ends, and /long shows it whole
     asks.push(e.prompt);
     return { value: { isAnswered: true, text: "No tool checks sung words yet. Which chain do I build?", usage: {} } } as any;
   });
+  on("model.classify", () => ({ value: "kept" }));
   let shown = "";
   on("ui.render", (_, e) => {
     shown = (e.props as any).text;
@@ -935,6 +926,7 @@ test("a short form that fills its token cap is dropped, and the reply stays long
     return { value: undefined };
   });
   on("model.complete", () => ({ value: { isAnswered: true, text: "No tool checks sung words yet. | 40", usage: { output_tokens: SHORT_CAP } } }) as any);
+  on("model.classify", () => ({ value: "kept" }));
   let shown = "";
   on("ui.render", (_, e) => {
     shown = (e.props as any).text;
@@ -966,6 +958,7 @@ test("a short form that drops an idea is dropped, and the reply stays long", asy
     return { value: undefined };
   });
   on("model.complete", () => ({ value: { isAnswered: true, text: CONSULT_TAKE_SHORT, usage: {} } }) as any);
+  on("model.classify", () => ({ value: "kept" }));
   const host: string[] = [];
   on("ui.render", (_, e) => {
     host.push((e.props as any).text);
@@ -993,6 +986,7 @@ test("a short form no shorter than the reply is dropped, and the reply shows as 
   });
   const reworded = WALL.replace("The last research agent is back.", "The final research agent has come back.");
   on("model.complete", () => ({ value: { isAnswered: true, text: reworded, usage: {} } }) as any);
+  on("model.classify", () => ({ value: "kept" }));
   let shown = "";
   on("ui.render", (_, e) => {
     shown = (e.props as any).text;
@@ -1006,6 +1000,35 @@ test("a short form no shorter than the reply is dropped, and the reply shows as 
   await reply.drawn();
   expect(shown).toBe(WALL);
 });
+
+// WALL's short form keeps every number, `code` span and link, so only the check on its points can drop it.
+for (const [label, says, failures] of [
+  ["lost", "a short form the check says lost a point is dropped, and the reply stays long", 0],
+  [undefined, "a check that names no label shows its failure once, and the reply stays long", 1],
+] as const)
+  test(says, async ($, on) => {
+    mock.store(on);
+    const clock = mock.clock(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
+    on("session.messages", () => ({ value: [{ role: "user", text: "we need to research avalable tools", toolUses: [] }, said(WALL)] }));
+    on("ui.invalidate", () => ({ value: undefined }));
+    const toasts: unknown[] = [];
+    on("ui.toast", (_, e) => (toasts.push(e), { value: undefined }));
+    on("model.complete", () => ({ value: { isAnswered: true, text: "No tool checks sung words yet. Which chain do I build?", usage: {} } }) as any);
+    on("model.classify", () => ({ value: label }) as any);
+    let shown = "";
+    on("ui.render", (_, e) => {
+      shown = (e.props as any).text;
+      return { type: "Box", props: {} } as any;
+    });
+    on("turn.complete", (_, e) => ({ text: e.answer }));
+    await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+    await clock.settle();
+    expect(toasts).toHaveLength(failures);
+    await (await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any })).drawn();
+    expect(shown).toContain("Three chains are worth building");
+  });
 
 test("a prompt carries to Claude the band's questions it answers, numbered after Claude's own; the rest stay out", async () => {
   const unheard = [{ q: "Keep A?", options: ["keep", "drop"] }, { q: "Keep B?", options: ["keep", "drop"] }];

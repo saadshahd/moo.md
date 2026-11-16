@@ -8,9 +8,9 @@
  *
  * A case is one JSON line: {"id", "cut": whether readers found the short form dropped something the
  * user needed, "answer": the reply as sent, card and all, "long": the reply tend redrew, "short": the
- * short form it showed}. A label run lists each long reply's cover items, labels each against its short
- * form, and runs the code check; a redraw run runs the whole redraw on each long reply. Runs add to
- * --out, so `--runs 0` rescores the runs there without a model call.
+ * short form it showed}. A label run reads each long reply against its short form with the label and
+ * the code check; a redraw run runs the whole redraw on each long reply. Runs add to --out, so
+ * `--runs 0` rescores the runs there without a model call.
  */
 import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -57,11 +57,10 @@ const runsAsked = (mode: Mode) => {
 // The command runs each case with tend's own cover, label, code check and redraw, a few at once.
 const EVAL_MODULE = `import type { Register } from "claude-code";
 import { register as hunch } from "./index.tsx";
-import { cover, expertsNamed, labelShown, lostTokens, missingItems, prose, redraw } from "./tend.tsx";
+import { expertsNamed, losesPoint, lostTokens, prose, redraw } from "./tend.tsx";
 const AT_ONCE = 8;
 async function labelOne($: any, c: any) {
-    const items = await cover($, c.long);
-    return { items, missing: await missingItems($, items, c.short), lost: lostTokens(c.long, c.short, expertsNamed(c.answer)) };
+    return { dropsPoint: await losesPoint($, c.long, c.short), lost: lostTokens(c.long, c.short, expertsNamed(c.answer)) };
 }
 async function redrawOne($: any, c: any) {
     const from = Date.now();
@@ -77,7 +76,6 @@ async function redrawOne($: any, c: any) {
       items,
       shown,
       chars: [prose(c.long).length, prose(shown ?? c.long).length],
-      flagged: await labelShown($, items, step),
     };
 }
 export const register: Register = (on, options) => {
@@ -131,9 +129,9 @@ function score(calls: { id: string; cut: boolean }[]) {
 
 /** What each check calls a cut, from one case's label run. */
 const CHECKS: Record<string, (c: any) => boolean> = {
-  "model label": (c) => c.missing.length > 0,
+  "model label": (c) => c.dropsPoint,
   "code check": (c) => c.lost.length > 0,
-  either: (c) => c.missing.length > 0 || c.lost.length > 0,
+  either: (c) => c.dropsPoint || c.lost.length > 0,
 };
 
 const labelRuns = runFiles("label").map(read);
@@ -162,7 +160,7 @@ if (redraws.length) {
   const atPass = [1, 2, 3].map((n) => shown.filter((c) => c.shownAt === n).length);
   const cut = shown.map((c) => 1 - c.chars[1] / c.chars[0]);
   console.log(`
-| date | redraws | shown short | long: lost a token | long: cut off | long: saved nothing | failed | shown at pass 1, 2, 3 | prose cut, median | seconds, median | label flags |
+| date | redraws | shown short | long: lost a token | long: lost a point | long: cut off | long: saved nothing | failed | shown at pass 1, 2, 3 | prose cut, median | seconds, median |
 |---|---|---|---|---|---|---|---|---|---|---|
-| ${today} | ${redraws.length} | ${shown.length} | ${longFor("lost a token")} | ${longFor("cut off")} | ${longFor("saved nothing")} | ${redraws.filter((c) => c.error).length} | ${atPass.join(", ")} | ${(median(cut) * 100).toFixed(0)}% | ${(median(redraws.filter((c) => c.ms).map((c) => c.ms)) / 1000).toFixed(0)} | ${shown.filter((c) => c.flagged.length).length} |`);
+| ${today} | ${redraws.length} | ${shown.length} | ${longFor("lost a token")} | ${longFor("lost a point")} | ${longFor("cut off")} | ${longFor("saved nothing")} | ${redraws.filter((c) => c.error).length} | ${atPass.join(", ")} | ${(median(cut) * 100).toFixed(0)}% | ${(median(redraws.filter((c) => c.ms).map((c) => c.ms)) / 1000).toFixed(0)} |`);
 }

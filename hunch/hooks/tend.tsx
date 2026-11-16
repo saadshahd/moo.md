@@ -177,31 +177,54 @@ export function lostTokens(
   ];
 }
 
-const COVER_LABELS = ["covered", "missing"] as const;
-/** The model the label was measured on; a change of model is a new measurement. */
-const LABEL_MODEL = "haiku";
+// What a short form keeps beyond its numbers, `code` and links, and what it may cut, in the words the label was measured on.
+const ACTED_ON =
+  "a decision the reply asks of the user, the reason behind a verdict, pick or recommendation, an option with why it won or lost, or the next step";
+const NOT_ACTED_ON =
+  "file paths, notices of what was saved, counts, how the agent worked, and context the user gave";
+const POINT_LABELS = ["kept", "lost"] as const;
+/** The model the label was measured on; a change of model or wording is a new measurement. */
+const LABEL_MODEL = "sonnet";
 
-/** What the label reads: a short form, and one item it must cover. */
-function labelText(item: string, short: string): string {
-  return `A short reply an agent sent to a user, and one item it must cover.
-<reply>
+/** What the label reads: the long reply, a short form of it, and what each label means. */
+function labelText(reply: string, short: string): string {
+  return `A long reply an agent sent to a user, and the short form the user saw in its place.
+<long>
+${reply}
+</long>
+<short>
 ${short}
-</reply>
-<item>${item}</item>
+</short>
 
-covered: the reply says what the item says, in any words.
-missing: the reply leaves the item out, or says less than it.`;
+lost: the short form drops, or says less than, a point of the long reply the user would act on: ${ACTED_ON}.
+kept: every such point is in the short form, in any words. Detail the user would not act on may go: ${NOT_ACTED_ON}.`;
+}
+
+/** Whether `short` drops a point of `reply` the user would act on. A label the model never names fails the redraw. */
+export async function losesPoint(
+  $: any,
+  reply: string,
+  short: string,
+): Promise<boolean> {
+  const label = await $.model.classify(labelText(reply, short), POINT_LABELS, {
+    model: LABEL_MODEL,
+  });
+  if (!label)
+    throw new Error(
+      "the short reply's check named no label, so the reply stays long",
+    );
+  return label === "lost";
 }
 
 /** A redraw cuts at most this many times; each pass rewrites the one before it. */
 export const MAX_PASSES = 3;
 
-/** One rewrite and what its checks found; `missing` stays empty unless the label read it. */
+/** One rewrite and what its checks found. */
 export type Pass = {
   text: string;
   capped: boolean;
   lost: string[];
-  missing: string[];
+  dropsPoint: boolean;
 };
 
 /** What a redraw does after a pass: cut again, show a pass, or keep the reply long, for the fault named. */
@@ -216,18 +239,15 @@ type End = Exclude<Step, { kind: "cut" }>;
  * the agent's words for Haiku's. */
 const FAULTS: {
   why: string;
-  holds: (p: Pass, before: string, labelGates: boolean) => boolean;
+  holds: (p: Pass, before: string) => boolean;
 }[] = [
   { why: "cut off", holds: (p) => p.capped },
   { why: "lost a token", holds: (p) => p.lost.length > 0 },
   {
-    why: "left an item out",
-    holds: (p, _, labelGates) => labelGates && p.missing.length > 0,
-  },
-  {
     why: "saved nothing",
     holds: (p, before) => prose(p.text).length >= prose(before).length,
   },
+  { why: "lost a point", holds: (p) => p.dropsPoint },
 ];
 
 /** After the latest pass, given the passes before it, each of which kept all: cut once more, or end on
@@ -236,12 +256,9 @@ export function nextStep(
   reply: string,
   kept: Pass[],
   latest: Pass,
-  labelGates: boolean,
 ): Step {
   const previous = kept.at(-1);
-  const fault = FAULTS.find((f) =>
-    f.holds(latest, previous?.text ?? reply, labelGates),
-  );
+  const fault = FAULTS.find((f) => f.holds(latest, previous?.text ?? reply));
   if (!fault)
     return kept.length + 1 < MAX_PASSES
       ? { kind: "cut" }
@@ -635,8 +652,6 @@ let lastStem = "";
 const typedFrom = new Map<string, number>();
 // Each long reply's short form, by textKey of the long one; `/long` shows the long ones again.
 const short = new Map<string, string>();
-// What the label called missing in each short form, by the same key: kept for a later measure, never shown.
-const flagged = new Map<string, string[]>();
 let showLong = false;
 // The store keeps the latest short forms only: a session's replies would outgrow its share.
 const KEPT_SHORT = 40;
@@ -669,10 +684,6 @@ async function registerCommands($: any) {
 // so the cap sits far above thinking and text together.
 export const SHORT_CAP = 16_000;
 
-/** Whether the covered/missing label decides which pass shows. It gates only once its rate on real
- * redraws meets its bar (skills/short-replies/HYPOTHESIS.md); below the bar it only reports. */
-const LABEL_GATES = false;
-
 /** One Haiku call; one that gets no answer fails the redraw. */
 async function haiku($: any, prompt: string) {
   const r = await $.model.complete({
@@ -683,22 +694,6 @@ async function haiku($: any, prompt: string) {
   });
   if (!r.isAnswered) throw new Error(`the short reply failed: ${r.reason}`);
   return r;
-}
-
-/** The items the label calls anything but covered in `text`. */
-export async function missingItems(
-  $: any,
-  items: string[],
-  text: string,
-): Promise<string[]> {
-  const labels = await Promise.all(
-    items.map((i) =>
-      $.model.classify(labelText(i, text), COVER_LABELS, {
-        model: LABEL_MODEL,
-      }),
-    ),
-  );
-  return items.filter((_, k) => labels[k] !== "covered");
 }
 
 /** What a reply must still say once short, as a list of items. */
@@ -726,42 +721,29 @@ export async function redraw(
       $,
       shortAsk(kept.at(-1)?.text ?? reply, items, asWritten),
     );
+    const text = r.text.trim();
     const latest: Pass = {
-      text: r.text.trim(),
+      text,
       capped: r.usage.output_tokens >= SHORT_CAP,
-      lost: lostTokens(reply, r.text, names),
-      missing: LABEL_GATES ? await missingItems($, items, r.text) : [],
+      lost: lostTokens(reply, text, names),
+      dropsPoint: await losesPoint($, reply, text),
     };
-    const step = nextStep(reply, kept, latest, LABEL_GATES);
+    const step = nextStep(reply, kept, latest);
     if (step.kind !== "cut") return { items, passes: [...kept, latest], step };
     kept.push(latest);
   }
 }
 
-/** What the label calls missing in the pass a redraw shows. Below its bar it reads that pass alone,
- * for the record. */
-export async function labelShown(
-  $: any,
-  items: string[],
-  step: End,
-): Promise<string[]> {
-  if (step.kind !== "show") return [];
-  return LABEL_GATES ? step.pass.missing : missingItems($, items, step.pass.text);
-}
-
 /** Redraws a long reply short once the turn ends: its long form already showed while it streamed.
- * A reply no pass could shorten whole just stays long. What the label calls missing is kept, unshown,
- * beside the short form, for a later measure. */
+ * A reply no pass could shorten whole just stays long. */
 async function shorten($: any, reply: string, names: string[]) {
-  const { items, step } = await redraw($, reply, names);
+  const { step } = await redraw($, reply, names);
   if (step.kind === "long") return;
   const key = textKey(reply);
   const id = await sid($);
   short.set(key, step.pass.text);
   await save($, `tend:${id}:short`, newest(short));
   $.ui.invalidate("ui.render");
-  flagged.set(key, await labelShown($, items, step));
-  await save($, `tend:${id}:flagged`, newest(flagged));
 }
 
 async function readSession($: any) {
@@ -807,7 +789,6 @@ function refill<V>(m: Map<string, V>, saved: unknown) {
 async function load($: any, id: string) {
   const get = (k: string) => $.store.get(`tend:${id}:${k}`);
   refill(short, await get("short"));
-  refill(flagged, await get("flagged"));
   open = (await get("open")) as Question[] | undefined;
   unheard = ((await get("unheard")) as Question[] | undefined) ?? [];
   $.ui.invalidate("ui.render");
@@ -982,7 +963,6 @@ function reset() {
   lastPaneItem = null;
   typedFrom.clear();
   short.clear();
-  flagged.clear();
   lastStem = "";
 }
 

@@ -1,12 +1,12 @@
-With tend on, a reply with more prose than two 80-column lines is redrawn short once its turn ends. Haiku lists what the reply must keep (each decision it asks, result, option with why it won or lost, and next action), then rewrites the reply from that list, one fact per sentence or row, and cuts it again, up to 3 passes. A pass shows only if it keeps every number, `code` span and link of the reply, and every expert it names; commit hashes, ids and dates never count, so a short form may always cut them, while the long reply keeps them for Claude and `/long` shows them. The last pass that kept all shows, and when the first did not, the reply stays long. `/long` shows replies at full length again; a prompt that says "explain" or "walk me through" keeps its reply long.
+With tend on, a reply with more prose than two 80-column lines is redrawn short once its turn ends. Haiku lists what the reply must keep (each decision it asks, result, option with why it won or lost, and next action), then rewrites the reply from that list, one fact per sentence or row, and cuts it again, up to 3 passes. A pass shows only if it keeps every number, `code` span and link of the reply, and every expert it names, and a Sonnet label finds no point it lost that the user would act on; commit hashes, ids and dates never count, so a short form may always cut them, while the long reply keeps them for Claude and `/long` shows them. The last pass that kept all shows, and when the first did not, the reply stays long. `/long` shows replies at full length again; a prompt that says "explain" or "walk me through" keeps its reply long.
 
 Graduate when it stays on for 10 real sessions, the user runs `/long` in at most two of them, and never calls a short reply a wall of text. Kill if the user turns it off, runs `/long` to recover a fact the short reply cut, or a later turn leans on text only the long reply held.
 
 ## The label's bar
 
-A Haiku label also reads each listed item against the short form: covered or missing. It has a rate, not a guarantee. Its bar is 0.8, as hum's `minJudgeRate`, on each class: cuts the readers found that it catches, and redraws they passed that it leaves alone. Below the bar it decides nothing and shows nothing: what it calls missing in the shown pass is kept in tend's store beside the short form, for a later measure. A reply no pass could shorten whole just stays long, with no toast; only a model call that fails shows, once. On #93 the user ruled that a check audits silently rather than add output.
+A Sonnet label reads each pass against the long reply: kept, or lost a point the user would act on, which is a decision asked of them, the reason behind a verdict or pick, an option with why it won or lost, or the next step. File paths, notices of what was saved, counts and how the agent worked may go. It has a rate, not a guarantee. Its bar is 0.8, as hum's `minJudgeRate`, on each class: cuts the readers found that it catches, and redraws they passed that it leaves alone. It met the bar on 2026-11-16, so it gates: a pass it calls lost backs off to the pass before, and a reply whose first pass it calls lost stays long, with no toast. Only a model call that fails shows, once. On #93 the user ruled that a check audits silently rather than add output.
 
-Re-measure with `bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <folder> --runs 3 --redraws 1`. It runs tend's own code in a headless session and keeps each run's raw output, so `--runs 0` rescores them.
+Re-measure with `bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <folder> --runs 3 --redraws 1`. It runs tend's own code in a headless session and keeps each run's raw output, so `--runs 0` rescores them. A change to the label's model or words is a new measurement.
 
 ## Field notes
 
@@ -60,3 +60,34 @@ Re-measure with `bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <fol
 - 7 of the 8 that stayed long for a lost token lost one to three numbers; one lost a file path in `code`.
 - The old single rewrite cut a median 13% of these replies' prose, in one Haiku call. The new one cuts 35% and takes about 17 seconds, so the short form replaces the long one later.
 - Not measured yet: whether the new short forms drop what the user needs. No reader has read them; the label's flags, kept beside each live short form, are where a later count starts.
+
+### 2026-11-16 — the label asks whether a point the user acts on was lost, and gates
+
+- The user, after #95: two of the five cuts lost a reason or an idea with no number, `code` or link in it. 12 labels were scored on the same 94 cases, 3 runs each, raw output kept beside the cases:
+
+| label | cut caught | kept left alone | calls per read | seconds per read, median |
+|---|---|---|---|---|
+| each cover item, Haiku (0.21.0) | 15/15 | 124/267 (0.46) | 8.5 | 5.8 |
+| each cover item, Sonnet | 15/15 | 152/267 (0.57) | 8.8 | 6.5 |
+| each cover item, two Haiku reads agree | 15/15 | 134/267 (0.50) | 16.5 | 6.1 |
+| cover list of what the user acts on, Haiku | 14/15 | 161/267 (0.60) | 6.1 | 5.0 |
+| the same list, Sonnet | 15/15 | 195/267 (0.73) | 6.2 | 5.1 |
+| the same list, two Sonnet reads agree | 14/15 | 200/267 (0.75) | 11.5 | 5.5 |
+| lost a point the user acts on, Haiku | 14/15 | 210/267 (0.79) | 1 | 1.9 |
+| the same, two Haiku reads agree | 13/15 | 227/267 (0.85) | 2 | 2.1 |
+| **the same, Sonnet** | **15/15** | **232/267 (0.87)** | **1** | **2.4** |
+| the same, two Sonnet reads agree | 15/15 | 234/267 (0.88) | 2 | 2.5 |
+| quote each lost point, Haiku | 15/15 | 146/267 (0.55) | 1 | 3.3 |
+| quote each lost point, Sonnet | 15/15 | 204/267 (0.76) | 1 | 3.1 |
+
+- Changing the question did most: asking whether the short form lost a point the user acts on, against the long reply, beat checking every cover item. Narrowing the cover list helped less, Sonnet more, and a second read little. Sonnet read once is the cheapest label over the bar, so it gates. Through tend's own code it then scored 15/15 and 230/267 (0.86), each run at least 0.85.
+- How far 5 cuts go: catching 5 of 5 says the label's rate on unseen cuts is likely above 0.55, not that it is above 0.8; two of the 5 are one bug. On the 89 passed redraws, 77 of 89 puts the rate between 0.78 and 0.92. Both classes rest on the readers' verdicts, and the earlier flags showed the readers did not count every drop.
+- What the gate costs, on one fresh redraw run of the 94 long replies:
+
+| version | shown short | long: lost a point | long: lost a token | long: saved nothing | seconds, median |
+|---|---|---|---|---|---|
+| 0.21.0 | 83 | — | 8 | 3 | 17 |
+| 0.22.0 | 69 | 13 | 7 | 5 | 23 |
+
+- The label alone kept 11 to 13 of about 83 short forms long in 4 runs: this run, and 3 label runs on the passes of 0.21.0's run. No reader has judged these new short forms, so whether the 13 lost what the user needs is not measured yet.
+- Each pass adds one Sonnet call of about 800 tokens in and one word out.
