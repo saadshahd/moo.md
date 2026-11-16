@@ -31,5 +31,5 @@ A plugin may define its own beliefs, principles, and constraints serving the mis
 - **hope** — Thinking discipline: intent clarification, approach shaping, expert consultation, guarded delegation, ownership retrieval. See `hope/PHILOSOPHY.md`.
 - **hold** — Comprehension at the human's pace: grasp a change, drive a behavior, land one thing in an audience, until they can say how it works with the agent out of the room. See `hold/PHILOSOPHY.md`.
 - **hunch** — Experimental staging ground. Cheap to enter, honest to exit: every experiment graduates or dies. See `hunch/PHILOSOPHY.md`.
-- **sound** — Code taste as installable rules: a corpus selected against a repo's real surfaces, delivered as user-owned reference files.
+- **sound** — Code taste as installable rules, and tools found live: a corpus selected against a repo's real surfaces, delivered as user-owned reference files; and the current best tool for a need, named only when an agent can run it end to end and its author passes a check.
 - **hum** — Unwatched work the human still decides: work items become Claude Code runs on the human's Mac or in CI, the repo's own checks decide what they can, a path's risk level decides who reviews, and only what nothing settles becomes a question, with each choice made alone listed and undoable.

@@ -35,7 +35,7 @@ claude plugin update hunch@moo.md
 
 Then it sets `"outputStyle": "hold:Plain"` in `~/.claude/settings.json` and keeps every other key.
 
-`hope` is the decision loop, and the reason to be here. `hold` is comprehension at your own pace, and its `hold:Plain` output style keeps replies short. `hunch` is experiments that graduate or die. One more layer ships from the same marketplace: `sound@moo.md`, code taste as installable rules.
+`hope` is the decision loop, and the reason to be here. `hold` is comprehension at your own pace, and its `hold:Plain` output style keeps replies short. `hunch` is experiments that graduate or die. One more layer ships from the same marketplace: `sound@moo.md`, code taste as installable rules, and the current best tool for a need.
 
 </details>
 

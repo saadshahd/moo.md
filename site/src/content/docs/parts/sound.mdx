@@ -1,7 +1,7 @@
 ---
 title: sound
-move: code taste as installable rules
-description: "Your repo gets only the code rules its own code calls for, as files you own."
+move: installable code taste, and tools for hand steps
+description: "Your repo gets only the code rules its own code calls for, as files you own, and a tool for each step you still do by hand."
 tableOfContents: false
 ---
 import Copy from "../../../components/Copy.astro";
@@ -16,8 +16,12 @@ sound reads your repo's stack and proposes only the rules your code shows a surf
 | `/sound:setup` | reads your stack, proposes rules with their evidence, installs the ones you confirm |
 | `/sound:prime` | has Claude read the rules for the code it is about to change |
 | `/sound:review` | checks a staged diff or a commit range against your rules |
+| `/sound:find` | names up to three tools for one need, each checked against sources fetched that run; Claude also runs it when it is about to pick a tool |
+| `/sound:stack` | lists the steps you still do by hand, finds a tool for each, and writes the picks into `CLAUDE.md` under `## Tools` for you to review |
 
 Run `/sound:setup` again after your stack changes. It reconciles with the rules you already have.
+
+`find` names a tool only when an agent can run it from text, can read the result back, its license and docs check out, and its author passes. The author check cannot see a hijacked maintainer, so each pick shows the age of its latest version. `stack` installs nothing and edits no manifest.
 
 ## Install
 
