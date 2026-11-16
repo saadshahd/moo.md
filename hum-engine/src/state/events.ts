@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { z } from "zod";
+import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
 import { climb, type Steps } from "../config/migrate.ts";
 import { DONE_BY } from "../decide/merge.ts";
@@ -120,8 +121,8 @@ export type SavedEvent = z.infer<typeof SavedEvent>;
 /** What the log stamps on each record it saves. */
 type Stamped = "format" | "engineVersion" | "receivedAt" | "seq";
 
-/** An event as its writer gives it; the log stamps its format, engine, time and place. */
-export type NewEvent = { [Type in SavedEvent["type"]]: Omit<Extract<SavedEvent, { type: Type }>, Stamped> }[SavedEvent["type"]];
+/** An event as its writer gives it. One with no `sourceId` is keyed by its content and the place it takes in its item's log. */
+export type NewEvent = { [Type in SavedEvent["type"]]: Omit<Extract<SavedEvent, { type: Type }>, Stamped | "sourceId"> & { readonly sourceId?: string } }[SavedEvent["type"]];
 
 /** A record found in an item's log, with what places it. */
 type Found = { readonly record: LogRecord; readonly placed: Placed };
@@ -179,8 +180,9 @@ export class EventLog {
 	}
 
 	/** Saves the event at the end of its item's log. `added` is false when this source and id are already in the log. */
-	add(event: NewEvent): { readonly added: boolean; readonly event: SavedEvent } {
-		const saved = SavedEvent.parse({ ...event, format: LOG_FORMAT, engineVersion: this.#engineVersion, receivedAt: this.#now(), seq: this.#nextPlace(event.itemId) });
+	add({ sourceId, ...event }: NewEvent): { readonly added: boolean; readonly event: SavedEvent } {
+		const seq = this.#nextPlace(event.itemId);
+		const saved = SavedEvent.parse({ ...event, sourceId: sourceId ?? hashJson({ type: event.type, payload: event.payload, seq }), format: LOG_FORMAT, engineVersion: this.#engineVersion, receivedAt: this.#now(), seq });
 		const added = createOnce(this.#path(saved), `${JSON.stringify(saved)}\n`);
 
 		return added ? { added, event: saved } : { added, event: this.get(saved) };

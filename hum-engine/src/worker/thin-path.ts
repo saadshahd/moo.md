@@ -17,7 +17,7 @@ import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
-import { answerOnce, foldItem, machineStarted, ownerAnswered, picked, recordMachine } from "../state/item-log.ts";
+import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered, recordMachine } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
@@ -645,7 +645,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				});
 
 				if (purpose === "review") keepVerdict(state, { id, head, pick, models });
-				else state.events.add(picked(id, { judge: purpose, pick, models: [...models] }));
+				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick, models: [...models] } });
 
 				PICKED.get(pick.event)?.(pick, models);
 
@@ -802,7 +802,7 @@ const keepVerdict = (state: State, { id, head, pick, models }: { readonly id: st
 	const verdict = { item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] };
 
 	state.verdicts.put(id, verdict);
-	state.events.add(picked(id, { judge: "review", head, pick, models: [...models] }));
+	keepPick(state.events, { itemId: id, pick: { judge: "review", head, pick, models: [...models] } });
 
 	return verdict;
 };

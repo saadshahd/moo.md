@@ -6,7 +6,7 @@ import { type AnyActor, createActor, createAsyncLogic, waitFor } from "xstate";
 import { kindMachine, openState, persistedSnapshot, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
-import { answerOnce, doneByOf, foldItem, keepLanding, machineStarted, ownerAnswered, picked, recordMachine } from "../src/state/item-log.ts";
+import { answerOnce, doneByOf, foldItem, keepLanding, keepPick, machineStarted, ownerAnswered, recordMachine } from "../src/state/item-log.ts";
 import { finished } from "./fixtures/answers.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -120,7 +120,7 @@ const merged = (state: State) => state.events.add({ source: "work-source", sourc
 /** A sure pick of `event`, as a plan or review run makes one. */
 const sure = (event: string) => ({ event, sure: true, reason: "It reads so.", cites: [], parts: [] });
 
-const planPicked = (state: State, event: string) => state.events.add(picked(ITEM, { judge: "plan", pick: sure(event), models: ["m"] }));
+const planPicked = (state: State, event: string) => keepPick(state.events, { itemId: ITEM, pick: { judge: "plan", pick: sure(event), models: ["m"] } });
 
 test.each([
 	["split, by its plan", "split", "needs-split", []],
@@ -159,13 +159,22 @@ test("the log keeps each judge's last pick", () => {
 	const alignment = { graded: { alignment: "sound", verification: "partial" } } as const;
 
 	planPicked(state, "plan-ready");
-	state.events.add(picked(ITEM, { judge: "review", head: "abc", pick: sure("request-changes"), models: ["m"] }));
-	state.events.add(picked(ITEM, { judge: "alignment", head: "def", alignment }));
-	state.events.add(picked(ITEM, { judge: "review", head: "def", pick: sure("approve"), models: ["m"] }));
+	keepPick(state.events, { itemId: ITEM, pick: { judge: "review", head: "abc", pick: sure("request-changes"), models: ["m"] } });
+	keepPick(state.events, { itemId: ITEM, pick: { judge: "alignment", head: "def", alignment } });
+	keepPick(state.events, { itemId: ITEM, pick: { judge: "review", head: "def", pick: sure("approve"), models: ["m"] } });
 
 	const { picks } = folded(state);
 
 	expect([picks.plan?.pick.event, picks.review?.pick.event, picks.review?.head, picks.alignment?.alignment]).toEqual(["plan-ready", "approve", "def", alignment]);
+});
+
+test("a judge's pick that repeats its last adds nothing, and one that comes back after another pick is kept again", () => {
+	const state = openState(dir, { now: Date.now });
+
+	for (const event of ["plan-ready", "plan-ready", "plan-blocked", "plan-ready"]) planPicked(state, event);
+
+	expect(state.events.list(ITEM).map(({ payload }) => "pick" in payload && payload.pick.event)).toEqual(["plan-ready", "plan-blocked", "plan-ready"]);
+	expect(folded(state).picks.plan?.pick.event).toBe("plan-ready");
 });
 
 /** Asks the plan question once, as a run of the item would, and ends the run's record; counts each time the model is asked. */
@@ -210,6 +219,14 @@ test("a run that ends with no answer keeps nothing, so the same question is aske
 
 	expect(plan.asked()).toBe(2);
 	expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["model-answered"]);
+});
+
+test("a fix run that starts again under its key, as one does after a kill left its record open, keeps one answer, which the cap counts once", async () => {
+	const state = openState(dir, { now: Date.now });
+
+	for (let run = 0; run < 2; run++) await answerOnce(state, { key: state.runs.keyFor(ITEM, "fix"), launch: { name: "fix" }, machineVersion: VERSION }, async () => finished({ status: "done" }));
+
+	expect(folded(state).fixRuns).toBe(1);
 });
 
 test("a build or fix run, which asks no question the log can answer, runs every time", async () => {

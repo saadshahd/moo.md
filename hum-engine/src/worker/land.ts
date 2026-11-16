@@ -56,7 +56,7 @@ import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
 import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
-import { keepLanding, picked } from "../state/item-log.ts";
+import { keepLanding, keepPick } from "../state/item-log.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
 import { pickedAnswer } from "./thread.ts";
@@ -564,7 +564,7 @@ const alignmentOf = async (ctx: LandContext, saved: SavedLanding, diff: string):
 	const alignment = judged.kind === "picked" ? { graded: judged.value } : { abstained: judged.why };
 
 	ctx.state.landings.put(ctx.id, { ...saved, alignment });
-	ctx.state.events.add(picked(ctx.id, { judge: "alignment", head: saved.head, alignment }));
+	keepPick(ctx.state.events, { itemId: ctx.id, pick: { judge: "alignment", head: saved.head, alignment } });
 
 	return alignment;
 };
