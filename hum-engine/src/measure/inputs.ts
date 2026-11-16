@@ -1,6 +1,7 @@
 import type { Label } from "../decide/risk.ts";
 import { brokenCommits } from "../loop/breaks.ts";
 import { BREAK_NOTES, commitsOf, type Merge, type NoteSource } from "../loop/records.ts";
+import { doneByOf, foldItem } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { Counted } from "./measure.ts";
 
@@ -36,7 +37,7 @@ export const measureInputsOf = (state: State) => {
 	};
 
 	return {
-		merged: merges.map((merge) => ({ item: merge.item, at: merge.at, paths: merge.paths, doneBy: merge.doneBy, label: labelOf(merge), ...costOf(merge.item, commitsOf(merge)) })),
+		merged: merges.map((merge) => ({ item: merge.item, at: merge.at, paths: merge.paths, doneBy: doneByOf(foldItem(state.events.list(merge.item))), label: labelOf(merge), ...costOf(merge.item, commitsOf(merge)) })),
 		abandoned: state.parked.list().flatMap(({ item, why, since }) => (why === "stuck" && !merges.some((merge) => merge.item === item) ? [{ item, since, paths: [], ...costOf(item, []) }] : [])),
 		loopTokens: spent.filter(({ item }) => item.startsWith(LOOP_SPEND_PREFIX)).reduce((total, { total: tokens }) => total + tokens, 0),
 	};

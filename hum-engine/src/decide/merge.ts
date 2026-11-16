@@ -1,5 +1,6 @@
 import { proofFor } from "../config/checks.ts";
 import type { Boundary, HumConfig, Level, REVIEWS } from "../config/schema.ts";
+import { SPLIT } from "./prose.ts";
 import type { Placement } from "./risk.ts";
 
 /** Why a change never merges on its own, whatever its level: paths no rule places, or a model call that abstained. */
@@ -39,6 +40,9 @@ const APPROVALS_OWNER_FIRST = ["owner", "review"] as const satisfies readonly (k
 
 /** How a cleared change reaches done: by the first approval it holds, else by its checks alone. */
 export const clearedBy = (approvals: Approvals): DoneBy => APPROVALS_OWNER_FIRST.find((approval) => approvals[approval]) ?? "checks";
+
+/** How a merged item reached done: split by its plan run's pick, else as landing found its change cleared, else by the person who merged it while it waited. */
+export const reachedDoneBy = ({ planPick, cleared }: { readonly planPick: string | undefined; readonly cleared: DoneBy | undefined }): DoneBy => (planPick === SPLIT ? "split" : (cleared ?? "owner"));
 
 /** What clears a clear change without the owner, by its level's review. The owner's approval clears any change. */
 const CLEARED_BY = {

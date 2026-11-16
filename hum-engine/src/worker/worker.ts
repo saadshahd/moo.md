@@ -14,6 +14,7 @@ import { checkTokenAge } from "../service/token.ts";
 import { listFiles } from "../state/fs.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
 import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
+import { ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import { tallyOf } from "./tally.ts";
 import { checkBaseAfterMerge } from "./base-check.ts";
@@ -417,13 +418,7 @@ export class Worker {
 					const hasNewAnswer = waiting.has(id) && answerTo(item) !== undefined && lastAnswerAt !== undefined;
 
 					if (hasNewAnswer) {
-						state.events.add({
-							source: "thread",
-							sourceId: `answer:${lastAnswerAt}`,
-							itemId: id,
-							type: "answered",
-							payload: {},
-						});
+						state.events.add(ownerAnswered(id, lastAnswerAt));
 						this.#answered.add(id);
 					}
 				}),

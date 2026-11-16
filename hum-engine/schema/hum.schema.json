@@ -375,7 +375,7 @@
 			"type": "integer",
 			"minimum": 0,
 			"maximum": 9007199254740991,
-			"description": "Fix runs an item gets after failed checks before it ends stuck."
+			"description": "Fix runs an item gets after failed checks, counted since the owner last answered, before it ends stuck."
 		},
 		"serviceLabel": {
 			"default": "md.moo.hum",

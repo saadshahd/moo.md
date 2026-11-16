@@ -94,6 +94,11 @@ export class RunRecords {
 		return this.list(itemId).find((record) => record.run === run && record.endedAt === undefined);
 	}
 
+	/** The key the item's next run of this purpose takes: the begun run a restart adopts, else a new attempt. */
+	keyFor(itemId: string, run: string): RunKey {
+		return { itemId, run, attempt: this.unended(itemId, run)?.attempt ?? this.list(itemId).length };
+	}
+
 	/** Every item's saved runs, oldest first. */
 	all(): RunRecord[] {
 		return listFiles(this.#folder)

@@ -10,14 +10,16 @@ export const SavedEvent = z.object({
 	itemId: z.string().min(1),
 	type: z.string().min(1),
 	receivedAt: z.int().nonnegative(),
+	/** The event's place in its item's log. An event saved before hum kept places has none, and comes first, by when it arrived. */
+	seq: z.int().nonnegative().optional(),
 	payload: Json,
 });
 
 export type SavedEvent = z.infer<typeof SavedEvent>;
 
-export type NewEvent = Omit<SavedEvent, "receivedAt">;
+export type NewEvent = Omit<SavedEvent, "receivedAt" | "seq">;
 
-/** Every event is saved before anything acts on it, keyed by source, so reading one twice adds nothing. */
+/** Every event is saved before anything acts on it, keyed by source, so reading one twice adds nothing; each new one takes the next place in its item's log. */
 export class EventLog {
 	readonly #folder: string;
 	readonly #now: () => number;
@@ -31,9 +33,9 @@ export class EventLog {
 		return join(this.#folder, slug(itemId), `${slug(`${source}\u0000${sourceId}`)}.json`);
 	}
 
-	/** Saves the event. `added` is false when this source and id are already in the log. */
+	/** Saves the event at the end of its item's log. `added` is false when this source and id are already in the log. */
 	add(event: NewEvent): { readonly added: boolean; readonly event: SavedEvent } {
-		const saved = SavedEvent.parse({ ...event, receivedAt: this.#now() });
+		const saved = SavedEvent.parse({ ...event, receivedAt: this.#now(), seq: listRecords(join(this.#folder, slug(event.itemId))).length });
 		const added = createOnce(this.#path(saved), `${JSON.stringify(saved)}\n`);
 
 		return added ? { added, event: saved } : { added, event: this.get(saved) };
@@ -43,10 +45,10 @@ export class EventLog {
 		return SavedEvent.parse(readJson(this.#path(key)));
 	}
 
-	/** An item's events in the order they arrived. */
+	/** An item's events in the order its log took them. */
 	list(itemId: string): SavedEvent[] {
 		return listRecords(join(this.#folder, slug(itemId)))
 			.map((file) => SavedEvent.parse(readJson(file)))
-			.sort((a, b) => a.receivedAt - b.receivedAt || (a.sourceId < b.sourceId ? -1 : 1));
+			.sort((a, b) => (a.seq ?? -1) - (b.seq ?? -1) || a.receivedAt - b.receivedAt || (a.sourceId < b.sourceId ? -1 : 1));
 	}
 }

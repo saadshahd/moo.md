@@ -357,6 +357,19 @@ test("one event read twice is saved once, and the first copy stays", () => {
 	expect(events.list("#none")).toEqual([]);
 });
 
+test("an item's events list in the order the log took them, on a clock that stands still, and a copy into another log keeps it", () => {
+	const { events } = openState(dir, { now: () => 5 });
+	const copy = openState(join(dir, "copy"), { now: () => 9 }).events;
+	const event = (sourceId: string) => ({ source: "machine", sourceId, itemId: "#68", type: "machine", payload: {} });
+
+	for (const sourceId of ["c", "a", "b"]) events.add(event(sourceId));
+
+	for (const saved of events.list("#68")) copy.add(saved);
+
+	expect(events.list("#68").map(({ sourceId }) => sourceId)).toEqual(["c", "a", "b"]);
+	expect(copy.list("#68").map(({ sourceId }) => sourceId)).toEqual(["c", "a", "b"]);
+});
+
 test("the run's name is saved before launch and adopted after a restart", () => {
 	const key = { itemId: "#68", run: "build", attempt: 1 };
 	const before = openState(dir, { now: Date.now }).runs;

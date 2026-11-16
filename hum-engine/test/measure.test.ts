@@ -8,7 +8,10 @@ import { labelChanges, type PastChange } from "../src/decide/labels.ts";
 import { measureInputsOf } from "../src/measure/inputs.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
 import { openState } from "../src/state/open.ts";
-import { recordMerged, settleMergedPulls } from "../src/worker/merged.ts";
+import { settleMergedPulls } from "../src/worker/merged.ts";
+import type { DoneBy } from "../src/decide/merge.ts";
+import type { Merge } from "../src/loop/records.ts";
+import { keepLanding } from "../src/state/item-log.ts";
 import { configWith } from "./fixtures/config.ts";
 import { pastChange } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -74,7 +77,7 @@ test("only the last window of merges counts, each way of reaching done over its 
 	expect(measureOf({ merged: [], abandoned, ...window })).toBeUndefined();
 });
 
-test("the inputs come from what the engine saved: notes by commit or item, questions by op key, stuck items as abandoned, tokens with the loop's own, and each merge's label from the reverts and fixes of its commits and the base's breaks after it", async () => {
+test("the inputs come from what the engine saved: notes by commit or item, questions by op key, stuck items as abandoned, tokens with the loop's own, each merge's way of reaching done from its item's log, and its label from the reverts and fixes of its commits and the base's breaks after it", async () => {
 	const state = freshState();
 	const asked = (itemId: string, op: string, done: "done" | "started" = "done") => state.ops.once({ itemId, run: "ask", attempt: 0, op }, { holds: async () => done === "done", run: async () => {} });
 
@@ -90,12 +93,19 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 
 	const broke = (source: "revert" | "fix", sourceId: string, change: string) => state.notes.put(`${source}:${sourceId}`, { source, sourceId, change, hunk: "", text: "n", at: 7 });
 
-	state.merges.put("fixed", { item: "fixed", sha: "merge-f", at: 6, paths: [], commits: ["run-f", "merge-f"], doneBy: "review" });
+	/** A merge whose item's log holds how landing found it cleared, or none while it waited for a person. */
+	const mergeLogged = (merge: Merge, cleared: DoneBy | undefined) => {
+		state.merges.put(merge.item, merge);
+		keepLanding(state.events, merge.item, merge.sha, cleared);
+		state.events.add({ source: "work-source", sourceId: `merged:${merge.sha}`, itemId: merge.item, type: "merged", payload: {} });
+	};
+
+	mergeLogged({ item: "fixed", sha: "merge-f", at: 6, paths: [], commits: ["run-f", "merge-f"], baseChecked: true }, "review");
 	broke("fix", "f1", "run-f");
-	state.merges.put("reverted", { item: "reverted", sha: "merge-r", at: 6, paths: [], commits: ["merge-r"], doneBy: "checks" });
+	mergeLogged({ item: "reverted", sha: "merge-r", at: 6, paths: [], commits: ["merge-r"], baseChecked: true }, "checks");
 	broke("fix", "f2", "merge-r");
 	broke("revert", "r1", "merge-r");
-	state.merges.put("broke-base", { item: "broke-base", sha: "merge-b", at: 6, paths: [], commits: ["merge-b"], doneBy: "owner" });
+	mergeLogged({ item: "broke-base", sha: "merge-b", at: 6, paths: [], commits: ["merge-b"], baseChecked: true }, undefined);
 	state.breaks.put("broke-base", { item: "broke-base", sha: "merge-b", at: 7, paths: [], level: "low", failure: "f", onBreak: "follow-up", followUp: "fix-b" });
 
 	const inputs = measureInputsOf(state);
@@ -110,29 +120,6 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 		abandoned: [{ item: "b", since: 6, paths: [], notes: 0, questions: 0, tokens: 0 }],
 		loopTokens: 90,
 	});
-});
-
-test("a merge keeps how its item reached done, and the plan, verdict and alignment grades behind it, after its landing, plan and verdict go", async () => {
-	const state = freshState();
-	const git = gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
-	const landing = (item: string, doneBy?: "review") => state.landings.put(item, { item, branch: `hum/${item}`, since: 1, change: { paths: [], size: 0, loosened: false, pinChanged: false }, head: "h", doneBy, alignment: { abstained: "no rate" } });
-
-	const merged = async (item: string) => {
-		await recordMerged(state, { git, remote: "origin" }, { item, sha: `m-${item}`, commits: undefined, at: 2 });
-
-		return state.merges.get(item);
-	};
-
-	landing("split");
-	state.plans.put("split", { item: "split", event: "needs-split", parts: ["one", "two"], models: ["m"] });
-	landing("reviewed", "review");
-	state.verdicts.put("reviewed", { item: "reviewed", head: "h", event: "approve", reason: "fine", cites: [], models: ["m"] });
-	landing("waited");
-
-	expect(await merged("split")).toMatchObject({ doneBy: "split", plan: { event: "needs-split", parts: ["one", "two"] }, alignment: { abstained: "no rate" } });
-	expect(await merged("reviewed")).toMatchObject({ doneBy: "review", verdict: { event: "approve", models: ["m"] } });
-	expect(await merged("waited")).toMatchObject({ doneBy: "owner" });
-	expect([state.landings.list(), state.plans.list(), state.verdicts.list()]).toEqual([[], [], []]);
 });
 
 /** A pull request open, or merged as `merge-a` on the base, and a work source that writes each item it finishes into `finished`. */
@@ -156,7 +143,7 @@ test("a change merged through a pull request after the worker moved on ends its 
 	await settleMergedPulls(state, pull("MERGED", finished), 10);
 
 	expect(finished).toEqual(["a"]);
-	expect(state.merges.list()).toEqual([{ item: "a", sha: "merge-a", at: 9, paths: ["ui/a.ts"], baseChecked: false, commits: ["sha-a", "merge-a"], doneBy: "owner" }]);
+	expect(state.merges.list()).toEqual([{ item: "a", sha: "merge-a", at: 9, paths: ["ui/a.ts"], baseChecked: false, commits: ["sha-a", "merge-a"] }]);
 	expect(state.landings.list()).toEqual([]);
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
 });

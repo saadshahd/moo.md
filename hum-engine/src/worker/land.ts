@@ -56,6 +56,7 @@ import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
 import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
+import { keepLanding, picked } from "../state/item-log.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
 import { pickedAnswer } from "./thread.ts";
@@ -550,19 +551,12 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 
-	keepDoneBy(ctx, cleared ? clearedBy(approvals) : undefined);
+	keepLanding(ctx.state.events, ctx.id, saved.head, cleared ? clearedBy(approvals) : undefined);
 
 	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest, cleared }), route, rules, why);
 };
 
-/** How the saved change reaches done once it lands, as this landing found it; undefined while it waits for a person. */
-const keepDoneBy = ({ state, id }: LandContext, doneBy: SavedLanding["doneBy"]): void => {
-	const saved = state.landings.get(id);
-
-	if (saved) state.landings.put(id, { ...saved, doneBy });
-};
-
-/** The alignment call's grades for a saved change, made once and kept with the landing. */
+/** The alignment call's grades for a saved change, made once and kept with the landing and in the item's log. */
 const alignmentOf = async (ctx: LandContext, saved: SavedLanding, diff: string): Promise<NonNullable<SavedLanding["alignment"]>> => {
 	if (saved.alignment) return saved.alignment;
 
@@ -570,6 +564,7 @@ const alignmentOf = async (ctx: LandContext, saved: SavedLanding, diff: string):
 	const alignment = judged.kind === "picked" ? { graded: judged.value } : { abstained: judged.why };
 
 	ctx.state.landings.put(ctx.id, { ...saved, alignment });
+	ctx.state.events.add(picked(ctx.id, { judge: "alignment", head: saved.head, alignment }));
 
 	return alignment;
 };

@@ -17,6 +17,7 @@ import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
 import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
 import { Holder, ItemId } from "../../src/adapter-api.ts";
+import { doneByOf, foldItem, foldMachine, mergedPicks } from "../../src/state/item-log.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
 const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
@@ -28,6 +29,17 @@ const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
 };
 
 const NOTE = { write: { "docs/note.md": "hello\n" } };
+
+/** The item's log as saved, its machine folded under the kind hum gave the item: no model is asked and no actor starts. */
+const folded = (w: Awaited<ReturnType<typeof world>>, id: string) => {
+	const events = w.state.events.list(id);
+	const fold = foldItem(events);
+
+	return { at: foldMachine(w.config.kinds[w.state.itemKinds.get(id)?.kind ?? ""]!, events).value, fixRuns: fold.fixRuns, doneBy: doneByOf(fold), picks: mergedPicks(fold) };
+};
+
+/** Where the item's saved snapshot stands. */
+const savedAt = (w: Awaited<ReturnType<typeof world>>, id: string) => w.state.items.saved().find(({ itemId }) => itemId === id)?.state;
 
 /** A file a shim run writes its stdin to, in a temp folder of its own. */
 const stdinFile = (): string => join(tempDir("stdin"), "stdin");
@@ -53,7 +65,8 @@ test("the thin path: item → claude -p shim change → hum commits it → check
 	// The merge keeps the commits the push put on main, and that the change reached done on its checks alone.
 	const pushed = sh(w.repo.remote, ["rev-list", "--reverse", "-2", "main"]).split("\n").filter(Boolean);
 
-	expect(w.state.merges.get(id)).toMatchObject({ sha: pushed.at(-1), commits: pushed, doneBy: "checks" });
+	expect(w.state.merges.get(id)).toMatchObject({ sha: pushed.at(-1), commits: pushed });
+	expect(folded(w, id).doneBy).toBe("checks");
 
 	// Both of hum's commits, whatever git config the clone holds, are credited to the owner and no one else.
 	const credited = `${OWNER.name} <${OWNER.email}> | ${OWNER.name} <${OWNER.email}>`;
@@ -231,6 +244,7 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 
 	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
+	expect(folded(w, id)).toMatchObject({ at: "stuck", fixRuns: 2 });
 
 	// Stuck stays stuck, though the item file still says ready: no run, no claim.
 	w.clock.at += TTL + 1;
@@ -349,6 +363,7 @@ test("a run that needs the owner pushes its branch, asks, and ends; the answer s
 	const asked = await runThinPath(w.thinPath());
 
 	expect(asked).toEqual({ outcome: "asked", item: id, detail: "Which title?" });
+	expect(folded(w, id).at).toBe(savedAt(w, id));
 	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/part-one.md`])).toBe("one\n");
 
 	const thread = (await w.adapter.workSource!.read(id)).thread;
@@ -532,10 +547,10 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 
 const featureJudge = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND });
 
-test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, and an approval merges it", async () => {
+test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, the fixed change is reviewed again though the prompt cuts both diffs to the same text, and an approval merges it", async () => {
 	const [buildStdin, fixStdin] = [stdinFile(), stdinFile()];
 	const cite = { event: "request-changes", sure: true, reason: "The note says nothing.", cites: [{ file: "docs/note.md", line: 1 }] };
-	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { write: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, cite] });
+	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { write: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, cite] }, { config: configWith((raw) => void (raw.hum.diffLimit = 1)) });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
@@ -548,6 +563,7 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	expect(review?.cwd).not.toContain("hum-run-");
 	expect(review?.prompt).not.toContain("Write it.");
 	expect(w.repo.show(id)).toContain("state: done");
+	expect(folded(w, id)).toMatchObject({ doneBy: "checks", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
 });
 
 test("a medium change waits for a fresh review run at landing: a request for changes holds it for the owner, an approval merges it", async () => {
@@ -561,6 +577,7 @@ test("a medium change waits for a fresh review run at landing: a request for cha
 
 	expect(await runThinPath(w.thinPath({ itemId: merged }))).toEqual({ outcome: "merged", item: merged });
 	expect(w.shim.decisions().map((d) => [d.purpose, d.answer.event])).toEqual([["review", "request-changes"], ["review", "approve"]]);
+	expect(folded(w, merged)).toMatchObject({ doneBy: "review", picks: { review: { pick: { event: "approve" } } } });
 });
 
 test("a review run at landing counts toward the item's total, and one that passes the kind's cap holds the change for the owner", async () => {
@@ -595,7 +612,7 @@ test("a plan run that splits its item files each part as a ready item and lands 
 	expect(w.repo.show(id)).toContain("state: done");
 	expect((await w.adapter.workSource!.listReady()).map((ref) => ref.title)).toEqual(["Write part one", "Write part two"]);
 	expect(w.shim.calls()).toHaveLength(1);
-	expect(w.state.merges.get(id)).toMatchObject({ doneBy: "split", plan: { event: "needs-split", parts: ["Write part one", "Write part two"] } });
+	expect(folded(w, id)).toMatchObject({ doneBy: "split", picks: { plan: { pick: { event: "needs-split", parts: ["Write part one", "Write part two"] } } } });
 });
 
 test("a docs item whose change touches code moves to its real kind and runs again from the plan, on the same branch", async () => {
@@ -675,10 +692,12 @@ test("a review that leaves the change to the owner asks, and the owner's approva
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "asked", item: id, detail: "Is the tone right?" });
+	expect(folded(w, id).at).toBe(savedAt(w, id));
 
 	await w.adapter.answers!.answer(id, { text: "yes", option: "approve" });
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(folded(w, id).doneBy).toBe("owner");
 });
 
 test("the owner's rejection of a change a review left to them sends it to a fix with the owner's words", async () => {

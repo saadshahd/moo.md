@@ -1,7 +1,5 @@
 import { z } from "zod";
-import { DONE_BY } from "../decide/merge.ts";
 import type { Label } from "../decide/risk.ts";
-import { Landing, SavedPlan, Verdict } from "../state/saved.ts";
 
 const name = z.string().min(1);
 const time = z.int().nonnegative();
@@ -57,9 +55,9 @@ export const PossibleRepeat = z.object({ a: name, b: name, models: z.array(name)
 export type PossibleRepeat = z.infer<typeof PossibleRepeat>;
 
 /**
- * A merged change: what the measure counts, and what a judge can be scored again on once its prompt changes. The
- * item's text is the work source's, and the change the judges read is the base's diff across its commits on the
- * base's first-parent line, hum's done mark aside.
+ * A merged change: what the measure counts, and, with the picks its item's log keeps, what a judge can be scored again
+ * on once its prompt changes. The item's text is the work source's, and the change the judges read is the base's diff
+ * across its commits on the base's first-parent line, hum's done mark aside.
  */
 export const Merge = z.object({
 	item: name,
@@ -75,12 +73,6 @@ export const Merge = z.object({
 	 * them, as on a merge saved before it kept them; `sha` alone then stands for them.
 	 */
 	commits: z.array(name).optional(),
-	/** How the item reached done; absent on a merge saved before hum kept it. */
-	doneBy: z.enum(DONE_BY).optional(),
-	/** The plan run's pick, the latest review run's verdict and the alignment call's grades, each where one was made; the kind call's pick stays in the item's kind. */
-	plan: SavedPlan.optional(),
-	verdict: Verdict.optional(),
-	alignment: Landing.shape.alignment,
 });
 
 export type Merge = z.infer<typeof Merge>;

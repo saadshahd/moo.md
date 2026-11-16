@@ -1,0 +1,254 @@
+import { beforeEach, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { type AnyActor, createActor, createAsyncLogic, waitFor } from "xstate";
+import { kindMachine, openState, persistedSnapshot, type State } from "../src/index.ts";
+import type { RunOutcome } from "../src/adapters/claude-p.ts";
+import type { DoneBy } from "../src/decide/merge.ts";
+import { shippedConfig } from "../src/setup/shipped.ts";
+import { slug } from "../src/state/fs.ts";
+import { answerOnce, doneByOf, foldItem, foldMachine, keepLanding, machineStarted, mergedPicks, ownerAnswered, picked, recordMachine } from "../src/state/item-log.ts";
+import { finished } from "./fixtures/answers.ts";
+import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
+import { tempDir } from "./fixtures/temp.ts";
+
+const feature = shippedConfig().kinds.feature!;
+const ITEM = "#68";
+
+let dir: string;
+
+beforeEach(() => {
+	dir = tempDir("item-log");
+});
+
+/** What each source of the feature machine does on its next call, in order; a source with nothing left stops the pass there, as a limit or a lost claim does. */
+type Script = { plan?: string[]; build?: string[]; checks?: string[]; fix?: string[]; review?: string[] };
+
+/** Where a pass ends on its own: an owner wait, the merge, or stuck. */
+const RESTS: ReadonlySet<string> = new Set(["asking", "owner-review", "merging", "stuck"]);
+
+/**
+ * One pass of the item in this process, as the thin path drives it: a pass that carries the owner's answer restores
+ * the saved wait and sends it, any other starts the machine over. Its snapshot is saved where the pass ends.
+ */
+const pass = async (state: State, script: Script, answer?: string): Promise<void> => {
+	let actor: AnyActor;
+	const stopped = Promise.withResolvers<void>();
+	const forever = new Promise<never>(() => {});
+	const next = (source: keyof Script): string | undefined => script[source]?.shift();
+
+	const picks = (source: "plan" | "review") =>
+		createAsyncLogic({
+			run: () => {
+				const event = next(source);
+
+				if (event === undefined) stopped.resolve();
+				else queueMicrotask(() => actor.send({ type: event }));
+
+				return forever;
+			},
+		});
+
+	const acts = (source: "build" | "checks" | "fix") =>
+		createAsyncLogic({
+			run: async () => {
+				const step = next(source);
+
+				if (step === undefined) return stopped.resolve(), forever;
+
+				if (step === "token-cap") return queueMicrotask(() => actor.send({ type: step })), forever;
+
+				if (step === "fail") throw new Error("the checks fail");
+
+				if (source === "fix") (await answerOnce(state, { key: state.runs.keyFor(ITEM, source), launch: { name: source } }, async () => finished({ status: "done" }))).begun.end();
+			},
+		});
+
+	const sources = { plan: picks("plan"), build: acts("build"), checks: acts("checks"), fix: acts("fix"), review: picks("review") };
+	const inspect = recordMachine(state.events, ITEM);
+
+	if (answer === undefined) {
+		state.events.add(machineStarted(ITEM, false));
+		actor = createActor(kindMachine(feature, sources), { inspect }).start();
+	} else {
+		const restored = await state.items.restore(ITEM, feature, { sources, inspect });
+
+		if (!restored.ok || !restored.value) throw new Error(`no saved wait to answer for ${ITEM}`);
+
+		actor = restored.value.start();
+		state.events.add(ownerAnswered(ITEM, Date.now()));
+		actor.send({ type: answer });
+	}
+
+	await Promise.race([waitFor(actor, (snapshot) => RESTS.has(String(snapshot.value))), stopped.promise]);
+	expect(state.items.save(ITEM, feature, persistedSnapshot(actor)).ok).toBe(true);
+	actor.stop();
+};
+
+const folded = (state: State) => foldItem(state.events.list(ITEM));
+
+/** Where the fold leaves the machine, and the fix runs it counts: plain values, so a failure prints them and not the machine. */
+const progress = (state: State) => ({ at: foldMachine(feature, state.events.list(ITEM)).value, fixRuns: folded(state).fixRuns });
+
+test("the item's log folds to the state its saved snapshot holds after each pass, one restored from a wait among them", async () => {
+	const state = openState(dir, { now: Date.now });
+
+	await pass(state, { plan: ["plan-ready"], build: ["token-cap"] });
+	expect(progress(state).at).toBe("asking");
+	expect(state.items.saved().map(({ state: at }) => at)).toEqual(["asking"]);
+
+	await pass(state, { build: ["done"], checks: ["fail", "pass"], fix: ["done"], review: ["needs-owner"] }, "answered");
+	expect(progress(state).at).toBe("owner-review");
+	expect(state.items.saved().map(({ state: at }) => at)).toEqual(["owner-review"]);
+});
+
+test("fix runs count from the owner's last answer, over passes that start the machine over and a pass that resumes a wait", async () => {
+	const state = openState(dir, { now: Date.now });
+
+	await pass(state, { plan: ["plan-ready"], build: ["done"], checks: ["fail", "fail"], fix: ["done"] });
+	expect(progress(state)).toEqual({ at: "fixing", fixRuns: 1 });
+
+	await pass(state, { plan: ["plan-ready"], build: ["done"], checks: ["fail", "fail"], fix: ["done"] });
+	expect(progress(state)).toEqual({ at: "fixing", fixRuns: 2 });
+
+	await pass(state, { plan: ["plan-ready"], build: ["done"], checks: ["fail"], fix: ["token-cap"] });
+	expect(progress(state)).toEqual({ at: "asking", fixRuns: 2 });
+
+	await pass(state, { build: ["done"], checks: ["fail", "fail"], fix: ["done"] }, "answered");
+	expect(progress(state)).toEqual({ at: "fixing", fixRuns: 1 });
+});
+
+const merged = (state: State) => state.events.add({ source: "work-source", sourceId: "merged:0123456", itemId: ITEM, type: "merged", payload: {} });
+
+/** A sure pick of `event`, as a plan or review run makes one. */
+const sure = (event: string) => ({ event, sure: true, reason: "It reads so.", cites: [], parts: [] });
+
+const planPicked = (state: State, event: string) => state.events.add(picked(ITEM, { judge: "plan", pick: sure(event), models: ["m"] }));
+
+test.each([
+	["split", "needs-split", undefined],
+	["checks", "plan-ready", "checks"],
+	["review", "plan-ready", "review"],
+	["owner", "plan-ready", undefined],
+] as const)("a merged item's log folds to how it reached done: %s", (doneBy, planPick, cleared) => {
+	const state = openState(dir, { now: Date.now });
+
+	planPicked(state, planPick);
+	keepLanding(state.events, ITEM, "abc", undefined);
+
+	if (cleared) keepLanding(state.events, ITEM, "abc", cleared);
+	expect(doneByOf(folded(state))).toBeUndefined();
+
+	merged(state);
+	expect(doneByOf(folded(state))).toBe(doneBy);
+});
+
+test("landing's finding is logged each time it changes, so a change that went back to waiting reads as the owner's when a person merges it", () => {
+	const state = openState(dir, { now: Date.now });
+	const found: (DoneBy | undefined)[] = [undefined, undefined, "checks", undefined];
+
+	for (const doneBy of found) keepLanding(state.events, ITEM, "abc", doneBy);
+	merged(state);
+
+	expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["landing", "landing", "landing", "merged"]);
+	expect(doneByOf(folded(state))).toBe("owner");
+});
+
+test("a merged item's log keeps the last plan, review and alignment picks, and one call returns them once the change merged", () => {
+	const state = openState(dir, { now: Date.now });
+	const alignment = { graded: { alignment: "sound", verification: "partial" } } as const;
+
+	planPicked(state, "plan-ready");
+	state.events.add(picked(ITEM, { judge: "review", head: "abc", pick: sure("request-changes"), models: ["m"] }));
+	state.events.add(picked(ITEM, { judge: "alignment", head: "def", alignment }));
+	state.events.add(picked(ITEM, { judge: "review", head: "def", pick: sure("approve"), models: ["m"] }));
+	expect(mergedPicks(folded(state))).toBeUndefined();
+
+	merged(state);
+
+	const picks = mergedPicks(folded(state));
+
+	expect([picks?.plan?.pick.event, picks?.review?.pick.event, picks?.review?.head, picks?.alignment?.alignment]).toEqual(["plan-ready", "approve", "def", alignment]);
+});
+
+test("a log hum 0.1.0 saved folds: its thread answer counts as the owner's", () => {
+	const folder = join(dir, "events", slug(SAVED_0_1_0.events.itemId));
+
+	mkdirSync(folder, { recursive: true });
+	writeFileSync(join(folder, "record.json"), JSON.stringify(SAVED_0_1_0.events));
+
+	const events = openState(dir, { now: Date.now }).events.list(SAVED_0_1_0.events.itemId);
+	const { fixRuns, merged } = foldItem(events);
+
+	expect({ at: foldMachine(feature, events).value, fixRuns, merged }).toEqual({ at: "planning", fixRuns: 0, merged: false });
+});
+
+/** Asks the plan question once, as a run of the item would, and ends the run's record; counts each time the model is asked. */
+const planAsker = (state: State, answer: () => RunOutcome) => {
+	let asked = 0;
+
+	const ask = async () => {
+		const { begun } = await answerOnce(state, { key: state.runs.keyFor(ITEM, "plan"), launch: { name: "plan" }, question: { prompt: "Plan the change." } }, async () => {
+			asked++;
+
+			return answer();
+		});
+
+		begun.end();
+	};
+
+	return { ask, asked: () => asked };
+};
+
+test.each([
+	["a pass that starts the machine over reads it back", machineStarted(ITEM, false), 1],
+	["a pass that starts the item afresh asks again", machineStarted(ITEM, true), 2],
+	["the owner's answer makes the next run ask again", ownerAnswered(ITEM, 1), 2],
+] as const)("an answer the log keeps to the same question: %s", async (_, between, times) => {
+	const state = openState(dir, { now: Date.now });
+	const plan = planAsker(state, () => finished({ event: "plan-ready" }));
+
+	await plan.ask();
+	state.events.add(between);
+	await plan.ask();
+
+	expect(plan.asked()).toBe(times);
+});
+
+test("a run that ends with no answer keeps nothing, so the same question is asked again", async () => {
+	const state = openState(dir, { now: Date.now });
+	const answers: RunOutcome[] = [{ kind: "limited", until: 1 }, finished({ event: "plan-ready" })];
+	const plan = planAsker(state, () => answers.shift() ?? finished({ event: "plan-blocked" }));
+
+	await plan.ask();
+	await plan.ask();
+
+	expect(plan.asked()).toBe(2);
+	expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["model-answer"]);
+});
+
+test("a build or fix run, which asks no question the log can answer, runs every time", async () => {
+	const state = openState(dir, { now: Date.now });
+	let asked = 0;
+
+	for (let run = 0; run < 2; run++) (await answerOnce(state, { key: state.runs.keyFor(ITEM, "build"), launch: { name: "build" } }, async () => (asked++, finished({ status: "done" })))).begun.end();
+
+	expect(asked).toBe(2);
+});
+
+for (const mode of ["before-run", "after-run", "after-log", "after-end"] as const) {
+	test(`a process killed ${mode} leaves the model asked once and its answer kept once`, () => {
+		const script = join(import.meta.dir, "fixtures/kill-answer.ts");
+
+		expect(spawnSync("bun", [script, dir, mode]).signal).toBe("SIGKILL");
+
+		for (let times = 0; times < 2; times++) expect(spawnSync("bun", [script, dir, "finish"]).status).toBe(0);
+
+		const state = openState(dir, { now: Date.now });
+
+		expect(readFileSync(join(dir, "transcript.txt"), "utf8").split("\n").filter(Boolean)).toHaveLength(1);
+		expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["model-answer"]);
+		expect(state.runs.list(ITEM).every(({ endedAt }) => endedAt !== undefined)).toBe(true);
+	});
+}
