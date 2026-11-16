@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, loadedCommand, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, answeredContext, withOpen } from "./tend.tsx";
+import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, loadedCommand, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, answeredContext, withOpen, coverItems, lostTokens, MAX_PASSES, nextStep, wordForWord, type Pass } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -681,7 +681,7 @@ const CONSULT = [
 ].join("\n");
 
 describe("a reply that ends on ideas", () => {
-  const SHORT = "| idea | by |\n|---|---|\n| open on the title | Mostafa |\n| end the bridge a bar late | Ruby |\n| leave a line open | Wegz |\n\nNext: choose late or on time.";
+  const SHORT = "| idea | by |\n|---|---|\n| open on the title | Mostafa |\n| end the bridge a bar late | Ruby |\n| leave a line open | Wegz |\n\nNext: choose late or on time for idea 2; ideas 1–2 then go in the song.";
   // What Claude Code's own drawing was handed, and the reply as tend drew it.
   const setup = ($: any, on: any, shortForm = SHORT) => {
     mock.store(on);
@@ -743,13 +743,13 @@ describe("a reply that ends on ideas", () => {
     expect(host).toEqual([SHORT]);
   });
   test("a short form that keeps the ideas keeps their tones", async ($, on) => {
-    const kept = "1. Mostafa — **Open on the title**\n   Chosen because the hook is the title\n2. Ruby — **End on the bridge, late**\n3. Wegz — Leave a line open\n\nNext: choose late or on time.";
+    const kept = "1. Mostafa — **Open on the title**\n   Chosen because the hook is the title\n2. Ruby — **End on the bridge, late**\n3. Wegz — Leave a line open\n\nNext: choose late or on time for idea 2; ideas 1–2 then go in the song.";
     const { clock, host, mount } = setup($, on, kept);
     await $.turn.complete({ answer: CONSULT, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
     await clock.settle();
     const reply = await mount();
     expect(host).toEqual(["1. Mostafa — **Open on the title**"]);
-    expect(await md(reply, true)).toEqual(["3. Wegz — Leave a line open", "Next: choose late or on time."]);
+    expect(await md(reply, true)).toEqual(["3. Wegz — Leave a line open", "Next: choose late or on time for idea 2; ideas 1–2 then go in the song."]);
     expect((await reply.find({ type: "Text", text: "Chosen because the hook is the title" }))?.props.color).toBe("success");
     expect(await reply.find({ text: /Open the verse/ })).toBeUndefined();
   });
@@ -807,6 +807,86 @@ describe("short replies", () => {
   });
 });
 
+describe("the redraw's passes", () => {
+  test("a cover list's items are its lines, list markers dropped", () => {
+    expect(coverItems("- the ask: pick A or B\n2. 80 tests pass\n\n• next: merge")).toEqual(["the ask: pick A or B", "80 tests pass", "next: merge"]);
+  });
+  test("numbers, `code` and links are kept as written; a list's numbering and numbers inside code or links are not", () => {
+    expect(wordForWord("1. Run `bun test:2`: 80 pass in 2.5 s.\n2. See https://example.com/pr/93.")).toEqual(["`bun test:2`", "https://example.com/pr/93", "80", "2.5"]);
+  });
+  test("noise never has to stay: commit hashes, ids and dates, bare or in `code`", () => {
+    expect(wordForWord("Merged `4d734dd` (#93) on 2026-09-28T21:09:44Z, Oct 14 and 3 Nov 2026, run 1794863341431, session 052de2d7-d518-4562-8dd0-f2c4cac5414d.")).toEqual([]);
+  });
+  test("a short form lacks a name it never says, and a number none of its own numbers matches", () => {
+    expect(lostTokens("80 pass, 1 skipped, by Fowler", "80 pass, 10 skipped", ["Fowler"])).toEqual(["Fowler", "1"]);
+  });
+
+  const REPLY = "a".repeat(300);
+  const pass = (chars: number, found: Partial<Pass> = {}): Pass => ({ text: "a".repeat(chars), capped: false, lost: [], missing: [], ...found });
+  test("a pass that keeps all and saves some is cut again, until the last pass shows", () => {
+    const passes = Array.from({ length: MAX_PASSES - 1 }, (_, i) => pass(200 - 50 * i));
+    const last = pass(200 - 50 * MAX_PASSES);
+    expect(nextStep(REPLY, [], pass(200), false)).toEqual({ kind: "cut" });
+    expect(nextStep(REPLY, passes, last, false)).toEqual({ kind: "show", pass: last });
+  });
+  test("a pass that loses a token, is cut off at its cap, or saves nothing backs off to the pass before", () => {
+    const first = pass(200);
+    for (const failed of [pass(100, { lost: ["80"] }), pass(100, { capped: true }), pass(200)])
+      expect(nextStep(REPLY, [first], failed, false)).toEqual({ kind: "show", pass: first });
+  });
+  test("a first pass that fails keeps the reply long, naming its fault", () => {
+    expect(nextStep(REPLY, [], pass(100, { lost: ["Fowler", "80"] }), false)).toEqual({ kind: "long", why: "lost a token" });
+  });
+  test("an item the label calls missing backs a pass off only while the label gates", () => {
+    const left = pass(200, { missing: ["the ask"] });
+    expect(nextStep(REPLY, [], left, false)).toEqual({ kind: "cut" });
+    expect(nextStep(REPLY, [], left, true)).toEqual({ kind: "long", why: "left an item out" });
+  });
+});
+
+describe("a redraw whose second pass drops a number", () => {
+  const LONG = "The suite ran on the branch, and 80 tests pass. The build ran too, and it finished without a warning or an error of any kind. Two choices are open, and both change the release. Which do I take: ship now, or wait for review?";
+  const COVER = "80 tests pass\nship now or wait for review";
+  const KEEPS_NUMBER = "80 tests pass and the build is clean. Ship now, or wait for review?";
+  const DROPS_NUMBER = "Tests pass. Ship now, or wait?";
+  const setup = ($: any, on: any) => {
+    const store = cappedStore(on, MiB);
+    const clock = mock.clock(on);
+    on("session.id", () => ({ value: "s1" }));
+    on("session.surfaces", () => ({ value: ["terminal"] }));
+    on("session.messages", () => ({ value: [{ role: "user", text: "status?", toolUses: [] }, said(LONG)] }));
+    on("ui.invalidate", () => ({ value: undefined }));
+    const toasts: string[] = [];
+    on("ui.toast", (_: any, e: any) => (toasts.push(e.text), { value: undefined }));
+    on("model.complete", (_: any, e: any) => {
+      const text = e.prompt.startsWith("List") ? COVER : e.prompt.includes(LONG) ? KEEPS_NUMBER : DROPS_NUMBER;
+      return { value: { isAnswered: true, text, usage: {} } } as any;
+    });
+    on("model.classify", () => ({ value: "missing" }));
+    let shown = "";
+    on("ui.render", (_: any, e: any) => {
+      shown = e.props.text;
+      return { type: "Box", props: {} } as any;
+    });
+    on("turn.complete", (_: any, e: any) => ({ text: e.answer }));
+    const redrawn = async () => {
+      await $.turn.complete({ answer: LONG, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
+      await clock.settle();
+      await (await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: LONG } as any })).drawn();
+      return { shown, toasts, store };
+    };
+    return { redrawn };
+  };
+  test("shows the first pass, the last that kept every number", async ($, on) => {
+    expect((await setup($, on).redrawn()).shown).toBe(KEEPS_NUMBER);
+  });
+  test("a label below its bar keeps what it calls missing beside the short form, and shows nothing", async ($, on) => {
+    const { toasts, store } = await setup($, on).redrawn();
+    expect(store.get("tend:s1:flagged")).toEqual({ [textKey(LONG)]: ["80 tests pass", "ship now or wait for review"] });
+    expect(toasts).toEqual([]);
+  });
+});
+
 // A real reply the user called a wall of text (a songs session, 2026-09-25), cut short.
 const WALL = "The last research agent is back. No tool can check sung Egyptian Arabic word by word yet, and no candidate has been tested on singing. The work order above still waits on your answer.\n\nThree chains are worth building:\n\n1. **Free chain.**\n   - It runs on this Mac.\n   - It pulls out the vocal and finds each word's timing.\n   - Then it compares the sounds a phonetic recogniser hears (ZIPA) against the sounds I write by hand from your Franco.\n   - It is the only one of the three that can hear g against j, or a glottal stop against q.\n2. **Azure pronunciation scorer.**\n   - It lists Egyptian Arabic and scores each word against the lyric.\n   - It needs the least building.\n   - It gives no sound-by-sound detail for Arabic, so it catches blurred or wrong words, not accent.\n   - It is paid per hour of audio.\n3. **Two speech-to-text tools agreeing.** This measures whether a word comes ac";
 
@@ -832,7 +912,6 @@ test("a long reply is redrawn short once its turn ends, and /long shows it whole
   await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
   // The short form is asked for unawaited: the turn ends before it comes back.
   await clock.settle();
-  expect(asks).toHaveLength(1);
   expect(asks[0]).toContain(WALL);
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
   await reply.drawn();
@@ -864,7 +943,7 @@ test("a short form that fills its token cap is dropped, and the reply stays long
   on("turn.complete", (_, e) => ({ text: e.answer }));
   await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
   await clock.settle();
-  expect(toasts).toHaveLength(1);
+  expect(toasts).toEqual([]);
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
   await reply.drawn();
   expect(shown).toContain("Three chains are worth building");
@@ -895,7 +974,7 @@ test("a short form that drops an idea is dropped, and the reply stays long", asy
   on("turn.complete", (_, e) => ({ text: e.answer }));
   await $.turn.complete({ answer: CONSULT_TAKE, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
   await clock.settle();
-  expect(JSON.stringify(toasts)).toContain("dropped Humble, Freeman, Evans, Beck");
+  expect(toasts).toEqual([]);
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: CONSULT_TAKE, isFirstOfReply: true } as any });
   expect(JSON.stringify(await reply.drawn())).toContain("Beck");
 });

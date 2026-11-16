@@ -84,17 +84,179 @@ export function wantsShort(reply: string, prompt: string): boolean {
 }
 
 // What won the user's blind ranking of real replies: short, but never a fact cut they'd act on.
-export function shortAsk(reply: string): string {
-  return `Rewrite the reply below, which an agent sent to a user, as the shortest reply that still covers everything it must.
-It must cover: every decision it asks of the user, every result the user needs, every option it weighed with why that option won or lost, and its next action.
-Derive the rewrite from that coverage, not by deleting sentences. Keep its first-line and last-line order, its tables, its code and every item of its lists.
-Cut commit hashes, ids and dates unless the user must act on one.
-Never pack several facts into one line: give each fact the user would act on its own sentence or row, and keep it rather than cut it.
-Hand back the rewritten reply alone.
+const COVERAGE =
+  "every decision it asks of the user, every result the user needs, every option it weighed with why that option won or lost, and its next action";
+
+/** The ask for what a reply must still say once it is short. */
+function coverAsk(reply: string): string {
+  return `List what the reply below, which an agent sent to a user, must still say once it is rewritten short: ${COVERAGE}. Leave out what the user would not act on, such as how the agent worked or context the user gave.
+Give one item per line, in the reply's order, each in the fewest words that name it. Hand back the list alone.
 
 <reply>
 ${reply}
 </reply>`;
+}
+
+/** A cover list's items: its lines, list markers dropped. */
+export function coverItems(list: string): string[] {
+  return list
+    .split("\n")
+    .map((l) => l.trim().replace(/^(?:[-*+•]|\d+[.)])\s+/, ""))
+    .filter(Boolean);
+}
+
+/** The ask for one pass: the shortest rewrite of `text` that still covers `items` and keeps each of `asWritten`. */
+function shortAsk(text: string, items: string[], asWritten: string[]): string {
+  const keep = asWritten.length
+    ? `\nKeep each of these exactly as the reply writes it: ${asWritten.join(" · ")}`
+    : "";
+  return `Rewrite the reply below, which an agent sent to a user, as the shortest reply that still covers each item listed under it.
+Derive the rewrite from those items, not by deleting sentences: say each item once, in the fewest words that carry it, and drop every word that carries none. Keep its first-line and last-line order, every row and column of its tables, its code and every item of its lists.${keep}
+Cut commit hashes, ids and dates unless the user must act on one.
+Never pack several facts into one line: give each fact the user would act on its own sentence or row, and keep it rather than cut it.
+The rewrite comes out shorter than the reply, or, when nothing can go, is the reply as it is. Hand back the rewrite alone.
+
+<reply>
+${text}
+</reply>
+
+<items>
+${items.join("\n")}
+</items>`;
+}
+
+const CODE = /`[^`\n]+`/g;
+const LINK = /https?:\/\/[^\s)>\]|`"]+/g;
+const LIST_NUMBER = /^(\s*)\d+[.)](?=\s)/gm;
+const NUMBER = /(?<![\p{L}\p{N}_.])\d+(?:[.,:]\d+)*(?![\p{L}\p{N}_])/gu;
+const MONTH = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?";
+
+/** Noise a short form may always cut: commit hashes, ids and dates. The long reply keeps it for Claude,
+ * and `/long` shows it, so no check ever makes a short form keep it. */
+const NOISE = [
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+  /\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/gi,
+  /#\d+\b/g,
+  /\b\d{8,}\b/g,
+  /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\b/g,
+  new RegExp(`\\b${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?\\b`, "g"),
+  new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH}(?:,?\\s+\\d{4})?\\b`, "g"),
+];
+const withoutNoise = (text: string) =>
+  NOISE.reduce((t, noise) => t.replace(noise, " "), text);
+
+/** What a short form keeps exactly as the reply writes it, by kind: each finds its own in a text. A number
+ * counts outside code and links; noise never counts, nor does a list's numbering. */
+const WORD_FOR_WORD = {
+  code: (t) =>
+    (t.match(CODE) ?? []).filter((c) => withoutNoise(c.slice(1, -1)).trim()),
+  link: (t) => (t.match(LINK) ?? []).map((u) => u.replace(/[.,;:!?]+$/, "")),
+  number: (t) =>
+    withoutNoise(t.replace(CODE, " ").replace(LINK, " "))
+      .replace(LIST_NUMBER, "$1")
+      .match(NUMBER) ?? [],
+} satisfies Record<string, (text: string) => string[]>;
+
+/** Each token of `text` a short form keeps as written, once. */
+export function wordForWord(text: string): string[] {
+  return [
+    ...new Set(Object.values(WORD_FOR_WORD).flatMap((find) => find(text))),
+  ];
+}
+
+/** The `names`, then the tokens of `reply`, that `short` lacks. */
+export function lostTokens(
+  reply: string,
+  short: string,
+  names: string[],
+): string[] {
+  const kept = new Set(wordForWord(short));
+  return [
+    ...names.filter((n) => !short.includes(n)),
+    ...wordForWord(reply).filter((t) => !kept.has(t)),
+  ];
+}
+
+const COVER_LABELS = ["covered", "missing"] as const;
+/** The model the label was measured on; a change of model is a new measurement. */
+const LABEL_MODEL = "haiku";
+
+/** What the label reads: a short form, and one item it must cover. */
+function labelText(item: string, short: string): string {
+  return `A short reply an agent sent to a user, and one item it must cover.
+<reply>
+${short}
+</reply>
+<item>${item}</item>
+
+covered: the reply says what the item says, in any words.
+missing: the reply leaves the item out, or says less than it.`;
+}
+
+/** A redraw cuts at most this many times; each pass rewrites the one before it. */
+export const MAX_PASSES = 3;
+
+/** One rewrite and what its checks found; `missing` stays empty unless the label read it. */
+export type Pass = {
+  text: string;
+  capped: boolean;
+  lost: string[];
+  missing: string[];
+};
+
+/** What a redraw does after a pass: cut again, show a pass, or keep the reply long, for the fault named. */
+type Step =
+  | { kind: "cut" }
+  | { kind: "show"; pass: Pass }
+  | { kind: "long"; why: string };
+/** Where a redraw ends. */
+type End = Exclude<Step, { kind: "cut" }>;
+
+/** What keeps a pass from showing, the first that holds. A rewrite that saves nothing would only swap
+ * the agent's words for Haiku's. */
+const FAULTS: {
+  why: string;
+  holds: (p: Pass, before: string, labelGates: boolean) => boolean;
+}[] = [
+  { why: "cut off", holds: (p) => p.capped },
+  { why: "lost a token", holds: (p) => p.lost.length > 0 },
+  {
+    why: "left an item out",
+    holds: (p, _, labelGates) => labelGates && p.missing.length > 0,
+  },
+  {
+    why: "saved nothing",
+    holds: (p, before) => prose(p.text).length >= prose(before).length,
+  },
+];
+
+/** After the latest pass, given the passes before it, each of which kept all: cut once more, or end on
+ * the last pass that kept all, or on the long reply when none did. */
+export function nextStep(
+  reply: string,
+  kept: Pass[],
+  latest: Pass,
+  labelGates: boolean,
+): Step {
+  const previous = kept.at(-1);
+  const fault = FAULTS.find((f) =>
+    f.holds(latest, previous?.text ?? reply, labelGates),
+  );
+  if (!fault)
+    return kept.length + 1 < MAX_PASSES
+      ? { kind: "cut" }
+      : { kind: "show", pass: latest };
+  return previous
+    ? { kind: "show", pass: previous }
+    : { kind: "long", why: fault.why };
+}
+
+/** Each idea's expert a reply names, so its short form never drops one. */
+export function expertsNamed(answer: string): string[] {
+  const reply = stripCards(answer);
+  return (latestCard([{ role: "assistant", text: answer }]).ideas ?? [])
+    .map((d) => d.by)
+    .filter((n) => reply.includes(n));
 }
 
 /** A short key for a reply's text, so the store holds its short form without the long one. */
@@ -473,9 +635,13 @@ let lastStem = "";
 const typedFrom = new Map<string, number>();
 // Each long reply's short form, by textKey of the long one; `/long` shows the long ones again.
 const short = new Map<string, string>();
+// What the label called missing in each short form, by the same key: kept for a later measure, never shown.
+const flagged = new Map<string, string[]>();
 let showLong = false;
 // The store keeps the latest short forms only: a session's replies would outgrow its share.
 const KEPT_SHORT = 40;
+const newest = <V,>(m: Map<string, V>) =>
+  Object.fromEntries([...m].slice(-KEPT_SHORT));
 
 // ---- effects ----
 
@@ -503,29 +669,99 @@ async function registerCommands($: any) {
 // so the cap sits far above thinking and text together.
 export const SHORT_CAP = 16_000;
 
-/** Redraws a long reply short once the turn ends: its long form already showed while it streamed.
- * A rewrite no shorter than the reply, or missing any of `names`, keeps the reply long. */
-async function shorten($: any, reply: string, names: string[]) {
+/** Whether the covered/missing label decides which pass shows. It gates only once its rate on real
+ * redraws meets its bar (skills/short-replies/HYPOTHESIS.md); below the bar it only reports. */
+const LABEL_GATES = false;
+
+/** One Haiku call; one that gets no answer fails the redraw. */
+async function haiku($: any, prompt: string) {
   const r = await $.model.complete({
     model: "haiku",
-    prompt: shortAsk(reply),
+    prompt,
     maxTokens: SHORT_CAP,
     timeoutMs: 60_000,
   });
   if (!r.isAnswered) throw new Error(`the short reply failed: ${r.reason}`);
-  if (r.usage.output_tokens >= SHORT_CAP)
-    throw new Error("the short reply ran out of room, so the reply stays long");
-  // A rewrite that saves nothing would only swap the agent's words for Haiku's.
-  if (prose(r.text).length >= prose(reply).length) return;
-  const lost = names.filter((n) => !r.text.includes(n));
-  if (lost.length)
+  return r;
+}
+
+/** The items the label calls anything but covered in `text`. */
+export async function missingItems(
+  $: any,
+  items: string[],
+  text: string,
+): Promise<string[]> {
+  const labels = await Promise.all(
+    items.map((i) =>
+      $.model.classify(labelText(i, text), COVER_LABELS, {
+        model: LABEL_MODEL,
+      }),
+    ),
+  );
+  return items.filter((_, k) => labels[k] !== "covered");
+}
+
+/** What a reply must still say once short, as a list of items. */
+export async function cover($: any, reply: string): Promise<string[]> {
+  const items = coverItems((await haiku($, coverAsk(reply))).text);
+  if (!items.length)
     throw new Error(
-      `the short reply dropped ${lost.join(", ")}, so the reply stays long`,
+      "the short reply's cover list came back empty, so the reply stays long",
     );
-  short.set(textKey(reply), r.text.trim());
-  const kept = [...short].slice(-KEPT_SHORT);
-  await save($, `tend:${await sid($)}:short`, Object.fromEntries(kept));
+  return items;
+}
+
+/** The redraw: list what the reply must cover, then cut, check and cut again until a pass fails or
+ * MAX_PASSES ran. Model calls only; showing the outcome is the caller's. */
+export async function redraw(
+  $: any,
+  reply: string,
+  names: string[],
+): Promise<{ items: string[]; passes: Pass[]; step: End }> {
+  const items = await cover($, reply);
+  const asWritten = [...names, ...wordForWord(reply)];
+  const kept: Pass[] = [];
+  for (;;) {
+    const r = await haiku(
+      $,
+      shortAsk(kept.at(-1)?.text ?? reply, items, asWritten),
+    );
+    const latest: Pass = {
+      text: r.text.trim(),
+      capped: r.usage.output_tokens >= SHORT_CAP,
+      lost: lostTokens(reply, r.text, names),
+      missing: LABEL_GATES ? await missingItems($, items, r.text) : [],
+    };
+    const step = nextStep(reply, kept, latest, LABEL_GATES);
+    if (step.kind !== "cut") return { items, passes: [...kept, latest], step };
+    kept.push(latest);
+  }
+}
+
+/** What the label calls missing in the pass a redraw shows. Below its bar it reads that pass alone,
+ * for the record. */
+export async function labelShown(
+  $: any,
+  items: string[],
+  step: End,
+): Promise<string[]> {
+  if (step.kind !== "show") return [];
+  return LABEL_GATES ? step.pass.missing : missingItems($, items, step.pass.text);
+}
+
+/** Redraws a long reply short once the turn ends: its long form already showed while it streamed.
+ * A reply no pass could shorten whole just stays long. What the label calls missing is kept, unshown,
+ * beside the short form, for a later measure. */
+async function shorten($: any, reply: string, names: string[]) {
+  const { items, step } = await redraw($, reply, names);
+  if (step.kind === "long") return;
+  const key = textKey(reply);
+  const id = await sid($);
+  short.set(key, step.pass.text);
+  await save($, `tend:${id}:short`, newest(short));
   $.ui.invalidate("ui.render");
+  flagged.set(key, await labelShown($, items, step));
+  await save($, `tend:${id}:flagged`, newest(flagged));
 }
 
 async function readSession($: any) {
@@ -562,12 +798,16 @@ async function sid($: any): Promise<string> {
   return id;
 }
 
+/** A map back from what the store kept of it. */
+function refill<V>(m: Map<string, V>, saved: unknown) {
+  for (const [k, v] of Object.entries((saved as Record<string, V>) ?? {}))
+    m.set(k, v);
+}
+
 async function load($: any, id: string) {
   const get = (k: string) => $.store.get(`tend:${id}:${k}`);
-  for (const [k, v] of Object.entries(
-    ((await get("short")) as Record<string, string>) ?? {},
-  ))
-    short.set(k, v);
+  refill(short, await get("short"));
+  refill(flagged, await get("flagged"));
   open = (await get("open")) as Question[] | undefined;
   unheard = ((await get("unheard")) as Question[] | undefined) ?? [];
   $.ui.invalidate("ui.render");
@@ -742,6 +982,7 @@ function reset() {
   lastPaneItem = null;
   typedFrom.clear();
   short.clear();
+  flagged.clear();
   lastStem = "";
 }
 
@@ -857,10 +1098,7 @@ export const register: Register = (on) => {
     const asked =
       ((await $.session.messages()) as Msg[]).findLast((m) => m.role === "user")
         ?.text ?? "";
-    // Each idea's expert the reply names, so the short form never drops one.
-    const by = (latestCard([{ role: "assistant", text: e.answer }]).ideas ?? [])
-      .map((d) => d.by)
-      .filter((n) => reply.includes(n));
+    const by = expertsNamed(e.answer);
     if (!(await headless($)) && wantsShort(reply, asked))
       loud($, "tend", shorten($, reply, by));
     return r;

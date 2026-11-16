@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
  * Measures unsaid's said/assumed label on real work orders through the mod's own code in the engine:
- * it copies hunch's hooks into a scratch plugin beside a command that labels every case, runs that
- * command headless, and scores every run in --out against the labels in the cases file.
+ * a command beside hunch's hooks labels every case headless (../headless.ts), and each run in --out is
+ * scored against the labels in the cases file.
  *
  *   bun hunch/skills/unsaid/eval.ts <cases.jsonl> --out <folder> [--runs <n>]
  *
@@ -10,19 +10,10 @@
  * "text", "label"?}]}. The model labels the kinds unsaid checks; a line the cases leave unlabelled counts
  * in no rate. Runs add to --out, so `--runs 0` rescores the runs there without a model call.
  */
-import { $ } from "bun";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { runHeadless, scratchHunch } from "../headless.ts";
 
 const USAGE = "usage: eval.ts <cases.jsonl> --out <folder> [--runs <n>]";
 const { values, positionals } = parseArgs({
@@ -75,49 +66,12 @@ export const register: Register = (on, options) => {
 };
 `;
 
-/** A scratch copy of hunch whose hooks module adds the labelling command. */
-function scratchPlugin(): string {
-  const hunch = resolve(import.meta.dir, "../..");
-  const plugin = mkdtempSync(join(tmpdir(), "unsaid-eval-"));
-  cpSync(join(hunch, "hooks"), join(plugin, "hooks"), {
-    recursive: true,
-    filter: (f) => !f.endsWith(".test.ts"),
-  });
-  cpSync(join(hunch, "unsaid.d.ts"), join(plugin, "unsaid.d.ts"));
-  mkdirSync(join(plugin, ".claude-plugin"));
-  writeFileSync(
-    join(plugin, ".claude-plugin/plugin.json"),
-    JSON.stringify({
-      name: "hunch",
-      version: "0.0.0",
-      description: "Labels unsaid's eval cases",
-      types: "./unsaid.d.ts",
-    }),
-  );
-  writeFileSync(
-    join(plugin, "hooks/hooks.json"),
-    JSON.stringify({ modules: ["./eval.tsx"] }),
-  );
-  writeFileSync(join(plugin, "hooks/eval.tsx"), EVAL_MODULE);
-  return plugin;
-}
-
-async function labelAll(plugin: string, to: string) {
-  const r =
-    await $`claude -p --setting-sources "" --strict-mcp-config --no-session-persistence --plugin-dir ${plugin} ${`/unsaid-eval ${resolve(casesPath!)} ${to}`}`
-      .env({ ...process.env, ENABLE_CLAUDEAI_MCP_SERVERS: "false" })
-      .nothrow()
-      .quiet();
-  if (r.exitCode !== 0 || !existsSync(to))
-    throw new Error(
-      `${to} labelled nothing (exit ${r.exitCode}): ${r.stderr.toString() || r.stdout.toString()}`,
-    );
-}
-
 const first = runFiles().length + 1;
-const plugin = runs ? scratchPlugin() : "";
-for (let run = first; run < first + runs; run++)
-  await labelAll(plugin, join(out, `run-${run}.json`));
+const plugin = runs ? scratchHunch(EVAL_MODULE) : "";
+for (let run = first; run < first + runs; run++) {
+  const to = join(out, `run-${run}.json`);
+  await runHeadless(plugin, `unsaid-eval ${resolve(casesPath!)} ${to}`, to);
+}
 
 const key = (id: string, text: string) => `${id}\n${text}`;
 const expected = new Map(
