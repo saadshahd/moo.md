@@ -21,6 +21,8 @@ sound reads your repo's stack and proposes only the rules your code shows a surf
 
 Run `/sound:setup` again after your stack changes. It reconciles with the rules you already have.
 
+If your repo runs oxlint or a flat ESLint config, `/sound:setup` also adds a lint check for each confirmed rule that a linter can decide. It runs your whole lint after the edit and puts your config back if anything breaks. `/sound:review` reads the check hits first.
+
 `find` names a tool only when an agent can run it from text, can read the result back, its license and docs check out, and its author passes. The author check cannot see a hijacked maintainer, so each pick shows the age of its latest version. `stack` installs nothing and edits no manifest.
 
 ## Install
