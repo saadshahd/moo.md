@@ -220,6 +220,28 @@ export function withOpen(card: Card, open: Question[] | undefined): Card {
   return open.length ? { ...rest, questions: open } : rest;
 }
 
+/** The card as the band shows it: Claude's open questions, then the ones it never asked. */
+export function withUnheard(card: Card, unheard: Question[]): Card {
+  return unheard.length
+    ? { ...card, questions: [...(card.questions ?? []), ...unheard] }
+    : card;
+}
+
+/** What Claude reads beside a prompt that answers questions it never asked: each one the prompt cites
+ * by its number in the band (`q3: …`), counted after Claude's own `asked`. Undefined when it cites none. */
+export function answeredContext(
+  prompt: string,
+  asked: number,
+  unheard: Question[],
+): string | undefined {
+  const cited = unheard
+    .map((q, i) => ({ q, n: asked + i + 1 }))
+    .filter(({ n }) => new RegExp(`(?<!\\w)q${n}:`).test(prompt));
+  return cited.length
+    ? `The user's prompt answers questions the band asked them, which you never asked:\n${cited.map(({ q, n }) => `q${n}: ${q.q}`).join("\n")}`
+    : undefined;
+}
+
 /** The message a compaction ends on: the whole card, word for word. Undefined for an empty card. */
 export function replayCard(card: Card): string | undefined {
   if (!Object.keys(card).length) return undefined;
@@ -436,6 +458,9 @@ let card: Card = {};
 // The questions still open: a card block holds only those its writer chose, and the user's
 // next prompt closes them all, however it answered them.
 let open: Question[] | undefined;
+// Questions Claude never asked, put in the band by another part of hunch; the user's next prompt closes
+// them as it closes Claude's, and carries to Claude only the ones it answers.
+let unheard: Question[] = [];
 let shown: Shown | null = null;
 let lastPaneItem: string | null = null;
 let started = false;
@@ -509,10 +534,10 @@ async function readSession($: any) {
   $.ui.invalidate("ui.render");
 }
 
-/** Runs a detached step; a failure is shown, never swallowed, and never breaks the hook that started it. */
-function loud($: any, p: Promise<unknown>) {
+/** Runs a detached step of `part`; a failure is shown, never swallowed, and never breaks the hook that started it. */
+export function loud($: any, part: string, p: Promise<unknown>) {
   p.catch((err: unknown) =>
-    $.ui.toast(`tend: ${err instanceof Error ? err.message : String(err)}`),
+    $.ui.toast(`${part}: ${err instanceof Error ? err.message : String(err)}`),
   );
 }
 
@@ -544,14 +569,15 @@ async function load($: any, id: string) {
   ))
     short.set(k, v);
   open = (await get("open")) as Question[] | undefined;
+  unheard = ((await get("unheard")) as Question[] | undefined) ?? [];
   $.ui.invalidate("ui.render");
   // Pruning reads every value in the store, seconds on a full one, so the replies never wait on it.
-  if (!(await headless($))) loud($, keepRecent($, id));
+  if (!(await headless($))) loud($, "tend", keepRecent($, id));
 }
 
 /** A `-p` run or the SDK draws nowhere, so nobody sees what it would keep. Hooks spawn many:
  * each one kept would push a live session out of the store. */
-async function headless($: any): Promise<boolean> {
+export async function headless($: any): Promise<boolean> {
   return (await $.session.surfaces()).length === 0;
 }
 
@@ -617,6 +643,24 @@ async function setOpen($: any, questions: Question[]) {
   card = withOpen(card, open);
   $.ui.invalidate("ui.render");
   await save($, `tend:${sessionId}:open`, open);
+}
+
+async function setUnheard($: any, questions: Question[]) {
+  await sid($);
+  unheard = questions;
+  $.ui.invalidate("ui.render");
+  await save($, `tend:${sessionId}:unheard`, unheard);
+}
+
+/** Puts questions Claude never asked in the band's questions chip, after Claude's own; one the chip
+ * already holds shows once. */
+export async function addQuestions($: any, questions: Question[]) {
+  await sid($);
+  const held = new Set(withUnheard(card, unheard).questions?.map((q) => q.q));
+  await setUnheard($, [
+    ...unheard,
+    ...questions.filter((q) => !held.has(q.q) && held.add(q.q)),
+  ]);
 }
 
 async function showPane($: any, item: string) {
@@ -693,6 +737,7 @@ async function setAnswer($: any, n: number, options: string[], pick: string) {
 function reset() {
   card = {};
   open = undefined;
+  unheard = [];
   shown = null;
   lastPaneItem = null;
   typedFrom.clear();
@@ -710,7 +755,7 @@ async function act($: any, id: string) {
   } else if (kind === "probe") await fill($, `${arg}: `);
   else if (kind === "answer") {
     const [i, j] = rest.map(Number);
-    const q = card.questions?.[i];
+    const q = withUnheard(card, unheard).questions?.[i];
     // Answered once sent, not on the click: an abandoned answer leaves the question up.
     if (q) await setAnswer($, i + 1, q.options, q.options[j]);
   } else if (kind === "close") await hide($);
@@ -783,11 +828,20 @@ export const register: Register = (on) => {
         ? next({ ...e, context: [...(e.context ?? []), ...more] })
         : next(e);
     if (e.origin.kind !== "composer") return withContext(asked);
+    const answered = answeredContext(
+      e.text,
+      card.questions?.length ?? 0,
+      unheard,
+    );
+    const told = answered ? [answered] : [];
     // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
     await setOpen($, []);
-    if (asked.length || !Object.keys(card).length) return withContext(asked);
+    await setUnheard($, []);
+    if (asked.length || !Object.keys(card).length)
+      return withContext([...asked, ...told]);
     return withContext([
       `Only if this turn settles or changes what the card holds (the block may follow the last line, whatever the reply format says):\n${CARD_FORMAT}`,
+      ...told,
     ]);
   });
 
@@ -808,7 +862,7 @@ export const register: Register = (on) => {
       .map((d) => d.by)
       .filter((n) => reply.includes(n));
     if (!(await headless($)) && wantsShort(reply, asked))
-      loud($, shorten($, reply, by));
+      loud($, "tend", shorten($, reply, by));
     return r;
   });
 
@@ -889,6 +943,7 @@ export const register: Register = (on) => {
       started = true;
       loud(
         $,
+        "tend",
         (async () => {
           await registerCommands($);
           await readSession($);
@@ -899,7 +954,7 @@ export const register: Register = (on) => {
     // Surfaces with no Client (mobile, the editor's panel) keep their own band.
     if (!("Client" in els)) return next(e);
     const { Box, Client } = els;
-    const band = bandModel(card, shown);
+    const band = bandModel(withUnheard(card, unheard), shown);
     if (!band.chips.length && !band.body.length) return <Box />;
     // A blank line parts the band from the reply above it, so the chips read as controls, not its last line.
     return (
@@ -954,7 +1009,7 @@ export const register: Register = (on) => {
           { id: "close", label: "close", kind: "line" },
         ],
         [],
-        ...cardRows(card, name),
+        ...cardRows(withUnheard(card, unheard), name),
       ],
     };
     return (
