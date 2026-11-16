@@ -3,48 +3,58 @@ import { update } from "claude-code";
 import type { Unsaid } from "../unsaid.d.ts";
 import { addQuestions, headless, loud, type Question } from "./tend.tsx";
 
-/* intent writes its work order in a fenced `order` block, each line starting with its kind. Each line
- * that states the user's ask or its bar is checked against the user's own words, and one they never
- * said becomes a question in tend's questions chip; Claude reads it only with the user's answer.
- * Nothing waits on the user and nothing wakes Claude. */
+/* intent writes each line of its work order under a bold label: `**Ask:**`, `**Bar:**`, `**Not:**`,
+ * `**Assumed:**`. Each Ask and Bar line is checked against the user's own words, silently: one they
+ * never said becomes a question in tend's questions chip, the one thing the user sees, and Claude reads
+ * it only with the user's answer. Nothing waits on the user and nothing wakes Claude. */
 
-/** Which kinds of line are checked: the ask and its bar state what the user wants; a limit, and a
- * line the order itself marks as an assumption, are the order's own. */
-export const CHECKED = {
-  ask: true,
-  bar: true,
-  not: false,
-  assumption: false,
+/** Each kind of work-order line: the label it starts with, and whether it is checked. The ask and its
+ * bar state what the user wants; a limit, and a line the order itself marks assumed, are its own. */
+export const KINDS = {
+  ask: { label: "Ask", checked: true },
+  bar: { label: "Bar", checked: true },
+  not: { label: "Not", checked: false },
+  assumed: { label: "Assumed", checked: false },
 } as const;
-export type Kind = keyof typeof CHECKED;
+export type Kind = keyof typeof KINDS;
 export type Line = { kind: Kind; text: string };
-/** A work order: its block as written, its lines, and the rows of the block that name no kind. */
-export type Order = { block: string; lines: Line[]; unread: string[] };
+/** A work order: its labelled lines as written, and each line read. */
+export type Order = { text: string; lines: Line[] };
 
-// An order opens at a line's start: one quoted inside a reply is text, not an order.
-const ORDER_RE = /(?<=^|\n)```order[^\S\n]*\n([\s\S]*?)\n```/g;
-const ROW_RE = new RegExp(`^(${Object.keys(CHECKED).join("|")}):\\s*(\\S.*)$`);
+const KIND_OF = new Map<string, Kind>(
+  Object.entries(KINDS).map(([kind, { label }]) => [label, kind as Kind]),
+);
+// A label opens its line: one inside a quote (`> **Ask:**`) or a code block is text, not an order.
+const LINE_RE = new RegExp(
+  `^\\*\\*(${[...KIND_OF.keys()].join("|")}):\\*\\*\\s*(\\S.*)$`,
+);
+const FENCE_RE = /^\s*```/;
 
-/** One row of an order block as a line, or undefined when it names no kind. */
-function readRow(row: string): Line | undefined {
-  const [, kind, text] = row.match(ROW_RE) ?? [];
-  return kind && text ? { kind: kind as Kind, text } : undefined;
+/** One line of a reply as a work-order line, or undefined when no label opens it. */
+function readLine(line: string): Line | undefined {
+  const [, label, text] = line.match(LINE_RE) ?? [];
+  const kind = label && KIND_OF.get(label);
+  return kind && text ? { kind, text: text.trim() } : undefined;
 }
 
-/** A reply's work order: its last order block, since a restated order replaces the one before. */
+/** A reply's work order: its last run of labelled lines outside code, blank lines allowed between;
+ * a restated order replaces the one before. */
 export function lastOrder(answer: string): Order | undefined {
-  const block = [...answer.matchAll(ORDER_RE)].at(-1)?.[1];
-  if (block === undefined) return undefined;
-  const rows = block
-    .split("\n")
-    .map((r) => r.trim())
-    .filter(Boolean);
-  const read = rows.map(readRow);
-  return {
-    block,
-    lines: read.filter((l) => l !== undefined),
-    unread: rows.filter((_, i) => !read[i]),
-  };
+  const runs: { raw: string[]; lines: Line[] }[] = [];
+  let fenced = false;
+  let open = false;
+  for (const raw of answer.split("\n")) {
+    if (FENCE_RE.test(raw)) fenced = !fenced;
+    const line = fenced ? undefined : readLine(raw);
+    if (line) {
+      if (!open) runs.push({ raw: [], lines: [] });
+      runs.at(-1)!.raw.push(raw.trim());
+      runs.at(-1)!.lines.push(line);
+      open = true;
+    } else if (raw.trim()) open = false;
+  }
+  const last = runs.at(-1);
+  return last && { text: last.raw.join("\n"), lines: last.lines };
 }
 
 /** Rows a session keeps as the user's that the user never typed: a task's notice, a peer's message,
@@ -113,9 +123,9 @@ export const MAX_CHECKS = 3;
 /** Whether an order is checked: one not checked yet, while fewer than MAX_CHECKS ran. */
 export function shouldCheck(
   checked: readonly string[],
-  block: string,
+  order: string,
 ): boolean {
-  return checked.length < MAX_CHECKS && !checked.includes(block);
+  return checked.length < MAX_CHECKS && !checked.includes(order);
 }
 
 /** The question a line the user never said becomes. */
@@ -129,16 +139,11 @@ export function question(line: Line): Question {
 const UNSAID = { plugin: "hunch", key: "unsaid" } as const;
 
 async function check($: any, order: Order) {
-  const lines = order.lines.filter((l) => CHECKED[l.kind]);
+  const lines = order.lines.filter((l) => KINDS[l.kind].checked);
   const words = userWords(await $.session.messages());
   const labels = await Promise.all(lines.map((l) => label($, words, l.text)));
   const assumed = lines.filter((_, i) => labels[i] === "assumed");
   if (assumed.length) await addQuestions($, assumed.map(question));
-  const unread = order.unread.length + labels.filter((l) => !l).length;
-  if (unread)
-    throw new Error(
-      `${unread} of the work order's lines went unchecked: they named no kind, or got no label`,
-    );
 }
 
 export const register: Register = (on) => {
@@ -148,9 +153,9 @@ export const register: Register = (on) => {
     if (!order || (await headless($))) return r;
     const { value } = await $.state.get(UNSAID);
     const checked = (value as Unsaid | undefined)?.checked ?? [];
-    if (!shouldCheck(checked, order.block)) return r;
+    if (!shouldCheck(checked, order.text)) return r;
     await update($, UNSAID, (s: Unsaid | undefined) => ({
-      checked: [...(s?.checked ?? []), order.block],
+      checked: [...(s?.checked ?? []), order.text],
     }));
     loud($, "unsaid", check($, order));
     return r;

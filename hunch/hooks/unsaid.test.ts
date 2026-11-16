@@ -8,26 +8,36 @@ import {
   userWords,
 } from "./unsaid.tsx";
 
-const ORDER =
-  "```order\nask: Turn each piece of feedback into a GitHub Issue\nbar: each Issue number is told to the user\nnot: open a PR\nassumption: one Issue per message\nfile it at once\n```";
+const ORDER = [
+  "**Ask:** Turn each piece of feedback into a GitHub Issue",
+  "**Bar:** each Issue number is told to the user",
+  "",
+  "**Not:** open a PR",
+  "**Assumed:** one Issue per message",
+].join("\n");
 
 describe("the work order", () => {
-  test("is a reply's last order block: rows by kind, the rows that name none kept apart", () => {
-    const reply = `Before:\n\`\`\`order\nask: old\n\`\`\`\nNow:\n${ORDER}\nTake it?`;
+  test("is a reply's last run of labelled lines, outside quotes and code", () => {
+    const reply = [
+      "**Ask:** an old ask",
+      "Restated:",
+      ORDER,
+      "> **Ask:** quoted",
+      "```",
+      "**Bar:** in code",
+      "```",
+      "Take it?",
+    ].join("\n");
     expect(lastOrder(reply)).toEqual({
-      block: ORDER.slice("```order\n".length, -"\n```".length),
+      text: ORDER.replace("\n\n", "\n"),
       lines: [
-        {
-          kind: "ask",
-          text: "Turn each piece of feedback into a GitHub Issue",
-        },
+        { kind: "ask", text: "Turn each piece of feedback into a GitHub Issue" },
         { kind: "bar", text: "each Issue number is told to the user" },
         { kind: "not", text: "open a PR" },
-        { kind: "assumption", text: "one Issue per message" },
+        { kind: "assumed", text: "one Issue per message" },
       ],
-      unread: ["file it at once"],
     });
-    expect(lastOrder("> ```order\n> ask: quoted\n> ```")).toBeUndefined();
+    expect(lastOrder("> **Ask:** quoted\n```\n**Ask:** in code\n```")).toBeUndefined();
   });
   test("is checked when new, not again, and none past the session's last check", () => {
     expect(shouldCheck([], "a")).toBe(true);
@@ -125,12 +135,14 @@ describe("after a turn that states a work order", () => {
     );
     on("model.classify", (_: any, e: any) => {
       asked.push(e.text);
+      const said = (line: string) => e.text.includes(`<line>${line}</line>`);
+      // The model names no label for the ask, and calls the bar assumed.
       return {
-        value: e.text.includes(
-          "<line>each Issue number is told to the user</line>",
-        )
+        value: said("each Issue number is told to the user")
           ? "assumed"
-          : "said",
+          : said("Turn each piece of feedback into a GitHub Issue")
+            ? undefined
+            : "said",
       };
     });
     on("turn.complete", (_: any, e: any) => ({ text: e.answer }));
@@ -152,7 +164,7 @@ describe("after a turn that states a work order", () => {
     return { clock, asked, toasts, turn, submit };
   };
 
-  test("a line the user never said becomes a question; Claude reads it with the user's answer, once", async ($, on) => {
+  test("a line the user never said becomes a question, the only thing shown; Claude reads it with the user's answer, once", async ($, on) => {
     const { clock, asked, toasts, turn, submit } = setup($, on);
     const card =
       '\n```card\n{"questions":[{"q":"Which repo?","options":["moo"]}]}\n```';
@@ -161,9 +173,7 @@ describe("after a turn that states a work order", () => {
     await turn(`${ORDER}${card}`);
     await clock.settle();
     expect(asked.length).toBe(2);
-    expect(toasts).toEqual([
-      "unsaid: 1 of the work order's lines went unchecked: they named no kind, or got no label",
-    ]);
+    expect(toasts).toEqual([]);
     const unsaid = 'You never said "each Issue number is told to the user"';
     expect((await submit("q2: drop")).join("\n")).toContain(unsaid);
     expect((await submit("q2: drop")).join("\n")).not.toContain(unsaid);

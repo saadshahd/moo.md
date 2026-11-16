@@ -49,7 +49,7 @@ const runFiles = () => readdirSync(out).filter((f) => RUN_FILE.test(f));
 // The command labels each case's checked lines with the mod's own words and label functions.
 const EVAL_MODULE = `import type { Register } from "claude-code";
 import { register as hunch } from "./index.tsx";
-import { CHECKED, label, userWords } from "./unsaid.tsx";
+import { KINDS, label, userWords } from "./unsaid.tsx";
 export const register: Register = (on, options) => {
   hunch(on, options);
   on("session.start", { isInteractive: false }, async ($, e, next) => {
@@ -62,7 +62,7 @@ export const register: Register = (on, options) => {
     const done = [];
     for (const c of cases) {
       const words = userWords(c.messages);
-      const lines = await Promise.all(c.lines.filter((l: any) => CHECKED[l.kind]).map(async (l: any) => ({
+      const lines = await Promise.all(c.lines.filter((l: any) => KINDS[l.kind]?.checked).map(async (l: any) => ({
         kind: l.kind,
         text: l.text,
         got: await label($, words, l.text).catch((err: Error) => \`error: \${err.message}\`),

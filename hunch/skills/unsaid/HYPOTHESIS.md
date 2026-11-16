@@ -1,4 +1,4 @@
-With unsaid on, intent writes its work order as an `order` block, and each of its `ask` and `bar` lines is checked against the user's own words: what they typed and what they picked in Claude's questions. A line they never said becomes a question in tend's questions chip ("You never said …. Keep it in the work order?"). Claude reads it only when the user's next prompt answers it (`q3: drop`), with that answer; an unanswered line never reaches Claude and stands as the order stated it. A restated order is checked again, up to 3 times a session. Nothing waits on the user, and nothing wakes Claude.
+With unsaid on, intent opens each line of its work order with a bold label (`**Ask:**`, `**Bar:**`, `**Not:**`, `**Assumed:**`), and each Ask and Bar line is checked against the user's own words: what they typed and what they picked in Claude's questions. The check is a silent audit: the user sees only its questions. A line they never said becomes a question in tend's questions chip ("You never said …. Keep it in the work order?"). Claude reads it only when the user's next prompt answers it (`q3: drop`), with that answer; an unanswered line never reaches Claude and stands as the order stated it. A restated order is checked again, up to 3 times a session. Nothing waits on the user, and nothing wakes Claude.
 
 Graduate when, over 10 real intent sessions with unsaid on, the user corrects what they wanted after the work order in at most 1 (the measured rate before it was 10 in 50), and a re-measure keeps the label at 0.8 or more on each class. Kill if the user turns it off, answers none of its questions across 10 sessions, or later corrects a line the label called said in 2 of 10 sessions.
 
@@ -6,7 +6,7 @@ Graduate when, over 10 real intent sessions with unsaid on, the user corrects wh
 
 The said/assumed label is a model check (Haiku, one `$.model.classify` call per line), so it has a rate, not a guarantee. Its bar is 0.8, as hum's `minJudgeRate`, on each class: assumed lines it catches, and said lines it leaves alone. Raw accuracy alone is too easy here: 72% of lines are assumed, so a label that calls every line assumed scores 0.72. Both classes clear 0.8, so the label could have sent every unsaid line to Claude. The user chose answers only: at about 3 unsaid lines per order, Claude would hear about most of every order.
 
-Re-measure with `bun hunch/skills/unsaid/eval.ts <cases.jsonl> --out <folder> --runs 3`. It runs the mod's own code in a headless session and keeps each run's raw labels, so `--runs 0` rescores them.
+Re-measure with `bun hunch/skills/unsaid/eval.ts <cases.jsonl> --out <folder> --runs 3`. It runs the mod's own code in a headless session and keeps each run's raw labels, so `--runs 0` rescores them. A line the model gives no label is never shown; the eval counts it under "no label".
 
 ## Field notes
 
