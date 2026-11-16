@@ -1,6 +1,12 @@
-With tend on, a reply with more prose than two 80-column lines is redrawn short once its turn ends: a haiku rewrite that keeps every decision, result and next action, one fact per sentence or row. `/long` shows replies at full length again; a prompt that says "explain" or "walk me through" keeps its reply long.
+With tend on, a reply with more prose than two 80-column lines is redrawn short once its turn ends. Haiku lists what the reply must keep (each decision it asks, result, option with why it won or lost, and next action), then rewrites the reply from that list, one fact per sentence or row, and cuts it again, up to 3 passes. A pass shows only if it keeps every number, `code` span and link of the reply, and every expert it names; the last pass that did shows, and when the first did not, the reply stays long. `/long` shows replies at full length again; a prompt that says "explain" or "walk me through" keeps its reply long.
 
 Graduate when it stays on for 10 real sessions, the user runs `/long` in at most two of them, and never calls a short reply a wall of text. Kill if the user turns it off, runs `/long` to recover a fact the short reply cut, or a later turn leans on text only the long reply held.
+
+## The label's bar
+
+A Haiku label also reads each listed item against the short form: covered or missing. It has a rate, not a guarantee. Its bar is 0.8, as hum's `minJudgeRate`, on each class: cuts the readers found that it catches, and redraws they passed that it leaves alone. Below the bar it decides nothing: a toast names the items it calls missing, and `/long` shows the reply whole.
+
+Re-measure with `bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <folder> --runs 3 --redraws 1`. It runs tend's own code in a headless session and keeps each run's raw output, so `--runs 0` rescores them.
 
 ## Field notes
 
@@ -32,3 +38,24 @@ Graduate when it stays on for 10 real sessions, the user runs `/long` in at most
 - 6 of the 8 passed the 2,048 cap, so their replies stayed long, though every rewrite ended whole.
 - The cap is now 16,000. At it, 8 of 8 came back whole, the largest at 4,208 tokens.
 - A cut rewrite still passes its cap: one cut at a 1,200 cap reported 3,248 tokens.
+
+### 2026-11-16 — every pass is checked, and none that drops a number shows
+
+| check | runs | cases | cut caught | kept left alone |
+|---|---|---|---|---|
+| model label | 3 | 282 | 15/15 (1.00) | 120/267 (0.45) |
+| code check | 3 | 282 | 9/15 (0.60) | 186/267 (0.70) |
+
+- Cases: the 105 redraws two readers judged on 2026-09-30, as the user saw them. 94 came back whole from the readers' tool output and the transcripts, every one length-checked; one short form was rebuilt from the diff a reader printed. 5 cut something the user needed, 89 did not. The 2 the readers split on are left out, and 9 survive nowhere whole.
+- The cases hold the user's own words from private repos, so they stay out of the repo, at `~/.local/share/moo/evals/redraw/cases.jsonl` on the Mac that measured them.
+- The label caught all 5 cuts in each run but flagged 55% of the redraws the readers passed. In 4 of the first 6 flags, the old short form had dropped the item, such as a saved file's path or a count of cut ideas, and the readers had not counted it as needed. Below its bar, it only reports.
+- The code check is exact, so it gates from the start. Each pass is told to keep every number, `code` span and link as written, and every row and column of a table. On a 17-case trial before that last clause, 5 replies stayed long, every number they lost from a table.
+- One redraw run of the new machine on the 94 long replies:
+
+| shown short | long: lost a number | long: saved nothing | shown at pass 1, 2, 3 | prose cut, median | seconds, median | label reports |
+|---|---|---|---|---|---|---|
+| 82 | 10 | 2 | 21, 22, 39 | 36% | 18 | 18 of 82 |
+
+- 8 of the 10 that stayed long for a lost number lost one or two numbers in prose. The one reader-found cut among them, a song draft, lost its table's line and syllable counts.
+- The old single rewrite cut a median 13% of these replies' prose, in one Haiku call. The new one cuts 36% and takes about 18 seconds, so the short form replaces the long one later.
+- Not measured yet: whether the new short forms drop what the user needs (no reader has read them), and whether the label's toast helps or only adds noise.
