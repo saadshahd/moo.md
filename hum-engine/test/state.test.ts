@@ -505,6 +505,15 @@ test("a status file with fields a newer engine added reads, without those fields
 	expect(readStatus(path)).toEqual({ ok: true, status: { ...status, cards: [card], choices: [choice] } });
 });
 
+test("a status file an older engine wrote, whose measure has no breaks by way of reaching done, reads with none", () => {
+	const { path, status } = statusFile();
+	const measure = { window: 20, merges: 1, abandoned: 0, notes: 0, questions: 0, tokens: 0, byPath: [] };
+
+	writeFileSync(path, JSON.stringify({ ...status, measure }));
+
+	expect(readStatus(path)).toEqual({ ok: true, status: { ...status, measure: { ...measure, byDoneBy: [] } } });
+});
+
 test("a heartbeat with a field a newer engine added reads, without that field", () => {
 	const path = join(dir, "heartbeat.json");
 	const heartbeat = { time: 5, engineVersion: "0.1.0", configHash: "h", inFlight: [], intervalMs: 600_000 };
