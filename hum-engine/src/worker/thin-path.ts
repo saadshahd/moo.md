@@ -640,7 +640,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					prompt: PROSE_PROMPTS[purpose](config, item, diff),
 					diff,
 					model: (await tierFor(purpose)).model,
-					run: (text, schema) => runAgent(purpose, text, schema, signal, { head, diff }),
+					run: (text, schema) => runAgent(purpose, text, schema, signal, { head }),
 					canTake: (type) => actor.getSnapshot().can({ type }),
 				});
 
@@ -767,11 +767,11 @@ type Purpose = (typeof PURPOSES)[number];
 const PLACED_BY_DIFF = { plan: false, build: false, fix: true, review: true } as const satisfies Record<Purpose, boolean>;
 
 /**
- * What a plan or review run reads besides its prompt: the commit its clone stands at, and the whole diff, which its
+ * What a plan or review run reads besides its prompt: the commit its clone stands at, which fixes the whole diff its
  * prompt may cut short. Only these runs are given it: their answer is all they do, while a build or fix run's change
  * lives in a clone that a kill loses.
  */
-type Judged = { readonly head: string; readonly diff: string };
+type Judged = { readonly head: string };
 
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
