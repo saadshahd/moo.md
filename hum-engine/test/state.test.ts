@@ -17,6 +17,7 @@ import {
 	writeStatus,
 } from "../src/index.ts";
 import { kindMachine } from "../src/index.ts";
+import { LOG_FORMAT } from "../src/state/events.ts";
 import { slug } from "../src/state/fs.ts";
 import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -124,16 +125,52 @@ test("a snapshot from an older engine restores in place and saves under the newe
 	expect(JSON.parse(readFileSync(next.items.path("#68"), "utf8")).engineVersion).toBe("0.2.0");
 });
 
-test("an older engine that meets a newer engine's snapshot gives one card however often it looks, keeps the file, and does not start the item over", async () => {
-	waitingItem(openState(dir, { engineVersion: "0.2.0", now: Date.now }), "#68");
+const answered = (sourceId: string) => ({ source: "thread", sourceId, itemId: "#68", type: "answered", payload: {} });
+
+test("an older engine that meets a newer engine's snapshot and log gives one card however often it looks, keeps the files, and does not start the item over", async () => {
+	const newer = openState(dir, { engineVersion: "0.2.0", now: Date.now });
+
+	waitingItem(newer, "#68");
+	newer.events.add(answered("a1"));
 
 	const rolledBack = openState(dir, { engineVersion: "0.1.0", now: Date.now });
-	const before = readFileSync(rolledBack.items.path("#68"));
+	const files = () => [rolledBack.items.path("#68"), ...readdirSync(join(dir, "events", slug("#68")), { withFileTypes: true }).map((entry) => join(entry.parentPath, entry.name))].map((path) => readFileSync(path));
+	const before = files();
 
-	for (let times = 0; times < 3; times++) expect((await rolledBack.items.restore("#68", tiny)).ok).toBe(false);
+	for (let times = 0; times < 3; times++) {
+		expect((await rolledBack.items.restore("#68", tiny)).ok).toBe(false);
+		expect(rolledBack.events.read("#68").ok).toBe(false);
+	}
 
 	expect(rolledBack.faults.list().map((card) => card.code)).toEqual(["snapshot-from-newer-engine"]);
-	expect(readFileSync(rolledBack.items.path("#68"))).toEqual(before);
+	expect(files()).toEqual(before);
+});
+
+test("a log record in a format newer than the engine reads gives one card however often the log is read, and nothing of the log is read", () => {
+	const state = openState(dir, { now: Date.now });
+	const { event } = state.events.add(answered("a1"));
+
+	writeFileSync(join(dir, "events", slug("#68"), "later.json"), JSON.stringify({ ...event, format: LOG_FORMAT + 1, sourceId: "a2", seq: 1 }));
+
+	for (let times = 0; times < 3; times++) expect(state.events.read("#68").ok).toBe(false);
+
+	expect(() => state.events.list("#68")).toThrow(`format ${LOG_FORMAT + 1}`);
+	expect(state.faults.list().map((card) => card.code)).toEqual(["snapshot-from-newer-engine"]);
+});
+
+test("a copied log keeps each record as its engine wrote it, at the next places in the log it joins, once", () => {
+	const work = openState(join(dir, "work"), { engineVersion: "0.2.0", now: Date.now });
+	const publish = openState(join(dir, "publish"), { engineVersion: "0.3.0", now: Date.now });
+
+	publish.events.add(answered("a1"));
+	work.events.add(answered("a2"));
+
+	for (let times = 0; times < 2; times++) work.events.copyTo(publish.events, "#68");
+
+	expect(publish.events.list("#68").map(({ sourceId, engineVersion, seq }) => ({ sourceId, engineVersion, seq }))).toEqual([
+		{ sourceId: "a1", engineVersion: "0.3.0", seq: 0 },
+		{ sourceId: "a2", engineVersion: "0.2.0", seq: 1 },
+	]);
 });
 
 test("a shipped envelope migration runs on an older format; a format with no migration reads as damaged, with one card", async () => {
@@ -278,12 +315,15 @@ const readsOf = (state: State) =>
 /** Runs and events live one folder deeper, under the item's slug. */
 const folderOf = (store: keyof typeof SAVED_0_1_0): string => (store === "runs" || store === "events" ? join(dir, store, slug(SAVED_0_1_0[store].itemId)) : join(dir, store));
 
+/** Where a record reads otherwise than hum 0.1.0 wrote it: its log record, at format 0, climbs to this engine's format, its thread answer `answer` read as `answered`. */
+const READS_AS: Partial<Record<keyof typeof SAVED_0_1_0, { readonly format: number; readonly type: string }>> = { events: { format: LOG_FORMAT, type: "answered" } };
+
 // SAFETY: Object.keys of a literal object lists exactly the keys its type names.
 test.each(Object.keys(SAVED_0_1_0) as (keyof typeof SAVED_0_1_0)[])("a %s record hum 0.1.0 wrote reads, with a field a newer engine added", (store) => {
 	mkdirSync(folderOf(store), { recursive: true });
 	writeFileSync(join(folderOf(store), "record.json"), JSON.stringify({ ...SAVED_0_1_0[store], addedLater: true }));
 
-	expect(readsOf(openState(dir, { now: Date.now }))[store]()).toEqual([expect.objectContaining(SAVED_0_1_0[store])]);
+	expect(readsOf(openState(dir, { now: Date.now }))[store]()).toEqual([expect.objectContaining({ ...SAVED_0_1_0[store], ...READS_AS[store] })]);
 });
 
 test("a failed save of a new item leaves nothing behind, and a later save clears the card", () => {

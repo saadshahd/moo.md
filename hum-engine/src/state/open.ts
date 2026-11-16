@@ -49,7 +49,7 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		stops: join(dir, STOPS_DIR),
 		faults,
 		items: new Items(join(dir, "items"), faults, now, codec),
-		events: new EventLog(join(dir, "events"), now),
+		events: new EventLog(join(dir, "events"), now, faults, codec.engineVersion),
 		ops: new OpKeys(join(dir, "ops"), now),
 		runs: new RunRecords(join(dir, "runs"), now),
 		parked: new Records(join(dir, "parked"), Parked),

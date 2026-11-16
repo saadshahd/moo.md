@@ -18,6 +18,7 @@ import { tempDir } from "../fixtures/temp.ts";
 import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
 import { Holder, ItemId } from "../../src/adapter-api.ts";
 import { doneByOf, foldItem, foldMachine } from "../../src/state/item-log.ts";
+import { openState } from "../../src/state/open.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
 const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
@@ -172,6 +173,19 @@ test("a merged item is not picked up again after its claim expires", async () =>
 	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "idle" });
 	expect(w.shim.calls()).toHaveLength(2);
 	expect(w.repo.show(id)).toContain("state: done");
+});
+
+test("an item whose log holds a record a newer engine wrote is held with that engine's card, and no run starts", async () => {
+	const w = await world({ script: [] });
+	const id = w.repo.seed("Write the note");
+
+	const asked = w.shim.calls().length;
+
+	openState(w.state.dir, { engineVersion: "99.0.0", now: Date.now }).events.add({ source: "thread", sourceId: "a1", itemId: id, type: "answered", payload: {} });
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "held", why: expect.stringContaining("hum 99.0.0") });
+	expect(w.state.faults.list().map(({ code }) => code)).toEqual(["snapshot-from-newer-engine"]);
+	expect(w.shim.calls()).toHaveLength(asked);
 });
 
 test("a merge that keeps losing the race to the base raises one card after mergeTries passes, kept while it stays held and gone once the item leaves the base by a pull request", async () => {

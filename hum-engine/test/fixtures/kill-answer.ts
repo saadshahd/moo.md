@@ -15,7 +15,7 @@ const kill = () => process.kill(process.pid, "SIGKILL");
 const state = openState(dir, { now: Date.now });
 const key = state.runs.keyFor("#68", "plan");
 
-const { begun } = await answerOnce(state, { key, launch: { name: `hum #68 plan #${key.attempt}` }, question: { prompt: "Plan the change." } }, async ({ adopted }) => {
+const { begun } = await answerOnce(state, { key, launch: { name: `hum #68 plan #${key.attempt}` }, machineVersion: "1", question: { prompt: "Plan the change." } }, async ({ adopted }) => {
 	if (mode === "before-run") kill();
 
 	// An adopted run whose transcript holds its answer is read, never asked again.

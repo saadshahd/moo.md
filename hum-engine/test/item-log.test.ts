@@ -1,19 +1,18 @@
 import { beforeEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AnyActor, createActor, createAsyncLogic, waitFor } from "xstate";
 import { kindMachine, openState, persistedSnapshot, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
-import { slug } from "../src/state/fs.ts";
 import { answerOnce, doneByOf, foldItem, foldMachine, keepLanding, machineStarted, ownerAnswered, picked, recordMachine } from "../src/state/item-log.ts";
 import { finished } from "./fixtures/answers.ts";
-import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
 const feature = shippedConfig().kinds.feature!;
 const ITEM = "#68";
+const VERSION = feature.machine.version;
 
 let dir: string;
 
@@ -60,15 +59,15 @@ const pass = async (state: State, script: Script, answer?: string): Promise<void
 
 				if (step === "fail") throw new Error("the checks fail");
 
-				if (source === "fix") (await answerOnce(state, { key: state.runs.keyFor(ITEM, source), launch: { name: source } }, async () => finished({ status: "done" }))).begun.end();
+				if (source === "fix") (await answerOnce(state, { key: state.runs.keyFor(ITEM, source), launch: { name: source }, machineVersion: VERSION }, async () => finished({ status: "done" }))).begun.end();
 			},
 		});
 
 	const sources = { plan: picks("plan"), build: acts("build"), checks: acts("checks"), fix: acts("fix"), review: picks("review") };
-	const inspect = recordMachine(state.events, ITEM);
+	const inspect = recordMachine(state.events, ITEM, VERSION);
 
 	if (answer === undefined) {
-		state.events.add(machineStarted(ITEM, false));
+		state.events.add(machineStarted(ITEM, false, VERSION));
 		actor = createActor(kindMachine(feature, sources), { inspect }).start();
 	} else {
 		const restored = await state.items.restore(ITEM, feature, { sources, inspect });
@@ -147,7 +146,7 @@ test("how landing found the change stands through later passes until landing fin
 	const state = openState(dir, { now: Date.now });
 
 	keepLanding(state.events, ITEM, "abc", "checks");
-	state.events.add(machineStarted(ITEM, true));
+	state.events.add(machineStarted(ITEM, true, VERSION));
 	state.events.add(ownerAnswered(ITEM, 1));
 	planPicked(state, "plan-ready");
 	keepLanding(state.events, ITEM, "abc", "checks");
@@ -171,24 +170,12 @@ test("the log keeps each judge's last pick", () => {
 	expect([picks.plan?.pick.event, picks.review?.pick.event, picks.review?.head, picks.alignment?.alignment]).toEqual(["plan-ready", "approve", "def", alignment]);
 });
 
-test("a log hum 0.1.0 saved folds: its thread answer counts as the owner's", () => {
-	const folder = join(dir, "events", slug(SAVED_0_1_0.events.itemId));
-
-	mkdirSync(folder, { recursive: true });
-	writeFileSync(join(folder, "record.json"), JSON.stringify(SAVED_0_1_0.events));
-
-	const events = openState(dir, { now: Date.now }).events.list(SAVED_0_1_0.events.itemId);
-	const { fixRuns, merged } = foldItem(events);
-
-	expect({ at: foldMachine(feature, events).value, fixRuns, merged }).toEqual({ at: "planning", fixRuns: 0, merged: false });
-});
-
 /** Asks the plan question once, as a run of the item would, and ends the run's record; counts each time the model is asked. */
 const planAsker = (state: State, answer: () => RunOutcome) => {
 	let asked = 0;
 
 	const ask = async () => {
-		const { begun } = await answerOnce(state, { key: state.runs.keyFor(ITEM, "plan"), launch: { name: "plan" }, question: { prompt: "Plan the change." } }, async () => {
+		const { begun } = await answerOnce(state, { key: state.runs.keyFor(ITEM, "plan"), launch: { name: "plan" }, machineVersion: VERSION, question: { prompt: "Plan the change." } }, async () => {
 			asked++;
 
 			return answer();
@@ -201,8 +188,8 @@ const planAsker = (state: State, answer: () => RunOutcome) => {
 };
 
 test.each([
-	["a pass that starts the machine over reads it back", machineStarted(ITEM, false), 1],
-	["a pass that starts the item afresh asks again", machineStarted(ITEM, true), 2],
+	["a pass that starts the machine over reads it back", machineStarted(ITEM, false, VERSION), 1],
+	["a pass that starts the item afresh asks again", machineStarted(ITEM, true, VERSION), 2],
 	["the owner's answer makes the next run ask again", ownerAnswered(ITEM, 1), 2],
 ] as const)("an answer the log keeps to the same question: %s", async (_, between, times) => {
 	const state = openState(dir, { now: Date.now });
@@ -231,7 +218,7 @@ test("a build or fix run, which asks no question the log can answer, runs every 
 	const state = openState(dir, { now: Date.now });
 	let asked = 0;
 
-	for (let run = 0; run < 2; run++) (await answerOnce(state, { key: state.runs.keyFor(ITEM, "build"), launch: { name: "build" } }, async () => (asked++, finished({ status: "done" })))).begun.end();
+	for (let run = 0; run < 2; run++) (await answerOnce(state, { key: state.runs.keyFor(ITEM, "build"), launch: { name: "build" }, machineVersion: VERSION }, async () => (asked++, finished({ status: "done" })))).begun.end();
 
 	expect(asked).toBe(2);
 });

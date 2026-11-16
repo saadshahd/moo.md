@@ -36,8 +36,15 @@ export const measureInputsOf = (state: State) => {
 		return isNamedBy(BREAK_NOTES.fixed, commits) || broken.has(merge.sha) ? "fixed" : "clean";
 	};
 
+	/** How the item reached done, from its log; unknown where a newer engine wrote some of it, which raises the item's card. */
+	const reachedDoneBy = (item: string) => {
+		const log = state.events.read(item);
+
+		return log.ok ? doneByOf(foldItem(log.value)) : undefined;
+	};
+
 	return {
-		merged: merges.map((merge) => ({ item: merge.item, at: merge.at, paths: merge.paths, doneBy: doneByOf(foldItem(state.events.list(merge.item))), label: labelOf(merge), ...costOf(merge.item, commitsOf(merge)) })),
+		merged: merges.map((merge) => ({ item: merge.item, at: merge.at, paths: merge.paths, doneBy: reachedDoneBy(merge.item), label: labelOf(merge), ...costOf(merge.item, commitsOf(merge)) })),
 		abandoned: state.parked.list().flatMap(({ item, why, since }) => (why === "stuck" && !merges.some((merge) => merge.item === item) ? [{ item, since, paths: [], ...costOf(item, []) }] : [])),
 		loopTokens: spent.filter(({ item }) => item.startsWith(LOOP_SPEND_PREFIX)).reduce((total, { total: tokens }) => total + tokens, 0),
 	};

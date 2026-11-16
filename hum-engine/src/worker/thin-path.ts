@@ -409,6 +409,11 @@ type Driven = ThinPathOptions & {
 
 const drive = async (d: Driven): Promise<ThinResult> => {
 	const { state, runner, config, kind, id, item, branch, clone, g, base } = d;
+	const log = state.events.read(id);
+
+	if (!log.ok) return { outcome: "held", item: id, why: log.fault.cause };
+
+	const { version } = kind.machine;
 	const maxFixes = config.hum.maxFixRuns;
 	const result = Promise.withResolvers<ThinResult>();
 
@@ -494,7 +499,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const tier = await tierFor(purpose);
 		const launch = { name: `hum ${id} ${purpose} #${key.attempt}`, sessionId: d.newSessionId() };
 
-		const { begun, outcome } = await answerOnce(state, { key, launch, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
+		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
 
 			return runner
@@ -653,7 +658,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review") };
 
 	if (d.resume) {
-		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), inspect: recordMachine(state.events, id) });
+		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), inspect: recordMachine(state.events, id, version) });
 
 		if (!restored.ok) return { outcome: "held", item: id, why: restored.fault.cause };
 
@@ -663,8 +668,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		// The wait it was saved in is already handled; only what follows the answer needs a reaction.
 		handled = String(actor.getSnapshot().value);
 	} else {
-		state.events.add(machineStarted(id, d.restarted));
-		actor = createActor(kindMachine(kind, sources), { inspect: recordMachine(state.events, id) });
+		state.events.add(machineStarted(id, d.restarted, version));
+		actor = createActor(kindMachine(kind, sources), { inspect: recordMachine(state.events, id, version) });
 	}
 
 	const react = async (value: string) => {
