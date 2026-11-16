@@ -20,6 +20,7 @@ export const Change = z
 
 export type Change = z.infer<typeof Change>;
 
+/** Worst first: a change that several commits held takes the first of these that any of them has. */
 export const LABELS = ["reverted", "fixed", "clean"] as const;
 
 export type Label = (typeof LABELS)[number];

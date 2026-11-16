@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Label } from "../decide/risk.ts";
+import { type Label, LABELS } from "../decide/risk.ts";
 
 const name = z.string().min(1);
 const time = z.int().nonnegative();
@@ -79,6 +79,11 @@ export type Merge = z.infer<typeof Merge>;
 
 /** The commits that held a merged change; its `sha` alone where hum did not see them. */
 export const commitsOf = ({ sha, commits }: Pick<Merge, "sha" | "commits">): readonly string[] => commits ?? [sha];
+
+/** A commit on the base that git's label rule finds a later change reverted or fixed, or that a test of the base failed after. */
+export const BrokenCommit = z.object({ sha: name, label: z.enum(LABELS).exclude(["clean"]) });
+
+export type BrokenCommit = z.infer<typeof BrokenCommit>;
 
 /** A test of the base that failed after an item's change merged. */
 export const Break = z.object({ item: name, sha: name, at: time, paths: z.array(name), level: name, failure: z.string(), onBreak: z.enum(["follow-up", "block"]), followUp: name });

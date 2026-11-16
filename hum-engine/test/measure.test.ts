@@ -6,6 +6,7 @@ import { BOUNDARIES, SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { labelChanges, type PastChange } from "../src/decide/labels.ts";
 import { measureInputsOf } from "../src/measure/inputs.ts";
+import { runLoopPass } from "../src/loop/pass.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
 import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
@@ -77,7 +78,7 @@ test("only the last window of merges counts, each way of reaching done over its 
 	expect(measureOf({ merged: [], abandoned, ...window })).toBeUndefined();
 });
 
-test("the inputs come from what the engine saved: notes by commit or item, questions by op key, stuck items as abandoned, tokens with the loop's own, each merge's way of reaching done from its item's log, and its label from the reverts and fixes of its commits and the base's breaks after it", async () => {
+test("the inputs come from what the engine saved: notes by commit or item, questions by op key, stuck items as abandoned, tokens with the loop's own, each merge's way of reaching done from its item's log, and its label the worst the loop saved for its commits", async () => {
 	const state = freshState();
 	const asked = (itemId: string, op: string, done: "done" | "started" = "done") => state.ops.once({ itemId, run: "ask", attempt: 0, op }, { holds: async () => done === "done", run: async () => {} });
 
@@ -91,7 +92,7 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 	await asked("a", "question:one");
 	await asked("a", "comment:other");
 
-	const broke = (source: "revert" | "fix", sourceId: string, change: string) => state.notes.put(`${source}:${sourceId}`, { source, sourceId, change, hunk: "", text: "n", at: 7 });
+	const labelled = (sha: string, label: "reverted" | "fixed") => state.labels.put(sha, { sha, label });
 
 	/** A merge whose item's log holds how landing found its change. */
 	const mergeLogged = (merge: Merge, found: DoneBy) => {
@@ -101,25 +102,50 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 	};
 
 	mergeLogged({ item: "fixed", sha: "merge-f", at: 6, paths: [], commits: ["run-f", "merge-f"], baseChecked: true }, "review");
-	broke("fix", "f1", "run-f");
-	mergeLogged({ item: "reverted", sha: "merge-r", at: 6, paths: [], commits: ["merge-r"], baseChecked: true }, "checks");
-	broke("fix", "f2", "merge-r");
-	broke("revert", "r1", "merge-r");
-	mergeLogged({ item: "broke-base", sha: "merge-b", at: 6, paths: [], commits: ["merge-b"], baseChecked: true }, "owner");
-	state.breaks.put("broke-base", { item: "broke-base", sha: "merge-b", at: 7, paths: [], level: "low", failure: "f", onBreak: "follow-up", followUp: "fix-b" });
+	labelled("run-f", "fixed");
+	mergeLogged({ item: "reverted", sha: "merge-r", at: 6, paths: [], commits: ["run-r", "merge-r"], baseChecked: true }, "checks");
+	labelled("run-r", "fixed");
+	labelled("merge-r", "reverted");
 
 	const inputs = measureInputsOf(state);
 
 	expect({ ...inputs, merged: inputs.merged.toSorted((x, y) => x.item.localeCompare(y.item)) }).toEqual({
 		merged: [
 			{ item: "a", at: 5, paths: ["ui/a.ts"], doneBy: undefined, label: "clean", notes: 2, questions: 1, tokens: 700 },
-			{ item: "broke-base", at: 6, paths: [], doneBy: "owner", label: "fixed", notes: 0, questions: 0, tokens: 0 },
-			{ item: "fixed", at: 6, paths: [], doneBy: "review", label: "fixed", notes: 1, questions: 0, tokens: 0 },
-			{ item: "reverted", at: 6, paths: [], doneBy: "checks", label: "reverted", notes: 2, questions: 0, tokens: 0 },
+			{ item: "fixed", at: 6, paths: [], doneBy: "review", label: "fixed", notes: 0, questions: 0, tokens: 0 },
+			{ item: "reverted", at: 6, paths: [], doneBy: "checks", label: "reverted", notes: 0, questions: 0, tokens: 0 },
 		],
 		abandoned: [{ item: "b", since: 6, paths: [], notes: 0, questions: 0, tokens: 0 }],
 		loopTokens: 90,
 	});
+});
+
+test("the loop saves each merge's label as git's rule gives it, so one fix that names two merged changes marks both fixed, and a test of the base that failed after a third marks it fixed", async () => {
+	const state = freshState();
+	const [a, b, c, d, fix] = ["aaaaaaa1", "bbbbbbb2", "ccccccc3", "ddddddd4", "fffffff5"];
+
+	const nothingFiled = async (): Promise<never> => {
+		throw new Error("the loop files nothing here");
+	};
+
+	for (const [at, sha] of [a, b, c, d].entries()) state.merges.put(sha, { item: sha, sha, at, paths: ["x.ts"], commits: [sha] });
+
+	state.breaks.put(c, { item: c, sha: c, at: 9, paths: ["x.ts"], level: "low", failure: "f", onBreak: "follow-up", followUp: "fix-c" });
+
+	await runLoopPass({
+		state,
+		config: configWith(),
+		workSource: { fileFollowUp: nothingFiled, comment: nothingFiled },
+		now: Date.now,
+		comments: async () => [],
+		history: async () => [...[a, b, c, d].map((sha) => pastChange({ sha, files: ["x.ts"] })), pastChange({ sha: fix, subject: `fix: what ${a} and ${b} broke`, files: ["x.ts"] })],
+		hunkOf: async () => "",
+		propose: nothingFiled,
+		trusts: () => false,
+		ciLogs: async () => [],
+	});
+
+	expect(Object.fromEntries(measureInputsOf(state).merged.map(({ item, label }) => [item, label]))).toEqual({ [a]: "fixed", [b]: "fixed", [c]: "fixed", [d]: "clean" });
 });
 
 test("a merge whose log holds a record a newer engine wrote reads its way of reaching done as unknown, with that engine's card, and the measure goes on", () => {

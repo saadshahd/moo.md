@@ -1,6 +1,5 @@
-import type { Label } from "../decide/risk.ts";
-import { brokenCommits } from "../loop/breaks.ts";
-import { BREAK_NOTES, commitsOf, type Merge, type NoteSource } from "../loop/records.ts";
+import { type Label, LABELS } from "../decide/risk.ts";
+import { commitsOf, type Merge } from "../loop/records.ts";
 import { doneByOf, foldItem } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { Counted } from "./measure.ts";
@@ -17,7 +16,6 @@ export const measureInputsOf = (state: State) => {
 	const notes = state.notes.list();
 	const spent = state.spent.list();
 	const asked = state.ops.list().filter(({ op, state: done }) => op.startsWith(QUESTION_OP) && done === "done");
-	const broken = brokenCommits(state);
 
 	const costOf = (item: string, shas: readonly string[]): Counted => ({
 		notes: notes.filter((note) => note.item === item || shas.includes(note.change)).length,
@@ -25,15 +23,11 @@ export const measureInputsOf = (state: State) => {
 		tokens: spent.find((found) => found.item === item)?.total ?? 0,
 	});
 
-	const isNamedBy = (source: NoteSource, commits: readonly string[]): boolean => notes.some((note) => note.source === source && commits.includes(note.change));
-
-	/** A merged change's label, as `labelChanges` gives it from git, read from what the loop saved: a revert note on one of its commits, else a fix note on one or a test of the base that failed after it, else clean. */
+	/** A merged change's label: the worst the loop saved for any of its commits, as git's label rule gave it; clean where it saved none. */
 	const labelOf = (merge: Merge): Label => {
-		const commits = commitsOf(merge);
+		const found = new Set<Label>(commitsOf(merge).flatMap((sha) => state.labels.get(sha)?.label ?? []));
 
-		if (isNamedBy(BREAK_NOTES.reverted, commits)) return "reverted";
-
-		return isNamedBy(BREAK_NOTES.fixed, commits) || broken.has(merge.sha) ? "fixed" : "clean";
+		return LABELS.find((label) => found.has(label)) ?? "clean";
 	};
 
 	/** How the item reached done, from its log; unknown where a newer engine wrote some of it, which raises the item's card. */
