@@ -244,9 +244,10 @@ test("setup reads schema 1 answers, their pull request token secret carried into
 	expect(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")).pullRequestToken).toEqual({ from: "secret", secret: "OTHER_TOKEN" });
 });
 
-/** A stand-in `gh` that reads the repo's issues, labels and visibility, and is refused the admin-only workflow permissions, as anyone but an admin is. */
-const NON_ADMIN_GH = `#!/bin/sh
+/** A stand-in `gh` that reads the repo's issues, labels and visibility, and is refused the read named in `refused` and any other, as `gh` is for a read its account has no rights to. */
+const ghRefusing = (refused: string) => `#!/bin/sh
 case "$1 $2" in
+  "${refused}") echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
   "issue list") echo '[{"body":"The button is broken.","labels":[{"name":"bug"}]}]' ;;
   "label list") echo '[{"name":"bug"},{"name":"docs"}]' ;;
   "repo view") echo '{"visibility":"PRIVATE"}' ;;
@@ -254,21 +255,37 @@ case "$1 $2" in
 esac
 `;
 
-test("a GitHub read that fails, as an admin-only one does for anyone else, leaves the scan every fact the other reads gave", () => {
+/** What `hum setup scan` prints in a repo whose `gh` is the script `gh`. */
+const scanWithGh = (gh: string) => {
 	const repo = repoWith(PROJECT);
 	const bin = tempDir("gh");
 
-	writeFileSync(join(bin, "gh"), NON_ADMIN_GH);
+	writeFileSync(join(bin, "gh"), gh);
 	chmodSync(join(bin, "gh"), 0o755);
 
 	const scanned = Bun.spawnSync(["bun", MAIN, "setup", "scan"], { cwd: repo, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
-	const printed = JSON.parse(scanned.stdout.toString());
 
-	expect(scanned.exitCode).toBe(0);
-	expect(printed.proposal.integrations).toEqual({ "work-source": "github", questions: "github", answers: "github" });
+	return { exitCode: scanned.exitCode, printed: JSON.parse(scanned.stdout.toString()) };
+};
+
+const GITHUB_INTEGRATIONS = { "work-source": "github", questions: "github", answers: "github" };
+
+test("a GitHub read that fails, as an admin-only one does for anyone else, leaves the scan every fact the other reads gave", () => {
+	const { exitCode, printed } = scanWithGh(ghRefusing("api repos/{owner}/{repo}/actions/permissions/workflow"));
+
+	expect(exitCode).toBe(0);
+	expect(printed.proposal.integrations).toEqual(GITHUB_INTEGRATIONS);
 	expect(printed.coverage).not.toBeNull();
 	expect(printed.isPublicRepo).toBe(false);
 	expect(printed.workflowsMayOpenPullRequests).toBeNull();
+});
+
+test("a scan prints no coverage where it could not read the repo's labels, which the issues are counted against, and still proposes the GitHub integrations", () => {
+	const { exitCode, printed } = scanWithGh(ghRefusing("label list"));
+
+	expect(exitCode).toBe(0);
+	expect(printed.proposal.integrations).toEqual(GITHUB_INTEGRATIONS);
+	expect(printed.coverage).toBeNull();
 });
 
 test("a scan skips a workflow, compose or issue-template file that is not YAML and reads the rest", async () => {

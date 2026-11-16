@@ -69,7 +69,7 @@ const ghRead = async <T>(repo: string, args: readonly string[], parse: (stdout: 
 /** Whether anyone may read and comment on the repo; undefined where `gh` cannot read it. */
 const isPublicRepo = (repo: string): Promise<boolean | undefined> => ghRead(repo, ["repo", "view", "--json", "visibility"], (stdout) => Visibility.parse(JSON.parse(stdout)).visibility === "PUBLIC");
 
-/** The repo's open issues, its label names and its workflow permissions, from `gh`. Without open issues read, the scan prints no coverage. */
+/** The repo's open issues, its label names and its workflow permissions, from `gh`. Without the open issues and the labels both read, the scan prints no coverage, as the issues are counted against the labels. */
 const githubFacts = async (repo: string): Promise<GithubFacts> => ({
 	items: await ghRead(repo, ["issue", "list", "--state", "open", "--limit", GH_LIST_LIMIT, "--json", "body,labels"], (stdout) =>
 		GhIssues.parse(JSON.parse(stdout)).map(({ body, labels }) => ({ body, labels: labels.map(({ name }) => name) })),
@@ -104,7 +104,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 			const isPublic = await isPublicRepo(io.cwd);
 			const proposal = proposeSetup(scan, shipped.hum, { labels: facts.labels, isPublic: isPublic ?? true, openIssues: facts.items?.length });
 			const { tracked, folders, ...shown } = scan;
-			const coverage = facts.items && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
+			const coverage = facts.items && facts.labels && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
 			const gitIdentity = await readGitIdentity(setupGit(io.cwd));
 
 			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts.workflowsMayOpenPullRequests ?? null, isPublicRepo: isPublic ?? null, gitIdentity }, null, "\t")}\n`);
