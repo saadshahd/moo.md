@@ -7,7 +7,7 @@ import { kindMachine, openState, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
 import { answerOnce, doneByOf, foldItem, keepLanding, keepPick, machineStarted, ownerAnswered, recordMachine } from "../src/state/item-log.ts";
-import { finished } from "./fixtures/answers.ts";
+import { finished } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
 const feature = shippedConfig().kinds.feature!;
@@ -39,7 +39,7 @@ test("the log keeps each event the item's machine takes, under its kind's machin
 const folded = (state: State) => foldItem(state.events.list(ITEM));
 
 /** One fix run of the item that keeps its answer and ends its record, as a pass's fix run does. */
-const fixRun = async (state: State) => (await answerOnce(state, { key: state.runs.keyFor(ITEM, "fix"), launch: { name: "fix" }, machineVersion: VERSION }, async () => finished({ status: "done" }))).begun.end();
+const fixRun = async (state: State) => (await answerOnce(state, { key: state.runs.keyFor(ITEM, "fix"), launch: { name: "fix" }, machineVersion: VERSION }, async () => finished({ structured: { status: "done" } }))).begun.end();
 
 test("fix runs count from the owner's last answer, over passes that start the machine over", async () => {
 	const state = openState(dir, { now: Date.now });
@@ -139,7 +139,7 @@ test.each([
 	["the owner's answer makes the next run ask again", ownerAnswered(ITEM, 1), 2],
 ] as const)("an answer the log keeps to the same question: %s", async (_, between, times) => {
 	const state = openState(dir, { now: Date.now });
-	const plan = planAsker(state, () => finished({ event: "plan-ready" }));
+	const plan = planAsker(state, () => finished({ structured: { event: "plan-ready" } }));
 
 	await plan.ask();
 	state.events.add(between);
@@ -150,8 +150,8 @@ test.each([
 
 test("a run that ends with no answer keeps nothing, so the same question is asked again", async () => {
 	const state = openState(dir, { now: Date.now });
-	const answers: RunOutcome[] = [{ kind: "limited", until: 1 }, finished({ event: "plan-ready" })];
-	const plan = planAsker(state, () => answers.shift() ?? finished({ event: "plan-blocked" }));
+	const answers: RunOutcome[] = [{ kind: "limited", until: 1 }, finished({ structured: { event: "plan-ready" } })];
+	const plan = planAsker(state, () => answers.shift() ?? finished({ structured: { event: "plan-blocked" } }));
 
 	await plan.ask();
 	await plan.ask();
@@ -163,7 +163,7 @@ test("a run that ends with no answer keeps nothing, so the same question is aske
 test("a fix run that starts again under its key, as one does after a kill left its record open, keeps one answer, which the cap counts once", async () => {
 	const state = openState(dir, { now: Date.now });
 
-	for (let run = 0; run < 2; run++) await answerOnce(state, { key: state.runs.keyFor(ITEM, "fix"), launch: { name: "fix" }, machineVersion: VERSION }, async () => finished({ status: "done" }));
+	for (let run = 0; run < 2; run++) await answerOnce(state, { key: state.runs.keyFor(ITEM, "fix"), launch: { name: "fix" }, machineVersion: VERSION }, async () => finished({ structured: { status: "done" } }));
 
 	expect(folded(state).fixRuns).toBe(1);
 });
@@ -172,7 +172,7 @@ test("a build or fix run, which asks no question the log can answer, runs every 
 	const state = openState(dir, { now: Date.now });
 	let asked = 0;
 
-	for (let run = 0; run < 2; run++) (await answerOnce(state, { key: state.runs.keyFor(ITEM, "build"), launch: { name: "build" }, machineVersion: VERSION }, async () => (asked++, finished({ status: "done" })))).begun.end();
+	for (let run = 0; run < 2; run++) (await answerOnce(state, { key: state.runs.keyFor(ITEM, "build"), launch: { name: "build" }, machineVersion: VERSION }, async () => (asked++, finished({ structured: { status: "done" } })))).begun.end();
 
 	expect(asked).toBe(2);
 });

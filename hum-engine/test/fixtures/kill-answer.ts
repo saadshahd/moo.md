@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { openState } from "../../src/index.ts";
 import { answerOnce } from "../../src/state/item-log.ts";
-import { finished } from "./answers.ts";
+import { finished } from "./records.ts";
 
 const [dir, mode] = process.argv.slice(2);
 
@@ -19,7 +19,7 @@ const { begun } = await answerOnce(state, { key, launch: { name: `hum #68 plan #
 	if (mode === "before-run") kill();
 
 	// An adopted run whose transcript holds its answer is read, never asked again.
-	if (!(adopted && existsSync(transcript))) appendFileSync(transcript, `${JSON.stringify(finished({ event: "plan-ready" }))}\n`);
+	if (!(adopted && existsSync(transcript))) appendFileSync(transcript, `${JSON.stringify(finished({ structured: { event: "plan-ready" } }))}\n`);
 
 	if (mode === "after-run") kill();
 
