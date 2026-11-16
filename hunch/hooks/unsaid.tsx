@@ -5,7 +5,8 @@ import { addQuestions, headless, loud, type Question } from "./tend.tsx";
 
 /* intent writes its work order in a fenced `order` block, each line starting with its kind. Each line
  * that states the user's ask or its bar is checked against the user's own words, and one they never
- * said becomes a question in tend's questions chip. Nothing waits on the user and nothing wakes Claude. */
+ * said becomes a question in tend's questions chip; Claude reads it only with the user's answer.
+ * Nothing waits on the user and nothing wakes Claude. */
 
 /** Which kinds of line are checked: the ask and its bar state what the user wants; a limit, and a
  * line the order itself marks as an assumption, are the order's own. */

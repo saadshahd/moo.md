@@ -152,7 +152,7 @@ describe("after a turn that states a work order", () => {
     return { clock, asked, toasts, turn, submit };
   };
 
-  test("a line the user never said reaches Claude with the user's next prompt, once", async ($, on) => {
+  test("a line the user never said becomes a question; Claude reads it with the user's answer, once", async ($, on) => {
     const { clock, asked, toasts, turn, submit } = setup($, on);
     const card =
       '\n```card\n{"questions":[{"q":"Which repo?","options":["moo"]}]}\n```';
@@ -165,8 +165,8 @@ describe("after a turn that states a work order", () => {
       "unsaid: 1 of the work order's lines went unchecked: they named no kind, or got no label",
     ]);
     const unsaid = 'You never said "each Issue number is told to the user"';
-    expect((await submit("go on")).join("\n")).toContain(unsaid);
-    expect((await submit("go on")).join("\n")).not.toContain(unsaid);
+    expect((await submit("q2: drop")).join("\n")).toContain(unsaid);
+    expect((await submit("q2: drop")).join("\n")).not.toContain(unsaid);
   });
 
   test("a session nobody sees spends no check", async ($, on) => {

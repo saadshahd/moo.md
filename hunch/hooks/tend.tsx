@@ -227,14 +227,18 @@ export function withUnheard(card: Card, unheard: Question[]): Card {
     : card;
 }
 
-/** What Claude reads beside the user's next prompt about questions it never asked: each one, numbered
- * as the band shows it after Claude's own `asked`, so an answer such as `q3: drop` reads. Undefined when there are none. */
-export function unheardContext(
+/** What Claude reads beside a prompt that answers questions it never asked: each one the prompt cites
+ * by its number in the band (`q3: …`), counted after Claude's own `asked`. Undefined when it cites none. */
+export function answeredContext(
+  prompt: string,
   asked: number,
   unheard: Question[],
 ): string | undefined {
-  return unheard.length
-    ? `The band asked the user these questions, which you never asked; their prompt may answer one by its number:\n${unheard.map((q, i) => `q${asked + i + 1}: ${q.q}`).join("\n")}`
+  const cited = unheard
+    .map((q, i) => ({ q, n: asked + i + 1 }))
+    .filter(({ n }) => new RegExp(`(?<!\\w)q${n}:`).test(prompt));
+  return cited.length
+    ? `The user's prompt answers questions the band asked them, which you never asked:\n${cited.map(({ q, n }) => `q${n}: ${q.q}`).join("\n")}`
     : undefined;
 }
 
@@ -454,8 +458,8 @@ let card: Card = {};
 // The questions still open: a card block holds only those its writer chose, and the user's
 // next prompt closes them all, however it answered them.
 let open: Question[] | undefined;
-// Questions Claude never asked, put in the band by another part of hunch; the user's next prompt carries
-// them to Claude and closes them, as it closes Claude's.
+// Questions Claude never asked, put in the band by another part of hunch; the user's next prompt closes
+// them as it closes Claude's, and carries to Claude only the ones it answers.
 let unheard: Question[] = [];
 let shown: Shown | null = null;
 let lastPaneItem: string | null = null;
@@ -824,8 +828,12 @@ export const register: Register = (on) => {
         ? next({ ...e, context: [...(e.context ?? []), ...more] })
         : next(e);
     if (e.origin.kind !== "composer") return withContext(asked);
-    const unheardAsk = unheardContext(card.questions?.length ?? 0, unheard);
-    const told = unheardAsk ? [unheardAsk] : [];
+    const answered = answeredContext(
+      e.text,
+      card.questions?.length ?? 0,
+      unheard,
+    );
+    const told = answered ? [answered] : [];
     // Whatever it says, the prompt answers what was asked: a question the next reply leaves out stays closed.
     await setOpen($, []);
     await setUnheard($, []);
