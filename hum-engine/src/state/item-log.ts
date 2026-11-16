@@ -86,7 +86,7 @@ type Picks = { readonly [Judge in Picked["judge"]]?: Extract<Picked, { judge: Ju
 
 /** An item's state from its log alone: the same log always folds the same. */
 export type ItemFold = {
-	/** The fix runs that finished since the owner last answered. */
+	/** The fix runs whose answer the log keeps since the owner last answered. */
 	readonly fixRuns: number;
 	/** The answers kept since the item last started afresh and the owner last answered, by the question each answered. */
 	readonly answers: Readonly<Record<string, KeptOutcome>>;
@@ -96,13 +96,13 @@ export type ItemFold = {
 	readonly merged: boolean;
 };
 
-/** The run purpose whose finished runs the fix cap counts. */
+/** The run purpose whose answers the fix cap counts. */
 const FIX = "fix" satisfies (typeof PURPOSES)[number];
 
-/** The fold after a kept answer: a finished fix run counts toward the cap, and an answer to a question stands for the next run asked it. */
+/** The fold after a kept answer: a fix run's answer counts toward the cap, and an answer to a question stands for the next run asked it. */
 const withAnswer = (fold: ItemFold, { run, question, outcome }: Entry<"model-answered">["payload"]): ItemFold => ({
 	...fold,
-	fixRuns: fold.fixRuns + Number(run === FIX && outcome.kind === "finished"),
+	fixRuns: fold.fixRuns + Number(run === FIX),
 	answers: question === undefined ? fold.answers : { ...fold.answers, [question]: outcome },
 });
 
