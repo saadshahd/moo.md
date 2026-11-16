@@ -1,1 +1,1 @@
-{ "modules": ["./tend.tsx"] }
+{ "modules": ["./index.tsx"] }
