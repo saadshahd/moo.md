@@ -192,35 +192,30 @@ export type Pass = {
   missing: string[];
 };
 
-/** What a redraw does after a pass: cut again, show a pass, or keep the reply long. */
+/** What a redraw does after a pass: cut again, show a pass, or keep the reply long, for the fault named. */
 type Step =
   | { kind: "cut" }
   | { kind: "show"; pass: Pass }
-  | { kind: "long"; why?: string };
+  | { kind: "long"; why: string };
 /** Where a redraw ends. */
 type End = Exclude<Step, { kind: "cut" }>;
 
-/** Why a pass can't show, the first that holds; `says` is the toast when no pass shows. A rewrite that
- * saves nothing fails quietly: it would only swap the agent's words for Haiku's. */
+/** What keeps a pass from showing, the first that holds. A rewrite that saves nothing would only swap
+ * the agent's words for Haiku's. */
 const FAULTS: {
+  why: string;
   holds: (p: Pass, before: string, labelGates: boolean) => boolean;
-  says?: (p: Pass) => string;
 }[] = [
+  { why: "cut off", holds: (p) => p.capped },
+  { why: "lost a token", holds: (p) => p.lost.length > 0 },
   {
-    holds: (p) => p.capped,
-    says: () => "the short reply ran out of room, so the reply stays long",
-  },
-  {
-    holds: (p) => p.lost.length > 0,
-    says: (p) =>
-      `the short reply dropped ${p.lost.join(", ")}, so the reply stays long`,
-  },
-  {
+    why: "left an item out",
     holds: (p, _, labelGates) => labelGates && p.missing.length > 0,
-    says: (p) =>
-      `the short reply left out ${p.missing.join("; ")}, so the reply stays long`,
   },
-  { holds: (p, before) => prose(p.text).length >= prose(before).length },
+  {
+    why: "saved nothing",
+    holds: (p, before) => prose(p.text).length >= prose(before).length,
+  },
 ];
 
 /** After the latest pass, given the passes before it, each of which kept all: cut once more, or end on
@@ -241,7 +236,7 @@ export function nextStep(
       : { kind: "show", pass: latest };
   return previous
     ? { kind: "show", pass: previous }
-    : { kind: "long", why: fault.says?.(latest) };
+    : { kind: "long", why: fault.why };
 }
 
 /** Each idea's expert a reply names, so its short form never drops one. */
@@ -603,9 +598,13 @@ let lastStem = "";
 const typedFrom = new Map<string, number>();
 // Each long reply's short form, by textKey of the long one; `/long` shows the long ones again.
 const short = new Map<string, string>();
+// What the label called missing in each short form, by the same key: kept for a later measure, never shown.
+const flagged = new Map<string, string[]>();
 let showLong = false;
 // The store keeps the latest short forms only: a session's replies would outgrow its share.
 const KEPT_SHORT = 40;
+const newest = <V,>(m: Map<string, V>) =>
+  Object.fromEntries([...m].slice(-KEPT_SHORT));
 
 // ---- effects ----
 
@@ -702,24 +701,30 @@ export async function redraw(
   }
 }
 
+/** What the label calls missing in the pass a redraw shows. Below its bar it reads that pass alone,
+ * for the record. */
+export async function labelShown(
+  $: any,
+  items: string[],
+  step: End,
+): Promise<string[]> {
+  if (step.kind !== "show") return [];
+  return LABEL_GATES ? step.pass.missing : missingItems($, items, step.pass.text);
+}
+
 /** Redraws a long reply short once the turn ends: its long form already showed while it streamed.
- * While the label only reports, a short form it calls short of an item says so. */
+ * A reply no pass could shorten whole just stays long. What the label calls missing is kept, unshown,
+ * beside the short form, for a later measure. */
 async function shorten($: any, reply: string, names: string[]) {
   const { items, step } = await redraw($, reply, names);
-  if (step.kind === "long") {
-    if (step.why) throw new Error(step.why);
-    return;
-  }
-  short.set(textKey(reply), step.pass.text);
-  const kept = [...short].slice(-KEPT_SHORT);
-  await save($, `tend:${await sid($)}:short`, Object.fromEntries(kept));
+  if (step.kind === "long") return;
+  const key = textKey(reply);
+  const id = await sid($);
+  short.set(key, step.pass.text);
+  await save($, `tend:${id}:short`, newest(short));
   $.ui.invalidate("ui.render");
-  if (LABEL_GATES) return;
-  const left = await missingItems($, items, step.pass.text);
-  if (left.length)
-    $.ui.toast(
-      `tend: the short reply may leave out ${left.join("; ")}. /long shows it whole.`,
-    );
+  flagged.set(key, await labelShown($, items, step));
+  await save($, `tend:${id}:flagged`, newest(flagged));
 }
 
 async function readSession($: any) {
@@ -756,12 +761,16 @@ async function sid($: any): Promise<string> {
   return id;
 }
 
+/** A map back from what the store kept of it. */
+function refill<V>(m: Map<string, V>, saved: unknown) {
+  for (const [k, v] of Object.entries((saved as Record<string, V>) ?? {}))
+    m.set(k, v);
+}
+
 async function load($: any, id: string) {
   const get = (k: string) => $.store.get(`tend:${id}:${k}`);
-  for (const [k, v] of Object.entries(
-    ((await get("short")) as Record<string, string>) ?? {},
-  ))
-    short.set(k, v);
+  refill(short, await get("short"));
+  refill(flagged, await get("flagged"));
   open = (await get("open")) as Question[] | undefined;
   $.ui.invalidate("ui.render");
   // Pruning reads every value in the store, seconds on a full one, so the replies never wait on it.
@@ -916,6 +925,7 @@ function reset() {
   lastPaneItem = null;
   typedFrom.clear();
   short.clear();
+  flagged.clear();
   lastStem = "";
 }
 

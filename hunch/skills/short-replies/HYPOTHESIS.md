@@ -4,7 +4,7 @@ Graduate when it stays on for 10 real sessions, the user runs `/long` in at most
 
 ## The label's bar
 
-A Haiku label also reads each listed item against the short form: covered or missing. It has a rate, not a guarantee. Its bar is 0.8, as hum's `minJudgeRate`, on each class: cuts the readers found that it catches, and redraws they passed that it leaves alone. Below the bar it decides nothing: a toast names the items it calls missing, and `/long` shows the reply whole.
+A Haiku label also reads each listed item against the short form: covered or missing. It has a rate, not a guarantee. Its bar is 0.8, as hum's `minJudgeRate`, on each class: cuts the readers found that it catches, and redraws they passed that it leaves alone. Below the bar it decides nothing and shows nothing: what it calls missing in the shown pass is kept in tend's store beside the short form, for a later measure. A reply no pass could shorten whole just stays long, with no toast; only a model call that fails shows, once. On #93 the user ruled that a check audits silently rather than add output.
 
 Re-measure with `bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <folder> --runs 3 --redraws 1`. It runs tend's own code in a headless session and keeps each run's raw output, so `--runs 0` rescores them.
 
@@ -48,14 +48,14 @@ Re-measure with `bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <fol
 
 - Cases: the 105 redraws two readers judged on 2026-09-30, as the user saw them. 94 came back whole from the readers' tool output and the transcripts, every one length-checked; one short form was rebuilt from the diff a reader printed. 5 cut something the user needed, 89 did not. The 2 the readers split on are left out, and 9 survive nowhere whole.
 - The cases hold the user's own words from private repos, so they stay out of the repo, at `~/.local/share/moo/evals/redraw/cases.jsonl` on the Mac that measured them.
-- The label caught all 5 cuts in each run but flagged 55% of the redraws the readers passed. In 4 of the first 6 flags, the old short form had dropped the item, such as a saved file's path or a count of cut ideas, and the readers had not counted it as needed. Below its bar, it only reports.
+- The label caught all 5 cuts in each run but flagged 55% of the redraws the readers passed. In 4 of the first 6 flags, the old short form had dropped the item, such as a saved file's path or a count of cut ideas, and the readers had not counted it as needed. Below its bar, it only records.
 - The code check is exact, so it gates from the start. Each pass is told to keep every number, `code` span and link as written, and every row and column of a table. On a 17-case trial before that last clause, 5 replies stayed long, every number they lost from a table.
 - One redraw run of the new machine on the 94 long replies:
 
-| shown short | long: lost a number | long: saved nothing | shown at pass 1, 2, 3 | prose cut, median | seconds, median | label reports |
+| shown short | long: lost a number | long: saved nothing | shown at pass 1, 2, 3 | prose cut, median | seconds, median | label flags |
 |---|---|---|---|---|---|---|
 | 82 | 10 | 2 | 21, 22, 39 | 36% | 18 | 18 of 82 |
 
 - 8 of the 10 that stayed long for a lost number lost one or two numbers in prose. The one reader-found cut among them, a song draft, lost its table's line and syllable counts.
 - The old single rewrite cut a median 13% of these replies' prose, in one Haiku call. The new one cuts 36% and takes about 18 seconds, so the short form replaces the long one later.
-- Not measured yet: whether the new short forms drop what the user needs (no reader has read them), and whether the label's toast helps or only adds noise.
+- Not measured yet: whether the new short forms drop what the user needs. No reader has read them; the label's flags, kept beside each live short form, are where a later count starts.

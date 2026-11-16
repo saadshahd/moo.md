@@ -65,7 +65,7 @@ const runsAsked = (mode: Mode) => {
 
 // The command runs each case with tend's own cover, label, code check and redraw, a few at once.
 const EVAL_MODULE = `import type { Register } from "claude-code";
-import { register as tend, cover, expertsNamed, lostTokens, missingItems, prose, redraw } from "./tend.tsx";
+import { register as tend, cover, expertsNamed, labelShown, lostTokens, missingItems, prose, redraw } from "./tend.tsx";
 const AT_ONCE = 8;
 async function labelOne($: any, c: any) {
     const items = await cover($, c.long);
@@ -85,7 +85,7 @@ async function redrawOne($: any, c: any) {
       items,
       shown,
       chars: [prose(c.long).length, prose(shown ?? c.long).length],
-      report: shown ? await missingItems($, items, shown) : [],
+      flagged: await labelShown($, items, step),
     };
 }
 export const register: Register = (on, options) => {
@@ -201,11 +201,11 @@ const redraws = runFiles("redraw").map(read).flat();
 if (redraws.length) {
   const shown = redraws.filter((c) => c.end === "show");
   const long = redraws.filter((c) => c.end === "long");
-  const longFor = (why: RegExp) => long.filter((c) => why.test(c.why ?? "")).length;
+  const longFor = (why: string) => long.filter((c) => c.why === why).length;
   const atPass = [1, 2, 3].map((n) => shown.filter((c) => c.shownAt === n).length);
   const cut = shown.map((c) => 1 - c.chars[1] / c.chars[0]);
   console.log(`
-| date | redraws | shown short | long: lost a token | long: cut off | long: saved nothing | failed | shown at pass 1, 2, 3 | prose cut, median | seconds, median | label reports |
+| date | redraws | shown short | long: lost a token | long: cut off | long: saved nothing | failed | shown at pass 1, 2, 3 | prose cut, median | seconds, median | label flags |
 |---|---|---|---|---|---|---|---|---|---|---|
-| ${today} | ${redraws.length} | ${shown.length} | ${longFor(/dropped/)} | ${longFor(/ran out of room/)} | ${long.filter((c) => !c.why).length} | ${redraws.filter((c) => c.error).length} | ${atPass.join(", ")} | ${(median(cut) * 100).toFixed(0)}% | ${(median(redraws.filter((c) => c.ms).map((c) => c.ms)) / 1000).toFixed(0)} | ${shown.filter((c) => c.report.length).length} |`);
+| ${today} | ${redraws.length} | ${shown.length} | ${longFor("lost a token")} | ${longFor("cut off")} | ${longFor("saved nothing")} | ${redraws.filter((c) => c.error).length} | ${atPass.join(", ")} | ${(median(cut) * 100).toFixed(0)}% | ${(median(redraws.filter((c) => c.ms).map((c) => c.ms)) / 1000).toFixed(0)} | ${shown.filter((c) => c.flagged.length).length} |`);
 }

@@ -832,16 +832,13 @@ describe("the redraw's passes", () => {
     for (const failed of [pass(100, { lost: ["80"] }), pass(100, { capped: true }), pass(200)])
       expect(nextStep(REPLY, [first], failed, false)).toEqual({ kind: "show", pass: first });
   });
-  test("a first pass that fails keeps the reply long, and says why", () => {
-    expect(nextStep(REPLY, [], pass(100, { lost: ["Fowler", "80"] }), false)).toEqual({ kind: "long", why: "the short reply dropped Fowler, 80, so the reply stays long" });
-  });
-  test("a first pass that only saves nothing keeps the reply long, quietly", () => {
-    expect(nextStep(REPLY, [], pass(300), false)).toEqual({ kind: "long", why: undefined });
+  test("a first pass that fails keeps the reply long, naming its fault", () => {
+    expect(nextStep(REPLY, [], pass(100, { lost: ["Fowler", "80"] }), false)).toEqual({ kind: "long", why: "lost a token" });
   });
   test("an item the label calls missing backs a pass off only while the label gates", () => {
     const left = pass(200, { missing: ["the ask"] });
     expect(nextStep(REPLY, [], left, false)).toEqual({ kind: "cut" });
-    expect(nextStep(REPLY, [], left, true)).toEqual({ kind: "long", why: "the short reply left out the ask, so the reply stays long" });
+    expect(nextStep(REPLY, [], left, true)).toEqual({ kind: "long", why: "left an item out" });
   });
 });
 
@@ -851,7 +848,7 @@ describe("a redraw whose second pass drops a number", () => {
   const KEEPS_NUMBER = "80 tests pass and the build is clean. Ship now, or wait for review?";
   const DROPS_NUMBER = "Tests pass. Ship now, or wait?";
   const setup = ($: any, on: any) => {
-    mock.store(on);
+    const store = cappedStore(on, MiB);
     const clock = mock.clock(on);
     on("session.id", () => ({ value: "s1" }));
     on("session.surfaces", () => ({ value: ["terminal"] }));
@@ -874,15 +871,17 @@ describe("a redraw whose second pass drops a number", () => {
       await $.turn.complete({ answer: LONG, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
       await clock.settle();
       await (await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: LONG } as any })).drawn();
-      return { shown, toasts };
+      return { shown, toasts, store };
     };
     return { redrawn };
   };
   test("shows the first pass, the last that kept every number", async ($, on) => {
     expect((await setup($, on).redrawn()).shown).toBe(KEEPS_NUMBER);
   });
-  test("a label below its bar names what it calls missing in a toast", async ($, on) => {
-    expect((await setup($, on).redrawn()).toasts).toEqual(["tend: the short reply may leave out 80 tests pass; ship now or wait for review. /long shows it whole."]);
+  test("a label below its bar keeps what it calls missing beside the short form, and shows nothing", async ($, on) => {
+    const { toasts, store } = await setup($, on).redrawn();
+    expect(store.get("tend:s1:flagged")).toEqual({ [textKey(LONG)]: ["80 tests pass", "ship now or wait for review"] });
+    expect(toasts).toEqual([]);
   });
 });
 
@@ -942,7 +941,7 @@ test("a short form that fills its token cap is dropped, and the reply stays long
   on("turn.complete", (_, e) => ({ text: e.answer }));
   await $.turn.complete({ answer: WALL, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
   await clock.settle();
-  expect(toasts).toHaveLength(1);
+  expect(toasts).toEqual([]);
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
   await reply.drawn();
   expect(shown).toContain("Three chains are worth building");
@@ -973,7 +972,7 @@ test("a short form that drops an idea is dropped, and the reply stays long", asy
   on("turn.complete", (_, e) => ({ text: e.answer }));
   await $.turn.complete({ answer: CONSULT_TAKE, durationMs: 1, isAborted: false, turnId: "t", reason: "answer" });
   await clock.settle();
-  expect(JSON.stringify(toasts)).toContain("dropped Humble, Freeman, Evans, Beck");
+  expect(toasts).toEqual([]);
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: CONSULT_TAKE, isFirstOfReply: true } as any });
   expect(JSON.stringify(await reply.drawn())).toContain("Beck");
 });
