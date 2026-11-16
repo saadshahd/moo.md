@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, loadedCommand, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, withOpen } from "./tend.tsx";
+import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, loadedCommand, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, unheardContext, withOpen } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -926,4 +926,12 @@ test("a short form no shorter than the reply is dropped, and the reply shows as 
   const reply = await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: WALL } as any });
   await reply.drawn();
   expect(shown).toBe(WALL);
+});
+
+test("the band's questions Claude never asked reach it with the next prompt, numbered after its own", async () => {
+  const unheard = [{ q: "Keep A?", options: ["keep", "drop"] }, { q: "Keep B?", options: ["keep", "drop"] }];
+  expect(unheardContext(1, unheard)).toBe(
+    "The band asked the user these questions, which you never asked; their prompt may answer one by its number:\nq2: Keep A?\nq3: Keep B?",
+  );
+  expect(unheardContext(1, [])).toBeUndefined();
 });
