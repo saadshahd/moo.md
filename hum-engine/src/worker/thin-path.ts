@@ -489,7 +489,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	/**
 	 * One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where
 	 * the state can, and ends stuck where it cannot. A run given what it judges is answered from the item's log when
-	 * the log keeps an answer to the same prompt on the same change.
+	 * the log keeps an answer to the same prompt on the same change, and that answer spends nothing again.
 	 */
 	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
 		const key = state.runs.keyFor(id, purpose);
@@ -502,7 +502,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
 
-			return runner
+			const ran = await runner
 				.run({
 					prompt,
 					cwd: purpose === "review" ? tmpdir() : clone,
@@ -518,6 +518,10 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					onFirstToken: () => lease?.opened(),
 				})
 				.finally(() => lease?.release());
+
+			if (!isPaused(ran)) tally.spend(ran.tokens);
+
+			return ran;
 		});
 
 		begun.end(held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
@@ -525,8 +529,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (isPaused(outcome)) return pause(pauseOf(id, outcome));
 
 		if (outcome.kind === "over-cap") {
-			tally.spend(outcome.tokens);
-
 			const why = `The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens.`;
 
 			if (!actor.getSnapshot().can({ type: "token-cap" })) throw failed(why);
@@ -535,8 +537,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			return new Promise<never>(() => {});
 		}
-
-		tally.spend(outcome.tokens);
 
 		return outcome;
 	};

@@ -15,7 +15,7 @@ import { READY_PLAN, SHIM_MODEL, type ShimSpec } from "../fixtures/shim.ts";
 import { BASE, poolConfig } from "../fixtures/slot-world.ts";
 import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
-import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
+import { NOW, TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
 import { Holder, ItemId } from "../../src/adapter-api.ts";
 import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import { openState } from "../../src/state/open.ts";
@@ -572,6 +572,21 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	expect(review?.prompt).not.toContain("Write it.");
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(folded(w, id)).toMatchObject({ doneBy: "checks", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
+});
+
+test("a plan answer the log keeps is read back on the pass after a limit: the model is asked once and the item's total counts it once", async () => {
+	const limited = { rejectUntil: NOW / 1000 + 60, error: "You've hit your limit" };
+	const w = await world({ script: [{}, limited, limited], decisions: [READY_PLAN] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "limited" });
+
+	const spent = w.state.spent.get(id)?.total;
+
+	w.clock.at = NOW + 61_000;
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toMatchObject({ outcome: "limited" });
+	expect(w.shim.decisions().map(({ purpose }) => purpose)).toEqual(["plan"]);
+	expect(w.state.spent.get(id)?.total).toBe(spent);
 });
 
 test("a medium change waits for a fresh review run at landing: a request for changes holds it for the owner, an approval merges it", async () => {
