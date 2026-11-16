@@ -557,7 +557,7 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 
 const featureJudge = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND });
 
-test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, the fixed change is reviewed again though the prompt cuts both diffs to the same text, and an approval merges it", async () => {
+test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, the fixed change is reviewed again though the prompt cuts both diffs to the same text, and an approval merges it, reaching done by review though landing ran none", async () => {
 	const [buildStdin, fixStdin] = [stdinFile(), stdinFile()];
 	const cite = { event: "request-changes", sure: true, reason: "The note says nothing.", cites: [{ file: "docs/note.md", line: 1 }] };
 	const w = await world({ script: [{}, { ...NOTE, saveStdin: buildStdin }, { write: { "docs/note.md": "hello, reader\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, cite] }, { config: configWith((raw) => void (raw.hum.diffLimit = 1)) });
@@ -573,7 +573,7 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	expect(review?.cwd).not.toContain("hum-run-");
 	expect(review?.prompt).not.toContain("Write it.");
 	expect(w.repo.show(id)).toContain("state: done");
-	expect(folded(w, id)).toMatchObject({ doneBy: "checks", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
+	expect(folded(w, id)).toMatchObject({ doneBy: "review", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
 });
 
 test("a plan answer the log keeps is read back on a pass after a limit, adding nothing to the item's total, and asked again once nothing saved is left to go on from", async () => {

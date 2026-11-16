@@ -8,7 +8,7 @@ import { createActor, waitFor } from "xstate";
 import { kindMachine } from "../src/config/machine.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { labelChanges, matchedSample } from "../src/decide/labels.ts";
-import { isCleared, type Landing, landingOf, reachesDoneBy, routeOf } from "../src/decide/merge.ts";
+import { doesApprove, isCleared, type Landing, landingOf, reachesDoneBy, routeOf } from "../src/decide/merge.ts";
 import { reviewInput } from "../src/decide/review.ts";
 import { type Change, type Histories, type Label, placeChange, type Policy, usualSize } from "../src/decide/risk.ts";
 import { ruleGlobFor } from "../src/worker/land.ts";
@@ -109,9 +109,15 @@ test("a change touching a folder no rule places is unclear at the level of the r
 	expect(isCleared(route, { review: false, owner: true })).toBe(true);
 });
 
-test("a cleared change reaches done by the owner's approval first, then a fresh review's, else by its checks alone; one not cleared, by the person who merges it", () => {
+test("a cleared change reaches done by the owner's approval first, then a review run's, else by its checks alone; one not cleared, by the person who merges it", () => {
 	expect([{ review: true, owner: true }, { review: true, owner: false }, { review: false, owner: false }].map((approvals) => reachesDoneBy(approvals, true))).toEqual(["owner", "review", "checks"]);
 	expect(reachesDoneBy({ review: true, owner: false }, false)).toBe("owner");
+});
+
+test("a review run's verdict approves only the head it judged, and only by approving it", () => {
+	const verdicts = [{ head: "abc", event: "approve" }, { head: "def", event: "approve" }, { head: "abc", event: "request-changes" }, undefined];
+
+	expect(verdicts.map((verdict) => doesApprove(verdict, "abc"))).toEqual([true, false, false, false]);
 });
 
 test.each([

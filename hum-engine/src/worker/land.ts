@@ -33,8 +33,10 @@ import { pickTier } from "../config/checks.ts";
 import { footprintOf } from "./scheduler.ts";
 import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
+	doesApprove,
 	isCleared,
 	reachesDoneBy,
+	REVIEW_APPROVAL,
 	type Landing,
 	landingOf,
 	doesNeedReviewRun,
@@ -108,9 +110,6 @@ export type LandContext = {
 
 /** What a review run at landing came to: its verdict, or the result that stopped it, such as a usage limit. */
 export type ReviewOutcome = { readonly verdict: Verdict } | { readonly halted: ThinResult };
-
-/** The review verdict that lets a change merge. */
-const REVIEW_APPROVAL = "approve";
 
 /** The base moved after the work side checked the change on it: pushing now could land code no check ran on. */
 type Moved = { readonly kind: "moved" };
@@ -546,7 +545,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	const verdict = reviewed?.verdict;
 	const route = routeWith(verdict);
-	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
+	const approvals = { review: doesApprove(ctx.state.verdicts.get(ctx.id), saved.head), owner: pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
 	const cleared = isCleared(route, approvals);
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;

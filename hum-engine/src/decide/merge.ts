@@ -26,13 +26,19 @@ export type Landing =
 
 const STRICTEST_PROOF = "the owner's word that the change is proven";
 
-/** Who has approved a change: a fresh review run, and the owner. */
+/** Who has approved a change: a review run, whichever step ran it, and the owner. */
 export type Approvals = { readonly review: boolean; readonly owner: boolean };
 
-/** How an item reached done: its checks alone, a fresh review's approval on top of them, the owner's approval, or a plan run that split it into new items. */
+/** How an item reached done: its checks alone, a review run's approval of the head that landed on top of them, the owner's approval, or a plan run that split it into new items. */
 export const DONE_BY = ["checks", "review", "owner", "split"] as const;
 
 export type DoneBy = (typeof DONE_BY)[number];
+
+/** The review verdict that lets a change merge. */
+export const REVIEW_APPROVAL = "approve";
+
+/** Whether a review run's verdict approves the change that ends at `head`: one on another head approves nothing. */
+export const doesApprove = (verdict: { readonly head: string; readonly event: string } | undefined, head: string): boolean => verdict?.head === head && verdict.event === REVIEW_APPROVAL;
 
 /** The approvals that clear a change, the owner's first; each is the way the change it clears reaches done. */
 const APPROVALS_OWNER_FIRST = ["owner", "review"] as const satisfies readonly (keyof Approvals & DoneBy)[];
