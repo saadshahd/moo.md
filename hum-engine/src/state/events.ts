@@ -19,11 +19,11 @@ type LogRecord = z.infer<typeof LogRecord>;
 
 /**
  * One step per earlier format, each rewriting a record at that format into the next one's shape, with no clock and no
- * I/O. Format 0 is every record hum wrote before 0.5.0, which named no format and no engine; hum 0.1.0 saved the
- * owner's answer as `answer`.
+ * I/O. Format 0 is every record hum wrote before 0.5.0, an `answered` or a `merged` with no format and no engine: it
+ * reads as format 1 unchanged.
  */
 const LOG_MIGRATIONS: Steps<LogRecord> = {
-	0: (record) => (record.type === "answer" ? { ...record, type: "answered" } : record),
+	0: (record) => record,
 };
 
 /** What every format of a record carries: enough to place it in its log, and to refuse one from a newer engine before reading the rest. */

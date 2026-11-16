@@ -315,8 +315,8 @@ const readsOf = (state: State) =>
 /** Runs and events live one folder deeper, under the item's slug. */
 const folderOf = (store: keyof typeof SAVED_0_1_0): string => (store === "runs" || store === "events" ? join(dir, store, slug(SAVED_0_1_0[store].itemId)) : join(dir, store));
 
-/** Where a record reads otherwise than hum 0.1.0 wrote it: its log record, at format 0, climbs to this engine's format, its thread answer `answer` read as `answered`. */
-const READS_AS: Partial<Record<keyof typeof SAVED_0_1_0, { readonly format: number; readonly type: string }>> = { events: { format: LOG_FORMAT, type: "answered" } };
+/** Where a record reads otherwise than hum 0.1.0 wrote it: its log record, at format 0, climbs to this engine's format. */
+const READS_AS: Partial<Record<keyof typeof SAVED_0_1_0, { readonly format: number }>> = { events: { format: LOG_FORMAT } };
 
 // SAFETY: Object.keys of a literal object lists exactly the keys its type names.
 test.each(Object.keys(SAVED_0_1_0) as (keyof typeof SAVED_0_1_0)[])("a %s record hum 0.1.0 wrote reads, with a field a newer engine added", (store) => {
