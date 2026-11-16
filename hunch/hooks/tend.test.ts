@@ -811,8 +811,11 @@ describe("the redraw's passes", () => {
   test("a cover list's items are its lines, list markers dropped", () => {
     expect(coverItems("- the ask: pick A or B\n2. 80 tests pass\n\n• next: merge")).toEqual(["the ask: pick A or B", "80 tests pass", "next: merge"]);
   });
-  test("numbers, `code` and links are kept as written; dates, a list's numbering and numbers inside code or links are not", () => {
-    expect(wordForWord("1. Run `bun test:2` on 2026-09-28: 80 pass in 2.5 s.\n2. See https://example.com/pr/93.")).toEqual(["`bun test:2`", "https://example.com/pr/93", "80", "2.5"]);
+  test("numbers, `code` and links are kept as written; a list's numbering and numbers inside code or links are not", () => {
+    expect(wordForWord("1. Run `bun test:2`: 80 pass in 2.5 s.\n2. See https://example.com/pr/93.")).toEqual(["`bun test:2`", "https://example.com/pr/93", "80", "2.5"]);
+  });
+  test("noise never has to stay: commit hashes, ids and dates, bare or in `code`", () => {
+    expect(wordForWord("Merged `4d734dd` (#93) on 2026-09-28T21:09:44Z, Oct 14 and 3 Nov 2026, run 1794863341431, session 052de2d7-d518-4562-8dd0-f2c4cac5414d.")).toEqual([]);
   });
   test("a short form lacks a name it never says, and a number none of its own numbers matches", () => {
     expect(lostTokens("80 pass, 1 skipped, by Fowler", "80 pass, 10 skipped", ["Fowler"])).toEqual(["Fowler", "1"]);

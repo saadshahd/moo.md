@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Measures the short-reply redraw on real redraws through tend's own code in the engine: it copies
- * hunch's hooks into a scratch plugin beside a command that runs every case, runs that command
- * headless, and scores every run in --out against the cases' verdicts.
+ * Measures the short-reply redraw on real redraws through tend's own code in the engine: a command
+ * beside hunch's hooks runs every case headless (../headless.ts), and each run in --out is scored
+ * against the cases' verdicts.
  *
  *   bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <folder> [--runs <n>] [--redraws <n>]
  *
@@ -12,19 +12,10 @@
  * form, and runs the code check; a redraw run runs the whole redraw on each long reply. Runs add to
  * --out, so `--runs 0` rescores the runs there without a model call.
  */
-import { $ } from "bun";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { runHeadless, scratchHunch } from "../headless.ts";
 
 const USAGE =
   "usage: eval.ts <cases.jsonl> --out <folder> [--runs <n>] [--redraws <n>]";
@@ -65,7 +56,8 @@ const runsAsked = (mode: Mode) => {
 
 // The command runs each case with tend's own cover, label, code check and redraw, a few at once.
 const EVAL_MODULE = `import type { Register } from "claude-code";
-import { register as tend, cover, expertsNamed, labelShown, lostTokens, missingItems, prose, redraw } from "./tend.tsx";
+import { register as hunch } from "./index.tsx";
+import { cover, expertsNamed, labelShown, lostTokens, missingItems, prose, redraw } from "./tend.tsx";
 const AT_ONCE = 8;
 async function labelOne($: any, c: any) {
     const items = await cover($, c.long);
@@ -89,7 +81,7 @@ async function redrawOne($: any, c: any) {
     };
 }
 export const register: Register = (on, options) => {
-  tend(on, options);
+  hunch(on, options);
   on("session.start", { isInteractive: false }, async ($, e, next) => {
     await $.command.register({ name: "redraw-eval", description: "Run the redraw's eval cases", immediate: true });
     return next(e);
@@ -109,49 +101,14 @@ export const register: Register = (on, options) => {
 };
 `;
 
-/** A scratch copy of hunch whose hooks module adds the eval command. */
-function scratchPlugin(): string {
-  const hunch = resolve(import.meta.dir, "../..");
-  const plugin = mkdtempSync(join(tmpdir(), "redraw-eval-"));
-  cpSync(join(hunch, "hooks"), join(plugin, "hooks"), {
-    recursive: true,
-    filter: (f) => !f.endsWith(".test.ts"),
-  });
-  mkdirSync(join(plugin, ".claude-plugin"));
-  writeFileSync(
-    join(plugin, ".claude-plugin/plugin.json"),
-    JSON.stringify({
-      name: "hunch",
-      version: "0.0.0",
-      description: "Runs the redraw's eval cases",
-    }),
-  );
-  writeFileSync(
-    join(plugin, "hooks/hooks.json"),
-    JSON.stringify({ modules: ["./eval.tsx"] }),
-  );
-  writeFileSync(join(plugin, "hooks/eval.tsx"), EVAL_MODULE);
-  return plugin;
-}
-
-async function runAll(plugin: string, mode: Mode, to: string) {
-  const r =
-    await $`claude -p --setting-sources "" --strict-mcp-config --no-session-persistence --plugin-dir ${plugin} ${`/redraw-eval ${mode} ${resolve(casesPath!)} ${to}`}`
-      .env({ ...process.env, ENABLE_CLAUDEAI_MCP_SERVERS: "false" })
-      .nothrow()
-      .quiet();
-  if (r.exitCode !== 0 || !existsSync(to))
-    throw new Error(
-      `${to} ran nothing (exit ${r.exitCode}): ${r.stderr.toString() || r.stdout.toString()}`,
-    );
-}
-
 const modes = Object.keys(MODES) as Mode[];
-const plugin = modes.some(runsAsked) ? scratchPlugin() : "";
+const plugin = modes.some(runsAsked) ? scratchHunch(EVAL_MODULE) : "";
 for (const mode of modes) {
   const first = runFiles(mode).length + 1;
-  for (let run = first; run < first + runsAsked(mode); run++)
-    await runAll(plugin, mode, join(out, `${mode}-${run}.json`));
+  for (let run = first; run < first + runsAsked(mode); run++) {
+    const to = join(out, `${mode}-${run}.json`);
+    await runHeadless(plugin, `redraw-eval ${mode} ${resolve(casesPath!)} ${to}`, to);
+  }
 }
 
 const read = (f: string): any[] => JSON.parse(readFileSync(join(out, f), "utf8"));

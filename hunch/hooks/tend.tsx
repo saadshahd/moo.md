@@ -127,20 +127,32 @@ ${items.join("\n")}
 
 const CODE = /`[^`\n]+`/g;
 const LINK = /https?:\/\/[^\s)>\]|`"]+/g;
-const DATE = /\b\d{4}-\d{2}-\d{2}\b/g;
 const LIST_NUMBER = /^(\s*)\d+[.)](?=\s)/gm;
 const NUMBER = /(?<![\p{L}\p{N}_.])\d+(?:[.,:]\d+)*(?![\p{L}\p{N}_])/gu;
+const MONTH = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?";
+
+/** Noise a short form may always cut: commit hashes, ids and dates. The long reply keeps it for Claude,
+ * and `/long` shows it, so no check ever makes a short form keep it. */
+const NOISE = [
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+  /\b(?=[0-9a-f]*\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\b/gi,
+  /#\d+\b/g,
+  /\b\d{8,}\b/g,
+  /\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\b/g,
+  new RegExp(`\\b${MONTH}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?\\b`, "g"),
+  new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH}(?:,?\\s+\\d{4})?\\b`, "g"),
+];
+const withoutNoise = (text: string) =>
+  NOISE.reduce((t, noise) => t.replace(noise, " "), text);
 
 /** What a short form keeps exactly as the reply writes it, by kind: each finds its own in a text. A number
- * counts outside code and links; dates are cut unless the user acts on one, and a list's numbering is no number. */
+ * counts outside code and links; noise never counts, nor does a list's numbering. */
 const WORD_FOR_WORD = {
-  code: (t) => t.match(CODE) ?? [],
+  code: (t) =>
+    (t.match(CODE) ?? []).filter((c) => withoutNoise(c.slice(1, -1)).trim()),
   link: (t) => (t.match(LINK) ?? []).map((u) => u.replace(/[.,;:!?]+$/, "")),
   number: (t) =>
-    t
-      .replace(CODE, " ")
-      .replace(LINK, " ")
-      .replace(DATE, " ")
+    withoutNoise(t.replace(CODE, " ").replace(LINK, " "))
       .replace(LIST_NUMBER, "$1")
       .match(NUMBER) ?? [],
 } satisfies Record<string, (text: string) => string[]>;
