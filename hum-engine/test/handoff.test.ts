@@ -48,20 +48,20 @@ test("a work job may move an item only to another kind whose risk floor is no lo
 	expect(kindMoveFault(floored, { from: "check", to: "check" })).toContain("the kind it already has");
 });
 
-test("a work job's spend only raises publish's, and starts the cap's count afresh only where the owner answered", () => {
+test("a work job's token and fix-run counts only raise publish's, and start afresh only where the owner answered", () => {
 	const [work, into] = [stateIn("work"), stateIn("publish")];
 
-	into.spent.put("a", { item: "a", total: 900, base: 100 });
-	work.spent.put("a", { item: "a", total: 0, base: 0 });
+	into.spent.put("a", { item: "a", total: 900, base: 100, fixes: { total: 3, base: 1 } });
+	work.spent.put("a", { item: "a", total: 0, base: 0, fixes: { total: 0, base: 0 } });
 	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS);
-	expect(into.spent.get("a")).toEqual({ item: "a", total: 900, base: 100 });
+	expect(into.spent.get("a")).toEqual({ item: "a", total: 900, base: 100, fixes: { total: 3, base: 1 } });
 
-	work.spent.put("a", { item: "a", total: 1000, base: 1000 });
+	work.spent.put("a", { item: "a", total: 1000, base: 1000, fixes: { total: 5, base: 5 } });
 	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS);
-	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 100 });
+	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 100, fixes: { total: 5, base: 1 } });
 
 	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: true }, LIMITS);
-	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 1000 });
+	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 1000, fixes: { total: 5, base: 5 } });
 });
 
 test("publish takes a work job's saved-state cards with no action, a usage limit cut to its cap, and questions that never offer the owner's approval", () => {

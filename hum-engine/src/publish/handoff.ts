@@ -5,7 +5,7 @@ import { nextStates, reachedFrom } from "../config/machine.ts";
 import { type Config } from "../config/load.ts";
 import { type Kind, OWNER_WAIT_TAG } from "../config/schema.ts";
 import type { State } from "../state/open.ts";
-import type { Spent } from "../state/saved.ts";
+import { type Count, NO_COUNT, type Spent } from "../state/saved.ts";
 import { queuedKey } from "../worker/questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { SNAPSHOT_CARDS } from "../state/items.ts";
@@ -46,16 +46,19 @@ export const kindMoveFault = (config: Config, { from, to }: { readonly from: str
 	return floorRank(config, to) < floorRank(config, from) ? `it moves the item from ${from} to ${to}, whose risk floor is lower` : undefined;
 };
 
-/**
- * An item's spend as publish takes it from a work job: the total only rises, and the count toward the kind's cap
- * starts afresh only where the owner answered.
- */
-const raisedSpend = (held: Spent | undefined, worked: Spent, answered: boolean): Spent => {
-	const total = Math.max(held?.total ?? 0, worked.total);
-	const base = held?.base ?? 0;
+/** A count as publish takes it from a work job: the total only rises, and the count toward its cap starts afresh only where the owner answered. */
+const raisedCount = (held: Count, worked: Count, answered: boolean): Count => {
+	const total = Math.max(held.total, worked.total);
 
-	return { item: worked.item, total, base: answered ? Math.min(Math.max(base, worked.base), total) : base };
+	return { total, base: answered ? Math.min(Math.max(held.base, worked.base), total) : held.base };
 };
+
+/** An item's spend as publish takes it from a work job: its tokens and its fix runs, each raised as a count. */
+const raisedSpend = (held: Spent | undefined, worked: Spent, answered: boolean): Spent => ({
+	item: worked.item,
+	...raisedCount(held ?? NO_COUNT, worked, answered),
+	fixes: raisedCount(held?.fixes ?? NO_COUNT, worked.fixes, answered),
+});
 
 /** The cards a work job raises on an item that publish shows: those of its saved state, never one with an action. */
 const WORK_CARD_CODES: ReadonlySet<string> = new Set(Object.values(SNAPSHOT_CARDS));

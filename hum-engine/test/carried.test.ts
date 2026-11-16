@@ -151,7 +151,7 @@ test("an item's token total is saved over all its runs and restarts; the cap cou
 	w.item("a", "docs/a.md");
 	await w.worker.tick();
 	await w.worker.idle();
-	expect(w.state.spent.get("a")).toEqual({ item: "a", total: 700, base: 0 });
+	expect(w.state.spent.get("a")).toEqual({ item: "a", total: 700, base: 0, fixes: { total: 0, base: 0 } });
 
 	// A restart and an answer: the second run spends 700 more, which a per-call count would allow too, but the total is kept.
 	await w.adapter.answers!.answer(ItemId.parse("a"), { text: "Use Plain" });
@@ -163,7 +163,7 @@ test("an item's token total is saved over all its runs and restarts; the cap cou
 	await restarted.idle();
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged" });
-	expect(w.state.spent.get("a")).toEqual({ item: "a", total: 1400, base: 700 });
+	expect(w.state.spent.get("a")).toEqual({ item: "a", total: 1400, base: 700, fixes: { total: 0, base: 0 } });
 });
 
 test("runs in one cycle add up across restarts: the second run of a cycle gets only what the first left, and passing it asks the owner", async () => {

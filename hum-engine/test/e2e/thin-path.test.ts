@@ -15,7 +15,7 @@ import { READY_PLAN, SHIM_MODEL, type ShimSpec } from "../fixtures/shim.ts";
 import { BASE, poolConfig } from "../fixtures/slot-world.ts";
 import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
-import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
+import { NOW, TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
 import { Holder, ItemId } from "../../src/adapter-api.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
@@ -232,6 +232,29 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
+});
+
+test("fix runs spent before a usage limit still count after it: the next pass gets only the fix runs left", async () => {
+	const until = Math.floor(NOW / 1000) + 3600;
+
+	const config = configWith((raw) => {
+		raw.hum.maxFixRuns = 2;
+	});
+
+	const w = await world(
+		{ script: [{}, { write: { "docs/note.md": "one\n" } }, { write: { "docs/note.md": "two\n" } }, { error: `Claude usage limit reached|${until}` }, { write: { "docs/note.md": "three\n" } }, { write: { "docs/note.md": "four\n" } }, { write: { "docs/note.md": "five\n" } }] },
+		{ config, checks: ["false"] },
+	);
+
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "limited", item: id });
+
+	w.clock.at = until * 1000 + 1;
+
+	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "stuck", item: id, detail: "the checks still fail after 2 fixes" });
+	/* The start check, then a build, a fix and the fix the limit cut; after the limit, a build and the one fix left. */
+	expect(w.shim.calls()).toHaveLength(1 + 3 + 2);
 });
 
 test("a run that succeeds and commits nothing is not done", async () => {

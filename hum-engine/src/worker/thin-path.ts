@@ -412,12 +412,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	// The worker lost the claim or is exiting for an update: the run stops, and its actor with it.
 	d.signal?.addEventListener("abort", () => result.resolve({ outcome: "lost", item: id }), { once: true });
-	// The total over all runs is saved; the cap counts what the item spent since the owner last answered.
+	// The totals over all runs are saved; the token cap and maxFixRuns count what the item spent since the owner last answered.
 	const tally = tallyOf(state, id);
 
 	if (d.answered) tally.startAfresh();
 
-	let fixes = 0;
 	let lastFailure = "";
 	let cause = "";
 	let handled = "";
@@ -550,7 +549,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const step = (purpose: "build" | "fix") =>
 		createAsyncLogic({
 			run: async ({ signal }) => {
-				if (purpose === "fix" && ++fixes > maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
+				if (purpose === "fix" && tally.fixesSinceAnswer() >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
 				const before = (await g(["rev-parse", "HEAD"])).trim();
 				const chosen: string[] = [];
@@ -568,6 +567,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 						await keepPullRequest(d, wants.pullRequest);
 
 						if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${purpose} run succeeded and changed nothing`);
+
+						if (purpose === "fix") tally.spendFix();
 
 						return;
 					}

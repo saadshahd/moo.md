@@ -326,7 +326,7 @@ export class Worker {
 
 	/**
 	 * Takes an item the owner acted on back from the parked. A finished change keeps its saved landing and lands again,
-	 * unless the owner asked to run it again; otherwise its saved state is dropped and its cap starts afresh.
+	 * unless the owner asked to run it again; otherwise its saved state is dropped and its caps start afresh.
 	 */
 	#unpark(id: string, option: string | undefined): void {
 		const { state } = this.#o;
@@ -343,10 +343,7 @@ export class Worker {
 
 		state.items.remove(id);
 		state.landings.remove(id);
-
-		const spent = state.spent.get(id);
-
-		if (spent) state.spent.put(id, { ...spent, base: spent.total });
+		tallyOf(state, id).startAfresh();
 	}
 
 	/** Where an item stands when its thread is read, for the disposition of an answer to it. */

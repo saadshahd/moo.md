@@ -187,7 +187,7 @@ const Shipped = z.object({
 	latestVersionCacheSeconds: seconds.describe("How long the newest published engine version is kept before it is read again."),
 	watchCacheSeconds: seconds.describe("How long one read of what changed serves every `hum watch` in the repo before the next one reads again."),
 	watchLockSeconds: seconds.describe("How long the lock of the one `hum watch` that reads stays held before another may take it over."),
-	maxFixRuns: z.int().nonnegative().describe("Fix runs an item gets after failed checks before it ends stuck."),
+	maxFixRuns: z.int().nonnegative().describe("Fix runs an item gets after failed checks before it ends stuck, counted over all its runs since the owner last answered."),
 	serviceLabel: z.string().regex(SERVICE_LABEL, "a service label is letters, digits, dot, dash and underscore").describe("The service unit's label, and the name its file takes."),
 	maxCrashes: count.describe("Worker crashes within crashWindowSeconds that stop the service's restarts."),
 	crashWindowSeconds: seconds.describe("The window in which maxCrashes crashes stop the service's restarts."),

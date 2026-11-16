@@ -12,8 +12,15 @@ export const Parked = z.object({ item: name, why: z.enum(["stuck", "review"]), c
 
 export type Parked = z.infer<typeof Parked>;
 
-/** Tokens an item has spent over all its runs. The cap counts those after `base`, the total when the owner last answered. */
-export const Spent = z.object({ item: name, total: time, base: time });
+/** A count over all an item's runs, and `base`, what it stood at when the owner last answered: a cap counts what came after. */
+export const Count = z.object({ total: time, base: time });
+
+export type Count = z.infer<typeof Count>;
+
+export const NO_COUNT: Count = { total: 0, base: 0 };
+
+/** Tokens an item has spent over all its runs, and under `fixes` its fix runs, which a record saved before hum counted them lacks. */
+export const Spent = Count.extend({ item: name, fixes: Count.default(NO_COUNT) });
 
 export type Spent = z.infer<typeof Spent>;
 
