@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Label } from "../decide/risk.ts";
 
 const name = z.string().min(1);
 const time = z.int().nonnegative();
@@ -7,6 +8,9 @@ const time = z.int().nonnegative();
 const NOTE_SOURCES = ["review-comment", "review-body", "plan-answer", "revert", "fix"] as const;
 
 export type NoteSource = (typeof NOTE_SOURCES)[number];
+
+/** The note a broken change gets, by how a later change broke it. */
+export const BREAK_NOTES = { reverted: "revert", fixed: "fix" } as const satisfies Record<Exclude<Label, "clean">, NoteSource>;
 
 /** One correction the owner made to hum's work, saved before anything acts on it and keyed by its source and source id. */
 export const ReviewNote = z.object({

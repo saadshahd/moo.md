@@ -43,9 +43,12 @@ export type PlanFile = z.infer<typeof PlanFile>;
 /** A plan's identity: a later run reads the plan with this hash, and any other text is not the approved plan. */
 export const planHash = (plan: PlanFile): string => hashJson(plan);
 
+/** The event by which a plan run splits its item into parts. */
+export const SPLIT = "needs-split";
+
 /** The two states whose outcome is prose: the events each may pick, and the safer pick an unsure run takes. */
 export const PROSE_STATES = {
-	plan: { boundary: "plan-outcome", events: ["plan-ready", "needs-split", "plan-blocked"], unsure: "plan-blocked" },
+	plan: { boundary: "plan-outcome", events: ["plan-ready", SPLIT, "plan-blocked"], unsure: "plan-blocked" },
 	review: { boundary: "review-verdict", events: ["approve", "request-changes", "needs-owner"], unsure: "request-changes" },
 } as const satisfies Record<string, { boundary: Boundary; events: readonly [string, ...string[]]; unsure: string }>;
 

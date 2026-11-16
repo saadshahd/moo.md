@@ -2,7 +2,7 @@ import type { PastChange } from "../decide/labels.ts";
 import { breakOf, type LabelRules } from "../decide/labels.ts";
 import { optionOf, type SettledAnswer } from "../state/saved.ts";
 import type { State } from "../state/open.ts";
-import { type NoteSource, noteKey, type ReviewNote } from "./records.ts";
+import { BREAK_NOTES, type NoteSource, noteKey, type ReviewNote } from "./records.ts";
 
 /** What an integration reads from the review surface, before the owner's own are told from the rest. */
 export type RawComment = {
@@ -52,7 +52,7 @@ export const breakNotes = (changes: readonly PastChange[], rules: LabelRules, hu
 			return [
 				hunkOf(found.by.sha, file).then(
 					(hunk): ReviewNote => ({
-						source: found.label === "reverted" ? "revert" : "fix",
+						source: BREAK_NOTES[found.label],
 						sourceId: found.by.sha,
 						change: change.sha,
 						file,

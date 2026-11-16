@@ -15,7 +15,7 @@ import { invokedSources, kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
-import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges } from "../decide/prose.ts";
+import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
@@ -748,9 +748,6 @@ type Purpose = (typeof PURPOSES)[number];
 
 /** Which runs are placed by the branch's diff so far; the others by the files their item declares. */
 const PLACED_BY_DIFF = { plan: false, build: false, fix: true, review: true } as const satisfies Record<Purpose, boolean>;
-
-/** The event by which a plan run splits its item into parts. */
-const SPLIT = "needs-split";
 
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
