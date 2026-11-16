@@ -33,8 +33,8 @@ import { pickTier } from "../config/checks.ts";
 import { footprintOf } from "./scheduler.ts";
 import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
-	clearedBy,
 	isCleared,
+	reachesDoneBy,
 	type Landing,
 	landingOf,
 	doesNeedReviewRun,
@@ -551,7 +551,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 
-	keepLanding(ctx.state.events, ctx.id, saved.head, cleared ? clearedBy(approvals) : undefined);
+	keepLanding(ctx.state.events, ctx.id, saved.head, reachesDoneBy(approvals, cleared));
 
 	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest, cleared }), route, rules, why);
 };

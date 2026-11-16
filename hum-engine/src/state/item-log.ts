@@ -3,11 +3,11 @@ import { type AnyEventObject, type AnyMachineSnapshot, type AnyStateMachine, typ
 import { z } from "zod";
 import { isPaused, type RunOutcome } from "../adapters/claude-p.ts";
 import { hashJson } from "../config/hash.ts";
-import { Json } from "../config/json.ts";
+import { asJson, type Json } from "../config/json.ts";
 import { kindMachine } from "../config/machine.ts";
 import type { Kind, PURPOSES } from "../config/schema.ts";
-import { DONE_BY, type DoneBy, reachedDoneBy } from "../decide/merge.ts";
-import { EventPick } from "../decide/prose.ts";
+import { DONE_BY, type DoneBy } from "../decide/merge.ts";
+import { EventPick, SPLIT } from "../decide/prose.ts";
 import type { EventLog, NewEvent, SavedEvent } from "./events.ts";
 import type { BegunRun, RunKey, RunRecords } from "./runs.ts";
 import { Alignment } from "./saved.ts";
@@ -31,18 +31,12 @@ const Entry = z.discriminatedUnion("type", [
 	z.object({ type: z.literal("machine-started"), payload: z.object({ afresh: z.boolean() }) }),
 	z.object({ type: z.literal("model-answer"), payload: z.object({ run: name, attempt: z.int().nonnegative(), question: name.optional(), outcome: z.looseObject({ kind: name }) }) }),
 	z.object({ type: z.literal("picked"), payload: Picked }),
-	z.object({ type: z.literal("landing"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY).nullable() }) }),
+	z.object({ type: z.literal("landing"), payload: z.object({ head: name, doneBy: z.enum(DONE_BY) }) }),
 	z.object({ type: z.enum(["answered", "answer"]) }),
 	z.object({ type: z.literal("merged") }),
 ]);
 
 type Entry = z.infer<typeof Entry>;
-
-/** A model run's answer as the log keeps it, under the question it answered where an answer to it stands for a later run. */
-type KeptAnswer = { readonly run: string; readonly attempt: number; readonly question: string | undefined; readonly outcome: RunOutcome };
-
-/** A fact the log keeps, as the JSON it saves. */
-const asJson = (fact: AnyEventObject | Picked | KeptAnswer): Json => Json.parse(JSON.parse(JSON.stringify(fact)));
 
 const entriesOf = (events: readonly SavedEvent[]): Entry[] => events.map((event) => Entry.parse(event));
 
@@ -111,8 +105,8 @@ export type ItemFold = {
 	/** The answers kept since the item last started afresh and the owner last answered, by the question each answered. */
 	readonly answers: Readonly<Record<string, RunOutcome>>;
 	readonly picks: Picks;
-	/** How landing last found the change that ends at `head` cleared: null while it waits for a person. */
-	readonly landing: { readonly head: string; readonly doneBy: DoneBy | null } | undefined;
+	/** How the change that ends at `head` reaches done if it merges as landing last found it; absent where landing never judged it. */
+	readonly landing?: { readonly head: string; readonly doneBy: DoneBy };
 	readonly merged: boolean;
 };
 
@@ -148,7 +142,7 @@ const stepItem = (fold: ItemFold, entry: Entry): ItemFold => {
 };
 
 /** An item's facts from its log alone: no model is asked and no effect runs. */
-export const foldItem = (events: readonly SavedEvent[]): ItemFold => entriesOf(events).reduce(stepItem, { fixRuns: 0, answers: {}, picks: {}, landing: undefined, merged: false });
+export const foldItem = (events: readonly SavedEvent[]): ItemFold => entriesOf(events).reduce(stepItem, { fixRuns: 0, answers: {}, picks: {}, merged: false });
 
 /** An invoked actor's done or error event: it names the child it came from. */
 const ChildEvent = z.looseObject({ actorId: z.string() });
@@ -186,18 +180,19 @@ export const foldMachine = (kind: Kind, events: readonly SavedEvent[]): AnyMachi
 	return entriesOf(events).reduce(stepMachine(logic), initialOf(logic));
 };
 
-/** Appends how landing found the change that ends at `head` cleared, the way it reaches done or null while it waits for a person, when the log last held otherwise. */
-export const keepLanding = (events: EventLog, itemId: string, head: string, doneBy: DoneBy | undefined): void => {
-	const found = { head, doneBy: doneBy ?? null };
+/** Appends how the change that ends at `head` reaches done if it merges as landing found it, when the log last held otherwise. */
+export const keepLanding = (events: EventLog, itemId: string, head: string, doneBy: DoneBy): void => {
 	const last = foldItem(events.list(itemId)).landing;
 
-	if (last?.head === found.head && last.doneBy === found.doneBy) return;
+	if (last?.head === head && last.doneBy === doneBy) return;
 
-	events.add({ source: "landing", sourceId: randomUUID(), itemId, type: "landing", payload: found });
+	events.add({ source: "landing", sourceId: randomUUID(), itemId, type: "landing", payload: { head, doneBy } });
 };
 
-/** How the item reached done, once its change merged: by the plan run's last pick and how landing last found it cleared. */
-export const doneByOf = ({ merged, picks, landing }: ItemFold): DoneBy | undefined => (merged ? reachedDoneBy({ planPick: picks.plan?.pick.event, cleared: landing?.doneBy ?? undefined }) : undefined);
+/** How the item reached done, once its change merged: split by its plan run's last pick, else as landing last found its change; unknown where landing never judged it. */
+export const doneByOf = ({ merged, picks, landing }: ItemFold): DoneBy | undefined => {
+	if (!merged) return undefined;
 
-/** A merged item's last plan, review and alignment picks, which a judge whose prompt changed is scored again on; undefined before its change merged. */
-export const mergedPicks = ({ merged, picks }: ItemFold): Picks | undefined => (merged ? picks : undefined);
+	return picks.plan?.pick.event === SPLIT ? "split" : landing?.doneBy;
+};
+

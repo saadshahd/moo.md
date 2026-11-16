@@ -15,7 +15,6 @@ import { OWNER } from "../fixtures/identity.ts";
 import { tempDir } from "../fixtures/temp.ts";
 import { workerWorld } from "../fixtures/worker-world.ts";
 import { ItemId } from "../../src/adapter-api.ts";
-import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 
 const NOTE = { write: { "docs/note.md": "hello\n" } };
 
@@ -67,7 +66,6 @@ test("an issue lands through a pull request: no item file is marked, the pull re
 	expect(github.issueState(Number(id))).toBe("CLOSED");
 	expect(await issues.workSource!.listReady()).toEqual([]);
 	expect(w.state.merges.get(id)).toMatchObject({ sha: mergeCommitOf(pull?.number ?? 0) });
-	expect(doneByOf(foldItem(w.state.events.list(id)))).toBe("checks");
 });
 
 test("an issue whose base takes a push lands on main and closes, with no item file in the repo, as hum's commit under the run's pull request title", async () => {

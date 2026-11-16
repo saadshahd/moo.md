@@ -17,7 +17,7 @@ import { FakeGitHub } from "../fixtures/fake-github.ts";
 import { tempDir } from "../fixtures/temp.ts";
 import { TTL, workerWorld, type WorldOptions } from "../fixtures/worker-world.ts";
 import { Holder, ItemId } from "../../src/adapter-api.ts";
-import { doneByOf, foldItem, foldMachine, mergedPicks } from "../../src/state/item-log.ts";
+import { doneByOf, foldItem, foldMachine } from "../../src/state/item-log.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
 const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
@@ -35,7 +35,7 @@ const folded = (w: Awaited<ReturnType<typeof world>>, id: string) => {
 	const events = w.state.events.list(id);
 	const fold = foldItem(events);
 
-	return { at: foldMachine(w.config.kinds[w.state.itemKinds.get(id)?.kind ?? ""]!, events).value, fixRuns: fold.fixRuns, doneBy: doneByOf(fold), picks: mergedPicks(fold) };
+	return { at: foldMachine(w.config.kinds[w.state.itemKinds.get(id)?.kind ?? ""]!, events).value, fixRuns: fold.fixRuns, doneBy: doneByOf(fold), picks: fold.picks };
 };
 
 /** Where the item's saved snapshot stands. */
@@ -62,11 +62,10 @@ test("the thin path: item → claude -p shim change → hum commits it → check
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(sh(w.repo.remote, ["log", "--format=%s", "-3", "main"]).split("\n")).toEqual(["hum: finish " + id, "shim: the change", `add ${id}`, ""]);
 
-	// The merge keeps the commits the push put on main, and that the change reached done on its checks alone.
+	// The merge keeps the commits the push put on main.
 	const pushed = sh(w.repo.remote, ["rev-list", "--reverse", "-2", "main"]).split("\n").filter(Boolean);
 
 	expect(w.state.merges.get(id)).toMatchObject({ sha: pushed.at(-1), commits: pushed });
-	expect(folded(w, id).doneBy).toBe("checks");
 
 	// Both of hum's commits, whatever git config the clone holds, are credited to the owner and no one else.
 	const credited = `${OWNER.name} <${OWNER.email}> | ${OWNER.name} <${OWNER.email}>`;

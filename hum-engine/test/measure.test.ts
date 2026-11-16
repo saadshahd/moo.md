@@ -93,10 +93,10 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 
 	const broke = (source: "revert" | "fix", sourceId: string, change: string) => state.notes.put(`${source}:${sourceId}`, { source, sourceId, change, hunk: "", text: "n", at: 7 });
 
-	/** A merge whose item's log holds how landing found it cleared, or none while it waited for a person. */
-	const mergeLogged = (merge: Merge, cleared: DoneBy | undefined) => {
+	/** A merge whose item's log holds how landing found its change. */
+	const mergeLogged = (merge: Merge, found: DoneBy) => {
 		state.merges.put(merge.item, merge);
-		keepLanding(state.events, merge.item, merge.sha, cleared);
+		keepLanding(state.events, merge.item, merge.sha, found);
 		state.events.add({ source: "work-source", sourceId: `merged:${merge.sha}`, itemId: merge.item, type: "merged", payload: {} });
 	};
 
@@ -105,7 +105,7 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 	mergeLogged({ item: "reverted", sha: "merge-r", at: 6, paths: [], commits: ["merge-r"], baseChecked: true }, "checks");
 	broke("fix", "f2", "merge-r");
 	broke("revert", "r1", "merge-r");
-	mergeLogged({ item: "broke-base", sha: "merge-b", at: 6, paths: [], commits: ["merge-b"], baseChecked: true }, undefined);
+	mergeLogged({ item: "broke-base", sha: "merge-b", at: 6, paths: [], commits: ["merge-b"], baseChecked: true }, "owner");
 	state.breaks.put("broke-base", { item: "broke-base", sha: "merge-b", at: 7, paths: [], level: "low", failure: "f", onBreak: "follow-up", followUp: "fix-b" });
 
 	const inputs = measureInputsOf(state);

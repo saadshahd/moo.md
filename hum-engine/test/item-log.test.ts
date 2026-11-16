@@ -5,10 +5,9 @@ import { join } from "node:path";
 import { type AnyActor, createActor, createAsyncLogic, waitFor } from "xstate";
 import { kindMachine, openState, persistedSnapshot, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
-import type { DoneBy } from "../src/decide/merge.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
 import { slug } from "../src/state/fs.ts";
-import { answerOnce, doneByOf, foldItem, foldMachine, keepLanding, machineStarted, mergedPicks, ownerAnswered, picked, recordMachine } from "../src/state/item-log.ts";
+import { answerOnce, doneByOf, foldItem, foldMachine, keepLanding, machineStarted, ownerAnswered, picked, recordMachine } from "../src/state/item-log.ts";
 import { finished } from "./fixtures/answers.ts";
 import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -127,35 +126,38 @@ const sure = (event: string) => ({ event, sure: true, reason: "It reads so.", ci
 const planPicked = (state: State, event: string) => state.events.add(picked(ITEM, { judge: "plan", pick: sure(event), models: ["m"] }));
 
 test.each([
-	["split", "needs-split", undefined],
-	["checks", "plan-ready", "checks"],
-	["review", "plan-ready", "review"],
-	["owner", "plan-ready", undefined],
-] as const)("a merged item's log folds to how it reached done: %s", (doneBy, planPick, cleared) => {
+	["split, by its plan", "split", "needs-split", []],
+	["checks", "checks", "plan-ready", ["checks"]],
+	["review", "review", "plan-ready", ["review"]],
+	["the owner's, once its change went back to waiting", "owner", "plan-ready", ["checks", "owner"]],
+	["unknown, where landing never judged its change", undefined, "plan-ready", []],
+] as const)("a merged item's log folds to how it reached done: %s", (_, doneBy, planPick, found) => {
 	const state = openState(dir, { now: Date.now });
 
 	planPicked(state, planPick);
-	keepLanding(state.events, ITEM, "abc", undefined);
 
-	if (cleared) keepLanding(state.events, ITEM, "abc", cleared);
+	for (const finding of found) keepLanding(state.events, ITEM, "abc", finding);
 	expect(doneByOf(folded(state))).toBeUndefined();
 
 	merged(state);
 	expect(doneByOf(folded(state))).toBe(doneBy);
 });
 
-test("landing's finding is logged each time it changes, so a change that went back to waiting reads as the owner's when a person merges it", () => {
+test("how landing found the change stands through later passes until landing finds otherwise, and finding it again adds nothing", () => {
 	const state = openState(dir, { now: Date.now });
-	const found: (DoneBy | undefined)[] = [undefined, undefined, "checks", undefined];
 
-	for (const doneBy of found) keepLanding(state.events, ITEM, "abc", doneBy);
+	keepLanding(state.events, ITEM, "abc", "checks");
+	state.events.add(machineStarted(ITEM, true));
+	state.events.add(ownerAnswered(ITEM, 1));
+	planPicked(state, "plan-ready");
+	keepLanding(state.events, ITEM, "abc", "checks");
 	merged(state);
 
-	expect(state.events.list(ITEM).map(({ type }) => type)).toEqual(["landing", "landing", "landing", "merged"]);
-	expect(doneByOf(folded(state))).toBe("owner");
+	expect(state.events.list(ITEM).filter(({ type }) => type === "landing")).toHaveLength(1);
+	expect(doneByOf(folded(state))).toBe("checks");
 });
 
-test("a merged item's log keeps the last plan, review and alignment picks, and one call returns them once the change merged", () => {
+test("the log keeps each judge's last pick", () => {
 	const state = openState(dir, { now: Date.now });
 	const alignment = { graded: { alignment: "sound", verification: "partial" } } as const;
 
@@ -163,13 +165,10 @@ test("a merged item's log keeps the last plan, review and alignment picks, and o
 	state.events.add(picked(ITEM, { judge: "review", head: "abc", pick: sure("request-changes"), models: ["m"] }));
 	state.events.add(picked(ITEM, { judge: "alignment", head: "def", alignment }));
 	state.events.add(picked(ITEM, { judge: "review", head: "def", pick: sure("approve"), models: ["m"] }));
-	expect(mergedPicks(folded(state))).toBeUndefined();
 
-	merged(state);
+	const { picks } = folded(state);
 
-	const picks = mergedPicks(folded(state));
-
-	expect([picks?.plan?.pick.event, picks?.review?.pick.event, picks?.review?.head, picks?.alignment?.alignment]).toEqual(["plan-ready", "approve", "def", alignment]);
+	expect([picks.plan?.pick.event, picks.review?.pick.event, picks.review?.head, picks.alignment?.alignment]).toEqual(["plan-ready", "approve", "def", alignment]);
 });
 
 test("a log hum 0.1.0 saved folds: its thread answer counts as the owner's", () => {

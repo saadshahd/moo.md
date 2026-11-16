@@ -2,7 +2,7 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { type AnyActor, type AnyActorLogic } from "xstate";
 import { restoreActor } from "xstate/persist";
-import { Json } from "../config/json.ts";
+import { asJson, type Json } from "../config/json.ts";
 import { climb } from "../config/migrate.ts";
 import { migrateSnapshot } from "../config/state-map.ts";
 import { kindMachine } from "../config/machine.ts";
@@ -50,7 +50,7 @@ export type SavedSnapshot = {
 };
 
 /** The snapshot of a running item actor, as the JSON `saveItem` writes. */
-export const persistedSnapshot = (actor: AnyActor): Json => Json.parse(JSON.parse(JSON.stringify(actor.getPersistedSnapshot())));
+export const persistedSnapshot = (actor: AnyActor): Json => asJson(actor.getPersistedSnapshot());
 
 const reason = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 

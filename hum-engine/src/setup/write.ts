@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { GitIdentityRead } from "../adapters/git.ts";
 import { type Config, loadConfig, type RawConfig, readConfigDir } from "../config/load.ts";
 import { hashJson } from "../config/hash.ts";
-import { Json } from "../config/json.ts";
+import { asJson, Json } from "../config/json.ts";
 import { migrateConfig } from "../config/migrate.ts";
 import { noGitIdentity, type Refusal, type Result } from "../config/refusal.ts";
 import { type HumConfig, Kind, READABLE_SCHEMA_VERSIONS, SCHEMA_VERSION } from "../config/schema.ts";
@@ -110,8 +110,6 @@ const STRUCTURAL = new Set<string>(STRUCTURE);
 
 const ownerKeys = (hum: Readonly<Record<string, Json>>, shipped: Readonly<Record<string, Json>>): Record<string, Json> =>
 	Object.fromEntries(Object.entries(hum).filter(([key, value]) => STRUCTURAL.has(key) || hashJson(value) !== hashJson(shipped[key] ?? null)));
-
-const asJson = (value: Kind | Readonly<Record<string, Json>>): Json => Json.parse(JSON.parse(JSON.stringify(value)));
 
 /**
  * Writes `.hum/` and the service files from the owner's answers, or writes nothing: the config must pass every check
