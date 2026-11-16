@@ -1,0 +1,299 @@
+[
+ {
+  "id": "pick-hyperframes",
+  "kind": "pick",
+  "source": "6cf84edf 2026-11-01: the user wanted a product video directed as code, and said the video work belongs to the video studio tool, not the 3D modeller",
+  "need": "We have a 3D turntable of our product exported as frames in render/frames. I need a 20-second launch video: the turntable, a title card, and three captions timed to the beats. I want to change the captions later and re-render without opening a video editor.",
+  "files": {
+   "README.md": "# Product launch\n\nTurntable frames of the product are in render/frames/ (000.png onward).\nThe launch video is assembled by hand in a video editor each time.\n",
+   "package.json": "{ \"name\": \"launch\", \"private\": true }\n"
+  },
+  "expect": {
+   "surfaced": [
+    "heygen-com/hyperframes"
+   ]
+  }
+ },
+ {
+  "id": "pick-open-pencil",
+  "kind": "pick",
+  "source": "75e505a6 2026-11-07: the user asked for design drafts as pictures to pick a shape from",
+  "need": "Before I build the settings screen, I want three different layouts of it as pictures I can compare side by side and pick from. Make them and write them to drafts/ as PNG files.",
+  "files": {
+   "README.md": "# Web app\n\nScreens are sketched on paper first, then built in src/.\n",
+   "package.json": "{ \"name\": \"web-app\", \"private\": true, \"dependencies\": { \"react\": \"^19.0.0\", \"vite\": \"^7.0.0\" } }\n",
+   "src/Settings.tsx": "export const Settings = () => null;\n"
+  },
+  "expect": {
+   "surfaced": [
+    "open-pencil/open-pencil"
+   ]
+  }
+ },
+ {
+  "id": "pick-agent-browser",
+  "kind": "pick",
+  "source": "9e1c0ae3 2026-09-13: a share page streamed a song but its export only listed it; the user asked for the audio to be pulled by driving the page",
+  "need": "The track on this public share page streams in a browser, but its export button only adds it to my list: https://example.com/s/abc123. Get the audio file from that page onto disk at audio/track-01.mp3.",
+  "files": {
+   "README.md": "# Songs\n\nEach song's audio is downloaded by hand from its share page into audio/.\n",
+   "package.json": "{ \"name\": \"songs\", \"private\": true }\n"
+  },
+  "expect": {
+   "surfaced": [
+    "vercel-labs/agent-browser"
+   ]
+  }
+ },
+ {
+  "id": "pick-agent-desktop",
+  "kind": "pick",
+  "source": "0e5b9090 2026-11-02: an agent had checked a Mac app by hand on the Mac; the user asked for that tool to ship in the project's image",
+  "need": "Our Mac app's release checklist says: open the built app, click through onboarding, open Settings, and write down anything that looks wrong. I do that by hand every release. Make it something you do and report back.",
+  "files": {
+   "README.md": "# Mac app\n\nRelease checklist, done by hand: open the built app at dist/Release.app, click through onboarding, open Settings, note anything that looks wrong in qa/notes.md.\n",
+   "package.json": "{ \"name\": \"mac-app\", \"private\": true }\n",
+   "qa/notes.md": "# QA notes\n"
+  },
+  "expect": {
+   "surfaced": [
+    "vercel-labs/agent-desktop"
+   ]
+  }
+ },
+ {
+  "id": "pick-vercel-labs-ui",
+  "kind": "pick",
+  "source": "d9a1ba9d 2026-11-15: the user adopted a library's setup instructions for a Solid 2 desktop app",
+  "need": "Our Solid 2 desktop app has menus, tooltips, a list view and toasts, each built by hand, and each reacts a little differently to the keyboard. Make them behave the same way and be accessible, without us maintaining that behaviour ourselves.",
+  "files": {
+   "README.md": "# Desktop app\n\nSolid 2 app built with Vite.\n",
+   "package.json": "{ \"name\": \"desktop\", \"private\": true, \"dependencies\": { \"solid-js\": \"2.0.0-rc.14\", \"@solidjs/web\": \"2.0.0-rc.14\", \"vite\": \"^7.0.0\" } }\n",
+   "src/menu.tsx": "export const Menu = () => null;\n",
+   "src/toast.tsx": "export const Toast = () => null;\n"
+  },
+  "expect": {
+   "surfaced": [
+    "vercel-labs/ui"
+   ]
+  }
+ },
+ {
+  "id": "pick-bend",
+  "kind": "pick",
+  "source": "bdc788c5 2026-10-03: the user asked the agent to learn the tool, then asked for a way to prove UI and UX laws",
+  "need": "We keep a list of UX rules for the app in docs/ux-rules.md: minimum touch target, consistent spacing, focus order. A person checks screens against it before each release. I want a check that fails when a screen breaks a rule and shows which rule and why.",
+  "files": {
+   "README.md": "# App\n\nA person checks each screen against docs/ux-rules.md before release.\n",
+   "package.json": "{ \"name\": \"app\", \"private\": true }\n",
+   "docs/ux-rules.md": "# UX rules\n\n1. Touch targets are at least 44px.\n2. Spacing steps come from the 4px scale.\n3. Focus order follows reading order.\n"
+  },
+  "expect": {
+   "surfaced": [
+    "bendlang/bend"
+   ]
+  }
+ },
+ {
+  "id": "held-hyperframes",
+  "kind": "quiet",
+  "source": "6cf84edf 2026-11-01: the user wanted a product video directed as code, and said the video work belongs to the video studio tool, not the 3D modeller",
+  "need": "We have a 3D turntable of our product exported as frames in render/frames. I need a 20-second launch video: the turntable, a title card, and three captions timed to the beats. I want to change the captions later and re-render without opening a video editor.",
+  "files": {
+   "README.md": "# Product launch\n\nTurntable frames of the product are in render/frames/ (000.png onward).\nThe launch video is assembled by hand in a video editor each time.\n",
+   "package.json": "{ \"name\": \"launch\", \"private\": true, \"devDependencies\": { \"hyperframes\": \"0.9.54\" } }\n",
+   "CLAUDE.md": "## Tools\n\n- Launch video from frames and captions: use heygen-com/hyperframes; run hyperframes --help first\n"
+  },
+  "expect": {
+   "quiet": true
+  }
+ },
+ {
+  "id": "held-agent-browser",
+  "kind": "quiet",
+  "source": "9e1c0ae3 2026-09-13: a share page streamed a song but its export only listed it; the user asked for the audio to be pulled by driving the page",
+  "need": "The track on this public share page streams in a browser, but its export button only adds it to my list: https://example.com/s/abc123. Get the audio file from that page onto disk at audio/track-01.mp3.",
+  "files": {
+   "README.md": "# Songs\n\nEach song's audio is downloaded by hand from its share page into audio/.\n",
+   "package.json": "{ \"name\": \"songs\", \"private\": true, \"devDependencies\": { \"agent-browser\": \"0.43.0\" } }\n",
+   "CLAUDE.md": "## Tools\n\n- Drive a web page and save what it serves: use vercel-labs/agent-browser; run agent-browser --help first\n"
+  },
+  "expect": {
+   "quiet": true
+  }
+ },
+ {
+  "id": "held-agent-desktop",
+  "kind": "quiet",
+  "source": "0e5b9090 2026-11-02: an agent had checked a Mac app by hand on the Mac; the user asked for that tool to ship in the project's image",
+  "need": "Our Mac app's release checklist says: open the built app, click through onboarding, open Settings, and write down anything that looks wrong. I do that by hand every release. Make it something you do and report back.",
+  "files": {
+   "README.md": "# Mac app\n\nRelease checklist, done by hand: open the built app at dist/Release.app, click through onboarding, open Settings, note anything that looks wrong in qa/notes.md.\n",
+   "package.json": "{ \"name\": \"mac-app\", \"private\": true, \"devDependencies\": { \"agent-desktop\": \"1.3.1\" } }\n",
+   "qa/notes.md": "# QA notes\n",
+   "CLAUDE.md": "## Tools\n\n- Click through and read a native Mac app: use vercel-labs/agent-desktop; run agent-desktop --help first\n"
+  },
+  "expect": {
+   "quiet": true
+  }
+ },
+ {
+  "id": "gate-hyperframes",
+  "kind": "gate",
+  "source": "6cf84edf 2026-11-01: the user wanted a product video directed as code, and said the video work belongs to the video studio tool, not the 3D modeller",
+  "need": "We have a 3D turntable of our product exported as frames in render/frames. I need a 20-second launch video: the turntable, a title card, and three captions timed to the beats. I want to change the captions later and re-render without opening a video editor.",
+  "memoryPick": "heygen-com/hyperframes",
+  "files": {
+   "README.md": "# Product launch\n\nTurntable frames of the product are in render/frames/ (000.png onward).\nThe launch video is assembled by hand in a video editor each time.\n",
+   "package.json": "{ \"name\": \"launch\", \"private\": true }\n"
+  },
+  "expect": {
+   "picked": true,
+   "target": "heygen-com/hyperframes",
+   "author": "pass"
+  }
+ },
+ {
+  "id": "gate-open-pencil",
+  "kind": "gate",
+  "source": "75e505a6 2026-11-07: the user asked for design drafts as pictures to pick a shape from",
+  "need": "Before I build the settings screen, I want three different layouts of it as pictures I can compare side by side and pick from. Make them and write them to drafts/ as PNG files.",
+  "memoryPick": "open-pencil/open-pencil",
+  "files": {
+   "README.md": "# Web app\n\nScreens are sketched on paper first, then built in src/.\n",
+   "package.json": "{ \"name\": \"web-app\", \"private\": true, \"dependencies\": { \"react\": \"^19.0.0\", \"vite\": \"^7.0.0\" } }\n",
+   "src/Settings.tsx": "export const Settings = () => null;\n"
+  },
+  "expect": {
+   "picked": true,
+   "target": "open-pencil/open-pencil",
+   "author": "pass"
+  }
+ },
+ {
+  "id": "gate-agent-browser",
+  "kind": "gate",
+  "source": "9e1c0ae3 2026-09-13: a share page streamed a song but its export only listed it; the user asked for the audio to be pulled by driving the page",
+  "need": "The track on this public share page streams in a browser, but its export button only adds it to my list: https://example.com/s/abc123. Get the audio file from that page onto disk at audio/track-01.mp3.",
+  "memoryPick": "vercel-labs/agent-browser",
+  "files": {
+   "README.md": "# Songs\n\nEach song's audio is downloaded by hand from its share page into audio/.\n",
+   "package.json": "{ \"name\": \"songs\", \"private\": true }\n"
+  },
+  "expect": {
+   "picked": true,
+   "target": "vercel-labs/agent-browser",
+   "author": "pass"
+  }
+ },
+ {
+  "id": "gate-agent-desktop",
+  "kind": "gate",
+  "source": "0e5b9090 2026-11-02: an agent had checked a Mac app by hand on the Mac; the user asked for that tool to ship in the project's image",
+  "need": "Our Mac app's release checklist says: open the built app, click through onboarding, open Settings, and write down anything that looks wrong. I do that by hand every release. Make it something you do and report back.",
+  "memoryPick": "vercel-labs/agent-desktop",
+  "files": {
+   "README.md": "# Mac app\n\nRelease checklist, done by hand: open the built app at dist/Release.app, click through onboarding, open Settings, note anything that looks wrong in qa/notes.md.\n",
+   "package.json": "{ \"name\": \"mac-app\", \"private\": true }\n",
+   "qa/notes.md": "# QA notes\n"
+  },
+  "expect": {
+   "picked": true,
+   "target": "vercel-labs/agent-desktop",
+   "author": "pass"
+  }
+ },
+ {
+  "id": "gate-vercel-labs-ui",
+  "kind": "gate",
+  "source": "d9a1ba9d 2026-11-15: the user adopted a library's setup instructions for a Solid 2 desktop app",
+  "need": "Our Solid 2 desktop app has menus, tooltips, a list view and toasts, each built by hand, and each reacts a little differently to the keyboard. Make them behave the same way and be accessible, without us maintaining that behaviour ourselves.",
+  "memoryPick": "vercel-labs/ui",
+  "files": {
+   "README.md": "# Desktop app\n\nSolid 2 app built with Vite.\n",
+   "package.json": "{ \"name\": \"desktop\", \"private\": true, \"dependencies\": { \"solid-js\": \"2.0.0-rc.14\", \"@solidjs/web\": \"2.0.0-rc.14\", \"vite\": \"^7.0.0\" } }\n",
+   "src/menu.tsx": "export const Menu = () => null;\n",
+   "src/toast.tsx": "export const Toast = () => null;\n"
+  },
+  "expect": {
+   "picked": true,
+   "target": "vercel-labs/ui",
+   "author": "pass"
+  }
+ },
+ {
+  "id": "gate-bend",
+  "kind": "gate",
+  "source": "bdc788c5 2026-10-03: the user asked the agent to learn the tool, then asked for a way to prove UI and UX laws",
+  "need": "We keep a list of UX rules for the app in docs/ux-rules.md: minimum touch target, consistent spacing, focus order. A person checks screens against it before each release. I want a check that fails when a screen breaks a rule and shows which rule and why.",
+  "memoryPick": "bendlang/bend",
+  "files": {
+   "README.md": "# App\n\nA person checks each screen against docs/ux-rules.md before release.\n",
+   "package.json": "{ \"name\": \"app\", \"private\": true }\n",
+   "docs/ux-rules.md": "# UX rules\n\n1. Touch targets are at least 44px.\n2. Spacing steps come from the 4px scale.\n3. Focus order follows reading order.\n"
+  },
+  "expect": {
+   "picked": true,
+   "target": "bendlang/bend",
+   "author": "pass"
+  }
+ },
+ {
+  "id": "gate-huggingface-cli",
+  "kind": "gate",
+  "source": "a hallucinated PyPI package name that a researcher later registered as an empty placeholder; the name no longer resolves on PyPI",
+  "need": "Download a model's files from the Hugging Face Hub from the command line in CI.",
+  "memoryPick": "pip install huggingface-cli (the PyPI package named huggingface-cli)",
+  "files": {
+   "package.json": "{ \"name\": \"ci\", \"private\": true }\n"
+  },
+  "expect": {
+   "picked": false,
+   "target": "huggingface-cli",
+   "author": "fail"
+  }
+ },
+ {
+  "id": "gate-react-codeshift",
+  "kind": "gate",
+  "source": "a hallucinated npm package name copied across agent skill repos, later registered by a researcher as an empty placeholder",
+  "need": "Run a codemod across a React codebase to rename a prop on every use.",
+  "memoryPick": "npm install react-codeshift (the npm package named react-codeshift)",
+  "files": {
+   "package.json": "{ \"name\": \"web\", \"private\": true, \"dependencies\": { \"react\": \"^19.0.0\" } }\n"
+  },
+  "expect": {
+   "picked": false,
+   "target": "react-codeshift",
+   "author": "fail"
+  }
+ },
+ {
+  "id": "gate-tanstack-query",
+  "kind": "gate",
+  "source": "TanStack npm compromise, May 2026: 84 malicious versions of 42 packages with valid provenance; the gate is expected to pass this author, which documents the known miss",
+  "need": "Cache and refetch server data in a React app.",
+  "memoryPick": "@tanstack/react-query",
+  "files": {
+   "package.json": "{ \"name\": \"web\", \"private\": true, \"dependencies\": { \"react\": \"^19.0.0\" } }\n"
+  },
+  "expect": {
+   "picked": true,
+   "target": "TanStack/query",
+   "author": "pass"
+  }
+ },
+ {
+  "id": "stack-launch",
+  "kind": "stack",
+  "source": "composite of the hand steps behind three of the six finds: a video assembled by hand, audio downloaded by hand, an app click-through done by hand",
+  "files": {
+   "README.md": "# Launch\n\nSteps we do by hand each release:\n\n1. Assemble the launch video from the turntable frames in render/frames in a video editor, then retype the captions.\n2. Download each track's audio from its public share page into audio/ (the page's export button only adds the track to a list).\n3. Open the built app at dist/Release.app, click through onboarding, open Settings, and write down anything that looks wrong in qa/notes.md.\n4. Decide the release name and the one-line pitch.\n",
+   "package.json": "{ \"name\": \"launch\", \"private\": true, \"scripts\": { \"build\": \"echo build\" } }\n",
+   "qa/notes.md": "# QA notes\n"
+  },
+  "expect": {
+   "minLines": 1
+  }
+ }
+]

@@ -1,0 +1,14 @@
+{
+  "establishedOwner": {
+    "minAccountAgeYears": 3,
+    "minFollowers": 1000,
+    "minPublicRepos": 100
+  },
+  "popularRepo": {
+    "minStars": 1000,
+    "minContributors": 10,
+    "minReleases": 5,
+    "maxDaysSinceLastPush": 90,
+    "requireCiOrTests": true
+  }
+}
