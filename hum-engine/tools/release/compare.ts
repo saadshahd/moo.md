@@ -45,13 +45,18 @@ export const PLACEHOLDER_VERSION = "0.0.0";
 /** One difference between two surfaces, with the smallest bump that may carry it. */
 type Finding = { readonly part: string; readonly path: string; readonly difference: Difference["type"]; readonly requires: Level };
 
-const findingsBetween = (published: Surface, next: Surface, version: string): Finding[] =>
-	diff(published, next).map((difference) => ({
-		part: String(difference.path[0]),
-		path: difference.path.slice(1).join("."),
-		difference: difference.type,
-		requires: levelAt(version, levelOf(difference)),
-	}));
+/** The package naming its own version, as `ENGINE_VERSION` does: every release changes it, so it never asks for a bigger bump. */
+const isOwnVersion = (difference: Difference, from: string, to: string): boolean => difference.type === "CHANGE" && difference.oldValue === from && difference.value === to;
+
+const findingsBetween = (published: Baseline & { readonly surface: Surface }, next: { readonly version: string; readonly surface: Surface }): Finding[] =>
+	diff(published.surface, next.surface)
+		.filter((difference) => !isOwnVersion(difference, published.version, next.version))
+		.map((difference) => ({
+			part: String(difference.path[0]),
+			path: difference.path.slice(1).join("."),
+			difference: difference.type,
+			requires: levelAt(published.version, levelOf(difference)),
+		}));
 
 export type Verdict = { readonly ok: true; readonly summary: string } | { readonly ok: false; readonly reasons: readonly string[] };
 
@@ -77,7 +82,7 @@ export const checkBump = (baseline: Baseline | undefined, next: { readonly versi
 			: refuse(`the published ${baseline.version} carries no surface to compare against`);
 	}
 
-	const findings = findingsBetween(baseline.surface, next.surface, baseline.version);
+	const findings = findingsBetween({ version: baseline.version, surface: baseline.surface }, next);
 	const required = strongest(findings.map(({ requires }) => requires));
 	// SAFETY: `gt` above makes the versions differ, and prereleases were refused, so `diff` names a level.
 	const bumped = semver.diff(baseline.version, next.version) as Level;

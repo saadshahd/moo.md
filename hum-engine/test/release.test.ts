@@ -81,6 +81,13 @@ test.each([
 	expect(checkBump(published(version), next(bumped, changed)).ok).toBe(accepted);
 });
 
+test("the package's own version, which every release changes, asks for no bump where the surface holds it", () => {
+	const naming = (version: string): Surface => ({ ...surface, savedState: { "src/state/format.ts": { ENGINE_VERSION: { type: "string", value: version } } } });
+
+	expect(checkBump({ version: "0.4.0", surface: naming("0.4.0") }, next("0.4.1", naming("0.4.1"))).ok).toBe(true);
+	expect(checkBump({ version: "0.4.0", surface: naming("0.4.0") }, next("0.4.1", naming("0.3.9"))).ok).toBe(false);
+});
+
 test("the semver check names the changes that need the larger bump", () => {
 	const verdict = checkBump(published("1.2.3"), next("1.2.4", removedSetting));
 
@@ -141,7 +148,7 @@ test("every action in the release workflow is pinned to a full commit sha", asyn
 	expect(used.filter((action) => !/@[0-9a-f]{40}$/.test(action))).toEqual([]);
 });
 
-test.skipIf(!Bun.which("actionlint"))("actionlint passes on the release workflow", () => {
+test("actionlint passes on the release workflow", () => {
 	const lint = Bun.spawnSync(["actionlint", "-no-color", WORKFLOW], { cwd: REPO_ROOT });
 
 	expect(lint.stdout.toString() + lint.stderr.toString()).toBe("");

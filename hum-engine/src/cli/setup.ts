@@ -30,21 +30,15 @@ const GhLabels = z.array(z.object({ name: z.string() }));
 
 const EVAL_SCRIPT = join(import.meta.dir, "..", "..", "scripts", "eval.ts");
 
+/** What the scan reads from GitHub. Each fact is read alone, and one whose read fails is unknown while the rest stand. */
 type GithubFacts = {
-	readonly items: readonly Pick<Item, "body" | "labels">[];
-	readonly labels: readonly string[];
+	readonly items: readonly Pick<Item, "body" | "labels">[] | undefined;
+	readonly labels: readonly string[] | undefined;
 	/** Whether the repo lets a workflow open pull requests; off, a CI run cannot open one at all. */
-	readonly workflowsMayOpenPullRequests: boolean;
+	readonly workflowsMayOpenPullRequests: boolean | undefined;
 };
 
 const Visibility = z.object({ visibility: z.string() });
-
-/** Whether anyone may read and comment on the repo; undefined without `gh` or a GitHub remote. */
-const isPublicRepo = async (repo: string): Promise<boolean | undefined> => {
-	const viewed = await gh(repo, ["repo", "view", "--json", "visibility"]);
-
-	return isRead(viewed) ? Visibility.parse(JSON.parse(viewed.stdout)).visibility === "PUBLIC" : undefined;
-};
 
 const WorkflowPermissions = z.object({ can_approve_pull_request_reviews: z.boolean() });
 
@@ -62,25 +56,27 @@ const gh = async (repo: string, args: readonly string[]) => {
 	}
 };
 
-type GhOutput = Awaited<ReturnType<typeof gh>>;
+/**
+ * What one `gh` read prints, through `parse`; undefined where the read fails: without `gh` or a GitHub remote, or
+ * without the rights it needs, as a read that needs admin fails for anyone else.
+ */
+const ghRead = async <T>(repo: string, args: readonly string[], parse: (stdout: string) => T): Promise<T | undefined> => {
+	const output = await gh(repo, args);
 
-const isRead = (output: GhOutput): output is NonNullable<GhOutput> => output?.exitCode === 0;
-
-/** The repo's open issues and its label names, from `gh`. Without `gh` or a GitHub remote there are none, and the scan prints no coverage. */
-const githubFacts = async (repo: string): Promise<GithubFacts | undefined> => {
-	const issues = await gh(repo, ["issue", "list", "--state", "open", "--limit", GH_LIST_LIMIT, "--json", "body,labels"]);
-	const labels = await gh(repo, ["label", "list", "--limit", GH_LIST_LIMIT, "--json", "name"]);
-
-	const permissions = await gh(repo, ["api", "repos/{owner}/{repo}/actions/permissions/workflow"]);
-
-	if (!isRead(issues) || !isRead(labels) || !isRead(permissions)) return undefined;
-
-	return {
-		items: GhIssues.parse(JSON.parse(issues.stdout)).map(({ body, labels: on }) => ({ body, labels: on.map(({ name }) => name) })),
-		labels: GhLabels.parse(JSON.parse(labels.stdout)).map(({ name }) => name),
-		workflowsMayOpenPullRequests: WorkflowPermissions.parse(JSON.parse(permissions.stdout)).can_approve_pull_request_reviews,
-	};
+	return output?.exitCode === 0 ? parse(output.stdout) : undefined;
 };
+
+/** Whether anyone may read and comment on the repo; undefined where `gh` cannot read it. */
+const isPublicRepo = (repo: string): Promise<boolean | undefined> => ghRead(repo, ["repo", "view", "--json", "visibility"], (stdout) => Visibility.parse(JSON.parse(stdout)).visibility === "PUBLIC");
+
+/** The repo's open issues, its label names and its workflow permissions, from `gh`. Without the open issues and the labels both read, the scan prints no coverage, as the issues are counted against the labels. */
+const githubFacts = async (repo: string): Promise<GithubFacts> => ({
+	items: await ghRead(repo, ["issue", "list", "--state", "open", "--limit", GH_LIST_LIMIT, "--json", "body,labels"], (stdout) =>
+		GhIssues.parse(JSON.parse(stdout)).map(({ body, labels }) => ({ body, labels: labels.map(({ name }) => name) })),
+	),
+	labels: await ghRead(repo, ["label", "list", "--limit", GH_LIST_LIMIT, "--json", "name"], (stdout) => GhLabels.parse(JSON.parse(stdout)).map(({ name }) => name)),
+	workflowsMayOpenPullRequests: await ghRead(repo, ["api", "repos/{owner}/{repo}/actions/permissions/workflow"], (stdout) => WorkflowPermissions.parse(JSON.parse(stdout)).can_approve_pull_request_reviews),
+});
 
 const printStep = ({ name, status, detail, ms }: Step): string => `${status.padEnd(7)} ${name} (${ms} ms): ${detail}`;
 
@@ -106,12 +102,12 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 			const scan = await scanRepo(io.cwd, base);
 			const facts = await githubFacts(io.cwd);
 			const isPublic = await isPublicRepo(io.cwd);
-			const proposal = proposeSetup(scan, shipped.hum, { labels: facts?.labels, isPublic: isPublic ?? true, openIssues: facts?.items.length });
+			const proposal = proposeSetup(scan, shipped.hum, { labels: facts.labels, isPublic: isPublic ?? true, openIssues: facts.items?.length });
 			const { tracked, folders, ...shown } = scan;
-			const coverage = facts && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
+			const coverage = facts.items && facts.labels && kindCoverage(facts.items, shipped.hum.kinds, proposal.kindLabels);
 			const gitIdentity = await readGitIdentity(setupGit(io.cwd));
 
-			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts?.workflowsMayOpenPullRequests ?? null, isPublicRepo: isPublic ?? null, gitIdentity }, null, "\t")}\n`);
+			io.stdout(`${JSON.stringify({ scan: { ...shown, trackedFiles: tracked.length, folders: folders.map(({ folder, changes }) => ({ folder, changes })) }, proposal, waits: waitsOf(shipped.kinds), coverage: coverage ?? null, workflowsMayOpenPullRequests: facts.workflowsMayOpenPullRequests ?? null, isPublicRepo: isPublic ?? null, gitIdentity }, null, "\t")}\n`);
 		});
 
 	setup

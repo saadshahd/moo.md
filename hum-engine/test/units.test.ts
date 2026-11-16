@@ -63,6 +63,9 @@ const gateway: WorkflowSettings = {
 	pullRequestToken: { from: "app", clientIdSecret: "APP_CLIENT_ID", privateKeySecret: "APP_PRIVATE_KEY" },
 };
 
+/** A repo that signs Claude Code in through a gateway that takes no secret, so no env reaches the work job's hum step alone. */
+const keyless: WorkflowSettings = { ...settings, ciClaudeAuth: "env", ciEnv: OPEN_ENV };
+
 const Trigger = z.object({ on: z.record(z.string(), z.json()), jobs: z.object({ wake: z.object({ if: z.string().optional() }) }) });
 
 const Step = z.object({
@@ -107,6 +110,9 @@ const allSteps = (from: WorkflowSettings) => Object.values(wakeOf(from).jobs).fl
 /** The step of a job that runs hum's part of the wake. */
 const humStep = (job: z.infer<typeof Job>) => job.steps.find(({ run }) => run?.includes("hum wake "));
 
+/** The first step of a job that runs one of GitHub's actions, named without its version. */
+const actionStep = (job: z.infer<typeof Job>, action: string) => job.steps.find(({ uses }) => uses?.startsWith(`actions/${action}@`));
+
 const has = (tool: string): boolean => Bun.which(tool) !== null;
 
 const writeWorkflows = (repo: string, from: WorkflowSettings): void => {
@@ -141,8 +147,8 @@ test("the launchd plist restarts only after a failure, keeps the paths absolute 
 /** actionlint 1.7.12 knows create-github-app-token v3 only by app-id, which v3 deprecates for client-id. */
 const STALE_ACTION_INPUTS = ["-ignore", 'missing input "app-id"', "-ignore", 'input "client-id" is not defined'];
 
-test.skipIf(!has("actionlint"))("actionlint passes on every CI workflow, with the wake workflow they call beside them", () => {
-	for (const from of [settings, gateway]) {
+test("actionlint passes on every CI workflow, with the wake workflow they call beside them", () => {
+	for (const from of [settings, gateway, keyless]) {
 		const repo = temp();
 
 		Bun.spawnSync(["git", "init", "-q"], { cwd: repo });
@@ -189,8 +195,28 @@ test("each action runs at one commit, with its release beside it as a comment", 
 	const checkout = "uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1";
 	const mint = "uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0";
 	const download = "uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2";
+	const upload = "uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2";
 
-	expect(uses).toEqual([checkout, mint, checkout, download, "uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2", checkout, download, mint]);
+	expect(uses).toEqual([checkout, mint, upload, checkout, download, upload, checkout, download, mint]);
+});
+
+test("the work job downloads the inbox gather uploads, and publish the outbox the work job uploads, at the folder hum writes and reads", () => {
+	for (const from of [settings, gateway]) {
+		const { gather, work, publish } = wakeOf(from).jobs;
+
+		for (const [giver, taker, name] of [[gather, work, "hum-inbox"], [work, publish, "hum-outbox"]] as const) {
+			const handed = { name, path: `\${{ runner.temp }}/${name}` };
+			const uploaded = actionStep(giver, "upload-artifact") ?? {};
+			const downloaded = actionStep(taker, "download-artifact") ?? {};
+			const [writes = {}, reads = {}] = [humStep(giver), humStep(taker)];
+
+			expect(uploaded.with).toMatchObject(handed);
+			expect(downloaded.with).toEqual(handed);
+			expect([writes.run, reads.run]).toEqual([expect.stringContaining(`"$RUNNER_TEMP/${name}"`), expect.stringContaining(`"$RUNNER_TEMP/${name}"`)]);
+			expect(giver.steps.indexOf(uploaded)).toBeGreaterThan(giver.steps.indexOf(writes));
+			expect(taker.steps.indexOf(downloaded)).toBeLessThan(taker.steps.indexOf(reads));
+		}
+	}
 });
 
 test("each job of the wake runs on the runner and in the container the settings name, as written", () => {
@@ -250,14 +276,15 @@ test("a secret's token is GH_TOKEN in the jobs that hold GitHub's token, and fal
 	expect(wakeText(settings)).not.toContain("create-github-app-token");
 });
 
-test("an App's token is minted last in each job that holds it, with the workflow's own permissions, from the two secrets the settings name, and a job whose App secrets are unset stops first, naming them", () => {
+test("an App's token is minted just before hum runs in each job that holds it, with the workflow's own permissions, from the two secrets the settings name, and a job whose App secrets are unset stops first, naming them", () => {
 	const { on, permissions } = wakeOf(gateway);
 
 	expect(on.workflow_call.secrets).toMatchObject({ APP_CLIENT_ID: { required: false }, APP_PRIVATE_KEY: { required: false } });
 	expect(permissions).toEqual({});
 
 	for (const job of tokenJobs(gateway)) {
-		const [mint, wake] = job.steps.slice(-2);
+		const wake = humStep(job) ?? {};
+		const mint = job.steps[job.steps.indexOf(wake) - 1];
 
 		expect(mint?.uses).toStartWith("actions/create-github-app-token@");
 		expect(mint?.with).toEqual({
@@ -269,7 +296,7 @@ test("an App's token is minted last in each job that holds it, with the workflow
 		});
 		expect(job.permissions).toMatchObject({ contents: "write", issues: "write", "pull-requests": "write" });
 		expect(mint?.if).toBeUndefined();
-		expect(wake?.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token }}`);
+		expect(wake.env?.GH_TOKEN).toBe(`\${{ steps.${mint?.id}.outputs.token }}`);
 
 		const [check] = job.steps;
 		const ran = Bun.spawnSync(["bash", "-ec", check?.run ?? "true"], { env: { PATH: process.env.PATH } });
@@ -291,14 +318,14 @@ test("the work job holds no GitHub token: it reads the repo alone, at the base g
 	expect(gather.outputs?.gathered).toBe(`\${{ steps.${humStep(gather)?.id}.outputs.gathered }}`);
 	expect(humStep(publish)?.env?.HUM_GATHERED).toBe("${{ needs.gather.outputs.gathered }}");
 
-	for (const job of [work, publish]) expect(job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with?.ref).toBe("${{ fromJSON(needs.gather.outputs.gathered).baseSha }}");
+	for (const job of [work, publish]) expect(actionStep(job, "checkout")?.with?.ref).toBe("${{ fromJSON(needs.gather.outputs.gathered).baseSha }}");
 });
 
 test("the checkout keeps no token in the workspace; the jobs that hold GitHub's token install hum from npm, none of the repo's packages and no plugin, and the work job installs its plugins after its packages", () => {
 	const { work } = wakeOf(settings).jobs;
 	const at = (steps: typeof work.steps, found: (typeof work.steps)[number] | undefined) => steps.findIndex((step) => step === found);
 
-	for (const { steps } of Object.values(wakeOf(settings).jobs)) expect(steps.find(({ uses }) => uses?.startsWith("actions/checkout@"))?.with).toMatchObject({ "fetch-depth": 0, "persist-credentials": false });
+	for (const job of Object.values(wakeOf(settings).jobs)) expect(actionStep(job, "checkout")?.with).toMatchObject({ "fetch-depth": 0, "persist-credentials": false });
 
 	for (const { steps } of tokenJobs(settings)) {
 		const [install = ""] = steps.find(({ run }) => run?.startsWith("npm install"))?.run?.split("\n") ?? [];

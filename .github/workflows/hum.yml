@@ -36,6 +36,12 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
+      # The tests run actionlint over every workflow hum writes; go install checks its source against Go's checksum database.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache: false
+      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       - run: bun install --frozen-lockfile
         working-directory: hum
       - run: bun install --frozen-lockfile

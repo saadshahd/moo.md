@@ -84,6 +84,9 @@ echo "${JOB_TOOLS}/bin" >> "$GITHUB_PATH"
 /** The YAML writer leaves out a key whose value is undefined, so a job that runs on the runner itself has no `container`. */
 const NO_KEY = undefined;
 
+/** An env, or no key where it holds nothing: actionlint refuses an empty `env`. */
+const envOrNone = (env: Readonly<Record<string, string>>) => (Object.keys(env).length > 0 ? env : NO_KEY);
+
 const OPTIONAL_SECRET = { required: false } as const;
 
 /** The secrets the owner's settings name. A called workflow reads only the secrets it declares, so each is declared, and none is required. */
@@ -147,8 +150,7 @@ const gitSetup = ({ name, email }: HumConfig["commitIdentity"]) => ({
 	run: `git config --global user.name "$${ENV.gitName}"
 git config --global user.email "$${ENV.gitEmail}"
 git config --global credential.https://github.com.helper "$${ENV.gitCredentialHelper}"
-git config --global --add safe.directory "$GITHUB_WORKSPACE"
-`,
+${SAFE_CHECKOUT.run}`,
 	env: {
 		[ENV.gitName]: name,
 		[ENV.gitEmail]: email,
@@ -211,12 +213,12 @@ const SAFE_CHECKOUT = { run: 'git config --global --add safe.directory "$GITHUB_
 
 /**
  * The wake, as three jobs. `gather` and `publish` hold GitHub's token and run hum as published, with none of the
- * repo's code: no install of its packages, no hook and no check; each mints an App's token at its end, inside the
- * token's hour. `work` holds no GitHub token: its workflow token reads the repo alone and stays out of the checkout,
- * and everything it needs from GitHub reaches it in gather's inbox. Its runs and the repo's checks run there, and what
- * they made goes to publish as the outbox, which publish checks before any write. The Claude sign-in and every `ciEnv`
- * value that reads a secret reach the steps that run hum alone. A runner GitHub does not host keeps what a job leaves,
- * so a process a run left could outlive the work job there: ephemeral runners close that.
+ * repo's code: no install of its packages, no hook and no check; each mints an App's token just before hum runs,
+ * inside the token's hour. `work` holds no GitHub token: its workflow token reads the repo alone and stays out of the
+ * checkout, and everything it needs from GitHub reaches it in the inbox gather uploads. Its runs and the repo's checks
+ * run there, and what they made goes to publish as the outbox, which publish checks before any write. The Claude
+ * sign-in and every `ciEnv` value that reads a secret reach the steps that run hum alone. A runner GitHub does not
+ * host keeps what a job leaves, so a process a run left could outlive the work job there: ephemeral runners close that.
  */
 const wake = ({ commitIdentity, ciWakeTimeoutMinutes, ciOutboxMaxMegabytes, pullRequestToken, ciRunner, ciContainer, ciEnv, ciClaudeAuth }: WorkflowSettings) => {
 	const claude = CLAUDE_SIGN_IN[ciClaudeAuth];
@@ -226,13 +228,13 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, ciOutboxMaxMegabytes, pull
 	const humEnv = { ...env.humStep, ...claude.env, [ENV.githubToken]: github.token };
 	const checkout = (ref?: string) => ({ uses: ACTIONS.checkout.uses, with: { ...(ref && { ref }), "fetch-depth": 0, "persist-credentials": false } });
 
-	/** A job that holds GitHub's token: hum from npm, git that pushes as hum, and the token minted last. It installs no plugin: it makes judgment calls alone, which load none. */
-	const holdsToken = ({ before, ref, run, permissions = PERMISSIONS }: { readonly before: readonly object[]; readonly ref?: string; readonly run: object; readonly permissions?: typeof PERMISSIONS }) => ({
+	/** A job that holds GitHub's token: hum from npm, git that pushes as hum, and the token minted just before hum runs. It installs no plugin: it makes judgment calls alone, which load none. */
+	const holdsToken = ({ before, ref, run, after = [], permissions = PERMISSIONS }: { readonly before: readonly object[]; readonly ref?: string; readonly run: object; readonly after?: readonly object[]; readonly permissions?: typeof PERMISSIONS }) => ({
 		...where,
 		permissions,
 		"timeout-minutes": APP_TOKEN_MINUTES,
 		env: { ...env.everyStep, ...github.env, [ENV.event]: "${{ github.event_name }}" },
-		steps: [...github.check, checkout(ref), JOB_PATHS_STEP, installTools(` ${PUBLISHED_HUM}`), gitSetup(commitIdentity), ...before, ...github.steps, run],
+		steps: [...github.check, checkout(ref), JOB_PATHS_STEP, installTools(` ${PUBLISHED_HUM}`), gitSetup(commitIdentity), ...before, ...github.steps, run, ...after],
 	});
 
 	return {
@@ -241,7 +243,7 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, ciOutboxMaxMegabytes, pull
 		permissions: {},
 		jobs: {
 			gather: {
-				...holdsToken({ before: [], run: { id: "gather", run: `hum wake gather --inbox ${handoverFolder(HANDOVER.inbox)}`, env: humEnv } }),
+				...holdsToken({ before: [], run: { id: "gather", run: `hum wake gather --inbox ${handoverFolder(HANDOVER.inbox)}`, env: humEnv }, after: [upload(HANDOVER.inbox)] }),
 				outputs: { gathered: "${{ steps.gather.outputs.gathered }}" },
 			},
 			work: {
@@ -249,7 +251,7 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, ciOutboxMaxMegabytes, pull
 				...where,
 				permissions: { contents: "read" },
 				"timeout-minutes": ciWakeTimeoutMinutes,
-				env: Object.keys(env.everyStep).length > 0 ? env.everyStep : NO_KEY,
+				env: envOrNone(env.everyStep),
 				steps: [
 					checkout(GATHERED_BASE),
 					JOB_PATHS_STEP,
@@ -258,7 +260,7 @@ const wake = ({ commitIdentity, ciWakeTimeoutMinutes, ciOutboxMaxMegabytes, pull
 					{ run: "./node_modules/.bin/hum plugins" },
 					SAFE_CHECKOUT,
 					download(HANDOVER.inbox),
-					{ run: `./node_modules/.bin/hum wake work --inbox ${handoverFolder(HANDOVER.inbox)} --outbox ${handoverFolder(HANDOVER.outbox)}`, env: { ...env.humStep, ...claude.env } },
+					{ run: `./node_modules/.bin/hum wake work --inbox ${handoverFolder(HANDOVER.inbox)} --outbox ${handoverFolder(HANDOVER.outbox)}`, env: envOrNone({ ...env.humStep, ...claude.env }) },
 					upload(HANDOVER.outbox),
 				],
 			},

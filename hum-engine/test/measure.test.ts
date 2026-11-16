@@ -2,13 +2,14 @@ import { expect, test } from "bun:test";
 import { tmpdir } from "node:os";
 import { gitIn } from "../src/adapters/git.ts";
 import type { Pull } from "../src/adapters/pull-requests.ts";
-import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
+import { BOUNDARIES, SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { labelChanges, type PastChange } from "../src/decide/labels.ts";
 import { measureInputsOf } from "../src/measure/inputs.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
 import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
+import { configWith } from "./fixtures/config.ts";
 import { pastChange } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { rateOf, withRate } from "../src/measure/rate.ts";
@@ -112,6 +113,14 @@ test("a revert titled revert!: that names a change's commit marks that change re
 test("a boundary where nothing was measured has no rate, so it never stands in for a measured one", () => {
 	expect(rateOf(0, 0)).toBeUndefined();
 	expect(rateOf(3, 4)).toBe(0.75);
+});
+
+test("rates measured into a hum.json that had none keep each boundary not measured, such as taste, with no rate, so the config still loads", () => {
+	const measured = withRate({}, { boundary: "kind", model: "haiku", answered: [], rate: 0.9 });
+	const loaded = configWith((raw) => (raw.hum.measuredModels = measured)).hum.measuredModels;
+
+	expect(Object.keys(loaded).toSorted()).toEqual(BOUNDARIES.toSorted());
+	expect(Object.entries(loaded).filter(([, rates]) => Object.keys(rates).length > 0)).toEqual([["kind", { haiku: 0.9 }]]);
 });
 
 test("a measured rate is kept under the model as the owner names it and under each id that answered, so an alias such as haiku is trusted by the id its answers name", () => {
