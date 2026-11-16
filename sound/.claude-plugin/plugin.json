@@ -1,11 +1,12 @@
 {
   "name": "sound",
-  "version": "0.1.1",
-  "description": "Code taste as installable rules. Probe a repo's stack, select only the rules its code shows a surface for (evidence-cited per rule), confirm, and scaffold a browsable .claude/sound/ rule map (surfaced by the sound:prime skill). Installed rules are user-owned; re-runs reconcile.",
+  "version": "0.2.0",
+  "description": "Code taste as installable rules, and the current best tool for a need. Probe a repo's stack, select only the rules its code shows a surface for (evidence-cited per rule), confirm, and scaffold a browsable .claude/sound/ rule map (surfaced by the sound:prime skill). Installed rules are user-owned; re-runs reconcile. sound:find names tools an agent can run end to end, from sources fetched live; sound:stack writes them into CLAUDE.md for a project's hand steps.",
   "keywords": [
     "taste",
     "rules",
-    "engineering"
+    "engineering",
+    "tools"
   ],
   "author": {
     "name": "Saad Shahd",
