@@ -1,0 +1,188 @@
+{
+ "labels": [
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/shared/Chart.tsx",
+   "line": 82,
+   "anchor": "<p key={index} className=\"text-sm\" style={{ color: entry.color }}> ⏎ {entry.name}:{\" \"} ⏎ {typeof entry.value === \"number\"",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/shared/Chart.tsx",
+   "line": 287,
+   "anchor": "key={`cell-${index}`} ⏎ fill={colors[index % colors.length]} ⏎ />",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/settings/SafetyBoundaries.tsx",
+   "line": 348,
+   "anchor": "key={index} ⏎ className=\"inline-flex items-center px-3 py-1 rounded-full text-sm bg-red-100 text-red-800\" ⏎ >",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/settings/SafetyBoundaries.tsx",
+   "line": 526,
+   "anchor": "key={index} ⏎ className=\"inline-flex items-center px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-800\" ⏎ >",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ReviewStep.tsx",
+   "line": 139,
+   "anchor": "<li key={index}>{error}</li> ⏎ ))} ⏎ </ul>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ReviewStep.tsx",
+   "line": 247,
+   "anchor": "key={index} ⏎ className=\"inline-flex items-center px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800\" ⏎ >",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ReviewStep.tsx",
+   "line": 329,
+   "anchor": "<li key={index}>• {warning}</li> ⏎ ), ⏎ )}",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ReviewStep.tsx",
+   "line": 344,
+   "anchor": "<li key={index}>• {suggestion}</li> ⏎ ), ⏎ )}",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ReviewStep.tsx",
+   "line": 381,
+   "anchor": "<p key={index} className=\"mb-3 text-gray-800 leading-relaxed\"> ⏎ {paragraph} ⏎ </p>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ThemeSelectionStep.tsx",
+   "line": 240,
+   "anchor": "<li key={index}>{error}</li> ⏎ ))} ⏎ </ul>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/StoryWizard.tsx",
+   "line": 255,
+   "anchor": "<li key={index}>{error}</li> ⏎ ))} ⏎ </ul>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ChildSelectionStep.tsx",
+   "line": 165,
+   "anchor": "<li key={index}>{error}</li> ⏎ ))} ⏎ </ul>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ParameterStep.tsx",
+   "line": 120,
+   "anchor": "<li key={index}>{error}</li> ⏎ ))} ⏎ </ul>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ParameterStep.tsx",
+   "line": 339,
+   "anchor": "key={index} ⏎ className=\"inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800\" ⏎ >",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/ProgressIndicator.tsx",
+   "line": 119,
+   "anchor": "key={index} ⏎ onClick={() => onStepClick(index)} ⏎ className={`w-2 h-2 rounded-full transition-colors ${",
+   "label": "unclear",
+   "reason": "index is the step identity (onStepClick(index)) over a fixed step list, but nothing in the file says WHY"
+  },
+  {
+   "source": "moo.md@7bf5f76",
+   "file": "hunch/hooks/tend.tsx",
+   "line": 1142,
+   "anchor": "<Markdown key={`md${i}`} text={g.md} /> ⏎ ) : \"head\" in g ? ( ⏎ <Text key={`h${i}`}>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "moo.md@7bf5f76",
+   "file": "hunch/hooks/tend.tsx",
+   "line": 1144,
+   "anchor": "<Text key={`h${i}`}> ⏎ {g.head.lead} ⏎ <Text bold>{g.head.change}</Text>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "moo.md@7bf5f76",
+   "file": "hunch/hooks/tend.tsx",
+   "line": 1150,
+   "anchor": "<Text key={`d${i}`} dimColor> ⏎ {g.dim} ⏎ </Text>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hunch/hooks/tend.tsx",
+   "line": 871,
+   "anchor": "<Box key={`s${i}`} paddingLeft={s.under ?? 0}> ⏎ {!s.md ? ( ⏎ <Text> </Text>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum/mod/draw.tsx",
+   "line": 47,
+   "anchor": "<Box key={`row-${y}`} flexDirection=\"row\"> ⏎ {row.map((part) => drawSpan({ Text, Button }, part, keyOf, onPress))} ⏎ </Box>",
+   "label": "unclear",
+   "reason": "row index is the identity of a drawn grid row, but nothing in the file says WHY"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/playground/playground.tsx",
+   "line": 335,
+   "anchor": "<span key={index} className={colorClass}> ⏎ {prefix} [{entry.timestamp}] {entry.message} ⏎ </span>",
+   "label": "unclear",
+   "reason": "log list is append-only and cleared whole (setLogs(prev => [...prev, entry])), so index holds; no WHY comment"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/playground/src/components/IndustrialPlayground.tsx",
+   "line": 158,
+   "anchor": "<div key={i} className=\"text-red-400 font-mono text-xs\"> ⏎ {deadlock.state} ⏎ </div>",
+   "label": "true",
+   "reason": "key is built from the map index and the list can change, with nothing in the file saying it is static"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/playground/src/components/IndustrialPlayground.tsx",
+   "line": 196,
+   "anchor": "<span key={index} className={colorClass}> ⏎ [{entry.timestamp}] {entry.message} ⏎ </span>",
+   "label": "unclear",
+   "reason": "log list is append-only and cleared whole (setLogs(prev => [...prev, entry])), so index holds; no WHY comment"
+  }
+ ]
+}

@@ -1,0 +1,244 @@
+{
+ "labels": [
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cron/service/store.ts",
+   "line": 7,
+   "anchor": "const storeCache = new Map<string, { version: 1; jobs: CronJob[] }>(); ⏎  ⏎ export async function ensureLoaded(state: CronServiceState) {",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "site/src/demo/speed.ts",
+   "line": 24,
+   "anchor": "const players = new Set<(x: number) => void>(); ⏎  ⏎ export const currentSpeed = () => (speed ??= saved());",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/skills-remote.ts",
+   "line": 21,
+   "anchor": "const remoteNodes = new Map<string, RemoteNodeRecord>(); ⏎ let remoteRegistry: NodeRegistry | null = null; ⏎ ",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/matrix/src/matrix/send/targets.ts",
+   "line": 19,
+   "anchor": "const directRoomCache = new Map<string, string>(); ⏎  ⏎ async function persistDirectRoom(",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media-understanding/runner.ts",
+   "line": 88,
+   "anchor": "const binaryCache = new Map<string, Promise<string | null>>(); ⏎ const geminiProbeCache = new Map<string, Promise<boolean>>(); ⏎ ",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/line/monitor.ts",
+   "line": 50,
+   "anchor": "const runtimeState = new Map< ⏎ string, ⏎ {",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cron/service/locked.ts",
+   "line": 3,
+   "anchor": "const storeLocks = new Map<string, Promise<void>>(); ⏎  ⏎ const resolveChain = (promise: Promise<unknown>) =>",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/nextcloud-talk/src/room-info.ts",
+   "line": 10,
+   "anchor": "const roomCache = new Map< ⏎ string, ⏎ { kind?: \"direct\" | \"group\"; fetchedAt: number; error?: string }",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/env.ts",
+   "line": 5,
+   "anchor": "const loggedEnv = new Set<string>(); ⏎  ⏎ type AcceptedEnvOption = {",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hold/hooks/view.tsx",
+   "line": 20,
+   "anchor": "const drawings = new Map<string, Drawn>(); ⏎ const pending = new Map<string, Promise<Drawn>>(); ⏎ /** The [view]s unfolded, by their Button's key. */",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/outbound/outbound-session.ts",
+   "line": 53,
+   "anchor": "const SLACK_CHANNEL_TYPE_CACHE = new Map<string, \"channel\" | \"group\" | \"dm\" | \"unknown\">(); ⏎  ⏎ function looksLikeUuid(value: string): boolean {",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/line/send.ts",
+   "line": 20,
+   "anchor": "const userProfileCache = new Map< ⏎ string, ⏎ { displayName: string; pictureUrl?: string; fetchedAt: number }",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/googlechat/src/auth.ts",
+   "line": 12,
+   "anchor": "const authCache = new Map<string, { key: string; auth: GoogleAuth }>(); ⏎ const verifyClient = new OAuth2Client(); ⏎ ",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/skills/workspace.ts",
+   "line": 32,
+   "anchor": "const skillCommandDebugOnce = new Set<string>(); ⏎  ⏎ function debugSkillCommandOnce(",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/session-write-lock.ts",
+   "line": 19,
+   "anchor": "const cleanupHandlers = new Map<CleanupSignal, () => void>(); ⏎  ⏎ function isAlive(pid: number): boolean {",
+   "label": "false",
+   "reason": "The keys are the three process signals, a closed set, so the map cannot grow."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hold/hooks/view.tsx",
+   "line": 25,
+   "anchor": "const pictures = new Map<string, string>(); ⏎ let theme: Promise<string> | undefined; ⏎ let termEnv: Promise<TermEnv> | undefined;",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/process/command-queue.ts",
+   "line": 26,
+   "anchor": "const lanes = new Map<string, LaneState>(); ⏎  ⏎ function getLaneState(lane: string): LaneState {",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/agent-events.ts",
+   "line": 21,
+   "anchor": "const seqByRun = new Map<string, number>(); ⏎ const listeners = new Set<(evt: AgentEventPayload) => void>(); ⏎ const runContextById = new Map<string, AgentRunCo",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hold/hooks/ui.ts",
+   "line": 11,
+   "anchor": "const toasted = new Set<string>(); ⏎  ⏎ /** Shows `why` once a session, as hooks fail: the event it met passes on unchanged. */",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cron/run-log.ts",
+   "line": 22,
+   "anchor": "const writesByPath = new Map<string, Promise<void>>(); ⏎  ⏎ async function pruneIfNeeded(filePath: string, opts: { maxBytes: number; keepLines: number }) {",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/auto-reply/reply/abort.ts",
+   "line": 24,
+   "anchor": "const ABORT_MEMORY = new Map<string, boolean>(); ⏎  ⏎ export function isAbortTrigger(text?: string): boolean {",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/slack/monitor/media.ts",
+   "line": 93,
+   "anchor": "const THREAD_STARTER_CACHE = new Map<string, SlackThreadStarter>(); ⏎  ⏎ export async function resolveSlackThreadStarter(params: {",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/mattermost/src/mattermost/send.ts",
+   "line": 31,
+   "anchor": "const botUserCache = new Map<string, MattermostUser>(); ⏎ const userByNameCache = new Map<string, MattermostUser>(); ⏎ ",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/imessage/probe.ts",
+   "line": 25,
+   "anchor": "const rpcSupportCache = new Map<string, RpcSupportResult>(); ⏎  ⏎ async function probeRpcSupport(cliPath: string): Promise<RpcSupportResult> {",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/anthropic-payload-log.ts",
+   "line": 41,
+   "anchor": "const writers = new Map<string, PayloadLogWriter>(); ⏎ const log = createSubsystemLogger(\"agent/anthropic-payload\"); ⏎ ",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/context.ts",
+   "line": 10,
+   "anchor": "const MODEL_CACHE = new Map<string, number>(); ⏎ const loadPromise = (async () => { ⏎ try {",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moo.md@7bf5f76",
+   "file": "hunch/hooks/tend.tsx",
+   "line": 567,
+   "anchor": "const paneAgent = new Map<string, Row>(); ⏎ // Agents of a session this module no longer serves. ⏎ const gone = new Set<string>();",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moo.md@7bf5f76",
+   "file": "hunch/hooks/tend.tsx",
+   "line": 569,
+   "anchor": "const gone = new Set<string>(); ⏎ // Teammates whose last turn ended; a tool call of theirs starts them again. ⏎ const idle = new Set<string>();",
+   "label": "true",
+   "reason": "Entries are added for keys from external input or runs and nothing in the module removes or expires them."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/nostr/src/nostr-profile-http.ts",
+   "line": 45,
+   "anchor": "const rateLimitMap = new Map<string, RateLimitEntry>(); ⏎ const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute ⏎ const RATE_LIMIT_MAX_REQUESTS = 5; // 5 requests pe",
+   "label": "unclear",
+   "reason": "The keys come from a small fixed set of config values or one-time log markers; growth is real but tiny."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media-understanding/runner.ts",
+   "line": 89,
+   "anchor": "const geminiProbeCache = new Map<string, Promise<boolean>>(); ⏎  ⏎ function expandHomeDir(value: string): string {",
+   "label": "false",
+   "reason": "The cache is only ever keyed \"gemini\", so it holds one entry."
+  }
+ ]
+}

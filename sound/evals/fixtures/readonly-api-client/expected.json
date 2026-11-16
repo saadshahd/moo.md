@@ -2,6 +2,11 @@
   "tags": [
     "react"
   ],
+  "stack": {
+    "linter": "none",
+    "hook": "git"
+  },
+  "stack_notes": "eslint runs the lint but the tree holds no flat config; no hook manager",
   "notes": "react: repo is plain React 15 (React.createClass) with JSX embedded directly in .js files — no .jsx/.tsx extension is used anywhere in the tree (verified via tree.txt); JSX-in-.js is still real react usage. NOT distributed: the sole remote boundary is src/services/HNService.js, which only performs Firebase Realtime Database reads (.once('value', ...) and ref hand-off for reactfire's live-bind, consumed read-only in src/StoryListItem.js and others) — zero .set(/.push(/.update(/.remove( calls anywhere in the repo (grepped via GitHub code search scoped to insin/react-hn). The one 'write' in the codebase, src/utils/storage.js's window.localStorage assignment, is client-local persistence, not a remote party — included specifically to make that distinction visible rather than assumed. NOT db: no database client/ORM/schema anywhere; Firebase here is consumed purely as a read-only public data source, not owned storage. Repo has zero test files (grepped tree.txt for *.test.*/*.spec.*/__tests__, zero hits, and no test-runner devDependency in package.json).",
   "rules": {
     "must_install": [

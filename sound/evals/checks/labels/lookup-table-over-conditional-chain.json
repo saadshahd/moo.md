@@ -1,0 +1,180 @@
+{
+ "labels": [
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/line/download.ts",
+   "line": 102,
+   "anchor": "switch (contentType) { ⏎ case \"image/jpeg\": ⏎ return \".jpg\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "ui/src/ui/navigation.ts",
+   "line": 162,
+   "anchor": "switch (tab) { ⏎ case \"overview\": ⏎ return \"Gateway status, entry points, and a fast health read.\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/ProgressIndicator.tsx",
+   "line": 26,
+   "anchor": "switch (status) { ⏎ case \"completed\": ⏎ return `${baseClasses} bg-green-600 text-white hover:bg-green-700`;",
+   "label": "unclear",
+   "reason": "Every arm interpolates a per-call local or calls a function; a table needs per-call values or lazy entries."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/server/ws-connection/message-handler.ts",
+   "line": 97,
+   "anchor": "switch (reason) { ⏎ case \"token_missing\": ⏎ return `unauthorized: gateway token missing (${tokenHint})`;",
+   "label": "unclear",
+   "reason": "Every arm interpolates a per-call local or calls a function; a table needs per-call values or lazy entries."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "ui/src/ui/navigation.ts",
+   "line": 104,
+   "anchor": "switch (tab) { ⏎ case \"chat\": ⏎ return \"messageSquare\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/session-utils.fs.ts",
+   "line": 214,
+   "anchor": "switch ((role ?? \"\").toLowerCase()) { ⏎ case \"user\": ⏎ return \"user\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/effects/codegen.ts",
+   "line": 412,
+   "anchor": "switch (method.name) { ⏎ case \"visit\": ⏎ return \"cy.visit(url);\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/effects/codegen.ts",
+   "line": 431,
+   "anchor": "switch (method.name) { ⏎ case \"getByRole\": ⏎ return \"return screen.getByRole(role, options);\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/effects/codegen.ts",
+   "line": 393,
+   "anchor": "switch (method.name) { ⏎ case \"click\": ⏎ return \"await this.page.click(selector, options);\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media/constants.ts",
+   "line": 19,
+   "anchor": "switch (kind) { ⏎ case \"image\": ⏎ return MAX_IMAGE_BYTES;",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/telegram/send.ts",
+   "line": 621,
+   "anchor": "switch (kind) { ⏎ case \"image\": ⏎ return \"image.jpg\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/matrix/src/matrix/send/formatting.ts",
+   "line": 65,
+   "anchor": "switch (kind) { ⏎ case \"image\": ⏎ return MsgType.Image;",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/machines/visualization.machine.ts",
+   "line": 297,
+   "anchor": "switch (timeRange) { ⏎ case \"1h\": ⏎ return now - 60 * 60 * 1000;",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/node-cli/daemon.ts",
+   "line": 51,
+   "anchor": "switch (process.platform) { ⏎ case \"darwin\": ⏎ return [",
+   "label": "unclear",
+   "reason": "Every arm interpolates a per-call local or calls a function; a table needs per-call values or lazy entries."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/effects/codegen.ts",
+   "line": 466,
+   "anchor": "switch (param.type) { ⏎ case \"string\": ⏎ return \"string\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/gateway-cli/shared.ts",
+   "line": 68,
+   "anchor": "switch (process.platform) { ⏎ case \"darwin\": ⏎ return [",
+   "label": "unclear",
+   "reason": "Every arm interpolates a per-call local or calls a function; a table needs per-call values or lazy entries."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/date-time.ts",
+   "line": 120,
+   "anchor": "switch (day % 10) { ⏎ case 1: ⏎ return \"st\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/failover-error.ts",
+   "line": 42,
+   "anchor": "switch (reason) { ⏎ case \"billing\": ⏎ return 402;",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/core/graph.ts",
+   "line": 624,
+   "anchor": "switch (reason) { ⏎ case \"no-outgoing-transitions\": ⏎ return `State '${state}' has no outgoing transitions and is not a final state`;",
+   "label": "unclear",
+   "reason": "Every arm interpolates a per-call local or calls a function; a table needs per-call values or lazy entries."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/skills-install.ts",
+   "line": 85,
+   "anchor": "switch (prefs.nodeManager) { ⏎ case \"pnpm\": ⏎ return [\"pnpm\", \"add\", \"-g\", packageName];",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/line/bot-message-context.ts",
+   "line": 132,
+   "anchor": "switch (message.type) { ⏎ case \"image\": ⏎ return \"<media:image>\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "ui/src/ui/navigation.ts",
+   "line": 133,
+   "anchor": "switch (tab) { ⏎ case \"overview\": ⏎ return \"Overview\";",
+   "label": "true",
+   "reason": "Every arm returns a constant or a value computed from literals; an object lookup replaces the block."
+  }
+ ]
+}

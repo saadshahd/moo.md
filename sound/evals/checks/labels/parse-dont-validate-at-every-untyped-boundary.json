@@ -1,0 +1,324 @@
+{
+ "labels": [
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/session-write-lock.ts",
+   "line": 93,
+   "anchor": "const parsed = JSON.parse(raw) as Partial<LockFilePayload>; ⏎ if (typeof parsed.pid !== \"number\") return null; ⏎ if (typeof parsed.createdAt !== \"string\") retur",
+   "label": "unclear",
+   "reason": "The cast is followed at once by typeof or Array.isArray checks on the same value, a hand-written parse."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/server-context.ts",
+   "line": 58,
+   "anchor": "return (await res.json()) as T; ⏎ } finally { ⏎ clearTimeout(t);",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/attachments/graph.ts",
+   "line": 215,
+   "anchor": "const msgData = (await msgRes.json()) as { ⏎ body?: { content?: string; contentType?: string }; ⏎ attachments?: Array<{",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/provider-usage.fetch.gemini.ts",
+   "line": 42,
+   "anchor": "const data = (await res.json()) as GeminiUsageResponse; ⏎ const quotas: Record<string, number> = {}; ⏎ ",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/signal-install.ts",
+   "line": 135,
+   "anchor": "const payload = (await response.json()) as ReleaseResponse; ⏎ const version = payload.tag_name?.replace(/^v/, \"\") ?? \"unknown\"; ⏎ const assets = payload.assets ",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/chutes-oauth.ts",
+   "line": 112,
+   "anchor": "const data = (await response.json()) as { ⏎ access_token?: string; ⏎ refresh_token?: string;",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/update-cli.ts",
+   "line": 145,
+   "anchor": "const parsed = JSON.parse(raw) as { version?: string }; ⏎ return typeof parsed.version === \"string\" ? parsed.version : null; ⏎ } catch {",
+   "label": "unclear",
+   "reason": "The cast is followed at once by typeof or Array.isArray checks on the same value, a hand-written parse."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/tts/tts.ts",
+   "line": 359,
+   "anchor": "return JSON.parse(readFileSync(prefsPath, \"utf8\")) as TtsUserPrefs; ⏎ } catch { ⏎ return {};",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/telegram/probe.ts",
+   "line": 87,
+   "anchor": "const webhookJson = (await webhookRes.json()) as { ⏎ ok?: boolean; ⏎ result?: { url?: string; has_custom_certificate?: boolean };",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/mattermost/src/mattermost/monitor.ts",
+   "line": 868,
+   "anchor": "payload = JSON.parse(raw) as MattermostEventPayload; ⏎ } catch { ⏎ return;",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/zalouser/src/zca.ts",
+   "line": 123,
+   "anchor": "return JSON.parse(stdout) as T; ⏎ } catch { ⏎ const cleaned = stripAnsi(stdout);",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/memory/manager.ts",
+   "line": 1420,
+   "anchor": "return JSON.parse(row.value) as MemoryIndexMeta; ⏎ } catch { ⏎ return null;",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/status-all/gateway.ts",
+   "line": 100,
+   "anchor": "return JSON.parse(block.json) as { ⏎ error?: { code?: string; message?: string }; ⏎ };",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "scripts/write-build-info.ts",
+   "line": 13,
+   "anchor": "const parsed = JSON.parse(raw) as { version?: string }; ⏎ return parsed.version ?? null; ⏎ } catch {",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/provider-usage.fetch.claude.ts",
+   "line": 149,
+   "anchor": "const data = (await res.json()) as ClaudeUsageResponse; ⏎ const windows: UsageWindow[] = []; ⏎ ",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "ui/src/ui/device-auth.ts",
+   "line": 34,
+   "anchor": "const parsed = JSON.parse(raw) as DeviceAuthStore; ⏎ if (!parsed || parsed.version !== 1) return null; ⏎ if (!parsed.deviceId || typeof parsed.deviceId !== \"str",
+   "label": "unclear",
+   "reason": "The cast is followed at once by typeof or Array.isArray checks on the same value, a hand-written parse."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/qwen-portal-auth/oauth.ts",
+   "line": 117,
+   "anchor": "const tokenPayload = (await response.json()) as { ⏎ access_token?: string | null; ⏎ refresh_token?: string | null;",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/update-check.ts",
+   "line": 312,
+   "anchor": "const json = (await res.json()) as { version?: unknown }; ⏎ const version = typeof json?.version === \"string\" ? json.version : null; ⏎ return { tag, version };",
+   "label": "unclear",
+   "reason": "The cast is followed at once by typeof or Array.isArray checks on the same value, a hand-written parse."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/provider-usage.fetch.codex.ts",
+   "line": 60,
+   "anchor": "const data = (await res.json()) as CodexUsageResponse; ⏎ const windows: UsageWindow[] = []; ⏎ ",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/config.ts",
+   "line": 393,
+   "anchor": "const resolved = JSON.parse(JSON.stringify(config)) as VoiceCallConfig; ⏎  ⏎ // Telnyx",
+   "label": "false",
+   "reason": "JSON.parse(JSON.stringify(config)) clones in-process data; it is not an untyped boundary."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/mattermost/src/mattermost/client.ts",
+   "line": 60,
+   "anchor": "const data = (await res.json()) as { message?: string } | undefined; ⏎ if (data?.message) return data.message; ⏎ return JSON.stringify(data);",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/graph-upload.ts",
+   "line": 108,
+   "anchor": "const data = (await res.json()) as { ⏎ link?: { webUrl?: string }; ⏎ };",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/media-stream.ts",
+   "line": 98,
+   "anchor": "const message = JSON.parse(data.toString()) as TwilioMediaMessage; ⏎  ⏎ switch (message.event) {",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/memory/internal.ts",
+   "line": 183,
+   "anchor": "const parsed = JSON.parse(raw) as number[]; ⏎ return Array.isArray(parsed) ? parsed : []; ⏎ } catch {",
+   "label": "unclear",
+   "reason": "The cast is followed at once by typeof or Array.isArray checks on the same value, a hand-written parse."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media-understanding/providers/google/video.ts",
+   "line": 70,
+   "anchor": "const payload = (await res.json()) as { ⏎ candidates?: Array<{ ⏎ content?: { parts?: Array<{ text?: string }> };",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/pairing/pairing-store.ts",
+   "line": 73,
+   "anchor": "return JSON.parse(raw) as T; ⏎ } catch { ⏎ return null;",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/memory/batch-gemini.ts",
+   "line": 226,
+   "anchor": ".map((line) => JSON.parse(line) as GeminiBatchOutputLine); ⏎ } ⏎ ",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/attachments/graph.ts",
+   "line": 106,
+   "anchor": "const data = (await res.json()) as { value?: T[] }; ⏎ return { status, items: Array.isArray(data.value) ? data.value : [] }; ⏎ } catch {",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/provider-usage.fetch.claude.ts",
+   "line": 120,
+   "anchor": "const data = (await res.json()) as { ⏎ error?: { message?: unknown } | null; ⏎ };",
+   "label": "unclear",
+   "reason": "The cast is followed at once by typeof or Array.isArray checks on the same value, a hand-written parse."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/web/auth-store.ts",
+   "line": 138,
+   "anchor": "const parsed = JSON.parse(raw) as { me?: { id?: string } } | undefined; ⏎ const jid = parsed?.me?.id ?? null; ⏎ const e164 = jid ? jidToE164(jid, { authDir }) :",
+   "label": "true",
+   "reason": "A cast trusts parsed or fetched data with no schema or parse step between it and use."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hold/hooks/popover.ts",
+   "line": 158,
+   "anchor": "const r = place(JSON.parse(probe.stdout) as Pointer, size); ⏎ // Closed while the pointer was read: the window open now is another's to keep. ⏎ if (isClosed) re",
+   "label": "true",
+   "reason": "A cast trusts parsed, fetched, env or subprocess data with no schema or parse step before use."
+  },
+  {
+   "source": "worldbox@c38d13c",
+   "file": "src/main.tsx",
+   "line": 9,
+   "anchor": ").then((r) => r.json() as Promise<readonly Biome[]>); ⏎  ⏎ function Root() {",
+   "label": "true",
+   "reason": "A cast trusts parsed, fetched, env or subprocess data with no schema or parse step before use."
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/config/redis.ts",
+   "line": 93,
+   "anchor": "return JSON.parse(value) as T; ⏎ } catch { ⏎ return value as T;",
+   "label": "true",
+   "reason": "A cast trusts parsed, fetched, env or subprocess data with no schema or parse step before use."
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/config/index.ts",
+   "line": 70,
+   "anchor": "theme: process.env.APPLE_CODE_THEME as 'light' | 'dark', ⏎ maxTokens: process.env.APPLE_CODE_MAX_TOKENS ? parseInt(process.env.APPLE_CODE_MAX_TOKENS) : undefine",
+   "label": "true",
+   "reason": "A cast trusts parsed, fetched, env or subprocess data with no schema or parse step before use."
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/config/index.ts",
+   "line": 69,
+   "anchor": "outputFormat: process.env.APPLE_CODE_OUTPUT_FORMAT as 'terminal' | 'file' | 'clipboard', ⏎ theme: process.env.APPLE_CODE_THEME as 'light' | 'dark', ⏎ maxTokens:",
+   "label": "true",
+   "reason": "A cast trusts parsed, fetched, env or subprocess data with no schema or parse step before use."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "site/src/demo/player.ts",
+   "line": 113,
+   "anchor": "const pair = JSON.parse(root.dataset.demo!) as Pair; ⏎ const $ = <T extends HTMLElement>(k: string, within: ParentNode = root) => within.querySelector<T>(`[data",
+   "label": "unclear",
+   "reason": "The string was written by this repo's own build into its own page, not a foreign boundary."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "site/tools/check-timing.mts",
+   "line": 30,
+   "anchor": "pair: JSON.parse(unescape(m[1])) as Pair, ⏎ })), ⏎ );",
+   "label": "unclear",
+   "reason": "The string was written by this repo's own build into its own page, not a foreign boundary."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hold/hooks/view.tsx",
+   "line": 104,
+   "anchor": "const box = JSON.parse(r.stdout) as Box; ⏎ const { base64 } = await $.fs.read(out, { as: \"bytes\" }); ⏎ ",
+   "label": "true",
+   "reason": "A cast trusts parsed, fetched, env or subprocess data with no schema or parse step before use."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/hooks/useSettings.ts",
+   "line": 77,
+   "anchor": "const draftSettings = JSON.parse(savedDraft) as SettingsFormData; ⏎ setSettings(draftSettings); ⏎ setHasUnsavedChanges(true);",
+   "label": "true",
+   "reason": "A cast trusts parsed, fetched, env or subprocess data with no schema or parse step before use."
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/routes/events.ts",
+   "line": 42,
+   "anchor": "const data = JSON.parse(message.toString()) as WebSocketMessage; ⏎  ⏎ // Validate the message schema",
+   "label": "false",
+   "reason": "ajv validates the value against a schema on the next line, so the cast only types a checked value."
+  }
+ ]
+}

@@ -2,6 +2,11 @@
   "tags": [
     "react"
   ],
+  "stack": {
+    "linter": "eslint",
+    "hook": "git"
+  },
+  "stack_notes": "flat eslint.config.js only inside packages/playground; no hook manager",
   "notes": "RELABELED from tags=[] during fixture review: tree.txt (declared ground truth) lists 14 real .tsx files in packages/playground (App.tsx, main.tsx, graph-visualizer.tsx...) with genuine react+react-dom+reactflow deps in playground's package.json — real JSX UI usage, so react fires; the evidence is confined to playground. The original label curated this evidence away, contradicting the visible tree. Remaining discriminations this fixture tests: (1) react evidence is CONFINED to packages/playground — packages/core is a pure TS library; (2) core's custom non-React JSX runtime (esbuild jsxImportSource './jsx-runtime', state-machine DSL in .ts files) is NOT react usage — UI is the operative word; (3) no db, no distributed anywhere (verified: no ORM/client, no payment/queue/webhook/messaging side effects). Test convention: packages/core/tests/**/*.test.ts.",
   "rules": {
     "must_install": [

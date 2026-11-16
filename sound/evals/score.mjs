@@ -3,6 +3,7 @@
 // Usage: bun score.mjs <fixture-dir> <proposal-json-file>
 // Compares proposal against <fixture-dir>/expected.json:
 //   tags  — exact set equality (reported per-tag)
+//   pick  — the lint tool and hook manager, each an exact match against expected.stack
 //   rules — three-class labels: every must_install present, no must_not_install present,
 //           all proposed names exist in the corpus, every citation path exists in tree.txt.
 //           Unlabeled rules are don't-care by design (full-corpus exact labels are unlabelable).
@@ -101,6 +102,14 @@ const ruleChecks = !expected.rules ? [] : [
   },
 ];
 
+const expectedPick = expected.stack;
+const proposedPick = proposal.stack ?? {};
+const pickChecks = !expectedPick ? [] : ["linter", "hook"].map((key) => ({
+  name: `pick:${key}`,
+  pass: proposedPick[key] === expectedPick[key],
+  detail: `expected ${expectedPick[key]} got ${proposedPick[key]}`,
+}));
+
 const checks = [
   {
     name: "tags",
@@ -109,6 +118,7 @@ const checks = [
       (tagsMatch ? "" :
         ` | missing: [${expTags.filter((t) => !gotTags.includes(t))}] spurious: [${gotTags.filter((t) => !expTags.includes(t))}]`),
   },
+  ...pickChecks,
   ...ruleChecks,
 ];
 

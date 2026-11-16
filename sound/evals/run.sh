@@ -10,6 +10,7 @@ assert_cheap_model "$MODEL"
 shift || true
 
 SKILL="$(cd ../skills/setup && pwd)/SKILL.md"
+LINT_CLI="$(cd ../lint && pwd)/cli.mjs"
 FIXTURES=("$@")
 [ ${#FIXTURES[@]} -eq 0 ] && FIXTURES=($(ls fixtures))
 
@@ -22,12 +23,12 @@ for fx in "${FIXTURES[@]}"; do
   [ -d "$repo" ] || { echo "SKIP $fx (no repo/)"; continue; }
   out="$RUN_DIR/$fx.json"
   echo "== $fx ($MODEL)"
-  printf '%s' "Read the skill file at $SKILL and the propose-only contract it points at ($(dirname "$SKILL")/propose-only.md). Execute it in PROPOSE-ONLY mode against the repository at $repo (this is a trimmed skeleton: tree.txt lists the real repo's full file listing — treat it as ground truth for which files exist; the included source files are real excerpts). Run Phases 1-3 (probe, select, confirm); run the selection INLINE, no subagents. Output ONLY the propose-only JSON object, nothing else." \
+  printf '%s' "Read the skill file at $SKILL and the propose-only contract it points at ($(dirname "$SKILL")/propose-only.md). Execute it in PROPOSE-ONLY mode against the repository at $repo (this is a trimmed skeleton: tree.txt lists the real repo's full file listing — treat it as ground truth for which files exist; the included source files are real excerpts). Run Phases 1-3 (probe, select, confirm); run the selection INLINE, no subagents. Probe the linter and hook with exactly: node $LINT_CLI probe $repo --tree $repo/tree.txt. Output ONLY the propose-only JSON object, nothing else." \
     > "$RUN_DIR/$fx.prompt"
   ok=0
   for attempt in 1 2 3; do
     if claude -p --model "$MODEL" \
-      --allowedTools "Read,Glob,Grep,Bash(find:*),Bash(ls:*),Bash(cat:*)" \
+      --allowedTools "Read,Glob,Grep,Bash(find:*),Bash(ls:*),Bash(cat:*),Bash(node $LINT_CLI probe:*)" \
       --add-dir "$repo" \
       < "$RUN_DIR/$fx.prompt" > "$out" 2>"$RUN_DIR/$fx.err" \
       && ! grep -q "^API Error" "$out"; then ok=1; break; fi

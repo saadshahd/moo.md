@@ -1,5 +1,10 @@
 {
   "tags": [],
+  "stack": {
+    "linter": "none",
+    "hook": "git"
+  },
+  "stack_notes": "no lint config and no hook manager in the tree",
   "notes": "react tag deliberately absent: ink@^4.4.1 + react@^18.2.0 sit in dependencies but zero .tsx/.jsx files exist and zero react/ink imports anywhere in source — the actual UI is readline/chalk/boxen (src/ui/simple-terminal-ui.ts). Trap: the string 'react' DOES appear in source, only inside template literals (foundation-client.ts demo code-gen output) and a content-sniffing predicate (language-detector.ts) — neither is usage. db absent: no db client, schema, or migrations. distributed absent: no network SDK at all — foundation-client generates code locally (mock of on-device Apple Foundation Models); dead deps blessed/blessed-contrib/terminal-kit are also unused. The only .js file is the root demo-ui.js scaffold script, below the skill's SUBSTANTIVE-source bar (labeler ruling 2026-07-09). Repo has NO test files (tsconfig excludes **/*.test.ts but none exist; scripts/test.sh only).",
   "rules": {
     "must_install": [

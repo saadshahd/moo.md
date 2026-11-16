@@ -10,6 +10,10 @@ description: Use when reviewing a staged diff or a commit range for soundness ag
 - **No argument** → `git diff --cached`.
 - **A range** (e.g. `main..HEAD`) → its commits and the whole `git diff <range>`.
 
+## Mechanical hits first
+
+Run `node ../../lint/cli.mjs hits <repo>` (add `--range <range>` for a range). Each line is a check-backed rule's `Detect:` already run by the repo's linter on the changed files. Report these first as `- <file>:<line>: <rule> — <message>`, without re-deriving them by eye; a hit stands until the rule's `Not-when:` is shown to apply, and a check reports only a part of its `Detect:`, so the rule's remainder is still read below. No `.claude/sound/plugin.mjs` → no hits; continue.
+
 ## How to review
 
 The project's taste rules live under `.claude/sound/`. Read the ones that bear on the code the diff touches, and apply each rule's `Detect:` and `Not-when:` **verbatim** — never from memory. If `.claude/sound/` is absent, say so and stop.

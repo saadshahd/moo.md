@@ -1,0 +1,244 @@
+{
+ "labels": [
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/minimax-vlm.ts",
+   "line": 63,
+   "anchor": "const res = await fetch(url, { ⏎ method: \"POST\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/google-gemini-cli-auth/oauth.ts",
+   "line": 498,
+   "anchor": "const response = await fetch(`${CODE_ASSIST_ENDPOINT}/v1internal/${operationName}`, { ⏎ headers, ⏎ });",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/tlon/src/urbit/sse-client.ts",
+   "line": 348,
+   "anchor": "await fetch(this.channelUrl, { ⏎ method: \"PUT\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/channels/plugins/onboarding/telegram.ts",
+   "line": 84,
+   "anchor": "const res = await fetch(url); ⏎ if (!res.ok) return null; ⏎ const data = (await res.json().catch(() => null)) as {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/tlon/src/urbit/sse-client.ts",
+   "line": 167,
+   "anchor": "const response = await fetch(this.channelUrl, { ⏎ method: \"GET\", ⏎ headers: {",
+   "label": "unclear",
+   "reason": "A long-lived event stream, where an overall deadline does not apply; only a connect deadline would."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/nextcloud-talk/src/room-info.ts",
+   "line": 76,
+   "anchor": "const response = await fetch(url, { ⏎ method: \"GET\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/google-gemini-cli-auth/oauth.ts",
+   "line": 315,
+   "anchor": "const response = await fetch(TOKEN_URL, { ⏎ method: \"POST\", ⏎ headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" },",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/hooks/useSettings.ts",
+   "line": 255,
+   "anchor": "const response = await fetch(`/api/families/settings`, { ⏎ method: \"PUT\", ⏎ headers: {",
+   "label": "unclear",
+   "reason": "A browser fetch of the app's own origin, where the browser and server set the limits."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/google-antigravity-auth/index.ts",
+   "line": 181,
+   "anchor": "const response = await fetch(TOKEN_URL, { ⏎ method: \"POST\", ⏎ headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" },",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/tlon/src/urbit/sse-client.ts",
+   "line": 110,
+   "anchor": "const response = await fetch(this.channelUrl, { ⏎ method: \"PUT\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/nextcloud-talk/src/send.ts",
+   "line": 99,
+   "anchor": "const response = await fetch(url, { ⏎ method: \"POST\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/slack/monitor/media.ts",
+   "line": 16,
+   "anchor": "const initialRes = await fetch(url, { ⏎ headers: { Authorization: `Bearer ${token}` }, ⏎ redirect: \"manual\",",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/providers/github-copilot-auth.ts",
+   "line": 47,
+   "anchor": "const res = await fetch(DEVICE_CODE_URL, { ⏎ method: \"POST\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/memory/batch-gemini.ts",
+   "line": 210,
+   "anchor": "const res = await fetch(downloadUrl, { ⏎ headers: getGeminiHeaders(params.gemini, { json: true }), ⏎ });",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/matrix/src/directory-live.ts",
+   "line": 33,
+   "anchor": "const res = await fetch(`${params.homeserver}${params.path}`, { ⏎ method: params.method ?? \"GET\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "site/tools/fetch-fonts.mjs",
+   "line": 14,
+   "anchor": "const res = await fetch(src.startsWith(\"//\") ? `https:${src}` : src); ⏎ if (!res.ok) throw new Error(`fetch-fonts: ${res.status} for ${src}`); ⏎ await mkdir(new",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/googlechat/src/api.ts",
+   "line": 170,
+   "anchor": "const res = await fetch(url, { ⏎ method: \"POST\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/hooks/useSettings.ts",
+   "line": 128,
+   "anchor": "const response = await fetch(`/api/families/settings`, { ⏎ headers: { ⏎ \"Content-Type\": \"application/json\",",
+   "label": "unclear",
+   "reason": "A browser fetch of the app's own origin, where the browser and server set the limits."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/slack/monitor/media.ts",
+   "line": 37,
+   "anchor": "return fetch(resolvedUrl, { redirect: \"follow\" }); ⏎ } ⏎ ",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/qwen-portal-auth/oauth.ts",
+   "line": 46,
+   "anchor": "const response = await fetch(QWEN_OAUTH_DEVICE_CODE_ENDPOINT, { ⏎ method: \"POST\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/matrix/src/matrix/client/config.ts",
+   "line": 121,
+   "anchor": "const loginResponse = await fetch(`${resolved.homeserver}/_matrix/client/v3/login`, { ⏎ method: \"POST\", ⏎ headers: { \"Content-Type\": \"application/json\" },",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/providers/tts-openai.ts",
+   "line": 113,
+   "anchor": "const response = await fetch(\"https://api.openai.com/v1/audio/speech\", { ⏎ method: \"POST\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "worldbox@c38d13c",
+   "file": "src/main.tsx",
+   "line": 7,
+   "anchor": "const biomesPromise: Promise<readonly Biome[]> = fetch( ⏎ \"/data/biomes.json\", ⏎ ).then((r) => r.json() as Promise<readonly Biome[]>);",
+   "label": "unclear",
+   "reason": "A browser fetch of the app's own origin, where the browser and server set the limits."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "site/tools/fetch-fonts.mjs",
+   "line": 11,
+   "anchor": "const css = await (await fetch(\"https://api.fontshare.com/v2/css?f[]=switzer@600&display=swap\")).text(); ⏎ const src = css.match(/url\\('([^']+\\.woff2)'\\)/)?.[1]",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/googlechat/src/auth.ts",
+   "line": 63,
+   "anchor": "const res = await fetch(CHAT_CERTS_URL); ⏎ if (!res.ok) { ⏎ throw new Error(`Failed to fetch Chat certs (${res.status})`);",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/google-antigravity-auth/index.ts",
+   "line": 244,
+   "anchor": "const response = await fetch(`${endpoint}/v1internal:loadCodeAssist`, { ⏎ method: \"POST\", ⏎ headers,",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/providers/telnyx.ts",
+   "line": 54,
+   "anchor": "const response = await fetch(`${this.baseUrl}${endpoint}`, { ⏎ method: \"POST\", ⏎ headers: {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/app/dashboard/stories/[id]/page.tsx",
+   "line": 40,
+   "anchor": "const response = await fetch( ⏎ `${process.env.NEXT_PUBLIC_API_URL || \"http://localhost:8000\"}/api/stories/${id}`, ⏎ {",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/memory/batch-openai.ts",
+   "line": 98,
+   "anchor": "const res = await fetch(`${baseUrl}/batches`, { ⏎ method: \"POST\", ⏎ headers: getOpenAiHeaders(params.openAi, { json: true }),",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/google-gemini-cli-auth/oauth.ts",
+   "line": 351,
+   "anchor": "const response = await fetch(USERINFO_URL, { ⏎ headers: { Authorization: `Bearer ${accessToken}` }, ⏎ });",
+   "label": "true",
+   "reason": "An outbound call with no signal or timeout in its options and none in the lines around it."
+  }
+ ]
+}

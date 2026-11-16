@@ -1,0 +1,852 @@
+{
+ "labels": [
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/utils/clipboard.ts",
+   "line": 0,
+   "anchor": "src/utils/clipboard.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/utils/file-operations.ts",
+   "line": 0,
+   "anchor": "src/utils/file-operations.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/utils/language-detector.ts",
+   "line": 0,
+   "anchor": "src/utils/language-detector.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/utils/logger.ts",
+   "line": 0,
+   "anchor": "src/utils/logger.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/utils/syntax-highlighter.ts",
+   "line": 0,
+   "anchor": "src/utils/syntax-highlighter.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/shared/Chart.tsx",
+   "line": 0,
+   "anchor": "frontend/src/components/shared/Chart.tsx (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/shared/LoadingSpinner.tsx",
+   "line": 0,
+   "anchor": "frontend/src/components/shared/LoadingSpinner.tsx (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/shared/Modal.tsx",
+   "line": 0,
+   "anchor": "frontend/src/components/shared/Modal.tsx (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "apps/shared/MoltbotKit/Tools/CanvasA2UI/bootstrap.js",
+   "line": 0,
+   "anchor": "apps/shared/MoltbotKit/Tools/CanvasA2UI/bootstrap.js (shared)",
+   "label": "true",
+   "reason": "role folder shared/ holds a domain-named Swift package; no published JS package around the file"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "apps/shared/MoltbotKit/Tools/CanvasA2UI/rolldown.config.mjs",
+   "line": 0,
+   "anchor": "apps/shared/MoltbotKit/Tools/CanvasA2UI/rolldown.config.mjs (shared)",
+   "label": "true",
+   "reason": "role folder shared/ holds a domain-named Swift package; no published JS package around the file"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/matrix/src/matrix/client/shared.ts",
+   "line": 0,
+   "anchor": "extensions/matrix/src/matrix/client/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/attachments/shared.ts",
+   "line": 0,
+   "anchor": "extensions/msteams/src/attachments/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/tlon/src/monitor/utils.ts",
+   "line": 0,
+   "anchor": "extensions/tlon/src/monitor/utils.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/twitch/src/utils/markdown.ts",
+   "line": 0,
+   "anchor": "extensions/twitch/src/utils/markdown.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/twitch/src/utils/twitch.ts",
+   "line": 0,
+   "anchor": "extensions/twitch/src/utils/twitch.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/utils.ts",
+   "line": 0,
+   "anchor": "extensions/voice-call/src/utils.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/cli-runner/helpers.ts",
+   "line": 0,
+   "anchor": "src/agents/cli-runner/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/pi-embedded-runner/utils.ts",
+   "line": 0,
+   "anchor": "src/agents/pi-embedded-runner/utils.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/sandbox/shared.ts",
+   "line": 0,
+   "anchor": "src/agents/sandbox/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/tools/common.test.ts",
+   "line": 0,
+   "anchor": "src/agents/tools/common.test.ts (common)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/tools/common.ts",
+   "line": 0,
+   "anchor": "src/agents/tools/common.ts (common)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/routes/utils.test.ts",
+   "line": 0,
+   "anchor": "src/browser/routes/utils.test.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/routes/utils.ts",
+   "line": 0,
+   "anchor": "src/browser/routes/utils.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/channels/plugins/helpers.ts",
+   "line": 0,
+   "anchor": "src/channels/plugins/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/channels/plugins/onboarding/helpers.ts",
+   "line": 0,
+   "anchor": "src/channels/plugins/onboarding/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/channels/plugins/status-issues/shared.ts",
+   "line": 0,
+   "anchor": "src/channels/plugins/status-issues/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/browser-cli-actions-input/shared.ts",
+   "line": 0,
+   "anchor": "src/cli/browser-cli-actions-input/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/cron-cli/shared.ts",
+   "line": 0,
+   "anchor": "src/cli/cron-cli/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/daemon-cli/shared.ts",
+   "line": 0,
+   "anchor": "src/cli/daemon-cli/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/gateway-cli/shared.ts",
+   "line": 0,
+   "anchor": "src/cli/gateway-cli/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/program/helpers.ts",
+   "line": 0,
+   "anchor": "src/cli/program/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/program/message/helpers.ts",
+   "line": 0,
+   "anchor": "src/cli/program/message/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/channels/shared.ts",
+   "line": 0,
+   "anchor": "src/commands/channels/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/gateway-status/helpers.ts",
+   "line": 0,
+   "anchor": "src/commands/gateway-status/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/models/shared.ts",
+   "line": 0,
+   "anchor": "src/commands/models/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cron/isolated-agent/helpers.ts",
+   "line": 0,
+   "anchor": "src/cron/isolated-agent/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media-understanding/providers/shared.ts",
+   "line": 0,
+   "anchor": "src/media-understanding/providers/shared.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/shared/text/reasoning-tags.ts",
+   "line": 0,
+   "anchor": "src/shared/text/reasoning-tags.ts (shared)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/telegram/bot/helpers.expand-text-links.test.ts",
+   "line": 0,
+   "anchor": "src/telegram/bot/helpers.expand-text-links.test.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/telegram/bot/helpers.test.ts",
+   "line": 0,
+   "anchor": "src/telegram/bot/helpers.test.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/telegram/bot/helpers.ts",
+   "line": 0,
+   "anchor": "src/telegram/bot/helpers.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils.test.ts",
+   "line": 0,
+   "anchor": "src/utils.test.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils.ts",
+   "line": 0,
+   "anchor": "src/utils.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/account-id.ts",
+   "line": 0,
+   "anchor": "src/utils/account-id.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/boolean.test.ts",
+   "line": 0,
+   "anchor": "src/utils/boolean.test.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/boolean.ts",
+   "line": 0,
+   "anchor": "src/utils/boolean.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/delivery-context.test.ts",
+   "line": 0,
+   "anchor": "src/utils/delivery-context.test.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/delivery-context.ts",
+   "line": 0,
+   "anchor": "src/utils/delivery-context.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/directive-tags.ts",
+   "line": 0,
+   "anchor": "src/utils/directive-tags.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/message-channel.test.ts",
+   "line": 0,
+   "anchor": "src/utils/message-channel.test.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/message-channel.ts",
+   "line": 0,
+   "anchor": "src/utils/message-channel.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/provider-utils.ts",
+   "line": 0,
+   "anchor": "src/utils/provider-utils.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/queue-helpers.ts",
+   "line": 0,
+   "anchor": "src/utils/queue-helpers.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/time-format.ts",
+   "line": 0,
+   "anchor": "src/utils/time-format.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/usage-format.test.ts",
+   "line": 0,
+   "anchor": "src/utils/usage-format.test.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/utils/usage-format.ts",
+   "line": 0,
+   "anchor": "src/utils/usage-format.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "test/helpers/envelope-timestamp.ts",
+   "line": 0,
+   "anchor": "test/helpers/envelope-timestamp.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "test/helpers/inbound-contract.ts",
+   "line": 0,
+   "anchor": "test/helpers/inbound-contract.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "test/helpers/normalize-text.ts",
+   "line": 0,
+   "anchor": "test/helpers/normalize-text.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "test/helpers/paths.ts",
+   "line": 0,
+   "anchor": "test/helpers/paths.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "test/helpers/poll.ts",
+   "line": 0,
+   "anchor": "test/helpers/poll.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "test/helpers/temp-home.ts",
+   "line": 0,
+   "anchor": "test/helpers/temp-home.ts (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/config.ts",
+   "line": 0,
+   "anchor": "eval/lib/config.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/layers/a-static.ts",
+   "line": 0,
+   "anchor": "eval/lib/layers/a-static.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/layers/c-trigger.ts",
+   "line": 0,
+   "anchor": "eval/lib/layers/c-trigger.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/layers/d-quality.ts",
+   "line": 0,
+   "anchor": "eval/lib/layers/d-quality.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/parse.ts",
+   "line": 0,
+   "anchor": "eval/lib/parse.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/process.ts",
+   "line": 0,
+   "anchor": "eval/lib/process.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/runner.ts",
+   "line": 0,
+   "anchor": "eval/lib/runner.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@2f2af24",
+   "file": "eval/lib/types.ts",
+   "line": 0,
+   "anchor": "eval/lib/types.ts (lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/effect/shared/tagged-values.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/effect/shared/tagged-values.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/shared/array-method.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/shared/array-method.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/shared/dictionary-types.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/shared/dictionary-types.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/shared/function-parameters.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/shared/function-parameters.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/shared/lexical-type-parameters.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/shared/lexical-type-parameters.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/shared/reflect-method.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/shared/reflect-method.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/shared/scope.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/shared/scope.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/tools/oxlint/anti-slop/shared/type-alias-resolution.ts",
+   "line": 0,
+   "anchor": "hum-engine/tools/oxlint/anti-slop/shared/type-alias-resolution.ts (shared)",
+   "label": "false",
+   "reason": "vendored upstream plugin (UPSTREAM.md beside it); its shared/ folder is not this repo's own organisation"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/auth-helpers/client.ts",
+   "line": 0,
+   "anchor": "utils/auth-helpers/client.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/auth-helpers/server.ts",
+   "line": 0,
+   "anchor": "utils/auth-helpers/server.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/auth-helpers/settings.ts",
+   "line": 0,
+   "anchor": "utils/auth-helpers/settings.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/cn.ts",
+   "line": 0,
+   "anchor": "utils/cn.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/helpers.ts",
+   "line": 0,
+   "anchor": "utils/helpers.ts (utils helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/stripe/client.ts",
+   "line": 0,
+   "anchor": "utils/stripe/client.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/stripe/config.ts",
+   "line": 0,
+   "anchor": "utils/stripe/config.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/stripe/server.ts",
+   "line": 0,
+   "anchor": "utils/stripe/server.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/supabase/admin.ts",
+   "line": 0,
+   "anchor": "utils/supabase/admin.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/supabase/client.ts",
+   "line": 0,
+   "anchor": "utils/supabase/client.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/supabase/middleware.ts",
+   "line": 0,
+   "anchor": "utils/supabase/middleware.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/supabase/queries.ts",
+   "line": 0,
+   "anchor": "utils/supabase/queries.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/supabase/server.ts",
+   "line": 0,
+   "anchor": "utils/supabase/server.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/buildClassName.js",
+   "line": 0,
+   "anchor": "src/utils/buildClassName.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/cancellableDebounce.js",
+   "line": 0,
+   "anchor": "src/utils/cancellableDebounce.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/constants.js",
+   "line": 0,
+   "anchor": "src/utils/constants.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/extend.js",
+   "line": 0,
+   "anchor": "src/utils/extend.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/pageCalc.js",
+   "line": 0,
+   "anchor": "src/utils/pageCalc.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/pluralise.js",
+   "line": 0,
+   "anchor": "src/utils/pluralise.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/setTitle.js",
+   "line": 0,
+   "anchor": "src/utils/setTitle.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "react-hn@7c5a780",
+   "file": "src/utils/storage.js",
+   "line": 0,
+   "anchor": "src/utils/storage.js (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "rule-engine@afec643",
+   "file": "helpers/index.js",
+   "line": 0,
+   "anchor": "helpers/index.js (helpers)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/tests/utils/composition-generators.ts",
+   "line": 0,
+   "anchor": "packages/core/tests/utils/composition-generators.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/tests/utils/generator-validation.test.ts",
+   "line": 0,
+   "anchor": "packages/core/tests/utils/generator-validation.test.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/tests/utils/graph-generators.ts",
+   "line": 0,
+   "anchor": "packages/core/tests/utils/graph-generators.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/tests/utils/graph-properties.ts",
+   "line": 0,
+   "anchor": "packages/core/tests/utils/graph-properties.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/tests/utils/graph-shrinkers.ts",
+   "line": 0,
+   "anchor": "packages/core/tests/utils/graph-shrinkers.ts (utils)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/playground/src/lib/utils.ts",
+   "line": 0,
+   "anchor": "packages/playground/src/lib/utils.ts (utils lib)",
+   "label": "true",
+   "reason": "role-named folder or module authored in this repo, with no published package named for the role"
+  }
+ ]
+}

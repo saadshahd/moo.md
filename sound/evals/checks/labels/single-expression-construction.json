@@ -1,0 +1,244 @@
+{
+ "labels": [
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/pw-role-snapshot.ts",
+   "line": 126,
+   "anchor": "const out = new Set<string>(); ⏎ for (const [key, refs] of refsByKey) { ⏎ if (refs.length > 1) out.add(key);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/config/includes.test.ts",
+   "line": 228,
+   "anchor": "const files: Record<string, unknown> = {}; ⏎ for (let i = 0; i < 15; i++) { ⏎ files[configPath(`level${i}.json`)] = {",
+   "label": "unclear",
+   "reason": "A counter or stride loop, with no source collection in hand to map over."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/session-utils.ts",
+   "line": 217,
+   "anchor": "const ids = new Set<string>(); ⏎ for (const entry of agents) { ⏎ if (entry?.id) ids.add(normalizeAgentId(entry.id));",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/hooks/soul-evil.ts",
+   "line": 112,
+   "anchor": "const map: Record<string, string> = {}; ⏎ for (const part of parts) { ⏎ if (part.type !== \"literal\") map[part.type] = part.value;",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/client-fetch.ts",
+   "line": 66,
+   "anchor": "const query: Record<string, unknown> = {}; ⏎ for (const [key, value] of parsed.searchParams.entries()) { ⏎ query[key] = value;",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/skills/workspace.ts",
+   "line": 336,
+   "anchor": "const used = new Set<string>(); ⏎ for (const reserved of opts?.reservedNames ?? []) { ⏎ used.add(reserved.toLowerCase());",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/cdp.ts",
+   "line": 177,
+   "anchor": "const byId = new Map<string, RawAXNode>(); ⏎ for (const n of nodes) { ⏎ if (n.nodeId) byId.set(n.nodeId, n);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/server.chat.gateway-server-chat-b.e2e.test.ts",
+   "line": 73,
+   "anchor": "const largeLines: string[] = []; ⏎ for (let i = 0; i < 60; i += 1) { ⏎ largeLines.push(",
+   "label": "unclear",
+   "reason": "A counter or stride loop, with no source collection in hand to map over."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/browser-cli-state.ts",
+   "line": 117,
+   "anchor": "const headers: Record<string, string> = {}; ⏎ for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) { ⏎ if (typeof v === \"string\") headers[k] ",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/session-utils.fs.test.ts",
+   "line": 322,
+   "anchor": "const lines: string[] = []; ⏎ for (let i = 0; i < 50; i++) { ⏎ lines.push(padding);",
+   "label": "unclear",
+   "reason": "A counter or stride loop, with no source collection in hand to map over."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/memory-cli.ts",
+   "line": 605,
+   "anchor": "const lines: string[] = []; ⏎ for (const result of results) { ⏎ lines.push(",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/docs/slash-commands-doc.test.ts",
+   "line": 18,
+   "anchor": "const documented = new Set<string>(); ⏎ for (const match of markdown.matchAll(/`\\/(?!<)([a-z0-9_-]+)/gi)) { ⏎ documented.add(`/${match[1]}`);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/hooks-cli.ts",
+   "line": 50,
+   "anchor": "const merged = new Map<string, HookEntry>(); ⏎ for (const entry of pluginEntries) { ⏎ merged.set(entry.hook.name, entry);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/pi-extensions/context-pruning/pruner.ts",
+   "line": 18,
+   "anchor": "const parts: string[] = []; ⏎ for (const block of content) { ⏎ if (block.type === \"text\") parts.push(block.text);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/model-picker.ts",
+   "line": 433,
+   "anchor": "const nextModels: Record<string, { alias?: string }> = {}; ⏎ for (const key of normalized) { ⏎ nextModels[key] = existingModels[key] ?? {};",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/config/includes.ts",
+   "line": 136,
+   "anchor": "const rest: Record<string, unknown> = {}; ⏎ for (const key of otherKeys) { ⏎ rest[key] = this.process(obj[key]);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/models/list.configured.ts",
+   "line": 23,
+   "anchor": "const aliasesByKey = new Map<string, string[]>(); ⏎  ⏎ for (const [key, aliases] of aliasIndex.byKey.entries()) {",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/webhook-security.test.ts",
+   "line": 31,
+   "anchor": "const queryPairs: Array<[string, string]> = []; ⏎ for (const [k, v] of u.searchParams.entries()) queryPairs.push([k, v]); ⏎ ",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/routes/agent.storage.ts",
+   "line": 192,
+   "anchor": "const parsed: Record<string, string> = {}; ⏎ for (const [k, v] of Object.entries(headers)) { ⏎ if (typeof v === \"string\") parsed[k] = v;",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/plugins-cli.ts",
+   "line": 170,
+   "anchor": "const lines: string[] = []; ⏎ for (const plugin of list) { ⏎ lines.push(formatPluginLine(plugin, true));",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/discord/monitor.test.ts",
+   "line": 27,
+   "anchor": "const out: Record<string, DiscordGuildEntryResolved> = {}; ⏎ for (const [key, value] of Object.entries(entries)) { ⏎ out[key] = {",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/channels/list.ts",
+   "line": 118,
+   "anchor": "const chat: Record<string, string[]> = {}; ⏎ for (const plugin of plugins) { ⏎ chat[plugin.id] = plugin.config.listAccountIds(cfg);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/config/schema.ts",
+   "line": 736,
+   "anchor": "const hints: ConfigUiHints = {}; ⏎ for (const [group, label] of Object.entries(GROUP_LABELS)) { ⏎ hints[group] = {",
+   "label": "false",
+   "reason": "Later loops merge more entries into the same container conditionally, which the rule exempts."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/subagent-registry.store.ts",
+   "line": 98,
+   "anchor": "const serialized: Record<string, PersistedSubagentRunRecord> = {}; ⏎ for (const [runId, entry] of runs.entries()) { ⏎ serialized[runId] = entry;",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/config/includes.ts",
+   "line": 112,
+   "anchor": "const result: Record<string, unknown> = {}; ⏎ for (const [key, value] of Object.entries(obj)) { ⏎ result[key] = this.process(value);",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/onboard-channels.ts",
+   "line": 396,
+   "anchor": "const metaById = new Map<string, ChannelMeta>(); ⏎ for (const meta of core) { ⏎ metaById.set(meta.id, meta);",
+   "label": "false",
+   "reason": "Later loops merge more entries into the same container conditionally, which the rule exempts."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/tests/performance/graph-generators.ts",
+   "line": 97,
+   "anchor": "const initialConnections = []; ⏎ for (let i = 1; i <= Math.min(branchingFactor, states - 2); i++) { ⏎ initialConnections.push(jsx(\"Transition\", { to: `state_${i",
+   "label": "unclear",
+   "reason": "A counter or stride loop, with no source collection in hand to map over."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/config/includes.test.ts",
+   "line": 251,
+   "anchor": "const failFiles: Record<string, unknown> = {}; ⏎ for (let i = 0; i < 10; i++) { ⏎ failFiles[configPath(`fail${i}.json`)] = {",
+   "label": "unclear",
+   "reason": "A counter or stride loop, with no source collection in hand to map over."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/terminal/note.ts",
+   "line": 8,
+   "anchor": "const parts: string[] = []; ⏎ for (let i = 0; i < chars.length; i += maxLen) { ⏎ parts.push(chars.slice(i, i + maxLen).join(\"\"));",
+   "label": "unclear",
+   "reason": "A counter or stride loop, with no source collection in hand to map over."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "test/helpers/temp-home.ts",
+   "line": 38,
+   "anchor": "const snapshot: Record<string, string | undefined> = {}; ⏎ for (const key of keys) snapshot[key] = process.env[key]; ⏎ return snapshot;",
+   "label": "true",
+   "reason": "The loop only fills the empty container from a source in hand; a map, filter or constructor replaces it."
+  }
+ ]
+}

@@ -1,0 +1,116 @@
+{
+ "labels": [
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/webhook-security.ts",
+   "line": 263,
+   "anchor": "function validatePlivoV2Signature(params: { ⏎ authToken: string; ⏎ signature: string;",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/sandbox.ts",
+   "line": 99,
+   "anchor": "function validateRecreateOptions(opts: SandboxRecreateOptions, runtime: RuntimeEnv): boolean { ⏎ if (!opts.all && !opts.session && !opts.agent) { ⏎ runtime.erro",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/tests/utils/graph-properties.ts",
+   "line": 433,
+   "anchor": "private static validateProperties( ⏎ graph: StateGraph, ⏎ properties: Partial<GraphProperties>,",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/services/event.service.ts",
+   "line": 428,
+   "anchor": "private validateABTestResult(result: ABTestResult): boolean { ⏎ if ( ⏎ !result.sessionId ||",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/services/event.service.ts",
+   "line": 416,
+   "anchor": "private validatePerformanceMetric(metric: PerformanceMetric): boolean { ⏎ if ( ⏎ !metric.sessionId ||",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/services/event.service.ts",
+   "line": 403,
+   "anchor": "private validateUIEvent(event: UIEvent): boolean { ⏎ // In a real implementation, use a proper validator like AJV ⏎ if (",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/effects/deterministic-replay.ts",
+   "line": 605,
+   "anchor": "private validateFinalResults( ⏎ originalLog: CommandLog, ⏎ replayResult: ReplayResult",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/twitch/src/access-control.ts",
+   "line": 110,
+   "anchor": "function checkSenderRoles(params: { message: TwitchChatMessage; allowedRoles: string[] }): boolean { ⏎ const { message, allowedRoles } = params; ⏎ const { isMod",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/nostr/src/nostr-profile-http.ts",
+   "line": 49,
+   "anchor": "function checkRateLimit(accountId: string): boolean { ⏎ const now = Date.now(); ⏎ const entry = rateLimitMap.get(accountId);",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/services/event.service.ts",
+   "line": 440,
+   "anchor": "private validateEventBatch(batch: EventBatch): boolean { ⏎ if ( ⏎ !batch.events ||",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/webhook-security.ts",
+   "line": 13,
+   "anchor": "export function validateTwilioSignature( ⏎ authToken: string, ⏎ signature: string | undefined,",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/api/foundation-client.ts",
+   "line": 50,
+   "anchor": "private checkAppleIntelligenceAvailability(): boolean { ⏎ try { ⏎ // Check if we're on macOS 15+ with Apple Intelligence",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/webhook-security.ts",
+   "line": 341,
+   "anchor": "function validatePlivoV3Signature(params: { ⏎ authToken: string; ⏎ signatureHeader: string;",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/line/signature.ts",
+   "line": 3,
+   "anchor": "export function validateLineSignature( ⏎ body: string, ⏎ signature: string,",
+   "label": "true",
+   "reason": "A validate or check name on a function that answers yes or no; the rule bans these names whatever else the function does."
+  }
+ ]
+}

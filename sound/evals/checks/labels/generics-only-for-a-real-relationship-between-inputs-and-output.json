@@ -1,0 +1,436 @@
+{
+ "labels": [
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/services/api.service.ts",
+   "line": 31,
+   "anchor": "private async request<T>( ⏎ endpoint: string, ⏎ options: RequestInit = {},",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/services/websocket.service.ts",
+   "line": 135,
+   "anchor": "send<T extends WSMessage>(message: T): void { ⏎ if (this.socket?.connected) { ⏎ this.socket.emit(message.type, message);",
+   "label": "true",
+   "reason": "T appears once, in the parameter; its bound WSMessage is the concrete type"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/services/growthbook.service.ts",
+   "line": 238,
+   "anchor": "public async runExperiment<T = any>( ⏎ experimentKey: string, ⏎ userId: string,",
+   "label": "true",
+   "reason": "T never appears in the signature"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/services/growthbook.service.ts",
+   "line": 435,
+   "anchor": "private async trackFeatureEvaluation<T>( ⏎ featureKey: string, ⏎ result: FeatureResult<T>,",
+   "label": "unclear",
+   "reason": "T appears once, inside the input FeatureResult<T>; the output never depends on it, and the only remedy left is unknown on an input, which the rule bars"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/config/redis.ts",
+   "line": 88,
+   "anchor": "async get<T = string>(key: string): Promise<T | null> { ⏎ const value = await this.client.get(key); ⏎ if (!value) return null;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/config/redis.ts",
+   "line": 125,
+   "anchor": "async hget<T = string>(key: string, field: string): Promise<T | null> { ⏎ const value = await this.client.hget(key, field); ⏎ if (!value) return null;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/config/redis.ts",
+   "line": 136,
+   "anchor": "async hgetall<T = Record<string, string>>(key: string): Promise<T> { ⏎ return (await this.client.hgetall(key)) as T; ⏎ }",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/cdp.helpers.ts",
+   "line": 101,
+   "anchor": "export async function fetchJson<T>(url: string, timeoutMs = 1500, init?: RequestInit): Promise<T> { ⏎ const ctrl = new AbortController(); ⏎ const t = setTimeout",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/channels/plugins/helpers.ts",
+   "line": 7,
+   "anchor": "export function resolveChannelDefaultAccountId<ResolvedAccount>(params: { ⏎ plugin: ChannelPlugin<ResolvedAccount>; ⏎ cfg: MoltbotConfig;",
+   "label": "unclear",
+   "reason": "ResolvedAccount appears once, inside the input ChannelPlugin<ResolvedAccount>; plugins differ per channel, so no one concrete type exists"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/channels/plugins/status.ts",
+   "line": 5,
+   "anchor": "export async function buildChannelAccountSnapshot<ResolvedAccount>(params: { ⏎ plugin: ChannelPlugin<ResolvedAccount>; ⏎ cfg: MoltbotConfig;",
+   "label": "unclear",
+   "reason": "ResolvedAccount appears once, inside the input ChannelPlugin<ResolvedAccount>; plugins differ per channel, so no one concrete type exists"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/device-pairing.ts",
+   "line": 80,
+   "anchor": "async function readJSON<T>(filePath: string): Promise<T | null> { ⏎ try { ⏎ const raw = await fs.readFile(filePath, \"utf8\");",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/client-fetch.ts",
+   "line": 32,
+   "anchor": "async function fetchHttpJson<T>( ⏎ url: string, ⏎ init: RequestInit & { timeoutMs?: number },",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/client-fetch.ts",
+   "line": 51,
+   "anchor": "export async function fetchBrowserJson<T>( ⏎ url: string, ⏎ init?: RequestInit & { timeoutMs?: number },",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/server.agent-contract-snapshot-endpoints.test.ts",
+   "line": 271,
+   "anchor": "const postJson = async <T>(url: string, body?: unknown): Promise<T> => { ⏎ const res = await realFetch(url, { ⏎ method: \"POST\",",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/archive.ts",
+   "line": 123,
+   "anchor": "export async function readJsonFile<T>(filePath: string): Promise<T> { ⏎ const raw = await fs.readFile(filePath, \"utf-8\"); ⏎ return JSON.parse(raw) as T;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/providers/twilio/api.ts",
+   "line": 1,
+   "anchor": "export async function twilioApiRequest<T = unknown>(params: { ⏎ baseUrl: string; ⏎ accountSid: string;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/providers/telnyx.ts",
+   "line": 49,
+   "anchor": "private async apiRequest<T = unknown>( ⏎ endpoint: string, ⏎ body: Record<string, unknown>,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/server.agent-contract-form-layout-act-commands.test.ts",
+   "line": 273,
+   "anchor": "const postJson = async <T>(url: string, body?: unknown): Promise<T> => { ⏎ const res = await realFetch(url, { ⏎ method: \"POST\",",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/providers/plivo.ts",
+   "line": 64,
+   "anchor": "private async apiRequest<T = unknown>(params: { ⏎ method: \"GET\" | \"POST\" | \"DELETE\"; ⏎ endpoint: string;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/providers/twilio.ts",
+   "line": 152,
+   "anchor": "private async apiRequest<T = unknown>( ⏎ endpoint: string, ⏎ params: Record<string, string | string[]>,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/browser-cli-actions-input/shared.ts",
+   "line": 21,
+   "anchor": "export async function callBrowserAct<T = unknown>(params: { ⏎ parent: BrowserParentOpts; ⏎ profile?: string;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/browser/server-context.ts",
+   "line": 51,
+   "anchor": "async function fetchJson<T>(url: string, timeoutMs = 1500, init?: RequestInit): Promise<T> { ⏎ const ctrl = new AbortController(); ⏎ const t = setTimeout(() => ",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/node-pairing.ts",
+   "line": 67,
+   "anchor": "async function readJSON<T>(filePath: string): Promise<T | null> { ⏎ try { ⏎ const raw = await fs.readFile(filePath, \"utf8\");",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/call.ts",
+   "line": 112,
+   "anchor": "export async function callGateway<T = unknown>(opts: CallGatewayOptions): Promise<T> { ⏎ const timeoutMs = opts.timeoutMs ?? 10_000; ⏎ const config = opts.confi",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/client.ts",
+   "line": 382,
+   "anchor": "async request<T = unknown>( ⏎ method: string, ⏎ params?: unknown,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/sandbox-formatters.ts",
+   "line": 43,
+   "anchor": "export function countRunning<T extends { running: boolean }>(items: T[]): number { ⏎ return items.filter((item) => item.running).length; ⏎ }",
+   "label": "true",
+   "reason": "T appears once, in items: T[]; its bound { running: boolean } is the concrete type"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/commands/sandbox-formatters.ts",
+   "line": 47,
+   "anchor": "export function countMismatches<T extends { imageMatch: boolean }>(items: T[]): number { ⏎ return items.filter((item) => !item.imageMatch).length; ⏎ }",
+   "label": "true",
+   "reason": "T appears once, in items: T[]; its bound { imageMatch: boolean } is the concrete type"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/matrix/src/directory-live.ts",
+   "line": 26,
+   "anchor": "async function fetchMatrixJson<T>(params: { ⏎ homeserver: string; ⏎ path: string;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/mattermost/src/mattermost/client.ts",
+   "line": 5,
+   "anchor": "request: <T>(path: string, init?: RequestInit) => Promise<T>; ⏎ }; ⏎ ",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/mattermost/src/mattermost/client.ts",
+   "line": 78,
+   "anchor": "const request = async <T>(path: string, init?: RequestInit): Promise<T> => { ⏎ const url = buildMattermostApiUrl(baseUrl, path); ⏎ const headers = new Headers(i",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/attachments/graph.ts",
+   "line": 94,
+   "anchor": "async function fetchGraphCollection<T>(params: { ⏎ url: string; ⏎ accessToken: string;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/gateway/test-helpers.server.ts",
+   "line": 226,
+   "anchor": "export function onceMessage<T = unknown>( ⏎ ws: WebSocket, ⏎ filter: (obj: unknown) => boolean,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/store-fs.ts",
+   "line": 18,
+   "anchor": "function safeParseJson<T>(raw: string): T | null { ⏎ try { ⏎ return JSON.parse(raw) as T;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/wizard/session.ts",
+   "line": 38,
+   "anchor": "function createDeferred<T>(): Deferred<T> { ⏎ let resolve!: (value: T) => void; ⏎ let reject!: (err: unknown) => void;",
+   "label": "false",
+   "reason": "T links two positions inside the returned Deferred<T> (promise result and resolve parameter); the link sits in the returned type, which a signature count cannot see"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/googlechat/src/api.ts",
+   "line": 10,
+   "anchor": "async function fetchJson<T>( ⏎ account: ResolvedGoogleChatAccount, ⏎ url: string,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/auto-reply/reply.triggers.trigger-handling.filters-usage-summary-current-model-provider.e2e.test.ts",
+   "line": 99,
+   "anchor": "function pickFirstStoreEntry<T>(store: Record<string, unknown>): T | undefined { ⏎ const entries = Object.values(store) as T[]; ⏎ return entries[0];",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/providers/github-copilot-auth.ts",
+   "line": 34,
+   "anchor": "function parseJsonResponse<T>(value: unknown): T { ⏎ if (!value || typeof value !== \"object\") { ⏎ throw new Error(\"Unexpected response from GitHub\");",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/resolve-allowlist.ts",
+   "line": 123,
+   "anchor": "async function fetchGraphJson<T>(params: { ⏎ token: string; ⏎ path: string;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/msteams/src/directory-live.ts",
+   "line": 44,
+   "anchor": "async function fetchGraphJson<T>(params: { ⏎ token: string; ⏎ path: string;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/node-host/runner.ts",
+   "line": 1101,
+   "anchor": "function decodeParams<T>(raw?: string | null): T { ⏎ if (!raw) { ⏎ throw new Error(\"INVALID_REQUEST: paramsJSON required\");",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/discord/api.ts",
+   "line": 84,
+   "anchor": "export async function fetchDiscord<T>( ⏎ path: string, ⏎ token: string,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/pairing/pairing-store.ts",
+   "line": 71,
+   "anchor": "function safeParseJson<T>(raw: string): T | null { ⏎ try { ⏎ return JSON.parse(raw) as T;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/browser-cli-shared.ts",
+   "line": 26,
+   "anchor": "export async function callBrowserRequest<T>( ⏎ opts: BrowserParentOpts, ⏎ params: BrowserRequestParams,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/signal/client.ts",
+   "line": 54,
+   "anchor": "export async function signalRpcRequest<T = unknown>( ⏎ method: string, ⏎ params: Record<string, unknown> | undefined,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/core-bridge.ts",
+   "line": 124,
+   "anchor": "async function importCoreModule<T>(relativePath: string): Promise<T> { ⏎ const root = resolveMoltbotRoot(); ⏎ const distPath = path.join(root, \"dist\", relativeP",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "ui/src/ui/gateway.ts",
+   "line": 276,
+   "anchor": "request<T = unknown>(method: string, params?: unknown): Promise<T> { ⏎ if (!this.ws || this.ws.readyState !== WebSocket.OPEN) { ⏎ return Promise.reject(new Erro",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/zalo/src/api.ts",
+   "line": 90,
+   "anchor": "export async function callZaloApi<T = unknown>( ⏎ method: string, ⏎ token: string,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/auto-reply/reply/history.ts",
+   "line": 13,
+   "anchor": "export function evictOldHistoryKeys<T>( ⏎ historyMap: Map<string, T[]>, ⏎ maxKeys: number = MAX_HISTORY_KEYS,",
+   "label": "unclear",
+   "reason": "T appears once, inside the input Map<string, T[]>; the output is void, and the only remedy left is unknown on an input, which the rule bars"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/imessage/client.ts",
+   "line": 127,
+   "anchor": "async request<T = unknown>( ⏎ method: string, ⏎ params?: Record<string, unknown>,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/voicewake.ts",
+   "line": 25,
+   "anchor": "async function readJSON<T>(filePath: string): Promise<T | null> { ⏎ try { ⏎ const raw = await fs.readFile(filePath, \"utf8\");",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/zalouser/src/zca.ts",
+   "line": 121,
+   "anchor": "export function parseJsonOutput<T>(stdout: string): T | null { ⏎ try { ⏎ return JSON.parse(stdout) as T;",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/src/adapters/each-call.ts",
+   "line": 8,
+   "anchor": "export const eachCall = <R extends object, W extends object>(role: R, wrap: Wrap): W => ⏎ Object.fromEntries(Object.entries(role).map(([name, member]) => [name,",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/core/closure-serializer.ts",
+   "line": 50,
+   "anchor": "static execute<T>( ⏎ closure: SerializableClosure, ⏎ args: any[] = [],",
+   "label": "true",
+   "reason": "T appears only in the return type, so the caller asserts a shape nothing checks"
+  },
+  {
+   "source": "worldbox@c38d13c",
+   "file": "src/sim/kernel/index.ts",
+   "line": 81,
+   "anchor": "const runPass = <T extends { rng: Rng; events: readonly Event[] }>( ⏎ eids: readonly number[], ⏎ rng: Rng,",
+   "label": "true",
+   "reason": "T appears once, in the callback return; its bound is the concrete type and the function returns that bound"
+  }
+ ]
+}

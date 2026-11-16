@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Pre-commit gate for no-role-named-modules.md: blocks a staged new or moved
+# JS/TS file whose path names a code-organization role. Run from the repo root.
+# Exit 1 blocks the commit.
+set -Eeuo pipefail
+trap 'echo "role-name gate crashed at line $LINENO; commit allowed" >&2; exit 0' ERR
+
+roles="shared utils helpers common lib"
+sources=" js jsx ts tsx mjs cjs mts cts "
+
+role_words() {
+  local path=$1 dir=${1%/*} stem=${1##*/} word found=''
+  [ "$dir" = "$1" ] && dir=''
+  stem=${stem%%.*}
+  for word in $roles; do
+    case "/$dir/" in *"/$word/"*) found+="$word " ;; esac
+    [ "$stem" = "$word" ] && found+="$word "
+  done
+  printf '%s' "$found"
+}
+
+source_file() {
+  case "$sources" in *" ${1##*.} "*) return 0 ;; esac
+  return 1
+}
+
+not_authored_here() {
+  local attributes
+  case "/$1" in */node_modules/* | */vendor/* | */fixtures/* | */__fixtures__/* | */testdata/* | */evals/* | */*.evals/*) return 0 ;; esac
+  attributes=$(git check-attr --cached linguist-vendored linguist-generated -- "$1")
+  case $attributes in *": set"* | *": true"*) return 0 ;; esac
+  return 1
+}
+
+nearest_package() {
+  local dir=${1%/*}
+  [ "$dir" = "$1" ] && return 0
+  while [ -n "$dir" ]; do
+    git cat-file -e ":$dir/package.json" 2>/dev/null && { printf '%s' "$dir"; return 0; }
+    [ "$dir" = "${dir%/*}" ] && return 0
+    dir=${dir%/*}
+  done
+}
+
+in_published_package_named() {
+  local package manifest
+  package=$(nearest_package "$1")
+  [ -n "$package" ] || return 1
+  manifest=$(git cat-file blob ":$package/package.json")
+  grep -Eq '"private"[[:space:]]*:[[:space:]]*true' <<<"$manifest" && return 1
+  case "/$package/" in *"/$2/"*) return 0 ;; esac
+  return 1
+}
+
+blocked=''
+while IFS= read -r -d '' meta; do
+  read -r _ _ _ _ status <<<"${meta#:}"
+  IFS= read -r -d '' path
+  old=x
+  case $status in R* | C*) old=$path; IFS= read -r -d '' path ;; esac
+  source_file "$path" && ! not_authored_here "$path" || continue
+  added=''
+  for word in $(role_words "$path"); do
+    case " $(role_words "$old") " in *" $word "*) continue ;; esac
+    in_published_package_named "$path" "$word" && continue
+    added+="$word "
+  done
+  [ -z "$added" ] || blocked+="  $path  (${added% })"$'\n'
+done < <(git diff --cached --raw -z --no-abbrev -M --diff-filter=ACR)
+
+[ -z "$blocked" ] && exit 0
+cat >&2 <<EOF
+Commit blocked: these new files sit under a role-named folder or module.
+$blocked
+Name each for the domain it serves, in a commit of its own:
+1. Unstage this change. Say what the code is about: dates, currency, invoices.
+2. Move the file to a folder or module with that domain's name, beside its callers.
+3. Commit the move alone, then stage and commit this change again.
+Do not rename the role to another role word (misc, core, tools), or skip this hook.
+Vendored or generated code, not written here? Mark it linguist-vendored or
+linguist-generated in .gitattributes, in a commit of its own.
+A cross-cutting library with its own domain identity? Give it its own
+package.json that is not private, and the gate lets its files through.
+EOF
+exit 1

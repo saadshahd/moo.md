@@ -1,0 +1,114 @@
+{
+  "note": "Real code the checks are measured on. Every fixture under evals/fixtures is a trimmed copy of a repo listed here (factory-setup holds one SKILL.md and no source), so the full repos carry the measurement and moo.md leaves the fixtures out. Revisions are pinned; ORIGIN.md recorded no SHA for four of these repos, so the SHA is the HEAD found on 2026-11-15.",
+  "sources": [
+    {
+      "name": "moltbot",
+      "path": "/Users/saad.shahd/repos/moltbot",
+      "rev": "109ac1c54932511b36dc51fb0d18fbcddd7766d1"
+    },
+    {
+      "name": "imaginery-friend-web",
+      "path": "/Users/saad.shahd/repos/imaginery-friend",
+      "subdir": "web",
+      "rev": "772d72a9d9a33b5d2b0c5f096844e3604925ca8e"
+    },
+    {
+      "name": "rule-engine",
+      "path": "/Users/saad.shahd/repos/rule-engine",
+      "rev": "afec6432100994b0bdceb3b49f540e1fc53acff6"
+    },
+    {
+      "name": "adaptive-ui-ecosystem",
+      "path": "/Users/saad.shahd/repos/adaptive-ui-ecosystem",
+      "rev": "4048c9b0f578d9a38482d65fbff6eb3e8a508b3e"
+    },
+    {
+      "name": "sieve",
+      "path": "/Users/saad.shahd/repos/sieve",
+      "rev": "f61e244e9d8b0272073f31cc40c8a7178d2cafdf"
+    },
+    {
+      "name": "worldbox",
+      "path": "/Users/saad.shahd/repos/games/worldbox",
+      "rev": "c38d13c28f7d14b25994b80df66d47b2dbc51c87"
+    },
+    {
+      "name": "Apple-AI-CLI",
+      "url": "https://github.com/0xatrilla/Apple-AI-CLI.git",
+      "rev": "d15fd1c6f6f2a70327318e69d36ac9fed99bca43"
+    },
+    {
+      "name": "react-hn",
+      "url": "https://github.com/insin/react-hn.git",
+      "rev": "7c5a7802109b1d2bae5c8493dd1fecf5bfe823a9"
+    },
+    {
+      "name": "nextjs-subscription-payments",
+      "url": "https://github.com/vercel/nextjs-subscription-payments.git",
+      "rev": "bdd0813206e47e6b218d42f15a7976c8a0d3c3eb"
+    },
+    {
+      "name": "moo.md",
+      "path": "/Users/saad.shahd/repos/moo.md",
+      "rev": "952e76bc697949ec89925d9f5f05ad12680569f1",
+      "exclude": [
+        ".evals/cases/",
+        "sound/evals/fixtures/"
+      ]
+    },
+    {
+      "name": "moo.md",
+      "path": "/Users/saad.shahd/repos/moo.md",
+      "rev": "7bf5f76281b1635d8d3323d254cf67ce2998b307",
+      "exclude": [
+        ".evals/cases/",
+        "sound/evals/fixtures/"
+      ]
+    },
+    {
+      "name": "moo.md",
+      "path": "/Users/saad.shahd/repos/moo.md",
+      "rev": "d1a77b1175a44e450f860e11c0c62cfbddd5436e",
+      "exclude": [
+        ".evals/cases/",
+        "sound/evals/fixtures/"
+      ]
+    },
+    {
+      "name": "moo.md",
+      "path": "/Users/saad.shahd/repos/moo.md",
+      "rev": "a9d4566dc1f9563ab1b1d5b344654796d227a4d1",
+      "exclude": [
+        ".evals/cases/",
+        "sound/evals/fixtures/"
+      ]
+    },
+    {
+      "name": "moo.md",
+      "path": "/Users/saad.shahd/repos/moo.md",
+      "rev": "9c889de69d45b36f53c58326636dc643660f0f0f",
+      "exclude": [
+        ".evals/cases/",
+        "sound/evals/fixtures/"
+      ]
+    },
+    {
+      "name": "moo.md",
+      "path": "/Users/saad.shahd/repos/moo.md",
+      "rev": "2f2af24c092f8eb282c0430db15587289e7c7b91",
+      "exclude": [
+        ".evals/cases/",
+        "sound/evals/fixtures/"
+      ]
+    },
+    {
+      "name": "moo.md",
+      "path": "/Users/saad.shahd/repos/moo.md",
+      "rev": "74385b47735661c8651e0d207e702a8c9d4932c2",
+      "exclude": [
+        ".evals/cases/",
+        "sound/evals/fixtures/"
+      ]
+    }
+  ]
+}

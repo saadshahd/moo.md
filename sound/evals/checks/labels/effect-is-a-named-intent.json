@@ -1,0 +1,44 @@
+{
+ "labels": [
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/SessionReplay.tsx",
+   "line": 165,
+   "anchor": "useEffect(() => { ⏎ if (replayerRef.current) { ⏎ replayerRef.current.setConfig({ speed: state.playbackSpeed });",
+   "label": "true",
+   "reason": "component with 3 effects; the fullscreen listener is a named-hook concept"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/App.tsx",
+   "line": 126,
+   "anchor": "useEffect(() => { ⏎ const handleFrictionEvent = (event: CustomEvent) => { ⏎ const frictionEvent = event.detail;",
+   "label": "true",
+   "reason": "component with 3 effects; the window event listener is a named-hook concept"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/FrictionMonitor.tsx",
+   "line": 87,
+   "anchor": "useEffect(() => { ⏎ if (events.length > 0 && onFrictionDetected) { ⏎ onFrictionDetected(events[events.length - 1]);",
+   "label": "true",
+   "reason": "component with 2 effects; one polls on an interval and one calls a prop callback after a state change"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/components/UIGraph.tsx",
+   "line": 412,
+   "anchor": "useEffect(() => { ⏎ if (!cyInstance.current) return; ⏎ ",
+   "label": "true",
+   "reason": "component with 2 effects, both on the same external system (the cytoscape instance), so the different-systems Not-when does not hold"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/contexts/ProfileContext.tsx",
+   "line": 144,
+   "anchor": "useEffect(() => { ⏎ dispatch({ type: \"SET_LOADING\", payload: profilesLoading }); ⏎ }, [profilesLoading]);",
+   "label": "true",
+   "reason": "component with 3 effects that copy query results into reducer state"
+  }
+ ]
+}

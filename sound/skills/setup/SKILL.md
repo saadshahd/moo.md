@@ -21,6 +21,8 @@ Decide which kind-tags apply (`react`, `db`, `distributed`) — verified STACK F
 | `db` | a db client or ORM imported in source, whichever one; `redis-as-store`; EMBEDDED dbs with owned DDL/schema (sqlite, node:sqlite, level — in-process still counts); owned schema/migration files | consuming someone else's hosted API without owning storage |
 | `distributed` | any SIDE-EFFECTFUL remote boundary: payments, email/SMS, queue/broker publish, webhook handlers, bot messaging SDKs, multiple owned services reconciling state. FRAMEWORK-WRAPPED senders count: an auth provider configured with an SMTP transport, e.g. next-auth EmailProvider, IS email-sending usage even with no direct nodemailer import. Publisher-side evidence alone is SUFFICIENT — the consumer usually lives outside the repo | READ-ONLY consumption of remote APIs (fetch-and-render); analytics beacons; redis as a plain same-process cache (get/set/del only) |
 
+**Linter and hook.** Run `node ../../lint/cli.mjs probe <repo>` (path from this SKILL.md). It reads the files and returns the supported lint configs (`.oxlintrc.json`, flat `eslint.config.*`) each with its version (lockfile, else the `package.json` range), the unsupported ones with the reason (legacy eslintrc, Biome, `xo`, `next lint`), the lint script, and the hook manager. Present it at Confirm; never infer a linter from `package.json` alone.
+
 ## Phase 2 — Select (per rule, evidence-cited)
 
 Candidates = the ENTIRE `corpus/`. There is no tag pre-filter — each rule's own subject-surface gate below is the selection; the Phase 1 facts are the evidence it judges against.
@@ -42,7 +44,14 @@ Method — DEEP by design; spend the tokens. Every candidate rule is judged agai
 
 ## Phase 3 — Confirm (never skip; a request to install is the confirmation, so write, then present)
 
-Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons, plus the hook wiring change for each rule with a gate (Phase 4). The statement is the rule's opening mandate: the file's first sentence, extended to the next only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never `_Avoid_`, `Detect:`, or `Not-when:`. The user's answer is the verdict — a corrected set replaces yours without argument; redo the affected phases. When the invocation already asks to install, that request confirms the rules: write them (Phase 4) and present this for correction, the corrected set replacing what you wrote. Otherwise write only after explicit confirmation. A gate's hook wiring is asked first either way. The user confirms the SET here; the written files are theirs afterward.
+Present compactly: the extracted facts (each with file evidence), the proposed tag set, and the proposed rule set — each rule as name + citation + its one-line statement (never name-only; the user must see what each rule requires) — plus the rejected candidates grouped with their reasons, plus the hook wiring change for each rule with a gate (Phase 4), plus one row per rule with a check. Get the rows from the install output — when confirming before writing, run `node ../../lint/cli.mjs install <repo> --rule <name>=<cite> …` without `--write`: it measures and restores every file:
+
+| Row status | Show | Result |
+|---|---|---|
+| `would-install` | linter and config, severity, repo hits, repo rules that flag the check's valid code | installs |
+| `covered` | the repo rule and config file that already flag every invalid case | installs nothing |
+| `no-linter`, `manual`, `cannot-run`, `reverted` | the note | stays prose; the rule's prose still installs |
+ The statement is the rule's opening mandate: the file's first sentence, extended to the next only when the first merely scopes or defines without stating the mandate (e.g. `derive-dont-sync`, `module-is-the-noun-functions-are-bare-verbs`). Never `_Avoid_`, `Detect:`, or `Not-when:`. The user's answer is the verdict — a corrected set replaces yours without argument; redo the affected phases. When the invocation already asks to install, that request confirms the rules: write them (Phase 4) and present this for correction, the corrected set replacing what you wrote. Otherwise write only after explicit confirmation. A gate's hook wiring is asked first either way. The user confirms the SET here; the written files are theirs afterward.
 
 **Propose-only mode:** if the invocation asks for a proposal only (evals, dry runs), read `propose-only.md` and follow it instead of confirming or writing.
 
@@ -50,17 +59,20 @@ Present compactly: the extracted facts (each with file evidence), the proposed t
 
 Copy each confirmed rule's file verbatim — no additions — to `.claude/sound/<topic>/<rule-name>.md`, a plain reference file. `<topic>` is the rule's parent directory in the corpus. These live OUTSIDE `.claude/rules/`, so they never auto-load; the browsable `.claude/sound/` tree IS the map `sound:prime` points at. No marker, manifest, or hash anywhere.
 
-A rule with a `<rule-name>.gate` beside it in the corpus installs that file too, verbatim and executable, and is wired as a pre-commit hook through the hook manager the repo already uses — never a new one. `<gate>` below is `.claude/sound/<topic>/<rule-name>.gate`, from the repo root.
+A rule with a `<rule-name>.gate` beside it in the corpus installs that file too, verbatim and executable, and is wired as a pre-commit hook through the hook manager the repo already uses — never a new one. `<gate>` below is `.claude/sound/<topic>/<rule-name>.gate`, from the repo root. The probe's `hook.manager` names the row.
 
-| Repo shows | Wire |
+| `hook.manager` | Wire |
 |---|---|
-| `lefthook.yml` | `pre-commit: commands: <rule-name>: run: <gate>` |
-| `.pre-commit-config.yaml` | a `repo: local` hook: `id: <rule-name>`, `entry: <gate>`, `language: script`, `pass_filenames: false` |
-| `.husky/` | a `<gate>` line in `.husky/pre-commit` |
-| `core.hooksPath` set to another folder | a `<gate>` line in that folder's `pre-commit`; folder missing → say so, wire nothing |
-| none of these | a `<gate>` line in `.git/hooks/pre-commit`, created executable if absent |
+| `lefthook` | `pre-commit: commands: <rule-name>: run: <gate>` |
+| `pre-commit` | a `repo: local` hook: `id: <rule-name>`, `entry: <gate>`, `language: script`, `pass_filenames: false` |
+| `husky` | a `<gate>` line in `.husky/pre-commit` |
+| `husky-v4` | `<gate>` chained with `&&` onto `husky.hooks.pre-commit` in `package.json`; absent → set it to `<gate>` |
+| `hooks-path` | a `<gate>` line in that folder's `pre-commit`; folder missing → say so, wire nothing |
+| `git` | a `<gate>` line in `.git/hooks/pre-commit`, created executable if absent |
 
 An entry already naming `<gate>` stays as it is. A declined wiring leaves the gate installed but unrun — say so.
+
+A rule with a `<rule-name>.check.mjs` beside it runs as a lint rule inside the repo's own linter. Install with `node ../../lint/cli.mjs install <repo> --write --rule <name>=<cite> …` (`<cite>` is the Phase 2 file). The script copies each check to `.claude/sound/<topic>/`, generates `.claude/sound/plugin.mjs` (the linter's entry point, not a record), wires it into the config the cited file falls under, then verifies: the check's own cases through the repo's config, and the whole lint before and after. A failed verification restores every touched file byte-for-byte and says why. It adds no dependency, linter, or hook manager. Severity is `error` only for a `problem` check the repo has zero hits for; otherwise `warn`. A `manual` row carries the exact lines to add by hand: print them and leave the config alone.
 
 ## Re-runs
 

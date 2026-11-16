@@ -1,0 +1,244 @@
+{
+ "labels": [
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/logging/levels.ts",
+   "line": 20,
+   "anchor": "const map: Record<LogLevel, number> = { ⏎ fatal: 0, ⏎ error: 1,",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/types/settings.ts",
+   "line": 217,
+   "anchor": "export const FamilyValueDescriptions: Record<FamilyValue, string> = { ⏎ [FamilyValue.KINDNESS]: \"Being caring and considerate toward others\", ⏎ [FamilyValue.COU",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/tool-policy.ts",
+   "line": 59,
+   "anchor": "const TOOL_PROFILES: Record<ToolProfileId, ToolProfilePolicy> = { ⏎ minimal: { ⏎ allow: [\"session_status\"],",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/provider-usage.shared.ts",
+   "line": 6,
+   "anchor": "export const PROVIDER_LABELS: Record<UsageProviderId, string> = { ⏎ anthropic: \"Claude\", ⏎ \"github-copilot\": \"Copilot\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "site/src/demo/player.ts",
+   "line": 105,
+   "anchor": "const LABEL: Record<Side, string> = { off: \"moo off\", on: \"moo on\" }; ⏎  ⏎ /** A wait on the pair's clock, and what it marks, for a screen reader. */",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/test/fixtures/claude-shim.ts",
+   "line": 59,
+   "anchor": "const DECIDED: Record<\"plan\" | \"review\", Decided> = { ⏎ plan: READY_PLAN, ⏎ review: { event: \"approve\", sure: true, reason: \"The change does what the item asks.",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/types/profile.ts",
+   "line": 147,
+   "anchor": "export const GenderLabels: Record<Gender, string> = { ⏎ [Gender.BOY]: \"Boy\", ⏎ [Gender.GIRL]: \"Girl\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "worldbox@c38d13c",
+   "file": "src/sim/laws/proximity.ts",
+   "line": 50,
+   "anchor": "const applyOutcome: Record< ⏎ Outcome, ⏎ (eid: number, candidate: number, world: World) => readonly Event[]",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media-understanding/defaults.ts",
+   "line": 19,
+   "anchor": "export const DEFAULT_TIMEOUT_SECONDS: Record<MediaUnderstandingCapability, number> = { ⏎ image: 60, ⏎ audio: 60,",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/types/story-wizard.ts",
+   "line": 300,
+   "anchor": "export const StoryPurposeLabels: Record<StoryPurpose, string> = { ⏎ [StoryPurpose.ENTERTAINMENT]: \"Entertainment\", ⏎ [StoryPurpose.COPING]: \"Coping & Comfort\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/types/profile.ts",
+   "line": 133,
+   "anchor": "export const PersonalityTraitLabels: Record<PersonalityTrait, string> = { ⏎ [PersonalityTrait.CURIOUS]: \"Curious\", ⏎ [PersonalityTrait.SHY]: \"Shy\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/plugins/slots.ts",
+   "line": 16,
+   "anchor": "const DEFAULT_SLOT_BY_KEY: Record<PluginSlotKey, string> = { ⏎ memory: \"memory-core\", ⏎ };",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/exec-approvals.ts",
+   "line": 1199,
+   "anchor": "const order: Record<ExecSecurity, number> = { deny: 0, allowlist: 1, full: 2 }; ⏎ return order[a] <= order[b] ? a : b; ⏎ }",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/exec-approvals.ts",
+   "line": 1204,
+   "anchor": "const order: Record<ExecAsk, number> = { off: 0, \"on-miss\": 1, always: 2 }; ⏎ return order[a] >= order[b] ? a : b; ⏎ }",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ThemeSelectionStep.tsx",
+   "line": 138,
+   "anchor": "const descriptions: Record<StoryTheme, string> = { ⏎ [StoryTheme.COURAGE]: \"Stories about being brave and facing fears\", ⏎ [StoryTheme.KINDNESS]: \"Tales of comp",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media-understanding/defaults.ts",
+   "line": 24,
+   "anchor": "export const DEFAULT_PROMPT: Record<MediaUnderstandingCapability, string> = { ⏎ image: \"Describe the image.\", ⏎ audio: \"Transcribe the audio.\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moo.md@952e76b",
+   "file": "hum-engine/scripts/eval.ts",
+   "line": 159,
+   "anchor": "const BOUNDARY_RUNS: Record<Boundary, () => Promise<Measured>> = { ⏎ kind: async () => { ⏎ const cases = (await read(\"kind\", KindCase)).slice(0, limit);",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/outbound/message-action-spec.ts",
+   "line": 5,
+   "anchor": "export const MESSAGE_ACTION_TARGET_MODE: Record<ChannelMessageActionName, MessageActionTargetMode> = ⏎ { ⏎ send: \"to\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/media-understanding/defaults.ts",
+   "line": 14,
+   "anchor": "export const DEFAULT_MAX_BYTES: Record<MediaUnderstandingCapability, number> = { ⏎ image: 10 * MB, ⏎ audio: 20 * MB,",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "ui/src/ui/app-defaults.ts",
+   "line": 4,
+   "anchor": "export const DEFAULT_LOG_LEVEL_FILTERS: Record<LogLevel, boolean> = { ⏎ trace: true, ⏎ debug: true,",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/types/settings.ts",
+   "line": 196,
+   "anchor": "export const FamilyValueLabels: Record<FamilyValue, string> = { ⏎ [FamilyValue.KINDNESS]: \"Kindness\", ⏎ [FamilyValue.COURAGE]: \"Courage\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/types/profile.ts",
+   "line": 217,
+   "anchor": "const emojiMap: Record<PersonalityTrait, string> = { ⏎ [PersonalityTrait.CURIOUS]: \"🔍\", ⏎ [PersonalityTrait.SHY]: \"😊\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "worldbox@c38d13c",
+   "file": "src/sim/laws/proximity.ts",
+   "line": 38,
+   "anchor": "const OUTCOME_WEIGHTS: Record<Outcome, (a: Traits, b: Traits) => number> = { ⏎ mate: (a, b) => ⏎ a.attractionPrefX * b.aggression + a.attractionPrefY * b.curios",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "worldbox@c38d13c",
+   "file": "src/sim/laws/reproduction.ts",
+   "line": 73,
+   "anchor": "const TRAIT_COMPONENTS: Record< ⏎ TraitKey, ⏎ (typeof Components)[keyof typeof Components] & { value: Float32Array }",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ThemeSelectionStep.tsx",
+   "line": 119,
+   "anchor": "const emojiMap: Record<StoryTheme, string> = { ⏎ [StoryTheme.COURAGE]: \"🦁\", ⏎ [StoryTheme.KINDNESS]: \"💝\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/types/story-wizard.ts",
+   "line": 307,
+   "anchor": "export const ReadingLevelLabels: Record<ReadingLevel, string> = { ⏎ [ReadingLevel.BEGINNER]: \"Beginner\", ⏎ [ReadingLevel.INTERMEDIATE]: \"Intermediate\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/auto-reply/status.ts",
+   "line": 435,
+   "anchor": "const CATEGORY_LABELS: Record<CommandCategory, string> = { ⏎ session: \"Session\", ⏎ options: \"Options\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/plugins/slots.ts",
+   "line": 12,
+   "anchor": "const SLOT_BY_KIND: Record<PluginKind, PluginSlotKey> = { ⏎ memory: \"memory\", ⏎ };",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/auto-reply/reply/reply-dispatcher.ts",
+   "line": 95,
+   "anchor": "const queuedCounts: Record<ReplyDispatchKind, number> = { ⏎ tool: 0, ⏎ block: 0,",
+   "label": "false",
+   "reason": "The zeroed counts are mutable state that is incremented later, not a static table."
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/channels/registry.ts",
+   "line": 27,
+   "anchor": "const CHAT_CHANNEL_META: Record<ChatChannelId, ChannelMeta> = { ⏎ telegram: { ⏎ id: \"telegram\",",
+   "label": "true",
+   "reason": "A hand-written literal table keyed by a closed union, annotated with Record instead of satisfies."
+  }
+ ]
+}
