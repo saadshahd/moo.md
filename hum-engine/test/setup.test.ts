@@ -12,6 +12,7 @@ import { waitsOf, withTimeouts } from "../src/setup/waits.ts";
 import { SetupAnswers, writeSetup } from "../src/setup/write.ts";
 import { installedSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
+import { MAIN } from "./fixtures/owner-repo.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -241,6 +242,33 @@ test("setup reads schema 1 answers, their pull request token secret carried into
 
 	expect(writeSetup(repo, answers, { installedSkills: installedSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
 	expect(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")).pullRequestToken).toEqual({ from: "secret", secret: "OTHER_TOKEN" });
+});
+
+/** A stand-in `gh` that reads the repo's issues, labels and visibility, and is refused the admin-only workflow permissions, as anyone but an admin is. */
+const NON_ADMIN_GH = `#!/bin/sh
+case "$1 $2" in
+  "issue list") echo '[{"body":"The button is broken.","labels":[{"name":"bug"}]}]' ;;
+  "label list") echo '[{"name":"bug"},{"name":"docs"}]' ;;
+  "repo view") echo '{"visibility":"PRIVATE"}' ;;
+  *) echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+esac
+`;
+
+test("a GitHub read that fails, as an admin-only one does for anyone else, leaves the scan every fact the other reads gave", () => {
+	const repo = repoWith(PROJECT);
+	const bin = tempDir("gh");
+
+	writeFileSync(join(bin, "gh"), NON_ADMIN_GH);
+	chmodSync(join(bin, "gh"), 0o755);
+
+	const scanned = Bun.spawnSync(["bun", MAIN, "setup", "scan"], { cwd: repo, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` } });
+	const printed = JSON.parse(scanned.stdout.toString());
+
+	expect(scanned.exitCode).toBe(0);
+	expect(printed.proposal.integrations).toEqual({ "work-source": "github", questions: "github", answers: "github" });
+	expect(printed.coverage).not.toBeNull();
+	expect(printed.isPublicRepo).toBe(false);
+	expect(printed.workflowsMayOpenPullRequests).toBeNull();
 });
 
 test("a scan skips a workflow, compose or issue-template file that is not YAML and reads the rest", async () => {
