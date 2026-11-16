@@ -447,7 +447,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${d.evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
 		];
 
-		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
+		if (plan?.event === "plan-ready") parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
 
 		if (d.answered) {
 			const soFar = d.restarted
@@ -600,7 +600,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	/** What a taken pick leaves behind before the machine moves on. */
 	const PICKED = new Map<string, (pick: EventPick, models: readonly string[]) => void>([
-		["plan-ready", (pick, models) => pick.plan && state.plans.put(id, { item: id, plan: pick.plan, hash: planHash(pick.plan), models: [...models] })],
+		["plan-ready", (pick, models) => pick.plan && state.plans.put(id, { item: id, event: "plan-ready", plan: pick.plan, hash: planHash(pick.plan), models: [...models] })],
+		[SPLIT, (pick, models) => state.plans.put(id, { item: id, event: SPLIT, parts: pick.parts, models: [...models] })],
 		["plan-blocked", ownerQuestion],
 		["needs-owner", ownerQuestion],
 		[

@@ -28,5 +28,17 @@ export const fullStatus: Status = {
 	rules: [],
 	possibleRepeats: [],
 	unusedMemory: [],
-	measure: { merges: 20, abandoned: 3, notes: 0.4, questions: 0.2, tokens: 310_000, window: 20, byPath: [] },
+	measure: {
+		merges: 20,
+		abandoned: 3,
+		notes: 0.4,
+		questions: 0.2,
+		tokens: 310_000,
+		window: 20,
+		byPath: [],
+		byDoneBy: [
+			{ doneBy: "checks", merges: 9, reverted: 1, fixed: 2 },
+			{ doneBy: "review", merges: 8, reverted: 0, fixed: 1 },
+		],
+	},
 };

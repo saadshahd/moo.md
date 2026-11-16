@@ -33,15 +33,25 @@ export const headerRow = (status: Status, input: Pick<ViewInput, "now" | "amberA
 
 const NO_MEASURE = "per merge: no merged change yet";
 
+const doneByPart = ({ doneBy, merges, reverted, fixed }: Measure["byDoneBy"][number]): Span => span(`${doneBy}: ${reverted} reverted, ${fixed} fixed of ${merges}`, "plain");
+
 /**
- * The measure line: notes, questions and tokens per merged change. Tokens drop first, then questions, then the
- * label; the notes stay. It never wraps.
+ * The measure line: notes, questions and tokens per merged change, then each way of reaching done with how many of
+ * its merges a later change reverted or fixed. The ways drop first, the last first, then tokens, then questions, then
+ * the label; the notes stay. It never wraps.
  */
 export const measureRow = (measure: Measure | null, width: number): Row => {
 	if (measure === null) return firstFitting([[span(NO_MEASURE, "dim")]], width);
 
 	const label = `per merge (last ${measure.window}): `;
-	const parts: Span[] = [span(`${perMerge(measure.notes)} notes`, "plain"), span(`${perMerge(measure.questions)} questions`, "plain"), span(`${tokensText(measure.tokens)} tokens`, "plain")];
+
+	const parts: Span[] = [
+		span(`${perMerge(measure.notes)} notes`, "plain"),
+		span(`${perMerge(measure.questions)} questions`, "plain"),
+		span(`${tokensText(measure.tokens)} tokens`, "plain"),
+		...measure.byDoneBy.map(doneByPart),
+	];
+
 	const labelled = droppingFromEnd(parts).map(([first, ...rest]) => (first === undefined ? [] : [span(`${label}${first.text}`, first.tone), ...rest]));
 
 	return firstFitting([...labelled, joinParts(parts.slice(0, 1))], width);

@@ -1,3 +1,4 @@
+import { DONE_BY } from "../../hum-engine/src/decide/merge.ts";
 import type { Card, Question, Status } from "../../hum-engine/src/status/format.ts";
 import { fullStatus, NOW } from "./status.ts";
 
@@ -117,7 +118,16 @@ const worstWith = (flights: number, notices: number, merged: number, choices: nu
 	rules: [],
 	possibleRepeats: [],
 	unusedMemory: [],
-	measure: { merges: 100_000, abandoned: 0, notes: 1_234_567.89, questions: 0, tokens: 999_500, window: 100_000, byPath: [] },
+	measure: {
+		merges: 100_000,
+		abandoned: 0,
+		notes: 1_234_567.89,
+		questions: 0,
+		tokens: 999_500,
+		window: 100_000,
+		byPath: [],
+		byDoneBy: DONE_BY.map((doneBy) => ({ doneBy, merges: 100_000, reverted: 99_999, fixed: 100_000 })),
+	},
 });
 
 /** The status file at its worst with every list at the length the shipped settings give it. */

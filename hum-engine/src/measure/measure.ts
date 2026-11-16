@@ -1,7 +1,11 @@
+import { DONE_BY, type DoneBy } from "../decide/merge.ts";
+import type { Label } from "../decide/risk.ts";
+
 /** What an item cost the owner: review notes, questions, and model tokens. */
 export type Counted = { readonly notes: number; readonly questions: number; readonly tokens: number };
 
-export type MergedChange = Counted & { readonly item: string; readonly at: number; readonly paths: readonly string[] };
+/** A merged change: its cost, how its item reached done where hum kept it, and whether a later change reverted or fixed it. */
+export type MergedChange = Counted & { readonly item: string; readonly at: number; readonly paths: readonly string[]; readonly doneBy: DoneBy | undefined; readonly label: Label };
 
 /** An item that never merged. Its cost counts all the same, so dropping work never lowers a number. */
 export type AbandonedItem = Counted & { readonly item: string; readonly since: number; readonly paths: readonly string[] };
@@ -18,9 +22,13 @@ export type MeasureInput = {
 	readonly globs: readonly string[];
 };
 
+/** The merged changes that reached done one way, over that way's own last `window`, and how many of them a later change reverted or fixed. */
+type DoneByBreaks = { readonly doneBy: DoneBy; readonly merges: number; readonly reverted: number; readonly fixed: number };
+
 export type Measured = PerMerge & {
 	readonly window: number;
 	readonly byPath: ({ readonly glob: string } & PerMerge)[];
+	readonly byDoneBy: DoneByBreaks[];
 };
 
 const sum = (counted: readonly Counted[], key: keyof Counted): number => counted.reduce((total, found) => total + found[key], 0);
@@ -49,9 +57,20 @@ const abandonedSince = (abandoned: readonly AbandonedItem[], inWindow: readonly 
 
 const doesTouch = (glob: string, paths: readonly string[]): boolean => paths.some((path) => new Bun.Glob(glob).match(path));
 
+const labelled = (merged: readonly MergedChange[], label: Label): number => merged.filter((found) => found.label === label).length;
+
+/** Each way of reaching done that any merged change took: its own last `window` merged changes, and how many of them broke. A merge saved before hum kept its way counts in none. */
+const breaksByDoneBy = (merged: readonly MergedChange[], window: number): DoneByBreaks[] =>
+	DONE_BY.flatMap((doneBy) => {
+		const done = newestFirst(merged.filter((found) => found.doneBy === doneBy), window);
+
+		return done.length === 0 ? [] : [{ doneBy, merges: done.length, reverted: labelled(done, "reverted"), fixed: labelled(done, "fixed") }];
+	});
+
 /**
  * The three numbers per merged change over the last `window` merged changes, and over each path's own last
- * `window`. `undefined` while nothing has merged, when a per-merge number has no meaning.
+ * `window`, and the breaks of each way of reaching done. `undefined` while nothing has merged, when a per-merge
+ * number has no meaning.
  */
 export const measureOf = ({ merged, abandoned, loopTokens, window, globs }: MeasureInput): Measured | undefined => {
 	const recent = newestFirst(merged, window);
@@ -64,5 +83,5 @@ export const measureOf = ({ merged, abandoned, loopTokens, window, globs }: Meas
 		return onPath.length === 0 ? [] : [{ glob, ...perMerge(onPath, abandonedSince(abandoned, onPath).filter(({ paths }) => doesTouch(glob, paths)), 0) }];
 	});
 
-	return { window, ...perMerge(recent, abandonedSince(abandoned, recent), loopTokens), byPath };
+	return { window, ...perMerge(recent, abandonedSince(abandoned, recent), loopTokens), byPath, byDoneBy: breaksByDoneBy(merged, window) };
 };

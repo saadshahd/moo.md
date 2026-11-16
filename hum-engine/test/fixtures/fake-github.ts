@@ -73,6 +73,9 @@ const gitAt = (repo: string, args: readonly string[], input?: Buffer | string) =
 const REPOSITORY_ID = "R_fake";
 const TOKENS = new Set(["token fake-token", "bearer fake-token"]);
 
+/** The commit the fake names as a merged pull request's merge on the base. */
+export const mergeCommitOf = (number: number): string => `merge-of-${number}`;
+
 /** A pull request as GitHub's GraphQL answers it. */
 const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
 	id,
@@ -81,6 +84,7 @@ const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
 	state,
 	mergeStateStatus: status,
 	autoMergeRequest: autoMerge ? { enabledAt: "2026-11-08T00:00:00Z" } : null,
+	mergeCommit: state === "MERGED" ? { oid: mergeCommitOf(number) } : null,
 });
 
 const json = (status: number, value: Json, headers: Record<string, string> = {}) =>

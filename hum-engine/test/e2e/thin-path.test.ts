@@ -50,6 +50,11 @@ test("the thin path: item → claude -p shim change → hum commits it → check
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(sh(w.repo.remote, ["log", "--format=%s", "-3", "main"]).split("\n")).toEqual(["hum: finish " + id, "shim: the change", `add ${id}`, ""]);
 
+	// The merge keeps the commits the push put on main, and that the change reached done on its checks alone.
+	const pushed = sh(w.repo.remote, ["rev-list", "--reverse", "-2", "main"]).split("\n").filter(Boolean);
+
+	expect(w.state.merges.get(id)).toMatchObject({ sha: pushed.at(-1), commits: pushed, doneBy: "checks" });
+
 	// Both of hum's commits, whatever git config the clone holds, are credited to the owner and no one else.
 	const credited = `${OWNER.name} <${OWNER.email}> | ${OWNER.name} <${OWNER.email}>`;
 
@@ -590,6 +595,7 @@ test("a plan run that splits its item files each part as a ready item and lands 
 	expect(w.repo.show(id)).toContain("state: done");
 	expect((await w.adapter.workSource!.listReady()).map((ref) => ref.title)).toEqual(["Write part one", "Write part two"]);
 	expect(w.shim.calls()).toHaveLength(1);
+	expect(w.state.merges.get(id)).toMatchObject({ doneBy: "split", plan: { event: "needs-split", parts: ["Write part one", "Write part two"] } });
 });
 
 test("a docs item whose change touches code moves to its real kind and runs again from the plan, on the same branch", async () => {

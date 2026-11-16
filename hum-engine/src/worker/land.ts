@@ -33,6 +33,7 @@ import { pickTier } from "../config/checks.ts";
 import { footprintOf } from "./scheduler.ts";
 import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
+	clearedBy,
 	isCleared,
 	type Landing,
 	landingOf,
@@ -54,7 +55,7 @@ import type { State } from "../state/open.ts";
 import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
-import { recordMerged } from "./merged.ts";
+import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
 import { queueQuestion, releaseQuestions } from "./questions.ts";
 import { pickedAnswer } from "./thread.ts";
@@ -290,9 +291,13 @@ const markItemDone = async ({ git, clone, dir, id }: LandContext): Promise<void>
 /** The patch id of the change against the base: a rebase keeps it. */
 const patchOf = async (ctx: Pick<LandContext, "git" | "base" | "dir" | "id">): Promise<string> => (await ctx.git.raw(["patch-id", "--stable"], await changeDiff(ctx))).split(" ")[0] ?? "";
 
+/** The run branch's commits past the base, oldest first. */
+const branchCommits = async ({ git, base }: Pick<LandContext, "git" | "base">): Promise<string[]> =>
+	(await git.raw(["rev-list", "--reverse", "--first-parent", `origin/${base}..HEAD`])).split("\n").filter(Boolean);
+
 /**
  * Marks the item done on the run branch where it holds the item's file, pushes the branch and saves what its diff
- * showed, so a retry lands it without a run. The saved head is the change before hum's done mark; a push GitHub signed
+ * showed and the commits it pushed, so a retry lands it without a run. The saved head is the change before hum's done mark; a push GitHub signed
  * rebuilt the change as its own commit, which is then the head, and a verdict on the old commit holds for its tree.
  * The same change saved again, as after a rebase, keeps when it was first saved, so the owner's answers since then
  * still count; a new change starts the count afresh.
@@ -315,7 +320,7 @@ export const prepareLanding = async (ctx: LandContext): Promise<PushOutcome> => 
 
 	if (head !== built && verdict?.head === built) state.verdicts.put(id, { ...verdict, head });
 
-	state.landings.put(id, { item: id, branch, since: kept?.since ?? now(), change, head, lostRaces: kept?.lostRaces ?? 0, alignment: kept?.alignment, patch });
+	state.landings.put(id, { item: id, branch, since: kept?.since ?? now(), change, head, lostRaces: kept?.lostRaces ?? 0, alignment: kept?.alignment, patch, commits: await branchCommits(ctx) });
 
 	return pushed;
 };
@@ -364,13 +369,25 @@ const endedByChange = async ({ git, dir, id }: LandContext): Promise<boolean> =>
  * The change is on the base: its item ends at the work source unless the change ended it, then the merge is recorded.
  * A failed end leaves the landing saved, so the next pass ends it again.
  */
-const finish = async (ctx: LandContext): Promise<ThinResult> => {
+const finish = async (ctx: LandContext, onBase: OnBase): Promise<ThinResult> => {
 	const { state, git, id, item, workSource, now } = ctx;
 
 	if (!(await endedByChange(ctx))) await workSource.finish(item.id);
-	await recordMerged(state, { git, remote: "origin" }, { item: id, sha: (await git.raw(["rev-parse", "HEAD"])).trim(), at: now() });
+	await recordMerged(state, { git, remote: "origin" }, { item: id, at: now(), ...onBase });
 
 	return { outcome: "merged", item: id };
+};
+
+/** A change the run branch's own push put on the base: the base stands at HEAD, and its commits are the ones the landing saved. */
+const pushedOnBase = async ({ git, state, id }: LandContext): Promise<OnBase> => ({ sha: (await git.raw(["rev-parse", "HEAD"])).trim(), commits: state.landings.get(id)?.commits });
+
+/** A change GitHub merged through its pull request, once GitHub names the commit the merge made. */
+const mergedPull = async (ctx: LandContext, pulls: PullRequests): Promise<ThinResult> => {
+	const pull = await pulls.find(ctx.branch);
+
+	if (pull?.state !== "MERGED") throw new Error(`GitHub merged the pull request from ${ctx.branch}, then named it ${pull?.state ?? "missing"}`);
+
+	return finish(ctx, mergedThrough(ctx.state.landings.get(ctx.id), pull.mergeCommit));
 };
 
 /** Pushes the change to the base once, only as it grows from the base as it stands: a base that moved after the change was checked waits for the next pass to check it again. */
@@ -402,7 +419,7 @@ const throughPullRequest = async (
 	const { id, branch, base, config } = ctx;
 	const pull = (await pulls.find(branch)) ?? (await pulls.open({ head: branch, base, ...pullRequestOf(ctx, autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`) }));
 
-	if (pull.state === "MERGED") return finish(ctx);
+	if (pull.state === "MERGED") return finish(ctx, mergedThrough(ctx.state.landings.get(id), pull.mergeCommit));
 
 	if (pull.state === "CLOSED")
 		return {
@@ -422,7 +439,7 @@ const throughPullRequest = async (
 		methodFor(config.hum.mergeMethod, rules.mergeMethods),
 	);
 
-	if (armed === "merged") return finish(ctx);
+	if (armed === "merged") return mergedPull(ctx, pulls);
 
 	if (armed === "armed" && pull.behind) await pulls.update(pull);
 
@@ -486,7 +503,7 @@ const landBy = async (
 
 	if (landed.kind === "moved") return loseRace(ctx, `${ctx.base} moved after the change was checked on it; the next pass checks it there`);
 
-	return finish(ctx);
+	return finish(ctx, await pushedOnBase(ctx));
 };
 
 /**
@@ -500,7 +517,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	if (!saved) throw new Error(`no landing is saved for ${ctx.id}`);
 
 	// A change of no files, such as a split item's, whose branch the base already holds has nothing left to land.
-	if (saved.change.paths.length === 0 && (await isOnBase(ctx))) return finish(ctx);
+	if (saved.change.paths.length === 0 && (await isOnBase(ctx))) return finish(ctx, await pushedOnBase(ctx));
 
 	const first = await placementOf(ctx, saved.change);
 	const answered = answeredLevel(ctx.item, saved.since, levelNames(ctx.config));
@@ -529,10 +546,20 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const verdict = reviewed?.verdict;
 	const route = routeWith(verdict);
 	const approvals = { review: verdict?.event === REVIEW_APPROVAL, owner: pickedAnswer(ctx.item.thread, [OWNER_APPROVAL], saved.since) !== undefined };
+	const cleared = isCleared(route, approvals);
 	const why = verdict && verdict.event !== REVIEW_APPROVAL ? `the review run answered ${verdict.event}: ${verdict.reason}` : waitReason(route);
 	const rules = ctx.pulls ? await ctx.pulls.rules(ctx.base) : NO_RULES;
 
-	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest, cleared: isCleared(route, approvals) }), route, rules, why);
+	keepDoneBy(ctx, cleared ? clearedBy(approvals) : undefined);
+
+	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest, cleared }), route, rules, why);
+};
+
+/** How the saved change reaches done once it lands, as this landing found it; undefined while it waits for a person. */
+const keepDoneBy = ({ state, id }: LandContext, doneBy: SavedLanding["doneBy"]): void => {
+	const saved = state.landings.get(id);
+
+	if (saved) state.landings.put(id, { ...saved, doneBy });
 };
 
 /** The alignment call's grades for a saved change, made once and kept with the landing. */

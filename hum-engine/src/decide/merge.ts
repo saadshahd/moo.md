@@ -29,6 +29,17 @@ const STRICTEST_PROOF = "the owner's word that the change is proven";
 /** Who has approved a change: a fresh review run, and the owner. */
 export type Approvals = { readonly review: boolean; readonly owner: boolean };
 
+/** How an item reached done: its checks alone, a fresh review's approval on top of them, the owner's approval, or a plan run that split it into new items. */
+export const DONE_BY = ["checks", "review", "owner", "split"] as const;
+
+export type DoneBy = (typeof DONE_BY)[number];
+
+/** The approvals that clear a change, the owner's first; each is the way the change it clears reaches done. */
+const APPROVALS_OWNER_FIRST = ["owner", "review"] as const satisfies readonly (keyof Approvals & DoneBy)[];
+
+/** How a cleared change reaches done: by the first approval it holds, else by its checks alone. */
+export const clearedBy = (approvals: Approvals): DoneBy => APPROVALS_OWNER_FIRST.find((approval) => approvals[approval]) ?? "checks";
+
 /** What clears a clear change without the owner, by its level's review. The owner's approval clears any change. */
 const CLEARED_BY = {
 	none: () => true,

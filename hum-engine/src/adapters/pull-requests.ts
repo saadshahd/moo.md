@@ -18,11 +18,10 @@ export type Pull = {
 	readonly id: string;
 	readonly number: number;
 	readonly url: string;
-	readonly state: "OPEN" | "MERGED" | "CLOSED";
 	readonly autoMerge: boolean;
 	/** Its branch is behind the base, which a strict required check makes wait. */
 	readonly behind: boolean;
-};
+} & ({ readonly state: "OPEN" | "CLOSED" } | { readonly state: "MERGED"; /** The commit its merge made on the base. */ readonly mergeCommit: string });
 
 /** Pull requests on the repo a run's changes land in. */
 export type PullRequests = {
@@ -62,17 +61,22 @@ const PULL_REQUEST_RULE = "pull_request";
 
 const SIGNATURES_RULE = "required_signatures";
 
-const PullNode = z.object({
+const pullFields = {
 	id: z.string(),
 	number: z.int(),
 	url: z.string(),
-	state: z.enum(["OPEN", "MERGED", "CLOSED"]),
 	mergeStateStatus: z.string(),
 	autoMergeRequest: z.object({ enabledAt: z.string().nullable() }).nullable(),
-});
+};
+
+/** GitHub names the commit a merge made once the pull request merged, and none before. */
+const PullNode = z.discriminatedUnion("state", [
+	z.object({ ...pullFields, state: z.enum(["OPEN", "CLOSED"]) }),
+	z.object({ ...pullFields, state: z.literal("MERGED"), mergeCommit: z.object({ oid: z.string().min(1) }) }),
+]);
 
 const PULL_FIELDS =
-	"id number url state mergeStateStatus autoMergeRequest { enabledAt }";
+	"id number url state mergeStateStatus autoMergeRequest { enabledAt } mergeCommit { oid }";
 
 const BEHIND = "BEHIND";
 
@@ -125,9 +129,9 @@ const pullOf = (node: z.infer<typeof PullNode>): Pull => ({
 	id: node.id,
 	number: node.number,
 	url: node.url,
-	state: node.state,
 	autoMerge: node.autoMergeRequest !== null,
 	behind: node.mergeStateStatus === BEHIND,
+	...(node.state === "MERGED" ? { state: node.state, mergeCommit: node.mergeCommit.oid } : { state: node.state }),
 });
 
 /** The method the owner set when the branch's rules allow it, else the first they allow. */

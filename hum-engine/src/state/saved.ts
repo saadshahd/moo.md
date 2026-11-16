@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { AlignmentAnswer } from "../decide/alignment.ts";
 import { DISPOSITIONS, RESOLUTION_SOURCES } from "../decide/answer.ts";
-import { Cite, PlanFile } from "../decide/prose.ts";
+import { DONE_BY } from "../decide/merge.ts";
+import { Cite, PlanFile, SPLIT } from "../decide/prose.ts";
 import { Change } from "../decide/risk.ts";
 
 const name = z.string().min(1);
@@ -37,6 +38,10 @@ export const Landing = z.object({
 	patch: z.string().optional(),
 	/** The alignment call's grades, or why it abstained; made once per change. */
 	alignment: z.union([z.object({ graded: AlignmentAnswer }), z.object({ abstained: name })]).optional(),
+	/** The run branch's commits past the base, oldest first, hum's done mark among them: what a push puts on the base. Absent on a landing saved before hum kept them. */
+	commits: z.array(name).optional(),
+	/** How the change reaches done once it lands, set while landing found it cleared; absent while it waits for a person. */
+	doneBy: z.enum(DONE_BY).optional(),
 });
 
 export type Landing = z.infer<typeof Landing>;
@@ -58,8 +63,14 @@ export const ItemKind = z.discriminatedUnion("from", [
 
 export type ItemKind = z.infer<typeof ItemKind>;
 
-/** The plan a plan run made ready, saved with its hash so later runs read it unchanged. */
-export const SavedPlan = z.object({ item: name, plan: PlanFile, hash: name, models });
+/**
+ * The pick a plan run's item went on with: a plan made ready, saved with its hash so later runs read it unchanged, or
+ * the parts it split the item into. A plan saved before hum kept splits names no event, and was made ready.
+ */
+export const SavedPlan = z.union([
+	z.object({ item: name, event: z.literal("plan-ready").default("plan-ready"), plan: PlanFile, hash: name, models }),
+	z.object({ item: name, event: z.literal(SPLIT), parts: z.array(name), models }),
+]);
 
 export type SavedPlan = z.infer<typeof SavedPlan>;
 
