@@ -574,9 +574,9 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	expect(folded(w, id)).toMatchObject({ doneBy: "checks", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
 });
 
-test("a plan answer the log keeps is read back on the pass after a limit: the model is asked once and the item's total counts it once", async () => {
+test("a plan answer the log keeps is read back on a pass after a limit, adding nothing to the item's total, and asked again once nothing saved is left to go on from", async () => {
 	const limited = { rejectUntil: NOW / 1000 + 60, error: "You've hit your limit" };
-	const w = await world({ script: [{}, limited, limited], decisions: [READY_PLAN] });
+	const w = await world({ script: [{}, limited, limited, limited], decisions: [READY_PLAN, READY_PLAN] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "limited" });
@@ -587,6 +587,36 @@ test("a plan answer the log keeps is read back on the pass after a limit: the mo
 	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toMatchObject({ outcome: "limited" });
 	expect(w.shim.decisions().map(({ purpose }) => purpose)).toEqual(["plan"]);
 	expect(w.state.spent.get(id)?.total).toBe(spent);
+
+	w.state.items.remove(id);
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toMatchObject({ outcome: "limited" });
+	expect(w.shim.decisions().map(({ purpose }) => purpose)).toEqual(["plan", "plan"]);
+});
+
+test("the owner's answer at the token cap's wait starts the fix count over, and the pass that resumes the wait logs each event its machine takes", async () => {
+	const config = configWith((raw) => {
+		raw.hum.maxFixRuns = 2;
+		raw.kinds.feature.tokenCap.tokens = 500;
+	});
+
+	const fix = (tokens: number) => ({ write: { "docs/note.md": `${tokens}\n` }, modelTokens: tokens });
+	const w = await world({ script: [{}, { ...NOTE, modelTokens: 10 }, fix(10), fix(1000), fix(11), fix(12), fix(13)], decisions: [READY_PLAN] }, { config, checks: ["false"] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "asked", item: id });
+	expect(folded(w, id).fixRuns).toBe(2);
+
+	const asked = w.shim.calls().length;
+
+	await w.adapter.answers!.answer(id, { text: "Go on." });
+	w.clock.at += TTL + 1;
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toMatchObject({ outcome: "stuck", item: id, detail: "the checks still fail after 2 fixes" });
+	expect(w.shim.calls().length - asked).toBe(3);
+
+	const log = w.state.events.list(id);
+
+	expect(log.slice(log.findIndex(({ type }) => type === "answered")).flatMap((record) => (record.type === "machine-stepped" ? [record.payload.event.type] : []))).toContain("answered");
 });
 
 test("a medium change waits for a fresh review run at landing: a request for changes holds it for the owner, an approval merges it", async () => {

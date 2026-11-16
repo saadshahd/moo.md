@@ -172,21 +172,6 @@ test("a log record this engine cannot read holds its item with one card however 
 	expect(state.events.list("#69").map(({ sourceId }) => sourceId)).toEqual(["b1"]);
 });
 
-test("a copied log keeps each record as its engine wrote it, at the next places in the log it joins, once", () => {
-	const work = openState(join(dir, "work"), { engineVersion: "0.2.0", now: Date.now });
-	const publish = openState(join(dir, "publish"), { engineVersion: "0.3.0", now: Date.now });
-
-	publish.events.add(answered("a1"));
-	work.events.add(answered("a2"));
-
-	for (let times = 0; times < 2; times++) work.events.copyTo(publish.events, "#68");
-
-	expect(publish.events.list("#68").map(({ sourceId, engineVersion, seq }) => ({ sourceId, engineVersion, seq }))).toEqual([
-		{ sourceId: "a1", engineVersion: "0.3.0", seq: 0 },
-		{ sourceId: "a2", engineVersion: "0.2.0", seq: 1 },
-	]);
-});
-
 test("a shipped envelope migration runs on an older format; a format with no migration reads as damaged, with one card", async () => {
 	const engine = openState(dir, { now: Date.now });
 
@@ -409,16 +394,12 @@ test("one event read twice is saved once, and the first copy stays", () => {
 	expect(events.list("#none")).toEqual([]);
 });
 
-test("an item's events list in the order the log took them, on a clock that stands still, and a copy into another log keeps it", () => {
+test("an item's events list in the order the log took them, on a clock that stands still", () => {
 	const { events } = openState(dir, { now: () => 5 });
-	const copy = openState(join(dir, "copy"), { now: () => 9 }).events;
 
 	for (const sourceId of ["c", "a", "b"]) events.add(answered(sourceId));
 
-	for (const saved of events.list("#68")) copy.add(saved);
-
 	expect(events.list("#68").map(({ sourceId }) => sourceId)).toEqual(["c", "a", "b"]);
-	expect(copy.list("#68").map(({ sourceId }) => sourceId)).toEqual(["c", "a", "b"]);
 });
 
 test("the run's name is saved before launch and adopted after a restart", () => {

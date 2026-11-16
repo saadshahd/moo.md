@@ -2,8 +2,8 @@ import { beforeEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type AnyActor, createActor, createAsyncLogic, waitFor } from "xstate";
-import { kindMachine, openState, persistedSnapshot, type State } from "../src/index.ts";
+import { createActor, createAsyncLogic } from "xstate";
+import { kindMachine, openState, type State } from "../src/index.ts";
 import type { RunOutcome } from "../src/adapters/claude-p.ts";
 import { shippedConfig } from "../src/setup/shipped.ts";
 import { answerOnce, doneByOf, foldItem, keepLanding, keepPick, machineStarted, ownerAnswered, recordMachine } from "../src/state/item-log.ts";
@@ -20,99 +20,38 @@ beforeEach(() => {
 	dir = tempDir("item-log");
 });
 
-/** What each source of the feature machine does on its next call, in order; a source with nothing left stops the pass there, as a limit or a lost claim does. */
-type Script = { plan?: string[]; build?: string[]; checks?: string[]; fix?: string[]; review?: string[] };
+/** A source that never settles, so the machine moves only on the events the test sends. */
+const waits = createAsyncLogic({ run: () => new Promise<never>(() => {}) });
 
-/** Where a pass ends on its own: an owner wait, the merge, or stuck. */
-const RESTS: ReadonlySet<string> = new Set(["asking", "owner-review", "merging", "stuck"]);
-
-/**
- * One pass of the item in this process, as the thin path drives it: a pass that carries the owner's answer restores
- * the saved wait and sends it, any other starts the machine over. Its snapshot is saved where the pass ends.
- */
-const pass = async (state: State, script: Script, answer?: string): Promise<void> => {
-	let actor: AnyActor;
-	const stopped = Promise.withResolvers<void>();
-	const forever = new Promise<never>(() => {});
-	const next = (source: keyof Script): string | undefined => script[source]?.shift();
-
-	const picks = (source: "plan" | "review") =>
-		createAsyncLogic({
-			run: () => {
-				const event = next(source);
-
-				if (event === undefined) stopped.resolve();
-				else queueMicrotask(() => actor.send({ type: event }));
-
-				return forever;
-			},
-		});
-
-	const acts = (source: "build" | "checks" | "fix") =>
-		createAsyncLogic({
-			run: async () => {
-				const step = next(source);
-
-				if (step === undefined) return stopped.resolve(), forever;
-
-				if (step === "token-cap") return queueMicrotask(() => actor.send({ type: step })), forever;
-
-				if (step === "fail") throw new Error("the checks fail");
-
-				if (source === "fix") (await answerOnce(state, { key: state.runs.keyFor(ITEM, source), launch: { name: source }, machineVersion: VERSION }, async () => finished({ status: "done" }))).begun.end();
-			},
-		});
-
-	const sources = { plan: picks("plan"), build: acts("build"), checks: acts("checks"), fix: acts("fix"), review: picks("review") };
-	const inspect = recordMachine(state.events, { itemId: ITEM, machineVersion: VERSION });
-
-	if (answer === undefined) {
-		state.events.add(machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: false }));
-		actor = createActor(kindMachine(feature, sources), { inspect }).start();
-	} else {
-		const restored = await state.items.restore(ITEM, feature, { sources, inspect });
-
-		if (!restored.ok || !restored.value) throw new Error(`no saved wait to answer for ${ITEM}`);
-
-		actor = restored.value.start();
-		state.events.add(ownerAnswered(ITEM, Date.now()));
-		actor.send({ type: answer });
-	}
-
-	await Promise.race([waitFor(actor, (snapshot) => RESTS.has(String(snapshot.value))), stopped.promise]);
-	expect(state.items.save(ITEM, feature, persistedSnapshot(actor)).ok).toBe(true);
-	actor.stop();
-};
-
-const folded = (state: State) => foldItem(state.events.list(ITEM));
-
-/** Where the item's saved snapshot stands, and the fix runs its log counts. */
-const progress = (state: State) => ({ at: state.items.saved().find(({ itemId }) => itemId === ITEM)?.state, fixRuns: folded(state).fixRuns });
-
-test("the log keeps each event the item's machine takes, under its kind's machine version, and none of the actor's own start or stop", async () => {
+test("the log keeps each event the item's machine takes, under its kind's machine version, and none of the actor's own start or stop", () => {
 	const state = openState(dir, { now: Date.now });
+	const actor = createActor(kindMachine(feature, { plan: waits, build: waits, checks: waits, fix: waits, review: waits }), { inspect: recordMachine(state.events, { itemId: ITEM, machineVersion: VERSION }) }).start();
 
-	await pass(state, { plan: ["plan-ready"], build: ["token-cap"] });
+	for (const type of ["plan-ready", "token-cap"]) actor.send({ type });
+
+	actor.stop();
 
 	expect(state.events.list(ITEM).filter(({ type }) => type === "machine-stepped")).toEqual(
 		["plan-ready", "token-cap"].map((type) => expect.objectContaining({ machineVersion: VERSION, payload: { event: expect.objectContaining({ type }) } })),
 	);
 });
 
-test("fix runs count from the owner's last answer, over passes that start the machine over and a pass that resumes a wait", async () => {
+const folded = (state: State) => foldItem(state.events.list(ITEM));
+
+/** One fix run of the item that keeps its answer and ends its record, as a pass's fix run does. */
+const fixRun = async (state: State) => (await answerOnce(state, { key: state.runs.keyFor(ITEM, "fix"), launch: { name: "fix" }, machineVersion: VERSION }, async () => finished({ status: "done" }))).begun.end();
+
+test("fix runs count from the owner's last answer, over passes that start the machine over", async () => {
 	const state = openState(dir, { now: Date.now });
 
-	await pass(state, { plan: ["plan-ready"], build: ["done"], checks: ["fail", "fail"], fix: ["done"] });
-	expect(progress(state)).toEqual({ at: "fixing", fixRuns: 1 });
+	await fixRun(state);
+	state.events.add(machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: false }));
+	await fixRun(state);
+	expect(folded(state).fixRuns).toBe(2);
 
-	await pass(state, { plan: ["plan-ready"], build: ["done"], checks: ["fail", "fail"], fix: ["done"] });
-	expect(progress(state)).toEqual({ at: "fixing", fixRuns: 2 });
-
-	await pass(state, { plan: ["plan-ready"], build: ["done"], checks: ["fail"], fix: ["token-cap"] });
-	expect(progress(state)).toEqual({ at: "asking", fixRuns: 2 });
-
-	await pass(state, { build: ["done"], checks: ["fail", "fail"], fix: ["done"] }, "answered");
-	expect(progress(state)).toEqual({ at: "fixing", fixRuns: 1 });
+	state.events.add(ownerAnswered(ITEM, 1));
+	await fixRun(state);
+	expect(folded(state).fixRuns).toBe(1);
 });
 
 const merged = (state: State) => state.events.add({ source: "work-source", sourceId: "merged:0123456", itemId: ITEM, type: "merged", payload: {} });
