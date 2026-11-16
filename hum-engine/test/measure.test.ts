@@ -122,6 +122,16 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 	});
 });
 
+test("a merge whose log holds a record a newer engine wrote reads its way of reaching done as unknown, with that engine's card, and the measure goes on", () => {
+	const state = freshState();
+
+	state.merges.put("a", { item: "a", sha: "sha-a", at: 5, paths: [] });
+	openState(state.dir, { engineVersion: "99.0.0", now: Date.now }).events.add({ source: "work-source", sourceId: "merged:sha-a", itemId: "a", type: "merged", payload: {} });
+
+	expect(measureInputsOf(state).merged.map(({ doneBy }) => doneBy)).toEqual([undefined]);
+	expect(state.faults.list().map(({ code }) => code)).toEqual(["snapshot-from-newer-engine"]);
+});
+
 /** A pull request open, or merged as `merge-a` on the base, and a work source that writes each item it finishes into `finished`. */
 const pull = (state: "OPEN" | "MERGED", finished: string[]) => ({
 	pulls: { find: async (): Promise<Pull> => ({ id: "p", number: 1, url: "u", autoMerge: true, behind: false, ...(state === "MERGED" ? { state, mergeCommit: "merge-a" } : { state }) }) },
