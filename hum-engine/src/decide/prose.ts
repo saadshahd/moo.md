@@ -69,6 +69,9 @@ export type EventPick = z.infer<typeof EventPick>;
 
 export type JsonSchema = z.core.JSONSchema.BaseSchema;
 
+/** What a model is sent to judge: the prompt, and the schema its answer must match. */
+export type ModelAsk = { readonly prompt: string; readonly schema: JsonSchema };
+
 /** A schema as `claude --json-schema` reads it: draft-07, since its validator knows no later draft. */
 export const jsonSchemaOf = (schema: z.ZodType): JsonSchema => z.toJSONSchema(schema, { target: "draft-7" });
 
