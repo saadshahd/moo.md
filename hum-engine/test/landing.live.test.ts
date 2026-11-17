@@ -64,6 +64,7 @@ const landing = async (config: Config, pulls: PullRequests, stamp: string) => {
 		reviewRun: () => {
 			throw new Error("a low docs change needs no review run");
 		},
+		save: async () => undefined,
 	};
 
 	return { ctx, branch };

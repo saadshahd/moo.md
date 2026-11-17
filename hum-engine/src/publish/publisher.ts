@@ -13,6 +13,7 @@ import { commandTimeoutMs } from "../exec.ts";
 import type { State } from "../state/open.ts";
 import { evidenceRef } from "../worker/evidence.ts";
 import { land, type LandContext, prepareLanding, unpushed } from "../worker/land.ts";
+import { settleLanding } from "../worker/merged.ts";
 import { releaseQuestions, roomToday } from "../worker/questions.ts";
 import { pushRunBranch, signsCommits } from "../worker/signed-push.ts";
 import { claimTtlMs, runBranch, type ThinResult } from "../worker/thin-path.ts";
@@ -61,6 +62,8 @@ export type Publisher = {
 	readonly repo: string;
 	/** The time past which publish starts no merge: its GitHub token's hour less `ciMergeMarginMinutes`; unset on a Mac. */
 	readonly mergesBefore?: number;
+	/** Makes publish's state outlast a crash of this process: a CI wake uploads it, while a Mac's is on disk as it is written. A throw stops what was to follow. */
+	readonly save: () => Promise<void>;
 };
 
 const timeoutOf = (p: Pick<Publisher, "config">): number => commandTimeoutMs(p.config.hum);
@@ -132,7 +135,15 @@ const landContext = (p: Publisher, item: Item, { git, folder }: { readonly git: 
 	judge: p.judge,
 	reviewRun: p.reviewRun(item, p.kindOf(item)),
 	mergesBefore: p.mergesBefore,
+	save: p.save,
 });
+
+/** Ends the item whose saved landing already reached the base, as after a pass that died past its push: false where it has none or its change waits to land. */
+export const settleSavedLanding = async (p: Publisher, item: string): Promise<boolean> => {
+	const landing = p.state.landings.get(item);
+
+	return landing !== undefined && settleLanding(p.state, { pulls: p.pulls, workSource: p.workSource, git: await fetchedPublishRepo(p), remote: "origin", base: `origin/${p.base}` }, landing, p.now());
+};
 
 const NOTHING_BUNDLED: BundleCheck = { ok: true, refs: new Map() };
 

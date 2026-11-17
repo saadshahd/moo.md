@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Git } from "../adapters/git.ts";
+import { type Git, isCommit } from "../adapters/git.ts";
 import { runChecks } from "../worker/checks.ts";
 import type { ReviewNote } from "./records.ts";
 
@@ -27,8 +27,6 @@ type ProofCost = {
 };
 
 export type ProofResult = ProofCost & ({ readonly passed: true } | { readonly passed: false; readonly reason: string });
-
-const isCommit = async (git: Git, sha: string): Promise<boolean> => (await git.run(["cat-file", "-e", `${sha}^{commit}`])).code === 0;
 
 /** The files the check item adds or changes against the base. */
 const checkFiles = async (git: Git, base: string, head: string): Promise<string[]> =>

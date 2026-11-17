@@ -9,8 +9,8 @@ import type { Gathered, OutboxPass, ReadOutbox } from "./handover.ts";
 import { fetchedPublishRepo, type Publisher, publishPass, refusedPass } from "./publisher.ts";
 import { settleBaseCheck } from "../worker/base-check.ts";
 
-/** What publish works from in a CI wake: its own root, what gather settled, the work job's outbox and its state, and how it saves its own state. */
-export type PublishWake = { readonly publisher: Publisher; readonly gathered: Gathered; readonly outbox: ReadOutbox; readonly work: State; readonly save: () => Promise<void> };
+/** What publish works from in a CI wake: its own root, which saves its state, what gather settled, and the work job's outbox and its state. */
+export type PublishWake = { readonly publisher: Publisher; readonly gathered: Gathered; readonly outbox: ReadOutbox; readonly work: State };
 
 /**
  * Publishes one pass of a work job: the work job's own records for the item, a kind it moved the item to only where
@@ -57,7 +57,7 @@ export const publishWake = async (wake: PublishWake): Promise<ThinResult[]> => {
 
 		if (baseCheck !== undefined) {
 			await settleBaseCheck({ state: p.state, config: p.config, workSource: p.workSource, git: await fetchedPublishRepo(p), base: p.base, now: p.now }, baseCheck);
-			await wake.save();
+			await p.save();
 		}
 
 		for (const pass of wake.outbox.passes) {
@@ -66,13 +66,13 @@ export const publishWake = async (wake: PublishWake): Promise<ThinResult[]> => {
 			if (result.outcome === "merged") p.state.items.remove(pass.item);
 
 			results.push(result);
-			await wake.save();
+			await p.save();
 		}
 
 		await releaseQuestions({ state: p.state, config: p.config, workSource: p.workSource, questions: p.questions, now: p.now });
 
 		return results;
 	} finally {
-		await wake.save();
+		await p.save();
 	}
 };

@@ -9,7 +9,7 @@ import { measureInputsOf } from "../src/measure/inputs.ts";
 import { runLoopPass } from "../src/loop/pass.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
 import { openState } from "../src/state/open.ts";
-import { settleMergedPulls } from "../src/worker/merged.ts";
+import { settleLanding, settleMergedPulls } from "../src/worker/merged.ts";
 import type { DoneBy } from "../src/decide/merge.ts";
 import type { Merge } from "../src/loop/records.ts";
 import { keepLanding } from "../src/state/item-log.ts";
@@ -167,11 +167,14 @@ const pull = (state: "OPEN" | "MERGED", finished: string[]) => ({
 	remote: "origin",
 });
 
+/** A saved landing of item a, whose one commit the base does not hold. */
+const LANDING_A = { item: "a", branch: "hum/a", since: 1, change: { paths: ["ui/a.ts"], size: 3, loosened: false, pinChanged: false }, head: "sha-a", lostRaces: 0, commits: ["sha-a"] };
+
 test("a change merged through a pull request after the worker moved on ends its item and is recorded as merged at the commit its merge made, once, and its saved landing goes", async () => {
 	const state = freshState();
 	const finished: string[] = [];
 
-	state.landings.put("a", { item: "a", branch: "hum/a", since: 1, change: { paths: ["ui/a.ts"], size: 3, loosened: false, pinChanged: false }, head: "sha-a", commits: ["sha-a"] });
+	state.landings.put("a", LANDING_A);
 	await settleMergedPulls(state, pull("OPEN", finished), 9);
 	expect(state.merges.list()).toEqual([]);
 	expect(finished).toEqual([]);
@@ -183,6 +186,21 @@ test("a change merged through a pull request after the worker moved on ends its 
 	expect(state.merges.list()).toEqual([{ item: "a", sha: "merge-a", at: 9, paths: ["ui/a.ts"], baseChecked: false, commits: ["sha-a", "merge-a"] }]);
 	expect(state.landings.list()).toEqual([]);
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
+});
+
+test("a saved landing whose pull request GitHub merged settles at the commit the merge made; one whose pull request is open and whose commit the base lacks settles nothing", async () => {
+	const state = freshState();
+	const finished: string[] = [];
+	const base = gitIn(tempDir("base"), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+
+	await base.raw(["init", "-q", "-b", "main"]);
+	state.landings.put("a", LANDING_A);
+
+	expect(await settleLanding(state, { ...pull("OPEN", finished), git: base, base: "main" }, LANDING_A, 9)).toBe(false);
+	expect(state.merges.list()).toEqual([]);
+	expect(await settleLanding(state, { ...pull("MERGED", finished), base: "main" }, LANDING_A, 9)).toBe(true);
+	expect(finished).toEqual(["a"]);
+	expect(state.merges.list()).toEqual([{ item: "a", sha: "merge-a", at: 9, paths: ["ui/a.ts"], baseChecked: false, commits: ["sha-a", "merge-a"] }]);
 });
 
 test("a revert titled revert!: that names a change's commit marks that change reverted; one that names none marks nothing", () => {

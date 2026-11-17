@@ -1,6 +1,6 @@
 import { ItemId, type WorkSource } from "../adapter-api.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
-import type { Git } from "../adapters/git.ts";
+import { type Git, isAncestor, isCommit } from "../adapters/git.ts";
 import type { State } from "../state/open.ts";
 import type { Landing } from "../state/saved.ts";
 import { dropEvidence } from "./evidence.ts";
@@ -33,21 +33,58 @@ export const recordMerged = async (state: State, { git, remote }: EvidenceRemote
 	state.events.add({ source: "work-source", sourceId: `merged:${sha}`, itemId: item, type: "merged", payload: {} });
 };
 
+/** Where an item ends once its change reached the base: the work source that lists it, and the remote its evidence ref is taken off. */
+type Ending = { readonly workSource: Pick<WorkSource, "finish"> } & EvidenceRemote;
+
+/** A landed item ends at the work source, so it is never listed again, its merge is recorded, so the measure counts it, and its saved state goes. */
+const endLanded = async (state: State, { workSource, ...evidenceRemote }: Ending, { item, at, ...onBase }: OnBase & { readonly item: string; readonly at: number }): Promise<void> => {
+	await workSource.finish(ItemId.parse(item));
+	await recordMerged(state, evidenceRemote, { item, at, ...onBase });
+	state.items.remove(item);
+};
+
+/** Where GitHub merged the landing's pull request, or undefined while it has not. */
+const mergedPullOf = async (pulls: Pick<PullRequests, "find">, landing: Landing): Promise<OnBase | undefined> => {
+	const pull = await pulls.find(landing.branch);
+
+	return pull?.state === "MERGED" ? mergedThrough(landing, pull.mergeCommit) : undefined;
+};
+
+/** Where `base`, a ref of the base in `git`, holds the landing's last commit, as a push of its branch left it; undefined where it does not. */
+const pushedOf = async (git: Git, base: string, landing: Landing): Promise<OnBase | undefined> => {
+	const tip = landing.commits?.at(-1);
+
+	if (tip === undefined || !(await isCommit(git, tip))) return undefined;
+
+	return (await isAncestor(git, { ancestor: tip, descendant: base })) ? { sha: tip, commits: landing.commits } : undefined;
+};
+
 /**
  * A change that landed through a pull request is merged by GitHub after the worker has moved on. Each saved landing
- * whose pull request has merged ends its item at the work source, so it is never listed again, and is recorded as
- * merged, so the measure counts it.
+ * whose pull request has merged ends its item.
  */
-export const settleMergedPulls = async (state: State, { pulls, workSource, ...evidenceRemote }: { readonly pulls: Pick<PullRequests, "find">; readonly workSource: Pick<WorkSource, "finish"> } & EvidenceRemote, at: number): Promise<void> => {
+export const settleMergedPulls = async (state: State, { pulls, ...ending }: { readonly pulls: Pick<PullRequests, "find"> } & Ending, at: number): Promise<void> => {
 	await Promise.all(
 		state.landings.list().map(async (landing) => {
-			const pull = await pulls.find(landing.branch);
+			const merged = await mergedPullOf(pulls, landing);
 
-			if (pull?.state !== "MERGED") return;
-
-			await workSource.finish(ItemId.parse(landing.item));
-			await recordMerged(state, evidenceRemote, { item: landing.item, at, ...mergedThrough(landing, pull.mergeCommit) });
-			state.items.remove(landing.item);
+			if (merged) await endLanded(state, ending, { item: landing.item, at, ...merged });
 		}),
 	);
+};
+
+/**
+ * Ends the item of a saved landing whose change already reached the base, by its pull request or by a push of its
+ * branch, as one does whose pass died after the push and before the merge was recorded. It reads the remote and never
+ * pushes, and it runs before anything prepares the landing again, which would read the landed change as empty. False
+ * while the change waits to land.
+ */
+export const settleLanding = async (state: State, { pulls, base, ...ending }: { readonly pulls: Pick<PullRequests, "find"> | undefined; readonly base: string } & Ending, landing: Landing, at: number): Promise<boolean> => {
+	const landed = (pulls && (await mergedPullOf(pulls, landing))) ?? (await pushedOf(ending.git, base, landing));
+
+	if (landed === undefined) return false;
+
+	await endLanded(state, ending, { item: landing.item, at, ...landed });
+
+	return true;
 };

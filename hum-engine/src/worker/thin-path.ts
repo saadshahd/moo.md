@@ -37,7 +37,7 @@ import { decideProse } from "./prose-run.ts";
 import { type PrefixGate } from "./scheduler.ts";
 import { evidenceRef, keepEvidence } from "./evidence.ts";
 import { Outbox } from "../publish/intents.ts";
-import { type GatherTrust, type PassOutbox, type Publisher, publishPass } from "../publish/publisher.ts";
+import { type GatherTrust, type PassOutbox, type Publisher, publishPass, settleSavedLanding } from "../publish/publisher.ts";
 import { PUBLISH_DIR as PUBLISH_REPO } from "../state/open.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
 import { repoFromRemote } from "../adapters/github.ts";
@@ -229,6 +229,10 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (!log.ok) return { outcome: "held", item: id, why: log.fault.cause };
 
+	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum, (item, tokens) => tallyOf(o.state, item).spend(tokens));
+
+	if (await settleSavedLanding(publisherOf(o, judge), id)) return { outcome: "merged", item: id };
+
 	const at = saved.value === undefined ? undefined : String(saved.value.getSnapshot().value);
 
 	if (knownKind && hasEndedStuck(knownKind, at)) return park(o, { outcome: "stuck", item: id, detail: "the saved state ended stuck" });
@@ -237,7 +241,6 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (!claim.won) return { outcome: "lost", item: id };
 
-	const judge = o.judge ?? configuredModelCall(o.runner, o.config.hum, (item, tokens) => tallyOf(o.state, item).spend(tokens));
 	const { now } = o;
 	const onSnapshot = saved.value !== undefined;
 	const ownerWait = knownKind && isWaitingOnOwner(knownKind, at) ? ownerWaitStage(knownKind, at) : undefined;
@@ -883,6 +886,7 @@ export const publisherOf = (
 	dir: o.dir ?? o.config.hum.itemsDir,
 	repo: join(o.state.dir, PUBLISH_REPO),
 	mergesBefore,
+	save: async () => undefined,
 });
 
 /** Publishes a pass in the worker's own process, against what the pass's checkout saw before any run. */
