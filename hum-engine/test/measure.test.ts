@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { tmpdir } from "node:os";
-import { gitIn } from "../src/adapters/git.ts";
+import { type Git, gitIn } from "../src/adapters/git.ts";
 import type { Pull } from "../src/adapters/pull-requests.ts";
 import { BOUNDARIES, SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
@@ -197,6 +197,38 @@ test("a saved landing whose pull request GitHub merged settles at the commit the
 	expect(await settleLanding(state, { ...pull("MERGED", finished), base: "main" }, LANDING_A, 9)).toBe(true);
 	expect(finished).toEqual(["a"]);
 	expect(state.merges.list()).toEqual([{ item: "a", sha: "merge-a", at: 9, paths: ["ui/a.ts"], baseChecked: false, commits: ["sha-a", "merge-a"] }]);
+});
+
+/** A git that holds no commit: `cat-file` exits 1 and is noted in `asked`, and any other call throws. */
+const gitHoldingNothing = (asked: string[]): Git => {
+	const refused = async (args: readonly string[]): Promise<never> => {
+		throw new Error(`git ${args.join(" ")}: this git answers cat-file only`);
+	};
+
+	return {
+		run: async (args) => {
+			if (args[0] !== "cat-file") return refused(args);
+
+			asked.push(args[0]);
+
+			return { code: 1, stdout: "", stderr: "" };
+		},
+		raw: refused,
+		bytes: refused,
+	};
+};
+
+test("a saved landing whose pull request is open and whose commit git does not hold settles nothing, and git is asked whether it holds the commit and nothing more", async () => {
+	const state = freshState();
+	const finished: string[] = [];
+	const asked: string[] = [];
+
+	state.landings.put("a", LANDING_A);
+
+	expect(await settleLanding(state, { ...pull("OPEN", finished), git: gitHoldingNothing(asked), base: "main" }, LANDING_A, 9)).toBe(false);
+	expect(asked).toEqual(["cat-file"]);
+	expect(finished).toEqual([]);
+	expect(state.merges.list()).toEqual([]);
 });
 
 test("a revert titled revert!: that names a change's commit marks that change reverted; one that names none marks nothing", () => {
