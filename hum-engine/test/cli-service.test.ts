@@ -1,8 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { CI_STATE_REF } from "../src/service/ci-state.ts";
+import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
+import { CI_STATE_REF, restoreCiState } from "../src/service/ci-state.ts";
 import { CI_TICK_REF } from "../src/service/ci-tick.ts";
+import { doneByOf, foldItem } from "../src/state/item-log.ts";
+import { openState } from "../src/state/open.ts";
 import { readStatus } from "../src/status/file.ts";
 import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
 import { sh } from "./fixtures/work-repo.ts";
@@ -22,41 +25,65 @@ afterEach(() => {
 	for (const o of owners.splice(0)) rmSync(o.repo.root, { recursive: true, force: true });
 });
 
-const hum = (o: ReturnType<typeof ownerRepo>, args: string[], env: Record<string, string> = {}) => {
-	const run = Bun.spawnSync(["bun", MAIN, ...args], { cwd: o.repo.owner, env: { ...o.env, ...env } });
+/** The `hum` binary run in the owner's checkout with `args`, as `Bun.spawn` takes it. */
+const humCommand = (o: ReturnType<typeof ownerRepo>, args: string[], env: Record<string, string> = {}) => ({ cmd: ["bun", MAIN, ...args], cwd: o.repo.owner, env: { ...o.env, ...env } });
+
+const ran = (command: ReturnType<typeof humCommand>) => {
+	const run = Bun.spawnSync(command);
 
 	return { code: run.exitCode, out: run.stdout.toString(), err: run.stderr.toString() };
 };
 
+const hum = (o: ReturnType<typeof ownerRepo>, args: string[], env: Record<string, string> = {}) => ran(humCommand(o, args, env));
+
 const stateDir = (o: ReturnType<typeof ownerRepo>) => join(o.repo.owner, ".git", "hum");
 
 /**
- * The three jobs of a CI wake in the owner's checkout, each on a fresh runner's state folder, as the workflow runs them:
- * gather, then work after the checkout fetched what gather left on the remote, then publish with gather's output.
- * Returns the first job that failed, else publish.
+ * The three jobs of one CI wake in the owner's checkout, each on a fresh runner's state folder, as the workflow runs
+ * them: gather, then work after the checkout fetched what gather left on the remote, then publish with gather's output,
+ * whose command is given to run.
  */
-const wake = (o: ReturnType<typeof ownerRepo>, args: string[] = [], env: Record<string, string> = {}) => {
+const wakeJobs = (o: ReturnType<typeof ownerRepo>, env: Record<string, string> = {}) => {
 	const folder = tempDir("wake");
 	const [inbox, outbox, output] = [join(folder, "inbox"), join(folder, "outbox"), join(folder, "output")];
 
 	writeFileSync(output, "");
 
-	const gather = hum(o, ["wake", "gather", "--inbox", inbox], { ...env, GITHUB_OUTPUT: output });
+	return {
+		gather: () => hum(o, ["wake", "gather", "--inbox", inbox], { ...env, GITHUB_OUTPUT: output }),
+		work: () => {
+			rmSync(stateDir(o), { recursive: true, force: true });
+			sh(o.repo.owner, ["fetch", "-q", "origin"]);
+
+			return hum(o, ["wake", "work", "--inbox", inbox, "--outbox", outbox], env);
+		},
+		publish: (args: string[] = []) => {
+			rmSync(stateDir(o), { recursive: true, force: true });
+
+			return humCommand(o, ["wake", "publish", "--outbox", outbox, ...args], { ...env, HUM_GATHERED: readFileSync(output, "utf8").split("\n")[1] ?? "" });
+		},
+	};
+};
+
+/** One CI wake: the first of its jobs that failed, else publish. */
+const wake = (o: ReturnType<typeof ownerRepo>, args: string[] = [], env: Record<string, string> = {}) => {
+	const jobs = wakeJobs(o, env);
+	const gather = jobs.gather();
 
 	if (gather.code !== 0) return gather;
 
-	rmSync(stateDir(o), { recursive: true, force: true });
-	sh(o.repo.owner, ["fetch", "-q", "origin"]);
+	const work = jobs.work();
 
-	const work = hum(o, ["wake", "work", "--inbox", inbox, "--outbox", outbox], env);
+	return work.code === 0 ? ran(jobs.publish(args)) : work;
+};
 
-	if (work.code !== 0) return work;
+/** hum's state as the last job saved it on the remote. */
+const savedState = async (o: ReturnType<typeof ownerRepo>) => {
+	const dir = tempDir("saved-state");
 
-	rmSync(stateDir(o), { recursive: true, force: true });
+	await restoreCiState({ repo: o.repo.owner, remote: o.repo.remote, dir, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
-	const gathered = readFileSync(output, "utf8").split("\n")[1] ?? "";
-
-	return hum(o, ["wake", "publish", "--outbox", outbox, ...args], { ...env, HUM_GATHERED: gathered });
+	return openState(dir, { now: Date.now });
 };
 
 test("a wake on a schedule event: the item merges, the tick and hum's state are recorded on the remote, and each job exits 0", () => {
@@ -84,6 +111,45 @@ test("a wake on a comment event records no tick, and the next wake starts from t
 	rmSync(stateDir(o), { recursive: true, force: true });
 	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
 	expect(sh(o.repo.remote, ["rev-parse", CI_STATE_REF]).trim()).not.toBe(saved);
+});
+
+test("a publish job killed once its push moved main has saved the landing first; the next wake's gather records the merge with its commits, paths and way of reaching done and runs no check, its work job checks main, and nothing is pushed again", async () => {
+	const o = owner({ items: { a: { writeForItem: true } } });
+
+	o.item("a");
+
+	const base = sh(o.repo.remote, ["rev-parse", "main"]).trim();
+	const onMain = () => sh(o.repo.remote, ["rev-list", "--reverse", `${base}..main`]).split("\n").filter(Boolean);
+	const pidFile = join(tempDir("kill"), "pid");
+	const first = wakeJobs(o);
+
+	expect(first.gather().code).toBe(0);
+	expect(first.work().code).toBe(0);
+
+	o.repo.killsOnPush(pidFile);
+	const publish = Bun.spawn({ ...first.publish(), stdout: "ignore", stderr: "ignore" });
+
+	writeFileSync(pidFile, String(publish.pid));
+	await publish.exited;
+
+	const pushed = onMain();
+
+	expect(publish.signalCode).toBe("SIGKILL");
+	expect(pushed).toHaveLength(2);
+	expect((await savedState(o)).landings.get("a")).toMatchObject({ commits: pushed });
+
+	const next = wakeJobs(o);
+
+	expect(next.gather().code).toBe(0);
+
+	const gathered = await savedState(o);
+
+	expect(gathered.merges.get("a")).toMatchObject({ sha: pushed.at(-1), commits: pushed, paths: ["docs/a.md"], baseChecked: false });
+	expect(doneByOf(foldItem(gathered.events.list("a")))).toBe("checks");
+	expect(next.work().code).toBe(0);
+	expect(ran(next.publish()).code).toBe(0);
+	expect((await savedState(o)).merges.get("a")).toMatchObject({ baseChecked: true });
+	expect(onMain()).toEqual(pushed);
 });
 
 test("a wake with a rejected token exits 1, annotates the job and writes its summary", () => {

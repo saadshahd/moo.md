@@ -533,7 +533,7 @@ export class Worker {
 				mergedAt: this.#now(),
 			});
 
-		if (result.outcome === "merged") void this.#pool.add(() => this.#checkBase(id));
+		if (result.outcome === "merged" && this.#o.ciJob === undefined) void this.#pool.add(() => this.#checkBase(id));
 
 		if (result.outcome === "held" && this.#o.state.landings.get(id) !== undefined) this.#relanding.add(id);
 
@@ -541,7 +541,7 @@ export class Worker {
 		this.wake();
 	}
 
-	/** After a merge, the repo's checks run on the base; a failure there files a follow-up and joins the fix limit. */
+	/** After a merge, the repo's checks run on the base; a failure there files a follow-up and joins the fix limit. In a CI wake the work job runs them, the one job that holds no token. */
 	async #checkBase(item: string): Promise<void> {
 		const { state, config, adapters, repo, remote, base = DEFAULT_BASE, checks } = this.#o;
 

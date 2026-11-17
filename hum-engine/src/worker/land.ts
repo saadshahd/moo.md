@@ -106,6 +106,8 @@ export type LandContext = {
 	readonly reviewRun: (change: { readonly head: string; readonly diff: string; readonly level: string }) => Promise<ReviewOutcome>;
 	/** The time past which no merge starts, as when the GitHub token's hour runs short; the landing stays saved for the next wake. */
 	readonly mergesBefore?: number;
+	/** Makes the state outlast a crash of this process; called before each act on the remote that lands the change, so the next pass finds the landing and settles it. */
+	readonly save: () => Promise<void>;
 };
 
 /** What a review run at landing came to: its verdict, or the result that stopped it, such as a usage limit. */
@@ -491,6 +493,8 @@ const landBy = async (
 		return { outcome: "review", item: ctx.id, detail: why };
 
 	if (ctx.mergesBefore !== undefined && ctx.now() >= ctx.mergesBefore) return { outcome: "held", item: ctx.id, why: "too little of the GitHub token's hour is left to merge; the next wake lands it" };
+
+	await ctx.save();
 
 	if (landing.via === "pull-request" && ctx.pulls)
 		return throughPullRequest(ctx, { pulls: ctx.pulls, autoMerge: landing.autoMerge, route, rules, why });

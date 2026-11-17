@@ -3,6 +3,9 @@ import { chmodSync, closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openS
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { ItemId } from "../../src/adapter-api.ts";
+import { guarded, guardTimings } from "../../src/adapters/guard.ts";
+import { markdownAdapter } from "../../src/adapters/markdown.ts";
+import type { Faults } from "../../src/state/faults.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { OWNER } from "./identity.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
@@ -19,6 +22,9 @@ export const markdownSettings = {
 	ownerBranchPrefix: SHIPPED_DEFAULTS.ownerBranchPrefix,
 	timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS,
 };
+
+/** A markdown work source on `clone`, guarded as a worker that just started holds it: it has read nothing yet. */
+export const markdownOn = (clone: string, faults: Faults) => guarded(markdownAdapter({ ...markdownSettings, repo: clone }, { report: () => {}, now: Date.now, env: process.env }), { provider: "markdown", faults, ...guardTimings(SHIPPED_DEFAULTS) });
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 
@@ -134,6 +140,15 @@ export class WorkRepo {
 		chmodSync(hook, 0o755);
 
 		return () => (existsSync(refused) ? readFileSync(refused, "utf8").split("\n").filter(Boolean).length : 0);
+	}
+
+	/** The remote kills the process whose id `pidFile` holds once a push moved main, then forgets it, so only that process dies. */
+	killsOnPush(pidFile: string): void {
+		const hook = join(this.remote, "hooks", "post-receive");
+
+		mkdirSync(join(this.remote, "hooks"), { recursive: true });
+		writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n\tif [ "$ref" = refs/heads/main ] && [ -f ${pidFile} ]; then kill -KILL "$(cat ${pidFile})"; rm -f ${pidFile}; fi\ndone\n`);
+		chmodSync(hook, 0o755);
 	}
 
 	/** The item file as the remote holds it on main. */

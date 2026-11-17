@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { cpSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { docsJudge } from "../fixtures/judge.ts";
@@ -7,7 +8,7 @@ import { type PassOutbox, publishPass } from "../../src/publish/publisher.ts";
 import { readOutbox, writeBaseCheck, writeOutboxState, writePass } from "../../src/publish/handover.ts";
 import { publisherOf, runThinPath } from "../../src/worker/thin-path.ts";
 
-import { sh } from "../fixtures/work-repo.ts";
+import { markdownOn, sh } from "../fixtures/work-repo.ts";
 import { tempDir } from "../fixtures/temp.ts";
 import { type WorkerWorld, workerWorld } from "../fixtures/worker-world.ts";
 import { ItemId } from "../../src/adapter-api.ts";
@@ -17,6 +18,7 @@ import { openState, PUBLISH_DIR } from "../../src/state/open.ts";
 import { evidenceRef } from "../../src/worker/evidence.ts";
 import { runBranch } from "../../src/worker/thin-path.ts";
 import { publishWake } from "../../src/publish/wake.ts";
+import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import type { Intent } from "../../src/publish/intents.ts";
 
 const NOTE = { "docs/note.md": "hello\n" };
@@ -160,11 +162,10 @@ test("publish refuses a work job's move to the kind the item has, keeps the kind
 	const refs = snapshotOf(w).refs;
 
 	const results = await publishWake({
-		publisher: { ...publisher, workSource: { ...publisher.workSource, read: async (item) => (item === other ? Promise.reject(new Error("the work source broke")) : publisher.workSource.read(item)) } },
+		publisher: { ...publisher, workSource: { ...publisher.workSource, read: async (item) => (item === other ? Promise.reject(new Error("the work source broke")) : publisher.workSource.read(item)) }, save: async () => void saves++ },
 		gathered: { holder: w.thinPath().holder, base: "main", baseSha, heads: {}, claimed: [id, other] },
 		outbox: { passes: [{ item: id, result: { outcome: "moved", item: id, kind: "docs" }, intents: [...outbox.intents], bundle: undefined }, { item: other, result: { outcome: "held", item: other, why: "publish lands the change" }, intents: [], bundle: undefined }], baseCheck: undefined, stateDir: tempDir("work-state"), bundleOf: () => outbox.bundle },
 		work: openState(tempDir("work-state"), { now }),
-		save: async () => void saves++,
 	});
 
 	expect(results).toMatchObject([
@@ -174,4 +175,29 @@ test("publish refuses a work job's move to the kind the item has, keeps the kind
 	expect(w.state.itemKinds.get(id)).toEqual(kind);
 	expect(snapshotOf(w).refs).toBe(refs);
 	expect(saves).toBe(3);
+});
+
+const KILL_LANDING = join(import.meta.dir, "../fixtures/kill-landing.ts");
+
+test("a Mac's publish killed once its push moved the base leaves the landing saved, and the next pass records the merge with its commits, paths and way of reaching done, and pushes nothing", async () => {
+	const { w, id, baseSha, outbox } = await workedPass();
+	const pidFile = join(tempDir("kill"), "pid");
+	const world = join(tempDir("kill-world"), "world.json");
+	const onMain = () => sh(w.repo.remote, ["rev-list", "--reverse", `${baseSha}..main`]).split("\n").filter(Boolean);
+
+	w.repo.killsOnPush(pidFile);
+	writeFileSync(world, JSON.stringify({ dir: w.state.dir, remote: w.repo.remote, clone: w.clone, pidFile, trust: { baseSha, heads: {} }, outbox }));
+
+	expect(spawnSync("bun", [KILL_LANDING, world]).signal).toBe("SIGKILL");
+
+	const pushed = onMain();
+	const state = openState(w.state.dir, { now: Date.now });
+	const { workSource, questions } = markdownOn(w.clone, state.faults);
+
+	expect(pushed).toHaveLength(2);
+	expect(state.landings.get(id)).toMatchObject({ commits: pushed });
+	expect(await runThinPath(w.thinPath({ state, workSource: workSource!, questions: questions!, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(state.merges.get(id)).toMatchObject({ sha: pushed.at(-1), commits: pushed, paths: Object.keys(NOTE) });
+	expect(doneByOf(foldItem(state.events.list(id)))).toBe("checks");
+	expect(onMain()).toEqual(pushed);
 });
