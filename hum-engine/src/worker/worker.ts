@@ -28,6 +28,9 @@ import { runLoopPass, type LoopPass } from "../loop/pass.ts";
 import { modelProposer, doesTrustRepeats } from "../loop/pair.ts";
 import { measureOf } from "../measure/measure.ts";
 import { measureInputsOf } from "../measure/inputs.ts";
+import { keepMergedCases } from "../measure/cases.ts";
+import { type StaleScore, staleScores } from "../measure/judges.ts";
+import type { Measured, Measurement } from "../measure/remeasure.ts";
 import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
 import type { Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
@@ -93,6 +96,8 @@ export type WorkerOptions = {
 	readonly loop?: Partial<Pick<LoopPass, "comments" | "ciLogs">>;
 	/** The CI job this worker is, where a wake splits into jobs; unset, a tick does all a wake does. */
 	readonly ciJob?: CiJob;
+	/** Measures a model again on the owner's judges, writing its new scores in `.hum/hum.json`; absent where that file is thrown away, as in CI. */
+	readonly remeasure?: (measurement: Measurement, signal: AbortSignal) => Promise<Measured>;
 };
 
 /**
@@ -124,6 +129,15 @@ type InFlight = {
 const ERROR_EXCERPT = 300;
 
 const UNREAD_CODE = "item-unread";
+
+/** The card for scores that gate on a judge that changed since they were measured. */
+const JUDGE_CODE = "judge-changed";
+
+const staleText = (stale: readonly StaleScore[]): string => stale.map(({ boundary, model, score }) => `${boundary} on ${model} at ${score.rate.toFixed(2)}`).join(", ");
+
+/** The stale scores, one measurement per model, of the boundaries whose judge changed for it. */
+const byModel = (stale: readonly StaleScore[]): { readonly model: string; readonly boundaries: StaleScore["boundary"][] }[] =>
+	[...new Set(stale.map(({ model }) => model))].map((model) => ({ model, boundaries: stale.flatMap((found) => (found.model === model ? [found.boundary] : [])) }));
 
 const linesText = (lines: readonly number[]): string => `${lines.length === 1 ? "line" : "lines"} ${lines.join(", ")}`;
 
@@ -196,6 +210,11 @@ export class Worker {
 	#watchToken: string | undefined;
 	/** Set while the worker has seen an update; no change lands until a worker on the new config takes it. */
 	#updating: string | undefined;
+	/** The scores that gate on a judge that changed since they were measured: the config is the worker's for its life. */
+	readonly #stale: readonly StaleScore[];
+	/** Stops the measurement of changed judges while one runs. */
+	#remeasuring: AbortController | undefined;
+	#remeasureAt = Number.NEGATIVE_INFINITY;
 
 	get config(): Config {
 		return this.#o.config;
@@ -210,6 +229,7 @@ export class Worker {
 		this.#latest = readEvery(options.latestVersion, { everyMs: options.config.hum.latestVersionCacheSeconds * SECOND_MS, timeoutMs });
 		this.#ciTick = readEvery(options.ciTick, { everyMs: options.config.hum.ciTickCacheSeconds * SECOND_MS, timeoutMs });
 		this.#start = signatureOf({ repo: options.repo, fallbackVersion: options.engineVersion ?? ENGINE_VERSION, itemsDir: options.config.hum.itemsDir });
+		this.#stale = staleScores(options.config);
 		this.#judge = options.judge ?? configuredModelCall(options.runner, options.config.hum, (item, tokens) => tallyOf(options.state, item).spend(tokens));
 		rememberKinds(options.state, options.config);
 		this.#recheckLandings();
@@ -577,6 +597,8 @@ export class Worker {
 
 		if (pulls) await settleMergedPulls(state, { pulls, workSource: adapters.workSource, git, remote }, this.#now());
 
+		const changes = await readHistory(git, tip, config.hum);
+
 		await runLoopPass({
 			state,
 			config,
@@ -584,11 +606,63 @@ export class Worker {
 			now: this.#now,
 			comments: loop?.comments ?? (async () => []),
 			ciLogs: loop?.ciLogs ?? (async () => []),
-			history: () => readHistory(git, tip, config.hum),
+			history: async () => changes,
 			hunkOf: async (sha, file) => (await git.run(["show", ...PATCH, "-U3", "--format=", sha, ...(file === undefined ? [] : ["--", file])])).stdout,
 			propose: modelProposer(call),
 			trusts: (models) => doesTrustRepeats(models, config.hum),
 			memoryPath: join(repo, ".hum", "memory.md"),
+		});
+
+		await keepMergedCases(state, changes, config.hum, {
+			itemText: (item) => adapters.workSource.read(ItemId.parse(item)).then(({ title, body }) => ({ title, body }), () => undefined),
+			diff: (from, to) => git.raw(["diff", ...PATCH, from, to]),
+		});
+	}
+
+	/** Raises the judge card with this cause, in place of one that names another. */
+	#showJudgeCard(cause: string, fix: string): void {
+		const { faults } = this.#o.state;
+
+		if (faults.list().some((card) => card.code === JUDGE_CODE && card.cause !== cause)) faults.clear({ code: JUDGE_CODE });
+
+		faults.raise({ code: JUDGE_CODE, cause, fix });
+	}
+
+	/**
+	 * A score whose judge changed since it was measured keeps gating. Where hum can keep a measurement, it measures
+	 * those judges again, once a loop interval and outside a usage limit; the new scores in `.hum/hum.json` restart the
+	 * worker, which gates on them, so a judge whose new rate misses the bar abstains from then on. Where it cannot, or
+	 * the measurement fails, a card names the old scores.
+	 */
+	#judgesIfDue(t: number): void {
+		const { state, config, runner, remeasure } = this.#o;
+		const stale = this.#stale;
+
+		if (stale.length === 0) return state.faults.clear({ code: JUDGE_CODE });
+
+		const gating = `${staleText(stale)} gate on rates measured before the judge's prompt or role text last changed.`;
+
+		if (remeasure === undefined) return this.#showJudgeCard(gating, "Run `bunx hum setup measure` where Claude Code is signed in and commit .hum/hum.json; CI cannot keep a rate it measures.");
+
+		if (this.#remeasuring !== undefined || t - this.#remeasureAt < config.hum.loopIntervalSeconds * SECOND_MS || runner.limitedUntil() > t) return;
+
+		const abort = new AbortController();
+		const failed = (why: string) => this.#showJudgeCard(`${gating} Measuring them again failed: ${why}`, "hum tries again after loopIntervalSeconds; `bunx hum setup measure` measures them now.");
+
+		this.#remeasureAt = t;
+		this.#remeasuring = abort;
+		void this.#pool.add(async () => {
+			try {
+				for (const measurement of byModel(stale)) {
+					const measured = await remeasure({ ...measurement, runs: config.hum.evalRuns }, abort.signal);
+
+					if (!measured.ok && !abort.signal.aborted) failed(`${measurement.model}: ${measured.why}`);
+				}
+			} catch (error) {
+				failed(error instanceof Error ? error.message : String(error));
+			} finally {
+				this.#remeasuring = undefined;
+			}
 		});
 	}
 
@@ -607,6 +681,8 @@ export class Worker {
 
 	async #stopRuns(): Promise<void> {
 		for (const run of this.#inFlight.values()) run.abort.abort();
+
+		this.#remeasuring?.abort();
 
 		await this.idle();
 	}
@@ -760,7 +836,7 @@ export class Worker {
 		if (update !== undefined) {
 			await this.#publish(t, signature, update);
 
-			return this.#inFlight.size === 0 ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
+			return this.#inFlight.size === 0 && this.#remeasuring === undefined ? { kind: "exit", reason: update } : { kind: "draining", reason: update };
 		}
 
 		const sources = await this.#readSources();
@@ -771,6 +847,7 @@ export class Worker {
 			});
 
 			this.#loopIfDue(t);
+			this.#judgesIfDue(t);
 		}
 
 		const ready = await this.#readReady(sources, sleeping);

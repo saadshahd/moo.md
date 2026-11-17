@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Question } from "../adapters/model-call.ts";
 import type { ModelCall } from "../adapters/model-call.ts";
 import type { HumConfig } from "../config/schema.ts";
-import { DATA_RULE, fenced } from "../decide/prose.ts";
+import { DATA_RULE, doesMeetBar, fenced } from "../decide/prose.ts";
 import { LOOP_SPEND_PREFIX } from "../measure/inputs.ts";
 import type { Proposer } from "./groups.ts";
 import { noteKey, type ReviewNote } from "./records.ts";
@@ -36,4 +36,4 @@ export const modelProposer =
 
 /** Whether every model id behind a proposal reached the owner's precision bar on labelled pairs. */
 export const doesTrustRepeats = (models: readonly string[], { measuredModels, repeatPrecision }: Pick<HumConfig, "measuredModels" | "repeatPrecision">): boolean =>
-	models.length > 0 && models.every((model) => (measuredModels["repeat-pair"]?.[model] ?? 0) >= repeatPrecision);
+	doesMeetBar(models, "repeat-pair", measuredModels, repeatPrecision);

@@ -21,10 +21,21 @@ export const climb = <T extends object>(value: T, from: number, to: number, step
 /** Per earlier schema version: rewrites a config at that version into the next version's shape. */
 export type Migrations = Steps<ConfigJson>;
 
+const RatesAt2 = z.record(z.string(), z.record(z.string(), z.number()));
+
+/** A version-2 `measuredModels`, each rate as a score with no judge hash; anything else is left for the schema to refuse. */
+const scoresOf = (measured: Json): Json => {
+	const rates = RatesAt2.safeParse(measured);
+
+	return rates.success ? Object.fromEntries(Object.entries(rates.data).map(([boundary, byModel]) => [boundary, Object.fromEntries(Object.entries(byModel).map(([model, rate]) => [model, { rate }]))])) : measured;
+};
+
 /** One entry per earlier schema version. Setup climbs the owner's answers, a part of a config, through the same steps, so a step rewrites only the keys it finds. */
 export const MIGRATIONS = {
 	/** 2 holds the pull request token as one of its sources: the secret 1 named becomes `{ from: "secret", secret }`. */
 	1: ({ pullRequestTokenSecret, ...config }) => (pullRequestTokenSecret === undefined ? config : { ...config, pullRequestToken: { from: "secret", secret: pullRequestTokenSecret } }),
+	/** 3 keeps each measured rate as `{ rate, judgeHash }`; a rate 2 kept has no hash, so its judge counts as changed. */
+	2: ({ measuredModels, ...config }) => (measuredModels === undefined ? config : { ...config, measuredModels: scoresOf(measuredModels) }),
 } satisfies Migrations;
 
 const Raw = z.record(z.string(), Json);

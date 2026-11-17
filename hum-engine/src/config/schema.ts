@@ -4,10 +4,10 @@ import { z } from "zod";
 import shippedConfig from "../../defaults/hum.json" with { type: "json" };
 
 /** The `hum.json` schema version this engine writes. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** The schema versions this engine reads, each migrated up to `SCHEMA_VERSION` by `migrateConfig`. */
-export const READABLE_SCHEMA_VERSIONS: readonly number[] = [1, 2];
+export const READABLE_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3];
 
 /** Parts the engine ships; the owner adds roles, never these. */
 export const FIXED_PARTS = [
@@ -126,6 +126,17 @@ const backoff = z
 	.refine(({ firstSeconds, maxSeconds }) => firstSeconds <= maxSeconds, "the first pause is at most the longest pause");
 
 const fraction = z.number().gt(0).lt(1);
+
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/** A model's measured rate at one boundary, and the hash of what the judge read when it was measured. */
+const Score = z.strictObject({
+	rate: z.number().min(0).max(1),
+	/** Absent on a rate measured before hum kept the hash: what the judge read then is unknown. */
+	judgeHash: z.string().regex(SHA256_HEX, "a judge hash is a SHA-256 in hex").optional(),
+});
+
+export type Score = z.infer<typeof Score>;
 
 /** A name GitHub stores a secret under: a workflow reads it as `secrets.<name>`, and GitHub keeps the `GITHUB_` prefix for its own. */
 const secretName = z
@@ -256,9 +267,12 @@ const Shipped = z.object({
 	decisionModel: name.describe("The model id of the cheap model call, made through claude -p."),
 	modelCallTimeoutSeconds: seconds.describe("How long a cheap model call may take before it counts as an abstention."),
 	measuredModels: z
-		.record(z.enum(BOUNDARIES), z.record(name, z.number().min(0).max(1)))
-		.describe("Per model-judgment boundary, the rate each model id scored on its labelled set; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention."),
+		.record(z.enum(BOUNDARIES), z.record(name, Score))
+		.describe(
+			"Per model-judgment boundary, each model id's rate on its labelled set, and the judgeHash of the prompt, role text and answer form its judge read then; a pick from an id below 'minJudgeRate', or not measured, counts as an abstention. A rate whose judge has changed since keeps gating until a new measurement replaces it: the Mac worker measures it again.",
+		),
 	minJudgeRate: z.number().min(0).max(1).describe("The lowest measured rate at which hum trusts a model's pick at a boundary; below it the call abstains."),
+	evalRuns: count.describe("Runs pooled per boundary each time hum measures a model: in `hum setup measure`, and when a judge's prompt or role text changed since its rate was measured."),
 	questionLimits: z
 		.strictObject({ cells: count, wordCells: count })
 		.describe("The most terminal cells a question holds, and the most any one word of it holds; a longer question is replaced by a short one and its text rides folded."),
@@ -297,7 +311,7 @@ const Shipped = z.object({
 	memoryMaxBytes: count.describe("The most bytes memory.md holds; a new entry past it is refused."),
 	memoryUnusedRuns: count.describe("Runs without use after which a memory.md entry is listed for the owner."),
 	measureWindow: count.describe("Merged changes the per-merge numbers average over, and the window per path."),
-	loopIntervalSeconds: seconds.describe("The time between passes that collect review notes, file check items and confirm CI ran their checks."),
+	loopIntervalSeconds: seconds.describe("The time between passes that collect review notes, file check items and confirm CI ran their checks, and between tries to measure again a judge whose prompt or role text changed."),
 	proofTimeoutSeconds: seconds.describe("How long the repo's checks may run, on a run's branch, on the base after a merge or as a new check on one note's commit, before they are stopped and fail."),
 	kindFloors: z.record(name, name).describe("A kind's lowest risk level: its changes take at least this level, as in { \"check\": \"high\" }."),
 	checkKind: name.describe("The kind of the work item filed for a rule that review notes repeat: it turns the notes into one check."),
@@ -513,6 +527,7 @@ export const OWNER_CHANGEABLE = {
 	"model call timeout": "modelCallTimeoutSeconds",
 	"measured models": "measuredModels",
 	"judge rate bar": "minJudgeRate",
+	"eval runs": "evalRuns",
 	"merge-risk weights": "mergeRisk",
 	"question limits": "questionLimits",
 	"question timeout": "questionTimeoutHours",

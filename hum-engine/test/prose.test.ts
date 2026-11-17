@@ -85,8 +85,8 @@ test("a cheap model call that times out, or answers from a model id not measured
 test("a model id is trusted at a boundary only when its measured rate meets minJudgeRate; a lower or missing rate abstains", async () => {
 	const bar = configWith((raw) => {
 		raw.hum.minJudgeRate = 0.8;
-		raw.hum.measuredModels.alignment = { "claude-haiku-5-5": 0.8, "claude-sonnet-5-5": 0.79 };
-		raw.hum.measuredModels.kind = { "claude-haiku-5-5": 0.58 };
+		raw.hum.measuredModels.alignment = { "claude-haiku-5-5": { rate: 0.8 }, "claude-sonnet-5-5": { rate: 0.79 } };
+		raw.hum.measuredModels.kind = { "claude-haiku-5-5": { rate: 0.58 } };
 	}).hum;
 
 	const asked = (models: string[]) => configuredModelCall(runnerOf(async () => finished({ structured: SOUND, models })), bar)({ boundary: "alignment", prompt: "grade", answer: AlignmentAnswer });

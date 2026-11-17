@@ -40,9 +40,9 @@ Where runs include CI, tell the owner what a wake's three jobs hold. `gather` an
 
 ## Write
 
-1. Write the answers as JSON: `{ "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 2 }`.
+1. Write the answers as JSON: `{ "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 3 }`.
 2. Run `bunx hum setup write --answers <file>`. A refusal writes nothing: relay its message, which names the fix.
-3. Run `bunx hum setup measure` to record each model's pass rate, so a check that cannot yet be trusted reports instead of gating.
+3. Run `bunx hum setup measure` to record each model's pass rate, so a check that cannot yet be trusted reports instead of gating. Tell the owner: once a role file or a judge's prompt changes, the Mac worker measures that judge again, spending live calls, and writes the new rate into `.hum/hum.json`. The old rate gates until then, and in CI until they commit the file.
 4. Run `bunx hum setup prove`. Add `--item` only after the owner agrees to the live calls it spends.
 
 End by stating what is now written, which proofs passed, and which were skipped and why.

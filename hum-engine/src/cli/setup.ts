@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 import type { Command } from "commander";
-import { x } from "tinyexec";
 import { z } from "zod";
 import type { Item } from "../adapter-api.ts";
 import { gitIn, readGitIdentity } from "../adapters/git.ts";
-import { HumConfig } from "../config/schema.ts";
+import { HumConfig, SCHEMA_VERSION } from "../config/schema.ts";
+import { runModels } from "../measure/judges.ts";
+import { measureOn } from "../measure/remeasure.ts";
 import { CommandTimedOut, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { readSettings } from "../config/settings.ts";
 import { kindCoverage, proposeSetup } from "../setup/propose.ts";
@@ -27,8 +27,6 @@ const GH_LIST_LIMIT = "200";
 const GhIssues = z.array(z.object({ body: z.string().default(""), labels: z.array(z.object({ name: z.string() })).default([]) }));
 
 const GhLabels = z.array(z.object({ name: z.string() }));
-
-const EVAL_SCRIPT = join(import.meta.dir, "..", "..", "scripts", "eval.ts");
 
 /** What the scan reads from GitHub. Each fact is read alone, and one whose read fails is unknown while the rest stand. */
 type GithubFacts = {
@@ -80,14 +78,9 @@ const githubFacts = async (repo: string): Promise<GithubFacts> => ({
 
 const printStep = ({ name, status, detail, ms }: Step): string => `${status.padEnd(7)} ${name} (${ms} ms): ${detail}`;
 
-const ModelSettings = z.looseObject({ models: HumConfig.shape.models, decisionModel: HumConfig.shape.decisionModel });
+const MeasureSettings = z.looseObject({ models: HumConfig.shape.models, decisionModel: HumConfig.shape.decisionModel, evalRuns: HumConfig.shape.evalRuns });
 
-/** The distinct model ids the owner's tiers and cheap call run on. */
-const modelsOf = (repo: string): string[] => {
-	const { models, decisionModel } = readSettings(repo, ModelSettings);
-
-	return [...new Set([...Object.values(models), decisionModel])];
-};
+const Runs = z.coerce.number().int().positive();
 
 /** `hum setup scan | write | prove | measure`: the facts and writes behind the /hum skill. */
 export const addSetupCommands = (root: Command, io: Io, done: (code: number) => void): void => {
@@ -113,7 +106,7 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 	setup
 		.command("write")
 		.description("Write .hum/ and the service files from the answers file, or write nothing and say why.")
-		.requiredOption("--answers <file>", 'JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": 2 }')
+		.requiredOption("--answers <file>", `JSON: { "hum": {settings}, "waitHours": { "kind/state": hours }, "schemaVersion": ${SCHEMA_VERSION} }`)
 		.option("--home <folder>", "where the service unit goes; default the user's home")
 		.action(async ({ answers, home }: { answers: string; home?: string }) => {
 			const result = writeSetup(io.cwd, readAnswers(answers), { installedSkills: await installedSkills(), home, gitIdentity: await readGitIdentity(setupGit(io.cwd)), isPublicRepo: await isPublicRepo(io.cwd) });
@@ -137,13 +130,15 @@ export const addSetupCommands = (root: Command, io: Io, done: (code: number) => 
 	setup
 		.command("measure")
 		.description("Measure the owner's models on every labelled set and record the pooled rates in .hum/hum.json.")
-		.option("--runs <n>", "runs pooled per boundary", "3")
+		.option("--runs <n>", "runs pooled per boundary; default evalRuns in hum.json")
 		.option("--model <id...>", "model ids to measure; default every model the tiers and the cheap call use")
-		.action(async ({ runs, model }: { runs: string; model?: string[] }) => {
-			for (const id of model ?? modelsOf(io.cwd)) {
-				const ran = await x(process.execPath, [EVAL_SCRIPT, "--model", id, "--runs", runs, "--write", join(io.cwd, ".hum")], { throwOnError: false, nodeOptions: { cwd: io.cwd, stdio: "inherit" } });
+		.action(async ({ runs, model }: { runs?: string; model?: string[] }) => {
+			const settings = readSettings(io.cwd, MeasureSettings);
 
-				if (ran.exitCode !== 0) return done(EXIT_FAILED);
+			for (const id of model ?? runModels(settings)) {
+				const measured = await measureOn(io.cwd, { model: id, runs: runs === undefined ? settings.evalRuns : Runs.parse(runs) }, { inherit: true });
+
+				if (!measured.ok) return done(EXIT_FAILED);
 			}
 
 			done(EXIT_OK);
