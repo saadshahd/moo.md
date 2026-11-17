@@ -1,5 +1,4 @@
 import { Document, visit } from "yaml";
-import { CLAUDE_FLOOR } from "../adapters/claude-p.ts";
 import type { HumConfig, PullRequestToken } from "../config/schema.ts";
 import { APP_TOKEN_ACTION, APP_TOKEN_MINUTES, CLAUDE_TOKEN, readsSecrets, secretsNamed, TRUSTED_ASSOCIATIONS, WAKE_ENV as ENV, WORKFLOW_FILES } from "../config/wake-job.ts";
 import { ENGINE_VERSION } from "../state/format.ts";
@@ -18,6 +17,9 @@ const WAKE_PATH = `./.github/workflows/${WORKFLOW_FILES.wake}`;
 
 /** The Bun that builds the workflows is the one the owner's repo runs, so CI installs with the same lockfile reader. */
 const BUN_VERSION = Bun.version;
+
+/** The Claude Code every job installs. `hum plugins` adds each marketplace the repo declares at a commit SHA, which Claude Code clones from 2.1.325 on, as its release notes say. */
+const CLAUDE_VERSION = "2.1.325";
 
 /**
  * Each action the workflows run, at the one commit its release is. A tag can move to code that then holds the App's
@@ -197,7 +199,7 @@ const PUBLISHED_HUM = `@moo.md/hum@${ENGINE_VERSION}`;
 /** The tools every job installs at exact versions, each with the one install script that fetches its native binary. */
 const TOOLS = [
 	{ spec: `bun@${BUN_VERSION}`, folder: "bun", script: "install.js" },
-	{ spec: `@anthropic-ai/claude-code@${CLAUDE_FLOOR}`, folder: "@anthropic-ai/claude-code", script: "install.cjs" },
+	{ spec: `@anthropic-ai/claude-code@${CLAUDE_VERSION}`, folder: "@anthropic-ai/claude-code", script: "install.cjs" },
 ] as const;
 
 /**

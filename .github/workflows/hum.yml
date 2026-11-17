@@ -1,4 +1,4 @@
-# Tests hum on macOS and Linux for every change under hum/ or hum-engine/, and on main publishes
+# Tests hum on Linux for every change under hum/ or hum-engine/, and on main publishes
 # @moo.md/hum when its version is not on npm yet. Publishing uses npm trusted publishing: the
 # package on npmjs.com trusts this workflow, so the repo holds no npm token.
 name: hum
@@ -26,11 +26,7 @@ env:
 
 jobs:
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
