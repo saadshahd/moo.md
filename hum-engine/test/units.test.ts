@@ -3,8 +3,10 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "plist";
+import semver from "semver";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { CLAUDE_FLOOR } from "../src/adapters/claude-p.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { renderUnit, type UnitVars } from "../src/service/unit.ts";
 import { ciWorkflows, type WorkflowSettings } from "../src/service/workflows.ts";
@@ -338,6 +340,18 @@ test("the checkout keeps no token in the workspace; the jobs that hold GitHub's 
 
 	expect(at(work.steps, work.steps.find(({ run }) => run === "./node_modules/.bin/hum plugins"))).toBeGreaterThan(at(work.steps, work.steps.find(({ run }) => run === "bun install --frozen-lockfile")));
 	expect(wakeText(settings)).not.toContain("claude plugin");
+});
+
+/** The release whose notes say Claude Code clones a marketplace pinned to a commit SHA; 2.1.316 runs `git clone --branch <sha>`, which git refuses. */
+const SHA_REF_CLAUDE = "2.1.325";
+
+test("every job installs a Claude Code that adds a marketplace pinned to a commit SHA, as hum plugins adds each one, and that the runner's floor admits", () => {
+	for (const { steps } of Object.values(wakeOf(settings).jobs)) {
+		const [, version = ""] = /@anthropic-ai\/claude-code@(\S+)/.exec(steps.find(({ run }) => run?.startsWith("npm install"))?.run ?? "") ?? [];
+
+		expect(semver.gte(version, SHA_REF_CLAUDE)).toBe(true);
+		expect(semver.gte(version, CLAUDE_FLOOR)).toBe(true);
+	}
 });
 
 test("the publish job reads the outbox artifact's size from GitHub's artifacts API, and stops before it downloads one over the outbox cap", async () => {
