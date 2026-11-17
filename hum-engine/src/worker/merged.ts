@@ -1,6 +1,6 @@
 import { ItemId, type WorkSource } from "../adapter-api.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
-import { type Git, isAncestor } from "../adapters/git.ts";
+import { type Git, isAncestor, isCommit } from "../adapters/git.ts";
 import type { State } from "../state/open.ts";
 import type { Landing } from "../state/saved.ts";
 import { dropEvidence } from "./evidence.ts";
@@ -54,7 +54,7 @@ const mergedPullOf = async (pulls: Pick<PullRequests, "find">, landing: Landing)
 const pushedOf = async (git: Git, base: string, landing: Landing): Promise<OnBase | undefined> => {
 	const tip = landing.commits?.at(-1);
 
-	if (tip === undefined || (await git.run(["cat-file", "-e", `${tip}^{commit}`])).code !== 0) return undefined;
+	if (tip === undefined || !(await isCommit(git, tip))) return undefined;
 
 	return (await isAncestor(git, { ancestor: tip, descendant: base })) ? { sha: tip, commits: landing.commits } : undefined;
 };
