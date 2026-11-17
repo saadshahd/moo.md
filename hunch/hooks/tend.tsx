@@ -105,6 +105,10 @@ export function coverItems(list: string): string[] {
     .filter(Boolean);
 }
 
+/** What a rewrite keeps in the reply's own words, beyond the cover list: the facts the user acts on. */
+export const MUST_KEEP =
+  "every step the user takes and when to take it, every detail of an option or proposal the user decides on, every figure, who does each action, the cause or reason behind each verdict, finding or fix, what the agent agreed to do from now on, and each offer or question waiting on the user";
+
 /** The ask for one pass: the shortest rewrite of `text` that still covers `items` and keeps each of `asWritten`. */
 function shortAsk(text: string, items: string[], asWritten: string[]): string {
   const keep = asWritten.length
@@ -112,6 +116,7 @@ function shortAsk(text: string, items: string[], asWritten: string[]): string {
     : "";
   return `Rewrite the reply below, which an agent sent to a user, as the shortest reply that still covers each item listed under it.
 Derive the rewrite from those items, not by deleting sentences: say each item once, in the fewest words that carry it, and drop every word that carries none. Keep its first-line and last-line order, every row and column of its tables, its code and every item of its lists.${keep}
+Keep, in the reply's own words, ${MUST_KEEP}.
 Cut commit hashes, ids and dates unless the user must act on one.
 Never pack several facts into one line: give each fact the user would act on its own sentence or row, and keep it rather than cut it.
 The rewrite comes out shorter than the reply, or, when nothing can go, is the reply as it is. Hand back the rewrite alone.
@@ -673,10 +678,14 @@ export const SHORT_CAP = 16_000;
  * redraws meets its bar (skills/short-replies/HYPOTHESIS.md); below the bar it only reports. */
 const LABEL_GATES = false;
 
-/** One Haiku call; one that gets no answer fails the redraw. */
-async function haiku($: any, prompt: string) {
+/** The models the redraw was measured on; a change of either is a new measurement. */
+const COVER_MODEL = "sonnet";
+const REWRITE_MODEL = "haiku";
+
+/** One model call; one that gets no answer fails the redraw. */
+async function complete($: any, model: string, prompt: string) {
   const r = await $.model.complete({
-    model: "haiku",
+    model,
     prompt,
     maxTokens: SHORT_CAP,
     timeoutMs: 60_000,
@@ -703,7 +712,9 @@ export async function missingItems(
 
 /** What a reply must still say once short, as a list of items. */
 export async function cover($: any, reply: string): Promise<string[]> {
-  const items = coverItems((await haiku($, coverAsk(reply))).text);
+  const items = coverItems(
+    (await complete($, COVER_MODEL, coverAsk(reply))).text,
+  );
   if (!items.length)
     throw new Error(
       "the short reply's cover list came back empty, so the reply stays long",
@@ -722,8 +733,9 @@ export async function redraw(
   const asWritten = [...names, ...wordForWord(reply)];
   const kept: Pass[] = [];
   for (;;) {
-    const r = await haiku(
+    const r = await complete(
       $,
+      REWRITE_MODEL,
       shortAsk(kept.at(-1)?.text ?? reply, items, asWritten),
     );
     const latest: Pass = {

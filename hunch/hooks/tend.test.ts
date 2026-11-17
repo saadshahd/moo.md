@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "claude-code/testing";
 import { hit, layout, move, navRows, wrap, type Item } from "./band.tsx";
-import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, loadedCommand, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, answeredContext, withOpen, coverItems, lostTokens, MAX_PASSES, nextStep, wordForWord, type Pass } from "./tend.tsx";
+import { CARD_FORMAT, prose, textKey, wantsShort, SHORT_CAP, IDEAS_FORMAT, ideaSegments, bandModel, cardRows, chipLabel, factParts, bareFact, cleanCard, commandFor, loadedCommand, slashName, latestCard, proseQuestions, replayCard, stripCards, swapAnswer, turnQuestions, answeredContext, withOpen, coverItems, MUST_KEEP, lostTokens, MAX_PASSES, nextStep, wordForWord, type Pass } from "./tend.tsx";
 
 const block = (json: string) => `reply\n\`\`\`card\n${json}\n\`\`\`\n`;
 const said = (text: string) => ({ role: "assistant", text, toolUses: [] });
@@ -858,7 +858,9 @@ describe("a redraw whose second pass drops a number", () => {
     on("ui.invalidate", () => ({ value: undefined }));
     const toasts: string[] = [];
     on("ui.toast", (_: any, e: any) => (toasts.push(e.text), { value: undefined }));
+    const asked: { model: string; prompt: string }[] = [];
     on("model.complete", (_: any, e: any) => {
+      asked.push({ model: e.model, prompt: e.prompt });
       const text = e.prompt.startsWith("List") ? COVER : e.prompt.includes(LONG) ? KEEPS_NUMBER : DROPS_NUMBER;
       return { value: { isAnswered: true, text, usage: {} } } as any;
     });
@@ -875,10 +877,20 @@ describe("a redraw whose second pass drops a number", () => {
       await (await $.ui.mount({ plugin: "hunch", surface: "terminal", component: "AssistantMessage", props: { text: LONG } as any })).drawn();
       return { shown, toasts, store };
     };
-    return { redrawn };
+    return { redrawn, asked };
   };
   test("shows the first pass, the last that kept every number", async ($, on) => {
     expect((await setup($, on).redrawn()).shown).toBe(KEEPS_NUMBER);
+  });
+  test("Sonnet lists what the reply must cover, and Haiku writes each pass", async ($, on) => {
+    const { redrawn, asked } = setup($, on);
+    await redrawn();
+    expect(asked.map((a) => a.model)).toEqual(["sonnet", "haiku", "haiku"]);
+  });
+  test("each pass is told to keep, in the reply's own words, what the user acts on", async ($, on) => {
+    const { redrawn, asked } = setup($, on);
+    await redrawn();
+    expect(asked.slice(1).map((a) => a.prompt.includes(MUST_KEEP))).toEqual([true, true]);
   });
   test("a label below its bar keeps what it calls missing beside the short form, and shows nothing", async ($, on) => {
     const { toasts, store } = await setup($, on).redrawn();
