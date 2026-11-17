@@ -1,4 +1,4 @@
-With tend on, a reply with more prose than two 80-column lines is redrawn short once its turn ends. Haiku lists what the reply must keep (each decision it asks, result, option with why it won or lost, and next action), then rewrites the reply from that list, one fact per sentence or row, and cuts it again, up to 3 passes. A pass shows only if it keeps every number, `code` span and link of the reply, and every expert it names; commit hashes, ids and dates never count, so a short form may always cut them, while the long reply keeps them for Claude and `/long` shows them. The last pass that kept all shows, and when the first did not, the reply stays long. `/long` shows replies at full length again; a prompt that says "explain" or "walk me through" keeps its reply long.
+With tend on, a reply with more prose than two 80-column lines is redrawn short once its turn ends. Sonnet lists what the reply must cover (each decision it asks, result, option with why it won or lost, and next action), then Haiku rewrites the reply from that list, one fact per sentence or row, and cuts it again, up to 3 passes. Each rewrite is told to keep, in the reply's own words, every step the user takes and when, an option's details, every figure, who acts, the reason behind each verdict, what the agent agreed to do from now on, and each offer or question waiting on the user. A pass shows only if it keeps every number, `code` span and link of the reply, and every expert it names; commit hashes, ids and dates never count, so a short form may always cut them, while the long reply keeps them for Claude and `/long` shows them. The last pass that kept all shows, and when the first did not, the reply stays long. `/long` shows replies at full length again; a prompt that says "explain" or "walk me through" keeps its reply long.
 
 Graduate when it stays on for 10 real sessions, the user runs `/long` in at most two of them, and never calls a short reply a wall of text. Kill if the user turns it off, runs `/long` to recover a fact the short reply cut, or a later turn leans on text only the long reply held.
 
@@ -60,3 +60,23 @@ Re-measure with `bun hunch/skills/short-replies/eval.ts <cases.jsonl> --out <fol
 - 7 of the 8 that stayed long for a lost token lost one to three numbers; one lost a file path in `code`.
 - The old single rewrite cut a median 13% of these replies' prose, in one Haiku call. The new one cuts 35% and takes about 17 seconds, so the short form replaces the long one later.
 - Not measured yet: whether the new short forms drop what the user needs. No reader has read them; the label's flags, kept beside each live short form, are where a later count starts.
+
+### 2026-11-17 — a must-keep list and a Sonnet cover list, measured on 100 fresh replies
+
+Main's redraw (0.21.0) cut a median 38% of the prose but dropped something the user would act on in about 1 reply in 4. This version makes two changes and nothing else: each rewrite is told to keep, in the reply's own words, the facts the user acts on, and Sonnet writes the cover list in place of Haiku. It still runs 3 passes with the code check; the label still only records.
+
+| set | version | dropped a point | 95% range | prose cut, median |
+|---|---|---|---|---|
+| tuning: 98 replies, 2026-10-01 to 2026-11-16 | keep-list | 4/98 | 0.02–0.10 | 26.3% |
+| fresh: 100 later replies no earlier round used | keep-list | 8/100 | 0.04–0.15 | 24.5% |
+| fresh | main (0.21.0) | 20/100 | 0.13–0.29 | 32.8% |
+| tuning: the 56 replies it showed | 0.20.0 one rewrite | 1/56 | 0.00–0.09 | 4% |
+
+- Ranges are Wilson 95% intervals on the share of replies that dropped a point. Prose cut is the median over every reply in the set, and a reply left long counts as 0%.
+- Two Opus readers labelled every short form blind, in one random order with no mark of version or pass. The measuring agent settled their splits.
+- The keep-list version was picked from 12 or more on the tuning set, so its 4/98 looks better than it is. The fresh set's 8/100 is the number to trust.
+- The bar was at most 5 drops with a prose cut of at least 25%. The fresh set missed both (8; 24.5%). The user chose this version anyway as the best trade: Sonnet writing every pass dropped 0 of 98 but cut 16%, and the 0.20.0 single rewrite dropped 1 of 56 but cut 4%.
+- It took about 17 seconds in the median, as main does.
+- What it dropped on the fresh set: something still in progress shown as live, a dissenting recommendation, an assembly step, credit wording for a public release, message text the user would paste (reworded), a reversal of the user's own earlier cut, a design rule handed to another agent, and why a deletion is safe.
+- Not measured: a live session, and whether the 8 drops matter to the user.
+- The cases hold the user's words from private repos, so they stay on the Mac that measured them, under `~/.local/share/moo/evals/redraw/heldout/`.
