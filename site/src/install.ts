@@ -33,6 +33,9 @@ export const pluginUpdate = (plugin: string) =>
   `claude plugin update ${plugin}@${MARKETPLACE_NAME}`;
 
 export const OUTPUT_STYLE_SETTING = `"outputStyle": "${OUTPUT_STYLE}"`;
+/** Auto-update for the marketplace, set inside the entry that holds its source.
+ * Claude Code leaves it off for every marketplace Anthropic does not run. */
+export const AUTO_UPDATE_SETTING = `"extraKnownMarketplaces": { "${MARKETPLACE_NAME}": { "autoUpdate": true } }`;
 export const OUTPUT_STYLE_COMMAND = `/output-style ${OUTPUT_STYLE}`;
 
 /** One plugin's skills as files in the shared .agents folder, which Claude

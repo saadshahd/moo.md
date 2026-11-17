@@ -5,9 +5,12 @@
 # from, waits until the origin serves this checkout's public/install.sh, so a
 # push is checked after its own deploy, runs the line twice in an empty home
 # that holds Claude Code and one other agent, and passes only when the plugins
-# are enabled, the output style is set, every plugin skill has its file copy
-# for other agents, and Claude's own skills folder stays absent. The second run
-# is the "run it again to update" the page promises.
+# are enabled, auto-update is on for the marketplace, the output style is set,
+# every plugin skill has its file copy for other agents, and Claude's own
+# skills folder stays absent. The second run is the "run it again to update"
+# the page promises. It starts without the marketplace's settings entry, which
+# plugin install does not write back, so the entry rebuilt from
+# known_marketplaces.json is checked.
 #
 # Usage: check-install.sh [origin]
 # An origin, such as http://localhost:4321, replaces the page's origin so the
@@ -34,6 +37,12 @@ page_line() {
 
 in_room() {
   env -i HOME="$room" PATH="$PATH" "$@"
+}
+
+drop_marketplace_entry() {
+  settings="$room/.claude/settings.json"
+  jq --arg name "$MARKETPLACE_NAME" 'del(.extraKnownMarketplaces[$name])' "$settings" >"$settings.tmp"
+  mv "$settings.tmp" "$settings"
 }
 
 installed_plugins() {
@@ -76,6 +85,7 @@ mkdir -p "$room/$OTHER_AGENT_HOME"
 for run in first again; do
   printf 'install check, %s run: %s\n' "$run" "$line"
   in_room sh -c "$line" || fail "the $run run exited with an error"
+  [ "$run" = again ] || drop_marketplace_entry
 done
 
 plugins=$(installed_plugins)
@@ -93,6 +103,9 @@ done
 jq -e --arg style "$OUTPUT_STYLE" '.outputStyle == $style' "$room/.claude/settings.json" >/dev/null ||
   fail "outputStyle is not $OUTPUT_STYLE"
 
+jq -e --arg name "$MARKETPLACE_NAME" '.extraKnownMarketplaces[$name] | .autoUpdate == true and .source != null' "$room/.claude/settings.json" >/dev/null ||
+  fail "auto-update is not on for $MARKETPLACE_NAME, or its settings entry has no source"
+
 [ ! -e "$room/.claude/skills" ] || fail "skill files landed in Claude's folder: $room/.claude/skills"
 
-printf 'install check passed: %s enabled, style %s, skill files in .agents only\n' "$PLUGINS" "$OUTPUT_STYLE"
+printf 'install check passed: %s enabled, auto-update on, style %s, skill files in .agents only\n' "$PLUGINS" "$OUTPUT_STYLE"

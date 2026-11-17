@@ -1,10 +1,10 @@
 #!/bin/sh
 # moo.md installer, served at https://saadshahd.github.io/moo.md/install.sh.
 #
-# Claude Code found: installs the plugins from the marketplace and sets the
-# output style. Another agent found: copies the same plugins' skill files to
-# the shared .agents folder, which Claude Code does not read, so no skill lands
-# twice. Run it again to update both.
+# Claude Code found: installs the plugins from the marketplace, turns on its
+# auto-update and sets the output style. Another agent found: copies the same
+# plugins' skill files to the shared .agents folder, which Claude Code does not
+# read, so no skill lands twice. Run it again to update both.
 #
 # Everything runs inside main, called on the last line, so a download cut short
 # runs nothing. Each command reads /dev/null: under `curl | sh` stdin is this
@@ -59,23 +59,40 @@ install_plugins() {
   done
 }
 
-settings_with_output_style() {
+# Claude Code leaves auto-update off for every marketplace Anthropic does not
+# run. A missing marketplace entry takes its source from known_marketplaces.json,
+# $2, so no entry is written without one.
+settings_with_style_and_auto_update() {
   if has_command jq; then
-    jq --arg style "$OUTPUT_STYLE" '.outputStyle = $style' "$1"
+    jq --arg style "$OUTPUT_STYLE" --arg name "$MARKETPLACE_NAME" --slurpfile known "$2" '
+      .outputStyle = $style
+      | .extraKnownMarketplaces[$name] = (.extraKnownMarketplaces[$name] // {source: $known[0][$name].source})
+      | if .extraKnownMarketplaces[$name].source == null then error("no source for \($name)") else . end
+      | .extraKnownMarketplaces[$name].autoUpdate = true
+    ' "$1"
   elif has_command node; then
     node -e '
-      const [file, outputStyle] = process.argv.slice(1);
-      const settings = JSON.parse(require("fs").readFileSync(file, "utf8"));
-      console.log(JSON.stringify({ ...settings, outputStyle }, null, 2));
-    ' "$1" "$OUTPUT_STYLE"
+      const fs = require("fs");
+      const [file, knownFile, outputStyle, name] = process.argv.slice(1);
+      const read = (path) => JSON.parse(fs.readFileSync(path, "utf8"));
+      const settings = read(file);
+      const known = read(knownFile);
+      const marketplaces = settings.extraKnownMarketplaces ?? {};
+      const entry = marketplaces[name] ?? { source: known[name]?.source };
+      if (entry.source == null) throw new Error("no source for " + name);
+      const extraKnownMarketplaces = { ...marketplaces, [name]: { ...entry, autoUpdate: true } };
+      console.log(JSON.stringify({ ...settings, outputStyle, extraKnownMarketplaces }, null, 2));
+    ' "$1" "$2" "$OUTPUT_STYLE" "$MARKETPLACE_NAME"
   else
-    die "no jq or node to edit $1. Add this key to it: \"outputStyle\": \"$OUTPUT_STYLE\""
+    die "no jq or node to edit $1. Set \"outputStyle\": \"$OUTPUT_STYLE\" in it, and \"autoUpdate\": true in the \"$MARKETPLACE_NAME\" entry of extraKnownMarketplaces"
   fi
 }
 
-set_output_style() {
-  settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
-  updated=$(settings_with_output_style "$settings") || die "could not set outputStyle in $settings"
+set_style_and_auto_update() {
+  config="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+  settings="$config/settings.json"
+  updated=$(settings_with_style_and_auto_update "$settings" "$config/plugins/known_marketplaces.json") ||
+    die "could not set outputStyle and auto-update in $settings"
   printf '%s\n' "$updated" >"$settings"
 }
 
@@ -93,8 +110,8 @@ main() {
   fi
   if has_claude_code; then
     install_plugins
-    set_output_style
-    say "Claude Code: $PLUGINS installed, output style $OUTPUT_STYLE. In an open session, run /reload-plugins."
+    set_style_and_auto_update
+    say "Claude Code: $PLUGINS installed, auto-update on, output style $OUTPUT_STYLE. In an open session, run /reload-plugins."
   fi
   if has_other_agent; then
     install_skill_files

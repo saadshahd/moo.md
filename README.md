@@ -33,7 +33,7 @@ claude plugin update hold@moo.md
 claude plugin update hunch@moo.md
 ```
 
-Then it sets `"outputStyle": "hold:Plain"` in `~/.claude/settings.json` and keeps every other key.
+Then it edits `~/.claude/settings.json` and keeps every other key. It sets `"outputStyle": "hold:Plain"`, and `"autoUpdate": true` in the `moo.md` entry of `extraKnownMarketplaces`, since Claude Code leaves auto-update off for marketplaces Anthropic does not run.
 
 `hope` is the decision loop, and the reason to be here. `hold` is comprehension at your own pace, and its `hold:Plain` output style keeps replies short. `hunch` is experiments that graduate or die. One more layer ships from the same marketplace: `sound@moo.md`, code taste as installable rules, and the current best tool for a need.
 
