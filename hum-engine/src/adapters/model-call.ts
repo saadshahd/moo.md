@@ -1,7 +1,7 @@
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import type { Boundary, HumConfig } from "../config/schema.ts";
-import { isTrusted, jsonSchemaOf } from "../decide/prose.ts";
+import { isTrusted, jsonSchemaOf, type ModelAsk } from "../decide/prose.ts";
 import { SECOND_MS } from "../time.ts";
 import { type RunOutcome, type Runner, hasSucceeded } from "./claude-p.ts";
 
@@ -38,16 +38,20 @@ export type ModelCallOptions = {
 	readonly onSpent?: (item: string, tokens: number) => void;
 };
 
+/** What a model is sent for a question: its prompt, and the schema its answer must match. */
+export const askOf = ({ prompt, answer }: Pick<Question<unknown>, "prompt" | "answer">): ModelAsk => ({ prompt, schema: jsonSchemaOf(answer) });
+
 /** The cheap model call through `claude -p`, as hope's judge calls it, with a typed answer by JSON schema. */
 export const modelCallOver =
 	(runner: Runner, { model, timeoutMs, trusts, onSpent }: ModelCallOptions): ModelCall =>
-	async ({ boundary, prompt, answer, item, reportOnly }) => {
+	async (question) => {
+		const { boundary, answer, item, reportOnly } = question;
+
 		const outcome = await runner.run({
-			prompt,
+			...askOf(question),
 			cwd: tmpdir(),
 			model,
 			effort: "low",
-			schema: jsonSchemaOf(answer),
 			call: "judgment",
 			signal: AbortSignal.timeout(timeoutMs),
 		});

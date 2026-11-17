@@ -1,6 +1,6 @@
 import { type AgentDecisionExecutor, createDecisionRequest, getMessageText, renderDecisionAttempts, resolveDecision } from "@statelyai/agent";
 import { type Finished, hasSucceeded } from "../adapters/claude-p.ts";
-import { type EventPick, type JsonSchema, PROSE_STATES, type ProsePurpose, pickSchema, readPick } from "../decide/prose.ts";
+import { type EventPick, type JsonSchema, type ModelAsk, PROSE_STATES, type ProsePurpose, pickSchema, readPick } from "../decide/prose.ts";
 
 const RESULT_EXCERPT = 300;
 
@@ -23,6 +23,9 @@ export type ProseOptions = {
 const offer = (events: readonly string[]): string =>
 	`Answer with one event: ${events.join(", ")}. Set sure to false when you are not sure; the safer event is then taken. Give your reason in a sentence.`;
 
+/** What a plan or review run is sent first: its prompt and the events it is offered, and the schema its answer must match. */
+export const proseAsk = (prompt: string, offered: readonly string[]): ModelAsk => ({ prompt: [prompt, offer(offered)].join("\n\n"), schema: pickSchema(offered) });
+
 /**
  * A plan or review run's pick of the next event, through the agent library's decide executor: the run is offered
  * only the events the state takes, and code checks the artifact behind its pick. A pick that fails its check is
@@ -34,7 +37,8 @@ export const decideProse = async ({ purpose, prompt, diff, model, run, canTake =
 	const decide: AgentDecisionExecutor = async (request) => {
 		const offered = request.events.map(({ type }) => type);
 		const feedback = renderDecisionAttempts(request).map(getMessageText);
-		const outcome = await run([prompt, offer(offered), ...feedback].join("\n\n"), pickSchema(offered));
+		const ask = proseAsk(prompt, offered);
+		const outcome = await run([ask.prompt, ...feedback].join("\n\n"), ask.schema);
 
 		if (!hasSucceeded(outcome)) return { rejected: { failure: "invalid-payload", reason: `the run ended as ${outcome.subtype}: ${outcome.text.slice(0, RESULT_EXCERPT)}` } };
 

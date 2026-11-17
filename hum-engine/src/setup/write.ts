@@ -195,5 +195,5 @@ const serviceFile = (repo: string, config: Config, env: SetupEnv): FileToWrite =
 	};
 };
 
-/** The answers file the skill writes: `{ "hum": {...}, "waitHours": {...}, "schemaVersion": 2 }`, with `"ownRunnerOnPublicRepo": true` once the owner agreed to it. */
+/** The answers file the skill writes: `{ "hum": {...}, "waitHours": {...}, "schemaVersion": <the schema version> }`, with `"ownRunnerOnPublicRepo": true` once the owner agreed to it. */
 export const readAnswers = (file: string): SetupAnswers => SetupAnswers.parse(JSON.parse(readFileSync(file, "utf8")));

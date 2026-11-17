@@ -164,6 +164,17 @@ test("a schema 1 hum.json's pull request token secret becomes schema 2's secret 
 	expect(loaded(atSchema1("PR_TOKEN")).hum.pullRequestToken).toEqual({ from: "secret", secret: "PR_TOKEN" });
 });
 
+test("a rate a schema 2 hum.json kept loads as a score with no judge hash", () => {
+	const old = clone(setUp());
+
+	const each = <T>(of: (rate: number) => T) => Object.fromEntries(Object.entries(SHIPPED_DEFAULTS.measuredModels).map(([boundary, scores]) => [boundary, Object.fromEntries(Object.entries(scores).map(([model, { rate }]) => [model, of(rate)]))]));
+
+	old.hum = { ...old.hum, schemaVersion: 2, measuredModels: each((rate) => rate) };
+
+	expect<unknown>(loaded(old).hum.measuredModels).toEqual(each((rate) => ({ rate })));
+	expect(loaded(old).hum.measuredModels.kind["claude-haiku-5-5"]).toEqual({ rate: 0.58 });
+});
+
 test("a schema 1 hum.json that names no pull request token secret gets the shipped source", () => {
 	expect(loaded(atSchema1()).hum.pullRequestToken).toEqual(SHIPPED_DEFAULTS.pullRequestToken);
 });

@@ -8,6 +8,9 @@ import { z } from "zod";
 import { type Finished, type Runner, startRunner } from "../src/adapters/claude-p.ts";
 import { gitIn, readGitIdentity } from "../src/adapters/git.ts";
 import { modelCallOver } from "../src/adapters/model-call.ts";
+import { loadConfig, readConfigDir } from "../src/config/load.ts";
+import { migrateConfig } from "../src/config/migrate.ts";
+import type { Result } from "../src/config/refusal.ts";
 import { BOUNDARIES, type Boundary } from "../src/config/schema.ts";
 import { alignmentQuestion, doesRaiseLevel } from "../src/decide/alignment.ts";
 import { replyQuestion } from "../src/decide/answer.ts";
@@ -19,35 +22,52 @@ import { pairing, prepare } from "../src/loop/signals.ts";
 import type { JsonSchema, ProsePurpose } from "../src/decide/prose.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { shippedRaw, shippedSettingsAs } from "../src/setup/shipped.ts";
-import { openState } from "../src/state/open.ts";
+import { defaultStateDir, openState } from "../src/state/open.ts";
 import { decideProse } from "../src/worker/prose-run.ts";
-import { PROSE_PROMPTS } from "../src/worker/thin-path.ts";
+import { PROSE_PROMPTS, type RunConfig } from "../src/worker/thin-path.ts";
 import { SECOND_MS } from "../src/time.ts";
 import { rateOf, withRate } from "../src/measure/rate.ts";
+import { judgeHash, SHIPPED_SETS } from "../src/measure/judges.ts";
+import { EVALS_DIR } from "../src/measure/remeasure.ts";
+import { AlignmentCase, MERGED_CASES, ReviewCase } from "../src/measure/cases.ts";
 
 /**
  * Measures one model-judgment boundary on its labelled cases, through the same prompts and fences the engine runs,
  * and adds a row to its RESULTS.md. `bun run eval -- --model <id>` measures every boundary on that model id; naming
  * boundaries measures only those. A case the runner held or limited counts in no rate. `--runs <n>` repeats each
- * boundary and pools the runs, since one run proves little; `--write <folder>` records each pooled rate under
- * `measuredModels` in that folder's `hum.json`, which is how setup measures an owner's own models. A boundary where
- * nothing was measured records no rate, and the script exits non-zero.
+ * boundary and pools the runs, since one run proves little. `--write <folder>` measures the judges as the config in
+ * that `.hum/`-shaped folder has them, its role files and kind meanings with them, and records each pooled rate with
+ * its judge's hash under `measuredModels` in the folder's `hum.json`, in one write once every boundary is done: that
+ * is how setup, and the Mac worker when a judge changed, measure an owner's own models. The alignment and review sets
+ * then take the cases the repo's merged items gave them too. Without it the judges and sets are the shipped ones. A
+ * boundary where nothing was measured records no rate, and the script exits non-zero.
  */
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: { model: { type: "string" }, limit: { type: "string" }, runs: { type: "string" }, write: { type: "string" } } });
-/** Boundaries whose labelled cases only the owner can give; they are measured when named, from the cases the owner puts in their evals folder. */
-const OWNER_LABELLED: readonly Boundary[] = ["taste"];
 
-const boundaries: readonly Boundary[] = positionals.length > 0 ? z.array(z.enum(BOUNDARIES)).parse(positionals) : BOUNDARIES.filter((boundary) => !OWNER_LABELLED.includes(boundary));
+const boundaries: readonly Boundary[] = positionals.length > 0 ? z.array(z.enum(BOUNDARIES)).parse(positionals) : SHIPPED_SETS;
 const root = join(import.meta.dir, "..");
-const settings = shippedSettingsAs(await readGitIdentity(gitIn(process.cwd(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })));
 
-if (!settings.ok) {
-	console.error(settings.refusal.message);
+/** The judges as an owner's `.hum/` folder has them, or as hum ships them, to the owner's git identity. */
+const judgesConfig = async (folder: string | undefined): Promise<Result<RunConfig>> => {
+	if (folder !== undefined) return loadConfig(readConfigDir(folder), { env: {} });
+
+	const settings = shippedSettingsAs(await readGitIdentity(gitIn(process.cwd(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS })));
+
+	return settings.ok ? { ok: true, value: { hum: settings.value, roles: shippedRaw().roles } } : settings;
+};
+
+const loaded = await judgesConfig(values.write);
+
+if (!loaded.ok) {
+	console.error(loaded.refusal.message);
 	process.exit(1);
 }
 
-const config = { hum: settings.value, roles: shippedRaw().roles };
+const config = loaded.value;
+
+/** The cases merged items gave the judges, kept in the state of the repo whose `.hum/` is measured; the shipped judges take none. */
+const merged = values.write === undefined ? [] : openState(await defaultStateDir(dirname(values.write)), { now: Date.now }).cases.list();
 const model = values.model ?? config.hum.decisionModel;
 const Count = z.coerce.number().int().positive();
 const runs = values.runs === undefined ? 1 : Count.parse(values.runs);
@@ -124,10 +144,8 @@ const planRepo = (): string => {
 };
 
 const KindCase = z.object({ case: z.string(), label: z.string(), title: z.string(), body: z.string() });
-const AlignmentCase = z.object({ case: z.string(), label: z.enum(["reverted", "fixed", "clean"]), subject: z.string(), diff: z.string() });
 const PlanCase = z.object({ case: z.string(), label: z.string(), body: z.string() });
 const ReplyCase = z.object({ case: z.string(), label: z.string(), question: z.string(), options: z.array(z.string()), reply: z.string() });
-const ReviewCase = z.object({ case: z.string(), label: z.string(), item: z.string(), diff: z.string() });
 const PairCase = z.object({ case: z.string(), label: z.enum(["same", "different"]), a: z.object({ text: z.string() }), b: z.object({ text: z.string() }) });
 const TasteCase = z.object({ case: z.string(), label: z.enum(["keeps", "breaks"]), rule: z.string(), diff: z.string() });
 
@@ -137,7 +155,7 @@ const AT_ONCE = 4;
 const eachOf = <T, R>(cases: readonly T[], measure: (found: T) => Promise<R>): Promise<R[]> => new PQueue({ concurrency: AT_ONCE }).addAll(cases.map((found) => () => measure(found)));
 
 const read = async <T>(boundary: Boundary, schema: z.ZodType<T>, file = "cases.jsonl"): Promise<T[]> =>
-	(await Bun.file(join(root, "evals", boundary, file)).text())
+	(await Bun.file(join(root, EVALS_DIR, boundary, file)).text())
 		.split("\n")
 		.filter(Boolean)
 		.map((line) => schema.parse(JSON.parse(line)));
@@ -169,11 +187,11 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Measured>> = {
 		};
 	},
 	alignment: async () => {
-		const sample = (await read("alignment", AlignmentCase, "sample.jsonl")).slice(0, limit);
+		const sample = [...(await read("alignment", AlignmentCase, "sample.jsonl")), ...MERGED_CASES.alignment(merged).map((found) => AlignmentCase.parse(found))].slice(0, limit);
 
 		return {
 			verdicts: await eachOf(sample, async (found): Promise<Verdict> => {
-				const judged = await judge(alignmentQuestion({ title: found.subject, body: "" }, found.diff, config.hum));
+				const judged = await judge(alignmentQuestion({ title: found.subject, body: found.body }, found.diff, config.hum));
 
 				if (judged.kind === "abstained") return "abstained";
 
@@ -232,9 +250,9 @@ const BOUNDARY_RUNS: Record<Boundary, () => Promise<Measured>> = {
 		};
 	},
 	"review-verdict": async () => {
-		const cases = (await read("review-verdict", ReviewCase)).slice(0, limit);
+		const cases = [...(await read("review-verdict", ReviewCase)), ...MERGED_CASES["review-verdict"](merged).map((found) => ReviewCase.parse(found))].slice(0, limit);
 
-		return { verdicts: await eachOf(cases, async (found) => scored(await prosePick("review", PROSE_PROMPTS.review(config, { id: found.case, title: found.item, body: "" }, found.diff), found.diff, tmpdir()), found.label)) };
+		return { verdicts: await eachOf(cases, async (found) => scored(await prosePick("review", PROSE_PROMPTS.review(config, { id: found.case, title: found.item, body: found.body }, found.diff), found.diff, tmpdir()), found.label)) };
 	},
 };
 
@@ -250,15 +268,26 @@ const precisionOf = ({ tp, fp }: PairCounts): number | undefined => rateOf(tp, t
 const pairRow = (day: string, pairs: PairCounts, abstained: number, used: number): string =>
 	`| ${day} | ${model} | ${pairs.tp + pairs.fp + pairs.fn + pairs.tn} | ${pairs.tp} | ${pairs.fp} | ${pairs.fn} | ${pairs.tn} | ${abstained} | ${pairs.pairedBySignals} | ${rateCell(precisionOf(pairs))} | ${rateCell(rateOf(pairs.tp, pairs.tp + pairs.fn))} | ${used} |`;
 
-/** Sets one pooled rate in the owner's `hum.json`, where trust reads it, under the model as named and each id that answered for it. */
-const recordRate = async (folder: string, boundary: Boundary, rate: number): Promise<void> => {
-	const file = join(folder, "hum.json");
-	const written = z.looseObject({ measuredModels: z.partialRecord(z.enum(BOUNDARIES), z.record(z.string(), z.number())).default({}) }).parse(JSON.parse(await Bun.file(file).text()));
+/** One boundary's pooled rate, and the model ids that answered while it was measured. */
+type Pooled = { readonly boundary: Boundary; readonly rate: number; readonly answered: readonly string[] };
 
-	await Bun.write(file, `${JSON.stringify({ ...written, measuredModels: withRate(written.measuredModels, { boundary, model, answered: [...answered], rate }) }, null, "\t")}\n`);
+/**
+ * Sets each pooled rate, beside its judge's hash, in the owner's `hum.json` at the current schema, where trust reads
+ * it, under the model as named and each id that answered for it; every other rate stays as the config had it.
+ */
+const recordRates = async (folder: string, pooled: readonly Pooled[]): Promise<void> => {
+	const file = join(folder, "hum.json");
+	const migrated = migrateConfig(JSON.parse(await Bun.file(file).text()));
+
+	if (!migrated.ok) throw new Error(migrated.refusal.message);
+
+	const measuredModels = pooled.reduce((measured, { boundary, rate, answered }) => withRate(measured, { boundary, model, answered, rate, judgeHash: judgeHash(boundary, config) }), config.hum.measuredModels);
+
+	await Bun.write(file, `${JSON.stringify({ ...migrated.value, measuredModels }, null, "\t")}\n`);
 };
 
 const unmeasured: Boundary[] = [];
+const recorded: Pooled[] = [];
 
 for (const boundary of boundaries) {
 	const pool = { right: 0, measured: 0, pairs: NO_PAIRS };
@@ -272,7 +301,7 @@ for (const boundary of boundaries) {
 		const measured = verdicts.length - count("halted");
 		const day = new Date().toISOString().slice(0, 10);
 		const row = boundary === "repeat-pair" ? pairRow(day, pairs, count("abstained"), calls - before) : `| ${day} | ${model} | ${measured} | ${count("right")} | ${count("wrong")} | ${count("abstained")} | ${rateCell(rateOf(count("right"), measured))} | ${calls - before} |`;
-		const results = join(values.write ?? root, "evals", boundary, "RESULTS.md");
+		const results = join(values.write ?? root, EVALS_DIR, boundary, "RESULTS.md");
 		const earlier = (await Bun.file(results).exists()) ? await Bun.file(results).text() : boundary === "repeat-pair" ? pairHeader : header;
 
 		pool.right += count("right");
@@ -284,15 +313,17 @@ for (const boundary of boundaries) {
 
 	const pooled = boundary === "repeat-pair" ? precisionOf(pool.pairs) : rateOf(pool.right, pool.measured);
 
-	console.log(`${boundary}: pooled over ${runs} run(s): ${rateCell(pooled)}`);
+	console.log(`${boundary}: pooled over ${runs} run(s): ${rateCell(pooled)}, judge ${judgeHash(boundary, config)}`);
 
 	if (pooled === undefined) unmeasured.push(boundary);
-	else if (values.write !== undefined) await recordRate(values.write, boundary, pooled);
+	else recorded.push({ boundary, rate: pooled, answered: [...answered] });
 }
+
+if (values.write !== undefined && recorded.length > 0) await recordRates(values.write, recorded);
 
 if (unmeasured.length > 0) {
 	console.error(`Nothing was measured on ${unmeasured.join(", ")}, so no rate was recorded for ${unmeasured.length === 1 ? "it" : "them"}.`);
 	process.exitCode = 1;
 }
 
-console.log(`${calls} live calls, the start check included. Record each rate under measuredModels in defaults/hum.json; a model decides a boundary alone only at minJudgeRate or above; repeat-pair takes its precision, against repeatPrecision.`);
+console.log(`${calls} live calls, the start check included. Record each rate as { rate, judgeHash } under measuredModels in defaults/hum.json; a model decides a boundary alone only at minJudgeRate or above; repeat-pair takes its precision, against repeatPrecision.`);

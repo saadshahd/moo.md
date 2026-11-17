@@ -10,6 +10,9 @@ import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { HOUR_MS } from "../src/time.ts";
 import { Holder, ItemId } from "../src/adapter-api.ts";
+import { isTrusted } from "../src/decide/prose.ts";
+import type { Measured, Measurement } from "../src/measure/remeasure.ts";
+import { configWith, trustedScores } from "./fixtures/config.ts";
 
 const merged = (w: WorkerWorld) => w.results.filter((r) => r.outcome === "merged").map((r) => r.item).sort();
 
@@ -504,4 +507,85 @@ test("an item waiting behind a run on the same file starts once the owner moves 
 	w.clock.at += 1000;
 	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["b"] });
 	await w.worker.idle();
+});
+
+/** The shipped config whose review role changed after its scores were measured. */
+const reviewRoleChanged = (measuredAgain = false) =>
+	configWith((raw) => {
+		raw.roles["roles/review.md"] = `${raw.roles["roles/review.md"]}\nCite each line you judge.`;
+
+		if (measuredAgain) raw.hum.measuredModels = trustedScores(raw);
+	});
+
+const judgeCards = (w: WorkerWorld) => w.state.faults.list().flatMap(({ code, cause }) => (code === "judge-changed" ? [cause] : []));
+
+test("where hum cannot keep a measurement, a judge whose text changed gates on its old score under a card naming it, and the card goes once a score on the new text replaces it", async () => {
+	const config = reviewRoleChanged();
+	const w = await workerWorld({ items: {} }, { config });
+
+	await w.worker.tick();
+
+	const { light, standard, top } = config.hum.models;
+
+	expect(judgeCards(w)).toEqual([`review-verdict on ${light} at 1.00, review-verdict on ${standard} at 1.00, review-verdict on ${top} at 1.00 gate on rates measured before the judge's prompt or role text last changed.`]);
+	expect(isTrusted([light], "review-verdict", config.hum)).toBe(true);
+
+	await w.workerWith({ config: reviewRoleChanged(true) }).tick();
+
+	expect(judgeCards(w)).toEqual([]);
+});
+
+test("where hum can keep a measurement, it measures each model once at the boundaries whose judge changed, names a failed one on the card, and tries again after the loop interval", async () => {
+	const config = reviewRoleChanged();
+	const { light, standard, top } = config.hum.models;
+	const asked: Measurement[] = [];
+	const remeasure = async (measurement: Measurement): Promise<Measured> => (asked.push(measurement), measurement.model === top ? { ok: false, why: "a usage limit refused the call" } : { ok: true });
+	const w = await workerWorld({ items: {} }, { config, worker: { remeasure } });
+
+	const tickAt = async (at: number) => {
+		w.clock.at = at;
+		await w.worker.tick();
+		await w.worker.idle();
+	};
+
+	await tickAt(NOW);
+
+	expect(asked).toEqual([light, standard, top].map((model) => ({ model, boundaries: ["review-verdict"], runs: config.hum.evalRuns })));
+	expect(judgeCards(w)).toEqual([expect.stringContaining(`Measuring them again failed: ${top}: a usage limit refused the call`)]);
+
+	await tickAt(NOW + config.hum.loopIntervalSeconds * 1000 - 1);
+	expect(asked).toHaveLength(3);
+
+	await tickAt(NOW + config.hum.loopIntervalSeconds * 1000);
+	expect(asked).toHaveLength(6);
+});
+
+test("results a measurement writes under .hum/evals leave the worker serving, and a worker that sees new scores in hum.json exits only once the measurement ends", async () => {
+	const ended = Promise.withResolvers<Measured>();
+	const w = await workerWorld({ items: {} }, { config: reviewRoleChanged(), worker: { remeasure: () => ended.promise } });
+
+	await w.worker.tick();
+	w.ownerFile(".hum/evals/review-verdict/RESULTS.md", "| 2026-11-17 | claude-haiku-5-5 | 12 |\n");
+	expect((await w.worker.tick()).kind).toBe("ran");
+
+	w.ownerFile(".hum/hum.json", "{}");
+	expect((await w.worker.tick()).kind).toBe("draining");
+
+	ended.resolve({ ok: true });
+	await w.worker.idle();
+	expect((await w.worker.tick()).kind).toBe("exit");
+});
+
+test("a worker told to stop stops the measurement it runs", async () => {
+	const measuring = Promise.withResolvers<AbortSignal>();
+	const remeasure = (_: Measurement, signal: AbortSignal) => (measuring.resolve(signal), new Promise<Measured>((resolve) => signal.addEventListener("abort", () => resolve({ ok: false, why: "stopped" }))));
+	const w = await workerWorld({ items: {} }, { config: reviewRoleChanged(), worker: { remeasure } });
+	const stop = new AbortController();
+	const served = w.worker.serve(stop.signal);
+	const signal = await measuring.promise;
+
+	stop.abort();
+
+	expect(await served).toEqual({ reason: "stopped" });
+	expect(signal.aborted).toBe(true);
 });

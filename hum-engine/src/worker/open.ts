@@ -17,6 +17,7 @@ import { loadConfig, readConfigDir } from "../config/load.ts";
 import type { HumConfig } from "../config/schema.ts";
 import { commandTimeoutMs, type Env, withoutGitHubTokens } from "../exec.ts";
 import { defaultStateDir, openState } from "../state/open.ts";
+import { type Measurement, measureOn } from "../measure/remeasure.ts";
 import { DEFAULT_BASE } from "./thin-path.ts";
 import { Worker, type WorkerOptions } from "./worker.ts";
 
@@ -114,5 +115,8 @@ export const workerOptions = async (repo: string, options: OpenWorkerOptions): P
 	const commits = github === undefined ? undefined : gitHubCommits(github, { timeoutMs, env });
 	const loop = github === undefined ? undefined : githubLoopReads(github, rest.base ?? DEFAULT_BASE, config.hum.measureWindow, () => ownerGitHub(timeoutMs, env));
 
-	return { ...rest, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
+	/** A measurement writes the owner's `.hum/hum.json`, which a CI checkout throws away. */
+	const remeasure = rest.where === "ci" ? undefined : (measurement: Measurement, signal: AbortSignal) => measureOn(repo, measurement, { inherit: false, signal });
+
+	return { ...rest, remeasure, checks: config.hum.checks, checkout: rest.checkout ?? slots?.checkout, slots, repo, state, config, adapters: { workSource, questions, answers }, runner, remote, pulls, commits, loop, runnerVariables: new Set(Object.entries(withoutGitHubTokens(env)).flatMap(([name, value]) => (value === undefined ? [] : [name]))) };
 };

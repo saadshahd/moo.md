@@ -7,6 +7,7 @@ import { Faults } from "./faults.ts";
 import { type Codec, Items } from "./items.ts";
 import { Break, BrokenCommit, Merge, PossibleRepeat, Proof, RepeatGroup, ReviewNote } from "../loop/records.ts";
 import { Choice } from "../status/format.ts";
+import { MergedCase } from "../measure/cases.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
@@ -90,6 +91,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		labels: new Records(join(dir, "labels"), BrokenCommit),
 		/** What proving a check item cost, by item. */
 		proofs: new Records(join(dir, "proofs"), Proof),
+		/** The labelled case each merged item gives the judges its change was put to, by item. */
+		cases: new Records(join(dir, "cases"), MergedCase),
 	};
 };
 

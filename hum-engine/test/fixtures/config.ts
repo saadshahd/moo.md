@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { BOUNDARIES } from "../../src/config/schema.ts";
+import { BOUNDARIES, HumConfig } from "../../src/config/schema.ts";
 import { type Config, listPluginSkills, loadConfig, readConfigDir } from "../../src/config/load.ts";
+import { judgeHash } from "../../src/measure/judges.ts";
 import { withTimeouts } from "../../src/setup/waits.ts";
 import { OWNER } from "./identity.ts";
 import { SHIM_MODEL } from "./shim.ts";
@@ -23,6 +24,13 @@ export const shippedRaw = (): Tree => {
 /** `raw` as setup leaves it when the owner answers no wait: each wait ends stuck after its proposed hours. */
 export const withProposedTimeouts = (raw: Tree): Tree => ({ ...structuredClone(raw), kinds: withTimeouts(raw.kinds, {}) });
 
+/** A rate of 1 for the shim's model and each model the tiers name, at every boundary, measured on the judges `raw` has. */
+export const trustedScores = (raw: Tree): Tree => {
+	const judges = { hum: HumConfig.parse(raw.hum), roles: raw.roles };
+
+	return Object.fromEntries(BOUNDARIES.map((boundary) => [boundary, Object.fromEntries([SHIM_MODEL, ...Object.values<string>(raw.hum.models)].map((model) => [model, { rate: 1, judgeHash: judgeHash(boundary, judges) }]))]));
+};
+
 /**
  * The shipped config as setup writes it, with one path rule (docs are low risk). Tests run items as docs, the kind with
  * the fewest states, on changes of any path, and trust the shim's model and each model the tiers name at every boundary.
@@ -33,7 +41,7 @@ export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 	raw.hum.paths = [{ glob: "docs/**", level: "low" }];
 	raw.hum.docsOnly.paths = ["**"];
 	raw.hum.checks = ["true"];
-	raw.hum.measuredModels = Object.fromEntries(BOUNDARIES.map((boundary) => [boundary, Object.fromEntries([SHIM_MODEL, ...Object.values(raw.hum.models)].map((model) => [model, 1]))]));
+	raw.hum.measuredModels = trustedScores(raw);
 
 	edit(raw);
 

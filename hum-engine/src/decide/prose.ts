@@ -24,9 +24,13 @@ export const fenced = (label: string, text: string): string => {
 	return `<${tag}>\n${clean}\n</${tag}>`;
 };
 
+/** Whether every model id that answered has a measured rate at the boundary of at least `bar`; none answering meets no bar. */
+export const doesMeetBar = (models: readonly string[], boundary: Boundary, measuredModels: HumConfig["measuredModels"], bar: number): boolean =>
+	models.length > 0 && models.every((model) => (measuredModels[boundary]?.[model]?.rate ?? 0) >= bar);
+
 /** A model's pick counts only when every model id that answered has a measured rate at the boundary that meets the bar. */
 export const isTrusted = (models: readonly string[], boundary: Boundary, { measuredModels, minJudgeRate }: Pick<HumConfig, "measuredModels" | "minJudgeRate">): boolean =>
-	models.length > 0 && models.every((model) => (measuredModels[boundary]?.[model] ?? 0) >= minJudgeRate);
+	doesMeetBar(models, boundary, measuredModels, minJudgeRate);
 
 export const Cite = z.strictObject({ file: z.string().min(1), line: z.int().positive() });
 
@@ -68,6 +72,9 @@ export const EventPick = z.object({
 export type EventPick = z.infer<typeof EventPick>;
 
 export type JsonSchema = z.core.JSONSchema.BaseSchema;
+
+/** What a model is sent to judge: the prompt, and the schema its answer must match. */
+export type ModelAsk = { readonly prompt: string; readonly schema: JsonSchema };
 
 /** A schema as `claude --json-schema` reads it: draft-07, since its validator knows no later draft. */
 export const jsonSchemaOf = (schema: z.ZodType): JsonSchema => z.toJSONSchema(schema, { target: "draft-7" });

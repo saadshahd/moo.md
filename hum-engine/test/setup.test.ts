@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { dirname, join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
+import { SCHEMA_VERSION } from "../src/config/schema.ts";
 import { kindCoverage, proposeSetup } from "../src/setup/propose.ts";
 import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
@@ -220,7 +221,7 @@ test("without a job that runs Claude Code, the wake job takes the pull request j
 	});
 });
 
-test("setup rewrites a schema 1 hum.json at schema 2, its pull request token secret carried into the token source", () => {
+test("setup rewrites a schema 1 hum.json at the current schema, its pull request token secret carried into the token source", () => {
 	const repo = repoWith({ "README.md": "x" });
 	const file = join(repo, ".hum", "hum.json");
 	const answers = { hum: { checks: ["true"], runPlaces: ["ci" as const] }, waitHours: {} };
@@ -231,7 +232,7 @@ test("setup rewrites a schema 1 hum.json at schema 2, its pull request token sec
 
 	const written = JSON.parse(readFileSync(file, "utf8"));
 
-	expect(written).toMatchObject({ schemaVersion: 2, pullRequestToken: { from: "secret", secret: "PR_TOKEN" } });
+	expect(written).toMatchObject({ schemaVersion: SCHEMA_VERSION, pullRequestToken: { from: "secret", secret: "PR_TOKEN" } });
 	expect(written).not.toHaveProperty("pullRequestTokenSecret");
 	expect(readFileSync(join(repo, ".github", "workflows", "hum-wake.yml"), "utf8")).toContain("secrets.PR_TOKEN || github.token");
 });

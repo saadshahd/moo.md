@@ -1,5 +1,5 @@
 {
-	"schemaVersion": 2,
+	"schemaVersion": 3,
 	"levels": [
 		{
 			"name": "low",
@@ -212,28 +212,55 @@
 	"decisionModel": "claude-haiku-5-5",
 	"modelCallTimeoutSeconds": 120,
 	"minJudgeRate": 0.8,
+	"evalRuns": 3,
 	"measuredModels": {
 		"kind": {
-			"claude-haiku-5-5": 0.58,
-			"claude-sonnet-5-5": 0.63
+			"claude-haiku-5-5": {
+				"rate": 0.58,
+				"judgeHash": "38d9c55d5a9ecca44ee320fd408cc34140fe32219a9d199f6d7114fced6800ef"
+			},
+			"claude-sonnet-5-5": {
+				"rate": 0.63,
+				"judgeHash": "38d9c55d5a9ecca44ee320fd408cc34140fe32219a9d199f6d7114fced6800ef"
+			}
 		},
 		"alignment": {
-			"claude-haiku-5-5": 0.68,
-			"claude-sonnet-5-5": 0.68
+			"claude-haiku-5-5": {
+				"rate": 0.68,
+				"judgeHash": "dc59bc1941fa786d738dd1d8810a4d0644b8e672dd4239bea340102d2960fbbd"
+			},
+			"claude-sonnet-5-5": {
+				"rate": 0.68,
+				"judgeHash": "dc59bc1941fa786d738dd1d8810a4d0644b8e672dd4239bea340102d2960fbbd"
+			}
 		},
 		"plan-outcome": {
-			"claude-haiku-5-5": 1,
-			"claude-sonnet-5-5": 1
+			"claude-haiku-5-5": {
+				"rate": 1
+			},
+			"claude-sonnet-5-5": {
+				"rate": 1
+			}
 		},
 		"review-verdict": {
-			"claude-haiku-5-5": 0.92,
-			"claude-sonnet-5-5": 0.83
+			"claude-haiku-5-5": {
+				"rate": 0.92
+			},
+			"claude-sonnet-5-5": {
+				"rate": 0.83
+			}
 		},
 		"reply-option": {
-			"claude-haiku-5-5": 0.87
+			"claude-haiku-5-5": {
+				"rate": 0.87,
+				"judgeHash": "75d15bd34fb5907209ae421ff529574447cda9eff461173f2d8ad6771e2ddd47"
+			}
 		},
 		"repeat-pair": {
-			"claude-haiku-5-5": 1
+			"claude-haiku-5-5": {
+				"rate": 1,
+				"judgeHash": "fceeafd3501e0597d2c460ce2ff88021a1746eee91fdc18adc56a334b711d331"
+			}
 		},
 		"taste": {}
 	},

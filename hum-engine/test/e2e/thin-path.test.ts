@@ -647,7 +647,7 @@ test("a review run at landing counts toward the item's total, and one that passe
 });
 
 test("the plan bar reads the model the config gives the plan run, so a run that reports only a measured model cannot lift it", async () => {
-	const config = configWith((raw) => void (raw.hum.measuredModels["plan-outcome"] = { [SHIM_MODEL]: 1 }));
+	const config = configWith((raw) => void (raw.hum.measuredModels["plan-outcome"] = { [SHIM_MODEL]: { rate: 1 } }));
 	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] }, { config });
 	const id = w.repo.seed("Write the note");
 
@@ -721,7 +721,7 @@ test("the alignment grade times out: the change is unclear and waits for the own
 
 test("an alignment call below the bar gates nothing: the change still lands by its level, the grades are a pull request comment", async () => {
 	const config = configWith((raw) => {
-		raw.hum.measuredModels.alignment = { [raw.hum.decisionModel]: 0.68 };
+		raw.hum.measuredModels.alignment = { [raw.hum.decisionModel]: { rate: 0.68 } };
 	});
 
 	const judge = scriptedJudge({ kind: { kind: "docs" }, alignment: { alignment: "concern", verification: "concern" } });

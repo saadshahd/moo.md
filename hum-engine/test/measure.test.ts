@@ -17,6 +17,7 @@ import { configWith } from "./fixtures/config.ts";
 import { pastChange } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { rateOf, withRate } from "../src/measure/rate.ts";
+import { judgeHash } from "../src/measure/judges.ts";
 import { isTrusted } from "../src/decide/prose.ts";
 import { doesGateAlignment } from "../src/decide/alignment.ts";
 
@@ -196,20 +197,23 @@ test("a boundary where nothing was measured has no rate, so it never stands in f
 	expect(rateOf(3, 4)).toBe(0.75);
 });
 
+const KIND_JUDGE = judgeHash("kind", configWith());
+
 test("rates measured into a hum.json that had none keep each boundary not measured, such as taste, with no rate, so the config still loads", () => {
-	const measured = withRate({}, { boundary: "kind", model: "haiku", answered: [], rate: 0.9 });
+	const measured = withRate({}, { boundary: "kind", model: "haiku", answered: [], rate: 0.9, judgeHash: KIND_JUDGE });
 	const loaded = configWith((raw) => (raw.hum.measuredModels = measured)).hum.measuredModels;
 
 	expect(Object.keys(loaded).toSorted()).toEqual(BOUNDARIES.toSorted());
-	expect(Object.entries(loaded).filter(([, rates]) => Object.keys(rates).length > 0)).toEqual([["kind", { haiku: 0.9 }]]);
+	expect(Object.entries(loaded).filter(([, rates]) => Object.keys(rates).length > 0)).toEqual([["kind", { haiku: { rate: 0.9, judgeHash: KIND_JUDGE } }]]);
 });
 
 test("a measured rate is kept under the model as the owner names it and under each id that answered, so an alias such as haiku is trusted by the id its answers name", () => {
 	const shipped = SHIPPED_DEFAULTS.measuredModels;
-	const measured = withRate(shipped, { boundary: "alignment", model: "haiku", answered: ["global.anthropic.claude-haiku-5-5"], rate: 0.8123 });
+	const measured = withRate(shipped, { boundary: "alignment", model: "haiku", answered: ["global.anthropic.claude-haiku-5-5"], rate: 0.8123, judgeHash: KIND_JUDGE });
 	const bar = { measuredModels: measured, minJudgeRate: 0.8 };
+	const score = { rate: 0.81, judgeHash: KIND_JUDGE };
 
-	expect(measured).toEqual({ ...shipped, alignment: { ...shipped.alignment, haiku: 0.81, "global.anthropic.claude-haiku-5-5": 0.81 } });
+	expect(measured).toEqual({ ...shipped, alignment: { ...shipped.alignment, haiku: score, "global.anthropic.claude-haiku-5-5": score } });
 	expect(isTrusted(["global.anthropic.claude-haiku-5-5"], "alignment", bar)).toBe(true);
 	expect(doesGateAlignment({ ...bar, decisionModel: "haiku" })).toBe(true);
 });

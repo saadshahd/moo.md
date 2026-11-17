@@ -1,4 +1,5 @@
-import { type Label, LABELS } from "../decide/risk.ts";
+import type { Label } from "../decide/risk.ts";
+import { brokenLabelOf } from "../loop/breaks.ts";
 import { commitsOf, type Merge } from "../loop/records.ts";
 import { doneByOf, foldItem } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
@@ -24,11 +25,7 @@ export const measureInputsOf = (state: State) => {
 	});
 
 	/** A merged change's label: the worst the loop saved for any of its commits, as git's label rule gave it; clean where it saved none. */
-	const labelOf = (merge: Merge): Label => {
-		const found = new Set<Label>(commitsOf(merge).flatMap((sha) => state.labels.get(sha)?.label ?? []));
-
-		return LABELS.find((label) => found.has(label)) ?? "clean";
-	};
+	const labelOf = (merge: Merge): Label => brokenLabelOf(state, merge) ?? "clean";
 
 	/** How the item reached done, from its log; unknown where a newer engine wrote some of it, which raises the item's card. */
 	const reachedDoneBy = (item: string) => {

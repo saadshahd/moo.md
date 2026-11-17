@@ -125,7 +125,7 @@ test("a model that abstains proposes nothing", async () => {
 });
 
 test("a model id counts for repeats only at the owner's precision bar", () => {
-	const config = { ...SHIPPED_DEFAULTS, measuredModels: { ...SHIPPED_DEFAULTS.measuredModels, "repeat-pair": { good: 0.95, weak: 0.7 } } };
+	const config = { ...SHIPPED_DEFAULTS, measuredModels: { ...SHIPPED_DEFAULTS.measuredModels, "repeat-pair": { good: { rate: 0.95 }, weak: { rate: 0.7 } } } };
 
 	expect([doesTrustRepeats(["good"], config), doesTrustRepeats(["good", "weak"], config), doesTrustRepeats(["unmeasured"], config), doesTrustRepeats([], config)]).toEqual([true, false, false, false]);
 });

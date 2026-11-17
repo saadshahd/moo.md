@@ -32,7 +32,7 @@ export const alignmentQuestion = (item: Pick<Item, "title" | "body">, diff: stri
 
 /** The pull request comment for a call below the bar: its grades, or why it gave none. It blocks nothing. */
 export const alignmentComment = (alignment: { readonly graded: AlignmentAnswer } | { readonly abstained: string }, config: Pick<HumConfig, "decisionModel" | "measuredModels" | "minJudgeRate">): string => {
-	const rate = config.measuredModels.alignment?.[config.decisionModel];
+	const rate = config.measuredModels.alignment?.[config.decisionModel]?.rate;
 	const measured = rate === undefined ? "not measured" : `measured at ${rate.toFixed(2)}`;
 	const view = "graded" in alignment ? `alignment ${alignment.graded.alignment}, verification ${alignment.graded.verification}` : `no view (${alignment.abstained})`;
 
