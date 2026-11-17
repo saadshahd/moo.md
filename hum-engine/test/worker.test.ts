@@ -575,3 +575,17 @@ test("results a measurement writes under .hum/evals leave the worker serving, an
 	await w.worker.idle();
 	expect((await w.worker.tick()).kind).toBe("exit");
 });
+
+test("a worker told to stop stops the measurement it runs", async () => {
+	const measuring = Promise.withResolvers<AbortSignal>();
+	const remeasure = (_: Measurement, signal: AbortSignal) => (measuring.resolve(signal), new Promise<Measured>((resolve) => signal.addEventListener("abort", () => resolve({ ok: false, why: "stopped" }))));
+	const w = await workerWorld({ items: {} }, { config: reviewRoleChanged(), worker: { remeasure } });
+	const stop = new AbortController();
+	const served = w.worker.serve(stop.signal);
+	const signal = await measuring.promise;
+
+	stop.abort();
+
+	expect(await served).toEqual({ reason: "stopped" });
+	expect(signal.aborted).toBe(true);
+});

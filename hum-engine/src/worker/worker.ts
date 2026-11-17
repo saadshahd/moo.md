@@ -654,6 +654,8 @@ export class Worker {
 		void this.#pool.add(async () => {
 			try {
 				for (const measurement of byModel(stale)) {
+					if (abort.signal.aborted) return;
+
 					const measured = await remeasure({ ...measurement, runs: config.hum.evalRuns }, abort.signal);
 
 					if (!measured.ok && !abort.signal.aborted) failed(`${measurement.model}: ${measured.why}`);
