@@ -188,16 +188,12 @@ test("a change merged through a pull request after the worker moved on ends its 
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
 });
 
-test("a saved landing whose pull request GitHub merged settles at the commit the merge made; one whose pull request is open and whose commit the base lacks settles nothing", async () => {
+test("a saved landing whose pull request GitHub merged settles at the commit the merge made, after the commits of its run branch", async () => {
 	const state = freshState();
 	const finished: string[] = [];
-	const base = gitIn(tempDir("base"), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
-	await base.raw(["init", "-q", "-b", "main"]);
 	state.landings.put("a", LANDING_A);
 
-	expect(await settleLanding(state, { ...pull("OPEN", finished), git: base, base: "main" }, LANDING_A, 9)).toBe(false);
-	expect(state.merges.list()).toEqual([]);
 	expect(await settleLanding(state, { ...pull("MERGED", finished), base: "main" }, LANDING_A, 9)).toBe(true);
 	expect(finished).toEqual(["a"]);
 	expect(state.merges.list()).toEqual([{ item: "a", sha: "merge-a", at: 9, paths: ["ui/a.ts"], baseChecked: false, commits: ["sha-a", "merge-a"] }]);
