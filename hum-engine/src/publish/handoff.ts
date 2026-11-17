@@ -95,7 +95,7 @@ export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limi
 
 	for (const choice of work.choices.list().filter((choice) => choice.item === item)) into.choices.put(`${item}@${choice.text}`, choice);
 
-	for (const event of work.events.list(item)) into.events.add(event);
+	work.events.copyTo(into.events, item);
 
 	for (const { code, cause, fix } of work.faults.list().filter((card) => card.item === item && WORK_CARD_CODES.has(card.code))) into.faults.raise({ code, item, cause, fix });
 

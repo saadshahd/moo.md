@@ -874,6 +874,17 @@ function isPlainObject(o) {
   }
   return true;
 }
+function shallowClone(o) {
+  if (isPlainObject(o))
+    return { ...o };
+  if (Array.isArray(o))
+    return [...o];
+  if (o instanceof Map)
+    return new Map(o);
+  if (o instanceof Set)
+    return new Set(o);
+  return o;
+}
 var propertyKeyTypes = /* @__PURE__ */ new Set(["string", "number", "symbol"]);
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -2079,6 +2090,31 @@ var $ZodNullable = /* @__PURE__ */ $constructor("$ZodNullable", (inst, def) => {
     return def.innerType._zod.run(payload, ctx);
   };
 });
+var $ZodDefault = /* @__PURE__ */ $constructor("$ZodDefault", (inst, def) => {
+  $ZodType.init(inst, def);
+  inst._zod.optin = "defaulted";
+  defineLazyInternal(inst, "values", (zod) => zod.def.innerType._zod.values);
+  inst._zod.parse = (payload, ctx) => {
+    if (ctx.direction === "backward") {
+      return def.innerType._zod.run(payload, ctx);
+    }
+    if (payload.value === undefined) {
+      payload.value = def.defaultValue;
+      return payload;
+    }
+    const result = def.innerType._zod.run(payload, ctx);
+    if (result instanceof Promise) {
+      return result.then((result2) => handleDefaultResult(result2, def));
+    }
+    return handleDefaultResult(result, def);
+  };
+});
+function handleDefaultResult(payload, def) {
+  if (payload.value === undefined) {
+    payload.value = def.defaultValue;
+  }
+  return payload;
+}
 var $ZodCustom = /* @__PURE__ */ $constructor("$ZodCustom", (inst, def) => {
   $ZodCheck.init(inst, def);
   $ZodType.init(inst, def);
@@ -2455,6 +2491,19 @@ function nullable(innerType) {
     innerType
   });
 }
+var ZodMiniDefault = /* @__PURE__ */ $constructor("ZodMiniDefault", (inst, def) => {
+  $ZodDefault.init(inst, def);
+  ZodMiniType.init(inst, def);
+});
+function _default(innerType, defaultValue) {
+  return new ZodMiniDefault({
+    type: "default",
+    innerType,
+    get defaultValue() {
+      return typeof defaultValue === "function" ? defaultValue() : shallowClone(defaultValue);
+    }
+  });
+}
 var ZodMiniCustom = /* @__PURE__ */ $constructor("ZodMiniCustom", (inst, def) => {
   $ZodCustom.init(inst, def);
   ZodMiniType.init(inst, def);
@@ -2487,16 +2536,19 @@ var Question = object({ item: name, text: name, options: array(name), since: tim
 var Merged = object({ item: name, title: name, level: optional(name), mergedAt: time2 });
 var Choice = object({ item: name, text: name, at: time2 });
 var LearnedRule = object({ glob: name, level: name, item: name, at: time2, undo: Action });
+var count = int().check(_nonnegative());
 var PerMerge = object({
-  merges: int().check(_nonnegative()),
-  abandoned: int().check(_nonnegative()),
+  merges: count,
+  abandoned: count,
   notes: number2().check(_nonnegative()),
   questions: number2().check(_nonnegative()),
   tokens: number2().check(_nonnegative())
 });
+var DoneByBreaks = object({ doneBy: name, merges: count, reverted: count, fixed: count });
 var Measure = extend2(PerMerge, {
   window: int().check(_positive()),
-  byPath: array(extend2(PerMerge, { glob: name }))
+  byPath: array(extend2(PerMerge, { glob: name })),
+  byDoneBy: _default(array(DoneByBreaks), [])
 });
 var Status = object({
   format: literal(STATUS_FORMAT),

@@ -7,6 +7,7 @@ import { checkNameOf, fileChecks, filedFrom } from "./check-item.ts";
 import { type CiLogs, doesLogName } from "./ci.ts";
 import { type Proposer, groupNotes } from "./groups.ts";
 import { withoutCovered } from "./memory.ts";
+import { saveLabels } from "./breaks.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "./notes.ts";
 import { type RepeatGroup, type ReviewNote, noteKey } from "./records.ts";
 
@@ -42,11 +43,11 @@ const unappliedCard = (state: State) => (extension: string, signals: readonly st
 };
 
 /** Step 1: the owner's notes from each source, saved once. Returns the ones this pass added. */
-const collectNotes = async ({ state, config, comments, history, hunkOf }: LoopPass): Promise<ReviewNote[]> =>
+const collectNotes = async ({ state, config, comments, hunkOf }: LoopPass, changes: readonly PastChange[]): Promise<ReviewNote[]> =>
 	saveNotes(state, [
 		...ownerNotes(await comments(sinceOfLastComment(state)), config.hum.ownerLogins),
 		...planChangingNotes(state.answers.list()),
-		...(await breakNotes(await history(), config.hum.changeLabels, hunkOf)),
+		...(await breakNotes(changes, config.hum.changeLabels, hunkOf)),
 	]);
 
 /** Step 6: a landed check item whose name the next CI run's log shows. */
@@ -97,8 +98,10 @@ export const closeLoop = async ({ state, workSource, memoryPath }: Pick<LoopPass
 /** One pass of the loop: collect, find repeats, file checks, confirm CI ran them, close the loop. */
 export const runLoopPass = async (pass: LoopPass): Promise<void> => {
 	const { state, config, workSource, propose, trusts } = pass;
+	const changes = await pass.history();
 
-	await groupNotes({ state, propose, trusts, onUnapplied: unappliedCard(state) }, await collectNotes(pass));
+	saveLabels(state, changes, config.hum.changeLabels);
+	await groupNotes({ state, propose, trusts, onUnapplied: unappliedCard(state) }, await collectNotes(pass, changes));
 	await fileChecks({ state, workSource, repeatAt: config.hum.repeatAt, checkKind: config.hum.checkKind });
 	await confirmChecks(pass);
 	await closeLoop(pass);

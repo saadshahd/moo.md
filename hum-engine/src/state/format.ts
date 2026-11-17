@@ -37,8 +37,15 @@ export type EnvelopeMigrations = Steps<EnvelopeJson>;
 /** One entry per earlier format, from format 0 up. Empty while format 1 is the first shipped. */
 export const ENVELOPE_MIGRATIONS: EnvelopeMigrations = {};
 
-/** True when a file was written by an engine newer than the running one, or by one whose version is unreadable. */
-export const isFromNewerEngine = ({ written, running }: { readonly written: string; readonly running: string }): boolean => semver.valid(written) === null || semver.gt(written, running);
+/** What the owner does about a file a newer engine wrote. */
+export const UPDATE_ENGINE = "Update the engine to that version or later: bun add --exact @moo.md/hum@latest.";
+
+/** A file's format and the engine that wrote it; a file from before engines were recorded names none. */
+type Written = { readonly format: number; readonly engineVersion?: string | undefined };
+
+/** True when a file's format is newer than the running engine reads, or a newer engine, or one whose version is unreadable, wrote it. */
+export const isNewerThan = ({ format, engineVersion }: Written, running: { readonly format: number; readonly engineVersion: string }): boolean =>
+	format > running.format || (engineVersion !== undefined && (semver.valid(engineVersion) === null || semver.gt(engineVersion, running.engineVersion)));
 
 /** The part of an envelope that names the item and its machine, enough to list what is saved without restoring it. */
 export const SavedHeader = z.looseObject({

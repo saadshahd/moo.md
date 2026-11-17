@@ -1,6 +1,6 @@
 import { dirname, extname } from "node:path";
 import { Lang, parse } from "@ast-grep/napi";
-import type { ReviewNote } from "./records.ts";
+import { BREAK_NOTES, type ReviewNote } from "./records.ts";
 
 /** The languages whose hunks the parser reads. A hunk in any other language leaves the signals that need a parse unapplied. */
 const PARSED_LANGUAGES = new Map<string, Lang>([
@@ -96,7 +96,7 @@ const doShare = <T>(a: Set<T> | undefined, b: Set<T> | undefined): boolean => a 
 /** Two notes on one change are about one hunk; only notes across changes repeat. */
 const isAnotherChange = (a: Prepared, b: Prepared): boolean => a.note.change !== b.note.change;
 
-const BREAK_SOURCES: readonly ReviewNote["source"][] = ["revert", "fix"];
+const BREAK_SOURCES: readonly ReviewNote["source"][] = Object.values(BREAK_NOTES);
 
 type Signal = {
 	readonly name: string;

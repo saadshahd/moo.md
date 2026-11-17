@@ -2,22 +2,30 @@ import { ItemId, type WorkSource } from "../adapter-api.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { Git } from "../adapters/git.ts";
 import type { State } from "../state/open.ts";
+import type { Landing } from "../state/saved.ts";
 import { dropEvidence } from "./evidence.ts";
 
 /** Where a merged change's evidence ref is taken off: git in a repo with `remote`. */
 export type EvidenceRemote = { readonly git: Git; readonly remote: string };
 
+/** Where a merged change is: the base's commit once it is on it, and every commit that held it, absent where hum did not see them. */
+export type OnBase = { readonly sha: string; readonly commits: readonly string[] | undefined };
+
+/** A change a pull request merged: the commit the merge made on the base, after the run branch's own. */
+export const mergedThrough = (landing: Landing | undefined, mergeCommit: string): OnBase => ({ sha: mergeCommit, commits: [...(landing?.commits ?? []), mergeCommit] });
+
 /**
  * An item's change reached the base: its evidence ref is taken off the remote, the merge is kept for the measure, the
- * saved landing, plan, verdict and pull request text go, and the merge is logged once per commit.
+ * saved landing, plan, verdict and pull request text go, and the merge is logged once per commit in the item's log,
+ * which keeps how the item reached done and the picks behind it.
  */
-export const recordMerged = async (state: State, { git, remote }: EvidenceRemote, { item, sha, at }: { readonly item: string; readonly sha: string; readonly at: number }): Promise<void> => {
+export const recordMerged = async (state: State, { git, remote }: EvidenceRemote, { item, at, sha, commits }: OnBase & { readonly item: string; readonly at: number }): Promise<void> => {
 	const landing = state.landings.get(item);
 	const evidence = state.pullRequests.get(item)?.evidence;
 
 	if (evidence !== undefined && "url" in evidence) await dropEvidence(git, { remote, item });
 
-	state.merges.put(item, { item, sha, at, paths: [...(landing?.change.paths ?? [])], baseChecked: false });
+	state.merges.put(item, { item, sha, at, paths: [...(landing?.change.paths ?? [])], baseChecked: false, commits: commits && [...commits] });
 	state.landings.remove(item);
 	state.plans.remove(item);
 	state.verdicts.remove(item);
@@ -32,12 +40,14 @@ export const recordMerged = async (state: State, { git, remote }: EvidenceRemote
  */
 export const settleMergedPulls = async (state: State, { pulls, workSource, ...evidenceRemote }: { readonly pulls: Pick<PullRequests, "find">; readonly workSource: Pick<WorkSource, "finish"> } & EvidenceRemote, at: number): Promise<void> => {
 	await Promise.all(
-		state.landings.list().map(async ({ item, branch, head }) => {
-			if ((await pulls.find(branch))?.state !== "MERGED") return;
+		state.landings.list().map(async (landing) => {
+			const pull = await pulls.find(landing.branch);
 
-			await workSource.finish(ItemId.parse(item));
-			await recordMerged(state, evidenceRemote, { item, sha: head, at });
-			state.items.remove(item);
+			if (pull?.state !== "MERGED") return;
+
+			await workSource.finish(ItemId.parse(landing.item));
+			await recordMerged(state, evidenceRemote, { item: landing.item, at, ...mergedThrough(landing, pull.mergeCommit) });
+			state.items.remove(landing.item);
 		}),
 	);
 };

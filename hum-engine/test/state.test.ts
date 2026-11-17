@@ -17,6 +17,7 @@ import {
 	writeStatus,
 } from "../src/index.ts";
 import { kindMachine } from "../src/index.ts";
+import { LOG_FORMAT, type NewEvent } from "../src/state/events.ts";
 import { slug } from "../src/state/fs.ts";
 import { SAVED_0_1_0 } from "./fixtures/saved-0-1-0.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -124,16 +125,51 @@ test("a snapshot from an older engine restores in place and saves under the newe
 	expect(JSON.parse(readFileSync(next.items.path("#68"), "utf8")).engineVersion).toBe("0.2.0");
 });
 
-test("an older engine that meets a newer engine's snapshot gives one card however often it looks, keeps the file, and does not start the item over", async () => {
-	waitingItem(openState(dir, { engineVersion: "0.2.0", now: Date.now }), "#68");
+const answered = (sourceId: string): NewEvent => ({ source: "thread", sourceId, itemId: "#68", type: "answered", payload: {} });
+
+test("an older engine that meets a newer engine's snapshot and log gives one card however often it looks, keeps the files, and does not start the item over", async () => {
+	const newer = openState(dir, { engineVersion: "0.2.0", now: Date.now });
+
+	waitingItem(newer, "#68");
+	newer.events.add(answered("a1"));
 
 	const rolledBack = openState(dir, { engineVersion: "0.1.0", now: Date.now });
-	const before = readFileSync(rolledBack.items.path("#68"));
+	const files = () => [rolledBack.items.path("#68"), ...readdirSync(join(dir, "events", slug("#68")), { withFileTypes: true }).map((entry) => join(entry.parentPath, entry.name))].map((path) => readFileSync(path));
+	const before = files();
 
-	for (let times = 0; times < 3; times++) expect((await rolledBack.items.restore("#68", tiny)).ok).toBe(false);
+	for (let times = 0; times < 3; times++) {
+		expect((await rolledBack.items.restore("#68", tiny)).ok).toBe(false);
+		expect(rolledBack.events.read("#68").ok).toBe(false);
+	}
 
 	expect(rolledBack.faults.list().map((card) => card.code)).toEqual(["snapshot-from-newer-engine"]);
-	expect(readFileSync(rolledBack.items.path("#68"))).toEqual(before);
+	expect(files()).toEqual(before);
+});
+
+test("a log record in a format newer than the engine reads gives one card however often the log is read, and nothing of the log is read", () => {
+	const state = openState(dir, { now: Date.now });
+	const { event } = state.events.add(answered("a1"));
+
+	writeFileSync(join(dir, "events", slug("#68"), "later.json"), JSON.stringify({ ...event, format: LOG_FORMAT + 1, sourceId: "a2", seq: 1 }));
+
+	for (let times = 0; times < 3; times++) expect(state.events.read("#68").ok).toBe(false);
+
+	expect(() => state.events.list("#68")).toThrow(`format ${LOG_FORMAT + 1}`);
+	expect(state.faults.list().map((card) => card.code)).toEqual(["snapshot-from-newer-engine"]);
+});
+
+test("a log record this engine cannot read holds its item with one card however often the log is read, and another item's log reads", () => {
+	const state = openState(dir, { now: Date.now });
+	const unread = { format: LOG_FORMAT, source: "model", sourceId: "m1", itemId: "#68", machineVersion: "1", type: "model-answered", receivedAt: 1, seq: 1, payload: { run: "plan", attempt: 0, outcome: { kind: "finished" } } };
+
+	state.events.add(answered("a1"));
+	state.events.add({ ...answered("b1"), itemId: "#69" });
+	writeFileSync(join(dir, "events", slug("#68"), "unread.json"), JSON.stringify(unread));
+
+	for (let times = 0; times < 3; times++) expect(state.events.read("#68").ok).toBe(false);
+
+	expect(state.faults.list().map((card) => card.code)).toEqual(["snapshot-unreadable"]);
+	expect(state.events.list("#69").map(({ sourceId }) => sourceId)).toEqual(["b1"]);
 });
 
 test("a shipped envelope migration runs on an older format; a format with no migration reads as damaged, with one card", async () => {
@@ -278,12 +314,15 @@ const readsOf = (state: State) =>
 /** Runs and events live one folder deeper, under the item's slug. */
 const folderOf = (store: keyof typeof SAVED_0_1_0): string => (store === "runs" || store === "events" ? join(dir, store, slug(SAVED_0_1_0[store].itemId)) : join(dir, store));
 
+/** Where a record reads otherwise than hum 0.1.0 wrote it: its log record, at format 0, climbs to this engine's format. */
+const READS_AS: Partial<Record<keyof typeof SAVED_0_1_0, { readonly format: number }>> = { events: { format: LOG_FORMAT } };
+
 // SAFETY: Object.keys of a literal object lists exactly the keys its type names.
 test.each(Object.keys(SAVED_0_1_0) as (keyof typeof SAVED_0_1_0)[])("a %s record hum 0.1.0 wrote reads, with a field a newer engine added", (store) => {
 	mkdirSync(folderOf(store), { recursive: true });
 	writeFileSync(join(folderOf(store), "record.json"), JSON.stringify({ ...SAVED_0_1_0[store], addedLater: true }));
 
-	expect(readsOf(openState(dir, { now: Date.now }))[store]()).toEqual([expect.objectContaining(SAVED_0_1_0[store])]);
+	expect(readsOf(openState(dir, { now: Date.now }))[store]()).toEqual([expect.objectContaining({ ...SAVED_0_1_0[store], ...READS_AS[store] })]);
 });
 
 test("a failed save of a new item leaves nothing behind, and a later save clears the card", () => {
@@ -342,19 +381,25 @@ test("an op whose run returns a value that did not finish it stays started, and 
 });
 
 test("one event read twice is saved once, and the first copy stays", () => {
-
 	let tick = 0;
 	const { events } = openState(dir, { now: () => ++tick });
-	const answer = { source: "github-comment", sourceId: "4411", itemId: "#68", type: "answer", payload: { text: "yes" } };
 
-	const first = events.add(answer);
-	const second = events.add({ ...answer, payload: { text: "changed" } });
+	const first = events.add(answered("4411"));
+	const second = events.add(answered("4411"));
 
 	expect([first.added, second.added]).toEqual([true, false]);
-	expect(second.event.payload).toEqual({ text: "yes" });
-	events.add({ ...answer, sourceId: "4412", payload: { text: "later" } });
+	expect(second.event.receivedAt).toBe(first.event.receivedAt);
+	events.add(answered("4412"));
 	expect(events.list("#68").map((event) => event.sourceId)).toEqual(["4411", "4412"]);
 	expect(events.list("#none")).toEqual([]);
+});
+
+test("an item's events list in the order the log took them, on a clock that stands still", () => {
+	const { events } = openState(dir, { now: () => 5 });
+
+	for (const sourceId of ["c", "a", "b"]) events.add(answered(sourceId));
+
+	expect(events.list("#68").map(({ sourceId }) => sourceId)).toEqual(["c", "a", "b"]);
 });
 
 test("the run's name is saved before launch and adopted after a restart", () => {
@@ -458,6 +503,15 @@ test("a status file with fields a newer engine added reads, without those fields
 	writeFileSync(path, JSON.stringify({ ...status, addedLater: 1, engine: { ...status.engine, addedLater: 1 }, cards: [{ ...card, addedLater: 1 }], choices: [{ ...choice, addedLater: 1 }] }));
 
 	expect(readStatus(path)).toEqual({ ok: true, status: { ...status, cards: [card], choices: [choice] } });
+});
+
+test("a status file an older engine wrote, whose measure has no breaks by way of reaching done, reads with none", () => {
+	const { path, status } = statusFile();
+	const measure = { window: 20, merges: 1, abandoned: 0, notes: 0, questions: 0, tokens: 0, byPath: [] };
+
+	writeFileSync(path, JSON.stringify({ ...status, measure }));
+
+	expect(readStatus(path)).toEqual({ ok: true, status: { ...status, measure: { ...measure, byDoneBy: [] } } });
 });
 
 test("a heartbeat with a field a newer engine added reads, without that field", () => {

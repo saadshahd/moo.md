@@ -2,7 +2,7 @@ import { rmSync } from "node:fs";
 import { join } from "node:path";
 import { type AnyActor, type AnyActorLogic } from "xstate";
 import { restoreActor } from "xstate/persist";
-import { Json } from "../config/json.ts";
+import { asJson, type Json } from "../config/json.ts";
 import { climb } from "../config/migrate.ts";
 import { migrateSnapshot } from "../config/state-map.ts";
 import { kindMachine } from "../config/machine.ts";
@@ -17,8 +17,9 @@ import {
 	ENVELOPE_MIGRATIONS,
 	type EnvelopeMigrations,
 	Header,
-	isFromNewerEngine,
+	isNewerThan,
 	SavedHeader,
+	UPDATE_ENGINE,
 } from "./format.ts";
 
 type ActorClock = NonNullable<Parameters<typeof restoreActor>[2]>["clock"];
@@ -48,7 +49,7 @@ export type SavedSnapshot = {
 };
 
 /** The snapshot of a running item actor, as the JSON `saveItem` writes. */
-export const persistedSnapshot = (actor: AnyActor): Json => Json.parse(JSON.parse(JSON.stringify(actor.getPersistedSnapshot())));
+export const persistedSnapshot = (actor: AnyActor): Json => asJson(actor.getPersistedSnapshot());
 
 const reason = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
@@ -158,8 +159,8 @@ export class Items {
 
 		if (!header.success) return unreadable("it has no format or engine version");
 
-		if (header.data.format > this.#format || isFromNewerEngine({ written: header.data.engineVersion, running: this.#engineVersion })) {
-			return this.#fault({ itemId, code: SNAPSHOT_CARDS.newerEngine, cause: `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, fix: "Update the engine to that version or later: bun add --exact @moo.md/hum@latest." });
+		if (isNewerThan(header.data, { format: this.#format, engineVersion: this.#engineVersion })) {
+			return this.#fault({ itemId, code: SNAPSHOT_CARDS.newerEngine, cause: `The saved state of ${itemId} was written by hum ${header.data.engineVersion}, which is newer than the running ${this.#engineVersion}.`, fix: UPDATE_ENGINE });
 		}
 
 		let envelope: ReturnType<typeof Envelope.safeParse>;

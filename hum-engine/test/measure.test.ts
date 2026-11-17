@@ -6,9 +6,13 @@ import { BOUNDARIES, SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { labelChanges, type PastChange } from "../src/decide/labels.ts";
 import { measureInputsOf } from "../src/measure/inputs.ts";
+import { runLoopPass } from "../src/loop/pass.ts";
 import { type AbandonedItem, type MergedChange, measureOf } from "../src/measure/measure.ts";
 import { openState } from "../src/state/open.ts";
 import { settleMergedPulls } from "../src/worker/merged.ts";
+import type { DoneBy } from "../src/decide/merge.ts";
+import type { Merge } from "../src/loop/records.ts";
+import { keepLanding } from "../src/state/item-log.ts";
 import { configWith } from "./fixtures/config.ts";
 import { pastChange } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -19,7 +23,17 @@ import { doesGateAlignment } from "../src/decide/alignment.ts";
 
 const freshState = () => openState(tempDir("measure"), { now: Date.now });
 
-const merge = (n: number): MergedChange => ({ item: `m${n}`, at: n, paths: [n < 10 ? "ui/x.ts" : "api/y.ts"], notes: n % 5 === 0 ? 2 : 0, questions: n % 4 === 0 ? 1 : 0, tokens: 1000 });
+/** The first four were saved before hum kept how an item reached done; then review and checks take turns. One is reverted, and every sixth fixed. */
+const merge = (n: number): MergedChange => ({
+	item: `m${n}`,
+	at: n,
+	paths: [n < 10 ? "ui/x.ts" : "api/y.ts"],
+	doneBy: n < 4 ? undefined : n % 2 === 0 ? "review" : "checks",
+	label: n === 5 ? "reverted" : n % 6 === 0 ? "fixed" : "clean",
+	notes: n % 5 === 0 ? 2 : 0,
+	questions: n % 4 === 0 ? 1 : 0,
+	tokens: 1000,
+});
 
 const merges = Array.from({ length: 20 }, (_, n) => merge(n));
 
@@ -31,7 +45,7 @@ const abandoned: AbandonedItem[] = [
 
 const window = { loopTokens: 400, window: 20, globs: ["ui/**"] };
 
-test("20 merges and 3 abandoned items give known notes, questions and tokens per merge, and per path", () => {
+test("20 merges and 3 abandoned items give known notes, questions and tokens per merge, per path, and the reverts and fixes of each way of reaching done", () => {
 	expect(measureOf({ merged: merges, abandoned, ...window })).toEqual({
 		window: 20,
 		merges: 20,
@@ -40,6 +54,10 @@ test("20 merges and 3 abandoned items give known notes, questions and tokens per
 		questions: 7 / 20,
 		tokens: (20_000 + 10_000 + 400) / 20,
 		byPath: [{ glob: "ui/**", merges: 10, abandoned: 0, notes: 4 / 10, questions: 3 / 10, tokens: 1000 }],
+		byDoneBy: [
+			{ doneBy: "checks", merges: 8, reverted: 1, fixed: 0 },
+			{ doneBy: "review", merges: 8, reverted: 0, fixed: 3 },
+		],
 	});
 });
 
@@ -49,14 +67,18 @@ test("an item abandoned before the window does not count", () => {
 	expect(withOld?.abandoned).toBe(0);
 });
 
-test("only the last window of merges counts, and nothing merged measures nothing", () => {
+test("only the last window of merges counts, each way of reaching done over its own, and nothing merged measures nothing", () => {
 	const more = [...merges, merge(20), merge(21)];
 
 	expect(measureOf({ merged: more, abandoned: [], ...window, window: 20 })?.merges).toBe(20);
+	expect(measureOf({ merged: merges, abandoned: [], ...window, window: 4 })?.byDoneBy).toEqual([
+		{ doneBy: "checks", merges: 4, reverted: 0, fixed: 0 },
+		{ doneBy: "review", merges: 4, reverted: 0, fixed: 2 },
+	]);
 	expect(measureOf({ merged: [], abandoned, ...window })).toBeUndefined();
 });
 
-test("the inputs come from what the engine saved: notes by commit or item, questions by op key, stuck items as abandoned, and tokens with the loop's own", async () => {
+test("the inputs come from what the engine saved: notes by commit or item, questions by op key, stuck items as abandoned, tokens with the loop's own, each merge's way of reaching done from its item's log, and its label the worst the loop saved for its commits", async () => {
 	const state = freshState();
 	const asked = (itemId: string, op: string, done: "done" | "started" = "done") => state.ops.once({ itemId, run: "ask", attempt: 0, op }, { holds: async () => done === "done", run: async () => {} });
 
@@ -70,26 +92,85 @@ test("the inputs come from what the engine saved: notes by commit or item, quest
 	await asked("a", "question:one");
 	await asked("a", "comment:other");
 
-	expect(measureInputsOf(state)).toEqual({
-		merged: [{ item: "a", at: 5, paths: ["ui/a.ts"], notes: 2, questions: 1, tokens: 700 }],
+	const labelled = (sha: string, label: "reverted" | "fixed") => state.labels.put(sha, { sha, label });
+
+	/** A merge whose item's log holds how landing found its change. */
+	const mergeLogged = (merge: Merge, found: DoneBy) => {
+		state.merges.put(merge.item, merge);
+		keepLanding(state.events, { itemId: merge.item, head: merge.sha, doneBy: found });
+		state.events.add({ source: "work-source", sourceId: `merged:${merge.sha}`, itemId: merge.item, type: "merged", payload: {} });
+	};
+
+	mergeLogged({ item: "fixed", sha: "merge-f", at: 6, paths: [], commits: ["run-f", "merge-f"], baseChecked: true }, "review");
+	labelled("run-f", "fixed");
+	mergeLogged({ item: "reverted", sha: "merge-r", at: 6, paths: [], commits: ["run-r", "merge-r"], baseChecked: true }, "checks");
+	labelled("run-r", "fixed");
+	labelled("merge-r", "reverted");
+
+	const inputs = measureInputsOf(state);
+
+	expect({ ...inputs, merged: inputs.merged.toSorted((x, y) => x.item.localeCompare(y.item)) }).toEqual({
+		merged: [
+			{ item: "a", at: 5, paths: ["ui/a.ts"], doneBy: undefined, label: "clean", notes: 2, questions: 1, tokens: 700 },
+			{ item: "fixed", at: 6, paths: [], doneBy: "review", label: "fixed", notes: 0, questions: 0, tokens: 0 },
+			{ item: "reverted", at: 6, paths: [], doneBy: "checks", label: "reverted", notes: 0, questions: 0, tokens: 0 },
+		],
 		abandoned: [{ item: "b", since: 6, paths: [], notes: 0, questions: 0, tokens: 0 }],
 		loopTokens: 90,
 	});
 });
 
-/** A pull request in `state`, and a work source that writes each item it finishes into `finished`. */
-const pull = (state: Pull["state"], finished: string[]) => ({
-	pulls: { find: async () => ({ id: "p", number: 1, url: "u", state, autoMerge: true, behind: false }) },
+test("the loop saves each merge's label as git's rule gives it, so one fix that names two merged changes marks both fixed, and a test of the base that failed after a third marks it fixed", async () => {
+	const state = freshState();
+	const [a, b, c, d, fix] = ["aaaaaaa1", "bbbbbbb2", "ccccccc3", "ddddddd4", "fffffff5"];
+
+	const nothingFiled = async (): Promise<never> => {
+		throw new Error("the loop files nothing here");
+	};
+
+	for (const [at, sha] of [a, b, c, d].entries()) state.merges.put(sha, { item: sha, sha, at, paths: ["x.ts"], commits: [sha] });
+
+	state.breaks.put(c, { item: c, sha: c, at: 9, paths: ["x.ts"], level: "low", failure: "f", onBreak: "follow-up", followUp: "fix-c" });
+
+	await runLoopPass({
+		state,
+		config: configWith(),
+		workSource: { fileFollowUp: nothingFiled, comment: nothingFiled },
+		now: Date.now,
+		comments: async () => [],
+		history: async () => [...[a, b, c, d].map((sha) => pastChange({ sha, files: ["x.ts"] })), pastChange({ sha: fix, subject: `fix: what ${a} and ${b} broke`, files: ["x.ts"] })],
+		hunkOf: async () => "",
+		propose: nothingFiled,
+		trusts: () => false,
+		ciLogs: async () => [],
+	});
+
+	expect(Object.fromEntries(measureInputsOf(state).merged.map(({ item, label }) => [item, label]))).toEqual({ [a]: "fixed", [b]: "fixed", [c]: "fixed", [d]: "clean" });
+});
+
+test("a merge whose log holds a record a newer engine wrote reads its way of reaching done as unknown, with that engine's card, and the measure goes on", () => {
+	const state = freshState();
+
+	state.merges.put("a", { item: "a", sha: "sha-a", at: 5, paths: [] });
+	openState(state.dir, { engineVersion: "99.0.0", now: Date.now }).events.add({ source: "work-source", sourceId: "merged:sha-a", itemId: "a", type: "merged", payload: {} });
+
+	expect(measureInputsOf(state).merged.map(({ doneBy }) => doneBy)).toEqual([undefined]);
+	expect(state.faults.list().map(({ code }) => code)).toEqual(["snapshot-from-newer-engine"]);
+});
+
+/** A pull request open, or merged as `merge-a` on the base, and a work source that writes each item it finishes into `finished`. */
+const pull = (state: "OPEN" | "MERGED", finished: string[]) => ({
+	pulls: { find: async (): Promise<Pull> => ({ id: "p", number: 1, url: "u", autoMerge: true, behind: false, ...(state === "MERGED" ? { state, mergeCommit: "merge-a" } : { state }) }) },
 	workSource: { finish: async (id: string) => void finished.push(id) },
 	git: gitIn(tmpdir(), { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }),
 	remote: "origin",
 });
 
-test("a change merged through a pull request after the worker moved on ends its item and is recorded as merged, once, and its saved landing goes", async () => {
+test("a change merged through a pull request after the worker moved on ends its item and is recorded as merged at the commit its merge made, once, and its saved landing goes", async () => {
 	const state = freshState();
 	const finished: string[] = [];
 
-	state.landings.put("a", { item: "a", branch: "hum/a", since: 1, change: { paths: ["ui/a.ts"], size: 3, loosened: false, pinChanged: false }, head: "sha-a" });
+	state.landings.put("a", { item: "a", branch: "hum/a", since: 1, change: { paths: ["ui/a.ts"], size: 3, loosened: false, pinChanged: false }, head: "sha-a", commits: ["sha-a"] });
 	await settleMergedPulls(state, pull("OPEN", finished), 9);
 	expect(state.merges.list()).toEqual([]);
 	expect(finished).toEqual([]);
@@ -98,7 +179,7 @@ test("a change merged through a pull request after the worker moved on ends its 
 	await settleMergedPulls(state, pull("MERGED", finished), 10);
 
 	expect(finished).toEqual(["a"]);
-	expect(state.merges.list()).toEqual([{ item: "a", sha: "sha-a", at: 9, paths: ["ui/a.ts"], baseChecked: false }]);
+	expect(state.merges.list()).toEqual([{ item: "a", sha: "merge-a", at: 9, paths: ["ui/a.ts"], baseChecked: false, commits: ["sha-a", "merge-a"] }]);
 	expect(state.landings.list()).toEqual([]);
 	expect(state.events.list("a").map(({ type }) => type)).toEqual(["merged"]);
 });

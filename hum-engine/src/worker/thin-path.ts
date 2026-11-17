@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type AnyActor, createActor, createAsyncLogic } from "xstate";
 import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource } from "../adapter-api.ts";
-import { type Finished, type Runner, type RunOutcome, hasSucceeded } from "../adapters/claude-p.ts";
+import { type Finished, type Paused, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { visibleText } from "../adapters/marked.ts";
 import { type Git, gitIn, PATCH, withConfigPinned } from "../adapters/git.ts";
@@ -15,8 +15,9 @@ import { invokedSources, kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
-import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges } from "../decide/prose.ts";
+import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
+import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checksTimeoutMs, runChecks } from "./checks.ts";
@@ -113,7 +114,7 @@ export type ThinResult =
 	| { readonly outcome: "limited"; readonly item: string; readonly until: number }
 	| { readonly outcome: "held"; readonly item: string; readonly why: string };
 
-type Answered = { readonly question: string; readonly answer: string; readonly option: string | undefined; readonly plan: string };
+type Answered = { readonly question: string; readonly answer: string; readonly option: string | undefined; readonly plan: string; readonly at: number };
 
 /** The question, the answer to it and the plan, once the owner has answered the latest question. */
 export const answerTo = (item: Item): Answered | undefined => {
@@ -128,6 +129,7 @@ export const answerTo = (item: Item): Answered | undefined => {
 		answer: answer.option ? `${answer.option}: ${answer.text}` : answer.text,
 		option: answer.option,
 		plan: plan?.text.slice(PLAN_MARK.length).trim() ?? "",
+		at: answer.at,
 	};
 };
 
@@ -222,6 +224,10 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const saved = knownKind ? await o.state.items.restore(id, knownKind, { sources: stubSources(knownKind), kindAt: earlierKinds(o.state, knownKind) }) : ({ ok: true, value: undefined } as const);
 
 	if (!saved.ok) return { outcome: "held", item: id, why: saved.fault.cause };
+
+	const log = o.state.events.read(id);
+
+	if (!log.ok) return { outcome: "held", item: id, why: log.fault.cause };
 
 	const at = saved.value === undefined ? undefined : String(saved.value.getSnapshot().value);
 
@@ -407,6 +413,7 @@ type Driven = ThinPathOptions & {
 
 const drive = async (d: Driven): Promise<ThinResult> => {
 	const { state, runner, config, kind, id, item, branch, clone, g, base } = d;
+	const { version } = kind.machine;
 	const maxFixes = config.hum.maxFixRuns;
 	const result = Promise.withResolvers<ThinResult>();
 
@@ -415,9 +422,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	// The total over all runs is saved; the cap counts what the item spent since the owner last answered.
 	const tally = tallyOf(state, id);
 
-	if (d.answered) tally.startAfresh();
+	if (d.answered) {
+		tally.startAfresh();
+		state.events.add(ownerAnswered(id, d.answered.at));
+	}
 
-	let fixes = 0;
 	let lastFailure = "";
 	let cause = "";
 	let handled = "";
@@ -477,40 +486,49 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		actor.send({ type: "token-cap" });
 	};
 
-	/** One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where the state can, and ends stuck where it cannot. */
-	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal): Promise<Finished> => {
-		const attempt = state.runs.unended(id, purpose)?.attempt ?? state.runs.list(id).length;
-		const key = { itemId: id, run: purpose, attempt };
-		const begun = state.runs.begin(key, { name: `hum ${id} ${purpose} #${attempt}`, sessionId: d.newSessionId() });
+	/**
+	 * One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where
+	 * the state can, and ends stuck where it cannot. A run given what it judges is answered from the item's log when
+	 * the log keeps an answer to the same prompt on the same change, and that answer spends nothing again.
+	 */
+	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
+		const key = state.runs.keyFor(id, purpose);
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[purpose]?.file ?? purpose;
+		const prompt = `${text}${memorySection(held)}`;
+		const tier = await tierFor(purpose);
+		const launch = { name: `hum ${id} ${purpose} #${key.attempt}`, sessionId: d.newSessionId() };
 
-		const lease = await d.gate?.enter(prefix, signal);
+		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
+			const lease = await d.gate?.enter(prefix, signal);
 
-		const outcome = await runner
-			.run({
-				prompt: `${text}${memorySection(held)}`,
-				cwd: purpose === "review" ? tmpdir() : clone,
-				env: d.env,
-				...(await tierFor(purpose)),
-				schema,
-				tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
-				name: begun.record.name,
-				// A saved id already has a transcript under it; a fresh run mints its own.
-				sessionId: begun.adopted ? undefined : begun.record.sessionId,
-				signal,
-				onSession: (sessionId) => begun.saveSession(sessionId),
-				onFirstToken: () => lease?.opened(),
-			})
-			.finally(() => lease?.release());
+			const ran = await runner
+				.run({
+					prompt,
+					cwd: purpose === "review" ? tmpdir() : clone,
+					env: d.env,
+					...tier,
+					schema,
+					tokenCap: kind.tokenCap.tokens - tally.sinceAnswer(),
+					name: begun.record.name,
+					// A saved id already has a transcript under it; a fresh run mints its own.
+					sessionId: begun.adopted ? undefined : begun.record.sessionId,
+					signal,
+					onSession: (sessionId) => begun.saveSession(sessionId),
+					onFirstToken: () => lease?.opened(),
+				})
+				.finally(() => lease?.release());
+
+			if (!isPaused(ran)) tally.spend(ran.tokens);
+
+			return ran;
+		});
 
 		begun.end(held.length === 0 ? undefined : outcome.kind === "finished" ? rulesUsed(outcome, held) : []);
 
 		if (isPaused(outcome)) return pause(pauseOf(id, outcome));
 
 		if (outcome.kind === "over-cap") {
-			tally.spend(outcome.tokens);
-
 			const why = `The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens.`;
 
 			if (!actor.getSnapshot().can({ type: "token-cap" })) throw failed(why);
@@ -519,8 +537,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			return new Promise<never>(() => {});
 		}
-
-		tally.spend(outcome.tokens);
 
 		return outcome;
 	};
@@ -550,7 +566,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const step = (purpose: "build" | "fix") =>
 		createAsyncLogic({
 			run: async ({ signal }) => {
-				if (purpose === "fix" && ++fixes > maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
+				// Every fix run since the owner last answered counts, over every pass and wake: the item's log holds them all.
+				if (purpose === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
 				const before = (await g(["rev-parse", "HEAD"])).trim();
 				const chosen: string[] = [];
@@ -611,8 +628,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		],
 	]);
 
-	const saveVerdict = (pick: EventPick, models: readonly string[], head: string) => state.verdicts.put(id, verdictOf({ id, head, pick, models }));
-
 	/** A plan or review state: its run picks the next event, and a split files the parts and lands the item as done. */
 	const decision = (purpose: ProsePurpose) =>
 		createAsyncLogic({
@@ -625,11 +640,12 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					prompt: PROSE_PROMPTS[purpose](config, item, diff),
 					diff,
 					model: (await tierFor(purpose)).model,
-					run: (text, schema) => runAgent(purpose, text, schema, signal),
+					run: (text, schema) => runAgent(purpose, text, schema, signal, { head }),
 					canTake: (type) => actor.getSnapshot().can({ type }),
 				});
 
-				if (purpose === "review") saveVerdict(pick, models, head);
+				if (purpose === "review") keepVerdict(state, { id, head, pick, models });
+				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick, models: [...models] } });
 
 				PICKED.get(pick.event)?.(pick, models);
 
@@ -652,6 +668,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		// The wait it was saved in is already handled; only what follows the answer needs a reaction.
 		handled = String(actor.getSnapshot().value);
 	} else {
+		state.events.add(machineStarted({ itemId: id, machineVersion: version, afresh: d.restarted }));
 		actor = createActor(kindMachine(kind, sources));
 	}
 
@@ -749,8 +766,12 @@ type Purpose = (typeof PURPOSES)[number];
 /** Which runs are placed by the branch's diff so far; the others by the files their item declares. */
 const PLACED_BY_DIFF = { plan: false, build: false, fix: true, review: true } as const satisfies Record<Purpose, boolean>;
 
-/** The event by which a plan run splits its item into parts. */
-const SPLIT = "needs-split";
+/**
+ * What a plan or review run reads besides its prompt: the commit its clone stands at, which fixes the whole diff its
+ * prompt may cut short. Only these runs are given it: their answer is all they do, while a build or fix run's change
+ * lives in a clone that a kill loses.
+ */
+type Judged = { readonly head: string };
 
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
@@ -776,14 +797,15 @@ export const PROSE_PROMPTS = {
 	review: (config: RunConfig, item: ItemText, diff: string): string => [roleOf(config, "review"), reviewInput(item, diff, config.hum)].join("\n\n"),
 } as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string) => string>;
 
-const verdictOf = ({ id, head, pick, models }: { readonly id: string; readonly head: string; readonly pick: EventPick; readonly models: readonly string[] }) => ({ item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] });
+/** A review's verdict on the change that ends at `head`: saved for landing, and kept in the item's log. */
+const keepVerdict = (state: State, { id, head, pick, models }: { readonly id: string; readonly head: string; readonly pick: EventPick; readonly models: readonly string[] }) => {
+	const verdict = { item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] };
 
-/** A run that ended with no answer and no token to count: a usage limit, a hold, or a stop. */
-type Paused = Extract<RunOutcome, { kind: "limited" | "held" | "stopped" }>;
+	state.verdicts.put(id, verdict);
+	keepPick(state.events, { itemId: id, pick: { judge: "review", head, pick, models: [...models] } });
 
-const PAUSED_KINDS: readonly string[] = ["limited", "held", "stopped"] satisfies readonly Paused["kind"][];
-
-const isPaused = (outcome: RunOutcome): outcome is Paused => PAUSED_KINDS.includes(outcome.kind);
+	return verdict;
+};
 
 /** What a paused run comes to for its item. */
 const pauseOf = (id: string, outcome: Paused): ThinResult => {
@@ -834,13 +856,7 @@ export const reviewRunOf =
 			return new Promise<never>(() => {});
 		};
 
-		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => {
-			const verdict = verdictOf({ id: item.id, head, pick, models });
-
-			o.state.verdicts.put(item.id, verdict);
-
-			return { verdict };
-		});
+		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => ({ verdict: keepVerdict(o.state, { id: item.id, head, pick, models }) }));
 
 		return Promise.race([decided, halted]);
 	};

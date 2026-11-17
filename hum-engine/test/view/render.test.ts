@@ -118,10 +118,16 @@ test("the header and the measure line are one row each at every width, and the n
 	}
 });
 
-test("the measure line drops tokens, then questions, then its label", () => {
+test("the measure line drops each way of reaching done, the last first, then tokens, then questions, then its label", () => {
 	const shown = (width: number) =>
 		textOf(measureRow(fullStatus.measure, width));
 
+	expect(shown(140)).toBe(
+		"per merge (last 20): 0.4 notes · 0.2 questions · 310k tokens · checks: 1 reverted, 2 fixed of 9 · review: 0 reverted, 1 fixed of 8",
+	);
+	expect(shown(100)).toBe(
+		"per merge (last 20): 0.4 notes · 0.2 questions · 310k tokens · checks: 1 reverted, 2 fixed of 9",
+	);
 	expect(shown(80)).toBe(
 		"per merge (last 20): 0.4 notes · 0.2 questions · 310k tokens",
 	);

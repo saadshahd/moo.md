@@ -20,7 +20,7 @@ export const SAVED_0_1_0 = {
 	answers: { item: "7", ordinal: 1, text: "alpha", option: "alpha", source: "first-word", disposition: "applied", why: "The run goes on with your answer.", at: 1_700_000_000_000 },
 	slots: { name: "slot-1", index: 0, folder: "/tmp/slots/slot-1", status: "taken", item: "7", lockfiles: "abc", since: 1_700_000_000_000 },
 	runs: { itemId: "7", run: "build", attempt: 0, name: "hum #7 build 0", sessionId: "session-1", savedAt: 1_700_000_000_000, endedAt: 1_700_000_000_900, memoryUsed: ["Run the tests first."] },
-	events: { source: "thread", sourceId: "c1", itemId: "7", type: "answer", receivedAt: 1_700_000_000_000, payload: { text: "alpha" } },
+	events: { source: "thread", sourceId: "answer:1700000000000", itemId: "7", type: "answered", receivedAt: 1_700_000_000_000, payload: {} },
 	ops: { itemId: "7", run: "build", attempt: 0, op: "comment", state: "done", at: 1_700_000_000_000 },
 	proofs: { item: "7", at: 1_700_000_000_000, passed: false, reason: "the check passes on 0123456, the commit a note points at", worktrees: 2, ms: 900 },
 	choices: { item: "7", text: 'Chose "short" over long without you.', at: 1_700_000_000_000 },

@@ -228,6 +228,13 @@ type Ended = RunOutcome | LimitEnded;
 
 export const hasSucceeded = (outcome: Finished): boolean => outcome.subtype === "success" && !outcome.isError;
 
+/** A run that ended with no answer and no token to count: a usage limit, a hold, or a stop. */
+export type Paused = Extract<RunOutcome, { kind: "limited" | "held" | "stopped" }>;
+
+const PAUSED_KINDS: readonly string[] = ["limited", "held", "stopped"] satisfies readonly Paused["kind"][];
+
+export const isPaused = (outcome: RunOutcome): outcome is Paused => PAUSED_KINDS.includes(outcome.kind);
+
 const LOCK_TEXT = /refresh[^\n]*lock|lock[^\n]*refresh/i;
 
 const isLimitRefusal = (t: Transcript, result: Result): boolean => result.is_error && (t.rejectedUntil !== undefined || LIMIT_TEXT.test(result.result));

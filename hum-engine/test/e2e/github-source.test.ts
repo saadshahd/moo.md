@@ -6,7 +6,7 @@ import { guarded, guardTimings } from "../../src/adapters/guard.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 import { runThinPath } from "../../src/worker/thin-path.ts";
-import { FakeGitHub } from "../fixtures/fake-github.ts";
+import { FakeGitHub, mergeCommitOf } from "../fixtures/fake-github.ts";
 import { sh, WorkRepo } from "../fixtures/work-repo.ts";
 import { gitIn } from "../../src/adapters/git.ts";
 import { dropEvidence, evidenceMarkdown, evidenceRef, keepEvidence } from "../../src/worker/evidence.ts";
@@ -65,7 +65,7 @@ test("an issue lands through a pull request: no item file is marked, the pull re
 	expect(await pass()).toEqual({ outcome: "merged", item: id });
 	expect(github.issueState(Number(id))).toBe("CLOSED");
 	expect(await issues.workSource!.listReady()).toEqual([]);
-	expect(w.state.merges.get(id)).toBeDefined();
+	expect(w.state.merges.get(id)).toMatchObject({ sha: mergeCommitOf(pull?.number ?? 0) });
 });
 
 test("an issue whose base takes a push lands on main and closes, with no item file in the repo, as hum's commit under the run's pull request title", async () => {

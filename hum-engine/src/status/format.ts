@@ -60,19 +60,28 @@ export type Choice = z.infer<typeof Choice>;
 /** A path rule the owner's answer added, with the command that takes it back. */
 const LearnedRule = z.object({ glob: name, level: name, item: name, at: time, undo: Action });
 
+const count = z.int().check(z.nonnegative());
+
 const PerMerge = z.object({
-	merges: z.int().check(z.nonnegative()),
+	merges: count,
 	/** Items that never merged in the window; their costs are in the numbers. */
-	abandoned: z.int().check(z.nonnegative()),
+	abandoned: count,
 	notes: z.number().check(z.nonnegative()),
 	questions: z.number().check(z.nonnegative()),
 	tokens: z.number().check(z.nonnegative()),
 });
 
-/** Per merged change over the last `window` merged changes, and over each path's own last `window`. */
+/** The merged changes that reached done one way, over that way's own last `window`, and how many of them a later change reverted or fixed. */
+const DoneByBreaks = z.object({ doneBy: name, merges: count, reverted: count, fixed: count });
+
+/**
+ * Per merged change over the last `window` merged changes, and over each path's own last `window`; then the breaks
+ * of each way of reaching done, which a status file an older engine wrote lacks.
+ */
 export const Measure = z.extend(PerMerge, {
 	window: z.int().check(z.positive()),
 	byPath: z.array(z.extend(PerMerge, { glob: name })),
+	byDoneBy: z._default(z.array(DoneByBreaks), []),
 });
 
 export type Measure = z.infer<typeof Measure>;

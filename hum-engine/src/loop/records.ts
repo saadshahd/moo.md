@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { type Label, LABELS } from "../decide/risk.ts";
 
 const name = z.string().min(1);
 const time = z.int().nonnegative();
@@ -7,6 +8,9 @@ const time = z.int().nonnegative();
 const NOTE_SOURCES = ["review-comment", "review-body", "plan-answer", "revert", "fix"] as const;
 
 export type NoteSource = (typeof NOTE_SOURCES)[number];
+
+/** The note a broken change gets, by how a later change broke it. */
+export const BREAK_NOTES = { reverted: "revert", fixed: "fix" } as const satisfies Record<Exclude<Label, "clean">, NoteSource>;
 
 /** One correction the owner made to hum's work, saved before anything acts on it and keyed by its source and source id. */
 export const ReviewNote = z.object({
@@ -50,17 +54,36 @@ export const PossibleRepeat = z.object({ a: name, b: name, models: z.array(name)
 
 export type PossibleRepeat = z.infer<typeof PossibleRepeat>;
 
-/** A merged change: what the measure counts. */
+/**
+ * A merged change: what the measure counts, and, with the picks its item's log keeps, what a judge can be scored again
+ * on once its prompt changes. The item's text is the work source's, and the change the judges read is the base's diff
+ * across its commits on the base's first-parent line, hum's done mark aside.
+ */
 export const Merge = z.object({
 	item: name,
+	/** The base's commit once the change is on it. */
 	sha: name,
 	at: time,
 	paths: z.array(name),
 	/** The repo's checks have run on the base since it merged; a merge saved before hum checked the base counts as checked. */
 	baseChecked: z.boolean().default(true),
+	/**
+	 * Every commit that held the change, oldest first: the run branch's own, then, for a pull request, the commit its
+	 * merge made on the base. A note, revert or fix that names one is about this item. Absent where hum did not see
+	 * them, as on a merge saved before it kept them; `sha` alone then stands for them.
+	 */
+	commits: z.array(name).optional(),
 });
 
 export type Merge = z.infer<typeof Merge>;
+
+/** The commits that held a merged change; its `sha` alone where hum did not see them. */
+export const commitsOf = ({ sha, commits }: Pick<Merge, "sha" | "commits">): readonly string[] => commits ?? [sha];
+
+/** A commit on the base that git's label rule finds a later change reverted or fixed, or that a test of the base failed after. */
+export const BrokenCommit = z.object({ sha: name, label: z.enum(LABELS).exclude(["clean"]) });
+
+export type BrokenCommit = z.infer<typeof BrokenCommit>;
 
 /** A test of the base that failed after an item's change merged. */
 export const Break = z.object({ item: name, sha: name, at: time, paths: z.array(name), level: name, failure: z.string(), onBreak: z.enum(["follow-up", "block"]), followUp: name });

@@ -23,6 +23,9 @@ export const Limit = z.object({ until: time });
 /** The ids a provider last listed as ready, so a restart still sees an empty list that contradicts them. */
 export const ReadyList = z.object({ ids: z.array(name) });
 
+/** The alignment call's grades, or why it abstained. */
+export const Alignment = z.union([z.object({ graded: AlignmentAnswer }), z.object({ abstained: name })]);
+
 /** A finished change on its way to the base: what its diff showed, so a retry lands it again without a run. */
 export const Landing = z.object({
 	item: name,
@@ -35,8 +38,10 @@ export const Landing = z.object({
 	lostRaces: z.int().nonnegative().default(0),
 	/** The change's patch id against the base: the same change rebased keeps its landing. */
 	patch: z.string().optional(),
-	/** The alignment call's grades, or why it abstained; made once per change. */
-	alignment: z.union([z.object({ graded: AlignmentAnswer }), z.object({ abstained: name })]).optional(),
+	/** Made once per change. */
+	alignment: Alignment.optional(),
+	/** The run branch's commits past the base, oldest first, hum's done mark among them: what a push puts on the base. Absent on a landing saved before hum kept them. */
+	commits: z.array(name).optional(),
 });
 
 export type Landing = z.infer<typeof Landing>;

@@ -5,7 +5,7 @@ import { SHIPPED_COMMAND_TIMEOUT_MS } from "../exec.ts";
 import { EventLog } from "./events.ts";
 import { Faults } from "./faults.ts";
 import { type Codec, Items } from "./items.ts";
-import { Break, Merge, PossibleRepeat, Proof, RepeatGroup, ReviewNote } from "../loop/records.ts";
+import { Break, BrokenCommit, Merge, PossibleRepeat, Proof, RepeatGroup, ReviewNote } from "../loop/records.ts";
 import { Choice } from "../status/format.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
@@ -49,7 +49,7 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		stops: join(dir, STOPS_DIR),
 		faults,
 		items: new Items(join(dir, "items"), faults, now, codec),
-		events: new EventLog(join(dir, "events"), now),
+		events: new EventLog(join(dir, "events"), now, faults, codec.engineVersion),
 		ops: new OpKeys(join(dir, "ops"), now),
 		runs: new RunRecords(join(dir, "runs"), now),
 		parked: new Records(join(dir, "parked"), Parked),
@@ -86,6 +86,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		merges: new Records(join(dir, "merges"), Merge),
 		/** Tests of the base that failed after a merge, by item. */
 		breaks: new Records(join(dir, "breaks"), Break),
+		/** The label git's rule gives each commit on the base that broke, by sha. */
+		labels: new Records(join(dir, "labels"), BrokenCommit),
 		/** What proving a check item cost, by item. */
 		proofs: new Records(join(dir, "proofs"), Proof),
 	};

@@ -45,6 +45,7 @@ test("the view reads the status file the engine wrote, and every section draws i
 	expect(read.status.questions.map(({ item }) => item)).toContain("b");
 	expect(read.status.cards.map(({ code }) => code)).toContain("run-error");
 	expect(read.status.choices).toHaveLength(1);
+	expect(read.status.measure?.byDoneBy.map(({ doneBy }) => doneBy)).toEqual(["checks"]);
 
 	for (const width of WIDTHS) {
 		const rows = [...paneRows({ read, now, amberAfterSeconds: AMBER_AFTER, width, unfolded: new Set() }), bandRow({ read, now, amberAfterSeconds: AMBER_AFTER, width })];

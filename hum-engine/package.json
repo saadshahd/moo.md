@@ -1,6 +1,6 @@
 {
   "name": "@moo.md/hum",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "The hum engine: work items become Claude Code agent runs, the repo's checks decide what they can, and only what nothing settles becomes a question to the owner.",
   "license": "MIT",
   "author": {
@@ -87,6 +87,7 @@
     "@types/proper-lockfile": "4.1.4",
     "@types/semver": "7.8.0",
     "@types/write-file-atomic": "4.0.3",
+    "graphql": "17.1.0",
     "microdiff": "1.6.0",
     "oxlint": "1.89.0",
     "typescript": "5.9.2"

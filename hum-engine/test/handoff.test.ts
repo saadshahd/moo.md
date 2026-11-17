@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { kindMoveFault, passReach, takeWorkRecords } from "../src/publish/handoff.ts";
+import { ownerAnswered } from "../src/state/item-log.ts";
 import { openState } from "../src/state/open.ts";
 import { savedLimitUntil, settleLimit } from "../src/adapters/limit.ts";
 import { configWith } from "./fixtures/config.ts";
@@ -28,6 +29,23 @@ test("publish takes a work job's runs and a machine state a pass can reach, and 
 	expect(into.runs.list("a")).toHaveLength(1);
 	expect(into.landings.get("a")).toBeUndefined();
 	expect(into.verdicts.get("a")).toBeUndefined();
+});
+
+test("publish keeps each log record as the work job's engine wrote it, at the next places in its own log, once however often it takes them", () => {
+	const work = openState(tempDir("work"), { engineVersion: "0.2.0", now: () => 5 });
+	const into = openState(tempDir("publish"), { engineVersion: "0.3.0", now: () => 9 });
+
+	into.events.add(ownerAnswered("a", 1));
+
+	for (const at of [3, 2]) work.events.add(ownerAnswered("a", at));
+
+	for (let times = 0; times < 2; times++) takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS);
+
+	expect(into.events.list("a").map(({ sourceId, engineVersion, receivedAt, seq }) => ({ sourceId, engineVersion, receivedAt, seq }))).toEqual([
+		{ sourceId: "answer:1", engineVersion: "0.3.0", receivedAt: 9, seq: 0 },
+		{ sourceId: "answer:3", engineVersion: "0.2.0", receivedAt: 5, seq: 1 },
+		{ sourceId: "answer:2", engineVersion: "0.2.0", receivedAt: 5, seq: 2 },
+	]);
 });
 
 test("publish refuses a machine state the owner's wait stands before, and keeps its own", () => {

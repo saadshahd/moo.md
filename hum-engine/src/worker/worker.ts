@@ -416,16 +416,7 @@ export class Worker {
 
 					const hasNewAnswer = waiting.has(id) && answerTo(item) !== undefined && lastAnswerAt !== undefined;
 
-					if (hasNewAnswer) {
-						state.events.add({
-							source: "thread",
-							sourceId: `answer:${lastAnswerAt}`,
-							itemId: id,
-							type: "answered",
-							payload: {},
-						});
-						this.#answered.add(id);
-					}
+					if (hasNewAnswer) this.#answered.add(id);
 				}),
 			),
 		);

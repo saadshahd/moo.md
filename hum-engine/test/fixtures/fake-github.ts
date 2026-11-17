@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Kind, type OperationDefinitionNode, parse, type SelectionSetNode } from "graphql";
 import { z } from "zod";
 import { gitHubClient } from "../../src/adapters/github-client.ts";
 import { type GitHubCommits, gitHubCommits } from "../../src/adapters/github-commits.ts";
@@ -73,6 +74,37 @@ const gitAt = (repo: string, args: readonly string[], input?: Buffer | string) =
 const REPOSITORY_ID = "R_fake";
 const TOKENS = new Set(["token fake-token", "bearer fake-token"]);
 
+type JsonObject = { readonly [key: string]: Json };
+
+const isObject = (value: Json): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The fields of `value` a selection names, under their aliases; an inline fragment adds its own on a node of its type. */
+const fieldsOf = (selection: SelectionSetNode, value: JsonObject): [string, Json][] =>
+	selection.selections.flatMap((node): [string, Json][] => {
+		if (node.kind === Kind.INLINE_FRAGMENT) return node.typeCondition === undefined || node.typeCondition.name.value === value.__typename ? fieldsOf(node.selectionSet, value) : [];
+
+		if (node.kind === Kind.FRAGMENT_SPREAD) throw new Error(`the fake reads no named fragment, as ${node.name.value}`);
+
+		const field = value[node.name.value];
+
+		if (field === undefined) throw new Error(`the fake answers no ${node.name.value}`);
+
+		return [[node.alias?.value ?? node.name.value, node.selectionSet ? selected(node.selectionSet, field) : field]];
+	});
+
+/**
+ * An answer as GitHub sends it for a selection: only the fields the selection names. A field it names that the fake
+ * leaves out throws, so a query passes against the fake only where GitHub would answer every field it reads.
+ */
+const selected = (selection: SelectionSetNode, value: Json): Json => {
+	if (Array.isArray(value)) return value.map((each) => selected(selection, each));
+
+	return isObject(value) ? Object.fromEntries(fieldsOf(selection, value)) : value;
+};
+
+/** The commit the fake names as a merged pull request's merge on the base. */
+export const mergeCommitOf = (number: number): string => `merge-of-${number}`;
+
 /** A pull request as GitHub's GraphQL answers it. */
 const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
 	id,
@@ -81,6 +113,7 @@ const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
 	state,
 	mergeStateStatus: status,
 	autoMergeRequest: autoMerge ? { enabledAt: "2026-11-08T00:00:00Z" } : null,
+	mergeCommit: state === "MERGED" ? { oid: mergeCommitOf(number) } : null,
 });
 
 const json = (status: number, value: Json, headers: Record<string, string> = {}) =>
@@ -315,7 +348,7 @@ export class FakeGitHub {
 		const oid = ref === undefined ? undefined : this.#refs.get(ref);
 		const commit = oid === undefined ? undefined : this.#commits.get(oid);
 
-		return oid && commit ? { target: { oid, message: commit.message, tree: { oid: commit.tree } } } : null;
+		return oid && commit ? { target: { __typename: "Commit", oid, message: commit.message, tree: { oid: commit.tree } } } : null;
 	}
 
 	#issueNode(issue: Issue) {
@@ -325,7 +358,7 @@ export class FakeGitHub {
 	#claims(prefix: string) {
 		const refs = [...this.#refs.keys()].filter((ref) => ref.startsWith(prefix));
 
-		return { totalCount: refs.length, nodes: refs.map((ref) => ({ name: ref.slice(prefix.length), target: { message: this.#commits.get(this.#refs.get(ref) ?? "")?.message ?? "" } })) };
+		return { totalCount: refs.length, nodes: refs.map((ref) => ({ name: ref.slice(prefix.length), target: { __typename: "Commit", message: this.#commits.get(this.#refs.get(ref) ?? "")?.message ?? "" } })) };
 	}
 
 	#commit(commit: Commit): string {
@@ -429,18 +462,19 @@ export class FakeGitHub {
 
 	#graphql(raw: string): Response {
 		const { query, variables } = Request.parse(JSON.parse(raw));
-		const operation = /^\s*(?:query|mutation)\s+(\w+)/.exec(query)?.[1] ?? "";
-		const run = Object.entries(this.#operations).find(([name]) => name === operation)?.[1];
+		const operation = parse(query).definitions.find((definition): definition is OperationDefinitionNode => definition.kind === Kind.OPERATION_DEFINITION);
+		const name = operation?.name?.value ?? "";
+		const run = Object.entries(this.#operations).find(([found]) => found === name)?.[1];
 
-		if (!run) throw new Error(`the fake knows no operation "${operation}"`);
+		if (!operation || !run) throw new Error(`the fake knows no operation "${name}"`);
 
-		this.requests.push(`graphql ${operation}`);
+		this.requests.push(`graphql ${name}`);
 
-		if (this.failsOnce.delete(operation)) return new Response("bad gateway", { status: 502 });
+		if (this.failsOnce.delete(name)) return new Response("bad gateway", { status: 502 });
 
 		const answer = run(Vars.parse(variables));
 
-		return answer instanceof Refused ? json(200, { data: null, errors: [answer.graphql] }) : json(200, { data: answer });
+		return answer instanceof Refused ? json(200, { data: null, errors: [answer.graphql] }) : json(200, { data: selected(operation.selectionSet, answer) });
 	}
 
 	#rest(method: string, url: URL, body: RequestInit["body"], headers: Headers): Response {
