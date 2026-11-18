@@ -5,7 +5,7 @@ import { restoreActor } from "xstate/persist";
 import { asJson, type Json } from "../config/json.ts";
 import { climb } from "../config/migrate.ts";
 import { migrateSnapshot } from "../config/state-map.ts";
-import { kindMachine } from "../config/machine.ts";
+import { kindMachine, type Touched } from "../config/machine.ts";
 import type { Kind } from "../config/schema.ts";
 import { type Faults, type Outcome } from "./faults.ts";
 import { atomicWrite, isMissing, listRecords, readJson, slug } from "./fs.ts";
@@ -35,6 +35,8 @@ export type RestoreOptions = {
 	/** The earlier version of the kind, by machine version, for a snapshot saved under it. */
 	readonly kindAt?: (machineVersion: string) => Kind | undefined;
 	readonly sources?: Readonly<Record<string, AnyActorLogic>>;
+	/** What the machine's guards read of the change; a guard that reads it where none is given throws. */
+	readonly touched?: Touched;
 	readonly clock?: ActorClock;
 };
 
@@ -144,7 +146,7 @@ export class Items {
 	 * Reads the item's snapshot and restores its actor, not started. Returns `undefined` when nothing is saved.
 	 * A snapshot that cannot be restored stays on disk, and the caller starts nothing for that item.
 	 */
-	async restore(itemId: string, kind: Kind, { kindAt, sources = {}, clock }: RestoreOptions = {}): Promise<Outcome<AnyActor | undefined>> {
+	async restore(itemId: string, kind: Kind, { kindAt, sources = {}, touched, clock }: RestoreOptions = {}): Promise<Outcome<AnyActor | undefined>> {
 		const file = this.path(itemId);
 		const unreadable = (why: string) => this.#fault({ itemId, code: SNAPSHOT_CARDS.unreadable, cause: `The saved state of ${itemId} at ${file} is damaged: ${why}.`, fix: DAMAGED_FIX });
 		const unrestorable = (why: string) => this.#fault({ itemId, code: SNAPSHOT_CARDS.restoreError, cause: `The saved state of ${itemId} does not restore: ${why}.`, fix: DAMAGED_FIX });
@@ -198,7 +200,7 @@ export class Items {
 		try {
 			// SAFETY: the snapshot is JSON the machine's own schema validates; xstate reports a bad one as an 'error' status, checked below.
 			const restored = current as never;
-			const actor = restoreActor(kindMachine(kind, sources), restored, clock ? { clock } : undefined);
+			const actor = restoreActor(kindMachine(kind, sources, touched), restored, clock ? { clock } : undefined);
 			const status = actor.getSnapshot();
 
 			return status.status === "error" ? unrestorable(reason(status.error)) : { ok: true, value: actor };

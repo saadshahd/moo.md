@@ -29,6 +29,12 @@ const FIXED: ReadonlySet<string> = new Set(FIXED_PARTS);
 /** Whether a state's `invoke.src` names one of the engine's parts, not a role's run. */
 export const isFixedPart = (src: string): boolean => FIXED.has(src);
 
+/** The engine's parts a state may invoke; every other part only sends events, so a state that invokes one would run nothing. */
+const RUN_PARTS: ReadonlySet<string> = new Set(["checks", "shows-bug", "bug-gone"] satisfies (typeof FIXED_PARTS)[number][]);
+
+/** Whether a state's `invoke.src` names an engine part that runs. */
+export const isRunPart = (src: string): boolean => RUN_PARTS.has(src);
+
 export const PURPOSES = ["plan", "build", "fix", "review"] as const;
 
 /** The integration slots `hum.json` `integrations` names, each to an adapter. */
@@ -197,6 +203,11 @@ const Shipped = z.object({
 	claimPrefix: branchPrefix.describe("A claim is the first push of the branch this prefix and its item id make."),
 	readyLabel: name.describe("The label that marks an issue ready for hum."),
 	mergeMethod: z.enum(MERGE_METHODS).describe("How a released pull request merges."),
+	alwaysPullRequest: z
+		.boolean()
+		.describe(
+			"Whether every change hum lands on the base goes through a pull request: a run's change, an answer's or a learned path rule's commit. A cleared change's pull request merges itself once the base's required checks pass. False pushes a cleared change where the base's rules allow a push, as when the owner's token may bypass them. It needs a base on GitHub; elsewhere a change ends stuck.",
+		),
 	models: z.record(z.enum(TIERS), name).describe("The model id each tier of a kind's table runs on."),
 	runners: count.describe("The most runs that go at once."),
 	tickIntervalSeconds: seconds.describe("The time between worker ticks; each tick writes the heartbeat and renews the claims in flight."),
@@ -448,10 +459,11 @@ export const MachineJSON = z.strictObject({
 export type MachineJSON = z.infer<typeof MachineJSON>;
 
 export const Kind = z.strictObject({
-	/** Tier and effort by purpose, level and size; an omitted level or size matches all. */
+	/** Tier and effort by purpose, role, level and size; an omitted role, level or size matches all, and a row that names the role wins. */
 	tiers: z.array(
 		z.strictObject({
 			purpose: z.enum(PURPOSES),
+			role: name.optional(),
 			level: name.optional(),
 			size: z.enum(SIZES).optional(),
 			tier: z.enum(TIERS),
@@ -484,6 +496,7 @@ export const OWNER_CHANGEABLE = {
 	"claim prefix": "claimPrefix",
 	"ready label": "readyLabel",
 	"merge method": "mergeMethod",
+	"always pull request": "alwaysPullRequest",
 	"model per tier": "models",
 	"runner count": "runners",
 	"tick interval": "tickIntervalSeconds",

@@ -124,7 +124,7 @@ test.skipIf(!live)("live: an owner's commit goes through a pull request that aut
 	const branch = `${config.hum.ownerBranchPrefix}live-${stamp}-${sha.slice(0, 12)}`;
 
 	try {
-		const landed = await landOwnerCommit({ sha, base: "main", label: `live-${stamp}`, title: `docs: owner ${stamp}`, body: "A live test of landing an owner's commit.", branchPrefix: config.hum.ownerBranchPrefix, mergeMethod: config.hum.mergeMethod, labels: [], pulls, push: (refspecs) => push(git, ["origin", ...refspecs]) });
+		const landed = await landOwnerCommit({ sha, base: "main", label: `live-${stamp}`, title: `docs: owner ${stamp}`, body: "A live test of landing an owner's commit.", branchPrefix: config.hum.ownerBranchPrefix, mergeMethod: config.hum.mergeMethod, alwaysPullRequest: config.hum.alwaysPullRequest, labels: [], pulls, push: (refspecs) => push(git, ["origin", ...refspecs]) });
 
 		expect(landed).toMatchObject({ via: "pull-request" });
 

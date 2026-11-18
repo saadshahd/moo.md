@@ -48,6 +48,31 @@ export const rawConfig = (edit: (raw: Tree) => void = () => {}): Tree => {
 	return raw;
 };
 
+/** The glob a design critic's changes live under, as roundup's desktop app keeps its source. */
+export const CRITIC_PATHS = ["apps/desktop/src/**"];
+
+/**
+ * `raw` with a design-critic role a repo adds: it runs on the top tier after the feature kind's review approves a
+ * change that touches CRITIC_PATHS, and its request-changes goes to a fix run as the review's does. Each part is what
+ * the repo writes in its own `.hum/`.
+ */
+export const withCritic = (raw: Tree): Tree => {
+	const feature = raw.kinds.feature;
+	const { states } = feature.machine;
+
+	raw.hum.roles["design-critic"] = { file: "roles/design-critic.md", purpose: "review", skills: [] };
+	raw.roles["roles/design-critic.md"] = "You are the design critic. Judge whether the change keeps the design system.\n";
+	feature.tiers.push({ purpose: "review", role: "design-critic", tier: "top", effort: "high" });
+	feature.machine.version = "2";
+	states.reviewing.on.approve = [{ target: "critiquing", guard: { type: "touches", params: { paths: CRITIC_PATHS } } }, { target: "merging" }];
+	states.critiquing = {
+		invoke: { src: "design-critic", onError: { target: "stuck" } },
+		on: { approve: { target: "merging" }, "request-changes": { target: "fixing" }, "needs-owner": { target: "owner-review" } },
+	};
+
+	return raw;
+};
+
 /** Writes `raw` as the folder readConfigDir reads: hum.json, a file per kind and the role prompts. */
 export const writeConfigDir = (folder: string, raw: Tree): void => {
 	const put = (path: string, text: string) => {

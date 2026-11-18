@@ -295,6 +295,11 @@
 			],
 			"description": "How a released pull request merges."
 		},
+		"alwaysPullRequest": {
+			"default": false,
+			"type": "boolean",
+			"description": "Whether every change hum lands on the base goes through a pull request: a run's change, an answer's or a learned path rule's commit. A cleared change's pull request merges itself once the base's required checks pass. False pushes a cleared change where the base's rules allow a push, as when the owner's token may bypass them. It needs a base on GitHub; elsewhere a change ends stuck."
+		},
 		"models": {
 			"default": {
 				"light": "claude-haiku-5-5",

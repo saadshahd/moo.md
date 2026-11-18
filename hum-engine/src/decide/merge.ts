@@ -95,7 +95,7 @@ export const isCleared = (route: Pick<Route, "level" | "unclear">, approvals: Ap
 /** Every level that asks for a review gets a fresh review run first; the owner's review comes after it. */
 export const doesNeedReviewRun = (route: Route): boolean => route.level.review !== "none";
 
-/** Where the target branch requires a pull request, every change lands through one, merging itself only when cleared; elsewhere a cleared change is pushed. */
+/** Where a pull request is required, by the target branch's rules or by the owner's alwaysPullRequest, every change lands through one, merging itself only when cleared; elsewhere a cleared change is pushed. */
 export const landingOf = (
 	{ requiresPullRequest, cleared }: { readonly requiresPullRequest: boolean; readonly cleared: boolean },
 ): Landing => {

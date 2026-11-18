@@ -108,6 +108,7 @@
 	"claimPrefix": "hum/claim/",
 	"readyLabel": "hum:ready",
 	"mergeMethod": "squash",
+	"alwaysPullRequest": false,
 	"models": {
 		"light": "claude-haiku-5-5",
 		"standard": "claude-sonnet-5-5",

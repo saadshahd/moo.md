@@ -58,12 +58,24 @@ const silentCheck = `export default { meta: { type: 'suggestion', schema: [] }, 
 export const cases = { valid: [{ code: 'const a = 1;' }], invalid: [{ code: 'const b = 2;', errors: 1 }] };
 `;
 
-const lintHits = ({ root, installed, tool }) =>
-  runLint({ tool, bin: installed.bin, cwd: root, config: join(root, tool === 'eslint' ? 'eslint.config.mjs' : '.oxlintrc.json'), files: ['.'] }).hits;
+const lintHits = ({ root, installed, linter }) =>
+  runLint({ tool: linter.tool, bin: installed.bin, cwd: root, config: join(root, linter.config), files: ['.'] }).hits;
 
 const linters = [
-  { tool: 'eslint', version: '9', config: 'eslint.config.mjs', text: eslintConfig },
-  { tool: 'oxlint', version: 'latest', config: '.oxlintrc.json', text: '{\n  "rules": {}\n}\n' },
+  {
+    tool: 'eslint',
+    version: '9',
+    config: 'eslint.config.mjs',
+    text: eslintConfig,
+    ignoringLongFiles: eslintConfig.replace('export default [\n', "export default [\n  { ignores: ['.claude/**'] },\n  { rules: { 'max-lines': ['error', 20] } },\n"),
+  },
+  {
+    tool: 'oxlint',
+    version: 'latest',
+    config: '.oxlintrc.json',
+    text: '{\n  "rules": {}\n}\n',
+    ignoringLongFiles: '{\n  "ignorePatterns": [".claude/**"],\n  "rules": { "max-lines": ["error", 20] }\n}\n',
+  },
 ];
 
 for (const linter of linters) {
@@ -74,7 +86,7 @@ for (const linter of linters) {
       const first = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
       assert.deepEqual(first.map(({ rule, status, severity }) => ({ rule, status, severity })), [{ rule: keysRule.rule, status: 'installed', severity: 'warn' }]);
       assert.equal(first[0].repoHits, 1);
-      const hits = lintHits({ root: repo.root, installed: repo.installed, tool: linter.tool }).filter((hit) => hit.ruleId === `sound/${keysRule.rule}`);
+      const hits = lintHits({ root: repo.root, installed: repo.installed, linter }).filter((hit) => hit.ruleId === `sound/${keysRule.rule}`);
       assert.equal(hits.length, 1);
       const wired = readFileSync(join(repo.root, linter.config), 'utf8');
       await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
@@ -86,6 +98,13 @@ for (const linter of linters) {
       if (repo.skip) return t.skip(repo.skip);
       const rows = await installChecks({ root: repo.root, corpus, selected: shippedChecks, write: true });
       assert.deepEqual(rows.filter(({ status }) => !['installed', 'covered'].includes(status)).map(({ rule, status, note }) => ({ rule, status, note })), []);
+    });
+
+    test('lints only the files the repo config lints, so a check file the config ignores adds no failure', async (t) => {
+      const repo = repoFor(linter, { [linter.config]: linter.ignoringLongFiles });
+      if (repo.skip) return t.skip(repo.skip);
+      const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+      assert.deepEqual(rows.map(({ status, note }) => ({ status, note })), [{ status: 'installed', note: undefined }]);
     });
 
     test('a dry run measures and leaves the repo byte-for-byte as it was', async (t) => {
@@ -120,14 +139,13 @@ for (const linter of linters) {
 
 describe('a linter older than the lowest tested version', () => {
   test('the failure names the version, and the repo is left as it was', async (t) => {
-    const installed = installLinter({ tool: 'oxlint', version: '1.21.0' });
-    if (installed.skip) return t.skip(installed.skip);
-    const repo = repoFor({ tool: 'oxlint', version: '1.21.0' }, { '.oxlintrc.json': '{\n  "rules": {}\n}\n', 'package.json': '{"devDependencies":{"oxlint":"1.21.0"}}' });
+    const repo = repoFor({ tool: 'oxlint', version: '1.21.0' }, { [linters[1].config]: linters[1].text, 'package.json': '{"devDependencies":{"oxlint":"1.21.0"}}' });
+    if (repo.skip) return t.skip(repo.skip);
     const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
     assert.equal(rows[0].status, 'reverted');
     assert.match(rows[0].note, /report that cannot be read/);
     assert.match(rows[0].note, /oxlint 1\.21\.0 from package\.json range is older than 1\.26\.0/);
-    assert.equal(readFileSync(join(repo.root, '.oxlintrc.json'), 'utf8'), '{\n  "rules": {}\n}\n');
+    assert.equal(readFileSync(join(repo.root, linters[1].config), 'utf8'), linters[1].text);
   });
 });
 
@@ -172,6 +190,16 @@ describe('a repo whose own lint already flags the check\'s invalid cases', () =>
   });
 });
 
+describe('the generated plugin entry', () => {
+  test('passes a repo rule that wants a blank line after the imports', async (t) => {
+    const blankAfterImports = "{ rules: { 'padding-line-between-statements': ['error', { blankLine: 'always', prev: 'import', next: '*' }, { blankLine: 'any', prev: 'import', next: 'import' }] } }";
+    const repo = repoFor(linters[0], { 'eslint.config.mjs': eslintConfig.replace("';\nexport default [\n", `';\n\nexport default [\n  ${blankAfterImports},\n`) });
+    if (repo.skip) return t.skip(repo.skip);
+    const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
+    assert.deepEqual(rows.map(({ status, note }) => ({ status, note })), [{ status: 'installed', note: undefined }]);
+  });
+});
+
 describe('a rule the repo\'s lint cannot run', () => {
   test('a cited file no supported config covers is reported, not wired', async (t) => {
     const repo = repoFor(linters[0], { 'packages/a/eslint.config.mjs': eslintConfig });
@@ -199,7 +227,7 @@ describe('re-running over an edited check file', () => {
     const theirs = readFileSync(installedFile, 'utf8') + '\n';
     writeFileSync(installedFile, theirs);
     const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true, resolutions: resolution ? { [keysRule.rule]: resolution } : {} });
-    return { rows, installedFile, theirs, repo };
+    return { rows, installedFile, theirs };
   };
 
   test('asks, and changes nothing, until told which version wins', async (t) => {

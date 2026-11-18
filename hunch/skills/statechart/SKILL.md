@@ -1,6 +1,6 @@
 ---
 name: statechart
-description: Model a flow that moves between states in TLA+, check the rules its reader agrees to in TLC over every order of events, and chart it in the reader's words with the shortest path to each rule that breaks. Use when a flow, protocol, retry loop or state machine needs its rules checked, a bug shown as a path through states, or formal verification is asked for.
+description: Model a flow that moves between states in TLA+, check the rules its reader agrees to with the everystate model checker over every order of events, and chart it in the reader's words with the shortest path to each rule that breaks. Use when a flow, protocol, retry loop or state machine needs its rules checked, a bug shown as a path through states, or formal verification is asked for.
 ---
 
 The chart shows how a system moves between states, in the words of its reader: the person who decides whether the behavior is right.
@@ -43,12 +43,12 @@ Aim for about 20 arrows. First give one label to states that act the same; never
 ## Run
 
 ```sh
-TLA2TOOLS=<tla2tools.jar> JAVA=<java> bun ${CLAUDE_SKILL_DIR}/scripts/statechart.ts SPEC.tla --view view.ts --out <folder>
+bun ${CLAUDE_SKILL_DIR}/scripts/statechart.ts SPEC.tla --view view.ts --out <folder>
 ```
 
-It needs Java 11 or later and `tla2tools.jar`: `brew install openjdk`, then `gh release download v1.7.4 -R tlaplus/tlaplus -p tla2tools.jar`.
+It runs everystate, a TLC-compatible model checker, through `bunx`, so it needs only bun.
 
-It checks each rule in its own run, so one break hides no other rule's verdict, and gives the shortest path to each rule that breaks. It refuses a spec SANY cannot read, a config TLC refuses, and a view that would make the chart claim what the model does not do; the message says what to change. Above 500 states it draws only the paths to broken rules. It exits 0 when every rule holds, 1 when one breaks, 2 when it refuses.
+It checks each rule in its own run, so one break hides no other rule's verdict, and gives the shortest path to each rule that breaks. It refuses a spec or config everystate cannot read, and a view that would make the chart claim what the model does not do; the message says what to change. Above 500 states it draws only the paths to broken rules. It exits 0 when every rule holds, 1 when one breaks, 2 when it refuses.
 
 ## Prove it can fail
 

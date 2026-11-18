@@ -1,5 +1,6 @@
 /**
- * Reads what TLC and SANY print, and writes the TLC config files a check runs on. Nothing here runs a process.
+ * Reads what TLC and SANY print, in the formats everystate keeps, and writes the config files and the module a check
+ * runs on. Nothing here runs a process.
  */
 
 export type Value = string | number | boolean | Value[] | { [key: string]: Value };
@@ -54,9 +55,16 @@ export const configText = (base: string, rules: { invariants?: string[]; propert
 /** A TLA+ value as TLC prints it. A set is an array; a record, a sequence or a function is an object
  * keyed by its domain, so a sequence's first element is at key 1, as in TLA+. */
 export function parseValue(text: string): Value {
-	let at = 0;
+	const { value, end } = valueAt(text, 0);
+	if (text.slice(end).trim() !== "") throw new Error(`cannot read the TLA+ value at ${end} (text after the value): ${text.slice(0, 200)}`);
+	return value;
+}
+
+/** The value that starts at `start` in `text`, read as `parseValue` reads it, and the index just past it. */
+function valueAt(text: string, start: number): { value: Value; end: number } {
+	let at = start;
 	const fail = (what: string): never => {
-		throw new Error(`cannot read the TLA+ value at ${at} (${what}): ${text.slice(0, 200)}`);
+		throw new Error(`cannot read the TLA+ value at ${at} (${what}): ${text.slice(start, start + 200)}`);
 	};
 	const skip = () => {
 		while (at < text.length && /\s/.test(text[at])) at++;
@@ -130,10 +138,7 @@ export function parseValue(text: string): Value {
 		at += word[0].length;
 		return word[0] === "TRUE" ? true : word[0] === "FALSE" ? false : word[0];
 	};
-	const parsed = value();
-	skip();
-	if (at !== text.length) fail("text after the value");
-	return parsed;
+	return { value: value(), end: at };
 }
 
 /** A state as TLC prints it: \`/\\ name = value\` lines, or one \`name = value\` for a single variable. */
@@ -143,7 +148,7 @@ export function parseState(text: string): Vars {
 	return Object.fromEntries(
 		parts.map((part) => {
 			const pair = /^(\w+)\s*=\s*([\s\S]*)$/.exec(part.trim());
-			if (!pair) throw new Error(`cannot read the TLC state line "${part}"`);
+			if (!pair) throw new Error(`cannot read the state line "${part}" everystate printed`);
 			return [pair[1], parseValue(pair[2])];
 		}),
 	);
@@ -176,7 +181,7 @@ export function readRun(output: string): RunResult {
 	const traceAfter = (head: string): Trace => {
 		if (head.endsWith("by the initial state:")) return { states: [{ action: undefined, vars: stateLines() }] };
 		while (i < lines.length && lines[i].trim() === "") i++;
-		if (!TRACE_HEAD.test(lines[i] ?? "")) throw new Error(`TLC printed "${head}" with no trace after it`);
+		if (!TRACE_HEAD.test(lines[i] ?? "")) throw new Error(`everystate printed "${head}" with no trace after it`);
 		i++;
 		const trace: Trace = { states: [] };
 		while (i < lines.length) {
@@ -198,7 +203,7 @@ export function readRun(output: string): RunResult {
 		const line = lines[i++];
 		if (!line.startsWith("Error:")) continue;
 		const known = VIOLATION.find(([re]) => re.test(line));
-		if (!known) throw new Error(`TLC printed an error this script cannot place:\n${lines.slice(i - 1, i + 8).join("\n")}`);
+		if (!known) throw new Error(`everystate printed an error this script cannot place:\n${lines.slice(i - 1, i + 8).join("\n")}`);
 		violations.push({ rule: known[0].exec(line)?.[1], kind: known[1], trace: traceAfter(line) });
 	}
 	const counts = [...output.matchAll(/(\d+) distinct states? (?:found|generated)/g)].map((m) => Number(m[1]));
@@ -206,7 +211,11 @@ export function readRun(output: string): RunResult {
 }
 
 export type Step = { from: string; to: string; action: string };
-export type Graph = { states: Map<string, { vars: Vars; start: boolean }>; steps: Step[] };
+/** A state of a graph; one marked `pastBound` lies past a constraint. */
+export type GraphState = { vars: Vars; start: boolean; pastBound?: boolean };
+export type Graph = { states: Map<string, GraphState>; steps: Step[] };
+
+export const stepId = ({ from, to, action }: Step) => `${from}|${to}|${action}`;
 
 const unescapeDot = (s: string) => s.replace(/\\(.)/g, (_, c: string) => (c === "n" ? "\n" : c));
 
@@ -214,7 +223,7 @@ const unescapeDot = (s: string) => s.replace(/\\(.)/g, (_, c: string) => (c === 
  * label and stay out. */
 export function parseDot(dot: string): Graph {
 	const ids = new Map<string, string>();
-	const states = new Map<string, { vars: Vars; start: boolean }>();
+	const states = new Map<string, GraphState>();
 	const edges: [string, string, string][] = [];
 	for (const line of dot.split("\n")) {
 		const node = /^(-?\d+) \[label="((?:[^"\\]|\\.)*)"(,style = filled)?/.exec(line);
@@ -227,13 +236,13 @@ export function parseDot(dot: string): Graph {
 		const edge = /^(-?\d+) -> (-?\d+) \[label="([^"]*)"/.exec(line);
 		if (edge) edges.push([edge[1], edge[2], edge[3]]);
 	}
-	const keyOf = (id: string) => must(ids.get(id), `the TLC graph has a step to or from state ${id}, which it does not list`);
+	const keyOf = (id: string) => must(ids.get(id), `the state graph everystate wrote has a step to or from state ${id}, which it does not list`);
 	return { states, steps: edges.map(([from, to, action]) => ({ from: keyOf(from), to: keyOf(to), action })) };
 }
 
 /** The graph of the given traces alone: what a chart draws when the model has too many states for all. */
 export function pathGraph(traces: Trace[]): Graph {
-	const states = new Map<string, { vars: Vars; start: boolean }>();
+	const states = new Map<string, GraphState>();
 	const steps = new Map<string, Step>();
 	for (const { states: path } of traces)
 		path.forEach(({ vars, action }, i) => {
@@ -241,15 +250,68 @@ export function pathGraph(traces: Trace[]): Graph {
 			if (!states.has(key)) states.set(key, { vars, start: i === 0 });
 			if (i > 0 && action !== undefined) {
 				const step = { from: stateKey(path[i - 1].vars), to: key, action };
-				steps.set(JSON.stringify(step), step);
+				steps.set(stepId(step), step);
 			}
 		});
 	return { states, steps: [...steps.values()] };
 }
 
-/** Each operator's level as SANY's XML export gives it: 0 constant, 1 state, 2 action, 3 temporal. */
+/** The state graph a check dumped, with the states and steps of `traces` it lacks. Under a constraint the dump leaves
+ * out the states just past it, where a check still tests each rule, so a path can end on one: each state the dump lacks
+ * is marked `pastBound`. */
+export function withPaths(dump: Graph, traces: Trace[]): Graph {
+	const paths = pathGraph(traces);
+	const dumped = new Set(dump.steps.map(stepId));
+	const pastBound = [...paths.states].filter(([key]) => !dump.states.has(key)).map(([key, state]): [string, GraphState] => [key, { ...state, pastBound: true }]);
+	return { states: new Map([...dump.states, ...pastBound]), steps: [...dump.steps, ...paths.steps.filter((step) => !dumped.has(stepId(step)))] };
+}
+
+/** Each operator's level as SANY's XML export gives it: 0 constant, 1 state, 2 action, 3 temporal. SANY writes an
+ * operator's level before its name and everystate after it; both come before its body, whose expressions carry
+ * levels of their own. */
 export function definitionLevels(xml: string): Map<string, number> {
-	return new Map([...xml.matchAll(/<UserDefinedOpKind>(?:(?!<\/UserDefinedOpKind>)[\s\S])*?<level>(\d)<\/level><uniquename>([^<]+)<\/uniquename>/g)].map((m) => [m[2], Number(m[1])]));
+	const heads = xml.split("<UserDefinedOpKind>").slice(1).map((entry) => entry.split(/<body>|<\/UserDefinedOpKind>/)[0]);
+	return new Map(
+		heads.flatMap((head): [string, number][] => {
+			const name = /<uniquename>([^<]+)<\/uniquename>/.exec(head);
+			const level = /<level>(\d)<\/level>/.exec(head);
+			return name && level ? [[name[1], Number(level[1])]] : [];
+		}),
+	);
 }
 
 export const TEMPORAL_LEVEL = 3;
+
+const unusedWord = (sources: string[], base: string, n = 1): string => {
+	const word = n === 1 ? base : `${base}${n}`;
+	return sources.some((source) => source.includes(word)) ? unusedWord(sources, base, n + 1) : word;
+};
+
+/** A module that EXTENDS `spec` and TLC, whose one invariant always holds and prints
+ * `<<marker, rule, <<values>>>>` for each of `rules` a state breaks, its values in the order of `variables`.
+ * Its module name, invariant name and marker hold a word no text in `sources` contains, so none collides with the
+ * spec's own. */
+export function watchModule(spec: string, rules: string[], variables: string[], sources: string[]) {
+	const marker = unusedWord(sources, "Statechart");
+	const names = { module: `${marker}Breaks`, invariant: `${marker}Watch`, marker };
+	return {
+		...names,
+		text: [
+			`---- MODULE ${names.module} ----`,
+			`EXTENDS ${spec}, TLC`,
+			`${names.invariant} ==`,
+			...rules.map((rule) => `  /\\ (~(${rule}) => PrintT(<<"${marker}", "${rule}", <<${variables.join(", ")}>>>>))`),
+			"====",
+		].join("\n") + "\n",
+	};
+}
+
+/** The states a run of `watchModule` printed as breaking each rule, keyed by `stateKey` with the printed values
+ * named in the order of `variables`. Java TLC wraps a long tuple across lines; everystate prints it on one. */
+export function printedBreaks(output: string, marker: string, variables: string[]): Map<string, Set<string>> {
+	const printed = [...output.matchAll(new RegExp(String.raw`^<<\s*"${marker}"`, "gm"))].map(({ index }) => {
+		const { 2: rule, 3: values } = valueAt(output, index).value as { 2: string; 3: { [key: string]: Value } };
+		return { rule, key: stateKey(Object.fromEntries(variables.map((name, i) => [name, values[i + 1]]))) };
+	});
+	return new Map([...Map.groupBy(printed, ({ rule }) => rule)].map(([rule, found]) => [rule, new Set(found.map(({ key }) => key))]));
+}

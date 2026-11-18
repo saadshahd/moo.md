@@ -19,6 +19,7 @@ export const markdownSettings = {
 	writeRaceRetries: SHIPPED_DEFAULTS.writeRaceRetries,
 	itemReadsAtOnce: SHIPPED_DEFAULTS.itemReadsAtOnce,
 	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,
+	alwaysPullRequest: SHIPPED_DEFAULTS.alwaysPullRequest,
 	ownerBranchPrefix: SHIPPED_DEFAULTS.ownerBranchPrefix,
 	growthLabels: SHIPPED_DEFAULTS.growthLabels,
 	timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS,

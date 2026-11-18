@@ -84,7 +84,9 @@ const readReport = ({ tool, adapter, run }) => {
 
 export const runLint = ({ tool, bin, cwd, config, files }) => {
   const adapter = tools[tool];
-  const run = spawnSync(bin, adapter.args({ config, files }), {
+  // An absolute -c path makes oxlint 1.74.0 and later drop the config's ignorePatterns,
+  // so the run would lint files the repo's own lint skips and flag them as new failures.
+  const run = spawnSync(bin, adapter.args({ config: config && relative(cwd, config), files }), {
     cwd,
     encoding: 'utf8',
     maxBuffer: 1 << 28,

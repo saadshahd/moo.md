@@ -23,7 +23,7 @@ import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { readSettings } from "../src/config/settings.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
 import { DAY_MS, HOUR_MS } from "../src/time.ts";
-import { installedSkills, root, shippedRaw, type Tree, withProposedTimeouts } from "./fixtures/config.ts";
+import { installedSkills, root, shippedRaw, type Tree, withCritic, withProposedTimeouts } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -446,12 +446,68 @@ test("a tier table with a gap is refused", () => {
 
 	bad.kinds.docs.tiers = bad.kinds.docs.tiers.filter((row: Tree) => !(row.purpose === "build" && row.level === undefined));
 
-	expect(problemsOf(bad)).toContainEqual({ kind: "docs", problem: "tier-table-gap", purpose: "build", level: "low", size: "small" });
+	expect(problemsOf(bad)).toContainEqual({ kind: "docs", problem: "tier-table-gap", role: "build", purpose: "build", level: "low", size: "small" });
 });
 
 test("the most specific tier row wins", () => {
 	const tiers = loaded(setUp()).kinds.feature!;
 
-	expect(pickTier(tiers, { purpose: "build", level: "critical", size: "small" })).toMatchObject({ tier: "top", effort: "high" });
-	expect(pickTier(tiers, { purpose: "build", level: "low", size: "small" })).toMatchObject({ tier: "standard", effort: "medium" });
+	expect(pickTier(tiers, { role: "build", purpose: "build", level: "critical", size: "small" })).toMatchObject({ tier: "top", effort: "high" });
+	expect(pickTier(tiers, { role: "build", purpose: "build", level: "low", size: "small" })).toMatchObject({ tier: "standard", effort: "medium" });
+});
+
+test("a tier row that names a role wins for that role at every level, and never fits another role of its purpose", () => {
+	const { kinds } = loaded(withCritic(setUp()));
+	const feature = kinds.feature!;
+
+	for (const level of ["low", "critical"]) {
+		expect(pickTier(feature, { role: "design-critic", purpose: "review", level, size: "small" })).toMatchObject({ role: "design-critic", tier: "top" });
+		expect(pickTier(feature, { role: "review", purpose: "review", level, size: "small" })?.role).toBeUndefined();
+	}
+});
+
+test("a tier row whose role hum.json lacks, or holds for another purpose, is refused", () => {
+	const lacking = withCritic(setUp());
+	const otherPurpose = withCritic(setUp());
+
+	delete lacking.hum.roles["design-critic"];
+	lacking.kinds.feature.machine.states.critiquing.invoke.src = "review";
+	otherPurpose.hum.roles["design-critic"].purpose = "plan";
+
+	expect(problemsOf(lacking)).toContainEqual({ problem: "tier-role-mismatch", kind: "feature", role: "design-critic", purpose: "review" });
+	expect(problemsOf(otherPurpose)).toContainEqual({ problem: "tier-role-mismatch", kind: "feature", role: "design-critic", purpose: "review" });
+});
+
+test("a touches guard read where no run is at hand throws, and the machine fails rather than pick a branch", async () => {
+	const actor = createActor(kindMachine(loaded(withCritic(setUp())).kinds.feature!));
+	const errors: string[] = [];
+
+	actor.subscribe({ error: (error) => errors.push(String(error)) });
+	actor.start();
+	actor.send({ type: "plan-ready" });
+	await waitFor(actor, (s) => s.value === "reviewing");
+	actor.send({ type: "approve" });
+
+	expect(actor.getSnapshot().status).toBe("error");
+	expect(errors).toEqual([expect.stringContaining("a guard read the change's paths where no run is at hand")]);
+});
+
+test("a state that invokes an engine part that only sends events is refused, as it would run nothing", () => {
+	const raw = clone(setUp());
+
+	raw.kinds.feature.machine.states.reviewing.invoke.src = "scheduler";
+
+	expect(problemsOf(raw)).toContainEqual({ problem: "unknown-run-source", kind: "feature", state: "reviewing", src: "scheduler" });
+});
+
+test("a guard the engine lacks, or a touches guard without paths, is refused before the machine loads", () => {
+	const unknown = withCritic(setUp());
+	const noPaths = withCritic(setUp());
+
+	unknown.kinds.feature.machine.states.reviewing.on.approve[0].guard = { type: "touchesDesktop" };
+	noPaths.kinds.feature.machine.states.reviewing.on.approve[0].guard = { type: "touches", params: { paths: [] } };
+
+	expect(problemsOf(unknown)).toContainEqual({ problem: "unknown-guard", kind: "feature", state: "reviewing", guard: "touchesDesktop" });
+	expect(problemsOf(noPaths)).toContainEqual(expect.objectContaining({ problem: "guard-params", kind: "feature", state: "reviewing", guard: "touches" }));
+	expect(problemsOf(unknown).map(({ problem }) => problem)).not.toContain("machine-rejected");
 });
