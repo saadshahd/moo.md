@@ -288,6 +288,22 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
 });
 
+test("the fix cap holds before each fix run, so a fix run whose choice hum makes itself does not run again past it", async () => {
+	const options = [{ word: "short", paths: ["docs/note.md"] }, { word: "long", paths: ["docs/note.md"] }];
+	const choosing = { write: { "docs/note.md": "BAD\n" }, structured: { status: "needs-owner", question: "Short or long?", plan: "Fix it.", reason: { kind: "choice", options, default: "short" } } };
+
+	const config = configWith((raw) => {
+		raw.hum.maxFixRuns = 1;
+	});
+
+	const w = await world({ script: [{}, { write: { "docs/note.md": "BAD\n" } }, choosing, choosing, { write: { "docs/note.md": "good\n" } }] }, { config, checks: ["! grep -q BAD docs/note.md"] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id, detail: "the checks still fail after 1 fixes" });
+	expect(w.shim.calls()).toHaveLength(1 + 1 + 1);
+	expect(folded(w, id).fixRuns).toBe(1);
+});
+
 test("a check the base fails too ends the item stuck for the owner, naming the check and the base, with no fix run", async () => {
 	const w = await world({ script: [{}, NOTE] }, { checks: ["false"] });
 	const id = w.repo.seed("Write the note");

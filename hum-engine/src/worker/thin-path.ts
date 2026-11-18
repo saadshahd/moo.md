@@ -641,9 +641,6 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const step = (role: StepRole) =>
 		createAsyncLogic({
 			run: async ({ signal }) => {
-				// Every fix run since the owner last answered counts, over every pass and wake: the item's log holds them all.
-				if (role === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
-
 				// An answer at the repro's wait objects to it, so a new repro run reads the owner's words.
 				if (role === "repro" && !d.answered && (await isReproduced())) return;
 
@@ -657,6 +654,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				const chosen: string[] = [];
 
 				for (;;) {
+					// Every fix run since the owner last answered counts, over every pass and wake and each run again after a choice hum made: the item's log holds them all.
+					if (role === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
+
 					const outcome = await runAgent(role, `${await prompt(role)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
 
 					if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}${await unreadyAfter()}`);
