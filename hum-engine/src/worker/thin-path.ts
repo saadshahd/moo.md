@@ -624,6 +624,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		state.repros.put(id, { item: id, command: wants.repro.command, translated: wants.repro.translated, commit, files });
 	};
 
+	/** A build run starts only once the owner's window to object to the repro closed, so a pass that starts over passes the window by. */
+	const keepUnopposed = (): void => {
+		const saved = state.repros.get(id);
+
+		if (saved !== undefined && saved.unopposed === undefined) state.repros.put(id, { ...saved, unopposed: true });
+	};
+
 	/** Whether the branch already holds the item's saved repro, as on a pass that starts the machine over on the same branch. */
 	const isReproduced = async (): Promise<boolean> => {
 		const saved = state.repros.get(id);
@@ -639,6 +646,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 				// An answer at the repro's wait objects to it, so a new repro run reads the owner's words.
 				if (role === "repro" && !d.answered && (await isReproduced())) return;
+
+				if (role === "build") keepUnopposed();
 
 				const unready = await d.readyFailure();
 
@@ -713,6 +722,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		run: async () => {
 			const repro = savedRepro();
 			const passed = (await atCommit(repro.commit, () => reproRuns(repro.command))).filter((failure) => failure === undefined).length;
+
+			if (passed === 0 && repro.unopposed) return void actor.send({ type: WINDOW_PASSED });
 
 			if (passed === 0) {
 				pending = { question: { text: PLAIN_QUESTIONS.objection, detail: `${repro.command} failed on all ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where only the repro is in. Reply to object, and the repro runs again with your words.` }, plain: "objection", plan: "" };
@@ -977,6 +988,9 @@ const keepVerdict = (state: State, { id, head, patch, pick, models }: { readonly
 
 	return verdict;
 };
+
+/** What a repro that still shows the bug sends where the owner's window to object to it already closed. */
+const WINDOW_PASSED = "window-passed";
 
 /** The runs that change files: each leaves its change in the working tree, which hum commits. */
 type StepRole = "build" | "fix" | "repro";

@@ -107,6 +107,9 @@
 				"on": {
 					"token-cap": {
 						"target": "asking-repro"
+					},
+					"window-passed": {
+						"target": "building"
 					}
 				}
 			},

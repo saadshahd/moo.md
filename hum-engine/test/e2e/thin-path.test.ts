@@ -20,7 +20,7 @@ import { Holder, ItemId } from "../../src/adapter-api.ts";
 import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import { openState } from "../../src/state/open.ts";
 import { PLAIN_QUESTIONS } from "../../src/decide/question.ts";
-import { DAY_MS } from "../../src/time.ts";
+import { DAY_MS, HOUR_MS } from "../../src/time.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
 const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
@@ -664,6 +664,22 @@ test("a fix item runs a repro and proves it fails without the fix, gives the own
 	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls, itemId: id }))).toEqual({ outcome: "merged", item: id });
 	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/repro.sh`])).toBe("grep -q fixed docs/note.md\n");
 	expect(w.state.repros.get(id)).toBeUndefined();
+});
+
+test("once the window passed, a pass the usage limit cut short goes on without opening it again", async () => {
+	const limitedUntil = (NOW + DAY_MS + HOUR_MS) / 1000;
+	const w = await world({ script: [{}, REPRO, { rejectUntil: limitedUntil, error: "You've hit your limit" }, { write: { "docs/note.md": "fixed\n" } }] }, { checks: ["true"] });
+	const id = w.repo.seed("The note is wrong");
+	const pass = () => runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, itemId: id }));
+
+	expect(await pass()).toMatchObject({ outcome: "asked", item: id });
+
+	w.clock.at += DAY_MS + 1;
+	expect(await pass()).toMatchObject({ outcome: "limited", item: id });
+
+	w.clock.at = limitedUntil * 1000 + TTL + 1;
+	expect(await pass()).toEqual({ outcome: "merged", item: id });
+	expect(w.shim.calls()).toHaveLength(4);
 });
 
 test("an owner's reply in the window objects: a new repro run reads it, and the window opens again", async () => {

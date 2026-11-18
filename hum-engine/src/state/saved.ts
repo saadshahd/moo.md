@@ -105,10 +105,10 @@ export const FiledFollowUp = z.object({ item: name, from: name, at: time });
 
 /**
  * The check a fix item's repro run wrote: the command that fails because of the bug, what stood in for the reported
- * environment where it was not at hand, the commit that added it and the files it touched. `proven` counts the runs
- * that passed once the fix was in.
+ * environment where it was not at hand, the commit that added it and the files it touched. `unopposed` is set once the
+ * owner's window to object to it closed with no objection; `proven` counts the runs that passed once the fix was in.
  */
-export const SavedRepro = z.object({ item: name, command: name, translated: name.optional(), commit: name, files: z.array(name), proven: z.int().positive().optional() });
+export const SavedRepro = z.object({ item: name, command: name, translated: name.optional(), commit: name, files: z.array(name), unopposed: z.literal(true).optional(), proven: z.int().positive().optional() });
 
 export type SavedRepro = z.infer<typeof SavedRepro>;
 
