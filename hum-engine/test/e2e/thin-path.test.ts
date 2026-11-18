@@ -249,7 +249,7 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 		raw.hum.maxFixRuns = 2;
 	});
 
-	const w = await world({ script: [{}, { write: { "docs/note.md": "one\n" } }, { write: { "docs/note.md": "two\n" } }, { write: { "docs/note.md": "three\n" } }] }, { config, checks: ["false"] });
+	const w = await world({ script: [{}, { write: { "docs/note.md": "one\n" } }, { write: { "docs/note.md": "two\n" } }, { write: { "docs/note.md": "three\n" } }] }, { config, checks: ["! test -f docs/note.md"] });
 	const id = w.repo.seed("Write the note");
 	const before = sh(w.repo.remote, ["rev-parse", "main"]);
 
@@ -262,6 +262,16 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
+});
+
+test("a check the base fails too ends the item stuck for the owner, naming the check and the base, with no fix run", async () => {
+	const w = await world({ script: [{}, NOTE] }, { checks: ["false"] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("false fails on main too") });
+	expect(w.shim.calls()).toHaveLength(2);
+	expect(folded(w, id).fixRuns).toBe(0);
+	expect(w.state.faults.list().find((card) => card.code === "item-stuck")?.cause).toContain("false fails on main too");
 });
 
 test("a run that succeeds and commits nothing is not done", async () => {
@@ -622,7 +632,7 @@ test("the owner's answer at the token cap's wait starts the fix count over", asy
 	});
 
 	const fix = (tokens: number) => ({ write: { "docs/note.md": `${tokens}\n` }, modelTokens: tokens });
-	const w = await world({ script: [{}, { ...NOTE, modelTokens: 10 }, fix(10), fix(1000), fix(11), fix(12), fix(13)], decisions: [READY_PLAN] }, { config, checks: ["false"] });
+	const w = await world({ script: [{}, { ...NOTE, modelTokens: 10 }, fix(10), fix(1000), fix(11), fix(12), fix(13)], decisions: [READY_PLAN] }, { config, checks: ["! test -f docs/note.md"] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "asked", item: id });

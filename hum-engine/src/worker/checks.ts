@@ -7,6 +7,8 @@ export type ShellOptions = {
 	readonly env?: Readonly<Record<string, string>>;
 	/** A command still running after this many ms is stopped, with every process it started, and counts as failed. */
 	readonly timeoutMs: number;
+	/** Times a failing command runs again before its failure counts; a pass on any run counts as a pass. */
+	readonly reruns?: number;
 };
 
 /**
@@ -26,16 +28,32 @@ const failureOf = async (command: string, cwd: string, { env, timeoutMs }: Shell
 	}
 };
 
-/** How long the repo's checks may run: the owner's `proofTimeoutSeconds` in milliseconds. */
-export const checksTimeoutMs = ({ proofTimeoutSeconds }: Pick<HumConfig, "proofTimeoutSeconds">): number => proofTimeoutSeconds * SECOND_MS;
+/** A check's failure once its run and each of its reruns failed; undefined once any of them passes. */
+const settledFailureOf = async (command: string, cwd: string, options: ShellOptions, reruns = options.reruns ?? 0): Promise<string | undefined> => {
+	const failure = await failureOf(command, cwd, options);
+
+	return failure === undefined || reruns === 0 ? failure : settledFailureOf(command, cwd, options, reruns - 1);
+};
+
+/** How the repo's checks run: stopped past the owner's `proofTimeoutSeconds`, and run again `checkReruns` times before a failure counts. */
+export const checkLimits = ({ proofTimeoutSeconds, checkReruns }: Pick<HumConfig, "proofTimeoutSeconds" | "checkReruns">): Required<Pick<ShellOptions, "timeoutMs" | "reruns">> => ({
+	timeoutMs: proofTimeoutSeconds * SECOND_MS,
+	reruns: checkReruns,
+});
+
+/** A check that failed: its command, and the failure it gave. */
+export type CheckFailure = { readonly command: string; readonly failure: string };
 
 /** The first failing check; undefined when all pass. */
-export const runChecks = async (commands: readonly string[], cwd: string, options: ShellOptions): Promise<string | undefined> => {
+export const firstFailing = async (commands: readonly string[], cwd: string, options: ShellOptions): Promise<CheckFailure | undefined> => {
 	for (const command of commands) {
-		const failure = await failureOf(command, cwd, options);
+		const failure = await settledFailureOf(command, cwd, options);
 
-		if (failure !== undefined) return failure;
+		if (failure !== undefined) return { command, failure };
 	}
 
 	return undefined;
 };
+
+/** The first failing check's failure; undefined when all pass. */
+export const runChecks = async (commands: readonly string[], cwd: string, options: ShellOptions): Promise<string | undefined> => (await firstFailing(commands, cwd, options))?.failure;

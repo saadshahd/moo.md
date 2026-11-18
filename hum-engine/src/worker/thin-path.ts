@@ -20,7 +20,7 @@ import { persistedSnapshot } from "../state/items.ts";
 import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
-import { checksTimeoutMs, runChecks } from "./checks.ts";
+import { checkLimits, firstFailing } from "./checks.ts";
 import { BASE_CONTENDED, changeOn, declaredChange, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
@@ -48,6 +48,8 @@ export const claimTtlMs = (config: Config): number => config.hum.claimExpirySeco
 const CARD_EXCERPT = 300;
 
 const ERROR_EXCERPT = 500;
+
+const SHORT_SHA = 12;
 
 /** The branch runs start from when none is given. */
 export const DEFAULT_BASE = "main";
@@ -603,14 +605,31 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			},
 		});
 
+	const checkOptions = { env: d.env, ...checkLimits(config.hum) };
+
+	/** Whether the base the pass started from fails `command` too, run in the clone itself so it reads what the change's checks read. */
+	const failsOnBase = async (command: string): Promise<boolean> => {
+		await g(["checkout", "-q", "-f", "--detach", d.baseSha]);
+
+		try {
+			return (await firstFailing([command], clone, checkOptions)) !== undefined;
+		} finally {
+			await g(["checkout", "-q", "-f", branch]);
+		}
+	};
+
+	/** A failing check goes to a fix run, unless the base fails it too: no change of the item's can pass it, so the item ends for the owner. */
 	const checksSource = createAsyncLogic({
 		run: async () => {
-			const failure = await runChecks(d.checks, clone, { env: d.env, timeoutMs: checksTimeoutMs(d.config.hum) });
+			const failed = await firstFailing(d.checks, clone, checkOptions);
 
-			if (failure) {
-				lastFailure = failure;
-				throw new Error(failure.slice(0, ERROR_EXCERPT));
-			}
+			if (failed === undefined) return;
+
+			lastFailure = failed.failure;
+
+			if (await failsOnBase(failed.command)) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
+
+			throw new Error(failed.failure.slice(0, ERROR_EXCERPT));
 		},
 	});
 

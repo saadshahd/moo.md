@@ -58,7 +58,7 @@ import {
 import type { State } from "../state/open.ts";
 import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
-import { checksTimeoutMs, runChecks } from "./checks.ts";
+import { checkLimits, runChecks } from "./checks.ts";
 import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
 import { keepLanding, keepPick } from "../state/item-log.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
@@ -352,7 +352,7 @@ export const rebaseOnto = async ({ git, clone, env, checks, config, base }: { re
 		return `the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}`;
 	}
 
-	const failure = await runChecks(checks, clone, { env, timeoutMs: checksTimeoutMs(config.hum) });
+	const failure = await runChecks(checks, clone, { env, ...checkLimits(config.hum) });
 
 	return failure && `the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}`;
 };

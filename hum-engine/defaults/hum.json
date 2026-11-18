@@ -113,6 +113,7 @@
 	"watchCacheSeconds": 10,
 	"watchLockSeconds": 30,
 	"maxFixRuns": 3,
+	"checkReruns": 1,
 	"serviceLabel": "md.moo.hum",
 	"maxCrashes": 5,
 	"crashWindowSeconds": 600,

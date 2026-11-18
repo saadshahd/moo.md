@@ -370,7 +370,7 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 	const spent = w.shim.calls().length;
 
 	expect(w.state.parked.get("a")).toMatchObject({ why: "stuck" });
-	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 0 });
+	expect(w.state.spent.get("a")).toMatchObject({ total: 401, base: 0 });
 
 	// The file still says ready and the claim lapses, yet no tick spends tokens on it.
 	for (let tick = 0; tick < 3; tick++) {
@@ -389,7 +389,7 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(w.state.parked.get("a")).toBeUndefined();
 	expect(w.state.faults.list().map((c) => c.code)).not.toContain("item-stuck");
-	expect(w.state.spent.get("a")).toMatchObject({ total: 1203, base: 802 });
+	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 401 });
 });
 
 test("a limit the runner hit is saved, and a restarted worker makes no call before it ends, then resumes", async () => {
