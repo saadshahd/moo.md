@@ -7,6 +7,7 @@ import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import type { Verdict } from "../src/state/saved.ts";
 import { carriedVerdict, patchOf, rebaseOnto } from "../src/worker/land.ts";
 import { configWith } from "./fixtures/config.ts";
+import { OWNER } from "./fixtures/identity.ts";
 import { sh, WorkRepo } from "./fixtures/work-repo.ts";
 
 /** The test config, with the prose globs hum ships: the test config counts every path as docs. */
@@ -16,7 +17,7 @@ const config = configWith((raw) => void (raw.hum.docsOnly = SHIPPED_DEFAULTS.doc
 const runClone = () => {
 	const repo = new WorkRepo();
 	const clone = repo.worker("run");
-	const git = gitIn(clone, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
+	const git = gitIn(clone, { identity: OWNER, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	sh(clone, ["checkout", "-q", "-b", "run"]);
 
