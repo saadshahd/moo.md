@@ -769,6 +769,18 @@ test("a plan answer the log keeps is read back on a pass after a limit, adding n
 	expect(w.shim.decisions().map(({ purpose }) => purpose)).toEqual(["plan", "plan"]);
 });
 
+test("a plan run past the token cap asks the owner in the kind's tokenCap.overCap state instead of ending stuck", async () => {
+	const config = configWith((raw) => {
+		raw.kinds.feature.tokenCap.tokens = 5;
+	});
+
+	const w = await world({ script: [{}], decisions: [READY_PLAN] }, { config });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
+	expect(w.state.items.saved().find(({ itemId }) => itemId === id)?.state).toBe(w.config.kinds.feature?.tokenCap.overCap);
+});
+
 test("the owner's answer at the token cap's wait starts the fix count over", async () => {
 	const config = configWith((raw) => {
 		raw.hum.maxFixRuns = 2;

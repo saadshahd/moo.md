@@ -11,7 +11,7 @@ import { type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapter
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { earliestTimeout, invokedSources, kindMachine } from "../config/machine.ts";
+import { earliestTimeout, invokedSources, kindMachine, TOKEN_CAP } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
@@ -512,7 +512,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	/** The kinds reach their owner-wait state only through the over-cap event, so a run's question uses it too. */
 	const ask = (note: Pending) => {
 		pending = note;
-		actor.send({ type: "token-cap" });
+		actor.send({ type: TOKEN_CAP });
 	};
 
 	/**
@@ -561,7 +561,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (outcome.kind === "over-cap") {
 			const why = `The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens.`;
 
-			if (!actor.getSnapshot().can({ type: "token-cap" })) throw failed(why);
+			if (!actor.getSnapshot().can({ type: TOKEN_CAP })) throw failed(why);
 
 			ask({ question: { text: PLAIN_QUESTIONS["over-cap"], detail: why }, plain: "over-cap", plan: "" });
 
