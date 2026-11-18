@@ -9,17 +9,38 @@ Success is defined before the run, not by it. Build the contract by invoking eac
 
 - What "done" means reads two ways that would build different things → use **clarify** skill.
 - The user holds a bar they can't yet state → use **elicit** skill.
-- Nothing exists to react to yet → use **draft** skill on the contract itself: one observable that means done — a single reading, not a dashboard — the literal command that reads it (the strongest the work allows: drive the running app for a UI, a live terminal for a TUI, tests otherwise), which direction is better and the value that ends the work, a cap that ends it even unmet, what must keep passing while optimizing, and every choice made on the user's behalf surfaced.
-- Any part leans on someone's judgment — "clean", "better", "reasonable" → use **anchor** skill: replace it with a trigger a machine evaluates identically every time. The dry run is the anchored rule deciding one real case — record the value it reads now. A command that will not run fails here, loudly.
+- Nothing exists to react to yet → use **draft** skill on the contract itself, every choice made on the user's behalf surfaced:
+  - one observable that means done — a single reading, not a dashboard;
+  - the literal command that reads it: the strongest check the work allows, from the table below, its tool version pinned, quick enough to run on every change;
+  - which direction is better, the value that ends the work, and a floor of attempts so a lucky early win cannot end it;
+  - a cap that ends it even unmet;
+  - what must keep passing while optimizing, led by the promise whose break would harm users most and that tests rarely reach;
+  - every check it names, seen failing on a planted break of what it guards, then passing once the break is undone;
+  - that a failing check is a finding to report: no one loosens it, or bends the code it guards, to make it pass, and a check updated after the code changed is written from the code before it reruns.
+- Any part leans on someone's judgment — "clean", "better", "reasonable" → use **anchor** skill: replace it with a trigger a machine evaluates identically every time. The dry run is the anchored rule deciding contrasting real cases — the target case and easier ones, each the median of repeated runs — record the values it reads now. A command that will not run, or values that do not separate the cases past the run-to-run spread, fail here, loudly.
 - The drafted contract → use **judge** skill, on the claim: the cheapest way to pass is the real work. Start from the known false-pass catalog in `cheat-museum.md`, then hunt false passes specific to this contract.
 
 Each open false pass judge finds re-enters as an amendment — back through the drafting and anchoring conditions above — until the verdict stands.
 
+| The work changes, or must hold | The strongest check |
+| --- | --- |
+| A UI | drive the running app |
+| A TUI | a live terminal |
+| A parser or a migration | replay saved input |
+| Stored data | read the value back |
+| Speed | compare profiles |
+| A promise about the order of events | a model checker |
+| A promise about every input | a code verifier |
+| A promise at every size | a proof |
+| Anything else | tests |
+
 ## The contract
 
-Hand it back as short bullets, one part per line: each part the drafting named, the dry-run value recorded, each cheap false pass closed. It locks only when judge's verdict stands and the user locks it.
+Hand it back as short bullets, one part per line: each part the drafting named, the dry-run values recorded, each cheap false pass closed. It locks only when judge's verdict stands and the user locks it.
 
 Two things stay open for the human alone, before the run starts: capping the spend with a disposable key, since the contract bounds correctness and only the key bounds cost; and watching the first cycle to see the run use what the contract names.
+
+A failure that repeats across the watched cycles becomes a check or a tool before the run goes unwatched.
 
 If the running work later games the contract, the cheat is a bug in the contract: amend it here and rerun from the last honest point.
 
