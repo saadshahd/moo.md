@@ -309,22 +309,12 @@ export class Worker {
 		actor.stop();
 	}
 
-	/**
-	 * Whether no one else works on an item hum has not started: one a person or a pull request claims gets a card naming
-	 * them, which goes once they let it go.
-	 */
-	#isUnclaimed(id: string, { claimedBy }: Known): boolean {
+	/** Shows on a card who already works on an item hum has not started, and takes the card down once no one does. */
+	#showClaim(id: string, claimedBy: readonly string[]): void {
 		const { faults } = this.#o.state;
 
-		if (claimedBy.length === 0) {
-			faults.clear({ code: CLAIMED_CODE, item: id });
-
-			return true;
-		}
-
-		faults.raise({ code: CLAIMED_CODE, item: id, cause: `${id} is already taken by ${claimedBy.join(" and ")}, so hum starts no rival change.`, fix: "Unassign the item or close the pull request, and hum takes it at its next tick." });
-
-		return false;
+		if (claimedBy.length === 0) faults.clear({ code: CLAIMED_CODE, item: id });
+		else faults.raise({ code: CLAIMED_CODE, item: id, cause: `${id} is already taken by ${claimedBy.join(" and ")}, so hum starts no rival change.`, fix: "Unassign the item or close the pull request, and hum takes it at its next tick." });
 	}
 
 	/** Whether a split part waits on a part that has not merged; an item no split filed waits on none. */
@@ -798,7 +788,11 @@ export class Worker {
 
 		const relands = [...this.#relanding].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
 
-		const waiting = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known && (answered || this.#isUnclaimed(id, known)) ? [{ id, answered, known }] : []));
+		const candidates = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
+
+		for (const { id, known } of candidates.filter((candidate) => !candidate.answered)) this.#showClaim(id, known.claimedBy);
+
+		const waiting = candidates.filter((candidate) => candidate.answered || candidate.known.claimedBy.length === 0);
 		const knownOf = new Map(waiting.map((w) => [w.id, w.known]));
 
 		const { start } = pick({
