@@ -1,12 +1,10 @@
+import { timeoutsOf } from "../config/machine.ts";
 import type { Kind } from "../config/schema.ts";
 import type { SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 
 /** The delays of the timeouts the wait a saved item stands in declares, shortest first. */
-const delaysOf = (kind: Kind, saved: SavedSnapshot): number[] =>
-	Object.keys((saved.state && kind.machine.states[saved.state]?.after) || {})
-		.map(Number)
-		.sort((a, b) => a - b);
+const delaysOf = (kind: Kind, saved: SavedSnapshot): number[] => timeoutsOf(saved.state === undefined ? undefined : kind.machine.states[saved.state]).map(({ ms }) => ms);
 
 /**
  * When the owner was told of the wait an item was saved in: once the question it queued was asked, which the daily

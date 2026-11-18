@@ -46,11 +46,17 @@ export const kindMachine = (kind: Kind, sources: Readonly<Record<string, AnyActo
 	return machineFromJSON(kind.machine as Parameters<typeof machineFromJSON>[0], { actors: invokedSources(kind, placeholder, sources) });
 };
 
-/** A state's earliest `after` timeout: its hours and the transitions it takes; undefined for a state with none. */
-export const earliestTimeout = (node: StateNodeJSON | undefined): { readonly hours: number; readonly transitions: NonNullable<StateNodeJSON["after"]>[string] } | undefined => {
-	const [delay, transitions] = Object.entries(node?.after ?? {}).sort(([a], [b]) => Number(a) - Number(b))[0] ?? [];
+/** A state's `after` timeouts, shortest first: each one's delay in ms and the transitions it takes. */
+export const timeoutsOf = (node: StateNodeJSON | undefined): { readonly ms: number; readonly transitions: NonNullable<StateNodeJSON["after"]>[string] }[] =>
+	Object.entries(node?.after ?? {})
+		.map(([delay, transitions]) => ({ ms: Number(delay), transitions }))
+		.sort((a, b) => a.ms - b.ms);
 
-	return delay === undefined || transitions === undefined ? undefined : { hours: Number(delay) / HOUR_MS, transitions };
+/** A state's earliest `after` timeout: its hours and the transitions it takes; undefined for a state with none. */
+export const earliestTimeout = (node: StateNodeJSON | undefined) => {
+	const [earliest] = timeoutsOf(node);
+
+	return earliest && { hours: earliest.ms / HOUR_MS, transitions: earliest.transitions };
 };
 
 /** An actor for each source the kind's machine invokes: the one `sources` gives, else `fallback`. */
