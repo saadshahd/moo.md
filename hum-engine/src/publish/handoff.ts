@@ -73,7 +73,7 @@ const WORK_CARD_CODES: ReadonlySet<string> = new Set(Object.values(SNAPSHOT_CARD
  */
 export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limits: { readonly now: number; readonly usageLimitMaxMs: number }): string | undefined => {
 	const { item, kind } = inbox;
-	const saved = work.items.saved().find(({ itemId }) => itemId === item);
+	const saved = work.items.savedOf(item);
 
 	if (saved !== undefined) {
 		if (saved.kind !== kind.machine.id || saved.machineVersion !== kind.machine.version) return `the work job saved ${item} under ${saved.kind}@${saved.machineVersion}, not ${kind.machine.id}@${kind.machine.version}`;
