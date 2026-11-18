@@ -368,10 +368,13 @@ test("where roundup serves a slot, setup writes no service unit and gives the st
 	writeFileSync(join(stubs, "rup"), '#!/bin/sh\nprintf "%s\\n" "$@"\n');
 	chmodSync(join(stubs, "rup"), 0o755);
 
-	const ran = Bun.spawnSync(["/bin/sh", "-c", (result.ok && result.start) || "false"], { env: { PATH: `${stubs}:/usr/bin:/bin`, ROUNDUP_AGENT_ID: "42" } });
+	const path = `${stubs}:/usr/bin:/bin`;
+	const ran = Bun.spawnSync(["/bin/sh", "-c", (result.ok && result.start) || "false"], { env: { PATH: path, ROUNDUP_AGENT_ID: "42" } });
+	const [env = "", ...args] = ran.stdout.toString().trimEnd().split("\n").toReversed();
 	const hum = join(repo, "node_modules", ".bin", "hum");
 
-	expect(ran.stdout.toString().trimEnd().split("\n")).toEqual(["terminal", "spawn", repo, "120", "40", "--command", bun, "--command", hum, "--command", "serve", "--env", '{"ROUNDUP_AGENT_ID":"42"}']);
+	expect(args.toReversed()).toEqual(["terminal", "spawn", repo, "120", "40", "--command", bun, "--command", hum, "--command", "serve", "--env"]);
+	expect(JSON.parse(env)).toEqual({ PATH: path, ROUNDUP_AGENT_ID: "42" });
 	expect(existsSync(home)).toBe(false);
 });
 
