@@ -16,6 +16,11 @@ const GITHUB_TOKENS = ["GH_TOKEN", "GITHUB_TOKEN"] as const;
  */
 export const withoutGitHubTokens = (env: Env) => ({ ...env, ...Object.fromEntries(GITHUB_TOKENS.map((name) => [name, undefined])) });
 
+const SINGLE_QUOTE = /'/g;
+
+/** `text` as one word a POSIX shell reads back unchanged. */
+export const shellQuote = (text: string): string => `'${text.replace(SINGLE_QUOTE, `'\\''`)}'`;
+
 /** A command ran past its limit and was told to stop. */
 export class CommandTimedOut extends Error {
 	override name = "CommandTimedOut";
