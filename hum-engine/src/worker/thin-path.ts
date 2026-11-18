@@ -562,8 +562,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (decision.action === "ask") return { asked: { ...askedQuestion({ reason, confirmed: decision.confirmed, runsWords: wants.question }), plan: wants.plan ?? "" } };
 
 		const text = `Chose "${decision.choice}" over ${decision.over.filter((word) => word !== decision.choice).join(", ")} without you.`;
+		const why = `each option touches only this change's own files, at level ${placement.level.name}`;
+		const files = reason.options?.find(({ word }) => word === decision.choice)?.paths ?? [];
+
 		await d.outbox.calls({ run: "decide", attempt: state.runs.list(id).length }).decide(id, text);
-		state.choices.put(`${id}@${text}`, { item: id, text, at: d.now() });
+		state.choices.put(`${id}@${text}`, { item: id, text, at: d.now(), why, files });
 
 		return { chose: text };
 	};

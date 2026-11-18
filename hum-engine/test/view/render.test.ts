@@ -251,6 +251,17 @@ test.each([
 	expect(listRows(ENTRY, { isUnfolded: false, width })).toHaveLength(lines);
 });
 
+test("a choice made without you shows what came of its item, and unfolded, why the run chose alone and the files it touched", () => {
+	const choiceRows = (unfolded: ReadonlySet<string>) => paneRows({ ...inputOf(statusRead, 120), unfolded }).map(textOf).join("\n");
+	const folded = choiceRows(new Set());
+	const unfolded = choiceRows(new Set(fullStatus.choices.map(({ item, at }) => `choice:${item}:${at}`)));
+
+	expect(folded).toContain("merged");
+	expect(folded).not.toContain("Files:");
+	expect(unfolded).toContain("Why: each option touches only this change's own files, at level low");
+	expect(unfolded).toContain("Files: docs/release-note.md");
+});
+
 test("an unclear item carries the word beside its level", () => {
 	expect(listRows(ENTRY, { isUnfolded: false, width: 120 }).map(textOf).join("")).toContain(
 		"medium unclear",

@@ -32,7 +32,7 @@ import { keepMergedCases } from "../measure/cases.ts";
 import { type StaleScore, staleScores } from "../measure/judges.ts";
 import type { Measured, Measurement } from "../measure/remeasure.ts";
 import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
-import type { Status } from "../status/format.ts";
+import type { Choice, Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
@@ -327,6 +327,13 @@ export class Worker {
 		}
 
 		actor.stop();
+	}
+
+	/** What came of an item so far: merged, or parked stuck or for review; nothing while it goes on. */
+	#resultOf(item: string): Choice["result"] {
+		const { state } = this.#o;
+
+		return state.merges.get(item) ? "merged" : state.parked.get(item)?.why;
 	}
 
 	/** The item ids the answer hook dropped in the inbox folder. Each file is read once and removed. */
@@ -721,7 +728,7 @@ export class Worker {
 				latest,
 			},
 			questions: openQuestions(state.questions.list(), state.answers.list()),
-			choices: newestChoices(state.choices.list(), config.hum.choicesShown),
+			choices: newestChoices(state.choices.list(), config.hum.choicesShown).map((choice) => ({ ...choice, result: this.#resultOf(choice.item) })),
 			cards: state.faults.list(),
 			inFlight: [...this.#inFlight].map(([item, run]) => ({
 				item,

@@ -24,7 +24,7 @@ export const fullStatus: Status = {
 		{ item: "seed-3", title: "Write the note", level: "high", state: "checking", since: ago(30), unclear: true },
 	],
 	merged: [{ item: "69", title: "Fix the typo in the README", level: "low", mergedAt: ago(7200) }],
-	choices: [{ item: "70", text: 'Chose "short" over long without you.', at: ago(900) }],
+	choices: [{ item: "70", text: 'Chose "short" over long without you.', at: ago(900), why: "each option touches only this change's own files, at level low", files: ["docs/release-note.md"], result: "merged" }],
 	rules: [],
 	possibleRepeats: [],
 	unusedMemory: [],

@@ -45,8 +45,15 @@ const mergedEntries = ({ merged }: Status, now: number): ListEntry[] =>
 		meta: [...(level === undefined ? [] : [span(level, "plain")]), span(sinceText(mergedAt, now), "dim")],
 	}));
 
+/** A choice's row: what was chosen, what came of its item and when; unfolded, why the run could choose alone and the files it touched. */
 const choiceEntries = ({ choices }: Status, now: number): ListEntry[] =>
-	choices.map(({ item, text, at }) => ({ foldId: `choice:${item}:${at}`, item, title: text, meta: [span(sinceText(at, now), "dim")] }));
+	choices.map(({ item, text, at, why, files = [], result }) => ({
+		foldId: `choice:${item}:${at}`,
+		item,
+		title: text,
+		meta: [...(result === undefined ? [] : [span(result, result === "merged" ? "plain" : "amber")]), span(sinceText(at, now), "dim")],
+		detail: [...(why === undefined ? [] : [`Why: ${why}`]), ...(files.length === 0 ? [] : [`Files: ${files.join(", ")}`])],
+	}));
 
 const unreadBlocks = (input: ViewInput): Row[][] => {
 	const reported = reportedUnread(input.unread, input);

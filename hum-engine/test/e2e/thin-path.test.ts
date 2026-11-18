@@ -835,5 +835,5 @@ test("a cheap choice a run reports is made without the owner, listed with its ti
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "merged", item: id });
-	expect(w.state.choices.list()).toEqual([{ item: id, text: 'Chose "short" over long without you.', at: expect.any(Number) }]);
+	expect(w.state.choices.list()).toEqual([{ item: id, text: 'Chose "short" over long without you.', at: expect.any(Number), why: expect.stringContaining("touches only this change's own files"), files: ["docs/note.md"] }]);
 });

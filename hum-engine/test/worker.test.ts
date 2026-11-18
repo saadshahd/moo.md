@@ -471,12 +471,13 @@ test("the status file lists the open questions and the newest choices from what 
 	w.state.questions.put("a@1", { item: "a", text: "Which title?", priority: 0, queuedAt: NOW - 2, askedAt: NOW - 1 });
 	w.state.choices.put("b@old", { item: "b", text: "old", at: 3 });
 	w.state.choices.put("b@new", { item: "b", text: "new", at: 4 });
+	w.state.parked.put("b", { item: "b", why: "stuck", cause: "the checks still fail", since: 5 });
 	await w.worker.tick();
 
 	const status = readStatus(w.state.statusPath);
 
 	expect(status.ok && status.status.questions).toEqual([{ item: "a", text: "Which title?", options: [], since: NOW - 1 }]);
-	expect(status.ok && status.status.choices).toEqual([{ item: "b", text: "new", at: 4 }]);
+	expect(status.ok && status.status.choices).toEqual([{ item: "b", text: "new", at: 4, result: "stuck" }]);
 });
 
 test("memory.md lines with no source or past the byte cap each raise a card naming them, and the cards go once the file is fixed", async () => {

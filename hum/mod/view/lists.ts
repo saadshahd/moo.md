@@ -14,6 +14,8 @@ export type ListEntry = {
 	readonly title: string;
 	/** Metadata parts, dropped from the end when short. */
 	readonly meta: readonly Span[];
+	/** Lines an unfolded row shows under its title. */
+	readonly detail?: readonly string[];
 };
 
 /**
@@ -35,7 +37,7 @@ export const listRows = (entry: ListEntry, { isUnfolded, width }: { readonly isU
 
 	const head: Row = [span(id, "strong", press), span(spaces(width - cells(id) - rowCells(meta)), "plain"), ...meta];
 
-	if (isUnfolded) return [head, ...wrap(entry.title, width).map((line) => [span(line, "plain", press)])];
+	if (isUnfolded) return [head, ...wrap(entry.title, width).map((line) => [span(line, "plain", press)]), ...(entry.detail ?? []).flatMap((detail) => wrap(detail, width).map((line) => [span(line, "dim", press)]))];
 
 	const title = ellipsize(entry.title, width);
 
