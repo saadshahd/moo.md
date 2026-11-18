@@ -46,8 +46,6 @@ const statusRead: ViewRead = { kind: "status", status: fullStatus };
 
 const READS: readonly ViewRead[] = [
 	statusRead,
-	{ kind: "waiting" },
-	{ kind: "missing", path: "/repo/.git/hum/status.json" },
 	{ kind: "unreadable", message: "Unexpected token" },
 	{ kind: "unsupported", format: 2 },
 	{

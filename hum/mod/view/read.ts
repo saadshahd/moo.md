@@ -1,11 +1,9 @@
-import type { ViewSource } from "../../types";
+import type { ServedSource } from "../../types";
 import { STATUS_FORMAT, Status } from "../vendor/libs.js";
 
 /** What the view knows about the status file: a format it does not read is unsupported, and its own format in another shape is unreadable. */
 export type ViewRead =
-	| { readonly kind: "waiting" }
 	| { readonly kind: "status"; readonly status: Status }
-	| { readonly kind: "missing"; readonly path: string }
 	| { readonly kind: "unreadable"; readonly message: string }
 	| { readonly kind: "unsupported"; readonly format: number | string };
 
@@ -34,12 +32,8 @@ export const statusPathOf = ({ cwd, commonDir }: { readonly cwd: string; readonl
 	return `${absolute.replace(/\/\.?$/, "")}/hum/status.json`;
 };
 
-export const readOf = (source: ViewSource): ViewRead => {
+export const readOf = (source: ServedSource): ViewRead => {
 	switch (source.kind) {
-		case "waiting":
-			return { kind: "waiting" };
-		case "missing":
-			return { kind: "missing", path: source.path };
 		case "failed":
 			return { kind: "unreadable", message: source.message };
 		case "text":

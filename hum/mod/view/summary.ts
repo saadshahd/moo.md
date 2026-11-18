@@ -19,10 +19,6 @@ const IDLE = "idle";
 /** At most 34 cells, the room the band gives its status. */
 export const statusWords = (read: ViewRead): string => {
 	switch (read.kind) {
-		case "waiting":
-			return "reading status";
-		case "missing":
-			return "no status yet";
 		case "unreadable":
 			return "status unreadable";
 		case "unsupported":
@@ -36,17 +32,12 @@ export const statusWords = (read: ViewRead): string => {
 };
 
 /** The cause the pane names under its header when the status file cannot be shown. */
-export const problemWords = (read: ViewRead): string | undefined => {
+export const problemWords = (read: Exclude<ViewRead, { readonly kind: "status" }>): string => {
 	switch (read.kind) {
-		case "missing":
-			return `${read.path} does not exist. Start the worker with hum serve, or run hum work once.`;
 		case "unreadable":
 			return `The status file cannot be read: ${read.message}`;
 		case "unsupported":
 			return `The status file is format ${read.format}; this view reads another. Update the plugin or the engine so they match.`;
-		case "waiting":
-		case "status":
-			return undefined;
 		default:
 			return read satisfies never;
 	}

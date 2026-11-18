@@ -11,13 +11,13 @@ import type { ViewInput } from "./view/input.ts";
 import { paneRows } from "./view/pane.ts";
 import { readOf } from "./view/read.ts";
 import type { Press } from "./view/row.ts";
-import { exclusive, locate, NOTHING_SEEN, poll, repoRoot, watchOnce } from "./watch.ts";
+import { exclusive, locate, NOTHING_SEEN, poll, repoRoot, UNSERVED, watchOnce } from "./watch.ts";
 
 const MS = 1000;
 const PANE = "hum";
 
 /* oxlint-disable anti-slop/no-shape-in-symbol-names -- `shape` is the engine's option name for a stored value's version tag */
-const source = atom({ plugin: "hum", key: "source" } as const, { kind: "waiting" }, { shape: "source-1" });
+const source = atom({ plugin: "hum", key: "source" } as const, UNSERVED, { shape: "source-2" });
 
 const unfolded = atom({ plugin: "hum", key: "unfolded" } as const, [], { shape: "unfolded-1" });
 
@@ -42,9 +42,13 @@ const pressed = ($: EngineInterface, context: PressContext) => async (press: Pre
 	}
 };
 
-/** What a drawing starts from, read as it is drawn. */
-async function viewInput($: EngineInterface, drawing: Pick<ViewInput, "width" | "amberAfterSeconds">): Promise<ViewInput> {
-	return { ...drawing, read: readOf(await read($, source)), now: await $.clock.now(), unread: (await read($, unread)) ?? undefined };
+/** What a drawing starts from, read as it is drawn; nothing where hum does not serve. */
+async function viewInput($: EngineInterface, drawing: Pick<ViewInput, "width" | "amberAfterSeconds">): Promise<ViewInput | undefined> {
+	const found = await read($, source);
+
+	if (found.kind === "unserved") return undefined;
+
+	return { ...drawing, read: readOf(found), now: await $.clock.now(), unread: (await read($, unread)) ?? undefined };
 }
 
 /** A failure outside answer mode shows once and the event passes on. */
@@ -58,20 +62,27 @@ export const register: Register = (on, options) => {
 
 		await restartAnswer($);
 
-		const path = await locate($, e.cwd);
-		const root = await repoRoot($, e.cwd);
+		const place = await locate($, e.cwd);
+
+		if (place === undefined) return next(e);
+
 		let seen = NOTHING_SEEN;
 
 		const look = async (): Promise<void> => {
-			const { found, seen: after } = await poll($, path, seen, amberAfterSeconds);
+			const wasServed = seen.kind === "served";
+			const { found, seen: after } = await poll($, place, seen, amberAfterSeconds);
 
 			seen = after;
 
-			if (found !== undefined) await update($, source, () => found);
+			if (found === undefined) return;
+
+			await update($, source, () => found);
+
+			if (wasServed && after.kind === "unserved") await $.ui.close({ id: PANE });
 		};
 
 		const ask = async (): Promise<void> => {
-			const cause = await watchOnce($, root);
+			const cause = seen.kind === "served" ? await watchOnce($, place.root) : undefined;
 			const now = await $.clock.now();
 
 			await update($, unread, (before) => (cause === undefined ? null : { cause, since: before?.since ?? now }));
@@ -123,6 +134,9 @@ export const register: Register = (on, options) => {
 		if (e.props.hasSurvey) return below;
 
 		const input = await viewInput($, { width: e.props.bodyColumns, amberAfterSeconds });
+
+		if (input === undefined) return below;
+
 		const row = bandRow({ ...input, answering: await answeringLabel($) });
 
 		const tags = $.ui.resolve(e);
@@ -137,9 +151,13 @@ export const register: Register = (on, options) => {
 	});
 
 	on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
+		const tags = $.ui.resolve(e);
 		const input = await viewInput($, { width: e.props.bodyColumns, amberAfterSeconds });
+
+		if (input === undefined) return <tags.Box />;
+
 		const rows = paneRows({ ...input, unfolded: new Set(await read($, unfolded)) });
 
-		return drawRows($.ui.resolve(e), rows, pressed($, input));
+		return drawRows(tags, rows, pressed($, input));
 	});
 };
