@@ -80,3 +80,15 @@ Main's redraw (0.21.0) cut a median 38% of the prose but dropped something the u
 - What it dropped on the fresh set: something still in progress shown as live, a dissenting recommendation, an assembly step, credit wording for a public release, message text the user would paste (reworded), a reversal of the user's own earlier cut, a design rule handed to another agent, and why a deletion is safe.
 - Not measured: a live session, and whether the 8 drops matter to the user.
 - The cases hold the user's words from private repos, so they stay on the Mac that measured them, under `~/.local/share/moo/evals/redraw/heldout/`.
+
+### 2026-11-18 — a word-list check for AI tells, measured and not built, from cursor's pstack `unslop`
+
+The proposal: a script that fences the redraw by flagging banned AI words (additionally, crucial, delve, enhance, foster, landscape, pivotal, showcase, testament, underscore, vibrant), curly quotes and decorative emoji that a pass adds.
+
+| where | what it found |
+|---|---|
+| 757 stored redraw passes | 0 added a banned word, a curly quote or an emoji |
+| 3,636 stored long replies | 0 banned words, 0 curly quotes; 15 with a pictograph such as ⏸ or 👍 |
+| 309 repo `.md` files | 19 banned words, mostly "enhancement" and "landscape"; 0 curly quotes |
+
+- Not built: the check would have fired 0 times in 757 passes. Build it when a count shows redraws adding these.
