@@ -139,14 +139,13 @@ for (const linter of linters) {
 
 describe('a linter older than the lowest tested version', () => {
   test('the failure names the version, and the repo is left as it was', async (t) => {
-    const installed = installLinter({ tool: 'oxlint', version: '1.21.0' });
-    if (installed.skip) return t.skip(installed.skip);
-    const repo = repoFor({ tool: 'oxlint', version: '1.21.0' }, { '.oxlintrc.json': '{\n  "rules": {}\n}\n', 'package.json': '{"devDependencies":{"oxlint":"1.21.0"}}' });
+    const repo = repoFor({ tool: 'oxlint', version: '1.21.0' }, { [linters[1].config]: linters[1].text, 'package.json': '{"devDependencies":{"oxlint":"1.21.0"}}' });
+    if (repo.skip) return t.skip(repo.skip);
     const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true });
     assert.equal(rows[0].status, 'reverted');
     assert.match(rows[0].note, /report that cannot be read/);
     assert.match(rows[0].note, /oxlint 1\.21\.0 from package\.json range is older than 1\.26\.0/);
-    assert.equal(readFileSync(join(repo.root, '.oxlintrc.json'), 'utf8'), '{\n  "rules": {}\n}\n');
+    assert.equal(readFileSync(join(repo.root, linters[1].config), 'utf8'), linters[1].text);
   });
 });
 
@@ -228,7 +227,7 @@ describe('re-running over an edited check file', () => {
     const theirs = readFileSync(installedFile, 'utf8') + '\n';
     writeFileSync(installedFile, theirs);
     const rows = await installChecks({ root: repo.root, corpus, selected: [keysRule], write: true, resolutions: resolution ? { [keysRule.rule]: resolution } : {} });
-    return { rows, installedFile, theirs, repo };
+    return { rows, installedFile, theirs };
   };
 
   test('asks, and changes nothing, until told which version wins', async (t) => {
