@@ -42,7 +42,7 @@ type CliSettings = z.infer<typeof CliSettings>;
 
 type Flags = { ttl?: number; renew?: boolean; option?: string | string[]; since?: string; body?: string };
 
-type Adapters = Awaited<ReturnType<typeof resolveAdapters>>;
+type Adapters = Awaited<ReturnType<typeof resolveAdapters>>["slots"];
 
 /** What every op reads: its positional arguments, flags and the integrations `hum.json` names. */
 type Call = {
@@ -60,6 +60,8 @@ type Call = {
 	readonly settings: CliSettings;
 	/** The integration role of a slot; throws when none is set up. */
 	readonly slot: <T>(name: Slot, role: (adapter: NonNullable<Adapters[Slot]>) => T | undefined) => T;
+	/** Ends what the integrations hold open, so the op's process can exit. */
+	readonly close: () => Promise<void>;
 };
 
 /** Leaves a wake file in the inbox for the worker on this machine. A repo that runs only in CI has no such worker to read it, so no file is left. */
@@ -119,7 +121,7 @@ const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Pro
 	const state = openState(stateDir, { now: Date.now });
 	const settings = readSettings(io.cwd, CliSettings);
 
-	const adapters = await resolveAdapters(io.cwd, {
+	const { slots: adapters, close } = await resolveAdapters(io.cwd, {
 		faults: state.faults,
 		guard: {},
 		context: { report: (fault) => void state.faults.raise(fault), now: Date.now, env: io.env },
@@ -136,6 +138,7 @@ const callOf = async (positionals: readonly string[], flags: Flags, io: Io): Pro
 		stateDir,
 		inbox: state.inbox,
 		settings,
+		close,
 		slot: (name, role) => {
 			const adapter = adapters[name];
 			const found = adapter && role(adapter);
@@ -165,9 +168,13 @@ const perform = async (op: OpName, positionals: readonly string[], flags: Flags,
 	if (op === "push") return push(positionals, io);
 
 	try {
-		const printed = await handlers[op](await callOf(positionals, flags, io));
+		const call = await callOf(positionals, flags, io);
 
-		io.stdout(`${JSON.stringify(printed)}\n`);
+		try {
+			io.stdout(`${JSON.stringify(await handlers[op](call))}\n`);
+		} finally {
+			await call.close();
+		}
 
 		return 0;
 	} catch (error) {

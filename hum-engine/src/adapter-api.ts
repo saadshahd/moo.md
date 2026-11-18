@@ -147,6 +147,8 @@ export type Adapter = {
 	readonly questions?: Fallible<Questions>;
 	readonly answers?: Fallible<Answers>;
 	readonly release?: Fallible<Release>;
+	/** Ends what the adapter holds open, such as a client's process, so the process that resolved it can exit. */
+	readonly close?: () => Promise<void>;
 };
 
 /** The integrations with plain replies: the engine calls them so behind the guard, which retries or throws on `Failed`, and an adapter that never answers `Failed` may implement them so. */

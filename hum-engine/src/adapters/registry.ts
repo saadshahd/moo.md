@@ -118,15 +118,18 @@ export const refuseOtherVersion = (name: string, adapter: Adapter, faults: Fault
 	});
 };
 
+/** The integrations of each slot, and how to end what their adapters hold open once the caller is done with them. */
+export type Resolved = { readonly slots: Partial<Record<Slot, Integrations>>; readonly close: () => Promise<void> };
+
 /**
  * The adapter `hum.json` names for each slot, guarded: one the engine ships, else an owner's `adapters/<name>.ts`.
  * A slot with no entry uses the markdown source in `repo`, except release, which has no default. Slots that name
- * the same adapter share one instance.
+ * the same adapter share one instance, which `close` ends once.
  */
 export const resolveAdapters = async (
 	repo: string,
 	{ faults, guard, context }: { faults: Faults; guard: Pick<GuardOptions, "lastReady">; context: AdapterContext },
-): Promise<Partial<Record<Slot, Integrations>>> => {
+): Promise<Resolved> => {
 	const settings = readSettings(repo, AdapterSettings);
 
 	const slots = SLOTS.flatMap((slot) => {
@@ -137,21 +140,26 @@ export const resolveAdapters = async (
 
 	const source: Repo = { path: repo, settings, context };
 
-	const build = async (name: string): Promise<Integrations> => {
-		const adapter = await (isBuiltIn(name) ? BUILT_IN[name](source) : ownerAdapter(name, source));
+	const build = async (name: string) => {
+		const adapter: Adapter = await (isBuiltIn(name) ? BUILT_IN[name](source) : ownerAdapter(name, source));
 
 		if (refuseOtherVersion(name, adapter, faults)) throw new PermanentError(`adapter "${name}" implements another adapter API version`);
 
-		return guarded(adapter, {
+		const integrations = guarded(adapter, {
 			...guard,
 			provider: name,
 			faults,
 			...guardTimings(settings),
 		});
+
+		return { integrations, close: async () => void (await adapter.close?.()) };
 	};
 
 	const names = [...new Set(slots.map(([, name]) => name))];
 	const built = new Map(await Promise.all(names.map(async (name) => [name, await build(name)] as const)));
 
-	return Object.fromEntries(slots.map(([slot, name]) => [slot, built.get(name)]));
+	return {
+		slots: Object.fromEntries(slots.map(([slot, name]) => [slot, built.get(name)?.integrations])),
+		close: async () => void (await Promise.all([...built.values()].map(({ close }) => close()))),
+	};
 };

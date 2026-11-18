@@ -11,7 +11,8 @@ import { SlotPool } from "../slots/pool.ts";
 import { orMissing } from "../state/fs.ts";
 import { openState } from "../state/open.ts";
 import { checkLimits, runChecks } from "../worker/checks.ts";
-import { openWorker } from "../worker/open.ts";
+import { closingAfter, workerOptions } from "../worker/open.ts";
+import { Worker } from "../worker/worker.ts";
 import { Scratch } from "./scratch.ts";
 
 type StepStatus = "passed" | "failed" | "skipped";
@@ -174,7 +175,7 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 
 	const results: string[] = [];
 
-	const worker = await openWorker(scratch.owner, {
+	const options = await workerOptions(scratch.owner, {
 		now: env.now,
 		env: env.processEnv,
 		newSessionId: env.newSessionId,
@@ -187,8 +188,12 @@ const runItem = async (scratch: Scratch, env: ProveEnv): Promise<Outcome> => {
 		onResult: (result) => results.push(result.outcome),
 	});
 
-	await worker.tick();
-	await worker.idle();
+	await closingAfter(options, async () => {
+		const worker = new Worker(options);
+
+		await worker.tick();
+		await worker.idle();
+	});
 
 	return results.includes("merged") ? passed("one item ran end to end and merged") : failed(`the item ended as ${results.join(", ") || "nothing"}`);
 };
