@@ -1,4 +1,4 @@
-With `statechart`, Claude models a flow that moves between states, checks the rules its reader agrees to in TLC over every order of events, and charts it in the reader's words with the shortest path to each rule that breaks.
+With `statechart`, Claude models a flow that moves between states, checks the rules its reader agrees to with everystate over every order of events, and charts it in the reader's words with the shortest path to each rule that breaks.
 
 The bet: checking every order of events finds bugs that tests and a flow's own graph checks miss. First target: hum's kind machines (`hum-engine/defaults/kinds/*.json`, run as xstate machines), whose own checks cover only reachability and dead ends (`hum-engine/src/config/checks.ts`).
 
@@ -31,3 +31,12 @@ Graduate when 2 bugs it finds, in at least 2 flows, replay against the real code
 - The chart refused the first view, whose labels put states that break different rules under one name; the relabelled view drew 37 to 63 arrows against a budget of 20.
 - The run showed the chart naming only the first rule a state breaks; 0.28.1 runs TLC once per broken rule to mark them all.
 - Open for the skill: it says nothing about generating the model when the flow is already data, as hum's kinds are.
+
+### 2026-11-18 — everystate in place of Java TLC
+
+- Changed: the script runs everystate 0.4.0 through `bunx`. It is a Rust model checker that prints TLC's output, exit codes and state graph, so the command needs only bun: no Java, no `tla2tools.jar`.
+- Closed, two gaps that changed verdicts with no error. everystate ignores `-continue`, so one run of a generated module now prints every state each broken invariant fails, in place of one `-continue` run per rule. Its SANY export writes a definition's name before its level, so levels are read in either order, and a PROPERTY with no level stops the run.
+- Parity on hum's 20 kind specs, against the old script on Java TLC: 19 charts match, and the 20th refuses under both for the same merged label. Reports match apart from the engine's name, except in 4 plant-merging specs, whose `Settles` counterexample is shorter: 3 to 5 steps where TLC printed 7 to 10. Both are valid paths.
+- Count keeps its known answer: Small breaks at n = 1, 2, 3 and Tiny at n = 2, 3.
+- Under a CONSTRAINT, both checkers test each rule on the states just past it, which the graph leaves out. The chart leaves them out too, and the report counts, per rule, those that break it.
+- Open: a rule that breaks only past the constraint stops the run, as it did under TLC.

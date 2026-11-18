@@ -1,8 +1,8 @@
 import { describe, expect, test } from "claude-code/testing";
 import { draw, Refusal, type Verdict, type View } from "./chart.ts";
-import { configText, definitionLevels, parseDot, parseValue, pathGraph, readConfig, readRun, stateKey, type Graph, type Trace, type Vars } from "./tlc.ts";
+import { configText, definitionLevels, parseDot, parseValue, pathGraph, printedBreaks, readConfig, readRun, stateKey, watchModule, type Graph, type Trace, type Vars } from "./tlc.ts";
 
-const COUNT_CONTINUED = `Error: Invariant Small is violated.
+const COUNT = `Error: Invariant Small is violated.
 Error: The behavior up to this point is:
 State 1: <Initial predicate>
 /\\ seen = {}
@@ -11,20 +11,6 @@ State 1: <Initial predicate>
 State 2: <Up line 5, col 7 to line 5, col 50 of module Count>
 /\\ seen = {0}
 /\\ n = 1
-
-Error: Invariant Small is violated.
-Error: The behavior up to this point is:
-State 1: <Initial predicate>
-/\\ seen = {}
-/\\ n = 0
-
-State 2: <Up line 5, col 7 to line 5, col 50 of module Count>
-/\\ seen = {0}
-/\\ n = 1
-
-State 3: <Up line 5, col 7 to line 5, col 50 of module Count>
-/\\ seen = {0, 1}
-/\\ n = 2
 
 3 states generated, 3 distinct states found, 0 states left on queue.`;
 
@@ -84,7 +70,25 @@ color="white";
 }
 }`;
 
-const SANY_XML = `<entry><UID>337</UID><UserDefinedOpKind><location><column><begin>1</begin><end>40</end></column><line><begin>14</begin><end>14</end></line><filename>Pay</filename></location><level>3</level><uniquename>Ends</uniquename><entry><UID>341</UID><UserDefinedOpKind><location><column><begin>1</begin><end>26</end></column><line><begin>15</begin><end>15</end></line><filename>Pay</filename></location><level>1</level><uniquename>InitOnly</uniquename>`;
+const SANY_XML = `<UserDefinedOpKind><location><column><begin>1</begin><end>17</end></column><line><begin>13</begin><end>13</end></line><filename>Count</filename></location><level>3</level><uniquename>Ends</uniquename><arity>0</arity><body><OpApplNode><location><column><begin>9</begin><end>17</end></column><line><begin>13</begin><end>13</end></line><filename>Count</filename></location><level>3</level><operator><BuiltInKindRef><UID>63</UID></BuiltInKindRef></operator><operands><OpApplNode><location><column><begin>12</begin><end>16</end></column><line><begin>13</begin><end>13</end></line><filename>Count</filename></location><level>1</level><operator><BuiltInKindRef><UID>4</UID></BuiltInKindRef></operator><operands><OpApplNode><location><column><begin>12</begin><end>12</end></column><line><begin>13</begin><end>13</end></line><filename>Count</filename></location><level>1</level><operator><OpDeclNodeRef><UID>230</UID></OpDeclNodeRef></operator><operands/></OpApplNode><NumeralNode><location><column><begin>16</begin><end>16</end></column><line><begin>13</begin><end>13</end></line><filename>Count</filename></location><level>0</level><IntValue>3</IntValue></NumeralNode></operands></OpApplNode></operands></OpApplNode></body><params/></UserDefinedOpKind><UserDefinedOpKind><uniquename>StateProp</uniquename><level>1</level><arity>0</arity></UserDefinedOpKind>`;
+
+const PRINTED_BY_TLC = `Finished computing initial states: 1 distinct state generated at 2026-11-18 21:08:21.
+<< "Statechart",
+   "Small",
+   << "checking-the-very-long-phase-name",
+      <<"alpha-entry", "beta-entry", "gamma-entry", "delta-entry">>,
+      [fixRuns |-> 1, reviewRuns |-> 0, planRuns |-> 0, tokens |-> 0] >> >>
+<< "Statechart",
+   "Small",
+   << "checking-the-very-long-phase-name",
+      <<"alpha-entry", "beta-entry", "gamma-entry", "delta-entry">>,
+      [fixRuns |-> 2, reviewRuns |-> 0, planRuns |-> 0, tokens |-> 0] >> >>
+Model checking completed. No error has been found.`;
+
+const PRINTED_BY_EVERYSTATE = `Finished computing initial states: 1 distinct state generated at 2026-11-18 21:08:21.
+<<"Statechart", "Small", <<"checking-the-very-long-phase-name", <<"alpha-entry", "beta-entry", "gamma-entry", "delta-entry">>, [fixRuns |-> 1, reviewRuns |-> 0, planRuns |-> 0, tokens |-> 0]>>>>
+<<"Statechart", "Small", <<"checking-the-very-long-phase-name", <<"alpha-entry", "beta-entry", "gamma-entry", "delta-entry">>, [fixRuns |-> 2, reviewRuns |-> 0, planRuns |-> 0, tokens |-> 0]>>>>
+Model checking completed. No error has been found.`;
 
 describe("readConfig", () => {
 	test("splits the rules a config checks from the rest, kept as written", () => {
@@ -99,11 +103,8 @@ test("parseValue reads sets as arrays, and records, sequences and functions as o
 });
 
 describe("readRun", () => {
-	test("reads every violation -continue prints, the first one the shortest, and the distinct states", () => {
-		const run = readRun(COUNT_CONTINUED);
-		expect(run.distinct).toBe(3);
-		expect(run.violations.map((v) => [v.rule, v.trace.states.length])).toEqual([["Small", 2], ["Small", 3]]);
-		expect(run.violations[1].trace.states[2]).toEqual({ action: "Up", vars: { seen: [0, 1], n: 2 } });
+	test("reads a broken invariant's path and the distinct states", () => {
+		expect(readRun(COUNT)).toEqual({ distinct: 3, violations: [{ rule: "Small", kind: "invariant", trace: { states: [{ action: undefined, vars: { seen: [], n: 0 } }, { action: "Up", vars: { seen: [0], n: 1 } }] } }] });
 	});
 	test("reads a rule broken by a start state, and a deadlock", () => {
 		expect(readRun(INITIAL).violations).toEqual([{ rule: "Never", kind: "invariant", trace: { states: [{ action: undefined, vars: { phase: "checking" } }] } }]);
@@ -130,8 +131,28 @@ test("pathGraph draws a trace's steps, the step back into its loop among them", 
 	expect(graph.steps.map((s) => s.action)).toEqual(["ChecksFail", "FixDone"]);
 });
 
-test("definitionLevels reads each definition's level from SANY's XML", () => {
-	expect([...definitionLevels(SANY_XML)]).toEqual([["Ends", 3], ["InitOnly", 1]]);
+test("definitionLevels reads each definition's level from SANY's XML, written before its name or after it", () => {
+	expect([...definitionLevels(SANY_XML)]).toEqual([["Ends", 3], ["StateProp", 1]]);
+});
+
+test("watchModule prints each broken rule's states under a module, an invariant and a marker no spec text holds", () => {
+	expect(watchModule("Count", ["Small", "Tiny"], ["seen", "n"], ["Count.tla", "---- MODULE Count ----\n\\* drawn by Statechart\n===="])).toEqual({
+		module: "Statechart2Breaks",
+		invariant: "Statechart2Watch",
+		marker: "Statechart2",
+		text: `---- MODULE Statechart2Breaks ----
+EXTENDS Count, TLC
+Statechart2Watch ==
+  /\\ (~(Small) => PrintT(<<"Statechart2", "Small", <<seen, n>>>>))
+  /\\ (~(Tiny) => PrintT(<<"Statechart2", "Tiny", <<seen, n>>>>))
+====
+`,
+	});
+});
+
+test("printedBreaks reads each state a rule breaks, whether TLC wraps the printed tuple or everystate keeps it on one line", () => {
+	const state = (fixRuns: number) => stateKey({ phase: "checking-the-very-long-phase-name", log: { 1: "alpha-entry", 2: "beta-entry", 3: "gamma-entry", 4: "delta-entry" }, counts: { fixRuns, reviewRuns: 0, planRuns: 0, tokens: 0 } });
+	for (const output of [PRINTED_BY_TLC, PRINTED_BY_EVERYSTATE]) expect(printedBreaks(output, "Statechart", ["phase", "log", "counts"])).toEqual(new Map([["Small", new Set([state(1), state(2)])]]));
 });
 
 const at = (phase: string, n = 0): Vars => ({ phase, n });
@@ -190,6 +211,10 @@ describe("draw", () => {
 	test("gives each broken rule's shortest path, numbered in the reader's words", () => {
 		const { report } = draw(PAY, [PAID_TWICE], { ...byPhase, step: (a) => ({ Pay: "you press pay", Decline: "the card is declined", Accept: "the bank accepts" })[a] }, settings);
 		expect(report).toContain("The shortest path has 4 steps:\n\n0. idle (start)\n1. you press pay → paying\n2. the card is declined → idle\n3. you press pay → paying\n4. the bank accepts → paid");
+	});
+	test("says how many states past the constraint break a rule, which the chart does not draw", () => {
+		const { report } = draw(PAY, [{ ...PAID_TWICE, pastBound: 2 }], byPhase, settings);
+		expect(report).toContain("| PaysOnce | breaks, also in 2 states past the constraint, which the chart does not draw |");
 	});
 	test("says a property with no temporal operator checks only the start states", () => {
 		const { report } = draw(PAY, [{ rule: "StartsIdle", kind: "property", initialOnly: true }], byPhase, settings);
