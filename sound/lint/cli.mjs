@@ -47,4 +47,4 @@ const commands = {
 };
 
 if (!commands[command]) throw new Error(`usage: cli.mjs <${Object.keys(commands).join('|')}> <repo-root> [options]`);
-console.log(JSON.stringify(await commands[command](), null, 2));
+process.stdout.write(`${JSON.stringify(await commands[command](), null, 2)}\n`);
