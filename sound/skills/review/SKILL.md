@@ -20,4 +20,6 @@ The project's taste rules live under `.claude/sound/`. Read the ones that bear o
 
 Review deeply: surface every rule the changes violate, and the enhancements that genuinely matter for this diff's kind. Ground every finding in the diff and the intent behind it — never rule from the text alone. Stay silent where a rule's `Not-when:` applies.
 
+When the diff fixes a fault, search the repo for every other site of the same fault — the same call, pattern or missing guard — and report each one the diff leaves as it was: `- <file>:<line>: same fault as <fixed file>:<line>`.
+
 Report most-consequential first: `- <file>: <rule or enhancement> — <anchor>`. If nothing stands, say `CLEAN`.
