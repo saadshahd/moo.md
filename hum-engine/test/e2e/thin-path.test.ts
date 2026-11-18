@@ -1168,6 +1168,26 @@ test("past conflictRebuilds rebuilds since the owner last answered, a change tha
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "review", item: id, detail: expect.stringContaining("conflicts with the newest main") });
 });
 
+test("where the base requires a pull request, a change that no longer rebases is built again and lands through the same pull request", async () => {
+	const w = await world({ script: [{}, NOTE, NOTE] }, { settings: { conflictRebuilds: 1 } });
+	const github = new FakeGitHub();
+	const pulls = github.client();
+	const id = w.repo.seed("Write the note");
+	const pass = () => runThinPath(w.thinPath({ pulls, itemId: id }));
+
+	github.requiresPullRequest = true;
+	expect(await pass()).toMatchObject({ outcome: "landing", item: id });
+
+	w.repo.put({ path: "docs/note.md", content: "the owner's note\n" });
+	w.clock.at += TTL;
+
+	expect(await pass()).toMatchObject({ outcome: "restarted", item: id });
+	expect(await pass()).toMatchObject({ outcome: "landing", item: id });
+	expect(github.pulls()).toMatchObject([{ head: runBranch(SHIPPED_DEFAULTS, id), autoMerge: true, state: "OPEN" }]);
+	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/note.md`])).toBe("hello\n");
+	expect(sh(w.repo.remote, ["merge-base", "--is-ancestor", "main", runBranch(SHIPPED_DEFAULTS, id)])).toBe("");
+});
+
 test("a run that ends done and changed nothing ends stuck, saying so", async () => {
 	const w = await world({ script: [{}, { structured: { status: "done", pullRequest: { title: "Nothing", body: "No change." } } }] });
 	const id = w.repo.seed("Write the note");
