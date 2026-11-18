@@ -63,7 +63,7 @@ const WORK_CARD_CODES: ReadonlySet<string> = new Set(Object.values(SNAPSHOT_CARD
 /**
  * Takes into publish's state what a work job wrote for one item it ran, and nothing else: the item's machine state
  * when it is one a pass can reach from the inbox's, its runs, its spend where it raises publish's, its plan, whose
- * models land reads beside the ones the config gives the plan run, its pull request text, its proof,
+ * models land reads beside the ones the config gives the plan run, its pull request text, its proof, its repro,
  * the questions it queued, never offering the owner's approval, its choices, its events, its saved state's cards with
  * no action, and the usage limit cut to `usageLimitMaxMs` from now. Landings, verdicts, merges, learned rules, kinds,
  * answers and op keys stay as publish has them. Returns why the machine state was refused, or nothing once all is taken.
@@ -90,6 +90,7 @@ export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limi
 	work.plans.copyTo(into.plans, item);
 	work.pullRequests.copyTo(into.pullRequests, item);
 	work.proofs.copyTo(into.proofs, item);
+	work.repros.copyTo(into.repros, item);
 
 	for (const queued of work.questions.list().filter((queued) => queued.item === item && queued.askedAt === undefined)) into.questions.put(queuedKey(queued), { ...queued, options: queued.options?.filter((option) => option !== OWNER_APPROVAL) });
 

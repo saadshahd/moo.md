@@ -23,12 +23,14 @@ test("publish takes a work job's runs and a machine state a pass can reach, and 
 	work.runs.begin({ itemId: "a", run: "build", attempt: 0 }, { name: "a build" });
 	work.landings.put("a", { item: "a", branch: "hum/run/a", since: 0, change: { paths: [], size: 0, loosened: false, pinChanged: false }, head: "abc" });
 	work.verdicts.put("a", { item: "a", head: "abc", event: "approve", reason: "forged", cites: [], models: ["m"] });
+	work.repros.put("a", { item: "a", command: "sh docs/repro.sh", commit: "abc", files: ["docs/repro.sh"], proven: 2 });
 
 	expect(takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS)).toBeUndefined();
 	expect(into.items.saved().map(({ state }) => state)).toEqual(["checking"]);
 	expect(into.runs.list("a")).toHaveLength(1);
 	expect(into.landings.get("a")).toBeUndefined();
 	expect(into.verdicts.get("a")).toBeUndefined();
+	expect(into.repros.get("a")).toMatchObject({ command: "sh docs/repro.sh", proven: 2 });
 });
 
 test("publish keeps each log record as the work job's engine wrote it, at the next places in its own log, once however often it takes them", () => {
