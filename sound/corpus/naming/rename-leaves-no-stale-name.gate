@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# Pre-commit gate for rename-leaves-no-stale-name.md: blocks a staged change
+# that retires a name while a doc or a JS/TS comment in the staged tree still
+# uses it. A change retires a compound name (camelCase, two-word PascalCase,
+# snake_case) when it removes an exported or top-level declaration and no
+# JS/TS code uses the name any more; it retires a source path when it renames
+# the file away. An old path also counts in a string or a config file. A doc
+# that declares the name in its own example is not a use. Run from the repo
+# root. Exit 1 blocks the commit.
+set -Eeuo pipefail
+trap 'echo "stale-name gate crashed at line $LINENO; commit allowed" >&2; exit 0' ERR
+
+sources=" js jsx ts tsx mjs cjs mts cts "
+docs=" md mdx markdown txt rst adoc "
+configs=" json jsonc yml yaml toml "
+keywords='function|class|const|let|var|interface|type|enum'
+types='function|class|interface|type|enum'
+modifiers='(declare|async|abstract)[[:space:]]+'
+history_specs=(':(exclude,glob)**/CHANGELOG*' ':(exclude,glob)**/CHANGES*' ':(exclude,glob)**/HISTORY*'
+  ':(exclude,glob)**/*.lock' ':(exclude,glob)**/package-lock.json' ':(exclude,glob)**/pnpm-lock.yaml' ':(exclude,glob)**/bun.lockb')
+
+source_file() {
+  case "$sources" in *" ${1##*.} "*) return 0 ;; esac
+  return 1
+}
+
+not_authored_here() {
+  local attributes
+  case "/$1" in */node_modules/* | */vendor/* | */dist/* | */build/* | *.bundle.* | *.min.* | */fixtures/* | */__fixtures__/* | */testdata/* | */evals/* | */*.evals/*) return 0 ;; esac
+  attributes=$(git check-attr --cached linguist-vendored linguist-generated -- "$1")
+  case $attributes in *": set"* | *": true"*) return 0 ;; esac
+  return 1
+}
+
+changed_sources() {
+  local status path
+  while IFS= read -r -d '' status; do
+    IFS= read -r -d '' path
+    case $status in R*) IFS= read -r -d '' path ;; esac
+    source_file "$path" && ! not_authored_here "$path" && printf '%s\0' "$path"
+  done < <(git diff --cached --name-status -z -M --diff-filter=DMR)
+  return 0
+}
+
+renamed_away() {
+  local status old new
+  while IFS= read -r -d '' status; do
+    IFS= read -r -d '' old
+    case $status in R*) IFS= read -r -d '' new ;; *) continue ;; esac
+    source_file "$old" && ! not_authored_here "$old" || continue
+    case $old in */*) ;; *) continue ;; esac
+    git cat-file -e ":$old" 2>/dev/null && continue
+    printf '%s\n' "$old"
+  done < <(git diff --cached --name-status -z -M --diff-filter=R)
+  return 0
+}
+
+declared_names() {
+  { grep -oE "^(export[[:space:]]+(default[[:space:]]+)?($modifiers)*($keywords)|($modifiers)*($types))[[:space:]]+[A-Za-z_][A-Za-z0-9_]*" || true; } |
+    awk '{ print $NF }' | { grep -E '[a-z0-9][A-Z]|[A-Za-z0-9]_[A-Za-z0-9]' || true; } | sort -u
+}
+
+classify() {
+  awk -v token="$1" -v word="$2" -v sources="$sources" -v docs="$docs" -v configs="$configs" -v quotes="\"'\`" '
+    function last_index(text, part,   at, found) {
+      at = 0
+      while ((found = index(substr(text, at + 1), part)) > 0) at += found
+      return at
+    }
+    function kind_in_code(prefix,   copy, i) {
+      if (index(prefix, "//") || last_index(prefix, "/*") > last_index(prefix, "*/")) return "comment"
+      if (prefix ~ /^[ \t]*\*/ && !index(prefix, "*/")) return "comment"
+      for (i = 1; i <= 3; i++) {
+        copy = prefix
+        if (gsub(substr(quotes, i, 1), "", copy) % 2 == 1) return "string"
+      }
+      return "code"
+    }
+    function kind_of_word(text, pattern,   seen, rest, kind, found) {
+      seen = ""; rest = text; kind = ""
+      while (match(rest, pattern)) {
+        found = kind_in_code(seen substr(rest, 1, RSTART))
+        if (found == "code") return found
+        if (kind == "") kind = found
+        seen = seen substr(rest, 1, RSTART + RLENGTH - 1)
+        rest = substr(rest, RSTART + RLENGTH)
+      }
+      return kind
+    }
+    {
+      path = $0; sub(/:.*/, "", path)
+      rest = substr($0, length(path) + 2)
+      line = rest; sub(/:.*/, "", line)
+      text = substr(rest, length(line) + 2)
+      extension = path; sub(/.*\./, "", extension)
+      pattern = "(^|[^A-Za-z0-9_$])" token "([^A-Za-z0-9_$]|$)"
+      if (word) at = match(text, pattern) ? RSTART : 0
+      else {
+        at = index(text, token)
+        if (at > 1 && substr(text, at - 1, 1) ~ /[A-Za-z0-9_.\/-]/) at = 0
+      }
+      if (!at) next
+      if (index(sources, " " extension " ")) kind = word ? kind_of_word(text, pattern) : kind_in_code(substr(text, 1, at))
+      else if (index(docs, " " extension " ")) kind = "doc"
+      else if (index(configs, " " extension " ")) kind = "config"
+      else next
+      print path ":" line " " kind
+    }'
+}
+
+undefined_in_file() {
+  local hit
+  while IFS= read -r hit; do
+    git grep --cached -qE "(^|[^A-Za-z0-9_\$])($keywords)[[:space:]]+$1([^A-Za-z0-9_\$]|\$)" -- "${hit%%:*}" || printf '%s\n' "$hit"
+  done
+  return 0
+}
+
+authored_only() {
+  local hit
+  while IFS= read -r hit; do
+    not_authored_here "${hit%%:*}" || printf '%s\n' "$hit"
+  done
+  return 0
+}
+
+stale=''
+add_hits() {
+  local hit
+  while IFS= read -r hit; do
+    [ -n "$hit" ] && stale+="  ${hit% *}  ($1)"$'\n'
+  done
+  return 0
+}
+
+files=()
+while IFS= read -r -d '' path; do files+=("$path"); done < <(changed_sources)
+
+if [ ${#files[@]} -gt 0 ]; then
+  diff=$(git diff --cached -U0 --no-color --no-ext-diff -M -- "${files[@]}")
+  removed=$({ grep -E '^-' <<<"$diff" || true; } | { grep -vE '^---' || true; } | cut -c2- | declared_names)
+  for name in $removed; do
+    uses=$({ git grep --cached -n -I -w -F -e "$name" -- . "${history_specs[@]}" || true; } | classify "$name" 1 | authored_only)
+    grep -q ' code$' <<<"$uses" && continue
+    add_hits "$name" < <({ grep -E ' (doc|comment)$' <<<"$uses" || true; } | undefined_in_file "$name")
+  done
+fi
+
+while IFS= read -r old; do
+  [ -n "$old" ] || continue
+  add_hits "$old" < <({ git grep --cached -n -I -F -e "$old" -- . "${history_specs[@]}" || true; } | classify "$old" 0 | authored_only)
+done < <(renamed_away)
+
+[ -z "$stale" ] && exit 0
+cat >&2 <<EOF
+Commit blocked: this change retires these names, and these lines still use them:
+$stale
+The type checker sees code; it cannot see docs, comments or an old path in
+config. In this commit, give each line the new name, or delete it if the
+thing is gone. A line that names the old one on purpose belongs in CHANGELOG.md.
+Vendored or generated? Mark it linguist-vendored or linguist-generated in
+.gitattributes, in a commit of its own.
+EOF
+exit 1
