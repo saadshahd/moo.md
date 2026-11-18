@@ -78,15 +78,18 @@ for (const rule of config.properties) properties.set(rule, (await tlc(`property-
 
 const complete = distinct <= Number(values["chart-states"]);
 const lastKey = (trace: Trace) => stateKey(trace.states.at(-1)!.vars);
-const chartRun = complete ? await tlc("chart", configText(config.base, { invariants: [...broken.keys()] }), ["-deadlock", "-continue", "-dump", "dot,actionlabels", join(work, "chart")]) : undefined;
-const graph = chartRun ? parseDot(readFileSync(join(work, "chart.dot"), "utf8")) : pathGraph([...broken.values(), ...(deadlock ? [deadlock] : []), ...[...properties.values()].flatMap((t) => (t ? [t] : []))]);
+/** One run maps every state, and one run per broken rule lists each state that breaks it: TLC names only the first rule a state breaks. */
+const chartRuns = complete
+	? await Promise.all([undefined, ...broken.keys()].map((rule) => (rule ? tlc(`chart-${rule}`, configText(config.base, { invariants: [rule] }), ["-deadlock", "-continue"]) : tlc("chart", configText(config.base, {}), ["-deadlock", "-dump", "dot,actionlabels", join(work, "chart")]))))
+	: undefined;
+const graph = chartRuns ? parseDot(readFileSync(join(work, "chart.dot"), "utf8")) : pathGraph([...broken.values(), ...(deadlock ? [deadlock] : []), ...[...properties.values()].flatMap((t) => (t ? [t] : []))]);
 const bounded = /\b(ACTION_)?CONSTRAINTS?\b/.test(config.base);
 const deadEnds = [...graph.states.keys()].filter((key) => !graph.steps.some((s) => s.from === key));
 
 const verdicts: Verdict[] = [
 	...config.invariants.map((rule): Verdict => {
 		const trace = broken.get(rule);
-		const found = chartRun?.violations.filter((v) => v.rule === rule).map((v) => lastKey(v.trace)) ?? [];
+		const found = chartRuns?.flatMap((run) => run.violations).filter((v) => v.rule === rule).map((v) => lastKey(v.trace)) ?? [];
 		return { rule, kind: "invariant", trace, breaking: trace && new Set([lastKey(trace), ...found]) };
 	}),
 	...(config.checksDeadlock ? [{ rule: "deadlock", kind: "deadlock", trace: deadlock, breaking: deadlock && new Set(complete && !bounded ? deadEnds : [lastKey(deadlock)]) } satisfies Verdict] : []),
