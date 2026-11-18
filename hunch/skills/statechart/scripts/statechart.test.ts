@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import { draw, Refusal, type Verdict, type View } from "./chart.ts";
-import { configText, definitionLevels, parseDot, parseValue, pathGraph, printedBreaks, readConfig, readRun, stateKey, watchModule, type Graph, type Trace, type Vars } from "./tlc.ts";
+import { configText, definitionLevels, parseDot, parseValue, pathGraph, printedBreaks, readConfig, readRun, stateKey, watchModule, withPaths, type Graph, type Trace, type Vars } from "./tlc.ts";
 
 const COUNT = `Error: Invariant Small is violated.
 Error: The behavior up to this point is:
@@ -131,6 +131,12 @@ test("pathGraph draws a trace's steps, the step back into its loop among them", 
 	expect(graph.steps.map((s) => s.action)).toEqual(["ChecksFail", "FixDone"]);
 });
 
+test("withPaths adds the states and steps a path takes that the dump lacks, each state it adds marked past the constraint", () => {
+	const graph = withPaths(parseDot(PAY_DOT), [readRun(DEADLOCK).violations[0].trace]);
+	expect([...graph.states.values()].map((s) => [s.vars.phase, s.vars.tries, s.pastBound ?? false])).toEqual([["idle", 0, false], ["paying", 0, false], ["idle", 1, false], ["paid", 0, true]]);
+	expect(graph.steps.map((s) => s.action)).toEqual(["YouPay", "Fails", "Succeeds"]);
+});
+
 test("definitionLevels reads each definition's level from SANY's XML, written before its name or after it", () => {
 	expect([...definitionLevels(SANY_XML)]).toEqual([["Ends", 3], ["StateProp", 1]]);
 });
@@ -215,6 +221,12 @@ describe("draw", () => {
 	test("says how many states past the constraint break a rule, which the chart does not draw", () => {
 		const { report } = draw(PAY, [{ ...PAID_TWICE, pastBound: 2 }], byPhase, settings);
 		expect(report).toContain("| PaysOnce | breaks, also in 2 states past the constraint, which the chart does not draw |");
+	});
+	test("marks the end of a path that lies past the constraint, and counts the drawn states past it", () => {
+		const paidPastBound = { ...PAY, states: new Map([...PAY.states].map(([key, s]) => [key, { ...s, pastBound: key === stateKey(at("paid", 1)) }])) };
+		const { report } = draw(paidPastBound, [PAID_TWICE], byPhase, settings);
+		expect(report).toContain("1 drawn state lies past the constraint, which everystate's count leaves out.");
+		expect(report).toContain("4. Accept → paid (past the constraint)");
 	});
 	test("says a property with no temporal operator checks only the start states", () => {
 		const { report } = draw(PAY, [{ rule: "StartsIdle", kind: "property", initialOnly: true }], byPhase, settings);

@@ -40,3 +40,4 @@ Graduate when 2 bugs it finds, in at least 2 flows, replay against the real code
 - Count keeps its known answer: Small breaks at n = 1, 2, 3 and Tiny at n = 2, 3.
 - Under a CONSTRAINT, both checkers test each rule on the states just past it, which the graph leaves out. The chart leaves them out too, and the report counts, per rule, those that break it.
 - Open: a rule that breaks only past the constraint stops the run, as it did under TLC.
+- Closed 2026-11-18 in 0.29.1: under a CONSTRAINT or ACTION_CONSTRAINT, the chart adds each broken rule's path, so a path that ends past the bound ends on a drawn state, which the report marks as past the constraint. The report counts only the states past the bound that the chart still leaves out.

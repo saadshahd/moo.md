@@ -14,7 +14,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { $ } from "bun";
 import { draw, Refusal, type Verdict, type View } from "./chart.ts";
-import { configText, definitionLevels, type Graph, parseDot, pathGraph, printedBreaks, readConfig, readRun, stateKey, TEMPORAL_LEVEL, type Trace, watchModule } from "./tlc.ts";
+import { configText, definitionLevels, type Graph, parseDot, pathGraph, printedBreaks, readConfig, readRun, stateKey, TEMPORAL_LEVEL, type Trace, watchModule, withPaths } from "./tlc.ts";
 
 const USAGE = "usage: statechart.ts SPEC.tla [--config FILE] [--view FILE] [--out DIR] [--chart-states N] [--arrows N]";
 const ENGINE = ["bunx", "everystate@0.4.0"];
@@ -94,10 +94,12 @@ async function breakingStates(graph: Graph, graphDistinct: number) {
 
 const complete = distinct <= Number(values["chart-states"]);
 const lastKey = (trace: Trace) => stateKey(trace.states.at(-1)!.vars);
-const chart = complete ? await check("chart", configText(config.base, {}), ["-deadlock", "-dump", "dot,actionlabels", join(work, "chart")]) : undefined;
-const graph = chart ? parseDot(readFileSync(join(work, "chart.dot"), "utf8")) : pathGraph([...broken.values(), ...(deadlock ? [deadlock] : []), ...[...properties.values()].flatMap((t) => (t ? [t] : []))]);
-const breaking = chart && broken.size ? await breakingStates(graph, chart.distinct) : new Map<string, Set<string>>();
+const paths = [...broken.values(), deadlock, ...properties.values()].filter((trace) => trace !== undefined);
 const bounded = /\b(ACTION_)?CONSTRAINTS?\b/.test(config.base);
+const chart = complete ? await check("chart", configText(config.base, {}), ["-deadlock", "-dump", "dot,actionlabels", join(work, "chart")]) : undefined;
+const dumped = chart && parseDot(readFileSync(join(work, "chart.dot"), "utf8"));
+const graph = !dumped ? pathGraph(paths) : bounded ? withPaths(dumped, paths) : dumped;
+const breaking = chart && broken.size ? await breakingStates(graph, chart.distinct) : new Map<string, Set<string>>();
 /** A check tests each rule on the states just past a constraint, which the state graph leaves out. */
 const pastBound = new Map([...breaking].map(([rule, keys]) => [rule, [...keys].filter((key) => !graph.states.has(key)).length]));
 if (!bounded && [...pastBound.values()].some(Boolean)) fail(`the run that lists the states each rule breaks printed states the state graph does not hold, with no constraint to explain them; see ${join(out, "everystate-breaking.out")}.`);

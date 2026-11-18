@@ -2,7 +2,7 @@
  * Draws a model's states as a Mermaid statechart in the reader's words, and writes the report, refusing
  * a view that would make the chart claim what the model does not do.
  */
-import { type Graph, must, type Step, type Trace, type Vars, stateKey } from "./tlc.ts";
+import { type Graph, must, type Step, stepId, type Trace, type Vars, stateKey } from "./tlc.ts";
 
 /** What a view module exports: the reader's words for a state and for a step, and the chart's title.
  * \`step\` returns null for a step the chart hides. */
@@ -45,8 +45,6 @@ const varsText = (vars: Vars) =>
 		.map(([name, value]) => `${name} = ${JSON.stringify(value)}`)
 		.join(", ");
 
-const stepId = ({ from, to, action }: Step) => `${from}|${to}|${action}`;
-
 /** Each step a trace takes, the step back into its loop among them. */
 const traceSteps = ({ states }: Trace): Step[] =>
 	states.slice(1).flatMap(({ action, vars }, i) => (action === undefined ? [] : [{ from: stateKey(states[i].vars), to: stateKey(vars), action }]));
@@ -68,6 +66,7 @@ export function draw(graph: Graph, verdicts: Verdict[], view: View, settings: Se
 	for (const [key, { vars }] of graph.states) labels.set(key, view.state ? readerText(view.state(vars), `state() for ${varsText(vars)}`) : varsText(vars));
 	const labelOf = (key: string) => must(labels.get(key), `a path passes a state the graph does not hold: ${key}`);
 	const varsOf = (key: string) => graph.states.get(key)?.vars ?? {};
+	const drawnPastBound = [...graph.states.values()].filter((s) => s.pastBound).length;
 
 	const stepLabels = new Map<string, string | null>();
 	const stepLabel = (step: Step) => {
@@ -165,7 +164,7 @@ export function draw(graph: Graph, verdicts: Verdict[], view: View, settings: Se
 			`${exact} has ${taken.length} step${taken.length === 1 ? "" : "s"}:`,
 			"",
 			`0. ${labelOf(stateKey(states[0].vars))} (start)`,
-			...taken.map((s, i) => `${i + 1}. ${stepLabel(s)} → ${labelOf(s.to)}`),
+			...taken.map((s, i) => `${i + 1}. ${stepLabel(s)} → ${labelOf(s.to)}${graph.states.get(s.to)?.pastBound ? " (past the constraint)" : ""}`),
 			...(loop !== undefined ? ["", `From step ${loop} it repeats forever.`] : []),
 			...(stutters ? ["", `Then it stays in ${labelOf(stateKey(states.at(-1)!.vars))} forever.`] : []),
 		].join("\n");
@@ -185,6 +184,7 @@ export function draw(graph: Graph, verdicts: Verdict[], view: View, settings: Se
 		[
 			`everystate saw ${settings.distinct} distinct states.`,
 			mermaid ? `The chart draws ${chartStates.length} states and ${arrows.length} arrows${arrows.length > settings.arrowBudget ? `; aim for about ${settings.arrowBudget}` : ""}.` : "No rule breaks and the model is too large to draw, so there is no chart.",
+			drawnPastBound ? `${drawnPastBound} drawn state${drawnPastBound === 1 ? " lies" : "s lie"} past the constraint, which everystate's count leaves out.` : "",
 			settings.complete ? "" : "The model is too large to draw whole, so the chart draws only the paths to the rules that break.",
 		]
 			.filter(Boolean)
