@@ -332,6 +332,6 @@ export class SlotPool {
 			throw error;
 		}
 
-		return { folder: slot.folder, env: this.#envOf(slot), giveBack: () => this.#give(slot) };
+		return { folder: slot.folder, env: this.#envOf(slot), readyFailure: () => this.#run(slot, this.#settings.recipe.ready), giveBack: () => this.#give(slot) };
 	};
 }

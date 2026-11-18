@@ -306,7 +306,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (taken === undefined) return { outcome: "lost", item: id };
 
-	const { folder: clone, env } = taken;
+	const { folder: clone, env, readyFailure } = taken;
 
 	try {
 		const checkedOut = gitIn(clone, { identity: o.config.hum.commitIdentity, timeoutMs });
@@ -324,7 +324,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 		try {
 			const outbox = new Outbox(id);
 			const ownChecks = ownChecksOf(o.state, id);
-			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh, outbox };
+			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, resume: asking, restarted: isFresh, outbox };
 
 			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
 			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
@@ -361,6 +361,8 @@ type CheckoutRequest = Source & { readonly item: string; readonly signal: AbortS
 export type Checkedout = {
 	readonly folder: string;
 	readonly env: Readonly<Record<string, string>>;
+	/** The working copy's ready check, run again around each run: its failure, undefined where it passes or the copy has none. */
+	readonly readyFailure: () => Promise<string | undefined>;
 	readonly giveBack: () => Promise<void>;
 };
 
@@ -379,7 +381,7 @@ const clonesIn =
 
 		await gitIn(tmpdir(), { timeoutMs }).raw(["clone", "-q", "--branch", base, remote, folder]);
 
-		return { folder, env: {}, giveBack: async () => rmSync(folder, { recursive: true, force: true }) };
+		return { folder, env: {}, readyFailure: async () => undefined, giveBack: async () => rmSync(folder, { recursive: true, force: true }) };
 	};
 
 /**
@@ -417,6 +419,7 @@ type Driven = ThinPathOptions & {
 	/** The folder a run saves its evidence in. */
 	readonly evidence: string;
 	readonly env: Readonly<Record<string, string>>;
+	readonly readyFailure: Checkedout["readyFailure"];
 	readonly g: (args: readonly string[]) => Promise<string>;
 	readonly git: Git;
 	readonly answered: Answered | undefined;
@@ -586,6 +589,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return { chose: text };
 	};
 
+	/** What the ready check says after a run failed: whether the slot broke beside it, or nothing where it still passes. */
+	const unreadyAfter = async (): Promise<string> => {
+		const unready = await d.readyFailure();
+
+		return unready === undefined ? "" : `; the run slot's ready check fails after it too: ${unready}`;
+	};
+
 	/** A finished build or fix run's change, committed under the pull request title it wrote. */
 	const finishChange = async (role: StepRole, wants: Wanted | undefined, before: string): Promise<void> => {
 		if (!wants?.pullRequest) throw failed(`the ${role} run ended without the pull request title hum commits its change under`);
@@ -622,13 +632,17 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 				if (role === "repro" && (await isReproduced())) return;
 
+				const unready = await d.readyFailure();
+
+				if (unready !== undefined) throw failed(`the run slot's ready check fails before the ${role} run, so no run starts: ${unready}`);
+
 				const before = (await g(["rev-parse", "HEAD"])).trim();
 				const chosen: string[] = [];
 
 				for (;;) {
 					const outcome = await runAgent(role, `${await prompt(role)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
 
-					if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
+					if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}${await unreadyAfter()}`);
 
 					const wants = Wants.safeParse(outcome.structured).data;
 
@@ -941,10 +955,19 @@ type StepRole = "build" | "fix" | "repro";
 /** Where a run that changes files works, and the folder it saves its evidence in. */
 type Workplace = { readonly branch: string; readonly evidence: string };
 
+/** How a run that drives the app proves its change, and what it reports where it cannot. */
+const PROOF_RULES = [
+	"Where you drive the app to prove the change, prove each way into the changed behavior you know of; never count a skipped one as proven through another.",
+	"A way in you cannot reach goes in the pull request, with the command you tried and what it lacked.",
+	"When the app does not behave as you expect, decide first whether your drive, the setup or the product is wrong; a product fault the item did not ask about goes in the pull request, never edited away.",
+	"Stop only what this run started, after each failed attempt too, and keep the proof files.",
+].join(" ");
+
 const pullRequestContract = ({ branch, evidence }: Workplace): string =>
 	[
 		`Work on the branch ${branch}. Leave the change in the working tree and make no commit: hum commits every file there once you are done. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
 		`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
+		PROOF_RULES,
 	].join("\n\n");
 
 /** What each run that changes files is told about its answer: a build or fix run writes the pull request, a repro run names its check. */

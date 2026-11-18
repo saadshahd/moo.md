@@ -1464,7 +1464,7 @@
 								"type": "string",
 								"minLength": 1
 							},
-							"description": "Run after prepare and each refresh; a slot where one fails leaves the pool."
+							"description": "Read-only checks that the slot is worth driving. Run after prepare and each refresh, where a failure takes the slot out of the pool, and again before each build, fix or repro run, where a failure starts no run, and after a failed run, whose card then names it."
 						}
 					},
 					"required": [

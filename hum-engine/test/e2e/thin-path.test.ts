@@ -147,12 +147,34 @@ test("a run's working copy comes from the checkout it is given, on the remote's 
 		asked.push({ item, remote, base });
 		await sh(tmpdir(), ["clone", "-q", "--branch", base, remote, folder]);
 
-		return { folder, env: {}, giveBack: async () => void given.push(folder) };
+		return { folder, env: {}, readyFailure: async () => undefined, giveBack: async () => void given.push(folder) };
 	};
 
 	expect(await runThinPath(w.thinPath({ checkout }))).toEqual({ outcome: "merged", item: id });
 	expect(asked).toEqual([{ item: id, remote: w.repo.remote, base: "main" }]);
 	expect(given).toHaveLength(1);
+});
+
+test("the working copy's ready check runs before each run, so none starts where it fails, and again after a failed run, whose card then names it", async () => {
+	const copyWhoseReady = (answers: (string | undefined)[]): Checkout => async ({ remote, base }) => {
+		const folder = tempDir("given");
+
+		await sh(tmpdir(), ["clone", "-q", "--branch", base, remote, folder]);
+
+		return { folder, env: {}, readyFailure: async () => answers.shift(), giveBack: async () => undefined };
+	};
+
+	const down = await world({ script: [{}, NOTE] });
+	const downId = down.repo.seed("Write the note");
+
+	expect(await runThinPath(down.thinPath({ checkout: copyWhoseReady(["the database is down"]) }))).toMatchObject({ outcome: "stuck", item: downId, detail: expect.stringContaining("ready check fails before the build run, so no run starts: the database is down") });
+	expect(down.shim.calls()).toHaveLength(1);
+
+	const broke = await world({ script: [{}, { error: "the server stopped answering" }] });
+	const brokeId = broke.repo.seed("Write the note");
+
+	expect(await runThinPath(broke.thinPath({ checkout: copyWhoseReady([undefined, "the server is down"]) }))).toMatchObject({ outcome: "stuck", item: brokeId, detail: expect.stringContaining("the run slot's ready check fails after it too: the server is down") });
+	expect(broke.shim.calls()).toHaveLength(2);
 });
 
 test("a merged item is not picked up again after its claim expires", async () => {
