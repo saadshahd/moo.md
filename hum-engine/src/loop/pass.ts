@@ -33,9 +33,12 @@ const EPOCH = 0;
 /** Review comments are read from the newest one already saved; the saved key makes any overlap add nothing. */
 const sinceOfLastComment = (state: State): number => Math.max(EPOCH, ...state.notes.list().filter(({ source }) => source === "review-comment").map(({ at }) => at));
 
+/** The card for a file type whose hunks the parser cannot read. */
+export const SIGNAL_NOT_APPLIED = "signal-not-applied";
+
 const unappliedCard = (state: State) => (extension: string, signals: readonly string[]) => {
 	state.faults.raise({
-		code: "signal-not-applied",
+		code: SIGNAL_NOT_APPLIED,
 		item: extension,
 		cause: `Hunks in ${extension} files are not parsed, so ${signals.join(" and ")} did not run on them.`,
 		fix: "The other signals still decide; add the language to the parsed languages to apply these.",
@@ -95,9 +98,17 @@ export const closeLoop = async ({ state, workSource, memoryPath }: Pick<LoopPass
 	}
 };
 
+/** Clears the cards the last pass raised for unparsed hunks: each pass shows only what it found, so none stays. */
+const clearUnappliedCards = (state: State): void => {
+	for (const card of state.faults.list()) if (card.code === SIGNAL_NOT_APPLIED) state.faults.clear(card);
+};
+
 /** One pass of the loop: collect, find repeats, file checks, confirm CI ran them, close the loop. */
 export const runLoopPass = async (pass: LoopPass): Promise<void> => {
 	const { state, config, workSource, propose, trusts } = pass;
+
+	clearUnappliedCards(state);
+
 	const changes = await pass.history();
 
 	saveLabels(state, changes, config.hum.changeLabels);

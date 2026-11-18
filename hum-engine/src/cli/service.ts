@@ -14,7 +14,7 @@ import { CI_STATE_REF, CiStateRaced, restoreCiState, saveCiState } from "../serv
 import { readCiTick, recordCiTick } from "../service/ci-tick.ts";
 import { EXIT_UPDATED, supervise } from "../service/supervise.ts";
 import { installPlugins } from "../service/plugins.ts";
-import { reportCards, wakeUntilQuiet } from "../service/wake.ts";
+import { doesStopWake, reportCards, wakeUntilQuiet } from "../service/wake.ts";
 import { defaultStateDir, openState, STATUS_FILE } from "../state/open.ts";
 import { SECOND_MS } from "../time.ts";
 import { readStatus } from "../status/file.ts";
@@ -39,7 +39,7 @@ const EXIT_OK = 0;
 /** The start script's exit code when it gave up or was stopped: the unit restarts a script only after a failure. */
 const EXIT_STAY_DOWN = EXIT_OK;
 
-const EXIT_CARDS_SHOWN = 1;
+const EXIT_WAKE_STOPPED = 1;
 
 const EXIT_FAILED = 1;
 
@@ -281,14 +281,14 @@ export const addServiceCommands = (root: Command, io: Io, done: (code: number) =
 		}));
 };
 
-/** Runs one job of a wake, then shows the cards its state holds; the job exits 1 when it shows any or fails. */
+/** Runs one job of a wake, then shows the cards its state holds; the job exits 1 when it fails or shows a card that stops the wake. */
 const wakeJob = async (io: Io, done: (code: number) => void, job: () => Promise<string>): Promise<void> => {
 	try {
 		const status = readStatus(join(await job(), STATUS_FILE));
 		const cards = status.ok ? status.status.cards : [];
 
 		await reportCards(cards, { hasStepSummary: Boolean(process.env.GITHUB_STEP_SUMMARY) });
-		done(cards.length > 0 ? EXIT_CARDS_SHOWN : EXIT_OK);
+		done(cards.some(doesStopWake) ? EXIT_WAKE_STOPPED : EXIT_OK);
 	} catch (error) {
 		io.stderr(`hum wake: ${error instanceof Error ? error.message : String(error)}\n`);
 		done(EXIT_FAILED);

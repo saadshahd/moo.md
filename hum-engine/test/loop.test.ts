@@ -7,12 +7,13 @@ import { checkNameOf, fileChecks, filedFrom } from "../src/loop/check-item.ts";
 import { groupNotes } from "../src/loop/groups.ts";
 import { parseMemory, rulesUsed, unusedEntries, useOf } from "../src/loop/memory.ts";
 import { breakNotes, ownerNotes, planChangingNotes, type RawComment, saveNotes } from "../src/loop/notes.ts";
-import { closeLoop, confirmChecks } from "../src/loop/pass.ts";
+import { closeLoop, confirmChecks, runLoopPass } from "../src/loop/pass.ts";
 import { doesTrustRepeats } from "../src/loop/pair.ts";
 import { noteKey, type ReviewNote } from "../src/loop/records.ts";
 import { pairing, prepare } from "../src/loop/signals.ts";
 import { openState } from "../src/state/open.ts";
 import { z } from "zod";
+import { configWith } from "./fixtures/config.ts";
 import { finished, pastChange, reviewNote, runnerOf } from "./fixtures/records.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { ItemId } from "../src/adapter-api.ts";
@@ -85,6 +86,47 @@ test("a hunk in a language the parser cannot read leaves the signals that need a
 	const found = pairing(prepare(reviewNote({ file: "README.md", hunk: hunk("+text"), text: "One." })), prepare(reviewNote({ file: "README.md", hunk: hunk("+text"), text: "Two." })));
 
 	expect(found.unapplied).toEqual(["shared-identifier", "same-glob-symbol"]);
+});
+
+const inMarkdown = { file: "README.md", hunk: hunk("+Some prose.") };
+
+const inTypeScript = { file: "src/a.ts", hunk: hunk("+export const parseThing = (text: string) => text.trim();") };
+
+test("a pairing the parser could not read is told by the file type of the hunk it could not parse, never the other note's", async () => {
+	const notes = [reviewNote({ ...inMarkdown, sourceId: "1", at: 1, text: "Say it plainly." }), reviewNote({ ...inTypeScript, sourceId: "2", change: "c2", at: 2, text: "Name this better." })];
+	const state = freshState();
+	const told = new Set<string>();
+
+	saveNotes(state, notes);
+	await groupNotes({ state, propose: async () => undefined, trusts: () => false, onUnapplied: (extension) => void told.add(extension) }, notes);
+
+	expect([...told]).toEqual([".md"]);
+});
+
+test("each loop pass replaces the signal cards before it with what it found, so a card shows one pass's finding and the next pass clears it", async () => {
+	const state = freshState();
+	const said: RawComment[] = [];
+	const config = configWith((raw) => void (raw.hum.ownerLogins = ["owner"]));
+
+	const filesNothing = async (): Promise<never> => {
+		throw new Error("the loop files nothing here");
+	};
+
+	const pass = () => runLoopPass({ state, config, workSource: { fileFollowUp: filesNothing, comment: filesNothing }, now: Date.now, comments: async () => said, history: async () => [], hunkOf: async () => "", propose: async () => undefined, trusts: () => false, ciLogs: async () => [] });
+	const signalCards = () => state.faults.list().flatMap(({ code, item }) => (code === "signal-not-applied" ? [item] : []));
+
+	said.push(comment({ ...inMarkdown, id: "1", at: 1, body: "Say it plainly." }));
+	await pass();
+	// hum 0.7.0 named the fresh note's file type and kept its card for good.
+	state.faults.raise({ code: "signal-not-applied", item: ".ts", cause: "Hunks in .ts files are not parsed.", fix: "One sentence." });
+	said.push(comment({ ...inTypeScript, id: "2", commit: "def", at: 2, body: "Name this better." }));
+	await pass();
+
+	expect(signalCards()).toEqual([".md"]);
+
+	await pass();
+
+	expect(signalCards()).toEqual([]);
 });
 
 const proposer = (answer: { same: boolean; models: string[] } | undefined) => {

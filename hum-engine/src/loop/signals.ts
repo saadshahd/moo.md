@@ -118,13 +118,14 @@ const SIGNALS: readonly Signal[] = [
 	},
 ];
 
-/** The first signal that pairs two notes, and the signals a note's language left unapplied. */
-export type Pairing = { readonly signal?: string; readonly unapplied: readonly string[] };
+/** The first signal that pairs two notes, the signals left unapplied, and the notes whose hunk the parser cannot read, which left them so. */
+export type Pairing = { readonly signal?: string; readonly unapplied: readonly string[]; readonly unparsed: readonly ReviewNote[] };
 
 export const pairing = (a: Prepared, b: Prepared): Pairing => {
-	const canRead = (signal: Signal): boolean => !signal.parsed || (a.named !== undefined && b.named !== undefined);
+	const unparsed = [a, b].filter(({ named }) => named === undefined);
+	const canRead = (signal: Signal): boolean => !signal.parsed || unparsed.length === 0;
 	const unapplied = SIGNALS.flatMap((signal) => (canRead(signal) ? [] : [signal.name]));
 	const found = SIGNALS.find((signal) => canRead(signal) && signal.pairs(a, b));
 
-	return { signal: found?.name, unapplied };
+	return { signal: found?.name, unapplied, unparsed: unparsed.map(({ note }) => note) };
 };
