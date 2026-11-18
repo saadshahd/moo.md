@@ -211,7 +211,11 @@ export function readRun(output: string): RunResult {
 }
 
 export type Step = { from: string; to: string; action: string };
-export type Graph = { states: Map<string, { vars: Vars; start: boolean }>; steps: Step[] };
+/** A state of a graph; one marked `pastBound` lies past a constraint. */
+export type GraphState = { vars: Vars; start: boolean; pastBound?: boolean };
+export type Graph = { states: Map<string, GraphState>; steps: Step[] };
+
+export const stepId = ({ from, to, action }: Step) => `${from}|${to}|${action}`;
 
 const unescapeDot = (s: string) => s.replace(/\\(.)/g, (_, c: string) => (c === "n" ? "\n" : c));
 
@@ -219,7 +223,7 @@ const unescapeDot = (s: string) => s.replace(/\\(.)/g, (_, c: string) => (c === 
  * label and stay out. */
 export function parseDot(dot: string): Graph {
 	const ids = new Map<string, string>();
-	const states = new Map<string, { vars: Vars; start: boolean }>();
+	const states = new Map<string, GraphState>();
 	const edges: [string, string, string][] = [];
 	for (const line of dot.split("\n")) {
 		const node = /^(-?\d+) \[label="((?:[^"\\]|\\.)*)"(,style = filled)?/.exec(line);
@@ -238,7 +242,7 @@ export function parseDot(dot: string): Graph {
 
 /** The graph of the given traces alone: what a chart draws when the model has too many states for all. */
 export function pathGraph(traces: Trace[]): Graph {
-	const states = new Map<string, { vars: Vars; start: boolean }>();
+	const states = new Map<string, GraphState>();
 	const steps = new Map<string, Step>();
 	for (const { states: path } of traces)
 		path.forEach(({ vars, action }, i) => {
@@ -246,10 +250,20 @@ export function pathGraph(traces: Trace[]): Graph {
 			if (!states.has(key)) states.set(key, { vars, start: i === 0 });
 			if (i > 0 && action !== undefined) {
 				const step = { from: stateKey(path[i - 1].vars), to: key, action };
-				steps.set(JSON.stringify(step), step);
+				steps.set(stepId(step), step);
 			}
 		});
 	return { states, steps: [...steps.values()] };
+}
+
+/** The state graph a check dumped, with the states and steps of `traces` it lacks. Under a constraint the dump leaves
+ * out the states just past it, where a check still tests each rule, so a path can end on one: each state the dump lacks
+ * is marked `pastBound`. */
+export function withPaths(dump: Graph, traces: Trace[]): Graph {
+	const paths = pathGraph(traces);
+	const dumped = new Set(dump.steps.map(stepId));
+	const pastBound = [...paths.states].filter(([key]) => !dump.states.has(key)).map(([key, state]): [string, GraphState] => [key, { ...state, pastBound: true }]);
+	return { states: new Map([...dump.states, ...pastBound]), steps: [...dump.steps, ...paths.steps.filter((step) => !dumped.has(stepId(step)))] };
 }
 
 /** Each operator's level as SANY's XML export gives it: 0 constant, 1 state, 2 action, 3 temporal. SANY writes an
