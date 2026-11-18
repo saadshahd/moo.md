@@ -502,6 +502,19 @@ test("proving a written setup on a scratch copy passes its checks and contract, 
 	expect(steps.filter(({ status }) => status === "failed")).toEqual([]);
 });
 
+test("proving with --item skips the item where a slot writes to a live target, whose real items the run would take", async () => {
+	const repo = repoWith({ "package.json": PINNED });
+
+	expect(writeSetup(repo, { hum: { checks: ["true"], runPlaces: ["mac"], integrations: { "work-source": "roundup" } }, waitHours: {} }, { installedSkills: installedSkills(), home: join(repo, "home"), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	sh(repo, ["add", "-A"]);
+	sh(repo, ["commit", "-q", "-m", "setup"]);
+	sh(repo, ["push", "-q", "origin", "main"]);
+
+	const steps = await proveSetup(repo, { now: Date.now, installedSkills: installedSkills(), base: "main", item: true, published: async () => "unpublished", newSessionId: randomUUID, processEnv: {} });
+
+	expect(steps.find(({ name }) => name === "item")).toMatchObject({ status: "skipped", detail: expect.stringContaining("live target") });
+});
+
 test("proving fails the checks step when a check command fails", async () => {
 	const repo = repoWith({ "package.json": PINNED });
 
