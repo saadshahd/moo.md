@@ -278,10 +278,11 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const kind = kindNamed(o.config, kindName);
 	const asking = isWaitingOnOwner(kind, at);
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
-	const waited = asking && answered === undefined ? o.state.items.savedOf(id) : undefined;
+	const isAwaitingAnswer = asking && answered === undefined;
+	const waited = isAwaitingAnswer ? o.state.items.savedOf(id) : undefined;
 	const timedOut = waited !== undefined && isDue(o.state, kind, waited, now()) ? waited : undefined;
 
-	if (asking && answered === undefined && timedOut === undefined) return { outcome: "waiting", item: id };
+	if (isAwaitingAnswer && timedOut === undefined) return { outcome: "waiting", item: id };
 
 	const stopped = answered !== undefined && isOverCapStop(visibleText(answered.question), answered.option);
 
