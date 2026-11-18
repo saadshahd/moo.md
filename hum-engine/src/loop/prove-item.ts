@@ -1,7 +1,7 @@
 import type { Git } from "../adapters/git.ts";
 import type { Config } from "../config/load.ts";
 import type { State } from "../state/open.ts";
-import { checksTimeoutMs } from "../worker/checks.ts";
+import { checkLimits } from "../worker/checks.ts";
 import { proveCheck } from "./proof.ts";
 
 export type ProveItem = {
@@ -25,7 +25,7 @@ export const proveCheckItem = async ({ state, config, git, item, base, checks, n
 
 	const notes = group.notes.flatMap((key) => state.notes.get(key) ?? []);
 	const head = (await git.raw(["rev-parse", "HEAD"])).trim();
-	const proof = await proveCheck({ git, head, base: `origin/${base}`, notes, checks, timeoutMs: checksTimeoutMs(config.hum), now });
+	const proof = await proveCheck({ git, head, base: `origin/${base}`, notes, checks, limits: checkLimits(config.hum), now });
 
 	state.proofs.put(item, { item, at: now(), ...proof });
 

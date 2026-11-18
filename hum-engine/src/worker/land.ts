@@ -8,6 +8,7 @@ import {
 	type WorkSource,
 } from "../adapter-api.ts";
 import {
+	filesBetween,
 	type Git,
 	gitIn,
 	isAncestor,
@@ -31,7 +32,7 @@ import type { ModelCall } from "../adapters/model-call.ts";
 import type { Config } from "../config/load.ts";
 import type { Boundary, Kind, PURPOSES } from "../config/schema.ts";
 import { pickTier } from "../config/checks.ts";
-import { footprintOf } from "./scheduler.ts";
+import { doOverlap, footprintOf } from "./scheduler.ts";
 import { alignedPlacement, alignmentQuestion, doesGateAlignment } from "../decide/alignment.ts";
 import {
 	doesApprove,
@@ -49,6 +50,7 @@ import {
 } from "../decide/merge.ts";
 import { growthLabelsOf } from "../decide/growth.ts";
 import { isTrusted } from "../decide/prose.ts";
+import { doesLeaveDocs } from "../decide/kind.ts";
 import {
 	type Change,
 	placeChange,
@@ -56,9 +58,9 @@ import {
 	type Policy,
 } from "../decide/risk.ts";
 import type { State } from "../state/open.ts";
-import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
+import type { Landing as SavedLanding, SavedRepro, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
-import { checksTimeoutMs, runChecks } from "./checks.ts";
+import { checkLimits, runChecks } from "./checks.ts";
 import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
 import { keepLanding, keepPick } from "../state/item-log.ts";
 import { blockedPaths, brokenCommits } from "../loop/breaks.ts";
@@ -105,7 +107,7 @@ export type LandContext = {
 	readonly now: () => number;
 	readonly judge: ModelCall;
 	/** A fresh review run on the change that ends at `head`, at its level's tier; it saves its verdict. */
-	readonly reviewRun: (change: { readonly head: string; readonly diff: string; readonly level: string }) => Promise<ReviewOutcome>;
+	readonly reviewRun: (change: { readonly head: string; readonly diff: string; readonly level: string; readonly patch: string | undefined }) => Promise<ReviewOutcome>;
 	/** The time past which no merge starts, as when the GitHub token's hour runs short; the landing stays saved for the next wake. */
 	readonly mergesBefore?: number;
 	/** Makes the state outlast a crash of this process; called before each act on the remote that lands the change, so the next pass finds the landing and settles it. */
@@ -294,7 +296,7 @@ const markItemDone = async ({ git, clone, dir, id }: LandContext): Promise<void>
 };
 
 /** The patch id of the change against the base: a rebase keeps it. */
-const patchOf = async (ctx: Pick<LandContext, "git" | "base" | "dir" | "id">): Promise<string> => (await ctx.git.raw(["patch-id", "--stable"], await changeDiff(ctx))).split(" ")[0] ?? "";
+export const patchOf = async (ctx: Pick<LandContext, "git" | "base" | "dir" | "id">): Promise<string> => (await ctx.git.raw(["patch-id", "--stable"], await changeDiff(ctx))).split(" ")[0] ?? "";
 
 /** The run branch's commits past the base, oldest first. */
 const branchCommits = async ({ git, base }: Pick<LandContext, "git" | "base">): Promise<string[]> =>
@@ -337,13 +339,19 @@ const isOnBase = async ({ git, base }: LandContext): Promise<boolean> => {
 	return isAncestor(git, { ancestor: "HEAD", descendant: `origin/${base}` });
 };
 
+/** The folder each file sits in, "" for the repo's top, where manifests and lockfiles every folder depends on live. */
+const foldersOf = (files: readonly string[]): string[] => files.map((file) => (dirname(file) === "." ? "" : dirname(file)));
+
 /**
  * The change on the base the work side checked it on, as a work pass leaves it: rebased there when it does not grow
- * from it, and checked again; else why it cannot merge there.
+ * from it, and checked again when the base moved a file in a folder the change touches or at the repo's top; else why
+ * it cannot merge there.
  */
 export const rebaseOnto = async ({ git, clone, env, checks, config, base }: { readonly git: Git; readonly clone: string; readonly env: Readonly<Record<string, string>>; readonly checks: readonly string[]; readonly config: Config; readonly base: string }, onto: string): Promise<string | undefined> => {
 	if (await isAncestor(git, { ancestor: onto, descendant: "HEAD" })) return undefined;
 
+	const from = (await git.raw(["merge-base", onto, "HEAD"])).trim();
+	const [moved, touched] = await Promise.all([filesBetween(git, from, onto), filesBetween(git, from, "HEAD")]);
 	const rebased = await git.run(["rebase", "-q", onto]);
 
 	if (rebased.code !== 0) {
@@ -352,7 +360,9 @@ export const rebaseOnto = async ({ git, clone, env, checks, config, base }: { re
 		return `the change conflicts with the newest ${base}: ${rebased.stderr.trim().slice(0, SHORT_EXCERPT)}`;
 	}
 
-	const failure = await runChecks(checks, clone, { env, timeoutMs: checksTimeoutMs(config.hum) });
+	if (!doOverlap(foldersOf(moved), foldersOf(touched))) return undefined;
+
+	const failure = await runChecks(checks, clone, { env, ...checkLimits(config.hum) });
 
 	return failure && `the checks fail on the newest ${base}: ${failure.slice(0, SHORT_EXCERPT)}`;
 };
@@ -406,13 +416,18 @@ const pushToBase = async (ctx: LandContext): Promise<BaseLanding> => {
 	return pushed.kind === "skipped" || pushed.value.kind === "pushed" ? LANDED : pushed.value;
 };
 
-/** What the change's pull request says: the text the run wrote under the repo's own rules, else the item's title, then its evidence, then hum's word on the merge and the item. */
+/** What a fix item's repro proved, and what stood in where the reported environment was not at hand. */
+const reproMarkdown = ({ command, translated, proven }: SavedRepro): string =>
+	[`Repro: \`${command}\` failed without the fix${proven ? ` and passed on ${proven} runs in a row with it` : ""}.`, translated && `Not the reported environment: ${translated}.`].filter(Boolean).join("\n");
+
+/** What the change's pull request says: the text the run wrote under the repo's own rules, else the item's title, then its evidence and repro, then hum's word on the merge and the item. */
 const pullRequestOf = ({ state, id, item }: LandContext, merging: string) => {
 	const written = state.pullRequests.get(id);
+	const repro = state.repros.get(id);
 
 	return {
 		title: written?.title ?? `hum: ${item.title}`,
-		body: [written?.body, written?.evidence && evidenceMarkdown(written.evidence), merging, `Item ${id}.`].filter(Boolean).join("\n\n"),
+		body: [written?.body, written?.evidence && evidenceMarkdown(written.evidence), repro && reproMarkdown(repro), merging, `Item ${id}.`].filter(Boolean).join("\n\n"),
 	};
 };
 
@@ -551,7 +566,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 	const planModels = await planModelsOf(ctx);
 	const routeWith = (verdict?: Verdict): Route => routeOf(aligned, policy.paths, ctx.kind, saved.change.paths, abstentionsOf(ctx, { alignment, planModels, verdict }));
 	const placed = routeWith();
-	const reviewed = doesNeedReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name }) : undefined;
+	const reviewed = doesNeedReviewRun(placed) ? await verdictOn(ctx, { head: saved.head, diff, level: placed.level.name, patch: saved.patch }) : undefined;
 
 	if (reviewed && "halted" in reviewed) return reviewed.halted;
 
@@ -580,11 +595,34 @@ const alignmentOf = async (ctx: LandContext, saved: SavedLanding, diff: string):
 	return alignment;
 };
 
-/** The verdict on the change at `head`: the one saved for it, else a fresh review run. */
-const verdictOn = async (ctx: LandContext, change: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
-	const saved = ctx.state.verdicts.get(ctx.id);
+/** Whether every file that differs between two commits is prose, by the docs-only kind's globs; false where git holds no `from`. */
+const isProseBetween = async ({ git, config }: Pick<LandContext, "git" | "config">, from: string, to: string): Promise<boolean> => {
+	const changed = await git.run(["diff", "--name-only", from, to]);
 
-	return saved?.head === change.head ? { verdict: saved } : ctx.reviewRun(change);
+	return changed.code === 0 && !doesLeaveDocs(changed.stdout.split("\n").filter(Boolean), config.hum);
+};
+
+/**
+ * A saved verdict as it stands for the change at `head`: its own, the same patch rebased onto a moved base, or an
+ * approval of an earlier head that the change since touches only in prose. Undefined where none holds and a review runs.
+ */
+export const carriedVerdict = async (ctx: Pick<LandContext, "git" | "config">, verdict: Verdict | undefined, { head, patch }: { readonly head: string; readonly patch: string | undefined }): Promise<Verdict | undefined> => {
+	if (verdict === undefined || verdict.head === head) return verdict;
+
+	if (patch !== undefined && verdict.patch === patch) return { ...verdict, head };
+
+	return verdict.event === REVIEW_APPROVAL && (await isProseBetween(ctx, verdict.head, head)) ? { ...verdict, head, patch } : undefined;
+};
+
+/** The verdict on the change at `head`: the saved one carried to it, kept under that head, else a fresh review run. */
+const verdictOn = async (ctx: LandContext, change: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
+	const carried = await carriedVerdict(ctx, ctx.state.verdicts.get(ctx.id), change);
+
+	if (carried === undefined) return ctx.reviewRun(change);
+
+	ctx.state.verdicts.put(ctx.id, carried);
+
+	return { verdict: carried };
 };
 
 const abstained = (boundary: Boundary, why: string): Unclear => ({ cause: "abstained", boundary, why });

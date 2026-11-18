@@ -27,7 +27,7 @@ export type PoolOptions = {
 	/** The owner's checkout: the repo every slot is a worktree of. */
 	readonly repo: string;
 	readonly state: Pick<State, "slots" | "faults" | "runs">;
-	readonly config: Pick<HumConfig, "runners" | "runSlots" | "lockfiles" | "commandTimeoutSeconds">;
+	readonly config: Pick<HumConfig, "runners" | "runSlots" | "lockfiles" | "commandTimeoutSeconds" | "checkReruns">;
 	readonly base: string;
 	/** The names of the runs alive outside this process; a taken slot whose item has none of them is returned. */
 	readonly liveRuns?: () => Promise<ReadonlySet<string>>;
@@ -99,8 +99,9 @@ export class SlotPool {
 		return slotEnv(this.#settings, slot);
 	}
 
-	#run(slot: Slot, commands: readonly string[]): Promise<string | undefined> {
-		return runChecks(commands, slot.folder, { env: this.#envOf(slot), timeoutMs: this.#settings.stepTimeoutSeconds * SECOND_MS });
+	/** Runs `commands` in the slot; a failing one runs again up to `reruns` times before its failure counts. */
+	#run(slot: Slot, commands: readonly string[], reruns = 0): Promise<string | undefined> {
+		return runChecks(commands, slot.folder, { env: this.#envOf(slot), timeoutMs: this.#settings.stepTimeoutSeconds * SECOND_MS, reruns });
 	}
 
 	#git(folder: string): Git {
@@ -332,6 +333,6 @@ export class SlotPool {
 			throw error;
 		}
 
-		return { folder: slot.folder, env: this.#envOf(slot), giveBack: () => this.#give(slot) };
+		return { folder: slot.folder, env: this.#envOf(slot), readyFailure: () => this.#run(slot, this.#settings.recipe.ready, this.#o.config.checkReruns), giveBack: () => this.#give(slot) };
 	};
 }

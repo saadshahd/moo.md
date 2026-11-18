@@ -171,7 +171,7 @@ test("runs in one cycle add up across restarts: the second run of a cycle gets o
 		raw.kinds.docs.tokenCap.tokens = 1000;
 	});
 
-	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 599 } } }, { config, checks: ["false"] });
+	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 599 } } }, { config, checks: ["! test -f docs/a.md"] });
 
 	w.item("a", "docs/a.md");
 	await w.worker.tick();

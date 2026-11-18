@@ -37,7 +37,7 @@ const checkItemHead = (dir: string, forbidden: string): string => {
 const prove = (dir: string, head: string, notes: ReviewNote[]) => {
 	const timeMs = 0;
 
-	return proveCheck({ git: gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), head, base: "main", notes, checks: ["sh check.sh"], timeoutMs: 20_000, now: () => timeMs + Date.now() });
+	return proveCheck({ git: gitIn(dir, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }), head, base: "main", notes, checks: ["sh check.sh"], limits: { timeoutMs: 20_000 }, now: () => timeMs + Date.now() });
 };
 
 /** A repo whose base fixed a violating commit, and a check that forbids `forbidden` on top of the fix. */

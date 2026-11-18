@@ -52,6 +52,8 @@ const ItemReply = z.object({
 			state: z.enum(["OPEN", "CLOSED"]),
 			labels: Labels,
 			comments: z.object({ nodes: z.array(IssueComment) }),
+			assignees: z.object({ nodes: z.array(z.object({ login: z.string() })) }),
+			closedByPullRequestsReferences: z.object({ nodes: z.array(z.object({ number: z.int().positive(), headRefName: z.string() })) }),
 		}),
 		ref: z.object({ target: Commit.partial() }).nullable(),
 	}),
@@ -92,6 +94,8 @@ const ITEM = `query Item($owner: String!, $name: String!, $number: Int!, $claimR
 			id title body state
 			labels(first: 100) { nodes { name } }
 			comments(first: 100, after: $cursor) { nodes { body createdAt authorAssociation author { __typename login } } pageInfo { hasNextPage endCursor } }
+			assignees(first: 10) { nodes { login } }
+			closedByPullRequestsReferences(first: 10) { nodes { number headRefName } }
 		}
 		ref(qualifiedName: $claimRef) { target { ... on Commit { message } } }
 	}
@@ -156,6 +160,8 @@ export type GitHubOptions = {
 	readonly base: string;
 	/** A claim is the first push of the branch this prefix and the issue number make. */
 	readonly claimPrefix: string;
+	/** hum's own run branches start with this, so the pull request hum opens from one is no one else's claim on its issue. */
+	readonly runBranchPrefix: string;
 	/** Open issues with this label are the ready items. */
 	readonly readyLabel: string;
 	readonly mergeMethod: (typeof MERGE_METHODS)[number];
@@ -199,7 +205,7 @@ const isHeard = (owners: ReadonlySet<string>) => ({ body, author, authorAssociat
  * read. `watch` is one REST request with `If-None-Match`, because GitHub answers 304 free of rate limit.
  */
 export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterContext): Whole => {
-	const { base, claimPrefix, readyLabel, mergeMethod, timeoutMs } = options;
+	const { base, claimPrefix, runBranchPrefix, readyLabel, mergeMethod, timeoutMs } = options;
 	const isHeardHere = isHeard(new Set(options.ownerLogins.map((login) => login.toLowerCase())));
 	const repo = parseArgument(Repo, options.repo);
 	const [owner = "", name = ""] = repo.split("/");
@@ -330,6 +336,10 @@ export const githubAdapter = (options: GitHubOptions, { now, env }: AdapterConte
 					ready: isReadyIssue(issue) && !isLive(claimFrom(id, ref?.target), now()),
 					thread: issue.comments.nodes.map((found) => parseComment(found.body, Date.parse(found.createdAt))),
 					labels: issue.labels.nodes.map((label) => label.name),
+					claimedBy: [
+						...issue.assignees.nodes.map(({ login }) => `@${login}`),
+						...issue.closedByPullRequestsReferences.nodes.flatMap(({ number, headRefName }) => (headRefName.startsWith(runBranchPrefix) ? [] : [`pull request #${number}`])),
+					],
 				};
 			},
 			claim: (id, holder, ttlMs) => take("claim", parseArgument(IssueId, id), holder, ttlMs),

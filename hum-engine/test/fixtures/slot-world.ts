@@ -23,6 +23,7 @@ export const poolConfig = (pool: string, { runners = 2, recipe = {}, services, p
 	runners,
 	lockfiles: SHIPPED_DEFAULTS.lockfiles,
 	commandTimeoutSeconds: SHIPPED_DEFAULTS.commandTimeoutSeconds,
+	checkReruns: SHIPPED_DEFAULTS.checkReruns,
 	runSlots: { ...SHIPPED_DEFAULTS.runSlots, enabled: true, pool, services: services ?? SHIPPED_DEFAULTS.runSlots.services, ports: ports ?? SHIPPED_DEFAULTS.runSlots.ports, projectPrefix: projectPrefix ?? SHIPPED_DEFAULTS.runSlots.projectPrefix, recipe: { ...SHIPPED_DEFAULTS.runSlots.recipe, ...recipe } },
 });
 

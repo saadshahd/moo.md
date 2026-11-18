@@ -75,9 +75,59 @@
 	},
 	"machine": {
 		"id": "fix",
-		"version": "1",
-		"initial": "building",
+		"version": "2",
+		"initial": "reproducing",
 		"states": {
+			"reproducing": {
+				"invoke": {
+					"src": "repro",
+					"onDone": {
+						"target": "confirming"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"token-cap": {
+						"target": "asking-repro"
+					}
+				}
+			},
+			"confirming": {
+				"invoke": {
+					"src": "shows-bug",
+					"onDone": {
+						"target": "objecting"
+					},
+					"onError": {
+						"target": "stuck"
+					}
+				},
+				"on": {
+					"token-cap": {
+						"target": "asking-repro"
+					},
+					"window-passed": {
+						"target": "building"
+					}
+				}
+			},
+			"objecting": {
+				"tags": [
+					"owner-wait"
+				],
+				"on": {
+					"answered": {
+						"target": "reproducing"
+					}
+				},
+				"after": {
+					"86400000": {
+						"target": "building"
+					}
+				}
+			},
 			"building": {
 				"invoke": {
 					"src": "build",
@@ -97,6 +147,17 @@
 			"checking": {
 				"invoke": {
 					"src": "checks",
+					"onDone": {
+						"target": "proving"
+					},
+					"onError": {
+						"target": "fixing"
+					}
+				}
+			},
+			"proving": {
+				"invoke": {
+					"src": "bug-gone",
 					"onDone": {
 						"target": "reviewing"
 					},
@@ -167,6 +228,16 @@
 				"on": {
 					"answered": {
 						"target": "building"
+					}
+				}
+			},
+			"asking-repro": {
+				"tags": [
+					"owner-wait"
+				],
+				"on": {
+					"answered": {
+						"target": "reproducing"
 					}
 				}
 			},

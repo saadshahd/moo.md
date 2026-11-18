@@ -7,24 +7,26 @@ import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource
 import { type Finished, type Paused, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, PATCH, withConfigPinned } from "../adapters/git.ts";
+import { filesBetween, type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { invokedSources, kindMachine } from "../config/machine.ts";
-import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
+import { ANSWERED, earliestTimeout, invokedSources, kindMachine, TOKEN_CAP } from "../config/machine.ts";
+import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
-import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT } from "../decide/prose.ts";
-import { persistedSnapshot } from "../state/items.ts";
+import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
 import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
+import type { SavedRepro } from "../state/saved.ts";
+import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
+import { dueClock, isDue } from "./due.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
-import { checksTimeoutMs, runChecks } from "./checks.ts";
-import { BASE_CONTENDED, changeOn, declaredChange, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
-import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
-import type { Stage } from "../decide/answer.ts";
+import { checkLimits, firstFailing, runChecks } from "./checks.ts";
+import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
+import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
+import { askDecision, askedQuestion, isOverCapStop, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
+import { RUN_AGAIN, type Stage } from "../decide/answer.ts";
 import { type ItemText, reviewInput } from "../decide/review.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
 import { settleAnswers } from "./answers.ts";
@@ -49,6 +51,8 @@ const CARD_EXCERPT = 300;
 
 const ERROR_EXCERPT = 500;
 
+const SHORT_SHA = 12;
+
 /** The branch runs start from when none is given. */
 export const DEFAULT_BASE = "main";
 
@@ -59,8 +63,11 @@ const PullRequestWritten = z.object({ title: z.string().min(1), body: z.string()
 
 type PullRequestWritten = z.infer<typeof PullRequestWritten>;
 
+/** The check a repro run wrote: the command that fails because of the bug, and what stood in where the reported environment was not at hand. */
+const ReproWritten = z.object({ command: z.string().min(1), translated: z.string().min(1).optional() });
+
 /** What the agent run hands back besides the change it leaves in the working tree. */
-export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional(), pullRequest: PullRequestWritten.optional() }));
+export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional(), pullRequest: PullRequestWritten.optional(), repro: ReproWritten.optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
 export const PLAN_MARK = "hum plan:";
@@ -146,7 +153,9 @@ const isApprovalWait = (kind: Kind, state: string | undefined): boolean => state
 /** Where an item saved in an owner wait stands for an answer: waiting on approval where the state takes the owner's approval, else waiting. */
 export const ownerWaitStage = (kind: Kind, state: string | undefined): Stage => (isApprovalWait(kind, state) ? "approval" : "waiting");
 
-const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), pullRequest: PullRequestWritten.optional() });
+const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), pullRequest: PullRequestWritten.optional(), repro: ReproWritten.optional() });
+
+type Wanted = z.infer<typeof Wants>;
 
 /** The kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
 const earlierKinds = (state: State, kind: Kind) => (machineVersion: string) => state.kinds.get(`${kind.machine.id}@${machineVersion}`);
@@ -210,6 +219,8 @@ export type Gathered = {
 	readonly onSnapshot: boolean;
 	readonly asking: boolean;
 	readonly answered: ReturnType<typeof answerTo>;
+	/** The saved owner wait whose timeout passed with no answer. */
+	readonly timedOut: SavedSnapshot | undefined;
 };
 
 export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gathered | ThinResult> => {
@@ -267,13 +278,20 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 	const kind = kindNamed(o.config, kindName);
 	const asking = isWaitingOnOwner(kind, at);
 	const answered = asking || !onSnapshot ? answerTo(item) : undefined;
+	const isAwaitingAnswer = asking && answered === undefined;
+	const waited = isAwaitingAnswer ? o.state.items.savedOf(id) : undefined;
+	const timedOut = waited !== undefined && isDue(o.state, { kind, saved: waited }, now()) ? waited : undefined;
 
-	if (asking && answered === undefined) return { outcome: "waiting", item: id };
+	if (isAwaitingAnswer && timedOut === undefined) return { outcome: "waiting", item: id };
+
+	const stopped = answered !== undefined && isOverCapStop(visibleText(answered.question), answered.option);
+
+	if (stopped && asking) return park(o, { outcome: "stuck", item: id, detail: "the owner stopped it at the token cap" });
 
 	/* The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands. */
 	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
 
-	return { item, kindName, kind, judge, onSnapshot, asking, answered };
+	return { item, kindName, kind, judge, onSnapshot, asking, answered: stopped ? undefined : answered, timedOut };
 };
 
 export const isGathered = (gathered: Gathered | ThinResult): gathered is Gathered => "kindName" in gathered;
@@ -288,7 +306,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (!isGathered(gathered)) return gathered;
 
-	const { item, kindName, kind, judge, onSnapshot, asking, answered } = gathered;
+	const { item, kindName, kind, judge, onSnapshot, asking, answered, timedOut } = gathered;
 	const landing = o.state.landings.get(id);
 	/** Nothing saved is left to go on from: a new item, one that moved to another kind, or one the owner ran again. */
 	const isFresh = !onSnapshot && landing === undefined;
@@ -298,7 +316,7 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 	if (taken === undefined) return { outcome: "lost", item: id };
 
-	const { folder: clone, env } = taken;
+	const { folder: clone, env, readyFailure } = taken;
 
 	try {
 		const checkedOut = gitIn(clone, { identity: o.config.hum.commitIdentity, timeoutMs });
@@ -315,7 +333,8 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 		try {
 			const outbox = new Outbox(id);
-			const driven: Driven = { ...o, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh, outbox };
+			const ownChecks = ownChecksOf(o.state, id);
+			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, readyFailure, g, git, answered, resume: asking, timedOut, restarted: isFresh, outbox };
 
 			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
 			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
@@ -335,6 +354,13 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 	}
 };
 
+/** The checks an item brings of its own: a split part's, which publish kept as it filed the part. */
+const ownChecksOf = (state: State, id: string): string[] => {
+	const part = state.parts.get(id);
+
+	return part === undefined ? [] : [part.check];
+};
+
 /** Where a run's working copy comes from: the remote and the branch it starts on. */
 export type Source = { readonly remote: string; readonly base: string };
 
@@ -345,6 +371,8 @@ type CheckoutRequest = Source & { readonly item: string; readonly signal: AbortS
 export type Checkedout = {
 	readonly folder: string;
 	readonly env: Readonly<Record<string, string>>;
+	/** The working copy's ready check, run again around each run: its failure, undefined where it passes or the copy has none. */
+	readonly readyFailure: () => Promise<string | undefined>;
 	readonly giveBack: () => Promise<void>;
 };
 
@@ -363,7 +391,7 @@ const clonesIn =
 
 		await gitIn(tmpdir(), { timeoutMs }).raw(["clone", "-q", "--branch", base, remote, folder]);
 
-		return { folder, env: {}, giveBack: async () => rmSync(folder, { recursive: true, force: true }) };
+		return { folder, env: {}, readyFailure: async () => undefined, giveBack: async () => rmSync(folder, { recursive: true, force: true }) };
 	};
 
 /**
@@ -401,6 +429,7 @@ type Driven = ThinPathOptions & {
 	/** The folder a run saves its evidence in. */
 	readonly evidence: string;
 	readonly env: Readonly<Record<string, string>>;
+	readonly readyFailure: Checkedout["readyFailure"];
 	readonly g: (args: readonly string[]) => Promise<string>;
 	readonly git: Git;
 	readonly answered: Answered | undefined;
@@ -408,8 +437,12 @@ type Driven = ThinPathOptions & {
 	readonly baseSha: string;
 	/** What the pass asks publish to do. */
 	readonly outbox: Outbox;
+	/** The checks the item brings beside the repo's, which `checks` holds too; no base was meant to pass them. */
+	readonly ownChecks: readonly string[];
 	/** Restore the saved owner-wait snapshot instead of starting the machine. */
 	readonly resume: boolean;
+	/** The saved owner wait whose timeout passed with no answer: the pass restores it and fires the timeout. */
+	readonly timedOut: SavedSnapshot | undefined;
 	/** The run branch starts again at the base: earlier work on the item, and the plan written for it, are gone. */
 	readonly restarted: boolean;
 };
@@ -449,17 +482,15 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const branchDiff = (): Promise<string> => g(["diff", ...PATCH, `origin/${base}...HEAD`]);
 
-	const prompt = async (purpose: "build" | "fix"): Promise<string> => {
+	const prompt = async (role: StepRole): Promise<string> => {
 		const plan = state.plans.get(id);
+		const repro = state.repros.get(id);
 
-		const parts = [
-			roleOf(config, purpose),
-			`# Item ${id}: ${item.title}\n\n${item.body}`,
-			`Work on the branch ${branch}. Leave the change in the working tree and make no commit: hum commits every file there once you are done. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
-			`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${d.evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
-		];
+		const parts = [roleOf(config, role), `# Item ${id}: ${item.title}\n\n${item.body}`, RUN_CONTRACTS[role]({ branch, evidence: d.evidence })];
 
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
+
+		if (repro && role !== "repro") parts.push(`## The repro\n\`${repro.command}\` fails because of the bug. Make it pass, and leave the files the repro wrote as they are: ${repro.files.join(", ") || "it wrote none"}.`);
 
 		if (d.answered) {
 			const soFar = d.restarted
@@ -469,7 +500,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			parts.push(`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n${soFar}`);
 		}
 
-		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
+		if (role === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
 
 		return parts.join("\n\n");
 	};
@@ -486,21 +517,22 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	/** The kinds reach their owner-wait state only through the over-cap event, so a run's question uses it too. */
 	const ask = (note: Pending) => {
 		pending = note;
-		actor.send({ type: "token-cap" });
+		actor.send({ type: TOKEN_CAP });
 	};
 
 	/**
 	 * One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where
-	 * the state can, and ends stuck where it cannot. A run given what it judges is answered from the item's log when
+	 * the state can, and ends stuck where it cannot. The owner's answer runs on past the cap, or with `stop` ends the item. A run given what it judges is answered from the item's log when
 	 * the log keeps an answer to the same prompt on the same change, and that answer spends nothing again.
 	 */
-	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
-		const key = state.runs.keyFor(id, purpose);
+	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
+		const purpose = purposeOf(config, role);
+		const key = state.runs.keyFor(id, role);
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
-		const prefix = config.hum.roles[purpose]?.file ?? purpose;
+		const prefix = config.hum.roles[role]?.file ?? role;
 		const prompt = `${text}${memorySection(held)}`;
 		const tier = await tierFor(purpose);
-		const launch = { name: `hum ${id} ${purpose} #${key.attempt}`, sessionId: d.newSessionId() };
+		const launch = { name: `hum ${id} ${role} #${key.attempt}`, sessionId: d.newSessionId() };
 
 		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
@@ -534,9 +566,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (outcome.kind === "over-cap") {
 			const why = `The run passed its token cap (${kind.tokenCap.tokens}) at ${tally.sinceAnswer()} tokens.`;
 
-			if (!actor.getSnapshot().can({ type: "token-cap" })) throw failed(why);
+			if (!actor.getSnapshot().can({ type: TOKEN_CAP })) throw failed(why);
 
-			ask({ question: { text: PLAIN_QUESTIONS["over-cap"], detail: why }, plain: "over-cap", plan: "" });
+			ask({ question: { text: PLAIN_QUESTIONS["over-cap"], options: Object.values(OVER_CAP_OPTIONS), detail: why }, plain: "over-cap", plan: "" });
 
 			return new Promise<never>(() => {});
 		}
@@ -560,37 +592,89 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (decision.action === "ask") return { asked: { ...askedQuestion({ reason, confirmed: decision.confirmed, runsWords: wants.question }), plan: wants.plan ?? "" } };
 
 		const text = `Chose "${decision.choice}" over ${decision.over.filter((word) => word !== decision.choice).join(", ")} without you.`;
+		const why = `each option touches only this change's own files, at level ${placement.level.name}`;
+		const files = reason.options?.find(({ word }) => word === decision.choice)?.paths ?? [];
+
 		await d.outbox.calls({ run: "decide", attempt: state.runs.list(id).length }).decide(id, text);
-		state.choices.put(`${id}@${text}`, { item: id, text, at: d.now() });
+		state.choices.put(`${id}@${text}`, { item: id, text, at: d.now(), why, files });
 
 		return { chose: text };
 	};
 
-	const step = (purpose: "build" | "fix") =>
+	/** What the ready check says after a run failed: whether the slot broke beside it, or nothing where it still passes. */
+	const unreadyAfter = async (): Promise<string> => {
+		const unready = await d.readyFailure();
+
+		return unready === undefined ? "" : `; the run slot's ready check fails after it too: ${unready}`;
+	};
+
+	/** A finished build or fix run's change, committed under the pull request title it wrote. */
+	const finishChange = async (role: StepRole, wants: Wanted | undefined, before: string): Promise<void> => {
+		if (!wants?.pullRequest) throw failed(`the ${role} run ended without the pull request title hum commits its change under`);
+
+		await keepPullRequest(d, wants.pullRequest);
+
+		if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${role} run succeeded and changed nothing`);
+	};
+
+	/**
+	 * A finished repro run's check, committed under a subject of hum's and saved with the files it touched. A repro run
+	 * again, as on a branch started over, keeps the owner's window as passed while it names the same command, so only a
+	 * changed repro opens the window again.
+	 */
+	const finishRepro = async (wants: Wanted | undefined, before: string): Promise<void> => {
+		if (!wants?.repro) throw failed("the repro run ended without the command that shows the bug");
+
+		await commitRun(d.git, { since: before, subject: `hum: ${id} repro` });
+
+		const { command, translated } = wants.repro;
+		const commit = (await g(["rev-parse", "HEAD"])).trim();
+		const files = await filesBetween(d.git, before, commit);
+		const earlier = state.repros.get(id);
+
+		state.repros.put(id, { item: id, command, translated, commit, files, unopposed: earlier?.command === command ? earlier.unopposed : undefined });
+	};
+
+	/** A build run starts only once the owner's window to object to the repro closed, so a pass that starts over passes the window by. */
+	const keepUnopposed = (): void => {
+		const saved = state.repros.get(id);
+
+		if (saved !== undefined && saved.unopposed === undefined) state.repros.put(id, { ...saved, unopposed: true });
+	};
+
+	/** Whether the branch already holds the item's saved repro, as on a pass that starts the machine over on the same branch. */
+	const isReproduced = async (): Promise<boolean> => {
+		const saved = state.repros.get(id);
+
+		return saved !== undefined && (await isAncestor(d.git, { ancestor: saved.commit, descendant: "HEAD" }));
+	};
+
+	const step = (role: StepRole) =>
 		createAsyncLogic({
 			run: async ({ signal }) => {
-				// Every fix run since the owner last answered counts, over every pass and wake: the item's log holds them all.
-				if (purpose === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
+				/* An answer at the repro's wait objects to it, so a new repro run reads the owner's words. */
+				if (role === "repro" && !d.answered && (await isReproduced())) return;
+
+				if (role === "build") keepUnopposed();
+
+				const unready = await d.readyFailure();
+
+				if (unready !== undefined) throw failed(`the run slot's ready check fails before the ${role} run, so no run starts: ${unready}`);
 
 				const before = (await g(["rev-parse", "HEAD"])).trim();
 				const chosen: string[] = [];
 
 				for (;;) {
-					const outcome = await runAgent(purpose, `${await prompt(purpose)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
+					/* Every fix run since the owner last answered counts, over every pass and wake and each run again after a choice hum made: the item's log holds them all. */
+					if (role === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
-					if (!hasSucceeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
+					const outcome = await runAgent(role, `${await prompt(role)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
+
+					if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}${await unreadyAfter()}`);
 
 					const wants = Wants.safeParse(outcome.structured).data;
 
-					if (wants?.status !== "needs-owner") {
-						if (!wants?.pullRequest) throw failed(`the ${purpose} run ended without the pull request title hum commits its change under`);
-
-						await keepPullRequest(d, wants.pullRequest);
-
-						if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${purpose} run succeeded and changed nothing`);
-
-						return;
-					}
+					if (wants?.status !== "needs-owner") return role === "repro" ? finishRepro(wants, before) : finishChange(role, wants, before);
 
 					await commitRun(d.git, { since: before, subject: `hum: ${id} so far` });
 
@@ -603,14 +687,92 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			},
 		});
 
+	const checkOptions = { env: d.env, ...checkLimits(config.hum) };
+
+	/** A failure a fix run reads, as the error that sends the machine to it. */
+	const failedCheck = (failure: string): Error => {
+		lastFailure = failure;
+
+		return new Error(failure.slice(0, ERROR_EXCERPT));
+	};
+
+	/** Runs `body` with the clone's files at `commit`, then puts the run branch back. */
+	const atCommit = async <T>(commit: string, body: () => Promise<T>): Promise<T> => {
+		await g(["checkout", "-q", "-f", "--detach", commit]);
+
+		try {
+			return await body();
+		} finally {
+			await g(["checkout", "-q", "-f", branch]);
+		}
+	};
+
+	/** Whether the base the pass started from fails `command` too, run in the clone itself so it reads what the change's checks read. */
+	const failsOnBase = async (command: string): Promise<boolean> => (await atCommit(d.baseSha, () => firstFailing([command], clone, checkOptions))) !== undefined;
+
+	/** The item's repro as its run saved it; a state that proves a repro the machine never ran is a broken kind. */
+	const savedRepro = (): SavedRepro => {
+		const saved = state.repros.get(id);
+
+		if (saved === undefined) throw failed("no repro is saved for the item: its kind proves a repro its machine never ran");
+
+		return saved;
+	};
+
+	/** The repro's command run `fixProofRuns` times where the clone stands: each run's failure, undefined where it passed. */
+	const reproRuns = async (command: string): Promise<(string | undefined)[]> => {
+		const failures: (string | undefined)[] = [];
+
+		for (let run = 0; run < config.hum.fixProofRuns; run++) failures.push(await runChecks([command], clone, { ...checkOptions, reruns: 0 }));
+
+		return failures;
+	};
+
+	/** The repro must fail on every run where it went in before any fix; one that passes shows no bug, and the owner says how to go on. */
+	const showsBug = createAsyncLogic({
+		run: async () => {
+			const repro = savedRepro();
+			const passed = (await atCommit(repro.commit, () => reproRuns(repro.command))).filter((failure) => failure === undefined).length;
+
+			if (passed === 0 && repro.unopposed) return void actor.send({ type: WINDOW_PASSED });
+
+			if (passed === 0) {
+				pending = { question: { text: PLAIN_QUESTIONS.objection, detail: `${repro.command} failed on all ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where only the repro is in. Reply to object, and the repro runs again with your words.` }, plain: "objection", plan: "" };
+
+				return;
+			}
+
+			state.repros.remove(id);
+			ask({ question: { text: PLAIN_QUESTIONS.repro, detail: `${repro.command} passed on ${passed} of ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where the repro went in before any fix.` }, plain: "repro", plan: "" });
+		},
+	});
+
+	/** The fix is proven once the repro's own files are as it left them and its command passes on every run; else a fix run reads why. */
+	const bugGone = createAsyncLogic({
+		run: async () => {
+			const repro = savedRepro();
+			const edited = repro.files.length === 0 ? [] : await filesBetween(d.git, repro.commit, "HEAD", ...repro.files);
+
+			if (edited.length > 0) throw failedCheck(`The change edits the repro's own files (${edited.join(", ")}): put them back as the repro left them, and fix the bug instead.`);
+
+			const failures = (await reproRuns(repro.command)).flatMap((failure) => (failure === undefined ? [] : [failure]));
+
+			if (failures.length > 0) throw failedCheck(`The repro still fails on ${failures.length} of ${config.hum.fixProofRuns} runs:\n${failures[0]}`);
+
+			state.repros.put(id, { ...repro, proven: config.hum.fixProofRuns });
+		},
+	});
+
+	/** A failing check goes to a fix run, unless it is one of the repo's and the base fails it too: no change of the item's can pass it, so the item ends for the owner. */
 	const checksSource = createAsyncLogic({
 		run: async () => {
-			const failure = await runChecks(d.checks, clone, { env: d.env, timeoutMs: checksTimeoutMs(d.config.hum) });
+			const failed = await firstFailing(d.checks, clone, checkOptions);
 
-			if (failure) {
-				lastFailure = failure;
-				throw new Error(failure.slice(0, ERROR_EXCERPT));
-			}
+			if (failed === undefined) return;
+
+			if (!d.ownChecks.includes(failed.command) && (await failsOnBase(failed.command))) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
+
+			throw failedCheck(failed.failure);
 		},
 	});
 
@@ -637,6 +799,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			run: async ({ signal }) => {
 				const diff = purpose === "review" ? await branchDiff() : "";
 				const head = (await g(["rev-parse", "HEAD"])).trim();
+				const patch = purpose === "review" ? await patchOf(placing(d)) : undefined;
+				const carried = purpose === "review" ? await carriedVerdict(placing(d), state.verdicts.get(id), { head, patch }) : undefined;
+
+				if (carried?.event === REVIEW_APPROVAL) {
+					state.verdicts.put(id, carried);
+
+					return actor.send({ type: carried.event });
+				}
 
 				const { pick, models } = await decideProse({
 					purpose,
@@ -647,8 +817,8 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 					canTake: (type) => actor.getSnapshot().can({ type }),
 				});
 
-				if (purpose === "review") keepVerdict(state, { id, head, pick, models });
-				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick, models: [...models] } });
+				if (purpose === "review") keepVerdict(state, { id, head, patch, pick, models });
+				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick: keptPick(pick), models: [...models] } });
 
 				PICKED.get(pick.event)?.(pick, models);
 
@@ -658,10 +828,13 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			},
 		});
 
-	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review") };
+	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review"), repro: step("repro"), "shows-bug": showsBug, "bug-gone": bugGone };
+
+	/** A wait that timed out restores on a clock that keeps its timers, so the pass fires the due ones with the real sources. */
+	const due = d.timedOut === undefined ? undefined : dueClock(state, { kind, saved: d.timedOut }, d.now());
 
 	if (d.resume) {
-		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind) });
+		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), clock: due?.clock });
 
 		if (!restored.ok) return { outcome: "held", item: id, why: restored.fault.cause };
 
@@ -683,7 +856,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (hasEndedStuck(kind, value)) return result.resolve({ outcome: "stuck", item: id, detail: stuckCause() });
 
 		if (isWaitingOnOwner(kind, value)) {
-			const note = pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" };
+			const note = withTimeoutNote(kind, value, pending ?? { question: { text: "The run stopped for the owner." }, plain: "unsure" as const, plan: "" });
+
+			pending = undefined;
 
 			const approval = isApprovalWait(kind, value);
 			const stopped = await handOff(d, approval ? approvalQuestion(note) : note, { approval });
@@ -716,14 +891,25 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (resume === OWNER_REJECTED) lastFailure = d.answered.answer;
 
 		actor.send({ type: resume });
-	}
+	} else due?.fireDue();
 
 	return result.promise.finally(() => actor.stop());
 };
 
-/** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */
+/** An owner wait whose timeout goes on to work, not to stuck, tells the owner when it goes on without them. */
+const withTimeoutNote = (kind: Kind, state: string, note: Pending): Pending => {
+	const timeout = earliestTimeout(kind.machine.states[state]);
+	const target = timeout?.transitions[0]?.target;
+
+	if (timeout === undefined || target === undefined || hasEndedStuck(kind, target)) return note;
+
+	const told = `With no reply within ${timeout.hours} hours, the item goes on to ${target}.`;
+
+	return { ...note, question: { ...note.question, detail: [note.question.detail, told].filter(Boolean).join(" ") } };
+};
+
 /**
- * Commits what a build or fix run left in the working tree as one commit on `since`, under `subject`, by the owner's
+ * Commits what a run left in the working tree as one commit on `since`, under `subject`, by the owner's
  * commitIdentity, and says whether there was a change to commit. A commit the run made anyway, and the work so far
  * hum committed when the run asked, are folded into it, so the run's whole change is one commit of hum's.
  */
@@ -738,6 +924,7 @@ const commitRun = async (git: Git, { since, subject }: { readonly since: string;
 	return true;
 };
 
+/** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */
 const keepPullRequest = async (d: Driven, { title, body, evidence }: PullRequestWritten): Promise<void> => {
 	const kept = evidence === undefined ? d.state.pullRequests.get(d.id)?.evidence : await keepEvidence({ git: d.git, folder: d.evidence, file: evidence, item: d.id, repo: repoFromRemote(d.remote) });
 
@@ -754,8 +941,6 @@ const chosenSection = (chosen: readonly string[]): string => (chosen.length === 
 const OWNER_APPROVED = "owner-approved";
 
 const OWNER_REJECTED = "owner-rejected";
-
-const ANSWERED = "answered";
 
 /** The event an owner's answer sends a saved wait: `answered` where the state takes it, else the owner's approval or rejection of the change. */
 const resumeEvent = (snapshot: { can: (event: { type: string }) => boolean }, answered: Answered) => {
@@ -779,9 +964,9 @@ type Judged = { readonly head: string };
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
 
-/** The role file of a run's purpose, then the skills its role names, so the run reaches for them. */
-const roleOf = (config: RunConfig, purpose: Purpose): string => {
-	const role = config.hum.roles[purpose];
+/** A role's file, then the skills it names, so the run reaches for them. */
+const roleOf = (config: RunConfig, name: string): string => {
+	const role = config.hum.roles[name];
 	const text = ((role && config.roles[role.file]) ?? "").trim();
 	const skills = role?.skills ?? [];
 
@@ -795,20 +980,58 @@ export const PROSE_PROMPTS = {
 		[
 			roleOf(config, "plan"),
 			`# Item ${item.id}: ${item.title}\n\n${item.body}`,
-			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part as a title; a plan-blocked answer asks the owner one question.",
+			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it; a plan-blocked answer asks the owner one question.",
 		].join("\n\n"),
 	review: (config: RunConfig, item: ItemText, diff: string): string => [roleOf(config, "review"), reviewInput(item, diff, config.hum)].join("\n\n"),
 } as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string) => string>;
 
+/** A pick as the item's log keeps it: a split's parts by title, which is all a measure reads of them. */
+const keptPick = (pick: EventPick) => ({ ...pick, parts: pick.parts.map(({ title }) => title) });
+
 /** A review's verdict on the change that ends at `head`: saved for landing, and kept in the item's log. */
-const keepVerdict = (state: State, { id, head, pick, models }: { readonly id: string; readonly head: string; readonly pick: EventPick; readonly models: readonly string[] }) => {
-	const verdict = { item: id, head, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] };
+const keepVerdict = (state: State, { id, head, patch, pick, models }: { readonly id: string; readonly head: string; readonly patch: string | undefined; readonly pick: EventPick; readonly models: readonly string[] }) => {
+	const verdict = { item: id, head, patch, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] };
 
 	state.verdicts.put(id, verdict);
-	keepPick(state.events, { itemId: id, pick: { judge: "review", head, pick, models: [...models] } });
+	keepPick(state.events, { itemId: id, pick: { judge: "review", head, pick: keptPick(pick), models: [...models] } });
 
 	return verdict;
 };
+
+/** What a repro that still shows the bug sends where the owner's window to object to it already closed. */
+const WINDOW_PASSED = "window-passed";
+
+/** The runs that change files: each leaves its change in the working tree, which hum commits. */
+type StepRole = "build" | "fix" | "repro";
+
+/** Where a run that changes files works, and the folder it saves its evidence in. */
+type Workplace = { readonly branch: string; readonly evidence: string };
+
+/** How a run that drives the app proves its change, and what it reports where it cannot. */
+const PROOF_RULES = [
+	"Where you drive the app to prove the change, prove each way into the changed behavior you know of; never count a skipped one as proven through another.",
+	"A way in you cannot reach goes in the pull request, with the command you tried and what it lacked.",
+	"When the app does not behave as you expect, decide first whether your drive, the setup or the product is wrong; a product fault the item did not ask about goes in the pull request, never edited away.",
+	"Stop only what this run started, after each failed attempt too, and keep the proof files.",
+].join(" ");
+
+const pullRequestContract = ({ branch, evidence }: Workplace): string =>
+	[
+		`Work on the branch ${branch}. Leave the change in the working tree and make no commit: hum commits every file there once you are done. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+		`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
+		PROOF_RULES,
+	].join("\n\n");
+
+/** What each run that changes files is told about its answer: a build or fix run writes the pull request, a repro run names its check. */
+const RUN_CONTRACTS = {
+	build: pullRequestContract,
+	fix: pullRequestContract,
+	repro: ({ branch }) =>
+		`Work on the branch ${branch}. Leave the check in the working tree and make no commit: hum commits it once you are done. End with the JSON {"status":"done","repro":{"command":…}}, naming the one shell command that fails now because of the bug and will pass once it is fixed, with "repro.translated" saying what stood in where the reported environment was not at hand; or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+} as const satisfies Record<StepRole, (where: Workplace) => string>;
+
+/** The purpose a role runs for, which picks its tier: the config's, else the role's own name for one of the four purposes. */
+const purposeOf = (config: RunConfig, role: string): Purpose => config.hum.roles[role]?.purpose ?? z.enum(PURPOSES).parse(role);
 
 /** What a paused run comes to for its item. */
 const pauseOf = (id: string, outcome: Paused): ThinResult => {
@@ -828,7 +1051,7 @@ const pauseOf = (id: string, outcome: Paused): ThinResult => {
  */
 export const reviewRunOf =
 	(o: Pick<ThinPathOptions, "runner" | "state" | "config">, item: Item, kindName: string) =>
-	async ({ head, diff, level }: { head: string; diff: string; level: string }): Promise<ReviewOutcome> => {
+	async ({ head, diff, level, patch }: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
 		const kind = kindNamed(o.config, kindName);
 		const row = pickTier(kind, { purpose: "review", level, size: "small" });
 
@@ -859,7 +1082,7 @@ export const reviewRunOf =
 			return new Promise<never>(() => {});
 		};
 
-		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => ({ verdict: keepVerdict(o.state, { id: item.id, head, pick, models }) }));
+		const decided = decideProse({ purpose: "review", prompt: PROSE_PROMPTS.review(o.config, item, diff), diff, model: o.config.hum.models[row.tier], run }).then(({ pick, models }): ReviewOutcome => ({ verdict: keepVerdict(o.state, { id: item.id, head, patch, pick, models }) }));
 
 		return Promise.race([decided, halted]);
 	};
@@ -916,11 +1139,14 @@ const bundleOf = async (git: Git, { branch, item, gathered, folder }: { readonly
 	return file;
 };
 
-/** Files each part of a split item as its own item, then lands the item as done with no change of its own. */
-const split = async (d: Driven, parts: readonly string[]): Promise<ThinResult> => {
+/**
+ * Files each part of a split item as its own item, with the files it may touch, which the scheduler reads, and its
+ * check; publish names the parts it waits on. Then the item lands as done with no change of its own.
+ */
+const split = async (d: Driven, parts: readonly SplitPart[]): Promise<ThinResult> => {
 	const writes = d.outbox.calls({ run: SPLIT, attempt: 0 });
 
-	for (const title of parts) await writes.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}` });
+	for (const { title, touches, waitsOn, check } of parts) await writes.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}\n\ntouches: ${touches.join(", ")}\ncheck: ${check}` }, { waitsOn, check });
 
 	return merge(d);
 };
@@ -1000,9 +1226,6 @@ const handToPublish = async (d: Driven): Promise<ThinResult> => {
 
 	return { outcome: "held", item: d.id, why: LANDING_HANDED };
 };
-
-/** The answer option that runs a parked item again from the start. */
-export const RUN_AGAIN = "retry";
 
 type Parking = { readonly outcome: "stuck" | "review"; readonly item: string; readonly detail?: string };
 

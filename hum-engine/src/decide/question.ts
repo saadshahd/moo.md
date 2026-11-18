@@ -72,9 +72,17 @@ export const PLAIN_QUESTIONS = {
 	"owner-review": "Approve this change?",
 	kind: "Which kind of work is this?",
 	level: "Which level do these paths belong to?",
+	repro: "The repro passes without a fix; how should the run go on?",
+	objection: "Object to this repro before the fix starts?",
 } as const satisfies Record<string, string>;
 
 export type PlainQuestion = keyof typeof PLAIN_QUESTIONS;
+
+/** The over-cap question's options: go on past the cap, or end the item. */
+export const OVER_CAP_OPTIONS = { goOn: "continue", stop: "stop" } as const;
+
+/** Whether an answer's option to the question the owner reads ends the item at its token cap. */
+export const isOverCapStop = (question: string, option: string | undefined): boolean => option === OVER_CAP_OPTIONS.stop && question === PLAIN_QUESTIONS["over-cap"];
 
 /** The question each confirmed reason asks, from the facts the run named. */
 const ASKED = {

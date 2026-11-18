@@ -20,6 +20,8 @@ export type AnswerScope = {
 	readonly stage: Stage;
 	/** The options a card offers when no question does, such as the parked item's actions. */
 	readonly options?: readonly string[];
+	/** When the card was raised: an answer applied before it never drops a reply to the card. */
+	readonly since?: number;
 };
 
 /** A marked answer, or a person's reply typed without a marker. */
@@ -101,7 +103,7 @@ const settleOne = async ({ ctx, item, question, options, stage }: Settling, { re
 
 	if (saved && isFinal(saved)) return { record: saved, resolution };
 
-	const outcome = dispose({ resolution, answeredBefore, stage });
+	const outcome = dispose({ resolution, answeredBefore, stage, question });
 	const record = saved?.disposition === outcome.disposition ? saved : recordOf(item.id, reply, resolution, outcome, ctx.now());
 
 	if (record !== saved) ctx.state.answers.put(keyOf(item.id, reply.ordinal), record);
@@ -125,7 +127,7 @@ const dropSuperseded = async ({ ctx, item }: Settling, current: ReadonlySet<numb
  * Returns the item with its thread as the engine reads it: an applied reply is an answer carrying its option, any
  * other is a comment.
  */
-export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, options: cardOptions }: AnswerScope): Promise<Item> => {
+export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, options: cardOptions, since }: AnswerScope): Promise<Item> => {
 	const asked = latestQuestionAt(item.thread);
 	const questionText = asked < 0 ? "" : (item.thread[asked]?.text ?? "");
 	const settling: Settling = { ctx, item, question: visibleText(questionText), options: cardOptions ?? optionsIn(questionText), stage };
@@ -134,7 +136,7 @@ export const settleAnswers = async (ctx: AnswerContext, item: Item, { stage, opt
 	const replies = repliesOn(item.thread, asked);
 
 	for (const reply of replies) {
-		const answeredBefore = [...settled.values()].some(({ disposition }) => disposition === "applied");
+		const answeredBefore = [...settled].some(([index, { disposition }]) => disposition === "applied" && (since === undefined || (item.thread[index]?.at ?? since) > since));
 		const { record, resolution } = await settleOne(settling, { reply, answeredBefore });
 		const outcome = { disposition: record.disposition, why: record.why };
 

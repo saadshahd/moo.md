@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Git, isCommit } from "../adapters/git.ts";
-import { runChecks } from "../worker/checks.ts";
+import { runChecks, type ShellOptions } from "../worker/checks.ts";
 import type { ReviewNote } from "./records.ts";
 
 export type ProofOptions = {
@@ -15,7 +15,7 @@ export type ProofOptions = {
 	readonly notes: readonly ReviewNote[];
 	/** The repo's checks, which include the new one. */
 	readonly checks: readonly string[];
-	readonly timeoutMs: number;
+	readonly limits: Pick<ShellOptions, "timeoutMs" | "reruns">;
 	readonly now: () => number;
 };
 
@@ -51,7 +51,7 @@ export const inWorktreeAt = async <T>(git: Git, sha: string, body: (folder: stri
  * note's commit is checked out with the check's files laid over it. A note that points at no commit cannot be proved
  * and counts against the check.
  */
-export const proveCheck = async ({ git, head, base, notes, checks, timeoutMs, now }: ProofOptions): Promise<ProofResult> => {
+export const proveCheck = async ({ git, head, base, notes, checks, limits, now }: ProofOptions): Promise<ProofResult> => {
 	const started = now();
 	let worktrees = 0;
 
@@ -69,7 +69,7 @@ export const proveCheck = async ({ git, head, base, notes, checks, timeoutMs, no
 			worktrees++;
 			await git.raw(["-C", folder, "checkout", head, "--", ...files]);
 
-			return runChecks(checks, folder, { timeoutMs });
+			return runChecks(checks, folder, limits);
 		});
 
 		if (failure === undefined) return failed(`the check passes on ${sha}, the commit a note points at`);
@@ -78,7 +78,7 @@ export const proveCheck = async ({ git, head, base, notes, checks, timeoutMs, no
 	const failure = await inWorktreeAt(git, head, async (folder) => {
 		worktrees++;
 
-		return runChecks(checks, folder, { timeoutMs });
+		return runChecks(checks, folder, limits);
 	});
 
 	return failure === undefined ? { passed: true, ...cost() } : failed(`the checks fail on the check item's own commit: ${failure.slice(0, 300)}`);

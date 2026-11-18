@@ -18,18 +18,21 @@ export type InboxItem = {
 	readonly at: string | undefined;
 	/** The inbox thread holds the owner's answer to the wait the item is in. */
 	readonly answered: boolean;
+	/** The wait the item is in timed out unanswered into work, which a pass goes on to. */
+	readonly timedOut: boolean;
 };
 
 const isOwnerWait = (kind: Kind, state: string): boolean => kind.machine.states[state]?.tags?.includes(OWNER_WAIT_TAG) ?? false;
 
 /**
  * The states one pass may carry an item to from where the inbox saved it: through every transition of its kind's
- * machine, past the owner's wait it starts in only with the owner's answer, and never past another owner's wait.
+ * machine, past the owner's wait it starts in only with the owner's answer or once its timeout passed, and never past
+ * another owner's wait.
  */
-export const passReach = ({ kind, at, answered }: Omit<InboxItem, "item">): ReadonlySet<string> => {
+export const passReach = ({ kind, at, answered, timedOut }: Omit<InboxItem, "item">): ReadonlySet<string> => {
 	const start = at ?? kind.machine.initial;
 
-	return reachedFrom(start, nextStates(kind), (state) => !isOwnerWait(kind, state) || (state === start && answered));
+	return reachedFrom(start, nextStates(kind), (state) => !isOwnerWait(kind, state) || (state === start && (answered || timedOut)));
 };
 
 /** The rank of a kind's floor among the levels; a kind with no floor ranks lowest. */
@@ -63,14 +66,14 @@ const WORK_CARD_CODES: ReadonlySet<string> = new Set(Object.values(SNAPSHOT_CARD
 /**
  * Takes into publish's state what a work job wrote for one item it ran, and nothing else: the item's machine state
  * when it is one a pass can reach from the inbox's, its runs, its spend where it raises publish's, its plan, whose
- * models land reads beside the ones the config gives the plan run, its pull request text, its proof,
+ * models land reads beside the ones the config gives the plan run, its pull request text, its proof, its repro,
  * the questions it queued, never offering the owner's approval, its choices, its events, its saved state's cards with
  * no action, and the usage limit cut to `usageLimitMaxMs` from now. Landings, verdicts, merges, learned rules, kinds,
  * answers and op keys stay as publish has them. Returns why the machine state was refused, or nothing once all is taken.
  */
 export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limits: { readonly now: number; readonly usageLimitMaxMs: number }): string | undefined => {
 	const { item, kind } = inbox;
-	const saved = work.items.saved().find(({ itemId }) => itemId === item);
+	const saved = work.items.savedOf(item);
 
 	if (saved !== undefined) {
 		if (saved.kind !== kind.machine.id || saved.machineVersion !== kind.machine.version) return `the work job saved ${item} under ${saved.kind}@${saved.machineVersion}, not ${kind.machine.id}@${kind.machine.version}`;
@@ -90,6 +93,7 @@ export const takeWorkRecords = (work: State, into: State, inbox: InboxItem, limi
 	work.plans.copyTo(into.plans, item);
 	work.pullRequests.copyTo(into.pullRequests, item);
 	work.proofs.copyTo(into.proofs, item);
+	work.repros.copyTo(into.repros, item);
 
 	for (const queued of work.questions.list().filter((queued) => queued.item === item && queued.askedAt === undefined)) into.questions.put(queuedKey(queued), { ...queued, options: queued.options?.filter((option) => option !== OWNER_APPROVAL) });
 

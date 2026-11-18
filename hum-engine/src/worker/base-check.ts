@@ -3,7 +3,7 @@ import { type Git } from "../adapters/git.ts";
 import type { Config } from "../config/load.ts";
 import { inWorktreeAt } from "../loop/proof.ts";
 import type { State } from "../state/open.ts";
-import { checksTimeoutMs, runChecks } from "./checks.ts";
+import { checkLimits, runChecks } from "./checks.ts";
 import { placementOf } from "./land.ts";
 
 export type BaseCheckOptions = {
@@ -25,7 +25,7 @@ export type BaseCheck = { readonly items: readonly string[]; readonly failure?: 
 const FAILURE_EXCERPT = 1500;
 
 const failureAt = async ({ config, git, checks }: Pick<BaseCheckOptions, "config" | "git" | "checks">, sha: string): Promise<string | undefined> =>
-	(await inWorktreeAt(git, sha, (folder) => runChecks(checks, folder, { timeoutMs: checksTimeoutMs(config.hum) })))?.slice(0, FAILURE_EXCERPT);
+	(await inWorktreeAt(git, sha, (folder) => runChecks(checks, folder, checkLimits(config.hum))))?.slice(0, FAILURE_EXCERPT);
 
 /**
  * Settles the base checks that cover merged items: each merge not yet checked counts as checked, and a failure is a

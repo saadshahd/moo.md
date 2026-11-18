@@ -8,7 +8,8 @@ import { NOW, TTL, workerWorld, type WorkerWorld } from "./fixtures/worker-world
 import { readHeartbeat, readStatus } from "../src/status/file.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { WAIT_HOURS } from "../src/setup/tables.ts";
-import { HOUR_MS } from "../src/time.ts";
+import { DAY_MS, HOUR_MS } from "../src/time.ts";
+import { scriptedJudge, SOUND } from "./fixtures/judge.ts";
 import { Holder, ItemId } from "../src/adapter-api.ts";
 import { isTrusted } from "../src/decide/prose.ts";
 import type { Measured, Measurement } from "../src/measure/remeasure.ts";
@@ -357,6 +358,102 @@ test("a saved deadline fires on the next event, not only on a tick: a question t
 	expect(status.ok && w.clock.at - (status.status.workers.ci ?? 0)).toBe(pastTheWait);
 });
 
+test("an item in an owner wait whose timeout goes on to work sleeps through it, and once it passes the next tick restores the wait and goes on", async () => {
+	const repro = { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command: "sh docs/repro.sh" } } };
+	const w = await workerWorld({ script: [{}, repro, { write: { "docs/note.md": "fixed\n" } }] }, { worker: { judge: scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND }) } });
+
+	w.item("a", "docs/note.md");
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+	w.clock.at += HOUR_MS;
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.shim.calls()).toHaveLength(2);
+
+	w.clock.at += DAY_MS;
+	await w.worker.tick();
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
+	expect(w.shim.calls()).toHaveLength(3);
+});
+
+test("an item someone else claims never starts and carries a card naming them, which goes once they let it go", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
+	const claimedBy: string[] = ["@ana"];
+	const source = w.adapter.workSource!;
+	const worker = w.workerWith({ adapters: { workSource: { ...source, read: async (id: ItemId) => ({ ...(await source.read(id)), claimedBy }) }, questions: w.adapter.questions!, answers: w.adapter.answers } });
+
+	w.item("a", "docs/a.md");
+	await worker.tick();
+	await worker.idle();
+	expect(w.results).toEqual([]);
+	expect(w.state.faults.list().find(({ code }) => code === "item-claimed")?.cause).toBe("a is already taken by @ana, so hum starts no rival change.");
+
+	claimedBy.pop();
+	await worker.tick();
+	await worker.idle();
+	expect(w.results).toMatchObject([{ outcome: "merged", item: "a" }]);
+	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("item-claimed");
+});
+
+test("a fix item run again after its window passed reruns the repro, and opens the window again only when the repro changed", async () => {
+	const repro = (command: string) => ({ write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command } } });
+
+	const runAgainAfterTheWindow = async (again: ReturnType<typeof repro>) => {
+		const w = await workerWorld({ script: [{}, repro("sh docs/repro.sh"), { error: "the run broke" }, again, { write: { "docs/note.md": "fixed\n" } }] }, { worker: { judge: scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND }) } });
+
+		const step = async () => {
+			await w.worker.tick();
+			await w.worker.idle();
+		};
+
+		w.item("a", "docs/note.md");
+		await step();
+		expect(w.results.at(-1)).toMatchObject({ outcome: "asked", item: "a" });
+
+		w.clock.at += DAY_MS + 1;
+		await step();
+		expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "a" });
+
+		w.clock.at += TTL + 1;
+		await w.adapter.answers!.answer(ItemId.parse("a"), { text: "retry" });
+		await step();
+
+		return { result: w.results.at(-1), runs: w.shim.calls().length };
+	};
+
+	expect(await runAgainAfterTheWindow(repro("sh docs/repro.sh"))).toMatchObject({ result: { outcome: "merged", item: "a" }, runs: 5 });
+	expect(await runAgainAfterTheWindow(repro("bash docs/repro.sh"))).toMatchObject({ result: { outcome: "asked", item: "a" }, runs: 4 });
+});
+
+test("the owner's stop at the token cap ends the item, and Run it again starts it afresh", async () => {
+	const config = configWith((raw) => {
+		raw.kinds.docs.tokenCap.tokens = 500;
+	});
+
+	const w = await workerWorld({ script: [{}, { write: { "docs/a.md": "long\n" }, modelTokens: 1000 }, { write: { "docs/a.md": "short\n" }, modelTokens: 1 }] }, { config });
+
+	const step = async (answer?: string) => {
+		w.clock.at += TTL + 1;
+
+		if (answer !== undefined) await w.adapter.answers!.answer(ItemId.parse("a"), { text: answer });
+
+		await w.worker.tick();
+		await w.worker.idle();
+
+		return w.results.at(-1);
+	};
+
+	w.item("a", "docs/a.md");
+	expect(await step()).toMatchObject({ outcome: "asked", item: "a" });
+	expect(await step("Stop.")).toMatchObject({ outcome: "stuck", item: "a", detail: "the owner stopped it at the token cap" });
+	await step("retry");
+	expect(w.state.parked.get("a")).toBeUndefined();
+	expect(await step()).toMatchObject({ outcome: "merged", item: "a" });
+});
+
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {
 	const flag = join(tempDir("flag"), "flag");
 	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });
@@ -370,7 +467,7 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 	const spent = w.shim.calls().length;
 
 	expect(w.state.parked.get("a")).toMatchObject({ why: "stuck" });
-	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 0 });
+	expect(w.state.spent.get("a")).toMatchObject({ total: 401, base: 0 });
 
 	// The file still says ready and the claim lapses, yet no tick spends tokens on it.
 	for (let tick = 0; tick < 3; tick++) {
@@ -389,7 +486,7 @@ test("a stuck item never reruns until the owner answers; the answer takes it bac
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(w.state.parked.get("a")).toBeUndefined();
 	expect(w.state.faults.list().map((c) => c.code)).not.toContain("item-stuck");
-	expect(w.state.spent.get("a")).toMatchObject({ total: 1203, base: 802 });
+	expect(w.state.spent.get("a")).toMatchObject({ total: 802, base: 401 });
 });
 
 test("a limit the runner hit is saved, and a restarted worker makes no call before it ends, then resumes", async () => {
@@ -471,12 +568,13 @@ test("the status file lists the open questions and the newest choices from what 
 	w.state.questions.put("a@1", { item: "a", text: "Which title?", priority: 0, queuedAt: NOW - 2, askedAt: NOW - 1 });
 	w.state.choices.put("b@old", { item: "b", text: "old", at: 3 });
 	w.state.choices.put("b@new", { item: "b", text: "new", at: 4 });
+	w.state.parked.put("b", { item: "b", why: "stuck", cause: "the checks still fail", since: 5 });
 	await w.worker.tick();
 
 	const status = readStatus(w.state.statusPath);
 
 	expect(status.ok && status.status.questions).toEqual([{ item: "a", text: "Which title?", options: [], since: NOW - 1 }]);
-	expect(status.ok && status.status.choices).toEqual([{ item: "b", text: "new", at: 4 }]);
+	expect(status.ok && status.status.choices).toEqual([{ item: "b", text: "new", at: 4, result: "stuck" }]);
 });
 
 test("memory.md lines with no source or past the byte cap each raise a card naming them, and the cards go once the file is fixed", async () => {
@@ -493,6 +591,23 @@ test("memory.md lines with no source or past the byte cap each raise a card nami
 	w.ownerFile(".hum/memory.md", "- Use plain words (source: owner)\n");
 	await w.workerWith().tick();
 	expect(memoryCards()).toEqual([]);
+});
+
+test("a split part waits for the part it names to merge, though their files differ, and its own check, which no base was meant to pass, goes to fix runs when it fails", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 }, b: { writeForItem: true, spend: 5 } } }, { checks: ["true"], settings: { maxFixRuns: 1 } });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/b.md");
+	w.state.parts.put("a", { item: "a", from: "x", waitsOn: [], check: "test -f docs/a.md" });
+	w.state.parts.put("b", { item: "b", from: "x", waitsOn: ["a"], check: "test -f docs/never.md" });
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a"] });
+	await w.worker.idle();
+	expect(w.results).toMatchObject([{ outcome: "merged", item: "a" }]);
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["b"] });
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "b", detail: "the checks still fail after 1 fixes" });
 });
 
 test("an item waiting behind a run on the same file starts once the owner moves its touches: elsewhere", async () => {

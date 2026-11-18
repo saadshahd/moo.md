@@ -1,8 +1,38 @@
 import { type AnyActorLogic, type AnyStateMachine, createAsyncLogic, machineFromJSON } from "xstate";
 import { toDirectedGraph } from "xstate/graph";
-import type { Kind } from "./schema.ts";
+import { HOUR_MS } from "../time.ts";
+import { isFixedPart, type Kind, type StateNodeJSON } from "./schema.ts";
 
 const placeholder = createAsyncLogic({ run: async () => {} });
+
+/** What a run past its token cap, or a run's question for the owner, sends the machine. */
+export const TOKEN_CAP = "token-cap";
+
+/** What the owner's answer sends the wait it was given at. */
+export const ANSWERED = "answered";
+
+/**
+ * The kind as hum runs it. A state that invokes a role's run and names no `token-cap` transition stops, past the cap,
+ * at the wait `<overCap>-<state>`: the kind's own state of that name, else a copy of its `tokenCap.overCap` wait whose
+ * answer leads back to the state, so the owner's answer runs it again and skips nothing after it.
+ */
+export const withOverCapWaits = (kind: Kind): Kind => {
+	const { machine, tokenCap } = kind;
+	const wait = machine.states[tokenCap.overCap];
+
+	if (wait === undefined) return kind;
+
+	const waitOf = (run: string): string => `${tokenCap.overCap}-${run}`;
+
+	const runs = Object.entries(machine.states)
+		.filter(([, node]) => node.invoke !== undefined && !isFixedPart(node.invoke.src) && node.on?.[TOKEN_CAP] === undefined)
+		.map(([name]) => name);
+
+	const states = Object.fromEntries(Object.entries(machine.states).map(([name, node]) => [name, runs.includes(name) ? { ...node, on: { ...node.on, [TOKEN_CAP]: [{ target: waitOf(name) }] } } : node]));
+	const waits = Object.fromEntries(runs.map((run) => [waitOf(run), machine.states[waitOf(run)] ?? { ...wait, on: { ...wait.on, [ANSWERED]: [{ target: run }] } }]));
+
+	return { ...kind, machine: { ...machine, states: { ...states, ...waits } } };
+};
 
 /**
  * A kind's machine. `machineFromJSON` needs an actor for every `invoke.src`; any
@@ -12,6 +42,19 @@ const placeholder = createAsyncLogic({ run: async () => {} });
 export const kindMachine = (kind: Kind, sources: Readonly<Record<string, AnyActorLogic>> = {}): AnyStateMachine => {
 	// SAFETY: the zod machine schema is a subset of xstate's MachineJSON, and machineFromJSON validates the rest.
 	return machineFromJSON(kind.machine as Parameters<typeof machineFromJSON>[0], { actors: invokedSources(kind, placeholder, sources) });
+};
+
+/** A state's `after` timeouts, shortest first: each one's delay in ms and the transitions it takes. */
+export const timeoutsOf = (node: StateNodeJSON | undefined): { readonly ms: number; readonly transitions: NonNullable<StateNodeJSON["after"]>[string] }[] =>
+	Object.entries(node?.after ?? {})
+		.map(([delay, transitions]) => ({ ms: Number(delay), transitions }))
+		.sort((a, b) => a.ms - b.ms);
+
+/** A state's earliest `after` timeout: its hours and the transitions it takes; undefined for a state with none. */
+export const earliestTimeout = (node: StateNodeJSON | undefined) => {
+	const [earliest] = timeoutsOf(node);
+
+	return earliest && { hours: earliest.ms / HOUR_MS, transitions: earliest.transitions };
 };
 
 /** An actor for each source the kind's machine invokes: the one `sources` gives, else `fallback`. */

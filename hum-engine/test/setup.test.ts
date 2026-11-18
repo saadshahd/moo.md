@@ -337,6 +337,9 @@ test("every wait the shipped kinds have is asked once, and an answered wait carr
 	const kinds = withTimeouts(shipped.kinds, { [`${first?.kind}/${first?.state}`]: 5 });
 
 	expect(JSON.stringify(kinds[first?.kind ?? ""]?.machine.states[first?.state ?? ""]?.after)).toContain(String(5 * 3_600_000));
+
+	expect(waits.find(({ kind, state }) => kind === "fix" && state === "objecting")).toEqual({ kind: "fix", state: "objecting", waitsOn: "owner", hours: 24, leadsTo: "building" });
+	expect(withTimeouts(shipped.kinds, { "fix/objecting": 5 }).fix?.machine.states.objecting?.after).toEqual({ [String(5 * 3_600_000)]: [{ target: "building" }] });
 });
 
 test("writing setup answers writes a config that loads and carries only the settings that differ from the defaults", () => {

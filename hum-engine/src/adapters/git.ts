@@ -222,6 +222,10 @@ export const changedBytes = async (git: Git, { base, head }: { readonly base: st
 	return entries.map((entry) => ({ path: entry.path, before: bytesOf(entry.old), after: bytesOf(entry.new) }));
 };
 
+/** The files that differ between two commits, among `paths` where it names some. */
+export const filesBetween = async (git: Git, from: string, to: string, ...paths: readonly string[]): Promise<string[]> =>
+	(await git.raw(["diff", "--name-only", from, to, "--", ...paths])).split("\n").filter(Boolean);
+
 /** What git printed for one object, or undefined when the object does not exist. */
 export const readOrAbsent = async (git: Git, args: readonly string[]): Promise<string | undefined> => {
 	const result = await git.run(args);

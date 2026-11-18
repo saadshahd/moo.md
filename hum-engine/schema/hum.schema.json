@@ -377,6 +377,20 @@
 			"maximum": 9007199254740991,
 			"description": "Fix runs an item gets after failed checks, counted since the owner last answered, before it ends stuck."
 		},
+		"fixProofRuns": {
+			"default": 2,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Runs of a fix item's repro check on each side of the fix: each must fail where only the repro is in, and each must pass once the fix is in."
+		},
+		"checkReruns": {
+			"default": 1,
+			"type": "integer",
+			"minimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Times a failing check runs again before its failure counts: a check that passes on any of these runs passes, so a flaky check spends no fix run and files no follow-up."
+		},
 		"serviceLabel": {
 			"default": "md.moo.hum",
 			"type": "string",
@@ -1066,7 +1080,7 @@
 				"paths"
 			],
 			"additionalProperties": false,
-			"description": "An item of this kind whose change touches a path outside these globs moves to its real kind."
+			"description": "The globs of prose: an item of this kind whose change touches a path outside them moves to its real kind, and a review's approval holds past a later change that touches only them."
 		},
 		"decisionModel": {
 			"default": "claude-haiku-5-5",
@@ -1450,7 +1464,7 @@
 								"type": "string",
 								"minLength": 1
 							},
-							"description": "Run after prepare and each refresh; a slot where one fails leaves the pool."
+							"description": "Read-only checks that the slot is worth driving. Run after prepare and each refresh, where a failure takes the slot out of the pool, and again before each build, fix or repro run, where a failure starts no run, and after a failed run, whose card then names it. Before and after a run, a failing check runs again up to checkReruns times first."
 						}
 					},
 					"required": [

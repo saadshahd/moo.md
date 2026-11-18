@@ -10,7 +10,7 @@ import { gitHubPullRequests, type PullRequests } from "../../src/adapters/pull-r
 import type { Json } from "../../src/config/json.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
 
-type Issue = { number: number; title: string; body: string; state: "OPEN" | "CLOSED"; labels: string[] };
+type Issue = { number: number; title: string; body: string; state: "OPEN" | "CLOSED"; labels: string[]; assignees: string[] };
 
 /** Who wrote a comment, as GitHub's GraphQL names them. */
 export type Author = { readonly authorAssociation: string; readonly author: { readonly __typename: "User" | "Bot"; readonly login: string } | null };
@@ -25,6 +25,9 @@ export const STRANGER: Author = { authorAssociation: "NONE", author: { __typenam
 export const WORKFLOW_BOT: Author = { authorAssociation: "NONE", author: { __typename: "Bot", login: "github-actions" } };
 
 type Comment = Author & { body: string; createdAt: string };
+
+/** Whether a pull request's body closes issue `number` by one of GitHub's keywords. */
+const closesIssue = (body: string, number: number): boolean => new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?) #${number}\\b`, "i").test(body);
 
 type Pull = { id: string; number: number; head: string; base: string; title: string; body: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND"; labels: string[] };
 
@@ -186,12 +189,27 @@ export class FakeGitHub {
 		return answer;
 	}) as typeof fetch;
 
+	/** Assigns the issue to `login`, as a person taking the work does. */
+	assign(number: number, login: string): void {
+		this.#issues.find((issue) => issue.number === number)?.assignees.push(login);
+		this.#version++;
+	}
+
+	/** A person's open pull request from `head`, whose body may close issues by keyword, as GitHub reads it. */
+	personPull(head: string, body: string): number {
+		const number = this.#pulls.length + 1;
+
+		this.#pulls.push({ id: `PR_${number}`, number, head, base: "main", title: head, body, state: "OPEN", autoMerge: false, status: "BLOCKED", labels: [] });
+
+		return number;
+	}
+
 	/** A person's issue: ready for hum. */
 	seed(title: string, { label = "hum:ready" }: { label?: string } = {}): number {
 		const number = this.#issues.length + 1;
 
 		this.#labels.add(label);
-		this.#issues.push({ number, title, body: `${title} body`, state: "OPEN", labels: [label] });
+		this.#issues.push({ number, title, body: `${title} body`, state: "OPEN", labels: [label], assignees: [] });
 		this.#version++;
 
 		return number;
@@ -353,7 +371,15 @@ export class FakeGitHub {
 	}
 
 	#issueNode(issue: Issue) {
-		return { id: `I_${issue.number}`, title: issue.title, body: issue.body, state: issue.state, labels: { nodes: issue.labels.map((name) => ({ name })) } };
+		return {
+			id: `I_${issue.number}`,
+			title: issue.title,
+			body: issue.body,
+			state: issue.state,
+			labels: { nodes: issue.labels.map((name) => ({ name })) },
+			assignees: { nodes: issue.assignees.map((login) => ({ login })) },
+			closedByPullRequestsReferences: { nodes: this.#pulls.filter((pull) => pull.state === "OPEN" && closesIssue(pull.body, issue.number)).map(({ number, head }) => ({ number, headRefName: head })) },
+		};
 	}
 
 	#claims(prefix: string) {

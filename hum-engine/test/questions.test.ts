@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { dispose, matchOption, replyText } from "../src/decide/answer.ts";
+import { dispose, matchOption, replyText, RUN_AGAIN } from "../src/decide/answer.ts";
 import { type AskFacts, askDecision, composeQuestion, PLAIN_QUESTIONS, priorityOf, questionIssues, questionOrder, roomToAsk } from "../src/decide/question.ts";
 import { DAY_MS } from "../src/time.ts";
 
@@ -73,7 +73,7 @@ test("an answer picks its option by marker, else by its exact first word; free t
 });
 
 test("every answer is applied, held or dropped, and a model's pick never approves a change", () => {
-	const base = { answeredBefore: false, stage: "waiting" } as const;
+	const base = { answeredBefore: false, stage: "waiting", question: "Which one?" } as const;
 	const picked = { source: "model", option: "approve" } as const;
 
 	expect(dispose({ ...base, resolution: { source: "marker", option: "change" } }).disposition).toBe("applied");
@@ -87,14 +87,21 @@ test("every answer is applied, held or dropped, and a model's pick never approve
 	expect(dispose({ ...base, stage: "approval", resolution: { source: "marker", option: "approve" } }).disposition).toBe("applied");
 });
 
+test("a stop at the token cap's question is applied with a reply that says the item stopped and how to start it again", () => {
+	const stop = { answeredBefore: false, stage: "waiting", resolution: { source: "first-word", option: "stop" } } as const;
+
+	expect(dispose({ ...stop, question: PLAIN_QUESTIONS["over-cap"] })).toEqual({ disposition: "applied", why: `The item stopped. Answer ${RUN_AGAIN} to start it again.` });
+	expect(dispose({ ...stop, question: "Which one?" }).why).toBe("The run goes on with your answer.");
+});
+
 test("a dropped reply gives its reason and the options to answer with", () => {
-	const dropped = dispose({ resolution: { source: "none-of-these" }, answeredBefore: false, stage: "waiting" });
+	const dropped = dispose({ resolution: { source: "none-of-these" }, answeredBefore: false, stage: "waiting", question: "Which one?" });
 
 	expect(replyText(2, dropped, { source: "none-of-these" }, OPTIONS, "hm")).toBe(`Answer 2 dropped: ${dropped.why} Options: approve, change.`);
 });
 
 test("an applied reply names the pick", () => {
-	const applied = dispose({ resolution: { source: "first-word", option: "change" }, answeredBefore: false, stage: "waiting" });
+	const applied = dispose({ resolution: { source: "first-word", option: "change" }, answeredBefore: false, stage: "waiting", question: "Which one?" });
 
 	expect(replyText(1, applied, { source: "first-word", option: "change" }, OPTIONS, "change it")).toStartWith("Answer 1 applied: change.");
 });

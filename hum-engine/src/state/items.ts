@@ -126,6 +126,11 @@ export class Items {
 		});
 	}
 
+	/** The item's saved snapshot, read as `saved` reads each; undefined where it has none. */
+	savedOf(itemId: string): SavedSnapshot | undefined {
+		return this.saved().find((saved) => saved.itemId === itemId);
+	}
+
 	/** Removes an item's snapshot once the item has finished. */
 	remove(itemId: string): void {
 		rmSync(this.path(itemId), { force: true });

@@ -12,8 +12,9 @@ const stateIn = (name: string) => openState(tempDir(name), { now: () => 0 });
 const LIMITS = { now: 0, usageLimitMaxMs: 1000 };
 
 test("a pass leaves the owner's wait it starts in only with the owner's answer", () => {
-	expect(passReach({ kind: feature, at: "owner-review", answered: false })).toEqual(new Set(["owner-review"]));
-	expect(passReach({ kind: feature, at: "owner-review", answered: true })).toContain("merging");
+	expect(passReach({ kind: feature, at: "owner-review", answered: false, timedOut: false })).toEqual(new Set(["owner-review"]));
+	expect(passReach({ kind: feature, at: "owner-review", answered: true, timedOut: false })).toContain("merging");
+	expect(passReach({ kind: feature, at: "owner-review", answered: false, timedOut: true })).toContain("merging");
 });
 
 test("publish takes a work job's runs and a machine state a pass can reach, and none of its landings or verdicts", () => {
@@ -23,12 +24,14 @@ test("publish takes a work job's runs and a machine state a pass can reach, and 
 	work.runs.begin({ itemId: "a", run: "build", attempt: 0 }, { name: "a build" });
 	work.landings.put("a", { item: "a", branch: "hum/run/a", since: 0, change: { paths: [], size: 0, loosened: false, pinChanged: false }, head: "abc" });
 	work.verdicts.put("a", { item: "a", head: "abc", event: "approve", reason: "forged", cites: [], models: ["m"] });
+	work.repros.put("a", { item: "a", command: "sh docs/repro.sh", commit: "abc", files: ["docs/repro.sh"], proven: 2 });
 
-	expect(takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS)).toBeUndefined();
+	expect(takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false, timedOut: false }, LIMITS)).toBeUndefined();
 	expect(into.items.saved().map(({ state }) => state)).toEqual(["checking"]);
 	expect(into.runs.list("a")).toHaveLength(1);
 	expect(into.landings.get("a")).toBeUndefined();
 	expect(into.verdicts.get("a")).toBeUndefined();
+	expect(into.repros.get("a")).toMatchObject({ command: "sh docs/repro.sh", proven: 2 });
 });
 
 test("publish keeps each log record as the work job's engine wrote it, at the next places in its own log, once however often it takes them", () => {
@@ -39,7 +42,7 @@ test("publish keeps each log record as the work job's engine wrote it, at the ne
 
 	for (const at of [3, 2]) work.events.add(ownerAnswered("a", at));
 
-	for (let times = 0; times < 2; times++) takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS);
+	for (let times = 0; times < 2; times++) takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false, timedOut: false }, LIMITS);
 
 	expect(into.events.list("a").map(({ sourceId, engineVersion, receivedAt, seq }) => ({ sourceId, engineVersion, receivedAt, seq }))).toEqual([
 		{ sourceId: "answer:1", engineVersion: "0.3.0", receivedAt: 9, seq: 0 },
@@ -54,7 +57,7 @@ test("publish refuses a machine state the owner's wait stands before, and keeps 
 	into.items.save("a", feature, { status: "active", value: "owner-review", context: {} });
 	work.items.save("a", feature, { status: "active", value: "merging", context: {} });
 
-	expect(takeWorkRecords(work, into, { item: "a", kind: feature, at: "owner-review", answered: false }, LIMITS)).toContain("no pass takes a from owner-review to merging");
+	expect(takeWorkRecords(work, into, { item: "a", kind: feature, at: "owner-review", answered: false, timedOut: false }, LIMITS)).toContain("no pass takes a from owner-review to merging");
 	expect(into.items.saved().map(({ state }) => state)).toEqual(["owner-review"]);
 });
 
@@ -71,14 +74,14 @@ test("a work job's spend only raises publish's, and starts the cap's count afres
 
 	into.spent.put("a", { item: "a", total: 900, base: 100 });
 	work.spent.put("a", { item: "a", total: 0, base: 0 });
-	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS);
+	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false, timedOut: false }, LIMITS);
 	expect(into.spent.get("a")).toEqual({ item: "a", total: 900, base: 100 });
 
 	work.spent.put("a", { item: "a", total: 1000, base: 1000 });
-	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS);
+	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false, timedOut: false }, LIMITS);
 	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 100 });
 
-	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: true }, LIMITS);
+	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: true, timedOut: false }, LIMITS);
 	expect(into.spent.get("a")).toEqual({ item: "a", total: 1000, base: 1000 });
 });
 
@@ -90,7 +93,7 @@ test("publish takes a work job's saved-state cards with no action, a usage limit
 	settleLimit(work, { kind: "limited", until: 32_503_680_000_000 });
 	work.questions.put("a@0", { item: "a", text: "Ship it?", options: ["approve", "retry"], priority: 0, queuedAt: 0 });
 
-	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false }, LIMITS);
+	takeWorkRecords(work, into, { item: "a", kind: feature, at: undefined, answered: false, timedOut: false }, LIMITS);
 
 	expect(into.faults.list().map(({ code, action }) => [code, action])).toEqual([["snapshot-unreadable", undefined]]);
 	expect(savedLimitUntil(into)).toBe(LIMITS.usageLimitMaxMs);

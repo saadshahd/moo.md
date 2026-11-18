@@ -10,7 +10,7 @@ import { commandTimeoutMs, type Env, exec, SHIPPED_COMMAND_TIMEOUT_MS } from "..
 import { SlotPool } from "../slots/pool.ts";
 import { orMissing } from "../state/fs.ts";
 import { openState } from "../state/open.ts";
-import { checksTimeoutMs, runChecks } from "../worker/checks.ts";
+import { checkLimits, runChecks } from "../worker/checks.ts";
 import { openWorker } from "../worker/open.ts";
 import { Scratch } from "./scratch.ts";
 
@@ -85,7 +85,7 @@ const checksStep = async (repo: string, config: Config): Promise<Outcome> => {
 	if (config.hum.checks.length === 0) return failed('hum.json names no checks: set "checks"');
 
 	for (const check of config.hum.checks) {
-		const failure = await runChecks([check], repo, { timeoutMs: checksTimeoutMs(config.hum) });
+		const failure = await runChecks([check], repo, checkLimits(config.hum));
 
 		if (failure) return failed(failure);
 	}

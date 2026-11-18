@@ -17,7 +17,7 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | Ask | Proposal comes from | The answer sets |
 | --- | --- | --- |
 | Where runs happen: your Mac, CI, or both | the scan: CI workflows, a service unit | `runPlaces` |
-| Where items, questions and answers live: GitHub issues, or markdown files in `itemsDir` | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel` | `integrations` |
+| Where items, questions and answers live: GitHub issues, or markdown files in `itemsDir` | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel`; hum leaves one a person is assigned to, or an open pull request closes | `integrations` |
 | Which commands a change must pass | CI jobs on pull requests, else package scripts, after the lockfile install a fresh clone needs | `checks` |
 | Which label a pull request needs when it grows some files | `labelGates` in the proposal: a repo label a job quotes, in a workflow that runs again when a pull request gets a label. Read that job. Where it fails a pull request that grows the bytes of some files and lacks the label, write one entry per set of files it sums apart, with globs that match exactly those files | `growthLabels` |
 | For CI runs: the repo's setting "Allow GitHub Actions to create and approve pull requests" | `workflowsMayOpenPullRequests` in the scan; if off, ask the owner to turn it on and never change it yourself; `null` where the scan could not read it, as anyone but a repo admin cannot: ask the owner to check it | nothing written |
@@ -25,7 +25,7 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | For CI runs, when the owner names a runner GitHub does not host and `isPublicRepo` in the scan is not `false`: whether wakes may run there | the proposal never names one; such a machine keeps what a job leaves, so a process a run started could outlive the work job and reach the next job there, which holds GitHub's token; recommend ephemeral runners | `"ownRunnerOnPublicRepo": true` beside `hum` in the answers, only on the owner's yes |
 | For CI runs: how Claude Code signs in | `wakeJob.ciClaudeAuth`: the `CLAUDE_CODE_OAUTH_TOKEN` secret, or `env` where `ciEnv` carries the credentials, such as a gateway's settings | `ciClaudeAuth` |
 | For CI runs: how a pull request's required checks start | a pull request opened with the workflow token starts no workflows, and dispatching the check workflow does not satisfy the required check; ask for a GitHub App with contents, issues and pull requests write, whose two secrets `wakeJob.pullRequestToken` names where a workflow already mints a token, or a fine-grained token's secret | `pullRequestToken` |
-| One question per waiting state: after how many hours it ends stuck | `waits` in the scan | `waitHours` |
+| One question per waiting state: after how many hours it times out, and so goes to its `leadsTo` state | `waits` in the scan | `waitHours` |
 | What each folder's risk is | folder history and names | `paths`, `strictPaths` |
 | Which paths hold data or secrets | the scan's matches | `strictPaths` |
 | How many merged changes judge a fix or a measure | the shipped windows | `changeLabels.fixWindow`, `measureWindow` |

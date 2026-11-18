@@ -46,6 +46,11 @@
 			"purpose": "fix",
 			"skills": []
 		},
+		"repro": {
+			"file": "roles/repro.md",
+			"purpose": "build",
+			"skills": []
+		},
 		"review": {
 			"file": "roles/review.md",
 			"purpose": "review",
@@ -78,6 +83,9 @@
 		},
 		"answered": {
 			"source": "owner"
+		},
+		"window-passed": {
+			"source": "shows-bug"
 		},
 		"owner-approved": {
 			"source": "owner"
@@ -113,6 +121,8 @@
 	"watchCacheSeconds": 10,
 	"watchLockSeconds": 30,
 	"maxFixRuns": 3,
+	"checkReruns": 1,
+	"fixProofRuns": 2,
 	"serviceLabel": "md.moo.hum",
 	"maxCrashes": 5,
 	"crashWindowSeconds": 600,

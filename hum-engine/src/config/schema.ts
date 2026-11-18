@@ -20,7 +20,14 @@ export const FIXED_PARTS = [
 	"service-unit",
 	"run-slots",
 	"model-call",
+	"shows-bug",
+	"bug-gone",
 ] as const;
+
+const FIXED: ReadonlySet<string> = new Set(FIXED_PARTS);
+
+/** Whether a state's `invoke.src` names one of the engine's parts, not a role's run. */
+export const isFixedPart = (src: string): boolean => FIXED.has(src);
 
 export const PURPOSES = ["plan", "build", "fix", "review"] as const;
 
@@ -108,7 +115,7 @@ const RefreshStep = z.strictObject({ run: name, when: z.enum(REFRESH_WHEN) });
 export const SlotRecipe = z.strictObject({
 	prepare: z.array(name).describe("Run once when a slot is made: install dependencies, start or attach services, seed data."),
 	refresh: z.array(RefreshStep).describe("Run after each return, once the slot is reset to the latest base: reinstall when a lockfile changed, reset the data."),
-	ready: z.array(name).describe("Run after prepare and each refresh; a slot where one fails leaves the pool."),
+	ready: z.array(name).describe("Read-only checks that the slot is worth driving. Run after prepare and each refresh, where a failure takes the slot out of the pool, and again before each build, fix or repro run, where a failure starts no run, and after a failed run, whose card then names it. Before and after a run, a failing check runs again up to checkReruns times first."),
 });
 
 const seconds = z.int().positive();
@@ -199,6 +206,8 @@ const Shipped = z.object({
 	watchCacheSeconds: seconds.describe("How long one read of what changed serves every `hum watch` in the repo before the next one reads again."),
 	watchLockSeconds: seconds.describe("How long the lock of the one `hum watch` that reads stays held before another may take it over."),
 	maxFixRuns: z.int().nonnegative().describe("Fix runs an item gets after failed checks, counted since the owner last answered, before it ends stuck."),
+	fixProofRuns: count.describe("Runs of a fix item's repro check on each side of the fix: each must fail where only the repro is in, and each must pass once the fix is in."),
+	checkReruns: z.int().nonnegative().describe("Times a failing check runs again before its failure counts: a check that passes on any of these runs passes, so a flaky check spends no fix run and files no follow-up."),
 	serviceLabel: z.string().regex(SERVICE_LABEL, "a service label is letters, digits, dot, dash and underscore").describe("The service unit's label, and the name its file takes."),
 	maxCrashes: count.describe("Worker crashes within crashWindowSeconds that stop the service's restarts."),
 	crashWindowSeconds: seconds.describe("The window in which maxCrashes crashes stop the service's restarts."),
@@ -263,7 +272,7 @@ const Shipped = z.object({
 	fallbackKind: name.describe("The kind an item runs as when neither its source nor the model call names one."),
 	docsOnly: z
 		.strictObject({ kind: name, paths: z.array(name) })
-		.describe("An item of this kind whose change touches a path outside these globs moves to its real kind."),
+		.describe("The globs of prose: an item of this kind whose change touches a path outside them moves to its real kind, and a review's approval holds past a later change that touches only them."),
 	decisionModel: name.describe("The model id of the cheap model call, made through claude -p."),
 	modelCallTimeoutSeconds: seconds.describe("How long a cheap model call may take before it counts as an abstention."),
 	measuredModels: z
@@ -484,6 +493,8 @@ export const OWNER_CHANGEABLE = {
 	"watch cache": "watchCacheSeconds",
 	"watch lock": "watchLockSeconds",
 	"fix runs": "maxFixRuns",
+	"check reruns": "checkReruns",
+	"fix proof runs": "fixProofRuns",
 	"service label": "serviceLabel",
 	"crash limit": "maxCrashes",
 	"crash window": "crashWindowSeconds",

@@ -16,7 +16,7 @@ export const mergedThrough = (landing: Landing | undefined, mergeCommit: string)
 
 /**
  * An item's change reached the base: its evidence ref is taken off the remote, the merge is kept for the measure, the
- * saved landing, plan, verdict and pull request text go, and the merge is logged once per commit in the item's log,
+ * saved landing, plan, verdict, pull request text, repro and split part go, and the merge is logged once per commit in the item's log,
  * which keeps how the item reached done and the picks behind it.
  */
 export const recordMerged = async (state: State, { git, remote }: EvidenceRemote, { item, at, sha, commits }: OnBase & { readonly item: string; readonly at: number }): Promise<void> => {
@@ -30,6 +30,8 @@ export const recordMerged = async (state: State, { git, remote }: EvidenceRemote
 	state.plans.remove(item);
 	state.verdicts.remove(item);
 	state.pullRequests.remove(item);
+	state.repros.remove(item);
+	state.parts.remove(item);
 	state.events.add({ source: "work-source", sourceId: `merged:${sha}`, itemId: item, type: "merged", payload: {} });
 };
 

@@ -16,6 +16,7 @@ import { ENGINE_VERSION } from "../state/format.ts";
 import { persistedSnapshot, type SavedSnapshot } from "../state/items.ts";
 import type { State } from "../state/open.ts";
 import { tallyOf } from "./tally.ts";
+import { dueClock, isDue, type SavedWait } from "./due.ts";
 import { checkBaseAfterMerge } from "./base-check.ts";
 import { settleMergedPulls } from "./merged.ts";
 import type { GitHubCommits } from "../adapters/github-commits.ts";
@@ -32,7 +33,7 @@ import { keepMergedCases } from "../measure/cases.ts";
 import { type StaleScore, staleScores } from "../measure/judges.ts";
 import type { Measured, Measurement } from "../measure/remeasure.ts";
 import { emptyStatus, readStatus, writeHeartbeat, writeStatus } from "../status/file.ts";
-import type { Status } from "../status/format.ts";
+import type { Choice, Status } from "../status/format.ts";
 import { newestChoices, openQuestions } from "../status/sections.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { SECOND_MS } from "../time.ts";
@@ -42,11 +43,15 @@ import { type Signature, signatureOf } from "./signature.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import type { SlotPool } from "../slots/pool.ts";
 import { type AnswerScope, settleAnswers } from "./answers.ts";
+import { RUN_AGAIN } from "../decide/answer.ts";
 import { recentlyAsked, releaseQuestions } from "./questions.ts";
 import { OWNER_APPROVAL } from "../decide/merge.ts";
-import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, RUN_AGAIN, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
+import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gatherItem, hasEndedStuck, isGathered, park, rememberKinds, runThinPath, type ThinPathOptions, type ThinResult, isWaitingOnOwner } from "./thin-path.ts";
 
 export type { TickResult } from "./lifecycle.ts";
+
+/** The card on an item someone else already works on. */
+const CLAIMED_CODE = "item-claimed";
 
 /** Where the loop keeps the base it read, so a fetch elsewhere cannot move it mid-pass. */
 const LOOP_REF = "refs/hum/loop-base";
@@ -118,6 +123,8 @@ type Sources = {
 type Known = {
 	readonly footprint: Footprint;
 	readonly title: string;
+	/** Who else already works on the item, as its source names them. */
+	readonly claimedBy: readonly string[];
 };
 
 type InFlight = {
@@ -164,22 +171,7 @@ const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyM
 /** Sources that never settle, so a restored item can be stepped by its timers without starting a run. */
 const neverSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: () => new Promise<never>(() => {}) }));
 
-/** The declared delays of the state an item was saved in, shortest first. */
-const delaysOf = (kind: Kind, saved: SavedSnapshot): number[] =>
-	Object.keys((saved.state && kind.machine.states[saved.state]?.after) || {})
-		.map(Number)
-		.sort((a, b) => a - b);
-
 const isAnsweredSince = (answeredAt: number | undefined, since: number): boolean => answeredAt !== undefined && answeredAt > since;
-
-type DueWait = {
-	readonly saved: SavedSnapshot;
-	readonly kind: Kind;
-	readonly delays: readonly number[];
-};
-
-const isDue = ({ saved, kind, delays }: DueWait, t: number): boolean =>
-	saved.machineVersion === kind.machine.version && delays.length > 0 && t >= saved.savedAt + Math.min(...delays);
 
 /**
  * The worker. Each tick reads its facts once, then decides: it fires waits whose deadline has passed, renews claims,
@@ -196,6 +188,8 @@ export class Worker {
 	readonly #inFlight = new Map<string, InFlight>();
 	/** Items the owner answered that have not started yet; kept across ticks, because the watch token moves on. */
 	readonly #answered = new Set<string>();
+	/** Items whose owner wait timed out into work: a pass restores each wait and fires its timeout. */
+	readonly #timedOut = new Set<string>();
 	/** Saved changes that land again under this worker's config before anything else starts. */
 	readonly #relanding = new Set<string>();
 	/** The items a CI job's passes ended on: each job takes an item once, and the next wake takes it again. */
@@ -277,56 +271,64 @@ export class Worker {
 		return kind !== undefined && isWaitingOnOwner(kind, saved.state);
 	}
 
-	#dueWaits(t: number): DueWait[] {
-		const waits = this.#o.state.items.saved().flatMap((saved) => {
+	#dueWaits(t: number): SavedWait[] {
+		return this.#o.state.items.saved().flatMap((saved) => {
 			const kind = this.#kindNamed(saved.kind)?.kind;
+			const wait = kind && { kind, saved };
 
-			return kind && !this.#inFlight.has(saved.itemId) ? [{ saved, kind, delays: delaysOf(kind, saved) }] : [];
+			return wait && !this.#inFlight.has(saved.itemId) && isDue(this.#o.state, wait, t) ? [wait] : [];
 		});
-
-		return waits.filter((wait) => isDue(wait, t));
 	}
 
 	/**
-	 * A saved wait whose deadline has passed fires now. The restored machine schedules its timers on the wall clock, so
-	 * the clock given here only collects them, and the earliest ones, as many as the declared delays say are due by the
-	 * worker's clock, fire.
+	 * A saved wait whose deadline has passed fires now. One that ends stuck is saved and parked here; one that goes on to
+	 * work is left as it was saved, and a pass restores it and fires its timeout with the real sources.
 	 */
-	async #fireDue({ saved, kind, delays }: DueWait, t: number): Promise<void> {
+	async #fireDue(wait: SavedWait, t: number): Promise<void> {
 		const { state } = this.#o;
-		const timers: { fire: () => void; ms: number }[] = [];
-		const clock = { setTimeout: (fire: () => void, ms: number) => timers.push({ fire, ms }), clearTimeout: () => {} };
-		const restored = await state.items.restore(saved.itemId, kind, { sources: neverSources(kind), clock });
+		const { saved, kind } = wait;
+		const due = dueClock(state, wait, t);
+		const restored = await state.items.restore(saved.itemId, kind, { sources: neverSources(kind), clock: due.clock });
 
 		if (!restored.ok || !restored.value) return;
 
 		const actor = restored.value;
 
 		actor.start();
-
-		const dueCount = delays.filter((delay) => t - saved.savedAt >= delay).length;
-
-		for (const timer of timers.sort((a, b) => a.ms - b.ms).slice(0, dueCount)) timer.fire();
+		due.fireDue();
 
 		await Bun.sleep(0);
 
 		const value = String(actor.getSnapshot().value);
 
-		if (value !== saved.state) {
+		if (hasEndedStuck(kind, value)) {
 			state.items.save(saved.itemId, kind, persistedSnapshot(actor));
-
-			if (hasEndedStuck(kind, value))
-				park(
-					{ state, now: this.#now },
-					{
-						outcome: "stuck",
-						item: saved.itemId,
-						detail: `its wait in ${saved.state} timed out`,
-					},
-				);
-		}
+			park({ state, now: this.#now }, { outcome: "stuck", item: saved.itemId, detail: `its wait in ${saved.state} timed out` });
+		} else if (value !== saved.state) this.#timedOut.add(saved.itemId);
 
 		actor.stop();
+	}
+
+	/** Shows on a card who already works on an item hum has not started, and takes the card down once no one does. */
+	#showClaim(id: string, claimedBy: readonly string[]): void {
+		const { faults } = this.#o.state;
+
+		if (claimedBy.length === 0) faults.clear({ code: CLAIMED_CODE, item: id });
+		else faults.raise({ code: CLAIMED_CODE, item: id, cause: `${id} is already taken by ${claimedBy.join(" and ")}, so hum starts no rival change.`, fix: "Unassign the item or close the pull request, and hum takes it at its next tick." });
+	}
+
+	/** Whether a split part waits on a part that has not merged; an item no split filed waits on none. */
+	#isWaitingOnParts(id: string): boolean {
+		const { state } = this.#o;
+
+		return (state.parts.get(id)?.waitsOn ?? []).some((waited) => state.merges.get(waited) === undefined);
+	}
+
+	/** What came of an item so far: merged, or parked stuck or for review; nothing while it goes on. */
+	#resultOf(item: string): Choice["result"] {
+		const { state } = this.#o;
+
+		return state.merges.get(item) ? "merged" : state.parked.get(item)?.why;
 	}
 
 	/** The item ids the answer hook dropped in the inbox folder. Each file is read once and removed. */
@@ -375,7 +377,7 @@ export class Worker {
 
 		if (this.#inFlight.has(id)) return { stage: "running" };
 
-		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: parked.why === "review" ? [OWNER_APPROVAL, RUN_AGAIN] : [RUN_AGAIN] };
+		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: parked.why === "review" ? [OWNER_APPROVAL, RUN_AGAIN] : [RUN_AGAIN], since: parked.since };
 
 		const asleep = sleeping.get(id);
 		const kind = asleep && this.#kindNamed(asleep.kind)?.kind;
@@ -721,7 +723,7 @@ export class Worker {
 				latest,
 			},
 			questions: openQuestions(state.questions.list(), state.answers.list()),
-			choices: newestChoices(state.choices.list(), config.hum.choicesShown),
+			choices: newestChoices(state.choices.list(), config.hum.choicesShown).map((choice) => ({ ...choice, result: this.#resultOf(choice.item) })),
 			cards: state.faults.list(),
 			inFlight: [...this.#inFlight].map(([item, run]) => ({
 				item,
@@ -764,7 +766,7 @@ export class Worker {
 	async #learn(id: string): Promise<Known> {
 		const item = await this.#o.adapters.workSource.read(ItemId.parse(id));
 
-		return { footprint: footprintOf(item), title: item.title };
+		return { footprint: footprintOf(item), title: item.title, claimedBy: item.claimedBy ?? [] };
 	}
 
 	/** Which waiting items start now, by the scheduler's rules, and starts them. */
@@ -773,20 +775,24 @@ export class Worker {
 		const parked = new Set(state.parked.list().map((p) => p.item));
 		const asleep = new Set(sleeping.map((s) => s.itemId));
 		const isFresh = (id: string) => !this.#inFlight.has(id) && !parked.has(id) && !asleep.has(id) && !this.#handled.has(id);
-		const isAnsweredAndIdle = (id: string) => this.#answered.has(id) && !this.#inFlight.has(id);
+		const isWokenAndIdle = (id: string) => (this.#answered.has(id) || this.#timedOut.has(id)) && !this.#inFlight.has(id);
 		const learned = (id: string) => this.#learn(id).catch(() => undefined);
 
-		const fresh = ready.flatMap((ref) => (isFresh(ref.id) ? [learned(ref.id).then((known) => ({ id: ref.id, answered: false, known }))] : []));
+		const fresh = ready.flatMap((ref) => (isFresh(ref.id) && !this.#isWaitingOnParts(ref.id) ? [learned(ref.id).then((known) => ({ id: ref.id, answered: false, known }))] : []));
 
 		const answered = sleeping.flatMap((s) => {
 			const named = this.#kindNamed(s.kind);
 
-			return isAnsweredAndIdle(s.itemId) ? [learned(s.itemId).then((known) => ({ id: s.itemId, answered: true, known: known && named && { ...known, kind: named.name } }))] : [];
+			return isWokenAndIdle(s.itemId) ? [learned(s.itemId).then((known) => ({ id: s.itemId, answered: true, known: known && named && { ...known, kind: named.name } }))] : [];
 		});
 
 		const relands = [...this.#relanding].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
 
-		const waiting = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
+		const candidates = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
+
+		for (const { id, known } of candidates.filter((candidate) => !candidate.answered)) this.#showClaim(id, known.claimedBy);
+
+		const waiting = candidates.filter((candidate) => candidate.answered || candidate.known.claimedBy.length === 0);
 		const knownOf = new Map(waiting.map((w) => [w.id, w.known]));
 
 		const { start } = pick({
@@ -810,6 +816,7 @@ export class Worker {
 			if (!known) return [];
 
 			this.#answered.delete(id);
+			this.#timedOut.delete(id);
 			this.#relanding.delete(id);
 			this.#begin(id, known, t);
 

@@ -19,6 +19,8 @@ import { NOW, TTL, workerWorld, type WorldOptions } from "../fixtures/worker-wor
 import { Holder, ItemId } from "../../src/adapter-api.ts";
 import { doneByOf, foldItem } from "../../src/state/item-log.ts";
 import { openState } from "../../src/state/open.ts";
+import { PLAIN_QUESTIONS } from "../../src/decide/question.ts";
+import { DAY_MS, HOUR_MS } from "../../src/time.ts";
 
 /** A worker world whose shim's start check finished, checking for the note by default. */
 const world = async (spec: ShimSpec, options: WorldOptions = {}) => {
@@ -147,12 +149,37 @@ test("a run's working copy comes from the checkout it is given, on the remote's 
 		asked.push({ item, remote, base });
 		await sh(tmpdir(), ["clone", "-q", "--branch", base, remote, folder]);
 
-		return { folder, env: {}, giveBack: async () => void given.push(folder) };
+		return { folder, env: {}, readyFailure: async () => undefined, giveBack: async () => void given.push(folder) };
 	};
 
 	expect(await runThinPath(w.thinPath({ checkout }))).toEqual({ outcome: "merged", item: id });
 	expect(asked).toEqual([{ item: id, remote: w.repo.remote, base: "main" }]);
 	expect(given).toHaveLength(1);
+});
+
+/** A checkout whose ready check answers each call with the next of `answers`: a failure, or undefined where it passes. */
+const copyWhoseReady = (answers: (string | undefined)[]): Checkout => async ({ remote, base }) => {
+	const folder = tempDir("given");
+
+	await sh(tmpdir(), ["clone", "-q", "--branch", base, remote, folder]);
+
+	return { folder, env: {}, readyFailure: async () => answers.shift(), giveBack: async () => undefined };
+};
+
+test("the working copy's ready check runs before each run, so none starts where it fails", async () => {
+	const w = await world({ script: [{}, NOTE] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ checkout: copyWhoseReady(["the database is down"]) }))).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("ready check fails before the build run, so no run starts: the database is down") });
+	expect(w.shim.calls()).toHaveLength(1);
+});
+
+test("the working copy's ready check runs again after a failed run, whose card then names it", async () => {
+	const w = await world({ script: [{}, { error: "the server stopped answering" }] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ checkout: copyWhoseReady([undefined, "the server is down"]) }))).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("the run slot's ready check fails after it too: the server is down") });
+	expect(w.shim.calls()).toHaveLength(2);
 });
 
 test("a merged item is not picked up again after its claim expires", async () => {
@@ -249,7 +276,7 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 		raw.hum.maxFixRuns = 2;
 	});
 
-	const w = await world({ script: [{}, { write: { "docs/note.md": "one\n" } }, { write: { "docs/note.md": "two\n" } }, { write: { "docs/note.md": "three\n" } }] }, { config, checks: ["false"] });
+	const w = await world({ script: [{}, { write: { "docs/note.md": "one\n" } }, { write: { "docs/note.md": "two\n" } }, { write: { "docs/note.md": "three\n" } }] }, { config, checks: ["! test -f docs/note.md"] });
 	const id = w.repo.seed("Write the note");
 	const before = sh(w.repo.remote, ["rev-parse", "main"]);
 
@@ -262,6 +289,32 @@ test("checks that never pass end in stuck after the fix limit, and main is untou
 	expect(await runThinPath(w.thinPath({ itemId: id }))).toMatchObject({ outcome: "stuck", item: id });
 	expect(w.shim.calls()).toHaveLength(1 + 1 + 2);
 	expect(sh(w.repo.remote, ["rev-parse", "main"])).toBe(before);
+});
+
+test("the fix cap holds before each fix run, so a fix run whose choice hum makes itself does not run again past it", async () => {
+	const options = [{ word: "short", paths: ["docs/note.md"] }, { word: "long", paths: ["docs/note.md"] }];
+	const choosing = { write: { "docs/note.md": "BAD\n" }, structured: { status: "needs-owner", question: "Short or long?", plan: "Fix it.", reason: { kind: "choice", options, default: "short" } } };
+
+	const config = configWith((raw) => {
+		raw.hum.maxFixRuns = 1;
+	});
+
+	const w = await world({ script: [{}, { write: { "docs/note.md": "BAD\n" } }, choosing, choosing, { write: { "docs/note.md": "good\n" } }] }, { config, checks: ["! grep -q BAD docs/note.md"] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id, detail: "the checks still fail after 1 fixes" });
+	expect(w.shim.calls()).toHaveLength(1 + 1 + 1);
+	expect(folded(w, id).fixRuns).toBe(1);
+});
+
+test("a check the base fails too ends the item stuck for the owner, naming the check and the base, with no fix run", async () => {
+	const w = await world({ script: [{}, NOTE] }, { checks: ["false"] });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toMatchObject({ outcome: "stuck", item: id, detail: expect.stringContaining("false fails on main too") });
+	expect(w.shim.calls()).toHaveLength(2);
+	expect(folded(w, id).fixRuns).toBe(0);
+	expect(w.state.faults.list().find((card) => card.code === "item-stuck")?.cause).toContain("false fails on main too");
 });
 
 test("a run that succeeds and commits nothing is not done", async () => {
@@ -511,6 +564,26 @@ test("the owner's approval holds for the same change rebased onto a moved base, 
 	expect(await questionsOn(w, id)).toHaveLength(asked);
 });
 
+test("a review run's approval holds for the same change rebased onto a base that moved elsewhere: it lands with no second review run", async () => {
+	const approve = { event: "approve", sure: true, reason: "Fine." };
+	const w = await world({ script: [{}, NOTE], decisions: [approve] }, { config: configWith((raw) => void (raw.hum.paths = [{ glob: "docs/**", level: "medium" }])) });
+	const github = new FakeGitHub();
+	const pulls = github.client();
+	const id = w.repo.add("note", itemFile("Write the note", { state: "ready", body: "touches: docs/note.md" }));
+	const branch = runBranch(SHIPPED_DEFAULTS, id);
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+
+	w.repo.put({ path: "src/other.ts", content: "moved\n" });
+	w.clock.at += TTL;
+
+	expect(await runThinPath(w.thinPath({ pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
+	expect(sh(w.repo.remote, ["merge-base", "--is-ancestor", "main", branch])).toBe("");
+	expect(w.shim.decisions().map((d) => d.purpose)).toEqual(["review"]);
+	expect(github.pulls()).toMatchObject([{ autoMerge: true }]);
+});
+
 test("a push the remote refuses goes through a pull request, after the branch's rules are read again", async () => {
 	const w = await world({ script: [{}, NOTE] });
 	const github = new FakeGitHub();
@@ -577,6 +650,92 @@ test("a run that lowers its own level, bumps the engine pin and edits a workflow
 
 const featureJudge = scriptedJudge({ kind: { kind: "feature" }, alignment: SOUND });
 
+const fixJudge = scriptedJudge({ kind: { kind: "fix" }, alignment: SOUND });
+
+/** A repro run that writes its check and names the command that fails until docs/note.md is right. */
+const REPRO = { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" }, structured: { status: "done", repro: { command: "sh docs/repro.sh", translated: "a shell check of the file the report's page shows" } } };
+
+test("a fix item runs a repro and proves it fails without the fix, gives the owner a window to object, then proves the fix passes it, and its pull request says so", async () => {
+	const reproStdin = stdinFile();
+	const w = await world({ script: [{}, { ...REPRO, saveStdin: reproStdin }, { write: { "docs/note.md": "fixed\n" } }] }, { checks: ["true"] });
+	const github = new FakeGitHub();
+	const pulls = github.client();
+	const id = w.repo.seed("The note is wrong");
+
+	github.requiresPullRequest = true;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls }))).toEqual({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS.objection });
+	expect(readFileSync(reproStdin, "utf8")).toContain('"repro":{"command":…}');
+	expect(w.state.questions.list().find(({ item }) => item === id)?.detail).toBe(
+		`sh docs/repro.sh failed on all 2 runs at ${w.state.repros.get(id)?.commit.slice(0, 12)}, where only the repro is in. Reply to object, and the repro runs again with your words. With no reply within 24 hours, the item goes on to building.`,
+	);
+
+	w.clock.at += TTL + 1;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls, itemId: id }))).toEqual({ outcome: "waiting", item: id });
+	expect(w.shim.calls()).toHaveLength(2);
+
+	w.clock.at += DAY_MS;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
+	expect(w.shim.calls()).toHaveLength(3);
+	expect(github.pulls()[0]?.body).toContain("Repro: `sh docs/repro.sh` failed without the fix and passed on 2 runs in a row with it.\nNot the reported environment: a shell check of the file the report's page shows.");
+
+	github.checksPass(1);
+	w.clock.at += TTL;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, pulls, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(sh(w.repo.remote, ["show", `${runBranch(SHIPPED_DEFAULTS, id)}:docs/repro.sh`])).toBe("grep -q fixed docs/note.md\n");
+	expect(w.state.repros.get(id)).toBeUndefined();
+});
+
+test("once the window passed, a pass the usage limit cut short goes on without opening it again", async () => {
+	const limitedUntil = (NOW + DAY_MS + HOUR_MS) / 1000;
+	const w = await world({ script: [{}, REPRO, { rejectUntil: limitedUntil, error: "You've hit your limit" }, { write: { "docs/note.md": "fixed\n" } }] }, { checks: ["true"] });
+	const id = w.repo.seed("The note is wrong");
+	const pass = () => runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, itemId: id }));
+
+	expect(await pass()).toMatchObject({ outcome: "asked", item: id });
+
+	w.clock.at += DAY_MS + 1;
+	expect(await pass()).toMatchObject({ outcome: "limited", item: id });
+
+	w.clock.at = limitedUntil * 1000 + TTL + 1;
+	expect(await pass()).toEqual({ outcome: "merged", item: id });
+	expect(w.shim.calls()).toHaveLength(4);
+});
+
+test("an owner's reply in the window objects: a new repro run reads it, and the window opens again", async () => {
+	const againStdin = stdinFile();
+	const w = await world({ script: [{}, REPRO, { ...REPRO, saveStdin: againStdin }] }, { checks: ["true"] });
+	const id = w.repo.seed("The note is wrong");
+
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at }))).toMatchObject({ outcome: "asked", item: id });
+
+	await w.adapter.answers!.answer(id, { text: "The bug is in the title, not the body" });
+	w.clock.at += TTL + 1;
+
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, itemId: id }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS.objection });
+	expect(readFileSync(againStdin, "utf8")).toContain("The bug is in the title, not the body");
+	expect(w.shim.calls()).toHaveLength(3);
+});
+
+test("a repro that passes without a fix asks the owner", async () => {
+	const passing = { ...REPRO, write: { "docs/repro.sh": "true\n" } };
+	const w = await world({ script: [{}, passing] }, { checks: ["true"] });
+	const id = w.repo.seed("The note is wrong");
+
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS.repro });
+	expect(w.state.repros.get(id)).toBeUndefined();
+});
+
+test("a fix that edits the repro's own files goes to a fix run", async () => {
+	const w = await world({ script: [{}, REPRO, { write: { "docs/repro.sh": "true\n", "docs/note.md": "fixed\n" } }, { write: { "docs/repro.sh": "grep -q fixed docs/note.md\n" } }] }, { checks: ["true"] });
+	const id = w.repo.seed("The note is wrong");
+
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at }))).toMatchObject({ outcome: "asked", item: id });
+
+	w.clock.at += DAY_MS + 1;
+	expect(await runThinPath(w.thinPath({ judge: fixJudge, now: () => w.clock.at, itemId: id }))).toEqual({ outcome: "merged", item: id });
+	expect(folded(w, id).fixRuns).toBe(1);
+});
+
 test("a feature runs its plan and review states: the plan run's ready plan reaches the build, a review that cites a changed line sends it to a fix, the fixed change is reviewed again though the prompt cuts both diffs to the same text, and an approval merges it, reaching done by review though landing ran none", async () => {
 	const [buildStdin, fixStdin] = [stdinFile(), stdinFile()];
 	const cite = { event: "request-changes", sure: true, reason: "The note says nothing.", cites: [{ file: "docs/note.md", line: 1 }] };
@@ -615,6 +774,35 @@ test("a plan answer the log keeps is read back on a pass after a limit, adding n
 	expect(w.shim.decisions().map(({ purpose }) => purpose)).toEqual(["plan", "plan"]);
 });
 
+test("a plan run past the token cap asks the owner, runs the plan again on the answer, and ends at the owner's stop", async () => {
+	const config = configWith((raw) => {
+		raw.kinds.feature.tokenCap.tokens = 5;
+	});
+
+	const w = await world({ script: [{}] }, { config });
+	const id = w.repo.seed("Write the note");
+	const pass = () => runThinPath(w.thinPath({ judge: featureJudge, itemId: id }));
+	const plans = () => w.shim.decisions().filter(({ purpose }) => purpose === "plan").length;
+
+	const answer = async (text: string) => {
+		await w.adapter.answers!.answer(id, { text });
+		w.clock.at += TTL + 1;
+	};
+
+	expect(await pass()).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
+
+	const runs = w.shim.calls().length;
+
+	await answer("Continue.");
+	expect(await pass()).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
+	expect(plans()).toBe(2);
+	expect(w.shim.calls()).toHaveLength(runs);
+
+	await answer("Stop.");
+	expect(await pass()).toMatchObject({ outcome: "stuck", item: id, detail: "the owner stopped it at the token cap" });
+	expect(plans()).toBe(2);
+});
+
 test("the owner's answer at the token cap's wait starts the fix count over", async () => {
 	const config = configWith((raw) => {
 		raw.hum.maxFixRuns = 2;
@@ -622,7 +810,7 @@ test("the owner's answer at the token cap's wait starts the fix count over", asy
 	});
 
 	const fix = (tokens: number) => ({ write: { "docs/note.md": `${tokens}\n` }, modelTokens: tokens });
-	const w = await world({ script: [{}, { ...NOTE, modelTokens: 10 }, fix(10), fix(1000), fix(11), fix(12), fix(13)], decisions: [READY_PLAN] }, { config, checks: ["false"] });
+	const w = await world({ script: [{}, { ...NOTE, modelTokens: 10 }, fix(10), fix(1000), fix(11), fix(12), fix(13)], decisions: [READY_PLAN] }, { config, checks: ["! test -f docs/note.md"] });
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "asked", item: id });
@@ -630,7 +818,7 @@ test("the owner's answer at the token cap's wait starts the fix count over", asy
 
 	const asked = w.shim.calls().length;
 
-	await w.adapter.answers!.answer(id, { text: "Go on." });
+	await w.adapter.answers!.answer(id, { text: "Continue." });
 	w.clock.at += TTL + 1;
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toMatchObject({ outcome: "stuck", item: id, detail: "the checks still fail after 2 fixes" });
@@ -675,13 +863,23 @@ test("the plan bar reads the model the config gives the plan run, so a run that 
 	expect(w.state.plans.get(id)?.models).toEqual([SHIM_MODEL]);
 });
 
-test("a plan run that splits its item files each part as a ready item and lands the item as done with no change of its own", async () => {
-	const w = await world({ script: [{}], decisions: [{ event: "needs-split", sure: true, reason: "Two jobs.", parts: ["Write part one", "Write part two"] }] }, { checks: ["true"] });
+test("a plan run that splits its item files each part as a ready item, with its files, its check and the parts it waits on, and lands the item as done with no change of its own", async () => {
+	const parts = [
+		{ title: "Write part one", touches: ["docs/one.md"], waitsOn: [], check: "test -f docs/one.md" },
+		{ title: "Write part two", touches: ["docs/two.md"], waitsOn: [1], check: "test -f docs/two.md" },
+	];
+
+	const w = await world({ script: [{}], decisions: [{ event: "needs-split", sure: true, reason: "Two jobs.", parts }] }, { checks: ["true"] });
 	const id = w.repo.seed("Write two parts");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
 	expect(w.repo.show(id)).toContain("state: done");
-	expect((await w.adapter.workSource!.listReady()).map((ref) => ref.title)).toEqual(["Write part one", "Write part two"]);
+
+	const [one, two] = await w.adapter.workSource!.listReady();
+
+	expect([one?.title, two?.title]).toEqual(["Write part one", "Write part two"]);
+	expect((await w.adapter.workSource!.read(ItemId.parse(two!.id))).body).toContain(`touches: docs/two.md\ncheck: test -f docs/two.md\nwaits-on: ${one!.id}`);
+	expect(w.state.parts.get(two!.id)).toEqual({ item: two!.id, from: id, waitsOn: [one!.id], check: "test -f docs/two.md" });
 	expect(w.shim.calls()).toHaveLength(1);
 	expect(folded(w, id)).toMatchObject({ doneBy: "split", picks: { plan: { pick: { event: "needs-split", parts: ["Write part one", "Write part two"] } } } });
 });
@@ -805,5 +1003,5 @@ test("a cheap choice a run reports is made without the owner, listed with its ti
 	const id = w.repo.seed("Write the note");
 
 	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "merged", item: id });
-	expect(w.state.choices.list()).toEqual([{ item: id, text: 'Chose "short" over long without you.', at: expect.any(Number) }]);
+	expect(w.state.choices.list()).toEqual([{ item: id, text: 'Chose "short" over long without you.', at: expect.any(Number), why: expect.stringContaining("touches only this change's own files"), files: ["docs/note.md"] }]);
 });

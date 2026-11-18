@@ -5,7 +5,7 @@ import { type AdapterContext, gitHubClient, githubAdapter } from "../../src/inde
 import { guarded, guardTimings } from "../../src/adapters/guard.ts";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../../src/exec.ts";
-import { runThinPath } from "../../src/worker/thin-path.ts";
+import { runBranch, runThinPath } from "../../src/worker/thin-path.ts";
 import { FakeGitHub, mergeCommitOf } from "../fixtures/fake-github.ts";
 import { sh, WorkRepo } from "../fixtures/work-repo.ts";
 import { gitIn } from "../../src/adapters/git.ts";
@@ -29,7 +29,7 @@ const issuesWorld = async ({ requiresPullRequest, requiresSignatures = false }: 
 	const client = gitHubClient({ token: "fake-token", fetch: github.fetch, spaced: false, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	const issues = guarded(
-		githubAdapter({ repo: github.repo, base: "main", client, claimPrefix: SHIPPED_DEFAULTS.claimPrefix, readyLabel: SHIPPED_DEFAULTS.readyLabel, mergeMethod: SHIPPED_DEFAULTS.mergeMethod, ownerLogins: [], timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }, context),
+		githubAdapter({ repo: github.repo, base: "main", client, claimPrefix: SHIPPED_DEFAULTS.claimPrefix, runBranchPrefix: SHIPPED_DEFAULTS.runBranchPrefix, readyLabel: SHIPPED_DEFAULTS.readyLabel, mergeMethod: SHIPPED_DEFAULTS.mergeMethod, ownerLogins: [], timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }, context),
 		{ provider: "github", faults: w.state.faults, ...guardTimings(w.config.hum) },
 	);
 
@@ -44,6 +44,18 @@ const issuesWorld = async ({ requiresPullRequest, requiresSignatures = false }: 
 
 	return { w, github, issues, id, pass, refused };
 };
+
+test("an issue is claimed by a person it is assigned to and by a person's open pull request that closes it, never by hum's own", async () => {
+	const { github, issues, id } = await issuesWorld({ requiresPullRequest: true });
+	const claimedBy = async () => (await issues.workSource!.read(id)).claimedBy;
+
+	github.personPull(runBranch(SHIPPED_DEFAULTS, id), `Closes #${id}`);
+	expect(await claimedBy()).toEqual([]);
+
+	github.assign(Number(id), "ana");
+	github.personPull("ana/fix-note", `Fixes #${id}`);
+	expect(await claimedBy()).toEqual(["@ana", "pull request #2"]);
+});
 
 test("an issue lands through a pull request: no item file is marked, the pull request names the item, and once it merges the issue closes and is never listed again", async () => {
 	const { w, github, issues, id, pass } = await issuesWorld({ requiresPullRequest: true });

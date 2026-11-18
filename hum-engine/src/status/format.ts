@@ -53,7 +53,14 @@ export type Question = z.infer<typeof Question>;
 
 export const Merged = z.object({ item: name, title: name, level: z.optional(name), mergedAt: time });
 
-export const Choice = z.object({ item: name, text: name, at: time });
+/** What came of the item a choice was made on: it merged, or sits out stuck or waiting for the owner's review. */
+const CHOICE_RESULTS = ["merged", "stuck", "review"] as const;
+
+/**
+ * A choice a run made without the owner: why code let it, the files the chosen option touches, and what came of its
+ * item once something has. A record an older engine saved lacks the last three.
+ */
+export const Choice = z.object({ item: name, text: name, at: time, why: z.optional(name), files: z.optional(z.array(name)), result: z.optional(z.enum(CHOICE_RESULTS)) });
 
 export type Choice = z.infer<typeof Choice>;
 
