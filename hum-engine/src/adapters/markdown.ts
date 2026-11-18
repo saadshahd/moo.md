@@ -43,6 +43,8 @@ export type MarkdownOptions = {
 	/** Pull requests of the repo on GitHub. An owner's answer goes through one when the base requires it. */
 	readonly pulls?: PullRequests;
 	readonly mergeMethod: MergeMethod;
+	/** The owner's alwaysPullRequest: an owner's answer goes through a pull request even where the base takes a push. */
+	readonly alwaysPullRequest: boolean;
 	/** The branch prefix of a pull request that lands an owner's answer. */
 	readonly ownerBranchPrefix: string;
 	/** The labels such a pull request carries where the answer grows the paths beside them. */
@@ -84,7 +86,7 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, growthLabels, timeoutMs, base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, alwaysPullRequest, ownerBranchPrefix, growthLabels, timeoutMs, base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
 	const git = gitIn(repo, { identity, timeoutMs });
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
@@ -239,7 +241,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 		return "push";
 	};
 
-	/** An owner's commit lands the way the base asks: a pull request that merges itself where one is required, a push elsewhere. */
+	/** An owner's commit lands the way the base asks: a pull request that merges itself where one is required or alwaysPullRequest is on, a push elsewhere. */
 	const landOwned = async (sha: string, message: string, label: string): Promise<Landed | Failed> => {
 		const landed = await landOwnerCommit({
 			sha,
@@ -249,6 +251,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			body: `The owner answered on item ${label}.`,
 			branchPrefix: ownerBranchPrefix,
 			mergeMethod,
+			alwaysPullRequest,
 			labels: await growthLabelsOf(git, { base: `${sha}^`, head: sha }, growthLabels),
 			pulls,
 			push: pushCounted,

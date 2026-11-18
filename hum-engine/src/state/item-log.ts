@@ -1,7 +1,6 @@
 import { isPaused, type RunOutcome } from "../adapters/claude-p.ts";
 import { hashJson } from "../config/hash.ts";
 import { asJson, type Json } from "../config/json.ts";
-import type { PURPOSES } from "../config/schema.ts";
 import type { DoneBy } from "../decide/merge.ts";
 import { SPLIT } from "../decide/prose.ts";
 import { type EventLog, KeptOutcome, type NewEvent, type SavedEvent } from "./events.ts";
@@ -70,8 +69,8 @@ type Picks = { readonly [Judge in Picked["judge"]]?: Extract<Picked, { judge: Ju
 
 /** An item's state from its log alone: the same log always folds the same. */
 export type ItemFold = {
-	/** The fix runs whose answer the log keeps since the owner last answered. */
-	readonly fixRuns: number;
+	/** The answers the log keeps since the owner last answered, counted by the run (its role) that gave them. */
+	readonly runs: Readonly<Record<string, number>>;
 	/** The answers kept since the item last started afresh and the owner last answered, by the question each answered. */
 	readonly answers: Readonly<Record<string, KeptOutcome>>;
 	readonly picks: Picks;
@@ -80,13 +79,10 @@ export type ItemFold = {
 	readonly merged: boolean;
 };
 
-/** The run purpose whose answers the fix cap counts. */
-const FIX = "fix" satisfies (typeof PURPOSES)[number];
-
-/** The fold after a kept answer: a fix run's answer counts toward the cap, and an answer to a question stands for the next run asked it. */
+/** The fold after a kept answer: it counts for its run, as a fix run's does toward the cap, and an answer to a question stands for the next run asked it. */
 const withAnswer = (fold: ItemFold, { run, question, outcome }: Entry<"model-answered">["payload"]): ItemFold => ({
 	...fold,
-	fixRuns: fold.fixRuns + Number(run === FIX),
+	runs: { ...fold.runs, [run]: (fold.runs[run] ?? 0) + 1 },
 	answers: question === undefined ? fold.answers : { ...fold.answers, [question]: outcome },
 });
 
@@ -101,14 +97,14 @@ const stepItem = (fold: ItemFold, entry: SavedEvent): ItemFold => {
 		case "landing-found":
 			return { ...fold, landing: entry.payload };
 		case "answered":
-			return { ...fold, fixRuns: 0, answers: {} };
+			return { ...fold, runs: {}, answers: {} };
 		case "merged":
 			return { ...fold, merged: true };
 	}
 };
 
 /** An item's facts from its log alone: no model is asked and no effect runs. */
-export const foldItem = (events: readonly SavedEvent[]): ItemFold => events.reduce(stepItem, { fixRuns: 0, answers: {}, picks: {}, merged: false });
+export const foldItem = (events: readonly SavedEvent[]): ItemFold => events.reduce(stepItem, { runs: {}, answers: {}, picks: {}, merged: false });
 
 /** Appends the fact unless the item's last fact of its kind is the same JSON, so a fact read back or a step retried adds nothing. */
 const keepChanged = (events: EventLog, fact: NewEvent, last: NewEvent["payload"] | undefined): void => {

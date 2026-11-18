@@ -1,10 +1,11 @@
 import { APP_TOKEN_MINUTES, WAKE_OWN_ENV } from "./wake-job.ts";
-import { kindMachine, nextStates, reachedFrom } from "./machine.ts";
+import { z } from "zod";
+import { GUARD_PARAMS, kindMachine, nextStates, reachedFrom } from "./machine.ts";
 import type { Problem } from "./refusal.ts";
 import {
 	FIXED_PARTS,
 	type HumConfig,
-	isFixedPart,
+	isRunPart,
 	type Kind,
 	type Naming,
 	OWNER_WAIT_TAG,
@@ -51,6 +52,25 @@ const graphProblems = (kind: string, config: Kind): Problem[] => {
 	]);
 };
 
+/** Every transition a state holds, wherever it holds one. */
+const transitionsOf = (node: StateNodeJSON) => [...Object.values(node.on ?? {}), ...Object.values(node.after ?? {}), node.always ?? [], node.onTimeout ?? [], node.invoke?.onDone ?? [], node.invoke?.onError ?? []].flat();
+
+const isGuard = (type: string): type is keyof typeof GUARD_PARAMS => Object.hasOwn(GUARD_PARAMS, type);
+
+/** Every guard a transition names is one the engine has, with the params it takes. */
+const guardProblems = (kind: string, { machine }: Kind): Problem[] =>
+	Object.entries(machine.states).flatMap(([state, node]) =>
+		transitionsOf(node).flatMap(({ guard }): Problem[] => {
+			if (guard === undefined) return [];
+
+			if (!isGuard(guard.type)) return [{ problem: "unknown-guard", kind, state, guard: guard.type }];
+
+			const params = GUARD_PARAMS[guard.type].safeParse(guard.params);
+
+			return params.success ? [] : [{ problem: "guard-params", kind, state, guard: guard.type, why: z.prettifyError(params.error) }];
+		}),
+	);
+
 const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => {
 	const { states } = config.machine;
 	const problems: Problem[] = [];
@@ -59,14 +79,15 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 		problems.push({ problem: "unknown-state", kind, state: config.tokenCap.overCap, why: "tokenCap.overCap" });
 	}
 
-	const purposes = new Set<string>();
+	/** Each role a state runs, by name, with its purpose. */
+	const runs = new Map<string, string>();
 
 	for (const [state, node] of Object.entries(states)) {
 		if (node.invoke) {
 			const role = hum.roles[node.invoke.src];
 
-			if (role) purposes.add(role.purpose);
-			else if (!isFixedPart(node.invoke.src)) {
+			if (role) runs.set(node.invoke.src, role.purpose);
+			else if (!isRunPart(node.invoke.src)) {
 				problems.push({ problem: "unknown-run-source", kind, state, src: node.invoke.src });
 			}
 
@@ -82,17 +103,25 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 		if (row.level !== undefined && !levels.has(row.level)) {
 			problems.push({ problem: "unknown-level", level: row.level });
 		}
+
+		if (row.role !== undefined && hum.roles[row.role]?.purpose !== row.purpose) {
+			problems.push({ problem: "tier-role-mismatch", kind, role: row.role, purpose: row.purpose });
+		}
 	}
 
-	for (const purpose of purposes) {
+	for (const [role, purpose] of runs) {
 		for (const level of levels) {
 			for (const size of SIZES) {
-				if (!pickTier(config, { purpose, level, size })) {
-					problems.push({ problem: "tier-table-gap", kind, purpose, level, size });
+				if (!pickTier(config, { role, purpose, level, size })) {
+					problems.push({ problem: "tier-table-gap", kind, role, purpose, level, size });
 				}
 			}
 		}
 	}
+
+	const guards = guardProblems(kind, config);
+
+	if (guards.length > 0) return [...problems, ...guards];
 
 	try {
 		kindMachine(config);
@@ -103,16 +132,22 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 	return [...problems, ...graphProblems(kind, config)];
 };
 
-/** The most specific tier row for a run, or undefined when the table has a gap. */
-export const pickTier = (kind: Pick<Kind, "tiers">, key: { purpose: string; level: string; size: string }) =>
+type TierRow = Kind["tiers"][number];
+
+/** How closely a row fits: a row that names its role outranks any that does not, then each of level and size it names counts one. */
+const fitOf = ({ role, level, size }: TierRow): number => 3 * Number(role !== undefined) + Number(level !== undefined) + Number(size !== undefined);
+
+/** The most specific tier row for a run of `role`, or undefined when the table has a gap. A row that names another role never fits. */
+export const pickTier = (kind: Pick<Kind, "tiers">, key: { role: string; purpose: string; level: string; size: string }): TierRow | undefined =>
 	kind.tiers
 		.filter(
 			(row) =>
 				row.purpose === key.purpose &&
+				(row.role === undefined || row.role === key.role) &&
 				(row.level === undefined || row.level === key.level) &&
 				(row.size === undefined || row.size === key.size),
 		)
-		.sort((a, b) => Number(b.level !== undefined) + Number(b.size !== undefined) - (Number(a.level !== undefined) + Number(a.size !== undefined)))[0];
+		.sort((a, b) => fitOf(b) - fitOf(a))[0];
 
 /** Every event has a source and a handler, and every event a machine waits on has a source. */
 const eventProblems = (hum: HumConfig, kinds: Readonly<Record<string, Kind>>): Problem[] => {

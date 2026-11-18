@@ -178,12 +178,15 @@ export const placementOf = async (
 /** The change an item declares before any run: the paths it says it touches. */
 export const declaredChange = (item: Item): Change => ({ paths: footprintOf(item) ?? [], size: 0, loosened: false, pinChanged: false });
 
-/** The model and effort the kind's tier table gives a run of `purpose` on `change`, at the level the change places at. */
-export const tierOf = async (ctx: Pick<LandContext, "config" | "state" | "git" | "base" | "now"> & { readonly kind: string }, kind: Kind, purpose: (typeof PURPOSES)[number], change: Change): Promise<{ readonly model: string; readonly effort: Kind["tiers"][number]["effort"] }> => {
-	const { placement } = await placementOf(ctx, change);
-	const row = pickTier(kind, { purpose, level: placement.level.name, size: "small" });
+/** A run of a role, which picks its tier: the role's name, and the purpose it runs for. */
+export type RoleRun = { readonly role: string; readonly purpose: (typeof PURPOSES)[number] };
 
-	if (!row) throw new Error(`the ${ctx.kind} table has no ${purpose} row`);
+/** The model and effort the kind's tier table gives a run of the role on `change`, at the level the change places at. */
+export const tierOf = async (ctx: Pick<LandContext, "config" | "state" | "git" | "base" | "now"> & { readonly kind: string }, kind: Kind, { role, purpose }: RoleRun, change: Change): Promise<{ readonly model: string; readonly effort: Kind["tiers"][number]["effort"] }> => {
+	const { placement } = await placementOf(ctx, change);
+	const row = pickTier(kind, { role, purpose, level: placement.level.name, size: "small" });
+
+	if (!row) throw new Error(`the ${ctx.kind} table has no row for the ${role} role (${purpose})`);
 
 	return { model: ctx.config.hum.models[row.tier], effort: row.effort };
 };
@@ -258,6 +261,7 @@ const learnRules = async (
 			body: `The owner answered on item ${id}: ${globs.join(", ")} at level ${level}.`,
 			branchPrefix: config.hum.ownerBranchPrefix,
 			mergeMethod: config.hum.mergeMethod,
+			alwaysPullRequest: config.hum.alwaysPullRequest,
 			labels: await growthLabelsOf(git, { base: `${commit}^`, head: commit }, config.hum.growthLabels),
 			pulls: ctx.pulls,
 			push: (refspecs) => pushCommits({ git, base, pulls: ctx.pulls, commits: ctx.commits }, refspecs),
@@ -517,6 +521,8 @@ const landBy = async (
 
 	if (ctx.mergesBefore !== undefined && ctx.now() >= ctx.mergesBefore) return { outcome: "held", item: ctx.id, why: "too little of the GitHub token's hour is left to merge; the next wake lands it" };
 
+	if (landing.via === "pull-request" && !ctx.pulls) return { outcome: "stuck", item: ctx.id, detail: `alwaysPullRequest is on, and ${ctx.base} is not on GitHub, so no pull request can land the change` };
+
 	await ctx.save();
 
 	if (landing.via === "pull-request" && ctx.pulls)
@@ -579,7 +585,7 @@ export const land = async (ctx: LandContext): Promise<ThinResult> => {
 
 	keepLanding(ctx.state.events, { itemId: ctx.id, head: saved.head, doneBy: reachesDoneBy(approvals, cleared) });
 
-	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest, cleared }), route, rules, why);
+	return landBy(ctx, landingOf({ requiresPullRequest: rules.requiresPullRequest || ctx.config.hum.alwaysPullRequest, cleared }), route, rules, why);
 };
 
 /** The alignment call's grades for a saved change, made once and kept with the landing and in the item's log. */
@@ -629,8 +635,9 @@ const abstained = (boundary: Boundary, why: string): Unclear => ({ cause: "absta
 
 const unmeasured = (models: readonly string[]): string => `${models.join(", ") || "no model"} has no measured rate that meets the bar`;
 
-/** Whether an item of `kind` runs a plan: a state of its machine runs a role whose purpose is plan. */
-const doesPlan = (config: Config, kind: Kind): boolean => Object.values(kind.machine.states).some((node) => node.invoke !== undefined && config.hum.roles[node.invoke.src]?.purpose === "plan");
+/** The role that plans an item of `kind`: one a state of its machine runs whose purpose is plan; undefined where the kind never plans. */
+const planRoleOf = (config: Config, kind: Kind): string | undefined =>
+	Object.values(kind.machine.states).flatMap(({ invoke }) => (invoke !== undefined && config.hum.roles[invoke.src]?.purpose === "plan" ? [invoke.src] : []))[0];
 
 /**
  * The models behind the item's plan: the one its kind's tier table gives the plan run, with any the run reported,
@@ -638,10 +645,11 @@ const doesPlan = (config: Config, kind: Kind): boolean => Object.values(kind.mac
  */
 const planModelsOf = async (ctx: LandContext): Promise<readonly string[] | undefined> => {
 	const kind = ctx.config.kinds[ctx.kind];
+	const role = kind && planRoleOf(ctx.config, kind);
 
-	if (kind === undefined || !doesPlan(ctx.config, kind)) return undefined;
+	if (kind === undefined || role === undefined) return undefined;
 
-	const { model } = await tierOf(ctx, kind, "plan", declaredChange(ctx.item));
+	const { model } = await tierOf(ctx, kind, { role, purpose: "plan" }, declaredChange(ctx.item));
 
 	return [...new Set([model, ...(ctx.state.plans.get(ctx.id)?.models ?? [])])];
 };

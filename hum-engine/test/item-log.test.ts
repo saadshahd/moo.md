@@ -30,11 +30,11 @@ test("fix runs count from the owner's last answer, over passes that start the ma
 	await fixRun(state);
 	state.events.add(machineStarted({ itemId: ITEM, machineVersion: VERSION, afresh: false }));
 	await fixRun(state);
-	expect(folded(state).fixRuns).toBe(2);
+	expect(folded(state).runs.fix).toBe(2);
 
 	state.events.add(ownerAnswered(ITEM, 1));
 	await fixRun(state);
-	expect(folded(state).fixRuns).toBe(1);
+	expect(folded(state).runs.fix).toBe(1);
 });
 
 const merged = (state: State) => state.events.add({ source: "work-source", sourceId: "merged:0123456", itemId: ITEM, type: "merged", payload: {} });
@@ -148,7 +148,7 @@ test("a fix run that starts again under its key, as one does after a kill left i
 
 	for (let run = 0; run < 2; run++) await answerOnce(state, { key: state.runs.keyFor(ITEM, "fix"), launch: { name: "fix" }, machineVersion: VERSION }, async () => finished({ structured: { status: "done" } }));
 
-	expect(folded(state).fixRuns).toBe(1);
+	expect(folded(state).runs.fix).toBe(1);
 });
 
 test("a build or fix run, which asks no question the log can answer, runs every time", async () => {

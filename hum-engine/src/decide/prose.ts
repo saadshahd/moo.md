@@ -58,6 +58,9 @@ export const PROSE_STATES = {
 
 export type ProsePurpose = keyof typeof PROSE_STATES;
 
+/** Whether a run's purpose ends in a pick of the next event, as a plan's or a review's does. */
+export const isProsePurpose = (purpose: string): purpose is ProsePurpose => Object.hasOwn(PROSE_STATES, purpose);
+
 /** One part of a split item: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it. */
 export const SplitPart = z.strictObject({
 	title: z.string().min(1),

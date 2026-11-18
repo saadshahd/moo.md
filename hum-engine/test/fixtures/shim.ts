@@ -57,8 +57,8 @@ export type Behavior = {
 	stderrNoise?: boolean;
 };
 
-/** What a plan or review run picks, as the run's answer. */
-export type Decided = { event: string; sure: boolean; reason: string; cites?: { file: string; line: number }[]; parts?: { title: string; touches: string[]; waitsOn: number[]; check: string }[]; question?: string; plan?: { summary: string; steps: string[]; paths: string[] } };
+/** What a plan or review run picks, as the run's answer, and files it leaves in its working folder first. */
+export type Decided = { write?: Record<string, string>; event: string; sure: boolean; reason: string; cites?: { file: string; line: number }[]; parts?: { title: string; touches: string[]; waitsOn: number[]; check: string }[]; question?: string; plan?: { summary: string; steps: string[]; paths: string[] } };
 
 /** A plan run's pick of a clear item: write docs/note.md in one step. */
 export const READY_PLAN: Decided = { event: "plan-ready", sure: true, reason: "The item is clear.", plan: { summary: "Write the note.", steps: ["Write it."], paths: ["docs/note.md"] } };
@@ -76,8 +76,8 @@ export type Shim = {
 	readonly ends: () => { pid: number; at: number }[];
 	/** When each `-p` process wrote its first assistant message, by pid. */
 	readonly tokens: () => { pid: number; at: number }[];
-	/** Each plan or review run: its purpose, the pick it gave, its prompt and its working folder. */
-	readonly decisions: () => { purpose: "plan" | "review"; answer: Decided; prompt: string; cwd: string }[];
+	/** Each plan or review run: its purpose, the pick it gave, its prompt, its working folder and its arguments. */
+	readonly decisions: () => { purpose: "plan" | "review"; answer: Decided; prompt: string; cwd: string; argv: string[] }[];
 	/** Each `claude` call that concerns background runs, in order: `bg` launches (with name, prompt and settings), `stop` and `rm`. */
 	readonly background: () => { cmd: "bg" | "stop" | "rm"; name?: string; id?: string; prompt?: string; cwd?: string; settings?: string; argv?: string[] }[];
 	/** The runs `claude agents --json` lists now. */

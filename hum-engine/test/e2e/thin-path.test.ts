@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SlotPool } from "../../src/slots/pool.ts";
 import { type Checkout, PLAN_MARK, PROSE_PROMPTS, runBranch, runThinPath } from "../../src/worker/thin-path.ts";
-import { configWith, type Tree } from "../fixtures/config.ts";
+import { CRITIC_PATHS, configWith, type Tree, withCritic } from "../fixtures/config.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { itemFile, sh } from "../fixtures/work-repo.ts";
 import { READY_PLAN, SHIM_MODEL, type ShimSpec } from "../fixtures/shim.ts";
@@ -37,7 +37,7 @@ const NOTE = { write: { "docs/note.md": "hello\n" } };
 const folded = (w: Awaited<ReturnType<typeof world>>, id: string) => {
 	const fold = foldItem(w.state.events.list(id));
 
-	return { fixRuns: fold.fixRuns, doneBy: doneByOf(fold), picks: fold.picks };
+	return { fixRuns: fold.runs.fix ?? 0, doneBy: doneByOf(fold), picks: fold.picks };
 };
 
 /** A file a shim run writes its stdin to, in a temp folder of its own. */
@@ -753,6 +753,115 @@ test("a feature runs its plan and review states: the plan run's ready plan reach
 	expect(review?.prompt).not.toContain("Write it.");
 	expect(w.repo.show(id)).toContain("state: done");
 	expect(folded(w, id)).toMatchObject({ doneBy: "review", picks: { plan: { pick: { event: "plan-ready" } }, review: { pick: { event: "approve" } }, alignment: { alignment: { graded: SOUND } } } });
+});
+
+const APP = "apps/desktop/src/app.tsx";
+
+/** The shipped config with the design critic a repo adds, and its app's folder at the lowest level. */
+const criticConfig = () =>
+	configWith((raw) => {
+		withCritic(raw);
+		raw.hum.paths.push({ glob: "apps/**", level: "low" });
+	});
+
+/** Each plan or review run by who made it: the design critic by its role's words, else its purpose. */
+const judges = (w: Awaited<ReturnType<typeof world>>) => w.shim.decisions().map((d) => (d.prompt.includes("You are the design critic") ? "critic" : d.purpose));
+
+/** The model a run was started on. */
+const modelOf = (argv: readonly string[]) => argv[argv.indexOf("--model") + 1];
+
+test("a repo's design-critic role runs after the review approves a change that touches its paths: on its own tier, in the change's working copy, its request-changes sends the change to a fix run that reads it, and its approval merges it; no verdict passes between it and the review", async () => {
+	const fixStdin = stdinFile();
+	const reject = { event: "request-changes", sure: true, reason: "The button breaks the spacing scale.", cites: [{ file: APP, line: 1 }] };
+	const config = criticConfig();
+	const w = await world({ script: [{}, { write: { [APP]: "<Button />\n" } }, { write: { [APP]: "<Button gap={2} />\n" }, saveStdin: fixStdin }], decisions: [READY_PLAN, { event: "approve", sure: true, reason: "It does what the item asks." }, reject] }, { config, checks: [`test -f ${APP}`] });
+	const id = w.repo.seed("Add the button");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+
+	// The review's approval carries past the fix, as the docs globs take every path here; the critic's never comes from it, so it runs again.
+	expect(judges(w)).toEqual(["plan", "review", "critic", "critic"]);
+
+	const [, review, critic] = w.shim.decisions();
+
+	expect(modelOf(critic?.argv ?? [])).toBe(config.hum.models.top);
+	expect(modelOf(review?.argv ?? [])).toBe(config.hum.models.standard);
+	expect(critic?.cwd).toContain("hum-run-");
+	expect(review?.cwd).not.toContain("hum-run-");
+	expect(readFileSync(fixStdin, "utf8")).toContain(`The button breaks the spacing scale.\n${APP}:1`);
+	expect(sh(w.repo.remote, ["show", `main:${APP}`])).toBe("<Button gap={2} />\n");
+
+	const reviews = w.state.events.list(id).flatMap((entry) => (entry.type === "picked" && entry.payload.judge === "review" ? [entry.payload.pick.event] : []));
+
+	expect(reviews).toEqual(["approve"]);
+});
+
+test("a change that touches none of the critic's paths skips the critic, and the review's approval merges it", async () => {
+	const w = await world({ script: [{}, NOTE], decisions: [READY_PLAN] }, { config: criticConfig() });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+	expect(judges(w)).toEqual(["plan", "review"]);
+});
+
+test("the critic's guard reads the change as it stands after each run: a fix run that first touches its paths sends the change to the critic", async () => {
+	const w = await world({ script: [{}, NOTE, { write: { [APP]: "<Button />\n" } }], decisions: [READY_PLAN] }, { config: criticConfig(), checks: [`! test -f docs/note.md || test -f ${APP}`] });
+	const id = w.repo.seed("Add the button");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+	expect(folded(w, id).fixRuns).toBe(1);
+	expect(judges(w)).toEqual(["plan", "review", "critic"]);
+});
+
+test("a guard on a run's own done transition reads the change as that run left it", async () => {
+	const config = configWith((raw) => {
+		withCritic(raw);
+		raw.hum.paths.push({ glob: "apps/**", level: "low" });
+
+		const { states } = raw.kinds.feature.machine;
+
+		states.reviewing.on.approve = { target: "merging" };
+		states.checking.invoke.onDone = [{ target: "critiquing", guard: { type: "touches", params: { paths: CRITIC_PATHS } } }, { target: "reviewing" }];
+		states.critiquing.on.approve = { target: "reviewing" };
+	});
+
+	const w = await world({ script: [{}, { write: { [APP]: "<Button />\n" } }], decisions: [READY_PLAN] }, { config, checks: ["true"] });
+	const id = w.repo.seed("Add the button");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+	expect(judges(w)).toEqual(["plan", "critic", "review"]);
+});
+
+test("what a critic run leaves in the working copy stays out of the change, though a fix run commits the copy after it", async () => {
+	const scratch = "apps/desktop/src/critic-capture.png";
+	const reject = { event: "request-changes", sure: true, reason: "Too tight.", cites: [{ file: APP, line: 1 }], write: { [scratch]: "png", [APP]: "<Button critic />\n" } };
+	const w = await world({ script: [{}, { write: { [APP]: "<Button />\n" } }, { write: { "apps/desktop/src/other.tsx": "<Other />\n" } }], decisions: [READY_PLAN, { event: "approve", sure: true, reason: "Fine." }, reject] }, { config: criticConfig(), checks: ["true"] });
+	const id = w.repo.seed("Add the button");
+
+	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
+	expect(judges(w)).toEqual(["plan", "review", "critic", "critic"]);
+	expect(() => sh(w.repo.remote, ["show", `main:${scratch}`])).toThrow();
+	expect(sh(w.repo.remote, ["show", `main:${APP}`])).toBe("<Button />\n");
+});
+
+test("with alwaysPullRequest on, a cleared change goes through a pull request that merges itself, though the base takes a push", async () => {
+	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.alwaysPullRequest = true)) });
+	const github = new FakeGitHub();
+	const pulls = github.client();
+	const id = w.repo.seed("Write the note");
+
+	expect((await pulls.rules("main")).requiresPullRequest).toBe(false);
+	expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+	expect(github.pulls()).toMatchObject([{ base: "main", autoMerge: true }]);
+	expect(() => sh(w.repo.remote, ["show", "main:docs/note.md"])).toThrow();
+});
+
+test("with alwaysPullRequest on and a base off GitHub, a cleared change ends stuck and the base is untouched", async () => {
+	const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.alwaysPullRequest = true)) });
+	const id = w.repo.seed("Write the note");
+
+	expect(await runThinPath(w.thinPath())).toEqual({ outcome: "stuck", item: id, detail: "alwaysPullRequest is on, and main is not on GitHub, so no pull request can land the change" });
+	expect(() => sh(w.repo.remote, ["show", "main:docs/note.md"])).toThrow();
 });
 
 test("a plan answer the log keeps is read back on a pass after a limit, adding nothing to the item's total, and asked again once nothing saved is left to go on from", async () => {
