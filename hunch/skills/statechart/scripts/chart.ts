@@ -12,12 +12,14 @@ export type View = {
 	title?: unknown;
 };
 
-/** One rule and what TLC found. A broken rule carries its path and the states known to break it. */
+/** One rule and what the check found. A broken rule carries its path and the states known to break it, and how
+ * many of those lie past a constraint, outside the graph the chart draws. */
 export type Verdict = {
 	rule: string;
 	kind: "invariant" | "deadlock" | "property";
 	trace?: Trace;
 	breaking?: ReadonlySet<string>;
+	pastBound?: number;
 	initialOnly?: boolean;
 };
 
@@ -169,13 +171,19 @@ export function draw(graph: Graph, verdicts: Verdict[], view: View, settings: Se
 		].join("\n");
 	};
 	const verdictText = (v: Verdict) =>
-		[v.trace ? "breaks" : "holds", v.initialOnly ? "checking only the start states: it has no [], <> or ~>, so write it as an INVARIANT to check every state" : ""].filter(Boolean).join(", ");
+		[
+			v.trace ? "breaks" : "holds",
+			v.pastBound ? `also in ${v.pastBound} state${v.pastBound === 1 ? "" : "s"} past the constraint, which the chart does not draw` : "",
+			v.initialOnly ? "checking only the start states: it has no [], <> or ~>, so write it as an INVARIANT to check every state" : "",
+		]
+			.filter(Boolean)
+			.join(", ");
 	const hidden = [...Map.groupBy(moves.filter((s) => s.label === null), (s) => `${s.action} from "${s.fromLabel}" to "${s.toLabel}"`).keys()];
 	const report = [
 		`# ${settings.title}`,
 		"",
 		[
-			`TLC saw ${settings.distinct} distinct states.`,
+			`everystate saw ${settings.distinct} distinct states.`,
 			mermaid ? `The chart draws ${chartStates.length} states and ${arrows.length} arrows${arrows.length > settings.arrowBudget ? `; aim for about ${settings.arrowBudget}` : ""}.` : "No rule breaks and the model is too large to draw, so there is no chart.",
 			settings.complete ? "" : "The model is too large to draw whole, so the chart draws only the paths to the rules that break.",
 		]
