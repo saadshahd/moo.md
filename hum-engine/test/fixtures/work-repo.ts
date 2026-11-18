@@ -56,6 +56,19 @@ export const sh = (cwd: string, args: string[]): string => {
 	return result.stdout;
 };
 
+/** Writes each file in `dir` and commits them all on the branch checked out; returns the commit. */
+export const commitFiles = (dir: string, files: Readonly<Record<string, string>>, message: string): string => {
+	for (const [path, text] of Object.entries(files)) {
+		mkdirSync(dirname(join(dir, path)), { recursive: true });
+		writeFileSync(join(dir, path), text);
+	}
+
+	sh(dir, ["add", "-A"]);
+	sh(dir, ["commit", "-q", "-m", message]);
+
+	return sh(dir, ["rev-parse", "HEAD"]).trim();
+};
+
 export const itemFile = (title: string, { state = "ready", body = "body" }: { readonly state?: string; readonly body?: string } = {}) => `---\ntitle: ${JSON.stringify(title)}\nstate: ${state}\n---\n\n${body}\n`;
 
 let built: string | undefined;

@@ -1,12 +1,12 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, symlinkSync } from "node:fs";
+import { join } from "node:path";
 import { gitIn } from "../src/adapters/git.ts";
 import type { HumConfig } from "../src/config/schema.ts";
 import { growthLabelsOf } from "../src/decide/growth.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
-import { sh } from "./fixtures/work-repo.ts";
+import { commitFiles, sh } from "./fixtures/work-repo.ts";
 
 /** transferwise/selective's byte ratchet: agent context and the other docs are each summed on their own, and either growing needs `grow`. */
 const SELECTIVE: HumConfig["growthLabels"] = [
@@ -16,25 +16,14 @@ const SELECTIVE: HumConfig["growthLabels"] = [
 
 const RANGE = { base: "main", head: "change" };
 
-/** Writes each file and commits them all on the branch checked out. */
-const commit = (repo: string, files: Readonly<Record<string, string>>): void => {
-	for (const [path, text] of Object.entries(files)) {
-		mkdirSync(dirname(join(repo, path)), { recursive: true });
-		writeFileSync(join(repo, path), text);
-	}
-
-	sh(repo, ["add", "-A"]);
-	sh(repo, ["commit", "-q", "--allow-empty", "-m", "change"]);
-};
-
 /** A repo whose `main` holds `base` and whose `change` branch, cut from it, holds `change` on top and is checked out. */
 const repoWith = (base: Readonly<Record<string, string>>, change: Readonly<Record<string, string>>) => {
 	const repo = tempDir("growth");
 
 	sh(repo, ["init", "-q", "-b", "main"]);
-	commit(repo, base);
+	commitFiles(repo, base, "base");
 	sh(repo, ["checkout", "-q", "-b", "change"]);
-	commit(repo, change);
+	commitFiles(repo, change, "change");
 
 	return { repo, git: gitIn(repo, { timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS }) };
 };
@@ -56,7 +45,7 @@ test("a change that shrinks the guarded files, or grows only excepted, unguarded
 	// A symlink is no regular file, and selective's ratchet counts none.
 	mkdirSync(join(repo, ".claude"));
 	symlinkSync("a-target-whose-name-is-long.md", join(repo, ".claude", "link.md"));
-	commit(repo, {});
+	commitFiles(repo, {}, "link");
 
 	expect(await growthLabelsOf(git, RANGE, SELECTIVE)).toEqual([]);
 });
@@ -65,7 +54,7 @@ test("only the change's own files count: guarded files the base gained after the
 	const { repo, git } = repoWith(BASE, { "src/app.ts": "y" });
 
 	sh(repo, ["checkout", "-q", "main"]);
-	commit(repo, { "AGENTS.md": "a".repeat(5000) });
+	commitFiles(repo, { "AGENTS.md": "a".repeat(5000) }, "base grows");
 
 	expect(await growthLabelsOf(git, RANGE, SELECTIVE)).toEqual([]);
 });
