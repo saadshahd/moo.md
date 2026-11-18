@@ -1,3 +1,5 @@
+import { GUARD_PARAMS } from "./machine.ts";
+
 /** One thing a config check found wrong. */
 export type Problem =
 	| { readonly problem: "unreachable-state"; readonly kind: string; readonly state: string }
@@ -9,7 +11,10 @@ export type Problem =
 	| { readonly problem: "missing-skill"; readonly skill: string; readonly role: string }
 	| { readonly problem: "unknown-state"; readonly kind: string; readonly state: string; readonly why: string }
 	| { readonly problem: "unknown-run-source"; readonly kind: string; readonly state: string; readonly src: string }
-	| { readonly problem: "tier-table-gap"; readonly kind: string; readonly purpose: string; readonly level: string; readonly size: string }
+	| { readonly problem: "tier-table-gap"; readonly kind: string; readonly role: string; readonly purpose: string; readonly level: string; readonly size: string }
+	| { readonly problem: "tier-role-mismatch"; readonly kind: string; readonly role: string; readonly purpose: string }
+	| { readonly problem: "unknown-guard"; readonly kind: string; readonly state: string; readonly guard: string }
+	| { readonly problem: "guard-params"; readonly kind: string; readonly state: string; readonly guard: string; readonly why: string }
 	| { readonly problem: "machine-rejected"; readonly kind: string; readonly why: string }
 	| { readonly problem: "missing-file"; readonly file: string }
 	| { readonly problem: "unknown-level"; readonly level: string }
@@ -42,8 +47,11 @@ const DESCRIPTIONS = {
 	"run-and-owner-wait": (p) => `${p.kind}: state "${p.state}" starts a run and waits on the owner`,
 	"missing-skill": (p) => `role "${p.role}" names skill "${p.skill}", which no installed plugin has`,
 	"unknown-state": (p) => `${p.kind}: ${p.why} names state "${p.state}", which does not exist`,
-	"unknown-run-source": (p) => `${p.kind}: state "${p.state}" invokes "${p.src}", which is neither a role nor a part`,
-	"tier-table-gap": (p) => `${p.kind}: no tier for purpose "${p.purpose}", level "${p.level}", size "${p.size}"`,
+	"unknown-run-source": (p) => `${p.kind}: state "${p.state}" invokes "${p.src}", which is neither a role nor a part that runs`,
+	"tier-table-gap": (p) => `${p.kind}: no tier for role "${p.role}" (purpose "${p.purpose}"), level "${p.level}", size "${p.size}"`,
+	"tier-role-mismatch": (p) => `${p.kind}: a tier row names role "${p.role}" for purpose "${p.purpose}", and hum.json has no role of that name with that purpose`,
+	"unknown-guard": (p) => `${p.kind}: state "${p.state}" names guard "${p.guard}"; the engine's guards are ${Object.keys(GUARD_PARAMS).join(", ")}`,
+	"guard-params": (p) => `${p.kind}: state "${p.state}" gives guard "${p.guard}" params it does not take: ${p.why}`,
 	"machine-rejected": (p) => `${p.kind}: the machine does not load: ${p.why}`,
 	"missing-file": (p) => `file "${p.file}" is missing`,
 	"unknown-level": (p) => `risk level "${p.level}" is not in levels`,

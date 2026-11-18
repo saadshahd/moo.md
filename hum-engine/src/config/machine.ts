@@ -1,9 +1,34 @@
 import { type AnyActorLogic, type AnyStateMachine, createAsyncLogic, machineFromJSON } from "xstate";
 import { toDirectedGraph } from "xstate/graph";
+import { z } from "zod";
 import { HOUR_MS } from "../time.ts";
+import type { Json } from "./json.ts";
 import { isFixedPart, type Kind, type StateNodeJSON } from "./schema.ts";
 
 const placeholder = createAsyncLogic({ run: async () => {} });
+
+/** The paths the item's change touches as its machine runs: what a `touches` guard reads. */
+export type Touched = () => readonly string[];
+
+/** Where no run is at hand, a guard has no change to read: the machine is broken, and the guard throws rather than pass or fail. */
+const noChange: Touched = () => {
+	throw new Error("a guard read the change's paths where no run is at hand");
+};
+
+/** The guards a kind's transition may name, by the params each takes. */
+export const GUARD_PARAMS = {
+	/** Passes when the change touches a path one of `paths` matches. */
+	touches: z.strictObject({ paths: z.array(z.string().min(1)).min(1) }),
+} as const;
+
+/** The guards' implementations, reading the change through `touched`. */
+const guardsOf = (touched: Touched) => ({
+	touches: (_: { readonly event: { readonly type: string } }, params: Json): boolean => {
+		const { paths } = GUARD_PARAMS.touches.parse(params);
+
+		return touched().some((path) => paths.some((glob) => new Bun.Glob(glob).match(path)));
+	},
+});
 
 /** What a run past its token cap, or a run's question for the owner, sends the machine. */
 export const TOKEN_CAP = "token-cap";
@@ -37,11 +62,12 @@ export const withOverCapWaits = (kind: Kind): Kind => {
 /**
  * A kind's machine. `machineFromJSON` needs an actor for every `invoke.src`; any
  * `sources` not given stand in as placeholders, which is enough to check the graph.
+ * Its guards read the change through `touched`, and throw where none is given.
  * Throws with xstate's message when the machine is illegal.
  */
-export const kindMachine = (kind: Kind, sources: Readonly<Record<string, AnyActorLogic>> = {}): AnyStateMachine => {
+export const kindMachine = (kind: Kind, sources: Readonly<Record<string, AnyActorLogic>> = {}, touched: Touched = noChange): AnyStateMachine => {
 	// SAFETY: the zod machine schema is a subset of xstate's MachineJSON, and machineFromJSON validates the rest.
-	return machineFromJSON(kind.machine as Parameters<typeof machineFromJSON>[0], { actors: invokedSources(kind, placeholder, sources) });
+	return machineFromJSON(kind.machine as Parameters<typeof machineFromJSON>[0], { actors: invokedSources(kind, placeholder, sources), guards: guardsOf(touched) });
 };
 
 /** A state's `after` timeouts, shortest first: each one's delay in ms and the transitions it takes. */

@@ -15,8 +15,8 @@ import { ANSWERED, earliestTimeout, invokedSources, kindMachine, TOKEN_CAP } fro
 import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
-import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
-import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
+import { type EventPick, isProsePurpose, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
+import { answerOnce, foldItem, type ItemFold, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
 import type { SavedRepro } from "../state/saved.ts";
 import { type SavedSnapshot, persistedSnapshot } from "../state/items.ts";
@@ -477,20 +477,56 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return new Error(message);
 	};
 
-	/** A plan or build is placed by the files its item declares; a fix or review by the branch's diff so far. */
-	const tierFor = async (purpose: Purpose) => tierOf(placing(d), kind, purpose, PLACED_BY_DIFF[purpose] ? await changeOn(placing(d)) : declaredChange(item));
+	/** A plan or build run is placed by the files its item declares; a fix or review run by the branch's diff so far. */
+	const tierFor = async (role: string) => {
+		const purpose = purposeOf(config, role);
+
+		return tierOf(placing(d), kind, { role, purpose }, PLACED_BY_DIFF[purpose] ? await changeOn(placing(d)) : declaredChange(item));
+	};
+
+	/** The paths the change touches, as last read: what a `touches` guard reads. */
+	let touched: readonly string[] | undefined;
+
+	/** Reads the paths the change touches again, after a run or before an event, so a guard reads the change as it stands. */
+	const look = async (): Promise<void> => {
+		touched = (await changeOn(placing(d))).paths;
+	};
+
+	const touchedNow = (): readonly string[] => {
+		if (touched === undefined) throw new Error("a guard read the change's paths before hum read them");
+
+		return touched;
+	};
+
+	/** Sends the machine an event once the change's paths are read again. */
+	const send = async (type: string): Promise<void> => {
+		await look();
+		actor.send({ type });
+	};
+
+	/** A state's invoked run, after which the change's paths are read again, whether it ended or failed, before the machine moves on. */
+	const invoked = (body: ({ signal }: { readonly signal: AbortSignal }) => Promise<void>) =>
+		createAsyncLogic({
+			run: async ({ signal }) => {
+				try {
+					return await body({ signal });
+				} finally {
+					await look();
+				}
+			},
+		});
 
 	const branchDiff = (): Promise<string> => g(["diff", ...PATCH, `origin/${base}...HEAD`]);
 
-	const prompt = async (role: StepRole): Promise<string> => {
+	const prompt = async (role: string, change: StepKind): Promise<string> => {
 		const plan = state.plans.get(id);
 		const repro = state.repros.get(id);
 
-		const parts = [roleOf(config, role), `# Item ${id}: ${item.title}\n\n${item.body}`, RUN_CONTRACTS[role]({ branch, evidence: d.evidence })];
+		const parts = [roleOf(config, role), `# Item ${id}: ${item.title}\n\n${item.body}`, RUN_CONTRACTS[change]({ branch, evidence: d.evidence })];
 
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
 
-		if (repro && role !== "repro") parts.push(`## The repro\n\`${repro.command}\` fails because of the bug. Make it pass, and leave the files the repro wrote as they are: ${repro.files.join(", ") || "it wrote none"}.`);
+		if (repro && change !== "repro") parts.push(`## The repro\n\`${repro.command}\` fails because of the bug. Make it pass, and leave the files the repro wrote as they are: ${repro.files.join(", ") || "it wrote none"}.`);
 
 		if (d.answered) {
 			const soFar = d.restarted
@@ -500,7 +536,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			parts.push(`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n${soFar}`);
 		}
 
-		if (role === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
+		if (change === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
 
 		return parts.join("\n\n");
 	};
@@ -515,9 +551,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** The kinds reach their owner-wait state only through the over-cap event, so a run's question uses it too. */
-	const ask = (note: Pending) => {
+	const ask = async (note: Pending): Promise<void> => {
 		pending = note;
-		actor.send({ type: TOKEN_CAP });
+		await send(TOKEN_CAP);
 	};
 
 	/**
@@ -531,7 +567,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
 		const prefix = config.hum.roles[role]?.file ?? role;
 		const prompt = `${text}${memorySection(held)}`;
-		const tier = await tierFor(purpose);
+		const tier = await tierFor(role);
 		const launch = { name: `hum ${id} ${role} #${key.attempt}`, sessionId: d.newSessionId() };
 
 		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
@@ -540,7 +576,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			const ran = await runner
 				.run({
 					prompt,
-					cwd: purpose === "review" ? tmpdir() : clone,
+					cwd: role === REVIEW_ROLE ? tmpdir() : clone,
 					env: d.env,
 					...tier,
 					schema,
@@ -568,7 +604,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			if (!actor.getSnapshot().can({ type: TOKEN_CAP })) throw failed(why);
 
-			ask({ question: { text: PLAIN_QUESTIONS["over-cap"], options: Object.values(OVER_CAP_OPTIONS), detail: why }, plain: "over-cap", plan: "" });
+			await ask({ question: { text: PLAIN_QUESTIONS["over-cap"], options: Object.values(OVER_CAP_OPTIONS), detail: why }, plain: "over-cap", plan: "" });
 
 			return new Promise<never>(() => {});
 		}
@@ -609,7 +645,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** A finished build or fix run's change, committed under the pull request title it wrote. */
-	const finishChange = async (role: StepRole, wants: Wanted | undefined, before: string): Promise<void> => {
+	const finishChange = async (role: string, wants: Wanted | undefined, before: string): Promise<void> => {
 		if (!wants?.pullRequest) throw failed(`the ${role} run ended without the pull request title hum commits its change under`);
 
 		await keepPullRequest(d, wants.pullRequest);
@@ -649,42 +685,41 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return saved !== undefined && (await isAncestor(d.git, { ancestor: saved.commit, descendant: "HEAD" }));
 	};
 
-	const step = (role: StepRole) =>
-		createAsyncLogic({
-			run: async ({ signal }) => {
-				/* An answer at the repro's wait objects to it, so a new repro run reads the owner's words. */
-				if (role === "repro" && !d.answered && (await isReproduced())) return;
+	/** A run of `role` that changes files: a build or a fix of the change, or the repro's check. */
+	const step = (role: string, change: StepKind) =>
+		invoked(async ({ signal }) => {
+			/* An answer at the repro's wait objects to it, so a new repro run reads the owner's words. */
+			if (change === "repro" && !d.answered && (await isReproduced())) return;
 
-				if (role === "build") keepUnopposed();
+			if (change === "build") keepUnopposed();
 
-				const unready = await d.readyFailure();
+			const unready = await d.readyFailure();
 
-				if (unready !== undefined) throw failed(`the run slot's ready check fails before the ${role} run, so no run starts: ${unready}`);
+			if (unready !== undefined) throw failed(`the run slot's ready check fails before the ${role} run, so no run starts: ${unready}`);
 
-				const before = (await g(["rev-parse", "HEAD"])).trim();
-				const chosen: string[] = [];
+			const before = (await g(["rev-parse", "HEAD"])).trim();
+			const chosen: string[] = [];
 
-				for (;;) {
-					/* Every fix run since the owner last answered counts, over every pass and wake and each run again after a choice hum made: the item's log holds them all. */
-					if (role === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
+			for (;;) {
+				/* Every fix run since the owner last answered counts, over every pass and wake and each run again after a choice hum made: the item's log holds them all. */
+				if (change === "fix" && fixRunsOf(config, foldItem(state.events.list(id))) >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
-					const outcome = await runAgent(role, `${await prompt(role)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
+				const outcome = await runAgent(role, `${await prompt(role, change)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
 
-					if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}${await unreadyAfter()}`);
+				if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}${await unreadyAfter()}`);
 
-					const wants = Wants.safeParse(outcome.structured).data;
+				const wants = Wants.safeParse(outcome.structured).data;
 
-					if (wants?.status !== "needs-owner") return role === "repro" ? finishRepro(wants, before) : finishChange(role, wants, before);
+				if (wants?.status !== "needs-owner") return change === "repro" ? finishRepro(wants, before) : finishChange(role, wants, before);
 
-					await commitRun(d.git, { since: before, subject: `hum: ${id} so far` });
+				await commitRun(d.git, { since: before, subject: `hum: ${id} so far` });
 
-					const settled = await settleNeed(wants);
+				const settled = await settleNeed(wants);
 
-					if ("asked" in settled) return ask(settled.asked);
+				if ("asked" in settled) return ask(settled.asked);
 
-					chosen.push(settled.chose);
-				}
-			},
+				chosen.push(settled.chose);
+			}
 		});
 
 	const checkOptions = { env: d.env, ...checkLimits(config.hum) };
@@ -729,51 +764,45 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	};
 
 	/** The repro must fail on every run where it went in before any fix; one that passes shows no bug, and the owner says how to go on. */
-	const showsBug = createAsyncLogic({
-		run: async () => {
-			const repro = savedRepro();
-			const passed = (await atCommit(repro.commit, () => reproRuns(repro.command))).filter((failure) => failure === undefined).length;
+	const showsBug = invoked(async () => {
+		const repro = savedRepro();
+		const passed = (await atCommit(repro.commit, () => reproRuns(repro.command))).filter((failure) => failure === undefined).length;
 
-			if (passed === 0 && repro.unopposed) return void actor.send({ type: WINDOW_PASSED });
+		if (passed === 0 && repro.unopposed) return send(WINDOW_PASSED);
 
-			if (passed === 0) {
-				pending = { question: { text: PLAIN_QUESTIONS.objection, detail: `${repro.command} failed on all ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where only the repro is in. Reply to object, and the repro runs again with your words.` }, plain: "objection", plan: "" };
+		if (passed === 0) {
+			pending = { question: { text: PLAIN_QUESTIONS.objection, detail: `${repro.command} failed on all ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where only the repro is in. Reply to object, and the repro runs again with your words.` }, plain: "objection", plan: "" };
 
-				return;
-			}
+			return;
+		}
 
-			state.repros.remove(id);
-			ask({ question: { text: PLAIN_QUESTIONS.repro, detail: `${repro.command} passed on ${passed} of ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where the repro went in before any fix.` }, plain: "repro", plan: "" });
-		},
+		state.repros.remove(id);
+		await ask({ question: { text: PLAIN_QUESTIONS.repro, detail: `${repro.command} passed on ${passed} of ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where the repro went in before any fix.` }, plain: "repro", plan: "" });
 	});
 
 	/** The fix is proven once the repro's own files are as it left them and its command passes on every run; else a fix run reads why. */
-	const bugGone = createAsyncLogic({
-		run: async () => {
-			const repro = savedRepro();
-			const edited = repro.files.length === 0 ? [] : await filesBetween(d.git, repro.commit, "HEAD", ...repro.files);
+	const bugGone = invoked(async () => {
+		const repro = savedRepro();
+		const edited = repro.files.length === 0 ? [] : await filesBetween(d.git, repro.commit, "HEAD", ...repro.files);
 
-			if (edited.length > 0) throw failedCheck(`The change edits the repro's own files (${edited.join(", ")}): put them back as the repro left them, and fix the bug instead.`);
+		if (edited.length > 0) throw failedCheck(`The change edits the repro's own files (${edited.join(", ")}): put them back as the repro left them, and fix the bug instead.`);
 
-			const failures = (await reproRuns(repro.command)).flatMap((failure) => (failure === undefined ? [] : [failure]));
+		const failures = (await reproRuns(repro.command)).flatMap((failure) => (failure === undefined ? [] : [failure]));
 
-			if (failures.length > 0) throw failedCheck(`The repro still fails on ${failures.length} of ${config.hum.fixProofRuns} runs:\n${failures[0]}`);
+		if (failures.length > 0) throw failedCheck(`The repro still fails on ${failures.length} of ${config.hum.fixProofRuns} runs:\n${failures[0]}`);
 
-			state.repros.put(id, { ...repro, proven: config.hum.fixProofRuns });
-		},
+		state.repros.put(id, { ...repro, proven: config.hum.fixProofRuns });
 	});
 
 	/** A failing check goes to a fix run, unless it is one of the repo's and the base fails it too: no change of the item's can pass it, so the item ends for the owner. */
-	const checksSource = createAsyncLogic({
-		run: async () => {
-			const failed = await firstFailing(d.checks, clone, checkOptions);
+	const checksSource = invoked(async () => {
+		const failed = await firstFailing(d.checks, clone, checkOptions);
 
-			if (failed === undefined) return;
+		if (failed === undefined) return;
 
-			if (!d.ownChecks.includes(failed.command) && (await failsOnBase(failed.command))) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
+		if (!d.ownChecks.includes(failed.command) && (await failsOnBase(failed.command))) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
 
-			throw failedCheck(failed.failure);
-		},
+		throw failedCheck(failed.failure);
 	});
 
 	const ownerQuestion = (pick: EventPick) => {
@@ -793,48 +822,71 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		],
 	]);
 
-	/** A plan or review state: its run picks the next event, and a split files the parts and lands the item as done. */
-	const decision = (purpose: ProsePurpose) =>
-		createAsyncLogic({
-			run: async ({ signal }) => {
-				const diff = purpose === "review" ? await branchDiff() : "";
-				const head = (await g(["rev-parse", "HEAD"])).trim();
-				const patch = purpose === "review" ? await patchOf(placing(d)) : undefined;
-				const carried = purpose === "review" ? await carriedVerdict(placing(d), state.verdicts.get(id), { head, patch }) : undefined;
+	/**
+	 * A plan or review state: its run picks the next event, and a split files the parts and lands the item as done. The
+	 * engine's own plan and review roles keep their picks, and the review its verdict, which a later review of the same
+	 * change carries; a repo's role of either purpose only picks, so no verdict of its stands for the review's or comes
+	 * from it. A run in the clone that only judges leaves the clone as it found it.
+	 */
+	const decision = (role: string, purpose: ProsePurpose) =>
+		invoked(async ({ signal }) => {
+			const isOwn = role === purpose;
+			const isReview = purpose === "review" && isOwn;
+			const diff = purpose === "review" ? await branchDiff() : "";
+			const head = (await g(["rev-parse", "HEAD"])).trim();
+			const patch = isReview ? await patchOf(placing(d)) : undefined;
+			const carried = isReview ? await carriedVerdict(placing(d), state.verdicts.get(id), { head, patch }) : undefined;
 
-				if (carried?.event === REVIEW_APPROVAL) {
-					state.verdicts.put(id, carried);
+			if (carried?.event === REVIEW_APPROVAL) {
+				state.verdicts.put(id, carried);
 
-					return actor.send({ type: carried.event });
-				}
+				return send(carried.event);
+			}
 
-				const { pick, models } = await decideProse({
-					purpose,
-					prompt: PROSE_PROMPTS[purpose](config, item, diff),
-					diff,
-					model: (await tierFor(purpose)).model,
-					run: (text, schema) => runAgent(purpose, text, schema, signal, { head }),
-					canTake: (type) => actor.getSnapshot().can({ type }),
-				});
+			const left = role === REVIEW_ROLE ? undefined : await changedFiles(d.git);
 
-				if (purpose === "review") keepVerdict(state, { id, head, patch, pick, models });
-				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick: keptPick(pick), models: [...models] } });
+			const { pick, models } = await decideProse({
+				purpose,
+				prompt: PROSE_PROMPTS[purpose](config, item, diff, role),
+				diff,
+				model: (await tierFor(role)).model,
+				run: (text, schema) => runAgent(role, text, schema, signal, { head }),
+				canTake: (type) => actor.getSnapshot().can({ type }),
+			});
 
-				PICKED.get(pick.event)?.(pick, models);
+			if (left !== undefined) await undoRunIn(d.git, left);
 
-				if (pick.event === SPLIT) return result.resolve(await split(d, pick.parts));
+			if (isReview) keepVerdict(state, { id, head, patch, pick, models });
+			else if (isOwn && purpose === "plan") keepPick(state.events, { itemId: id, pick: { judge: purpose, pick: keptPick(pick), models: [...models] } });
 
-				actor.send({ type: pick.event });
-			},
+			PICKED.get(pick.event)?.(pick, models);
+
+			if (pick.event === SPLIT) return result.resolve(await split(d, pick.parts));
+
+			await send(pick.event);
 		});
 
-	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review"), repro: step("repro"), "shows-bug": showsBug, "bug-gone": bugGone };
+	/** A run for each role: the repro role writes the repro's check; a plan or review role picks the next event; a build or fix role changes the files. */
+	const roleSource = (role: string) => {
+		if (role === REPRO_ROLE) return step(role, "repro");
+
+		const purpose = purposeOf(config, role);
+
+		return isProsePurpose(purpose) ? decision(role, purpose) : step(role, purpose);
+	};
+
+	/** Anything else a state invokes runs nothing: the config check refuses it, and a pass that meets one anyway fails loud. */
+	const nothingRuns = invoked(async () => {
+		throw failed("a state invokes a source that is neither a role nor a part that runs");
+	});
+
+	const sources = { ...Object.fromEntries(Object.keys(config.hum.roles).map((role) => [role, roleSource(role)])), checks: checksSource, "shows-bug": showsBug, "bug-gone": bugGone };
 
 	/** A wait that timed out restores on a clock that keeps its timers, so the pass fires the due ones with the real sources. */
 	const due = d.timedOut === undefined ? undefined : dueClock(state, { kind, saved: d.timedOut }, d.now());
 
 	if (d.resume) {
-		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind), clock: due?.clock });
+		const restored = await state.items.restore(id, kind, { sources: invokedSources(kind, nothingRuns, sources), kindAt: earlierKinds(state, kind), clock: due?.clock, touched: touchedNow });
 
 		if (!restored.ok) return { outcome: "held", item: id, why: restored.fault.cause };
 
@@ -845,7 +897,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		handled = String(actor.getSnapshot().value);
 	} else {
 		state.events.add(machineStarted({ itemId: id, machineVersion: version, afresh: d.restarted }));
-		actor = createActor(kindMachine(kind, sources));
+		actor = createActor(kindMachine(kind, invokedSources(kind, nothingRuns, sources), touchedNow));
 	}
 
 	const react = async (value: string) => {
@@ -869,20 +921,25 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		if (value === "merging") return result.resolve(await merge(d));
 	};
 
-	actor.subscribe((snapshot) => {
-		const saved = state.items.save(id, kind, persistedSnapshot(actor));
+	actor.subscribe({
+		next: (snapshot) => {
+			const saved = state.items.save(id, kind, persistedSnapshot(actor));
 
-		if (!saved.ok) result.reject(new Error(saved.fault.cause));
+			if (!saved.ok) result.reject(new Error(saved.fault.cause));
 
-		if (snapshot.status === "done") {
-			state.items.remove(id);
+			if (snapshot.status === "done") {
+				state.items.remove(id);
 
-			return result.resolve({ outcome: "merged", item: id });
-		}
+				return result.resolve({ outcome: "merged", item: id });
+			}
 
-		react(String(snapshot.value)).catch((error) => result.reject(error));
+			react(String(snapshot.value)).catch((error) => result.reject(error));
+		},
+		/* A machine that fails, as a guard that throws does, ends the pass in its error instead of leaving it waiting. */
+		error: (error) => result.reject(error),
 	});
 
+	await look();
 	actor.start();
 
 	if (d.answered && d.resume) {
@@ -974,16 +1031,16 @@ const roleOf = (config: RunConfig, name: string): string => {
 };
 
 
-/** What a plan or review run reads. A plan run reads the repo too; a review run reads only the item and the diff, so no author's reasoning reaches it. */
+/** What a plan or review run reads. A plan run, and a repo's own review role, read the repo too; the engine's review reads only the item and the diff, so no author's reasoning reaches it. */
 export const PROSE_PROMPTS = {
-	plan: (config: RunConfig, item: ItemText): string =>
+	plan: (config: RunConfig, item: ItemText, _diff = "", role = "plan"): string =>
 		[
-			roleOf(config, "plan"),
+			roleOf(config, role),
 			`# Item ${item.id}: ${item.title}\n\n${item.body}`,
 			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it; a plan-blocked answer asks the owner one question.",
 		].join("\n\n"),
-	review: (config: RunConfig, item: ItemText, diff: string): string => [roleOf(config, "review"), reviewInput(item, diff, config.hum)].join("\n\n"),
-} as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string) => string>;
+	review: (config: RunConfig, item: ItemText, diff: string, role = REVIEW_ROLE): string => [roleOf(config, role), reviewInput(item, diff, config.hum)].join("\n\n"),
+} as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string, role?: string) => string>;
 
 /** A pick as the item's log keeps it: a split's parts by title, which is all a measure reads of them. */
 const keptPick = (pick: EventPick) => ({ ...pick, parts: pick.parts.map(({ title }) => title) });
@@ -1001,8 +1058,40 @@ const keepVerdict = (state: State, { id, head, patch, pick, models }: { readonly
 /** What a repro that still shows the bug sends where the owner's window to object to it already closed. */
 const WINDOW_PASSED = "window-passed";
 
-/** The runs that change files: each leaves its change in the working tree, which hum commits. */
-type StepRole = "build" | "fix" | "repro";
+/** What a run that changes files makes: a build or a fix of the change, or the repro's check. Each leaves it in the working tree, which hum commits. */
+type StepKind = "build" | "fix" | "repro";
+
+/** The engine's own review role: the review at landing runs it too, and it reads only the item and the diff, so it judges the change cold. */
+const REVIEW_ROLE = "review";
+
+/** The engine's own repro role, whose run writes the check that shows the bug. */
+const REPRO_ROLE = "repro";
+
+/** The fix runs whose answers the item's log keeps since the owner last answered: each run of a role whose purpose is fix. */
+const fixRunsOf = ({ hum }: RunConfig, { runs }: ItemFold): number =>
+	Object.entries(runs).reduce((total, [role, count]) => total + (hum.roles[role]?.purpose === "fix" ? count : 0), 0);
+
+/** The files git sees changed in a working copy: tracked ones that differ from HEAD, and untracked ones it does not ignore. */
+const changedFiles = async (git: Git): Promise<ReadonlySet<string>> => {
+	const [tracked, untracked] = await Promise.all([git.raw(["diff", "--name-only", "-z", "HEAD"]), git.raw(["ls-files", "--others", "--exclude-standard", "-z"])]);
+
+	return new Set([...tracked.split("\0"), ...untracked.split("\0")].filter(Boolean));
+};
+
+/** Undoes what a run changed in the working copy since `before` was read: a tracked file goes back to HEAD, and a file the run added goes. */
+const undoRunIn = async (git: Git, before: ReadonlySet<string>): Promise<void> => {
+	const made = [...(await changedFiles(git))].filter((file) => !before.has(file));
+
+	if (made.length === 0) return;
+
+	const tracked = new Set((await git.raw(["ls-files", "-z", "--", ...made])).split("\0").filter(Boolean));
+	const restored = made.filter((file) => tracked.has(file));
+	const added = made.filter((file) => !tracked.has(file));
+
+	if (restored.length > 0) await git.raw(["checkout", "-q", "HEAD", "--", ...restored]);
+
+	if (added.length > 0) await git.raw(["clean", "-q", "-f", "--", ...added]);
+};
 
 /** Where a run that changes files works, and the folder it saves its evidence in. */
 type Workplace = { readonly branch: string; readonly evidence: string };
@@ -1028,7 +1117,7 @@ const RUN_CONTRACTS = {
 	fix: pullRequestContract,
 	repro: ({ branch }) =>
 		`Work on the branch ${branch}. Leave the check in the working tree and make no commit: hum commits it once you are done. End with the JSON {"status":"done","repro":{"command":…}}, naming the one shell command that fails now because of the bug and will pass once it is fixed, with "repro.translated" saying what stood in where the reported environment was not at hand; or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
-} as const satisfies Record<StepRole, (where: Workplace) => string>;
+} as const satisfies Record<StepKind, (where: Workplace) => string>;
 
 /** The purpose a role runs for, which picks its tier: the config's, else the role's own name for one of the four purposes. */
 const purposeOf = (config: RunConfig, role: string): Purpose => config.hum.roles[role]?.purpose ?? z.enum(PURPOSES).parse(role);
@@ -1053,7 +1142,7 @@ export const reviewRunOf =
 	(o: Pick<ThinPathOptions, "runner" | "state" | "config">, item: Item, kindName: string) =>
 	async ({ head, diff, level, patch }: Parameters<LandContext["reviewRun"]>[0]): Promise<ReviewOutcome> => {
 		const kind = kindNamed(o.config, kindName);
-		const row = pickTier(kind, { purpose: "review", level, size: "small" });
+		const row = pickTier(kind, { role: REVIEW_ROLE, purpose: "review", level, size: "small" });
 
 		if (!row) throw new Error(`the ${kindName} table has no review row`);
 

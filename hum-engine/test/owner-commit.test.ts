@@ -8,10 +8,13 @@ import { markdownSettings, sh, WorkRepo } from "./fixtures/work-repo.ts";
 
 const ANSWER = '"kind":"answer"';
 
-const world = (growthLabels = markdownSettings.growthLabels) => {
+/** An owner's commit on a repo that is not on GitHub, where a push is the only way to land. */
+const OFF_GITHUB = { sha: "0123456789abcdef", base: "main", label: "7", title: "t", body: "b", branchPrefix: "hum/owner/", mergeMethod: "squash" as const, alwaysPullRequest: false, labels: [] };
+
+const world = (over: Partial<typeof markdownSettings> = {}) => {
 	const repo = new WorkRepo();
 	const github = new FakeGitHub();
-	const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, growthLabels, pulls: github.client() }, { report: () => {}, now: Date.now, env: process.env });
+	const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, ...over, pulls: github.client() }, { report: () => {}, now: Date.now, env: process.env });
 
 	return { repo, github, adapter, id: repo.seed("asked") };
 };
@@ -46,11 +49,22 @@ test("where the base needs a pull request, each answer goes through its own that
 	]);
 });
 
+test("with alwaysPullRequest on, an answer goes through a pull request that merges itself though the base takes a push", async () => {
+	const { repo, github, adapter, id } = world({ alwaysPullRequest: true });
+
+	await adapter.answers?.answer(id, { text: "yes" });
+
+	expect(repo.show(id)).not.toContain(ANSWER);
+	expect(github.pulls().map((pull) => [pull.base, pull.autoMerge])).toEqual([["main", true]]);
+});
+
 test("an answer's pull request gets each growth label whose files the answer grows, and no other", async () => {
-	const { github, adapter, id } = world([
-		{ label: "grow", paths: [".hum/**"], except: [] },
-		{ label: "src", paths: ["src/**"], except: [] },
-	]);
+	const { github, adapter, id } = world({
+		growthLabels: [
+			{ label: "grow", paths: [".hum/**"], except: [] },
+			{ label: "src", paths: ["src/**"], except: [] },
+		],
+	});
 
 	github.requiresPullRequest = true;
 	await adapter.answers?.answer(id, { text: "yes" });
@@ -73,8 +87,14 @@ test("a push the remote refuses goes through a pull request when the repo is on 
 });
 
 test("off GitHub, a push the remote refuses lands nothing and hands back the remote's words", async () => {
-	const commit = { sha: "0123456789abcdef", base: "main", label: "7", title: "t", body: "b", branchPrefix: "hum/owner/", mergeMethod: "squash" as const, labels: [] };
 	const refused = { kind: "refused" as const, said: "git push refused: GH006: Protected branch update failed" };
 
-	expect(await landOwnerCommit({ ...commit, push: async () => refused })).toEqual({ via: "refused", said: refused.said });
+	expect(await landOwnerCommit({ ...OFF_GITHUB, push: async () => refused })).toEqual({ via: "refused", said: refused.said });
+});
+
+test("off GitHub with alwaysPullRequest on, nothing is pushed and the refusal says why", async () => {
+	const pushed: string[][] = [];
+
+	expect(await landOwnerCommit({ ...OFF_GITHUB, alwaysPullRequest: true, push: async (refspecs) => (pushed.push([...refspecs]), { kind: "pushed" }) })).toEqual({ via: "refused", said: "alwaysPullRequest is on, and main is not on GitHub" });
+	expect(pushed).toEqual([]);
 });

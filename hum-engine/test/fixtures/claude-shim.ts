@@ -73,9 +73,14 @@ if (schemaArg.includes('"sure"')) {
 	})();
 
 	const purpose = schemaArg.includes('"plan-ready"') ? "plan" : "review";
-	const answer = spec.decisions?.[made] ?? DECIDED[purpose];
+	const { write = {}, ...answer } = spec.decisions?.[made] ?? DECIDED[purpose];
 
-	appendFileSync(decisionLog, `${JSON.stringify({ purpose, answer, prompt, cwd: process.cwd() })}\n`);
+	for (const [path, content] of Object.entries(write)) {
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, content);
+	}
+
+	appendFileSync(decisionLog, `${JSON.stringify({ purpose, answer, prompt, cwd: process.cwd(), argv: process.argv.slice(2) })}\n`);
 	console.log(JSON.stringify({ type: "system", subtype: "init", plugins: [{ name: "hope" }] }));
 	console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "", structured_output: answer, modelUsage: { [SHIM_MODEL]: { inputTokens: 1, outputTokens: 10 } } }));
 	process.exit(0);
