@@ -42,7 +42,7 @@ export const checkLimits = ({ proofTimeoutSeconds, checkReruns }: Pick<HumConfig
 });
 
 /** A check that failed: its command, and the failure it gave. */
-export type CheckFailure = { readonly command: string; readonly failure: string };
+type CheckFailure = { readonly command: string; readonly failure: string };
 
 /** The first failing check; undefined when all pass. */
 export const firstFailing = async (commands: readonly string[], cwd: string, options: ShellOptions): Promise<CheckFailure | undefined> => {
