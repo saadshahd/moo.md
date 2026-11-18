@@ -15,7 +15,7 @@ export type GroupingOptions = {
 	readonly propose: Proposer;
 	/** Whether a model's proposal files a check alone: its precision on labelled pairs reached the owner's bar. */
 	readonly trusts: (models: readonly string[]) => boolean;
-	/** Told when a note's language left a signal unapplied, so it is never silent. */
+	/** Told the file type of each hunk the parser could not read, and the signals it left unapplied, so it is never silent. */
 	readonly onUnapplied: (extension: string, signals: readonly string[]) => void;
 };
 
@@ -31,8 +31,8 @@ const noteOf = (state: State, key: string): ReviewNote => {
 const pairedGroups = (state: State, note: ReviewNote, groups: readonly RepeatGroup[], onUnapplied: GroupingOptions["onUnapplied"]): RepeatGroup[] => {
 	const target = prepare(note);
 
-	const report = ({ unapplied }: Pairing): void => {
-		if (unapplied.length > 0) onUnapplied(extname(note.file ?? "") || "(none)", unapplied);
+	const report = ({ unapplied, unparsed }: Pairing): void => {
+		for (const { file } of unparsed) onUnapplied(extname(file ?? "") || "(none)", unapplied);
 	};
 
 	return groups.filter((group) =>

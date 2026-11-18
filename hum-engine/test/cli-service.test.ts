@@ -1,12 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
-import { CI_STATE_REF, restoreCiState } from "../src/service/ci-state.ts";
+import { CI_STATE_REF, restoreCiState, saveCiState } from "../src/service/ci-state.ts";
 import { CI_TICK_REF } from "../src/service/ci-tick.ts";
+import { TOKEN_LIFE_DAYS } from "../src/service/token.ts";
+import type { FaultInput } from "../src/state/faults.ts";
 import { doneByOf, foldItem } from "../src/state/item-log.ts";
 import { openState } from "../src/state/open.ts";
 import { readStatus } from "../src/status/file.ts";
+import { DAY_MS } from "../src/time.ts";
+import { OWNER } from "./fixtures/identity.ts";
 import { MAIN, ownerRepo } from "./fixtures/owner-repo.ts";
 import { sh } from "./fixtures/work-repo.ts";
 import { tempDir } from "./fixtures/temp.ts";
@@ -84,6 +89,15 @@ const savedState = async (o: ReturnType<typeof ownerRepo>) => {
 	await restoreCiState({ repo: o.repo.owner, remote: o.repo.remote, dir, timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS });
 
 	return openState(dir, { now: Date.now });
+};
+
+/** Adds `card` to hum's state on the remote, as an earlier engine saved it there. */
+const keepCard = async (o: ReturnType<typeof ownerRepo>, card: FaultInput) => {
+	const where = { repo: o.repo.owner, remote: o.repo.remote, dir: tempDir("kept-card"), timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS };
+	const read = await restoreCiState(where);
+
+	openState(where.dir, { now: Date.now }).faults.raise(card);
+	await saveCiState({ ...where, ...read, identity: OWNER, at: Date.now() });
 };
 
 test("a wake on a schedule event: the item merges, the tick and hum's state are recorded on the remote, and each job exits 0", () => {
@@ -168,6 +182,35 @@ test("a wake with a rejected token exits 1, annotates the job and writes its sum
 	expect(readFileSync(summary, "utf8")).toContain("token-rejected");
 	// The item waits where it is.
 	expect(sh(o.repo.remote, ["show", "main:.hum/work/a.md"])).toContain("state: ready");
+});
+
+test("a wake whose CI token is in its last weeks warns on each job, merges the item and exits 0", () => {
+	const setUp = new Date(Date.now() - (TOKEN_LIFE_DAYS - SHIPPED_DEFAULTS.tokenWarnDays / 2) * DAY_MS).toISOString().slice(0, 10);
+	const o = owner({ items: { a: { writeForItem: true } } }, {}, (raw) => void (raw.hum.ciToken = { setUp }));
+	const jobs = wakeJobs(o);
+
+	o.item("a");
+
+	const gather = jobs.gather();
+
+	expect(gather.code).toBe(0);
+	expect(gather.out).toContain("::warning title=hum token-expiring::");
+	expect(jobs.work().code).toBe(0);
+	expect(ran(jobs.publish()).code).toBe(0);
+	expect(sh(o.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
+});
+
+test("a wake whose saved state holds the signal card hum 0.7.0 kept for good runs every job, and its review-note loop clears the card", async () => {
+	const o = owner({ items: { a: { writeForItem: true } } });
+
+	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
+	await keepCard(o, { code: "signal-not-applied", item: ".ts", cause: "Hunks in .ts files are not parsed, so shared-identifier and same-glob-symbol did not run on them.", fix: "The other signals still decide." });
+	rmSync(stateDir(o), { recursive: true, force: true });
+	o.item("a");
+
+	expect(wake(o, ["--event", "issue_comment"]).code).toBe(0);
+	expect(sh(o.repo.remote, ["show", "main:docs/a.md"])).toBe("from a\n");
+	expect((await savedState(o)).faults.list().map(({ code }) => code)).not.toContain("signal-not-applied");
 });
 
 test("a wake with a config that names no checks says what is missing and exits 1", () => {

@@ -360,6 +360,9 @@ const readCredential = (file: string): string | undefined => {
 	}
 };
 
+/** The card for a credential other than the recorded one. */
+export const CREDENTIAL_CHANGED = "credential-changed";
+
 /** The credential is recorded at the first start. A different one later shows one card, and runs go on. */
 const recordCredential = (state: RunnerOptions["state"], credential: string): void => {
 	const file = join(state.dir, CREDENTIALS);
@@ -372,10 +375,10 @@ const recordCredential = (state: RunnerOptions["state"], credential: string): vo
 		return;
 	}
 
-	if (recorded === credential) return state.faults.clear({ code: "credential-changed" });
+	if (recorded === credential) return state.faults.clear({ code: CREDENTIAL_CHANGED });
 
 	state.faults.raise({
-		code: "credential-changed",
+		code: CREDENTIAL_CHANGED,
 		cause: `claude now runs on ${credential}; it was recorded as ${recorded}.`,
 		fix: `Runs go on. Delete ${file} to record ${credential} as the choice.`,
 	});

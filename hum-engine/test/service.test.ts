@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { CI_TICK_REF, readCiTick, recordCiTick } from "../src/service/ci-tick.ts";
 import { backoffFor, type Child, EXIT_UPDATED, supervise, type Supervision } from "../src/service/supervise.ts";
 import { checkTokenAge } from "../src/service/token.ts";
-import { wakeUntilQuiet } from "../src/service/wake.ts";
+import { doesStopWake, wakeUntilQuiet } from "../src/service/wake.ts";
 import { SHIPPED_DEFAULTS } from "../src/config/schema.ts";
 import { openState } from "../src/state/open.ts";
 import { readStatus, writeHeartbeat } from "../src/status/file.ts";
@@ -178,6 +178,12 @@ test("a 401 holds the item where it is with one card naming claude setup-token; 
 
 	expect(w.results.at(-1)).toMatchObject({ outcome: "merged", item: "a" });
 	expect(w.state.faults.list().map((c) => c.code)).not.toContain("token-rejected");
+});
+
+test("in a CI wake a card that only informs stops nothing, and every other card stops the wake", () => {
+	const codes = ["signal-not-applied", "token-expiring", "credential-changed", "token-rejected", "review-loop"];
+
+	expect(codes.filter((code) => doesStopWake({ code }))).toEqual(["token-rejected", "review-loop"]);
 });
 
 test("the scheduled workflow's tick is a ref on the remote; the Mac reads its time", async () => {
