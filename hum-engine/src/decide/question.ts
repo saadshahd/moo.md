@@ -78,6 +78,9 @@ export const PLAIN_QUESTIONS = {
 
 export type PlainQuestion = keyof typeof PLAIN_QUESTIONS;
 
+/** The over-cap question's options: go on past the cap, or end the item. */
+export const OVER_CAP_OPTIONS = { goOn: "continue", stop: "stop" } as const;
+
 /** The question each confirmed reason asks, from the facts the run named. */
 const ASKED = {
 	"missing-secret": ({ variable }) => `Can you set ${variable} for the runner?`,

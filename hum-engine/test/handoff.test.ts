@@ -15,6 +15,8 @@ test("a pass leaves the owner's wait it starts in only with the owner's answer",
 	expect(passReach({ kind: feature, at: "owner-review", answered: false, timedOut: false })).toEqual(new Set(["owner-review"]));
 	expect(passReach({ kind: feature, at: "owner-review", answered: true, timedOut: false })).toContain("merging");
 	expect(passReach({ kind: feature, at: "owner-review", answered: false, timedOut: true })).toContain("merging");
+	expect(passReach({ kind: feature, at: "asking-planning", answered: false, timedOut: false })).toEqual(new Set(["asking-planning"]));
+	expect(passReach({ kind: feature, at: "asking-planning", answered: true, timedOut: false })).toContain("planning");
 });
 
 test("publish takes a work job's runs and a machine state a pass can reach, and none of its landings or verdicts", () => {

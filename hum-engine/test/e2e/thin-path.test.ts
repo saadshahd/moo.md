@@ -769,16 +769,55 @@ test("a plan answer the log keeps is read back on a pass after a limit, adding n
 	expect(w.shim.decisions().map(({ purpose }) => purpose)).toEqual(["plan", "plan"]);
 });
 
-test("a plan run past the token cap asks the owner in the kind's tokenCap.overCap state instead of ending stuck", async () => {
+test("a plan run past the token cap asks the owner, runs the plan again on the answer, and ends at the owner's stop", async () => {
 	const config = configWith((raw) => {
 		raw.kinds.feature.tokenCap.tokens = 5;
 	});
 
-	const w = await world({ script: [{}], decisions: [READY_PLAN] }, { config });
+	const w = await world({ script: [{}] }, { config });
 	const id = w.repo.seed("Write the note");
+	const pass = () => runThinPath(w.thinPath({ judge: featureJudge, itemId: id }));
+	const plans = () => w.shim.decisions().filter(({ purpose }) => purpose === "plan").length;
 
-	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
-	expect(w.state.items.saved().find(({ itemId }) => itemId === id)?.state).toBe(w.config.kinds.feature?.tokenCap.overCap);
+	const answer = async (text: string) => {
+		await w.adapter.answers!.answer(id, { text });
+		w.clock.at += TTL + 1;
+	};
+
+	expect(await pass()).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
+
+	const runs = w.shim.calls().length;
+
+	await answer("Continue.");
+	expect(await pass()).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
+	expect(plans()).toBe(2);
+	expect(w.shim.calls()).toHaveLength(runs);
+
+	await answer("Stop.");
+	expect(await pass()).toMatchObject({ outcome: "stuck", item: id, detail: "the owner stopped it at the token cap" });
+	expect(plans()).toBe(2);
+});
+
+test("a review run past the token cap runs the review again on the owner's answer, and builds nothing again", async () => {
+	const config = configWith((raw) => {
+		raw.kinds.check.tokenCap.tokens = 12;
+	});
+
+	const judge = scriptedJudge({ kind: { kind: "check" }, alignment: SOUND });
+	const w = await world({ script: [{}, { ...NOTE, modelTokens: 2 }] }, { config });
+	const id = w.repo.seed("Write the note");
+	const reviews = () => w.shim.decisions().filter(({ purpose }) => purpose === "review").length;
+
+	expect(await runThinPath(w.thinPath({ judge }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
+
+	const runs = w.shim.calls().length;
+
+	await w.adapter.answers!.answer(id, { text: "Continue." });
+	w.clock.at += TTL + 1;
+
+	expect(await runThinPath(w.thinPath({ judge, itemId: id }))).toMatchObject({ outcome: "merged", item: id });
+	expect(reviews()).toBe(2);
+	expect(w.shim.calls()).toHaveLength(runs);
 });
 
 test("the owner's answer at the token cap's wait starts the fix count over", async () => {
@@ -796,7 +835,7 @@ test("the owner's answer at the token cap's wait starts the fix count over", asy
 
 	const asked = w.shim.calls().length;
 
-	await w.adapter.answers!.answer(id, { text: "Go on." });
+	await w.adapter.answers!.answer(id, { text: "Continue." });
 	w.clock.at += TTL + 1;
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge, itemId: id }))).toMatchObject({ outcome: "stuck", item: id, detail: "the checks still fail after 2 fixes" });

@@ -8,18 +8,33 @@ const placeholder = createAsyncLogic({ run: async () => {} });
 /** What a run past its token cap, or a run's question for the owner, sends the machine. */
 export const TOKEN_CAP = "token-cap";
 
+/** What the owner's answer sends the wait it was given at. */
+export const ANSWERED = "answered";
+
 const FIXED: ReadonlySet<string> = new Set(FIXED_PARTS);
 
 /**
- * The kind's machine as hum runs it: a state that invokes a role's run and names no `token-cap` transition of its own
- * takes the kind's `tokenCap.overCap` on it, so a run past the cap reaches the owner wherever it runs.
+ * The kind as hum runs it. A state that invokes a role's run and names no `token-cap` transition stops, past the cap,
+ * at the wait `<overCap>-<state>`: the kind's own state of that name, else a copy of its `tokenCap.overCap` wait whose
+ * answer leads back to the state, so the owner's answer runs it again and skips nothing after it.
  */
-const withOverCap = ({ machine, tokenCap }: Kind): Kind["machine"] => ({
-	...machine,
-	states: Object.fromEntries(
-		Object.entries(machine.states).map(([name, node]) => [name, node.invoke !== undefined && !FIXED.has(node.invoke.src) && node.on?.[TOKEN_CAP] === undefined ? { ...node, on: { ...node.on, [TOKEN_CAP]: [{ target: tokenCap.overCap }] } } : node]),
-	),
-});
+export const withOverCapWaits = (kind: Kind): Kind => {
+	const { machine, tokenCap } = kind;
+	const wait = machine.states[tokenCap.overCap];
+
+	if (wait === undefined) return kind;
+
+	const waitOf = (run: string): string => `${tokenCap.overCap}-${run}`;
+
+	const runs = Object.entries(machine.states)
+		.filter(([, node]) => node.invoke !== undefined && !FIXED.has(node.invoke.src) && node.on?.[TOKEN_CAP] === undefined)
+		.map(([name]) => name);
+
+	const states = Object.fromEntries(Object.entries(machine.states).map(([name, node]) => [name, runs.includes(name) ? { ...node, on: { ...node.on, [TOKEN_CAP]: [{ target: waitOf(name) }] } } : node]));
+	const waits = Object.fromEntries(runs.map((run) => [waitOf(run), machine.states[waitOf(run)] ?? { ...wait, on: { ...wait.on, [ANSWERED]: [{ target: run }] } }]));
+
+	return { ...kind, machine: { ...machine, states: { ...states, ...waits } } };
+};
 
 /**
  * A kind's machine. `machineFromJSON` needs an actor for every `invoke.src`; any
@@ -28,7 +43,7 @@ const withOverCap = ({ machine, tokenCap }: Kind): Kind["machine"] => ({
  */
 export const kindMachine = (kind: Kind, sources: Readonly<Record<string, AnyActorLogic>> = {}): AnyStateMachine => {
 	// SAFETY: the zod machine schema is a subset of xstate's MachineJSON, and machineFromJSON validates the rest.
-	return machineFromJSON(withOverCap(kind) as Parameters<typeof machineFromJSON>[0], { actors: invokedSources(kind, placeholder, sources) });
+	return machineFromJSON(kind.machine as Parameters<typeof machineFromJSON>[0], { actors: invokedSources(kind, placeholder, sources) });
 };
 
 /** A state's earliest `after` timeout: its hours and the transitions it takes; undefined for a state with none. */

@@ -11,7 +11,7 @@ import { type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapter
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
-import { earliestTimeout, invokedSources, kindMachine, TOKEN_CAP } from "../config/machine.ts";
+import { ANSWERED, earliestTimeout, invokedSources, kindMachine, TOKEN_CAP } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
@@ -25,7 +25,7 @@ import { HOUR_MS, SECOND_MS } from "../time.ts";
 import { checkLimits, firstFailing, runChecks } from "./checks.ts";
 import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
-import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
+import { askDecision, askedQuestion, isWaitQuestion, OVER_CAP_OPTIONS, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
 import type { Stage } from "../decide/answer.ts";
 import { type ItemText, reviewInput } from "../decide/review.ts";
 import { forgetProgress, keepKind, kindAnswered, pickKind } from "./kind.ts";
@@ -283,10 +283,14 @@ export const gatherItem = async (o: ThinPathOptions, id: ItemId): Promise<Gather
 
 	if (asking && answered === undefined && timedOut === undefined) return { outcome: "waiting", item: id };
 
+	const stopped = answered?.option === OVER_CAP_OPTIONS.stop && visibleText(answered.question) === PLAIN_QUESTIONS["over-cap"];
+
+	if (stopped && asking) return park(o, { outcome: "stuck", item: id, detail: "the owner stopped it at the token cap" });
+
 	/* The owner's rejection at the approval wait ends the landing saved for it, so only a new change lands. */
 	if (isApprovalWait(kind, at) && answered !== undefined && answered.option !== OWNER_APPROVAL) o.state.landings.remove(id);
 
-	return { item, kindName, kind, judge, onSnapshot, asking, answered, timedOut };
+	return { item, kindName, kind, judge, onSnapshot, asking, answered: stopped ? undefined : answered, timedOut };
 };
 
 export const isGathered = (gathered: Gathered | ThinResult): gathered is Gathered => "kindName" in gathered;
@@ -517,7 +521,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	/**
 	 * One agent run of the item. A limit, a hold or a stop pauses the item; passing the token cap asks the owner where
-	 * the state can, and ends stuck where it cannot. A run given what it judges is answered from the item's log when
+	 * the state can, and ends stuck where it cannot. The owner's answer runs on past the cap, or with `stop` ends the item. A run given what it judges is answered from the item's log when
 	 * the log keeps an answer to the same prompt on the same change, and that answer spends nothing again.
 	 */
 	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
@@ -563,7 +567,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			if (!actor.getSnapshot().can({ type: TOKEN_CAP })) throw failed(why);
 
-			ask({ question: { text: PLAIN_QUESTIONS["over-cap"], detail: why }, plain: "over-cap", plan: "" });
+			ask({ question: { text: PLAIN_QUESTIONS["over-cap"], options: Object.values(OVER_CAP_OPTIONS), detail: why }, plain: "over-cap", plan: "" });
 
 			return new Promise<never>(() => {});
 		}
@@ -936,8 +940,6 @@ const chosenSection = (chosen: readonly string[]): string => (chosen.length === 
 const OWNER_APPROVED = "owner-approved";
 
 const OWNER_REJECTED = "owner-rejected";
-
-const ANSWERED = "answered";
 
 /** The event an owner's answer sends a saved wait: `answered` where the state takes it, else the owner's approval or rejection of the change. */
 const resumeEvent = (snapshot: { can: (event: { type: string }) => boolean }, answered: Answered) => {

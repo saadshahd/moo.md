@@ -428,6 +428,32 @@ test("a fix item run again after its window passed reruns the repro, and opens t
 	expect(await runAgainAfterTheWindow(repro("bash docs/repro.sh"))).toMatchObject({ result: { outcome: "asked", item: "a" }, runs: 4 });
 });
 
+test("the owner's stop at the token cap ends the item, and Run it again starts it afresh", async () => {
+	const config = configWith((raw) => {
+		raw.kinds.docs.tokenCap.tokens = 500;
+	});
+
+	const w = await workerWorld({ script: [{}, { write: { "docs/a.md": "long\n" }, modelTokens: 1000 }, { write: { "docs/a.md": "short\n" }, modelTokens: 1 }] }, { config });
+
+	const step = async (answer?: string) => {
+		w.clock.at += TTL + 1;
+
+		if (answer !== undefined) await w.adapter.answers!.answer(ItemId.parse("a"), { text: answer });
+
+		await w.worker.tick();
+		await w.worker.idle();
+
+		return w.results.at(-1);
+	};
+
+	w.item("a", "docs/a.md");
+	expect(await step()).toMatchObject({ outcome: "asked", item: "a" });
+	expect(await step("Stop.")).toMatchObject({ outcome: "stuck", item: "a", detail: "the owner stopped it at the token cap" });
+	await step("retry");
+	expect(w.state.parked.get("a")).toBeUndefined();
+	expect(await step()).toMatchObject({ outcome: "merged", item: "a" });
+});
+
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {
 	const flag = join(tempDir("flag"), "flag");
 	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });

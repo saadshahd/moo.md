@@ -390,7 +390,7 @@ export class Worker {
 
 		if (this.#inFlight.has(id)) return { stage: "running" };
 
-		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: parked.why === "review" ? [OWNER_APPROVAL, RUN_AGAIN] : [RUN_AGAIN] };
+		if (parked) return { stage: parked.why === "review" ? "approval" : "waiting", options: parked.why === "review" ? [OWNER_APPROVAL, RUN_AGAIN] : [RUN_AGAIN], since: parked.since };
 
 		const asleep = sleeping.get(id);
 		const kind = asleep && this.#kindNamed(asleep.kind)?.kind;
