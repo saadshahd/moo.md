@@ -1,6 +1,4 @@
 import { expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import type { FollowUp, ItemRef, WorkSource } from "../src/adapter-api.ts";
 import { gitIn } from "../src/adapters/git.ts";
 import { historiesOf } from "../src/adapters/history.ts";
@@ -13,7 +11,7 @@ import { openState } from "../src/state/open.ts";
 import { type BaseCheck, checkBaseAfterMerge, checkMergesAt, settleBaseCheck } from "../src/worker/base-check.ts";
 import { configWith } from "./fixtures/config.ts";
 import { pastChange, reviewNote } from "./fixtures/records.ts";
-import { sh } from "./fixtures/work-repo.ts";
+import { commitFiles as commit, sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
 import { ItemId } from "../src/adapter-api.ts";
@@ -25,18 +23,6 @@ const scratch = (): string => {
 	sh(dir, ["init", "-q", "-b", "main"]);
 
 	return dir;
-};
-
-const commit = (dir: string, files: Record<string, string>, message: string): string => {
-	for (const [file, text] of Object.entries(files)) {
-		mkdirSync(dirname(join(dir, file)), { recursive: true });
-		writeFileSync(join(dir, file), text);
-	}
-
-	sh(dir, ["add", "-A"]);
-	sh(dir, ["commit", "-q", "-m", message]);
-
-	return sh(dir, ["rev-parse", "HEAD"]).trim();
 };
 
 const violating = (dir: string): string => commit(dir, { "src/a.ts": "export const x = legacy();\n" }, "feat: a");

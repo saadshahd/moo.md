@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { gitIn, type GitIdentityRead, readGitIdentity } from "../src/adapters/git.ts";
 import { loadConfig, readConfigDir } from "../src/config/load.ts";
 import { SCHEMA_VERSION } from "../src/config/schema.ts";
@@ -14,7 +14,7 @@ import { readAnswers, SetupAnswers, writeSetup } from "../src/setup/write.ts";
 import { installedSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { MAIN } from "./fixtures/owner-repo.ts";
-import { sh } from "./fixtures/work-repo.ts";
+import { commitFiles, sh } from "./fixtures/work-repo.ts";
 import { SHIPPED_COMMAND_TIMEOUT_MS } from "../src/exec.ts";
 import { tempDir } from "./fixtures/temp.ts";
 
@@ -27,13 +27,7 @@ const repoWith = (files: Record<string, string>): string => {
 	sh(root, ["init", "-q", "-b", "main", repo]);
 	sh(repo, ["remote", "add", "origin", join(root, "remote.git")]);
 
-	for (const [path, text] of Object.entries(files)) {
-		mkdirSync(dirname(join(repo, path)), { recursive: true });
-		writeFileSync(join(repo, path), text);
-	}
-
-	sh(repo, ["add", "-A"]);
-	sh(repo, ["commit", "-q", "-m", "init"]);
+	commitFiles(repo, files, "init");
 	sh(repo, ["push", "-q", "origin", "main"]);
 
 	return repo;

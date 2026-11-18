@@ -178,10 +178,10 @@ export const push = async (git: Git, rest: readonly string[]): Promise<PushOutco
 	throw new GitFailed(args, result);
 };
 
-/** Whether `ancestor` is reachable from `descendant`. git answers by exit code alone. */
 /** Whether `git` holds `sha` as a commit. */
 export const isCommit = async (git: Git, sha: string): Promise<boolean> => (await git.run(["cat-file", "-e", `${sha}^{commit}`])).code === 0;
 
+/** Whether `ancestor` is reachable from `descendant`. git answers by exit code alone. */
 export const isAncestor = async (git: Git, { ancestor, descendant }: { readonly ancestor: string; readonly descendant: string }): Promise<boolean> => {
 	const args = ["merge-base", "--is-ancestor", ancestor, descendant];
 	const result = await git.run(args);
