@@ -58,9 +58,11 @@ Defects the rules only gesture at:
 | Zombie noun — an action embalmed as a noun (-tion, -ment, -ance) | Verb it | "perform validation" → "validate" |
 | Buried doer — abstract subject, actor missing or in a by-phrase | Doer as subject, action as verb | "the fix was applied" → "I fixed it" |
 | Negative form | State it positively | "not different" → "the same" |
-| Hedge — "somewhat", "fairly", "arguably", "should probably" | Cut it or commit | "should probably work" → "works", or name when it fails |
+| Hedge or bare claim — "somewhat", "fairly", "arguably", "should probably", or a claim with no proof | Cut the hedge. Give the claim its proof, or mark it measured, inferred or guess. Keep a confidence a source stated: it is a finding | "should probably work" → "works: the tests pass", or "works (guess)" |
 | Abstract where concrete exists | Name the thing | "the relevant file" → "`config.ts`" |
 | Unplaced name — one the reader didn't bring in: an acronym, a label you coined, or one from a subagent, another project, or memory | Say what it is and where it came from, or drop it for plain words | "the CAS failed" → "the compare-and-swap failed"; "the bench cards" → "the rule sheets that end your songs sessions" |
+| Loose pronoun — an "it", "they", "this" or "which" that points at a whole clause or could mean two things | Name the thing it points at | "this broke it" → "the rename broke the build" |
+| AI tell — a list padded to three, "not just X but Y", a trailing -ing clause that adds no fact, "serves as" for "is", stock words such as "delve", "crucial", "pivotal" | Cut it, or say the plain thing | "serves as the hub, ensuring speed" → "is the hub" |
 | One sentence, two ideas | Split it | — |
 
 Caps, from Simplified Technical English:
@@ -69,7 +71,7 @@ Caps, from Simplified Technical English:
 | --- | --- |
 | Sentence | 20 words for an instruction, 25 for anything else |
 | Paragraph | 6 sentences, one topic |
-| Instruction | one action per sentence |
+| Instruction | one action per sentence, after the condition or warning that guards it |
 | Noun cluster | 3 nouns; break longer ones with "of" / "for" |
 | Term | one per concept; reuse the exact word, never a synonym |
 | Point | made once; no restating in other words, no summary that repeats the body |
