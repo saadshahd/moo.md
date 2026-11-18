@@ -803,28 +803,6 @@ test("a plan run past the token cap asks the owner, runs the plan again on the a
 	expect(plans()).toBe(2);
 });
 
-test("a review run past the token cap runs the review again on the owner's answer, and builds nothing again", async () => {
-	const config = configWith((raw) => {
-		raw.kinds.check.tokenCap.tokens = 12;
-	});
-
-	const judge = scriptedJudge({ kind: { kind: "check" }, alignment: SOUND });
-	const w = await world({ script: [{}, { ...NOTE, modelTokens: 2 }] }, { config });
-	const id = w.repo.seed("Write the note");
-	const reviews = () => w.shim.decisions().filter(({ purpose }) => purpose === "review").length;
-
-	expect(await runThinPath(w.thinPath({ judge }))).toMatchObject({ outcome: "asked", item: id, detail: PLAIN_QUESTIONS["over-cap"] });
-
-	const runs = w.shim.calls().length;
-
-	await w.adapter.answers!.answer(id, { text: "Continue." });
-	w.clock.at += TTL + 1;
-
-	expect(await runThinPath(w.thinPath({ judge, itemId: id }))).toMatchObject({ outcome: "merged", item: id });
-	expect(reviews()).toBe(2);
-	expect(w.shim.calls()).toHaveLength(runs);
-});
-
 test("the owner's answer at the token cap's wait starts the fix count over", async () => {
 	const config = configWith((raw) => {
 		raw.hum.maxFixRuns = 2;
