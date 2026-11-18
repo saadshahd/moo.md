@@ -7,7 +7,7 @@ import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource
 import { type Finished, type Paused, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapters/git.ts";
+import { filesBetween, type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
@@ -628,7 +628,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 		const { command, translated } = wants.repro;
 		const commit = (await g(["rev-parse", "HEAD"])).trim();
-		const files = (await g(["diff", "--name-only", before, commit])).split("\n").filter(Boolean);
+		const files = await filesBetween(d.git, before, commit);
 		const earlier = state.repros.get(id);
 
 		state.repros.put(id, { item: id, command, translated, commit, files, unopposed: earlier?.command === command ? earlier.unopposed : undefined });
@@ -750,9 +750,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const bugGone = createAsyncLogic({
 		run: async () => {
 			const repro = savedRepro();
-			const edited = repro.files.length === 0 ? "" : (await g(["diff", "--name-only", repro.commit, "HEAD", "--", ...repro.files])).trim();
+			const edited = repro.files.length === 0 ? [] : await filesBetween(d.git, repro.commit, "HEAD", ...repro.files);
 
-			if (edited !== "") throw failedCheck(`The change edits the repro's own files (${edited.split("\n").join(", ")}): put them back as the repro left them, and fix the bug instead.`);
+			if (edited.length > 0) throw failedCheck(`The change edits the repro's own files (${edited.join(", ")}): put them back as the repro left them, and fix the bug instead.`);
 
 			const failures = (await reproRuns(repro.command)).flatMap((failure) => (failure === undefined ? [] : [failure]));
 

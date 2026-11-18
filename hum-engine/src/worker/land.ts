@@ -8,6 +8,7 @@ import {
 	type WorkSource,
 } from "../adapter-api.ts";
 import {
+	filesBetween,
 	type Git,
 	gitIn,
 	isAncestor,
@@ -337,9 +338,6 @@ const isOnBase = async ({ git, base }: LandContext): Promise<boolean> => {
 
 	return isAncestor(git, { ancestor: "HEAD", descendant: `origin/${base}` });
 };
-
-/** The files that differ between two commits. */
-const filesBetween = async (git: Git, from: string, to: string): Promise<string[]> => (await git.raw(["diff", "--name-only", from, to])).split("\n").filter(Boolean);
 
 /** The folder each file sits in, "" for the repo's top, where manifests and lockfiles every folder depends on live. */
 const foldersOf = (files: readonly string[]): string[] => files.map((file) => (dirname(file) === "." ? "" : dirname(file)));
