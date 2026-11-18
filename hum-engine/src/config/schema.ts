@@ -24,6 +24,11 @@ export const FIXED_PARTS = [
 	"bug-gone",
 ] as const;
 
+const FIXED: ReadonlySet<string> = new Set(FIXED_PARTS);
+
+/** Whether a state's `invoke.src` names one of the engine's parts, not a role's run. */
+export const isFixedPart = (src: string): boolean => FIXED.has(src);
+
 export const PURPOSES = ["plan", "build", "fix", "review"] as const;
 
 /** The integration slots `hum.json` `integrations` names, each to an adapter. */

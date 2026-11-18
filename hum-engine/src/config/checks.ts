@@ -4,6 +4,7 @@ import type { Problem } from "./refusal.ts";
 import {
 	FIXED_PARTS,
 	type HumConfig,
+	isFixedPart,
 	type Kind,
 	type Naming,
 	OWNER_WAIT_TAG,
@@ -18,8 +19,6 @@ import {
 export type CheckEnv = { readonly installedSkills?: ReadonlySet<string> };
 
 type Transitions = StateNodeJSON["onTimeout"];
-
-const FIXED = new Set<string>(FIXED_PARTS);
 
 const isWait = (node: StateNodeJSON) => node.tags?.includes(WAIT_TAG) || node.tags?.includes(OWNER_WAIT_TAG);
 const isTerminal = (node: StateNodeJSON) => node.type === "final" || node.tags?.includes(STUCK_TAG);
@@ -67,7 +66,7 @@ const kindProblems = (kind: string, config: Kind, hum: HumConfig): Problem[] => 
 			const role = hum.roles[node.invoke.src];
 
 			if (role) purposes.add(role.purpose);
-			else if (!FIXED.has(node.invoke.src)) {
+			else if (!isFixedPart(node.invoke.src)) {
 				problems.push({ problem: "unknown-run-source", kind, state, src: node.invoke.src });
 			}
 

@@ -1,7 +1,7 @@
 import { type AnyActorLogic, type AnyStateMachine, createAsyncLogic, machineFromJSON } from "xstate";
 import { toDirectedGraph } from "xstate/graph";
 import { HOUR_MS } from "../time.ts";
-import { FIXED_PARTS, type Kind, type StateNodeJSON } from "./schema.ts";
+import { isFixedPart, type Kind, type StateNodeJSON } from "./schema.ts";
 
 const placeholder = createAsyncLogic({ run: async () => {} });
 
@@ -10,8 +10,6 @@ export const TOKEN_CAP = "token-cap";
 
 /** What the owner's answer sends the wait it was given at. */
 export const ANSWERED = "answered";
-
-const FIXED: ReadonlySet<string> = new Set(FIXED_PARTS);
 
 /**
  * The kind as hum runs it. A state that invokes a role's run and names no `token-cap` transition stops, past the cap,
@@ -27,7 +25,7 @@ export const withOverCapWaits = (kind: Kind): Kind => {
 	const waitOf = (run: string): string => `${tokenCap.overCap}-${run}`;
 
 	const runs = Object.entries(machine.states)
-		.filter(([, node]) => node.invoke !== undefined && !FIXED.has(node.invoke.src) && node.on?.[TOKEN_CAP] === undefined)
+		.filter(([, node]) => node.invoke !== undefined && !isFixedPart(node.invoke.src) && node.on?.[TOKEN_CAP] === undefined)
 		.map(([name]) => name);
 
 	const states = Object.fromEntries(Object.entries(machine.states).map(([name, node]) => [name, runs.includes(name) ? { ...node, on: { ...node.on, [TOKEN_CAP]: [{ target: waitOf(name) }] } } : node]));
