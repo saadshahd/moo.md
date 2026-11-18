@@ -1,0 +1,5 @@
+A module's interface hides most of its work: when the interface changes whenever the internals do, or asks callers for decisions the module could make itself, the module is shallow — deepen it by pulling those decisions down behind a smaller interface.
+_Avoid_: an exported signature that gains a parameter, flag or option each time the implementation learns a case; callers that must sequence the module's internal steps (`init`, `load`, `validate`, then `run`) to use it.
+Detect: an export whose signature changed in most of the commits that changed its body (`git log -L` on the function); or an interface whose parameters, flags and required call order number about as many as the decisions inside it.
+Not-when: an adapter at a foreign boundary whose whole job is translation (integration-point-isolation); a plain data type, whose fields are its interface; the one call order a protocol fixes (open before read).
+Cross-ref: abstraction-earns-existence — the pass-through wrapper, cut by its deletion test; depend-on-the-narrow-capability-you-use — the same narrowness asked from the consumer's side.
