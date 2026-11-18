@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Pre-commit gate for rename-leaves-no-stale-name.md: blocks a staged change
-# that retires a name while a doc or a JS/TS comment in the staged tree still
-# uses it. A change retires a compound name (camelCase, two-word PascalCase,
+# Pre-commit gate for rename-leaves-no-stale-name.md: lists, without
+# blocking, the lines of a doc or a JS/TS comment in the staged tree that still
+# use a name the staged change retires. A change retires a compound name (camelCase, two-word PascalCase,
 # snake_case) when it removes an exported or top-level declaration and no
 # JS/TS code uses the name any more; it retires a source path when it renames
 # the file away. An old path also counts in a string or a config file. A doc
 # that declares the name in its own example is not a use. Run from the repo
-# root. Exit 1 blocks the commit.
+# root. Always exits 0: a refactor plan or a name shared with another tool
+# reads the same as a stale line, so the list is for the committer to judge.
 set -Eeuo pipefail
 trap 'echo "stale-name gate crashed at line $LINENO; commit allowed" >&2; exit 0' ERR
 
@@ -153,12 +154,11 @@ done < <(renamed_away)
 
 [ -z "$stale" ] && exit 0
 cat >&2 <<EOF
-Commit blocked: this change retires these names, and these lines still use them:
+Stale names: this change retires these names, and these lines may still use them:
 $stale
 The type checker sees code; it cannot see docs, comments or an old path in
-config. In this commit, give each line the new name, or delete it if the
-thing is gone. A line that names the old one on purpose belongs in CHANGELOG.md.
-Vendored or generated? Mark it linguist-vendored or linguist-generated in
-.gitattributes, in a commit of its own.
+config. Give each stale line the new name, or delete it if the thing is gone,
+then amend this commit. A plan or a history note that names the old one on
+purpose stays as it is.
 EOF
-exit 1
+exit 0
