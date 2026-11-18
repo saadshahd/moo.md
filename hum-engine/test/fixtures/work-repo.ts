@@ -20,6 +20,7 @@ export const markdownSettings = {
 	itemReadsAtOnce: SHIPPED_DEFAULTS.itemReadsAtOnce,
 	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,
 	ownerBranchPrefix: SHIPPED_DEFAULTS.ownerBranchPrefix,
+	growthLabels: SHIPPED_DEFAULTS.growthLabels,
 	timeoutMs: SHIPPED_COMMAND_TIMEOUT_MS,
 };
 

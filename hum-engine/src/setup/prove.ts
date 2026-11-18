@@ -94,7 +94,7 @@ const checksStep = async (repo: string, config: Config): Promise<Outcome> => {
 };
 
 const markdownOver = (repo: string, base: string, hum: Config["hum"], context: AdapterContext) =>
-	markdownAdapter({ repo, base, claimPrefix: hum.claimPrefix, itemsDir: hum.itemsDir, identity: hum.commitIdentity, writeRaceRetries: hum.writeRaceRetries, itemReadsAtOnce: hum.itemReadsAtOnce, mergeMethod: hum.mergeMethod, ownerBranchPrefix: hum.ownerBranchPrefix, timeoutMs: commandTimeoutMs(hum) }, context);
+	markdownAdapter({ repo, base, claimPrefix: hum.claimPrefix, itemsDir: hum.itemsDir, identity: hum.commitIdentity, writeRaceRetries: hum.writeRaceRetries, itemReadsAtOnce: hum.itemReadsAtOnce, mergeMethod: hum.mergeMethod, ownerBranchPrefix: hum.ownerBranchPrefix, growthLabels: hum.growthLabels, timeoutMs: commandTimeoutMs(hum) }, context);
 
 const contractStep = async (config: Config, scratch: Scratch, { base, now, processEnv }: Pick<ProveEnv, "base" | "now" | "processEnv">): Promise<Outcome> => {
 	const others = Object.entries(config.hum.integrations ?? {}).filter(([, adapter]) => adapter !== "markdown");

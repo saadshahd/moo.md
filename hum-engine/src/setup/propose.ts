@@ -38,7 +38,12 @@ export type Proposal = {
 	readonly wakeJob: Pick<HumConfig, "ciRunner" | "ciContainer" | "ciEnv" | "ciClaudeAuth" | "pullRequestToken">;
 	/** The adapter of each slot that does not use the markdown source; empty where the repo keeps no work in issues. */
 	readonly integrations: NonNullable<HumConfig["integrations"]>;
+	/** Repo labels a job quotes in a workflow that runs again when a pull request gets a label; the job's own text says which paths, if any, the label lets grow. */
+	readonly labelGates: readonly LabelGate[];
 };
+
+/** A label a CI job reads, and the job: setup reads the job for the rule the label lets through, such as `growthLabels`. */
+export type LabelGate = { readonly label: string; readonly file: string; readonly job: string };
 
 const isPullRequestJob = ({ triggers }: CiJob): boolean => triggers.includes("pull_request");
 
@@ -185,6 +190,15 @@ const wakeJobOf = (ci: readonly CiJob[], shipped: DefaultsConfig, isPublic: bool
 	};
 };
 
+/** The forms a command quotes a label in: in double or single quotes, or with its quotes escaped, as a pattern over a JSON reply writes it. */
+const quotedForms = (label: string): readonly string[] => [`"${label}"`, `'${label}'`, `"${label}\\"`];
+
+/** Each repo label a job quotes, where its workflow runs again when a pull request gets a label. */
+const labelGatesOf = (ci: readonly CiJob[], labels: readonly string[]): LabelGate[] =>
+	ci
+		.filter(({ rerunsOnLabel }) => rerunsOnLabel)
+		.flatMap(({ file, job, commands }) => labels.flatMap((label) => (quotedForms(label).some((form) => commands.some((command) => command.includes(form))) ? [{ label, file, job }] : [])));
+
 /** Everything setup proposes from a scan, before it asks. */
 export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, { labels = [], isPublic = false, openIssues }: RepoFacts = {}): Proposal => {
 	const checks = checksOf(scan);
@@ -200,5 +214,6 @@ export const proposeSetup = (scan: RepoScan, shipped: DefaultsConfig, { labels =
 		runPlaces: shipped.runPlaces,
 		wakeJob: wakeJobOf(scan.ci, shipped, isPublic),
 		integrations: integrationsOf(scan, openIssues),
+		labelGates: labelGatesOf(scan.ci, labels),
 	};
 };

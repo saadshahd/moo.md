@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { SHIPPED_DEFAULTS } from "../../src/config/schema.ts";
 import { SlotPool } from "../../src/slots/pool.ts";
 import { type Checkout, PLAN_MARK, PROSE_PROMPTS, runBranch, runThinPath } from "../../src/worker/thin-path.ts";
-import { configWith } from "../fixtures/config.ts";
+import { configWith, type Tree } from "../fixtures/config.ts";
 import { OWNER } from "../fixtures/identity.ts";
 import { itemFile, sh } from "../fixtures/work-repo.ts";
 import { READY_PLAN, SHIM_MODEL, type ShimSpec } from "../fixtures/shim.ts";
@@ -448,6 +448,26 @@ test("where the base requires a pull request, a cleared change opens one with au
 	expect(w.shim.calls()).toHaveLength(runs);
 	expect(w.state.landings.get(id)).toBeUndefined();
 	expect(github.requests.filter((r) => r.startsWith("GET"))).toHaveLength(1);
+});
+
+test("a pull request whose change grows a growth label's files gets the label once, the pass after keeps it, and one that grows none of them gets none", async () => {
+	const labelled = async (rule: Tree) => {
+		const w = await world({ script: [{}, NOTE] }, { config: configWith((raw) => void (raw.hum.growthLabels = [rule])) });
+		const github = new FakeGitHub();
+		const pulls = github.client();
+		const id = w.repo.seed("Write the note");
+
+		github.requiresPullRequest = true;
+		expect(await runThinPath(w.thinPath({ pulls }))).toMatchObject({ outcome: "landing", item: id });
+		w.clock.at += TTL;
+		expect(await runThinPath(w.thinPath({ pulls, itemId: id }))).toMatchObject({ outcome: "landing", item: id });
+
+		return { labels: github.pulls()[0]?.labels, labelCalls: github.requests.filter((request) => request.endsWith("/labels")).length };
+	};
+
+	expect(await labelled({ label: "grow", paths: ["docs/**"] })).toEqual({ labels: ["grow"], labelCalls: 1 });
+	// The change adds docs/note.md, excepted here, and its done mark takes a byte off the item's file.
+	expect(await labelled({ label: "grow", paths: ["**/*.md"], except: ["docs/**"] })).toEqual({ labels: [], labelCalls: 0 });
 });
 
 test("a change that waits for the owner runs on its level's tier and opens the same pull request without auto-merge; the owner's approval arms it", async () => {

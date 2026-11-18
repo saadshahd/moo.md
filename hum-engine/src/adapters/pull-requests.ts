@@ -21,7 +21,11 @@ export type Pull = {
 	readonly autoMerge: boolean;
 	/** Its branch is behind the base, which a strict required check makes wait. */
 	readonly behind: boolean;
+	readonly labels: readonly string[];
 } & ({ readonly state: "OPEN" | "CLOSED" } | { readonly state: "MERGED"; /** The commit its merge made on the base. */ readonly mergeCommit: string });
+
+/** What a new pull request holds: the branch it merges, where to, and its text. */
+export type PullChange = { readonly head: string; readonly base: string; readonly title: string; readonly body: string };
 
 /** Pull requests on the repo a run's changes land in. */
 export type PullRequests = {
@@ -29,12 +33,7 @@ export type PullRequests = {
 	readonly rules: (base: string, fresh?: boolean) => Promise<BranchRules>;
 	/** The newest pull request from `head`, in any state. */
 	readonly find: (head: string) => Promise<Pull | undefined>;
-	readonly open: (change: {
-		head: string;
-		base: string;
-		title: string;
-		body: string;
-	}) => Promise<Pull>;
+	readonly open: (change: PullChange) => Promise<Pull>;
 	/** Turns auto-merge on or off. A pull request whose checks already passed takes no auto-merge, so it merges now. */
 	readonly autoMerge: (
 		pull: Pull,
@@ -46,6 +45,8 @@ export type PullRequests = {
 	readonly update: (pull: Pull) => Promise<void>;
 	/** One comment on the pull request. */
 	readonly comment: (pull: Pull, body: string) => Promise<void>;
+	/** Adds labels to the pull request. */
+	readonly label: (pull: Pull, labels: readonly string[]) => Promise<void>;
 };
 
 const Rule = z.looseObject({
@@ -67,6 +68,7 @@ const pullFields = {
 	url: z.string(),
 	mergeStateStatus: z.string(),
 	autoMergeRequest: z.object({ enabledAt: z.string().nullable() }).nullable(),
+	labels: z.object({ nodes: z.array(z.object({ name: z.string() })) }),
 };
 
 /** GitHub names the commit a merge made once the pull request merged, and none before. */
@@ -76,7 +78,7 @@ const PullNode = z.discriminatedUnion("state", [
 ]);
 
 const PULL_FIELDS =
-	"id number url state mergeStateStatus autoMergeRequest { enabledAt } mergeCommit { oid }";
+	"id number url state mergeStateStatus autoMergeRequest { enabledAt } mergeCommit { oid } labels(first: 100) { nodes { name } }";
 
 const BEHIND = "BEHIND";
 
@@ -131,6 +133,7 @@ const pullOf = (node: z.infer<typeof PullNode>): Pull => ({
 	url: node.url,
 	autoMerge: node.autoMergeRequest !== null,
 	behind: node.mergeStateStatus === BEHIND,
+	labels: node.labels.nodes.map(({ name }) => name),
 	...(node.state === "MERGED" ? { state: node.state, mergeCommit: node.mergeCommit.oid } : { state: node.state }),
 });
 
@@ -251,5 +254,19 @@ export const gitHubPullRequests = (repo: string, options: RepoClientOptions): Pu
 			void (await graphql(Acknowledged, UPDATE_BRANCH, { pull: pull.id })),
 		comment: async (pull, body) =>
 			void (await graphql(Acknowledged, COMMENT, { pull: pull.id, body })),
+		label: async (pull, labels) =>
+			void (await (await connect())
+				.request("POST /repos/{owner}/{repo}/issues/{issue_number}/labels", { owner, repo: name, issue_number: pull.number, labels: [...labels] })
+				.catch(raise)),
 	};
+};
+
+/** The newest pull request from `change.head`, opened when there is none; an open one gets each of `labels` it lacks. */
+export const pullFor = async (pulls: PullRequests, change: PullChange, labels: readonly string[]): Promise<Pull> => {
+	const pull = (await pulls.find(change.head)) ?? (await pulls.open(change));
+	const lacking = labels.filter((label) => !pull.labels.includes(label));
+
+	if (pull.state === "OPEN" && lacking.length > 0) await pulls.label(pull, lacking);
+
+	return pull;
 };

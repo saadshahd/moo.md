@@ -191,6 +191,37 @@ export const isAncestor = async (git: Git, { ancestor, descendant }: { readonly 
 	throw new GitFailed(args, result);
 };
 
+/** A file a change touches, with its bytes on each side; a side where it is absent or no regular file, as a symlink or a submodule, holds 0. */
+export type FileBytes = { readonly path: string; readonly before: number; readonly after: number };
+
+/** The mode git gives a regular file, executable or not. */
+const REGULAR_FILE = /^100/;
+
+/** One side of a `--raw` diff entry: its blob where it is a regular file, else nothing. */
+const regularBlob = (mode: string | undefined, object: string | undefined): string | undefined => (mode !== undefined && REGULAR_FILE.test(mode) ? object : undefined);
+
+/** Each file the change from where `head` left `base` up to `head` touches, with its bytes before and after; a rename counts as a delete and an add. */
+export const changedBytes = async (git: Git, { base, head }: { readonly base: string; readonly head: string }): Promise<FileBytes[]> => {
+	// With -z and no renames, each entry is two fields: ":<old mode> <new mode> <old blob> <new blob> <status>", then its path.
+	const fields = (await git.raw(["diff", "--raw", "-z", "--no-abbrev", "--no-renames", `${base}...${head}`])).split("\0");
+
+	const entries = Array.from({ length: Math.floor(fields.length / 2) }, (_, index) => {
+		const [oldMode, newMode, oldBlob, newBlob] = (fields[2 * index] ?? "").slice(1).split(" ");
+
+		return { path: fields[2 * index + 1] ?? "", old: regularBlob(oldMode, oldBlob), new: regularBlob(newMode, newBlob) };
+	});
+
+	const blobs = [...new Set(entries.flatMap((entry) => [entry.old, entry.new].flatMap((blob) => blob ?? [])))];
+	const sizes = blobs.length === 0 ? [] : (await git.raw(["cat-file", "--batch-check=%(objectsize)"], `${blobs.join("\n")}\n`)).trim().split("\n").map(Number);
+
+	if (sizes.length !== blobs.length || sizes.some(Number.isNaN)) throw new Error(`git cat-file sized ${sizes.length} of the ${blobs.length} blobs ${base}...${head} touches`);
+
+	const bytes = new Map(blobs.map((blob, index) => [blob, sizes[index] ?? 0]));
+	const bytesOf = (blob: string | undefined): number => (blob === undefined ? 0 : (bytes.get(blob) ?? 0));
+
+	return entries.map((entry) => ({ path: entry.path, before: bytesOf(entry.old), after: bytesOf(entry.new) }));
+};
+
 /** What git printed for one object, or undefined when the object does not exist. */
 export const readOrAbsent = async (git: Git, args: readonly string[]): Promise<string | undefined> => {
 	const result = await git.run(args);

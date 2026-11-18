@@ -325,6 +325,7 @@
 	},
 	"ownerLogins": [],
 	"tasteRules": [],
+	"growthLabels": [],
 	"repeatAt": 2,
 	"repeatPrecision": 0.9,
 	"memoryMaxBytes": 8000,

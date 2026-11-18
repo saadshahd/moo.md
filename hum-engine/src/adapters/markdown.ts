@@ -5,7 +5,8 @@ import slugify from "@sindresorhus/slugify";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
 import { type Adapter, ADAPTER_API_VERSION, type AdapterContext, type Claim, type Failed, type Item, ITEM_ID_LENGTH, ItemId, type ItemRef, PermanentError, type ThreadEntry, type Watch } from "../adapter-api.ts";
-import type { MergeMethod } from "../config/schema.ts";
+import type { HumConfig, MergeMethod } from "../config/schema.ts";
+import { growthLabelsOf } from "../decide/growth.ts";
 import { parseArgument } from "./argument.ts";
 import { claimCommitMessage, claimer, claimOfCommit, isLive } from "./claim.ts";
 import { type GitIdentity, gitIn, push, readOrAbsent } from "./git.ts";
@@ -44,6 +45,8 @@ export type MarkdownOptions = {
 	readonly mergeMethod: MergeMethod;
 	/** The branch prefix of a pull request that lands an owner's answer. */
 	readonly ownerBranchPrefix: string;
+	/** The labels such a pull request carries where the answer grows the paths beside them. */
+	readonly growthLabels: HumConfig["growthLabels"];
 	/** The owner's `commandTimeoutSeconds` in milliseconds: the limit of every git call the adapter makes. */
 	readonly timeoutMs: number;
 };
@@ -81,7 +84,7 @@ const followUpId = (from: string, title: string): string =>
  * Every write is a commit built from git plumbing and pushed with hooks off, so the clone's working tree
  * and branches stay untouched. A claim is the first push of its claim branch; a renewal is a fast-forward on top.
  */
-export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, timeoutMs, base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
+export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRaceRetries, itemReadsAtOnce, pulls, mergeMethod, ownerBranchPrefix, growthLabels, timeoutMs, base = "main" }: MarkdownOptions, { report, now }: AdapterContext) => {
 	const git = gitIn(repo, { identity, timeoutMs });
 	const pathOf = (id: string): string => `${itemsDir}/${id}${ITEM_EXTENSION}`;
 	const baseBranch = `refs/heads/${base}`;
@@ -246,6 +249,7 @@ export const markdownAdapter = ({ repo, claimPrefix, itemsDir, identity, writeRa
 			body: `The owner answered on item ${label}.`,
 			branchPrefix: ownerBranchPrefix,
 			mergeMethod,
+			labels: await growthLabelsOf(git, { base: `${sha}^`, head: sha }, growthLabels),
 			pulls,
 			push: pushCounted,
 		});

@@ -308,6 +308,11 @@ const Shipped = z.object({
 	repeatAt: count.describe("Review notes stating one rule at which hum files a check item for it."),
 	repeatPrecision: fraction.describe("The lowest precision on labelled pairs at which a model's call that two notes state one rule files a check item; below it the pair waits as a possible repeat."),
 	tasteRules: z.array(name).describe("The owner's taste rules that have no deterministic check. Each pull request hum opens gets a comment saying whether its diff keeps each rule; the comment reports only and gates nothing."),
+	growthLabels: z
+		.array(z.strictObject({ label: name, paths: z.array(name).min(1), except: z.array(name).default([]) }))
+		.describe(
+			"Labels the repo's checks require on a pull request that grows some paths. Each entry sums the bytes of the regular files that match one of its 'paths' globs and none of its 'except' globs; where a pull request hum opens makes that sum larger, hum adds 'label' to it on each pass that finds it open. Two entries may share a label, so each set is summed on its own. hum never removes a label.",
+		),
 	memoryMaxBytes: count.describe("The most bytes memory.md holds; a new entry past it is refused."),
 	memoryUnusedRuns: count.describe("Runs without use after which a memory.md entry is listed for the owner."),
 	measureWindow: count.describe("Merged changes the per-merge numbers average over, and the window per path."),
@@ -544,6 +549,7 @@ export const OWNER_CHANGEABLE = {
 	"repeat threshold": "repeatAt",
 	"repeat precision bar": "repeatPrecision",
 	"taste rules": "tasteRules",
+	"growth labels": "growthLabels",
 	"memory size cap": "memoryMaxBytes",
 	"memory unused runs": "memoryUnusedRuns",
 	"measure window": "measureWindow",

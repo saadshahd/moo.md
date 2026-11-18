@@ -24,6 +24,7 @@ import {
 	type BranchRules,
 	methodFor,
 	type Pull,
+	pullFor,
 	type PullRequests,
 } from "../adapters/pull-requests.ts";
 import type { ModelCall } from "../adapters/model-call.ts";
@@ -46,6 +47,7 @@ import {
 	type Unclear,
 	waitReason,
 } from "../decide/merge.ts";
+import { growthLabelsOf } from "../decide/growth.ts";
 import { isTrusted } from "../decide/prose.ts";
 import {
 	type Change,
@@ -254,6 +256,7 @@ const learnRules = async (
 			body: `The owner answered on item ${id}: ${globs.join(", ")} at level ${level}.`,
 			branchPrefix: config.hum.ownerBranchPrefix,
 			mergeMethod: config.hum.mergeMethod,
+			labels: await growthLabelsOf(git, { base: `${commit}^`, head: commit }, config.hum.growthLabels),
 			pulls: ctx.pulls,
 			push: (refspecs) => pushCommits({ git, base, pulls: ctx.pulls, commits: ctx.commits }, refspecs),
 		});
@@ -413,13 +416,18 @@ const pullRequestOf = ({ state, id, item }: LandContext, merging: string) => {
 	};
 };
 
-/** One pull request from the run branch: it merges itself once GitHub's required checks pass when the change is cleared, and waits for the owner otherwise. */
+/**
+ * One pull request from the run branch: it merges itself once GitHub's required checks pass when the change is
+ * cleared, and waits for the owner otherwise. While it is open it carries each growth label its diff needs, the
+ * item's done mark counted, as GitHub merges that too.
+ */
 const throughPullRequest = async (
 	ctx: LandContext,
 	{ pulls, autoMerge, route, rules, why }: { readonly pulls: PullRequests; readonly autoMerge: boolean; readonly route: Route; readonly rules: BranchRules; readonly why: string },
 ): Promise<ThinResult> => {
 	const { id, branch, base, config } = ctx;
-	const pull = (await pulls.find(branch)) ?? (await pulls.open({ head: branch, base, ...pullRequestOf(ctx, autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`) }));
+	const labels = await growthLabelsOf(ctx.git, { base: `origin/${base}`, head: "HEAD" }, config.hum.growthLabels);
+	const pull = await pullFor(pulls, { head: branch, base, ...pullRequestOf(ctx, autoMerge ? `Level ${route.level.name}: it merges once the required checks pass.` : `Not merged by hum: ${why}.`) }, labels);
 
 	if (pull.state === "MERGED") return finish(ctx, mergedThrough(ctx.state.landings.get(id), pull.mergeCommit));
 
