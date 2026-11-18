@@ -27,6 +27,8 @@ export type CiJob = {
 	readonly file: string;
 	readonly job: string;
 	readonly triggers: readonly string[];
+	/** The workflow runs again when a pull request gets a label, so the job's result may turn on the labels. */
+	readonly rerunsOnLabel: boolean;
 	readonly commands: readonly string[];
 	/** What the job's `runs-on` holds: a label, a label list or a runner group. */
 	readonly runner: HumConfig["ciRunner"] | undefined;
@@ -102,8 +104,22 @@ const Container = z
 	.optional()
 	.catch(undefined);
 
+const PULL_REQUEST_EVENTS = ["pull_request", "pull_request_target"] as const;
+
+/** An event's `types`: what of the event starts the workflow. */
+const EventTypes = z
+	.looseObject({ types: z.union([z.string().transform((type) => [type]), z.array(z.string())]).default([]) })
+	.catch({ types: [] });
+
 const Workflow = z.looseObject({
-	on: z.union([z.string().transform((trigger) => [trigger]), z.array(z.string()), z.record(z.string(), z.unknown()).transform((triggers) => Object.keys(triggers))]).default([]),
+	on: z
+		.union([
+			z.string().transform((trigger) => ({ triggers: [trigger], rerunsOnLabel: false })),
+			z.array(z.string()).transform((triggers) => ({ triggers, rerunsOnLabel: false })),
+			// A label added to a pull request starts the workflow only where its types name it: GitHub's default types leave it out.
+			z.record(z.string(), EventTypes).transform((events) => ({ triggers: Object.keys(events), rerunsOnLabel: PULL_REQUEST_EVENTS.some((event) => events[event]?.types.includes("labeled") === true) })),
+		])
+		.default({ triggers: [], rerunsOnLabel: false }),
 	env: TextMap,
 	jobs: z
 		.record(
@@ -145,12 +161,13 @@ const ciJobsOf = (repo: string): CiJob[] =>
 
 		if (workflow === undefined) return [];
 
-		const triggers = workflow.on;
+		const { triggers, rerunsOnLabel } = workflow.on;
 
 		return Object.entries(workflow.jobs).map(([job, { steps, ...where }]) => ({
 			file: basename(file),
 			job,
 			triggers,
+			rerunsOnLabel,
 			commands: steps.flatMap((step) => commandsOf(step.run ?? "")),
 			runner: where["runs-on"],
 			container: where.container,

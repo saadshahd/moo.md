@@ -33,6 +33,7 @@ const AdapterSettings = z.looseObject({
 	ownerLogins: HumConfig.shape.ownerLogins,
 	mergeMethod: HumConfig.shape.mergeMethod,
 	ownerBranchPrefix: HumConfig.shape.ownerBranchPrefix,
+	growthLabels: HumConfig.shape.growthLabels,
 	writeRaceRetries: HumConfig.shape.writeRaceRetries,
 	itemReadsAtOnce: HumConfig.shape.itemReadsAtOnce,
 	providerTimeoutSeconds: HumConfig.shape.providerTimeoutSeconds,
@@ -78,7 +79,7 @@ const BUILT_IN = {
 	[MARKDOWN]: async ({ path, settings, context }) => {
 		const timeoutMs = commandTimeoutMs(settings);
 
-		return markdownAdapter({ repo: path, base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce, pulls: await originPulls(path, timeoutMs, context.env), mergeMethod: settings.mergeMethod, ownerBranchPrefix: settings.ownerBranchPrefix, timeoutMs }, context);
+		return markdownAdapter({ repo: path, base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, itemsDir: settings.itemsDir, identity: settings.commitIdentity, writeRaceRetries: settings.writeRaceRetries, itemReadsAtOnce: settings.itemReadsAtOnce, pulls: await originPulls(path, timeoutMs, context.env), mergeMethod: settings.mergeMethod, ownerBranchPrefix: settings.ownerBranchPrefix, growthLabels: settings.growthLabels, timeoutMs }, context);
 	},
 	github: async ({ path, settings, context }) => {
 		const timeoutMs = commandTimeoutMs(settings);

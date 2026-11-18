@@ -10,7 +10,7 @@ import { proveSetup } from "../src/setup/prove.ts";
 import { scanRepo } from "../src/setup/scan.ts";
 import { shippedConfig, shippedSettingsAs } from "../src/setup/shipped.ts";
 import { waitsOf, withTimeouts } from "../src/setup/waits.ts";
-import { SetupAnswers, writeSetup } from "../src/setup/write.ts";
+import { readAnswers, SetupAnswers, writeSetup } from "../src/setup/write.ts";
 import { installedSkills } from "./fixtures/config.ts";
 import { OWNER } from "./fixtures/identity.ts";
 import { MAIN } from "./fixtures/owner-repo.ts";
@@ -358,6 +358,46 @@ test("writing setup answers writes a config that loads and carries only the sett
 	expect(existsSync(join(repo, ".github", "workflows"))).toBe(true);
 	expect(existsSync(join(repo, "home"))).toBe(false);
 	expect(loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills: installedSkills() } }).ok).toBe(true);
+});
+
+/** transferwise/selective's byte ratchet: agent context and the other docs are each summed on their own, and either growing needs `grow`. */
+const SELECTIVE_GROWTH = [
+	{ label: "grow", paths: ["AGENTS.md", ".claude/**", ".github/**"] },
+	{ label: "grow", paths: ["**/*.md"], except: ["AGENTS.md", ".claude/**", ".github/**", "docs/specs/**", ".planning/PROJECT.md"] },
+];
+
+test("growth labels in the answers file are written to hum.json and load back as answered", () => {
+	const repo = repoWith({ "README.md": "x" });
+	const file = join(tempDir("answers"), "answers.json");
+
+	writeFileSync(file, JSON.stringify({ hum: { checks: ["true"], runPlaces: ["ci"], growthLabels: SELECTIVE_GROWTH }, waitHours: {}, schemaVersion: SCHEMA_VERSION }));
+	expect(writeSetup(repo, readAnswers(file), { installedSkills: installedSkills(), gitIdentity: OWNER_GIT }).ok).toBe(true);
+	expect(JSON.parse(readFileSync(join(repo, ".hum", "hum.json"), "utf8")).growthLabels).toEqual(SELECTIVE_GROWTH);
+
+	const loaded = loadConfig(readConfigDir(join(repo, ".hum")), { env: { installedSkills: installedSkills() } });
+
+	expect(loaded.ok && loaded.value.hum.growthLabels).toEqual(SELECTIVE_GROWTH.map((rule) => ({ except: [], ...rule })));
+});
+
+/** A byte ratchet as transferwise/selective runs it: the workflow runs again when a pull request gets a label, and the job reads `grow` out of GitHub's JSON. */
+const RATCHET = `on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Context and doc bytes
+        run: |
+          labels=$(curl -sSf "$LABELS_URL")
+          [[ $labels =~ \\"name\\":[[:space:]]*\\"grow\\" ]] && grow=true
+`;
+
+test("a repo label a job quotes, in a workflow a new label runs again, is proposed as a label gate; the same job in a workflow no label starts is not", async () => {
+	const files = { ...PROJECT, ".github/workflows/checks.yml": RATCHET, ".github/workflows/once.yml": RATCHET.replace(", labeled, unlabeled", "") };
+	const { labelGates } = proposeSetup(await scanRepo(repoWith(files), "main"), shipped.hum, { labels: ["bug", "grow"] });
+
+	expect(labelGates).toEqual([{ label: "grow", file: "checks.yml", job: "checks" }]);
 });
 
 test("setup keeps the commit identity hum.json already names over the one git config holds", () => {

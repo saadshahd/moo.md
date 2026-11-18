@@ -1,6 +1,6 @@
 import type { MergeMethod } from "../config/schema.ts";
 import type { PushOutcome } from "./git.ts";
-import { methodFor, type Pull, type PullRequests } from "./pull-requests.ts";
+import { methodFor, type Pull, pullFor, type PullRequests } from "./pull-requests.ts";
 
 export type OwnerCommit = {
 	/** The commit to land, already built on the newest base. */
@@ -12,6 +12,8 @@ export type OwnerCommit = {
 	readonly body: string;
 	readonly branchPrefix: string;
 	readonly mergeMethod: MergeMethod;
+	/** The growth labels the commit needs: its pull request, where it gets one, carries them. */
+	readonly labels: readonly string[];
 	/** Absent off GitHub, where a push is the only way to land. */
 	readonly pulls?: PullRequests;
 	/** Pushes refspecs to the remote. */
@@ -34,7 +36,7 @@ const throughPullRequest = async (commit: OwnerCommit, pulls: PullRequests): Pro
 
 	if (pushed.kind === "refused") return { via: "refused", said: pushed.said };
 
-	const pull = (await pulls.find(branch)) ?? (await pulls.open({ head: branch, base: commit.base, title: commit.title, body: commit.body }));
+	const pull = await pullFor(pulls, { head: branch, base: commit.base, title: commit.title, body: commit.body }, commit.labels);
 	const armed = pull.state === "MERGED" ? "merged" : await pulls.autoMerge(pull, true, methodFor(commit.mergeMethod, rules.mergeMethods));
 
 	return { via: "pull-request", pull, merged: armed === "merged" || pull.state === "MERGED" };

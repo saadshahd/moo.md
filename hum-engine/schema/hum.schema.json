@@ -1505,6 +1505,41 @@
 			},
 			"description": "The owner's taste rules that have no deterministic check. Each pull request hum opens gets a comment saying whether its diff keeps each rule; the comment reports only and gates nothing."
 		},
+		"growthLabels": {
+			"default": [],
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"label": {
+						"type": "string",
+						"minLength": 1
+					},
+					"paths": {
+						"minItems": 1,
+						"type": "array",
+						"items": {
+							"type": "string",
+							"minLength": 1
+						}
+					},
+					"except": {
+						"default": [],
+						"type": "array",
+						"items": {
+							"type": "string",
+							"minLength": 1
+						}
+					}
+				},
+				"required": [
+					"label",
+					"paths"
+				],
+				"additionalProperties": false
+			},
+			"description": "Labels the repo's checks require on a pull request that grows some paths. Each entry sums the bytes of the regular files that match one of its 'paths' globs and none of its 'except' globs; where a pull request hum opens makes that sum larger, hum adds 'label' to it on each pass that finds it open. Two entries may share a label, so each set is summed on its own. hum never removes a label."
+		},
 		"memoryMaxBytes": {
 			"default": 8000,
 			"type": "integer",

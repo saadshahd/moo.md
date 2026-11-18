@@ -26,7 +26,7 @@ export const WORKFLOW_BOT: Author = { authorAssociation: "NONE", author: { __typ
 
 type Comment = Author & { body: string; createdAt: string };
 
-type Pull = { id: string; number: number; head: string; base: string; title: string; body: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND" };
+type Pull = { id: string; number: number; head: string; base: string; title: string; body: string; state: "OPEN" | "MERGED" | "CLOSED"; autoMerge: boolean; status: "CLEAN" | "BLOCKED" | "BEHIND"; labels: string[] };
 
 type Commit = { message: string; tree: string; parents: string[] };
 
@@ -106,7 +106,7 @@ const selected = (selection: SelectionSetNode, value: Json): Json => {
 export const mergeCommitOf = (number: number): string => `merge-of-${number}`;
 
 /** A pull request as GitHub's GraphQL answers it. */
-const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
+const pullNode = ({ id, number, state, status, autoMerge, labels }: Pull): Json => ({
 	id,
 	number,
 	url: `https://github.com/me/scratch/pull/${number}`,
@@ -114,6 +114,7 @@ const pullNode = ({ id, number, state, status, autoMerge }: Pull): Json => ({
 	mergeStateStatus: status,
 	autoMergeRequest: autoMerge ? { enabledAt: "2026-11-08T00:00:00Z" } : null,
 	mergeCommit: state === "MERGED" ? { oid: mergeCommitOf(number) } : null,
+	labels: { nodes: labels.map((name) => ({ name })) },
 });
 
 const json = (status: number, value: Json, headers: Record<string, string> = {}) =>
@@ -447,7 +448,7 @@ export class FakeGitHub {
 		},
 		OpenPull: (v) => {
 			const number = this.#pulls.length + 1;
-			const pull: Pull = { id: `PR_${number}`, number, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", body: v.body ?? "", state: "OPEN", autoMerge: false, status: "BLOCKED" };
+			const pull: Pull = { id: `PR_${number}`, number, head: v.head ?? "", base: v.base ?? "", title: v.title ?? "", body: v.body ?? "", state: "OPEN", autoMerge: false, status: "BLOCKED", labels: [] };
 
 			this.#pulls.push(pull);
 
@@ -498,6 +499,15 @@ export class FakeGitHub {
 			const etag = `W/"v${this.#version}"`;
 
 			return headers.get("if-none-match") === etag ? new Response(null, { status: 304, headers: { etag } }) : json(200, this.#issues.slice(0, 1), { etag });
+		}
+
+		const labelled = /^\/issues\/(\d+)\/labels$/.exec(path);
+		const pull = labelled && this.#pulls.find((found) => found.number === Number(labelled[1]));
+
+		if (method === "POST" && pull) {
+			pull.labels = [...new Set([...pull.labels, ...z.object({ labels: z.array(z.string()) }).parse(JSON.parse(String(body))).labels])];
+
+			return json(200, pull.labels.map((name) => ({ name })));
 		}
 
 		if (method === "POST" && path === "/git/commits") return json(201, { sha: this.#commit(Posted.parse(JSON.parse(String(body)))) });

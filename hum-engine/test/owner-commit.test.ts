@@ -8,10 +8,10 @@ import { markdownSettings, sh, WorkRepo } from "./fixtures/work-repo.ts";
 
 const ANSWER = '"kind":"answer"';
 
-const world = () => {
+const world = (growthLabels = markdownSettings.growthLabels) => {
 	const repo = new WorkRepo();
 	const github = new FakeGitHub();
-	const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, pulls: github.client() }, { report: () => {}, now: Date.now, env: process.env });
+	const adapter = markdownAdapter({ repo: repo.worker("w"), base: "main", ...markdownSettings, growthLabels, pulls: github.client() }, { report: () => {}, now: Date.now, env: process.env });
 
 	return { repo, github, adapter, id: repo.seed("asked") };
 };
@@ -46,6 +46,18 @@ test("where the base needs a pull request, each answer goes through its own that
 	]);
 });
 
+test("an answer's pull request gets each growth label whose files the answer grows, and no other", async () => {
+	const { github, adapter, id } = world([
+		{ label: "grow", paths: [".hum/**"], except: [] },
+		{ label: "src", paths: ["src/**"], except: [] },
+	]);
+
+	github.requiresPullRequest = true;
+	await adapter.answers?.answer(id, { text: "yes" });
+
+	expect(github.pulls().map((pull) => pull.labels)).toEqual([["grow"]]);
+});
+
 test("a push the remote refuses goes through a pull request when the repo is on GitHub", async () => {
 	const { repo, github, adapter, id } = world();
 	const hook = join(repo.remote, "hooks", "pre-receive");
@@ -61,7 +73,7 @@ test("a push the remote refuses goes through a pull request when the repo is on 
 });
 
 test("off GitHub, a push the remote refuses lands nothing and hands back the remote's words", async () => {
-	const commit = { sha: "0123456789abcdef", base: "main", label: "7", title: "t", body: "b", branchPrefix: "hum/owner/", mergeMethod: "squash" as const };
+	const commit = { sha: "0123456789abcdef", base: "main", label: "7", title: "t", body: "b", branchPrefix: "hum/owner/", mergeMethod: "squash" as const, labels: [] };
 	const refused = { kind: "refused" as const, said: "git push refused: GH006: Protected branch update failed" };
 
 	expect(await landOwnerCommit({ ...commit, push: async () => refused })).toEqual({ via: "refused", said: refused.said });
