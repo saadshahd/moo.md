@@ -1,6 +1,6 @@
 ---
 name: smooth
-description: Count what slowed the agents down in this project over the last day, week or month (default day), and leave one fix for the friction that recurred most, on a smooth/<date> branch you keep or drop. Run it nightly from a scheduled task. Costs one Sonnet call on a day with a fix, none otherwise.
+description: Count what slowed the agents down in this project, from their transcripts, the commits the person reverted and their review comments, over the last day, week or month (default day), and leave one fix for the friction that recurred most, on a smooth/<date> branch you keep or drop. Run it nightly from a scheduled task. Costs one Sonnet call on a day with a fix, none otherwise.
 disable-model-invocation: true
 ---
 

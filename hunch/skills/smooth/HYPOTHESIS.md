@@ -1,4 +1,4 @@
-With `smooth` run nightly, the friction the agents hit in a project — failing commands, rediscovered files, repeated steps, skills that left them failing — falls day over day, because each night turns the worst of it into one change to the project the person keeps or drops.
+With `smooth` run nightly, the friction the agents hit in a project — failing commands, rediscovered files, repeated steps, skills that left them failing, changes the person reverted or flagged in review — falls day over day, because each night turns the worst of it into one change to the project the person keeps or drops.
 
 Graduate when the person keeps 3 of the first 5 fixes, and each kept fix's count falls the next day. Kill if 3 fixes in a row are dropped.
 
@@ -18,3 +18,13 @@ Graduate when the person keeps 3 of the first 5 fixes, and each kept fix's count
 
 - Picked `gh pr` failing in 5 of 15 sessions. Sonnet, 38 s: a memory note naming the right repo (`roundup-app/roundup`), zsh quoting for `--jq`, and the exit codes that are not failures. Left on `smooth/2026-10-26` in the memory folder's git, which the run created. Kept or dropped: not yet.
 - A tracked symlink in `.claude/` (a vendored skill) broke the `_claude/` copy on the first try; symlinks are now skipped, since a write through one lands outside the worktree.
+
+### 2026-11-18 — git history, fix levels and rules that failed, from cursor's pstack `correct`
+
+- Kept: mine the person's reverts and review comments for mistakes the agents repeat. `count.sh` counts each as a signal: a revert by the files it touches, a review comment by its file, one unit per commit or pull request, so `trend.sh` recounts them like the rest. Bot comments stay out. A repo with no GitHub remote has none to read; with one, a `gh` failure prints and the count goes on.
+- Kept: comments that explain a workaround; the fix pass greps for them near the cause.
+- Kept: fix at the highest level that works: the code or layout, then a type, lint or test, then a skill, then `CLAUDE.md` or a memory note. The pass says why each level above its fix would not work, in a `why:` line `smooth.sh` puts in the commit and its output, since the pass has no shell and replies in one line.
+- Kept: a rule the project already states that agents still miss is enforced a level above where it is written; rewording it is no fix.
+- Changed: `correct` proves each new check fails on a past mistake. The pass has no shell to run one, so the person's review and the project's pre-commit hook judge it.
+- Dropped: `correct`'s rule table in the agent's instruction file; the fix commits keep what each one enforces.
+- Base rate, 30 days: moo.md 0 reverts and 0 review comments by people (12 by bots, left out); meta-harness 6 reverts in 16,393 commits across its branches. Whether a revert or review group ever tops a night's pick is not measured yet.
