@@ -1,6 +1,6 @@
 ---
 name: complain
-description: Surfaces what the agent would change and kept to itself — a decision it would make differently, effort it saw wasted, a better route to the goal, a fact the user lacks, friction in the tools, permissions, setup or docs the work ran on. Use when you hold one of these and have not said it.
+description: Surfaces what the agent would change and kept to itself — a decision it would make differently, effort it saw wasted, a better route to the goal, a fact the user lacks, friction in the tools, permissions, setup or docs the work ran on, the cheap always-on signal that would have shown at first look a cause the work dug deep for. Use when you hold one of these and have not said it.
 ---
 
 Judge by your own standard, not by what the user hopes to hear.

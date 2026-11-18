@@ -1,4 +1,4 @@
-With `complain`, Claude hands back what it would change and kept to itself: a decision it would make differently, effort it saw wasted, a better route to the goal, a fact the user lacks, friction in the tools, permissions, setup or docs the work ran on. Each suggestion goes in the turn's card, and tend's `suggestions` chip lists every one from the session.
+With `complain`, Claude hands back what it would change and kept to itself: a decision it would make differently, effort it saw wasted, a better route to the goal, a fact the user lacks, friction in the tools, permissions, setup or docs the work ran on, the cheap always-on signal that would have shown at first look a cause the work dug deep for. Each suggestion goes in the turn's card, and tend's `suggestions` chip lists every one from the session.
 
 Graduate when 3 suggestions in the first 2 weeks of real sessions teach the user something: something new, a better decision, or a more efficient way to reach the goal. Kill if none do. Before judging the idea, check the skill fires: under ~5 suggestions in those 2 weeks is a description problem, not an answer.
 
@@ -17,3 +17,8 @@ Graduate when 3 suggestions in the first 2 weeks of real sessions teach the user
 - Each line already carried a fix, so the card key and chip now say so. The skill keeps the name `complain`, the word the user calls it by. Warp splits complaint from suggestion; here one line holds both.
 - Kept from `suggestion-box`: friction in the tools, permissions, setup or docs the work ran on; only what the agent saw; one cause per line.
 - Dropped: the hidden Slack post, its builder audience, the cap of three per run. The user is the audience, and the risk measured here is too few, not too many.
+
+### 2026-11-18 — the missing signal, from cursor's pstack `principle-fix-root-causes`
+
+- Kept one line: when the deciding fact took a deep dig, propose the cheap, always-on signal that would have shown it at first look. The dig is friction the work ran on; the signal, a log line, a check or a status, is the fix that spares the next one.
+- Its other lines are debugging steps, not something the agent keeps to itself, so they stay out.
