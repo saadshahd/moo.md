@@ -39,12 +39,12 @@ t=$("$here/scripts/trend.sh" "$root")
 [ -z "$t" ] || echo "trend: $t"
 
 # The friction to fix: the group spread over the most sessions, at least two. Interrupts have no home in the project.
-jq '[.signals[] | select(.name != "interrupts") | . as $s | .groups[] | select(.sessions >= 2) | . + {signal: $s.name, home: $s.fix}]
+jq '[.signals[] | select(.name != "interrupts") | . as $s | .groups[] | select(.sessions >= 2) | . + {signal: $s.name, unit: $s.unit, home: $s.fix}]
     | sort_by(-.sessions, -.n) | first // empty' "$work/counted.json" > "$work/pick.json"
 if [ ! -s "$work/pick.json" ]; then
   echo "smooth: no friction recurred across sessions in the last $window; no fix"; exit 0
 fi
-sig=$(jq -r .signal "$work/pick.json") grp=$(jq -r .g "$work/pick.json")
+sig=$(jq -r .signal "$work/pick.json") grp=$(jq -r .g "$work/pick.json") unit=$(jq -r .unit "$work/pick.json")
 n=$(jq -r .n "$work/pick.json") sessions=$(jq -r .sessions "$work/pick.json")
 
 git -C "$root" worktree add -q -b "$branch" "$work/repo" HEAD
@@ -64,9 +64,9 @@ fi
 
 prompt="$(sed "s|<config>|$config|" "$here/fix.md")
 
-Friction: $sig, $grp — $n times in $sessions sessions. Its usual home: $(jq -r .home "$work/pick.json").
+Friction: $sig, $grp — $n times in $sessions ${unit}s. Its usual home: $(jq -r .home "$work/pick.json").
 Calls behind it:
-$(jq -r '.calls[] | "- session \(.s) at \(.t): \(.what)\n  result: \(.result // "none" | gsub("\n"; " "))"' "$work/pick.json")
+$(jq -r --arg u "$unit" '.calls[] | "- \($u) \(.s) at \(.t): \(.what)\n  result: \(.result // "none" | gsub("\n"; " "))"' "$work/pick.json")
 
 Project repo (your current directory): $work/repo/
 $memline"
@@ -79,15 +79,20 @@ allowed=(Read Grep Glob "Edit(/$work/repo/**)" "Write(/$work/repo/**)")
     --allowed-tools "${allowed[@]}" -- "$prompt" < /dev/null ) > "$work/fix.json"
 line=$(python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print(r["result"].strip().splitlines()[-1] if r["result"].strip() else ""); sys.exit(1 if r.get("is_error") else 0)' "$work/fix.json") \
   || { echo "smooth: the fix pass failed: $(head -c 400 "$work/fix.json")" >&2; exit 1; }
+# Why each level above the fix would not work; the commit keeps it for the person deciding.
+why=$(jq -r .result "$work/fix.json" | sed -n 's/^why: //p' | tail -1)
 # The worktrees are gone after this run: name files from their own folder.
 line=$(printf '%s' "$line" | sed "s|$work/repo/||g; s|$work/mem/|memory/|g")
+why=$(printf '%s' "$why" | sed "s|$work/repo/||g; s|$work/mem/|memory/|g")
 
 if [ -d "$work/repo/_claude" ]; then
   ( cd "$work/repo" && mkdir -p .claude && cp -R _claude/. .claude/ && rm -rf _claude )
 fi
 
 msg="smooth: $line
-
+${why:+
+why: $why
+}
 signal: $sig
 group: $grp
 count: $n
@@ -107,9 +112,10 @@ for w in repo mem; do
   made="$made $w"
 done
 
-echo "friction: $sig, $grp — $n times in $sessions sessions"
+echo "friction: $sig, $grp — $n times in $sessions ${unit}s"
 if [ -z "$made" ]; then echo "no fix: $line"; exit 0; fi
 echo "fix: $line"
+[ -z "$why" ] || echo "why: $why"
 for w in $made; do
   g=$( [ "$w" = repo ] && echo "$root" || echo "$mem")
   git -C "$g" show --stat --format='' "$branch" | sed '/^$/d; s/^/  /'

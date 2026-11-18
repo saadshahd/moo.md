@@ -1,5 +1,6 @@
 #!/bin/bash
-# count.sh [--json] [days|day|week|month] [project-dir] — executor friction in one project's sessions, counted without a model.
+# count.sh [--json] [days|day|week|month] [project-dir] — executor friction in one project's sessions, the commits the person
+# reverted and their review comments on GitHub, counted without a model.
 # A project is its git root; its sessions are every transcript whose cwd sits at or under that root,
 # worktrees and subagents included. Each signal prints its count, the sessions it spans, and its top groups.
 # --json: the same as one object; each group carries its session ids and up to 5 calls behind it.
@@ -47,11 +48,32 @@ events=$(printf '%s\n' "$files" | while IFS= read -r f; do
   ' "$f" 2>/dev/null || echo "count.sh: skipped unreadable $f" >&2
 done)
 
+# A revert is a change the person undid: one event per file it touches, with what the undone commit was.
+reverts=$(git -C "$root" log --since="$since" --grep='^Revert "' --format=%H | while IFS= read -r h; do
+  t=$(TZ=UTC git -C "$root" show -s --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd "$h")
+  undone=$(git -C "$root" show -s --format=%b "$h" | sed -n '/^This reverts commit /{s/^This reverts commit \([0-9a-f]*\).*/\1/p;q;}')
+  what=""
+  if [ -n "$undone" ]; then what=$(git -C "$root" show --stat --format=%s "$undone" 2>/dev/null | tr '\n' ' ' | cut -c1-160); fi
+  git -C "$root" show --format= --name-only "$h" |
+    jq -Rc --arg h "$h" --arg t "$t" --arg c "$(git -C "$root" show -s --format=%s "$h")" --arg r "$what" \
+      'select(. != "") | {k: "revert", u: ($h + .), s: $h[0:12], t: $t, g: ., cmd: $c, r: {txt: $r}}'
+done)
+
+# Review comments by people, not bots, on the repo's pull requests. A repo with no GitHub remote has none to read.
+reviews=""
+if git -C "$root" remote -v | grep 'github\.com' >/dev/null; then
+  reviews=$(cd "$root" && repo=$(gh repo view --json nameWithOwner -q .nameWithOwner) &&
+    gh api --paginate "repos/$repo/pulls/comments?since=$since&per_page=100" --jq '.[] | select(.user.type != "Bot")
+      | {k: "review", u: ("review-" + (.id | tostring)), s: (.pull_request_url | split("/") | last), t: .created_at, g: .path,
+         cmd: (.body | gsub("\\s+"; " ") | .[0:200]), r: {txt: (.path + ":" + ((.line // .original_line // 0) | tostring))}} | tojson') ||
+    { echo "count.sh: review comments skipped: gh could not read this repo's pull requests" >&2; reviews=""; }
+fi
+
 # Pass 2: join results to calls, then count.
-printf '%s\n' "$events" | jq -rs --arg root "$root" --argjson days "$days" --argjson json "$json" '
+printf '%s\n' "$events" "$reverts" "$reviews" | jq -rs --arg root "$root" --argjson days "$days" --argjson json "$json" '
   def what: .cmd // .path // .pat // .skill // .name;
-  def signal($name; $xs; $fix):
-    {name: $name, fix: $fix, n: ($xs | length), sessions: ($xs | map(.s) | unique | length),
+  def signal($name; $xs; $unit; $fix):
+    {name: $name, unit: $unit, fix: $fix, n: ($xs | length), sessions: ($xs | map(.s) | unique | length),
      groups: ($xs | group_by(.g)
        | map({g: (.[0].g | tostring | gsub("\\s+"; " ") | .[0:110]), n: length, sessions: (map(.s) | unique | length),
               ids: (map(.s) | unique), calls: (.[0:5] | map({s, t, what: (what | tostring | .[0:200]), result: (.r.txt // null)}))})
@@ -91,22 +113,26 @@ printf '%s\n' "$events" | jq -rs --arg root "$root" --argjson days "$days" --arg
          elif $c.name == "Skill" then .sk = $c.skill
          elif .sk and $c.r.err then .out += [$c + {g: .sk}] else . end) | .out) | add // []) as $afterskill
   | ($e | map(select(.k == "interrupt"))) as $intr
-  | {project: $root, days: $days, sessions: ($e | map(.s) | unique | length), calls: ($calls | length),
+  | ($e | map(select(.k == "revert"))) as $reverts
+  | ($e | map(select(.k == "review"))) as $reviews
+  | {project: $root, days: $days, sessions: ($e | map(select(.k != "revert" and .k != "review") | .s) | unique | length), calls: ($calls | length),
      signals: [
-       signal("failed commands";       $failed   | map(. + {g: .head});              "CLAUDE.md, a script"),
-       signal("retried after failing"; $retried  | map(. + {g: .head});              "CLAUDE.md, a script"),
-       signal("empty searches";        $empty    | map(. + {g: .pat});               "CLAUDE.md map, file names"),
-       signal("files re-read";         $reread   | map(. + {g: .path});              "CLAUDE.md, a memory note"),
-       signal("edits rejected";        $rejected | map(. + {g: (.r.txt | .[0:70])}); "split the file"),
-       signal("hook or gate blocks";   $blocked  | map(. + {g: (.r.txt | .[0:70])}); "the hook, or its rule"),
-       signal("calls denied";          $denied   | map(. + {g: (.name + " " + (.head // .path // ""))}); ".claude/settings.json, CLAUDE.md"),
-       signal("repeated sequences";    $seq;                                           "a project skill"),
-       signal("errors after a skill";  $afterskill;                                    "that skill"),
-       signal("interrupts";            $intr     | map(. + {g: "interrupt"});        "read the turns")
+       signal("failed commands";       $failed   | map(. + {g: .head});              "session"; "CLAUDE.md, a script"),
+       signal("retried after failing"; $retried  | map(. + {g: .head});              "session"; "CLAUDE.md, a script"),
+       signal("empty searches";        $empty    | map(. + {g: .pat});               "session"; "CLAUDE.md map, file names"),
+       signal("files re-read";         $reread   | map(. + {g: .path});              "session"; "CLAUDE.md, a memory note"),
+       signal("edits rejected";        $rejected | map(. + {g: (.r.txt | .[0:70])}); "session"; "split the file"),
+       signal("hook or gate blocks";   $blocked  | map(. + {g: (.r.txt | .[0:70])}); "session"; "the hook, or its rule"),
+       signal("calls denied";          $denied   | map(. + {g: (.name + " " + (.head // .path // ""))}); "session"; ".claude/settings.json, CLAUDE.md"),
+       signal("repeated sequences";    $seq;                                           "session"; "a project skill"),
+       signal("errors after a skill";  $afterskill;                                    "session"; "that skill"),
+       signal("interrupts";            $intr     | map(. + {g: "interrupt"});        "session"; "read the turns"),
+       signal("reverted changes";      $reverts;                                       "commit"; "the code, or a type, lint or test that stops it"),
+       signal("review comments";       $reviews;                                       "pull request"; "a type, lint or test, else CLAUDE.md")
      ] | map(select(.n > 0))}
   | if $json then . else
       "project \(.project), last \(.days) day(s): \(.sessions) session(s), \(.calls) tool calls",
-      (.signals[] | "\(.name)  \(.n) in \(.sessions) session(s)  → \(.fix)",
+      (.signals[] | "\(.name)  \(.n) in \(.sessions) \(.unit)(s)  → \(.fix)",
         (.groups[0:3][] | "    \(.n)× (\(.sessions) sess)  \(.g)"))
     end
 '

@@ -43,7 +43,7 @@ case ${STUB_MODE:-repo} in
   (mem) dir=$(printf '%s\n' "$prompt" | sed -n 's/^Memory folder: //p'); echo 'tests: make test' > "$dir/tests.md" ;;
   (none) ;;
 esac
-echo "{\"is_error\":false,\"result\":\"the agent runs make test, from $PWD/CLAUDE.md\"}"
+echo "{\"is_error\":false,\"result\":\"why: no type or lint stops a mistyped make target\\nthe agent runs make test, from $PWD/CLAUDE.md\"}"
 STUB
 chmod +x "$root/bin/claude"
 export PATH=$root/bin:$PATH STUB_SEEN=$root/seen
@@ -56,6 +56,20 @@ run() { out=$("$here/smooth.sh" "${WINDOW:-day}" "$repo" 2>&1); code=$?; }
 counted=$("$here/count.sh" 1 "$repo")
 ok "count.sh finds the failed command"   'printf "%s" "$counted" | grep -q "failed commands  1 in 1 session"'
 ok "count.sh takes week as 7 days"       '[ "$("$here/count.sh" week "$repo")" = "$("$here/count.sh" 7 "$repo")" ]'
+
+# Reverts and review comments, in a repo of their own, so they never compete with the planted friction.
+repo2=$root/repo2
+mkdir -p "$repo2" "$root/ghfail"
+git -C "$repo2" init -q
+for n in 1 2; do
+  echo "try $n" > "$repo2/retry.sh"; git -C "$repo2" add -A; git -C "$repo2" commit -qm "retry $n"
+  git -C "$repo2" revert --no-edit HEAD >/dev/null
+done
+git -C "$repo2" remote add origin https://github.com/example/none.git
+printf '#!/bin/sh\nexit 1\n' > "$root/ghfail/gh"; chmod +x "$root/ghfail/gh"
+reverted=$(PATH=$root/ghfail:$PATH "$here/count.sh" 1 "$repo2" 2>"$root/err")
+ok "count.sh counts reverted changes"    'printf "%s" "$reverted" | grep -q "reverted changes  2 in 2 commit(s)"'
+ok "unread review comments fail loud"    'grep -q "review comments skipped" "$root/err"'
 
 WINDOW=fortnight run
 ok "unknown window fails loud"           '[ $code -ne 0 ] && printf "%s" "$out" | grep -q "day, week or month"'
@@ -72,6 +86,7 @@ ok ".claude/ staged back from _claude/"  'git -C "$repo" show "$branch:.claude/s
 ok "a symlinked skill stays a symlink"  '[ "$(git -C "$repo" ls-tree "$branch" .claude/skills/alias | cut -c1-6)" = 120000 ]'
 ok "commit carries signal and count"     'git -C "$repo" log -1 --format=%B "$branch" | grep -q "^count: 2"'
 ok "commit carries the window"           'git -C "$repo" log -1 --format=%B "$branch" | grep -q "^window: day"'
+ok "commit carries why not higher"       'git -C "$repo" log -1 --format=%B "$branch" | grep -q "^why: no type or lint"'
 ok "checked-out branch untouched"        '! grep -q "make test" "$repo/CLAUDE.md" && [ -z "$(git -C "$repo" status --porcelain)" ]'
 ok "no worktree left"                    '[ "$(git -C "$repo" worktree list | wc -l)" -eq 1 ]'
 ok "output names review, keep, drop"     'printf "%s" "$out" | grep -q "review: git" && printf "%s" "$out" | grep -q "keep:" && printf "%s" "$out" | grep -q "drop:"'
