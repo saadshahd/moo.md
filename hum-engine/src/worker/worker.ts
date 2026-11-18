@@ -49,6 +49,9 @@ import { answerTo, type Checkout, ownerWaitStage, claimTtlMs, DEFAULT_BASE, gath
 
 export type { TickResult } from "./lifecycle.ts";
 
+/** The card on an item someone else already works on. */
+const CLAIMED_CODE = "item-claimed";
+
 /** Where the loop keeps the base it read, so a fetch elsewhere cannot move it mid-pass. */
 const LOOP_REF = "refs/hum/loop-base";
 
@@ -119,6 +122,8 @@ type Sources = {
 type Known = {
 	readonly footprint: Footprint;
 	readonly title: string;
+	/** Who else already works on the item, as its source names them. */
+	readonly claimedBy: readonly string[];
 };
 
 type InFlight = {
@@ -305,6 +310,24 @@ export class Worker {
 		} else if (value !== saved.state) this.#timedOut.add(saved.itemId);
 
 		actor.stop();
+	}
+
+	/**
+	 * Whether no one else works on an item hum has not started: one a person or a pull request claims gets a card naming
+	 * them, which goes once they let it go.
+	 */
+	#isUnclaimed(id: string, { claimedBy }: Known): boolean {
+		const { faults } = this.#o.state;
+
+		if (claimedBy.length === 0) {
+			faults.clear({ code: CLAIMED_CODE, item: id });
+
+			return true;
+		}
+
+		faults.raise({ code: CLAIMED_CODE, item: id, cause: `${id} is already taken by ${claimedBy.join(" and ")}, so hum starts no rival change.`, fix: "Unassign the item or close the pull request, and hum takes it at its next tick." });
+
+		return false;
 	}
 
 	/** Whether every part a split part waits on has merged; an item no split filed waits on none. */
@@ -756,7 +779,7 @@ export class Worker {
 	async #learn(id: string): Promise<Known> {
 		const item = await this.#o.adapters.workSource.read(ItemId.parse(id));
 
-		return { footprint: footprintOf(item), title: item.title };
+		return { footprint: footprintOf(item), title: item.title, claimedBy: item.claimedBy ?? [] };
 	}
 
 	/** Which waiting items start now, by the scheduler's rules, and starts them. */
@@ -778,7 +801,7 @@ export class Worker {
 
 		const relands = [...this.#relanding].flatMap((id) => (isFresh(id) && !ready.some((ref) => ref.id === id) ? [learned(id).then((known) => ({ id, answered: true, known }))] : []));
 
-		const waiting = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known ? [{ id, answered, known }] : []));
+		const waiting = (await Promise.all([...fresh, ...answered, ...relands])).flatMap(({ id, answered, known }) => (known && (answered || this.#isUnclaimed(id, known)) ? [{ id, answered, known }] : []));
 		const knownOf = new Map(waiting.map((w) => [w.id, w.known]));
 
 		const { start } = pick({

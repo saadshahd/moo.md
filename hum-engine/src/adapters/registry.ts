@@ -27,6 +27,7 @@ const MARKDOWN_SLOTS: readonly Slot[] = ["work-source", "questions", "answers"];
 const AdapterSettings = z.looseObject({
 	integrations: HumConfig.shape.integrations,
 	claimPrefix: HumConfig.shape.claimPrefix,
+	runBranchPrefix: HumConfig.shape.runBranchPrefix,
 	itemsDir: HumConfig.shape.itemsDir,
 	commitIdentity: HumConfig.shape.commitIdentity,
 	readyLabel: HumConfig.shape.readyLabel,
@@ -84,7 +85,7 @@ const BUILT_IN = {
 	github: async ({ path, settings, context }) => {
 		const timeoutMs = commandTimeoutMs(settings);
 
-		return githubAdapter({ repo: await githubRepo(path, timeoutMs), base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod, ownerLogins: settings.ownerLogins, timeoutMs }, context);
+		return githubAdapter({ repo: await githubRepo(path, timeoutMs), base: await defaultBase(path, timeoutMs), claimPrefix: settings.claimPrefix, runBranchPrefix: settings.runBranchPrefix, readyLabel: settings.readyLabel, mergeMethod: settings.mergeMethod, ownerLogins: settings.ownerLogins, timeoutMs }, context);
 	},
 	roundup: async ({ context }) => roundupAdapter({}, context),
 } satisfies Readonly<Record<string, (repo: Repo) => Promise<Adapter>>>;

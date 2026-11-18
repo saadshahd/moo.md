@@ -20,6 +20,7 @@ const settings = (repo: string, client: GitHubClient): GitHubOptions => ({
 	base: "main",
 	client,
 	claimPrefix: SHIPPED_DEFAULTS.claimPrefix,
+	runBranchPrefix: SHIPPED_DEFAULTS.runBranchPrefix,
 	readyLabel: SHIPPED_DEFAULTS.readyLabel,
 	mergeMethod: SHIPPED_DEFAULTS.mergeMethod,
 	ownerLogins: SHIPPED_DEFAULTS.ownerLogins,

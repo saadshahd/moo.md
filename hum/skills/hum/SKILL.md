@@ -17,7 +17,7 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | Ask | Proposal comes from | The answer sets |
 | --- | --- | --- |
 | Where runs happen: your Mac, CI, or both | the scan: CI workflows, a service unit | `runPlaces` |
-| Where items, questions and answers live: GitHub issues, or markdown files in `itemsDir` | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel` | `integrations` |
+| Where items, questions and answers live: GitHub issues, or markdown files in `itemsDir` | `integrations` in the proposal: GitHub where the repo has open issues or an issue template. An issue is ready once it carries `readyLabel`; hum leaves one a person is assigned to, or an open pull request closes | `integrations` |
 | Which commands a change must pass | CI jobs on pull requests, else package scripts, after the lockfile install a fresh clone needs | `checks` |
 | Which label a pull request needs when it grows some files | `labelGates` in the proposal: a repo label a job quotes, in a workflow that runs again when a pull request gets a label. Read that job. Where it fails a pull request that grows the bytes of some files and lacks the label, write one entry per set of files it sums apart, with globs that match exactly those files | `growthLabels` |
 | For CI runs: the repo's setting "Allow GitHub Actions to create and approve pull requests" | `workflowsMayOpenPullRequests` in the scan; if off, ask the owner to turn it on and never change it yourself; `null` where the scan could not read it, as anyone but a repo admin cannot: ask the owner to check it | nothing written |

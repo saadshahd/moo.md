@@ -379,6 +379,25 @@ test("an item in an owner wait whose timeout goes on to work sleeps through it, 
 	expect(w.shim.calls()).toHaveLength(3);
 });
 
+test("an item someone else claims never starts and carries a card naming them, which goes once they let it go", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true } } });
+	const claimedBy: string[] = ["@ana"];
+	const source = w.adapter.workSource!;
+	const worker = w.workerWith({ adapters: { workSource: { ...source, read: async (id: ItemId) => ({ ...(await source.read(id)), claimedBy }) }, questions: w.adapter.questions!, answers: w.adapter.answers } });
+
+	w.item("a", "docs/a.md");
+	await worker.tick();
+	await worker.idle();
+	expect(w.results).toEqual([]);
+	expect(w.state.faults.list().find(({ code }) => code === "item-claimed")?.cause).toBe("a is already taken by @ana, so hum starts no rival change.");
+
+	claimedBy.pop();
+	await worker.tick();
+	await worker.idle();
+	expect(w.results).toMatchObject([{ outcome: "merged", item: "a" }]);
+	expect(w.state.faults.list().map(({ code }) => code)).not.toContain("item-claimed");
+});
+
 test("a stuck item never reruns until the owner answers; the answer takes it back with a fresh token cap", async () => {
 	const flag = join(tempDir("flag"), "flag");
 	const w = await workerWorld({ items: { a: { writeForItem: true, modelTokens: 400 } } }, { checks: [`test -f ${flag}`], settings: { maxFixRuns: 1 } });
