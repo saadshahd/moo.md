@@ -229,13 +229,27 @@ export const publishPass = async (p: Publisher, trust: GatherTrust, pass: PassOu
 			return pushed.kind === "pushed" ? then(ctx) : unpushed(pass.item, branch, pushed);
 		});
 
+	/** The items this pass filed so far, in order: a split part names the earlier ones it waits on by place. */
+	const filedIds: string[] = [];
+
 	const apply = {
 		comment: async ({ text, scope }) => void (await calls(scope).workSource?.comment(id, text)),
 		decide: async ({ text, scope }) => void (await calls(scope).questions?.decide(id, text)),
-		"file-follow-up": async ({ title, body }) => {
-			const filed = await p.workSource.fileFollowUp(id, { title, body });
+		"file-follow-up": async ({ title, body, part }) => {
+			const waitsOn = (part?.waitsOn ?? []).map((place) => {
+				const earlier = filedIds[place - 1];
 
+				if (earlier === undefined) throw new Error(`a part waits on follow-up ${place}, which this pass has not filed`);
+
+				return earlier;
+			});
+
+			const filed = await p.workSource.fileFollowUp(id, { title, body: waitsOn.length === 0 ? body : `${body}\nwaits-on: ${waitsOn.join(", ")}` });
+
+			filedIds.push(filed.id);
 			p.state.followUps.put(filed.id, { item: filed.id, from: pass.item, at: p.now() });
+
+			if (part) p.state.parts.put(filed.id, { item: filed.id, from: pass.item, waitsOn, check: part.check });
 
 			return undefined;
 		},

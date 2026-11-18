@@ -705,13 +705,23 @@ test("the plan bar reads the model the config gives the plan run, so a run that 
 	expect(w.state.plans.get(id)?.models).toEqual([SHIM_MODEL]);
 });
 
-test("a plan run that splits its item files each part as a ready item and lands the item as done with no change of its own", async () => {
-	const w = await world({ script: [{}], decisions: [{ event: "needs-split", sure: true, reason: "Two jobs.", parts: ["Write part one", "Write part two"] }] }, { checks: ["true"] });
+test("a plan run that splits its item files each part as a ready item, with its files, its check and the parts it waits on, and lands the item as done with no change of its own", async () => {
+	const parts = [
+		{ title: "Write part one", touches: ["docs/one.md"], waitsOn: [], check: "test -f docs/one.md" },
+		{ title: "Write part two", touches: ["docs/two.md"], waitsOn: [1], check: "test -f docs/two.md" },
+	];
+
+	const w = await world({ script: [{}], decisions: [{ event: "needs-split", sure: true, reason: "Two jobs.", parts }] }, { checks: ["true"] });
 	const id = w.repo.seed("Write two parts");
 
 	expect(await runThinPath(w.thinPath({ judge: featureJudge }))).toEqual({ outcome: "merged", item: id });
 	expect(w.repo.show(id)).toContain("state: done");
-	expect((await w.adapter.workSource!.listReady()).map((ref) => ref.title)).toEqual(["Write part one", "Write part two"]);
+
+	const [one, two] = await w.adapter.workSource!.listReady();
+
+	expect([one?.title, two?.title]).toEqual(["Write part one", "Write part two"]);
+	expect((await w.adapter.workSource!.read(ItemId.parse(two!.id))).body).toContain(`touches: docs/two.md\ncheck: test -f docs/two.md\nwaits-on: ${one!.id}`);
+	expect(w.state.parts.get(two!.id)).toEqual({ item: two!.id, from: id, waitsOn: [one!.id], check: "test -f docs/two.md" });
 	expect(w.shim.calls()).toHaveLength(1);
 	expect(folded(w, id)).toMatchObject({ doneBy: "split", picks: { plan: { pick: { event: "needs-split", parts: ["Write part one", "Write part two"] } } } });
 });

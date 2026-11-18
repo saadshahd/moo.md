@@ -127,6 +127,16 @@ test("a review asks for changes only by citing a changed line, a plan is ready o
 	expect(readPick("review", finished({ structured: { event: "approve", sure: false, reason: "unsure" } }), DIFF)).toMatchObject({ ok: true, pick: { event: "request-changes" } });
 });
 
+test("a split names at least two parts, each waiting only on parts listed before it", () => {
+	const part = (title: string, waitsOn: number[] = []) => ({ title, touches: [`src/${title}.ts`], waitsOn, check: `bun test ${title}` });
+	const split = (parts: ReturnType<typeof part>[]) => readPick("plan", finished({ structured: { event: "needs-split", sure: true, reason: "Two jobs.", parts } }), "");
+
+	expect(split([part("a"), part("b", [1])])).toMatchObject({ ok: true, pick: { event: "needs-split" } });
+	expect(split([part("a")])).toEqual({ ok: false, why: "needs-split must name at least two parts" });
+	expect(split([part("a", [2]), part("b")])).toEqual({ ok: false, why: "part 1 of needs-split waits on a part not listed before it" });
+	expect(split([part("a"), part("b", [2])])).toEqual({ ok: false, why: "part 2 of needs-split waits on a part not listed before it" });
+});
+
 test("a pick that fails its check is refused twice with the reason fed back, then the decision throws for the machine's error path", async () => {
 	const prompts: string[] = [];
 

@@ -496,6 +496,23 @@ test("memory.md lines with no source or past the byte cap each raise a card nami
 	expect(memoryCards()).toEqual([]);
 });
 
+test("a split part waits for the part it names to merge, though their files differ, and its own check, which no base was meant to pass, goes to fix runs when it fails", async () => {
+	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5 }, b: { writeForItem: true, spend: 5 } } }, { checks: ["true"], settings: { maxFixRuns: 1 } });
+
+	w.item("a", "docs/a.md");
+	w.item("b", "docs/b.md");
+	w.state.parts.put("a", { item: "a", from: "x", waitsOn: [], check: "test -f docs/a.md" });
+	w.state.parts.put("b", { item: "b", from: "x", waitsOn: ["a"], check: "test -f docs/never.md" });
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["a"] });
+	await w.worker.idle();
+	expect(w.results).toMatchObject([{ outcome: "merged", item: "a" }]);
+
+	expect(await w.worker.tick()).toEqual({ kind: "ran", started: ["b"] });
+	await w.worker.idle();
+	expect(w.results.at(-1)).toMatchObject({ outcome: "stuck", item: "b", detail: "the checks still fail after 1 fixes" });
+});
+
 test("an item waiting behind a run on the same file starts once the owner moves its touches: elsewhere", async () => {
 	const w = await workerWorld({ items: { a: { writeForItem: true, spend: 5, sleep: 400 }, b: { writeForItem: true, spend: 5 } } });
 

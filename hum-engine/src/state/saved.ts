@@ -103,6 +103,11 @@ export type QueuedQuestion = z.infer<typeof QueuedQuestion>;
 /** A follow-up item a pass filed, which counts against the daily question cap like a question asked. */
 export const FiledFollowUp = z.object({ item: name, from: name, at: time });
 
+/** A part a split filed, as publish filed it: the item it split from, the parts it waits on and the one command that proves it. Only publish writes these, so each check is hum's own. */
+export const FiledPart = z.object({ item: name, from: name, waitsOn: z.array(name), check: name });
+
+export type FiledPart = z.infer<typeof FiledPart>;
+
 const settledFields = {
 	item: name,
 	/** The answer's number among the thread's answers and replies from people. */

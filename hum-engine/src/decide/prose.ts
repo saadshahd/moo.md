@@ -59,6 +59,16 @@ export const PROSE_STATES = {
 export type ProsePurpose = keyof typeof PROSE_STATES;
 
 /** What a plan or review run answers: one event, how sure it is, and the artifact behind the pick. */
+/** One part of a split item: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it. */
+export const SplitPart = z.strictObject({
+	title: z.string().min(1),
+	touches: z.array(z.string().min(1)).min(1),
+	waitsOn: z.array(z.int().positive()),
+	check: z.string().min(1),
+});
+
+export type SplitPart = z.infer<typeof SplitPart>;
+
 export const EventPick = z.object({
 	event: z.string(),
 	sure: z.boolean(),
@@ -66,7 +76,7 @@ export const EventPick = z.object({
 	cites: z.array(Cite).default([]),
 	plan: PlanFile.optional(),
 	question: z.string().optional(),
-	parts: z.array(z.string().min(1)).default([]),
+	parts: z.array(SplitPart).default([]),
 });
 
 export type EventPick = z.infer<typeof EventPick>;
@@ -92,8 +102,18 @@ export const doesCiteDiff = (cites: readonly Cite[], diff: string): boolean => {
 	return cites.length > 0 && cites.every(isChanged);
 };
 
+/** Why a split's parts fail: fewer than two, or one waits on a part not listed before it. */
+const splitFault = ({ parts }: EventPick): string | undefined => {
+	if (parts.length < 2) return "needs-split must name at least two parts";
+
+	const early = parts.findIndex(({ waitsOn }, index) => waitsOn.some((place) => place > index));
+
+	return early < 0 ? undefined : `part ${early + 1} of needs-split waits on a part not listed before it`;
+};
+
 /** Code's check on the artifact behind a pick: why it fails, or undefined when it holds. */
 const FENCES = new Map<string, (pick: EventPick, diff: string) => string | undefined>([
+	[SPLIT, splitFault],
 	["request-changes", (pick, diff) => (doesCiteDiff(pick.cites, diff) ? undefined : "request-changes must cite a file and a line the diff changes")],
 	["plan-ready", (pick) => (pick.plan ? undefined : "plan-ready must hold a plan: a summary, at least one step and the paths it touches")],
 ]);

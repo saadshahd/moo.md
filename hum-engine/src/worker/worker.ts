@@ -329,6 +329,13 @@ export class Worker {
 		actor.stop();
 	}
 
+	/** Whether every part a split part waits on has merged; an item no split filed waits on none. */
+	#waitsMerged(id: string): boolean {
+		const { state } = this.#o;
+
+		return (state.parts.get(id)?.waitsOn ?? []).every((waited) => state.merges.get(waited) !== undefined);
+	}
+
 	/** What came of an item so far: merged, or parked stuck or for review; nothing while it goes on. */
 	#resultOf(item: string): Choice["result"] {
 		const { state } = this.#o;
@@ -783,7 +790,7 @@ export class Worker {
 		const isAnsweredAndIdle = (id: string) => this.#answered.has(id) && !this.#inFlight.has(id);
 		const learned = (id: string) => this.#learn(id).catch(() => undefined);
 
-		const fresh = ready.flatMap((ref) => (isFresh(ref.id) ? [learned(ref.id).then((known) => ({ id: ref.id, answered: false, known }))] : []));
+		const fresh = ready.flatMap((ref) => (isFresh(ref.id) && this.#waitsMerged(ref.id) ? [learned(ref.id).then((known) => ({ id: ref.id, answered: false, known }))] : []));
 
 		const answered = sleeping.flatMap((s) => {
 			const named = this.#kindNamed(s.kind);

@@ -15,7 +15,7 @@ import { invokedSources, kindMachine } from "../config/machine.ts";
 import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
-import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT } from "../decide/prose.ts";
+import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
@@ -317,7 +317,8 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 
 		try {
 			const outbox = new Outbox(id);
-			const driven: Driven = { ...o, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh, outbox };
+			const ownChecks = ownChecksOf(o.state, id);
+			const driven: Driven = { ...o, checks: [...o.checks, ...ownChecks], ownChecks, base, baseSha: gathered.baseSha, dir: o.dir ?? o.config.hum.itemsDir, kindName, kind, judge, id, item, branch, clone, evidence, env, g, git, answered, resume: asking, restarted: isFresh, outbox };
 
 			/* A change already finished lands again from its pushed branch; no run is spent on it. One saved at the owner's approval wait goes on from the wait. */
 			const worked = landing && !asking ? await handToPublish(driven) : await drive(driven);
@@ -335,6 +336,13 @@ const pass = async (o: ThinPathOptions): Promise<ThinResult> => {
 	} finally {
 		await taken.giveBack();
 	}
+};
+
+/** The checks an item brings of its own: a split part's, which publish kept as it filed the part. */
+const ownChecksOf = (state: State, id: string): string[] => {
+	const part = state.parts.get(id);
+
+	return part === undefined ? [] : [part.check];
 };
 
 /** Where a run's working copy comes from: the remote and the branch it starts on. */
@@ -410,6 +418,8 @@ type Driven = ThinPathOptions & {
 	readonly baseSha: string;
 	/** What the pass asks publish to do. */
 	readonly outbox: Outbox;
+	/** The checks the item brings beside the repo's, which `checks` holds too; no base was meant to pass them. */
+	readonly ownChecks: readonly string[];
 	/** Restore the saved owner-wait snapshot instead of starting the machine. */
 	readonly resume: boolean;
 	/** The run branch starts again at the base: earlier work on the item, and the plan written for it, are gone. */
@@ -621,7 +631,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		}
 	};
 
-	/** A failing check goes to a fix run, unless the base fails it too: no change of the item's can pass it, so the item ends for the owner. */
+	/** A failing check goes to a fix run, unless it is one of the repo's and the base fails it too: no change of the item's can pass it, so the item ends for the owner. */
 	const checksSource = createAsyncLogic({
 		run: async () => {
 			const failed = await firstFailing(d.checks, clone, checkOptions);
@@ -630,7 +640,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			lastFailure = failed.failure;
 
-			if (await failsOnBase(failed.command)) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
+			if (!d.ownChecks.includes(failed.command) && (await failsOnBase(failed.command))) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
 
 			throw new Error(failed.failure.slice(0, ERROR_EXCERPT));
 		},
@@ -678,7 +688,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				});
 
 				if (purpose === "review") keepVerdict(state, { id, head, patch, pick, models });
-				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick, models: [...models] } });
+				else keepPick(state.events, { itemId: id, pick: { judge: purpose, pick: keptPick(pick), models: [...models] } });
 
 				PICKED.get(pick.event)?.(pick, models);
 
@@ -825,17 +835,20 @@ export const PROSE_PROMPTS = {
 		[
 			roleOf(config, "plan"),
 			`# Item ${item.id}: ${item.title}\n\n${item.body}`,
-			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part as a title; a plan-blocked answer asks the owner one question.",
+			"Plan the change: read the repo, edit nothing. A plan-ready answer holds the plan; a needs-split answer names each part: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it; a plan-blocked answer asks the owner one question.",
 		].join("\n\n"),
 	review: (config: RunConfig, item: ItemText, diff: string): string => [roleOf(config, "review"), reviewInput(item, diff, config.hum)].join("\n\n"),
 } as const satisfies Record<ProsePurpose, (config: RunConfig, item: ItemText, diff: string) => string>;
+
+/** A pick as the item's log keeps it: a split's parts by title, which is all a measure reads of them. */
+const keptPick = (pick: EventPick) => ({ ...pick, parts: pick.parts.map(({ title }) => title) });
 
 /** A review's verdict on the change that ends at `head`: saved for landing, and kept in the item's log. */
 const keepVerdict = (state: State, { id, head, patch, pick, models }: { readonly id: string; readonly head: string; readonly patch: string | undefined; readonly pick: EventPick; readonly models: readonly string[] }) => {
 	const verdict = { item: id, head, patch, event: pick.event, reason: pick.reason, cites: pick.cites, models: [...models] };
 
 	state.verdicts.put(id, verdict);
-	keepPick(state.events, { itemId: id, pick: { judge: "review", head, pick, models: [...models] } });
+	keepPick(state.events, { itemId: id, pick: { judge: "review", head, pick: keptPick(pick), models: [...models] } });
 
 	return verdict;
 };
@@ -946,11 +959,14 @@ const bundleOf = async (git: Git, { branch, item, gathered, folder }: { readonly
 	return file;
 };
 
-/** Files each part of a split item as its own item, then lands the item as done with no change of its own. */
-const split = async (d: Driven, parts: readonly string[]): Promise<ThinResult> => {
+/**
+ * Files each part of a split item as its own item, with the files it may touch, which the scheduler reads, and its
+ * check; publish names the parts it waits on. Then the item lands as done with no change of its own.
+ */
+const split = async (d: Driven, parts: readonly SplitPart[]): Promise<ThinResult> => {
 	const writes = d.outbox.calls({ run: SPLIT, attempt: 0 });
 
-	for (const title of parts) await writes.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}` });
+	for (const { title, touches, waitsOn, check } of parts) await writes.fileFollowUp(d.id, { title, body: `Split from ${d.id}: ${d.item.title}\n\ntouches: ${touches.join(", ")}\ncheck: ${check}` }, { waitsOn, check });
 
 	return merge(d);
 };

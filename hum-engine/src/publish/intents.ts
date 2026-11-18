@@ -14,7 +14,7 @@ const Scope = z.strictObject({ run: text, attempt: z.int().nonnegative() });
 export const Intent = z.discriminatedUnion("kind", [
 	z.strictObject({ kind: z.literal("comment"), text, scope: Scope }),
 	z.strictObject({ kind: z.literal("decide"), text, scope: Scope }),
-	z.strictObject({ kind: z.literal("file-follow-up"), title: text, body: text }),
+	z.strictObject({ kind: z.literal("file-follow-up"), title: text, body: text, part: z.strictObject({ waitsOn: z.array(z.int().positive()), check: text }).optional() }),
 	z.strictObject({ kind: z.literal("push-branch"), head: text }),
 	z.strictObject({ kind: z.literal("keep-evidence") }),
 	...(["land", "save-landing"] as const).map((kind) => z.strictObject({ kind: z.literal(kind), head: text })),
@@ -26,8 +26,11 @@ export type Intent = z.infer<typeof Intent>;
 export type PassWrites = {
 	readonly comment: (id: ItemId, text: string) => Promise<void>;
 	readonly decide: (id: ItemId, text: string) => Promise<void>;
-	readonly fileFollowUp: (from: ItemId, followUp: FollowUp) => Promise<void>;
+	readonly fileFollowUp: (from: ItemId, followUp: FollowUp, part?: SplitFiling) => Promise<void>;
 };
+
+/** What a split part's follow-up carries besides its text: the parts it waits on, by their place among this pass's follow-ups from 1, and its check. */
+export type SplitFiling = { readonly waitsOn: readonly number[]; readonly check: string };
 
 /** One pass's intents for its item, in the order the pass made them. */
 export class Outbox {
@@ -44,7 +47,7 @@ export class Outbox {
 		return {
 			comment: async (item, text) => this.add({ kind: "comment", text: this.#own(item, text), scope }),
 			decide: async (item, text) => this.add({ kind: "decide", text: this.#own(item, text), scope }),
-			fileFollowUp: async (from, { title, body }) => this.add({ kind: "file-follow-up", title: this.#own(from, title), body }),
+			fileFollowUp: async (from, { title, body }, part) => this.add({ kind: "file-follow-up", title: this.#own(from, title), body, part: part && { waitsOn: [...part.waitsOn], check: part.check } }),
 		};
 	}
 
