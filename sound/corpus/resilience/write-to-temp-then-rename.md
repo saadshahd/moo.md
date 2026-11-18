@@ -1,0 +1,5 @@
+An operation that writes state a crash could leave half done writes to a temporary path beside the target and renames it into place, so a reader sees the old file or the new one, never a torn one, and the next run can tell a leftover temporary file is stale.
+_Avoid_: `writeFile` straight onto the live path of a state file, cache, lockfile or generated config; a temporary file on another filesystem, where the rename stops being atomic; a multi-file output written in place one file at a time.
+Detect: a whole-file write to a path that other runs or processes read, with no temporary sibling and rename.
+Not-when: an append-only log, where each append is its own unit; a store that already makes writes atomic (a database, a transactional key-value store); a file nothing reads until its writer exits successfully.
+Cross-ref: idempotent-handler-by-dedup-key — the rerun that finds the leftover converges on its goal; entity-is-the-atomic-boundary — atomicity holds within one entity, here one file.
