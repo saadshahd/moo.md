@@ -25,7 +25,7 @@ Ask in this order. One question per turn, each with its proposal. Where a questi
 | For CI runs, when the owner names a runner GitHub does not host and `isPublicRepo` in the scan is not `false`: whether wakes may run there | the proposal never names one; such a machine keeps what a job leaves, so a process a run started could outlive the work job and reach the next job there, which holds GitHub's token; recommend ephemeral runners | `"ownRunnerOnPublicRepo": true` beside `hum` in the answers, only on the owner's yes |
 | For CI runs: how Claude Code signs in | `wakeJob.ciClaudeAuth`: the `CLAUDE_CODE_OAUTH_TOKEN` secret, or `env` where `ciEnv` carries the credentials, such as a gateway's settings | `ciClaudeAuth` |
 | For CI runs: how a pull request's required checks start | a pull request opened with the workflow token starts no workflows, and dispatching the check workflow does not satisfy the required check; ask for a GitHub App with contents, issues and pull requests write, whose two secrets `wakeJob.pullRequestToken` names where a workflow already mints a token, or a fine-grained token's secret | `pullRequestToken` |
-| One question per waiting state: after how many hours it times out, and so goes to its `then` state | `waits` in the scan | `waitHours` |
+| One question per waiting state: after how many hours it times out, and so goes to its `leadsTo` state | `waits` in the scan | `waitHours` |
 | What each folder's risk is | folder history and names | `paths`, `strictPaths` |
 | Which paths hold data or secrets | the scan's matches | `strictPaths` |
 | How many merged changes judge a fix or a measure | the shipped windows | `changeLabels.fixWindow`, `measureWindow` |

@@ -4,7 +4,7 @@ import { HOUR_MS } from "../time.ts";
 import { WAIT_HOURS } from "./tables.ts";
 
 /** A state a kind's machine waits in, with the hours its timeout proposes and the state the timeout leads to. */
-export type Wait = { readonly kind: string; readonly state: string; readonly waitsOn: "owner" | "other"; readonly hours: number; readonly then: string | undefined };
+export type Wait = { readonly kind: string; readonly state: string; readonly waitsOn: "owner" | "other"; readonly hours: number; readonly leadsTo: string | undefined };
 
 /** The answer for one wait: the hours after which it times out. */
 export type WaitAnswers = Readonly<Record<string, number>>;
@@ -25,7 +25,7 @@ export const waitsOf = (kinds: Readonly<Record<string, Kind>>): Wait[] =>
 			const waitsOn = isOwnerWait(node.tags) ? "owner" : "other";
 			const shipped = earliestTimeout(node);
 
-			return [{ kind, state, waitsOn, hours: shipped?.hours ?? WAIT_HOURS[waitsOn], then: shipped?.transitions[0]?.target ?? stuckStateOf(config) }];
+			return [{ kind, state, waitsOn, hours: shipped?.hours ?? WAIT_HOURS[waitsOn], leadsTo: shipped?.transitions[0]?.target ?? stuckStateOf(config) }];
 		}),
 	);
 

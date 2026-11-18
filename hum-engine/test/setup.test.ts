@@ -338,7 +338,7 @@ test("every wait the shipped kinds have is asked once, and an answered wait carr
 
 	expect(JSON.stringify(kinds[first?.kind ?? ""]?.machine.states[first?.state ?? ""]?.after)).toContain(String(5 * 3_600_000));
 
-	expect(waits.find(({ kind, state }) => kind === "fix" && state === "objecting")).toEqual({ kind: "fix", state: "objecting", waitsOn: "owner", hours: 24, then: "building" });
+	expect(waits.find(({ kind, state }) => kind === "fix" && state === "objecting")).toEqual({ kind: "fix", state: "objecting", waitsOn: "owner", hours: 24, leadsTo: "building" });
 	expect(withTimeouts(shipped.kinds, { "fix/objecting": 5 }).fix?.machine.states.objecting?.after).toEqual({ [String(5 * 3_600_000)]: [{ target: "building" }] });
 });
 
