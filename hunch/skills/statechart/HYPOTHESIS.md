@@ -2,7 +2,7 @@ With `statechart`, Claude models a flow that moves between states, checks the ru
 
 The bet: checking every order of events finds bugs that tests and a flow's own graph checks miss. First target: hum's kind machines (`hum-engine/defaults/kinds/*.json`, run as xstate machines), whose own checks cover only reachability and dead ends (`hum-engine/src/config/checks.ts`).
 
-Graduate when 2 bugs it finds, in at least 2 flows, replay against the real code and get fixed. Kill if 3 flows modelled in earnest yield no bug that replays, or its findings keep turning out to be modelling errors.
+Graduate when 2 bugs it finds, in at least 2 flows, replay against the real code and get fixed. A finding counts only on a model a planted break was seen to fail. Kill if 3 flows modelled in earnest yield no bug that replays, or its findings keep turning out to be modelling errors.
 
 ## Field notes
 
@@ -13,3 +13,10 @@ Graduate when 2 bugs it finds, in at least 2 flows, replay against the real code
 - Changed: our own code, dependency-free, written from what pstack's skill says its command does. pstack's scripts were read, never run. TLC comes from `tla2tools.jar` and a Java the user installs; pstack installs both with mise. Every state a rule breaks comes from one `-continue` run on a model small enough to chart.
 - Dropped: parallel regions and parent states, so `state()` returns text only, and the region check with them: hum's machines are flat. Group colours and SVG rendering: the chart is Mermaid text, which a Pad or a pull request draws.
 - Base rate: 57 of 2,536 local sessions have a prompt that names a state machine, a race, xstate, TLA+ or model checking. How many needed every order of events checked is not counted.
+
+### 2026-11-18 — target, tool and upkeep, from cursor's pstack `create-formal-verification-skill` and `maintain-formal-verification-skill`
+
+- Kept: the target is the promise whose break harms users most and tests rarely reach, never the easiest to model. The question picks the kind of tool: order to a model checker, every input to a verifier on the code, every size to a proof; `sound:find` picks the concrete tool.
+- Kept: each action points at code a reviewer can open, and an indivisible step in the code stays one action. A planted break in the real code must be caught before a pass counts.
+- Kept: the covered files and a sync commit, and the upkeep pass that sorts each change since the sync and ends in sync, updated, bug or blocked. They live in the spec's own header.
+- Dropped: generating a verify skill in each repo. The owner ruled out generated per-repo skills; the spec's header holds what such a skill would record.
