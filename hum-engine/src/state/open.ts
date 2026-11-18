@@ -11,7 +11,7 @@ import { MergedCase } from "../measure/cases.ts";
 import { OpKeys } from "./ops.ts";
 import { Records } from "./records.ts";
 import { RunRecords } from "./runs.ts";
-import { FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
+import { FiledFollowUp, FiledPart, ItemKind, Landing, Learned, Limit, Parked, PullRequestText, QueuedQuestion, ReadyList, SavedPlan, SavedRepro, SettledAnswer, Slot, Spent, Verdict } from "./saved.ts";
 
 /** Names under the state folder that other modules address by name. */
 export const STATUS_FILE = "status.json";
@@ -74,6 +74,8 @@ export const openState = (dir: string, { now, ...codec }: StateOptions) => {
 		questions: new Records(join(dir, "questions"), QueuedQuestion),
 		/** Follow-up items a pass filed within the day, by the item filed. */
 		followUps: new Records(join(dir, "follow-ups"), FiledFollowUp),
+		/** The check each fix item's repro run wrote, by item. */
+		repros: new Records(join(dir, "repros"), SavedRepro),
 		/** The parts splits filed, by the item filed; kept while the part lives. */
 		parts: new Records(join(dir, "parts"), FiledPart),
 		/** Choices made without the owner, by item and time. */

@@ -103,6 +103,15 @@ export type QueuedQuestion = z.infer<typeof QueuedQuestion>;
 /** A follow-up item a pass filed, which counts against the daily question cap like a question asked. */
 export const FiledFollowUp = z.object({ item: name, from: name, at: time });
 
+/**
+ * The check a fix item's repro run wrote: the command that fails because of the bug, what stood in for the reported
+ * environment where it was not at hand, the commit that added it and the files it touched. `proven` counts the runs
+ * that passed once the fix was in.
+ */
+export const SavedRepro = z.object({ item: name, command: name, translated: name.optional(), commit: name, files: z.array(name), proven: z.int().positive().optional() });
+
+export type SavedRepro = z.infer<typeof SavedRepro>;
+
 /** A part a split filed, as publish filed it: the item it split from, the parts it waits on and the one command that proves it. Only publish writes these, so each check is hum's own. */
 export const FiledPart = z.object({ item: name, from: name, waitsOn: z.array(name), check: name });
 

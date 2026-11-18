@@ -72,6 +72,7 @@ export const PLAIN_QUESTIONS = {
 	"owner-review": "Approve this change?",
 	kind: "Which kind of work is this?",
 	level: "Which level do these paths belong to?",
+	repro: "The repro passes without a fix; how should the run go on?",
 } as const satisfies Record<string, string>;
 
 export type PlainQuestion = keyof typeof PLAIN_QUESTIONS;

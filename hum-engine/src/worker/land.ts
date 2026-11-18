@@ -57,7 +57,7 @@ import {
 	type Policy,
 } from "../decide/risk.ts";
 import type { State } from "../state/open.ts";
-import type { Landing as SavedLanding, Verdict } from "../state/saved.ts";
+import type { Landing as SavedLanding, SavedRepro, Verdict } from "../state/saved.ts";
 import { PLAIN_QUESTIONS } from "../decide/question.ts";
 import { checkLimits, runChecks } from "./checks.ts";
 import { mergedThrough, type OnBase, recordMerged } from "./merged.ts";
@@ -418,13 +418,18 @@ const pushToBase = async (ctx: LandContext): Promise<BaseLanding> => {
 	return pushed.kind === "skipped" || pushed.value.kind === "pushed" ? LANDED : pushed.value;
 };
 
-/** What the change's pull request says: the text the run wrote under the repo's own rules, else the item's title, then its evidence, then hum's word on the merge and the item. */
+/** What a fix item's repro proved, and what stood in where the reported environment was not at hand. */
+const reproMarkdown = ({ command, translated, proven }: SavedRepro): string =>
+	[`Repro: \`${command}\` failed without the fix${proven ? ` and passed on ${proven} runs in a row with it` : ""}.`, translated && `Not the reported environment: ${translated}.`].filter(Boolean).join("\n");
+
+/** What the change's pull request says: the text the run wrote under the repo's own rules, else the item's title, then its evidence and repro, then hum's word on the merge and the item. */
 const pullRequestOf = ({ state, id, item }: LandContext, merging: string) => {
 	const written = state.pullRequests.get(id);
+	const repro = state.repros.get(id);
 
 	return {
 		title: written?.title ?? `hum: ${item.title}`,
-		body: [written?.body, written?.evidence && evidenceMarkdown(written.evidence), merging, `Item ${id}.`].filter(Boolean).join("\n\n"),
+		body: [written?.body, written?.evidence && evidenceMarkdown(written.evidence), repro && reproMarkdown(repro), merging, `Item ${id}.`].filter(Boolean).join("\n\n"),
 	};
 };
 

@@ -20,6 +20,8 @@ export const FIXED_PARTS = [
 	"service-unit",
 	"run-slots",
 	"model-call",
+	"shows-bug",
+	"bug-gone",
 ] as const;
 
 export const PURPOSES = ["plan", "build", "fix", "review"] as const;
@@ -199,6 +201,7 @@ const Shipped = z.object({
 	watchCacheSeconds: seconds.describe("How long one read of what changed serves every `hum watch` in the repo before the next one reads again."),
 	watchLockSeconds: seconds.describe("How long the lock of the one `hum watch` that reads stays held before another may take it over."),
 	maxFixRuns: z.int().nonnegative().describe("Fix runs an item gets after failed checks, counted since the owner last answered, before it ends stuck."),
+	fixProofRuns: count.describe("Runs of a fix item's repro check on each side of the fix: each must fail where only the repro is in, and each must pass once the fix is in."),
 	checkReruns: z.int().nonnegative().describe("Times a failing check runs again before its failure counts: a check that passes on any of these runs passes, so a flaky check spends no fix run and files no follow-up."),
 	serviceLabel: z.string().regex(SERVICE_LABEL, "a service label is letters, digits, dot, dash and underscore").describe("The service unit's label, and the name its file takes."),
 	maxCrashes: count.describe("Worker crashes within crashWindowSeconds that stop the service's restarts."),
@@ -486,6 +489,7 @@ export const OWNER_CHANGEABLE = {
 	"watch lock": "watchLockSeconds",
 	"fix runs": "maxFixRuns",
 	"check reruns": "checkReruns",
+	"fix proof runs": "fixProofRuns",
 	"service label": "serviceLabel",
 	"crash limit": "maxCrashes",
 	"crash window": "crashWindowSeconds",

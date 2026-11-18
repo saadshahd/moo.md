@@ -377,6 +377,13 @@
 			"maximum": 9007199254740991,
 			"description": "Fix runs an item gets after failed checks, counted since the owner last answered, before it ends stuck."
 		},
+		"fixProofRuns": {
+			"default": 2,
+			"type": "integer",
+			"exclusiveMinimum": 0,
+			"maximum": 9007199254740991,
+			"description": "Runs of a fix item's repro check on each side of the fix: each must fail where only the repro is in, and each must pass once the fix is in."
+		},
 		"checkReruns": {
 			"default": 1,
 			"type": "integer",

@@ -7,20 +7,21 @@ import type { Holder, Item, ItemId, Question, Questions, ThreadEntry, WorkSource
 import { type Finished, type Paused, type Runner, hasSucceeded, isPaused } from "../adapters/claude-p.ts";
 import { configuredModelCall, type ModelCall } from "../adapters/model-call.ts";
 import { visibleText } from "../adapters/marked.ts";
-import { type Git, gitIn, PATCH, withConfigPinned } from "../adapters/git.ts";
+import { type Git, gitIn, isAncestor, PATCH, withConfigPinned } from "../adapters/git.ts";
 import type { PullRequests } from "../adapters/pull-requests.ts";
 import { pickTier } from "../config/checks.ts";
 import type { Config } from "../config/load.ts";
 import { invokedSources, kindMachine } from "../config/machine.ts";
-import { type Kind, type Naming, OWNER_WAIT_TAG, type PURPOSES, STUCK_TAG } from "../config/schema.ts";
+import { type Kind, type Naming, OWNER_WAIT_TAG, PURPOSES, STUCK_TAG } from "../config/schema.ts";
 import { commandTimeoutMs } from "../exec.ts";
 import { doesLeaveDocs } from "../decide/kind.ts";
 import { type EventPick, type JsonSchema, jsonSchemaOf, type ProsePurpose, planHash, requestedChanges, SPLIT, type SplitPart } from "../decide/prose.ts";
 import { persistedSnapshot } from "../state/items.ts";
 import { answerOnce, foldItem, keepPick, machineStarted, ownerAnswered } from "../state/item-log.ts";
 import type { State } from "../state/open.ts";
+import type { SavedRepro } from "../state/saved.ts";
 import { HOUR_MS, SECOND_MS } from "../time.ts";
-import { checkLimits, firstFailing } from "./checks.ts";
+import { checkLimits, firstFailing, runChecks } from "./checks.ts";
 import { BASE_CONTENDED, carriedVerdict, changeOn, declaredChange, type LandContext, patchOf, placementOf, rebaseOnto, type ReviewOutcome, tierOf } from "./land.ts";
 import { OWNER_APPROVAL, REVIEW_APPROVAL } from "../decide/merge.ts";
 import { askDecision, askedQuestion, isWaitQuestion, PLAIN_QUESTIONS, type PlainQuestion, RunReason } from "../decide/question.ts";
@@ -61,8 +62,11 @@ const PullRequestWritten = z.object({ title: z.string().min(1), body: z.string()
 
 type PullRequestWritten = z.infer<typeof PullRequestWritten>;
 
+/** The check a repro run wrote: the command that fails because of the bug, and what stood in where the reported environment was not at hand. */
+const ReproWritten = z.object({ command: z.string().min(1), translated: z.string().min(1).optional() });
+
 /** What the agent run hands back besides the change it leaves in the working tree. */
-export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional(), pullRequest: PullRequestWritten.optional() }));
+export const RUN_SCHEMA = jsonSchemaOf(z.object({ status: z.enum(["done", "needs-owner"]), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), memoryUsed: z.array(z.int().positive()).optional(), pullRequest: PullRequestWritten.optional(), repro: ReproWritten.optional() }));
 
 /** The comment that carries a run's plan on the item's thread, so the next run reads it. */
 export const PLAN_MARK = "hum plan:";
@@ -148,7 +152,9 @@ const isApprovalWait = (kind: Kind, state: string | undefined): boolean => state
 /** Where an item saved in an owner wait stands for an answer: waiting on approval where the state takes the owner's approval, else waiting. */
 export const ownerWaitStage = (kind: Kind, state: string | undefined): Stage => (isApprovalWait(kind, state) ? "approval" : "waiting");
 
-const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), pullRequest: PullRequestWritten.optional() });
+const Wants = z.looseObject({ status: z.string().optional(), question: z.string().optional(), plan: z.string().optional(), reason: RunReason.optional(), pullRequest: PullRequestWritten.optional(), repro: ReproWritten.optional() });
+
+type Wanted = z.infer<typeof Wants>;
 
 /** The kind as it stood at an earlier machine version, kept by `rememberKinds`, so a saved item restores across a change. */
 const earlierKinds = (state: State, kind: Kind) => (machineVersion: string) => state.kinds.get(`${kind.machine.id}@${machineVersion}`);
@@ -461,17 +467,15 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const branchDiff = (): Promise<string> => g(["diff", ...PATCH, `origin/${base}...HEAD`]);
 
-	const prompt = async (purpose: "build" | "fix"): Promise<string> => {
+	const prompt = async (role: StepRole): Promise<string> => {
 		const plan = state.plans.get(id);
+		const repro = state.repros.get(id);
 
-		const parts = [
-			roleOf(config, purpose),
-			`# Item ${id}: ${item.title}\n\n${item.body}`,
-			`Work on the branch ${branch}. Leave the change in the working tree and make no commit: hum commits every file there once you are done. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
-			`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${d.evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
-		];
+		const parts = [roleOf(config, role), `# Item ${id}: ${item.title}\n\n${item.body}`, RUN_CONTRACTS[role]({ branch, evidence: d.evidence })];
 
 		if (plan) parts.push(`## The approved plan (${plan.hash})\n${JSON.stringify(plan.plan, null, 2)}`);
+
+		if (repro && role !== "repro") parts.push(`## The repro\n\`${repro.command}\` fails because of the bug. Make it pass, and leave the files the repro wrote as they are: ${repro.files.join(", ") || "it wrote none"}.`);
 
 		if (d.answered) {
 			const soFar = d.restarted
@@ -481,7 +485,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			parts.push(`## The owner answered\nQuestion: ${d.answered.question}\nAnswer: ${d.answered.answer}\n\n${soFar}`);
 		}
 
-		if (purpose === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
+		if (role === "fix") parts.push(`## What to fix\n${lastFailure.slice(-config.hum.failureTail)}\nFix the cause.`);
 
 		return parts.join("\n\n");
 	};
@@ -506,13 +510,14 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	 * the state can, and ends stuck where it cannot. A run given what it judges is answered from the item's log when
 	 * the log keeps an answer to the same prompt on the same change, and that answer spends nothing again.
 	 */
-	const runAgent = async (purpose: Purpose, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
-		const key = state.runs.keyFor(id, purpose);
+	const runAgent = async (role: string, text: string, schema: JsonSchema, signal: AbortSignal, judged?: Judged): Promise<Finished> => {
+		const purpose = purposeOf(config, role);
+		const key = state.runs.keyFor(id, role);
 		const held = purpose === "build" || purpose === "fix" ? readMemory(join(clone, ".hum", "memory.md"), config.hum.memoryMaxBytes).entries : [];
-		const prefix = config.hum.roles[purpose]?.file ?? purpose;
+		const prefix = config.hum.roles[role]?.file ?? role;
 		const prompt = `${text}${memorySection(held)}`;
 		const tier = await tierFor(purpose);
-		const launch = { name: `hum ${id} ${purpose} #${key.attempt}`, sessionId: d.newSessionId() };
+		const launch = { name: `hum ${id} ${role} #${key.attempt}`, sessionId: d.newSessionId() };
 
 		const { begun, outcome } = await answerOnce(state, { key, launch, machineVersion: version, question: judged && { prompt, ...tier, ...judged } }, async (begun) => {
 			const lease = await d.gate?.enter(prefix, signal);
@@ -581,31 +586,53 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return { chose: text };
 	};
 
-	const step = (purpose: "build" | "fix") =>
+	/** A finished build or fix run's change, committed under the pull request title it wrote. */
+	const finishChange = async (role: StepRole, wants: Wanted | undefined, before: string): Promise<void> => {
+		if (!wants?.pullRequest) throw failed(`the ${role} run ended without the pull request title hum commits its change under`);
+
+		await keepPullRequest(d, wants.pullRequest);
+
+		if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${role} run succeeded and changed nothing`);
+	};
+
+	/** A finished repro run's check, committed under a subject of hum's and saved with the files it touched. */
+	const finishRepro = async (wants: Wanted | undefined, before: string): Promise<void> => {
+		if (!wants?.repro) throw failed("the repro run ended without the command that shows the bug");
+
+		await commitRun(d.git, { since: before, subject: `hum: ${id} repro` });
+
+		const commit = (await g(["rev-parse", "HEAD"])).trim();
+		const files = (await g(["diff", "--name-only", before, commit])).split("\n").filter(Boolean);
+
+		state.repros.put(id, { item: id, command: wants.repro.command, translated: wants.repro.translated, commit, files });
+	};
+
+	/** Whether the branch already holds the item's saved repro, as on a pass that starts the machine over on the same branch. */
+	const isReproduced = async (): Promise<boolean> => {
+		const saved = state.repros.get(id);
+
+		return saved !== undefined && (await isAncestor(d.git, { ancestor: saved.commit, descendant: "HEAD" }));
+	};
+
+	const step = (role: StepRole) =>
 		createAsyncLogic({
 			run: async ({ signal }) => {
 				// Every fix run since the owner last answered counts, over every pass and wake: the item's log holds them all.
-				if (purpose === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
+				if (role === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
+
+				if (role === "repro" && (await isReproduced())) return;
 
 				const before = (await g(["rev-parse", "HEAD"])).trim();
 				const chosen: string[] = [];
 
 				for (;;) {
-					const outcome = await runAgent(purpose, `${await prompt(purpose)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
+					const outcome = await runAgent(role, `${await prompt(role)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
 
-					if (!hasSucceeded(outcome)) throw failed(`the ${purpose} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
+					if (!hasSucceeded(outcome)) throw failed(`the ${role} run ended as ${outcome.subtype}: ${outcome.text.slice(0, CARD_EXCERPT)}`);
 
 					const wants = Wants.safeParse(outcome.structured).data;
 
-					if (wants?.status !== "needs-owner") {
-						if (!wants?.pullRequest) throw failed(`the ${purpose} run ended without the pull request title hum commits its change under`);
-
-						await keepPullRequest(d, wants.pullRequest);
-
-						if (!(await commitRun(d.git, { since: before, subject: wants.pullRequest.title }))) throw failed(`the ${purpose} run succeeded and changed nothing`);
-
-						return;
-					}
+					if (wants?.status !== "needs-owner") return role === "repro" ? finishRepro(wants, before) : finishChange(role, wants, before);
 
 					await commitRun(d.git, { since: before, subject: `hum: ${id} so far` });
 
@@ -620,16 +647,73 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 	const checkOptions = { env: d.env, ...checkLimits(config.hum) };
 
-	/** Whether the base the pass started from fails `command` too, run in the clone itself so it reads what the change's checks read. */
-	const failsOnBase = async (command: string): Promise<boolean> => {
-		await g(["checkout", "-q", "-f", "--detach", d.baseSha]);
+	/** A failure a fix run reads, as the error that sends the machine to it. */
+	const failedCheck = (failure: string): Error => {
+		lastFailure = failure;
+
+		return new Error(failure.slice(0, ERROR_EXCERPT));
+	};
+
+	/** Runs `body` with the clone's files at `commit`, then puts the run branch back. */
+	const atCommit = async <T>(commit: string, body: () => Promise<T>): Promise<T> => {
+		await g(["checkout", "-q", "-f", "--detach", commit]);
 
 		try {
-			return (await firstFailing([command], clone, checkOptions)) !== undefined;
+			return await body();
 		} finally {
 			await g(["checkout", "-q", "-f", branch]);
 		}
 	};
+
+	/** Whether the base the pass started from fails `command` too, run in the clone itself so it reads what the change's checks read. */
+	const failsOnBase = async (command: string): Promise<boolean> => (await atCommit(d.baseSha, () => firstFailing([command], clone, checkOptions))) !== undefined;
+
+	/** The item's repro as its run saved it; a state that proves a repro the machine never ran is a broken kind. */
+	const savedRepro = (): SavedRepro => {
+		const saved = state.repros.get(id);
+
+		if (saved === undefined) throw failed("no repro is saved for the item: its kind proves a repro its machine never ran");
+
+		return saved;
+	};
+
+	/** The repro's command run `fixProofRuns` times where the clone stands, with no rerun: each run's failure, undefined where it passed. */
+	const reproRuns = async (command: string): Promise<(string | undefined)[]> => {
+		const failures: (string | undefined)[] = [];
+
+		for (let run = 0; run < config.hum.fixProofRuns; run++) failures.push(await runChecks([command], clone, { env: d.env, timeoutMs: checkOptions.timeoutMs }));
+
+		return failures;
+	};
+
+	/** The repro must fail on every run where it went in before any fix; one that passes shows no bug, and the owner says how to go on. */
+	const showsBug = createAsyncLogic({
+		run: async () => {
+			const repro = savedRepro();
+			const passed = (await atCommit(repro.commit, () => reproRuns(repro.command))).filter((failure) => failure === undefined).length;
+
+			if (passed === 0) return;
+
+			state.repros.remove(id);
+			ask({ question: { text: PLAIN_QUESTIONS.repro, detail: `${repro.command} passed on ${passed} of ${config.hum.fixProofRuns} runs at ${repro.commit.slice(0, SHORT_SHA)}, where the repro went in before any fix.` }, plain: "repro", plan: "" });
+		},
+	});
+
+	/** The fix is proven once the repro's own files are as it left them and its command passes on every run; else a fix run reads why. */
+	const bugGone = createAsyncLogic({
+		run: async () => {
+			const repro = savedRepro();
+			const edited = repro.files.length === 0 ? "" : (await g(["diff", "--name-only", repro.commit, "HEAD", "--", ...repro.files])).trim();
+
+			if (edited !== "") throw failedCheck(`The change edits the repro's own files (${edited.split("\n").join(", ")}): put them back as the repro left them, and fix the bug instead.`);
+
+			const failures = (await reproRuns(repro.command)).flatMap((failure) => (failure === undefined ? [] : [failure]));
+
+			if (failures.length > 0) throw failedCheck(`The repro still fails on ${failures.length} of ${config.hum.fixProofRuns} runs:\n${failures[0]}`);
+
+			state.repros.put(id, { ...repro, proven: config.hum.fixProofRuns });
+		},
+	});
 
 	/** A failing check goes to a fix run, unless it is one of the repo's and the base fails it too: no change of the item's can pass it, so the item ends for the owner. */
 	const checksSource = createAsyncLogic({
@@ -638,11 +722,9 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 
 			if (failed === undefined) return;
 
-			lastFailure = failed.failure;
-
 			if (!d.ownChecks.includes(failed.command) && (await failsOnBase(failed.command))) return pause({ outcome: "stuck", item: id, detail: `${failed.command} fails on ${base} too, at ${d.baseSha.slice(0, SHORT_SHA)}: no change of this item can pass it until ${base} does` });
 
-			throw new Error(failed.failure.slice(0, ERROR_EXCERPT));
+			throw failedCheck(failed.failure);
 		},
 	});
 
@@ -698,7 +780,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 			},
 		});
 
-	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review") };
+	const sources = { build: step("build"), checks: checksSource, fix: step("fix"), plan: decision("plan"), review: decision("review"), repro: step("repro"), "shows-bug": showsBug, "bug-gone": bugGone };
 
 	if (d.resume) {
 		const restored = await state.items.restore(id, kind, { sources, kindAt: earlierKinds(state, kind) });
@@ -820,8 +902,8 @@ type Judged = { readonly head: string };
 export type RunConfig = Pick<Config, "hum" | "roles">;
 
 /** The role file of a run's purpose, then the skills its role names, so the run reaches for them. */
-const roleOf = (config: RunConfig, purpose: Purpose): string => {
-	const role = config.hum.roles[purpose];
+const roleOf = (config: RunConfig, name: string): string => {
+	const role = config.hum.roles[name];
 	const text = ((role && config.roles[role.file]) ?? "").trim();
 	const skills = role?.skills ?? [];
 
@@ -852,6 +934,29 @@ const keepVerdict = (state: State, { id, head, patch, pick, models }: { readonly
 
 	return verdict;
 };
+
+/** The runs that change files: each leaves its change in the working tree, which hum commits. */
+type StepRole = "build" | "fix" | "repro";
+
+/** Where a run that changes files works, and the folder it saves its evidence in. */
+type Workplace = { readonly branch: string; readonly evidence: string };
+
+const pullRequestContract = ({ branch, evidence }: Workplace): string =>
+	[
+		`Work on the branch ${branch}. Leave the change in the working tree and make no commit: hum commits every file there once you are done. End with the JSON {"status":"done"}, or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+		`With "done", give "pullRequest": the title and body of the pull request that lands the branch's whole change, written as this repo's own rules ask a pull request to be; hum commits your change under its title. Where one screenshot or short video shows the change at work, save that one file in ${evidence}, never in the repo, and give its file name as "pullRequest.evidence".`,
+	].join("\n\n");
+
+/** What each run that changes files is told about its answer: a build or fix run writes the pull request, a repro run names its check. */
+const RUN_CONTRACTS = {
+	build: pullRequestContract,
+	fix: pullRequestContract,
+	repro: ({ branch }) =>
+		`Work on the branch ${branch}. Leave the check in the working tree and make no commit: hum commits it once you are done. End with the JSON {"status":"done","repro":{"command":…}}, naming the one shell command that fails now because of the bug and will pass once it is fixed, with "repro.translated" saying what stood in where the reported environment was not at hand; or {"status":"needs-owner","question":…,"plan":…} when only the owner can answer.`,
+} as const satisfies Record<StepRole, (where: Workplace) => string>;
+
+/** The purpose a role runs for, which picks its tier: the config's, else the role's own name for one of the four purposes. */
+const purposeOf = (config: RunConfig, role: string): Purpose => config.hum.roles[role]?.purpose ?? z.enum(PURPOSES).parse(role);
 
 /** What a paused run comes to for its item. */
 const pauseOf = (id: string, outcome: Paused): ThinResult => {
