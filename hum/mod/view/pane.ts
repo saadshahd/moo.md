@@ -75,7 +75,7 @@ const headerRows = (status: Status, input: ViewInput): Row[] => [headerRow(statu
 const blocksOf = (input: PaneInput) => {
 	const { read, now, width } = input;
 
-	if (read.kind !== "status") return { lead: [...unreadBlocks(input), wrap(problemWords(read) ?? "Reading the status file.", width).map((line): Row => [span(line, "amber")])], rest: [] };
+	if (read.kind !== "status") return { lead: [...unreadBlocks(input), wrap(problemWords(read), width).map((line): Row => [span(line, "amber")])], rest: [] };
 
 	const { status } = read;
 	const [first = [], ...cards] = cardBlocks(status, input);

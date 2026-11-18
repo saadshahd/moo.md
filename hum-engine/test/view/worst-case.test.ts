@@ -21,10 +21,10 @@ const UNREAD: NonNullable<BandInput["unread"]> = {
 	since: NOW - 60_000,
 };
 
+const WORST_READ: ViewRead = { kind: "status", status: worstStatus };
+
 const READS: readonly ViewRead[] = [
-	{ kind: "status", status: worstStatus },
-	{ kind: "waiting" },
-	{ kind: "missing", path: `/Users/someone/${"a-very-deep-folder/".repeat(8)}.git/hum/status.json` },
+	WORST_READ,
 	{ kind: "unreadable", message: MULTILINE_ERROR },
 	{ kind: "unsupported", format: "x".repeat(80) },
 	{ kind: "unsupported", format: 1_000_000_000 },
@@ -78,7 +78,7 @@ test("every pane and band row has one empty cell at each side, inside its width"
 test("a view narrower than any it is built for still draws and does not throw", () => {
 	for (const width of BELOW_THE_SMALLEST_WIDTH) {
 		expect(() => [...bandsAt(width), ...panesAt(width), ...headersAt(width)]).not.toThrow();
-		expect(() => openingRows({ read: READS[0] ?? { kind: "waiting" }, now: NOW, amberAfterSeconds: AMBER_AFTER, width })).not.toThrow();
+		expect(() => openingRows({ read: WORST_READ, now: NOW, amberAfterSeconds: AMBER_AFTER, width })).not.toThrow();
 	}
 });
 

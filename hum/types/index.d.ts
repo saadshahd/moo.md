@@ -1,9 +1,8 @@
-/** What the poller last found at the status file's path. */
-export type ViewSource =
-	| { kind: "waiting" }
-	| { kind: "missing"; path: string }
-	| { kind: "text"; text: string }
-	| { kind: "failed"; message: string };
+/** What the poller found at the status file where hum serves: its text, or why it could not be read. */
+export type ServedSource = { kind: "text"; text: string } | { kind: "failed"; message: string };
+
+/** What the poller last found: nothing where hum does not serve, else what the status file held. */
+export type ViewSource = { kind: "unserved" } | ServedSource;
 
 /** The answer a fill started: the item, the words in front of the owner's own, and the option it carries. */
 export type Answering = {
