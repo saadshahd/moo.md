@@ -651,7 +651,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 	const step = (role: StepRole) =>
 		createAsyncLogic({
 			run: async ({ signal }) => {
-				// An answer at the repro's wait objects to it, so a new repro run reads the owner's words.
+				/* An answer at the repro's wait objects to it, so a new repro run reads the owner's words. */
 				if (role === "repro" && !d.answered && (await isReproduced())) return;
 
 				if (role === "build") keepUnopposed();
@@ -664,7 +664,7 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 				const chosen: string[] = [];
 
 				for (;;) {
-					// Every fix run since the owner last answered counts, over every pass and wake and each run again after a choice hum made: the item's log holds them all.
+					/* Every fix run since the owner last answered counts, over every pass and wake and each run again after a choice hum made: the item's log holds them all. */
 					if (role === "fix" && foldItem(state.events.list(id)).fixRuns >= maxFixes) throw failed(`the checks still fail after ${maxFixes} fixes`);
 
 					const outcome = await runAgent(role, `${await prompt(role)}${chosenSection(chosen)}`, RUN_SCHEMA, signal);
@@ -718,11 +718,11 @@ const drive = async (d: Driven): Promise<ThinResult> => {
 		return saved;
 	};
 
-	/** The repro's command run `fixProofRuns` times where the clone stands, with no rerun: each run's failure, undefined where it passed. */
+	/** The repro's command run `fixProofRuns` times where the clone stands: each run's failure, undefined where it passed. */
 	const reproRuns = async (command: string): Promise<(string | undefined)[]> => {
 		const failures: (string | undefined)[] = [];
 
-		for (let run = 0; run < config.hum.fixProofRuns; run++) failures.push(await runChecks([command], clone, { env: d.env, timeoutMs: checkOptions.timeoutMs }));
+		for (let run = 0; run < config.hum.fixProofRuns; run++) failures.push(await runChecks([command], clone, { ...checkOptions, reruns: 0 }));
 
 		return failures;
 	};
@@ -907,9 +907,8 @@ const withTimeoutNote = (kind: Kind, state: string, note: Pending): Pending => {
 	return { ...note, question: { ...note.question, detail: [note.question.detail, told].filter(Boolean).join(" ") } };
 };
 
-/** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */
 /**
- * Commits what a build or fix run left in the working tree as one commit on `since`, under `subject`, by the owner's
+ * Commits what a run left in the working tree as one commit on `since`, under `subject`, by the owner's
  * commitIdentity, and says whether there was a change to commit. A commit the run made anyway, and the work so far
  * hum committed when the run asked, are folded into it, so the run's whole change is one commit of hum's.
  */
@@ -924,6 +923,7 @@ const commitRun = async (git: Git, { since, subject }: { readonly since: string;
 	return true;
 };
 
+/** Saves the pull request a run wrote, with its evidence kept where GitHub shows it; evidence an earlier run kept stays when this run names none. */
 const keepPullRequest = async (d: Driven, { title, body, evidence }: PullRequestWritten): Promise<void> => {
 	const kept = evidence === undefined ? d.state.pullRequests.get(d.id)?.evidence : await keepEvidence({ git: d.git, folder: d.evidence, file: evidence, item: d.id, repo: repoFromRemote(d.remote) });
 
@@ -963,7 +963,7 @@ type Judged = { readonly head: string };
 /** What a run reads from its config: the settings and the role files. */
 export type RunConfig = Pick<Config, "hum" | "roles">;
 
-/** The role file of a run's purpose, then the skills its role names, so the run reaches for them. */
+/** A role's file, then the skills it names, so the run reaches for them. */
 const roleOf = (config: RunConfig, name: string): string => {
 	const role = config.hum.roles[name];
 	const text = ((role && config.roles[role.file]) ?? "").trim();

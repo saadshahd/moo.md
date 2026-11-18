@@ -171,7 +171,6 @@ const readEvery = <T>(read: (() => Promise<T | undefined>) | undefined, { everyM
 /** Sources that never settle, so a restored item can be stepped by its timers without starting a run. */
 const neverSources = (kind: Kind) => invokedSources(kind, createAsyncLogic({ run: () => new Promise<never>(() => {}) }));
 
-/** The declared delays of the state an item was saved in, shortest first. */
 const isAnsweredSince = (answeredAt: number | undefined, since: number): boolean => answeredAt !== undefined && answeredAt > since;
 
 type DueWait = {

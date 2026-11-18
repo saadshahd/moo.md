@@ -58,7 +58,6 @@ export const PROSE_STATES = {
 
 export type ProsePurpose = keyof typeof PROSE_STATES;
 
-/** What a plan or review run answers: one event, how sure it is, and the artifact behind the pick. */
 /** One part of a split item: its title, the files it may touch, the earlier parts it waits on by their place in the list from 1, and the one command that proves it. */
 export const SplitPart = z.strictObject({
 	title: z.string().min(1),
@@ -69,6 +68,7 @@ export const SplitPart = z.strictObject({
 
 export type SplitPart = z.infer<typeof SplitPart>;
 
+/** What a plan or review run answers: one event, how sure it is, and the artifact behind the pick. */
 export const EventPick = z.object({
 	event: z.string(),
 	sure: z.boolean(),
