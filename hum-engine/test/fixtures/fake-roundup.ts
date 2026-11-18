@@ -1,7 +1,9 @@
 import { z } from "zod";
 import type { ToolCall } from "../../src/index.ts";
 
-const Args = z.looseObject({ id: z.int().optional(), title: z.string().optional(), body: z.string().optional(), name: z.string().optional(), text: z.string().optional() });
+const Actor = z.looseObject({ kind: z.string(), id: z.string() });
+
+const Args = z.looseObject({ id: z.int().optional(), title: z.string().optional(), body: z.string().optional(), name: z.string().optional(), text: z.string().optional(), owner: Actor.optional() });
 
 /** What roundup holds an Agent's comment to. */
 const COMMENT_LIMIT = 280;
@@ -81,7 +83,7 @@ export class FakeRoundup {
 
 				return structuredClone(this.#todo(args.id));
 			case "todo_create": {
-				const id = this.seed(String(args.title), { body: String(args.body ?? "") });
+				const id = this.seed(String(args.title), { body: String(args.body ?? ""), owner: args.owner ? { kind: args.owner.kind, id: args.owner.id } : null });
 
 				return structuredClone(this.#todo(id));
 			}

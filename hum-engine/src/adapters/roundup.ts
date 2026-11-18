@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ADAPTER_API_VERSION, type AdapterContext, type Answers, Holder, type Integrations, type Item, ItemId, PermanentError, type Questions, type Watch, type WorkSource } from "../adapter-api.ts";
 import { hashJson } from "../config/hash.ts";
 import { Json } from "../config/json.ts";
+import type { HumConfig } from "../config/schema.ts";
 import type { Env } from "../exec.ts";
 import { parseArgument } from "./argument.ts";
 import { claimer, isLive } from "./claim.ts";
@@ -25,7 +26,16 @@ import {
 	splitMarker,
 } from "./marked.ts";
 
+/** The name `hum.json` gives the roundup adapter. */
+export const ROUNDUP = "roundup";
+
+/** Whether any slot `integrations` names is served by roundup. */
+export const doesUseRoundup = (integrations: HumConfig["integrations"]): boolean => Object.values(integrations ?? {}).includes(ROUNDUP);
+
 const CLAIM_OPEN = "<!-- hum-claim ";
+
+/** The Actor kind of an Agent, as a Todo's owner names it. */
+const AGENT = "agent";
 
 /** An Agent's comment on a Todo is one line of at most this many characters. */
 const COMMENT_LIMIT = 280;
@@ -72,7 +82,7 @@ export type ToolCall = (tool: string, args: Record<string, Json>) => Promise<Jso
 export type RoundupOptions = {
 	/** Replaces the stdio client, for a stub. */
 	readonly call?: ToolCall;
-	/** The Agent id `rup mcp` acts as. Defaults to `ROUNDUP_AGENT_ID`. */
+	/** The Agent hum acts as: `rup mcp` serves as it, and the Todos it owns are hum's work. Defaults to `ROUNDUP_AGENT_ID`. */
 	readonly agent?: string;
 	/** The Project's daemon socket. Defaults to `RUPD_SOCKET`. */
 	readonly socket?: string;
@@ -94,13 +104,22 @@ const replyValue = (tool: string, result: Awaited<ReturnType<Client["callTool"]>
 	return json === undefined ? text : json;
 };
 
-/** The stdio client: `rup mcp <agent>` on the Project's socket. Only a run roundup started has both. */
-export const stdioCall = ({ agent, socket }: RoundupOptions, env: Env) => {
+/** The Agent hum acts as. A Terminal roundup starts for a program carries no Agent id, so hum's start command sets `ROUNDUP_AGENT_ID` itself. */
+const agentOf = ({ agent }: RoundupOptions, env: Env): string => {
 	const who = agent ?? env.ROUNDUP_AGENT_ID;
-	const path = socket ?? env.RUPD_SOCKET;
+
+	if (!who) throw new PermanentError("the roundup adapter acts as one Agent, and ROUNDUP_AGENT_ID is not set: start hum with the command `hum setup write` printed");
+
+	return who;
+};
+
+/** The stdio client: `rup mcp <agent>` on the Project's socket, which only a Terminal roundup started holds. */
+export const stdioCall = (options: RoundupOptions, env: Env) => {
+	const who = agentOf(options, env);
+	const path = options.socket ?? env.RUPD_SOCKET;
 	let client: Promise<Client> | undefined;
 
-	if (!who || !path) throw new PermanentError("the roundup adapter runs only in a run roundup started: ROUNDUP_AGENT_ID and RUPD_SOCKET are not both set");
+	if (!path) throw new PermanentError("the roundup adapter runs only in a Terminal roundup started: RUPD_SOCKET is not set");
 
 	const connect = async () => {
 		const made = new Client({ name: "hum", version: "0" });
@@ -150,8 +169,11 @@ const standingEntry = (comments: readonly Comment[]): ClaimEntry | undefined =>
 		return entry && doesTakeOver(current, entry) ? entry : current;
 	}, undefined);
 
-/** Open, unblocked and unassigned: a Todo nobody else has taken. */
-const isOpenToTake = (todo: Todo): boolean => !todo.done && !todo.blocked && !todo.owner;
+/** Open, unblocked and owned by `agent`: a Todo's owner hands it to hum by assigning it to hum's Agent. */
+const isOpenFor =
+	(agent: string) =>
+	(todo: Todo): boolean =>
+		!todo.done && !todo.blocked && todo.owner?.kind === AGENT && todo.owner.id === agent;
 
 const doesFitOneComment = (text: string): boolean => !text.includes("\n") && text.length <= COMMENT_LIMIT;
 
@@ -166,12 +188,15 @@ type Whole = Integrations & {
 
 /**
  * roundup as a work source, through its MCP server over stdio: Todos are items and their comments are the thread.
- * A Todo is ready while it is open, unblocked, unassigned and holds no live claim. A claim is a comment, so the
- * daemon's comment order picks the winner. roundup has no release step.
+ * A Todo is ready while it is open, unblocked, owned by hum's Agent and holds no live claim; a follow-up hum files is
+ * owned by that Agent, so it is ready at once. A claim is a comment, so the daemon's comment order picks the winner.
+ * roundup has no release step.
  */
 export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterContext): Whole => {
-	const client = options.call ? { call: options.call, close: async () => {} } : stdioCall(options, env);
+	const agent = agentOf(options, env);
+	const client = options.call ? { call: options.call, close: async () => {} } : stdioCall({ ...options, agent }, env);
 	const { call } = client;
+	const isOpenToTake = isOpenFor(agent);
 
 	const comments = async (id: string) => Comment.array().parse(await call("todo_comments", { id: parseArgument(TodoId, id) }));
 
@@ -259,7 +284,7 @@ export const roundupAdapter = (options: RoundupOptions, { now, env }: AdapterCon
 
 				if (filed !== undefined) return { id: filed, title };
 
-				const created = async () => Todo.parse(await call("todo_create", { title, body: followUpBody(body, `#${from}`) })).id;
+				const created = async () => Todo.parse(await call("todo_create", { title, body: followUpBody(body, `#${from}`), owner: { kind: AGENT, id: agent } })).id;
 				const id = ItemId.parse(String((await todos()).find(isFollowUpOf(`#${from}`, title))?.id ?? (await created())));
 				const note = followUpNote(title, id);
 
