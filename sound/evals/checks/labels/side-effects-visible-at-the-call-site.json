@@ -1,0 +1,244 @@
+{
+ "labels": [
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/cli/handler.ts",
+   "line": 426,
+   "anchor": "console.log(chalk.white('  --help                          Show help\\n')); ⏎ } ⏎ }",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/manager.ts",
+   "line": 239,
+   "anchor": "console.warn( ⏎ `[voice-call] speakInitialMessage: no call found for ${providerCallId}`, ⏎ );",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/ui/conversation-manager.ts",
+   "line": 109,
+   "anchor": "console.warn(`Failed to remove corrupted file ${file}:`, removeError); ⏎ } ⏎ }",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/manager.ts",
+   "line": 261,
+   "anchor": "console.log( ⏎ `[voice-call] Speaking initial message for call ${call.callId} (mode: ${mode})`, ⏎ );",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "services/api/src/config/database.ts",
+   "line": 42,
+   "anchor": "console.error(\"❌ ClickHouse initialization failed:\", error); ⏎ throw error; ⏎ }",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/core/debug.ts",
+   "line": 90,
+   "anchor": "console.warn(\"Failed to send debug events:\", error); ⏎ // Re-queue events on failure ⏎ this.events.unshift(...batch);",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/cli/handler.ts",
+   "line": 420,
+   "anchor": "console.log(chalk.white('  -l, --language <language>       Programming language')); ⏎ console.log(chalk.white('  -o, --output <file>             Output file pat",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/zalo/src/monitor.ts",
+   "line": 323,
+   "anchor": "console.log( ⏎ `[${account.accountId}] Received unsupported message type from ${message.from.id}`, ⏎ );",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "sieve@f61e244",
+   "file": "packages/core/effects/deterministic-replay.ts",
+   "line": 863,
+   "anchor": "console.log(`      Log 1: ${diff.log1}`); ⏎ console.log(`      Log 2: ${diff.log2}`); ⏎ }",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/ui/simple-terminal-ui.ts",
+   "line": 294,
+   "anchor": "console.log(chalk.blue.bold('📚 Apple Code Assistant Commands')); ⏎ console.log(chalk.gray('─'.repeat(50))); ⏎ console.log();",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/ui/file-tree.ts",
+   "line": 110,
+   "anchor": "console.warn(`Cannot read directory: ${dirPath}`); ⏎ } ⏎ ",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/agents/compaction.ts",
+   "line": 187,
+   "anchor": "console.warn( ⏎ `Full summarization failed, trying partial: ${ ⏎ fullError instanceof Error ? fullError.message : String(fullError)",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/media-stream.ts",
+   "line": 197,
+   "anchor": "console.log(`[MediaStream] Stream stopped: ${session.streamSid}`); ⏎  ⏎ this.clearTtsState(session.streamSid);",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/manager.ts",
+   "line": 530,
+   "anchor": "console.log( ⏎ `[voice-call] Created inbound call record: ${callId} from ${from}`, ⏎ );",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/infra/tailscale.ts",
+   "line": 326,
+   "anchor": "console.error(danger(\"Funnel is not enabled on this tailnet/device.\")); ⏎ const linkMatch = stdout.match(/https?:\\/\\/\\S+/); ⏎ if (linkMatch) {",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "adaptive-ui-ecosystem@4048c9b",
+   "file": "frontend/src/services/posthog.service.ts",
+   "line": 490,
+   "anchor": "console.error(\"Failed to start session recording:\", error); ⏎ } ⏎ }",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/manager.ts",
+   "line": 266,
+   "anchor": "console.warn( ⏎ `[voice-call] Failed to speak initial message: ${result.error}`, ⏎ );",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/web/login.ts",
+   "line": 31,
+   "anchor": "console.log( ⏎ info( ⏎ \"WhatsApp asked for a restart after pairing (code 515); creds are saved. Restarting connection once…\",",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "nextjs-subscription-payments@bdd0813",
+   "file": "utils/supabase/admin.ts",
+   "line": 61,
+   "anchor": "console.log(`Retry attempt ${retryCount + 1} for price ID: ${price.id}`); ⏎ await new Promise((resolve) => setTimeout(resolve, 2000)); ⏎ await upsertPriceRecord",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/hooks/loader.ts",
+   "line": 87,
+   "anchor": "console.log( ⏎ `Registered hook: ${entry.hook.name} -> ${events.join(\", \")}${exportName !== \"default\" ? ` (export: ${exportName})` : \"\"}`, ⏎ );",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/cli/handler.ts",
+   "line": 417,
+   "anchor": "console.log(chalk.white('  apple-code -i                    # Explicit interactive mode\\n')); ⏎ console.log(chalk.yellow('Options:')); ⏎ console.log(chalk.white",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "imaginery-friend-web@772d72a",
+   "file": "web/src/components/story/steps/ReviewStep.tsx",
+   "line": 50,
+   "anchor": "console.error(\"Preview generation failed:\", error); ⏎ }, ⏎ });",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/acp/client.ts",
+   "line": 171,
+   "anchor": "console.log(`\\n[${response.stopReason}]\\n`); ⏎ } catch (err) { ⏎ console.error(`\\n[error] ${String(err)}\\n`);",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/ui/simple-terminal-ui.ts",
+   "line": 280,
+   "anchor": "console.log(chalk.gray('─'.repeat(50))); ⏎  ⏎ const highlighted = SyntaxHighlighter.highlight(result.code, result.language, 'dark');",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/manager/outbound.ts",
+   "line": 166,
+   "anchor": "console.log(`[voice-call] Speaking initial message for call ${call.callId} (mode: ${mode})`); ⏎ const result = await speak(ctx, call.callId, initialMessage); ⏎ ",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/acp/client.ts",
+   "line": 54,
+   "anchor": "console.log(`\\n[tool] ${update.title} (${update.status})`); ⏎ return; ⏎ }",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/ui/simple-terminal-ui.ts",
+   "line": 362,
+   "anchor": "console.log(); ⏎  ⏎ sessions.forEach((session, index) => {",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "extensions/voice-call/src/manager/outbound.ts",
+   "line": 179,
+   "anchor": "console.log(`[voice-call] Notify mode: hanging up call ${call.callId}`); ⏎ await endCall(ctx, call.callId); ⏎ }",
+   "label": "true",
+   "reason": "a diagnostic logged with console in shipped code, with no structured logger or id"
+  },
+  {
+   "source": "moltbot@109ac1c",
+   "file": "src/cli/run-main.ts",
+   "line": 48,
+   "anchor": "console.error(\"[moltbot] Uncaught exception:\", formatUncaughtError(error)); ⏎ process.exit(1); ⏎ });",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  },
+  {
+   "source": "Apple-AI-CLI@d15fd1c",
+   "file": "src/ui/simple-terminal-ui.ts",
+   "line": 101,
+   "anchor": "console.log(); ⏎  ⏎ console.log(chalk.cyan('💡 Examples:'));",
+   "label": "true",
+   "reason": "console in a shipped CLI printing to its user; the rule sends CLI output to process.stdout and diagnostics to a structured logger"
+  }
+ ]
+}

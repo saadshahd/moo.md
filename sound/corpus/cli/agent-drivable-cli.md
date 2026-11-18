@@ -1,0 +1,4 @@
+A CLI that agents call keeps a few real commands, puts `--dry-run` on every destructive one, prints JSON on request, gives each command a `--help` that lists its flags with one example call, and words each error as its fix: the flag, value or command to use instead.
+_Avoid_: an error that names the failure but not the fix ("invalid input", "something went wrong"); a destructive command — delete, overwrite, push, migrate, send — with no `--dry-run`; output only a human can parse (tables, colour, spinners, prose) with no `--json`; several near-identical commands for one operation.
+Detect: per command — a destructive verb with no dry-run flag; no machine-readable output flag; an error string naming no flag, value or next command; a `--help` that lists no flags.
+Not-when: a CLI only humans drive by hand (a TUI, a REPL, an interactive wizard); a one-off script no agent calls.

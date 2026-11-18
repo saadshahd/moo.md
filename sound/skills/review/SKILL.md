@@ -1,6 +1,6 @@
 ---
 name: review
-description: Use when reviewing a staged diff or a commit range for soundness against the project's taste rules, including a pre-commit pass or an explicit "sound review".
+description: Use when reviewing a staged diff, a commit range or a whole test suite for soundness against the project's taste rules, including a pre-commit pass, an explicit "sound review", or a request to prune or audit tests.
 ---
 
 # sound:review
@@ -9,6 +9,7 @@ description: Use when reviewing a staged diff or a commit range for soundness ag
 
 - **No argument** → `git diff --cached`.
 - **A range** (e.g. `main..HEAD`) → its commits and the whole `git diff <range>`.
+- **A test suite** (a test directory, a glob, or "the tests") → every test in it. There is no diff: skip mechanical hits.
 
 ## Mechanical hits first
 
@@ -20,4 +21,8 @@ The project's taste rules live under `.claude/sound/`. Read the ones that bear o
 
 Review deeply: surface every rule the changes violate, and the enhancements that genuinely matter for this diff's kind. Ground every finding in the diff and the intent behind it — never rule from the text alone. Stay silent where a rule's `Not-when:` applies.
 
-Report most-consequential first: `- <file>: <rule or enhancement> — <anchor>`. If nothing stands, say `CLEAN`.
+When the diff fixes a fault, search the repo for every other site of the same fault — the same call, pattern or missing guard — and report each one the diff leaves as it was: `- <file>:<line>: same fault as <fixed file>:<line>`.
+
+For a test suite, apply every rule under `.claude/sound/tests/` to each test and give it one verdict: keep, rewrite or delete. No rules there → say so and stop. A test that guards no behavior is deleted; one that guards a behavior through the wrong handle is rewritten.
+
+Report most-consequential first: `- <file>: <rule or enhancement> — <anchor>`; for a suite, `- <file>: <test name>: rewrite | delete — <rule>`, then the count kept. If nothing stands, say `CLEAN`.

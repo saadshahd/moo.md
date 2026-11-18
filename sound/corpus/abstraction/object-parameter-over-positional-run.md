@@ -1,5 +1,5 @@
 Group a positional list the caller must order by memory into a single object parameter — a named domain concept, not a bare sequence of primitives.
 _Avoid_: a function declaration with a positional run the caller must order by memory; a call site passing a run of bare literals whose meaning depends on position.
 Detect: two positional args that share a type, or a boolean in the positional run — a call that transposes them still type-checks. That silent swap is the hit.
-Not-when: the parameters are already one cohesive tuple with a conventional order (e.g. `(x, y, z)` coordinates), or a framework contract fixes the positional signature.
-Cross-ref: data-clump-to-parameter-object — the cross-signature version: the same primitives recurring across 2+ signatures name a missing domain concept.
+Not-when: the parameters are already one cohesive tuple with a conventional order (e.g. `(x, y, z)` coordinates), or a framework contract fixes the positional signature; or the function sits on a hot path (a per-frame render, a tokenizer, a parser) under a stated budget or measurement, where the object's allocation costs — an unmeasured path keeps the object.
+Cross-ref: data-clump-to-parameter-object — the cross-signature version: the same primitives recurring across 2+ signatures name a missing domain concept; optimization-cites-a-measurement — what licenses the hot-path carve.
